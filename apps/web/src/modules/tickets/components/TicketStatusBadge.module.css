@@ -1,0 +1,38 @@
+/* Colores exactos de `STAGE_BADGE` en Soporte/constants.ts. */
+
+.badge {
+  display: inline-flex;
+  height: 24px;
+  padding: 4px var(--kora-space-2);
+  align-items: center;
+  border-radius: var(--kora-radius-sm);
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-semibold);
+  line-height: normal;
+  white-space: nowrap;
+}
+
+.pending {
+  background: var(--kora-warning-surface);
+  color: var(--kora-warning-text);
+}
+
+.in_progress {
+  background: var(--kora-blue-surface);
+  color: var(--kora-info);
+}
+
+.in_testing {
+  background: #fff1da;
+  color: var(--kora-warning);
+}
+
+.done {
+  background: var(--kora-success-surface);
+  color: var(--kora-lime-dark);
+}
+
+.closed {
+  background: var(--kora-surface-disabled);
+  color: var(--kora-text-muted);
+}

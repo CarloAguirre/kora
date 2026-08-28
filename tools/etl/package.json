@@ -1,0 +1,39 @@
+{
+  "name": "@kora/etl",
+  "version": "2.0.0",
+  "private": true,
+  "type": "commonjs",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "users": "tsx src/run-users.ts",
+    "verify": "tsx src/verify.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "clean": "rimraf dist .turbo",
+    "clients": "tsx src/run-clients.ts",
+    "verify-clients": "tsx src/verify-clients.ts",
+    "projects": "tsx src/run-projects.ts",
+    "verify-projects": "tsx src/verify-projects.ts",
+    "hours": "tsx src/run-hours.ts",
+    "verify-hours": "tsx src/verify-hours.ts",
+    "tickets": "tsx src/run-tickets.ts",
+    "verify-tickets": "tsx src/verify-tickets.ts",
+    "forecast": "tsx src/run-forecast.ts",
+    "verify-forecast": "tsx src/verify-forecast.ts"
+  },
+  "dependencies": {
+    "@kora/contracts": "workspace:*",
+    "@kora/db": "workspace:*",
+    "argon2": "^0.45.1",
+    "drizzle-orm": "^0.45.2",
+    "postgres": "^3.4.9"
+  },
+  "devDependencies": {
+    "@kora/config": "workspace:*",
+    "@types/node": "^22.16.5",
+    "rimraf": "^6.0.1",
+    "tsx": "^4.20.3",
+    "typescript": "5.9.3"
+  }
+}

@@ -1,0 +1,223 @@
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+  margin-bottom: var(--kora-space-4);
+}
+
+.title {
+  font-size: var(--kora-text-2xl);
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-navy);
+  margin: 0;
+}
+
+/* Sin `max-width`: la tarjeta ocupa el ancho disponible del área de contenido,
+   igual que el resto de las pantallas de v2 (`Card` ya trae `align-self: stretch`
+   por defecto) — caparla aquí solo dejaba un margen gris muerto a la derecha. */
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-5);
+}
+
+/* Una sección = un encabezado de v1 ("Datos del Proyecto", "Documentación del
+   proyecto", ...), todas con el mismo peso visual. La línea divisoria entre
+   secciones reemplaza al `<svg>` separador de v1. */
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-4);
+  padding-top: var(--kora-space-5);
+}
+
+.section:first-child {
+  padding-top: 0;
+}
+
+.section + .section {
+  border-top: 1px solid var(--kora-border-soft);
+}
+
+.sectionTitle {
+  font-size: var(--kora-text-lg);
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-navy);
+  margin: 0;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--kora-space-4);
+}
+
+.clientField {
+  max-width: 480px;
+}
+
+.leaderField {
+  max-width: 480px;
+}
+
+.hint {
+  margin: calc(var(--kora-space-3) * -1) 0 0;
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-sm);
+}
+
+.hintLink {
+  color: var(--kora-navy);
+  font-weight: var(--kora-weight-semibold);
+}
+
+.clientCard {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--kora-space-3) var(--kora-space-5);
+  padding: var(--kora-space-4);
+  border: 1px solid var(--kora-border-soft);
+  border-radius: var(--kora-radius-lg);
+  background: var(--kora-surface-alt);
+}
+
+.clientRow {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.clientLabel {
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-medium);
+}
+
+.clientValue {
+  color: var(--kora-navy);
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-semibold);
+}
+
+.summaryGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--kora-space-3) var(--kora-space-5);
+}
+
+.summaryItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.summaryLabel {
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-medium);
+}
+
+.summaryValue {
+  color: var(--kora-navy);
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-semibold);
+}
+
+/* Equipos e involucrados */
+
+.teamsLayout {
+  display: flex;
+  gap: var(--kora-space-6);
+  flex-wrap: wrap;
+}
+
+.teamsAvailable {
+  min-width: 200px;
+}
+
+.teamsSelected {
+  flex: 1 1 320px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-3);
+}
+
+.teamsSubtitle {
+  font-size: var(--kora-text-base);
+  font-weight: var(--kora-weight-semibold);
+  color: var(--kora-navy);
+  margin: 0 0 var(--kora-space-3);
+}
+
+.teamsGrid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-2);
+}
+
+.teamCheckbox {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+  color: var(--kora-navy);
+  font-size: var(--kora-text-sm);
+  cursor: pointer;
+}
+
+.teamCheckbox input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--kora-navy);
+}
+
+.teamCheckboxDisabled {
+  color: var(--kora-text-disabled);
+  cursor: default;
+}
+
+.teamDetailCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-2);
+  padding: var(--kora-space-3) var(--kora-space-4);
+  border-radius: var(--kora-radius);
+  background: var(--kora-surface-muted);
+}
+
+.teamDetailName {
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-navy);
+}
+
+.alert {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--kora-space-2);
+  padding: var(--kora-space-3);
+  border-radius: var(--kora-radius-sm);
+  background: var(--kora-danger-surface-soft);
+  color: var(--kora-danger-hover);
+  font-size: var(--kora-text-base);
+}
+
+.alertIcon {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--kora-space-3);
+  margin-top: var(--kora-space-2);
+}
+
+@media (max-width: 640px) {
+  .row,
+  .clientCard,
+  .summaryGrid {
+    grid-template-columns: 1fr;
+  }
+}

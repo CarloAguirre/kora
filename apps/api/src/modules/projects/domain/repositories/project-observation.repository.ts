@@ -1,0 +1,23 @@
+import type { TransactionContext } from '@kora/core';
+
+export interface ProjectObservationRecord {
+  readonly id: string;
+  readonly projectId: string;
+  readonly message: string;
+  readonly authorUserId: string;
+  readonly authorName: string;
+  readonly createdAt: Date;
+}
+
+export interface ProjectObservationRepository {
+  listForProject(projectId: string, context?: TransactionContext): Promise<ProjectObservationRecord[]>;
+  add(
+    projectId: string,
+    message: string,
+    authorUserId: string,
+    now: Date,
+    context?: TransactionContext,
+  ): Promise<string>;
+}
+
+export const PROJECT_OBSERVATION_REPOSITORY = Symbol('ProjectObservationRepository');

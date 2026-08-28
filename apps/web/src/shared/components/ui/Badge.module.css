@@ -1,0 +1,43 @@
+/* Etiqueta de estado — misma forma y colores que `.badge`/`.usuario-badge` de la v1. */
+
+.badge {
+  display: inline-flex;
+  height: 24px;
+  padding: 4px var(--kora-space-2);
+  align-items: center;
+  border-radius: var(--kora-radius-sm);
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-semibold);
+  line-height: normal;
+  white-space: nowrap;
+}
+
+.success {
+  background: var(--kora-success-surface);
+  color: var(--kora-lime-dark);
+}
+
+.danger {
+  background: var(--kora-danger-surface);
+  color: var(--kora-danger-hover);
+}
+
+.warning {
+  background: var(--kora-warning-surface);
+  color: var(--kora-warning-text);
+}
+
+.info {
+  background: var(--kora-blue-surface);
+  color: var(--kora-info);
+}
+
+.neutral {
+  background: var(--kora-surface-disabled);
+  color: var(--kora-text-muted);
+}
+
+.brand {
+  background: var(--kora-lime-surface);
+  color: var(--kora-navy);
+}

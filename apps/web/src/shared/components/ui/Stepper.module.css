@@ -1,0 +1,53 @@
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-3);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex-wrap: wrap;
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+}
+
+.circle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border-radius: var(--kora-radius-pill);
+  border: 1.5px solid var(--kora-border);
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-bold);
+}
+
+.circleActive {
+  border-color: var(--kora-navy);
+  background: var(--kora-navy);
+  color: var(--kora-surface);
+}
+
+.circleComplete {
+  border-color: var(--kora-lime-dark);
+  background: var(--kora-lime-hover);
+  color: var(--kora-lime-dark);
+}
+
+.label {
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-medium);
+  white-space: nowrap;
+}
+
+.labelActive {
+  color: var(--kora-navy);
+  font-weight: var(--kora-weight-semibold);
+}

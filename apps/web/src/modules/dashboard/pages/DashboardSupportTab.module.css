@@ -1,0 +1,121 @@
+.tab {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-6);
+  width: 100%;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--kora-space-3);
+  flex-wrap: wrap;
+}
+
+.title {
+  font-size: var(--kora-text-xl);
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-navy);
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-3);
+}
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--kora-space-3);
+}
+
+.kpiCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-2);
+}
+
+.kpiLabelRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.kpiLabel {
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-medium);
+  color: var(--kora-text-muted);
+}
+
+.kpiPercent {
+  font-size: var(--kora-text-sm);
+  color: var(--kora-success);
+}
+
+.kpiPercentDanger {
+  font-size: var(--kora-text-sm);
+  color: var(--kora-danger);
+}
+
+.kpiValue {
+  font-size: var(--kora-text-2xl);
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-navy);
+}
+
+.kpiSub {
+  font-size: var(--kora-text-sm);
+  color: var(--kora-text-muted);
+}
+
+.chartRow {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: var(--kora-space-4);
+  align-items: stretch;
+}
+
+.chartCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-3);
+}
+
+.clientCard {
+  display: flex;
+}
+
+.deviationTag {
+  display: flex;
+  align-self: flex-end;
+  align-items: center;
+  gap: var(--kora-space-2);
+  padding: var(--kora-space-2) var(--kora-space-3);
+  border-radius: var(--kora-radius-lg);
+  border: 1px solid var(--kora-border);
+  background: var(--kora-blue-surface);
+  box-shadow: var(--kora-shadow-sm);
+  font-size: var(--kora-text-xs);
+  color: var(--kora-text-muted);
+}
+
+.deviationValue {
+  color: var(--kora-danger);
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+  padding: var(--kora-space-1) 0;
+  font-size: var(--kora-text-xs);
+  color: var(--kora-blue-400);
+}
+
+@media (max-width: 1024px) {
+  .chartRow {
+    grid-template-columns: 1fr;
+  }
+}

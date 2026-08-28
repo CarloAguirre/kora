@@ -1,0 +1,92 @@
+/* Campo de texto — medidas y colores de KoraInput de la v1. */
+
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-1);
+  align-self: stretch;
+}
+
+.label {
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-medium);
+  line-height: 16px;
+}
+
+.required {
+  color: var(--kora-danger);
+  margin-left: 2px;
+}
+
+.field {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+  height: var(--kora-field-height);
+  padding: var(--kora-space-2);
+  align-self: stretch;
+  border-radius: var(--kora-radius-sm);
+  border: 1px solid var(--kora-border-strong);
+  background: var(--kora-surface);
+  transition: border-color var(--kora-transition);
+}
+
+.field:focus-within {
+  border-color: var(--kora-blue-600);
+}
+
+.invalid,
+.invalid:focus-within {
+  border-color: var(--kora-danger);
+}
+
+.disabled {
+  background: var(--kora-surface-disabled);
+  border-color: var(--kora-border);
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: var(--kora-font);
+  font-size: var(--kora-text-base);
+  font-weight: var(--kora-weight-regular);
+  color: var(--kora-text);
+  padding: 0;
+  margin: 0;
+}
+
+.input::placeholder {
+  color: var(--kora-text-disabled);
+  font-style: italic;
+}
+
+.input:disabled {
+  color: var(--kora-text-disabled);
+  cursor: not-allowed;
+}
+
+.adornment {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--kora-text-muted);
+}
+
+/* Altura reservada siempre, para que mostrar un error no desplace el formulario. */
+.helper {
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-regular);
+  color: var(--kora-text-muted);
+  min-height: 16px;
+  line-height: 16px;
+}
+
+.helperError {
+  color: var(--kora-danger);
+}

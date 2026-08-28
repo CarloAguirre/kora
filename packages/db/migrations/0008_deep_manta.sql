@@ -1,0 +1,1 @@
+ALTER TABLE "project_teams" ADD COLUMN "member_count" integer;

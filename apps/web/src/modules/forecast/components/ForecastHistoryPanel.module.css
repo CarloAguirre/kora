@@ -1,0 +1,29 @@
+.entries {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-2);
+}
+
+.entry {
+  padding: var(--kora-space-2) var(--kora-space-3);
+  border-radius: var(--kora-radius-sm);
+  background: var(--kora-surface-muted);
+  border: 1px solid var(--kora-surface-disabled);
+}
+
+.description {
+  color: var(--kora-text);
+  font-size: var(--kora-text-sm);
+  margin: 0;
+}
+
+.meta {
+  margin-top: 2px;
+  font-size: var(--kora-text-xs);
+  color: var(--kora-text-muted);
+}
+
+.empty {
+  color: var(--kora-text-disabled);
+  font-size: var(--kora-text-sm);
+}

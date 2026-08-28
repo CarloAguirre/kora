@@ -1,0 +1,105 @@
+/* Tabla — cabecera lima y bordes grises, igual que .proy-table-th de la v1. */
+
+.container {
+  width: 100%;
+  overflow-x: auto;
+  /* La tabla desborda dentro de su propio contenedor: la página nunca hace
+     scroll horizontal, que es lo que rompe la lectura en pantallas pequeñas. */
+}
+
+.table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+  font-family: var(--kora-font);
+}
+
+.headerCell {
+  padding: 15px 10px;
+  border-top: 1px solid var(--kora-border-strong);
+  border-bottom: 1px solid var(--kora-border-strong);
+  background: var(--kora-lime-surface);
+  text-align: left;
+  white-space: nowrap;
+  color: var(--kora-navy);
+  font-size: var(--kora-text-base);
+  font-weight: var(--kora-weight-bold);
+}
+
+.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.sortable:hover {
+  background: var(--kora-lime-hover);
+}
+
+.headerButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kora-space-1);
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+}
+
+.sortIcon {
+  color: var(--kora-text-muted);
+  flex-shrink: 0;
+}
+
+.sortIconActive {
+  color: var(--kora-navy);
+}
+
+.row {
+  border-bottom: 1px solid var(--kora-surface-disabled);
+}
+
+.row:hover {
+  background: var(--kora-surface-muted);
+}
+
+.cell {
+  padding: 12px 10px;
+  font-size: var(--kora-text-base);
+  color: var(--kora-text);
+  vertical-align: middle;
+}
+
+.cellMuted {
+  color: var(--kora-text-muted);
+}
+
+.cellActions {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.stateCell {
+  padding: var(--kora-space-10) var(--kora-space-4);
+  text-align: center;
+  color: var(--kora-text-muted);
+}
+
+.skeletonBar {
+  height: 14px;
+  border-radius: var(--kora-radius-sm);
+  background: linear-gradient(
+    90deg,
+    var(--kora-surface-disabled) 25%,
+    var(--kora-surface-muted) 50%,
+    var(--kora-surface-disabled) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+}
+
+@keyframes shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}

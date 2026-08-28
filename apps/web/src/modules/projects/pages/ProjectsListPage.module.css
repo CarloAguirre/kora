@@ -1,0 +1,60 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-4);
+  width: 100%;
+}
+
+.tabsRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kora-space-4);
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--kora-surface-disabled);
+}
+
+.tabsActions {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-3);
+  padding-bottom: var(--kora-space-2);
+}
+
+.supportSubTabsRow {
+  margin-bottom: var(--kora-space-3);
+}
+
+.filters {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--kora-space-3);
+  flex-wrap: wrap;
+}
+
+.search {
+  flex: 1 1 260px;
+  min-width: 200px;
+}
+
+.filter {
+  flex: 0 1 200px;
+  min-width: 160px;
+}
+
+.link {
+  color: var(--kora-navy);
+  font-weight: var(--kora-weight-semibold);
+  text-decoration: underline;
+}
+
+.empty {
+  color: var(--kora-text-disabled);
+}
+
+@media (max-width: 640px) {
+  .tabsRow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

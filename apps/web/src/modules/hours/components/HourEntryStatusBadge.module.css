@@ -1,0 +1,29 @@
+.badge {
+  display: inline-flex;
+  height: 24px;
+  padding: 4px var(--kora-space-2);
+  align-items: center;
+  border-radius: var(--kora-radius-sm);
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-semibold);
+  line-height: normal;
+  white-space: nowrap;
+}
+
+/* Colores exactos de `getEstadoStyle` en ColaboradorDashboard — no coinciden
+   con los tonos del Badge genérico, que sirven a otro contexto (estado de
+   cliente/usuario). */
+.pending {
+  background: var(--kora-warning-surface);
+  color: var(--kora-warning-text);
+}
+
+.approved {
+  background: #d4edda;
+  color: var(--kora-success-text);
+}
+
+.rejected {
+  background: var(--kora-danger-surface);
+  color: var(--kora-danger-hover);
+}

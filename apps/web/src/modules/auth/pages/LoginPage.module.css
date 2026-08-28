@@ -1,0 +1,194 @@
+/* Pantalla de acceso — dos paneles: formulario + imagen de marca. */
+
+.page {
+  display: flex;
+  width: 100%;
+  min-height: 100vh;
+  background: var(--kora-surface);
+}
+
+/* ── Panel izquierdo: logo, bienvenida y formulario ─────────────────────── */
+
+.left {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  padding: var(--kora-space-10) var(--kora-space-6);
+}
+
+.leftContent {
+  display: flex;
+  width: 100%;
+  max-width: 380px;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--kora-space-6);
+}
+
+.logo {
+  height: 40px;
+  width: auto;
+}
+
+.welcome {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--kora-space-6);
+}
+
+.welcomeText {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--kora-space-2);
+  text-align: center;
+}
+
+.title {
+  margin: 0;
+  color: var(--kora-navy);
+  font-size: var(--kora-text-xl);
+  font-weight: var(--kora-weight-bold);
+}
+
+.tagline {
+  margin: 0;
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-base);
+}
+
+.alert {
+  display: flex;
+  width: 100%;
+  align-items: flex-start;
+  gap: var(--kora-space-2);
+  padding: var(--kora-space-3);
+  border-radius: var(--kora-radius);
+  border: 1px solid var(--kora-danger-hover);
+  background: var(--kora-danger-surface-soft);
+  color: var(--kora-danger-hover);
+  font-size: var(--kora-text-base);
+  box-sizing: border-box;
+}
+
+.alertIcon {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.form {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: var(--kora-space-3);
+}
+
+.eyeToggle {
+  display: flex;
+  align-items: center;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--kora-text-muted);
+  cursor: pointer;
+}
+
+.eyeToggle:hover {
+  color: var(--kora-navy);
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-3);
+  margin-top: var(--kora-space-2);
+}
+
+.googleButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--kora-space-2);
+  height: var(--kora-control-height);
+  padding: var(--kora-space-2) var(--kora-space-4);
+  border-radius: var(--kora-radius);
+  border: 1px solid var(--kora-border-strong);
+  background: var(--kora-surface);
+  color: var(--kora-navy);
+  font-family: var(--kora-font);
+  font-weight: var(--kora-weight-bold);
+  font-size: var(--kora-text-base);
+  text-decoration: none;
+  transition: background var(--kora-transition);
+}
+
+.googleButton:hover {
+  background: var(--kora-surface-muted);
+}
+
+.link {
+  align-self: center;
+  background: none;
+  border: none;
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-base);
+  text-decoration: underline;
+  padding: var(--kora-space-1);
+}
+
+.link:hover {
+  color: var(--kora-navy);
+}
+
+/* ── Panel derecho: imagen de marca ──────────────────────────────────────── */
+
+.right {
+  position: relative;
+  width: 451px;
+  min-width: 451px;
+  overflow: hidden;
+}
+
+.rightImage {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.credit {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--kora-space-1);
+  padding: var(--kora-space-3) 0;
+  color: var(--kora-surface);
+  font-size: var(--kora-text-xs);
+}
+
+.creditLink {
+  color: var(--kora-surface);
+  font-weight: var(--kora-weight-semibold);
+}
+
+/* ── Responsive: la imagen desaparece antes que el formulario deje de caber ── */
+
+@media (max-width: 1024px) {
+  .right {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .left {
+    padding: var(--kora-space-8) var(--kora-space-4);
+  }
+}

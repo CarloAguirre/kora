@@ -1,0 +1,100 @@
+.tab {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-6);
+  width: 100%;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-3);
+}
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--kora-space-3);
+}
+
+.kpiCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-2);
+}
+
+.kpiLabelRow {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+}
+
+.kpiLabel {
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-medium);
+  color: var(--kora-blue-400);
+}
+
+.kpiValue {
+  font-size: var(--kora-text-2xl);
+  font-weight: var(--kora-weight-bold);
+}
+
+.kpiValueInfo {
+  color: var(--kora-info);
+}
+
+.kpiValueDanger {
+  color: var(--kora-danger);
+}
+
+.kpiValueBrand {
+  color: var(--kora-lime-dark);
+}
+
+.kpiValueClosing {
+  font-size: var(--kora-text-base);
+  font-weight: var(--kora-weight-semibold);
+  color: var(--kora-success);
+}
+
+.kpiSub {
+  font-size: var(--kora-text-xs);
+  color: var(--kora-blue-400);
+}
+
+.kpiSubWarning {
+  font-size: var(--kora-text-sm);
+  color: var(--kora-warning-text);
+}
+
+.monitor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-4);
+}
+
+.monitorHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.monitorTitle {
+  font-size: var(--kora-text-xl);
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-navy);
+}
+
+.monitorList {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--kora-space-3);
+  overflow-x: auto;
+  padding-bottom: var(--kora-space-2);
+}
+
+.empty {
+  color: var(--kora-text-disabled);
+  font-size: var(--kora-text-sm);
+}

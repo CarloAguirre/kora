@@ -1,0 +1,16 @@
+/* Tarjeta de contenido — igual que `.card-container`/`.form-card` de la v1:
+   la superficie blanca elevada donde vive prácticamente cualquier tabla o
+   formulario del dashboard. */
+
+.card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  align-self: stretch;
+  gap: var(--kora-space-6);
+  padding: var(--kora-space-4);
+  border-radius: var(--kora-radius-lg);
+  border: 1px solid var(--kora-blue-200);
+  background: var(--kora-surface);
+  box-shadow: var(--kora-shadow-card);
+}

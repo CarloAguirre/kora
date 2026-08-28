@@ -1,0 +1,115 @@
+/* Réplica de `fpd-timeline-*` / la barra de fases inline de `LiderProyectoFicha` (v1). */
+
+.timeline {
+  display: flex;
+  flex-direction: column;
+}
+
+.monthLabels {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: var(--kora-space-2);
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-xs);
+}
+
+.track {
+  display: flex;
+  width: 100%;
+  height: 28px;
+  border-radius: var(--kora-radius-pill);
+  overflow: visible;
+  background: var(--kora-surface-disabled);
+}
+
+.segment {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-medium);
+  text-align: center;
+  padding: 0 var(--kora-space-1);
+  position: relative;
+}
+
+.segment:first-child {
+  border-top-left-radius: var(--kora-radius-pill);
+  border-bottom-left-radius: var(--kora-radius-pill);
+}
+
+.segment:last-child {
+  border-top-right-radius: var(--kora-radius-pill);
+  border-bottom-right-radius: var(--kora-radius-pill);
+}
+
+.segmentPast {
+  background: var(--kora-blue-200);
+  color: var(--kora-surface);
+}
+
+.segmentFuture {
+  background: var(--kora-surface-disabled);
+  color: var(--kora-text-muted);
+}
+
+.segmentCurrent_discovery,
+.segmentCurrent_testing,
+.segmentCurrent_pilot,
+.segmentCurrent_closed {
+  color: var(--kora-surface);
+  font-weight: var(--kora-weight-bold);
+}
+
+.segmentCurrent_development {
+  color: var(--kora-navy);
+  font-weight: var(--kora-weight-bold);
+}
+
+.segmentCurrent_discovery {
+  background: var(--kora-blue-600);
+}
+
+.segmentCurrent_development {
+  background: var(--kora-lime);
+}
+
+.segmentCurrent_testing {
+  background: var(--kora-info);
+}
+
+.segmentCurrent_pilot {
+  background: var(--kora-warning);
+}
+
+.segmentCurrent_closed {
+  background: var(--kora-success);
+}
+
+.today {
+  position: absolute;
+  top: -32px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+}
+
+.todayPill {
+  background: var(--kora-navy);
+  color: var(--kora-surface);
+  padding: 4px var(--kora-space-2);
+  border-radius: var(--kora-radius-pill);
+  font-size: 11px;
+  font-weight: var(--kora-weight-bold);
+  white-space: nowrap;
+}
+
+.todayLine {
+  width: 2px;
+  height: 32px;
+  background: var(--kora-danger);
+}

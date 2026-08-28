@@ -1,0 +1,63 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-4);
+  width: 100%;
+}
+
+.backButton {
+  align-self: flex-start;
+}
+
+.title {
+  margin: 0;
+  color: var(--kora-navy);
+  font-size: var(--kora-text-lg);
+  font-weight: var(--kora-weight-bold);
+}
+
+.subtitle {
+  margin: var(--kora-space-1) 0 0;
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-base);
+}
+
+.sectionTitle {
+  margin: var(--kora-space-4) 0 var(--kora-space-3);
+  font-size: var(--kora-text-lg);
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-navy);
+}
+
+.historyHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--kora-space-3);
+  flex-wrap: wrap;
+}
+
+.historyFilter {
+  width: 200px;
+}
+
+.statusCell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-1);
+}
+
+.rejectionReason {
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-xs);
+}
+
+.link {
+  color: var(--kora-navy);
+  font-weight: var(--kora-weight-semibold);
+  text-decoration: underline;
+}
+
+.empty {
+  color: var(--kora-text-disabled);
+}

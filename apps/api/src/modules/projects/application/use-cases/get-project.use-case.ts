@@ -1,0 +1,71 @@
+import { Inject, Injectable } from '@nestjs/common';
+import { ForbiddenError, err, ok, type ApplicationError, type Result } from '@kora/core';
+import type { Permission, ProjectDetail } from '@kora/contracts';
+import { ProjectNotFoundError } from '../../domain/errors/project.errors';
+import { PROJECT_REPOSITORY, type ProjectRepository } from '../../domain/repositories/project.repository';
+import {
+  PROJECT_TEAM_MEMBER_REPOSITORY,
+  type ProjectTeamMemberRepository,
+} from '../../domain/repositories/project-team-member.repository';
+import {
+  PROJECT_OBSERVATION_REPOSITORY,
+  type ProjectObservationRepository,
+} from '../../domain/repositories/project-observation.repository';
+import { PROJECT_USER_READER, type ProjectUserReader } from '../ports/project-user-reader.port';
+import { PROJECT_CLIENT_READER, type ProjectClientReader } from '../ports/project-client-reader.port';
+import type { UseCase } from '../../../../shared/application/use-case';
+import { toProjectDetail } from '../mappers/project.mapper';
+
+export interface GetProjectCommand {
+  readonly projectId: string;
+  readonly actorUserId: string;
+  readonly actorPermissions: readonly Permission[];
+}
+
+/**
+ * Sin `projects:read` (alcance completo), solo puede ver la ficha si
+ * participa en el proyecto — líder, desarrollador, responsable comercial, o
+ * en el equipo asignado. `projects:read_assigned` da acceso al endpoint;
+ * esta verificación decide si a ESTE proyecto en particular.
+ */
+@Injectable()
+export class GetProjectUseCase implements UseCase<GetProjectCommand, ProjectDetail, ApplicationError> {
+  constructor(
+    @Inject(PROJECT_REPOSITORY) private readonly projects: ProjectRepository,
+    @Inject(PROJECT_TEAM_MEMBER_REPOSITORY) private readonly members: ProjectTeamMemberRepository,
+    @Inject(PROJECT_OBSERVATION_REPOSITORY) private readonly observations: ProjectObservationRepository,
+    @Inject(PROJECT_USER_READER) private readonly users: ProjectUserReader,
+    @Inject(PROJECT_CLIENT_READER) private readonly clients: ProjectClientReader,
+  ) {}
+
+  async execute(command: GetProjectCommand): Promise<Result<ProjectDetail, ApplicationError>> {
+    const project = await this.projects.findById(command.projectId);
+    if (!project || project.isDeleted) return err(new ProjectNotFoundError(command.projectId));
+
+    const snapshot = project.toSnapshot();
+
+    const [client, leader, developer, commercialManager, members, projectObservations] = await Promise.all([
+      snapshot.clientId ? this.clients.findById(snapshot.clientId) : Promise.resolve(null),
+      snapshot.leaderUserId ? this.users.findById(snapshot.leaderUserId) : Promise.resolve(null),
+      snapshot.developerUserId ? this.users.findById(snapshot.developerUserId) : Promise.resolve(null),
+      snapshot.commercialManagerUserId
+        ? this.users.findById(snapshot.commercialManagerUserId)
+        : Promise.resolve(null),
+      this.members.listForProject(project.id),
+      this.observations.listForProject(project.id),
+    ]);
+
+    if (!command.actorPermissions.includes('projects:read')) {
+      const isParticipant =
+        snapshot.leaderUserId === command.actorUserId ||
+        snapshot.developerUserId === command.actorUserId ||
+        snapshot.commercialManagerUserId === command.actorUserId ||
+        members.some((member) => member.userId === command.actorUserId);
+      if (!isParticipant) return err(new ForbiddenError('No tienes acceso a este proyecto.', 'PROJECT_NOT_ASSIGNED'));
+    }
+
+    return ok(
+      toProjectDetail({ project, client, leader, developer, commercialManager, members, observations: projectObservations }),
+    );
+  }
+}

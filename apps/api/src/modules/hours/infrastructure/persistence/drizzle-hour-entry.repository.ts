@@ -1,0 +1,202 @@
+import { Inject, Injectable } from '@nestjs/common';
+import {
+  and,
+  asc,
+  clients,
+  count,
+  desc,
+  eq,
+  gte,
+  hourEntries,
+  ilike,
+  inArray,
+  isNull,
+  lte,
+  or,
+  projects,
+  sql,
+  teamMembers,
+  teams,
+  users,
+  type Database,
+} from '@kora/db';
+import { buildPage, toOffset, type Page, type PageRequest, type SortRequest, type TransactionContext } from '@kora/core';
+import type {
+  HourEntryFilters,
+  HourEntryListItem,
+  HourEntryRepository,
+  HourEntrySortableField,
+} from '../../domain/repositories/hour-entry.repository';
+import type { HourEntry } from '../../domain/entities/hour-entry.entity';
+import { DATABASE } from '../../../../shared/infrastructure/database/database.module';
+import { resolveDb } from '../../../../shared/infrastructure/database/unit-of-work';
+import { toDomain, toPersistence } from './hour-entry.persistence-mapper';
+
+@Injectable()
+export class DrizzleHourEntryRepository implements HourEntryRepository {
+  constructor(@Inject(DATABASE) private readonly database: Database) {}
+
+  async findById(id: string, context?: TransactionContext): Promise<HourEntry | null> {
+    const db = resolveDb(this.database, context);
+    const rows = await db.select().from(hourEntries).where(eq(hourEntries.id, id)).limit(1);
+    return rows[0] ? toDomain(rows[0]) : null;
+  }
+
+  async findByLegacyId(legacyId: string, context?: TransactionContext): Promise<HourEntry | null> {
+    const db = resolveDb(this.database, context);
+    const rows = await db.select().from(hourEntries).where(eq(hourEntries.legacyId, legacyId)).limit(1);
+    return rows[0] ? toDomain(rows[0]) : null;
+  }
+
+  async search(
+    filters: HourEntryFilters,
+    page: PageRequest,
+    sort: SortRequest<HourEntrySortableField>,
+    context?: TransactionContext,
+  ): Promise<Page<HourEntryListItem>> {
+    const db = resolveDb(this.database, context);
+    const where = this.buildWhere(filters);
+
+    const [rows, totalRows] = await Promise.all([
+      db
+        .select({
+          id: hourEntries.id,
+          userId: hourEntries.userId,
+          userFirstName: users.firstName,
+          userLastName: users.lastName,
+          projectId: hourEntries.projectId,
+          projectName: projects.name,
+          projectType: projects.type,
+          projectSalesStage: projects.salesStage,
+          clientId: projects.clientId,
+          clientName: clients.companyName,
+          assignment: hourEntries.assignment,
+          category: hourEntries.category,
+          description: hourEntries.description,
+          hours: hourEntries.hours,
+          date: hourEntries.date,
+          isOvertime: hourEntries.isOvertime,
+          status: hourEntries.status,
+          rejectionReason: hourEntries.rejectionReason,
+          designatedApproverUserId: hourEntries.designatedApproverUserId,
+          decisionUserId: hourEntries.decisionUserId,
+          createdAt: hourEntries.createdAt,
+        })
+        .from(hourEntries)
+        .leftJoin(users, eq(users.id, hourEntries.userId))
+        .leftJoin(projects, eq(projects.id, hourEntries.projectId))
+        .leftJoin(clients, eq(clients.id, projects.clientId))
+        .where(where)
+        .orderBy(...this.buildOrderBy(sort))
+        .limit(page.pageSize)
+        .offset(toOffset(page)),
+
+      db.select({ value: count() }).from(hourEntries).leftJoin(users, eq(users.id, hourEntries.userId)).where(where),
+    ]);
+
+    const approverIds = [
+      ...new Set(
+        rows
+          .flatMap((row) => [row.designatedApproverUserId, row.decisionUserId])
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    const approverNames = approverIds.length
+      ? await db
+          .select({ id: users.id, firstName: users.firstName, lastName: users.lastName })
+          .from(users)
+          .where(inArray(users.id, approverIds))
+      : [];
+    const approverNameById = new Map(approverNames.map((a) => [a.id, `${a.firstName} ${a.lastName ?? ''}`.trim()]));
+
+    const authorIds = [...new Set(rows.map((row) => row.userId))];
+    const teamRows = authorIds.length
+      ? await db
+          .select({ userId: teamMembers.userId, teamId: teams.id, teamName: teams.name })
+          .from(teamMembers)
+          .innerJoin(teams, eq(teams.id, teamMembers.teamId))
+          .where(and(inArray(teamMembers.userId, authorIds), isNull(teamMembers.leftAt)))
+      : [];
+    // Una persona podría (raro) tener más de una membresía activa; se muestra la primera.
+    const teamByUserId = new Map(teamRows.map((row) => [row.userId, { id: row.teamId, name: row.teamName }]));
+
+    const items: HourEntryListItem[] = rows.map((row) => ({
+      id: row.id,
+      userId: row.userId,
+      userFullName: `${row.userFirstName ?? ''} ${row.userLastName ?? ''}`.trim(),
+      projectId: row.projectId,
+      projectName: row.projectName,
+      teamId: teamByUserId.get(row.userId)?.id ?? null,
+      teamName: teamByUserId.get(row.userId)?.name ?? null,
+      assignment: row.assignment,
+      category: row.category,
+      description: row.description,
+      hours: Number(row.hours),
+      date: row.date,
+      isOvertime: row.isOvertime,
+      status: row.status,
+      rejectionReason: row.rejectionReason,
+      designatedApproverUserId: row.designatedApproverUserId,
+      designatedApproverFullName: row.designatedApproverUserId ? (approverNameById.get(row.designatedApproverUserId) ?? null) : null,
+      createdAt: row.createdAt,
+      decisionUserId: row.decisionUserId,
+      decisionByFullName: row.decisionUserId ? (approverNameById.get(row.decisionUserId) ?? null) : null,
+      clientId: row.clientId,
+      clientName: row.clientName,
+      projectType: row.projectType,
+      projectSalesStage: row.projectSalesStage,
+    }));
+
+    return buildPage(items, totalRows[0]?.value ?? 0, page);
+  }
+
+  async save(entry: HourEntry, context?: TransactionContext): Promise<void> {
+    const db = resolveDb(this.database, context);
+    const values = toPersistence(entry);
+
+    await db
+      .insert(hourEntries)
+      .values({ id: entry.id, ...values })
+      .onConflictDoUpdate({ target: hourEntries.id, set: values });
+  }
+
+  async delete(id: string, context?: TransactionContext): Promise<void> {
+    const db = resolveDb(this.database, context);
+    await db.delete(hourEntries).where(eq(hourEntries.id, id));
+  }
+
+  async sumApprovedHoursForProject(projectId: string, context?: TransactionContext): Promise<number> {
+    const db = resolveDb(this.database, context);
+    const rows = await db
+      .select({ total: sql<string>`coalesce(sum(${hourEntries.hours}), 0)` })
+      .from(hourEntries)
+      .where(and(eq(hourEntries.projectId, projectId), eq(hourEntries.status, 'approved')));
+    return Number(rows[0]?.total ?? 0);
+  }
+
+  private buildWhere(filters: HourEntryFilters) {
+    const conditions = [];
+    if (filters.projectId) conditions.push(eq(hourEntries.projectId, filters.projectId));
+    if (filters.search) {
+      const term = `%${filters.search.trim()}%`;
+      conditions.push(or(ilike(users.firstName, term), ilike(users.lastName, term)));
+    }
+    if (filters.status) conditions.push(eq(hourEntries.status, filters.status));
+    if (filters.dateFrom) conditions.push(gte(hourEntries.date, filters.dateFrom));
+    if (filters.dateTo) conditions.push(lte(hourEntries.date, filters.dateTo));
+    if (filters.visibleToUserIds) {
+      conditions.push(
+        filters.visibleToUserIds.length > 0 ? inArray(hourEntries.userId, [...filters.visibleToUserIds]) : sql`false`,
+      );
+    }
+    return conditions.length > 0 ? and(...conditions) : undefined;
+  }
+
+  private buildOrderBy(sort: SortRequest<HourEntrySortableField>) {
+    const direction = sort.direction === 'desc' ? desc : asc;
+    const column = { date: hourEntries.date, createdAt: hourEntries.createdAt, status: hourEntries.status, hours: hourEntries.hours }[
+      sort.field
+    ];
+    return [direction(column), desc(hourEntries.createdAt)];
+  }
+}

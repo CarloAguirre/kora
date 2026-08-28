@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  # Un push nuevo sobre la misma rama cancela la ejecución anterior: no tiene
+  # sentido gastar minutos validando un commit ya superado.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: kora2_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # El orden importa: los tipos dependen de los paquetes compilados.
+      - name: Compilar
+        run: pnpm build
+
+      - name: Comprobar tipos
+        run: pnpm typecheck
+
+      - name: Tests
+        run: pnpm test
+
+      # Las migraciones se aplican sobre una base limpia en cada ejecución: si
+      # una migración deja de ser aplicable desde cero, se descubre aquí y no
+      # el día del despliegue.
+      - name: Migraciones desde cero
+        run: pnpm db:migrate
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/kora2_test
+
+      - name: Siembra del catálogo de acceso
+        run: pnpm --filter @kora/db seed
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/kora2_test
+
+      # Se ejecuta dos veces a propósito: la siembra debe ser idempotente, y
+      # este paso lo demuestra en cada PR en lugar de confiar en que lo sea.
+      - name: La siembra es idempotente
+        run: pnpm --filter @kora/db seed
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/kora2_test

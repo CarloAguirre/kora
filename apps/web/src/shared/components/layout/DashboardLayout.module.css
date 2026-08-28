@@ -1,0 +1,48 @@
+/* Estructura general — medidas idénticas a .dashboard-layout de la v1. */
+
+.layout {
+  display: flex;
+  width: 100%;
+  min-height: 100vh;
+  background: var(--kora-surface-muted);
+  font-family: var(--kora-font);
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  flex: 1 0 0;
+  min-width: 0;
+}
+
+.content {
+  display: flex;
+  padding: var(--kora-space-6);
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--kora-space-6);
+  flex: 1;
+  overflow-y: auto;
+  background: var(--kora-surface-muted);
+}
+
+.overlay {
+  display: none;
+}
+
+@media (max-width: 1024px) {
+  /* Por debajo de 1024px el sidebar se superpone en lugar de empujar el
+     contenido: con 168px fijos, en una tablet no queda ancho útil para una
+     tabla. */
+  .overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(18, 34, 53, 0.4);
+    z-index: var(--kora-z-overlay);
+  }
+
+  .content {
+    padding: var(--kora-space-4);
+  }
+}

@@ -1,0 +1,93 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-3);
+  width: 284px;
+  flex-shrink: 0;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kora-space-2);
+}
+
+.name {
+  color: var(--kora-navy);
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-bold);
+}
+
+.leader {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-sm);
+}
+
+.metric {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-1);
+}
+
+.metricRow {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--kora-space-2);
+}
+
+.metricLabel {
+  font-size: var(--kora-text-xs);
+  color: var(--kora-text-muted);
+}
+
+.metricValue {
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-medium);
+  color: var(--kora-text-muted);
+}
+
+.track {
+  height: 8px;
+  border-radius: var(--kora-radius-pill);
+  background: var(--kora-surface-disabled);
+  overflow: hidden;
+}
+
+.fill {
+  height: 100%;
+  border-radius: var(--kora-radius-pill);
+}
+
+.fillCritical {
+  background: var(--kora-danger);
+}
+
+.fillAlert {
+  background: var(--kora-warning);
+}
+
+.fillProgress {
+  height: 100%;
+  border-radius: var(--kora-radius-pill);
+  background: var(--kora-warning);
+}
+
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--kora-space-2);
+}
+
+.link {
+  display: flex;
+  align-self: stretch;
+  text-decoration: none;
+}
+
+.linkButton {
+  width: 100%;
+}

@@ -1,0 +1,43 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-3);
+}
+
+.title {
+  font-size: var(--kora-text-lg);
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-navy);
+}
+
+.subtitle {
+  font-size: var(--kora-text-sm);
+  color: var(--kora-text-muted);
+}
+
+.chartArea {
+  width: 100%;
+}
+
+.legend {
+  display: flex;
+  justify-content: center;
+  gap: var(--kora-space-5);
+  flex-wrap: wrap;
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-medium);
+  color: var(--kora-navy);
+}
+
+.legendDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}

@@ -1,0 +1,86 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-4);
+  height: 100%;
+}
+
+.title {
+  font-size: var(--kora-text-base);
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-navy);
+}
+
+.body {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-6);
+  flex-wrap: wrap;
+  flex: 1;
+}
+
+.ringWrapper {
+  position: relative;
+  flex-shrink: 0;
+  width: 160px;
+  height: 160px;
+}
+
+.ring {
+  display: block;
+}
+
+.center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.centerValue {
+  font-size: var(--kora-text-2xl);
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-navy);
+  line-height: 1.2;
+}
+
+.centerLabel {
+  font-size: var(--kora-text-xs);
+  color: var(--kora-text-muted);
+}
+
+.legend {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-2);
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+  font-size: var(--kora-text-sm);
+  color: var(--kora-text);
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--kora-radius-pill);
+  flex-shrink: 0;
+}
+
+.dotActive {
+  background: var(--kora-success);
+}
+
+.dotInactive {
+  background: var(--kora-border);
+}
+
+.footnote {
+  font-size: var(--kora-text-xs);
+  color: var(--kora-text-muted);
+}

@@ -1,0 +1,110 @@
+.wrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-1);
+  align-self: stretch;
+}
+
+.label {
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-medium);
+  line-height: 16px;
+}
+
+.field {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+  height: var(--kora-field-height);
+  padding: 0 var(--kora-space-2);
+  border-radius: var(--kora-radius-sm);
+  border: 1px solid var(--kora-border-strong);
+  background: var(--kora-surface);
+}
+
+.fieldOpen,
+.field:focus-within {
+  border-color: var(--kora-blue-600);
+}
+
+.searchIcon {
+  flex-shrink: 0;
+  color: var(--kora-text-muted);
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: var(--kora-font);
+  font-size: var(--kora-text-base);
+  color: var(--kora-text);
+}
+
+.chevronButton {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+.chevron {
+  color: var(--kora-text-muted);
+}
+
+.panel {
+  position: absolute;
+  top: calc(100% + var(--kora-space-1));
+  left: 0;
+  right: 0;
+  z-index: var(--kora-z-dropdown);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 260px;
+  overflow-y: auto;
+  padding: var(--kora-space-2);
+  border-radius: var(--kora-radius);
+  border: 1px solid var(--kora-border-soft);
+  background: var(--kora-surface);
+  box-shadow: var(--kora-shadow-lg);
+}
+
+.option {
+  display: block;
+  width: 100%;
+  padding: var(--kora-space-2);
+  border: none;
+  border-radius: var(--kora-radius-sm);
+  background: none;
+  color: var(--kora-text);
+  font-family: var(--kora-font);
+  font-size: var(--kora-text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.option:hover {
+  background: var(--kora-surface-muted);
+}
+
+.optionSelected {
+  background: var(--kora-surface-alt);
+  color: var(--kora-navy);
+  font-weight: var(--kora-weight-semibold);
+}
+
+.emptyState {
+  padding: var(--kora-space-2);
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-sm);
+  margin: 0;
+}

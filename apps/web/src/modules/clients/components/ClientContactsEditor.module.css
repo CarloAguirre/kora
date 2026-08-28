@@ -1,0 +1,41 @@
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-3);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr auto;
+  gap: var(--kora-space-2);
+  align-items: start;
+  padding: var(--kora-space-3);
+  border: 1px solid var(--kora-surface-disabled);
+  border-radius: var(--kora-radius-sm);
+  background: var(--kora-surface-muted);
+}
+
+.removeButton {
+  margin-top: 24px;
+}
+
+.addButton {
+  align-self: flex-start;
+}
+
+.empty {
+  font-size: var(--kora-text-sm);
+  color: var(--kora-text-muted);
+  font-style: italic;
+}
+
+@media (max-width: 640px) {
+  .row {
+    grid-template-columns: 1fr;
+  }
+
+  .removeButton {
+    margin-top: 0;
+    justify-self: flex-end;
+  }
+}

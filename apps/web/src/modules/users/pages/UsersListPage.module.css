@@ -1,0 +1,43 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-6);
+  width: 100%;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kora-space-4);
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+.headerText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-1);
+  min-width: 0;
+}
+
+.subtitle {
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-base);
+  /* Altura reservada: el contador aparece al cargar y sin esto la cabecera
+     daría un salto vertical justo cuando llegan los datos. */
+  min-height: 20px;
+}
+
+.tableSection {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+@media (max-width: 640px) {
+  .header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

@@ -1,0 +1,82 @@
+/* Desplegable nativo con la misma caja que el campo de texto. */
+
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-1);
+  align-self: stretch;
+}
+
+.label {
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-medium);
+  line-height: 16px;
+}
+
+.required {
+  color: var(--kora-danger);
+  margin-left: 2px;
+}
+
+.field {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: var(--kora-field-height);
+  border-radius: var(--kora-radius-sm);
+  border: 1px solid var(--kora-border-strong);
+  background: var(--kora-surface);
+}
+
+.field:focus-within {
+  border-color: var(--kora-blue-600);
+}
+
+.invalid,
+.invalid:focus-within {
+  border-color: var(--kora-danger);
+}
+
+.select {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0 28px 0 var(--kora-space-2);
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: var(--kora-font);
+  font-size: var(--kora-text-base);
+  color: var(--kora-text);
+  /* Se oculta la flecha nativa para dibujar una igual en todos los navegadores. */
+  appearance: none;
+}
+
+.select:disabled {
+  color: var(--kora-text-disabled);
+  cursor: not-allowed;
+}
+
+.disabled {
+  background: var(--kora-surface-disabled);
+  border-color: var(--kora-border);
+}
+
+.chevron {
+  position: absolute;
+  right: var(--kora-space-2);
+  pointer-events: none;
+  color: var(--kora-text-muted);
+}
+
+.helper {
+  font-size: var(--kora-text-xs);
+  color: var(--kora-text-muted);
+  min-height: 16px;
+  line-height: 16px;
+}
+
+.helperError {
+  color: var(--kora-danger);
+}

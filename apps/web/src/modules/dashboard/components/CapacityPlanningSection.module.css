@@ -1,0 +1,135 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-4);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--kora-space-3);
+  flex-wrap: wrap;
+}
+
+.title {
+  font-size: var(--kora-text-xl);
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-navy);
+}
+
+.weekSelect {
+  min-width: 200px;
+}
+
+.teams {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-4);
+}
+
+.empty {
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-sm);
+}
+
+.team {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-2);
+}
+
+.teamHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--kora-space-2);
+  flex-wrap: wrap;
+}
+
+.teamNameGroup {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+}
+
+.teamName {
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-semibold);
+  color: var(--kora-navy);
+}
+
+.statusBadge {
+  display: inline-flex;
+  padding: 2px var(--kora-space-2);
+  border-radius: var(--kora-radius-pill);
+  font-size: 11px;
+  font-weight: var(--kora-weight-semibold);
+}
+
+.statusAvailable {
+  background: var(--kora-success-surface);
+  color: var(--kora-success);
+}
+
+.statusLimited {
+  background: var(--kora-warning-surface);
+  color: var(--kora-warning-text);
+}
+
+.teamStats {
+  font-size: var(--kora-text-xs);
+  color: var(--kora-text-muted);
+}
+
+.freeHours {
+  font-weight: var(--kora-weight-semibold);
+}
+
+.freeHoursAvailable {
+  color: var(--kora-success);
+}
+
+.freeHoursLimited {
+  color: var(--kora-warning-text);
+}
+
+.track {
+  height: 12px;
+  border-radius: var(--kora-radius-pill);
+  background: var(--kora-surface-muted);
+  overflow: hidden;
+}
+
+.fill {
+  height: 100%;
+  border-radius: var(--kora-radius-pill);
+  transition: width 0.3s ease;
+}
+
+.fillAvailable {
+  background: var(--kora-success);
+}
+
+.fillLimited {
+  background: var(--kora-warning);
+}
+
+.banner {
+  display: flex;
+  padding: var(--kora-space-4) var(--kora-space-4) var(--kora-space-4) var(--kora-space-5);
+  border-radius: var(--kora-radius);
+  border-left: 4px solid var(--kora-lime);
+  background: var(--kora-lime-surface);
+  font-size: var(--kora-text-base);
+  color: var(--kora-navy);
+}
+
+.banner strong {
+  font-size: var(--kora-text-xl);
+}
+
+.forecastLink {
+  align-self: flex-end;
+  text-decoration: none;
+}

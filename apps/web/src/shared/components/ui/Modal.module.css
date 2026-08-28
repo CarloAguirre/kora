@@ -1,0 +1,92 @@
+/* Diálogo modal sobre <dialog> nativo. */
+
+.dialog {
+  padding: 0;
+  border: none;
+  border-radius: var(--kora-radius-lg);
+  background: var(--kora-surface);
+  box-shadow: var(--kora-shadow-lg);
+  max-width: min(560px, calc(100vw - 32px));
+  width: 100%;
+  color: var(--kora-text);
+}
+
+.dialog::backdrop {
+  background: rgba(18, 34, 53, 0.45);
+}
+
+.wide {
+  max-width: min(840px, calc(100vw - 32px));
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--kora-space-4);
+  padding: var(--kora-space-6) var(--kora-space-6) var(--kora-space-4);
+  border-bottom: 1px solid var(--kora-surface-disabled);
+}
+
+.titles {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-1);
+  min-width: 0;
+}
+
+.title {
+  font-size: var(--kora-text-xl);
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-navy);
+}
+
+.description {
+  font-size: var(--kora-text-base);
+  color: var(--kora-text-muted);
+}
+
+.close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: var(--kora-radius-sm);
+  background: transparent;
+  color: var(--kora-text-muted);
+  flex-shrink: 0;
+}
+
+.close:hover {
+  background: var(--kora-surface-muted);
+  color: var(--kora-navy);
+}
+
+.body {
+  padding: var(--kora-space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-4);
+  max-height: min(60vh, 560px);
+  overflow-y: auto;
+}
+
+.footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--kora-space-3);
+  padding: var(--kora-space-4) var(--kora-space-6) var(--kora-space-6);
+  border-top: 1px solid var(--kora-surface-disabled);
+}
+
+@media (max-width: 640px) {
+  .footer {
+    flex-direction: column-reverse;
+  }
+
+  .footer > * {
+    width: 100%;
+  }
+}

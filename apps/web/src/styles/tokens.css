@@ -1,0 +1,114 @@
+/**
+ * Tokens del sistema de diseño de Kora.
+ *
+ * Los valores están tomados literalmente de la aplicación actual (`dashboard.css`,
+ * `kora-button.css` y los estilos en línea de los componentes Kora*), de modo que
+ * la v2 se ve exactamente igual. La diferencia es que allí el mismo `#122235`
+ * aparecía escrito a mano 1.010 veces repartidas por el proyecto, y aquí está
+ * declarado una sola vez.
+ *
+ * Los tokens son variables CSS globales a propósito: los CSS Modules aíslan los
+ * NOMBRES DE CLASE, no las variables. Cada componente tiene su `.module.css`
+ * privado, y todos beben de esta paleta común.
+ */
+
+:root {
+  /* ── Marca ───────────────────────────────────────────────────────────── */
+  --kora-navy: #122235;
+  --kora-lime: #bbfd53;
+  --kora-lime-hover: #e9ffc7;
+  --kora-lime-surface: #f8ffee;
+  --kora-lime-dark: #4e7511;
+  --kora-lime-mid: #9edb3e;
+
+  /* ── Azules de apoyo (sidebar, estados, gráficos) ────────────────────── */
+  --kora-blue-700: #3b5779;
+  --kora-blue-600: #57769b;
+  --kora-blue-400: #7797bd;
+  --kora-blue-200: #b9c9dd;
+  --kora-blue-surface: #e6f1f8;
+  --kora-blue-surface-alt: #ecf5ff;
+  --kora-blue-link: #155dfc;
+
+  /* ── Neutros ─────────────────────────────────────────────────────────── */
+  --kora-text: #122235;
+  --kora-text-muted: #5a6470;
+  --kora-text-disabled: #a3a7ab;
+  --kora-border: #a3a7ab;
+  --kora-border-strong: #5a6470;
+  --kora-border-soft: #d6dbe0;
+  --kora-surface: #ffffff;
+  --kora-surface-alt: #f9fcff;
+  --kora-surface-muted: #f5f6f8;
+  --kora-surface-disabled: #e2e7eb;
+
+  /* ── Semánticos ──────────────────────────────────────────────────────── */
+  --kora-danger: #c50000;
+  --kora-danger-hover: #aa0006;
+  --kora-danger-surface: #ffb4b5;
+  --kora-danger-surface-soft: #fed5c9;
+  --kora-success: #4fae32;
+  --kora-success-surface: #e8ffe1;
+  --kora-success-text: #155724;
+  --kora-info: #19738c;
+  --kora-warning: #ee7e23;
+  --kora-warning-text: #c34400;
+  --kora-warning-surface: #fee6c9;
+  --kora-warning-strong: #e5c636;
+
+  /* ── Tipografía ──────────────────────────────────────────────────────── */
+  --kora-font: 'Red Hat Display', -apple-system, Roboto, Helvetica, sans-serif;
+  --kora-text-xs: 12px;
+  --kora-text-sm: 13px;
+  --kora-text-base: 14px;
+  --kora-text-lg: 16px;
+  --kora-text-xl: 20px;
+  --kora-text-2xl: 24px;
+  --kora-text-title: 32px;
+
+  --kora-weight-regular: 400;
+  --kora-weight-medium: 500;
+  --kora-weight-semibold: 600;
+  --kora-weight-bold: 700;
+
+  /* ── Espaciado (escala de 4) ─────────────────────────────────────────── */
+  --kora-space-1: 4px;
+  --kora-space-2: 8px;
+  --kora-space-3: 12px;
+  --kora-space-4: 16px;
+  --kora-space-5: 20px;
+  --kora-space-6: 24px;
+  --kora-space-8: 32px;
+  --kora-space-10: 40px;
+
+  /* ── Formas ──────────────────────────────────────────────────────────── */
+  --kora-radius-sm: 4px;
+  --kora-radius: 8px;
+  --kora-radius-lg: 16px;
+  --kora-radius-pill: 999px;
+  --kora-radius-sidebar: 0 48px 0 0;
+
+  /* ── Medidas de la estructura ────────────────────────────────────────── */
+  --kora-sidebar-width: 168px;
+  --kora-topbar-height: 112px;
+  --kora-control-height: 40px;
+  --kora-control-height-sm: 36px;
+  --kora-field-height: 32px;
+
+  /* ── Elevación ───────────────────────────────────────────────────────── */
+  --kora-shadow-sm: 0 1px 2px rgba(18, 34, 53, 0.06);
+  --kora-shadow: 0 2px 8px rgba(18, 34, 53, 0.1);
+  --kora-shadow-lg: 0 8px 24px rgba(18, 34, 53, 0.16);
+  /* Sombra de las tarjetas de contenido (`.card-container` / `.form-card` en la v1). */
+  --kora-shadow-card: 2px 2px 10px 0 rgba(22, 81, 97, 0.21);
+
+  /* ── Movimiento ──────────────────────────────────────────────────────── */
+  --kora-transition: 0.2s ease;
+
+  /* ── Capas ───────────────────────────────────────────────────────────── */
+  --kora-z-dropdown: 100;
+  --kora-z-sticky: 200;
+  --kora-z-overlay: 900;
+  --kora-z-modal: 1000;
+  --kora-z-toast: 1200;
+}

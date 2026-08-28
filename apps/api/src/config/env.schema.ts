@@ -1,0 +1,89 @@
+import { z } from 'zod';
+
+/**
+ * Validación del entorno.
+ *
+ * La aplicación no arranca si falta o es inválida una sola variable. Esto evita
+ * la clase de fallo más cara: desplegar y descubrir en producción que un
+ * secreto venía vacío. `process.env` no se lee en ningún otro punto del código.
+ */
+
+const csvList = z
+  .string()
+  .transform((value) =>
+    value
+      .split(',')
+      .map((item) => item.trim().toLowerCase())
+      .filter(Boolean),
+  )
+  .pipe(z.array(z.string()));
+
+export const envSchema = z.object({
+  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  PORT: z.coerce.number().int().min(1).max(65535).default(3000),
+  API_PREFIX: z.string().default('api'),
+  CORS_ORIGINS: csvList.default([]),
+
+  DATABASE_URL: z.string().min(1, 'DATABASE_URL es obligatoria.'),
+  DATABASE_POOL_SIZE: z.coerce.number().int().min(1).max(100).default(10),
+  DATABASE_SSL: z.stringbool().default(false),
+
+  JWT_ACCESS_SECRET: z.string().min(32, 'JWT_ACCESS_SECRET debe tener al menos 32 caracteres.'),
+  JWT_REFRESH_SECRET: z.string().min(32, 'JWT_REFRESH_SECRET debe tener al menos 32 caracteres.'),
+  JWT_ACCESS_TTL_SECONDS: z.coerce.number().int().min(60).default(900),
+  JWT_REFRESH_TTL_DAYS: z.coerce.number().int().min(1).max(365).default(30),
+
+  ALLOWED_EMAIL_DOMAINS: csvList.default([]),
+
+  // Opcionales: sin ellas, el login con Google queda deshabilitado (ver
+  // AppConfigService.google.enabled) en vez de impedir que la API arranque.
+  GOOGLE_CLIENT_ID: z.string().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
+  GOOGLE_CALLBACK_URL: z.string().optional(),
+
+  MAX_FAILED_LOGIN_ATTEMPTS: z.coerce.number().int().min(1).max(50).default(5),
+  ACCOUNT_LOCK_MINUTES: z.coerce.number().int().min(1).max(1440).default(15),
+
+  LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
+});
+
+export type Env = z.infer<typeof envSchema>;
+
+export function validateEnv(raw: Record<string, unknown>): Env {
+  const parsed = envSchema.safeParse(raw);
+
+  if (!parsed.success) {
+    const issues = parsed.error.issues
+      .map((issue) => `  - ${issue.path.join('.') || '(raíz)'}: ${issue.message}`)
+      .join('\n');
+    throw new Error(`Configuración de entorno inválida:\n${issues}`);
+  }
+
+  if (parsed.data.NODE_ENV === 'production') {
+    assertProductionSafety(parsed.data);
+  }
+
+  return parsed.data;
+}
+
+/** Comprobaciones que solo tienen sentido exigir en producción. */
+function assertProductionSafety(env: Env): void {
+  const problems: string[] = [];
+
+  if (env.JWT_ACCESS_SECRET === env.JWT_REFRESH_SECRET) {
+    problems.push('JWT_ACCESS_SECRET y JWT_REFRESH_SECRET deben ser distintos.');
+  }
+  if (env.JWT_ACCESS_SECRET.includes('cambia-esto')) {
+    problems.push('JWT_ACCESS_SECRET conserva el valor de ejemplo.');
+  }
+  if (env.JWT_REFRESH_SECRET.includes('cambia-esto') || env.JWT_REFRESH_SECRET.includes('y-esto')) {
+    problems.push('JWT_REFRESH_SECRET conserva el valor de ejemplo.');
+  }
+  if (env.CORS_ORIGINS.length === 0) {
+    problems.push('CORS_ORIGINS no puede estar vacío en producción.');
+  }
+
+  if (problems.length > 0) {
+    throw new Error(`Configuración insegura para producción:\n${problems.map((p) => `  - ${p}`).join('\n')}`);
+  }
+}

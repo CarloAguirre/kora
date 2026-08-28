@@ -1,0 +1,34 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-4);
+  width: 100%;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kora-space-4);
+  flex-wrap: wrap;
+}
+
+.subtitle {
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-base);
+  min-height: 20px;
+}
+
+.search {
+  max-width: 360px;
+}
+
+.link {
+  color: var(--kora-navy);
+  font-weight: var(--kora-weight-semibold);
+  text-decoration: underline;
+}
+
+.empty {
+  color: var(--kora-text-disabled);
+}

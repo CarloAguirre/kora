@@ -1,0 +1,120 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-3);
+}
+
+.controls {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--kora-space-3);
+  flex-wrap: wrap;
+}
+
+.toggle {
+  display: inline-flex;
+  border: 1px solid var(--kora-border-strong);
+  border-radius: var(--kora-radius-sm);
+  overflow: hidden;
+}
+
+.toggleButton {
+  padding: var(--kora-space-2) var(--kora-space-4);
+  border: none;
+  background: var(--kora-surface);
+  color: var(--kora-text-muted);
+  font-family: var(--kora-font);
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-semibold);
+  cursor: pointer;
+}
+
+.toggleButtonActive {
+  background: var(--kora-navy);
+  color: var(--kora-surface);
+}
+
+.periodField {
+  width: 240px;
+}
+
+.empty {
+  color: var(--kora-text-disabled);
+}
+
+.tableContainer {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  min-width: 560px;
+  border-collapse: separate;
+  border-spacing: 6px;
+  font-family: var(--kora-font);
+}
+
+.memberHeaderCell {
+  min-width: 160px;
+}
+
+.headerCell {
+  padding: var(--kora-space-2);
+  text-align: center;
+  color: var(--kora-navy);
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-bold);
+  white-space: nowrap;
+}
+
+.memberCell {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+  padding: var(--kora-space-2) var(--kora-space-3);
+  color: var(--kora-navy);
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-semibold);
+  white-space: nowrap;
+}
+
+.cell {
+  text-align: center;
+}
+
+.chip {
+  display: inline-block;
+  min-width: 44px;
+  padding: 4px 8px;
+  border-radius: var(--kora-radius-sm);
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-semibold);
+  border: 1px solid transparent;
+}
+
+.chipEmpty {
+  background: #fdecec;
+  color: #aa0006;
+  border-color: #f3b5b6;
+}
+
+.chipLow {
+  background: #fff6d9;
+  color: #7a5a00;
+  border-color: #f0dfa0;
+}
+
+.chipFull {
+  background: var(--kora-lime-surface);
+  color: var(--kora-lime-dark);
+  border-color: var(--kora-lime-hover);
+}
+
+.skeletonBar {
+  height: 14px;
+  width: 100%;
+  border-radius: var(--kora-radius-sm);
+  background: var(--kora-surface-disabled);
+}

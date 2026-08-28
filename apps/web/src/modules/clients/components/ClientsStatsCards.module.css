@@ -1,0 +1,14 @@
+.row {
+  display: flex;
+  gap: var(--kora-space-6);
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+.donutCard {
+  flex: 1 1 340px;
+}
+
+.breakdownCard {
+  flex: 2 1 420px;
+}

@@ -1,0 +1,32 @@
+{
+  "name": "@kora/db",
+  "version": "2.0.0",
+  "private": true,
+  "type": "commonjs",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch --preserveWatchOutput",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "generate": "drizzle-kit generate",
+    "migrate": "tsx src/migrate.ts",
+    "push": "drizzle-kit push",
+    "studio": "drizzle-kit studio",
+    "seed": "tsx src/seeds/run.ts",
+    "clean": "rimraf dist .turbo"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.45.2",
+    "postgres": "^3.4.9",
+    "@kora/contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "@kora/config": "workspace:*",
+    "@types/node": "^22.16.5",
+    "drizzle-kit": "^0.31.10",
+    "rimraf": "^6.0.1",
+    "tsx": "^4.20.3",
+    "typescript": "5.9.3"
+  }
+}

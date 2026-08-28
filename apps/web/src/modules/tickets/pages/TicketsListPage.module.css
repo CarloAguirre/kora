@@ -1,0 +1,206 @@
+/* Réplica de `.soporte-toolbar` / `.soporte-board` / `.soporte-ticket*` en
+   dashboard.css (v1) — tablero Kanban, no listado tabular. */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-4);
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-3);
+}
+
+.toolbarActions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--kora-space-3);
+}
+
+.filtersRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--kora-space-3);
+}
+
+.search {
+  min-width: 240px;
+}
+
+.filter {
+  min-width: 200px;
+}
+
+/* ─── Kanban board ─── */
+.board {
+  display: flex;
+  gap: var(--kora-space-4);
+  flex: 1;
+  overflow-x: auto;
+  min-height: 0;
+}
+
+.column {
+  display: flex;
+  flex: 1 0 0;
+  min-width: 258px;
+  padding: var(--kora-space-2);
+  flex-direction: column;
+  gap: var(--kora-space-2);
+  border-radius: var(--kora-radius-lg);
+  border: 1px solid var(--kora-blue-200);
+  background: var(--kora-surface-alt);
+  overflow: hidden;
+  transition:
+    border-color 0.2s,
+    background 0.2s;
+}
+
+.columnDragOver {
+  border-color: var(--kora-lime);
+  background: var(--kora-lime-surface);
+}
+
+.columnHeader {
+  font-size: var(--kora-text-lg);
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-navy);
+  padding: 0 var(--kora-space-2);
+}
+
+.columnBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-2);
+  overflow-y: auto;
+}
+
+.empty {
+  padding: 0 var(--kora-space-2);
+  color: var(--kora-text-disabled);
+  font-size: var(--kora-text-sm);
+}
+
+/* ─── Ticket card ─── */
+.ticket {
+  display: flex;
+  width: 100%;
+  padding: var(--kora-space-4);
+  flex-direction: column;
+  gap: var(--kora-space-2);
+  border-radius: var(--kora-radius-lg);
+  border: 1px solid var(--kora-blue-400);
+  background: var(--kora-surface);
+  cursor: grab;
+  transition: box-shadow 0.2s;
+  box-sizing: border-box;
+  text-align: left;
+}
+
+.ticket:hover {
+  box-shadow: var(--kora-shadow);
+}
+
+.ticketUnassigned {
+  border-color: var(--kora-danger-surface);
+}
+
+.ticketUnassigned .responsableRow {
+  color: var(--kora-danger-hover);
+}
+
+.ticket:active {
+  cursor: grabbing;
+}
+
+.ticketHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.hhChip {
+  display: inline-flex;
+  height: 24px;
+  padding: 4px var(--kora-space-2);
+  align-items: center;
+  border-radius: var(--kora-radius-sm);
+  border: 1px solid var(--kora-info);
+  background: var(--kora-blue-surface);
+  color: var(--kora-info);
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-medium);
+}
+
+.divider {
+  width: 100%;
+  height: 1px;
+  background: var(--kora-surface-disabled);
+}
+
+.idRow {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-1);
+  color: var(--kora-text-muted);
+}
+
+.code {
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-medium);
+  color: var(--kora-text);
+}
+
+.separator {
+  width: 1px;
+  height: 19px;
+  background: var(--kora-border);
+}
+
+.title {
+  flex: 1;
+  font-size: var(--kora-text-base);
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.infoRow {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-1);
+  font-size: var(--kora-text-base);
+  font-weight: var(--kora-weight-regular);
+  color: var(--kora-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 1024px) {
+  .board {
+    overflow-x: auto;
+  }
+  .column {
+    min-width: 220px;
+  }
+}
+
+@media (max-width: 640px) {
+  .toolbarActions {
+    justify-content: stretch;
+  }
+  .filtersRow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

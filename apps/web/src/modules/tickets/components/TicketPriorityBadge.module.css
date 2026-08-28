@@ -1,0 +1,35 @@
+.badge {
+  display: inline-flex;
+  height: 24px;
+  padding: 4px var(--kora-space-2);
+  align-items: center;
+  border-radius: var(--kora-radius-sm);
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-semibold);
+  line-height: normal;
+  white-space: nowrap;
+}
+
+.critical {
+  background: var(--kora-danger-surface);
+  color: var(--kora-danger-hover);
+}
+
+.high {
+  background: var(--kora-danger-surface-soft);
+  color: var(--kora-danger);
+}
+
+.medium {
+  background: var(--kora-warning-surface);
+  color: var(--kora-warning-text);
+}
+
+.low {
+  background: var(--kora-blue-surface);
+  color: var(--kora-info);
+}
+
+.empty {
+  color: var(--kora-text-disabled);
+}

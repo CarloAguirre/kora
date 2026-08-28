@@ -1,0 +1,181 @@
+/* Selección múltiple: misma caja que Select, panel de casillas propio. */
+
+.wrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-1);
+  /* A propósito, sin `align-self: stretch`: a diferencia de Select/TextField,
+   * este wrapper no tiene una fila de texto de ayuda debajo del campo, así
+   * que estirarlo a la altura de esos vecinos deja un hueco vacío antes del
+   * panel — cuyo `top: 100%` mide justo ese alto estirado, no el borde real
+   * del botón disparador. */
+  align-self: flex-end;
+}
+
+.label {
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-medium);
+  line-height: 16px;
+}
+
+.trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kora-space-2);
+  height: var(--kora-field-height);
+  padding: 0 var(--kora-space-2);
+  border-radius: var(--kora-radius-sm);
+  border: 1px solid var(--kora-border-strong);
+  background: var(--kora-surface);
+  font-family: var(--kora-font);
+  font-size: var(--kora-text-base);
+  color: var(--kora-text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.trigger:hover {
+  border-color: var(--kora-blue-600);
+}
+
+.trigger[aria-expanded='true'] {
+  border-color: var(--kora-blue-600);
+}
+
+.summary {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chevron {
+  flex-shrink: 0;
+  color: var(--kora-text-muted);
+}
+
+.panel {
+  position: absolute;
+  top: calc(100% + var(--kora-space-1));
+  left: 0;
+  z-index: var(--kora-z-dropdown);
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-3);
+  width: 280px;
+  padding: var(--kora-space-4);
+  border-radius: var(--kora-radius);
+  border: 1px solid var(--kora-border-soft);
+  background: var(--kora-surface);
+  box-shadow: var(--kora-shadow-lg);
+}
+
+.panelHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--kora-space-2);
+}
+
+.panelTitle {
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-semibold);
+  color: var(--kora-text);
+}
+
+.clearLink {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--kora-text-muted);
+  font-family: var(--kora-font);
+  font-size: var(--kora-text-xs);
+  cursor: pointer;
+}
+
+.clearLink:hover {
+  color: var(--kora-navy);
+  text-decoration: underline;
+}
+
+.searchField {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+  height: var(--kora-field-height);
+  padding: 0 var(--kora-space-2);
+  border-radius: var(--kora-radius-sm);
+  border: 1px solid var(--kora-border-soft);
+  background: var(--kora-surface-alt);
+}
+
+.searchField:focus-within {
+  border-color: var(--kora-blue-600);
+}
+
+.searchIcon {
+  flex-shrink: 0;
+  color: var(--kora-text-muted);
+}
+
+.searchInput {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: var(--kora-font);
+  font-size: var(--kora-text-sm);
+  color: var(--kora-text);
+}
+
+.optionList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-1);
+  max-height: 220px;
+  overflow-y: auto;
+  border-top: 1px solid var(--kora-surface-disabled);
+  border-bottom: 1px solid var(--kora-surface-disabled);
+  padding: var(--kora-space-2) 0;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+  padding: var(--kora-space-1) var(--kora-space-1);
+  border-radius: var(--kora-radius-sm);
+  font-size: var(--kora-text-sm);
+  color: var(--kora-text);
+  cursor: pointer;
+}
+
+.option:hover {
+  background: var(--kora-surface-muted);
+}
+
+.option input[type='checkbox'] {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--kora-navy);
+}
+
+.emptyState {
+  padding: var(--kora-space-2) var(--kora-space-1);
+  font-size: var(--kora-text-sm);
+  color: var(--kora-text-muted);
+}
+
+.panelFooter {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--kora-space-2);
+}

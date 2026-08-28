@@ -1,0 +1,232 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-5);
+  width: 100%;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--kora-space-4);
+  flex-wrap: wrap;
+}
+
+.headerText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-1);
+  min-width: 0;
+}
+
+.title {
+  font-size: var(--kora-text-xl);
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-navy);
+  margin: 0;
+}
+
+.subtitle {
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-sm);
+  margin: 0;
+}
+
+.controls {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--kora-space-3);
+  flex-wrap: wrap;
+}
+
+.toggle {
+  display: inline-flex;
+  border: 1px solid var(--kora-border-strong);
+  border-radius: var(--kora-radius-sm);
+  overflow: hidden;
+}
+
+.toggleButton {
+  padding: var(--kora-space-2) var(--kora-space-4);
+  border: none;
+  background: var(--kora-surface);
+  color: var(--kora-text-muted);
+  font-family: var(--kora-font);
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-semibold);
+  cursor: pointer;
+}
+
+.toggleButtonActive {
+  background: var(--kora-navy);
+  color: var(--kora-surface);
+}
+
+.periodField {
+  width: 240px;
+}
+
+.filters {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--kora-space-4);
+  flex-wrap: wrap;
+}
+
+.search {
+  width: 100%;
+  max-width: 320px;
+}
+
+.roleFilter,
+.teamFilter {
+  width: 200px;
+}
+
+.incompleteFilter {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--kora-space-2);
+  max-width: 320px;
+  padding: var(--kora-space-2) var(--kora-space-3);
+  border: 1px solid var(--kora-border);
+  border-radius: var(--kora-radius-sm);
+  background: var(--kora-surface-alt);
+  cursor: pointer;
+}
+
+.incompleteFilter input {
+  margin-top: 3px;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--kora-navy);
+  cursor: pointer;
+}
+
+.incompleteFilterText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.incompleteFilterTitle {
+  color: var(--kora-navy);
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-bold);
+}
+
+.incompleteFilterHelp {
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-medium);
+}
+
+.empty {
+  color: var(--kora-text-disabled);
+}
+
+.tableContainer {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  min-width: 560px;
+  border-collapse: separate;
+  border-spacing: 6px;
+  font-family: var(--kora-font);
+}
+
+.memberHeaderCell {
+  min-width: 180px;
+}
+
+.headerCell {
+  padding: var(--kora-space-2);
+  text-align: center;
+  color: var(--kora-navy);
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-bold);
+  white-space: nowrap;
+}
+
+.memberCell {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+  padding: var(--kora-space-2) var(--kora-space-3);
+  color: var(--kora-navy);
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-semibold);
+  white-space: nowrap;
+}
+
+.memberInfo {
+  display: flex;
+  flex-direction: column;
+}
+
+.memberMeta {
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-medium);
+}
+
+.cell {
+  text-align: center;
+}
+
+.chip {
+  display: inline-block;
+  min-width: 44px;
+  padding: 4px 8px;
+  border-radius: var(--kora-radius-sm);
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-semibold);
+  border: 1px solid transparent;
+}
+
+.chipEmpty {
+  background: #fdecec;
+  color: #aa0006;
+  border-color: #f3b5b6;
+}
+
+.chipLow {
+  background: #fff6d9;
+  color: #7a5a00;
+  border-color: #f0dfa0;
+}
+
+.chipFull {
+  background: var(--kora-lime-surface);
+  color: var(--kora-lime-dark);
+  border-color: var(--kora-lime-hover);
+}
+
+.skeletonBar {
+  height: 14px;
+  width: 100%;
+  border-radius: var(--kora-radius-sm);
+  background: var(--kora-surface-disabled);
+}
+
+@media (max-width: 640px) {
+  .header,
+  .controls,
+  .filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .periodField,
+  .roleFilter,
+  .teamFilter,
+  .search,
+  .incompleteFilter {
+    max-width: none;
+    width: 100%;
+  }
+}

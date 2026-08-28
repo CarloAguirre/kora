@@ -1,0 +1,39 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-4);
+  height: 100%;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--kora-space-3);
+  flex-wrap: wrap;
+}
+
+.titleGroup {
+  display: flex;
+  flex-direction: column;
+}
+
+.title {
+  font-size: var(--kora-text-base);
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-navy);
+}
+
+.subtitle {
+  font-size: var(--kora-text-sm);
+  color: var(--kora-text-muted);
+}
+
+.periodSelect {
+  min-width: 180px;
+}
+
+.chartArea {
+  flex: 1;
+  min-width: 0;
+}

@@ -1,0 +1,19 @@
+.indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+  font-size: var(--kora-text-base);
+  color: var(--kora-navy);
+  font-weight: var(--kora-weight-semibold);
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.empty {
+  color: var(--kora-text-disabled);
+}

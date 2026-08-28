@@ -1,0 +1,90 @@
+/* Navegación lateral — navy con esquina redondeada, igual que la v1. */
+
+.sidebar {
+  display: flex;
+  width: var(--kora-sidebar-width);
+  min-width: var(--kora-sidebar-width);
+  padding-bottom: var(--kora-space-10);
+  flex-direction: column;
+  align-items: center;
+  border-radius: var(--kora-radius-sidebar);
+  background: var(--kora-navy);
+  flex-shrink: 0;
+}
+
+.brand {
+  display: flex;
+  height: var(--kora-topbar-height);
+  padding: var(--kora-space-8) var(--kora-space-6);
+  justify-content: center;
+  align-items: center;
+  align-self: stretch;
+  border-radius: var(--kora-radius-sidebar);
+  flex-shrink: 0;
+}
+
+.nav {
+  display: flex;
+  padding-top: var(--kora-space-4);
+  flex-direction: column;
+  align-items: center;
+  gap: var(--kora-space-4);
+  align-self: stretch;
+  flex: 1;
+}
+
+.navItem {
+  display: flex;
+  height: 48px;
+  padding: var(--kora-space-2) var(--kora-space-4);
+  align-items: center;
+  gap: var(--kora-space-2);
+  align-self: stretch;
+  background: none;
+  border: none;
+  border-radius: var(--kora-radius);
+  color: var(--kora-surface-alt);
+  font-family: var(--kora-font);
+  font-size: var(--kora-text-base);
+  font-weight: var(--kora-weight-medium);
+  text-align: left;
+  transition: background var(--kora-transition);
+}
+
+.navItem:hover:not(.active) {
+  background: var(--kora-blue-600);
+}
+
+.active {
+  color: var(--kora-lime);
+  font-weight: var(--kora-weight-bold);
+}
+
+.navIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.navLabel {
+  flex: 1 0 0;
+}
+
+@media (max-width: 1024px) {
+  .sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: calc(var(--kora-z-overlay) + 1);
+    transform: translateX(-100%);
+    transition: transform var(--kora-transition);
+  }
+
+  .open {
+    transform: translateX(0);
+  }
+}

@@ -1,0 +1,271 @@
+import { useMemo, useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import type { ProjectSummary } from '@kora/contracts';
+import styles from './ClientDetailPage.module.css';
+import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
+import { Button } from '@/shared/components/ui/Button';
+import { Card } from '@/shared/components/ui/Card';
+import { DataTable, type Column, type SortState } from '@/shared/components/ui/DataTable';
+import { Pagination } from '@/shared/components/ui/Pagination';
+import { Tabs } from '@/shared/components/ui/Tabs';
+import { TextField } from '@/shared/components/ui/TextField';
+import { PencilIcon, PlusIcon, ChevronLeftIcon, SearchIcon } from '@/shared/components/icons/Icons';
+import { ClientStatusBadge } from '../components/ClientStatusBadge';
+import { ClientFormDialog } from '../components/ClientFormDialog';
+import { useClientDetail } from '../api/clients.queries';
+import { useProjectsList } from '@/modules/projects/api/projects.queries';
+import { ProjectStatusBadge } from '@/modules/projects/components/ProjectStatusBadge';
+import { getProjectStageLabel } from '@/modules/projects/lib/project-stage-display';
+import { usePermissions } from '@/modules/auth/hooks/usePermissions';
+
+const PAGE_SIZE = 10;
+
+type ProjectTab = 'all' | 'active' | 'draft' | 'on_hold' | 'support' | 'finished' | 'quoted' | 'prospect';
+
+const TAB_LABELS: Readonly<Record<ProjectTab, string>> = {
+  all: 'Todos',
+  active: 'Activos',
+  draft: 'No iniciados',
+  on_hold: 'Detenidos',
+  support: 'Soporte',
+  finished: 'Finalizados',
+  quoted: 'Cotización',
+  prospect: 'Prospecto',
+};
+
+function matchesTab(project: ProjectSummary, tab: ProjectTab): boolean {
+  switch (tab) {
+    case 'all':
+      return true;
+    case 'support':
+      return project.type === 'support';
+    case 'quoted':
+    case 'prospect':
+      return project.type === 'development' && project.salesStage === tab;
+    default:
+      return project.status === tab;
+  }
+}
+
+const formatDate = (value: string | null) => (value ? new Date(value).toLocaleDateString('es-CL') : '—');
+const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 2 });
+
+function formatDuration(start: string | null, end: string | null): string {
+  if (!start) return '—';
+  const startDate = new Date(start);
+  const endDate = end ? new Date(end) : new Date();
+  const days = Math.ceil(Math.abs(endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+  if (days < 30) return `${days} días`;
+  const months = Math.round(days / 30);
+  return months === 1 ? '1 mes' : `${months} meses`;
+}
+
+/**
+ * Ficha de cliente: datos de la empresa, contactos y sus proyectos —
+ * equivalente a `ClienteDetalle` en la v1 (`/clientes/:cliente`), que la v2
+ * nunca llegó a construir a pesar de que el backend ya exponía el detalle
+ * completo (`useClientDetail`) desde M1.
+ */
+export function ClientDetailPage() {
+  const { clientId } = useParams<{ clientId: string }>();
+  const navigate = useNavigate();
+  const { can } = usePermissions();
+  const { data: client, isLoading } = useClientDetail(clientId ?? null);
+  const { data: projects } = useProjectsList({ clientId: clientId ?? undefined, page: 1, pageSize: 100 });
+  const [editing, setEditing] = useState(false);
+  const [tab, setTab] = useState<ProjectTab>('all');
+  const [search, setSearch] = useState('');
+  const [sort, setSort] = useState<SortState>({ field: 'name', direction: 'asc' });
+  const [page, setPage] = useState(1);
+
+  const allProjects = projects?.items ?? [];
+
+  const tabCounts = useMemo(() => {
+    const counts = {} as Record<ProjectTab, number>;
+    (Object.keys(TAB_LABELS) as ProjectTab[]).forEach((key) => {
+      counts[key] = allProjects.filter((p) => matchesTab(p, key)).length;
+    });
+    return counts;
+  }, [allProjects]);
+
+  const filteredProjects = useMemo(() => {
+    let data = allProjects.filter((p) => matchesTab(p, tab));
+
+    if (search.trim()) {
+      const query = search.trim().toLowerCase();
+      data = data.filter(
+        (p) =>
+          p.name.toLowerCase().includes(query) ||
+          (p.leader?.fullName ?? '').toLowerCase().includes(query) ||
+          (p.client?.companyName ?? '').toLowerCase().includes(query),
+      );
+    }
+
+    const direction = sort.direction === 'asc' ? 1 : -1;
+    const sorted = [...data].sort((a, b) => {
+      switch (sort.field) {
+        case 'startDate':
+          return direction * (new Date(a.startDate ?? 0).getTime() - new Date(b.startDate ?? 0).getTime());
+        case 'soldHours':
+          return direction * (a.soldHours - b.soldHours);
+        case 'usedHours':
+          return direction * (a.usedHours - b.usedHours);
+        default:
+          return direction * a.name.localeCompare(b.name, 'es');
+      }
+    });
+    return sorted;
+  }, [allProjects, tab, search, sort]);
+
+  const pageCount = Math.max(1, Math.ceil(filteredProjects.length / PAGE_SIZE));
+  const pagedProjects = filteredProjects.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  if (isLoading || !client || !clientId) {
+    return (
+      <DashboardLayout title="Cliente">
+        <p>Cargando…</p>
+      </DashboardLayout>
+    );
+  }
+
+  const toggleSort = (field: string) => {
+    setSort((prev) => (prev.field === field ? { field, direction: prev.direction === 'asc' ? 'desc' : 'asc' } : { field, direction: 'asc' }));
+    setPage(1);
+  };
+
+  const columns: Column<ProjectSummary>[] = [
+    {
+      key: 'name',
+      header: 'Nombre Proyecto',
+      sortable: true,
+      render: (p) => (
+        <Link to={`/proyectos/${p.id}`} className={styles.link}>
+          {p.name}
+        </Link>
+      ),
+    },
+    { key: 'status', header: 'Estado', render: (p) => <ProjectStatusBadge status={p.status} /> },
+    { key: 'startDate', header: 'Inicio', sortable: true, render: (p) => formatDate(p.startDate) },
+    { key: 'duration', header: 'Duración', render: (p) => formatDuration(p.startDate, p.endDate) },
+    { key: 'endDate', header: 'Fin Estimado', render: (p) => formatDate(p.endDate) },
+    { key: 'soldHours', header: 'HH Vendidas', sortable: true, render: (p) => formatHours(p.soldHours) },
+    { key: 'usedHours', header: 'HH Utilizadas', sortable: true, render: (p) => formatHours(p.usedHours) },
+    { key: 'stage', header: 'Etapa', render: (p) => getProjectStageLabel(p) },
+  ];
+
+  return (
+    <DashboardLayout title="Clientes">
+      <div className={styles.page}>
+        <div className={styles.header}>
+          <div className={styles.headerLeft}>
+            <Button variant="ghost" size="icon" onClick={() => void navigate(-1)} aria-label="Volver">
+              <ChevronLeftIcon size={20} />
+            </Button>
+            <h2 className={styles.clientName}>{client.companyName}</h2>
+          </div>
+          {can('projects:manage') && (
+            <Link to={`/proyectos/nuevo?clientId=${client.id}`}>
+              <Button iconLeft={<PlusIcon size={18} />}>Agregar Proyecto</Button>
+            </Link>
+          )}
+        </div>
+
+        <Card>
+          <div className={styles.datosHeader}>
+            <p className={styles.sectionTitle}>Datos del Cliente</p>
+            <div className={styles.datosHeaderRight}>
+              <ClientStatusBadge status={client.status} />
+              {can('clients:manage') && (
+                <Button variant="ghost" size="icon" onClick={() => setEditing(true)} aria-label="Editar cliente" title="Editar">
+                  <PencilIcon size={16} />
+                </Button>
+              )}
+            </div>
+          </div>
+
+          <div className={styles.datosGrid}>
+            <div className={styles.datosCol}>
+              <Field label="Empresa" value={client.companyName} />
+              <Field label="Razón social" value={client.legalName} />
+              <Field label="RUT/Identificador" value={client.taxId} />
+              <Field label="Rubro" value={client.industry?.name} />
+            </div>
+            <div className={styles.datosCol}>
+              <Field label="Sitio web" value={client.website} />
+              <Field label="Dirección" value={client.address} />
+              <Field label="Comuna" value={client.comuna?.name} />
+              <Field label="País" value={client.country?.name} />
+            </div>
+            <div className={styles.datosCol}>
+              <Field label="Responsable comercial" value={client.commercialManager?.fullName} />
+              {client.contacts.length === 0 && <Field label="Contacto" value={null} />}
+              {client.contacts.map((contact) => (
+                <div key={contact.id} className={styles.contactBlock}>
+                  <Field label="Nombre contacto" value={contact.name} />
+                  <Field label="Cargo" value={contact.position} />
+                  <Field label="Correo electrónico" value={contact.email} />
+                  <Field label="Teléfono" value={contact.phone} />
+                </div>
+              ))}
+            </div>
+          </div>
+        </Card>
+
+        <Card>
+          <p className={styles.sectionTitle}>Proyectos ({projects?.total ?? 0})</p>
+
+          <div className={styles.projectsToolbar}>
+            <Tabs
+              tabs={(Object.keys(TAB_LABELS) as ProjectTab[]).map((key) => ({
+                id: key,
+                label: `${TAB_LABELS[key]} (${tabCounts[key]})`,
+              }))}
+              activeId={tab}
+              onSelect={(id) => {
+                setTab(id as ProjectTab);
+                setPage(1);
+              }}
+            />
+            <TextField
+              className={styles.projectsSearch}
+              label="Buscar"
+              type="search"
+              placeholder="Nombre, cliente o líder"
+              value={search}
+              onChange={(event) => {
+                setSearch(event.target.value);
+                setPage(1);
+              }}
+              iconLeft={<SearchIcon size={16} />}
+            />
+          </div>
+
+          <DataTable
+            caption="Proyectos del cliente"
+            columns={columns}
+            items={pagedProjects}
+            getRowKey={(p) => p.id}
+            loading={false}
+            error={null}
+            sort={sort}
+            onSortChange={toggleSort}
+            emptyMessage="Este cliente todavía no tiene proyectos."
+          />
+
+          <Pagination page={page} pageCount={pageCount} total={filteredProjects.length} pageSize={PAGE_SIZE} onPageChange={setPage} />
+        </Card>
+      </div>
+
+      <ClientFormDialog open={editing} clientId={client.id} onClose={() => setEditing(false)} onSuccess={() => setEditing(false)} />
+    </DashboardLayout>
+  );
+}
+
+function Field({ label, value }: { label: string; value?: string | null }) {
+  return (
+    <div className={styles.field}>
+      <span className={styles.fieldLabel}>{label}:</span>
+      <span className={styles.fieldValue}>{value || '—'}</span>
+    </div>
+  );
+}

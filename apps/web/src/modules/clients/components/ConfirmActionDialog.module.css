@@ -1,0 +1,15 @@
+.alert {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--kora-space-2);
+  padding: var(--kora-space-3);
+  border-radius: var(--kora-radius-sm);
+  background: var(--kora-danger-surface-soft);
+  color: var(--kora-danger-hover);
+  font-size: var(--kora-text-base);
+}
+
+.alertIcon {
+  flex-shrink: 0;
+  margin-top: 1px;
+}

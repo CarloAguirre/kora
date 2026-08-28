@@ -1,0 +1,6 @@
+{
+  "name": "@kora/config",
+  "version": "2.0.0",
+  "private": true,
+  "files": ["tsconfig.base.json", "tsconfig.lib.json", "tsconfig.node.json"]
+}

@@ -1,0 +1,64 @@
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-4);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--kora-space-4);
+}
+
+.checkboxRow {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--kora-space-2);
+}
+
+.checkbox {
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  accent-color: var(--kora-navy);
+  flex-shrink: 0;
+}
+
+.checkboxLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  cursor: pointer;
+}
+
+.checkboxTitle {
+  font-size: var(--kora-text-base);
+  color: var(--kora-text);
+}
+
+.checkboxHint {
+  font-size: var(--kora-text-xs);
+  color: var(--kora-text-muted);
+}
+
+.alert {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--kora-space-2);
+  padding: var(--kora-space-3);
+  border-radius: var(--kora-radius-sm);
+  background: var(--kora-danger-surface-soft);
+  color: var(--kora-danger-hover);
+  font-size: var(--kora-text-base);
+}
+
+.alertIcon {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+@media (max-width: 640px) {
+  .row {
+    grid-template-columns: 1fr;
+  }
+}

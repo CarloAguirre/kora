@@ -1,0 +1,68 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--kora-space-3);
+  flex: 1;
+}
+
+.ring {
+  position: relative;
+  width: 106px;
+  height: 106px;
+}
+
+.ringLabel {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+}
+
+.ringValue {
+  font-size: var(--kora-text-2xl);
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-navy);
+}
+
+.ringUnit {
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-navy);
+}
+
+.legendGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--kora-space-2) var(--kora-space-3);
+  align-self: stretch;
+}
+
+.legendRow {
+  display: flex;
+  justify-content: center;
+  gap: var(--kora-space-4);
+  flex-wrap: wrap;
+}
+
+.legendItem {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--kora-space-2);
+}
+
+.legendDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+
+.legendText {
+  font-size: var(--kora-text-xs);
+  color: var(--kora-navy);
+}

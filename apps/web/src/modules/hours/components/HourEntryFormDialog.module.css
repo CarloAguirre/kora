@@ -1,0 +1,333 @@
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-4);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--kora-space-4);
+}
+
+.alert {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--kora-space-2);
+  padding: var(--kora-space-3);
+  border-radius: var(--kora-radius-sm);
+  background: var(--kora-danger-surface-soft);
+  color: var(--kora-danger-hover);
+  font-size: var(--kora-text-base);
+}
+
+.alertIcon {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--kora-space-3);
+  margin-top: var(--kora-space-2);
+}
+
+@media (max-width: 640px) {
+  .row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.tabsRow {
+  margin-bottom: var(--kora-space-4);
+}
+
+.noticeInfo,
+.noticeWarning {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--kora-space-2);
+  padding: var(--kora-space-3);
+  border-radius: var(--kora-radius-sm);
+  font-size: var(--kora-text-sm);
+}
+
+.noticeInfo {
+  background: #eef5ff;
+  color: #1d4f91;
+}
+
+.noticeWarning {
+  background: #fff8e1;
+  color: #8b6914;
+}
+
+.overCapValue {
+  color: var(--kora-danger);
+}
+
+.block {
+  border: 1px solid var(--kora-border-soft);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.blockHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+  padding: var(--kora-space-3) var(--kora-space-4);
+  background: var(--kora-surface-alt);
+  color: var(--kora-blue-400);
+  cursor: pointer;
+}
+
+.blockHeaderExpanded {
+  background: var(--kora-surface);
+}
+
+.blockTitle {
+  flex: 1;
+  font-weight: var(--kora-weight-semibold);
+  color: var(--kora-navy);
+  font-size: var(--kora-text-sm);
+}
+
+.blockBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-3);
+  padding: 0 var(--kora-space-4) var(--kora-space-4);
+}
+
+.addBlockButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--kora-space-2);
+  padding: var(--kora-space-3);
+  border: 1px dashed var(--kora-blue-200);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--kora-blue-400);
+  font-family: inherit;
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-medium);
+  cursor: pointer;
+}
+
+.addBlockButton:hover {
+  background: var(--kora-lime-surface);
+}
+
+.blockError {
+  color: var(--kora-danger);
+  font-size: var(--kora-text-xs);
+}
+
+.overtimeToggle {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+  align-self: flex-end;
+  padding-bottom: var(--kora-space-2);
+  font-size: var(--kora-text-sm);
+  color: var(--kora-navy);
+  white-space: nowrap;
+}
+
+.dailyTotal {
+  align-self: flex-end;
+  font-size: var(--kora-text-sm);
+  color: var(--kora-navy);
+}
+
+.weekNav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--kora-space-3);
+}
+
+.weekRange {
+  font-weight: var(--kora-weight-semibold);
+  color: var(--kora-navy);
+  font-size: var(--kora-text-sm);
+  min-width: 130px;
+  text-align: center;
+}
+
+.weekGrid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: var(--kora-space-3);
+}
+
+@media (max-width: 640px) {
+  .weekGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.formSubtitle {
+  margin: calc(var(--kora-space-4) * -1) 0 0;
+  color: var(--kora-blue-400);
+  font-size: var(--kora-text-sm);
+}
+
+.stepperField,
+.overtimeField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-2);
+  flex: 1;
+}
+
+.stepperLabel {
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-medium);
+  color: var(--kora-navy);
+}
+
+.stepper {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--kora-border-soft);
+  border-radius: var(--kora-radius-sm);
+  overflow: hidden;
+  height: 40px;
+}
+
+.stepperButton {
+  width: 40px;
+  border: none;
+  background: var(--kora-surface-alt);
+  color: var(--kora-navy);
+  font-size: var(--kora-text-lg);
+  font-weight: var(--kora-weight-semibold);
+  cursor: pointer;
+}
+
+.stepperButton:hover {
+  background: var(--kora-lime-surface);
+}
+
+.stepperInput {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  border-left: 1px solid var(--kora-border-soft);
+  border-right: 1px solid var(--kora-border-soft);
+  text-align: center;
+  font-family: inherit;
+  font-size: var(--kora-text-sm);
+  color: var(--kora-navy);
+}
+
+.stepperInput:focus {
+  outline: none;
+}
+
+.overtimeToggleRow {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+  height: 40px;
+}
+
+.overtimeSwitch {
+  display: inline-block;
+  width: 34px;
+  height: 18px;
+  border-radius: var(--kora-radius-pill);
+  background: var(--kora-border-soft);
+  position: relative;
+}
+
+.overtimeSwitch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--kora-surface);
+}
+
+.overtimeState {
+  font-size: var(--kora-text-sm);
+  color: var(--kora-blue-400);
+}
+
+.overtimeHelp {
+  font-size: var(--kora-text-xs);
+  color: var(--kora-text-disabled);
+}
+
+.textareaField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-2);
+}
+
+.textareaLabel {
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-medium);
+  color: var(--kora-navy);
+}
+
+.textarea {
+  min-height: 90px;
+  padding: var(--kora-space-3);
+  border: 1px solid var(--kora-border-soft);
+  border-radius: var(--kora-radius-sm);
+  font-family: inherit;
+  font-size: var(--kora-text-sm);
+  color: var(--kora-navy);
+  resize: vertical;
+}
+
+.weekSummaryRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kora-space-3);
+  flex-wrap: wrap;
+}
+
+.weekSummaryLabel {
+  font-size: var(--kora-text-sm);
+  color: var(--kora-navy);
+}
+
+.weekSummaryValue {
+  color: var(--kora-lime-dark);
+}
+
+.hoursGridHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kora-space-3);
+}
+
+.autoFillToggle {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+  font-size: var(--kora-text-xs);
+  color: var(--kora-blue-400);
+}
+
+.totalBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--kora-space-3) var(--kora-space-4);
+  background: var(--kora-surface-muted);
+  border-radius: var(--kora-radius-sm);
+  font-size: var(--kora-text-sm);
+  color: var(--kora-navy);
+}

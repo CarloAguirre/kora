@@ -1,0 +1,220 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-4);
+  width: 100%;
+}
+
+.title {
+  margin: 0;
+  color: var(--kora-navy);
+  font-size: var(--kora-text-xl);
+  font-weight: var(--kora-weight-bold);
+}
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--kora-space-3);
+}
+
+.kpiCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-2);
+  min-height: 108px;
+}
+
+.kpiLabelRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kora-space-2);
+}
+
+.kpiLabel {
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-medium);
+  color: var(--kora-blue-400);
+}
+
+.kpiValue {
+  font-size: var(--kora-text-2xl);
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-navy);
+}
+
+.kpiValueDanger {
+  color: var(--kora-danger);
+}
+
+.kpiSub {
+  font-size: var(--kora-text-xs);
+  color: var(--kora-blue-400);
+}
+
+.loadingText {
+  color: var(--kora-text-disabled);
+}
+
+.donutRow {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-3);
+}
+
+.donutLabel {
+  font-family: inherit;
+  font-weight: var(--kora-weight-bold);
+  font-size: 14px;
+  fill: var(--kora-navy);
+}
+
+.donutValue {
+  font-size: var(--kora-text-2xl);
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-navy);
+}
+
+.donutSub {
+  font-size: var(--kora-text-xs);
+  color: var(--kora-blue-400);
+}
+
+.progressTrack {
+  height: 8px;
+  border-radius: var(--kora-radius-pill);
+  background: var(--kora-border-soft);
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  border-radius: var(--kora-radius-pill);
+  background: var(--kora-lime-dark);
+}
+
+.attentionAlert {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+  padding: var(--kora-space-2) var(--kora-space-3);
+  border-radius: var(--kora-radius);
+  background: var(--kora-danger-surface-soft);
+  color: var(--kora-danger);
+  font-weight: var(--kora-weight-semibold);
+  font-size: var(--kora-text-sm);
+  width: fit-content;
+}
+
+.attentionOk {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--kora-space-1);
+  color: var(--kora-success-text);
+  font-weight: var(--kora-weight-semibold);
+  text-align: center;
+}
+
+.countBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: var(--kora-radius-pill);
+  background: var(--kora-blue-200);
+  color: var(--kora-navy);
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-bold);
+}
+
+.projectList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.projectItem {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+  font-size: var(--kora-text-sm);
+  color: var(--kora-navy);
+  font-weight: var(--kora-weight-medium);
+}
+
+.projectDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.empty {
+  color: var(--kora-text-disabled);
+  font-size: var(--kora-text-sm);
+}
+
+.sectionCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-3);
+}
+
+.sectionTitle {
+  margin: 0;
+  color: var(--kora-navy);
+  font-size: var(--kora-text-lg);
+  font-weight: var(--kora-weight-bold);
+}
+
+.sectionEmpty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--kora-space-2);
+  padding: var(--kora-space-6) 0;
+  color: var(--kora-blue-400);
+  font-size: var(--kora-text-sm);
+}
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--kora-text-sm);
+}
+
+.table th {
+  text-align: left;
+  padding: var(--kora-space-2) var(--kora-space-3);
+  border-bottom: 1px solid var(--kora-border-soft);
+  color: var(--kora-navy);
+  font-weight: var(--kora-weight-bold);
+  white-space: nowrap;
+}
+
+.table td {
+  padding: var(--kora-space-2) var(--kora-space-3);
+  border-bottom: 1px solid var(--kora-lime-surface);
+  color: var(--kora-navy);
+}
+
+.numCol {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.totalRow td {
+  font-weight: var(--kora-weight-bold);
+  background: var(--kora-lime-surface);
+}

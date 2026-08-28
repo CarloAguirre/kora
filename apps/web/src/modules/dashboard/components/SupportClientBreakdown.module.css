@@ -1,0 +1,74 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-4);
+  height: 100%;
+}
+
+.title {
+  font-size: var(--kora-text-base);
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-navy);
+}
+
+.subtitle {
+  font-size: var(--kora-text-sm);
+  color: var(--kora-text-muted);
+  margin-top: 2px;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-3);
+  flex: 1;
+}
+
+.empty {
+  color: var(--kora-text-disabled);
+  font-size: var(--kora-text-sm);
+}
+
+.item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-1);
+}
+
+.itemHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.itemName {
+  color: var(--kora-text);
+  font-size: var(--kora-text-sm);
+}
+
+.itemPercent {
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-xs);
+}
+
+.itemDetail {
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-xs);
+}
+
+.track {
+  height: 8px;
+  border-radius: var(--kora-radius-pill);
+  background: var(--kora-surface-disabled);
+  overflow: hidden;
+}
+
+.fill {
+  height: 100%;
+  border-radius: var(--kora-radius-pill);
+}
+
+.footerLink {
+  align-self: flex-end;
+  text-decoration: none;
+}

@@ -1,0 +1,42 @@
+/* Pestañas de sección — igual a KoraTabs.tsx de la v1. */
+
+.tabs {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+.tab {
+  display: flex;
+  padding: 10px var(--kora-space-6) 10px var(--kora-space-1);
+  align-items: center;
+  font-family: var(--kora-font);
+  font-size: var(--kora-text-lg);
+  font-weight: var(--kora-weight-medium);
+  color: var(--kora-blue-700);
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+  border-radius: 0;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color var(--kora-transition), background var(--kora-transition);
+}
+
+.tab:hover {
+  color: var(--kora-text-disabled);
+  background: #f4fbfb;
+  border-bottom: 1px solid var(--kora-text-disabled);
+  border-radius: var(--kora-radius-sm) var(--kora-radius-sm) 0 0;
+}
+
+.tab.active {
+  color: var(--kora-navy);
+  font-weight: var(--kora-weight-bold);
+  border-bottom: 3px solid var(--kora-navy);
+}
+
+.tab.active:hover {
+  background: transparent;
+  border-radius: 0;
+}

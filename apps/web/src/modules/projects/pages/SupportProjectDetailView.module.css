@@ -1,0 +1,120 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-4);
+  width: 100%;
+}
+
+.topRow {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--kora-space-4);
+  align-items: stretch;
+}
+
+.contactCard,
+.dataCard,
+.stateCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-3);
+}
+
+.contactBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-1);
+}
+
+.contactName {
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-navy);
+}
+
+.contactPosition {
+  font-size: var(--kora-text-sm);
+  color: var(--kora-text-muted);
+}
+
+.contactLine {
+  font-size: var(--kora-text-sm);
+  color: var(--kora-text-muted);
+  margin-top: 4px;
+}
+
+.dataRows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-2);
+}
+
+.dataRow {
+  display: flex;
+  align-items: baseline;
+  gap: var(--kora-space-2);
+  flex-wrap: wrap;
+}
+
+.dateRow {
+  display: flex;
+  gap: var(--kora-space-4);
+}
+
+.dataLabel {
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-semibold);
+  color: var(--kora-text-muted);
+  flex-shrink: 0;
+}
+
+.dataValue {
+  font-size: var(--kora-text-sm);
+  color: var(--kora-text);
+}
+
+.dataLink {
+  font-size: var(--kora-text-sm);
+  color: var(--kora-blue-link);
+  text-decoration: underline;
+  word-break: break-all;
+}
+
+.supportLine {
+  margin-top: var(--kora-space-2);
+  padding-top: var(--kora-space-2);
+  border-top: 1px solid var(--kora-surface-disabled);
+  font-size: var(--kora-text-sm);
+  color: var(--kora-text-muted);
+}
+
+.stateHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kora-space-2);
+}
+
+.stateSelect {
+  min-width: 140px;
+}
+
+.stateStatic {
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-semibold);
+  color: var(--kora-blue-link);
+  padding: var(--kora-space-1) var(--kora-space-2);
+  border-radius: var(--kora-radius-sm);
+  background: var(--kora-blue-surface);
+}
+
+.overHours {
+  color: var(--kora-danger);
+  font-weight: var(--kora-weight-semibold);
+}
+
+.ticketLink {
+  color: var(--kora-navy);
+  font-weight: var(--kora-weight-semibold);
+  text-decoration: underline;
+}

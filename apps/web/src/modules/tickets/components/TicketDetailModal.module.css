@@ -1,0 +1,222 @@
+/* Réplica de `.soporte-modal*` en dashboard.css (v1) — ver Soporte/index.tsx. */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(18, 34, 53, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: var(--kora-z-modal);
+  padding: var(--kora-space-4);
+}
+
+.modal {
+  display: flex;
+  width: 560px;
+  max-width: 100%;
+  max-height: 90vh;
+  padding: var(--kora-space-4);
+  flex-direction: column;
+  gap: var(--kora-space-2);
+  border-radius: var(--kora-radius);
+  border: 1px solid var(--kora-blue-400);
+  background: var(--kora-surface);
+  box-shadow: var(--kora-shadow-lg);
+  overflow-y: auto;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-4);
+  justify-content: space-between;
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-1);
+  flex: 1;
+  min-width: 0;
+  color: var(--kora-text-muted);
+}
+
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+  flex-shrink: 0;
+}
+
+.code {
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-medium);
+  color: var(--kora-text);
+}
+
+.sep {
+  width: 1px;
+  height: 19px;
+  background: var(--kora-border);
+  flex-shrink: 0;
+}
+
+.title {
+  font-size: var(--kora-text-base);
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.closeButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: var(--kora-space-1);
+  display: flex;
+  color: var(--kora-text-muted);
+  border-radius: var(--kora-radius-sm);
+}
+
+.closeButton:hover {
+  background: var(--kora-surface-muted);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-1);
+}
+
+.label {
+  font-size: var(--kora-text-base);
+  font-weight: var(--kora-weight-medium);
+  color: var(--kora-text);
+}
+
+.value {
+  font-size: var(--kora-text-base);
+  font-weight: var(--kora-weight-regular);
+  color: var(--kora-text-muted);
+}
+
+.warningBanner {
+  display: flex;
+  padding: var(--kora-space-4) var(--kora-space-3);
+  align-items: center;
+  gap: var(--kora-space-2);
+  border-radius: var(--kora-radius-lg);
+  border: 2px solid var(--kora-warning);
+  background: #fff1da;
+  font-size: var(--kora-text-lg);
+  font-weight: var(--kora-weight-semibold);
+  font-style: italic;
+  color: var(--kora-text);
+}
+
+.dates {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--kora-space-4);
+}
+
+.col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-2);
+}
+
+.divider {
+  width: 100%;
+  height: 1px;
+  background: var(--kora-surface-disabled);
+  margin: var(--kora-space-1) 0;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-1);
+}
+
+.text {
+  font-size: var(--kora-text-base);
+  font-weight: var(--kora-weight-regular);
+  color: var(--kora-text-muted);
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.empty {
+  color: var(--kora-text-disabled);
+  font-size: var(--kora-text-base);
+}
+
+.priorityChip {
+  display: inline-flex;
+  height: 24px;
+  padding: 4px var(--kora-space-2);
+  align-items: center;
+  border-radius: var(--kora-radius-sm);
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-semibold);
+}
+
+.history {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-2);
+}
+
+.historyEntry {
+  padding: var(--kora-space-2) var(--kora-space-3);
+  border-radius: var(--kora-radius-sm);
+  background: var(--kora-surface-muted);
+  border: 1px solid var(--kora-surface-disabled);
+}
+
+.historyDescription {
+  color: var(--kora-text);
+  font-size: var(--kora-text-sm);
+  margin: 0;
+}
+
+.historyMeta {
+  margin-top: 2px;
+  font-size: var(--kora-text-xs);
+  color: var(--kora-text-muted);
+}
+
+.resolutionEditor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-2);
+  align-items: flex-start;
+}
+
+.resolutionInput {
+  width: 100%;
+  min-height: 72px;
+  padding: var(--kora-space-2) var(--kora-space-3);
+  font: inherit;
+  font-size: var(--kora-text-base);
+  color: var(--kora-text);
+  background: var(--kora-surface);
+  border: 1px solid var(--kora-border);
+  border-radius: var(--kora-radius-sm);
+  resize: vertical;
+}
+
+.footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--kora-space-4);
+}
+
+.statusSelect {
+  min-width: 200px;
+}

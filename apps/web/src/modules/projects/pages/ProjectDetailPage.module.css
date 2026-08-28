@@ -1,0 +1,288 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-4);
+  width: 100%;
+}
+
+.backButton {
+  align-self: flex-start;
+}
+
+.title {
+  font-size: var(--kora-text-xl);
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-navy);
+}
+
+.layout {
+  display: flex;
+  gap: var(--kora-space-4);
+  align-items: flex-start;
+  width: 100%;
+}
+
+.colLeft {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-4);
+  flex: 7;
+  min-width: 0;
+}
+
+.colRight {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-4);
+  flex: 3;
+  min-width: 280px;
+  position: sticky;
+  top: var(--kora-space-4);
+}
+
+/* ─── Datos proyecto ─── */
+.summaryHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kora-space-2);
+  flex-wrap: wrap;
+}
+
+.badgeRow {
+  display: flex;
+  gap: var(--kora-space-2);
+}
+
+.client {
+  font-size: var(--kora-text-lg);
+  color: var(--kora-navy);
+  font-weight: var(--kora-weight-semibold);
+  margin-top: var(--kora-space-1);
+}
+
+.fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: var(--kora-space-4);
+  margin-top: var(--kora-space-3);
+}
+
+.fieldLabel {
+  font-size: 10px;
+  color: var(--kora-text-disabled);
+  font-weight: var(--kora-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.fieldValue {
+  font-size: var(--kora-text-sm);
+  color: var(--kora-text);
+  font-weight: var(--kora-weight-semibold);
+  margin-top: 2px;
+}
+
+.statusRow {
+  max-width: 260px;
+  margin-top: var(--kora-space-4);
+  padding-top: var(--kora-space-4);
+  border-top: 1px solid var(--kora-surface-disabled);
+}
+
+/* ─── KPIs ─── */
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--kora-space-3);
+}
+
+.kpiCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-1);
+  padding: var(--kora-space-4);
+}
+
+.kpiLabel {
+  font-size: var(--kora-text-xs);
+  color: var(--kora-text-muted);
+  font-weight: var(--kora-weight-medium);
+}
+
+.kpiValue {
+  font-size: var(--kora-text-2xl);
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-navy);
+}
+
+.kpiValueDanger {
+  color: var(--kora-danger);
+}
+
+.kpiValueSuccess {
+  color: var(--kora-lime-dark);
+}
+
+/* ─── Secciones ─── */
+.sectionTitle {
+  font-size: var(--kora-text-lg);
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-navy);
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kora-space-2);
+  margin-bottom: var(--kora-space-3);
+}
+
+/* ─── Equipos asignados ─── */
+.teamGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--kora-space-3);
+}
+
+.teamCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-2);
+  padding: var(--kora-space-3);
+  border: 1px solid var(--kora-surface-disabled);
+  border-radius: var(--kora-radius);
+  background: var(--kora-surface-alt);
+}
+
+.teamHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+}
+
+.teamAvatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--kora-radius-sm);
+  background: var(--kora-blue-700);
+  color: var(--kora-surface);
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-bold);
+  flex-shrink: 0;
+}
+
+.teamName {
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-navy);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.teamMemberCount {
+  font-size: var(--kora-text-xs);
+  color: var(--kora-text-muted);
+}
+
+.teamStats {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--kora-text-xs);
+  color: var(--kora-text-muted);
+}
+
+.teamHealthOk {
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-semibold);
+  color: var(--kora-success);
+}
+
+.teamHealthDanger {
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-semibold);
+  color: var(--kora-danger);
+}
+
+.teamStatValue {
+  color: var(--kora-navy);
+  font-weight: var(--kora-weight-semibold);
+}
+
+/* ─── Formularios inline ─── */
+.inlineForm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-3);
+  margin-top: var(--kora-space-4);
+  padding-top: var(--kora-space-4);
+  border-top: 1px solid var(--kora-surface-disabled);
+}
+
+.inlineFormRow {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr auto;
+  gap: var(--kora-space-3);
+  align-items: end;
+}
+
+.error {
+  color: var(--kora-danger);
+  font-size: var(--kora-text-sm);
+}
+
+.empty {
+  color: var(--kora-text-disabled);
+  font-style: italic;
+  font-size: var(--kora-text-sm);
+}
+
+/* ─── Tickets del proyecto (soporte) ─── */
+.ticketRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kora-space-2);
+  padding: var(--kora-space-2) 0;
+  border-bottom: 1px solid var(--kora-surface-disabled);
+  text-decoration: none;
+}
+
+.ticketRow:last-child {
+  border-bottom: none;
+}
+
+.ticketTitle {
+  font-size: var(--kora-text-sm);
+  color: var(--kora-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ticketCode {
+  font-size: var(--kora-text-xs);
+  color: var(--kora-text-muted);
+  font-weight: var(--kora-weight-semibold);
+}
+
+@media (max-width: 1024px) {
+  .layout {
+    flex-direction: column;
+  }
+  .colRight {
+    position: static;
+    width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  .inlineFormRow {
+    grid-template-columns: 1fr;
+  }
+}

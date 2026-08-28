@@ -1,0 +1,59 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-4);
+  width: 100%;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kora-space-4);
+  flex-wrap: wrap;
+}
+
+.subtitle {
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-base);
+  min-height: 20px;
+}
+
+.filters {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--kora-space-3);
+  flex-wrap: wrap;
+}
+
+.filter {
+  flex: 0 1 200px;
+  min-width: 160px;
+}
+
+.empty {
+  color: var(--kora-text-disabled);
+}
+
+.statusCell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-1);
+}
+
+.rejectionReason {
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-semibold);
+  color: var(--kora-danger-hover);
+  line-height: 1.3;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--kora-space-1);
+}
+
+.dangerAction {
+  color: var(--kora-danger);
+}

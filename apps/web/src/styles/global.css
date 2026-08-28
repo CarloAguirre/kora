@@ -1,0 +1,109 @@
+/**
+ * Estilos globales: reinicio mínimo y base tipográfica.
+ *
+ * Es deliberadamente corto. Todo lo demás vive en el `.module.css` del
+ * componente que lo necesita, así que no existe la hoja global de 7.388 líneas
+ * que tenía la v1, donde cambiar el estilo de una tabla obligaba a comprobar
+ * qué otras diez pantallas usaban la misma clase.
+ */
+
+@import './tokens.css';
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--kora-font);
+  font-size: var(--kora-text-base);
+  color: var(--kora-text);
+  background: var(--kora-surface);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p,
+figure {
+  margin: 0;
+}
+
+ul,
+ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+img,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+/* Foco visible y consistente en todo el sistema: se quita el anillo del
+   navegador solo cuando se sustituye por uno propio, nunca sin más. */
+:focus-visible {
+  outline: 2px solid var(--kora-blue-600);
+  outline-offset: 2px;
+}
+
+/* Respeta la preferencia del sistema de reducir animaciones. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Contenido visible solo para lectores de pantalla. */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
