@@ -26,3 +26,8 @@
 .empty {
   color: var(--kora-text-disabled);
 }
+
+.deviated {
+  color: var(--kora-warning-text);
+  font-weight: var(--kora-weight-bold);
+}

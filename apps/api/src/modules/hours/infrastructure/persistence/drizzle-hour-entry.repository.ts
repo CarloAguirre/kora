@@ -182,6 +182,16 @@ export class DrizzleHourEntryRepository implements HourEntryRepository {
       conditions.push(or(ilike(users.firstName, term), ilike(users.lastName, term)));
     }
     if (filters.status) conditions.push(eq(hourEntries.status, filters.status));
+    if (filters.teamId) {
+      conditions.push(
+        sql`exists (
+          select 1 from ${teamMembers}
+          where ${teamMembers.userId} = ${hourEntries.userId}
+            and ${teamMembers.teamId} = ${filters.teamId}
+            and ${teamMembers.leftAt} is null
+        )`,
+      );
+    }
     if (filters.dateFrom) conditions.push(gte(hourEntries.date, filters.dateFrom));
     if (filters.dateTo) conditions.push(lte(hourEntries.date, filters.dateTo));
     if (filters.visibleToUserIds) {

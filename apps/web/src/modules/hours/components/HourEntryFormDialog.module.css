@@ -199,6 +199,11 @@
   height: 40px;
 }
 
+.stepper:focus-within {
+  border-color: var(--kora-blue-600);
+  box-shadow: 0 0 0 3px var(--kora-blue-surface);
+}
+
 .stepperButton {
   width: 40px;
   border: none;
@@ -225,7 +230,8 @@
   color: var(--kora-navy);
 }
 
-.stepperInput:focus {
+.stepperInput:focus,
+.stepperInput:focus-visible {
   outline: none;
 }
 

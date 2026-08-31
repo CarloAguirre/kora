@@ -5,6 +5,10 @@
   width: 100%;
 }
 
+.backButton {
+  align-self: flex-start;
+}
+
 .subtitle {
   color: var(--kora-text-muted);
   font-size: var(--kora-text-base);
@@ -15,4 +19,9 @@
   color: var(--kora-navy);
   font-size: var(--kora-text-lg);
   font-weight: var(--kora-weight-bold);
+}
+
+.divider {
+  height: 1px;
+  background: var(--kora-surface-disabled);
 }

@@ -59,6 +59,36 @@
   color: var(--kora-navy);
 }
 
+.teamNameLink {
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-semibold);
+  color: var(--kora-navy);
+  text-decoration: none;
+}
+
+.teamNameLink:hover {
+  text-decoration: underline;
+}
+
+.teamStatsGroup {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+}
+
+.teamLinkIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--kora-navy);
+  border-radius: var(--kora-radius-sm);
+  padding: var(--kora-space-1);
+}
+
+.teamLinkIcon:hover {
+  background: var(--kora-surface-muted);
+}
+
 .statusBadge {
   display: inline-flex;
   padding: 2px var(--kora-space-2);

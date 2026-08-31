@@ -26,6 +26,13 @@
 .kpiLabelRow {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: var(--kora-space-2);
+}
+
+.kpiLabelGroup {
+  display: flex;
+  align-items: center;
   gap: var(--kora-space-2);
 }
 
@@ -61,6 +68,28 @@
 .kpiSub {
   font-size: var(--kora-text-xs);
   color: var(--kora-blue-400);
+}
+
+.kpiBreakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--kora-space-1) var(--kora-space-3);
+}
+
+.kpiBreakdownItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-medium);
+  color: var(--kora-text-muted);
+}
+
+.kpiDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 
 .kpiSubWarning {

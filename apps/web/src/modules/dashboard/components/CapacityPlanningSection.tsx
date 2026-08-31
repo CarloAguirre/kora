@@ -5,6 +5,8 @@ import styles from './CapacityPlanningSection.module.css';
 import { Card } from '@/shared/components/ui/Card';
 import { Button } from '@/shared/components/ui/Button';
 import { Select } from '@/shared/components/ui/Select';
+import { ChevronRightIcon } from '@/shared/components/icons/Icons';
+import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 
 function mondayOf(date: Date): Date {
   const result = new Date(date);
@@ -42,6 +44,7 @@ interface CapacityPlanningSectionProps {
 
 /** "Capacidad y Planificación" — igual disposición que `DashboardProyectos` en la v1, con datos reales de Forecast (M6). */
 export function CapacityPlanningSection({ capacity, loading, weekStart, onWeekStartChange }: CapacityPlanningSectionProps) {
+  const { can } = usePermissions();
   const selectedMonday = useMemo(() => mondayOf(weekStart ? new Date(`${weekStart}T00:00:00`) : new Date()), [weekStart]);
 
   const weekOptions = useMemo(
@@ -87,17 +90,30 @@ export function CapacityPlanningSection({ capacity, loading, weekStart, onWeekSt
               <div key={team.teamId} className={styles.team}>
                 <div className={styles.teamHeader}>
                   <div className={styles.teamNameGroup}>
-                    <span className={styles.teamName}>{team.teamName}</span>
+                    {can('teams:read') ? (
+                      <Link to={`/equipos/${team.teamId}`} className={styles.teamNameLink}>
+                        {team.teamName}
+                      </Link>
+                    ) : (
+                      <span className={styles.teamName}>{team.teamName}</span>
+                    )}
                     <span className={[styles.statusBadge, limited ? styles.statusLimited : styles.statusAvailable].join(' ')}>
                       {availabilityPercent}% {statusLabel}
                     </span>
                   </div>
-                  <span className={styles.teamStats}>
-                    {team.assignedHours}/{team.capacityHours} hrs ·{' '}
-                    <span className={[styles.freeHours, team.freeHours > 0 ? styles.freeHoursAvailable : styles.freeHoursLimited].join(' ')}>
-                      {team.freeHours} hrs libres
+                  <div className={styles.teamStatsGroup}>
+                    <span className={styles.teamStats}>
+                      {team.assignedHours}/{team.capacityHours} hrs ·{' '}
+                      <span className={[styles.freeHours, team.freeHours > 0 ? styles.freeHoursAvailable : styles.freeHoursLimited].join(' ')}>
+                        {team.freeHours} hrs libres
+                      </span>
                     </span>
-                  </span>
+                    {can('teams:read') && (
+                      <Link to={`/equipos/${team.teamId}`} aria-label={`Ir a ${team.teamName}`} className={styles.teamLinkIcon}>
+                        <ChevronRightIcon size={16} />
+                      </Link>
+                    )}
+                  </div>
                 </div>
                 <div className={styles.track}>
                   <div

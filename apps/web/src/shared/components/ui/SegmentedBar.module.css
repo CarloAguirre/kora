@@ -1,0 +1,14 @@
+.bar {
+  display: flex;
+  align-items: stretch;
+  height: 10px;
+  border-radius: var(--kora-radius-sm);
+  overflow: hidden;
+  background: var(--kora-surface-muted);
+  gap: 2px;
+}
+
+.segment {
+  height: 100%;
+  min-width: 2px;
+}

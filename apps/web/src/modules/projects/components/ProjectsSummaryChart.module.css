@@ -33,21 +33,6 @@
   min-width: 160px;
 }
 
-.finalizedToggle {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--kora-space-2);
-  font-size: var(--kora-text-sm);
-  color: var(--kora-text);
-  white-space: nowrap;
-  padding-bottom: var(--kora-space-2);
-  cursor: pointer;
-}
-
-.finalizedToggle input {
-  cursor: pointer;
-}
-
 .body {
   display: grid;
   grid-template-columns: 1fr 200px;

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { HOUR_ENTRY_STATUSES, HOUR_ENTRY_STATUS_LABELS, type HourEntryStatus, type HourEntrySummary } from '@kora/contracts';
 import styles from './TeamHourHistoryPanel.module.css';
 import { Button } from '@/shared/components/ui/Button';
@@ -33,7 +33,7 @@ type DialogState = { kind: 'none' } | { kind: 'view' | 'edit'; entry: HourEntryS
  * permite en cualquier estado para el dueño), Eliminar sí — un registro
  * aprobado ya afectó el consumo del proyecto y el backend rechaza borrarlo.
  */
-export function TeamHourHistoryPanel() {
+export function TeamHourHistoryPanel({ teamId, userId }: { teamId?: string; userId?: string }) {
   const { user } = useAuth();
   const toast = useToast();
   const [personSearch, setPersonSearch] = useState('');
@@ -46,8 +46,14 @@ export function TeamHourHistoryPanel() {
 
   const hasFilters = Boolean(personSearch || dateFrom || dateTo || status);
 
+  useEffect(() => {
+    setPage(1);
+  }, [teamId, userId]);
+
   const { data, isLoading, error } = useHourEntriesList({
     search: personSearch.trim() || undefined,
+    teamId,
+    userId,
     dateFrom: dateFrom || undefined,
     dateTo: dateTo || undefined,
     status: status || undefined,
@@ -79,7 +85,7 @@ export function TeamHourHistoryPanel() {
     { key: 'project', header: 'Proyecto', render: (e) => e.project?.name ?? <span className={styles.empty}>—</span> },
     { key: 'assignment', header: 'Asignación', render: (e) => e.assignment ?? 'Desarrollo' },
     { key: 'category', header: 'Actividad', render: (e) => e.category || <span className={styles.empty}>—</span> },
-    { key: 'hours', header: 'Horas', render: (e) => formatHours(e.hours) },
+    { key: 'hours', header: 'Horas', align: 'right', render: (e) => formatHours(e.hours) },
     {
       key: 'status',
       header: 'Estado',

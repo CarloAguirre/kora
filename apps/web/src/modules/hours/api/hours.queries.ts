@@ -59,7 +59,12 @@ export function useHourEntryDetail(entryId: string | null) {
 
 function useInvalidateHourEntries() {
   const queryClient = useQueryClient();
-  return () => queryClient.invalidateQueries({ queryKey: hourKeys.all });
+  return () => {
+    queryClient.invalidateQueries({ queryKey: hourKeys.all });
+    // El Dashboard resume horas/aprobaciones: sin esto quedaba desactualizado
+    // hasta que el usuario recargaba la página a mano.
+    queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+  };
 }
 
 export function useCreateHourEntry() {

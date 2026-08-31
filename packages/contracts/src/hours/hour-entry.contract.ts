@@ -108,6 +108,8 @@ export const listHourEntriesQuerySchema = paginationQuerySchema.extend({
   userId: uuidSchema.optional(),
   /** Filtra por nombre del autor — historial de equipo del líder ("Registro de horas Líder" en la v1). */
   search: z.string().trim().max(120).optional(),
+  /** Acota a los autores con membresía activa en este equipo, dentro del alcance de visibilidad ya resuelto. */
+  teamId: uuidSchema.optional(),
   projectId: uuidSchema.optional(),
   status: hourEntryStatusSchema.optional(),
   dateFrom: z.iso.date().optional(),

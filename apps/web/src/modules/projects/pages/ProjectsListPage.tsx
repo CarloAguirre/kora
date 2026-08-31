@@ -6,6 +6,7 @@ import {
   PROJECT_STATUSES,
   PROJECT_STATUS_LABELS,
   type ProjectPhase,
+  type ProjectSortField,
   type ProjectStatus,
   type ProjectSummary,
 } from '@kora/contracts';
@@ -13,7 +14,7 @@ import styles from './ProjectsListPage.module.css';
 import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Button } from '@/shared/components/ui/Button';
 import { Card } from '@/shared/components/ui/Card';
-import { DataTable, type Column } from '@/shared/components/ui/DataTable';
+import { DataTable, type Column, type SortState } from '@/shared/components/ui/DataTable';
 import { Pagination } from '@/shared/components/ui/Pagination';
 import { TextField } from '@/shared/components/ui/TextField';
 import { MultiSelect } from '@/shared/components/ui/MultiSelect';
@@ -64,6 +65,7 @@ export function ProjectsListPage() {
   const [statuses, setStatuses] = useState<ProjectStatus[]>([]);
   const [phases, setPhases] = useState<ProjectPhase[]>([]);
   const [page, setPage] = useState(1);
+  const [sort, setSort] = useState<SortState<ProjectSortField>>({ field: 'priority', direction: 'desc' });
 
   const listQuery =
     tab === 'development'
@@ -80,7 +82,13 @@ export function ProjectsListPage() {
           status: [supportSubTab],
         };
 
-  const { data, isLoading, error } = useProjectsList({ ...listQuery, page, pageSize: 25 });
+  const { data, isLoading, error } = useProjectsList({
+    ...listQuery,
+    page,
+    pageSize: 25,
+    sortField: sort.field,
+    sortDirection: sort.direction,
+  });
   // El gráfico y la exportación usan su propio universo de datos — todos los
   // proyectos del tipo activo, sin los filtros de la tabla (Líder/Estado/
   // Etapa/Buscar): en la v1 son estados independientes (`devChartFilterCliente`
@@ -101,6 +109,7 @@ export function ProjectsListPage() {
 
   const changeTab = (id: string) => {
     setTab(id as 'development' | 'support');
+    setSort({ field: 'priority', direction: 'desc' });
     setPage(1);
   };
 
@@ -109,47 +118,63 @@ export function ProjectsListPage() {
     setPage(1);
   };
 
+  const toggleSort = (field: string) => {
+    setSort((current) =>
+      current.field === field
+        ? { field: current.field, direction: current.direction === 'asc' ? 'desc' : 'asc' }
+        : { field: field as ProjectSortField, direction: 'asc' },
+    );
+    setPage(1);
+  };
+
   const developmentColumns: Column<ProjectSummary>[] = [
-    { key: 'priority', header: 'Prioridad', render: (p) => <PriorityIndicator priority={p.priority} /> },
+    { key: 'priority', header: 'Prioridad', sortable: true, render: (p) => <PriorityIndicator priority={p.priority} /> },
     {
       key: 'name',
       header: 'Nombre',
+      sortable: true,
       render: (p) => (
         <Link to={`/proyectos/${p.id}`} className={styles.link}>
           {p.name}
         </Link>
       ),
     },
-    { key: 'client', header: 'Cliente', render: (p) => p.client?.companyName ?? <span className={styles.empty}>—</span> },
-    { key: 'leader', header: 'Líder', render: (p) => p.leader?.fullName ?? <span className={styles.empty}>—</span> },
-    { key: 'status', header: 'Estado', render: (p) => <ProjectStatusBadge status={p.status} /> },
+    { key: 'client', header: 'Cliente', sortable: true, render: (p) => p.client?.companyName ?? <span className={styles.empty}>—</span> },
+    { key: 'leader', header: 'Líder', sortable: true, render: (p) => p.leader?.fullName ?? <span className={styles.empty}>—</span> },
+    { key: 'status', header: 'Estado', sortable: true, render: (p) => <ProjectStatusBadge status={p.status} /> },
     { key: 'stage', header: 'Etapa de avance', render: (p) => getProjectStageLabel(p) },
-    { key: 'startDate', header: 'Inicio', render: (p) => formatDate(p.startDate) },
-    { key: 'endDate', header: 'Fin', render: (p) => formatDate(p.endDate) },
-    { key: 'progress', header: '% Avance', render: (p) => (p.actualProgress != null ? `${p.actualProgress}%` : '—') },
-    { key: 'soldHours', header: 'HH vendidas', render: (p) => formatHours(p.soldHours) },
-    { key: 'usedHours', header: 'HH Consumidas', render: (p) => formatHours(p.usedHours) },
-    { key: 'remainingHours', header: 'HH Restantes', render: (p) => formatHours(p.soldHours - p.usedHours) },
+    { key: 'startDate', header: 'Inicio', sortable: true, render: (p) => formatDate(p.startDate) },
+    { key: 'endDate', header: 'Fin', sortable: true, render: (p) => formatDate(p.endDate) },
+    { key: 'progress', header: '% Avance', sortable: true, render: (p) => (p.actualProgress != null ? `${p.actualProgress}%` : '—') },
+    { key: 'soldHours', header: 'HH vendidas', sortable: true, render: (p) => formatHours(p.soldHours) },
+    { key: 'usedHours', header: 'HH Consumidas', sortable: true, render: (p) => formatHours(p.usedHours) },
+    { key: 'remainingHours', header: 'HH Restantes', sortable: true, render: (p) => formatHours(p.soldHours - p.usedHours) },
   ];
 
   const supportColumns: Column<ProjectSummary>[] = [
     {
       key: 'name',
       header: 'Nombre proyecto',
+      sortable: true,
       render: (p) => (
         <Link to={`/proyectos/${p.id}`} className={styles.link}>
           {p.name}
         </Link>
       ),
     },
-    { key: 'client', header: 'Cliente', render: (p) => p.client?.companyName ?? <span className={styles.empty}>—</span> },
-    { key: 'supportPlan', header: 'Tipo de Soporte', render: (p) => p.supportPlanDescription || <span className={styles.empty}>—</span> },
-    { key: 'leader', header: 'Líder', render: (p) => p.leader?.fullName ?? <span className={styles.empty}>—</span> },
+    { key: 'client', header: 'Cliente', sortable: true, render: (p) => p.client?.companyName ?? <span className={styles.empty}>—</span> },
+    {
+      key: 'supportPlan',
+      header: 'Tipo de Soporte',
+      sortable: true,
+      render: (p) => p.supportPlanDescription || <span className={styles.empty}>—</span>,
+    },
+    { key: 'leader', header: 'Líder', sortable: true, render: (p) => p.leader?.fullName ?? <span className={styles.empty}>—</span> },
     { key: 'stage', header: 'Etapa', render: (p) => getProjectStageLabel(p) },
-    { key: 'soldHours', header: 'HH Vendidas', render: (p) => formatHours(p.supportHours) },
-    { key: 'usedHours', header: 'HH Consumidas', render: (p) => formatHours(p.usedHours) },
-    { key: 'remainingHours', header: 'HH Restantes', render: (p) => formatHours(p.supportHours - p.usedHours) },
-    { key: 'deviationHours', header: 'HH Desviación', render: (p) => formatHours(p.usedHours - p.supportHours) },
+    { key: 'supportHours', header: 'HH Vendidas', sortable: true, render: (p) => formatHours(p.supportHours) },
+    { key: 'usedHours', header: 'HH Consumidas', sortable: true, render: (p) => formatHours(p.usedHours) },
+    { key: 'remainingHours', header: 'HH Restantes', sortable: true, render: (p) => formatHours(p.supportHours - p.usedHours) },
+    { key: 'deviationHours', header: 'HH Desviación', sortable: true, render: (p) => formatHours(p.usedHours - p.supportHours) },
   ];
 
   const columns = tab === 'development' ? developmentColumns : supportColumns;
@@ -253,6 +278,8 @@ export function ProjectsListPage() {
             loading={isLoading}
             error={error ? 'No se pudo cargar el listado de proyectos.' : null}
             emptyMessage="No hay proyectos que coincidan con los filtros aplicados."
+            sort={sort}
+            onSortChange={toggleSort}
           />
 
           {data && (

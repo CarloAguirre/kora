@@ -1,0 +1,247 @@
+.bar {
+  position: sticky;
+  top: 0;
+  z-index: var(--kora-z-sticky);
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-3);
+  padding: var(--kora-space-3) var(--kora-space-4);
+  border-radius: var(--kora-radius-lg);
+  border: 1px solid var(--kora-blue-200);
+  background: var(--kora-surface);
+  box-shadow: var(--kora-shadow-card);
+  flex-wrap: wrap;
+}
+
+.switcher {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.teamPill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+  height: 36px;
+  padding: 0 var(--kora-space-3);
+  border-radius: var(--kora-radius-pill);
+  border: 1.5px solid var(--kora-navy);
+  background: var(--kora-surface);
+  color: var(--kora-navy);
+  font-family: var(--kora-font);
+  cursor: pointer;
+  transition: background var(--kora-transition);
+}
+
+.teamPill:hover,
+.teamPill[aria-expanded='true'] {
+  background: var(--kora-lime-hover);
+}
+
+.teamPillStatic {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+  height: 36px;
+  padding: 0 var(--kora-space-3);
+  border-radius: var(--kora-radius-pill);
+  border: 1.5px solid var(--kora-navy);
+  color: var(--kora-navy);
+  flex-shrink: 0;
+}
+
+.chevron {
+  pointer-events: none;
+}
+
+/* Panel propio del selector de equipo — a diferencia de un `<select>`
+   nativo, cada fila sigue la línea gráfica de Kora (radios, colores de
+   hover, tipografía), en vez del picker del sistema operativo. */
+.switcherPanel {
+  position: absolute;
+  top: calc(100% + var(--kora-space-2));
+  left: 0;
+  z-index: var(--kora-z-dropdown);
+  display: flex;
+  flex-direction: column;
+  min-width: 180px;
+  padding: var(--kora-space-1);
+  border-radius: var(--kora-radius);
+  border: 1px solid var(--kora-blue-200);
+  background: var(--kora-surface);
+  box-shadow: var(--kora-shadow-lg);
+}
+
+.switcherOption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kora-space-2);
+  height: 36px;
+  padding: 0 var(--kora-space-3);
+  border: none;
+  border-radius: var(--kora-radius-sm);
+  background: none;
+  color: var(--kora-navy);
+  font-family: var(--kora-font);
+  font-size: var(--kora-text-base);
+  font-weight: var(--kora-weight-medium);
+  text-align: left;
+  cursor: pointer;
+}
+
+.switcherOption:hover {
+  background: var(--kora-lime-surface);
+}
+
+.switcherOptionActive {
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-lime-dark);
+}
+
+.teamName {
+  font-size: var(--kora-text-base);
+  font-weight: var(--kora-weight-bold);
+  white-space: nowrap;
+}
+
+.dot {
+  color: var(--kora-border-soft);
+  font-size: var(--kora-text-lg);
+  flex-shrink: 0;
+}
+
+.count {
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-sm);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.roster {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+  overflow-x: auto;
+  padding: 2px;
+}
+
+.allChip {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 var(--kora-space-3);
+  border-radius: var(--kora-radius-pill);
+  border: 1px solid var(--kora-border-soft);
+  background: var(--kora-surface);
+  color: var(--kora-text-muted);
+  font-family: var(--kora-font);
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-bold);
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: background var(--kora-transition), color var(--kora-transition), border-color var(--kora-transition);
+}
+
+.allChipActive {
+  border-color: var(--kora-navy);
+  background: var(--kora-navy);
+  color: var(--kora-lime);
+}
+
+/* Cada avatar es un chip que, al pasar el cursor o recibir foco, se alarga
+   para revelar el nombre y el rol de la persona — reemplaza el tooltip
+   nativo del navegador (lento, sin estilo) por una expansión propia. */
+.avatar {
+  display: flex;
+  align-items: center;
+  height: 32px;
+  max-width: 32px;
+  padding: 0;
+  border: none;
+  border-radius: var(--kora-radius-pill);
+  box-shadow: 0 0 0 1px var(--kora-border-soft);
+  background: var(--kora-lime-surface);
+  overflow: hidden;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: max-width 220ms ease, box-shadow var(--kora-transition), background var(--kora-transition);
+}
+
+.avatar:hover,
+.avatar:focus-visible {
+  max-width: 260px;
+  box-shadow: 0 0 0 1px var(--kora-blue-400);
+}
+
+.avatarLeader {
+  box-shadow: 0 0 0 1.5px var(--kora-lime-dark);
+}
+
+.avatarActive {
+  background: var(--kora-navy);
+  box-shadow: 0 0 0 2px var(--kora-navy);
+}
+
+.avatarInitials {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  color: var(--kora-lime-dark);
+  font-family: var(--kora-font);
+  font-size: 11px;
+  font-weight: var(--kora-weight-bold);
+}
+
+.avatarActive .avatarInitials {
+  color: var(--kora-lime);
+}
+
+.avatarCard {
+  display: flex;
+  flex-direction: column;
+  padding-right: var(--kora-space-3);
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+
+.avatar:hover .avatarCard,
+.avatar:focus-visible .avatarCard {
+  opacity: 1;
+}
+
+.avatarName {
+  color: var(--kora-navy);
+  font-size: 12px;
+  font-weight: var(--kora-weight-bold);
+}
+
+.avatarRole {
+  color: var(--kora-lime-dark);
+  font-size: 10px;
+}
+
+.avatarActive .avatarName {
+  color: var(--kora-lime);
+}
+
+.avatarActive .avatarRole {
+  color: var(--kora-blue-200);
+}
+
+.spacer {
+  flex: 1 0 0;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+

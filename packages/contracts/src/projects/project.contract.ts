@@ -201,7 +201,23 @@ export const addProjectObservationSchema = z.object({
 });
 export type AddProjectObservationInput = z.infer<typeof addProjectObservationSchema>;
 
-export const projectSortFieldSchema = z.enum(['name', 'status', 'priority', 'createdAt']);
+export const projectSortFieldSchema = z.enum([
+  'name',
+  'status',
+  'priority',
+  'createdAt',
+  'client',
+  'leader',
+  'startDate',
+  'endDate',
+  'progress',
+  'soldHours',
+  'usedHours',
+  'remainingHours',
+  'supportHours',
+  'supportPlan',
+  'deviationHours',
+]);
 export type ProjectSortField = z.infer<typeof projectSortFieldSchema>;
 
 export const listProjectsQuerySchema = paginationQuerySchema.extend({

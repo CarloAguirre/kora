@@ -34,7 +34,13 @@ export function useForecastHistory(query: ListForecastHistoryQuery | null) {
 
 function useInvalidateForecast() {
   const queryClient = useQueryClient();
-  return () => queryClient.invalidateQueries({ queryKey: forecastKeys.all });
+  return () => {
+    queryClient.invalidateQueries({ queryKey: forecastKeys.all });
+    // El Dashboard resume "Capacidad y Planificación" con datos de Forecast:
+    // sin esto quedaba desactualizado hasta que el usuario recargaba la
+    // página a mano.
+    queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+  };
 }
 
 export function useCreateForecastAssignment() {

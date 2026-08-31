@@ -16,7 +16,22 @@ export interface ProjectFilters {
   readonly includeDeleted?: boolean | undefined;
 }
 
-export type ProjectSortableField = 'name' | 'status' | 'priority' | 'createdAt';
+export type ProjectSortableField =
+  | 'name'
+  | 'status'
+  | 'priority'
+  | 'createdAt'
+  | 'client'
+  | 'leader'
+  | 'startDate'
+  | 'endDate'
+  | 'progress'
+  | 'soldHours'
+  | 'usedHours'
+  | 'remainingHours'
+  | 'supportHours'
+  | 'supportPlan'
+  | 'deviationHours';
 
 export interface ProjectListItem {
   readonly id: string;

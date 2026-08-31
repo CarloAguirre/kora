@@ -102,7 +102,7 @@ export function HourEntriesApprovalTable({
     { key: 'project', header: 'Proyecto', render: (entry) => entry.project?.name ?? <span className={styles.empty}>—</span> },
     { key: 'assignment', header: 'Asignación', render: (entry) => entry.assignment ?? 'Desarrollo' },
     { key: 'category', header: 'Actividad', render: (entry) => entry.category || <span className={styles.empty}>—</span> },
-    { key: 'hours', header: 'HH registradas', render: (entry) => formatHours(entry.hours) },
+    { key: 'hours', header: 'HH registradas', align: 'right', render: (entry) => formatHours(entry.hours) },
     {
       key: 'actions',
       header: 'Acciones',

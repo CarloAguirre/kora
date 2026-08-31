@@ -27,7 +27,12 @@
 
 .filters {
   display: flex;
-  align-items: flex-end;
+  /* `MultiSelect` no reserva la fila de texto de ayuda que sí reserva
+     `TextField` bajo su campo — alinear por el borde inferior del wrapper
+     dejaba el buscador más arriba que los demás filtros. Como la etiqueta
+     ocupa el mismo alto en ambos, alinear por el borde superior sí deja
+     los campos a la misma altura. */
+  align-items: flex-start;
   gap: var(--kora-space-3);
   flex-wrap: wrap;
 }

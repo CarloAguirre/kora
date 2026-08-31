@@ -3,16 +3,19 @@ import { CLOCK, ok, type ApplicationError, type Clock, type Result } from '@kora
 import {
   PROJECT_PHASE_LABELS,
   PROJECT_SALES_STAGE_LABELS,
+  type DashboardApprovalsTeam,
   type DashboardCapacityTeam,
   type DashboardCriticalProject,
+  type DashboardOldestOpenTicket,
   type DashboardSummary,
   type DashboardSupportClient,
+  type DashboardTicketStatusCount,
   type Permission,
   type RoleCode,
 } from '@kora/contracts';
 import { HOUR_ENTRY_REPOSITORY, type HourEntryRepository } from '../../../hours/domain/repositories/hour-entry.repository';
 import { HOUR_ENTRY_TEAM_READER, type HourEntryTeamReader } from '../../../hours/application/ports/hour-entry-team-reader.port';
-import { TICKET_REPOSITORY, type TicketRepository } from '../../../tickets/domain/repositories/ticket.repository';
+import { TICKET_REPOSITORY, type TicketRepository, type TicketListItem } from '../../../tickets/domain/repositories/ticket.repository';
 import {
   PROJECT_REPOSITORY,
   type ProjectListItem,
@@ -31,8 +34,10 @@ export interface GetDashboardSummaryCommand {
 }
 
 const WEEK_TARGET_HOURS = 40;
-const OPEN_TICKET_STATUSES = ['pending', 'in_progress', 'in_testing', 'done'] as const;
+/** "Terminado" ya no cuenta como trabajo abierto: el ticket está resuelto, solo falta el cierre administrativo. */
+const OPEN_TICKET_STATUSES = ['pending', 'in_progress', 'in_testing'] as const;
 const PROJECT_PAGE_SIZE = 2000;
+const PENDING_APPROVALS_PAGE_SIZE = 1000;
 /** Igual que `PLANNING_HH_CONCEPTS` en la v1 (`src/utils/hhConcepts.ts`): categorías de registro_hh que cuentan como "HH Planificación", no consumo. */
 const PLANNING_HH_CATEGORIES = new Set(['Apoyo Interno', 'Otros']);
 const PRIORITY_RANK: Record<string, number> = { high: 3, medium: 2, low: 1 };
@@ -167,10 +172,23 @@ export class GetDashboardSummaryUseCase implements UseCase<GetDashboardSummaryCo
 
     const page = await this.hourEntries.search(
       { status: 'pending', visibleToUserIds },
-      { page: 1, pageSize: 1 },
+      { page: 1, pageSize: PENDING_APPROVALS_PAGE_SIZE },
       { field: 'date', direction: 'desc' },
     );
-    return { pendingCount: page.total };
+
+    const byTeamMap = new Map<string, DashboardApprovalsTeam>();
+    for (const entry of page.items) {
+      const key = entry.teamId ?? 'none';
+      const existing = byTeamMap.get(key);
+      byTeamMap.set(key, {
+        teamId: entry.teamId,
+        teamName: entry.teamName,
+        pendingCount: (existing?.pendingCount ?? 0) + 1,
+      });
+    }
+    const pendingByTeam = [...byTeamMap.values()].sort((a, b) => b.pendingCount - a.pendingCount);
+
+    return { pendingCount: page.total, pendingByTeam };
   }
 
   private async buildTicketsSummary(actor: ActorContext, actorPermissions: readonly Permission[]) {
@@ -178,11 +196,35 @@ export class GetDashboardSummaryUseCase implements UseCase<GetDashboardSummaryCo
     const assigneeUserId = hasFullRead ? undefined : actor.userId;
     const pages = await Promise.all(
       OPEN_TICKET_STATUSES.map((status) =>
-        this.tickets.search({ status, assigneeUserId }, { page: 1, pageSize: 1 }, { field: 'createdAt', direction: 'desc' }),
+        this.tickets.search({ status, assigneeUserId }, { page: 1, pageSize: 1 }, { field: 'createdAt', direction: 'asc' }),
       ),
     );
+
+    const byStatus: DashboardTicketStatusCount[] = OPEN_TICKET_STATUSES.map((status, index) => ({
+      status,
+      count: pages[index]!.total,
+    })).filter((entry) => entry.count > 0);
+
+    const oldestCandidates = pages.map((page) => page.items[0]).filter((item): item is TicketListItem => item != null);
+    const oldest =
+      oldestCandidates.length > 0
+        ? oldestCandidates.reduce((min, item) => (item.createdAt < min.createdAt ? item : min))
+        : null;
+    const oldestOpenTicket: DashboardOldestOpenTicket | null = oldest
+      ? {
+          id: oldest.id,
+          title: oldest.title,
+          status: oldest.status,
+          createdAt: oldest.createdAt.toISOString(),
+          clientName: oldest.clientName,
+          assigneeName: oldest.assigneeName,
+        }
+      : null;
+
     return {
       openCount: pages.reduce((sum, page) => sum + page.total, 0),
+      byStatus,
+      oldestOpenTicket,
       scope: hasFullRead ? ('all' as const) : ('own' as const),
     };
   }
@@ -209,20 +251,27 @@ export class GetDashboardSummaryUseCase implements UseCase<GetDashboardSummaryCo
       (p) => p.endDate != null && p.endDate <= endOfMonth && p.endDate >= now,
     ).length;
 
-    const scored = active
-      .map((p) => {
-        const consumptionPercent = p.soldHours > 0 ? Math.round((p.usedHours / p.soldHours) * 100) : 0;
-        const actualProgress = p.actualProgress != null ? clampPct(p.actualProgress) : Math.max(0, consumptionPercent);
-        const expectedProgress = calculateExpectedProgress(p.startDate, p.endDate, now);
-        const lag = expectedProgress - actualProgress;
-        const hasOperationalData = p.usedHours > 0 || actualProgress > 0;
+    const allScored = active.map((p) => {
+      const consumptionPercent = p.soldHours > 0 ? Math.round((p.usedHours / p.soldHours) * 100) : 0;
+      const actualProgress = p.actualProgress != null ? clampPct(p.actualProgress) : Math.max(0, consumptionPercent);
+      const expectedProgress = calculateExpectedProgress(p.startDate, p.endDate, now);
+      const lag = expectedProgress - actualProgress;
+      const hasOperationalData = p.usedHours > 0 || actualProgress > 0;
 
-        let status: 'critical' | 'alert' | 'optimal' = 'optimal';
-        if (consumptionPercent >= 90 || (hasOperationalData && lag >= 20)) status = 'critical';
-        else if (consumptionPercent >= 70 || (hasOperationalData && lag >= 10)) status = 'alert';
+      let status: 'critical' | 'alert' | 'optimal' = 'optimal';
+      if (consumptionPercent >= 90 || (hasOperationalData && lag >= 20)) status = 'critical';
+      else if (consumptionPercent >= 70 || (hasOperationalData && lag >= 10)) status = 'alert';
 
-        return { p, actualProgress, expectedProgress, status };
-      })
+      return { p, actualProgress, expectedProgress, status };
+    });
+
+    const healthBreakdown = {
+      critical: allScored.filter((entry) => entry.status === 'critical').length,
+      alert: allScored.filter((entry) => entry.status === 'alert').length,
+      optimal: allScored.filter((entry) => entry.status === 'optimal').length,
+    };
+
+    const scored = allScored
       .filter((entry) => entry.status !== 'optimal')
       .sort((a, b) => {
         const priorityDiff = priorityRank(b.p.priority) - priorityRank(a.p.priority);
@@ -255,6 +304,7 @@ export class GetDashboardSummaryUseCase implements UseCase<GetDashboardSummaryCo
       quotationCount,
       finishedCount,
       closingThisMonthCount,
+      healthBreakdown,
       criticalProjects,
       scope: hasFullRead ? ('all' as const) : ('own' as const),
     };

@@ -5,13 +5,17 @@ import styles from './DashboardProjectsTab.module.css';
 import { Card } from '@/shared/components/ui/Card';
 import { Button } from '@/shared/components/ui/Button';
 import { useToast } from '@/shared/components/ui/Toast';
-import { PlusIcon, AlertIcon } from '@/shared/components/icons/Icons';
+import { PlusIcon, AlertIcon, ChevronRightIcon } from '@/shared/components/icons/Icons';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { ClientFormDialog } from '@/modules/clients/components/ClientFormDialog';
+import { SegmentedBar } from '@/shared/components/ui/SegmentedBar';
 import { CriticalProjectCard } from '../components/CriticalProjectCard';
 import { CapacityPlanningSection } from '../components/CapacityPlanningSection';
 
 const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 1 });
+
+/** Mismos colores de estado (danger/warning/success) que usa el resto del dashboard — nunca un color nuevo para "salud". */
+const HEALTH_COLORS = { critical: '#c50000', alert: '#ee7e23', optimal: '#4fae32' } as const;
 
 interface DashboardProjectsTabProps {
   projects: DashboardProjectsSummary | null;
@@ -45,14 +49,55 @@ export function DashboardProjectsTab({ projects, capacity, loading, weekStart, o
 
       <div className={styles.kpis}>
         <Card className={styles.kpiCard}>
-          <span className={styles.kpiLabel}>{projects?.scope === 'own' ? 'Mis Proyectos Activos' : 'Proyectos Activos'}</span>
+          <div className={styles.kpiLabelRow}>
+            <span className={styles.kpiLabel}>{projects?.scope === 'own' ? 'Mis Proyectos Activos' : 'Proyectos Activos'}</span>
+            <Button variant="ghost" size="icon" aria-label="Ir a Proyectos" onClick={() => navigate('/proyectos')}>
+              <ChevronRightIcon size={16} />
+            </Button>
+          </div>
           <span className={[styles.kpiValue, styles.kpiValueInfo].join(' ')}>{loading ? '…' : (projects?.activeCount ?? 0)}</span>
+          {!!projects && (
+            <>
+              <SegmentedBar
+                segments={[
+                  { key: 'critical', value: projects.healthBreakdown.critical, color: HEALTH_COLORS.critical, label: 'Crítico' },
+                  { key: 'alert', value: projects.healthBreakdown.alert, color: HEALTH_COLORS.alert, label: 'En alerta' },
+                  { key: 'optimal', value: projects.healthBreakdown.optimal, color: HEALTH_COLORS.optimal, label: 'Óptimo' },
+                ]}
+              />
+              <div className={styles.kpiBreakdown}>
+                {projects.healthBreakdown.critical > 0 && (
+                  <span className={styles.kpiBreakdownItem}>
+                    <span className={styles.kpiDot} style={{ background: HEALTH_COLORS.critical }} />
+                    {projects.healthBreakdown.critical} crítico{projects.healthBreakdown.critical === 1 ? '' : 's'}
+                  </span>
+                )}
+                {projects.healthBreakdown.alert > 0 && (
+                  <span className={styles.kpiBreakdownItem}>
+                    <span className={styles.kpiDot} style={{ background: HEALTH_COLORS.alert }} />
+                    {projects.healthBreakdown.alert} en alerta
+                  </span>
+                )}
+                {projects.healthBreakdown.optimal > 0 && (
+                  <span className={styles.kpiBreakdownItem}>
+                    <span className={styles.kpiDot} style={{ background: HEALTH_COLORS.optimal }} />
+                    {projects.healthBreakdown.optimal} óptimo{projects.healthBreakdown.optimal === 1 ? '' : 's'}
+                  </span>
+                )}
+              </div>
+            </>
+          )}
         </Card>
 
         <Card className={styles.kpiCard}>
           <div className={styles.kpiLabelRow}>
-            <AlertIcon size={16} />
-            <span className={styles.kpiLabel}>Alertas de Desvío</span>
+            <div className={styles.kpiLabelGroup}>
+              <AlertIcon size={16} />
+              <span className={styles.kpiLabel}>Alertas de Desvío</span>
+            </div>
+            <Button variant="ghost" size="icon" aria-label="Ir a Proyectos" onClick={() => navigate('/proyectos')}>
+              <ChevronRightIcon size={16} />
+            </Button>
           </div>
           <span className={[styles.kpiValue, styles.kpiValueDanger].join(' ')}>
             {loading ? '…' : `${formatHours(projects?.deviationHoursTotal ?? 0)} hrs.`}
@@ -61,7 +106,12 @@ export function DashboardProjectsTab({ projects, capacity, loading, weekStart, o
         </Card>
 
         <Card className={styles.kpiCard}>
-          <span className={styles.kpiLabel}>Prospecto y Cotización</span>
+          <div className={styles.kpiLabelRow}>
+            <span className={styles.kpiLabel}>Prospecto y Cotización</span>
+            <Button variant="ghost" size="icon" aria-label="Ir a Proyectos" onClick={() => navigate('/proyectos')}>
+              <ChevronRightIcon size={16} />
+            </Button>
+          </div>
           <span className={[styles.kpiValue, styles.kpiValueBrand].join(' ')}>
             {loading ? '…' : (projects?.prospectCount ?? 0) + (projects?.quotationCount ?? 0)}
           </span>
@@ -71,7 +121,12 @@ export function DashboardProjectsTab({ projects, capacity, loading, weekStart, o
         </Card>
 
         <Card className={styles.kpiCard}>
-          <span className={styles.kpiLabel}>Cierre de proyectos</span>
+          <div className={styles.kpiLabelRow}>
+            <span className={styles.kpiLabel}>Cierre de proyectos</span>
+            <Button variant="ghost" size="icon" aria-label="Ir a Proyectos" onClick={() => navigate('/proyectos')}>
+              <ChevronRightIcon size={16} />
+            </Button>
+          </div>
           <span className={styles.kpiValueClosing}>{loading ? '…' : `${projects?.finishedCount ?? 0} proyectos finalizados`}</span>
           <span className={styles.kpiSubWarning}>+{projects?.closingThisMonthCount ?? 0} por finalizar este mes</span>
         </Card>

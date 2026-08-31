@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import type { ProjectSummary, TeamSummary } from '@kora/contracts';
+import type { ProjectSummary, TeamMember, TeamSummary } from '@kora/contracts';
 import styles from './LeaderTeamConsole.module.css';
 import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Card } from '@/shared/components/ui/Card';
@@ -9,12 +9,12 @@ import { TextField } from '@/shared/components/ui/TextField';
 import { Tabs } from '@/shared/components/ui/Tabs';
 import { DataTable, type Column } from '@/shared/components/ui/DataTable';
 import { Pagination } from '@/shared/components/ui/Pagination';
-import { SearchIcon } from '@/shared/components/icons/Icons';
+import { ClockIcon, SearchIcon, TrendingUpIcon } from '@/shared/components/icons/Icons';
 import { ProjectStatusBadge } from '@/modules/projects/components/ProjectStatusBadge';
 import { getProjectStageLabel } from '@/modules/projects/lib/project-stage-display';
 import { useProjectsList } from '@/modules/projects/api/projects.queries';
 import { TeamHourHistoryPanel } from '@/modules/hours/components/TeamHourHistoryPanel';
-import { TeamMembersCard } from '../components/TeamMembersCard';
+import { TeamContextBar } from '../components/TeamContextBar';
 
 const PROJECT_TAB_KEYS = ['all', 'active', 'draft', 'on_hold', 'support', 'finished', 'quoted'] as const;
 type ProjectTabKey = (typeof PROJECT_TAB_KEYS)[number];
@@ -50,16 +50,17 @@ function matchesTab(project: ProjectSummary, tab: ProjectTabKey): boolean {
  * Consola del líder para su(s) equipo(s) — reemplaza la vista de administración
  * de equipos que veía un líder en `/equipos` (una tabla global de equipos que
  * no le pertenecía) por el equivalente de `LiderEquiposPM`/`LiderDashboardB`
- * en la v1: tarjetas de colaboradores, selector de equipo, y "Proyectos del
- * equipo" con tabs por estado, y "Registro de horas Líder": alta de horas
- * propias + historial de TODO el equipo (autor, equipo, filtros de persona/
- * fecha/estado), igual que `LiderDashboardB` en la v1. La capacidad semanal
- * y la aprobación de HH del equipo sí tienen pantallas propias completas en
- * v2 (`/forecast` y `/horas/aprobaciones`) — para esas dos, aquí solo se
- * enlaza en vez de reconstruirlas.
+ * en la v1: `TeamContextBar` (selector de equipo + filtro por colaborador),
+ * "Proyectos del equipo" con tabs por estado, y "Registro de horas Líder":
+ * alta de horas propias + historial de TODO el equipo (autor, equipo, filtros
+ * de persona/fecha/estado), igual que `LiderDashboardB` en la v1. La
+ * capacidad semanal y la aprobación de HH del equipo sí tienen pantallas
+ * propias completas en v2 (`/forecast` y `/horas/aprobaciones`) — para esas
+ * dos, aquí solo se enlaza en vez de reconstruirlas.
  */
 export function LeaderTeamConsole({ teams }: { teams: TeamSummary[] }) {
   const [teamId, setTeamId] = useState(teams[0]?.id ?? '');
+  const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
   const [tab, setTab] = useState<ProjectTabKey>('all');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -68,7 +69,9 @@ export function LeaderTeamConsole({ teams }: { teams: TeamSummary[] }) {
     data: teamProjects,
     isLoading: loadingProjects,
     error: teamProjectsError,
-  } = useProjectsList(teamId ? { teamId, page: 1, pageSize: TEAM_PROJECTS_FETCH_SIZE } : {});
+  } = useProjectsList(
+    teamId ? { teamId, assignedToUserId: selectedMember?.userId, page: 1, pageSize: TEAM_PROJECTS_FETCH_SIZE } : {},
+  );
 
   const allProjects = teamProjects?.items ?? [];
 
@@ -116,34 +119,49 @@ export function LeaderTeamConsole({ teams }: { teams: TeamSummary[] }) {
     {
       key: 'soldHours',
       header: 'HH vendidas',
+      align: 'right',
       render: (p) => formatHours(p.type === 'support' ? p.supportHours : p.soldHours),
     },
-    { key: 'usedHours', header: 'HH Consumidas', render: (p) => formatHours(p.usedHours) },
-    { key: 'plannedHours', header: 'HH Planificación', render: (p) => formatHours(p.plannedHours) },
+    { key: 'usedHours', header: 'HH Consumidas', align: 'right', render: (p) => formatHours(p.usedHours) },
+    { key: 'plannedHours', header: 'HH Planificación', align: 'right', render: (p) => formatHours(p.plannedHours) },
     {
       key: 'deviationHours',
       header: 'HH desviadas',
-      render: (p) => formatHours(Math.max(0, p.usedHours - (p.type === 'support' ? p.supportHours : p.soldHours))),
+      align: 'right',
+      render: (p) => {
+        const deviation = Math.max(0, p.usedHours - (p.type === 'support' ? p.supportHours : p.soldHours));
+        return deviation > 0 ? <span className={styles.deviated}>{formatHours(deviation)}</span> : <span className={styles.empty}>{formatHours(deviation)}</span>;
+      },
     },
   ];
 
   return (
     <DashboardLayout title="Equipos">
       <div className={styles.page}>
-        <TeamMembersCard
+        <TeamContextBar
           teams={teams}
           teamId={teamId}
           onTeamChange={(nextTeamId) => {
             setTeamId(nextTeamId);
+            setSelectedMember(null);
+            setPage(1);
+          }}
+          selectedMember={selectedMember}
+          onMemberSelect={(member) => {
+            setSelectedMember(member);
             setPage(1);
           }}
           actions={
             <>
               <Link to="/horas/aprobaciones">
-                <Button variant="secondary">Ver Registro de HH de Equipo</Button>
+                <Button variant="outlineDark" size="sm" iconLeft={<ClockIcon size={15} />}>
+                  Registro de HH
+                </Button>
               </Link>
               <Link to="/forecast">
-                <Button variant="secondary">Ver capacidad y planificación</Button>
+                <Button variant="outlineDark" size="sm" iconLeft={<TrendingUpIcon size={15} />}>
+                  Capacidad
+                </Button>
               </Link>
             </>
           }
@@ -186,7 +204,7 @@ export function LeaderTeamConsole({ teams }: { teams: TeamSummary[] }) {
 
         <Card>
           <h2 className={styles.title}>Registro de horas Líder</h2>
-          <TeamHourHistoryPanel />
+          <TeamHourHistoryPanel teamId={teamId || undefined} userId={selectedMember?.userId} />
         </Card>
       </div>
     </DashboardLayout>

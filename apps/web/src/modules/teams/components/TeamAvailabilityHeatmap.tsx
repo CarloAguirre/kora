@@ -59,7 +59,7 @@ function chipClass(hours: number) {
  * equipo (`ficha-equipo`, destino del botón "Ver Registro de HH de Equipo");
  * en v2 cuelga de `/horas/aprobaciones` por el mismo motivo.
  */
-export function TeamAvailabilityHeatmap({ teamId }: { teamId: string }) {
+export function TeamAvailabilityHeatmap({ teamId, teamMemberId }: { teamId: string; teamMemberId?: string | null }) {
   const [viewMode, setViewMode] = useState<ViewMode>('weekly');
   const [weekStartKey, setWeekStartKey] = useState(() => `${currentLaborWeek().periodStart}|${currentLaborWeek().periodEnd}`);
 
@@ -83,7 +83,7 @@ export function TeamAvailabilityHeatmap({ teamId }: { teamId: string }) {
     return map;
   }, [data]);
 
-  const members = data?.members ?? [];
+  const members = (data?.members ?? []).filter((member) => !teamMemberId || member.teamMemberId === teamMemberId);
 
   return (
     <div className={styles.wrapper}>

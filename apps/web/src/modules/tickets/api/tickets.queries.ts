@@ -21,7 +21,12 @@ export function useTicketDetail(ticketId: string | null) {
 
 function useInvalidateTickets() {
   const queryClient = useQueryClient();
-  return () => queryClient.invalidateQueries({ queryKey: ticketKeys.all });
+  return () => {
+    queryClient.invalidateQueries({ queryKey: ticketKeys.all });
+    // El Dashboard resume tickets abiertos: sin esto quedaba desactualizado
+    // hasta que el usuario recargaba la página a mano.
+    queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+  };
 }
 
 export function useCreateTicket() {

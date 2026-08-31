@@ -26,9 +26,9 @@
   justify-content: space-between;
   gap: var(--kora-space-2);
   height: var(--kora-field-height);
-  padding: 0 var(--kora-space-2);
-  border-radius: var(--kora-radius-sm);
-  border: 1px solid var(--kora-border-strong);
+  padding: 0 var(--kora-space-3);
+  border-radius: var(--kora-radius-input);
+  border: 1px solid var(--kora-blue-200);
   background: var(--kora-surface);
   font-family: var(--kora-font);
   font-size: var(--kora-text-base);
@@ -108,14 +108,15 @@
   align-items: center;
   gap: var(--kora-space-2);
   height: var(--kora-field-height);
-  padding: 0 var(--kora-space-2);
-  border-radius: var(--kora-radius-sm);
+  padding: 0 var(--kora-space-3);
+  border-radius: var(--kora-radius-input);
   border: 1px solid var(--kora-border-soft);
   background: var(--kora-surface-alt);
 }
 
 .searchField:focus-within {
   border-color: var(--kora-blue-600);
+  box-shadow: 0 0 0 3px var(--kora-blue-surface);
 }
 
 .searchIcon {
@@ -132,6 +133,11 @@
   font-family: var(--kora-font);
   font-size: var(--kora-text-sm);
   color: var(--kora-text);
+}
+
+/* El anillo de foco vive en `.searchField` (arriba) — ver TextField.module.css. */
+.searchInput:focus-visible {
+  outline: none;
 }
 
 .optionList {

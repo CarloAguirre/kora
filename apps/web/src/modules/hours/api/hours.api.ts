@@ -21,6 +21,7 @@ export const hoursApi = {
       pageSize: query.pageSize,
       userId: query.userId,
       search: query.search || undefined,
+      teamId: query.teamId,
       projectId: query.projectId,
       status: query.status,
       dateFrom: query.dateFrom,

@@ -261,16 +261,65 @@ export class DrizzleProjectRepository implements ProjectRepository {
 
   private buildOrderBy(sort: SortRequest<ProjectSortableField>) {
     const direction = sort.direction === 'desc' ? desc : asc;
+    const sqlDirection = sort.direction === 'desc' ? sql`desc` : sql`asc`;
 
     if (sort.field === 'priority') {
       // El enum project_priority se declaró en orden low < medium < high, así
       // que ordenar por la columna basta para respetar la severidad; los
       // proyectos sin prioridad quedan siempre al final, sin importar la dirección.
-      const priorityDirection = sort.direction === 'desc' ? sql`desc` : sql`asc`;
-      return [sql`${projects.priority} ${priorityDirection} nulls last`, desc(projects.createdAt), asc(projects.id)];
+      return [sql`${projects.priority} ${sqlDirection} nulls last`, desc(projects.createdAt), asc(projects.id)];
     }
 
-    const column = sort.field === 'name' ? projects.name : sort.field === 'status' ? projects.status : projects.createdAt;
+    if (sort.field === 'client') {
+      return [sql`${clients.companyName} ${sqlDirection} nulls last`, asc(projects.id)];
+    }
+
+    if (sort.field === 'leader') {
+      return [sql`${users.firstName} ${sqlDirection} nulls last`, sql`${users.lastName} ${sqlDirection} nulls last`, asc(projects.id)];
+    }
+
+    if (sort.field === 'startDate') {
+      return [sql`${projects.startDate} ${sqlDirection} nulls last`, asc(projects.id)];
+    }
+
+    if (sort.field === 'endDate') {
+      return [sql`${projects.endDate} ${sqlDirection} nulls last`, asc(projects.id)];
+    }
+
+    if (sort.field === 'progress') {
+      return [sql`${projects.actualProgress} ${sqlDirection} nulls last`, asc(projects.id)];
+    }
+
+    if (sort.field === 'supportPlan') {
+      return [sql`${projects.supportPlanDescription} ${sqlDirection} nulls last`, asc(projects.id)];
+    }
+
+    // Restantes = vendidas menos consumidas — desarrollo usa `soldHours`,
+    // soporte usa `supportHours`, así que se elige según el tipo de proyecto
+    // de cada fila en vez de asumir que la consulta ya viene filtrada por uno.
+    if (sort.field === 'remainingHours') {
+      return [
+        sql`(case when ${projects.type} = 'support' then ${projects.supportHours} else ${projects.soldHours} end - ${projects.usedHours}) ${sqlDirection}`,
+        asc(projects.id),
+      ];
+    }
+
+    if (sort.field === 'deviationHours') {
+      return [sql`(${projects.usedHours} - ${projects.supportHours}) ${sqlDirection}`, asc(projects.id)];
+    }
+
+    const column =
+      sort.field === 'name'
+        ? projects.name
+        : sort.field === 'status'
+          ? projects.status
+          : sort.field === 'soldHours'
+            ? projects.soldHours
+            : sort.field === 'usedHours'
+              ? projects.usedHours
+              : sort.field === 'supportHours'
+                ? projects.supportHours
+                : projects.createdAt;
     return [direction(column), asc(projects.id)];
   }
 }

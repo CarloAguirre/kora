@@ -6,6 +6,8 @@ export interface HourEntryFilters {
   readonly userId?: string | undefined;
   /** Filtra por nombre del autor (ilike sobre nombre/apellido). */
   readonly search?: string | undefined;
+  /** Acota a autores con membresía activa en este equipo. */
+  readonly teamId?: string | undefined;
   readonly projectId?: string | undefined;
   readonly status?: HourEntryStatus | undefined;
   readonly dateFrom?: Date | undefined;

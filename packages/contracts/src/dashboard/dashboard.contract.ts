@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { projectPrioritySchema } from '../projects/project.contract';
 import { forecastAssignmentTypeSchema } from '../forecast/forecast.contract';
+import { ticketStatusSchema } from '../tickets/ticket.contract';
+import { isoDateTimeSchema } from '../common/primitives';
 
 /**
  * Ver docs/DECISION-M7-DASHBOARD.md.
@@ -18,16 +20,46 @@ export const dashboardHoursSummarySchema = z.object({
 });
 export type DashboardHoursSummary = z.infer<typeof dashboardHoursSummarySchema>;
 
+/** Desglose de aprobaciones pendientes por equipo del autor (`teamId`/`teamName` `null` si no tiene equipo activo). */
+export const dashboardApprovalsTeamSchema = z.object({
+  teamId: z.string().nullable(),
+  teamName: z.string().nullable(),
+  pendingCount: z.number().int(),
+});
+export type DashboardApprovalsTeam = z.infer<typeof dashboardApprovalsTeamSchema>;
+
 export const dashboardApprovalsSummarySchema = z.object({
   pendingCount: z.number().int(),
+  /** Ordenado de mayor a menor `pendingCount`. */
+  pendingByTeam: z.array(dashboardApprovalsTeamSchema),
 });
 export type DashboardApprovalsSummary = z.infer<typeof dashboardApprovalsSummarySchema>;
 
 export const dashboardScopeSchema = z.enum(['own', 'all']);
 export type DashboardScope = z.infer<typeof dashboardScopeSchema>;
 
+export const dashboardTicketStatusCountSchema = z.object({
+  status: ticketStatusSchema,
+  count: z.number().int(),
+});
+export type DashboardTicketStatusCount = z.infer<typeof dashboardTicketStatusCountSchema>;
+
+export const dashboardOldestOpenTicketSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  status: ticketStatusSchema,
+  createdAt: isoDateTimeSchema,
+  clientName: z.string().nullable(),
+  assigneeName: z.string().nullable(),
+});
+export type DashboardOldestOpenTicket = z.infer<typeof dashboardOldestOpenTicketSchema>;
+
 export const dashboardTicketsSummarySchema = z.object({
   openCount: z.number().int(),
+  /** Solo estados abiertos con al menos un ticket, en el orden del flujo (pending → in_progress → in_testing → done). */
+  byStatus: z.array(dashboardTicketStatusCountSchema),
+  /** El ticket abierto más antiguo por fecha de creación — `null` si no hay tickets abiertos. */
+  oldestOpenTicket: dashboardOldestOpenTicketSchema.nullable(),
   /** `'own'` cuando el actor solo tiene `tickets:read_assigned` — el conteo es de sus propios tickets, no de toda la organización. */
   scope: dashboardScopeSchema,
 });
@@ -51,6 +83,14 @@ export const dashboardCriticalProjectSchema = z.object({
 });
 export type DashboardCriticalProject = z.infer<typeof dashboardCriticalProjectSchema>;
 
+/** Salud de TODOS los proyectos activos (no solo los 4 de `criticalProjects`) — mismo criterio de `dashboardCriticalProjectStatusSchema` más el resto ('optimal'). */
+export const dashboardProjectsHealthBreakdownSchema = z.object({
+  critical: z.number().int(),
+  alert: z.number().int(),
+  optimal: z.number().int(),
+});
+export type DashboardProjectsHealthBreakdown = z.infer<typeof dashboardProjectsHealthBreakdownSchema>;
+
 export const dashboardProjectsSummarySchema = z.object({
   activeCount: z.number().int(),
   deviationAlertsCount: z.number().int(),
@@ -59,6 +99,7 @@ export const dashboardProjectsSummarySchema = z.object({
   quotationCount: z.number().int(),
   finishedCount: z.number().int(),
   closingThisMonthCount: z.number().int(),
+  healthBreakdown: dashboardProjectsHealthBreakdownSchema,
   criticalProjects: z.array(dashboardCriticalProjectSchema),
   /** `'own'` cuando el actor solo tiene `projects:read_assigned` — todos los conteos están acotados a sus propios proyectos. */
   scope: dashboardScopeSchema,

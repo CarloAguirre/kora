@@ -185,8 +185,9 @@
 }
 
 .composerTextarea:focus-visible {
-  outline: 2px solid var(--kora-blue-600);
-  outline-offset: 1px;
+  outline: none;
+  border-color: var(--kora-blue-600);
+  box-shadow: 0 0 0 3px var(--kora-blue-surface);
 }
 
 .composerError {

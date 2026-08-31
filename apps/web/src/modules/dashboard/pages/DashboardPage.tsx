@@ -4,7 +4,7 @@ import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Button } from '@/shared/components/ui/Button';
 import { Tabs } from '@/shared/components/ui/Tabs';
 import { useToast } from '@/shared/components/ui/Toast';
-import { ClockIcon } from '@/shared/components/icons/Icons';
+import { ClockIcon, RefreshIcon } from '@/shared/components/icons/Icons';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { HourEntryFormDialog } from '@/modules/hours/components/HourEntryFormDialog';
@@ -41,7 +41,7 @@ export function DashboardPage() {
   const [tab, setTab] = useState<'proyectos' | 'soporte'>('proyectos');
   const [weekStart, setWeekStart] = useState<string | undefined>(undefined);
   const [registerHoursOpen, setRegisterHoursOpen] = useState(false);
-  const { data: summary, isLoading } = useDashboardSummary(weekStart);
+  const { data: summary, isLoading, isFetching, refetch } = useDashboardSummary(weekStart);
   const activeTab = tab === 'soporte' && !showSupportTab ? 'proyectos' : tab;
 
   return (
@@ -49,11 +49,21 @@ export function DashboardPage() {
       <div className={styles.page}>
         <div className={styles.topRow}>
           {isCollaborator ? <div /> : <Tabs tabs={tabs} activeId={activeTab} onSelect={(id) => setTab(id as 'proyectos' | 'soporte')} />}
-          {can('hours:register') && (
-            <Button iconLeft={<ClockIcon size={16} />} onClick={() => setRegisterHoursOpen(true)}>
-              Registrar Horas
+          <div className={styles.actions}>
+            <Button
+              variant="outline"
+              iconLeft={<RefreshIcon size={16} className={isFetching ? styles.spinning : undefined} />}
+              onClick={() => refetch()}
+              disabled={isFetching}
+            >
+              Actualizar
             </Button>
-          )}
+            {can('hours:register') && (
+              <Button iconLeft={<ClockIcon size={16} />} onClick={() => setRegisterHoursOpen(true)}>
+                Registrar Horas
+              </Button>
+            )}
+          </div>
         </div>
 
         {isCollaborator ? (

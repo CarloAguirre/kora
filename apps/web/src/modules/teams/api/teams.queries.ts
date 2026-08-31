@@ -37,7 +37,12 @@ export function useTeamAvailability(teamId: string | null, query: TeamAvailabili
 
 function useInvalidateTeams() {
   const queryClient = useQueryClient();
-  return () => queryClient.invalidateQueries({ queryKey: teamKeys.all });
+  return () => {
+    queryClient.invalidateQueries({ queryKey: teamKeys.all });
+    // El Dashboard resume capacidad por equipo: sin esto quedaba desactualizado
+    // hasta que el usuario recargaba la página a mano.
+    queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+  };
 }
 
 export function useCreateTeam() {

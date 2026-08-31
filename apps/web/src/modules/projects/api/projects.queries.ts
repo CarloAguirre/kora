@@ -28,7 +28,12 @@ export function useProjectDetail(projectId: string | null) {
 
 function useInvalidateProjects() {
   const queryClient = useQueryClient();
-  return () => queryClient.invalidateQueries({ queryKey: projectKeys.all });
+  return () => {
+    queryClient.invalidateQueries({ queryKey: projectKeys.all });
+    // El Dashboard resume proyectos/soporte: sin esto quedaba desactualizado
+    // hasta que el usuario recargaba la página a mano.
+    queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+  };
 }
 
 export function useCreateProject() {

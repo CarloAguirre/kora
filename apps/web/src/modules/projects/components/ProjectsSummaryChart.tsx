@@ -8,7 +8,7 @@ import { Select } from '@/shared/components/ui/Select';
 interface ProjectsSummaryChartProps {
   projects: readonly ProjectSummary[];
   clientOptions: readonly { value: string; label: string }[];
-  /** Solo la tab Desarrollo expone el checkbox "Incluir finalizados" en la v1. */
+  /** Solo la tab Desarrollo expone el filtro de estado (Activos/Finalizados/Todos). */
   showFinalizedToggle?: boolean;
 }
 
@@ -24,6 +24,14 @@ const SUB_PERIOD_OPTIONS: Record<PeriodOption, readonly string[]> = {
 };
 
 const PERIOD_OPTIONS = (Object.keys(SUB_PERIOD_OPTIONS) as PeriodOption[]).map((period) => ({ value: period, label: period }));
+
+type StatusFilter = 'active' | 'finished' | 'all';
+
+const STATUS_FILTER_OPTIONS: { value: StatusFilter; label: string }[] = [
+  { value: 'active', label: 'Activos' },
+  { value: 'finished', label: 'Finalizados' },
+  { value: 'all', label: 'Todos' },
+];
 
 const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 2 });
 
@@ -72,7 +80,7 @@ export function ProjectsSummaryChart({ projects, clientOptions, showFinalizedTog
   const [clientFilter, setClientFilter] = useState('');
   const [period, setPeriod] = useState<PeriodOption>('Semestral');
   const [detail, setDetail] = useState<string>(SUB_PERIOD_OPTIONS.Semestral[0] ?? '');
-  const [includeFinalized, setIncludeFinalized] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('active');
 
   const changePeriod = (value: PeriodOption) => {
     setPeriod(value);
@@ -83,11 +91,11 @@ export function ProjectsSummaryChart({ projects, clientOptions, showFinalizedTog
     () =>
       projects.filter((p) => {
         if (clientFilter && p.client?.id !== clientFilter) return false;
-        const statusOk = p.status === 'active' || (showFinalizedToggle && includeFinalized && p.status === 'finished');
+        const statusOk = showFinalizedToggle ? statusFilter === 'all' || p.status === statusFilter : p.status === 'active';
         if (!statusOk) return false;
         return projectOverlapsPeriod(p, period, detail);
       }),
-    [projects, clientFilter, showFinalizedToggle, includeFinalized, period, detail],
+    [projects, clientFilter, showFinalizedToggle, statusFilter, period, detail],
   );
 
   const chartData = useMemo(
@@ -147,10 +155,13 @@ export function ProjectsSummaryChart({ projects, clientOptions, showFinalizedTog
             onChange={(event) => setDetail(event.target.value)}
           />
           {showFinalizedToggle && (
-            <label className={styles.finalizedToggle}>
-              <input type="checkbox" checked={includeFinalized} onChange={(event) => setIncludeFinalized(event.target.checked)} />
-              <span>Incluir finalizados</span>
-            </label>
+            <Select
+              className={styles.periodFilter}
+              label="Estado"
+              options={STATUS_FILTER_OPTIONS}
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}
+            />
           )}
         </div>
       </div>

@@ -24,13 +24,14 @@
   display: flex;
   align-items: center;
   height: var(--kora-field-height);
-  border-radius: var(--kora-radius-sm);
-  border: 1px solid var(--kora-border-strong);
+  border-radius: var(--kora-radius-input);
+  border: 1px solid var(--kora-blue-200);
   background: var(--kora-surface);
 }
 
 .field:focus-within {
   border-color: var(--kora-blue-600);
+  box-shadow: 0 0 0 3px var(--kora-blue-surface);
 }
 
 .invalid,
@@ -42,7 +43,7 @@
   flex: 1;
   min-width: 0;
   height: 100%;
-  padding: 0 28px 0 var(--kora-space-2);
+  padding: 0 28px 0 var(--kora-space-3);
   border: none;
   outline: none;
   background: transparent;
@@ -53,9 +54,19 @@
   appearance: none;
 }
 
+.select option {
+  background: var(--kora-surface);
+  color: var(--kora-text);
+}
+
 .select:disabled {
   color: var(--kora-text-disabled);
   cursor: not-allowed;
+}
+
+/* El anillo de foco vive en `.field` (arriba) — ver TextField.module.css. */
+.select:focus-visible {
+  outline: none;
 }
 
 .disabled {

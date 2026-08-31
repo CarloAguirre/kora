@@ -24,16 +24,17 @@
   align-items: center;
   gap: var(--kora-space-2);
   height: var(--kora-field-height);
-  padding: var(--kora-space-2);
+  padding: var(--kora-space-2) var(--kora-space-3);
   align-self: stretch;
-  border-radius: var(--kora-radius-sm);
-  border: 1px solid var(--kora-border-strong);
+  border-radius: var(--kora-radius-input);
+  border: 1px solid var(--kora-blue-200);
   background: var(--kora-surface);
   transition: border-color var(--kora-transition);
 }
 
 .field:focus-within {
   border-color: var(--kora-blue-600);
+  box-shadow: 0 0 0 3px var(--kora-blue-surface);
 }
 
 .invalid,
@@ -68,6 +69,13 @@
 .input:disabled {
   color: var(--kora-text-disabled);
   cursor: not-allowed;
+}
+
+/* El anillo de foco del sistema vive en `.field` (arriba): sin esto, el
+   `<input>` recibe además el anillo global de `:focus-visible`, superpuesto
+   sobre el borde del campo — dos rectángulos azules en vez de uno. */
+.input:focus-visible {
+  outline: none;
 }
 
 .adornment {
