@@ -42,7 +42,6 @@ export function TicketHhRequestsSection({ ticketId, canRequest }: TicketHhReques
   const approveRequest = useApproveTicketHhRequest(ticketId);
   const rejectRequest = useRejectTicketHhRequest(ticketId);
 
-  const [formOpen, setFormOpen] = useState(false);
   const [date, setDate] = useState(todayIso());
   const [hours, setHours] = useState('');
   const [note, setNote] = useState('');
@@ -56,7 +55,6 @@ export function TicketHhRequestsSection({ ticketId, canRequest }: TicketHhReques
     if (!(hoursValue > 0)) return;
     await createRequest.mutateAsync({ date, hours: hoursValue, note: note.trim() || undefined });
     toast.success('Solicitud de horas enviada.');
-    setFormOpen(false);
     setHours('');
     setNote('');
   };
@@ -78,14 +76,9 @@ export function TicketHhRequestsSection({ ticketId, canRequest }: TicketHhReques
     <div className={styles.section}>
       <div className={styles.header}>
         <span className={styles.label}>Solicitudes de HH:</span>
-        {canRequest && (
-          <Button variant="tertiary" size="sm" onClick={() => setFormOpen((open) => !open)}>
-            {formOpen ? 'Cancelar' : 'Solicitar horas'}
-          </Button>
-        )}
       </div>
 
-      {formOpen && (
+      {canRequest && (
         <div className={styles.form}>
           <TextField label="Fecha" type="date" value={date} onChange={(event) => setDate(event.target.value)} />
           <TextField label="Horas" type="number" min="0.5" max="24" step="0.5" value={hours} onChange={(event) => setHours(event.target.value)} />

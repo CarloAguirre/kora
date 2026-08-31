@@ -5,7 +5,7 @@ import { Button } from '@/shared/components/ui/Button';
 import { AlertIcon } from '@/shared/components/icons/Icons';
 import { useChangeClientStatus } from '../api/clients.queries';
 import { ApiRequestError } from '@/shared/lib/api-client';
-import styles from './ConfirmActionDialog.module.css';
+import styles from '@/shared/components/ui/ConfirmActionDialog.module.css';
 
 export interface DeactivateClientDialogProps {
   open: boolean;

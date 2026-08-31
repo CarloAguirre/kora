@@ -165,6 +165,38 @@
   font-weight: var(--kora-weight-semibold);
 }
 
+.historyBox {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-2);
+  padding: var(--kora-space-3);
+  border-radius: var(--kora-radius-lg);
+  background: var(--kora-blue-surface-alt);
+}
+
+.historyToggle {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+
+.historyChevron {
+  color: var(--kora-text-muted);
+  transition: transform 0.2s;
+}
+
+.historyChevronOpen {
+  color: var(--kora-text-muted);
+  transform: rotate(180deg);
+  transition: transform 0.2s;
+}
+
 .history {
   display: flex;
   flex-direction: column;
@@ -212,11 +244,13 @@
 
 .footer {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   align-items: center;
   gap: var(--kora-space-4);
 }
 
-.statusSelect {
-  min-width: 200px;
+.footerRight {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-2);
 }

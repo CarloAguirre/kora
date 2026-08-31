@@ -67,3 +67,10 @@ export class CannotDeleteTicketError extends ForbiddenError {
     super('No puedes eliminar este ticket.', 'TICKET_CANNOT_DELETE');
   }
 }
+
+/** Sin `tickets:manage` y sin relación con el ticket (no es su responsable ni tiene autoridad sobre su proyecto). */
+export class CannotManageTicketError extends ForbiddenError {
+  constructor() {
+    super('No tienes permiso para gestionar este ticket.', 'TICKET_CANNOT_MANAGE');
+  }
+}

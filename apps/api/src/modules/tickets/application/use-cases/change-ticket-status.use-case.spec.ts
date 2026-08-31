@@ -9,11 +9,21 @@ import type {
   TicketHistoryRepository,
 } from '../../domain/repositories/ticket-history.repository';
 import type { TicketHhRequestListItem, TicketHhRequestRepository } from '../../domain/repositories/ticket-hh-request.repository';
+import type { TicketProjectReader } from '../ports/ticket-project-reader.port';
 import { FixedClock, RecordingAuditRecorder } from '../../../../test/fakes';
 import type { ActorContext } from '../../../../shared/application/use-case';
+import type { Permission } from '@kora/contracts';
 
 const ACTOR: ActorContext = { userId: 'user-1', email: 'user@kabeli.cl' };
+/** Actor con `tickets:manage` — ejercita el flujo forzado sin mezclarlo con la autorización por dueño del ticket. */
+const MANAGE_PERMISSIONS: Permission[] = ['tickets:manage'];
 const NOW = new Date('2026-08-25T12:00:00.000Z');
+
+class StubTicketProjectReader implements Partial<TicketProjectReader> {
+  async isProjectApprover(): Promise<boolean> {
+    return false;
+  }
+}
 
 class InMemoryTicketRepository implements Partial<TicketRepository> {
   private readonly tickets = new Map<string, Ticket>();
@@ -84,11 +94,15 @@ describe('ChangeTicketStatusUseCase — flujo forzado (ver docs/DECISION-M5-TICK
     audit = new RecordingAuditRecorder();
   });
 
-  function buildUseCase(hhRequests: TicketHhRequestListItem[] = []): ChangeTicketStatusUseCase {
+  function buildUseCase(
+    hhRequests: TicketHhRequestListItem[] = [],
+    projects: Partial<TicketProjectReader> = new StubTicketProjectReader(),
+  ): ChangeTicketStatusUseCase {
     return new ChangeTicketStatusUseCase(
       tickets as unknown as TicketRepository,
       history,
       new StubTicketHhRequestRepository(hhRequests) as unknown as TicketHhRequestRepository,
+      projects as TicketProjectReader,
       audit,
       new FixedClock(NOW),
     );
@@ -98,7 +112,12 @@ describe('ChangeTicketStatusUseCase — flujo forzado (ver docs/DECISION-M5-TICK
     tickets.seed(buildTicket());
     const useCase = buildUseCase();
 
-    const result = await useCase.execute({ ticketId: 'ticket-1', data: { status: 'in_progress' }, actor: ACTOR });
+    const result = await useCase.execute({
+      ticketId: 'ticket-1',
+      data: { status: 'in_progress' },
+      actor: ACTOR,
+      actorPermissions: MANAGE_PERMISSIONS,
+    });
 
     expect(result.isErr()).toBe(true);
     if (result.isErr()) expect(result.error.code).toBe('TICKET_REQUIRES_ASSIGNEE');
@@ -107,9 +126,14 @@ describe('ChangeTicketStatusUseCase — flujo forzado (ver docs/DECISION-M5-TICK
   it('un incidente no puede saltar a "En Pruebas"', async () => {
     tickets.seed(buildTicket({ assigneeUserId: 'user-2', serviceType: 'incident' }));
     const useCase = buildUseCase();
-    await useCase.execute({ ticketId: 'ticket-1', data: { status: 'in_progress' }, actor: ACTOR });
+    await useCase.execute({ ticketId: 'ticket-1', data: { status: 'in_progress' }, actor: ACTOR, actorPermissions: MANAGE_PERMISSIONS });
 
-    const result = await useCase.execute({ ticketId: 'ticket-1', data: { status: 'in_testing' }, actor: ACTOR });
+    const result = await useCase.execute({
+      ticketId: 'ticket-1',
+      data: { status: 'in_testing' },
+      actor: ACTOR,
+      actorPermissions: MANAGE_PERMISSIONS,
+    });
 
     expect(result.isErr()).toBe(true);
     if (result.isErr()) expect(result.error.code).toBe('TICKET_INVALID_STATUS_TRANSITION');
@@ -119,7 +143,12 @@ describe('ChangeTicketStatusUseCase — flujo forzado (ver docs/DECISION-M5-TICK
     tickets.seed(buildTicket({ assigneeUserId: 'user-2' }));
     const useCase = buildUseCase();
 
-    const result = await useCase.execute({ ticketId: 'ticket-1', data: { status: 'done' }, actor: ACTOR });
+    const result = await useCase.execute({
+      ticketId: 'ticket-1',
+      data: { status: 'done' },
+      actor: ACTOR,
+      actorPermissions: MANAGE_PERMISSIONS,
+    });
 
     expect(result.isErr()).toBe(true);
     if (result.isErr()) expect(result.error.code).toBe('TICKET_INVALID_STATUS_TRANSITION');
@@ -128,9 +157,14 @@ describe('ChangeTicketStatusUseCase — flujo forzado (ver docs/DECISION-M5-TICK
   it('rechaza marcar "Terminado" sin solución registrada', async () => {
     tickets.seed(buildTicket({ assigneeUserId: 'user-2' }));
     const useCase = buildUseCase();
-    await useCase.execute({ ticketId: 'ticket-1', data: { status: 'in_progress' }, actor: ACTOR });
+    await useCase.execute({ ticketId: 'ticket-1', data: { status: 'in_progress' }, actor: ACTOR, actorPermissions: MANAGE_PERMISSIONS });
 
-    const result = await useCase.execute({ ticketId: 'ticket-1', data: { status: 'done' }, actor: ACTOR });
+    const result = await useCase.execute({
+      ticketId: 'ticket-1',
+      data: { status: 'done' },
+      actor: ACTOR,
+      actorPermissions: MANAGE_PERMISSIONS,
+    });
 
     expect(result.isErr()).toBe(true);
     if (result.isErr()) expect(result.error.code).toBe('TICKET_RESOLUTION_REQUIRED');
@@ -139,9 +173,14 @@ describe('ChangeTicketStatusUseCase — flujo forzado (ver docs/DECISION-M5-TICK
   it('permite marcar "Terminado" cuando hay solución registrada', async () => {
     tickets.seed(buildTicket({ assigneeUserId: 'user-2', resolution: 'Se reinició el servicio.' }));
     const useCase = buildUseCase();
-    await useCase.execute({ ticketId: 'ticket-1', data: { status: 'in_progress' }, actor: ACTOR });
+    await useCase.execute({ ticketId: 'ticket-1', data: { status: 'in_progress' }, actor: ACTOR, actorPermissions: MANAGE_PERMISSIONS });
 
-    const result = await useCase.execute({ ticketId: 'ticket-1', data: { status: 'done' }, actor: ACTOR });
+    const result = await useCase.execute({
+      ticketId: 'ticket-1',
+      data: { status: 'done' },
+      actor: ACTOR,
+      actorPermissions: MANAGE_PERMISSIONS,
+    });
 
     expect(result.isOk()).toBe(true);
   });
@@ -149,10 +188,15 @@ describe('ChangeTicketStatusUseCase — flujo forzado (ver docs/DECISION-M5-TICK
   it('rechaza cerrar con una solicitud de HH pendiente', async () => {
     tickets.seed(buildTicket({ assigneeUserId: 'user-2', resolution: 'Listo.' }));
     const useCase = buildUseCase([pendingHhRequest()]);
-    await useCase.execute({ ticketId: 'ticket-1', data: { status: 'in_progress' }, actor: ACTOR });
-    await useCase.execute({ ticketId: 'ticket-1', data: { status: 'done' }, actor: ACTOR });
+    await useCase.execute({ ticketId: 'ticket-1', data: { status: 'in_progress' }, actor: ACTOR, actorPermissions: MANAGE_PERMISSIONS });
+    await useCase.execute({ ticketId: 'ticket-1', data: { status: 'done' }, actor: ACTOR, actorPermissions: MANAGE_PERMISSIONS });
 
-    const result = await useCase.execute({ ticketId: 'ticket-1', data: { status: 'closed' }, actor: ACTOR });
+    const result = await useCase.execute({
+      ticketId: 'ticket-1',
+      data: { status: 'closed' },
+      actor: ACTOR,
+      actorPermissions: MANAGE_PERMISSIONS,
+    });
 
     expect(result.isErr()).toBe(true);
     if (result.isErr()) expect(result.error.code).toBe('TICKET_HAS_PENDING_HH_REQUESTS');
@@ -161,10 +205,15 @@ describe('ChangeTicketStatusUseCase — flujo forzado (ver docs/DECISION-M5-TICK
   it('reabrir (retroceder desde Terminado) no exige nada', async () => {
     tickets.seed(buildTicket({ assigneeUserId: 'user-2', resolution: 'Listo.' }));
     const useCase = buildUseCase();
-    await useCase.execute({ ticketId: 'ticket-1', data: { status: 'in_progress' }, actor: ACTOR });
-    await useCase.execute({ ticketId: 'ticket-1', data: { status: 'done' }, actor: ACTOR });
+    await useCase.execute({ ticketId: 'ticket-1', data: { status: 'in_progress' }, actor: ACTOR, actorPermissions: MANAGE_PERMISSIONS });
+    await useCase.execute({ ticketId: 'ticket-1', data: { status: 'done' }, actor: ACTOR, actorPermissions: MANAGE_PERMISSIONS });
 
-    const result = await useCase.execute({ ticketId: 'ticket-1', data: { status: 'in_progress' }, actor: ACTOR });
+    const result = await useCase.execute({
+      ticketId: 'ticket-1',
+      data: { status: 'in_progress' },
+      actor: ACTOR,
+      actorPermissions: MANAGE_PERMISSIONS,
+    });
 
     expect(result.isOk()).toBe(true);
     expect(history.entries.at(-1)?.eventType).toBe('ticket_reopened');
@@ -173,12 +222,67 @@ describe('ChangeTicketStatusUseCase — flujo forzado (ver docs/DECISION-M5-TICK
   it('una mejora sí debe pasar por "En Pruebas"', async () => {
     tickets.seed(buildTicket({ assigneeUserId: 'user-2', serviceType: 'improvement' }));
     const useCase = buildUseCase();
-    await useCase.execute({ ticketId: 'ticket-1', data: { status: 'in_progress' }, actor: ACTOR });
+    await useCase.execute({ ticketId: 'ticket-1', data: { status: 'in_progress' }, actor: ACTOR, actorPermissions: MANAGE_PERMISSIONS });
 
-    const skipTesting = await useCase.execute({ ticketId: 'ticket-1', data: { status: 'done' }, actor: ACTOR });
+    const skipTesting = await useCase.execute({
+      ticketId: 'ticket-1',
+      data: { status: 'done' },
+      actor: ACTOR,
+      actorPermissions: MANAGE_PERMISSIONS,
+    });
     expect(skipTesting.isErr()).toBe(true);
 
-    const throughTesting = await useCase.execute({ ticketId: 'ticket-1', data: { status: 'in_testing' }, actor: ACTOR });
+    const throughTesting = await useCase.execute({
+      ticketId: 'ticket-1',
+      data: { status: 'in_testing' },
+      actor: ACTOR,
+      actorPermissions: MANAGE_PERMISSIONS,
+    });
     expect(throughTesting.isOk()).toBe(true);
+  });
+
+  describe('autorización por dueño del ticket (ver docs/DECISION-M5-TICKETS.md — canModifyTicket en la v1)', () => {
+    it('el responsable del ticket puede avanzarlo sin tener tickets:manage', async () => {
+      tickets.seed(buildTicket({ assigneeUserId: 'user-1' }));
+      const useCase = buildUseCase();
+
+      const result = await useCase.execute({
+        ticketId: 'ticket-1',
+        data: { status: 'in_progress' },
+        actor: ACTOR,
+        actorPermissions: [],
+      });
+
+      expect(result.isOk()).toBe(true);
+    });
+
+    it('un actor sin tickets:manage que no es responsable ni tiene autoridad sobre el proyecto es rechazado', async () => {
+      tickets.seed(buildTicket({ assigneeUserId: 'user-2' }));
+      const useCase = buildUseCase();
+
+      const result = await useCase.execute({
+        ticketId: 'ticket-1',
+        data: { status: 'in_progress' },
+        actor: ACTOR,
+        actorPermissions: [],
+      });
+
+      expect(result.isErr()).toBe(true);
+      if (result.isErr()) expect(result.error.code).toBe('TICKET_CANNOT_MANAGE');
+    });
+
+    it('quien tiene autoridad sobre el proyecto del ticket puede avanzarlo aunque no sea el responsable', async () => {
+      tickets.seed(buildTicket({ assigneeUserId: 'user-2', projectId: 'project-1' }));
+      const useCase = buildUseCase([], { isProjectApprover: async () => true });
+
+      const result = await useCase.execute({
+        ticketId: 'ticket-1',
+        data: { status: 'in_progress' },
+        actor: ACTOR,
+        actorPermissions: [],
+      });
+
+      expect(result.isOk()).toBe(true);
+    });
   });
 });

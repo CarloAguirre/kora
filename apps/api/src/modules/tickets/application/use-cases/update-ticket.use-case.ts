@@ -1,17 +1,19 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CLOCK, err, ok, type ApplicationError, type Clock, type Result } from '@kora/core';
-import type { UpdateTicketInput } from '@kora/contracts';
-import { ReferencedProjectNotFoundError, TicketNotFoundError } from '../../domain/errors/ticket.errors';
+import type { Permission, UpdateTicketInput } from '@kora/contracts';
+import { CannotManageTicketError, ReferencedProjectNotFoundError, TicketNotFoundError } from '../../domain/errors/ticket.errors';
 import { TICKET_REPOSITORY, type TicketRepository } from '../../domain/repositories/ticket.repository';
 import { TICKET_HISTORY_REPOSITORY, type TicketHistoryRepository } from '../../domain/repositories/ticket-history.repository';
 import { TICKET_PROJECT_READER, type TicketProjectReader } from '../ports/ticket-project-reader.port';
 import { AUDIT_RECORDER, type AuditRecorder } from '../../../../shared/application/ports/audit-recorder.port';
 import type { ActorContext, UseCase } from '../../../../shared/application/use-case';
+import { canManageTicket } from '../services/ticket-access';
 
 export interface UpdateTicketCommand {
   readonly ticketId: string;
   readonly data: UpdateTicketInput;
   readonly actor: ActorContext;
+  readonly actorPermissions: readonly Permission[];
 }
 
 @Injectable()
@@ -28,6 +30,10 @@ export class UpdateTicketUseCase implements UseCase<UpdateTicketCommand, void, A
     const { ticketId, data, actor } = command;
     const ticket = await this.tickets.findById(ticketId);
     if (!ticket || ticket.isDeleted) return err(new TicketNotFoundError(ticketId));
+
+    if (!(await canManageTicket(ticket, actor.userId, command.actorPermissions, this.projects))) {
+      return err(new CannotManageTicketError());
+    }
 
     if (data.developmentProjectId) {
       const project = await this.projects.findById(data.developmentProjectId);

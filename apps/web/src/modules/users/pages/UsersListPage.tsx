@@ -11,7 +11,7 @@ import { PlusIcon } from '@/shared/components/icons/Icons';
 import { UsersFilters } from '../components/UsersFilters';
 import { UsersTable } from '../components/UsersTable';
 import { UserFormDialog } from '../components/UserFormDialog';
-import { ConfirmActionDialog } from '../components/ConfirmActionDialog';
+import { ConfirmActionDialog } from '@/shared/components/ui/ConfirmActionDialog';
 import { useUsersListState } from '../hooks/useUsersListState';
 import { useDeleteUser, useGrantUserAccess, useUsersList } from '../api/users.queries';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';

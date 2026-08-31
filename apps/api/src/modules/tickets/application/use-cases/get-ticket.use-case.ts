@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { ForbiddenError, err, ok, type ApplicationError, type Result } from '@kora/core';
-import type { Permission, TicketDetail } from '@kora/contracts';
+import { isAdminTier, type Permission, type RoleCode, type TicketDetail } from '@kora/contracts';
 import { TicketNotFoundError } from '../../domain/errors/ticket.errors';
 import { TICKET_REPOSITORY, type TicketRepository } from '../../domain/repositories/ticket.repository';
 import { TICKET_HISTORY_REPOSITORY, type TicketHistoryRepository } from '../../domain/repositories/ticket-history.repository';
@@ -13,6 +13,7 @@ import { toTicketDetail } from '../mappers/ticket.mapper';
 export interface GetTicketCommand {
   readonly ticketId: string;
   readonly actorUserId: string;
+  readonly actorRole: RoleCode;
   readonly actorPermissions: readonly Permission[];
 }
 
@@ -36,6 +37,11 @@ export class GetTicketUseCase implements UseCase<GetTicketCommand, TicketDetail,
     }
 
     const snapshot = ticket.toSnapshot();
+    const isApprover = snapshot.projectId ? await this.projects.isProjectApprover(snapshot.projectId, command.actorUserId) : false;
+    const isAssignee = snapshot.assigneeUserId === command.actorUserId;
+    const canManage = command.actorPermissions.includes('tickets:manage') || isAssignee || isApprover;
+    const canDelete = isAdminTier(command.actorRole) || (command.actorPermissions.includes('tickets:manage') && (isAssignee || isApprover));
+
     const [client, project, developmentProject, assignee, historyEntries] = await Promise.all([
       snapshot.clientId ? this.clients.findById(snapshot.clientId) : Promise.resolve(null),
       snapshot.projectId ? this.projects.findById(snapshot.projectId) : Promise.resolve(null),
@@ -44,6 +50,6 @@ export class GetTicketUseCase implements UseCase<GetTicketCommand, TicketDetail,
       this.history.listForTicket(ticket.id),
     ]);
 
-    return ok(toTicketDetail({ ticket, client, project, developmentProject, assignee, history: historyEntries }));
+    return ok(toTicketDetail({ ticket, client, project, developmentProject, assignee, history: historyEntries, canManage, canDelete }));
   }
 }

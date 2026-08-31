@@ -29,6 +29,8 @@ export interface TicketDetailSource {
   readonly developmentProject: TicketProjectReference | null;
   readonly assignee: { id: string; fullName: string } | null;
   readonly history: readonly TicketHistoryEntryRecord[];
+  readonly canManage: boolean;
+  readonly canDelete: boolean;
 }
 
 export function toTicketDetail(source: TicketDetailSource): TicketDetail {
@@ -63,5 +65,7 @@ export function toTicketDetail(source: TicketDetailSource): TicketDetail {
     legacyId: snapshot.legacyId,
     createdAt: snapshot.createdAt.toISOString(),
     updatedAt: snapshot.updatedAt.toISOString(),
+    canManage: source.canManage,
+    canDelete: source.canDelete,
   };
 }

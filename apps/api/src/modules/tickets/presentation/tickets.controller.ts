@@ -63,7 +63,12 @@ export class TicketsController {
   @RequireAnyPermission('tickets:read', 'tickets:read_assigned')
   async detail(@Param('id') id: string, @CurrentUser() actor: RequestUser): Promise<TicketDetail> {
     return unwrapOrThrow(
-      await this.getTicket.execute({ ticketId: id, actorUserId: actor.id, actorPermissions: actor.permissions }),
+      await this.getTicket.execute({
+        ticketId: id,
+        actorUserId: actor.id,
+        actorRole: actor.role,
+        actorPermissions: actor.permissions,
+      }),
     );
   }
 
@@ -77,26 +82,36 @@ export class TicketsController {
     return unwrapOrThrow(await this.createTicket.execute({ data: body, actor: toActorContext(actor), actorRole: actor.role }));
   }
 
+  /**
+   * `tickets:read_assigned` da acceso al endpoint aunque el actor no tenga
+   * `tickets:manage` — el caso de uso decide si puede gestionar ESTE ticket
+   * (responsable o autoridad sobre su proyecto), igual que `canModifyTicket`
+   * en la v1.
+   */
   @Patch(':id')
-  @RequirePermissions('tickets:manage')
+  @RequireAnyPermission('tickets:manage', 'tickets:read_assigned')
   @HttpCode(HttpStatus.NO_CONTENT)
   async update(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(updateTicketSchema)) body: UpdateTicketInput,
     @CurrentUser() actor: RequestUser,
   ): Promise<void> {
-    unwrapOrThrow(await this.updateTicket.execute({ ticketId: id, data: body, actor: toActorContext(actor) }));
+    unwrapOrThrow(
+      await this.updateTicket.execute({ ticketId: id, data: body, actor: toActorContext(actor), actorPermissions: actor.permissions }),
+    );
   }
 
   @Patch(':id/status')
-  @RequirePermissions('tickets:manage')
+  @RequireAnyPermission('tickets:manage', 'tickets:read_assigned')
   @HttpCode(HttpStatus.NO_CONTENT)
   async setStatus(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(changeTicketStatusSchema)) body: ChangeTicketStatusInput,
     @CurrentUser() actor: RequestUser,
   ): Promise<void> {
-    unwrapOrThrow(await this.changeStatus.execute({ ticketId: id, data: body, actor: toActorContext(actor) }));
+    unwrapOrThrow(
+      await this.changeStatus.execute({ ticketId: id, data: body, actor: toActorContext(actor), actorPermissions: actor.permissions }),
+    );
   }
 
   @Delete(':id')

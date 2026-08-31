@@ -1,7 +1,14 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CLOCK, err, ok, type ApplicationError, type Clock, type Result } from '@kora/core';
-import { TICKET_STATUS_LABELS, TICKET_STATUS_ORDER, nextForwardTicketStatus, type ChangeTicketStatusInput } from '@kora/contracts';
 import {
+  TICKET_STATUS_LABELS,
+  TICKET_STATUS_ORDER,
+  nextForwardTicketStatus,
+  type ChangeTicketStatusInput,
+  type Permission,
+} from '@kora/contracts';
+import {
+  CannotManageTicketError,
   InvalidTicketStatusTransitionError,
   TicketHasPendingHhRequestsError,
   TicketNotFoundError,
@@ -11,13 +18,16 @@ import {
 import { TICKET_REPOSITORY, type TicketRepository } from '../../domain/repositories/ticket.repository';
 import { TICKET_HISTORY_REPOSITORY, type TicketHistoryRepository } from '../../domain/repositories/ticket-history.repository';
 import { TICKET_HH_REQUEST_REPOSITORY, type TicketHhRequestRepository } from '../../domain/repositories/ticket-hh-request.repository';
+import { TICKET_PROJECT_READER, type TicketProjectReader } from '../ports/ticket-project-reader.port';
 import { AUDIT_RECORDER, type AuditRecorder } from '../../../../shared/application/ports/audit-recorder.port';
 import type { ActorContext, UseCase } from '../../../../shared/application/use-case';
+import { canManageTicket } from '../services/ticket-access';
 
 export interface ChangeTicketStatusCommand {
   readonly ticketId: string;
   readonly data: ChangeTicketStatusInput;
   readonly actor: ActorContext;
+  readonly actorPermissions: readonly Permission[];
 }
 
 /**
@@ -34,6 +44,7 @@ export class ChangeTicketStatusUseCase implements UseCase<ChangeTicketStatusComm
     @Inject(TICKET_REPOSITORY) private readonly tickets: TicketRepository,
     @Inject(TICKET_HISTORY_REPOSITORY) private readonly history: TicketHistoryRepository,
     @Inject(TICKET_HH_REQUEST_REPOSITORY) private readonly hhRequests: TicketHhRequestRepository,
+    @Inject(TICKET_PROJECT_READER) private readonly projects: TicketProjectReader,
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
     @Inject(CLOCK) private readonly clock: Clock,
   ) {}
@@ -41,6 +52,10 @@ export class ChangeTicketStatusUseCase implements UseCase<ChangeTicketStatusComm
   async execute(command: ChangeTicketStatusCommand): Promise<Result<void, ApplicationError>> {
     const ticket = await this.tickets.findById(command.ticketId);
     if (!ticket || ticket.isDeleted) return err(new TicketNotFoundError(command.ticketId));
+
+    if (!(await canManageTicket(ticket, command.actor.userId, command.actorPermissions, this.projects))) {
+      return err(new CannotManageTicketError());
+    }
 
     const previousStatus = ticket.status;
     const targetStatus = command.data.status;

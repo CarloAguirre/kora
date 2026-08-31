@@ -1,21 +1,18 @@
 import { useEffect, useState } from 'react';
 import {
   TICKET_PRIORITY_LABELS,
-  TICKET_STATUS_LABELS,
-  TICKET_STATUS_ORDER,
-  TICKET_STATUSES,
   nextForwardTicketStatus,
-  type TicketDetail,
   type TicketStatus,
 } from '@kora/contracts';
 import styles from './TicketDetailModal.module.css';
 import priorityStyles from './TicketPriorityBadge.module.css';
-import { Select } from '@/shared/components/ui/Select';
 import { Button } from '@/shared/components/ui/Button';
-import { AlertIcon, CalendarIcon, ClockIcon, CloseIcon, SparklesIcon } from '@/shared/components/icons/Icons';
+import { AlertIcon, CalendarIcon, ChevronDownIcon, ClockIcon, CloseIcon, PencilIcon, SparklesIcon } from '@/shared/components/icons/Icons';
 import { TicketStatusBadge } from './TicketStatusBadge';
 import { TicketHhRequestsSection } from './TicketHhRequestsSection';
-import { useChangeTicketStatus, useTicketDetail, useUpdateTicket } from '../api/tickets.queries';
+import { EditTicketDialog } from './EditTicketDialog';
+import { ConfirmActionDialog } from '@/shared/components/ui/ConfirmActionDialog';
+import { useChangeTicketStatus, useDeleteTicket, useTicketDetail, useUpdateTicket } from '../api/tickets.queries';
 import { useToast } from '@/shared/components/ui/Toast';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { ApiRequestError } from '@/shared/lib/api-client';
@@ -24,19 +21,23 @@ const formatDateTime = (value: string) => new Date(value).toLocaleString('es-CL'
 const formatDate = (value: string) => new Date(value).toLocaleDateString('es-CL');
 
 /**
- * Opciones habilitadas del selector de estado: el estado actual, cualquier
- * retroceso (reapertura libre, sin validar) y únicamente el siguiente paso
- * legal del avance forzado — el resto queda deshabilitado. Ver
- * `nextForwardTicketStatus` en @kora/contracts.
+ * Etiqueta del botón de avance forzado — replica `stageActionLabel` de la v1.
+ * El retroceso de estado no vive en el modal: en la v1 se hace arrastrando la
+ * tarjeta en el tablero, no hay selector de estado en la ficha.
  */
-function buildStatusOptions(ticket: TicketDetail) {
-  const legalNext = nextForwardTicketStatus(ticket.status, ticket.serviceType);
-  return TICKET_STATUSES.map((status) => {
-    const isCurrent = status === ticket.status;
-    const isBackward = TICKET_STATUS_ORDER[status] < TICKET_STATUS_ORDER[ticket.status];
-    const isLegalForward = status === legalNext;
-    return { value: status, label: TICKET_STATUS_LABELS[status], disabled: !isCurrent && !isBackward && !isLegalForward };
-  });
+function forwardActionLabel(current: TicketStatus, target: TicketStatus): string {
+  switch (target) {
+    case 'pending':
+      return '';
+    case 'in_progress':
+      return 'Iniciar Proceso';
+    case 'in_testing':
+      return 'Iniciar Pruebas';
+    case 'done':
+      return current === 'in_testing' ? 'Marcar Terminado' : 'Terminar Proceso';
+    case 'closed':
+      return 'Cerrar Ticket';
+  }
 }
 
 /**
@@ -52,9 +53,16 @@ export function TicketDetailModal({ ticketId, onClose }: { ticketId: string; onC
   const { data: ticket, isLoading, error } = useTicketDetail(ticketId);
   const changeStatus = useChangeTicketStatus();
   const updateTicket = useUpdateTicket();
+  const deleteTicket = useDeleteTicket();
   const forbidden = error instanceof ApiRequestError && error.isForbidden;
+  const forwardStatus = ticket ? nextForwardTicketStatus(ticket.status, ticket.serviceType) : null;
+  const isUnassignedPending = ticket ? ticket.status === 'pending' && !ticket.assignee : false;
 
   const [resolutionDraft, setResolutionDraft] = useState('');
+  const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [closeOpen, setCloseOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   useEffect(() => {
     setResolutionDraft(ticket?.resolution ?? '');
   }, [ticket?.resolution]);
@@ -169,7 +177,11 @@ export function TicketDetailModal({ ticketId, onClose }: { ticketId: string; onC
 
             <div className={styles.section}>
               <span className={styles.label}>Solución aplicada:</span>
-              {can('tickets:manage') ? (
+              {/* En la v1 el editor de solución solo aparece al avanzar el ticket ("Terminar Proceso"),
+                  nunca en Pendiente ni en Cerrado — ahí siempre es de solo lectura. */}
+              {ticket.resolution ? (
+                <p className={styles.text}>{ticket.resolution}</p>
+              ) : ticket.canManage && ticket.status !== 'pending' && ticket.status !== 'closed' ? (
                 <div className={styles.resolutionEditor}>
                   <textarea
                     className={styles.resolutionInput}
@@ -187,8 +199,6 @@ export function TicketDetailModal({ ticketId, onClose }: { ticketId: string; onC
                     Guardar solución
                   </Button>
                 </div>
-              ) : ticket.resolution ? (
-                <p className={styles.text}>{ticket.resolution}</p>
               ) : (
                 <span className={styles.empty}>Sin solución registrada</span>
               )}
@@ -200,34 +210,85 @@ export function TicketDetailModal({ ticketId, onClose }: { ticketId: string; onC
 
             <div className={styles.divider} />
 
-            <div className={styles.section}>
-              <span className={styles.label}>Bitácora:</span>
-              <div className={styles.history}>
-                {ticket.history.length === 0 && <span className={styles.empty}>Sin eventos todavía.</span>}
-                {ticket.history.map((entry) => (
-                  <div key={entry.id} className={styles.historyEntry}>
-                    <p className={styles.historyDescription}>{entry.description}</p>
-                    <p className={styles.historyMeta}>
-                      {entry.actorName ?? 'Sistema'} · {formatDateTime(entry.occurredAt)}
-                    </p>
-                  </div>
-                ))}
-              </div>
+            <div className={styles.historyBox}>
+              <button
+                type="button"
+                className={styles.historyToggle}
+                onClick={() => setHistoryOpen((open) => !open)}
+                aria-expanded={historyOpen}
+              >
+                <span className={styles.label}>Historial de ticket:</span>
+                <ChevronDownIcon size={16} className={historyOpen ? styles.historyChevronOpen : styles.historyChevron} />
+              </button>
+              {historyOpen && (
+                <div className={styles.history}>
+                  {ticket.history.length === 0 && <span className={styles.empty}>Sin eventos todavía.</span>}
+                  {ticket.history.map((entry) => (
+                    <div key={entry.id} className={styles.historyEntry}>
+                      <p className={styles.historyDescription}>{entry.description}</p>
+                      <p className={styles.historyMeta}>
+                        {entry.actorName ?? 'Sistema'} · {formatDateTime(entry.occurredAt)}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className={styles.divider} />
 
-            {can('tickets:manage') && (
+            {ticket.canManage && ticket.status !== 'closed' && (
               <div className={styles.footer}>
-                <Select
-                  className={styles.statusSelect}
-                  label="Cambiar estado"
-                  options={buildStatusOptions(ticket)}
-                  value={ticket.status}
-                  onChange={(event) => void onStatusChange(event.target.value as TicketStatus)}
-                />
+                {ticket.status !== 'done' && ticket.canDelete && (
+                  <Button variant="tertiary" onClick={() => setDeleteOpen(true)}>
+                    Eliminar ticket
+                  </Button>
+                )}
+                <div className={styles.footerRight}>
+                  {ticket.status !== 'done' && (
+                    <Button variant="outlineDark" iconLeft={<PencilIcon size={16} />} onClick={() => setEditOpen(true)}>
+                      Editar
+                    </Button>
+                  )}
+                  {forwardStatus && (
+                    <Button
+                      variant="primary"
+                      disabled={isUnassignedPending}
+                      loading={changeStatus.isPending}
+                      onClick={() => (forwardStatus === 'closed' ? setCloseOpen(true) : void onStatusChange(forwardStatus))}
+                    >
+                      {forwardActionLabel(ticket.status, forwardStatus)}
+                    </Button>
+                  )}
+                </div>
               </div>
             )}
+
+            <EditTicketDialog ticket={ticket} open={editOpen} onClose={() => setEditOpen(false)} />
+            <ConfirmActionDialog
+              open={deleteOpen}
+              title="Eliminar ticket"
+              description={`¿Eliminar el ticket "${ticket.title}"? Esta acción no se puede deshacer.`}
+              confirmLabel="Eliminar"
+              destructive
+              onClose={() => setDeleteOpen(false)}
+              onConfirm={async () => {
+                await deleteTicket.mutateAsync(ticket.id);
+                toast.success('Se eliminó el ticket.');
+                onClose();
+              }}
+            />
+            <ConfirmActionDialog
+              open={closeOpen}
+              title="Cerrar ticket"
+              description={`Al cerrar el ticket "${ticket.title}" saldrá del tablero y se trasladará al repositorio de cerrados. ¿Deseas confirmar el cierre?`}
+              confirmLabel="Cerrar Ticket"
+              onClose={() => setCloseOpen(false)}
+              onConfirm={async () => {
+                await changeStatus.mutateAsync({ ticketId, input: { status: 'closed' } });
+                toast.success('Se cerró el ticket.');
+              }}
+            />
           </>
         )}
       </div>

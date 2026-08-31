@@ -102,6 +102,15 @@ export const ticketDetailSchema = ticketSummarySchema.extend({
   history: z.array(ticketHistoryEntrySchema),
   legacyId: z.string().nullable(),
   updatedAt: isoDateTimeSchema,
+  /**
+   * Calculado por el servidor con el mismo criterio que `canModifyTicket` en
+   * la v1: no depende solo del rol — un actor sin `tickets:manage` igual
+   * puede gestionar ESTE ticket si es su responsable o tiene autoridad sobre
+   * su proyecto (líder o líder de un equipo asignado a él).
+   */
+  canManage: z.boolean(),
+  /** Más restrictivo que `canManage` — ver `DeleteTicketUseCase`. */
+  canDelete: z.boolean(),
 });
 export type TicketDetail = z.infer<typeof ticketDetailSchema>;
 
