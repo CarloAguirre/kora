@@ -1,16 +1,7 @@
-import {
-  clients,
-  eq,
-  isNotNull,
-  projects,
-  supportMonthlyPeriods,
-  supportPlans,
-  ticketHistoryEntries,
-  tickets,
-  users,
-} from '@kora/db';
+import { clients, eq, projects, supportMonthlyPeriods, supportPlans, ticketHistoryEntries, tickets } from '@kora/db';
 import type { TicketPriority, TicketServiceType, TicketStatus } from '@kora/contracts';
 import { StepTracker, type EtlContext } from '../lib/context';
+import { loadLegacyEmailByAuthId, loadUserIdsByEmail, loadUserIdsByLegacyAuthId, loadUserIdsByLegacyId, resolveUserId } from '../lib/user-lookup';
 
 /**
  * Migra `ticket`, `ticket_history`, `soporte_plan_contrato` y
@@ -117,10 +108,12 @@ export async function migrateTickets(context: EtlContext): Promise<void> {
   const projectIds = await loadLegacyIntIdMap(context, projects);
   const userIdsByLegacyId = await loadUserIdsByLegacyId(context);
   const userIdsByLegacyAuth = await loadUserIdsByLegacyAuthId(context);
+  const userIdsByEmail = await loadUserIdsByEmail(context);
+  const legacyEmailByAuthId = await loadLegacyEmailByAuthId(context);
 
   await migrateSupportPlans(context, clientIds, projectIds);
   await migrateTicketRows(context, clientIds, projectIds, userIdsByLegacyId);
-  await migrateTicketHistory(context, userIdsByLegacyAuth, userIdsByLegacyId);
+  await migrateTicketHistory(context, userIdsByLegacyAuth, userIdsByLegacyId, legacyEmailByAuthId, userIdsByEmail);
 }
 
 async function migrateTicketRows(
@@ -147,16 +140,25 @@ async function migrateTicketRows(
     const developmentProjectId = row.id_proyecto_desarrollo ? (projectIds.get(row.id_proyecto_desarrollo) ?? null) : null;
     const assigneeUserId = row.id_responsable ? (userIdsByLegacyId.get(row.id_responsable) ?? null) : null;
 
+    const serviceType = row.id_tipo_servi ? (SERVICE_TYPE_MAP[row.id_tipo_servi] ?? null) : null;
+    if (row.id_tipo_servi && !serviceType) {
+      tracker.warn(`ticket ${row.id_ticket}: tipo de servicio ${row.id_tipo_servi} desconocido, queda sin tipo`);
+    }
+    const priority = row.id_criticidad ? (PRIORITY_MAP[row.id_criticidad] ?? null) : null;
+    if (row.id_criticidad && !priority) {
+      tracker.warn(`ticket ${row.id_ticket}: criticidad ${row.id_criticidad} desconocida, queda sin prioridad`);
+    }
+
     const values = {
       clientId,
       projectId,
       developmentProjectId,
       title: row.titulo_ticket.trim(),
-      serviceType: row.id_tipo_servi ? (SERVICE_TYPE_MAP[row.id_tipo_servi] ?? null) : null,
+      serviceType,
       description: row.descrip_incidente?.trim() || null,
       evidenceUrl: row.evidencia_incidente?.trim() || null,
       assigneeUserId,
-      priority: row.id_criticidad ? (PRIORITY_MAP[row.id_criticidad] ?? null) : null,
+      priority,
       estimatedHours: row.hh_estimadas,
       status,
       resolution: row.solucion?.trim() || null,
@@ -184,6 +186,8 @@ async function migrateTicketHistory(
   context: EtlContext,
   userIdsByLegacyAuth: Map<string, string>,
   userIdsByLegacyId: Map<number, string>,
+  legacyEmailByAuthId: Map<string, string>,
+  userIdsByEmail: Map<string, string>,
 ): Promise<void> {
   const tracker = new StepTracker('historial de tickets');
 
@@ -203,7 +207,7 @@ async function migrateTicketHistory(
     }
 
     const actorUserId = row.actor_user_id
-      ? (userIdsByLegacyAuth.get(row.actor_user_id) ?? null)
+      ? resolveUserId(row.actor_user_id, userIdsByLegacyAuth, legacyEmailByAuthId, userIdsByEmail).userId
       : row.actor_id_usuario
         ? (userIdsByLegacyId.get(row.actor_id_usuario) ?? null)
         : null;
@@ -349,20 +353,3 @@ async function loadLegacyVarcharIdMap(context: EtlContext, table: typeof tickets
   return map;
 }
 
-async function loadUserIdsByLegacyId(context: EtlContext): Promise<Map<number, string>> {
-  const rows = await context.target.select({ id: users.id, legacyId: users.legacyId }).from(users);
-  const map = new Map<number, string>();
-  for (const row of rows) if (row.legacyId !== null) map.set(row.legacyId, row.id);
-  return map;
-}
-
-async function loadUserIdsByLegacyAuthId(context: EtlContext): Promise<Map<string, string>> {
-  const rows = await context.target
-    .select({ id: users.id, legacyAuthUserId: users.legacyAuthUserId })
-    .from(users)
-    .where(isNotNull(users.legacyAuthUserId));
-
-  const map = new Map<string, string>();
-  for (const row of rows) if (row.legacyAuthUserId) map.set(row.legacyAuthUserId, row.id);
-  return map;
-}

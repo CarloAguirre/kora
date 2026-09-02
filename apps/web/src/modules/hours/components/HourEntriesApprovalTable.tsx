@@ -12,22 +12,37 @@ import { useApproveHourEntry, useHourEntriesList, useRejectHourEntry } from '../
 const formatDate = (value: string) => new Date(`${value}T00:00:00`).toLocaleDateString('es-CL', { weekday: 'short', day: '2-digit', month: 'short' });
 const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 2 });
 
+function initials(fullName: string): string {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  const first = parts[0]![0]!;
+  const second = parts.length > 1 ? parts[1]![0]! : (parts[0]![1] ?? '');
+  return (first + second).toUpperCase();
+}
+
+interface EntryGroup {
+  user: HourEntrySummary['user'];
+  teamName: string | null;
+  entries: HourEntrySummary[];
+}
+
 /**
  * Tabla de horas pendientes de aprobación con selección y acciones masivas.
- * La usan tanto `/horas/aprobaciones` (todo lo que el actor puede aprobar)
- * como la ficha de colaborador (acotada a un `userId`) — misma lógica de
- * selección/aprobación/rechazo, distinto alcance de datos.
+ * La usan tanto `/horas/aprobaciones` (todo lo que el actor puede aprobar,
+ * agrupado por colaborador — `groupByUser`) como la ficha de colaborador
+ * (acotada a un único `userId`, sin agrupar) — misma lógica de
+ * selección/aprobación/rechazo, distinto alcance y presentación de datos.
  */
 export function HourEntriesApprovalTable({
   query,
   emptyMessage = 'No hay horas pendientes de aprobación.',
   showTeamColumn = true,
-  showUserColumn = true,
+  groupByUser = true,
 }: {
   query: Partial<ListHourEntriesQuery>;
   emptyMessage?: string;
   showTeamColumn?: boolean;
-  showUserColumn?: boolean;
+  groupByUser?: boolean;
 }) {
   const toast = useToast();
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -50,6 +65,30 @@ export function HourEntriesApprovalTable({
       else next.add(id);
       return next;
     });
+  const toggleGroup = (groupEntries: HourEntrySummary[]) => {
+    const allGroupSelected = groupEntries.every((entry) => selected.has(entry.id));
+    setSelected((prev) => {
+      const next = new Set(prev);
+      for (const entry of groupEntries) {
+        if (allGroupSelected) next.delete(entry.id);
+        else next.add(entry.id);
+      }
+      return next;
+    });
+  };
+
+  const groups: EntryGroup[] = groupByUser
+    ? Array.from(
+        entries
+          .reduce((map, entry) => {
+            const group = map.get(entry.user.id);
+            if (group) group.entries.push(entry);
+            else map.set(entry.user.id, { user: entry.user, teamName: entry.team?.name ?? null, entries: [entry] });
+            return map;
+          }, new Map<string, EntryGroup>())
+          .values(),
+      )
+    : [];
 
   const approveOne = async (entry: HourEntrySummary) => {
     await approveEntry.mutateAsync(entry.id);
@@ -87,10 +126,7 @@ export function HourEntriesApprovalTable({
       ),
     },
     { key: 'date', header: 'Fecha', render: (entry) => formatDate(entry.date) },
-    ...(showUserColumn
-      ? [{ key: 'user', header: 'Colaborador', render: (entry: HourEntrySummary) => entry.user.fullName } satisfies Column<HourEntrySummary>]
-      : []),
-    ...(showTeamColumn
+    ...(showTeamColumn && !groupByUser
       ? [
           {
             key: 'team',
@@ -139,15 +175,49 @@ export function HourEntriesApprovalTable({
         </button>
       )}
 
-      <DataTable
-        caption="Horas pendientes de aprobación"
-        columns={columns}
-        items={entries}
-        getRowKey={(entry) => entry.id}
-        loading={isLoading}
-        error={error ? 'No se pudo cargar la cola de aprobación.' : null}
-        emptyMessage={emptyMessage}
-      />
+      {!groupByUser || isLoading || error || entries.length === 0 ? (
+        <DataTable
+          caption="Horas pendientes de aprobación"
+          columns={columns}
+          items={entries}
+          getRowKey={(entry) => entry.id}
+          loading={isLoading}
+          error={error ? 'No se pudo cargar la cola de aprobación.' : null}
+          emptyMessage={emptyMessage}
+        />
+      ) : (
+        <div className={styles.groups}>
+          {groups.map((group) => {
+            const groupHours = group.entries.reduce((sum, entry) => sum + entry.hours, 0);
+            const groupSelected = group.entries.every((entry) => selected.has(entry.id));
+            return (
+              <div key={group.user.id} className={styles.group}>
+                <div className={styles.groupHeader}>
+                  <input
+                    type="checkbox"
+                    checked={groupSelected}
+                    onChange={() => toggleGroup(group.entries)}
+                    aria-label={`Seleccionar todas las horas de ${group.user.fullName}`}
+                  />
+                  <span className={styles.avatar}>{initials(group.user.fullName)}</span>
+                  <span className={styles.groupName}>{group.user.fullName}</span>
+                  <span className={styles.groupMeta}>
+                    {showTeamColumn && group.teamName ? `${group.teamName} · ` : ''}
+                    {group.entries.length} registro{group.entries.length === 1 ? '' : 's'}
+                  </span>
+                  <span className={styles.groupTotal}>{formatHours(groupHours)} hrs</span>
+                </div>
+                <DataTable
+                  caption={`Horas de ${group.user.fullName}`}
+                  columns={columns}
+                  items={group.entries}
+                  getRowKey={(entry) => entry.id}
+                />
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       <div className={styles.bulkBar}>
         <span className={styles.bulkSummary} aria-live="polite">

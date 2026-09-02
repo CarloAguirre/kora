@@ -86,7 +86,7 @@ export function MyActivityPanel({ hours, myActiveProjects, planning, loading }: 
               <DailyProgressDonut percent={pctDiario} />
               <div>
                 <div className={styles.donutValue}>
-                  {formatHours(Math.min(todayHours, DAILY_TARGET_HOURS))}/{formatHours(DAILY_TARGET_HOURS)}
+                  {formatHours(todayHours)}/{formatHours(DAILY_TARGET_HOURS)}
                 </div>
                 <div className={styles.donutSub}>Horas hoy</div>
               </div>

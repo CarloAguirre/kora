@@ -1,6 +1,7 @@
-import { auditLog, clients, eq, forecastAssignments, isNotNull, projects, teamMembers, teams, users } from '@kora/db';
+import { auditLog, clients, eq, forecastAssignments, projects, teamMembers, teams } from '@kora/db';
 import type { ForecastAssignmentType } from '@kora/contracts';
 import { StepTracker, type EtlContext } from '../lib/context';
+import { loadLegacyEmailByAuthId, loadUserIdsByEmail, loadUserIdsByLegacyAuthId, loadUserIdsByLegacyId, resolveUserId } from '../lib/user-lookup';
 
 /**
  * Migra `forecast_asignacion` → `forecast_assignments` y
@@ -71,9 +72,18 @@ export async function migrateForecast(context: EtlContext): Promise<void> {
   const teamIds = await loadLegacyIntIdMap(context, teams);
   const userIdsByLegacyId = await loadUserIdsByLegacyId(context);
   const userIdsByLegacyAuth = await loadUserIdsByLegacyAuthId(context);
+  const userIdsByEmail = await loadUserIdsByEmail(context);
+  const legacyEmailByAuthId = await loadLegacyEmailByAuthId(context);
 
   const assignmentIds = await migrateAssignments(context, memberIds, clientIds, projectIds);
-  await migrateHistory(context, { assignmentIds, teamIds, userIdsByLegacyId, userIdsByLegacyAuth });
+  await migrateHistory(context, {
+    assignmentIds,
+    teamIds,
+    userIdsByLegacyId,
+    userIdsByLegacyAuth,
+    legacyEmailByAuthId,
+    userIdsByEmail,
+  });
 }
 
 async function migrateAssignments(
@@ -164,6 +174,8 @@ async function migrateHistory(
     teamIds: Map<number, string>;
     userIdsByLegacyId: Map<number, string>;
     userIdsByLegacyAuth: Map<string, string>;
+    legacyEmailByAuthId: Map<string, string>;
+    userIdsByEmail: Map<string, string>;
   },
 ): Promise<void> {
   const tracker = new StepTracker('historial de forecast');
@@ -186,7 +198,7 @@ async function migrateHistory(
     const entityId = row.id_asignacion !== null ? (maps.assignmentIds.get(row.id_asignacion) ?? null) : null;
     const teamId = row.id_equipo !== null ? (maps.teamIds.get(row.id_equipo) ?? null) : null;
     const actorUserId = row.actor_user_id
-      ? (maps.userIdsByLegacyAuth.get(row.actor_user_id) ?? null)
+      ? resolveUserId(row.actor_user_id, maps.userIdsByLegacyAuth, maps.legacyEmailByAuthId, maps.userIdsByEmail).userId
       : row.actor_id_usuario
         ? (maps.userIdsByLegacyId.get(row.actor_id_usuario) ?? null)
         : null;
@@ -244,20 +256,3 @@ async function loadLegacyIntIdMap(
   return map;
 }
 
-async function loadUserIdsByLegacyId(context: EtlContext): Promise<Map<number, string>> {
-  const rows = await context.target.select({ id: users.id, legacyId: users.legacyId }).from(users);
-  const map = new Map<number, string>();
-  for (const row of rows) if (row.legacyId !== null) map.set(row.legacyId, row.id);
-  return map;
-}
-
-async function loadUserIdsByLegacyAuthId(context: EtlContext): Promise<Map<string, string>> {
-  const rows = await context.target
-    .select({ id: users.id, legacyAuthUserId: users.legacyAuthUserId })
-    .from(users)
-    .where(isNotNull(users.legacyAuthUserId));
-
-  const map = new Map<string, string>();
-  for (const row of rows) if (row.legacyAuthUserId) map.set(row.legacyAuthUserId, row.id);
-  return map;
-}

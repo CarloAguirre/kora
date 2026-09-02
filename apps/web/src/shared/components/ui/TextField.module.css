@@ -20,6 +20,7 @@
 }
 
 .field {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--kora-space-2);
@@ -84,6 +85,180 @@
   justify-content: center;
   flex-shrink: 0;
   color: var(--kora-text-muted);
+}
+
+/* Selector de fecha nativo: su ícono es un gris minúsculo que no sigue la
+   marca y su calendario desplegable no tiene NINGÚN gancho de CSS en ningún
+   navegador — ni con prefijo `-webkit-` — así que no hay forma de darle
+   espíritu Kora sin dejar de depender de él. Se oculta del todo: el campo
+   dibuja `.dateTrigger` (un botón propio) y, al abrirlo, `.datePanel` — un
+   calendario propio que escribe la fecha en el `<input>` nativo con su
+   setter + un evento `input`, para que tanto un `onChange` controlado como
+   `register()` de react-hook-form se enteren igual que si la persona hubiera
+   tecleado. El input en sí nunca se toca, así que el clic sobre cada
+   segmento (día/mes/año) para editarlo en línea sigue funcionando igual. */
+.dateInput::-webkit-calendar-picker-indicator {
+  display: none;
+}
+
+.dateTrigger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  margin-right: calc(var(--kora-space-1) * -1);
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: var(--kora-radius-sm);
+  color: var(--kora-text-muted);
+  cursor: pointer;
+  transition:
+    background-color var(--kora-transition),
+    color var(--kora-transition);
+}
+
+.dateTrigger:hover:not(:disabled) {
+  background: var(--kora-lime-surface);
+  color: var(--kora-lime-dark);
+}
+
+.dateTrigger:active:not(:disabled) {
+  background: var(--kora-lime-hover);
+}
+
+.dateTrigger:focus-visible {
+  outline: 2px solid var(--kora-blue-600);
+  outline-offset: 1px;
+}
+
+.dateTrigger:disabled {
+  color: var(--kora-text-disabled);
+  cursor: not-allowed;
+}
+
+.datePanel {
+  position: absolute;
+  top: calc(100% + var(--kora-space-2));
+  right: 0;
+  z-index: var(--kora-z-dropdown);
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-2);
+  width: 264px;
+  padding: var(--kora-space-3);
+  border-radius: var(--kora-radius);
+  border: 1px solid var(--kora-border-soft);
+  background: var(--kora-surface);
+  box-shadow: var(--kora-shadow-lg);
+}
+
+.datePanelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.datePanelTitle {
+  color: var(--kora-navy);
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-semibold);
+}
+
+.datePanelNav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: var(--kora-radius-sm);
+  background: transparent;
+  color: var(--kora-text-muted);
+  cursor: pointer;
+  transition: background-color var(--kora-transition), color var(--kora-transition);
+}
+
+.datePanelNav:hover {
+  background: var(--kora-lime-surface);
+  color: var(--kora-lime-dark);
+}
+
+.datePanelWeekdays,
+.datePanelGrid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.datePanelWeekdays span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-medium);
+}
+
+.dateCell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 30px;
+  border: none;
+  border-radius: var(--kora-radius-sm);
+  background: transparent;
+  color: var(--kora-text);
+  font-family: var(--kora-font);
+  font-size: var(--kora-text-sm);
+  cursor: pointer;
+  transition: background-color var(--kora-transition), color var(--kora-transition);
+}
+
+.dateCell:hover {
+  background: var(--kora-lime-surface);
+}
+
+.dateCellMuted {
+  color: var(--kora-text-disabled);
+}
+
+.dateCellToday {
+  color: var(--kora-lime-dark);
+  font-weight: var(--kora-weight-semibold);
+}
+
+.dateCellSelected,
+.dateCellSelected:hover {
+  background: var(--kora-lime);
+  color: var(--kora-navy);
+  font-weight: var(--kora-weight-semibold);
+}
+
+.datePanelFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: var(--kora-space-2);
+  border-top: 1px solid var(--kora-border-soft);
+}
+
+.datePanelLink {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--kora-blue-link);
+  font-family: var(--kora-font);
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-medium);
+  cursor: pointer;
+}
+
+.datePanelLink:hover {
+  text-decoration: underline;
 }
 
 /* Altura reservada siempre, para que mostrar un error no desplace el formulario. */

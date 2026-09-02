@@ -11,13 +11,14 @@ import { useRunLegacyImport } from '../api/legacy-import.queries';
 /**
  * Importador de datos legacy por archivo.
  *
- * Sube el mismo CSV con la columna `dump` que ya se usa para migrar desde la
- * v1, y reemplaza catálogos, clientes, proyectos, horas, tickets y forecast
- * por lo que trae el archivo — borrando lo que ya no está. Es una operación
- * destructiva sobre datos reales, así que "Vista previa" es obligatorio antes
- * de poder confirmar: corre exactamente el mismo pipeline dentro de una
- * transacción que se revierte al final, para que el conteo mostrado sea
- * siempre el conteo real de lo que pasaría.
+ * Sube el CSV con la columna `dump` que ya se usa para migrar desde la v1, o
+ * directamente el `.json` del backup completo de la base legacy, y reemplaza
+ * catálogos, clientes, proyectos, horas, tickets y forecast por lo que trae
+ * el archivo — borrando lo que ya no está. Es una operación destructiva sobre
+ * datos reales, así que "Vista previa" es obligatorio antes de poder
+ * confirmar: corre exactamente el mismo pipeline dentro de una transacción
+ * que se revierte al final, para que el conteo mostrado sea siempre el
+ * conteo real de lo que pasaría.
  */
 export function LegacyImportPage() {
   const toast = useToast();
@@ -62,16 +63,16 @@ export function LegacyImportPage() {
       <div className={styles.page}>
         <Card>
           <p>
-            Sube el archivo CSV con la columna <code>dump</code> (la misma consulta que ya usas para exportar la base legacy).
-            Reemplaza clientes, proyectos, horas, tickets y forecast por lo que traiga el archivo — lo que ya no esté, se borra.
-            Usuarios y equipos no se tocan.
+            Sube el CSV con la columna <code>dump</code> (la misma consulta que ya usas para exportar la base legacy) o
+            directamente el <code>.json</code> del backup completo. Reemplaza clientes, proyectos, horas, tickets y forecast
+            por lo que traiga el archivo — lo que ya no esté, se borra. Usuarios y equipos no se tocan.
           </p>
 
           <div className={styles.uploadRow}>
             <input
               ref={fileInputRef}
               type="file"
-              accept=".csv,text/csv"
+              accept=".csv,text/csv,.json,application/json"
               onChange={handleFileChange}
               aria-label="Archivo de datos legacy"
             />

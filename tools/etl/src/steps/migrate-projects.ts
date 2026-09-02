@@ -123,10 +123,19 @@ export async function migrateProjects(context: EtlContext): Promise<void> {
       tracker.warn(`proyecto ${row.id_proyecto}: cliente ${row.id_cliente} no migrado`);
     }
 
+    const primaryContactId = row.id_contacto ? (contactIds.get(row.id_contacto) ?? null) : null;
+    if (row.id_contacto && !primaryContactId) {
+      // `migrate-clients.ts` ya avisa que estos son los contactos enlazados
+      // solo desde `proyecto` (no desde `cliente`) y quedan pendientes de M3
+      // — este aviso es el rastro de que, mientras tanto, el proyecto queda
+      // sin contacto principal en vez de fallar en silencio.
+      tracker.warn(`proyecto ${row.id_proyecto}: contacto ${row.id_contacto} no migrado, queda sin contacto principal`);
+    }
+
     const values = {
       name: row.nombre_proyecto.trim(),
       clientId,
-      primaryContactId: row.id_contacto ? (contactIds.get(row.id_contacto) ?? null) : null,
+      primaryContactId,
       type,
       salesStage: type === 'development' ? (salesStage ?? 'approved') : null,
       status: mapProjectStatus(row.etapa, row.fase_proyecto, row.estado_proyecto),

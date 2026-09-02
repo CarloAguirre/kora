@@ -20,6 +20,59 @@
   cursor: pointer;
 }
 
+.groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-4);
+}
+
+.group {
+  border: 1px solid var(--kora-border-soft);
+  border-radius: var(--kora-radius);
+  overflow: hidden;
+}
+
+.groupHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-3);
+  padding: var(--kora-space-3) var(--kora-space-4);
+  background: var(--kora-lime-surface);
+  border-bottom: 1px solid var(--kora-border-strong);
+}
+
+.avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--kora-navy);
+  color: var(--kora-lime);
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-bold);
+  flex-shrink: 0;
+}
+
+.groupName {
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-navy);
+}
+
+.groupMeta {
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-sm);
+}
+
+.groupTotal {
+  margin-left: auto;
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-navy);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 .rowActions {
   display: flex;
   justify-content: flex-end;

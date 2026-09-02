@@ -1,6 +1,6 @@
-import { eq, isNotNull, teamMembers, teams, users } from '@kora/db';
+import { eq, teamMembers, teams } from '@kora/db';
 import { StepTracker, type EtlContext } from '../lib/context';
-import { normalizeEmail } from '../lib/role-mapping';
+import { loadLegacyEmailByAuthId, loadUserIdsByEmail, loadUserIdsByLegacyAuthId, loadUserIdsByLegacyId, resolveUserId } from '../lib/user-lookup';
 
 /**
  * Migra `equipo_miembro` → `team_members` y asigna el líder de cada equipo.
@@ -44,6 +44,8 @@ export async function migrateTeamMembers(context: EtlContext): Promise<void> {
 
   const teamIds = await loadTeamIdsByLegacyId(context);
   const userIdsByLegacyAuth = await loadUserIdsByLegacyAuthId(context);
+  const userIdsByEmail = await loadUserIdsByEmail(context);
+  const legacyEmailByAuthId = await loadLegacyEmailByAuthId(context);
 
   for (const row of rows) {
     const teamId = teamIds.get(row.id_equipo);
@@ -53,14 +55,18 @@ export async function migrateTeamMembers(context: EtlContext): Promise<void> {
       continue;
     }
 
-    const userId = row.user_id ? userIdsByLegacyAuth.get(row.user_id) : undefined;
-    if (!userId) {
+    const userMatch = resolveUserId(row.user_id, userIdsByLegacyAuth, legacyEmailByAuthId, userIdsByEmail);
+    if (!userMatch.userId) {
       tracker.warn(
         `miembro ${row.id} ("${row.nombre}"): no se pudo resolver el usuario ${row.user_id ?? 'nulo'}`,
       );
       tracker.skipped += 1;
       continue;
     }
+    if (userMatch.matchedBy === 'email') {
+      tracker.warn(`miembro ${row.id} ("${row.nombre}"): el usuario ${row.user_id} no coincidió por UUID, se resolvió por correo`);
+    }
+    const userId = userMatch.userId;
 
 
     const existing = await context.target
@@ -149,25 +155,3 @@ async function loadTeamIdsByLegacyId(context: EtlContext): Promise<Map<number, s
   return map;
 }
 
-async function loadUserIdsByLegacyId(context: EtlContext): Promise<Map<number, string>> {
-  const rows = await context.target.select({ id: users.id, legacyId: users.legacyId }).from(users);
-  const map = new Map<number, string>();
-  for (const row of rows) if (row.legacyId !== null) map.set(row.legacyId, row.id);
-  return map;
-}
-
-async function loadUserIdsByLegacyAuthId(context: EtlContext): Promise<Map<string, string>> {
-  const rows = await context.target
-    .select({ id: users.id, legacyAuthUserId: users.legacyAuthUserId })
-    .from(users)
-    .where(isNotNull(users.legacyAuthUserId));
-
-  const map = new Map<string, string>();
-  for (const row of rows) if (row.legacyAuthUserId) map.set(row.legacyAuthUserId, row.id);
-  return map;
-}
-
-/** Se conserva por si hiciera falta resolver miembros por correo en el futuro. */
-export function emailKey(email: string | null): string | null {
-  return normalizeEmail(email);
-}

@@ -1,6 +1,7 @@
-import { eq, holidays, hourEntries, isNotNull, projects, users } from '@kora/db';
+import { eq, holidays, hourEntries, projects, sql } from '@kora/db';
 import type { HourEntryStatus } from '@kora/contracts';
 import { StepTracker, type EtlContext } from '../lib/context';
+import { loadLegacyEmailByAuthId, loadUserIdsByEmail, loadUserIdsByLegacyAuthId, resolveUserId } from '../lib/user-lookup';
 
 /**
  * Migra `registro_hh` → `hour_entries` y `feriado` → `holidays`.
@@ -64,15 +65,23 @@ export async function migrateHourEntries(context: EtlContext): Promise<void> {
   tracker.read = rows.length;
 
   const userIdsByLegacyAuth = await loadUserIdsByLegacyAuthId(context);
+  const userIdsByEmail = await loadUserIdsByEmail(context);
+  const legacyEmailByAuthId = await loadLegacyEmailByAuthId(context);
   const projectIds = await loadProjectIdsByLegacyId(context);
 
   for (const row of rows) {
-    const userId = userIdsByLegacyAuth.get(row.user_id);
-    if (!userId) {
+    const userMatch = resolveUserId(row.user_id, userIdsByLegacyAuth, legacyEmailByAuthId, userIdsByEmail);
+    if (!userMatch.userId) {
       tracker.warn(`registro ${row.id}: el usuario ${row.user_id} no existe en destino`);
       tracker.skipped += 1;
       continue;
     }
+    if (userMatch.matchedBy === 'email') {
+      tracker.warn(
+        `registro ${row.id}: el usuario ${row.user_id} no coincidió por UUID (¿cuenta de Supabase recreada?), se resolvió por correo`,
+      );
+    }
+    const userId = userMatch.userId;
 
     const projectId = row.id_proyecto ? (projectIds.get(row.id_proyecto) ?? null) : null;
     if (row.id_proyecto && !projectId) {
@@ -88,10 +97,13 @@ export async function migrateHourEntries(context: EtlContext): Promise<void> {
       continue;
     }
 
-    const decisionUserId = row.decision_lider_user_id ? (userIdsByLegacyAuth.get(row.decision_lider_user_id) ?? null) : null;
-    const designatedApproverUserId = row.designated_approver_user_id
-      ? (userIdsByLegacyAuth.get(row.designated_approver_user_id) ?? null)
-      : null;
+    const decisionUserId = resolveUserId(row.decision_lider_user_id, userIdsByLegacyAuth, legacyEmailByAuthId, userIdsByEmail).userId;
+    const designatedApproverUserId = resolveUserId(
+      row.designated_approver_user_id,
+      userIdsByLegacyAuth,
+      legacyEmailByAuthId,
+      userIdsByEmail,
+    ).userId;
 
     const values = {
       userId,
@@ -154,28 +166,26 @@ async function migrateHolidays(context: EtlContext): Promise<void> {
       isWorkingDay: row.es_laboral,
     };
 
-    await context.target
+    // `xmax = 0` distingue insert de update tras un `onConflictDoUpdate` sin
+    // una segunda consulta — antes esto siempre contaba "creado", incluso
+    // cuando el conflicto solo actualizaba un feriado ya existente.
+    const [result] = await context.target
       .insert(holidays)
       .values(values)
       .onConflictDoUpdate({
         target: [holidays.countryCode, holidays.regionCode, holidays.date, holidays.name],
         set: { type: values.type, isWorkingDay: values.isWorkingDay, updatedAt: new Date() },
-      });
-    tracker.created += 1;
+      })
+      .returning({ inserted: sql<boolean>`(xmax = 0)` });
+
+    if (result?.inserted) {
+      tracker.created += 1;
+    } else {
+      tracker.updated += 1;
+    }
   }
 
   context.report.add(tracker.toResult());
-}
-
-async function loadUserIdsByLegacyAuthId(context: EtlContext): Promise<Map<string, string>> {
-  const rows = await context.target
-    .select({ id: users.id, legacyAuthUserId: users.legacyAuthUserId })
-    .from(users)
-    .where(isNotNull(users.legacyAuthUserId));
-
-  const map = new Map<string, string>();
-  for (const row of rows) if (row.legacyAuthUserId) map.set(row.legacyAuthUserId, row.id);
-  return map;
 }
 
 async function loadProjectIdsByLegacyId(context: EtlContext): Promise<Map<number, string>> {

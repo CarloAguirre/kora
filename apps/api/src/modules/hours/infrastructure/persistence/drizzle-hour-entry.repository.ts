@@ -176,6 +176,7 @@ export class DrizzleHourEntryRepository implements HourEntryRepository {
 
   private buildWhere(filters: HourEntryFilters) {
     const conditions = [];
+    if (filters.userId) conditions.push(eq(hourEntries.userId, filters.userId));
     if (filters.projectId) conditions.push(eq(hourEntries.projectId, filters.projectId));
     if (filters.search) {
       const term = `%${filters.search.trim()}%`;

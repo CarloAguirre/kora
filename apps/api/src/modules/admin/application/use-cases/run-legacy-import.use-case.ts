@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { err, ok, ValidationError, type ApplicationError, type Result } from '@kora/core';
 import type { LegacyImportResponse } from '@kora/contracts';
 import type { UseCase } from '../../../../shared/application/use-case';
-import { parseLegacyDumpCsv } from '../../infrastructure/parsing/legacy-dump-parser';
+import { parseLegacyDumpFile } from '../../infrastructure/parsing/legacy-dump-parser';
 import { LEGACY_IMPORT_RUNNER, type LegacyImportRunner } from '../ports/legacy-import-runner.port';
 
 export interface RunLegacyImportCommand {
@@ -22,7 +22,7 @@ export class RunLegacyImportUseCase implements UseCase<RunLegacyImportCommand, L
   constructor(@Inject(LEGACY_IMPORT_RUNNER) private readonly runner: LegacyImportRunner) {}
 
   async execute(command: RunLegacyImportCommand): Promise<Result<LegacyImportResponse, ApplicationError>> {
-    const parsed = parseLegacyDumpCsv(command.fileBuffer);
+    const parsed = parseLegacyDumpFile(command.fileBuffer);
 
     if (!parsed.dump) {
       return ok({

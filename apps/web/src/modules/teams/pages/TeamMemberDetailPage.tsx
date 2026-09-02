@@ -136,7 +136,7 @@ export function TeamMemberDetailPage() {
           <h2 className={styles.title}>Horas pendientes de aprobación</h2>
           <HourEntriesApprovalTable
             query={{ userId: member.userId }}
-            showUserColumn={false}
+            groupByUser={false}
             showTeamColumn={false}
             emptyMessage="No tiene horas pendientes de aprobación."
           />

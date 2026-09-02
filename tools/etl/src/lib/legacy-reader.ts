@@ -19,6 +19,11 @@ export interface LegacyReader {
 
 /** Tablas que los pasos en alcance del importador por archivo pueden pedir. */
 const ALLOWED_TABLES = new Set([
+  // `usuario` no la lee ningún paso de migración directamente: solo alimenta
+  // el fallback por correo de `lib/user-lookup.ts` (`loadLegacyEmailByAuthId`)
+  // para cuando el UUID de Supabase de alguien cambió (cuenta recreada) entre
+  // el último `migrate-users` y este dump.
+  'usuario',
   'pais',
   'comuna',
   'giro',

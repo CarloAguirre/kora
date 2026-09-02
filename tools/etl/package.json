@@ -7,6 +7,7 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
     "users": "tsx src/run-users.ts",
     "verify": "tsx src/verify.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
@@ -34,6 +35,7 @@
     "@types/node": "^22.16.5",
     "rimraf": "^6.0.1",
     "tsx": "^4.20.3",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "vitest": "^4.1.11"
   }
 }

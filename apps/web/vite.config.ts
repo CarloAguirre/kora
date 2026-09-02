@@ -34,8 +34,13 @@ export default defineConfig({
       // El front habla con /api en su mismo origen y Vite lo reenvía a la API.
       // Así no hay CORS en desarrollo y la cookie del refresh token viaja como
       // en producción, donde ambos van tras el mismo dominio.
+      //
+      // "127.0.0.1" y no "localhost": la API de Nest escucha en `0.0.0.0`
+      // (solo IPv4). Si otro proceso en la máquina tiene el puerto 3000
+      // ocupado en IPv6 (`[::]:3000`), "localhost" puede resolver a `::1`
+      // primero y el proxy le pega al servidor equivocado en vez de a esta API.
       '/api': {
-        target: 'http://localhost:3000',
+        target: 'http://127.0.0.1:3000',
         changeOrigin: true,
       },
     },
