@@ -18,3 +18,4 @@ export { migrateProjects } from './steps/migrate-projects';
 export { migrateHourEntries } from './steps/migrate-hours';
 export { migrateTickets } from './steps/migrate-tickets';
 export { migrateForecast } from './steps/migrate-forecast';
+export { backfillProjectTeamMembersFromHours } from './steps/backfill-project-team-members-from-hours';

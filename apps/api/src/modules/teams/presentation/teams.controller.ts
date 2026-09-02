@@ -8,6 +8,7 @@ import {
   updateTeamSchema,
   type AddTeamMemberInput,
   type CreateTeamInput,
+  type ListTeamMemberOptionsResponse,
   type ListTeamsQuery,
   type ListTeamsResponse,
   type TeamAvailabilityQuery,
@@ -30,6 +31,7 @@ import { DeleteTeamUseCase } from '../application/use-cases/delete-team.use-case
 import { AddTeamMemberUseCase } from '../application/use-cases/add-team-member.use-case';
 import { RemoveTeamMemberUseCase } from '../application/use-cases/remove-team-member.use-case';
 import { UpdateTeamMemberUseCase } from '../application/use-cases/update-team-member.use-case';
+import { ListTeamMemberOptionsUseCase } from '../application/use-cases/list-team-member-options.use-case';
 
 @Controller('teams')
 export class TeamsController {
@@ -43,7 +45,20 @@ export class TeamsController {
     private readonly addMember: AddTeamMemberUseCase,
     private readonly removeMember: RemoveTeamMemberUseCase,
     private readonly updateMember: UpdateTeamMemberUseCase,
+    private readonly listMemberOptions: ListTeamMemberOptionsUseCase,
   ) {}
+
+  /**
+   * Todos los miembros activos de todos los equipos, para el buscador por
+   * nombre al asignar a un proyecto. Declarada antes de `:id` para que
+   * Nest no la confunda con un id de equipo.
+   */
+  @Get('members')
+  @RequirePermissions('teams:read')
+  async memberOptions(): Promise<ListTeamMemberOptionsResponse> {
+    const items = unwrapOrThrow(await this.listMemberOptions.execute());
+    return { items };
+  }
 
   @Get()
   @RequirePermissions('teams:read')

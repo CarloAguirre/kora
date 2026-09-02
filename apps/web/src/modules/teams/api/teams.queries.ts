@@ -26,6 +26,14 @@ export function useTeamDetail(teamId: string | null) {
   });
 }
 
+export function useTeamMemberOptions() {
+  return useQuery({
+    queryKey: teamKeys.memberOptions(),
+    queryFn: () => teamsApi.memberOptions(),
+    staleTime: 30_000,
+  });
+}
+
 export function useTeamAvailability(teamId: string | null, query: TeamAvailabilityQuery) {
   return useQuery({
     queryKey: teamKeys.availability(teamId ?? '', query),

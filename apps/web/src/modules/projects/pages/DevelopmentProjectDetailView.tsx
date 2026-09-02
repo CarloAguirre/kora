@@ -2,12 +2,9 @@ import { useMemo, useState } from 'react';
 import {
   addProjectObservationSchema,
   assignProjectTeamMemberSchema,
-  PROJECT_STATUS_LABELS,
-  PROJECT_STATUSES,
   type AddProjectObservationInput,
   type AssignProjectTeamMemberInput,
   type ProjectDetail,
-  type ProjectStatus,
   type ProjectTeamMember,
 } from '@kora/contracts';
 import { useForm } from 'react-hook-form';
@@ -16,24 +13,22 @@ import { z } from 'zod';
 import styles from './ProjectDetailPage.module.css';
 import { Button } from '@/shared/components/ui/Button';
 import { Card } from '@/shared/components/ui/Card';
-import { Select } from '@/shared/components/ui/Select';
+import { Combobox } from '@/shared/components/ui/Combobox';
 import { TextField } from '@/shared/components/ui/TextField';
 import { DataTable, type Column } from '@/shared/components/ui/DataTable';
 import { useToast } from '@/shared/components/ui/Toast';
 import { TrashIcon } from '@/shared/components/icons/Icons';
-import { ProjectStatusBadge } from '../components/ProjectStatusBadge';
-import { ProjectTypeBadge } from '../components/ProjectTypeBadge';
-import { ProjectPhaseBadge } from '../components/ProjectPhaseBadge';
+import { ProjectInfoBar, type ProjectDocument } from '../components/ProjectInfoBar';
 import { ProjectTimeline } from '../components/ProjectTimeline';
 import { TeamHoursSummaryChart } from '../components/TeamHoursSummaryChart';
 import { BitacoraCard } from '../components/BitacoraCard';
-import { useAssignProjectMember, useChangeProjectStatus, useUnassignProjectMember, useAddProjectObservation } from '../api/projects.queries';
+import { useAssignProjectMember, useUnassignProjectMember, useAddProjectObservation } from '../api/projects.queries';
+import { useTeamMemberOptions } from '@/modules/teams/api/teams.queries';
 import { useHourEntriesList } from '@/modules/hours/api/hours.queries';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { ApiRequestError } from '@/shared/lib/api-client';
 
-const STATUS_OPTIONS = PROJECT_STATUSES.map((status) => ({ value: status, label: PROJECT_STATUS_LABELS[status] }));
 const formatDate = (value: string | null) => (value ? new Date(`${value}T00:00:00`).toLocaleDateString('es-CL') : '—');
 const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 2 });
 
@@ -67,11 +62,11 @@ export function DevelopmentProjectDetailView({ project, projectId }: { project: 
   const { can, canAny } = usePermissions();
   const { user } = useAuth();
   const toast = useToast();
-  const changeStatus = useChangeProjectStatus();
   const assignMember = useAssignProjectMember();
   const unassignMember = useUnassignProjectMember();
   const addObservation = useAddProjectObservation();
   const { data: projectHourEntries } = useHourEntriesList({ projectId, page: 1, pageSize: 20, sortField: 'date', sortDirection: 'desc' });
+  const { data: teamMemberOptions } = useTeamMemberOptions();
 
   const [memberError, setMemberError] = useState<string | null>(null);
 
@@ -79,6 +74,7 @@ export function DevelopmentProjectDetailView({ project, projectId }: { project: 
     resolver: zodResolver(assignProjectTeamMemberSchema),
     defaultValues: { teamMemberId: '', activity: '', assignedHours: 0 },
   });
+  const teamMemberId = memberForm.watch('teamMemberId');
 
   const observationForm = useForm<z.input<typeof addProjectObservationSchema>, unknown, AddProjectObservationInput>({
     resolver: zodResolver(addProjectObservationSchema),
@@ -108,6 +104,12 @@ export function DevelopmentProjectDetailView({ project, projectId }: { project: 
 
   const remainingHours = project.soldHours - project.usedHours;
 
+  const projectDocuments: ProjectDocument[] = [
+    project.quotationLink ? { label: 'Cotización', url: project.quotationLink } : null,
+    project.contractLink ? { label: 'Contrato', url: project.contractLink } : null,
+    project.additionalLinks ? { label: 'Adicionales', url: project.additionalLinks } : null,
+  ].filter((doc): doc is ProjectDocument => doc !== null);
+
   /**
    * Espejo exacto de la regla del backend (`AddProjectObservationUseCase`):
    * con `projects:manage` no hace falta más; sin él, `projects:read_assigned`
@@ -124,11 +126,6 @@ export function DevelopmentProjectDetailView({ project, projectId }: { project: 
         project.developer?.id === user.id ||
         project.commercialManager?.id === user.id ||
         project.members.some((member) => member.userId === user.id)));
-
-  const onStatusChange = async (status: ProjectStatus) => {
-    await changeStatus.mutateAsync({ projectId, input: { status } });
-    toast.success('Se actualizó el estado del proyecto.');
-  };
 
   const onAssignMember = memberForm.handleSubmit(async (values) => {
     setMemberError(null);
@@ -175,36 +172,15 @@ export function DevelopmentProjectDetailView({ project, projectId }: { project: 
     <div className={styles.layout}>
       <div className={styles.colLeft}>
         <Card>
-          <div className={styles.summaryHeader}>
-            <div>
-              <h1 className={styles.title}>{project.name}</h1>
-              <p className={styles.client}>{project.client?.companyName ?? 'Sin cliente'}</p>
-            </div>
-            <div className={styles.badgeRow}>
-              <ProjectTypeBadge type={project.type} />
-              <ProjectStatusBadge status={project.status} />
-              <ProjectPhaseBadge phase={project.phase} />
-            </div>
-          </div>
-
-          <div className={styles.fields}>
-            <Field label="Líder" value={project.leader?.fullName} />
-            <Field label="Desarrollador" value={project.developer?.fullName} />
-            <Field label="Responsable comercial" value={project.commercialManager?.fullName} />
-            <Field label="Fecha inicio" value={formatDate(project.startDate)} />
-            <Field label="Fecha fin" value={formatDate(project.endDate)} />
-          </div>
-
-          {can('projects:manage') && (
-            <div className={styles.statusRow}>
-              <Select
-                label="Cambiar estado"
-                options={STATUS_OPTIONS}
-                value={project.status}
-                onChange={(event) => void onStatusChange(event.target.value as ProjectStatus)}
-              />
-            </div>
-          )}
+          <ProjectInfoBar
+            clientName={project.client?.companyName ?? 'Sin cliente'}
+            leaderName={project.leader?.fullName ?? '—'}
+            dateRange={`${formatDate(project.startDate)} - ${formatDate(project.endDate)}`}
+            salesStage={project.salesStage}
+            status={project.status}
+            phase={project.phase}
+            documents={projectDocuments}
+          />
         </Card>
 
         <div className={styles.kpis}>
@@ -304,12 +280,22 @@ export function DevelopmentProjectDetailView({ project, projectId }: { project: 
             <form className={styles.inlineForm} onSubmit={onAssignMember}>
               {memberError && <p className={styles.error}>{memberError}</p>}
               <div className={styles.inlineFormRow}>
-                <TextField
-                  label="ID de miembro de equipo"
-                  placeholder="UUID de team_members"
-                  errorText={memberForm.formState.errors.teamMemberId?.message}
-                  {...memberForm.register('teamMemberId')}
-                />
+                <div>
+                  <Combobox
+                    label="Persona"
+                    placeholder="Buscar por nombre…"
+                    options={(teamMemberOptions?.items ?? []).map((member) => ({
+                      value: member.id,
+                      label: `${member.fullName} — ${member.teamName}`,
+                    }))}
+                    value={teamMemberId}
+                    onChange={(value) => memberForm.setValue('teamMemberId', value, { shouldValidate: true })}
+                    emptyMessage="No se encontraron personas."
+                  />
+                  {memberForm.formState.errors.teamMemberId && (
+                    <p className={styles.error}>{memberForm.formState.errors.teamMemberId.message}</p>
+                  )}
+                </div>
                 <TextField label="Actividad" {...memberForm.register('activity')} />
                 <TextField label="HH asignadas" type="number" {...memberForm.register('assignedHours')} />
                 <Button type="submit" loading={memberForm.formState.isSubmitting} loadingText="Asignando…">
@@ -332,15 +318,6 @@ export function DevelopmentProjectDetailView({ project, projectId }: { project: 
           onSubmitObservation={onAddObservation}
         />
       </div>
-    </div>
-  );
-}
-
-function Field({ label, value }: { label: string; value?: string | null }) {
-  return (
-    <div>
-      <p className={styles.fieldLabel}>{label}</p>
-      <p className={styles.fieldValue}>{value || '—'}</p>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import type {
   AddTeamMemberInput,
   CreateTeamInput,
+  ListTeamMemberOptionsResponse,
   ListTeamsQuery,
   ListTeamsResponse,
   TeamAvailabilityQuery,
@@ -25,6 +26,9 @@ export const teamsApi = {
   },
   detail(teamId: string): Promise<TeamDetail> {
     return api.get<TeamDetail>(`/teams/${teamId}`);
+  },
+  memberOptions(): Promise<ListTeamMemberOptionsResponse> {
+    return api.get<ListTeamMemberOptionsResponse>('/teams/members');
   },
   availability(teamId: string, query: TeamAvailabilityQuery): Promise<TeamAvailabilityResponse> {
     return api.get<TeamAvailabilityResponse>(`/teams/${teamId}/availability`, {
@@ -58,6 +62,7 @@ export const teamKeys = {
   list: (query: Partial<ListTeamsQuery>) => [...teamKeys.lists(), query] as const,
   details: () => [...teamKeys.all, 'detail'] as const,
   detail: (teamId: string) => [...teamKeys.details(), teamId] as const,
+  memberOptions: () => [...teamKeys.all, 'member-options'] as const,
   availability: (teamId: string, query: TeamAvailabilityQuery) =>
     [...teamKeys.all, 'availability', teamId, query] as const,
 };

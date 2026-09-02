@@ -33,10 +33,28 @@ interface ProjectTimelineProps {
   endDate: string | null;
 }
 
+/**
+ * Posición de "HOY" en la barra: porcentaje de días transcurridos entre
+ * inicio y fin — no el centro de la fase actual. La fase es una categoría
+ * elegida a mano y puede ir adelantada o atrasada respecto al calendario, así
+ * que anclar el marcador a ella hacía que "HOY" no coincidiera con la fecha
+ * real (p. ej. a mitad de camino en fechas pero recién en la 2ª de 5 fases).
+ */
+function getTodayPercent(startDate: string | null, endDate: string | null): number | null {
+  if (!startDate || !endDate) return null;
+  const start = new Date(`${startDate}T00:00:00`).getTime();
+  const end = new Date(`${endDate}T00:00:00`).getTime();
+  if (end <= start) return null;
+
+  const ratio = (Date.now() - start) / (end - start);
+  return Math.min(100, Math.max(0, ratio * 100));
+}
+
 /** Réplica de la barra de fases + fila de meses de `LiderProyectoFicha` (v1). */
 export function ProjectTimeline({ phase, isActive, startDate, endDate }: ProjectTimelineProps) {
   const currentIndex = phase ? PROJECT_PHASES.indexOf(phase) : -1;
   const monthLabels = getMonthLabels(startDate, endDate);
+  const todayPercent = isActive ? getTodayPercent(startDate, endDate) : null;
 
   return (
     <div className={styles.timeline}>
@@ -57,15 +75,16 @@ export function ProjectTimeline({ phase, isActive, startDate, endDate }: Project
           return (
             <div key={step} className={className}>
               {PROJECT_PHASE_LABELS[step]}
-              {state === 'current' && isActive && (
-                <span className={styles.today}>
-                  <span className={styles.todayPill}>HOY</span>
-                  <span className={styles.todayLine} />
-                </span>
-              )}
             </div>
           );
         })}
+
+        {todayPercent !== null && (
+          <span className={styles.today} style={{ left: `${todayPercent}%` }}>
+            <span className={styles.todayPill}>HOY</span>
+            <span className={styles.todayLine} />
+          </span>
+        )}
       </div>
     </div>
   );

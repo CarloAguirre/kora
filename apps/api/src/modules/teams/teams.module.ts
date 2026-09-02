@@ -10,6 +10,7 @@ import { DeleteTeamUseCase } from './application/use-cases/delete-team.use-case'
 import { AddTeamMemberUseCase } from './application/use-cases/add-team-member.use-case';
 import { RemoveTeamMemberUseCase } from './application/use-cases/remove-team-member.use-case';
 import { UpdateTeamMemberUseCase } from './application/use-cases/update-team-member.use-case';
+import { ListTeamMemberOptionsUseCase } from './application/use-cases/list-team-member-options.use-case';
 
 import { TEAM_REPOSITORY } from './domain/repositories/team.repository';
 import { TEAM_MEMBER_REPOSITORY } from './domain/repositories/team-member.repository';
@@ -38,6 +39,7 @@ import { DrizzleTeamUserReader } from './infrastructure/persistence/drizzle-team
     AddTeamMemberUseCase,
     RemoveTeamMemberUseCase,
     UpdateTeamMemberUseCase,
+    ListTeamMemberOptionsUseCase,
 
     { provide: TEAM_REPOSITORY, useClass: DrizzleTeamRepository },
     { provide: TEAM_MEMBER_REPOSITORY, useClass: DrizzleTeamMemberRepository },

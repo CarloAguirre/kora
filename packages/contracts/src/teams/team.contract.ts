@@ -68,6 +68,24 @@ export const updateTeamMemberSchema = z.object({
 });
 export type UpdateTeamMemberInput = z.infer<typeof updateTeamMemberSchema>;
 
+/**
+ * Miembro activo de CUALQUIER equipo, con el nombre de su equipo — usado por
+ * el buscador de personas al asignar a un proyecto (que no está acotado a un
+ * equipo en particular, a diferencia de `teamDetailSchema.members`).
+ */
+export const teamMemberOptionSchema = z.object({
+  id: uuidSchema,
+  fullName: z.string(),
+  teamId: uuidSchema,
+  teamName: z.string(),
+});
+export type TeamMemberOption = z.infer<typeof teamMemberOptionSchema>;
+
+export const listTeamMemberOptionsResponseSchema = z.object({
+  items: z.array(teamMemberOptionSchema),
+});
+export type ListTeamMemberOptionsResponse = z.infer<typeof listTeamMemberOptionsResponseSchema>;
+
 export const teamSortFieldSchema = z.enum(['name', 'memberCount', 'createdAt']);
 export type TeamSortField = z.infer<typeof teamSortFieldSchema>;
 

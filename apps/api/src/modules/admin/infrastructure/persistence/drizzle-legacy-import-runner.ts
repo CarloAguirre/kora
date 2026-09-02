@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { Database } from '@kora/db';
 import {
+  backfillProjectTeamMembersFromHours,
   EtlReport,
   JsonLegacyReader,
   migrateCatalogs,
@@ -18,9 +19,16 @@ import type { LegacyImportRunInput, LegacyImportRunner, LegacyImportRunResult } 
 
 /**
  * Corre el pipeline de `@kora/etl` (catálogos → clientes → proyectos →
- * {horas, tickets, forecast} → poda) contra el dump ya parseado del archivo
- * subido, dentro de una única transacción — un ensayo (`dryRun`) la revierte
- * al final vía `runMigration`, así que la vista previa nunca escribe nada.
+ * {horas, tickets, forecast} → backfill de asignaciones → poda) contra el
+ * dump ya parseado del archivo subido, dentro de una única transacción — un
+ * ensayo (`dryRun`) la revierte al final vía `runMigration`, así que la vista
+ * previa nunca escribe nada.
+ *
+ * `backfillProjectTeamMembersFromHours` va después de horas y antes de la
+ * poda: `proyecto_colaborador` es un subconjunto mucho más angosto que
+ * `hour_entries` (ver el comentario del paso), así que cada reimportación
+ * puede traer horas nuevas sin su fila de colaborador — sin este paso, esas
+ * asignaciones quedarían faltando otra vez en cada corrida.
  */
 @Injectable()
 export class DrizzleLegacyImportRunner implements LegacyImportRunner {
@@ -51,6 +59,7 @@ export class DrizzleLegacyImportRunner implements LegacyImportRunner {
       await migrateHourEntries(tx);
       await migrateTickets(tx);
       await migrateForecast(tx);
+      await backfillProjectTeamMembersFromHours(tx);
       await pruneStaleLegacyRows(tx, input.dump);
     });
 

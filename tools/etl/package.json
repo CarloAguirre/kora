@@ -21,7 +21,8 @@
     "tickets": "tsx src/run-tickets.ts",
     "verify-tickets": "tsx src/verify-tickets.ts",
     "forecast": "tsx src/run-forecast.ts",
-    "verify-forecast": "tsx src/verify-forecast.ts"
+    "verify-forecast": "tsx src/verify-forecast.ts",
+    "backfill-project-team-members": "tsx src/run-backfill-project-team-members.ts"
   },
   "dependencies": {
     "@kora/contracts": "workspace:*",

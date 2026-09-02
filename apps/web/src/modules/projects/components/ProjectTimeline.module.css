@@ -15,6 +15,7 @@
 
 .track {
   display: flex;
+  position: relative;
   width: 100%;
   height: 28px;
   border-radius: var(--kora-radius-pill);
@@ -31,7 +32,6 @@
   font-weight: var(--kora-weight-medium);
   text-align: center;
   padding: 0 var(--kora-space-1);
-  position: relative;
 }
 
 .segment:first-child {
@@ -90,7 +90,6 @@
 .today {
   position: absolute;
   top: -32px;
-  left: 50%;
   transform: translateX(-50%);
   display: flex;
   flex-direction: column;

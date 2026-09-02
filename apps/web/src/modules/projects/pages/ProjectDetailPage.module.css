@@ -5,14 +5,20 @@
   width: 100%;
 }
 
+.topRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kora-space-3);
+  flex-wrap: wrap;
+}
+
 .backButton {
   align-self: flex-start;
 }
 
-.title {
-  font-size: var(--kora-text-xl);
-  font-weight: var(--kora-weight-bold);
-  color: var(--kora-navy);
+.statusControl {
+  min-width: 220px;
 }
 
 .layout {
@@ -38,56 +44,6 @@
   min-width: 280px;
   position: sticky;
   top: var(--kora-space-4);
-}
-
-/* ─── Datos proyecto ─── */
-.summaryHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--kora-space-2);
-  flex-wrap: wrap;
-}
-
-.badgeRow {
-  display: flex;
-  gap: var(--kora-space-2);
-}
-
-.client {
-  font-size: var(--kora-text-lg);
-  color: var(--kora-navy);
-  font-weight: var(--kora-weight-semibold);
-  margin-top: var(--kora-space-1);
-}
-
-.fields {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: var(--kora-space-4);
-  margin-top: var(--kora-space-3);
-}
-
-.fieldLabel {
-  font-size: 10px;
-  color: var(--kora-text-disabled);
-  font-weight: var(--kora-weight-bold);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-
-.fieldValue {
-  font-size: var(--kora-text-sm);
-  color: var(--kora-text);
-  font-weight: var(--kora-weight-semibold);
-  margin-top: 2px;
-}
-
-.statusRow {
-  max-width: 260px;
-  margin-top: var(--kora-space-4);
-  padding-top: var(--kora-space-4);
-  border-top: 1px solid var(--kora-surface-disabled);
 }
 
 /* ─── KPIs ─── */
