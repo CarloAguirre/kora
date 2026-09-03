@@ -15,7 +15,7 @@ import { Modal } from '@/shared/components/ui/Modal';
 import { Button } from '@/shared/components/ui/Button';
 import { TextField } from '@/shared/components/ui/TextField';
 import { Select } from '@/shared/components/ui/Select';
-import { AlertIcon } from '@/shared/components/icons/Icons';
+import { AlertIcon, TrashIcon } from '@/shared/components/icons/Icons';
 import { useCreateUser, useUpdateUser } from '../api/users.queries';
 import { ApiRequestError } from '@/shared/lib/api-client';
 import { teamRequirementFor } from '../lib/team-requirement';
@@ -39,6 +39,8 @@ export interface UserFormDialogProps {
   teams: ReadonlyArray<{ id: string; name: string }>;
   onClose: () => void;
   onSuccess: (message: string) => void;
+  /** Solo en edición: pide eliminar al usuario que se está editando. */
+  onDelete?: (user: UserSummary) => void;
 }
 
 const ROLE_OPTIONS = ROLE_CODES.map((code) => ({ value: code, label: ROLE_LABELS[code] }));
@@ -54,7 +56,7 @@ const ROLE_OPTIONS = ROLE_CODES.map((code) => ({ value: code, label: ROLE_LABELS
  */
 type UserFormValues = z.input<typeof createUserSchema>;
 
-export function UserFormDialog({ open, user, teams, onClose, onSuccess }: UserFormDialogProps) {
+export function UserFormDialog({ open, user, teams, onClose, onSuccess, onDelete }: UserFormDialogProps) {
   const isEditing = user !== null;
   const createUser = useCreateUser();
   const updateUser = useUpdateUser();
@@ -180,6 +182,17 @@ export function UserFormDialog({ open, user, teams, onClose, onSuccess }: UserFo
       dismissible={!isSubmitting}
       footer={
         <>
+          {isEditing && user && onDelete && (
+            <Button
+              variant="dangerOutline"
+              iconLeft={<TrashIcon size={16} />}
+              onClick={() => onDelete(user)}
+              disabled={isSubmitting}
+              className={styles.deleteButton}
+            >
+              Eliminar usuario
+            </Button>
+          )}
           <Button variant="outline" onClick={onClose} disabled={isSubmitting}>
             Cancelar
           </Button>

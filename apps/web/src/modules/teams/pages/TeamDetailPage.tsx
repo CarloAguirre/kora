@@ -12,11 +12,15 @@ import { TextField } from '@/shared/components/ui/TextField';
 import { Select } from '@/shared/components/ui/Select';
 import { DataTable, type Column } from '@/shared/components/ui/DataTable';
 import { useToast } from '@/shared/components/ui/Toast';
-import { TrashIcon } from '@/shared/components/icons/Icons';
-import { useAddTeamMember, useRemoveTeamMember, useTeamDetail } from '../api/teams.queries';
+import { ConfirmActionDialog } from '@/shared/components/ui/ConfirmActionDialog';
+import { PencilIcon, TrashIcon } from '@/shared/components/icons/Icons';
+import { useAddTeamMember, useDeleteTeam, useRemoveTeamMember, useTeamDetail } from '../api/teams.queries';
 import { useUsersList } from '@/modules/users/api/users.queries';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { ApiRequestError } from '@/shared/lib/api-client';
+import { TeamFormDialog } from '../components/TeamFormDialog';
+import { EditTeamMemberDialog } from '../components/EditTeamMemberDialog';
+import { TeamAvailabilityHeatmap } from '../components/TeamAvailabilityHeatmap';
 import type { TeamMember } from '@kora/contracts';
 
 /**
@@ -31,7 +35,11 @@ export function TeamDetailPage() {
   const { data: team, isLoading } = useTeamDetail(teamId ?? null);
   const addMember = useAddTeamMember();
   const removeMember = useRemoveTeamMember();
+  const deleteTeam = useDeleteTeam();
   const [formError, setFormError] = useState<string | null>(null);
+  const [editingTeam, setEditingTeam] = useState(false);
+  const [deletingTeam, setDeletingTeam] = useState(false);
+  const [editingMember, setEditingMember] = useState<TeamMember | null>(null);
 
   // Candidatos para agregar: colaboradores y líderes que aún no pertenecen al
   // equipo. 200 alcanza con margen para una plantilla de este tamaño; si algún
@@ -68,6 +76,13 @@ export function TeamDetailPage() {
     toast.success('Se retiró al miembro del equipo.');
   };
 
+  const handleDeleteTeam = async () => {
+    if (!teamId || !team) return;
+    await deleteTeam.mutateAsync(teamId);
+    toast.success(`Se eliminó el equipo ${team.name}.`);
+    void navigate('/equipos');
+  };
+
   const columns: Column<TeamMember>[] = [
     { key: 'fullName', header: 'Nombre', render: (member) => member.fullName },
     { key: 'position', header: 'Cargo', render: (member) => member.position ?? '—' },
@@ -76,17 +91,27 @@ export function TeamDetailPage() {
       key: 'actions',
       header: 'Acciones',
       align: 'right',
-      width: '60px',
+      width: '90px',
       render: (member) =>
         can('teams:manage') ? (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => void handleRemove(member.id)}
-            aria-label={`Retirar a ${member.fullName}`}
-          >
-            <TrashIcon size={16} />
-          </Button>
+          <div className={styles.memberActions}>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setEditingMember(member)}
+              aria-label={`Editar a ${member.fullName}`}
+            >
+              <PencilIcon size={16} />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => void handleRemove(member.id)}
+              aria-label={`Retirar a ${member.fullName}`}
+            >
+              <TrashIcon size={16} />
+            </Button>
+          </div>
         ) : null,
     },
   ];
@@ -102,9 +127,27 @@ export function TeamDetailPage() {
   return (
     <DashboardLayout title={team.name}>
       <div className={styles.page}>
-        <Button variant="tertiary" size="sm" className={styles.backButton} onClick={() => void navigate('/equipos')}>
-          ← Volver a equipos
-        </Button>
+        <div className={styles.topRow}>
+          <Button variant="tertiary" size="sm" className={styles.backButton} onClick={() => void navigate('/equipos')}>
+            ← Volver a equipos
+          </Button>
+
+          {can('teams:manage') && (
+            <div className={styles.topRowActions}>
+              <Button variant="outline" size="sm" iconLeft={<PencilIcon size={16} />} onClick={() => setEditingTeam(true)}>
+                Editar equipo
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                iconLeft={<TrashIcon size={16} />}
+                onClick={() => setDeletingTeam(true)}
+              >
+                Eliminar equipo
+              </Button>
+            </div>
+          )}
+        </div>
 
         {(team.description || team.leader) && (
           <Card>
@@ -147,7 +190,37 @@ export function TeamDetailPage() {
             </form>
           )}
         </Card>
+
+        <Card>
+          <h2 className={styles.sectionTitle}>Disponibilidad</h2>
+          <TeamAvailabilityHeatmap teamId={team.id} />
+        </Card>
       </div>
+
+      <TeamFormDialog
+        open={editingTeam}
+        team={team}
+        onClose={() => setEditingTeam(false)}
+        onSuccess={(message) => toast.success(message)}
+      />
+
+      <EditTeamMemberDialog
+        open={editingMember !== null}
+        teamId={team.id}
+        member={editingMember}
+        onClose={() => setEditingMember(null)}
+        onSuccess={(message) => toast.success(message)}
+      />
+
+      <ConfirmActionDialog
+        open={deletingTeam}
+        title="Eliminar equipo"
+        description={`Se eliminará el equipo ${team.name}. Esta acción no se puede deshacer.`}
+        confirmLabel="Eliminar"
+        destructive
+        onConfirm={handleDeleteTeam}
+        onClose={() => setDeletingTeam(false)}
+      />
     </DashboardLayout>
   );
 }

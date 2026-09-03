@@ -80,12 +80,14 @@ export function DashboardPage() {
           </>
         ) : (
           <>
-            <DashboardMySummary
-              hours={summary?.hours ?? null}
-              approvals={summary?.approvals ?? null}
-              tickets={summary?.tickets ?? null}
-              loading={isLoading}
-            />
+            {user?.role === 'leader' && (
+              <DashboardMySummary
+                hours={summary?.hours ?? null}
+                approvals={summary?.approvals ?? null}
+                tickets={summary?.tickets ?? null}
+                loading={isLoading}
+              />
+            )}
 
             {activeTab === 'proyectos' ? (
               <DashboardProjectsTab

@@ -133,18 +133,21 @@ export function AvailabilityGrid() {
         </div>
 
         <div className={styles.controls}>
-          <div className={styles.toggle} role="group" aria-label="Vista de Registro de Horas">
-            {(['daily', 'weekly'] as const).map((mode) => (
-              <button
-                key={mode}
-                type="button"
-                aria-pressed={viewMode === mode}
-                className={[styles.toggleButton, viewMode === mode ? styles.toggleButtonActive : ''].join(' ')}
-                onClick={() => setViewMode(mode)}
-              >
-                {mode === 'daily' ? 'Diario' : 'Semanal'}
-              </button>
-            ))}
+          <div className={styles.toggleField}>
+            <span className={styles.toggleLabel}>Vista</span>
+            <div className={styles.toggle} role="group" aria-label="Vista de Registro de Horas">
+              {(['daily', 'weekly'] as const).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  aria-pressed={viewMode === mode}
+                  className={[styles.toggleButton, viewMode === mode ? styles.toggleButtonActive : ''].join(' ')}
+                  onClick={() => setViewMode(mode)}
+                >
+                  {mode === 'daily' ? 'Diario' : 'Semanal'}
+                </button>
+              ))}
+            </div>
           </div>
           <Select
             className={styles.periodField}

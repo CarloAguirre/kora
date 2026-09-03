@@ -127,13 +127,19 @@ export function TicketDetailModal({ ticketId, onClose }: { ticketId: string; onC
     toast.success('Se registró la solución y se terminó el ticket.');
   };
 
+  if (!error && (isLoading || !ticket)) {
+    return (
+      <div className={styles.overlay} onClick={onClose}>
+        <div className={styles.spinner} role="status" aria-label="Cargando" onClick={(event) => event.stopPropagation()} />
+      </div>
+    );
+  }
+
   return (
     <div className={styles.overlay} onClick={onClose}>
       <div className={styles.modal} role="dialog" aria-modal="true" aria-label={ticket?.title ?? 'Ticket'} onClick={(event) => event.stopPropagation()}>
         {error ? (
           <p className={styles.value}>{forbidden ? 'No tienes acceso a este ticket.' : 'No se pudo cargar el ticket.'}</p>
-        ) : isLoading || !ticket ? (
-          <p className={styles.value}>Cargando…</p>
         ) : (
           <>
             <div className={styles.header}>

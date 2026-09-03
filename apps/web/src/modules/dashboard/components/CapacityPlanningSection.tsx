@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import type { DashboardCapacitySummary } from '@kora/contracts';
 import styles from './CapacityPlanningSection.module.css';
 import { Card } from '@/shared/components/ui/Card';
-import { Button } from '@/shared/components/ui/Button';
 import { Select } from '@/shared/components/ui/Select';
 import { ChevronRightIcon } from '@/shared/components/icons/Icons';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
@@ -132,10 +131,6 @@ export function CapacityPlanningSection({ capacity, loading, weekStart, onWeekSt
           Disponibilidad global de los equipos durante el período: <strong>{totalFreeHours} horas libres</strong>
         </span>
       </div>
-
-      <Link to="/forecast" className={styles.forecastLink}>
-        <Button variant="tertiary">Ver forecast detallado</Button>
-      </Link>
     </Card>
   );
 }

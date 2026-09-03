@@ -7,6 +7,7 @@ import { Button } from '@/shared/components/ui/Button';
 import { Card } from '@/shared/components/ui/Card';
 import { ChevronLeftIcon } from '@/shared/components/icons/Icons';
 import { HourEntriesApprovalTable } from '../components/HourEntriesApprovalTable';
+import { HoursApprovalsSummary } from '../components/HoursApprovalsSummary';
 import { TeamAvailabilityHeatmap } from '@/modules/teams/components/TeamAvailabilityHeatmap';
 import { TeamContextBar } from '@/modules/teams/components/TeamContextBar';
 import { useTeamsList } from '@/modules/teams/api/teams.queries';
@@ -39,14 +40,23 @@ export function HoursApprovalsPage() {
   const teams = ledTeams?.items ?? [];
   const activeTeamId = teamId || teams[0]?.id || '';
 
+  // Se llega tanto desde "Equipos" como desde el card de Aprobaciones Pendientes
+  // del dashboard, así que no hay un único destino fijo al que volver: se usa
+  // el historial del navegador y solo se cae a "Equipos" si no hay de dónde volver
+  // (p.ej. la página se abrió directo desde un enlace).
+  const canGoBack = ((window.history.state as { idx?: number } | null)?.idx ?? 0) > 0;
+  const goBack = () => (canGoBack ? navigate(-1) : navigate('/equipos'));
+
   return (
     <DashboardLayout title="Aprobaciones de horas">
       <div className={styles.page}>
-        <Button variant="tertiary" size="sm" className={styles.backButton} onClick={() => void navigate('/equipos')}>
-          <ChevronLeftIcon size={16} /> Volver a equipos
+        <Button variant="tertiary" size="sm" className={styles.backButton} onClick={goBack}>
+          <ChevronLeftIcon size={16} /> Volver
         </Button>
 
         <p className={styles.subtitle}>Horas ingresadas pendientes de aprobación.</p>
+
+        <HoursApprovalsSummary query={{ teamId: activeTeamId || undefined, userId: selectedMember?.userId }} />
 
         {teams.length > 0 && (
           <TeamContextBar

@@ -158,8 +158,3 @@
 .banner strong {
   font-size: var(--kora-text-xl);
 }
-
-.forecastLink {
-  align-self: flex-end;
-  text-decoration: none;
-}

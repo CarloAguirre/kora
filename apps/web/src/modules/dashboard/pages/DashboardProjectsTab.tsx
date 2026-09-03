@@ -25,7 +25,7 @@ interface DashboardProjectsTabProps {
   onWeekStartChange: (weekStart: string) => void;
 }
 
-/** Tab "Proyectos" del Dashboard — igual disposición que `DashboardProyectos` en la v1. */
+/** Tab "Proyectos" del Dashboard — igual disposición que `DashboardProyectos` en la v1. Sin el enlace "Ver forecast detallado": Forecast ya vive en el menú lateral. */
 export function DashboardProjectsTab({ projects, capacity, loading, weekStart, onWeekStartChange }: DashboardProjectsTabProps) {
   const { can } = usePermissions();
   const navigate = useNavigate();

@@ -1,16 +1,19 @@
 import { useState } from 'react';
 import type { HourEntrySummary, ListHourEntriesQuery } from '@kora/contracts';
 import styles from './HourEntriesApprovalTable.module.css';
+import { Badge } from '@/shared/components/ui/Badge';
 import { Button } from '@/shared/components/ui/Button';
 import { DataTable, type Column } from '@/shared/components/ui/DataTable';
 import { Modal } from '@/shared/components/ui/Modal';
 import { TextField } from '@/shared/components/ui/TextField';
 import { useToast } from '@/shared/components/ui/Toast';
-import { CheckIcon, CloseIcon } from '@/shared/components/icons/Icons';
+import { ChevronDownIcon, CheckIcon, CloseIcon, UserIcon } from '@/shared/components/icons/Icons';
 import { useApproveHourEntry, useHourEntriesList, useRejectHourEntry } from '../api/hours.queries';
+import { resolvedApprover } from '../lib/approver';
 
 const formatDate = (value: string) => new Date(`${value}T00:00:00`).toLocaleDateString('es-CL', { weekday: 'short', day: '2-digit', month: 'short' });
 const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 2 });
+const pluralize = (count: number, singular: string, plural: string) => (count === 1 ? singular : plural);
 
 function initials(fullName: string): string {
   const parts = fullName.trim().split(/\s+/).filter(Boolean);
@@ -20,18 +23,27 @@ function initials(fullName: string): string {
   return (first + second).toUpperCase();
 }
 
-interface EntryGroup {
-  user: HourEntrySummary['user'];
-  teamName: string | null;
+interface LeaderGroup {
+  key: string;
+  leaderName: string;
+  employeeCount: number;
   entries: HourEntrySummary[];
 }
 
 /**
  * Tabla de horas pendientes de aprobación con selección y acciones masivas.
  * La usan tanto `/horas/aprobaciones` (todo lo que el actor puede aprobar,
- * agrupado por colaborador — `groupByUser`) como la ficha de colaborador
- * (acotada a un único `userId`, sin agrupar) — misma lógica de
+ * agrupado por líder responsable — `groupByUser`) como la ficha de
+ * colaborador (acotada a un único `userId`, sin agrupar) — misma lógica de
  * selección/aprobación/rechazo, distinto alcance y presentación de datos.
+ *
+ * Agrupar por líder (no por colaborador) importa porque quien mira esta cola
+ * no es necesariamente quien debe aprobarla — un PMO ve aquí lo pendiente de
+ * varios equipos a la vez, y sin este agrupamiento parecía que el usuario
+ * logueado era el responsable de aprobar todo. Cada grupo de líder es UNA
+ * sola tabla (columna "Colaborador") en vez de una mini-tabla por persona:
+ * repetir la cabecera "Fecha | Proyecto | ..." por cada colaborador se veía
+ * roto, no como filas agrupadas.
  */
 export function HourEntriesApprovalTable({
   query,
@@ -46,6 +58,7 @@ export function HourEntriesApprovalTable({
 }) {
   const toast = useToast();
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [collapsedLeaders, setCollapsedLeaders] = useState<Set<string>>(new Set());
   const [rejecting, setRejecting] = useState(false);
   const [reason, setReason] = useState('');
 
@@ -76,19 +89,41 @@ export function HourEntriesApprovalTable({
       return next;
     });
   };
+  const toggleCollapsed = (key: string) =>
+    setCollapsedLeaders((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
 
-  const groups: EntryGroup[] = groupByUser
-    ? Array.from(
-        entries
-          .reduce((map, entry) => {
-            const group = map.get(entry.user.id);
-            if (group) group.entries.push(entry);
-            else map.set(entry.user.id, { user: entry.user, teamName: entry.team?.name ?? null, entries: [entry] });
-            return map;
-          }, new Map<string, EntryGroup>())
-          .values(),
-      )
-    : [];
+  const leaderGroups: LeaderGroup[] = [];
+  if (groupByUser) {
+    const leaderIndex = new Map<string, { leaderName: string; employeeIds: Set<string>; entries: HourEntrySummary[] }>();
+    for (const entry of entries) {
+      const approver = resolvedApprover(entry);
+      const leaderKey = approver?.id ?? 'sin-aprobador';
+      let leaderGroup = leaderIndex.get(leaderKey);
+      if (!leaderGroup) {
+        leaderGroup = { leaderName: approver?.fullName ?? 'Sin aprobador asignado', employeeIds: new Set(), entries: [] };
+        leaderIndex.set(leaderKey, leaderGroup);
+      }
+      leaderGroup.entries.push(entry);
+      leaderGroup.employeeIds.add(entry.user.id);
+    }
+    for (const [key, group] of leaderIndex) {
+      leaderGroups.push({
+        key,
+        leaderName: group.leaderName,
+        employeeCount: group.employeeIds.size,
+        // Filas contiguas por colaborador para que se lean agrupadas aunque compartan una sola tabla.
+        entries: [...group.entries].sort(
+          (a, b) => a.user.fullName.localeCompare(b.user.fullName, 'es') || a.date.localeCompare(b.date),
+        ),
+      });
+    }
+    leaderGroups.sort((a, b) => a.leaderName.localeCompare(b.leaderName, 'es'));
+  }
 
   const approveOne = async (entry: HourEntrySummary) => {
     await approveEntry.mutateAsync(entry.id);
@@ -103,14 +138,14 @@ export function HourEntriesApprovalTable({
   const approveSelected = async () => {
     const ids = [...selected];
     for (const id of ids) await approveEntry.mutateAsync(id);
-    toast.success(`${ids.length} registro${ids.length === 1 ? '' : 's'} aprobado${ids.length === 1 ? '' : 's'}.`);
+    toast.success(`${ids.length} ${pluralize(ids.length, 'registro aprobado', 'registros aprobados')}.`);
     setSelected(new Set());
   };
 
   const confirmReject = async () => {
     const ids = [...selected];
     for (const id of ids) await rejectEntry.mutateAsync({ entryId: id, input: { reason } });
-    toast.success(`${ids.length} registro${ids.length === 1 ? '' : 's'} rechazado${ids.length === 1 ? '' : 's'}.`);
+    toast.success(`${ids.length} ${pluralize(ids.length, 'registro rechazado', 'registros rechazados')}.`);
     setSelected(new Set());
     setReason('');
     setRejecting(false);
@@ -125,6 +160,23 @@ export function HourEntriesApprovalTable({
         <input type="checkbox" checked={selected.has(entry.id)} onChange={() => toggleOne(entry.id)} aria-label={`Seleccionar ${entry.user.fullName}`} />
       ),
     },
+    ...(groupByUser
+      ? [
+          {
+            key: 'collaborator',
+            header: 'Colaborador',
+            render: (entry: HourEntrySummary) => (
+              <div className={styles.collaboratorCell}>
+                <span className={styles.employeeAvatar}>{initials(entry.user.fullName)}</span>
+                <span>
+                  <div className={styles.employeeName}>{entry.user.fullName}</div>
+                  {showTeamColumn && entry.team?.name && <div className={styles.employeeTeam}>{entry.team.name}</div>}
+                </span>
+              </div>
+            ),
+          } satisfies Column<HourEntrySummary>,
+        ]
+      : []),
     { key: 'date', header: 'Fecha', render: (entry) => formatDate(entry.date) },
     ...(showTeamColumn && !groupByUser
       ? [
@@ -136,6 +188,15 @@ export function HourEntriesApprovalTable({
         ]
       : []),
     { key: 'project', header: 'Proyecto', render: (entry) => entry.project?.name ?? <span className={styles.empty}>—</span> },
+    ...(!groupByUser
+      ? [
+          {
+            key: 'approver',
+            header: 'Debe aprobar',
+            render: (entry: HourEntrySummary) => resolvedApprover(entry)?.fullName ?? <span className={styles.empty}>—</span>,
+          } satisfies Column<HourEntrySummary>,
+        ]
+      : []),
     { key: 'assignment', header: 'Asignación', render: (entry) => entry.assignment ?? 'Desarrollo' },
     { key: 'category', header: 'Actividad', render: (entry) => entry.category || <span className={styles.empty}>—</span> },
     { key: 'hours', header: 'HH registradas', align: 'right', render: (entry) => formatHours(entry.hours) },
@@ -186,33 +247,50 @@ export function HourEntriesApprovalTable({
           emptyMessage={emptyMessage}
         />
       ) : (
-        <div className={styles.groups}>
-          {groups.map((group) => {
-            const groupHours = group.entries.reduce((sum, entry) => sum + entry.hours, 0);
-            const groupSelected = group.entries.every((entry) => selected.has(entry.id));
+        <div className={styles.leaderGroups}>
+          {leaderGroups.map((leader) => {
+            const leaderHours = leader.entries.reduce((sum, entry) => sum + entry.hours, 0);
+            const leaderSelected = leader.entries.every((entry) => selected.has(entry.id));
+            const collapsed = collapsedLeaders.has(leader.key);
             return (
-              <div key={group.user.id} className={styles.group}>
-                <div className={styles.groupHeader}>
+              <div key={leader.key} className={styles.leaderGroup}>
+                <div className={styles.leaderHeader}>
                   <input
                     type="checkbox"
-                    checked={groupSelected}
-                    onChange={() => toggleGroup(group.entries)}
-                    aria-label={`Seleccionar todas las horas de ${group.user.fullName}`}
+                    checked={leaderSelected}
+                    onChange={() => toggleGroup(leader.entries)}
+                    aria-label={`Seleccionar todas las horas que aprueba ${leader.leaderName}`}
                   />
-                  <span className={styles.avatar}>{initials(group.user.fullName)}</span>
-                  <span className={styles.groupName}>{group.user.fullName}</span>
-                  <span className={styles.groupMeta}>
-                    {showTeamColumn && group.teamName ? `${group.teamName} · ` : ''}
-                    {group.entries.length} registro{group.entries.length === 1 ? '' : 's'}
+                  <span className={styles.leaderAvatar}>
+                    <UserIcon size={15} />
                   </span>
-                  <span className={styles.groupTotal}>{formatHours(groupHours)} hrs</span>
+                  <Badge tone="info" className={styles.leaderBadge}>
+                    Debe aprobar: {leader.leaderName}
+                  </Badge>
+                  <span className={styles.leaderMeta}>
+                    {leader.employeeCount} {pluralize(leader.employeeCount, 'colaborador', 'colaboradores')} ·{' '}
+                    {leader.entries.length} {pluralize(leader.entries.length, 'registro', 'registros')}
+                  </span>
+                  <span className={styles.leaderTotal}>{formatHours(leaderHours)} hrs</span>
+                  <button
+                    type="button"
+                    className={styles.collapseToggle}
+                    onClick={() => toggleCollapsed(leader.key)}
+                    aria-label={collapsed ? `Mostrar horas que aprueba ${leader.leaderName}` : `Ocultar horas que aprueba ${leader.leaderName}`}
+                    aria-expanded={!collapsed}
+                  >
+                    <ChevronDownIcon size={16} className={collapsed ? styles.collapseIconClosed : styles.collapseIcon} />
+                  </button>
                 </div>
-                <DataTable
-                  caption={`Horas de ${group.user.fullName}`}
-                  columns={columns}
-                  items={group.entries}
-                  getRowKey={(entry) => entry.id}
-                />
+
+                {!collapsed && (
+                  <DataTable
+                    caption={`Horas que aprueba ${leader.leaderName}`}
+                    columns={columns}
+                    items={leader.entries}
+                    getRowKey={(entry) => entry.id}
+                  />
+                )}
               </div>
             );
           })}

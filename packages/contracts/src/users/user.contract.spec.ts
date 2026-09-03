@@ -87,8 +87,8 @@ describe('catálogo de permisos', () => {
     expect(DEFAULT_ROLE_PERMISSIONS.admin).toHaveLength(PERMISSIONS.length);
   });
 
-  it('PMO tiene todo menos eliminar usuarios', () => {
-    expect(DEFAULT_ROLE_PERMISSIONS.pmo).not.toContain('users:delete');
+  it('PMO tiene todo menos importar datos legados', () => {
+    expect(DEFAULT_ROLE_PERMISSIONS.pmo).not.toContain('admin:legacy_import');
     expect(DEFAULT_ROLE_PERMISSIONS.pmo).toHaveLength(PERMISSIONS.length - 1);
   });
 

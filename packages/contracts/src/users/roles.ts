@@ -66,7 +66,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Readonly<Record<RoleCode, readonly Permis
   admin: [...PERMISSIONS],
   // Reemplazar datos de negocio por un archivo es una operación destructiva, no
   // administración estándar: a diferencia del resto de PERMISSIONS, pmo no la hereda.
-  pmo: [...PERMISSIONS].filter((p) => p !== 'users:delete' && p !== 'admin:legacy_import'),
+  pmo: [...PERMISSIONS].filter((p) => p !== 'admin:legacy_import'),
   leader: [
     'teams:read',
     'teams:manage',

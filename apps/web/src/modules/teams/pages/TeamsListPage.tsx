@@ -8,15 +8,22 @@ import { Badge } from '@/shared/components/ui/Badge';
 import { Card } from '@/shared/components/ui/Card';
 import { DataTable, type Column } from '@/shared/components/ui/DataTable';
 import { Pagination } from '@/shared/components/ui/Pagination';
+import { Select } from '@/shared/components/ui/Select';
 import { useToast } from '@/shared/components/ui/Toast';
-import { PlusIcon, PencilIcon } from '@/shared/components/icons/Icons';
+import { PlusIcon, PencilIcon, TrashIcon } from '@/shared/components/icons/Icons';
 import { TextField } from '@/shared/components/ui/TextField';
 import { SearchIcon } from '@/shared/components/icons/Icons';
+import { ConfirmActionDialog } from '@/shared/components/ui/ConfirmActionDialog';
 import { TeamFormDialog } from '../components/TeamFormDialog';
 import { LeaderTeamConsole } from './LeaderTeamConsole';
-import { useTeamsList } from '../api/teams.queries';
+import { useDeleteTeam, useTeamsList } from '../api/teams.queries';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
+
+const STATUS_FILTER_OPTIONS = [
+  { value: 'true', label: 'Activo' },
+  { value: 'false', label: 'Inactivo' },
+];
 
 /**
  * `/equipos`. Para `admin`/`pmo` es la administración global de equipos (M2).
@@ -49,12 +56,28 @@ function TeamsAdminListPage() {
   const { can } = usePermissions();
   const toast = useToast();
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(1);
-  const { data, isLoading, error } = useTeamsList({ page, pageSize: 25, search: search || undefined });
+  const { data, isLoading, error } = useTeamsList({
+    page,
+    pageSize: 25,
+    search: search || undefined,
+    isActive: statusFilter === '' ? undefined : statusFilter === 'true',
+  });
+  const deleteTeam = useDeleteTeam();
 
-  const [dialog, setDialog] = useState<{ kind: 'none' } | { kind: 'form'; team: TeamSummary | null }>({
+  const [dialog, setDialog] = useState<
+    { kind: 'none' } | { kind: 'form'; team: TeamSummary | null } | { kind: 'delete'; team: TeamSummary }
+  >({
     kind: 'none',
   });
+  const closeDialog = () => setDialog({ kind: 'none' });
+
+  const handleDelete = async () => {
+    if (dialog.kind !== 'delete') return;
+    await deleteTeam.mutateAsync(dialog.team.id);
+    toast.success(`Se eliminó el equipo ${dialog.team.name}.`);
+  };
 
   const columns: Column<TeamSummary>[] = [
     {
@@ -77,12 +100,22 @@ function TeamsAdminListPage() {
       key: 'actions',
       header: 'Acciones',
       align: 'right',
-      width: '80px',
+      width: '110px',
       render: (team) =>
         can('teams:manage') ? (
-          <Button variant="ghost" size="icon" onClick={() => setDialog({ kind: 'form', team })} aria-label={`Editar ${team.name}`}>
-            <PencilIcon size={16} />
-          </Button>
+          <div className={styles.actions}>
+            <Button variant="ghost" size="icon" onClick={() => setDialog({ kind: 'form', team })} aria-label={`Editar ${team.name}`}>
+              <PencilIcon size={16} />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setDialog({ kind: 'delete', team })}
+              aria-label={`Eliminar ${team.name}`}
+            >
+              <TrashIcon size={16} />
+            </Button>
+          </div>
         ) : null,
     },
   ];
@@ -100,18 +133,31 @@ function TeamsAdminListPage() {
         </header>
 
         <Card>
-          <TextField
-            className={styles.search}
-            label="Buscar"
-            type="search"
-            placeholder="Nombre del equipo"
-            value={search}
-            onChange={(event) => {
-              setSearch(event.target.value);
-              setPage(1);
-            }}
-            iconLeft={<SearchIcon size={16} />}
-          />
+          <div className={styles.filters}>
+            <TextField
+              className={styles.search}
+              label="Buscar"
+              type="search"
+              placeholder="Nombre del equipo"
+              value={search}
+              onChange={(event) => {
+                setSearch(event.target.value);
+                setPage(1);
+              }}
+              iconLeft={<SearchIcon size={16} />}
+            />
+            <Select
+              className={styles.statusFilter}
+              label="Estado"
+              placeholder="Todos"
+              options={STATUS_FILTER_OPTIONS}
+              value={statusFilter}
+              onChange={(event) => {
+                setStatusFilter(event.target.value);
+                setPage(1);
+              }}
+            />
+          </div>
 
           <DataTable
             caption="Listado de equipos"
@@ -132,8 +178,22 @@ function TeamsAdminListPage() {
       <TeamFormDialog
         open={dialog.kind === 'form'}
         team={dialog.kind === 'form' ? dialog.team : null}
-        onClose={() => setDialog({ kind: 'none' })}
+        onClose={closeDialog}
         onSuccess={(message) => toast.success(message)}
+      />
+
+      <ConfirmActionDialog
+        open={dialog.kind === 'delete'}
+        title="Eliminar equipo"
+        description={
+          dialog.kind === 'delete'
+            ? `Se eliminará el equipo ${dialog.team.name}. Esta acción no se puede deshacer.`
+            : ''
+        }
+        confirmLabel="Eliminar"
+        destructive
+        onConfirm={handleDelete}
+        onClose={closeDialog}
       />
     </DashboardLayout>
   );

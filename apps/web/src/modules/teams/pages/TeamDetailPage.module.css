@@ -9,6 +9,26 @@
   align-self: flex-start;
 }
 
+.topRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kora-space-4);
+  flex-wrap: wrap;
+}
+
+.topRowActions {
+  display: flex;
+  gap: var(--kora-space-2);
+  flex-wrap: wrap;
+}
+
+.memberActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--kora-space-1);
+}
+
 .description {
   color: var(--kora-text-muted);
   font-size: var(--kora-text-base);

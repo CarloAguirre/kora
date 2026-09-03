@@ -19,13 +19,15 @@ import { Pagination } from '@/shared/components/ui/Pagination';
 import { TextField } from '@/shared/components/ui/TextField';
 import { MultiSelect } from '@/shared/components/ui/MultiSelect';
 import { Tabs } from '@/shared/components/ui/Tabs';
-import { SearchIcon, PlusIcon, DownloadIcon } from '@/shared/components/icons/Icons';
+import { useToast } from '@/shared/components/ui/Toast';
+import { ConfirmActionDialog } from '@/shared/components/ui/ConfirmActionDialog';
+import { SearchIcon, PlusIcon, DownloadIcon, TrashIcon } from '@/shared/components/icons/Icons';
 import { ProjectStatusBadge } from '../components/ProjectStatusBadge';
 import { PriorityIndicator } from '../components/PriorityIndicator';
 import { ProjectsSummaryChart } from '../components/ProjectsSummaryChart';
 import { getProjectStageLabel } from '../lib/project-stage-display';
 import { exportDevelopmentProjects, exportSupportProjects } from '../lib/project-export';
-import { useProjectsList } from '../api/projects.queries';
+import { useDeleteProject, useProjectsList } from '../api/projects.queries';
 import { useClientsList } from '@/modules/clients/api/clients.queries';
 import { useUsersList } from '@/modules/users/api/users.queries';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
@@ -58,6 +60,7 @@ const formatDate = (value: string | null) => (value ? new Date(value).toLocaleDa
  */
 export function ProjectsListPage() {
   const { can } = usePermissions();
+  const toast = useToast();
   const [tab, setTab] = useState<'development' | 'support'>('development');
   const [supportSubTab, setSupportSubTab] = useState<'active' | 'finished'>('active');
   const [search, setSearch] = useState('');
@@ -66,6 +69,8 @@ export function ProjectsListPage() {
   const [phases, setPhases] = useState<ProjectPhase[]>([]);
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState<SortState<ProjectSortField>>({ field: 'priority', direction: 'desc' });
+  const [deleteTarget, setDeleteTarget] = useState<ProjectSummary | null>(null);
+  const deleteProject = useDeleteProject();
 
   const listQuery =
     tab === 'development'
@@ -127,6 +132,33 @@ export function ProjectsListPage() {
     setPage(1);
   };
 
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    await deleteProject.mutateAsync(deleteTarget.id);
+    toast.success(`Se eliminó el proyecto ${deleteTarget.name}.`);
+    setDeleteTarget(null);
+  };
+
+  const actionsColumn: Column<ProjectSummary> = {
+    key: 'actions',
+    header: 'Acciones',
+    align: 'right',
+    width: '70px',
+    render: (project) =>
+      can('projects:manage') ? (
+        <div className={styles.actions}>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setDeleteTarget(project)}
+            aria-label={`Eliminar ${project.name}`}
+          >
+            <TrashIcon size={16} />
+          </Button>
+        </div>
+      ) : null,
+  };
+
   const developmentColumns: Column<ProjectSummary>[] = [
     { key: 'priority', header: 'Prioridad', sortable: true, render: (p) => <PriorityIndicator priority={p.priority} /> },
     {
@@ -149,6 +181,7 @@ export function ProjectsListPage() {
     { key: 'soldHours', header: 'HH vendidas', sortable: true, render: (p) => formatHours(p.soldHours) },
     { key: 'usedHours', header: 'HH Consumidas', sortable: true, render: (p) => formatHours(p.usedHours) },
     { key: 'remainingHours', header: 'HH Restantes', sortable: true, render: (p) => formatHours(p.soldHours - p.usedHours) },
+    actionsColumn,
   ];
 
   const supportColumns: Column<ProjectSummary>[] = [
@@ -175,6 +208,7 @@ export function ProjectsListPage() {
     { key: 'usedHours', header: 'HH Consumidas', sortable: true, render: (p) => formatHours(p.usedHours) },
     { key: 'remainingHours', header: 'HH Restantes', sortable: true, render: (p) => formatHours(p.supportHours - p.usedHours) },
     { key: 'deviationHours', header: 'HH Desviación', sortable: true, render: (p) => formatHours(p.usedHours - p.supportHours) },
+    actionsColumn,
   ];
 
   const columns = tab === 'development' ? developmentColumns : supportColumns;
@@ -287,6 +321,16 @@ export function ProjectsListPage() {
           )}
         </Card>
       </div>
+
+      <ConfirmActionDialog
+        open={deleteTarget !== null}
+        title="Eliminar proyecto"
+        description={deleteTarget ? `Se eliminará el proyecto ${deleteTarget.name}. Esta acción no se puede deshacer.` : ''}
+        confirmLabel="Eliminar"
+        destructive
+        onConfirm={handleDelete}
+        onClose={() => setDeleteTarget(null)}
+      />
     </DashboardLayout>
   );
 }

@@ -29,7 +29,7 @@ export interface SeedAccessCatalogResult {
 
 const ROLE_DESCRIPTIONS: Record<RoleCode, string> = {
   admin: 'Acceso total al sistema, incluida la eliminación de usuarios.',
-  pmo: 'Equivalente a administrador para la operación; no elimina usuarios.',
+  pmo: 'Equivalente a administrador para la operación, salvo la importación de datos legados.',
   leader: 'Gestiona sus equipos y proyectos, y aprueba las horas de su gente.',
   collaborator: 'Registra sus horas y trabaja los tickets que se le asignan.',
   commercial: 'Consulta los clientes y tickets de su cartera comercial.',

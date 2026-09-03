@@ -57,6 +57,10 @@
   margin-top: 1px;
 }
 
+.deleteButton {
+  margin-right: auto;
+}
+
 @media (max-width: 640px) {
   .row {
     grid-template-columns: 1fr;

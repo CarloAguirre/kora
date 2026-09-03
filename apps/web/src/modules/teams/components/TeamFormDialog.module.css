@@ -4,6 +4,18 @@
   gap: var(--kora-space-4);
 }
 
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--kora-space-4);
+}
+
+@media (max-width: 640px) {
+  .row {
+    grid-template-columns: 1fr;
+  }
+}
+
 .alert {
   display: flex;
   align-items: flex-start;

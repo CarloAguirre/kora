@@ -20,28 +20,27 @@
   cursor: pointer;
 }
 
-.groups {
+.leaderGroups {
   display: flex;
   flex-direction: column;
   gap: var(--kora-space-4);
 }
 
-.group {
-  border: 1px solid var(--kora-border-soft);
+.leaderGroup {
+  border: 1px solid var(--kora-border-strong);
   border-radius: var(--kora-radius);
   overflow: hidden;
 }
 
-.groupHeader {
+.leaderHeader {
   display: flex;
   align-items: center;
   gap: var(--kora-space-3);
   padding: var(--kora-space-3) var(--kora-space-4);
   background: var(--kora-lime-surface);
-  border-bottom: 1px solid var(--kora-border-strong);
 }
 
-.avatar {
+.leaderAvatar {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -50,27 +49,76 @@
   border-radius: 50%;
   background: var(--kora-navy);
   color: var(--kora-lime);
-  font-size: var(--kora-text-xs);
-  font-weight: var(--kora-weight-bold);
   flex-shrink: 0;
 }
 
-.groupName {
-  font-weight: var(--kora-weight-bold);
-  color: var(--kora-navy);
+.leaderBadge {
+  flex-shrink: 0;
 }
 
-.groupMeta {
+.leaderMeta {
   color: var(--kora-text-muted);
   font-size: var(--kora-text-sm);
 }
 
-.groupTotal {
+.leaderTotal {
   margin-left: auto;
   font-weight: var(--kora-weight-bold);
   color: var(--kora-navy);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+.collapseToggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  padding: var(--kora-space-1);
+  color: var(--kora-navy);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.collapseIcon {
+  transition: transform 0.15s ease;
+}
+
+.collapseIconClosed {
+  transform: rotate(-90deg);
+}
+
+.collaboratorCell {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+}
+
+.employeeAvatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--kora-surface-disabled);
+  color: var(--kora-navy);
+  font-size: 10px;
+  font-weight: var(--kora-weight-bold);
+  flex-shrink: 0;
+}
+
+.employeeName {
+  font-weight: var(--kora-weight-semibold);
+  color: var(--kora-navy);
+  font-size: var(--kora-text-sm);
+  white-space: nowrap;
+}
+
+.employeeTeam {
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-xs);
 }
 
 .rowActions {

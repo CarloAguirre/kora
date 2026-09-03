@@ -14,6 +14,7 @@ import { UserFormDialog } from '../components/UserFormDialog';
 import { ConfirmActionDialog } from '@/shared/components/ui/ConfirmActionDialog';
 import { useUsersListState } from '../hooks/useUsersListState';
 import { useDeleteUser, useGrantUserAccess, useUsersList } from '../api/users.queries';
+import { useTeamsList } from '@/modules/teams/api/teams.queries';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { ApiRequestError } from '@/shared/lib/api-client';
 import { CapacityReportTable } from '@/modules/hours/components/CapacityReportTable';
@@ -52,6 +53,7 @@ export function UsersListPage() {
   const [activeTab, setActiveTab] = useState<AdminTab>('usuarios');
   const { filters, query, sort, page, setFilters, setPage, toggleSort } = useUsersListState();
   const { data, isLoading, error } = useUsersList(query);
+  const { data: teamsData } = useTeamsList({ page: 1, pageSize: 200, sortField: 'name', isActive: true });
 
   const tabs = useMemo(
     () => (can('hours:read_all') ? [...BASE_TABS, ...HOURS_REPORT_TABS] : BASE_TABS),
@@ -159,12 +161,10 @@ export function UsersListPage() {
       <UserFormDialog
         open={dialog.kind === 'form'}
         user={dialog.kind === 'form' ? dialog.user : null}
-        // El módulo de equipos aún no existe en la v2; hasta entonces el
-        // selector se alimenta de los equipos presentes en la página actual,
-        // que cubre el caso real de reasignar dentro de los equipos vigentes.
-        teams={collectTeams(data?.items ?? [])}
+        teams={teamsData?.items ?? []}
         onClose={closeDialog}
         onSuccess={(message) => toast.success(message)}
+        onDelete={(user) => setDialog({ kind: 'delete', user })}
       />
 
       <ConfirmActionDialog
@@ -199,17 +199,4 @@ export function UsersListPage() {
       />
     </DashboardLayout>
   );
-}
-
-/** Equipos distintos presentes en la página actual, ordenados por nombre. */
-function collectTeams(users: readonly UserSummary[]): Array<{ id: string; name: string }> {
-  const teams = new Map<string, string>();
-
-  for (const user of users) {
-    if (user.team) teams.set(user.team.id, user.team.name);
-  }
-
-  return [...teams.entries()]
-    .map(([id, name]) => ({ id, name }))
-    .sort((a, b) => a.name.localeCompare(b.name, 'es'));
 }
