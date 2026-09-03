@@ -74,6 +74,8 @@ export function DashboardPage() {
               myActiveProjects={summary?.myActiveProjects ?? []}
               planning={summary?.planning ?? null}
               loading={isLoading}
+              weekStart={weekStart}
+              onWeekStartChange={setWeekStart}
             />
           </>
         ) : (

@@ -51,13 +51,34 @@ explícitamente).
 `admin`/`pmo` siempre pueden decidir (mismo criterio de equivalencia que ya
 usa el resto del sistema — `isAdminLikeRole`/`hasRoleAccess`). Para el resto:
 
-- Registro con proyecto: líder del proyecto, o líder de algún equipo asignado
-  a él (`ProjectRepository.isProjectLeaderOrTeamLeader`, nuevo método —
-  reemplaza el árbol de cinco funciones RLS anidadas de la v1 que llegaba a
-  `equipo_proyecto`, `lider_equipo`, `proyecto_colaborador` y
-  `forecast_asignacion`; la v2 solo tiene `projects.leaderUserId` y
-  `project_teams.teamId → teams.leaderUserId`, así que el árbol se reduce a
-  dos condiciones).
+- Registro con proyecto: líder del proyecto, o líder del **propio equipo del
+  autor del registro**, si ese equipo está asignado al proyecto
+  (`ProjectRepository.isProjectLeaderOrTeamLeaderOfMember`). Reemplaza el
+  árbol de cinco funciones RLS anidadas de la v1 (`equipo_proyecto`,
+  `lider_equipo`, `proyecto_colaborador`, `forecast_asignacion`); la v2 solo
+  tiene `projects.leaderUserId`, `project_teams.teamId → teams.leaderUserId`
+  y `team_members` para acotar al equipo del autor.
+  **Corregido tras revisión de negocio** (`RecentHistoryCard`/columna
+  "Aprobador" del historial de horas expuso el problema): la primera versión
+  de esta regla (`isProjectLeaderOrTeamLeader`, sin `memberUserId`) concedía
+  aprobación a el líder de CUALQUIER equipo asignado al proyecto, no solo el
+  del autor — un colaborador de "Desarrollo" podía terminar con sus horas
+  aprobables por el líder de "UX-UI" solo porque ambos equipos están
+  asignados al mismo proyecto. `isProjectLeaderOrTeamLeader` (sin acotar)
+  sigue existiendo y en uso por Tickets, donde la pregunta es "¿puede actuar
+  sobre el proyecto en general?", no "¿puede aprobar las horas de esta
+  persona?" — no es el mismo caso de uso y no se tocó.
+
+  Segunda corrección, mismo hallazgo: el líder del equipo del autor a
+  considerar es `project_teams.leaderUserId` ("líder para este proyecto", ver
+  `ProjectTeamRepository`), no `teams.leaderUserId` (líder orgánico del
+  equipo) — un equipo puede tener un líder distinto por proyecto, y la
+  primera versión de `isProjectLeaderOrTeamLeaderOfMember` usaba el segundo.
+  Ahora usa `coalesce(project_teams.leaderUserId, teams.leaderUserId)`, con el
+  líder orgánico solo como respaldo cuando el proyecto no fijó uno propio.
+  Nota: `isProjectLeaderOrTeamLeader` (Tickets) tiene el mismo defecto sin
+  corregir — usa `teams.leaderUserId` directamente — pendiente si Tickets lo
+  necesita.
 - Registro sin proyecto: el aprobador designado, o quien lidera al dueño del
   registro (`TeamRepository.isTeamLeaderOfMember`, nuevo método).
 

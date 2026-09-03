@@ -46,6 +46,13 @@
   color: var(--kora-text-muted);
 }
 
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+  flex-shrink: 0;
+}
+
 .close {
   display: flex;
   align-items: center;

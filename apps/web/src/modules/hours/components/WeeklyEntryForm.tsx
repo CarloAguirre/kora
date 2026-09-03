@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   HOUR_ENTRY_ASSIGNMENTS,
   PROJECT_REQUIRING_ASSIGNMENTS,
@@ -54,7 +54,16 @@ function formatRange(monday: Date): string {
  * la v1; cada día con horas &gt; 0 se guarda como un `hour_entries`
  * independiente para esa fecha.
  */
-export function WeeklyEntryForm({ onClose, onSuccess }: { onClose: () => void; onSuccess: (message: string) => void }) {
+export function WeeklyEntryForm({
+  onClose,
+  onSuccess,
+  onTotalChange,
+}: {
+  onClose: () => void;
+  onSuccess: (message: string) => void;
+  /** Notifica al diálogo contenedor el total de horas de la semana (para el contador junto al cierre). */
+  onTotalChange?: (total: number) => void;
+}) {
   const { user } = useAuth();
   const createEntry = useCreateHourEntry();
   const { data: projects } = useProjectsList({ page: 1, pageSize: 200, sortField: 'name' });
@@ -94,6 +103,10 @@ export function WeeklyEntryForm({ onClose, onSuccess }: { onClose: () => void; o
     (holidaysThisWeek ?? []).map((h) => Math.round((new Date(`${h.date}T00:00:00`).getTime() - monday.getTime()) / 86_400_000)),
   );
   const totalWeekWithExisting = existingWeekHours + weekTotal;
+
+  useEffect(() => {
+    onTotalChange?.(totalWeekWithExisting);
+  }, [totalWeekWithExisting, onTotalChange]);
 
   const shiftWeek = (deltaDays: number) => {
     const next = new Date(monday);

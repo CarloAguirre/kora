@@ -25,7 +25,7 @@ export class HourEntryApprovalAuthorityService {
   async canDecide(actorId: string, actorRole: RoleCode, entry: HourEntry): Promise<boolean> {
     if (actorRole === 'admin' || actorRole === 'pmo') return true;
 
-    if (entry.projectId) return this.projects.isProjectApprover(entry.projectId, actorId);
+    if (entry.projectId) return this.projects.isProjectApprover(entry.projectId, actorId, entry.userId);
 
     if (entry.designatedApproverUserId) return entry.designatedApproverUserId === actorId;
 

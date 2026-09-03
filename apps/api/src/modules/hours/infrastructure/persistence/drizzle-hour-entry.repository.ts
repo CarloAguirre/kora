@@ -14,6 +14,7 @@ import {
   lte,
   or,
   projects,
+  projectTeams,
   sql,
   teamMembers,
   teams,
@@ -66,6 +67,7 @@ export class DrizzleHourEntryRepository implements HourEntryRepository {
           userLastName: users.lastName,
           projectId: hourEntries.projectId,
           projectName: projects.name,
+          projectLeaderUserId: projects.leaderUserId,
           projectType: projects.type,
           projectSalesStage: projects.salesStage,
           clientId: projects.clientId,
@@ -94,10 +96,70 @@ export class DrizzleHourEntryRepository implements HourEntryRepository {
       db.select({ value: count() }).from(hourEntries).leftJoin(users, eq(users.id, hourEntries.userId)).where(where),
     ]);
 
+    const authorIds = [...new Set(rows.map((row) => row.userId))];
+    const teamRows = authorIds.length
+      ? await db
+          .select({ userId: teamMembers.userId, teamId: teams.id, teamName: teams.name, teamLeaderUserId: teams.leaderUserId })
+          .from(teamMembers)
+          .innerJoin(teams, eq(teams.id, teamMembers.teamId))
+          .where(and(inArray(teamMembers.userId, authorIds), isNull(teamMembers.leftAt)))
+      : [];
+    // Una persona podría (raro) tener más de una membresía activa; se muestra la primera.
+    const teamByUserId = new Map(
+      teamRows.map((row) => [row.userId, { id: row.teamId, name: row.teamName, leaderUserId: row.teamLeaderUserId }]),
+    );
+
+    const projectIds = [...new Set(rows.map((row) => row.projectId).filter((id): id is string => Boolean(id)))];
+    const authorTeamIds = [...new Set([...teamByUserId.values()].map((team) => team.id))];
+    // Qué pares (proyecto, equipo) están realmente asignados — el líder de un
+    // equipo solo aprueba las horas de SU propio equipo, no las de cualquier
+    // otro equipo asignado al mismo proyecto (a diferencia de "¿puede actuar
+    // sobre este proyecto en general?" que sí es por-cualquier-equipo, ver
+    // `ProjectRepository.isProjectLeaderOrTeamLeader`, usado por Tickets).
+    const assignedProjectTeamRows =
+      projectIds.length && authorTeamIds.length
+        ? await db
+            .select({
+              projectId: projectTeams.projectId,
+              teamId: projectTeams.teamId,
+              // Líder del equipo PARA ESTE PROYECTO — distinto del líder
+              // orgánico del equipo (`teams.leaderUserId`); un mismo equipo
+              // puede tener un líder distinto por proyecto (ver
+              // `ProjectTeamRepository`/`UpsertProjectTeamInput.leaderUserId`).
+              projectTeamLeaderUserId: projectTeams.leaderUserId,
+            })
+            .from(projectTeams)
+            .where(and(inArray(projectTeams.projectId, projectIds), inArray(projectTeams.teamId, authorTeamIds)))
+        : [];
+    const assignedProjectTeamLeaderId = new Map(
+      assignedProjectTeamRows.map((row) => [`${row.projectId}:${row.teamId}`, row.projectTeamLeaderUserId]),
+    );
+
+    // Líder del proyecto + líder del propio equipo del autor, si ese equipo
+    // está asignado al proyecto (DECISION-M4-HORAS.md "Con proyecto", acotado
+    // por autor — ver nota arriba). El líder del equipo se toma primero desde
+    // el override por-proyecto y, si no hay, desde el líder orgánico.
+    const projectApproverIdsByEntryId = new Map<string, Set<string>>();
+    for (const row of rows) {
+      if (!row.projectId) continue;
+      const set = new Set<string>();
+      if (row.projectLeaderUserId) set.add(row.projectLeaderUserId);
+      const authorTeam = teamByUserId.get(row.userId);
+      if (authorTeam) {
+        const pairKey = `${row.projectId}:${authorTeam.id}`;
+        if (assignedProjectTeamLeaderId.has(pairKey)) {
+          const effectiveLeaderId = assignedProjectTeamLeaderId.get(pairKey) ?? authorTeam.leaderUserId;
+          if (effectiveLeaderId) set.add(effectiveLeaderId);
+        }
+      }
+      if (set.size > 0) projectApproverIdsByEntryId.set(row.id, set);
+    }
+
     const approverIds = [
       ...new Set(
         rows
           .flatMap((row) => [row.designatedApproverUserId, row.decisionUserId])
+          .concat([...projectApproverIdsByEntryId.values()].flatMap((set) => [...set]))
           .filter((id): id is string => Boolean(id)),
       ),
     ];
@@ -108,17 +170,12 @@ export class DrizzleHourEntryRepository implements HourEntryRepository {
           .where(inArray(users.id, approverIds))
       : [];
     const approverNameById = new Map(approverNames.map((a) => [a.id, `${a.firstName} ${a.lastName ?? ''}`.trim()]));
-
-    const authorIds = [...new Set(rows.map((row) => row.userId))];
-    const teamRows = authorIds.length
-      ? await db
-          .select({ userId: teamMembers.userId, teamId: teams.id, teamName: teams.name })
-          .from(teamMembers)
-          .innerJoin(teams, eq(teams.id, teamMembers.teamId))
-          .where(and(inArray(teamMembers.userId, authorIds), isNull(teamMembers.leftAt)))
-      : [];
-    // Una persona podría (raro) tener más de una membresía activa; se muestra la primera.
-    const teamByUserId = new Map(teamRows.map((row) => [row.userId, { id: row.teamId, name: row.teamName }]));
+    const projectApproversByEntryId = new Map(
+      [...projectApproverIdsByEntryId.entries()].map(([entryId, ids]) => [
+        entryId,
+        [...ids].map((id) => ({ id, fullName: approverNameById.get(id) ?? '' })),
+      ]),
+    );
 
     const items: HourEntryListItem[] = rows.map((row) => ({
       id: row.id,
@@ -138,6 +195,7 @@ export class DrizzleHourEntryRepository implements HourEntryRepository {
       rejectionReason: row.rejectionReason,
       designatedApproverUserId: row.designatedApproverUserId,
       designatedApproverFullName: row.designatedApproverUserId ? (approverNameById.get(row.designatedApproverUserId) ?? null) : null,
+      projectApprovers: projectApproversByEntryId.get(row.id) ?? [],
       createdAt: row.createdAt,
       decisionUserId: row.decisionUserId,
       decisionByFullName: row.decisionUserId ? (approverNameById.get(row.decisionUserId) ?? null) : null,

@@ -15,7 +15,6 @@ import { Button } from '@/shared/components/ui/Button';
 import { Card } from '@/shared/components/ui/Card';
 import { Combobox } from '@/shared/components/ui/Combobox';
 import { TextField } from '@/shared/components/ui/TextField';
-import { DataTable, type Column } from '@/shared/components/ui/DataTable';
 import { useToast } from '@/shared/components/ui/Toast';
 import { TrashIcon } from '@/shared/components/icons/Icons';
 import { ProjectInfoBar, type ProjectDocument } from '../components/ProjectInfoBar';
@@ -23,7 +22,7 @@ import { ProjectTimeline } from '../components/ProjectTimeline';
 import { TeamHoursSummaryChart } from '../components/TeamHoursSummaryChart';
 import { BitacoraCard } from '../components/BitacoraCard';
 import { useAssignProjectMember, useUnassignProjectMember, useAddProjectObservation } from '../api/projects.queries';
-import { useTeamMemberOptions } from '@/modules/teams/api/teams.queries';
+import { useTeamMemberOptions, useTeamsList } from '@/modules/teams/api/teams.queries';
 import { useHourEntriesList } from '@/modules/hours/api/hours.queries';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
@@ -67,6 +66,7 @@ export function DevelopmentProjectDetailView({ project, projectId }: { project: 
   const addObservation = useAddProjectObservation();
   const { data: projectHourEntries } = useHourEntriesList({ projectId, page: 1, pageSize: 20, sortField: 'date', sortDirection: 'desc' });
   const { data: teamMemberOptions } = useTeamMemberOptions();
+  const { data: teamsCatalog } = useTeamsList({ page: 1, pageSize: 50, sortField: 'name' });
 
   const [memberError, setMemberError] = useState<string | null>(null);
 
@@ -89,7 +89,20 @@ export function DevelopmentProjectDetailView({ project, projectId }: { project: 
    * viniendo de los miembros, porque `project_teams` no lo guarda. Un
    * proyecto sin fila en `project_teams` (no todos la tienen) cae al cálculo
    * derivado de siempre, para no perder el equipo de vista.
+   *
+   * `leaderName` puede venir vacío de `project_teams` (nunca se eligió un
+   * líder específico para ESTE proyecto): en ese caso se usa el líder del
+   * equipo en general (catálogo de equipos), para no mostrar "Sin líder
+   * asignado" cuando el equipo sí tiene uno.
    */
+  const teamLeaderCatalog = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const team of teamsCatalog?.items ?? []) {
+      if (team.leader) map.set(team.id, team.leader.fullName);
+    }
+    return map;
+  }, [teamsCatalog]);
+
   const teamSummaries = useMemo(() => {
     const summaries = new Map<
       string,
@@ -101,7 +114,7 @@ export function DevelopmentProjectDetailView({ project, projectId }: { project: 
       summaries.set(team.teamId, {
         teamId: team.teamId,
         teamName: team.teamName,
-        leaderName: team.leader?.fullName ?? null,
+        leaderName: team.leader?.fullName ?? teamLeaderCatalog.get(team.teamId) ?? null,
         memberCount: team.memberCount,
         assignedHours: team.assignedHours ?? 0,
         consumedHours: 0,
@@ -120,7 +133,7 @@ export function DevelopmentProjectDetailView({ project, projectId }: { project: 
         summaries.set(member.teamId, {
           teamId: member.teamId,
           teamName: member.teamName,
-          leaderName: null,
+          leaderName: teamLeaderCatalog.get(member.teamId) ?? null,
           memberCount: 1,
           assignedHours: member.assignedHours,
           consumedHours: member.consumedHours,
@@ -129,7 +142,7 @@ export function DevelopmentProjectDetailView({ project, projectId }: { project: 
     }
 
     return [...summaries.values()];
-  }, [project]);
+  }, [project, teamLeaderCatalog]);
 
   const remainingHours = project.soldHours - project.usedHours;
 
@@ -177,25 +190,16 @@ export function DevelopmentProjectDetailView({ project, projectId }: { project: 
     observationForm.reset({ message: '' });
   });
 
-  const memberColumns: Column<ProjectTeamMember>[] = [
-    { key: 'fullName', header: 'Persona', render: (m) => m.fullName },
-    { key: 'team', header: 'Equipo', render: (m) => m.teamName },
-    { key: 'activity', header: 'Actividad', render: (m) => m.activity ?? '—' },
-    { key: 'assignedHours', header: 'HH asignadas', render: (m) => formatHours(m.assignedHours) },
-    { key: 'consumedHours', header: 'HH consumidas', render: (m) => formatHours(m.consumedHours) },
-    {
-      key: 'actions',
-      header: '',
-      align: 'right',
-      width: '50px',
-      render: (m) =>
-        can('projects:manage') ? (
-          <Button variant="ghost" size="icon" onClick={() => void onUnassign(m.id)} aria-label={`Quitar a ${m.fullName}`}>
-            <TrashIcon size={16} />
-          </Button>
-        ) : null,
-    },
-  ];
+  const membersByTeam = useMemo(() => {
+    const map = new Map<string, ProjectTeamMember[]>();
+    for (const member of project.members) {
+      const list = map.get(member.teamId);
+      if (list) list.push(member);
+      else map.set(member.teamId, [member]);
+    }
+    return map;
+  }, [project.members]);
+
 
   return (
     <div className={styles.layout}>
@@ -260,51 +264,82 @@ export function DevelopmentProjectDetailView({ project, projectId }: { project: 
             <p className={styles.sectionTitle}>Equipo asignado ({project.members.length})</p>
           </div>
 
-          {teamSummaries.length > 0 && (
-            <div className={styles.teamGrid} style={{ marginBottom: 'var(--kora-space-4)' }}>
-              {teamSummaries.map((team) => {
-                const style = getTeamStyle(team.teamName);
-                const deviatedHours = Math.max(0, team.consumedHours - team.assignedHours);
-                return (
-                  <div key={team.teamId} className={styles.teamCard} style={{ background: style.bg, borderColor: style.color }}>
-                    <div className={styles.teamHeader}>
-                      <span className={styles.teamAvatar} style={{ background: style.color }}>
-                        {style.sigla}
-                      </span>
-                      <div style={{ minWidth: 0 }}>
-                        <p className={styles.teamName}>{team.teamName}</p>
-                        <p className={styles.teamMemberCount}>
-                          {team.memberCount} persona{team.memberCount === 1 ? '' : 's'}
-                        </p>
-                        {team.leaderName && <p className={styles.teamLeader}>Líder: {team.leaderName}</p>}
-                      </div>
-                    </div>
-                    <div className={styles.teamStats}>
-                      <span>
-                        Asignadas: <span className={styles.teamStatValue}>{formatHours(team.assignedHours)}h</span>
-                      </span>
-                      <span>
-                        Consumidas: <span className={styles.teamStatValue}>{formatHours(team.consumedHours)}h</span>
-                      </span>
-                    </div>
-                    <p className={deviatedHours > 0 ? styles.teamHealthDanger : styles.teamHealthOk}>
-                      {deviatedHours > 0 ? `Desviación: ${formatHours(deviatedHours)} hrs` : 'En rango'}
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          {teamSummaries.length > 0 ? (
+            <div className={styles.groupedTableWrap}>
+              <table className={styles.groupedTable}>
+                <caption className="srOnly">Personas asignadas, agrupadas por equipo</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Persona</th>
+                    <th scope="col">Actividad</th>
+                    <th scope="col">HH asignadas</th>
+                    <th scope="col">HH consumidas</th>
+                    <th scope="col" aria-label="Acciones" />
+                  </tr>
+                </thead>
+                {teamSummaries.map((team) => {
+                  const style = getTeamStyle(team.teamName);
+                  const deviatedHours = Math.max(0, team.consumedHours - team.assignedHours);
+                  const members = membersByTeam.get(team.teamId) ?? [];
+                  return (
+                    <tbody key={team.teamId}>
+                      <tr className={styles.groupRow} style={{ background: style.bg }}>
+                        <td colSpan={5}>
+                          <div className={styles.groupRowContent}>
+                            <span className={styles.groupAvatar} style={{ background: style.color }}>
+                              {style.sigla}
+                            </span>
+                            <span className={styles.groupName}>{team.teamName}</span>
+                            <span className={styles.groupLeader}>
+                              {team.leaderName ? <>Líder: <b>{team.leaderName}</b></> : 'Sin líder asignado'}
+                            </span>
+                            <span className={styles.groupStats}>
+                              {team.memberCount} persona{team.memberCount === 1 ? '' : 's'} · {formatHours(team.assignedHours)}h asig. ·{' '}
+                              {formatHours(team.consumedHours)}h cons. ·{' '}
+                              <span className={deviatedHours > 0 ? styles.teamHealthDanger : styles.teamHealthOk}>
+                                {deviatedHours > 0 ? `${formatHours(deviatedHours)}h desv.` : 'en rango'}
+                              </span>
+                            </span>
+                          </div>
+                        </td>
+                      </tr>
 
-          <DataTable
-            caption="Miembros asignados al proyecto"
-            columns={memberColumns}
-            items={project.members}
-            getRowKey={(m) => m.id}
-            loading={false}
-            error={null}
-            emptyMessage="Nadie está asignado a este proyecto todavía."
-          />
+                      {members.length > 0 ? (
+                        members.map((m) => (
+                          <tr key={m.id} className={styles.memberRow}>
+                            <td>{m.fullName}</td>
+                            <td className={styles.memberCellMuted}>{m.activity ?? '—'}</td>
+                            <td>{formatHours(m.assignedHours)}</td>
+                            <td>{formatHours(m.consumedHours)}</td>
+                            <td className={styles.memberCellActions}>
+                              {can('projects:manage') && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => void onUnassign(m.id)}
+                                  aria-label={`Quitar a ${m.fullName}`}
+                                >
+                                  <TrashIcon size={16} />
+                                </Button>
+                              )}
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={5} className={styles.emptyGroupCell}>
+                            Sin colaboradores asignados en este equipo.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  );
+                })}
+              </table>
+            </div>
+          ) : (
+            <p className={styles.empty}>Nadie está asignado a este proyecto todavía.</p>
+          )}
 
           {can('projects:manage') && (
             <form className={styles.inlineForm} onSubmit={onAssignMember}>

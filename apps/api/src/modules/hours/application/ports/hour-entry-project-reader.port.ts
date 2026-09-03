@@ -6,11 +6,18 @@ export interface HourEntryProjectReference {
   readonly status: ProjectStatus;
 }
 
+export interface HourEntryProjectApprover {
+  readonly id: string;
+  readonly fullName: string;
+}
+
 export interface HourEntryProjectReader {
   findById(projectId: string): Promise<HourEntryProjectReference | null>;
   findManyByIds(projectIds: readonly string[]): Promise<HourEntryProjectReference[]>;
-  /** ¿Es líder del proyecto o líder de algún equipo asignado a él? */
-  isProjectApprover(projectId: string, userId: string): Promise<boolean>;
+  /** ¿Es líder del proyecto, o líder del equipo (asignado al proyecto) del que `memberUserId` es miembro activo? */
+  isProjectApprover(projectId: string, actorUserId: string, memberUserId: string): Promise<boolean>;
+  /** Líder del proyecto + líder del equipo del propio autor — mismo criterio que `isProjectApprover`, pero enumerado. */
+  findApprovers(projectId: string, memberUserId: string): Promise<HourEntryProjectApprover[]>;
 }
 
 export const HOUR_ENTRY_PROJECT_READER = Symbol('HourEntryProjectReader');

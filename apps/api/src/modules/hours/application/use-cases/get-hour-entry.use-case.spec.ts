@@ -63,6 +63,9 @@ class FakeProjectReader implements HourEntryProjectReader {
   async isProjectApprover(): Promise<boolean> {
     return false;
   }
+  async findApprovers(): Promise<never[]> {
+    return [];
+  }
 }
 
 class FakeTeamReader implements HourEntryTeamReader {

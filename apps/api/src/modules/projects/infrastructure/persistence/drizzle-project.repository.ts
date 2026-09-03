@@ -216,6 +216,80 @@ export class DrizzleProjectRepository implements ProjectRepository {
     return rows.length > 0;
   }
 
+  async isProjectLeaderOrTeamLeaderOfMember(
+    projectId: string,
+    actorUserId: string,
+    memberUserId: string,
+    context?: TransactionContext,
+  ): Promise<boolean> {
+    const db = resolveDb(this.database, context);
+    const rows = await db
+      .select({ id: projects.id })
+      .from(projects)
+      .where(
+        and(
+          eq(projects.id, projectId),
+          or(
+            eq(projects.leaderUserId, actorUserId),
+            exists(
+              db
+                .select({ id: projectTeams.id })
+                .from(projectTeams)
+                .innerJoin(teams, eq(teams.id, projectTeams.teamId))
+                .innerJoin(
+                  teamMembers,
+                  and(eq(teamMembers.teamId, teams.id), eq(teamMembers.userId, memberUserId), isNull(teamMembers.leftAt)),
+                )
+                .where(
+                  and(
+                    eq(projectTeams.projectId, projectId),
+                    // Líder del equipo PARA ESTE PROYECTO (override), con
+                    // el líder orgánico del equipo como respaldo — un mismo
+                    // equipo puede tener un líder distinto por proyecto (ver
+                    // `ProjectTeamRepository`/`UpsertProjectTeamInput.leaderUserId`).
+                    sql`coalesce(${projectTeams.leaderUserId}, ${teams.leaderUserId}) = ${actorUserId}`,
+                  ),
+                ),
+            ),
+          ),
+        ),
+      )
+      .limit(1);
+    return rows.length > 0;
+  }
+
+  async findApproverCandidatesForMember(
+    projectId: string,
+    memberUserId: string,
+    context?: TransactionContext,
+  ): Promise<{ id: string; fullName: string }[]> {
+    const db = resolveDb(this.database, context);
+    const rows = await db
+      .select({ id: users.id, firstName: users.firstName, lastName: users.lastName })
+      .from(projects)
+      .leftJoin(users, eq(users.id, projects.leaderUserId))
+      .where(eq(projects.id, projectId))
+      .unionAll(
+        db
+          .select({ id: users.id, firstName: users.firstName, lastName: users.lastName })
+          .from(projectTeams)
+          .innerJoin(teams, eq(teams.id, projectTeams.teamId))
+          .innerJoin(users, sql`${users.id} = coalesce(${projectTeams.leaderUserId}, ${teams.leaderUserId})`)
+          .innerJoin(
+            teamMembers,
+            and(eq(teamMembers.teamId, teams.id), eq(teamMembers.userId, memberUserId), isNull(teamMembers.leftAt)),
+          )
+          .where(eq(projectTeams.projectId, projectId)),
+      );
+
+    const byId = new Map<string, { id: string; fullName: string }>();
+    for (const row of rows) {
+      if (!row.id) continue;
+      byId.set(row.id, { id: row.id, fullName: `${row.firstName ?? ''} ${row.lastName ?? ''}`.trim() });
+    }
+    return [...byId.values()];
+  }
+
   private buildWhere(filters: ProjectFilters) {
     const conditions = [];
     if (!filters.includeDeleted) conditions.push(isNull(projects.deletedAt));

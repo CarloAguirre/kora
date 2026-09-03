@@ -1,6 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { PROJECT_REPOSITORY, type ProjectRepository } from '../../../projects/domain/repositories/project.repository';
-import type { HourEntryProjectReader, HourEntryProjectReference } from '../../application/ports/hour-entry-project-reader.port';
+import type {
+  HourEntryProjectApprover,
+  HourEntryProjectReader,
+  HourEntryProjectReference,
+} from '../../application/ports/hour-entry-project-reader.port';
 
 @Injectable()
 export class ProjectsModuleHourEntryProjectReader implements HourEntryProjectReader {
@@ -17,7 +21,11 @@ export class ProjectsModuleHourEntryProjectReader implements HourEntryProjectRea
     return results.filter((project): project is HourEntryProjectReference => project !== null);
   }
 
-  isProjectApprover(projectId: string, userId: string): Promise<boolean> {
-    return this.projects.isProjectLeaderOrTeamLeader(projectId, userId);
+  isProjectApprover(projectId: string, actorUserId: string, memberUserId: string): Promise<boolean> {
+    return this.projects.isProjectLeaderOrTeamLeaderOfMember(projectId, actorUserId, memberUserId);
+  }
+
+  findApprovers(projectId: string, memberUserId: string): Promise<HourEntryProjectApprover[]> {
+    return this.projects.findApproverCandidatesForMember(projectId, memberUserId);
   }
 }

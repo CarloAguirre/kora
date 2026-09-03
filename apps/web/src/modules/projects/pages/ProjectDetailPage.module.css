@@ -17,6 +17,13 @@
   align-self: flex-start;
 }
 
+.topRowActions {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-3);
+  flex-wrap: wrap;
+}
+
 .statusControl {
   min-width: 220px;
 }
@@ -95,87 +102,109 @@
   margin-bottom: var(--kora-space-3);
 }
 
-/* ─── Equipos asignados ─── */
-.teamGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: var(--kora-space-3);
+/* ─── Equipos asignados: tabla única agrupada por equipo ─── */
+.groupedTableWrap {
+  width: 100%;
+  overflow-x: auto;
 }
 
-.teamCard {
-  display: flex;
-  flex-direction: column;
-  gap: var(--kora-space-2);
-  padding: var(--kora-space-3);
-  border: 1px solid var(--kora-surface-disabled);
-  border-radius: var(--kora-radius);
-  background: var(--kora-surface-alt);
+.groupedTable {
+  width: 100%;
+  min-width: 640px;
+  border-collapse: collapse;
+  font-family: var(--kora-font);
 }
 
-.teamHeader {
+.groupedTable thead th {
+  padding: var(--kora-space-2) var(--kora-space-3);
+  border-top: 1px solid var(--kora-border-strong);
+  border-bottom: 1px solid var(--kora-border-strong);
+  background: var(--kora-lime-surface);
+  text-align: left;
+  white-space: nowrap;
+  color: var(--kora-navy);
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-bold);
+}
+
+.groupRow td {
+  padding: 0;
+  border-top: var(--kora-space-2) solid var(--kora-surface);
+}
+
+.groupRowContent {
   display: flex;
   align-items: center;
   gap: var(--kora-space-2);
+  padding: 6px var(--kora-space-3);
 }
 
-.teamAvatar {
+.groupAvatar {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 22px;
+  height: 22px;
   border-radius: var(--kora-radius-sm);
-  background: var(--kora-blue-700);
   color: var(--kora-surface);
-  font-size: var(--kora-text-xs);
+  font-size: 9px;
   font-weight: var(--kora-weight-bold);
   flex-shrink: 0;
 }
 
-.teamName {
+.groupName {
   font-size: var(--kora-text-sm);
   font-weight: var(--kora-weight-bold);
   color: var(--kora-navy);
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.teamMemberCount {
+.groupLeader {
   font-size: var(--kora-text-xs);
   color: var(--kora-text-muted);
-}
-
-.teamLeader {
-  font-size: var(--kora-text-xs);
-  color: var(--kora-text-muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.teamStats {
-  display: flex;
-  justify-content: space-between;
+.groupStats {
+  margin-left: auto;
   font-size: var(--kora-text-xs);
   color: var(--kora-text-muted);
+  white-space: nowrap;
+}
+
+.memberRow td {
+  padding: 6px var(--kora-space-3);
+  font-size: var(--kora-text-sm);
+  color: var(--kora-text);
+  border-bottom: 1px solid var(--kora-surface-disabled);
+  vertical-align: middle;
+}
+
+.memberCellMuted {
+  color: var(--kora-text-muted);
+}
+
+.memberCellActions {
+  text-align: right;
+  width: 40px;
+}
+
+.emptyGroupCell {
+  padding: var(--kora-space-2) var(--kora-space-3);
+  font-size: var(--kora-text-sm);
+  font-style: italic;
+  color: var(--kora-text-disabled);
+  border-bottom: 1px solid var(--kora-surface-disabled);
 }
 
 .teamHealthOk {
-  font-size: var(--kora-text-xs);
   font-weight: var(--kora-weight-semibold);
   color: var(--kora-success);
 }
 
 .teamHealthDanger {
-  font-size: var(--kora-text-xs);
   font-weight: var(--kora-weight-semibold);
   color: var(--kora-danger);
-}
-
-.teamStatValue {
-  color: var(--kora-navy);
-  font-weight: var(--kora-weight-semibold);
 }
 
 /* ─── Formularios inline ─── */

@@ -23,6 +23,8 @@ export interface ModalProps {
   wide?: boolean;
   /** Impide cerrar con Escape o clic fuera; para operaciones en curso. */
   dismissible?: boolean;
+  /** Contenido adicional junto al botón de cierre, p. ej. un contador de horas. */
+  headerExtra?: ReactNode;
 }
 
 export function Modal({
@@ -34,6 +36,7 @@ export function Modal({
   footer,
   wide = false,
   dismissible = true,
+  headerExtra,
 }: ModalProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   // Único por instancia: dos diálogos (uno abierto, otro cerrado) coexisten
@@ -90,11 +93,14 @@ export function Modal({
           {description && <p className={styles.description}>{description}</p>}
         </div>
 
-        {dismissible && (
-          <button type="button" className={styles.close} onClick={onClose} aria-label="Cerrar">
-            <CloseIcon size={18} />
-          </button>
-        )}
+        <div className={styles.headerActions}>
+          {headerExtra}
+          {dismissible && (
+            <button type="button" className={styles.close} onClick={onClose} aria-label="Cerrar">
+              <CloseIcon size={18} />
+            </button>
+          )}
+        </div>
       </header>
 
       <div className={styles.body}>{children}</div>

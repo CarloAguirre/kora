@@ -51,6 +51,14 @@ export const hourEntrySummarySchema = z.object({
   status: hourEntryStatusSchema,
   rejectionReason: z.string().nullable(),
   designatedApprover: z.object({ id: uuidSchema, fullName: z.string() }).nullable(),
+  /**
+   * Quiénes pueden aprobar este registro cuando es de proyecto: el líder del
+   * proyecto y/o el líder del propio equipo del autor, si ese equipo está
+   * asignado al proyecto (ver DECISION-M4-HORAS.md "Con proyecto" — acotado
+   * al equipo del autor, no cualquier equipo asignado al proyecto). Vacío
+   * para registros sin proyecto — ahí el aprobador es `designatedApprover`.
+   */
+  projectApprovers: z.array(z.object({ id: uuidSchema, fullName: z.string() })),
   createdAt: isoDateTimeSchema,
 });
 export type HourEntrySummary = z.infer<typeof hourEntrySummarySchema>;

@@ -85,6 +85,28 @@ export interface ProjectRepository {
 
   /** ¿Lidera el proyecto, o lidera algún equipo asignado a él? Satisface la autoridad de aprobación de M4. */
   isProjectLeaderOrTeamLeader(projectId: string, userId: string, context?: TransactionContext): Promise<boolean>;
+
+  /**
+   * ¿Lidera el proyecto, o lidera el equipo (asignado al proyecto) del que
+   * `memberUserId` es miembro activo? A diferencia de `isProjectLeaderOrTeamLeader`
+   * (¿puede actuar sobre el proyecto en general? — usado por Tickets), esto
+   * acota la aprobación de horas al propio equipo del autor del registro: el
+   * líder de OTRO equipo también asignado al mismo proyecto no debería recibir
+   * a aprobar horas de alguien que no lidera.
+   */
+  isProjectLeaderOrTeamLeaderOfMember(
+    projectId: string,
+    actorUserId: string,
+    memberUserId: string,
+    context?: TransactionContext,
+  ): Promise<boolean>;
+
+  /** Mismo criterio que `isProjectLeaderOrTeamLeaderOfMember`, pero enumerado — alimenta la columna "Aprobador" del historial de horas. */
+  findApproverCandidatesForMember(
+    projectId: string,
+    memberUserId: string,
+    context?: TransactionContext,
+  ): Promise<{ id: string; fullName: string }[]>;
 }
 
 export const PROJECT_REPOSITORY = Symbol('ProjectRepository');

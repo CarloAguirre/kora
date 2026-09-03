@@ -52,6 +52,7 @@ export interface HourEntryFormDialogProps {
  */
 export function HourEntryFormDialog({ open, entry, onClose, onSuccess, readOnly = false }: HourEntryFormDialogProps) {
   const [tab, setTab] = useState<'diario' | 'semanal'>('diario');
+  const [total, setTotal] = useState(0);
 
   useEffect(() => {
     if (open) setTab('diario');
@@ -74,14 +75,22 @@ export function HourEntryFormDialog({ open, entry, onClose, onSuccess, readOnly 
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Registrar horas" wide>
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Registrar horas"
+      wide
+      headerExtra={
+        <span className={styles.headerTotal}>Total: {total.toLocaleString('es-CL', { maximumFractionDigits: 1 })}h</span>
+      }
+    >
       <div className={styles.tabsRow}>
         <Tabs tabs={NEW_ENTRY_TABS} activeId={tab} onSelect={(id) => setTab(id as 'diario' | 'semanal')} />
       </div>
       {tab === 'diario' ? (
-        <DailyEntryForm onClose={onClose} onSuccess={onSuccess} />
+        <DailyEntryForm onClose={onClose} onSuccess={onSuccess} onTotalChange={setTotal} />
       ) : (
-        <WeeklyEntryForm onClose={onClose} onSuccess={onSuccess} />
+        <WeeklyEntryForm onClose={onClose} onSuccess={onSuccess} onTotalChange={setTotal} />
       )}
     </Modal>
   );

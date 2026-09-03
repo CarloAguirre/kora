@@ -37,6 +37,8 @@ export interface HourEntryListItem {
   readonly rejectionReason: string | null;
   readonly designatedApproverUserId: string | null;
   readonly designatedApproverFullName: string | null;
+  /** Líder del proyecto + líder del equipo del propio autor (si está asignado al proyecto), cuando `projectId` no es null. */
+  readonly projectApprovers: readonly { id: string; fullName: string }[];
   readonly createdAt: Date;
   /** Quién aprobó/rechazó el registro — alimenta el reporte de Capacity ("Responsable"). */
   readonly decisionUserId: string | null;

@@ -45,14 +45,15 @@ export class GetHourEntryUseCase implements UseCase<GetHourEntryCommand, HourEnt
       }
     }
 
-    const [owner, project, designatedApprover, decisionBy, team] = await Promise.all([
+    const [owner, project, designatedApprover, decisionBy, team, projectApprovers] = await Promise.all([
       this.users.findById(snapshot.userId),
       snapshot.projectId ? this.projects.findById(snapshot.projectId) : Promise.resolve(null),
       snapshot.designatedApproverUserId ? this.users.findById(snapshot.designatedApproverUserId) : Promise.resolve(null),
       snapshot.decisionUserId ? this.users.findById(snapshot.decisionUserId) : Promise.resolve(null),
       this.teams.findTeamForUser(snapshot.userId),
+      snapshot.projectId ? this.projects.findApprovers(snapshot.projectId, snapshot.userId) : Promise.resolve([]),
     ]);
 
-    return ok(toHourEntryDetail({ entry, owner, project, designatedApprover, decisionBy, team }));
+    return ok(toHourEntryDetail({ entry, owner, project, designatedApprover, decisionBy, team, projectApprovers }));
   }
 }

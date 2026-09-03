@@ -48,6 +48,16 @@
   margin-bottom: var(--kora-space-4);
 }
 
+.headerTotal {
+  padding: var(--kora-space-1) var(--kora-space-3);
+  border-radius: var(--kora-radius-pill);
+  background: var(--kora-surface-muted);
+  color: var(--kora-navy);
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-medium);
+  white-space: nowrap;
+}
+
 .noticeInfo,
 .noticeWarning {
   display: flex;

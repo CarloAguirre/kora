@@ -1,14 +1,16 @@
+import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { PROJECT_STATUS_LABELS, PROJECT_STATUSES, type ProjectStatus } from '@kora/contracts';
 import styles from './ProjectDetailPage.module.css';
 import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Button } from '@/shared/components/ui/Button';
 import { Select } from '@/shared/components/ui/Select';
-import { ChevronLeftIcon } from '@/shared/components/icons/Icons';
+import { ChevronLeftIcon, PencilIcon } from '@/shared/components/icons/Icons';
 import { useToast } from '@/shared/components/ui/Toast';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { ApiRequestError } from '@/shared/lib/api-client';
 import { useChangeProjectStatus, useProjectDetail } from '../api/projects.queries';
+import { EditProjectDialog } from '../components/EditProjectDialog';
 import { DevelopmentProjectDetailView } from './DevelopmentProjectDetailView';
 import { SupportProjectDetailView } from './SupportProjectDetailView';
 
@@ -28,6 +30,7 @@ export function ProjectDetailPage() {
   const toast = useToast();
   const changeStatus = useChangeProjectStatus();
   const { data: project, isLoading, error } = useProjectDetail(projectId ?? null);
+  const [editing, setEditing] = useState(false);
 
   const onStatusChange = async (status: ProjectStatus) => {
     if (!projectId) return;
@@ -65,15 +68,23 @@ export function ProjectDetailPage() {
             <ChevronLeftIcon size={16} /> Volver a proyectos
           </Button>
 
-          {project.type !== 'support' && can('projects:manage') && (
-            <Select
-              className={styles.statusControl}
-              label="Cambiar estado"
-              options={STATUS_OPTIONS}
-              value={project.status}
-              onChange={(event) => void onStatusChange(event.target.value as ProjectStatus)}
-            />
-          )}
+          <div className={styles.topRowActions}>
+            {can('projects:manage') && (
+              <Button variant="outline" size="sm" iconLeft={<PencilIcon size={16} />} onClick={() => setEditing(true)}>
+                Editar proyecto
+              </Button>
+            )}
+
+            {project.type !== 'support' && can('projects:manage') && (
+              <Select
+                className={styles.statusControl}
+                label="Cambiar estado"
+                options={STATUS_OPTIONS}
+                value={project.status}
+                onChange={(event) => void onStatusChange(event.target.value as ProjectStatus)}
+              />
+            )}
+          </div>
         </div>
 
         {project.type === 'support' ? (
@@ -81,6 +92,13 @@ export function ProjectDetailPage() {
         ) : (
           <DevelopmentProjectDetailView project={project} projectId={projectId} />
         )}
+
+        <EditProjectDialog
+          open={editing}
+          project={project}
+          onClose={() => setEditing(false)}
+          onSuccess={(message) => toast.success(message)}
+        />
       </div>
     </DashboardLayout>
   );

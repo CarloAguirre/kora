@@ -8,6 +8,7 @@ import {
 import styles from './MyActivityPanel.module.css';
 import { Card } from '@/shared/components/ui/Card';
 import { AlertIcon, CheckIcon, CalendarIcon } from '@/shared/components/icons/Icons';
+import { RecentHistoryCard } from './RecentHistoryCard';
 
 const DAILY_TARGET_HOURS = 8;
 const PROJECT_COLORS = ['#EE7E23', '#57769B', '#4FAE32', '#C50000', '#19738C'];
@@ -48,6 +49,8 @@ interface MyActivityPanelProps {
   myActiveProjects: readonly DashboardMyActiveProject[];
   planning: DashboardMyPlanning | null;
   loading: boolean;
+  weekStart: string | undefined;
+  onWeekStartChange: (weekStart: string) => void;
 }
 
 /**
@@ -64,7 +67,7 @@ interface MyActivityPanelProps {
  * no exigirle a `collaborator` un permiso de forecast propio ni construir un
  * endpoint nuevo que exponga horas registradas de otras personas.
  */
-export function MyActivityPanel({ hours, myActiveProjects, planning, loading }: MyActivityPanelProps) {
+export function MyActivityPanel({ hours, myActiveProjects, planning, loading, weekStart, onWeekStartChange }: MyActivityPanelProps) {
   const todayHours = hours?.todayHours ?? 0;
   const weekHours = hours?.weekHours ?? 0;
   const weekTargetHours = hours?.weekTargetHours ?? 40;
@@ -222,6 +225,8 @@ export function MyActivityPanel({ hours, myActiveProjects, planning, loading }: 
           </div>
         )}
       </Card>
+
+      <RecentHistoryCard weekStart={weekStart} onWeekStartChange={onWeekStartChange} />
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   HOUR_ENTRY_ASSIGNMENTS,
   PROJECT_REQUIRING_ASSIGNMENTS,
@@ -60,7 +60,16 @@ const createEmptyBlock = (): DailyBlock => ({
  * la deja auto-marcar todavía ("Horas extra authorization ... placeholder,
  * always false for now"), pendiente de un flujo de autorización del líder.
  */
-export function DailyEntryForm({ onClose, onSuccess }: { onClose: () => void; onSuccess: (message: string) => void }) {
+export function DailyEntryForm({
+  onClose,
+  onSuccess,
+  onTotalChange,
+}: {
+  onClose: () => void;
+  onSuccess: (message: string) => void;
+  /** Notifica al diálogo contenedor el total de horas del día (para el contador junto al cierre). */
+  onTotalChange?: (total: number) => void;
+}) {
   const { user } = useAuth();
   const createEntry = useCreateHourEntry();
   const { data: projects } = useProjectsList({ page: 1, pageSize: 200, sortField: 'name' });
@@ -110,6 +119,10 @@ export function DailyEntryForm({ onClose, onSuccess }: { onClose: () => void; on
 
   const dailyTotal = blocks.reduce((sum, block) => sum + (Number(block.hours) || 0), 0);
   const totalWithExisting = existingHoursForDate + dailyTotal;
+
+  useEffect(() => {
+    onTotalChange?.(totalWithExisting);
+  }, [totalWithExisting, onTotalChange]);
 
   const validateBlock = (block: DailyBlock): string | null => {
     if (!block.assignment) return 'Selecciona una asignación.';

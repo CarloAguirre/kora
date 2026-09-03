@@ -21,6 +21,7 @@ export function toHourEntrySummary(item: HourEntryListItem): HourEntrySummary {
     designatedApprover: item.designatedApproverUserId
       ? { id: item.designatedApproverUserId, fullName: item.designatedApproverFullName ?? '' }
       : null,
+    projectApprovers: item.projectApprovers.map((approver) => ({ id: approver.id, fullName: approver.fullName })),
     createdAt: item.createdAt.toISOString(),
   };
 }
@@ -32,6 +33,7 @@ export interface HourEntryDetailSource {
   readonly designatedApprover: HourEntryUserReference | null;
   readonly decisionBy: HourEntryUserReference | null;
   readonly team: { id: string; name: string } | null;
+  readonly projectApprovers: readonly { id: string; fullName: string }[];
 }
 
 export function toHourEntryDetail(source: HourEntryDetailSource): HourEntryDetail {
@@ -53,6 +55,7 @@ export function toHourEntryDetail(source: HourEntryDetailSource): HourEntryDetai
     designatedApprover: snapshot.designatedApproverUserId
       ? { id: snapshot.designatedApproverUserId, fullName: source.designatedApprover?.fullName ?? '' }
       : null,
+    projectApprovers: source.projectApprovers.map((approver) => ({ id: approver.id, fullName: approver.fullName })),
     projectStageAtEntry: snapshot.projectStageAtEntry,
     decisionBy: snapshot.decisionUserId ? { id: snapshot.decisionUserId, fullName: source.decisionBy?.fullName ?? '' } : null,
     decisionAt: snapshot.decisionAt?.toISOString() ?? null,
