@@ -26,7 +26,7 @@ import { StepTracker, type EtlContext } from '../lib/context';
  * clientes tiene un responsable sin usuario resoluble, y se informa.
  */
 
-interface LegacyContactRow {
+export interface LegacyContactRow {
   id_contacto: number;
   nombre_contacto: string;
   cargo_contacto: string | null;
@@ -142,18 +142,15 @@ export async function migrateClients(context: EtlContext): Promise<void> {
 
   context.report.add(tracker.toResult());
 
-  // Los 2 contactos que la v1 solo enlaza desde `proyecto` (no desde `cliente`)
-  // quedan pendientes: se migrarán cuando M3 (Proyectos) resuelva esa columna.
+  // Los contactos que la v1 solo enlaza desde `proyecto` (no desde `cliente`)
+  // los resuelve `migrateProjectPrimaryContacts` en `migrate-projects.ts` —
+  // este contador solo refleja lo que quedó pendiente en ESTA pasada.
   contactTracker.skipped = contactRows.length - contactTracker.read;
-  if (contactTracker.skipped > 0) {
-    contactTracker.warn(
-      `${contactTracker.skipped} contacto(s) solo enlazados desde proyecto; se migrarán con M3`,
-    );
-  }
   context.report.add(contactTracker.toResult());
 }
 
-async function upsertContact(
+/** Exportado: `migrate-projects.ts` la reutiliza para los 2 contactos que la v1 solo enlaza desde `proyecto`. */
+export async function upsertContact(
   context: EtlContext,
   clientId: string,
   legacy: LegacyContactRow,

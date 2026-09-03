@@ -146,6 +146,14 @@
   color: var(--kora-text-muted);
 }
 
+.teamLeader {
+  font-size: var(--kora-text-xs);
+  color: var(--kora-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .teamStats {
   display: flex;
   justify-content: space-between;

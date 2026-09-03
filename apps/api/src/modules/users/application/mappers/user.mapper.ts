@@ -64,6 +64,7 @@ export function toUserDetail(source: UserDetailSource): UserDetail {
     permissions: [...permissions],
     mustChangePassword: credentials?.mustChangePassword ?? false,
     emailVerifiedAt: credentials?.emailVerifiedAt?.toISOString() ?? null,
+    passwordUpdatedAt: credentials?.passwordUpdatedAt?.toISOString() ?? null,
     lockedUntil: credentials?.lockedUntil?.toISOString() ?? null,
     failedLoginAttempts: credentials?.failedAttempts ?? 0,
     legacyId: snapshot.legacyId,

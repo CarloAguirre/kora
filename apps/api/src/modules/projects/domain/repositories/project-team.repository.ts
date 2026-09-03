@@ -16,9 +16,21 @@ export interface UpsertProjectTeamInput {
   readonly assignedHours: number | null;
 }
 
+export interface ProjectTeamRecord {
+  readonly id: string;
+  readonly teamId: string;
+  readonly teamName: string;
+  readonly leaderUserId: string | null;
+  readonly leaderName: string | null;
+  readonly assignedHours: number | null;
+  /** Contado en vivo desde `project_team_members` — la v1 no traía este dato, así que el valor migrado siempre es nulo. */
+  readonly memberCount: number;
+}
+
 export interface ProjectTeamRepository {
   /** Crea o actualiza la fila de `(projectId, teamId)` — esa pareja es única. */
   save(input: UpsertProjectTeamInput, context?: TransactionContext): Promise<void>;
+  findByProject(projectId: string, context?: TransactionContext): Promise<ProjectTeamRecord[]>;
 }
 
 export const PROJECT_TEAM_REPOSITORY = Symbol('ProjectTeamRepository');

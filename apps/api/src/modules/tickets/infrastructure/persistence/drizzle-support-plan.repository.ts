@@ -33,6 +33,8 @@ export class DrizzleSupportPlanRepository implements SupportPlanRepository {
       startDate: row.startDate,
       endDate: row.endDate,
       contractedHours: Number(row.contractedHours),
+      planValueUf: Number(row.planValueUf),
+      extraHourValueUf: Number(row.extraHourValueUf),
     };
   }
 
@@ -49,6 +51,9 @@ export class DrizzleSupportPlanRepository implements SupportPlanRepository {
       consumedHoursPeriod: Number(row.consumedHoursPeriod),
       surplusHours: Number(row.surplusHours),
       status: row.status,
+      reusedBalanceHours: Number(row.reusedBalanceHours),
+      consumedHoursStart: Number(row.consumedHoursStart),
+      consumedHoursEnd: row.consumedHoursEnd !== null ? Number(row.consumedHoursEnd) : null,
     }));
   }
 }

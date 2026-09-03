@@ -22,6 +22,9 @@ export type SupportPlanHistoryPoint = z.infer<typeof supportPlanHistoryPointSche
 export const supportProjectSummarySchema = z.object({
   planType: supportPlanTypeSchema,
   contractedHours: z.number(),
+  /** Valor UF del plan y de la hora extra — v1: `valor_plan_uf`/`valor_hh_extra_uf` de `soporte_plan_contrato`. */
+  planValueUf: z.number(),
+  extraHourValueUf: z.number(),
   usedHours: z.number(),
   /** `null` para "a demanda" (sin tope). */
   availableHours: z.number().nullable(),

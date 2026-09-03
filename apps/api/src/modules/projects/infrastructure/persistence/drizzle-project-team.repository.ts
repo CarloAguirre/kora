@@ -1,7 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { projectTeams, type Database } from '@kora/db';
+import { and, eq, projectTeamMembers, projectTeams, sql, teams, users, type Database } from '@kora/db';
 import type { TransactionContext } from '@kora/core';
-import type { ProjectTeamRepository, UpsertProjectTeamInput } from '../../domain/repositories/project-team.repository';
+import type {
+  ProjectTeamRecord,
+  ProjectTeamRepository,
+  UpsertProjectTeamInput,
+} from '../../domain/repositories/project-team.repository';
 import { DATABASE } from '../../../../shared/infrastructure/database/database.module';
 import { resolveDb } from '../../../../shared/infrastructure/database/unit-of-work';
 
@@ -23,5 +27,42 @@ export class DrizzleProjectTeamRepository implements ProjectTeamRepository {
       .insert(projectTeams)
       .values(values)
       .onConflictDoUpdate({ target: [projectTeams.projectId, projectTeams.teamId], set: values });
+  }
+
+  async findByProject(projectId: string, context?: TransactionContext): Promise<ProjectTeamRecord[]> {
+    const db = resolveDb(this.database, context);
+    const rows = await db
+      .select({
+        id: projectTeams.id,
+        teamId: projectTeams.teamId,
+        teamName: teams.name,
+        leaderUserId: projectTeams.leaderUserId,
+        leaderFirstName: users.firstName,
+        leaderLastName: users.lastName,
+        assignedHours: projectTeams.assignedHours,
+        memberCount: sql<string>`count(${projectTeamMembers.id})`,
+      })
+      .from(projectTeams)
+      .innerJoin(teams, eq(teams.id, projectTeams.teamId))
+      .leftJoin(users, eq(users.id, projectTeams.leaderUserId))
+      .leftJoin(
+        projectTeamMembers,
+        and(
+          eq(projectTeamMembers.projectId, projectTeams.projectId),
+          eq(projectTeamMembers.teamId, projectTeams.teamId),
+        ),
+      )
+      .where(eq(projectTeams.projectId, projectId))
+      .groupBy(projectTeams.id, teams.name, users.firstName, users.lastName);
+
+    return rows.map((row) => ({
+      id: row.id,
+      teamId: row.teamId,
+      teamName: row.teamName,
+      leaderUserId: row.leaderUserId,
+      leaderName: row.leaderUserId ? `${row.leaderFirstName ?? ''} ${row.leaderLastName ?? ''}`.trim() : null,
+      assignedHours: row.assignedHours !== null ? Number(row.assignedHours) : null,
+      memberCount: Number(row.memberCount),
+    }));
   }
 }

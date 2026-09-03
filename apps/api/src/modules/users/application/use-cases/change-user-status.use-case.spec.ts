@@ -85,6 +85,7 @@ describe('ChangeUserStatusUseCase', () => {
       lockedUntil: new Date('2030-01-01'),
       lastLoginAt: null,
       emailVerifiedAt: null,
+      passwordUpdatedAt: null,
     });
 
     await useCase.execute({ userId: 'u1', data: { status: 'active' }, actor: ACTOR });

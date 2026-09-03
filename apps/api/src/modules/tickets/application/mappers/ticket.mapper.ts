@@ -59,6 +59,7 @@ export function toTicketDetail(source: TicketDetailSource): TicketDetail {
       id: entry.id,
       eventType: entry.eventType,
       description: entry.description,
+      metadata: entry.metadata,
       actorName: entry.actorName,
       occurredAt: entry.occurredAt.toISOString(),
     })),

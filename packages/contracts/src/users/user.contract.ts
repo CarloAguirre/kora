@@ -52,6 +52,7 @@ export const userDetailSchema = userSummarySchema.extend({
   permissions: z.array(permissionSchema),
   mustChangePassword: z.boolean(),
   emailVerifiedAt: isoDateTimeSchema.nullable(),
+  passwordUpdatedAt: isoDateTimeSchema.nullable(),
   lockedUntil: isoDateTimeSchema.nullable(),
   failedLoginAttempts: z.number().int().min(0),
   legacyId: z.number().int().nullable(),

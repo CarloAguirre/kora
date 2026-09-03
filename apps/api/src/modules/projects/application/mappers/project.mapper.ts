@@ -1,10 +1,18 @@
-import type { ProjectDetail, ProjectSummary, ProjectTeamMember as ProjectTeamMemberDto, ProjectObservation as ProjectObservationDto } from '@kora/contracts';
+import type {
+  ProjectDetail,
+  ProjectSummary,
+  ProjectTeam as ProjectTeamDto,
+  ProjectTeamMember as ProjectTeamMemberDto,
+  ProjectObservation as ProjectObservationDto,
+} from '@kora/contracts';
 import type { Project } from '../../domain/entities/project.entity';
 import type { ProjectListItem } from '../../domain/repositories/project.repository';
 import type { ProjectTeamMemberRecord } from '../../domain/repositories/project-team-member.repository';
+import type { ProjectTeamRecord } from '../../domain/repositories/project-team.repository';
 import type { ProjectObservationRecord } from '../../domain/repositories/project-observation.repository';
 import type { ProjectUserReference } from '../ports/project-user-reader.port';
 import type { ProjectClientReference } from '../ports/project-client-reader.port';
+import type { ProjectContactReference } from '../ports/project-contact-reader.port';
 
 export function toProjectSummary(item: ProjectListItem): ProjectSummary {
   return {
@@ -33,10 +41,12 @@ export function toProjectSummary(item: ProjectListItem): ProjectSummary {
 export interface ProjectDetailSource {
   readonly project: Project;
   readonly client: ProjectClientReference | null;
+  readonly primaryContact: ProjectContactReference | null;
   readonly leader: ProjectUserReference | null;
   readonly developer: ProjectUserReference | null;
   readonly commercialManager: ProjectUserReference | null;
   readonly members: readonly ProjectTeamMemberRecord[];
+  readonly teams: readonly ProjectTeamRecord[];
   readonly observations: readonly ProjectObservationRecord[];
 }
 
@@ -55,6 +65,15 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
     consumedHours: member.consumedHours,
   }));
 
+  const teams: ProjectTeamDto[] = source.teams.map((team) => ({
+    id: team.id,
+    teamId: team.teamId,
+    teamName: team.teamName,
+    leader: team.leaderUserId ? { id: team.leaderUserId, fullName: team.leaderName ?? '' } : null,
+    assignedHours: team.assignedHours,
+    memberCount: team.memberCount,
+  }));
+
   const observations: ProjectObservationDto[] = source.observations.map((observation) => ({
     id: observation.id,
     message: observation.message,
@@ -66,6 +85,7 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
     id: snapshot.id,
     name: snapshot.name,
     client: snapshot.clientId ? { id: snapshot.clientId, companyName: source.client?.companyName ?? '' } : null,
+    primaryContact: source.primaryContact,
     type: snapshot.type,
     salesStage: snapshot.salesStage,
     status: snapshot.status,
@@ -93,6 +113,7 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
     quotationLink: snapshot.quotationLink,
     contractLink: snapshot.contractLink,
     additionalLinks: snapshot.additionalLinks,
+    teams,
     members,
     observations,
     legacyId: snapshot.legacyId,

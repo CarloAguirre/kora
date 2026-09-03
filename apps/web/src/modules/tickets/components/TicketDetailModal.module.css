@@ -222,6 +222,13 @@
   color: var(--kora-text-muted);
 }
 
+.historyMetadata {
+  margin: var(--kora-space-1) 0 0;
+  padding-left: var(--kora-space-4);
+  font-size: var(--kora-text-xs);
+  color: var(--kora-text-muted);
+}
+
 .resolutionEditor {
   display: flex;
   flex-direction: column;

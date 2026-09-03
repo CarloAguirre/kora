@@ -9,6 +9,9 @@ export interface SupportPlanRecord {
   readonly startDate: Date;
   readonly endDate: Date | null;
   readonly contractedHours: number;
+  /** Valor UF del plan y de la hora extra — v1: `valor_plan_uf`/`valor_hh_extra_uf`. */
+  readonly planValueUf: number;
+  readonly extraHourValueUf: number;
 }
 
 export interface SupportMonthlyPeriodRecord {
@@ -20,6 +23,10 @@ export interface SupportMonthlyPeriodRecord {
   readonly consumedHoursPeriod: number;
   readonly surplusHours: number;
   readonly status: 'active' | 'expired' | 'closed' | 'cancelled';
+  /** Saldo de un período anterior reutilizado en este — v1: `hh_saldo_reutilizado`. */
+  readonly reusedBalanceHours: number;
+  readonly consumedHoursStart: number;
+  readonly consumedHoursEnd: number | null;
 }
 
 /**

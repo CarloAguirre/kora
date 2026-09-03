@@ -19,6 +19,7 @@ import {
   mapProjectType,
   mapSalesStage,
 } from '../lib/project-mapping';
+import { upsertContact, type LegacyContactRow } from './migrate-clients';
 
 interface LegacyProyectoRow {
   id_proyecto: number;
@@ -108,6 +109,10 @@ export async function migrateProjects(context: EtlContext): Promise<void> {
   const userIds = await loadLegacyIdMap(context, users);
   const managerUserIds = await loadCommercialManagerUserIds(context);
 
+  const contactRows = await context.legacyReader.getRows<LegacyContactRow>('contacto_cliente');
+  const legacyContactsById = new Map(contactRows.map((row) => [row.id_contacto, row]));
+  const orphanContactTracker = new StepTracker('contactos de cliente enlazados solo desde proyecto');
+
   for (const row of rows) {
     const type = mapProjectType(row.id_tipo_proyecto_desc);
     const salesStage = type === 'development' ? mapSalesStage(row.id_tipo_proyecto_desc) : null;
@@ -123,13 +128,24 @@ export async function migrateProjects(context: EtlContext): Promise<void> {
       tracker.warn(`proyecto ${row.id_proyecto}: cliente ${row.id_cliente} no migrado`);
     }
 
-    const primaryContactId = row.id_contacto ? (contactIds.get(row.id_contacto) ?? null) : null;
+    let primaryContactId = row.id_contacto ? (contactIds.get(row.id_contacto) ?? null) : null;
     if (row.id_contacto && !primaryContactId) {
-      // `migrate-clients.ts` ya avisa que estos son los contactos enlazados
-      // solo desde `proyecto` (no desde `cliente`) y quedan pendientes de M3
-      // — este aviso es el rastro de que, mientras tanto, el proyecto queda
-      // sin contacto principal en vez de fallar en silencio.
-      tracker.warn(`proyecto ${row.id_proyecto}: contacto ${row.id_contacto} no migrado, queda sin contacto principal`);
+      // Los contactos que `cliente.id_contacto` no enlaza pero `proyecto.id_contacto`
+      // sí (2 en el dump conocido) quedan pendientes en `migrate-clients.ts` — se
+      // resuelven acá, atados al cliente de este proyecto, la primera vez que un
+      // proyecto los referencia.
+      const legacyContact = legacyContactsById.get(row.id_contacto);
+      if (legacyContact && clientId) {
+        const { id: contactId, created } = await upsertContact(context, clientId, legacyContact);
+        contactIds.set(row.id_contacto, contactId);
+        primaryContactId = contactId;
+        orphanContactTracker.read += 1;
+        created ? (orphanContactTracker.created += 1) : (orphanContactTracker.updated += 1);
+      } else {
+        tracker.warn(
+          `proyecto ${row.id_proyecto}: contacto ${row.id_contacto} no resoluble (sin cliente o sin fila de origen), queda sin contacto principal`,
+        );
+      }
     }
 
     const values = {
@@ -180,6 +196,7 @@ export async function migrateProjects(context: EtlContext): Promise<void> {
   }
 
   context.report.add(tracker.toResult());
+  context.report.add(orphanContactTracker.toResult());
 
   await migrateProjectTeams(context);
   await migrateProjectTeamMembers(context);

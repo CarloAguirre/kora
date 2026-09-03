@@ -72,6 +72,8 @@ export const ticketHistoryEntrySchema = z.object({
   id: uuidSchema,
   eventType: z.string(),
   description: z.string(),
+  /** Detalle estructurado del evento (valores antes/después, horas solicitadas, etc.) — opaco, cada `eventType` define sus propias claves. */
+  metadata: z.record(z.string(), z.unknown()),
   actorName: z.string().nullable(),
   occurredAt: isoDateTimeSchema,
 });

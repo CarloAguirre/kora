@@ -39,6 +39,7 @@ export class DrizzleUserCredentialRepository implements UserCredentialRepository
       lockedUntil: row.lockedUntil,
       lastLoginAt: row.lastLoginAt,
       emailVerifiedAt: row.emailVerifiedAt,
+      passwordUpdatedAt: row.passwordUpdatedAt,
     };
   }
 

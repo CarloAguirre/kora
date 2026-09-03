@@ -8,6 +8,7 @@ import {
   sortDirectionSchema,
   uuidSchema,
 } from '../common/primitives';
+import { clientContactSchema } from '../clients/client.contract';
 
 /** Ver docs/DECISION-M3-ESTADOS.md: por qué son cuatro campos independientes. */
 
@@ -77,6 +78,23 @@ export const projectTeamMemberSchema = z.object({
 });
 export type ProjectTeamMember = z.infer<typeof projectTeamMemberSchema>;
 
+/**
+ * Equipo asignado al proyecto (v1: `equipo_proyecto`) — distinto de
+ * `projectTeamMemberSchema`: este es el nivel equipo (líder, HH
+ * presupuestadas), no la persona individual. `memberCount` se recalcula en
+ * vivo contando `project_team_members`, no se usa el valor migrado (la v1 no
+ * lo tenía, así que siempre llegaba nulo).
+ */
+export const projectTeamSchema = z.object({
+  id: uuidSchema,
+  teamId: uuidSchema,
+  teamName: z.string(),
+  leader: z.object({ id: uuidSchema, fullName: z.string() }).nullable(),
+  assignedHours: z.number().nullable(),
+  memberCount: z.number().int(),
+});
+export type ProjectTeam = z.infer<typeof projectTeamSchema>;
+
 export const projectObservationSchema = z.object({
   id: uuidSchema,
   message: z.string(),
@@ -113,12 +131,15 @@ export type ProjectSummary = z.infer<typeof projectSummarySchema>;
 export const projectDetailSchema = projectSummarySchema.extend({
   developer: z.object({ id: uuidSchema, fullName: z.string() }).nullable(),
   commercialManager: z.object({ id: uuidSchema, fullName: z.string() }).nullable(),
+  /** Contacto principal DE ESTE PROYECTO (v1: `proyecto.id_contacto`) — puede diferir del contacto general del cliente. */
+  primaryContact: clientContactSchema.nullable(),
   estimatedDeliveryDate: z.string().nullable(),
   expectedProgress: z.number().int().nullable(),
   overtimeRateUf: z.number(),
   quotationLink: z.string().nullable(),
   contractLink: z.string().nullable(),
   additionalLinks: z.string().nullable(),
+  teams: z.array(projectTeamSchema),
   members: z.array(projectTeamMemberSchema),
   observations: z.array(projectObservationSchema),
   legacyId: z.number().int().nullable(),

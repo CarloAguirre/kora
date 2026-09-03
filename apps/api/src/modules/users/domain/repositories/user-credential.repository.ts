@@ -19,6 +19,7 @@ export interface UserCredentialState {
   readonly lockedUntil: Date | null;
   readonly lastLoginAt: Date | null;
   readonly emailVerifiedAt: Date | null;
+  readonly passwordUpdatedAt: Date | null;
 }
 
 export interface UpsertCredentialInput {

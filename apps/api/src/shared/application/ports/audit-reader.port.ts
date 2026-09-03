@@ -19,6 +19,9 @@ export interface AuditReaderEntry {
   readonly entityId: string | null;
   readonly changes: Record<string, { before: unknown; after: unknown }> | null;
   readonly metadata: Record<string, unknown> | null;
+  readonly ipAddress: string | null;
+  readonly userAgent: string | null;
+  readonly requestId: string | null;
   readonly occurredAt: Date;
 }
 

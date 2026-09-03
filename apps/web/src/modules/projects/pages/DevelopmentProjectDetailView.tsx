@@ -81,25 +81,54 @@ export function DevelopmentProjectDetailView({ project, projectId }: { project: 
     defaultValues: { message: '' },
   });
 
+  /**
+   * `project.teams` (v1: `equipo_proyecto`) trae el líder y las HH
+   * presupuestadas por equipo — dato real que hasta ahora la ficha ignoraba
+   * por completo, recalculando "Asignadas" desde `project.members`
+   * (individual, `proyecto_colaborador`) en su lugar. `consumedHours` sigue
+   * viniendo de los miembros, porque `project_teams` no lo guarda. Un
+   * proyecto sin fila en `project_teams` (no todos la tienen) cae al cálculo
+   * derivado de siempre, para no perder el equipo de vista.
+   */
   const teamSummaries = useMemo(() => {
-    const byTeam = new Map<string, { teamId: string; teamName: string; memberCount: number; assignedHours: number; consumedHours: number }>();
+    const summaries = new Map<
+      string,
+      { teamId: string; teamName: string; leaderName: string | null; memberCount: number; assignedHours: number; consumedHours: number }
+    >();
+    const hasRealTeamRow = new Set(project.teams.map((team) => team.teamId));
+
+    for (const team of project.teams) {
+      summaries.set(team.teamId, {
+        teamId: team.teamId,
+        teamName: team.teamName,
+        leaderName: team.leader?.fullName ?? null,
+        memberCount: team.memberCount,
+        assignedHours: team.assignedHours ?? 0,
+        consumedHours: 0,
+      });
+    }
+
     for (const member of project.members) {
-      const existing = byTeam.get(member.teamId);
+      const existing = summaries.get(member.teamId);
       if (existing) {
-        existing.memberCount += 1;
-        existing.assignedHours += member.assignedHours;
         existing.consumedHours += member.consumedHours;
+        if (!hasRealTeamRow.has(member.teamId)) {
+          existing.memberCount += 1;
+          existing.assignedHours += member.assignedHours;
+        }
       } else {
-        byTeam.set(member.teamId, {
+        summaries.set(member.teamId, {
           teamId: member.teamId,
           teamName: member.teamName,
+          leaderName: null,
           memberCount: 1,
           assignedHours: member.assignedHours,
           consumedHours: member.consumedHours,
         });
       }
     }
-    return [...byTeam.values()];
+
+    return [...summaries.values()];
   }, [project]);
 
   const remainingHours = project.soldHours - project.usedHours;
@@ -247,6 +276,7 @@ export function DevelopmentProjectDetailView({ project, projectId }: { project: 
                         <p className={styles.teamMemberCount}>
                           {team.memberCount} persona{team.memberCount === 1 ? '' : 's'}
                         </p>
+                        {team.leaderName && <p className={styles.teamLeader}>Líder: {team.leaderName}</p>}
                       </div>
                     </div>
                     <div className={styles.teamStats}>

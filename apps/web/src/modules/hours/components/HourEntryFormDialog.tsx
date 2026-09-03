@@ -16,7 +16,7 @@ import { TextField } from '@/shared/components/ui/TextField';
 import { Select } from '@/shared/components/ui/Select';
 import { Tabs } from '@/shared/components/ui/Tabs';
 import { AlertIcon } from '@/shared/components/icons/Icons';
-import { useUpdateHourEntry } from '../api/hours.queries';
+import { useHourEntryDetail, useUpdateHourEntry } from '../api/hours.queries';
 import { useProjectsList } from '@/modules/projects/api/projects.queries';
 import { useUsersList } from '@/modules/users/api/users.queries';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
@@ -25,6 +25,7 @@ import { DailyEntryForm } from './DailyEntryForm';
 import { WeeklyEntryForm } from './WeeklyEntryForm';
 
 const ASSIGNMENT_OPTIONS = HOUR_ENTRY_ASSIGNMENTS.map((value) => ({ value, label: value }));
+const formatDateTime = (value: string) => new Date(value).toLocaleString('es-CL');
 const NEW_ENTRY_TABS = [
   { id: 'diario', label: 'Registro diario' },
   { id: 'semanal', label: 'Registro semanal' },
@@ -204,6 +205,9 @@ function EditEntryForm({
 function ViewEntryDetail({ entry, onClose }: { entry: HourEntrySummary; onClose: () => void }) {
   const needsProject = PROJECT_REQUIRING_ASSIGNMENTS.has(entry.assignment as (typeof HOUR_ENTRY_ASSIGNMENTS)[number]);
   const blockTitle = entry.project?.name || entry.assignment || 'Registro';
+  // `HourEntrySummary` no trae quién/cuándo decidió — antes ese dato quedaba
+  // enterrado en el backend porque nada llamaba al detalle.
+  const { data: detail } = useHourEntryDetail(entry.status !== 'pending' ? entry.id : null);
 
   return (
     <div className={styles.form}>
@@ -257,6 +261,13 @@ function ViewEntryDetail({ entry, onClose }: { entry: HourEntrySummary; onClose:
               <AlertIcon size={18} className={styles.alertIcon} />
               <span>Motivo de rechazo: {entry.rejectionReason}</span>
             </div>
+          )}
+
+          {detail && (detail.decisionBy || detail.decisionAt) && (
+            <p className={styles.decisionInfo}>
+              {entry.status === 'approved' ? 'Aprobado' : 'Rechazado'} por {detail.decisionBy?.fullName ?? 'Sistema'}
+              {detail.decisionAt ? ` el ${formatDateTime(detail.decisionAt)}` : ''}
+            </p>
           )}
         </div>
       </div>

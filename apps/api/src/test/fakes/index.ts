@@ -221,6 +221,7 @@ export class InMemoryCredentialRepository implements UserCredentialRepository {
       lockedUntil: existing?.lockedUntil ?? null,
       lastLoginAt: existing?.lastLoginAt ?? null,
       emailVerifiedAt: input.emailVerifiedAt ?? existing?.emailVerifiedAt ?? null,
+      passwordUpdatedAt: existing?.passwordUpdatedAt ?? null,
     });
   }
 

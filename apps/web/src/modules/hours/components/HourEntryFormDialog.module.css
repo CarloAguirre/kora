@@ -26,6 +26,11 @@
   margin-top: 1px;
 }
 
+.decisionInfo {
+  font-size: var(--kora-text-sm);
+  color: var(--kora-text-muted);
+}
+
 .actions {
   display: flex;
   justify-content: flex-end;

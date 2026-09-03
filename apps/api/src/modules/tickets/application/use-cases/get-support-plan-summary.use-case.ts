@@ -35,25 +35,34 @@ export class GetSupportPlanSummaryUseCase implements UseCase<GetSupportPlanSumma
     if (!plan) return ok(null);
 
     if (plan.planType === 'monthly') {
-      return ok(await this.buildMonthlySummary(plan.id, plan.contractedHours, plan.surplusPolicy === 'accumulate'));
+      return ok(
+        await this.buildMonthlySummary(
+          plan.id,
+          plan.contractedHours,
+          plan.planValueUf,
+          plan.extraHourValueUf,
+          plan.surplusPolicy === 'accumulate',
+        ),
+      );
     }
 
-    return ok(await this.buildUsageSummary(command.projectId, plan.planType, plan.contractedHours));
+    return ok(
+      await this.buildUsageSummary(command.projectId, plan.planType, plan.contractedHours, plan.planValueUf, plan.extraHourValueUf),
+    );
   }
 
   private async buildMonthlySummary(
     planId: string,
     contractedHours: number,
+    planValueUf: number,
+    extraHourValueUf: number,
     isAccumulate: boolean,
   ): Promise<SupportProjectSummary> {
     const periods = (await this.plans.listPeriodsForPlan(planId)).sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
     const now = this.clock.now();
 
-    const priorSurplusOf = (period: SupportMonthlyPeriodRecord) => {
-      if (!isAccumulate) return 0;
-      const prior = periods.find((candidate) => candidate.endDate.getTime() === period.startDate.getTime());
-      return prior?.surplusHours ?? 0;
-    };
+    /** El saldo reutilizado ya viene calculado en el período (v1: `hh_saldo_reutilizado`) — no hace falta adivinarlo buscando el período cuyo fin calce con este inicio. */
+    const priorSurplusOf = (period: SupportMonthlyPeriodRecord) => (isAccumulate ? period.reusedBalanceHours : 0);
 
     const current = periods.find(
       (period) => period.status === 'active' && period.startDate <= now && now < period.endDate,
@@ -87,6 +96,8 @@ export class GetSupportPlanSummaryUseCase implements UseCase<GetSupportPlanSumma
     return {
       planType: 'monthly',
       contractedHours,
+      planValueUf,
+      extraHourValueUf,
       usedHours: periods.reduce((sum, period) => sum + period.consumedHoursPeriod, 0),
       availableHours: currentPeriod?.capacityHours ?? null,
       currentPeriod,
@@ -103,6 +114,8 @@ export class GetSupportPlanSummaryUseCase implements UseCase<GetSupportPlanSumma
     projectId: string,
     planType: 'bundle' | 'on_demand',
     contractedHours: number,
+    planValueUf: number,
+    extraHourValueUf: number,
   ): Promise<SupportProjectSummary> {
     const page = await this.hourEntries.search(
       { projectId, status: 'approved' },
@@ -121,6 +134,8 @@ export class GetSupportPlanSummaryUseCase implements UseCase<GetSupportPlanSumma
     return {
       planType,
       contractedHours,
+      planValueUf,
+      extraHourValueUf,
       usedHours,
       availableHours: planType === 'bundle' ? Math.max(contractedHours - usedHours, 0) : null,
       currentPeriod: null,

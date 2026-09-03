@@ -21,6 +21,18 @@ const formatDateTime = (value: string) => new Date(value).toLocaleString('es-CL'
 const formatDate = (value: string) => new Date(value).toLocaleDateString('es-CL');
 
 /**
+ * `metadata` es JSON heredado de la v1 (`ticket_history.metadata`), sin forma
+ * fija por `eventType` — antes se leía de la base y se descartaba antes de
+ * llegar aquí. Se muestra como pares clave/valor genéricos en vez de intentar
+ * modelar cada forma posible.
+ */
+function formatMetadataEntries(metadata: Record<string, unknown>): string[] {
+  return Object.entries(metadata)
+    .filter(([, value]) => value !== null && value !== undefined && value !== '')
+    .map(([key, value]) => `${key}: ${typeof value === 'object' ? JSON.stringify(value) : String(value)}`);
+}
+
+/**
  * Etiqueta del botón de avance forzado — replica `stageActionLabel` de la v1.
  * El retroceso de estado no vive en el modal: en la v1 se hace arrastrando la
  * tarjeta en el tablero, no hay selector de estado en la ficha.
@@ -223,14 +235,24 @@ export function TicketDetailModal({ ticketId, onClose }: { ticketId: string; onC
               {historyOpen && (
                 <div className={styles.history}>
                   {ticket.history.length === 0 && <span className={styles.empty}>Sin eventos todavía.</span>}
-                  {ticket.history.map((entry) => (
-                    <div key={entry.id} className={styles.historyEntry}>
-                      <p className={styles.historyDescription}>{entry.description}</p>
-                      <p className={styles.historyMeta}>
-                        {entry.actorName ?? 'Sistema'} · {formatDateTime(entry.occurredAt)}
-                      </p>
-                    </div>
-                  ))}
+                  {ticket.history.map((entry) => {
+                    const metadataEntries = formatMetadataEntries(entry.metadata);
+                    return (
+                      <div key={entry.id} className={styles.historyEntry}>
+                        <p className={styles.historyDescription}>{entry.description}</p>
+                        <p className={styles.historyMeta}>
+                          {entry.actorName ?? 'Sistema'} · {formatDateTime(entry.occurredAt)}
+                        </p>
+                        {metadataEntries.length > 0 && (
+                          <ul className={styles.historyMetadata}>
+                            {metadataEntries.map((line) => (
+                              <li key={line}>{line}</li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>

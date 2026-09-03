@@ -46,7 +46,10 @@ export function SupportProjectDetailView({ project, projectId }: { project: Proj
     sortDirection: 'desc',
   });
 
-  const primaryContact = client?.contacts[0] ?? null;
+  // El contacto del PROYECTO (v1: `proyecto.id_contacto`) puede ser distinto
+  // del contacto general del cliente — antes esto siempre mostraba el primer
+  // contacto del cliente, ignorando cuál se había asignado a este proyecto.
+  const primaryContact = project.primaryContact ?? client?.contacts[0] ?? null;
 
   const onStatusChange = async (status: ProjectStatus) => {
     await changeStatus.mutateAsync({ projectId, input: { status } });
@@ -115,6 +118,12 @@ export function SupportProjectDetailView({ project, projectId }: { project: Proj
               {project.supportPlanDescription || 'Sin plan'} · {formatHours(project.supportHours)} hrs · Hora extra: UF{' '}
               {formatHours(project.overtimeRateUf)}
             </p>
+            {supportSummary && (
+              <p className={styles.supportLine}>
+                Valor plan: UF {formatHours(supportSummary.planValueUf)} · Hora extra del plan: UF{' '}
+                {formatHours(supportSummary.extraHourValueUf)}
+              </p>
+            )}
           </div>
         </Card>
 

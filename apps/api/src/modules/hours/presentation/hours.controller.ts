@@ -79,8 +79,10 @@ export class HoursController {
 
   @Get(':id')
   @RequirePermissions('hours:read_own')
-  async detail(@Param('id') id: string): Promise<HourEntryDetail> {
-    return unwrapOrThrow(await this.getEntry.execute({ entryId: id }));
+  async detail(@Param('id') id: string, @CurrentUser() actor: RequestUser): Promise<HourEntryDetail> {
+    return unwrapOrThrow(
+      await this.getEntry.execute({ entryId: id, actor: toActorContext(actor), actorPermissions: actor.permissions }),
+    );
   }
 
   @Post()

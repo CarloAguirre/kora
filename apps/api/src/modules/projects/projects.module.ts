@@ -18,6 +18,7 @@ import { PROJECT_TEAM_MEMBER_REPOSITORY } from './domain/repositories/project-te
 import { PROJECT_OBSERVATION_REPOSITORY } from './domain/repositories/project-observation.repository';
 import { PROJECT_USER_READER } from './application/ports/project-user-reader.port';
 import { PROJECT_CLIENT_READER } from './application/ports/project-client-reader.port';
+import { PROJECT_CONTACT_READER } from './application/ports/project-contact-reader.port';
 import { PROJECT_TEAM_MEMBER_VALIDATOR } from './application/ports/project-team-member-validator.port';
 
 import { DrizzleProjectRepository } from './infrastructure/persistence/drizzle-project.repository';
@@ -26,6 +27,7 @@ import { DrizzleProjectTeamMemberRepository } from './infrastructure/persistence
 import { DrizzleProjectObservationRepository } from './infrastructure/persistence/drizzle-project-observation.repository';
 import { DrizzleProjectUserReader } from './infrastructure/services/drizzle-project-user-reader';
 import { DrizzleProjectClientReader } from './infrastructure/services/drizzle-project-client-reader';
+import { DrizzleProjectContactReader } from './infrastructure/services/drizzle-project-contact-reader';
 import { DrizzleProjectTeamMemberValidator } from './infrastructure/services/drizzle-project-team-member-validator';
 
 /**
@@ -56,6 +58,7 @@ import { DrizzleProjectTeamMemberValidator } from './infrastructure/services/dri
     { provide: PROJECT_OBSERVATION_REPOSITORY, useClass: DrizzleProjectObservationRepository },
     { provide: PROJECT_USER_READER, useClass: DrizzleProjectUserReader },
     { provide: PROJECT_CLIENT_READER, useClass: DrizzleProjectClientReader },
+    { provide: PROJECT_CONTACT_READER, useClass: DrizzleProjectContactReader },
     { provide: PROJECT_TEAM_MEMBER_VALIDATOR, useClass: DrizzleProjectTeamMemberValidator },
   ],
   exports: [PROJECT_REPOSITORY],

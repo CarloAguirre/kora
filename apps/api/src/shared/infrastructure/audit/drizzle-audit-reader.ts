@@ -25,6 +25,9 @@ export class DrizzleAuditReader implements AuditReader {
         entityId: auditLog.entityId,
         changes: auditLog.changes,
         metadata: auditLog.metadata,
+        ipAddress: auditLog.ipAddress,
+        userAgent: auditLog.userAgent,
+        requestId: auditLog.requestId,
         occurredAt: auditLog.occurredAt,
       })
       .from(auditLog)
@@ -43,6 +46,9 @@ export class DrizzleAuditReader implements AuditReader {
       entityId: row.entityId,
       changes: row.changes ?? null,
       metadata: row.metadata ?? null,
+      ipAddress: row.ipAddress,
+      userAgent: row.userAgent,
+      requestId: row.requestId,
       occurredAt: row.occurredAt,
     }));
   }
