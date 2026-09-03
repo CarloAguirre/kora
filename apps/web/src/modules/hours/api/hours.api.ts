@@ -9,6 +9,7 @@ import type {
   ListHolidaysQuery,
   ListHourEntriesQuery,
   ListHourEntriesResponse,
+  ProjectPendingApprovalsResponse,
   RejectHourEntryInput,
   UpdateHourEntryInput,
 } from '@kora/contracts';
@@ -48,6 +49,9 @@ export const hoursApi = {
   remove(entryId: string): Promise<void> {
     return api.delete<void>(`/hour-entries/${entryId}`);
   },
+  projectPendingApprovals(projectId: string): Promise<ProjectPendingApprovalsResponse> {
+    return api.get<ProjectPendingApprovalsResponse>(`/hour-entries/projects/${projectId}/pending-approvals`);
+  },
   holidays(query: Partial<ListHolidaysQuery>): Promise<Holiday[]> {
     return api.get<Holiday[]>('/holidays', { dateFrom: query.dateFrom, dateTo: query.dateTo });
   },
@@ -79,6 +83,7 @@ export const hourKeys = {
   details: () => [...hourKeys.all, 'detail'] as const,
   detail: (entryId: string) => [...hourKeys.details(), entryId] as const,
   holidays: (query: Partial<ListHolidaysQuery>) => [...hourKeys.all, 'holidays', query] as const,
+  projectPendingApprovals: (projectId: string) => [...hourKeys.all, 'project-pending-approvals', projectId] as const,
   capacityReport: (query: Partial<ListCapacityReportQuery>) => [...hourKeys.all, 'capacity-report', query] as const,
   availability: (query: Partial<AvailabilityQuery>) => [...hourKeys.all, 'availability', query] as const,
 };

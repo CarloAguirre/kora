@@ -36,8 +36,11 @@ vi.mock('@/modules/teams/api/teams.queries', () => ({
   }),
 }));
 
+const { useProjectPendingApprovalsMock } = vi.hoisted(() => ({ useProjectPendingApprovalsMock: vi.fn() }));
+
 vi.mock('@/modules/hours/api/hours.queries', () => ({
   useHourEntriesList: () => ({ data: { items: [] } }),
+  useProjectPendingApprovals: useProjectPendingApprovalsMock,
 }));
 
 function buildMember(overrides: Partial<ProjectTeamMember>): ProjectTeamMember {
@@ -91,14 +94,28 @@ function buildProject(): ProjectDetail {
       { id: 'pt-rpa', teamId: 'team-rpa', teamName: 'RPA', leader: null, assignedHours: 0, memberCount: 3 },
     ],
     members: [
-      buildMember({ id: 'm1', teamId: 'team-rpa', teamName: 'RPA', fullName: 'José Aponte', consumedHours: 16 }),
-      buildMember({ id: 'm2', teamId: 'team-dev', teamName: 'Desarrollo', fullName: 'Claudio Andres Flores Vilches', consumedHours: 144 }),
-      buildMember({ id: 'm3', teamId: 'team-ux', teamName: 'UX-UI', fullName: 'Eduardo Aranda', consumedHours: 66.75 }),
-      buildMember({ id: 'm4', teamId: 'team-rpa', teamName: 'RPA', fullName: 'Pablo Vega', consumedHours: 2 }),
-      buildMember({ id: 'm5', teamId: 'team-rpa', teamName: 'RPA', fullName: 'Karen de Souza', consumedHours: 22.25 }),
-      buildMember({ id: 'm6', teamId: 'team-dev', teamName: 'Desarrollo', fullName: 'Cristian Esteban Cancino Espinoza', consumedHours: 330 }),
-      buildMember({ id: 'm7', teamId: 'team-ux', teamName: 'UX-UI', fullName: 'Leslie Galaz Contreras', consumedHours: 48 }),
-      buildMember({ id: 'm8', teamId: 'team-qa', teamName: 'QA', fullName: 'Nueva Persona', consumedHours: 0 }),
+      buildMember({ id: 'm1', userId: 'user-jose', teamId: 'team-rpa', teamName: 'RPA', fullName: 'José Aponte', consumedHours: 16 }),
+      buildMember({
+        id: 'm2',
+        userId: 'user-claudio',
+        teamId: 'team-dev',
+        teamName: 'Desarrollo',
+        fullName: 'Claudio Andres Flores Vilches',
+        consumedHours: 144,
+      }),
+      buildMember({ id: 'm3', userId: 'user-eduardo', teamId: 'team-ux', teamName: 'UX-UI', fullName: 'Eduardo Aranda', consumedHours: 66.75 }),
+      buildMember({ id: 'm4', userId: 'user-pablo', teamId: 'team-rpa', teamName: 'RPA', fullName: 'Pablo Vega', consumedHours: 2 }),
+      buildMember({ id: 'm5', userId: 'user-karen', teamId: 'team-rpa', teamName: 'RPA', fullName: 'Karen de Souza', consumedHours: 22.25 }),
+      buildMember({
+        id: 'm6',
+        userId: 'user-cristian',
+        teamId: 'team-dev',
+        teamName: 'Desarrollo',
+        fullName: 'Cristian Esteban Cancino Espinoza',
+        consumedHours: 330,
+      }),
+      buildMember({ id: 'm7', userId: 'user-leslie', teamId: 'team-ux', teamName: 'UX-UI', fullName: 'Leslie Galaz Contreras', consumedHours: 48 }),
+      buildMember({ id: 'm8', userId: 'user-qa', teamId: 'team-qa', teamName: 'QA', fullName: 'Nueva Persona', consumedHours: 0 }),
     ],
     observations: [],
     legacyId: null,
@@ -106,7 +123,8 @@ function buildProject(): ProjectDetail {
   };
 }
 
-function renderView(permissions: Permission[] = ['projects:manage']) {
+function renderView(permissions: Permission[] = ['projects:manage'], pendingApprovals: { groups: unknown[] } = { groups: [] }) {
+  useProjectPendingApprovalsMock.mockReturnValue({ data: pendingApprovals });
   const auth: AuthContextValue = {
     user: {
       id: 'actor',
@@ -198,5 +216,35 @@ describe('DevelopmentProjectDetailView — equipo asignado', () => {
 
     const desarrollo = getTeamGroup('Desarrollo');
     expect(desarrollo.queryByRole('button', { name: /Quitar a/ })).not.toBeInTheDocument();
+  });
+
+  it('el pedido fue "de qué colaborador son y el total por líder": muestra ambos', () => {
+    renderView(['projects:manage'], {
+      groups: [
+        {
+          approverUserId: 'u-jose',
+          approverName: 'José Aponte',
+          entryCount: 2,
+          totalHours: 6,
+          oldestPendingDate: '2026-01-05',
+          collaborators: [
+            { userId: 'user-cristian', userName: 'Cristian Esteban Cancino Espinoza', entryCount: 2, totalHours: 6, oldestPendingDate: '2026-01-05' },
+          ],
+        },
+      ],
+    });
+
+    // Total por líder, en el encabezado del grupo que lidera.
+    const desarrollo = getTeamGroup('Desarrollo');
+    expect(desarrollo.getByText(/6h pendientes de aprobar \(2\)/)).toBeInTheDocument();
+
+    // De qué colaborador son, en su propia fila.
+    const cristianRow = desarrollo.getByText('Cristian Esteban Cancino Espinoza', { selector: 'td' }).closest('tr');
+    expect(within(cristianRow as HTMLElement).getByText('6h (2)')).toBeInTheDocument();
+
+    // Quien no tiene horas pendientes muestra un guion, no vacío (uno para
+    // "Actividad", que tampoco tiene dato, y otro para "Pendiente aprob.").
+    const claudioRow = desarrollo.getByText('Claudio Andres Flores Vilches', { selector: 'td' }).closest('tr');
+    expect(within(claudioRow as HTMLElement).getAllByText('—')).toHaveLength(2);
   });
 });

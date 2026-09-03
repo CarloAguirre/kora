@@ -40,7 +40,9 @@ export class DeleteTicketUseCase implements UseCase<DeleteTicketCommand, void, A
     const isAdminTier = command.actorRole === 'admin' || command.actorRole === 'pmo';
     if (!isAdminTier) {
       const isAssignee = ticket.assigneeUserId === command.actor.userId;
-      const isApprover = ticket.projectId ? await this.projects.isProjectApprover(ticket.projectId, command.actor.userId) : false;
+      const isApprover = ticket.projectId
+        ? await this.projects.isProjectApprover(ticket.projectId, command.actor.userId, ticket.assigneeUserId)
+        : false;
       if (!isAssignee && !isApprover) return err(new CannotDeleteTicketError());
     }
 

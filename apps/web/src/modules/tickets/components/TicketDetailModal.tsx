@@ -33,6 +33,15 @@ import { ApiRequestError } from '@/shared/lib/api-client';
 const formatDateTime = (value: string) => new Date(value).toLocaleString('es-CL');
 const formatDate = (value: string) => new Date(value).toLocaleDateString('es-CL');
 
+/** Sólo se enlaza si es http(s) — evita que un `javascript:` guardado como "evidencia" se ejecute al hacer clic. */
+function isSafeHttpUrl(value: string): boolean {
+  try {
+    return ['http:', 'https:'].includes(new URL(value).protocol);
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Ícono por tipo de evento — solo para orientar de un vistazo, no intenta
  * cubrir cada `eventType` legacy posible. La descripción (`entry.description`)
@@ -73,9 +82,8 @@ function forwardActionLabel(current: TicketStatus, target: TicketStatus): string
 /**
  * Ficha de ticket como modal sobre el tablero — así se ve en la v1
  * (`Soporte/index.tsx`, vista `detail`), en vez de una página de ruta propia.
- * No incluye evidencia adjunta — ver docs/DECISION-M5-TICKETS.md. La
- * solicitud de horas (`ticket_hh_request`) sí está — es el "siguiente paso
- * de M5" que ese mismo documento dejaba anotado.
+ * La solicitud de horas (`ticket_hh_request`) también está — es el "siguiente
+ * paso de M5" que docs/DECISION-M5-TICKETS.md dejaba anotado.
  */
 export function TicketDetailModal({ ticketId, onClose }: { ticketId: string; onClose: () => void }) {
   const toast = useToast();
@@ -205,6 +213,21 @@ export function TicketDetailModal({ ticketId, onClose }: { ticketId: string; onC
             <div className={styles.section}>
               <span className={styles.label}>Descripción del incidente:</span>
               {ticket.description ? <p className={styles.text}>{ticket.description}</p> : <span className={styles.empty}>Sin descripción</span>}
+            </div>
+
+            <div className={styles.section}>
+              <span className={styles.label}>Evidencia:</span>
+              {ticket.evidenceUrl ? (
+                isSafeHttpUrl(ticket.evidenceUrl) ? (
+                  <a className={styles.text} href={ticket.evidenceUrl} target="_blank" rel="noreferrer">
+                    {ticket.evidenceUrl}
+                  </a>
+                ) : (
+                  <p className={styles.text}>{ticket.evidenceUrl}</p>
+                )
+              ) : (
+                <span className={styles.empty}>Sin evidencia adjunta</span>
+              )}
             </div>
 
             <div className={styles.section}>

@@ -31,6 +31,7 @@ export interface CreateTicketProps {
   readonly title: string;
   readonly serviceType?: TicketServiceType | null;
   readonly description?: string | null;
+  readonly evidenceUrl?: string | null;
   readonly priority?: TicketPriority | null;
   readonly assigneeUserId?: string | null;
   readonly estimatedHours?: number | null;
@@ -71,7 +72,7 @@ export class Ticket extends AggregateRoot<string> {
       title,
       serviceType: props.serviceType ?? null,
       description: props.description?.trim() || null,
-      evidenceUrl: null,
+      evidenceUrl: props.evidenceUrl?.trim() || null,
       assigneeUserId: props.assigneeUserId ?? null,
       priority: props.priority ?? null,
       estimatedHours: props.estimatedHours ?? null,
@@ -146,7 +147,15 @@ export class Ticket extends AggregateRoot<string> {
     data: Partial<
       Pick<
         TicketProps,
-        'title' | 'developmentProjectId' | 'serviceType' | 'description' | 'priority' | 'assigneeUserId' | 'estimatedHours' | 'resolution'
+        | 'title'
+        | 'developmentProjectId'
+        | 'serviceType'
+        | 'description'
+        | 'evidenceUrl'
+        | 'priority'
+        | 'assigneeUserId'
+        | 'estimatedHours'
+        | 'resolution'
       >
     >,
     now: Date,

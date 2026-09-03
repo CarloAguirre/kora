@@ -17,7 +17,6 @@ import { NewProjectPage } from '@/modules/projects/pages/NewProjectPage';
 import { HoursListPage } from '@/modules/hours/pages/HoursListPage';
 import { HoursApprovalsPage } from '@/modules/hours/pages/HoursApprovalsPage';
 import { TicketsListPage } from '@/modules/tickets/pages/TicketsListPage';
-import { NewTicketPage } from '@/modules/tickets/pages/NewTicketPage';
 import { TicketDetailPage } from '@/modules/tickets/pages/TicketDetailPage';
 import { ForecastPage } from '@/modules/forecast/pages/ForecastPage';
 import { DashboardPage } from '@/modules/dashboard/pages/DashboardPage';
@@ -118,10 +117,6 @@ export const router = createBrowserRouter([
   {
     element: <ProtectedRoute anyOf={['tickets:read', 'tickets:read_assigned']} />,
     children: [{ path: '/tickets', element: <TicketsListPage /> }],
-  },
-  {
-    element: <ProtectedRoute permission="tickets:create" />,
-    children: [{ path: '/tickets/nuevo', element: <NewTicketPage /> }],
   },
   {
     element: <ProtectedRoute anyOf={['tickets:read', 'tickets:read_assigned']} />,

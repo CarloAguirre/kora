@@ -12,7 +12,7 @@ export class ProjectsModuleTicketProjectReader implements TicketProjectReader {
     return { id: project.id, name: project.name, status: project.status };
   }
 
-  isProjectApprover(projectId: string, userId: string): Promise<boolean> {
-    return this.projects.isProjectLeaderOrTeamLeader(projectId, userId);
+  isProjectApprover(projectId: string, actorUserId: string, assigneeUserId: string | null): Promise<boolean> {
+    return this.projects.isProjectLeaderOrTeamLeaderOfMember(projectId, actorUserId, assigneeUserId);
   }
 }

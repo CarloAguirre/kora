@@ -11,6 +11,7 @@ import { RejectHourEntryUseCase } from './application/use-cases/reject-hour-entr
 import { DeleteHourEntryUseCase } from './application/use-cases/delete-hour-entry.use-case';
 import { GetHoursCapacityReportUseCase } from './application/use-cases/get-hours-capacity-report.use-case';
 import { GetHoursAvailabilityUseCase } from './application/use-cases/get-hours-availability.use-case';
+import { GetProjectPendingApprovalsUseCase } from './application/use-cases/get-project-pending-approvals.use-case';
 import { HourEntryApprovalAuthorityService } from './application/services/hour-entry-approval-authority.service';
 
 import { HOUR_ENTRY_REPOSITORY } from './domain/repositories/hour-entry.repository';
@@ -49,6 +50,7 @@ import { TeamsModule } from '../teams/teams.module';
     DeleteHourEntryUseCase,
     GetHoursCapacityReportUseCase,
     GetHoursAvailabilityUseCase,
+    GetProjectPendingApprovalsUseCase,
     HourEntryApprovalAuthorityService,
     DrizzleHolidayReader,
 

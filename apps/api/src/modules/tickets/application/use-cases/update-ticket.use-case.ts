@@ -48,6 +48,7 @@ export class UpdateTicketUseCase implements UseCase<UpdateTicketCommand, void, A
         developmentProjectId: data.developmentProjectId,
         serviceType: data.serviceType,
         description: data.description,
+        evidenceUrl: data.evidenceUrl,
         priority: data.priority,
         assigneeUserId: data.assigneeUserId,
         estimatedHours: data.estimatedHours,
@@ -92,6 +93,15 @@ export class UpdateTicketUseCase implements UseCase<UpdateTicketCommand, void, A
         ticketId: ticket.id,
         eventType: 'description_changed',
         description: 'Se actualizó la descripción del ticket.',
+        actorUserId: actor.userId,
+        occurredAt: now,
+      });
+    }
+    if (data.evidenceUrl !== undefined && after.evidenceUrl !== before.evidenceUrl) {
+      await this.history.append({
+        ticketId: ticket.id,
+        eventType: 'evidence_changed',
+        description: 'Se actualizó la evidencia adjunta del ticket.',
         actorUserId: actor.userId,
         occurredAt: now,
       });

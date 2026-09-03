@@ -113,9 +113,7 @@ export class DrizzleHourEntryRepository implements HourEntryRepository {
     const authorTeamIds = [...new Set([...teamByUserId.values()].map((team) => team.id))];
     // Qué pares (proyecto, equipo) están realmente asignados — el líder de un
     // equipo solo aprueba las horas de SU propio equipo, no las de cualquier
-    // otro equipo asignado al mismo proyecto (a diferencia de "¿puede actuar
-    // sobre este proyecto en general?" que sí es por-cualquier-equipo, ver
-    // `ProjectRepository.isProjectLeaderOrTeamLeader`, usado por Tickets).
+    // otro equipo asignado al mismo proyecto.
     const assignedProjectTeamRows =
       projectIds.length && authorTeamIds.length
         ? await db
@@ -135,24 +133,27 @@ export class DrizzleHourEntryRepository implements HourEntryRepository {
       assignedProjectTeamRows.map((row) => [`${row.projectId}:${row.teamId}`, row.projectTeamLeaderUserId]),
     );
 
-    // Líder del proyecto + líder del propio equipo del autor, si ese equipo
-    // está asignado al proyecto (DECISION-M4-HORAS.md "Con proyecto", acotado
-    // por autor — ver nota arriba). El líder del equipo se toma primero desde
-    // el override por-proyecto y, si no hay, desde el líder orgánico.
+    // EXCLUYENTE (DECISION-M4-HORAS.md "Tercera corrección"): el líder del
+    // propio equipo del autor, si ese equipo está asignado al proyecto —
+    // tomado primero desde el override por-proyecto y, si no hay, desde el
+    // líder orgánico. El líder del proyecto solo aparece cuando el autor no
+    // tiene líder de equipo resoluble; mismo criterio que
+    // `ProjectRepository.isProjectLeaderOrTeamLeaderOfMember`, que decide
+    // quién puede aprobar de verdad — este cálculo es solo para mostrar
+    // "pendiente con quién" en el listado, y debe coincidir.
     const projectApproverIdsByEntryId = new Map<string, Set<string>>();
     for (const row of rows) {
       if (!row.projectId) continue;
-      const set = new Set<string>();
-      if (row.projectLeaderUserId) set.add(row.projectLeaderUserId);
+      let teamLeaderId: string | null = null;
       const authorTeam = teamByUserId.get(row.userId);
       if (authorTeam) {
         const pairKey = `${row.projectId}:${authorTeam.id}`;
         if (assignedProjectTeamLeaderId.has(pairKey)) {
-          const effectiveLeaderId = assignedProjectTeamLeaderId.get(pairKey) ?? authorTeam.leaderUserId;
-          if (effectiveLeaderId) set.add(effectiveLeaderId);
+          teamLeaderId = assignedProjectTeamLeaderId.get(pairKey) ?? authorTeam.leaderUserId;
         }
       }
-      if (set.size > 0) projectApproverIdsByEntryId.set(row.id, set);
+      const approverId = teamLeaderId ?? row.projectLeaderUserId;
+      if (approverId) projectApproverIdsByEntryId.set(row.id, new Set([approverId]));
     }
 
     const approverIds = [

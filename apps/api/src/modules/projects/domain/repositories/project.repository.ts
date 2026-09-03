@@ -83,28 +83,32 @@ export interface ProjectRepository {
   /** Cuántos proyectos activos lidera o tiene asignados un usuario. Satisface `LeaderProfileResolver`. */
   countActiveLedByUser(userId: string, context?: TransactionContext): Promise<number>;
 
-  /** ¿Lidera el proyecto, o lidera algún equipo asignado a él? Satisface la autoridad de aprobación de M4. */
-  isProjectLeaderOrTeamLeader(projectId: string, userId: string, context?: TransactionContext): Promise<boolean>;
-
   /**
-   * ¿Lidera el proyecto, o lidera el equipo (asignado al proyecto) del que
-   * `memberUserId` es miembro activo? A diferencia de `isProjectLeaderOrTeamLeader`
-   * (¿puede actuar sobre el proyecto en general? — usado por Tickets), esto
-   * acota la aprobación de horas al propio equipo del autor del registro: el
-   * líder de OTRO equipo también asignado al mismo proyecto no debería recibir
-   * a aprobar horas de alguien que no lidera.
+   * ¿Puede `actorUserId` decidir/gestionar algo de `memberUserId` en este
+   * proyecto? EXCLUYENTE: si `memberUserId` tiene líder de equipo resoluble
+   * para este proyecto (override `project_teams.leaderUserId`, o el líder
+   * orgánico del equipo como respaldo), SOLO ese líder puede decidir — el
+   * líder del proyecto queda excluido de la decisión directa (sigue pudiendo
+   * verlas, ver `findApproverCandidatesForMember`). El líder del proyecto
+   * solo recupera la potestad de decidir cuando no hay líder de equipo
+   * resoluble — incluido el caso `memberUserId === null` (nada que resolver:
+   * sin persona no hay equipo que consultar), que Tickets usa para un ticket
+   * sin responsable asignado. Genérico a propósito: Horas lo usa para el
+   * dueño del registro, Tickets para el responsable del ticket — misma
+   * pregunta ("¿quién decide por esta persona en este proyecto?"), dos
+   * módulos.
    */
   isProjectLeaderOrTeamLeaderOfMember(
     projectId: string,
     actorUserId: string,
-    memberUserId: string,
+    memberUserId: string | null,
     context?: TransactionContext,
   ): Promise<boolean>;
 
-  /** Mismo criterio que `isProjectLeaderOrTeamLeaderOfMember`, pero enumerado — alimenta la columna "Aprobador" del historial de horas. */
+  /** Mismo criterio EXCLUYENTE que `isProjectLeaderOrTeamLeaderOfMember`, pero enumerado — alimenta la columna "Aprobador" del historial de horas y el resumen de pendientes del líder de proyecto. */
   findApproverCandidatesForMember(
     projectId: string,
-    memberUserId: string,
+    memberUserId: string | null,
     context?: TransactionContext,
   ): Promise<{ id: string; fullName: string }[]>;
 }

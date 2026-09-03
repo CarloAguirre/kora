@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { TICKET_STATUSES, type TicketStatus, type TicketSummary } from '@kora/contracts';
 import styles from './TicketsListPage.module.css';
 import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
@@ -9,6 +9,7 @@ import { TextField } from '@/shared/components/ui/TextField';
 import { AlertIcon, CalendarIcon, PlusIcon, SearchIcon, SparklesIcon, UserIcon } from '@/shared/components/icons/Icons';
 import { TicketPriorityBadge } from '../components/TicketPriorityBadge';
 import { TicketDetailModal } from '../components/TicketDetailModal';
+import { NewTicketDialog } from '../components/NewTicketDialog';
 import { useChangeTicketStatus, useTicketsList } from '../api/tickets.queries';
 import { useClientsList } from '@/modules/clients/api/clients.queries';
 import { useUsersList } from '@/modules/users/api/users.queries';
@@ -44,6 +45,7 @@ export function TicketsListPage() {
   const [assigneeUserId, setAssigneeUserId] = useState('');
   const [dragOverStatus, setDragOverStatus] = useState<TicketStatus | null>(null);
   const [openTicketId, setOpenTicketId] = useState<string | null>(null);
+  const [creatingTicket, setCreatingTicket] = useState(false);
 
   const changeStatus = useChangeTicketStatus();
   const { data: clients } = useClientsList({ page: 1, pageSize: 200, sortField: 'companyName' });
@@ -101,9 +103,9 @@ export function TicketsListPage() {
         <div className={styles.toolbar}>
           <div className={styles.toolbarActions}>
             {can('tickets:create') && (
-              <Link to="/tickets/nuevo">
-                <Button iconLeft={<PlusIcon size={18} />}>Nuevo Ticket</Button>
-              </Link>
+              <Button iconLeft={<PlusIcon size={18} />} onClick={() => setCreatingTicket(true)}>
+                Nuevo Ticket
+              </Button>
             )}
           </div>
           <div className={styles.filtersRow}>
@@ -174,6 +176,15 @@ export function TicketsListPage() {
       </div>
 
       {openTicketId && <TicketDetailModal ticketId={openTicketId} onClose={() => setOpenTicketId(null)} />}
+
+      <NewTicketDialog
+        open={creatingTicket}
+        onClose={() => setCreatingTicket(false)}
+        onCreated={(ticketId) => {
+          setCreatingTicket(false);
+          setOpenTicketId(ticketId);
+        }}
+      />
     </DashboardLayout>
   );
 }

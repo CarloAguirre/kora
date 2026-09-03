@@ -14,6 +14,7 @@ import {
   type ListCapacityReportResponse,
   type ListHourEntriesQuery,
   type ListHourEntriesResponse,
+  type ProjectPendingApprovalsResponse,
   type RejectHourEntryInput,
   type UpdateHourEntryInput,
 } from '@kora/contracts';
@@ -31,6 +32,7 @@ import { RejectHourEntryUseCase } from '../application/use-cases/reject-hour-ent
 import { DeleteHourEntryUseCase } from '../application/use-cases/delete-hour-entry.use-case';
 import { GetHoursCapacityReportUseCase } from '../application/use-cases/get-hours-capacity-report.use-case';
 import { GetHoursAvailabilityUseCase } from '../application/use-cases/get-hours-availability.use-case';
+import { GetProjectPendingApprovalsUseCase } from '../application/use-cases/get-project-pending-approvals.use-case';
 
 @Controller('hour-entries')
 export class HoursController {
@@ -44,6 +46,7 @@ export class HoursController {
     private readonly deleteEntry: DeleteHourEntryUseCase,
     private readonly getCapacityReport: GetHoursCapacityReportUseCase,
     private readonly getAvailability: GetHoursAvailabilityUseCase,
+    private readonly getProjectPendingApprovals: GetProjectPendingApprovalsUseCase,
   ) {}
 
   @Get()
@@ -75,6 +78,28 @@ export class HoursController {
     @Query(new ZodValidationPipe(availabilityQuerySchema)) query: AvailabilityQuery,
   ): Promise<AvailabilityResponse> {
     return unwrapOrThrow(await this.getAvailability.execute({ query }));
+  }
+
+  /**
+   * Horas pendientes que quedaron EXCLUYENTEMENTE con un líder de equipo, no
+   * con el propio líder de proyecto — ver `GetProjectPendingApprovalsUseCase`.
+   * Solo visible para el líder de ESE proyecto (o admin/pmo); `hours:approve`
+   * acota el endpoint a quien puede aprobar horas en general, y el caso de
+   * uso verifica el liderazgo puntual del proyecto.
+   */
+  @Get('projects/:projectId/pending-approvals')
+  @RequirePermissions('hours:approve')
+  async projectPendingApprovals(
+    @Param('projectId') projectId: string,
+    @CurrentUser() actor: RequestUser,
+  ): Promise<ProjectPendingApprovalsResponse> {
+    return unwrapOrThrow(
+      await this.getProjectPendingApprovals.execute({
+        projectId,
+        actor: toActorContext(actor),
+        actorRole: actor.role,
+      }),
+    );
   }
 
   @Get(':id')

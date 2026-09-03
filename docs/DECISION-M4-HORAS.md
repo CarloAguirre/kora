@@ -64,10 +64,10 @@ usa el resto del sistema — `isAdminLikeRole`/`hasRoleAccess`). Para el resto:
   aprobación a el líder de CUALQUIER equipo asignado al proyecto, no solo el
   del autor — un colaborador de "Desarrollo" podía terminar con sus horas
   aprobables por el líder de "UX-UI" solo porque ambos equipos están
-  asignados al mismo proyecto. `isProjectLeaderOrTeamLeader` (sin acotar)
-  sigue existiendo y en uso por Tickets, donde la pregunta es "¿puede actuar
-  sobre el proyecto en general?", no "¿puede aprobar las horas de esta
-  persona?" — no es el mismo caso de uso y no se tocó.
+  asignados al mismo proyecto. `isProjectLeaderOrTeamLeader` (sin acotar,
+  "¿puede actuar sobre el proyecto en general?") en ese momento seguía en uso
+  por Tickets sin este acotamiento — corregido después, ver "Actualización
+  (2026-09-03)" más abajo: ya no existe ese método.
 
   Segunda corrección, mismo hallazgo: el líder del equipo del autor a
   considerar es `project_teams.leaderUserId` ("líder para este proyecto", ver
@@ -76,14 +76,57 @@ usa el resto del sistema — `isAdminLikeRole`/`hasRoleAccess`). Para el resto:
   primera versión de `isProjectLeaderOrTeamLeaderOfMember` usaba el segundo.
   Ahora usa `coalesce(project_teams.leaderUserId, teams.leaderUserId)`, con el
   líder orgánico solo como respaldo cuando el proyecto no fijó uno propio.
-  Nota: `isProjectLeaderOrTeamLeader` (Tickets) tiene el mismo defecto sin
-  corregir — usa `teams.leaderUserId` directamente — pendiente si Tickets lo
-  necesita.
 - Registro sin proyecto: el aprobador designado, o quien lidera al dueño del
   registro (`TeamRepository.isTeamLeaderOfMember`, nuevo método).
 
 Esto vive en `HourEntryApprovalAuthorityService`, una decisión de aplicación
 explícita — no una política RLS que hay que leer en SQL para entender.
+
+### Tercera corrección: EXCLUYENTE, no "cualquiera de los dos" (regla de negocio explícita)
+
+Hasta acá, un registro con proyecto lo podía aprobar el líder del proyecto
+**o** el líder del equipo del autor — cualquiera de los dos, indistintamente.
+Revisión de negocio explícita (2026-09-03): esa no es la regla real. Es:
+
+- Si el colaborador **tiene** líder de equipo resoluble para este proyecto
+  (override `project_teams.leaderUserId`, o el líder orgánico del equipo como
+  respaldo), **solo ese líder de equipo** aprueba/rechaza — el líder de
+  proyecto queda excluido de la decisión directa.
+- Si el colaborador **no tiene** líder de equipo resoluble (no pertenece a
+  ningún equipo asignado al proyecto, o ese equipo no tiene líder ni override
+  ni orgánico), decide el líder del proyecto — igual que antes.
+- El líder de proyecto sigue necesitando saber que hay horas esperando a un
+  líder de equipo que aún no decide: no puede aprobarlas él, pero sí verlas.
+  Para eso existe `GetProjectPendingApprovalsUseCase`
+  (`GET /hour-entries/projects/:projectId/pending-approvals`), que agrupa por
+  líder de equipo lo pendiente que NO le corresponde decidir al propio líder
+  de proyecto, con cuántos registros, cuántas HH y desde cuándo. El frontend
+  lo pinta en `PendingApprovalsCard`, en la ficha del proyecto — visibilidad
+  únicamente, sin acción de aprobar desde ahí. No hay sistema de
+  notificaciones (ni email ni in-app) en el proyecto todavía; esta tarjeta es
+  deliberadamente la versión mínima ("verlo al entrar a la ficha"), no un
+  aviso proactivo.
+
+Esto cambió `isProjectLeaderOrTeamLeaderOfMember` y
+`findApproverCandidatesForMember` (`DrizzleProjectRepository`) para que
+resuelvan primero el líder de equipo del autor sobre ese proyecto, y solo
+caigan al líder de proyecto cuando ese primer paso no resuelve a nadie —en
+vez de una condición `OR` entre ambos.
+
+**Actualización (2026-09-03): Tickets ahora usa el mismo método.** El viejo
+`isProjectLeaderOrTeamLeader` (sin `OfMember`, "¿puede actuar sobre el
+proyecto en general?") tenía exactamente el mismo defecto sin corregir que
+esta sección documentaba desde la primera corrección: no acotaba por
+responsable, así que el líder de un equipo AJENO al responsable del ticket
+(pero asignado al mismo proyecto) podía gestionar el ticket igual que su
+propio líder. Se eliminó ese método — su único llamador real era
+`ProjectsModuleTicketProjectReader` — y Tickets pasó a usar
+`isProjectLeaderOrTeamLeaderOfMember(projectId, actorUserId,
+ticket.assigneeUserId)`, el mismo método que Horas, con `memberUserId`
+ampliado a `string | null` para cubrir un ticket sin responsable (cae
+directo al líder de proyecto, sin equipo que consultar). Ver
+docs/DECISION-M5-TICKETS.md "Autoridad sobre un ticket" para el detalle del
+lado de Tickets.
 
 ## Qué se dejó fuera de M4, deliberadamente
 

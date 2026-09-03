@@ -6,7 +6,6 @@ import {
   count,
   desc,
   eq,
-  exists,
   ilike,
   inArray,
   isNull,
@@ -192,102 +191,88 @@ export class DrizzleProjectRepository implements ProjectRepository {
     return rows[0]?.value ?? 0;
   }
 
-  async isProjectLeaderOrTeamLeader(projectId: string, userId: string, context?: TransactionContext): Promise<boolean> {
-    const db = resolveDb(this.database, context);
-    const rows = await db
-      .select({ id: projects.id })
-      .from(projects)
-      .where(
-        and(
-          eq(projects.id, projectId),
-          or(
-            eq(projects.leaderUserId, userId),
-            exists(
-              db
-                .select({ id: projectTeams.id })
-                .from(projectTeams)
-                .innerJoin(teams, eq(teams.id, projectTeams.teamId))
-                .where(and(eq(projectTeams.projectId, projectId), eq(teams.leaderUserId, userId))),
-            ),
-          ),
-        ),
+  /**
+   * Líder(es) del equipo del que `memberUserId` es miembro activo, ACOTADO a
+   * los equipos de ese miembro que están asignados a `projectId` — no
+   * cualquier equipo del proyecto. `coalesce(project_teams.leaderUserId,
+   * teams.leaderUserId)` porque un equipo puede tener un líder distinto por
+   * proyecto (`ProjectTeamRepository`/`UpsertProjectTeamInput.leaderUserId`),
+   * con el líder orgánico del equipo como respaldo cuando el proyecto no fijó
+   * uno propio. Puede haber más de un resultado si el miembro pertenece a más
+   * de un equipo asignado al proyecto (caso raro, pero no se descarta).
+   * `memberUserId === null` (p.ej. un ticket sin responsable) no tiene equipo
+   * que consultar: siempre vacío, sin ir a la base de datos.
+   */
+  private async findTeamLeadersForMemberOnProject(db: Database, projectId: string, memberUserId: string | null) {
+    if (memberUserId === null) return [];
+
+    return db
+      .select({ id: users.id, firstName: users.firstName, lastName: users.lastName })
+      .from(projectTeams)
+      .innerJoin(teams, eq(teams.id, projectTeams.teamId))
+      .innerJoin(users, sql`${users.id} = coalesce(${projectTeams.leaderUserId}, ${teams.leaderUserId})`)
+      .innerJoin(
+        teamMembers,
+        and(eq(teamMembers.teamId, teams.id), eq(teamMembers.userId, memberUserId), isNull(teamMembers.leftAt)),
       )
-      .limit(1);
-    return rows.length > 0;
+      .where(eq(projectTeams.projectId, projectId));
   }
 
+  /**
+   * ¿Puede `actorUserId` decidir/gestionar algo de `memberUserId` en este
+   * proyecto? EXCLUYENTE, no "cualquiera de los dos": si el autor/responsable
+   * tiene líder de equipo asignado a este proyecto, SOLO ese líder decide —
+   * el líder del proyecto queda excluido (solo informado, ver
+   * `findApproverCandidatesForMember`/`GetProjectPendingApprovalsUseCase`).
+   * El líder de proyecto solo recupera la potestad de decidir cuando no hay
+   * líder de equipo resoluble (ni override de proyecto ni líder orgánico del
+   * equipo), incluido `memberUserId === null` — ver docs/DECISION-M4-HORAS.md.
+   * Usado por Horas (dueño del registro) y Tickets (responsable del ticket).
+   */
   async isProjectLeaderOrTeamLeaderOfMember(
     projectId: string,
     actorUserId: string,
-    memberUserId: string,
+    memberUserId: string | null,
     context?: TransactionContext,
   ): Promise<boolean> {
     const db = resolveDb(this.database, context);
+    const teamLeaders = await this.findTeamLeadersForMemberOnProject(db, projectId, memberUserId);
+
+    if (teamLeaders.length > 0) {
+      return teamLeaders.some((leader) => leader.id === actorUserId);
+    }
+
     const rows = await db
       .select({ id: projects.id })
       .from(projects)
-      .where(
-        and(
-          eq(projects.id, projectId),
-          or(
-            eq(projects.leaderUserId, actorUserId),
-            exists(
-              db
-                .select({ id: projectTeams.id })
-                .from(projectTeams)
-                .innerJoin(teams, eq(teams.id, projectTeams.teamId))
-                .innerJoin(
-                  teamMembers,
-                  and(eq(teamMembers.teamId, teams.id), eq(teamMembers.userId, memberUserId), isNull(teamMembers.leftAt)),
-                )
-                .where(
-                  and(
-                    eq(projectTeams.projectId, projectId),
-                    // Líder del equipo PARA ESTE PROYECTO (override), con
-                    // el líder orgánico del equipo como respaldo — un mismo
-                    // equipo puede tener un líder distinto por proyecto (ver
-                    // `ProjectTeamRepository`/`UpsertProjectTeamInput.leaderUserId`).
-                    sql`coalesce(${projectTeams.leaderUserId}, ${teams.leaderUserId}) = ${actorUserId}`,
-                  ),
-                ),
-            ),
-          ),
-        ),
-      )
+      .where(and(eq(projects.id, projectId), eq(projects.leaderUserId, actorUserId)))
       .limit(1);
     return rows.length > 0;
   }
 
+  /** Mismo criterio EXCLUYENTE que `isProjectLeaderOrTeamLeaderOfMember`, pero enumerado — alimenta la columna "Aprobador" del historial de horas. */
   async findApproverCandidatesForMember(
     projectId: string,
-    memberUserId: string,
+    memberUserId: string | null,
     context?: TransactionContext,
   ): Promise<{ id: string; fullName: string }[]> {
     const db = resolveDb(this.database, context);
-    const rows = await db
-      .select({ id: users.id, firstName: users.firstName, lastName: users.lastName })
-      .from(projects)
-      .leftJoin(users, eq(users.id, projects.leaderUserId))
-      .where(eq(projects.id, projectId))
-      .unionAll(
-        db
-          .select({ id: users.id, firstName: users.firstName, lastName: users.lastName })
-          .from(projectTeams)
-          .innerJoin(teams, eq(teams.id, projectTeams.teamId))
-          .innerJoin(users, sql`${users.id} = coalesce(${projectTeams.leaderUserId}, ${teams.leaderUserId})`)
-          .innerJoin(
-            teamMembers,
-            and(eq(teamMembers.teamId, teams.id), eq(teamMembers.userId, memberUserId), isNull(teamMembers.leftAt)),
-          )
-          .where(eq(projectTeams.projectId, projectId)),
-      );
+    const teamLeaderRows = await this.findTeamLeadersForMemberOnProject(db, projectId, memberUserId);
 
     const byId = new Map<string, { id: string; fullName: string }>();
-    for (const row of rows) {
+    for (const row of teamLeaderRows) {
       if (!row.id) continue;
       byId.set(row.id, { id: row.id, fullName: `${row.firstName ?? ''} ${row.lastName ?? ''}`.trim() });
     }
-    return [...byId.values()];
+    if (byId.size > 0) return [...byId.values()];
+
+    const projectLeaderRows = await db
+      .select({ id: users.id, firstName: users.firstName, lastName: users.lastName })
+      .from(projects)
+      .innerJoin(users, eq(users.id, projects.leaderUserId))
+      .where(eq(projects.id, projectId));
+
+    return projectLeaderRows.map((row) => ({ id: row.id, fullName: `${row.firstName ?? ''} ${row.lastName ?? ''}`.trim() }));
   }
 
   private buildWhere(filters: ProjectFilters) {

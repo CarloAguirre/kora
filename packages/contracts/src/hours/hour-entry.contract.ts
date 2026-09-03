@@ -52,10 +52,12 @@ export const hourEntrySummarySchema = z.object({
   rejectionReason: z.string().nullable(),
   designatedApprover: z.object({ id: uuidSchema, fullName: z.string() }).nullable(),
   /**
-   * Quiénes pueden aprobar este registro cuando es de proyecto: el líder del
-   * proyecto y/o el líder del propio equipo del autor, si ese equipo está
-   * asignado al proyecto (ver DECISION-M4-HORAS.md "Con proyecto" — acotado
-   * al equipo del autor, no cualquier equipo asignado al proyecto). Vacío
+   * Quién puede aprobar este registro cuando es de proyecto: EXCLUYENTE — el
+   * líder del propio equipo del autor si tiene uno resoluble para este
+   * proyecto, y si no, el líder del proyecto (ver DECISION-M4-HORAS.md "Con
+   * proyecto" — acotado al equipo del autor, no cualquier equipo asignado al
+   * proyecto). En la práctica trae como mucho una persona; es un arreglo por
+   * si el autor pertenece a más de un equipo asignado al proyecto. Vacío
    * para registros sin proyecto — ahí el aprobador es `designatedApprover`.
    */
   projectApprovers: z.array(z.object({ id: uuidSchema, fullName: z.string() })),
@@ -232,3 +234,37 @@ export const availabilityResponseSchema = z.object({
   registeredHoursByUserAndDate: z.record(z.string(), z.number()),
 });
 export type AvailabilityResponse = z.infer<typeof availabilityResponseSchema>;
+
+/**
+ * Resumen de horas pendientes que quedaron con un líder de equipo (no con el
+ * propio líder de proyecto) — ver `GetProjectPendingApprovalsUseCase` y
+ * DECISION-M4-HORAS.md "Autoridad de aprobación". Solo lo ve el líder del
+ * proyecto (o admin/pmo): es la forma en que se entera de que un líder de
+ * equipo aún no ha decidido, sin poder aprobar/rechazar él mismo esas horas.
+ */
+export const projectPendingApprovalCollaboratorSchema = z.object({
+  userId: uuidSchema,
+  userName: z.string(),
+  entryCount: z.number().int(),
+  totalHours: z.number(),
+  /** Fecha (ISO `yyyy-mm-dd`) del registro pendiente más antiguo de este colaborador. */
+  oldestPendingDate: z.string(),
+});
+export type ProjectPendingApprovalCollaborator = z.infer<typeof projectPendingApprovalCollaboratorSchema>;
+
+export const projectPendingApprovalGroupSchema = z.object({
+  approverUserId: uuidSchema,
+  approverName: z.string(),
+  entryCount: z.number().int(),
+  totalHours: z.number(),
+  /** Fecha (ISO `yyyy-mm-dd`) del registro pendiente más antiguo del grupo. */
+  oldestPendingDate: z.string(),
+  /** De qué colaborador es cada tramo de lo pendiente — no solo el total del líder. */
+  collaborators: z.array(projectPendingApprovalCollaboratorSchema),
+});
+export type ProjectPendingApprovalGroup = z.infer<typeof projectPendingApprovalGroupSchema>;
+
+export const projectPendingApprovalsResponseSchema = z.object({
+  groups: z.array(projectPendingApprovalGroupSchema),
+});
+export type ProjectPendingApprovalsResponse = z.infer<typeof projectPendingApprovalsResponseSchema>;

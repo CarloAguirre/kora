@@ -34,7 +34,7 @@ export class RejectTicketHhRequestUseCase implements UseCase<RejectTicketHhReque
 
     if (request.userId === actor.userId) return err(new CannotReviewOwnTicketHhRequestError());
     if (actorRole !== 'admin' && actorRole !== 'pmo') {
-      const isApprover = await this.projects.isProjectApprover(request.projectId, actor.userId);
+      const isApprover = await this.projects.isProjectApprover(request.projectId, actor.userId, request.userId);
       if (!isApprover) return err(new CannotReviewTicketHhRequestError());
     }
 

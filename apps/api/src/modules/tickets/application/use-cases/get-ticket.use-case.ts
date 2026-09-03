@@ -37,7 +37,9 @@ export class GetTicketUseCase implements UseCase<GetTicketCommand, TicketDetail,
     }
 
     const snapshot = ticket.toSnapshot();
-    const isApprover = snapshot.projectId ? await this.projects.isProjectApprover(snapshot.projectId, command.actorUserId) : false;
+    const isApprover = snapshot.projectId
+      ? await this.projects.isProjectApprover(snapshot.projectId, command.actorUserId, snapshot.assigneeUserId)
+      : false;
     const isAssignee = snapshot.assigneeUserId === command.actorUserId;
     const canManage = command.actorPermissions.includes('tickets:manage') || isAssignee || isApprover;
     const canDelete = isAdminTier(command.actorRole) || (command.actorPermissions.includes('tickets:manage') && (isAssignee || isApprover));

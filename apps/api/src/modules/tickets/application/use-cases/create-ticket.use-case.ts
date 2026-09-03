@@ -65,6 +65,7 @@ export class CreateTicketUseCase implements UseCase<CreateTicketCommand, { id: s
       title: data.title,
       serviceType: data.serviceType,
       description: data.description,
+      evidenceUrl: data.evidenceUrl,
       priority: data.priority,
       assigneeUserId: data.assigneeUserId,
       estimatedHours: data.estimatedHours,

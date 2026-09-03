@@ -135,6 +135,7 @@
 .groupRowContent {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--kora-space-2);
   padding: 6px var(--kora-space-3);
 }
@@ -169,7 +170,11 @@
   margin-left: auto;
   font-size: var(--kora-text-xs);
   color: var(--kora-text-muted);
-  white-space: nowrap;
+}
+
+.pendingBadge {
+  color: var(--kora-warning);
+  font-weight: var(--kora-weight-semibold);
 }
 
 .memberRow td {
@@ -182,6 +187,11 @@
 
 .memberCellMuted {
   color: var(--kora-text-muted);
+}
+
+.pendingCell {
+  color: var(--kora-warning);
+  font-weight: var(--kora-weight-semibold);
 }
 
 .memberCellActions {

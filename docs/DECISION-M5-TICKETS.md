@@ -70,6 +70,46 @@ del motor financiero de soporte.
 Nada de esto se "resuelve en silencio": cada punto queda anotado aquí y el
 ETL de esta pasada no migra esas tablas, no las trunca ni las toca.
 
+## Autoridad sobre un ticket (2026-09-03)
+
+`canManageTicket` (`ticket-access.ts`) decide quién puede avanzar/cerrar un
+ticket, borrarlo, o cargarle horas (`ChangeTicketStatusUseCase`,
+`DeleteTicketUseCase`, `GetTicketUseCase` para los flags `canManage`/
+`canDelete`/`canRequestHh`, y `Approve/RejectTicketHhRequestUseCase`): con
+`tickets:manage` siempre; sin ese permiso, si el actor es el responsable del
+ticket, o si tiene autoridad sobre su proyecto.
+
+Esa autoridad sobre el proyecto usaba `isProjectLeaderOrTeamLeader` — "¿lidera
+el proyecto, o lidera CUALQUIER equipo asignado a él?", sin mirar de qué
+equipo era el responsable del ticket. Mismo defecto, sin corregir hasta
+ahora, que Horas tuvo y corrigió (ver DECISION-M4-HORAS.md "Autoridad de
+aprobación"): el líder de un equipo ajeno al responsable, pero también
+asignado al proyecto, podía gestionar el ticket igual que el líder real del
+equipo del responsable.
+
+Se corrigió igual que Horas, reusando el mismo método
+(`ProjectRepository.isProjectLeaderOrTeamLeaderOfMember`, ampliado a aceptar
+`memberUserId: string | null`) en vez de duplicar la lógica: EXCLUYENTE — si
+el responsable del ticket tiene líder de equipo resoluble para ESE proyecto,
+solo ese líder gestiona; si no (o el ticket no tiene responsable), decide el
+líder del proyecto. El viejo `isProjectLeaderOrTeamLeader` se eliminó — su
+único llamador real era `ProjectsModuleTicketProjectReader`.
+
+En la práctica, hoy esto siempre resuelve al líder del proyecto de soporte:
+ningún proyecto de tipo `support` tiene filas en `project_teams` (los
+equipos solo se asignan a proyectos de desarrollo desde "Nuevo proyecto"),
+así que no hay líder de equipo que resolver para ningún ticket — validado
+contra los 39 tickets abiertos en la base real, los 39 caen al líder del
+proyecto de soporte, cero sin aprobador resoluble. La ruta de líder de
+equipo queda lista para si algún día se asignan equipos a un proyecto de
+soporte, sin necesitar otro cambio de código.
+
+`CreateTicketHhRequestUseCase` (autoaprobación de la propia solicitud de
+horas) usa el mismo método sobre sí mismo:
+`isProjectApprover(projectId, actor.userId, actor.userId)` — "¿decidiría el
+actor sus propias horas en este proyecto?" — en vez de la pregunta más
+amplia de antes ("¿tiene autoridad sobre el proyecto en general?").
+
 ## Confirmado antes de migrar
 
 `bolsa`, `mensual`, `a_demanda` (el modelo anterior a `soporte_plan_contrato`)

@@ -13,7 +13,7 @@ export class ProjectsModuleHourEntryProjectReader implements HourEntryProjectRea
   async findById(projectId: string): Promise<HourEntryProjectReference | null> {
     const project = await this.projects.findById(projectId);
     if (!project || project.isDeleted) return null;
-    return { id: project.id, name: project.name, status: project.status };
+    return { id: project.id, name: project.name, status: project.status, leaderUserId: project.leaderUserId };
   }
 
   async findManyByIds(projectIds: readonly string[]): Promise<HourEntryProjectReference[]> {

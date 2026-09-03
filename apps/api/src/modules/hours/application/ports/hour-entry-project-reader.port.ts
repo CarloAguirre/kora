@@ -4,6 +4,7 @@ export interface HourEntryProjectReference {
   readonly id: string;
   readonly name: string;
   readonly status: ProjectStatus;
+  readonly leaderUserId: string | null;
 }
 
 export interface HourEntryProjectApprover {

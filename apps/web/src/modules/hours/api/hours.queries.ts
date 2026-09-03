@@ -57,6 +57,21 @@ export function useHourEntryDetail(entryId: string | null) {
   });
 }
 
+/**
+ * Horas que quedaron pendientes EXCLUYENTEMENTE con un líder de equipo, no
+ * con el propio líder de proyecto — ver DECISION-M4-HORAS.md. Solo responde
+ * algo útil para quien lidera el proyecto (o admin/pmo); el backend rechaza
+ * al resto, así que el llamador debe pasar `enabled` acorde.
+ */
+export function useProjectPendingApprovals(projectId: string | null, enabled = true) {
+  return useQuery({
+    queryKey: hourKeys.projectPendingApprovals(projectId ?? ''),
+    queryFn: () => hoursApi.projectPendingApprovals(projectId as string),
+    enabled: Boolean(projectId) && enabled,
+    staleTime: 30_000,
+  });
+}
+
 function useInvalidateHourEntries() {
   const queryClient = useQueryClient();
   return () => {

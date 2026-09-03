@@ -21,9 +21,10 @@ import { ProjectInfoBar, type ProjectDocument } from '../components/ProjectInfoB
 import { ProjectTimeline } from '../components/ProjectTimeline';
 import { TeamHoursSummaryChart } from '../components/TeamHoursSummaryChart';
 import { BitacoraCard } from '../components/BitacoraCard';
+import { PendingApprovalsCard } from '../components/PendingApprovalsCard';
 import { useAssignProjectMember, useUnassignProjectMember, useAddProjectObservation } from '../api/projects.queries';
 import { useTeamMemberOptions, useTeamsList } from '@/modules/teams/api/teams.queries';
-import { useHourEntriesList } from '@/modules/hours/api/hours.queries';
+import { useHourEntriesList, useProjectPendingApprovals } from '@/modules/hours/api/hours.queries';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { ApiRequestError } from '@/shared/lib/api-client';
@@ -96,9 +97,9 @@ export function DevelopmentProjectDetailView({ project, projectId }: { project: 
    * asignado" cuando el equipo sí tiene uno.
    */
   const teamLeaderCatalog = useMemo(() => {
-    const map = new Map<string, string>();
+    const map = new Map<string, { id: string; fullName: string }>();
     for (const team of teamsCatalog?.items ?? []) {
-      if (team.leader) map.set(team.id, team.leader.fullName);
+      if (team.leader) map.set(team.id, team.leader);
     }
     return map;
   }, [teamsCatalog]);
@@ -106,15 +107,25 @@ export function DevelopmentProjectDetailView({ project, projectId }: { project: 
   const teamSummaries = useMemo(() => {
     const summaries = new Map<
       string,
-      { teamId: string; teamName: string; leaderName: string | null; memberCount: number; assignedHours: number; consumedHours: number }
+      {
+        teamId: string;
+        teamName: string;
+        leaderId: string | null;
+        leaderName: string | null;
+        memberCount: number;
+        assignedHours: number;
+        consumedHours: number;
+      }
     >();
     const hasRealTeamRow = new Set(project.teams.map((team) => team.teamId));
 
     for (const team of project.teams) {
+      const leader = team.leader ?? teamLeaderCatalog.get(team.teamId) ?? null;
       summaries.set(team.teamId, {
         teamId: team.teamId,
         teamName: team.teamName,
-        leaderName: team.leader?.fullName ?? teamLeaderCatalog.get(team.teamId) ?? null,
+        leaderId: leader?.id ?? null,
+        leaderName: leader?.fullName ?? null,
         memberCount: team.memberCount,
         assignedHours: team.assignedHours ?? 0,
         consumedHours: 0,
@@ -130,10 +141,12 @@ export function DevelopmentProjectDetailView({ project, projectId }: { project: 
           existing.assignedHours += member.assignedHours;
         }
       } else {
+        const leader = teamLeaderCatalog.get(member.teamId) ?? null;
         summaries.set(member.teamId, {
           teamId: member.teamId,
           teamName: member.teamName,
-          leaderName: teamLeaderCatalog.get(member.teamId) ?? null,
+          leaderId: leader?.id ?? null,
+          leaderName: leader?.fullName ?? null,
           memberCount: 1,
           assignedHours: member.assignedHours,
           consumedHours: member.consumedHours,
@@ -168,6 +181,39 @@ export function DevelopmentProjectDetailView({ project, projectId }: { project: 
         project.developer?.id === user.id ||
         project.commercialManager?.id === user.id ||
         project.members.some((member) => member.userId === user.id)));
+
+  /**
+   * Mismo criterio que `GetProjectPendingApprovalsUseCase` en el backend: el
+   * líder de proyecto (o admin/pmo) es quien necesita este aviso, porque ya
+   * no puede aprobar directamente las horas que le tocan a un líder de
+   * equipo — ver docs/DECISION-M4-HORAS.md.
+   */
+  const canSeePendingApprovals =
+    user !== null && (user.role === 'admin' || user.role === 'pmo' || project.leader?.id === user.id);
+
+  // Misma consulta que `PendingApprovalsCard` (mismo query key) — React Query
+  // la comparte, no duplica la llamada de red.
+  const { data: pendingApprovals } = useProjectPendingApprovals(projectId, canSeePendingApprovals);
+
+  /** Horas pendientes de ESE colaborador puntual, para pintarlas junto a su fila en "Equipo asignado". */
+  const pendingHoursByUserId = useMemo(() => {
+    const map = new Map<string, { entryCount: number; totalHours: number }>();
+    for (const group of pendingApprovals?.groups ?? []) {
+      for (const collaborator of group.collaborators) {
+        map.set(collaborator.userId, { entryCount: collaborator.entryCount, totalHours: collaborator.totalHours });
+      }
+    }
+    return map;
+  }, [pendingApprovals]);
+
+  /** Total pendiente con el líder de ESE equipo, para pintarlo en el encabezado del grupo. */
+  const pendingHoursByApproverId = useMemo(() => {
+    const map = new Map<string, { entryCount: number; totalHours: number }>();
+    for (const group of pendingApprovals?.groups ?? []) {
+      map.set(group.approverUserId, { entryCount: group.entryCount, totalHours: group.totalHours });
+    }
+    return map;
+  }, [pendingApprovals]);
 
   const onAssignMember = memberForm.handleSubmit(async (values) => {
     setMemberError(null);
@@ -274,6 +320,7 @@ export function DevelopmentProjectDetailView({ project, projectId }: { project: 
                     <th scope="col">Actividad</th>
                     <th scope="col">HH asignadas</th>
                     <th scope="col">HH consumidas</th>
+                    {canSeePendingApprovals && <th scope="col">Pendiente aprob.</th>}
                     <th scope="col" aria-label="Acciones" />
                   </tr>
                 </thead>
@@ -281,10 +328,12 @@ export function DevelopmentProjectDetailView({ project, projectId }: { project: 
                   const style = getTeamStyle(team.teamName);
                   const deviatedHours = Math.max(0, team.consumedHours - team.assignedHours);
                   const members = membersByTeam.get(team.teamId) ?? [];
+                  const columnCount = canSeePendingApprovals ? 6 : 5;
+                  const pendingWithLeader = team.leaderId ? pendingHoursByApproverId.get(team.leaderId) : undefined;
                   return (
                     <tbody key={team.teamId}>
                       <tr className={styles.groupRow} style={{ background: style.bg }}>
-                        <td colSpan={5}>
+                        <td colSpan={columnCount}>
                           <div className={styles.groupRowContent}>
                             <span className={styles.groupAvatar} style={{ background: style.color }}>
                               {style.sigla}
@@ -299,35 +348,51 @@ export function DevelopmentProjectDetailView({ project, projectId }: { project: 
                               <span className={deviatedHours > 0 ? styles.teamHealthDanger : styles.teamHealthOk}>
                                 {deviatedHours > 0 ? `${formatHours(deviatedHours)}h desv.` : 'en rango'}
                               </span>
+                              {pendingWithLeader && (
+                                <>
+                                  {' · '}
+                                  <span className={styles.pendingBadge}>
+                                    {formatHours(pendingWithLeader.totalHours)}h pendientes de aprobar ({pendingWithLeader.entryCount})
+                                  </span>
+                                </>
+                              )}
                             </span>
                           </div>
                         </td>
                       </tr>
 
                       {members.length > 0 ? (
-                        members.map((m) => (
-                          <tr key={m.id} className={styles.memberRow}>
-                            <td>{m.fullName}</td>
-                            <td className={styles.memberCellMuted}>{m.activity ?? '—'}</td>
-                            <td>{formatHours(m.assignedHours)}</td>
-                            <td>{formatHours(m.consumedHours)}</td>
-                            <td className={styles.memberCellActions}>
-                              {can('projects:manage') && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => void onUnassign(m.id)}
-                                  aria-label={`Quitar a ${m.fullName}`}
-                                >
-                                  <TrashIcon size={16} />
-                                </Button>
+                        members.map((m) => {
+                          const pending = pendingHoursByUserId.get(m.userId);
+                          return (
+                            <tr key={m.id} className={styles.memberRow}>
+                              <td>{m.fullName}</td>
+                              <td className={styles.memberCellMuted}>{m.activity ?? '—'}</td>
+                              <td>{formatHours(m.assignedHours)}</td>
+                              <td>{formatHours(m.consumedHours)}</td>
+                              {canSeePendingApprovals && (
+                                <td className={pending ? styles.pendingCell : styles.memberCellMuted}>
+                                  {pending ? `${formatHours(pending.totalHours)}h (${pending.entryCount})` : '—'}
+                                </td>
                               )}
-                            </td>
-                          </tr>
-                        ))
+                              <td className={styles.memberCellActions}>
+                                {can('projects:manage') && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => void onUnassign(m.id)}
+                                    aria-label={`Quitar a ${m.fullName}`}
+                                  >
+                                    <TrashIcon size={16} />
+                                  </Button>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })
                       ) : (
                         <tr>
-                          <td colSpan={5} className={styles.emptyGroupCell}>
+                          <td colSpan={columnCount} className={styles.emptyGroupCell}>
                             Sin colaboradores asignados en este equipo.
                           </td>
                         </tr>
@@ -373,6 +438,8 @@ export function DevelopmentProjectDetailView({ project, projectId }: { project: 
       </div>
 
       <div className={styles.colRight}>
+        <PendingApprovalsCard projectId={projectId} visible={canSeePendingApprovals} />
+
         <BitacoraCard
           events={projectHourEntries?.items ?? []}
           observations={project.observations}

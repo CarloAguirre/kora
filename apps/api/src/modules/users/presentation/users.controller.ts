@@ -64,9 +64,11 @@ export class UsersController {
   @Get()
   // `hours:register` cubre el selector de "Líder aprobador" del modal de
   // registro de horas (roles sin `users:read`, p.ej. colaborador, necesitan
-  // listar líderes para elegir a quién le aprueban sus horas). El caso de uso
-  // fuerza `role: 'leader'` para ese permiso, sin importar lo que pida la query.
-  @RequireAnyPermission('users:read', 'hours:register')
+  // listar líderes para elegir a quién le aprueban sus horas); `tickets:create`
+  // cubre el selector de "Responsable" al crear/editar un ticket, que puede ser
+  // cualquier persona. `ListUsersUseCase` decide, según cuál de los dos tenga
+  // el actor, si fuerza `role: 'leader'` o respeta la query tal cual.
+  @RequireAnyPermission('users:read', 'hours:register', 'tickets:create')
   async list(
     @Query(new ZodValidationPipe(listUsersQuerySchema)) query: ListUsersQuery,
     @CurrentUser() actor: RequestUser,

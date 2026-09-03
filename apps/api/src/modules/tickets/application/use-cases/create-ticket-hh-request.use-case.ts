@@ -54,7 +54,10 @@ export class CreateTicketHhRequestUseCase implements UseCase<CreateTicketHhReque
 
     const isAdminTier = actorRole === 'admin' || actorRole === 'pmo';
     const isAssignee = ticket.assigneeUserId === actor.userId;
-    const isApprover = isAdminTier ? true : await this.projects.isProjectApprover(ticket.projectId, actor.userId);
+    // Autoridad sobre SU PROPIA carga: ¿el actor sería quien decide sus
+    // propias horas en este proyecto? (líder de su propio equipo, o líder de
+    // proyecto si no tiene uno) — mismo criterio EXCLUYENTE que Horas.
+    const isApprover = isAdminTier ? true : await this.projects.isProjectApprover(ticket.projectId, actor.userId, actor.userId);
     if (!isAdminTier && !isAssignee && !isApprover) return err(new CannotSubmitTicketHhRequestError());
 
     const now = this.clock.now();
