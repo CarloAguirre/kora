@@ -1,18 +1,32 @@
-import type { TicketDetail, TicketSummary } from '@kora/contracts';
+import type { TicketDetail, TicketServiceType, TicketSummary } from '@kora/contracts';
 import type { Ticket } from '../../domain/entities/ticket.entity';
 import type { TicketListItem } from '../../domain/repositories/ticket.repository';
 import type { TicketHistoryEntryRecord } from '../../domain/repositories/ticket-history.repository';
 import type { TicketClientReference } from '../ports/ticket-client-reader.port';
 import type { TicketProjectReference } from '../ports/ticket-project-reader.port';
 
+/**
+ * Código visible — réplica de `getSupportTicketDisplayCode` (v1): la v1 nunca
+ * mostraba `id_ticket` tal cual, lo formateaba como `IN0879`/`ME0886` (mejora
+ * vs el resto) a partir de sus dígitos + el tipo de servicio. `legacyId` en
+ * v2 guarda el valor crudo (clave de upsert idempotente en cada reimportación)
+ * — este es el único lugar que lo traduce al código que la gente reconoce.
+ */
+function formatTicketCode(legacyId: string | null, serviceType: TicketServiceType | null): string | null {
+  if (!legacyId) return null;
+  const digits = legacyId.replace(/\D/g, '').padStart(4, '0');
+  return serviceType === 'improvement' ? `ME${digits}` : `IN${digits}`;
+}
+
 export function toTicketSummary(item: TicketListItem): TicketSummary {
+  const serviceType = item.serviceType as TicketSummary['serviceType'];
   return {
     id: item.id,
-    code: item.legacyId,
+    code: formatTicketCode(item.legacyId, serviceType),
     title: item.title,
     client: item.clientId ? { id: item.clientId, companyName: item.clientName ?? '' } : null,
     project: item.projectId ? { id: item.projectId, name: item.projectName ?? '' } : null,
-    serviceType: item.serviceType as TicketSummary['serviceType'],
+    serviceType,
     priority: item.priority as TicketSummary['priority'],
     status: item.status,
     assignee: item.assigneeUserId ? { id: item.assigneeUserId, fullName: item.assigneeName ?? '' } : null,
@@ -31,6 +45,7 @@ export interface TicketDetailSource {
   readonly history: readonly TicketHistoryEntryRecord[];
   readonly canManage: boolean;
   readonly canDelete: boolean;
+  readonly canRequestHh: boolean;
 }
 
 export function toTicketDetail(source: TicketDetailSource): TicketDetail {
@@ -38,7 +53,7 @@ export function toTicketDetail(source: TicketDetailSource): TicketDetail {
 
   return {
     id: snapshot.id,
-    code: snapshot.legacyId,
+    code: formatTicketCode(snapshot.legacyId, snapshot.serviceType),
     title: snapshot.title,
     client: snapshot.clientId ? { id: snapshot.clientId, companyName: source.client?.companyName ?? '' } : null,
     project: snapshot.projectId ? { id: snapshot.projectId, name: source.project?.name ?? '' } : null,
@@ -68,5 +83,6 @@ export function toTicketDetail(source: TicketDetailSource): TicketDetail {
     updatedAt: snapshot.updatedAt.toISOString(),
     canManage: source.canManage,
     canDelete: source.canDelete,
+    canRequestHh: source.canRequestHh,
   };
 }

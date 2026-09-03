@@ -1,0 +1,159 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-3);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-3);
+}
+
+.avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--kora-navy);
+  color: var(--kora-lime);
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-bold);
+  flex-shrink: 0;
+}
+
+.identity {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.name {
+  font-size: var(--kora-text-lg);
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-navy);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.team {
+  font-size: var(--kora-text-sm);
+  color: var(--kora-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.loadRow {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+}
+
+.barTrack {
+  flex: 1;
+  height: 6px;
+  border-radius: var(--kora-radius-pill);
+  background: var(--kora-surface-disabled);
+  overflow: hidden;
+}
+
+.barFill {
+  height: 100%;
+  border-radius: var(--kora-radius-pill);
+  transition: width var(--kora-transition);
+}
+
+.barSuccess {
+  background: var(--kora-success);
+}
+
+.barWarning {
+  background: var(--kora-warning-strong);
+}
+
+.barDanger {
+  background: var(--kora-danger);
+}
+
+.statusText {
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-semibold);
+  white-space: nowrap;
+}
+
+.statusSuccess {
+  color: var(--kora-success);
+}
+
+.statusWarning {
+  color: var(--kora-warning-text);
+}
+
+.statusDanger {
+  color: var(--kora-danger);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--kora-space-2);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 4px var(--kora-space-2);
+  border-radius: var(--kora-radius-sm);
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-semibold);
+  white-space: nowrap;
+}
+
+.chipProject {
+  background: var(--kora-blue-surface);
+  color: var(--kora-navy);
+}
+
+.chipSupport {
+  background: var(--kora-blue-surface-alt);
+  color: var(--kora-info);
+}
+
+.chipVacation {
+  background: var(--kora-warning-surface);
+  color: var(--kora-warning-text);
+}
+
+.chipTraining {
+  background: var(--kora-success-surface);
+  color: var(--kora-success-text);
+}
+
+.chipSick {
+  background: var(--kora-danger-surface-soft);
+  color: var(--kora-danger-hover);
+}
+
+.chipNeutral {
+  background: var(--kora-surface-disabled);
+  color: var(--kora-text-muted);
+}
+
+.chipEmpty {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 4px var(--kora-space-2);
+  border-radius: var(--kora-radius-sm);
+  border: 1px dashed var(--kora-border-soft);
+  color: var(--kora-text-disabled);
+  font-size: var(--kora-text-xs);
+  font-style: italic;
+  white-space: nowrap;
+}

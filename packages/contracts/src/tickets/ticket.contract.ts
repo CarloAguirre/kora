@@ -113,6 +113,13 @@ export const ticketDetailSchema = ticketSummarySchema.extend({
   canManage: z.boolean(),
   /** Más restrictivo que `canManage` — ver `DeleteTicketUseCase`. */
   canDelete: z.boolean(),
+  /**
+   * Réplica de `canRegisterTicketHH` (v1) — a propósito NO incluye
+   * `tickets:manage`: un admin/PMO que solo supervisa no debe poder cargar
+   * horas de un ticket ajeno, solo su responsable o quien tiene autoridad
+   * real sobre el proyecto, y nunca sobre un ticket cerrado.
+   */
+  canRequestHh: z.boolean(),
 });
 export type TicketDetail = z.infer<typeof ticketDetailSchema>;
 

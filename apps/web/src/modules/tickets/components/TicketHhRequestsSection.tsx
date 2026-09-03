@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { TICKET_HH_REQUEST_STATUS_LABELS, type TicketHhRequest } from '@kora/contracts';
 import styles from './TicketHhRequestsSection.module.css';
 import { Badge, type BadgeTone } from '@/shared/components/ui/Badge';
@@ -12,6 +12,7 @@ import {
   useRejectTicketHhRequest,
   useTicketHhRequestsList,
 } from '../api/ticket-hh-requests.queries';
+import { computeApprovedHhBreakdown } from '../lib/ticket-hh-breakdown';
 
 const STATUS_TONE: Record<TicketHhRequest['status'], BadgeTone> = {
   pending: 'warning',
@@ -21,11 +22,12 @@ const STATUS_TONE: Record<TicketHhRequest['status'], BadgeTone> = {
 
 const formatDate = (value: string) => new Date(`${value}T00:00:00`).toLocaleDateString('es-CL');
 const formatDateTime = (value: string) => new Date(value).toLocaleString('es-CL');
+const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 2 });
 const todayIso = () => new Date().toISOString().slice(0, 10);
 
 interface TicketHhRequestsSectionProps {
   ticketId: string;
-  /** Solo se puede solicitar si el ticket tiene un proyecto asociado. */
+  /** `ticket.canRequestHh` — responsable o autoridad del proyecto, ticket no cerrado y con proyecto asociado (ver `GetTicketUseCase`). */
   canRequest: boolean;
 }
 
@@ -49,6 +51,10 @@ export function TicketHhRequestsSection({ ticketId, canRequest }: TicketHhReques
   const [rejectionReason, setRejectionReason] = useState('');
 
   const canApprove = can('hours:approve');
+
+  /** "HH cargadas por colaborador" de la v1 — vive de las mismas solicitudes ya cargadas, filtradas a aprobadas. */
+  const approvedBreakdown = useMemo(() => computeApprovedHhBreakdown(requests), [requests]);
+  const approvedTotal = approvedBreakdown.reduce((sum, user) => sum + user.hours, 0);
 
   const submitRequest = async () => {
     const hoursValue = Number(hours);
@@ -77,6 +83,18 @@ export function TicketHhRequestsSection({ ticketId, canRequest }: TicketHhReques
       <div className={styles.header}>
         <span className={styles.label}>Solicitudes de HH:</span>
       </div>
+
+      {approvedBreakdown.length > 0 && (
+        <div className={styles.breakdown}>
+          <span className={styles.breakdownTotal}>HH cargadas por colaborador: {formatHours(approvedTotal)}hrs en total</span>
+          {approvedBreakdown.map((user) => (
+            <div key={user.userId} className={styles.breakdownRow}>
+              <span>{user.fullName}</span>
+              <span>{formatHours(user.hours)}hrs</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {canRequest && (
         <div className={styles.form}>

@@ -2,6 +2,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--kora-space-4);
+  width: 100%;
 }
 
 .periodRow {
@@ -36,33 +37,28 @@
   color: var(--kora-warning-strong);
 }
 
+.toolbar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--kora-space-3);
+  flex-wrap: wrap;
+}
+
 .search {
   max-width: 320px;
-  margin-bottom: var(--kora-space-3);
+  flex: 1;
+  min-width: 220px;
 }
 
-.projectBadges {
+.sortGroup {
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--kora-space-1);
+  align-items: flex-end;
+  gap: var(--kora-space-2);
 }
 
-.projectBadge {
-  display: inline-flex;
-  align-items: center;
-  height: 24px;
-  padding: 4px var(--kora-space-2);
-  border-radius: var(--kora-radius-sm);
-  background: var(--kora-blue-surface);
-  color: var(--kora-text);
-  font-size: var(--kora-text-xs);
-  font-weight: var(--kora-weight-medium);
-  white-space: nowrap;
-}
-
-.projectBadgeWarning {
-  background: var(--kora-warning-surface);
-  color: var(--kora-warning-text);
+.sortField {
+  min-width: 180px;
 }
 
 .empty {
@@ -70,36 +66,9 @@
   font-size: var(--kora-text-sm);
 }
 
-.loadCell {
-  display: flex;
-  align-items: center;
-  gap: var(--kora-space-2);
-  min-width: 140px;
-}
-
-.loadTrack {
-  flex: 1;
-  height: 8px;
-  border-radius: var(--kora-radius-pill);
-  background: var(--kora-surface-disabled);
-  overflow: hidden;
-}
-
-.loadFill {
-  height: 100%;
-  border-radius: var(--kora-radius-pill);
-  background: var(--kora-warning-strong);
-  transition: width 0.2s;
-}
-
-.loadFillFull {
-  background: var(--kora-success);
-}
-
-.loadLabel {
-  font-size: var(--kora-text-sm);
-  font-weight: var(--kora-weight-semibold);
-  color: var(--kora-text);
-  min-width: 38px;
-  text-align: right;
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  align-items: start;
+  gap: var(--kora-space-3);
 }

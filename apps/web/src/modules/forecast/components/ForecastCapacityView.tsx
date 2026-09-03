@@ -1,18 +1,26 @@
 import { useMemo, useState } from 'react';
-import type { ForecastCapacityMember } from '@kora/contracts';
 import styles from './ForecastCapacityView.module.css';
 import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Card } from '@/shared/components/ui/Card';
 import { Select } from '@/shared/components/ui/Select';
 import { TextField } from '@/shared/components/ui/TextField';
-import { DataTable, type Column, type SortState } from '@/shared/components/ui/DataTable';
+import { Button } from '@/shared/components/ui/Button';
 import { Pagination } from '@/shared/components/ui/Pagination';
-import { SearchIcon } from '@/shared/components/icons/Icons';
+import { SearchIcon, ArrowUpDownIcon } from '@/shared/components/icons/Icons';
+import type { SortState } from '@/shared/components/ui/DataTable';
 import { useForecastCapacity } from '../api/forecast.queries';
 import { buildLaborWeeks, currentLaborWeek } from '../lib/labor-weeks';
+import { ForecastCapacityCard } from './ForecastCapacityCard';
 
 const PAGE_SIZE = 20;
 type SortField = 'fullName' | 'teamName' | 'assignedHours' | 'loadPercent';
+
+const SORT_OPTIONS: { value: SortField; label: string }[] = [
+  { value: 'fullName', label: 'Nombre' },
+  { value: 'teamName', label: 'Equipo' },
+  { value: 'loadPercent', label: 'Carga' },
+  { value: 'assignedHours', label: 'HH asignadas' },
+];
 
 const WEEKS = buildLaborWeeks();
 
@@ -69,13 +77,6 @@ export function ForecastCapacityView() {
     return { totalMembers, unassigned, availability };
   }, [data]);
 
-  const columns: Column<ForecastCapacityMember>[] = [
-    { key: 'fullName', header: 'Colaborador', sortable: true, render: (m) => m.fullName },
-    { key: 'teamName', header: 'Equipo', sortable: true, render: (m) => m.teamName },
-    { key: 'items', header: 'Proyectos / HH', render: (m) => <ProjectBadges member={m} /> },
-    { key: 'loadPercent', header: 'Carga', sortable: true, render: (m) => <LoadBar percent={m.loadPercent} /> },
-  ];
-
   return (
     <DashboardLayout title="Forecast">
       <div className={styles.page}>
@@ -106,7 +107,7 @@ export function ForecastCapacityView() {
           </Card>
         </div>
 
-        <Card>
+        <div className={styles.toolbar}>
           <TextField
             className={styles.search}
             label="Buscar"
@@ -120,72 +121,39 @@ export function ForecastCapacityView() {
             iconLeft={<SearchIcon size={16} />}
           />
 
-          <DataTable
-            caption="Capacidad de forecast por colaborador"
-            columns={columns}
-            items={pageItems}
-            getRowKey={(m) => m.teamMemberId}
-            loading={isLoading}
-            error={error ? 'No se pudo cargar el forecast.' : null}
-            emptyMessage="No hay colaboradores que coincidan con la búsqueda."
-            sort={sort}
-            onSortChange={(field) => {
-              setSort((prev) =>
-                prev.field === field ? { field: field as SortField, direction: prev.direction === 'asc' ? 'desc' : 'asc' } : { field: field as SortField, direction: 'asc' },
-              );
-            }}
-          />
+          <div className={styles.sortGroup}>
+            <Select
+              className={styles.sortField}
+              label="Ordenar por"
+              options={SORT_OPTIONS}
+              value={sort.field}
+              onChange={(event) => setSort((prev) => ({ field: event.target.value as SortField, direction: prev.direction }))}
+            />
+            <Button
+              variant="outline"
+              size="icon"
+              aria-label={sort.direction === 'asc' ? 'Cambiar a orden descendente' : 'Cambiar a orden ascendente'}
+              onClick={() => setSort((prev) => ({ ...prev, direction: prev.direction === 'asc' ? 'desc' : 'asc' }))}
+            >
+              <ArrowUpDownIcon size={16} />
+            </Button>
+          </div>
+        </div>
 
-          <Pagination page={page} pageCount={pageCount} total={total} pageSize={PAGE_SIZE} onPageChange={setPage} />
-        </Card>
+        {isLoading && <p className={styles.empty}>Cargando…</p>}
+        {error && <p className={styles.empty}>No se pudo cargar el forecast.</p>}
+        {!isLoading && !error && pageItems.length === 0 && (
+          <p className={styles.empty}>No hay colaboradores que coincidan con la búsqueda.</p>
+        )}
+
+        <div className={styles.cards}>
+          {pageItems.map((member) => (
+            <ForecastCapacityCard key={member.teamMemberId} member={member} />
+          ))}
+        </div>
+
+        <Pagination page={page} pageCount={pageCount} total={total} pageSize={PAGE_SIZE} onPageChange={setPage} />
       </div>
     </DashboardLayout>
-  );
-}
-
-function ProjectBadges({ member }: { member: ForecastCapacityMember }) {
-  if (member.items.length === 0) {
-    return <span className={styles.empty}>Sin asignación</span>;
-  }
-
-  return (
-    <div className={styles.projectBadges}>
-      {member.items.map((item, index) => (
-        <span
-          key={`${item.type}-${item.projectId ?? index}`}
-          className={[styles.projectBadge, item.type === 'training' ? styles.projectBadgeWarning : ''].filter(Boolean).join(' ')}
-          title={item.comments.join(' · ')}
-        >
-          {item.projectName ?? typeLabel(item.type)} · {item.hours}h
-        </span>
-      ))}
-    </div>
-  );
-}
-
-function typeLabel(type: string): string {
-  const labels: Record<string, string> = {
-    vacation: 'Vacaciones',
-    admin_day: 'Día administrativo',
-    day_off: 'Día libre',
-    sick_leave: 'Licencia médica',
-    training: 'Capacitación',
-    other: 'Otros',
-  };
-  return labels[type] ?? type;
-}
-
-function LoadBar({ percent }: { percent: number }) {
-  const clamped = Math.min(100, Math.max(0, percent));
-  return (
-    <div className={styles.loadCell}>
-      <div className={styles.loadTrack}>
-        <div
-          className={[styles.loadFill, percent === 100 ? styles.loadFillFull : ''].filter(Boolean).join(' ')}
-          style={{ width: `${clamped}%` }}
-        />
-      </div>
-      <span className={styles.loadLabel}>{percent}%</span>
-    </div>
   );
 }

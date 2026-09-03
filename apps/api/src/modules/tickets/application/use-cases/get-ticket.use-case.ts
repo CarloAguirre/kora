@@ -41,6 +41,13 @@ export class GetTicketUseCase implements UseCase<GetTicketCommand, TicketDetail,
     const isAssignee = snapshot.assigneeUserId === command.actorUserId;
     const canManage = command.actorPermissions.includes('tickets:manage') || isAssignee || isApprover;
     const canDelete = isAdminTier(command.actorRole) || (command.actorPermissions.includes('tickets:manage') && (isAssignee || isApprover));
+    /**
+     * Réplica de `canRegisterTicketHH` (v1): a diferencia de `canManage`, NO
+     * basta con `tickets:manage` — un admin/PMO que solo supervisa no debe
+     * poder cargarse horas de un ticket ajeno. Solo el responsable o quien
+     * tiene autoridad real sobre el proyecto, y nunca sobre un ticket cerrado.
+     */
+    const canRequestHh = Boolean(snapshot.projectId) && (isAssignee || isApprover) && snapshot.status !== 'closed';
 
     const [client, project, developmentProject, assignee, historyEntries] = await Promise.all([
       snapshot.clientId ? this.clients.findById(snapshot.clientId) : Promise.resolve(null),
@@ -50,6 +57,8 @@ export class GetTicketUseCase implements UseCase<GetTicketCommand, TicketDetail,
       this.history.listForTicket(ticket.id),
     ]);
 
-    return ok(toTicketDetail({ ticket, client, project, developmentProject, assignee, history: historyEntries, canManage, canDelete }));
+    return ok(
+      toTicketDetail({ ticket, client, project, developmentProject, assignee, history: historyEntries, canManage, canDelete, canRequestHh }),
+    );
   }
 }

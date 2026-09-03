@@ -1,0 +1,41 @@
+.wrapper {
+  position: relative;
+  display: inline-flex;
+  cursor: help;
+}
+
+.tooltip {
+  position: absolute;
+  bottom: calc(100% + var(--kora-space-2));
+  right: 0;
+  z-index: var(--kora-z-dropdown);
+  display: none;
+  flex-direction: column;
+  gap: var(--kora-space-1);
+  min-width: 180px;
+  max-width: 260px;
+  padding: var(--kora-space-3);
+  border-radius: var(--kora-radius-sm);
+  background: var(--kora-navy);
+  color: var(--kora-surface);
+  font-size: var(--kora-text-xs);
+  box-shadow: var(--kora-shadow-lg);
+  white-space: normal;
+}
+
+.wrapper:hover .tooltip,
+.wrapper:focus-visible .tooltip,
+.wrapper:focus-within .tooltip {
+  display: flex;
+}
+
+.title {
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-semibold);
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--kora-space-3);
+}

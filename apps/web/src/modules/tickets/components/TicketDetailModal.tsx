@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   TICKET_PRIORITY_LABELS,
   nextForwardTicketStatus,
@@ -7,29 +7,47 @@ import {
 import styles from './TicketDetailModal.module.css';
 import priorityStyles from './TicketPriorityBadge.module.css';
 import { Button } from '@/shared/components/ui/Button';
-import { AlertIcon, CalendarIcon, ChevronDownIcon, ClockIcon, CloseIcon, PencilIcon, SparklesIcon } from '@/shared/components/icons/Icons';
+import {
+  AlertIcon,
+  ArrowUpDownIcon,
+  CalendarIcon,
+  ChevronDownIcon,
+  ClockIcon,
+  CloseIcon,
+  PencilIcon,
+  PlusIcon,
+  SparklesIcon,
+} from '@/shared/components/icons/Icons';
 import { TicketStatusBadge } from './TicketStatusBadge';
 import { TicketHhRequestsSection } from './TicketHhRequestsSection';
+import { HhBreakdownTooltip } from './HhBreakdownTooltip';
 import { EditTicketDialog } from './EditTicketDialog';
+import { CompleteTicketDialog } from './CompleteTicketDialog';
 import { ConfirmActionDialog } from '@/shared/components/ui/ConfirmActionDialog';
 import { useChangeTicketStatus, useDeleteTicket, useTicketDetail, useUpdateTicket } from '../api/tickets.queries';
+import { useTicketHhRequestsList } from '../api/ticket-hh-requests.queries';
+import { computeApprovedHhBreakdown } from '../lib/ticket-hh-breakdown';
 import { useToast } from '@/shared/components/ui/Toast';
-import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { ApiRequestError } from '@/shared/lib/api-client';
 
 const formatDateTime = (value: string) => new Date(value).toLocaleString('es-CL');
 const formatDate = (value: string) => new Date(value).toLocaleDateString('es-CL');
 
 /**
- * `metadata` es JSON heredado de la v1 (`ticket_history.metadata`), sin forma
- * fija por `eventType` — antes se leía de la base y se descartaba antes de
- * llegar aquí. Se muestra como pares clave/valor genéricos en vez de intentar
- * modelar cada forma posible.
+ * Ícono por tipo de evento — solo para orientar de un vistazo, no intenta
+ * cubrir cada `eventType` legacy posible. La descripción (`entry.description`)
+ * ya narra el evento en español; `metadata` (JSON heredado de la v1, sin forma
+ * fija) es redundante con ella en la práctica y no se muestra en crudo.
  */
-function formatMetadataEntries(metadata: Record<string, unknown>): string[] {
-  return Object.entries(metadata)
-    .filter(([, value]) => value !== null && value !== undefined && value !== '')
-    .map(([key, value]) => `${key}: ${typeof value === 'object' ? JSON.stringify(value) : String(value)}`);
+function historyEventIcon(eventType: string) {
+  const type = eventType.toLowerCase();
+  if (type.includes('creat')) return <PlusIcon size={14} />;
+  if (type.includes('hh')) return <ClockIcon size={14} />;
+  if (type.includes('status') || type.includes('estado') || type.includes('reopen') || type.includes('clos')) {
+    return <ArrowUpDownIcon size={14} />;
+  }
+  if (type.includes('solution') || type.includes('solucion')) return <AlertIcon size={14} />;
+  return <PencilIcon size={14} />;
 }
 
 /**
@@ -60,7 +78,6 @@ function forwardActionLabel(current: TicketStatus, target: TicketStatus): string
  * de M5" que ese mismo documento dejaba anotado.
  */
 export function TicketDetailModal({ ticketId, onClose }: { ticketId: string; onClose: () => void }) {
-  const { can } = usePermissions();
   const toast = useToast();
   const { data: ticket, isLoading, error } = useTicketDetail(ticketId);
   const changeStatus = useChangeTicketStatus();
@@ -69,15 +86,14 @@ export function TicketDetailModal({ ticketId, onClose }: { ticketId: string; onC
   const forbidden = error instanceof ApiRequestError && error.isForbidden;
   const forwardStatus = ticket ? nextForwardTicketStatus(ticket.status, ticket.serviceType) : null;
   const isUnassignedPending = ticket ? ticket.status === 'pending' && !ticket.assignee : false;
+  const { data: hhRequests } = useTicketHhRequestsList(ticketId);
+  const hhBreakdown = computeApprovedHhBreakdown(hhRequests);
 
-  const [resolutionDraft, setResolutionDraft] = useState('');
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [closeOpen, setCloseOpen] = useState(false);
+  const [completeOpen, setCompleteOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
-  useEffect(() => {
-    setResolutionDraft(ticket?.resolution ?? '');
-  }, [ticket?.resolution]);
 
   const reportError = (error: unknown, fallback: string) => {
     toast.error(error instanceof ApiRequestError ? error.message : fallback);
@@ -92,13 +108,15 @@ export function TicketDetailModal({ ticketId, onClose }: { ticketId: string; onC
     }
   };
 
-  const onSaveResolution = async () => {
-    try {
-      await updateTicket.mutateAsync({ ticketId, input: { resolution: resolutionDraft } });
-      toast.success('Se guardó la solución del ticket.');
-    } catch (error) {
-      reportError(error, 'No se pudo guardar la solución.');
-    }
+  /**
+   * Igual que la v1: la solución se pide justo al confirmar el paso a
+   * "Terminado", no antes — nunca queda un campo editable esperando mientras
+   * el ticket sigue en trabajo (ver `CompleteTicketDialog`).
+   */
+  const onCompleteWithResolution = async (resolution: string) => {
+    await updateTicket.mutateAsync({ ticketId, input: { resolution } });
+    await changeStatus.mutateAsync({ ticketId, input: { status: 'done' } });
+    toast.success('Se registró la solución y se terminó el ticket.');
   };
 
   return (
@@ -166,7 +184,9 @@ export function TicketDetailModal({ ticketId, onClose }: { ticketId: string; onC
                 <div className={styles.row}>
                   <ClockIcon size={16} />
                   <span className={styles.label}>HH Utilizadas:</span>
-                  <span className={styles.value}>{ticket.usedHours}hrs</span>
+                  <HhBreakdownTooltip breakdown={hhBreakdown}>
+                    <span className={styles.value}>{ticket.usedHours}hrs</span>
+                  </HhBreakdownTooltip>
                 </div>
               </div>
             </div>
@@ -189,35 +209,17 @@ export function TicketDetailModal({ ticketId, onClose }: { ticketId: string; onC
 
             <div className={styles.section}>
               <span className={styles.label}>Solución aplicada:</span>
-              {/* En la v1 el editor de solución solo aparece al avanzar el ticket ("Terminar Proceso"),
-                  nunca en Pendiente ni en Cerrado — ahí siempre es de solo lectura. */}
+              {/* Igual que en la v1: acá siempre es de solo lectura — la solución se
+                  pide al confirmar "Terminar Proceso"/"Marcar Terminado" (ver CompleteTicketDialog). */}
               {ticket.resolution ? (
                 <p className={styles.text}>{ticket.resolution}</p>
-              ) : ticket.canManage && ticket.status !== 'pending' && ticket.status !== 'closed' ? (
-                <div className={styles.resolutionEditor}>
-                  <textarea
-                    className={styles.resolutionInput}
-                    value={resolutionDraft}
-                    placeholder="Describe la solución aplicada"
-                    onChange={(event) => setResolutionDraft(event.target.value)}
-                  />
-                  <Button
-                    variant="tertiary"
-                    size="sm"
-                    loading={updateTicket.isPending}
-                    disabled={resolutionDraft === (ticket.resolution ?? '')}
-                    onClick={() => void onSaveResolution()}
-                  >
-                    Guardar solución
-                  </Button>
-                </div>
               ) : (
                 <span className={styles.empty}>Sin solución registrada</span>
               )}
             </div>
 
             <div className={styles.section}>
-              <TicketHhRequestsSection ticketId={ticketId} canRequest={can('hours:register') && Boolean(ticket.project)} />
+              <TicketHhRequestsSection ticketId={ticketId} canRequest={ticket.canRequestHh} />
             </div>
 
             <div className={styles.divider} />
@@ -235,24 +237,17 @@ export function TicketDetailModal({ ticketId, onClose }: { ticketId: string; onC
               {historyOpen && (
                 <div className={styles.history}>
                   {ticket.history.length === 0 && <span className={styles.empty}>Sin eventos todavía.</span>}
-                  {ticket.history.map((entry) => {
-                    const metadataEntries = formatMetadataEntries(entry.metadata);
-                    return (
-                      <div key={entry.id} className={styles.historyEntry}>
+                  {ticket.history.map((entry) => (
+                    <div key={entry.id} className={styles.historyEntry}>
+                      <span className={styles.historyIcon}>{historyEventIcon(entry.eventType)}</span>
+                      <div className={styles.historyBody}>
                         <p className={styles.historyDescription}>{entry.description}</p>
                         <p className={styles.historyMeta}>
                           {entry.actorName ?? 'Sistema'} · {formatDateTime(entry.occurredAt)}
                         </p>
-                        {metadataEntries.length > 0 && (
-                          <ul className={styles.historyMetadata}>
-                            {metadataEntries.map((line) => (
-                              <li key={line}>{line}</li>
-                            ))}
-                          </ul>
-                        )}
                       </div>
-                    );
-                  })}
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -277,7 +272,11 @@ export function TicketDetailModal({ ticketId, onClose }: { ticketId: string; onC
                       variant="primary"
                       disabled={isUnassignedPending}
                       loading={changeStatus.isPending}
-                      onClick={() => (forwardStatus === 'closed' ? setCloseOpen(true) : void onStatusChange(forwardStatus))}
+                      onClick={() => {
+                        if (forwardStatus === 'closed') return setCloseOpen(true);
+                        if (forwardStatus === 'done' && !ticket.resolution) return setCompleteOpen(true);
+                        void onStatusChange(forwardStatus);
+                      }}
                     >
                       {forwardActionLabel(ticket.status, forwardStatus)}
                     </Button>
@@ -311,6 +310,14 @@ export function TicketDetailModal({ ticketId, onClose }: { ticketId: string; onC
                 toast.success('Se cerró el ticket.');
               }}
             />
+            {forwardStatus === 'done' && (
+              <CompleteTicketDialog
+                open={completeOpen}
+                confirmLabel={forwardActionLabel(ticket.status, forwardStatus)}
+                onClose={() => setCompleteOpen(false)}
+                onConfirm={onCompleteWithResolution}
+              />
+            )}
           </>
         )}
       </div>
