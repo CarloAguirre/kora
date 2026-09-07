@@ -1,4 +1,4 @@
-import { clients, eq, projects, supportMonthlyPeriods, supportPlans, ticketHistoryEntries, tickets } from '@kora/db';
+import { clients, eq, projects, sql, supportMonthlyPeriods, supportPlans, ticketHistoryEntries, tickets } from '@kora/db';
 import type { TicketPriority, TicketServiceType, TicketStatus } from '@kora/contracts';
 import { StepTracker, type EtlContext } from '../lib/context';
 import { loadLegacyEmailByAuthId, loadUserIdsByEmail, loadUserIdsByLegacyAuthId, loadUserIdsByLegacyId, resolveUserId } from '../lib/user-lookup';
@@ -114,6 +114,29 @@ export async function migrateTickets(context: EtlContext): Promise<void> {
   await migrateSupportPlans(context, clientIds, projectIds);
   await migrateTicketRows(context, clientIds, projectIds, userIdsByLegacyId);
   await migrateTicketHistory(context, userIdsByLegacyAuth, userIdsByLegacyId, legacyEmailByAuthId, userIdsByEmail);
+  await advanceTicketCodeSequence(context);
+}
+
+/**
+ * `DrizzleTicketCodeGenerator` numera los tickets nuevos con
+ * `nextval('tickets_code_seq')` formateado como `TK-####` — el mismo formato
+ * que trae `ticket.id_ticket` en la v1. Sin este paso la secuencia arranca en
+ * 1 y el primer ticket creado a mano choca con el `UNIQUE` de `legacy_id`
+ * contra cualquiera de los cientos de tickets heredados (bug real: pasó en
+ * el ambiente de prueba, cada intento de "Nuevo Ticket" fallaba con
+ * violación de unicidad hasta agotar los códigos ya usados por la v1).
+ */
+async function advanceTicketCodeSequence(context: EtlContext): Promise<void> {
+  await context.target.execute(sql`
+    select setval(
+      'tickets_code_seq',
+      coalesce(
+        (select max((regexp_match(legacy_id, '^TK-(\d+)$'))[1]::int) from tickets where legacy_id ~ '^TK-\d+$'),
+        0
+      ),
+      true
+    )
+  `);
 }
 
 async function migrateTicketRows(
