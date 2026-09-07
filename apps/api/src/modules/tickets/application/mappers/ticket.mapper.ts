@@ -24,8 +24,14 @@ export function toTicketSummary(item: TicketListItem): TicketSummary {
     id: item.id,
     code: formatTicketCode(item.legacyId, serviceType),
     title: item.title,
+    description: item.description,
+    resolution: item.resolution,
     client: item.clientId ? { id: item.clientId, companyName: item.clientName ?? '' } : null,
     project: item.projectId ? { id: item.projectId, name: item.projectName ?? '' } : null,
+    supportLeaderInitials: item.supportLeaderInitials,
+    developmentProject: item.developmentProjectId
+      ? { id: item.developmentProjectId, name: item.developmentProjectName ?? '' }
+      : null,
     serviceType,
     priority: item.priority as TicketSummary['priority'],
     status: item.status,
@@ -57,6 +63,11 @@ export function toTicketDetail(source: TicketDetailSource): TicketDetail {
     title: snapshot.title,
     client: snapshot.clientId ? { id: snapshot.clientId, companyName: source.client?.companyName ?? '' } : null,
     project: snapshot.projectId ? { id: snapshot.projectId, name: source.project?.name ?? '' } : null,
+    // El modal de detalle no trae al líder del proyecto de soporte —
+    // "Líder Soporte" solo existe hoy en el listado/export (ver
+    // DrizzleTicketRepository.search). Ampliar TicketProjectReader para
+    // incluirlo aquí también es trabajo aparte si se necesita en el modal.
+    supportLeaderInitials: null,
     developmentProject: snapshot.developmentProjectId
       ? { id: snapshot.developmentProjectId, name: source.developmentProject?.name ?? '' }
       : null,

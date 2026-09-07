@@ -1,11 +1,19 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, clients, count, desc, eq, ilike, inArray, isNull, or, projects, tickets, users, type Database } from '@kora/db';
+import { alias, and, asc, clients, count, desc, eq, ilike, inArray, isNull, or, projects, tickets, users, type Database } from '@kora/db';
 import { buildPage, toOffset, type Page, type PageRequest, type SortRequest, type TransactionContext } from '@kora/core';
 import type { TicketFilters, TicketListItem, TicketRepository, TicketSortableField } from '../../domain/repositories/ticket.repository';
 import type { Ticket } from '../../domain/entities/ticket.entity';
 import { DATABASE } from '../../../../shared/infrastructure/database/database.module';
 import { resolveDb } from '../../../../shared/infrastructure/database/unit-of-work';
 import { toDomain, toPersistence } from './ticket.persistence-mapper';
+
+/** "Pablo Vega" → "PV" — réplica de `getUserInitials` (v1). */
+function initials(firstName: string | null, lastName: string | null): string | null {
+  const first = firstName?.trim().split(/\s+/)[0]?.charAt(0) ?? '';
+  const last = lastName?.trim().split(/\s+/)[0]?.charAt(0) ?? '';
+  const value = `${first}${last}`.toUpperCase();
+  return value || null;
+}
 
 @Injectable()
 export class DrizzleTicketRepository implements TicketRepository {
@@ -31,6 +39,8 @@ export class DrizzleTicketRepository implements TicketRepository {
   ): Promise<Page<TicketListItem>> {
     const db = resolveDb(this.database, context);
     const where = this.buildWhere(filters);
+    const developmentProjects = alias(projects, 'development_projects');
+    const supportLeaders = alias(users, 'support_leaders');
 
     const [rows, totalRows] = await Promise.all([
       db
@@ -38,10 +48,16 @@ export class DrizzleTicketRepository implements TicketRepository {
           id: tickets.id,
           legacyId: tickets.legacyId,
           title: tickets.title,
+          description: tickets.description,
+          resolution: tickets.resolution,
           clientId: tickets.clientId,
           clientName: clients.companyName,
           projectId: tickets.projectId,
           projectName: projects.name,
+          supportLeaderFirstName: supportLeaders.firstName,
+          supportLeaderLastName: supportLeaders.lastName,
+          developmentProjectId: tickets.developmentProjectId,
+          developmentProjectName: developmentProjects.name,
           serviceType: tickets.serviceType,
           priority: tickets.priority,
           status: tickets.status,
@@ -55,6 +71,8 @@ export class DrizzleTicketRepository implements TicketRepository {
         .from(tickets)
         .leftJoin(clients, eq(clients.id, tickets.clientId))
         .leftJoin(projects, eq(projects.id, tickets.projectId))
+        .leftJoin(supportLeaders, eq(supportLeaders.id, projects.leaderUserId))
+        .leftJoin(developmentProjects, eq(developmentProjects.id, tickets.developmentProjectId))
         .leftJoin(users, eq(users.id, tickets.assigneeUserId))
         .where(where)
         .orderBy(...this.buildOrderBy(sort))
@@ -68,10 +86,15 @@ export class DrizzleTicketRepository implements TicketRepository {
       id: row.id,
       legacyId: row.legacyId,
       title: row.title,
+      description: row.description,
+      resolution: row.resolution,
       clientId: row.clientId,
       clientName: row.clientName,
       projectId: row.projectId,
       projectName: row.projectName,
+      supportLeaderInitials: initials(row.supportLeaderFirstName, row.supportLeaderLastName),
+      developmentProjectId: row.developmentProjectId,
+      developmentProjectName: row.developmentProjectName,
       serviceType: row.serviceType,
       priority: row.priority,
       status: row.status,

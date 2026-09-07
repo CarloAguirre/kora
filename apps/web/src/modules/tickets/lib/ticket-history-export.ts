@@ -5,12 +5,18 @@ function formatDate(value: string): string {
   return new Date(value).toLocaleDateString('es-CL');
 }
 
+// Mismo orden que HISTORY_TICKET_DATA_COLUMNS (v1) — quien exportaba esta
+// planilla todos los meses la sigue reconociendo columna por columna.
 const COLUMNS: ReadonlyArray<{ label: string; getValue: (ticket: TicketSummary) => string | number }> = [
   { label: 'Cod. Ticket', getValue: (t) => t.code ?? '' },
   { label: 'Título', getValue: (t) => t.title },
+  { label: 'Responsable', getValue: (t) => t.assignee?.fullName ?? 'Sin asignar' },
+  { label: 'Incidente', getValue: (t) => t.description ?? '' },
+  { label: 'Solución', getValue: (t) => t.resolution ?? '' },
   { label: 'Cliente', getValue: (t) => t.client?.companyName ?? '' },
   { label: 'Proyecto Soporte', getValue: (t) => t.project?.name ?? '' },
-  { label: 'Responsable', getValue: (t) => t.assignee?.fullName ?? 'Sin asignar' },
+  { label: 'Líder Soporte', getValue: (t) => t.supportLeaderInitials ?? '' },
+  { label: 'Proyecto Desarrollo', getValue: (t) => t.developmentProject?.name ?? '' },
   { label: 'Estado', getValue: (t) => TICKET_STATUS_LABELS[t.status] },
   { label: 'Prioridad', getValue: (t) => (t.priority ? TICKET_PRIORITY_LABELS[t.priority] : '') },
   { label: 'F. Reporte', getValue: (t) => formatDate(t.createdAt) },

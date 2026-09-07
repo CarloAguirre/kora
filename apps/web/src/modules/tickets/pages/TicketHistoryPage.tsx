@@ -83,8 +83,19 @@ export function TicketHistoryPage() {
     setExportError(null);
     setExporting(true);
     try {
-      const all = await ticketsApi.list({ ...query, page: 1, pageSize: 200 });
-      exportTicketHistory(all.items);
+      // La API limita pageSize a 200 (ver paginationQuerySchema) para que
+      // nadie pida la tabla entera de un tirón — el export sí la necesita
+      // entera, así que pagina hasta juntar `total` filas en vez de asumir
+      // que todo cabe en una página.
+      const EXPORT_PAGE_SIZE = 200;
+      const first = await ticketsApi.list({ ...query, page: 1, pageSize: EXPORT_PAGE_SIZE });
+      const rows = [...first.items];
+      const pageCount = Math.ceil(first.total / EXPORT_PAGE_SIZE);
+      for (let currentPage = 2; currentPage <= pageCount; currentPage += 1) {
+        const next = await ticketsApi.list({ ...query, page: currentPage, pageSize: EXPORT_PAGE_SIZE });
+        rows.push(...next.items);
+      }
+      exportTicketHistory(rows);
     } catch (exportErr) {
       setExportError(exportErr instanceof ApiRequestError ? exportErr.message : 'No se pudo generar el Excel.');
     } finally {
@@ -104,9 +115,13 @@ export function TicketHistoryPage() {
       ),
     },
     { key: 'title', header: 'Título', render: (ticket) => ticket.title },
+    { key: 'assignee', header: 'Responsable', render: (ticket) => ticket.assignee?.fullName ?? 'Sin asignar' },
+    { key: 'description', header: 'Incidente', render: (ticket) => ticket.description ?? '—' },
+    { key: 'resolution', header: 'Solución', render: (ticket) => ticket.resolution ?? '—' },
     { key: 'client', header: 'Cliente', render: (ticket) => ticket.client?.companyName ?? '—' },
     { key: 'project', header: 'Proyecto Soporte', render: (ticket) => ticket.project?.name ?? '—' },
-    { key: 'assignee', header: 'Responsable', render: (ticket) => ticket.assignee?.fullName ?? 'Sin asignar' },
+    { key: 'supportLeaderInitials', header: 'Líder Soporte', render: (ticket) => ticket.supportLeaderInitials ?? '—' },
+    { key: 'developmentProject', header: 'Proyecto Desarrollo', render: (ticket) => ticket.developmentProject?.name ?? '—' },
     { key: 'status', header: 'Estado', sortable: true, render: (ticket) => <TicketStatusBadge status={ticket.status} /> },
     { key: 'priority', header: 'Prioridad', sortable: true, render: (ticket) => <TicketPriorityBadge priority={ticket.priority} /> },
     { key: 'createdAt', header: 'F. Reporte', sortable: true, render: (ticket) => formatDate(ticket.createdAt) },

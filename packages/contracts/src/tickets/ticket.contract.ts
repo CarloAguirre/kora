@@ -83,8 +83,13 @@ export const ticketSummarySchema = z.object({
   id: uuidSchema,
   code: z.string().nullable(),
   title: z.string(),
+  description: z.string().nullable(),
+  resolution: z.string().nullable(),
   client: z.object({ id: uuidSchema, companyName: z.string() }).nullable(),
   project: z.object({ id: uuidSchema, name: z.string() }).nullable(),
+  /** Iniciales del líder del proyecto de soporte — "Líder Soporte" en la v1. */
+  supportLeaderInitials: z.string().nullable(),
+  developmentProject: z.object({ id: uuidSchema, name: z.string() }).nullable(),
   serviceType: ticketServiceTypeSchema.nullable(),
   priority: ticketPrioritySchema.nullable(),
   status: ticketStatusSchema,
@@ -96,10 +101,7 @@ export const ticketSummarySchema = z.object({
 export type TicketSummary = z.infer<typeof ticketSummarySchema>;
 
 export const ticketDetailSchema = ticketSummarySchema.extend({
-  developmentProject: z.object({ id: uuidSchema, name: z.string() }).nullable(),
-  description: z.string().nullable(),
   evidenceUrl: z.string().nullable(),
-  resolution: z.string().nullable(),
   resolvedAt: isoDateTimeSchema.nullable(),
   history: z.array(ticketHistoryEntrySchema),
   legacyId: z.string().nullable(),

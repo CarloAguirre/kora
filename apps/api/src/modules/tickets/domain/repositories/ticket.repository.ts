@@ -18,10 +18,16 @@ export interface TicketListItem {
   readonly id: string;
   readonly legacyId: string | null;
   readonly title: string;
+  readonly description: string | null;
+  readonly resolution: string | null;
   readonly clientId: string | null;
   readonly clientName: string | null;
   readonly projectId: string | null;
   readonly projectName: string | null;
+  /** Iniciales del líder del proyecto de soporte — "Líder Soporte" en la v1. */
+  readonly supportLeaderInitials: string | null;
+  readonly developmentProjectId: string | null;
+  readonly developmentProjectName: string | null;
   readonly serviceType: string | null;
   readonly priority: string | null;
   readonly status: TicketStatus;
