@@ -1,4 +1,4 @@
-import { AggregateRoot, createDomainEvent, err, ok, type Result } from '@kora/core';
+import { AggregateRoot, assignDefined, createDomainEvent, err, ok, type Result } from '@kora/core';
 import type { ProjectPhase, ProjectPriority, ProjectSalesStage, ProjectStatus, ProjectType } from '@kora/contracts';
 import {
   SalesStageNotAllowedForSupportError,
@@ -209,7 +209,7 @@ export class Project extends AggregateRoot<string> {
     if (data.name !== undefined) data.name = data.name.trim();
     if (this.props.type === 'support') data.phase = null;
 
-    Object.assign(this.props, data);
+    assignDefined(this.props, data);
     this.touch(now);
     return ok(undefined);
   }

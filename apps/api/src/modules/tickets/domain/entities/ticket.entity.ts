@@ -1,4 +1,4 @@
-import { AggregateRoot, createDomainEvent, err, ok, type Result } from '@kora/core';
+import { AggregateRoot, assignDefined, createDomainEvent, err, ok, type Result } from '@kora/core';
 import type { TicketPriority, TicketServiceType, TicketStatus } from '@kora/contracts';
 import { InvalidTicketTitleError, TicketAlreadyClosedError } from '../errors/ticket.errors';
 
@@ -166,7 +166,7 @@ export class Ticket extends AggregateRoot<string> {
       data.title = title;
     }
 
-    Object.assign(this.props, data);
+    assignDefined(this.props, data);
     this.touch(now);
     return ok(undefined);
   }

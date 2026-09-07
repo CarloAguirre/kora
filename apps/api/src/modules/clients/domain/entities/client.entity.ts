@@ -1,4 +1,4 @@
-import { AggregateRoot, createDomainEvent } from '@kora/core';
+import { AggregateRoot, assignDefined, createDomainEvent } from '@kora/core';
 import type { ClientStatus } from '@kora/contracts';
 import { TaxId } from '../value-objects/tax-id.vo';
 
@@ -157,7 +157,7 @@ export class Client extends AggregateRoot<string> {
     >,
     now: Date,
   ): void {
-    Object.assign(this.props, data);
+    assignDefined(this.props, data);
     this.touch(now);
   }
 

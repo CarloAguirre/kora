@@ -1,4 +1,4 @@
-import { AggregateRoot, createDomainEvent, err, ok, type Result } from '@kora/core';
+import { AggregateRoot, assignDefined, createDomainEvent, err, ok, type Result } from '@kora/core';
 import type { HourEntryStatus } from '@kora/contracts';
 import { PROJECT_REQUIRING_ASSIGNMENTS } from '@kora/contracts';
 import {
@@ -212,7 +212,8 @@ export class HourEntry extends AggregateRoot<string> {
       return err(new DesignatedApproverRequiredError());
     }
 
-    Object.assign(this.props, data, { designatedApproverUserId: projectId ? null : designatedApproverUserId });
+    assignDefined(this.props, data);
+    this.props.designatedApproverUserId = projectId ? null : designatedApproverUserId;
 
     const wasRejected = this.props.status === 'rejected';
     this.props.status = ownerRequiresApproval ? 'pending' : 'approved';

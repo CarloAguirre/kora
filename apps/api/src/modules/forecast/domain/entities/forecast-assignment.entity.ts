@@ -1,4 +1,4 @@
-import { AggregateRoot, createDomainEvent, err, ok, type Result } from '@kora/core';
+import { AggregateRoot, assignDefined, createDomainEvent, err, ok, type Result } from '@kora/core';
 import type { ForecastAssignmentType } from '@kora/contracts';
 import { InvalidForecastHoursError, InvalidForecastPeriodError } from '../errors/forecast.errors';
 
@@ -131,7 +131,7 @@ export class ForecastAssignment extends AggregateRoot<string> {
     }
     if (data.comments !== undefined) data.comments = data.comments.trim();
 
-    Object.assign(this.props, data);
+    assignDefined(this.props, data);
     this.touch(now);
     this.addDomainEvent(createDomainEvent('forecast_assignment.updated', this.id, {}, now));
     return ok(undefined);

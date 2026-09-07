@@ -1,4 +1,4 @@
-import { AggregateRoot, createDomainEvent } from '@kora/core';
+import { AggregateRoot, assignDefined, createDomainEvent } from '@kora/core';
 
 export interface TeamProps {
   name: string;
@@ -90,7 +90,7 @@ export class Team extends AggregateRoot<string> {
     now: Date,
   ): void {
     if (data.name !== undefined) data.name = data.name.trim();
-    Object.assign(this.props, data);
+    assignDefined(this.props, data);
     this.touch(now);
   }
 

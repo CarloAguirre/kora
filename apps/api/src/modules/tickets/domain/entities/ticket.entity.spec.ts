@@ -73,6 +73,29 @@ describe('Ticket', () => {
       expect(result.isErr()).toBe(true);
       if (result.isErr()) expect(result.error.code).toBe('TICKET_INVALID_TITLE');
     });
+
+    it('una clave presente pero en undefined no borra el valor ya guardado', () => {
+      // Reproduce el flujo real de UpdateTicketUseCase: arma el objeto con
+      // TODAS las claves del DTO, así que un campo que el cliente no mandó
+      // en un PATCH parcial (p.ej. el diálogo de "Registrar solución", que
+      // solo envía resolution/status) llega aquí como `title: undefined`,
+      // no ausente. Antes de assignDefined, Object.assign lo tomaba como
+      // "bórralo" y dejaba title en undefined — NOT NULL en la base, así
+      // que el guardado fallaba siempre.
+      const created = Ticket.create({ id: 't1', title: 'No carga el reporte', now: NOW });
+      if (created.isErr()) throw new Error('setup failed');
+      const ticket = created.value;
+
+      const result = ticket.updateDetails(
+        { title: undefined, description: undefined, resolution: 'Se reinició el servicio' },
+        NOW,
+      );
+
+      expect(result.isOk()).toBe(true);
+      const snapshot = ticket.toSnapshot();
+      expect(snapshot.title).toBe('No carga el reporte');
+      expect(snapshot.resolution).toBe('Se reinició el servicio');
+    });
   });
 
   describe('eliminación', () => {
