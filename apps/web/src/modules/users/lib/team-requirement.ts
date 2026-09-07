@@ -21,6 +21,7 @@ const REQUIREMENT_BY_ROLE: Readonly<Record<RoleCode, TeamRequirement>> = {
   leader: 'optional',
   collaborator: 'required',
   commercial: 'forbidden',
+  cliente: 'forbidden',
 };
 
 export function teamRequirementFor(role: RoleCode): TeamRequirement {

@@ -13,7 +13,7 @@ import { z } from 'zod';
  * caso de uso ni componente cambia.
  */
 
-export const ROLE_CODES = ['admin', 'pmo', 'leader', 'collaborator', 'commercial'] as const;
+export const ROLE_CODES = ['admin', 'pmo', 'leader', 'collaborator', 'commercial', 'cliente'] as const;
 export const roleCodeSchema = z.enum(ROLE_CODES);
 export type RoleCode = z.infer<typeof roleCodeSchema>;
 
@@ -36,11 +36,18 @@ export const PERMISSIONS = [
   'projects:read',
   'projects:read_assigned',
   'projects:manage',
+  /** Portal de cliente: solo los proyectos de la empresa del propio usuario.
+   *  Distinto de `read_assigned` (que es "asignado a mí como miembro interno
+   *  de un equipo Kabeli") porque un usuario `cliente` no pertenece a ningún
+   *  equipo — ver la nota sobre `client_id` en docs/DECISION-PORTAL-CLIENTE.md. */
+  'projects:read_own_client',
   // Tickets
   'tickets:read',
   'tickets:read_assigned',
   'tickets:create',
   'tickets:manage',
+  /** Portal de cliente: solo los contratos/tickets de soporte de la propia empresa. */
+  'tickets:read_own_client',
   // Horas (HH)
   'hours:register',
   'hours:read_own',
@@ -62,11 +69,23 @@ export type Permission = z.infer<typeof permissionSchema>;
 
 /** Permisos por defecto de cada rol. La BD es la fuente de verdad en runtime;
  *  esto es la semilla y el fallback tipado para el front. */
+/** Permisos exclusivos del portal de cliente: no tiene sentido que `admin`/`pmo`
+ *  los hereden por el patrón "todos los permisos salvo…" — no son una empresa
+ *  cliente, y heredarlos duplicaba el enlace "Proyectos"/"Soporte" del Sidebar
+ *  para cualquier admin/PMO (permiso propio de `read_own_client` calzando con
+ *  la misma entrada de menú que un `cliente` real). */
+const CLIENT_PORTAL_ONLY_PERMISSIONS: readonly Permission[] = [
+  'projects:read_own_client',
+  'tickets:read_own_client',
+];
+
 export const DEFAULT_ROLE_PERMISSIONS: Readonly<Record<RoleCode, readonly Permission[]>> = {
-  admin: [...PERMISSIONS],
+  admin: [...PERMISSIONS].filter((p) => !CLIENT_PORTAL_ONLY_PERMISSIONS.includes(p)),
   // Reemplazar datos de negocio por un archivo es una operación destructiva, no
   // administración estándar: a diferencia del resto de PERMISSIONS, pmo no la hereda.
-  pmo: [...PERMISSIONS].filter((p) => p !== 'admin:legacy_import'),
+  pmo: [...PERMISSIONS].filter(
+    (p) => p !== 'admin:legacy_import' && !CLIENT_PORTAL_ONLY_PERMISSIONS.includes(p),
+  ),
   leader: [
     'teams:read',
     'teams:manage',
@@ -90,6 +109,9 @@ export const DEFAULT_ROLE_PERMISSIONS: Readonly<Record<RoleCode, readonly Permis
     'hours:read_own',
   ],
   commercial: ['clients:read', 'tickets:read_assigned', 'projects:read_assigned'],
+  /** Usuario externo (contacto de una empresa cliente). Ve únicamente el
+   *  portal de cliente — nunca datos de otras empresas ni pantallas internas. */
+  cliente: ['projects:read_own_client', 'tickets:read_own_client'],
 };
 
 /** Etiquetas en español para la interfaz. Separadas del código del rol para que
@@ -100,6 +122,7 @@ export const ROLE_LABELS: Readonly<Record<RoleCode, string>> = {
   leader: 'Líder',
   collaborator: 'Colaborador',
   commercial: 'Comercial',
+  cliente: 'Cliente',
 };
 
 /**

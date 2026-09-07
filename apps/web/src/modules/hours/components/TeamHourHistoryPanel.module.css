@@ -19,6 +19,19 @@
   min-height: 20px;
 }
 
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-3);
+  flex-wrap: wrap;
+}
+
+.exportError {
+  color: var(--kora-danger);
+  font-size: var(--kora-text-sm);
+  margin: 0;
+}
+
 .sectionTitle {
   margin: 0;
   color: var(--kora-navy);

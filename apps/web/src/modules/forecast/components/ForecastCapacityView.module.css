@@ -5,10 +5,6 @@
   width: 100%;
 }
 
-.periodRow {
-  max-width: 320px;
-}
-
 .kpis {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -40,21 +36,25 @@
 .toolbar {
   display: flex;
   align-items: flex-end;
-  justify-content: space-between;
   gap: var(--kora-space-3);
   flex-wrap: wrap;
 }
 
+.periodSelect {
+  min-width: 220px;
+}
+
 .search {
-  max-width: 320px;
+  max-width: 480px;
   flex: 1;
   min-width: 220px;
 }
 
 .sortGroup {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   gap: var(--kora-space-2);
+  margin-left: auto;
 }
 
 .sortField {

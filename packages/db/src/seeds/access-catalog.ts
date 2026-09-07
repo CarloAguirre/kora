@@ -33,6 +33,7 @@ const ROLE_DESCRIPTIONS: Record<RoleCode, string> = {
   leader: 'Gestiona sus equipos y proyectos, y aprueba las horas de su gente.',
   collaborator: 'Registra sus horas y trabaja los tickets que se le asignan.',
   commercial: 'Consulta los clientes y tickets de su cartera comercial.',
+  cliente: 'Usuario externo: ve el portal con los proyectos y contratos de soporte de su propia empresa.',
 };
 
 export async function seedAccessCatalog(db: Database): Promise<SeedAccessCatalogResult> {

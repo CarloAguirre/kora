@@ -10,8 +10,10 @@ import {
   TicketIcon,
   TrendingUpIcon,
   SettingsIcon,
+  HelpCircleIcon,
 } from '../icons/Icons';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
+import { useAuth } from '@/modules/auth/hooks/useAuth';
 import type { Permission } from '@kora/contracts';
 import type { ReactNode } from 'react';
 
@@ -53,6 +55,23 @@ const NAVIGATION: readonly NavigationItem[] = [
     icon: <FolderOpenIcon size={20} />,
     anyOf: ['projects:read', 'projects:read_assigned'],
   },
+  // Portal de cliente: mismas etiquetas "Proyectos"/"Soporte" que el resto del
+  // menú, pero apuntando a las páginas de solo-lectura del propio cliente en
+  // vez de a los listados internos — el permiso `own_client` es exclusivo del
+  // rol `cliente`, así que nunca coinciden para un mismo usuario con las
+  // entradas de arriba/abajo. Ver docs/DECISION-PORTAL-CLIENTE.md.
+  {
+    to: '/portal/proyectos',
+    label: 'Proyectos',
+    icon: <FolderOpenIcon size={20} />,
+    permission: 'projects:read_own_client',
+  },
+  {
+    to: '/portal/soporte',
+    label: 'Soporte',
+    icon: <HelpCircleIcon size={20} />,
+    permission: 'tickets:read_own_client',
+  },
   {
     to: '/equipos',
     label: 'Equipos',
@@ -92,8 +111,15 @@ export interface SidebarProps {
 
 export function Sidebar({ open, onNavigate }: SidebarProps) {
   const { can, canAny } = usePermissions();
+  const { user } = useAuth();
 
   const visibleItems = NAVIGATION.filter((item) => {
+    // El Dashboard interno (KPIs, aprobaciones, forecast…) no tiene permiso
+    // propio porque siempre aplica — salvo para `cliente`, que no tiene
+    // ninguno de esos permisos y de todos modos rebota a /portal/proyectos
+    // (ver DashboardPage.tsx). Ocultarlo evita un enlace que solo lleva de
+    // vuelta a donde ya está.
+    if (item.to === '/dashboard' && user?.role === 'cliente') return false;
     if (item.permission) return can(item.permission);
     if (item.anyOf) return canAny(...item.anyOf);
     return true;

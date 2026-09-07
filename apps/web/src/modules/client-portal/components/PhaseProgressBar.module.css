@@ -1,0 +1,109 @@
+/* Valores exactos del Figma de referencia (node 9203:2329/2382/2431). */
+
+.phase {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 20px 22px;
+  border-radius: 16px;
+  border: 1px solid #e4e9ee;
+  background: var(--kora-surface);
+  box-shadow:
+    0px 1px 1px 0px rgba(15, 41, 66, 0.06),
+    0px 10px 14px 0px rgba(15, 41, 66, 0.16);
+}
+
+.phaseUpcoming {
+  background: #f1f4f7;
+  border-style: dashed;
+}
+
+.phaseHeader {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+
+.phaseName {
+  font-size: 14.5px;
+  font-weight: 800;
+  color: #0f2a44;
+}
+
+.phaseDates {
+  margin-left: auto;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #93a0ac;
+}
+
+.months {
+  display: flex;
+  justify-content: space-between;
+  padding: 14px 4px 0;
+}
+
+.months span {
+  font-size: 12px;
+  font-weight: 600;
+  color: #93a0ac;
+}
+
+.steps {
+  position: relative;
+  display: flex;
+  height: 44px;
+  margin-top: 8px;
+  border-radius: 22px;
+  overflow: hidden;
+  background: #f1f4f7;
+}
+
+.step {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12.5px;
+  font-weight: var(--kora-weight-bold);
+  white-space: nowrap;
+}
+
+.past {
+  background: #93a5b8;
+  color: var(--kora-surface);
+}
+
+.current {
+  background: #8bc53f;
+  color: #17330a;
+  font-weight: 800;
+}
+
+.future {
+  background: #f1f4f7;
+  color: #93a0ac;
+}
+
+.todayLine {
+  position: absolute;
+  top: -10px;
+  bottom: -10px;
+  width: 2px;
+  background: #d5504b;
+  z-index: 1;
+}
+
+.todayTag {
+  position: absolute;
+  top: -22px;
+  left: -19px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: #d5504b;
+  color: var(--kora-surface);
+  font-size: 10.5px;
+  font-weight: 800;
+  white-space: nowrap;
+}

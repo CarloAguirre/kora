@@ -19,6 +19,7 @@ const TONE_BY_ROLE: Readonly<Record<RoleCode, BadgeTone>> = {
   leader: 'info',
   collaborator: 'neutral',
   commercial: 'warning',
+  cliente: 'success',
 };
 
 export interface UserRoleBadgeProps {

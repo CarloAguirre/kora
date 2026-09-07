@@ -1,0 +1,72 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-5);
+  width: 100%;
+}
+
+.statsRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--kora-space-3);
+}
+
+.projectCell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.projectLink {
+  color: #0f2a44;
+  font-size: 14.5px;
+  font-weight: var(--kora-weight-bold);
+  text-decoration: underline;
+}
+
+.projectMeta {
+  font-size: 12px;
+  font-weight: var(--kora-weight-medium);
+  color: #93a0ac;
+}
+
+.contractName {
+  font-size: 14px;
+  font-weight: var(--kora-weight-bold);
+  color: #122235;
+}
+
+.stageCell {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 130px;
+}
+
+.stageLabel {
+  font-size: 12px;
+  font-weight: var(--kora-weight-bold);
+  color: #5d6b7a;
+}
+
+.stageBarTrack {
+  height: 6px;
+  border-radius: 4px;
+  background: #f1f4f7;
+  overflow: hidden;
+}
+
+.stageBarFill {
+  height: 100%;
+  border-radius: 4px;
+  background: #8bc53f;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+  padding: var(--kora-space-1) 0;
+  font-size: var(--kora-text-xs);
+  color: var(--kora-blue-400);
+}

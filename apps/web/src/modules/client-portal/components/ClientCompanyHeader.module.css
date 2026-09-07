@@ -1,0 +1,51 @@
+.row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--kora-space-4);
+  flex-wrap: wrap;
+}
+
+.identity {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-4);
+}
+
+.logoPlaceholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--kora-radius);
+  border: 1px solid var(--kora-border-soft);
+  background: var(--kora-surface-alt);
+  color: var(--kora-blue-700);
+  flex-shrink: 0;
+}
+
+.text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.name {
+  font-size: 21px;
+  font-weight: var(--kora-weight-bold);
+  color: #0f2a44;
+}
+
+.contact {
+  font-size: 13.5px;
+  color: #5d6b7a;
+}
+
+.contact strong {
+  font-weight: var(--kora-weight-bold);
+}
+
+.brand {
+  flex-shrink: 0;
+}

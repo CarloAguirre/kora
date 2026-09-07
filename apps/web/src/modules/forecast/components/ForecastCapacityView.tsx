@@ -80,34 +80,40 @@ export function ForecastCapacityView() {
   return (
     <DashboardLayout title="Forecast">
       <div className={styles.page}>
-        <Select
-          className={styles.periodRow}
-          label="Período"
-          options={WEEKS.map((week) => ({ value: `${week.periodStart}|${week.periodEnd}`, label: week.label }))}
-          value={`${period.periodStart}|${period.periodEnd}`}
-          onChange={(event) => {
-            const [periodStart, periodEnd] = event.target.value.split('|');
-            setPeriod({ periodStart: periodStart!, periodEnd: periodEnd!, label: '' });
-            setPage(1);
-          }}
-        />
-
         <div className={styles.kpis}>
-          <Card className={styles.kpiCard}>
-            <span className={styles.kpiLabel}>Total colaboradores</span>
-            <span className={styles.kpiValue}>{kpis.totalMembers}</span>
+          <Card>
+            <div className={styles.kpiCard}>
+              <span className={styles.kpiLabel}>Total colaboradores</span>
+              <span className={styles.kpiValue}>{kpis.totalMembers}</span>
+            </div>
           </Card>
-          <Card className={styles.kpiCard}>
-            <span className={styles.kpiLabel}>Sin asignación completa</span>
-            <span className={[styles.kpiValue, styles.kpiValueWarning].join(' ')}>{kpis.unassigned}</span>
+          <Card>
+            <div className={styles.kpiCard}>
+              <span className={styles.kpiLabel}>Sin asignación completa</span>
+              <span className={[styles.kpiValue, styles.kpiValueWarning].join(' ')}>{kpis.unassigned}</span>
+            </div>
           </Card>
-          <Card className={styles.kpiCard}>
-            <span className={styles.kpiLabel}>Disponibilidad</span>
-            <span className={styles.kpiValue}>{kpis.availability}%</span>
+          <Card>
+            <div className={styles.kpiCard}>
+              <span className={styles.kpiLabel}>Disponibilidad</span>
+              <span className={styles.kpiValue}>{kpis.availability}%</span>
+            </div>
           </Card>
         </div>
 
         <div className={styles.toolbar}>
+          <Select
+            className={styles.periodSelect}
+            label="Período"
+            options={WEEKS.map((week) => ({ value: `${week.periodStart}|${week.periodEnd}`, label: week.label }))}
+            value={`${period.periodStart}|${period.periodEnd}`}
+            onChange={(event) => {
+              const [periodStart, periodEnd] = event.target.value.split('|');
+              setPeriod({ periodStart: periodStart!, periodEnd: periodEnd!, label: '' });
+              setPage(1);
+            }}
+          />
+
           <TextField
             className={styles.search}
             label="Buscar"

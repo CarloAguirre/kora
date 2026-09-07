@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
-import type { CapacityReportRow } from '@kora/contracts';
+import type { CapacityReportRow, HourEntrySummary } from '@kora/contracts';
+import { HOUR_ENTRY_STATUS_LABELS } from '@kora/contracts';
 
 const MONTH_LABELS = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -36,4 +37,31 @@ export function exportCapacityReport(rows: readonly CapacityReportRow[], periodS
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, 'Capacity');
   XLSX.writeFile(workbook, `capacity-${periodStart.slice(0, 7)}.xlsx`);
+}
+
+function formatEntryDate(value: string): string {
+  const [year, month, day] = value.split('-');
+  return `${day}/${month}/${year}`;
+}
+
+const HOUR_ENTRY_COLUMNS: ReadonlyArray<{ label: string; getValue: (row: HourEntrySummary) => string | number }> = [
+  { label: 'Fecha', getValue: (r) => formatEntryDate(r.date) },
+  { label: 'Autor', getValue: (r) => r.user.fullName },
+  { label: 'Equipo', getValue: (r) => r.team?.name ?? '' },
+  { label: 'Proyecto', getValue: (r) => r.project?.name ?? '' },
+  { label: 'Asignación', getValue: (r) => r.assignment ?? '' },
+  { label: 'Actividad', getValue: (r) => r.category },
+  { label: 'Horas', getValue: (r) => r.hours },
+  { label: 'Estado', getValue: (r) => HOUR_ENTRY_STATUS_LABELS[r.status] },
+  { label: 'Motivo rechazo', getValue: (r) => r.rejectionReason ?? '' },
+];
+
+/** Exporta el historial de horas (respetando los filtros aplicados, no solo la página visible) — reemplaza al botón "Descargar registro de horas" de la v1. */
+export function exportHourEntries(rows: readonly HourEntrySummary[]) {
+  const sheetRows = [HOUR_ENTRY_COLUMNS.map((c) => c.label), ...rows.map((row) => HOUR_ENTRY_COLUMNS.map((c) => c.getValue(row)))];
+  const worksheet = XLSX.utils.aoa_to_sheet(sheetRows);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Registro de horas');
+  const today = new Date().toISOString().slice(0, 10);
+  XLSX.writeFile(workbook, `registro-horas-${today}.xlsx`);
 }

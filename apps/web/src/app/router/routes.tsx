@@ -20,6 +20,8 @@ import { TicketsListPage } from '@/modules/tickets/pages/TicketsListPage';
 import { TicketDetailPage } from '@/modules/tickets/pages/TicketDetailPage';
 import { ForecastPage } from '@/modules/forecast/pages/ForecastPage';
 import { DashboardPage } from '@/modules/dashboard/pages/DashboardPage';
+import { ClientPortalPage } from '@/modules/client-portal/pages/ClientPortalPage';
+import { ClientProjectDetailPage } from '@/modules/client-portal/pages/ClientProjectDetailPage';
 import { ForbiddenPage } from '@/app/pages/ForbiddenPage';
 import { NotFoundPage } from '@/app/pages/NotFoundPage';
 
@@ -127,6 +129,23 @@ export const router = createBrowserRouter([
   {
     element: <ProtectedRoute permission="forecast:read" />,
     children: [{ path: '/forecast', element: <ForecastPage /> }],
+  },
+
+  // ── Portal de cliente ─────────────────────────────────────────────────
+  // Vista de solo lectura para el rol `cliente` (contacto externo de una
+  // empresa cliente) — ver docs/DECISION-PORTAL-CLIENTE.md. `ClientPortalPage`
+  // sirve ambas rutas y decide la pestaña activa por la URL, igual que las dos
+  // entradas separadas "Proyectos"/"Soporte" del Figma de referencia.
+  {
+    element: <ProtectedRoute permission="projects:read_own_client" />,
+    children: [
+      { path: '/portal/proyectos', element: <ClientPortalPage /> },
+      { path: '/portal/proyectos/:projectId', element: <ClientProjectDetailPage /> },
+    ],
+  },
+  {
+    element: <ProtectedRoute permission="tickets:read_own_client" />,
+    children: [{ path: '/portal/soporte', element: <ClientPortalPage /> }],
   },
 
   { path: '*', element: <NotFoundPage /> },

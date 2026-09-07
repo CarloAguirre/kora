@@ -83,13 +83,17 @@ describe('passwordSchema', () => {
 });
 
 describe('catálogo de permisos', () => {
-  it('el administrador tiene todos los permisos', () => {
-    expect(DEFAULT_ROLE_PERMISSIONS.admin).toHaveLength(PERMISSIONS.length);
+  it('el administrador tiene todos los permisos salvo los exclusivos del portal de cliente', () => {
+    expect(DEFAULT_ROLE_PERMISSIONS.admin).not.toContain('projects:read_own_client');
+    expect(DEFAULT_ROLE_PERMISSIONS.admin).not.toContain('tickets:read_own_client');
+    expect(DEFAULT_ROLE_PERMISSIONS.admin).toHaveLength(PERMISSIONS.length - 2);
   });
 
-  it('PMO tiene todo menos importar datos legados', () => {
+  it('PMO tiene todo menos importar datos legados y los permisos del portal de cliente', () => {
     expect(DEFAULT_ROLE_PERMISSIONS.pmo).not.toContain('admin:legacy_import');
-    expect(DEFAULT_ROLE_PERMISSIONS.pmo).toHaveLength(PERMISSIONS.length - 1);
+    expect(DEFAULT_ROLE_PERMISSIONS.pmo).not.toContain('projects:read_own_client');
+    expect(DEFAULT_ROLE_PERMISSIONS.pmo).not.toContain('tickets:read_own_client');
+    expect(DEFAULT_ROLE_PERMISSIONS.pmo).toHaveLength(PERMISSIONS.length - 3);
   });
 
   it('un colaborador no puede administrar usuarios', () => {

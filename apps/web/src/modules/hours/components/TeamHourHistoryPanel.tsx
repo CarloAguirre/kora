@@ -7,11 +7,16 @@ import { Pagination } from '@/shared/components/ui/Pagination';
 import { Select } from '@/shared/components/ui/Select';
 import { TextField } from '@/shared/components/ui/TextField';
 import { useToast } from '@/shared/components/ui/Toast';
-import { PlusIcon, PencilIcon, TrashIcon, EyeIcon } from '@/shared/components/icons/Icons';
+import { PlusIcon, PencilIcon, TrashIcon, EyeIcon, DownloadIcon } from '@/shared/components/icons/Icons';
 import { HourEntryStatusBadge } from './HourEntryStatusBadge';
 import { HourEntryFormDialog } from './HourEntryFormDialog';
 import { useDeleteHourEntry, useHourEntriesList } from '../api/hours.queries';
+import { hoursApi } from '../api/hours.api';
+import { exportHourEntries } from '../lib/hours-export';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
+import { ApiRequestError } from '@/shared/lib/api-client';
+
+const EXPORT_PAGE_SIZE = 200;
 
 const STATUS_OPTIONS = HOUR_ENTRY_STATUSES.map((status) => ({ value: status, label: HOUR_ENTRY_STATUS_LABELS[status] }));
 const formatDate = (value: string) => new Date(`${value}T00:00:00`).toLocaleDateString('es-CL');
@@ -42,6 +47,8 @@ export function TeamHourHistoryPanel({ teamId, userId }: { teamId?: string; user
   const [status, setStatus] = useState<HourEntryStatus | ''>('');
   const [page, setPage] = useState(1);
   const [dialog, setDialog] = useState<DialogState>({ kind: 'none' });
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
   const deleteEntry = useDeleteHourEntry();
 
   const hasFilters = Boolean(personSearch || dateFrom || dateTo || status);
@@ -76,6 +83,34 @@ export function TeamHourHistoryPanel({ teamId, userId }: { teamId?: string; user
   const handleDelete = async (entry: HourEntrySummary) => {
     await deleteEntry.mutateAsync(entry.id);
     toast.success('Se eliminó el registro de horas.');
+  };
+
+  const handleExport = async () => {
+    setExportError(null);
+    setExporting(true);
+    try {
+      const baseQuery = {
+        search: personSearch.trim() || undefined,
+        teamId,
+        userId,
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
+        status: status || undefined,
+        sortField: 'date' as const,
+        sortDirection: 'desc' as const,
+      };
+      const first = await hoursApi.list({ ...baseQuery, page: 1, pageSize: EXPORT_PAGE_SIZE });
+      const rest = await Promise.all(
+        Array.from({ length: first.pageCount - 1 }, (_, index) =>
+          hoursApi.list({ ...baseQuery, page: index + 2, pageSize: EXPORT_PAGE_SIZE }),
+        ),
+      );
+      exportHourEntries([...first.items, ...rest.flatMap((page) => page.items)]);
+    } catch (exportErr) {
+      setExportError(exportErr instanceof ApiRequestError ? exportErr.message : 'No se pudo generar el Excel.');
+    } finally {
+      setExporting(false);
+    }
   };
 
   const columns: Column<HourEntrySummary>[] = [
@@ -135,10 +170,27 @@ export function TeamHourHistoryPanel({ teamId, userId }: { teamId?: string; user
     <div className={styles.wrapper}>
       <div className={styles.header}>
         <p className={styles.subtitle}>{data ? `${data.total} registro${data.total === 1 ? '' : 's'}` : ' '}</p>
-        <Button iconLeft={<PlusIcon size={18} />} onClick={() => setDialog({ kind: 'edit', entry: null })}>
-          Registrar horas
-        </Button>
+        <div className={styles.headerActions}>
+          <Button
+            variant="outlineDark"
+            iconLeft={<DownloadIcon size={18} />}
+            loading={exporting}
+            loadingText="Generando…"
+            onClick={() => void handleExport()}
+          >
+            Descargar registro de horas
+          </Button>
+          <Button iconLeft={<PlusIcon size={18} />} onClick={() => setDialog({ kind: 'edit', entry: null })}>
+            Registrar horas
+          </Button>
+        </div>
       </div>
+
+      {exportError && (
+        <p className={styles.exportError} role="alert">
+          {exportError}
+        </p>
+      )}
 
       <h3 className={styles.sectionTitle}>Historial Reciente</h3>
 

@@ -23,6 +23,8 @@ const TEAM_REQUIREMENT_BY_ROLE: Readonly<Record<RoleCode, TeamRequirement>> = {
   leader: 'optional',
   collaborator: 'required',
   commercial: 'forbidden',
+  // Un usuario cliente es externo a Kabeli: nunca pertenece a un equipo.
+  cliente: 'forbidden',
 };
 
 export class TeamAssignmentPolicy {

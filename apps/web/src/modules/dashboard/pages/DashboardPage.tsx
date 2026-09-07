@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Navigate } from 'react-router-dom';
 import styles from './DashboardPage.module.css';
 import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Button } from '@/shared/components/ui/Button';
@@ -43,6 +44,14 @@ export function DashboardPage() {
   const [registerHoursOpen, setRegisterHoursOpen] = useState(false);
   const { data: summary, isLoading, isFetching, refetch } = useDashboardSummary(weekStart);
   const activeTab = tab === 'soporte' && !showSupportTab ? 'proyectos' : tab;
+
+  // `cliente` no tiene ningún permiso de este dashboard interno (KPIs,
+  // aprobaciones, forecast…): su "inicio" es el portal de solo-lectura de su
+  // propia empresa. El chequeo va DESPUÉS de llamar todos los hooks de arriba
+  // (reglas de los Hooks) — ver docs/DECISION-PORTAL-CLIENTE.md.
+  if (user?.role === 'cliente') {
+    return <Navigate to="/portal/proyectos" replace />;
+  }
 
   return (
     <DashboardLayout title="Dashboard Principal">

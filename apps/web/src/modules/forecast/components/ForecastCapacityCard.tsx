@@ -50,37 +50,39 @@ export function ForecastCapacityCard({ member }: { member: ForecastCapacityMembe
         : `${remaining}h libres`;
 
   return (
-    <Card className={styles.card}>
-      <div className={styles.header}>
-        <span className={styles.avatar}>{initials(member.fullName)}</span>
-        <div className={styles.identity}>
-          <span className={styles.name} title={member.fullName}>
-            {member.fullName}
-          </span>
-          <span className={styles.team}>{member.teamName}</span>
+    <Card>
+      <div className={styles.body}>
+        <div className={styles.header}>
+          <span className={styles.avatar}>{initials(member.fullName)}</span>
+          <div className={styles.identity}>
+            <span className={styles.name} title={member.fullName}>
+              {member.fullName}
+            </span>
+            <span className={styles.team}>{member.teamName}</span>
+          </div>
         </div>
-      </div>
 
-      <div className={styles.loadRow}>
-        <div className={styles.barTrack}>
-          <div className={[styles.barFill, barClass].join(' ')} style={{ width: `${percent}%` }} />
-        </div>
-        <span className={[styles.statusText, statusClass].join(' ')}>
-          {member.loadPercent}% · {statusLabel}
-        </span>
-      </div>
-
-      <div className={styles.chips}>
-        {member.items.length === 0 && <span className={styles.chipEmpty}>Sin asignación</span>}
-        {member.items.map((item, index) => (
-          <span
-            key={`${item.type}-${item.projectId ?? index}`}
-            className={[styles.chip, TYPE_CHIP_CLASS[item.type]].filter(Boolean).join(' ')}
-            title={item.comments.join(' · ')}
-          >
-            {itemLabel(item)} · {item.hours}h
+        <div className={styles.loadRow}>
+          <div className={styles.barTrack}>
+            <div className={[styles.barFill, barClass].join(' ')} style={{ width: `${percent}%` }} />
+          </div>
+          <span className={[styles.statusText, statusClass].join(' ')}>
+            {member.loadPercent}% · {statusLabel}
           </span>
-        ))}
+        </div>
+
+        <div className={styles.chips}>
+          {member.items.length === 0 && <span className={styles.chipEmpty}>Sin asignación</span>}
+          {member.items.map((item, index) => (
+            <span
+              key={`${item.type}-${item.projectId ?? index}`}
+              className={[styles.chip, TYPE_CHIP_CLASS[item.type]].filter(Boolean).join(' ')}
+              title={item.comments.join(' · ')}
+            >
+              {itemLabel(item)} · {item.hours}h
+            </span>
+          ))}
+        </div>
       </div>
     </Card>
   );

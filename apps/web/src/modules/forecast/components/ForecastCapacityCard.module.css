@@ -1,4 +1,4 @@
-.card {
+.body {
   display: flex;
   flex-direction: column;
   gap: var(--kora-space-3);

@@ -1,0 +1,49 @@
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 12px;
+  border-radius: var(--kora-radius-pill);
+  font-size: 12.5px;
+  font-weight: var(--kora-weight-bold);
+  white-space: nowrap;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  background: var(--pill-dot, currentColor);
+}
+
+/* Colores exactos del Figma de referencia (node 8756:45807 y 9203:2063):
+   Activo/Vigente/Finalizado(fase), En riesgo, Próximo/Finalizado(contrato)
+   y En Proceso/En Proceso(fase). */
+
+.success {
+  --pill-dot: #2e9e52;
+  background: #e1f6e5;
+  color: #2e9e52;
+}
+
+.warning {
+  --pill-dot: #b8790e;
+  background: #fbf0d6;
+  color: #b8790e;
+}
+
+/* El punto (#93a0ac) no es el mismo color que el texto (#5d6b7a) en este
+   tono — a diferencia de los demás — de ahí la variable en vez de heredar
+   `currentColor`. */
+.neutral {
+  --pill-dot: #93a0ac;
+  background: #f1f4f7;
+  color: #5d6b7a;
+}
+
+.info {
+  --pill-dot: #6c63e8;
+  background: #eceafb;
+  color: #6c63e8;
+}

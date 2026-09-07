@@ -15,7 +15,7 @@ import type { SVGProps } from 'react';
  * ninguna pantalla ya construida tuviera que cambiar una línea.
  */
 
-interface IconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
+export interface IconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   size?: number;
 }
 
@@ -294,6 +294,85 @@ export const EyeOffIcon = (props: IconProps) => (
     <path d="M14.084 14.158a3 3 0 0 1-4.242-4.242" />
     <path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143" />
     <path d="m2 2 20 20" />
+  </Icon>
+);
+
+/** Lucide `link`. */
+export const LinkIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+  </Icon>
+);
+
+/** Lucide `lock`. */
+export const LockIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+  </Icon>
+);
+
+/** Lucide `lock-open`. */
+export const UnlockIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+    <path d="M7 11V7a5 5 0 0 1 9.9-1" />
+  </Icon>
+);
+
+/** Lucide `play`. */
+export const PlayIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <polygon points="6 3 20 12 6 21 6 3" />
+  </Icon>
+);
+
+/** Lucide `circle-check`. */
+export const CircleCheckIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <circle cx="12" cy="12" r="10" />
+    <path d="m9 12 2 2 4-4" />
+  </Icon>
+);
+
+/** Lucide `align-left`. */
+export const AlignLeftIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M21 6H3M15 12H3M17 18H3" />
+  </Icon>
+);
+
+/** Lucide `gem` — sin ícono oficial de Figma en el set, se usa como marcador visual del enlace "Figma". */
+export const DiamondIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M12 2 22 12 12 22 2 12Z" />
+  </Icon>
+);
+
+/** Lucide `list`. */
+export const ListIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M3 12h.01M3 18h.01M3 6h.01M8 12h13M8 18h13M8 6h13" />
+  </Icon>
+);
+
+/** Lucide `bar-chart-3`. */
+export const BarChartIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M3 3v18h18" />
+    <path d="M18 17V9" />
+    <path d="M13 17V5" />
+    <path d="M8 17v-3" />
+  </Icon>
+);
+
+/** Lucide `triangle-alert`. */
+export const TriangleAlertIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+    <path d="M12 9v4" />
+    <path d="M12 17h.01" />
   </Icon>
 );
 
