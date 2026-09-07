@@ -193,7 +193,7 @@ export class GetDashboardSummaryUseCase implements UseCase<GetDashboardSummaryCo
 
   private async buildTicketsSummary(actor: ActorContext, actorPermissions: readonly Permission[]) {
     const hasFullRead = actorPermissions.includes('tickets:read');
-    const assigneeUserId = hasFullRead ? undefined : actor.userId;
+    const assigneeUserId = hasFullRead ? undefined : [actor.userId];
     const pages = await Promise.all(
       OPEN_TICKET_STATUSES.map((status) =>
         this.tickets.search({ status, assigneeUserId }, { page: 1, pageSize: 1 }, { field: 'createdAt', direction: 'asc' }),

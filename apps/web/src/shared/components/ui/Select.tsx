@@ -74,13 +74,15 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
         <ChevronDownIcon className={styles.chevron} size={16} />
       </div>
 
-      <span
-        id={helperId}
-        className={[styles.helper, hasError ? styles.helperError : ''].filter(Boolean).join(' ')}
-        role={hasError ? 'alert' : undefined}
-      >
-        {message}
-      </span>
+      {message && (
+        <span
+          id={helperId}
+          className={[styles.helper, hasError ? styles.helperError : ''].filter(Boolean).join(' ')}
+          role={hasError ? 'alert' : undefined}
+        >
+          {message}
+        </span>
+      )}
     </div>
   );
 });

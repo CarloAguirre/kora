@@ -4,9 +4,9 @@ import type { Ticket } from '../entities/ticket.entity';
 
 export interface TicketFilters {
   readonly search?: string | undefined;
-  readonly clientId?: string | undefined;
+  readonly clientId?: readonly string[] | undefined;
   readonly projectId?: string | undefined;
-  readonly assigneeUserId?: string | undefined;
+  readonly assigneeUserId?: readonly string[] | undefined;
   readonly status?: TicketStatus | undefined;
   readonly priority?: TicketPriority | undefined;
   readonly includeDeleted?: boolean | undefined;

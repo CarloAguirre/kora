@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { isoDateTimeSchema, nonEmptyTrimmed, pageSchema, paginationQuerySchema, sortDirectionSchema, uuidSchema } from '../common/primitives';
+import { arrayQueryParam, isoDateTimeSchema, nonEmptyTrimmed, pageSchema, paginationQuerySchema, sortDirectionSchema, uuidSchema } from '../common/primitives';
 
 /** Ver docs/DECISION-M5-TICKETS.md. */
 
@@ -158,9 +158,9 @@ export type TicketSortField = z.infer<typeof ticketSortFieldSchema>;
 
 export const listTicketsQuerySchema = paginationQuerySchema.extend({
   search: z.string().trim().max(120).optional(),
-  clientId: uuidSchema.optional(),
+  clientId: arrayQueryParam(uuidSchema),
   projectId: uuidSchema.optional(),
-  assigneeUserId: uuidSchema.optional(),
+  assigneeUserId: arrayQueryParam(uuidSchema),
   status: ticketStatusSchema.optional(),
   priority: ticketPrioritySchema.optional(),
   sortField: ticketSortFieldSchema.default('createdAt'),

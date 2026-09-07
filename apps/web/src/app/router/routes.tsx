@@ -18,6 +18,7 @@ import { HoursListPage } from '@/modules/hours/pages/HoursListPage';
 import { HoursApprovalsPage } from '@/modules/hours/pages/HoursApprovalsPage';
 import { TicketsListPage } from '@/modules/tickets/pages/TicketsListPage';
 import { TicketDetailPage } from '@/modules/tickets/pages/TicketDetailPage';
+import { TicketHistoryPage } from '@/modules/tickets/pages/TicketHistoryPage';
 import { ForecastPage } from '@/modules/forecast/pages/ForecastPage';
 import { DashboardPage } from '@/modules/dashboard/pages/DashboardPage';
 import { ClientPortalPage } from '@/modules/client-portal/pages/ClientPortalPage';
@@ -118,7 +119,10 @@ export const router = createBrowserRouter([
   // ── Módulo de tickets ─────────────────────────────────────────────────
   {
     element: <ProtectedRoute anyOf={['tickets:read', 'tickets:read_assigned']} />,
-    children: [{ path: '/tickets', element: <TicketsListPage /> }],
+    children: [
+      { path: '/tickets', element: <TicketsListPage /> },
+      { path: '/tickets/historial-tickets', element: <TicketHistoryPage /> },
+    ],
   },
   {
     element: <ProtectedRoute anyOf={['tickets:read', 'tickets:read_assigned']} />,

@@ -4,7 +4,7 @@ import { TICKET_STATUSES, type TicketStatus, type TicketSummary } from '@kora/co
 import styles from './TicketsListPage.module.css';
 import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Button } from '@/shared/components/ui/Button';
-import { Select } from '@/shared/components/ui/Select';
+import { MultiSelect } from '@/shared/components/ui/MultiSelect';
 import { TextField } from '@/shared/components/ui/TextField';
 import { AlertIcon, CalendarIcon, PlusIcon, SearchIcon, SparklesIcon, UserIcon } from '@/shared/components/icons/Icons';
 import { TicketPriorityBadge } from '../components/TicketPriorityBadge';
@@ -17,7 +17,7 @@ import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { useToast } from '@/shared/components/ui/Toast';
 import { ApiRequestError } from '@/shared/lib/api-client';
 
-/** Sólo se muestran en el tablero — "Cerrado" sale del tablero, igual que en la v1. */
+/** Sólo se muestran en el tablero — "Cerrado" sale del tablero y va al historial, igual que en la v1. */
 const BOARD_STATUSES = TICKET_STATUSES.filter((status) => status !== 'closed');
 const BOARD_STATUS_LABELS: Record<Exclude<TicketStatus, 'closed'>, string> = {
   pending: 'Pendientes',
@@ -41,8 +41,8 @@ export function TicketsListPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
-  const [clientId, setClientId] = useState('');
-  const [assigneeUserId, setAssigneeUserId] = useState('');
+  const [clientIds, setClientIds] = useState<string[]>([]);
+  const [assigneeUserIds, setAssigneeUserIds] = useState<string[]>([]);
   const [dragOverStatus, setDragOverStatus] = useState<TicketStatus | null>(null);
   const [openTicketId, setOpenTicketId] = useState<string | null>(null);
   const [creatingTicket, setCreatingTicket] = useState(false);
@@ -53,8 +53,8 @@ export function TicketsListPage() {
 
   const baseFilters = {
     search: search || undefined,
-    clientId: clientId || undefined,
-    assigneeUserId: assigneeUserId || undefined,
+    clientId: clientIds.length > 0 ? clientIds : undefined,
+    assigneeUserId: assigneeUserIds.length > 0 ? assigneeUserIds : undefined,
     pageSize: 200,
   };
 
@@ -101,13 +101,6 @@ export function TicketsListPage() {
     <DashboardLayout title="Tickets">
       <div className={styles.page}>
         <div className={styles.toolbar}>
-          <div className={styles.toolbarActions}>
-            {can('tickets:create') && (
-              <Button iconLeft={<PlusIcon size={18} />} onClick={() => setCreatingTicket(true)}>
-                Nuevo Ticket
-              </Button>
-            )}
-          </div>
           <div className={styles.filtersRow}>
             <TextField
               className={styles.search}
@@ -118,22 +111,34 @@ export function TicketsListPage() {
               onChange={(event) => setSearch(event.target.value)}
               iconLeft={<SearchIcon size={16} />}
             />
-            <Select
+            <MultiSelect
               className={styles.filter}
               label="Cliente"
               placeholder="Todos"
+              searchPlaceholder="Buscar cliente"
               options={(clients?.items ?? []).map((client) => ({ value: client.id, label: client.companyName }))}
-              value={clientId}
-              onChange={(event) => setClientId(event.target.value)}
+              value={clientIds}
+              onChange={setClientIds}
             />
-            <Select
+            <MultiSelect
               className={styles.filter}
               label="Responsable"
               placeholder="Todos"
+              searchPlaceholder="Buscar responsable"
               options={(users?.items ?? []).map((user) => ({ value: user.id, label: user.fullName }))}
-              value={assigneeUserId}
-              onChange={(event) => setAssigneeUserId(event.target.value)}
+              value={assigneeUserIds}
+              onChange={setAssigneeUserIds}
             />
+          </div>
+          <div className={styles.toolbarActions}>
+            {can('tickets:create') && (
+              <Button iconLeft={<PlusIcon size={18} />} onClick={() => setCreatingTicket(true)}>
+                Nuevo Ticket
+              </Button>
+            )}
+            <Button variant="tertiary" onClick={() => navigate('/tickets/historial-tickets')}>
+              Ver Historial de Tickets
+            </Button>
           </div>
         </div>
 

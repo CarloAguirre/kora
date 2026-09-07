@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, clients, count, desc, eq, ilike, isNull, or, projects, tickets, users, type Database } from '@kora/db';
+import { and, asc, clients, count, desc, eq, ilike, inArray, isNull, or, projects, tickets, users, type Database } from '@kora/db';
 import { buildPage, toOffset, type Page, type PageRequest, type SortRequest, type TransactionContext } from '@kora/core';
 import type { TicketFilters, TicketListItem, TicketRepository, TicketSortableField } from '../../domain/repositories/ticket.repository';
 import type { Ticket } from '../../domain/entities/ticket.entity';
@@ -98,9 +98,9 @@ export class DrizzleTicketRepository implements TicketRepository {
   private buildWhere(filters: TicketFilters) {
     const conditions = [];
     if (!filters.includeDeleted) conditions.push(isNull(tickets.deletedAt));
-    if (filters.clientId) conditions.push(eq(tickets.clientId, filters.clientId));
+    if (filters.clientId?.length) conditions.push(inArray(tickets.clientId, filters.clientId));
     if (filters.projectId) conditions.push(eq(tickets.projectId, filters.projectId));
-    if (filters.assigneeUserId) conditions.push(eq(tickets.assigneeUserId, filters.assigneeUserId));
+    if (filters.assigneeUserId?.length) conditions.push(inArray(tickets.assigneeUserId, filters.assigneeUserId));
     if (filters.status) conditions.push(eq(tickets.status, filters.status));
     if (filters.priority) conditions.push(eq(tickets.priority, filters.priority));
     if (filters.search) {
