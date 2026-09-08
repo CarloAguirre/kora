@@ -33,6 +33,7 @@ export interface HourEntryListItem {
   readonly hours: number;
   readonly date: Date;
   readonly isOvertime: boolean;
+  readonly projectStageAtEntry: string | null;
   readonly status: HourEntryStatus;
   readonly rejectionReason: string | null;
   readonly designatedApproverUserId: string | null;

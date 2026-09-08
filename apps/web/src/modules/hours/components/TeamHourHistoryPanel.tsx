@@ -1,5 +1,12 @@
 import { useEffect, useState } from 'react';
-import { HOUR_ENTRY_STATUSES, HOUR_ENTRY_STATUS_LABELS, type HourEntryStatus, type HourEntrySummary } from '@kora/contracts';
+import {
+  HOUR_ENTRY_STATUSES,
+  HOUR_ENTRY_STATUS_LABELS,
+  PROJECT_STATUS_LABELS,
+  type HourEntryStatus,
+  type HourEntrySummary,
+  type ProjectStatus,
+} from '@kora/contracts';
 import styles from './TeamHourHistoryPanel.module.css';
 import { Button } from '@/shared/components/ui/Button';
 import { DataTable, type Column } from '@/shared/components/ui/DataTable';
@@ -13,6 +20,7 @@ import { HourEntryFormDialog } from './HourEntryFormDialog';
 import { useDeleteHourEntry, useHourEntriesList } from '../api/hours.queries';
 import { hoursApi } from '../api/hours.api';
 import { exportHourEntries } from '../lib/hours-export';
+import { resolvedApprover } from '../lib/approver';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { ApiRequestError } from '@/shared/lib/api-client';
 
@@ -122,8 +130,20 @@ export function TeamHourHistoryPanel({ teamId, userId }: { teamId?: string; user
     { key: 'category', header: 'Actividad', render: (e) => e.category || <span className={styles.empty}>—</span> },
     { key: 'hours', header: 'Horas', align: 'right', render: (e) => formatHours(e.hours) },
     {
-      key: 'status',
+      key: 'projectStage',
       header: 'Estado',
+      render: (e) =>
+        e.projectStageAtEntry ? PROJECT_STATUS_LABELS[e.projectStageAtEntry as ProjectStatus] : <span className={styles.empty}>—</span>,
+    },
+    { key: 'description', header: 'Comentario', render: (e) => e.description || <span className={styles.empty}>—</span> },
+    {
+      key: 'approver',
+      header: 'Aprobado por',
+      render: (e) => resolvedApprover(e)?.fullName ?? <span className={styles.empty}>—</span>,
+    },
+    {
+      key: 'status',
+      header: 'Estado de aprobación',
       render: (e) => (
         <div className={styles.statusCell}>
           <HourEntryStatusBadge status={e.status} />

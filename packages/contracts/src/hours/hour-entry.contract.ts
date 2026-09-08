@@ -48,6 +48,8 @@ export const hourEntrySummarySchema = z.object({
   hours: z.number(),
   date: z.string(),
   isOvertime: z.boolean(),
+  /** Fase del proyecto en el momento del registro — "Estado" en la v1 (Activo/No iniciado/Detenido). Null si el registro no tiene proyecto. */
+  projectStageAtEntry: z.string().nullable(),
   status: hourEntryStatusSchema,
   rejectionReason: z.string().nullable(),
   designatedApprover: z.object({ id: uuidSchema, fullName: z.string() }).nullable(),
@@ -66,7 +68,6 @@ export const hourEntrySummarySchema = z.object({
 export type HourEntrySummary = z.infer<typeof hourEntrySummarySchema>;
 
 export const hourEntryDetailSchema = hourEntrySummarySchema.extend({
-  projectStageAtEntry: z.string().nullable(),
   decisionBy: z.object({ id: uuidSchema, fullName: z.string() }).nullable(),
   decisionAt: isoDateTimeSchema.nullable(),
   legacyId: uuidSchema.nullable(),

@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx';
-import type { CapacityReportRow, HourEntrySummary } from '@kora/contracts';
-import { HOUR_ENTRY_STATUS_LABELS } from '@kora/contracts';
+import type { CapacityReportRow, HourEntrySummary, ProjectStatus } from '@kora/contracts';
+import { HOUR_ENTRY_STATUS_LABELS, PROJECT_STATUS_LABELS } from '@kora/contracts';
+import { resolvedApprover } from './approver';
 
 const MONTH_LABELS = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -44,6 +45,9 @@ function formatEntryDate(value: string): string {
   return `${day}/${month}/${year}`;
 }
 
+// Mismo orden que la v1: Fecha, Autor, Equipo, Proyecto, Asignación,
+// Actividad, Horas, Estado (etapa del proyecto), Comentario, Aprobado por,
+// Estado de aprobación.
 const HOUR_ENTRY_COLUMNS: ReadonlyArray<{ label: string; getValue: (row: HourEntrySummary) => string | number }> = [
   { label: 'Fecha', getValue: (r) => formatEntryDate(r.date) },
   { label: 'Autor', getValue: (r) => r.user.fullName },
@@ -52,7 +56,10 @@ const HOUR_ENTRY_COLUMNS: ReadonlyArray<{ label: string; getValue: (row: HourEnt
   { label: 'Asignación', getValue: (r) => r.assignment ?? '' },
   { label: 'Actividad', getValue: (r) => r.category },
   { label: 'Horas', getValue: (r) => r.hours },
-  { label: 'Estado', getValue: (r) => HOUR_ENTRY_STATUS_LABELS[r.status] },
+  { label: 'Estado', getValue: (r) => (r.projectStageAtEntry ? PROJECT_STATUS_LABELS[r.projectStageAtEntry as ProjectStatus] : '') },
+  { label: 'Comentario', getValue: (r) => r.description ?? '' },
+  { label: 'Aprobado por', getValue: (r) => resolvedApprover(r)?.fullName ?? '' },
+  { label: 'Estado de aprobación', getValue: (r) => HOUR_ENTRY_STATUS_LABELS[r.status] },
   { label: 'Motivo rechazo', getValue: (r) => r.rejectionReason ?? '' },
 ];
 

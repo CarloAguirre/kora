@@ -16,6 +16,7 @@ export function toHourEntrySummary(item: HourEntryListItem): HourEntrySummary {
     hours: item.hours,
     date: item.date.toISOString().slice(0, 10),
     isOvertime: item.isOvertime,
+    projectStageAtEntry: item.projectStageAtEntry,
     status: item.status,
     rejectionReason: item.rejectionReason,
     designatedApprover: item.designatedApproverUserId

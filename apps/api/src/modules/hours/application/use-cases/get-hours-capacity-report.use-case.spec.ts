@@ -24,6 +24,7 @@ function buildItem(overrides: Partial<HourEntryListItem>): HourEntryListItem {
     hours: 8,
     date: new Date('2026-08-10T00:00:00.000Z'),
     isOvertime: false,
+    projectStageAtEntry: null,
     status: 'approved',
     rejectionReason: null,
     designatedApproverUserId: null,
