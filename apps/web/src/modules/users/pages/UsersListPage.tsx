@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import type { UserSummary } from '@kora/contracts';
+import type { UserStatus, UserSummary } from '@kora/contracts';
 import styles from './UsersListPage.module.css';
 import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Button } from '@/shared/components/ui/Button';
@@ -13,7 +13,7 @@ import { UsersTable } from '../components/UsersTable';
 import { UserFormDialog } from '../components/UserFormDialog';
 import { ConfirmActionDialog } from '@/shared/components/ui/ConfirmActionDialog';
 import { useUsersListState } from '../hooks/useUsersListState';
-import { useDeleteUser, useGrantUserAccess, useUsersList } from '../api/users.queries';
+import { useChangeUserStatus, useDeleteUser, useGrantUserAccess, useUsersList } from '../api/users.queries';
 import { useTeamsList } from '@/modules/teams/api/teams.queries';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { ApiRequestError } from '@/shared/lib/api-client';
@@ -39,6 +39,7 @@ type DialogState =
   | { kind: 'none' }
   | { kind: 'form'; user: UserSummary | null }
   | { kind: 'grantAccess'; user: UserSummary }
+  | { kind: 'disable'; user: UserSummary }
   | { kind: 'delete'; user: UserSummary };
 
 const BASE_TABS: readonly TabItem[] = [{ id: 'usuarios', label: 'Usuarios' }];
@@ -62,9 +63,52 @@ export function UsersListPage() {
 
   const grantAccess = useGrantUserAccess();
   const deleteUser = useDeleteUser();
+  const changeStatus = useChangeUserStatus();
 
   const [dialog, setDialog] = useState<DialogState>({ kind: 'none' });
   const closeDialog = () => setDialog({ kind: 'none' });
+
+  // Qué fila tiene el cambio de estado en vuelo: mientras dure, su interruptor
+  // queda inerte. Con `changeStatus.isPending` a secas se apagarían todos.
+  const [statusPendingUserId, setStatusPendingUserId] = useState<string | null>(null);
+
+  const applyStatus = async (user: UserSummary, status: UserStatus) => {
+    setStatusPendingUserId(user.id);
+    try {
+      await changeStatus.mutateAsync({ userId: user.id, input: { status } });
+      toast.success(
+        status === 'active'
+          ? `${user.fullName} quedó habilitado.`
+          : `${user.fullName} quedó deshabilitado y se cerraron sus sesiones.`,
+      );
+    } finally {
+      setStatusPendingUserId(null);
+    }
+  };
+
+  /**
+   * Habilitar se aplica de inmediato; deshabilitar pasa por confirmación.
+   * No es simetría por gusto: deshabilitar echa a la persona de sus sesiones
+   * abiertas y le manda un correo, y un clic de más en la tabla no debería
+   * bastar para eso. Volver a habilitar no rompe nada.
+   */
+  const handleToggleStatus = (user: UserSummary, enabled: boolean) => {
+    if (!enabled) {
+      setDialog({ kind: 'disable', user });
+      return;
+    }
+
+    void applyStatus(user, 'active').catch((error) => {
+      toast.error(
+        error instanceof ApiRequestError ? error.message : 'No se pudo habilitar al usuario.',
+      );
+    });
+  };
+
+  const handleDisable = async () => {
+    if (dialog.kind !== 'disable') return;
+    await applyStatus(dialog.user, 'disabled');
+  };
 
   const handleGrantAccess = async () => {
     if (dialog.kind !== 'grantAccess') return;
@@ -87,18 +131,22 @@ export function UsersListPage() {
   return (
     <DashboardLayout title="Administración">
       <div className={styles.page}>
-        {tabs.length > 1 && (
-          <Tabs tabs={tabs} activeId={activeTab} onSelect={(id) => setActiveTab(id as AdminTab)} />
-        )}
+        {/* Contador y alta viven en la MISMA fila que las pestañas, alineados a
+            su centro — mismo patrón que el `.topRow` del Dashboard. El `<div/>`
+            vacío sostiene el lado izquierdo cuando no hay pestañas que mostrar,
+            para que el botón no se desplace a la izquierda. */}
+        <div className={styles.topRow}>
+          {tabs.length > 1 ? (
+            <Tabs tabs={tabs} activeId={activeTab} onSelect={(id) => setActiveTab(id as AdminTab)} />
+          ) : (
+            <div />
+          )}
 
-        {activeTab === 'usuarios' && (
-          <>
-            <header className={styles.header}>
-              <div className={styles.headerText}>
-                <p className={styles.subtitle}>
-                  {data ? `${data.total} usuario${data.total === 1 ? '' : 's'} registrados` : ' '}
-                </p>
-              </div>
+          {activeTab === 'usuarios' && (
+            <div className={styles.actions}>
+              <p className={styles.subtitle}>
+                {data ? `${data.total} usuario${data.total === 1 ? '' : 's'} registrados` : ' '}
+              </p>
 
               {can('users:create') && (
                 <Button
@@ -108,9 +156,12 @@ export function UsersListPage() {
                   Nuevo usuario
                 </Button>
               )}
-            </header>
+            </div>
+          )}
+        </div>
 
-            <Card>
+        {activeTab === 'usuarios' && (
+          <Card>
             <UsersFilters value={filters} onChange={setFilters} />
 
             <div className={styles.tableSection}>
@@ -129,6 +180,8 @@ export function UsersListPage() {
                 onEdit={(user) => setDialog({ kind: 'form', user })}
                 onGrantAccess={(user) => setDialog({ kind: 'grantAccess', user })}
                 onDelete={(user) => setDialog({ kind: 'delete', user })}
+                onToggleStatus={handleToggleStatus}
+                statusPendingUserId={statusPendingUserId}
               />
 
               {data && (
@@ -141,8 +194,7 @@ export function UsersListPage() {
                 />
               )}
             </div>
-            </Card>
-          </>
+          </Card>
         )}
 
         {activeTab === 'capacity' && (
@@ -181,6 +233,20 @@ export function UsersListPage() {
         }
         confirmLabel="Enviar invitación"
         onConfirm={handleGrantAccess}
+        onClose={closeDialog}
+      />
+
+      <ConfirmActionDialog
+        open={dialog.kind === 'disable'}
+        title="Deshabilitar al usuario"
+        description={
+          dialog.kind === 'disable'
+            ? `${dialog.user.fullName} dejará de poder entrar y se cerrarán sus sesiones abiertas al instante. Seguirá en los listados y podrás volver a habilitarlo cuando quieras.`
+            : ''
+        }
+        confirmLabel="Deshabilitar"
+        destructive
+        onConfirm={handleDisable}
         onClose={closeDialog}
       />
 

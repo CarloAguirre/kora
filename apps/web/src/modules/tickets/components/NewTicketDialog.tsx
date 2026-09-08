@@ -47,7 +47,10 @@ export function NewTicketDialog({ open, onClose, onCreated }: NewTicketDialogPro
   const { data: clients } = useClientsList({ page: 1, pageSize: 200, sortField: 'companyName' });
   // Cualquier persona del sistema puede ser responsable de un ticket — es
   // quien puede cargarle horas por tenerlo asignado, no solo colaboradores.
+  // Los eliminados ya vienen fuera del listado; los deshabilitados se descartan
+  // aquí: no entran al sistema, así que asignarles el ticket lo deja sin dueño.
   const { data: users } = useUsersList({ page: 1, pageSize: 200, sortField: 'firstName' });
+  const assignableUsers = (users?.items ?? []).filter((user) => user.status !== 'disabled');
   const [serverError, setServerError] = useState<string | null>(null);
 
   const {
@@ -167,7 +170,7 @@ export function NewTicketDialog({ open, onClose, onCreated }: NewTicketDialogPro
           <Combobox
             label="Responsable"
             placeholder="Buscar persona…"
-            options={[{ value: '', label: 'Sin asignar' }, ...(users?.items ?? []).map((user) => ({ value: user.id, label: user.fullName }))]}
+            options={[{ value: '', label: 'Sin asignar' }, ...assignableUsers.map((user) => ({ value: user.id, label: user.fullName }))]}
             value={assigneeUserId ?? ''}
             onChange={(value) => setValue('assigneeUserId', value || undefined, { shouldValidate: true })}
             emptyMessage="No se encontraron personas."

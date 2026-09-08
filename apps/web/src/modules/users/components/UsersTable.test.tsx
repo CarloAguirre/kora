@@ -69,6 +69,7 @@ function renderTable(
         onEdit={vi.fn()}
         onGrantAccess={vi.fn()}
         onDelete={vi.fn()}
+        onToggleStatus={vi.fn()}
         {...props}
       />
     </AuthContext.Provider>,
@@ -80,6 +81,7 @@ const ALL_PERMISSIONS: Permission[] = [
   'users:update',
   'users:delete',
   'users:reset_password',
+  'users:change_status',
 ];
 
 describe('UsersTable', () => {
@@ -115,6 +117,44 @@ describe('UsersTable', () => {
 
     expect(screen.queryByRole('button', { name: /Editar a Ana Soto/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Dar de baja a Ana Soto/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('switch')).not.toBeInTheDocument();
+  });
+
+  it('ofrece el interruptor de estado a quien puede cambiarlo', async () => {
+    const onToggleStatus = vi.fn();
+    renderTable([buildUser()], ALL_PERMISSIONS, { onToggleStatus });
+
+    const toggle = screen.getByRole('switch', { name: /Deshabilitar a Ana Soto/ });
+    expect(toggle).toBeChecked();
+
+    await userEvent.click(toggle);
+
+    expect(onToggleStatus).toHaveBeenCalledWith(expect.objectContaining({ id: 'user-1' }), false);
+  });
+
+  it('el interruptor de un usuario deshabilitado pide habilitarlo', async () => {
+    const onToggleStatus = vi.fn();
+    renderTable([buildUser({ status: 'disabled' })], ALL_PERMISSIONS, { onToggleStatus });
+
+    const toggle = screen.getByRole('switch', { name: /Habilitar a Ana Soto/ });
+    expect(toggle).not.toBeChecked();
+
+    await userEvent.click(toggle);
+
+    expect(onToggleStatus).toHaveBeenCalledWith(expect.objectContaining({ id: 'user-1' }), true);
+  });
+
+  /** Un segundo clic mientras la primera peticion vuela mandaria el estado contrario. */
+  it('bloquea el interruptor de la fila cuyo cambio esta en curso', async () => {
+    const onToggleStatus = vi.fn();
+    const users = [buildUser(), buildUser({ id: 'user-2', fullName: 'Luis Perez' })];
+    renderTable(users, ALL_PERMISSIONS, { onToggleStatus, statusPendingUserId: 'user-1' });
+
+    expect(screen.getByRole('switch', { name: /Deshabilitar a Ana Soto/ })).toBeDisabled();
+    expect(screen.getByRole('switch', { name: /Deshabilitar a Luis Perez/ })).toBeEnabled();
+
+    await userEvent.click(screen.getByRole('switch', { name: /Deshabilitar a Ana Soto/ }));
+    expect(onToggleStatus).not.toHaveBeenCalled();
   });
 
   it('ofrece "Dar acceso" a quien no lo tiene y "Reenviar invitación" a quien sí', () => {
@@ -152,6 +192,7 @@ describe('UsersTable', () => {
           onEdit={vi.fn()}
           onGrantAccess={vi.fn()}
           onDelete={vi.fn()}
+          onToggleStatus={vi.fn()}
         />
       </AuthContext.Provider>,
     );

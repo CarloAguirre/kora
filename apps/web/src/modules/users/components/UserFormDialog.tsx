@@ -16,7 +16,8 @@ import { Button } from '@/shared/components/ui/Button';
 import { TextField } from '@/shared/components/ui/TextField';
 import { Select } from '@/shared/components/ui/Select';
 import { AlertIcon, TrashIcon } from '@/shared/components/icons/Icons';
-import { useCreateUser, useUpdateUser } from '../api/users.queries';
+import { useChangeUserStatus, useCreateUser, useUpdateUser } from '../api/users.queries';
+import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { ApiRequestError } from '@/shared/lib/api-client';
 import { teamRequirementFor } from '../lib/team-requirement';
 
@@ -58,9 +59,24 @@ type UserFormValues = z.input<typeof createUserSchema>;
 
 export function UserFormDialog({ open, user, teams, onClose, onSuccess, onDelete }: UserFormDialogProps) {
   const isEditing = user !== null;
+  const { can } = usePermissions();
   const createUser = useCreateUser();
   const updateUser = useUpdateUser();
+  const changeUserStatus = useChangeUserStatus();
   const [serverError, setServerError] = useState<string | null>(null);
+
+  /**
+   * El estado de la cuenta NO forma parte de `createUserSchema`: se cambia por
+   * su propio endpoint porque arrastra efectos que un guardado de datos no
+   * tiene (revoca las sesiones abiertas y avisa por correo). Por eso vive en un
+   * `useState` aparte y solo se envía cuando de verdad cambió.
+   *
+   * "Habilitado" es `active`: un usuario `blocked` tampoco puede entrar, así
+   * que se muestra desmarcado y marcarlo lo reactiva limpiando el bloqueo.
+   */
+  const canChangeStatus = can('users:change_status');
+  const initiallyEnabled = user?.status === 'active';
+  const [enabled, setEnabled] = useState(true);
 
   const {
     register,
@@ -111,6 +127,7 @@ export function UserFormDialog({ open, user, teams, onClose, onSuccess, onDelete
             grantAccess: true,
           },
     );
+    setEnabled(user ? user.status === 'active' : true);
     setServerError(null);
   }, [open, user, reset]);
 
@@ -134,7 +151,22 @@ export function UserFormDialog({ open, user, teams, onClose, onSuccess, onDelete
             isCommercialManager: values.isCommercialManager,
           },
         });
-        onSuccess(`Se actualizaron los datos de ${values.firstName} ${values.lastName}.`);
+        // Después del guardado de datos: si falla por ser el último
+        // administrador activo, la ficha ya quedó guardada y solo se reporta lo
+        // que no se pudo aplicar.
+        const statusChanged = canChangeStatus && enabled !== initiallyEnabled;
+        if (statusChanged) {
+          await changeUserStatus.mutateAsync({
+            userId: user.id,
+            input: { status: enabled ? 'active' : 'disabled' },
+          });
+        }
+
+        onSuccess(
+          statusChanged
+            ? `Se actualizaron los datos de ${values.firstName} ${values.lastName} y se ${enabled ? 'habilitó' : 'deshabilitó'} su cuenta.`
+            : `Se actualizaron los datos de ${values.firstName} ${values.lastName}.`,
+        );
       } else {
         const created = await createUser.mutateAsync({ ...values, teamId });
         onSuccess(
@@ -272,6 +304,26 @@ export function UserFormDialog({ open, user, teams, onClose, onSuccess, onDelete
             </span>
           </label>
         </div>
+
+        {isEditing && canChangeStatus && (
+          <div className={styles.checkboxRow}>
+            <input
+              id="userEnabled"
+              type="checkbox"
+              className={styles.checkbox}
+              checked={enabled}
+              onChange={(event) => setEnabled(event.target.checked)}
+            />
+            <label className={styles.checkboxLabel} htmlFor="userEnabled">
+              <span className={styles.checkboxTitle}>Usuario habilitado</span>
+              <span className={styles.checkboxHint}>
+                {user?.status === 'blocked'
+                  ? 'Está bloqueado por intentos fallidos de ingreso. Al habilitarlo se limpia el bloqueo y podrá volver a entrar.'
+                  : 'Al deshabilitarlo se cierran sus sesiones al instante: deja de poder entrar y de figurar como responsable de nuevos tickets. Su historial se conserva.'}
+              </span>
+            </label>
+          </div>
+        )}
 
         {!isEditing && (
           <div className={styles.checkboxRow}>

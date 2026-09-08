@@ -46,7 +46,29 @@ export function EditTicketDialog({ ticket, open, onClose }: { ticket: TicketDeta
   });
   // Cualquier persona del sistema puede ser responsable de un ticket — es
   // quien puede cargarle horas por tenerlo asignado, no solo colaboradores.
+  // Los eliminados ya vienen fuera del listado; los deshabilitados se descartan
+  // aquí: no entran al sistema, así que asignarles el ticket lo deja sin dueño.
   const { data: users } = useUsersList({ page: 1, pageSize: 200, sortField: 'firstName' });
+  const assignableOptions = (users?.items ?? [])
+    .filter((user) => user.status !== 'disabled')
+    .map((user) => ({ value: user.id, label: user.fullName }));
+  // El responsable actual puede haber quedado fuera (se dio de baja después de
+  // asignarlo). Se mantiene como opción para que el campo no aparezca vacío y
+  // guardar otro cambio no lo borre sin que nadie lo note. Solo se marca como
+  // deshabilitado si consta en el listado: si no vino, no hay cómo saberlo.
+  const currentAssignee = ticket.assignee;
+  const assigneeOptions =
+    currentAssignee && !assignableOptions.some((option) => option.value === currentAssignee.id)
+      ? [
+          ...assignableOptions,
+          {
+            value: currentAssignee.id,
+            label: (users?.items ?? []).some((user) => user.id === currentAssignee.id)
+              ? `${currentAssignee.fullName} (deshabilitado)`
+              : currentAssignee.fullName,
+          },
+        ]
+      : assignableOptions;
 
   const {
     register,
@@ -115,7 +137,7 @@ export function EditTicketDialog({ ticket, open, onClose }: { ticket: TicketDeta
           <Combobox
             label="Responsable"
             placeholder="Buscar persona…"
-            options={[{ value: '', label: 'Sin asignar' }, ...(users?.items ?? []).map((user) => ({ value: user.id, label: user.fullName }))]}
+            options={[{ value: '', label: 'Sin asignar' }, ...assigneeOptions]}
             value={assigneeUserId ?? ''}
             onChange={(value) => setValue('assigneeUserId', value || undefined, { shouldValidate: true })}
             emptyMessage="No se encontraron personas."

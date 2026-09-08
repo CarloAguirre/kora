@@ -2,6 +2,7 @@ import type { UserSummary } from '@kora/contracts';
 import styles from './UsersTable.module.css';
 import { DataTable, type Column, type SortState } from '@/shared/components/ui/DataTable';
 import { Button } from '@/shared/components/ui/Button';
+import { Switch } from '@/shared/components/ui/Switch';
 import { UserStatusBadge } from './UserStatusBadge';
 import { UserRoleBadge } from './UserRoleBadge';
 import { KeyIcon, PencilIcon, TrashIcon } from '@/shared/components/icons/Icons';
@@ -27,6 +28,10 @@ export interface UsersTableProps {
   onEdit: (user: UserSummary) => void;
   onGrantAccess: (user: UserSummary) => void;
   onDelete: (user: UserSummary) => void;
+  /** Habilitar (`true`) o deshabilitar (`false`) al usuario desde su fila. */
+  onToggleStatus: (user: UserSummary, enabled: boolean) => void;
+  /** Usuario cuyo cambio de estado está en vuelo: su interruptor no admite otro clic. */
+  statusPendingUserId?: string | null;
 }
 
 export function UsersTable({
@@ -38,6 +43,8 @@ export function UsersTable({
   onEdit,
   onGrantAccess,
   onDelete,
+  onToggleStatus,
+  statusPendingUserId = null,
 }: UsersTableProps) {
   const { can } = usePermissions();
 
@@ -71,6 +78,19 @@ export function UsersTable({
       sortable: true,
       render: (user) => (
         <div className={styles.statusCell}>
+          {/* El interruptor actúa en el acto sobre la fila; la etiqueta se
+              mantiene al lado porque también distingue "Bloqueado", que es un
+              tercer estado que el interruptor no puede expresar. */}
+          {can('users:change_status') && (
+            <Switch
+              checked={user.status === 'active'}
+              onChange={(enabled) => onToggleStatus(user, enabled)}
+              disabled={statusPendingUserId === user.id}
+              label={
+                user.status === 'active' ? `Deshabilitar a ${user.fullName}` : `Habilitar a ${user.fullName}`
+              }
+            />
+          )}
           <UserStatusBadge status={user.status} />
           {/* Distinguir "no tiene cuenta" de "está deshabilitado" es esencial
               aquí: la mayoría de las fichas migradas nunca tuvo acceso. */}

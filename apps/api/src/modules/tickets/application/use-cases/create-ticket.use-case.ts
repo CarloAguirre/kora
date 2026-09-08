@@ -8,6 +8,8 @@ import { TICKET_HISTORY_REPOSITORY, type TicketHistoryRepository } from '../../d
 import { TICKET_CLIENT_READER, type TicketClientReader } from '../ports/ticket-client-reader.port';
 import { TICKET_PROJECT_READER, type TicketProjectReader } from '../ports/ticket-project-reader.port';
 import { TICKET_CODE_GENERATOR, type TicketCodeGenerator } from '../ports/ticket-code-generator.port';
+import { TICKET_USER_READER, type TicketUserReader } from '../ports/ticket-user-reader.port';
+import { ensureAssignable } from '../services/ticket-assignee';
 import { SupportPlanAvailabilityService } from '../services/support-plan-availability.service';
 import { AUDIT_RECORDER, type AuditRecorder } from '../../../../shared/application/ports/audit-recorder.port';
 import type { ActorContext, UseCase } from '../../../../shared/application/use-case';
@@ -32,6 +34,7 @@ export class CreateTicketUseCase implements UseCase<CreateTicketCommand, { id: s
     @Inject(TICKET_CLIENT_READER) private readonly clients: TicketClientReader,
     @Inject(TICKET_PROJECT_READER) private readonly projects: TicketProjectReader,
     @Inject(TICKET_CODE_GENERATOR) private readonly codeGenerator: TicketCodeGenerator,
+    @Inject(TICKET_USER_READER) private readonly users: TicketUserReader,
     private readonly supportPlanAvailability: SupportPlanAvailabilityService,
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
     @Inject(CLOCK) private readonly clock: Clock,
@@ -46,6 +49,9 @@ export class CreateTicketUseCase implements UseCase<CreateTicketCommand, { id: s
       const client = await this.clients.findById(data.clientId);
       if (!client) return err(new ReferencedClientNotFoundError(data.clientId));
     }
+
+    const assignable = await ensureAssignable(data.assigneeUserId, this.users);
+    if (assignable.isErr()) return err(assignable.error);
 
     if (data.projectId) {
       const project = await this.projects.findById(data.projectId);

@@ -37,6 +37,17 @@ export class NoUsableSupportPlanError extends ConflictError {
   }
 }
 
+/**
+ * Solo se puede asignar un ticket a alguien vigente: una persona eliminada o
+ * deshabilitada ya no entra al sistema ni puede cargarle horas, así que
+ * dejarla como responsable equivale a dejar el ticket sin dueño.
+ */
+export class TicketAssigneeNotAssignableError extends ConflictError {
+  constructor() {
+    super('No puedes asignar el ticket a una persona eliminada o deshabilitada.', 'TICKET_ASSIGNEE_NOT_ASSIGNABLE');
+  }
+}
+
 /** El flujo de estados es forzado: solo se permite avanzar un paso a la vez. Ver docs/DECISION-M5-TICKETS.md. */
 export class InvalidTicketStatusTransitionError extends ConflictError {
   constructor() {

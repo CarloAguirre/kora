@@ -1,0 +1,60 @@
+/* Interruptor de dos estados — la pastilla y el círculo usan la paleta de marca:
+   lima cuando está activo, gris neutro cuando no. */
+
+.switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  width: 36px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--kora-border);
+  border-radius: var(--kora-radius-pill);
+  background: var(--kora-surface-disabled);
+  cursor: pointer;
+  transition:
+    background var(--kora-transition),
+    border-color var(--kora-transition);
+}
+
+.switch:hover:not(:disabled) {
+  border-color: var(--kora-border-strong);
+}
+
+.switch:focus-visible {
+  outline: 2px solid var(--kora-blue-600);
+  outline-offset: 1px;
+}
+
+.checked {
+  background: var(--kora-lime);
+  border-color: var(--kora-lime-mid);
+}
+
+.checked:hover:not(:disabled) {
+  border-color: var(--kora-lime-dark);
+}
+
+/* En espera de la respuesta del servidor: se ve atenuado y no acepta más
+   pulsaciones, para que nadie encadene dos cambios de estado seguidos. */
+.switch:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.knob {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--kora-surface);
+  box-shadow: 0 1px 2px rgba(18, 34, 53, 0.25);
+  transition: transform var(--kora-transition);
+}
+
+.checked .knob {
+  transform: translateX(16px);
+}

@@ -5,6 +5,8 @@ import { CannotManageTicketError, ReferencedProjectNotFoundError, TicketNotFound
 import { TICKET_REPOSITORY, type TicketRepository } from '../../domain/repositories/ticket.repository';
 import { TICKET_HISTORY_REPOSITORY, type TicketHistoryRepository } from '../../domain/repositories/ticket-history.repository';
 import { TICKET_PROJECT_READER, type TicketProjectReader } from '../ports/ticket-project-reader.port';
+import { TICKET_USER_READER, type TicketUserReader } from '../ports/ticket-user-reader.port';
+import { ensureAssignable } from '../services/ticket-assignee';
 import { AUDIT_RECORDER, type AuditRecorder } from '../../../../shared/application/ports/audit-recorder.port';
 import type { ActorContext, UseCase } from '../../../../shared/application/use-case';
 import { canManageTicket } from '../services/ticket-access';
@@ -22,6 +24,7 @@ export class UpdateTicketUseCase implements UseCase<UpdateTicketCommand, void, A
     @Inject(TICKET_REPOSITORY) private readonly tickets: TicketRepository,
     @Inject(TICKET_HISTORY_REPOSITORY) private readonly history: TicketHistoryRepository,
     @Inject(TICKET_PROJECT_READER) private readonly projects: TicketProjectReader,
+    @Inject(TICKET_USER_READER) private readonly users: TicketUserReader,
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
     @Inject(CLOCK) private readonly clock: Clock,
   ) {}
@@ -38,6 +41,11 @@ export class UpdateTicketUseCase implements UseCase<UpdateTicketCommand, void, A
     if (data.developmentProjectId) {
       const project = await this.projects.findById(data.developmentProjectId);
       if (!project) return err(new ReferencedProjectNotFoundError(data.developmentProjectId));
+    }
+
+    if (data.assigneeUserId !== undefined && data.assigneeUserId !== ticket.assigneeUserId) {
+      const assignable = await ensureAssignable(data.assigneeUserId, this.users);
+      if (assignable.isErr()) return err(assignable.error);
     }
 
     const before = ticket.toSnapshot();

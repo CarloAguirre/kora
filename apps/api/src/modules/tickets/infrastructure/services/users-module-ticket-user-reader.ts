@@ -9,6 +9,6 @@ export class UsersModuleTicketUserReader implements TicketUserReader {
   async findById(userId: string): Promise<TicketUserReference | null> {
     const user = await this.users.findById(userId);
     if (!user || user.isDeleted) return null;
-    return { id: user.id, fullName: user.name.fullName };
+    return { id: user.id, fullName: user.name.fullName, status: user.status };
   }
 }
