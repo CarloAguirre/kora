@@ -10,13 +10,14 @@ import { DataTable, type Column } from '@/shared/components/ui/DataTable';
 import { Pagination } from '@/shared/components/ui/Pagination';
 import { Select } from '@/shared/components/ui/Select';
 import { useToast } from '@/shared/components/ui/Toast';
-import { PlusIcon, PencilIcon, TrashIcon } from '@/shared/components/icons/Icons';
+import { PlusIcon, PencilIcon, TrashIcon, DownloadIcon } from '@/shared/components/icons/Icons';
 import { TextField } from '@/shared/components/ui/TextField';
 import { SearchIcon } from '@/shared/components/icons/Icons';
 import { ConfirmActionDialog } from '@/shared/components/ui/ConfirmActionDialog';
 import { TeamFormDialog } from '../components/TeamFormDialog';
 import { LeaderTeamConsole } from './LeaderTeamConsole';
 import { useDeleteTeam, useTeamsList } from '../api/teams.queries';
+import { useHourEntriesExport } from '@/modules/hours/hooks/useHourEntriesExport';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
 
@@ -53,8 +54,10 @@ export function TeamsListPage() {
 
 /** Administración de equipos (M2). Sigue el mismo patrón compacto de Usuarios/Clientes. */
 function TeamsAdminListPage() {
+  const { user } = useAuth();
   const { can } = usePermissions();
   const toast = useToast();
+  const { exporting, exportError, exportEntries } = useHourEntriesExport();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(1);
@@ -72,6 +75,8 @@ function TeamsAdminListPage() {
     kind: 'none',
   });
   const closeDialog = () => setDialog({ kind: 'none' });
+
+  const handleExportHours = () => exportEntries({ sortField: 'date', sortDirection: 'desc' });
 
   const handleDelete = async () => {
     if (dialog.kind !== 'delete') return;
@@ -125,12 +130,31 @@ function TeamsAdminListPage() {
       <div className={styles.page}>
         <header className={styles.header}>
           <p className={styles.subtitle}>{data ? `${data.total} equipo${data.total === 1 ? '' : 's'}` : ' '}</p>
-          {can('teams:manage') && (
-            <Button onClick={() => setDialog({ kind: 'form', team: null })} iconLeft={<PlusIcon size={18} />}>
-              Nuevo equipo
-            </Button>
-          )}
+          <div className={styles.headerActions}>
+            {user?.role === 'pmo' && (
+              <Button
+                variant="outlineDark"
+                iconLeft={<DownloadIcon size={18} />}
+                loading={exporting}
+                loadingText="Generando…"
+                onClick={() => void handleExportHours()}
+              >
+                Descargar registro de horas
+              </Button>
+            )}
+            {can('teams:manage') && (
+              <Button onClick={() => setDialog({ kind: 'form', team: null })} iconLeft={<PlusIcon size={18} />}>
+                Nuevo equipo
+              </Button>
+            )}
+          </div>
         </header>
+
+        {exportError && (
+          <p className={styles.exportError} role="alert">
+            {exportError}
+          </p>
+        )}
 
         <Card>
           <div className={styles.filters}>

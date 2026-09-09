@@ -18,13 +18,9 @@ import { PlusIcon, PencilIcon, TrashIcon, EyeIcon, DownloadIcon } from '@/shared
 import { HourEntryStatusBadge } from './HourEntryStatusBadge';
 import { HourEntryFormDialog } from './HourEntryFormDialog';
 import { useDeleteHourEntry, useHourEntriesList } from '../api/hours.queries';
-import { hoursApi } from '../api/hours.api';
-import { exportHourEntries } from '../lib/hours-export';
+import { useHourEntriesExport } from '../hooks/useHourEntriesExport';
 import { resolvedApprover } from '../lib/approver';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
-import { ApiRequestError } from '@/shared/lib/api-client';
-
-const EXPORT_PAGE_SIZE = 200;
 
 const STATUS_OPTIONS = HOUR_ENTRY_STATUSES.map((status) => ({ value: status, label: HOUR_ENTRY_STATUS_LABELS[status] }));
 const formatDate = (value: string) => new Date(`${value}T00:00:00`).toLocaleDateString('es-CL');
@@ -55,8 +51,7 @@ export function TeamHourHistoryPanel({ teamId, userId }: { teamId?: string; user
   const [status, setStatus] = useState<HourEntryStatus | ''>('');
   const [page, setPage] = useState(1);
   const [dialog, setDialog] = useState<DialogState>({ kind: 'none' });
-  const [exporting, setExporting] = useState(false);
-  const [exportError, setExportError] = useState<string | null>(null);
+  const { exporting, exportError, exportEntries } = useHourEntriesExport();
   const deleteEntry = useDeleteHourEntry();
 
   const hasFilters = Boolean(personSearch || dateFrom || dateTo || status);
@@ -93,33 +88,17 @@ export function TeamHourHistoryPanel({ teamId, userId }: { teamId?: string; user
     toast.success('Se eliminó el registro de horas.');
   };
 
-  const handleExport = async () => {
-    setExportError(null);
-    setExporting(true);
-    try {
-      const baseQuery = {
-        search: personSearch.trim() || undefined,
-        teamId,
-        userId,
-        dateFrom: dateFrom || undefined,
-        dateTo: dateTo || undefined,
-        status: status || undefined,
-        sortField: 'date' as const,
-        sortDirection: 'desc' as const,
-      };
-      const first = await hoursApi.list({ ...baseQuery, page: 1, pageSize: EXPORT_PAGE_SIZE });
-      const rest = await Promise.all(
-        Array.from({ length: first.pageCount - 1 }, (_, index) =>
-          hoursApi.list({ ...baseQuery, page: index + 2, pageSize: EXPORT_PAGE_SIZE }),
-        ),
-      );
-      exportHourEntries([...first.items, ...rest.flatMap((page) => page.items)]);
-    } catch (exportErr) {
-      setExportError(exportErr instanceof ApiRequestError ? exportErr.message : 'No se pudo generar el Excel.');
-    } finally {
-      setExporting(false);
-    }
-  };
+  const handleExport = () =>
+    exportEntries({
+      search: personSearch.trim() || undefined,
+      teamId,
+      userId,
+      dateFrom: dateFrom || undefined,
+      dateTo: dateTo || undefined,
+      status: status || undefined,
+      sortField: 'date',
+      sortDirection: 'desc',
+    });
 
   const columns: Column<HourEntrySummary>[] = [
     { key: 'date', header: 'Fecha', render: (e) => formatDate(e.date) },
