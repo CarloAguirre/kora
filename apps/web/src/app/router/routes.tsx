@@ -153,4 +153,10 @@ export const router = createBrowserRouter([
   },
 
   { path: '*', element: <NotFoundPage /> },
-]);
+], {
+  // Vacío ('/') salvo que el build se haga con `vite build --base=/algo/`
+  // (así se despliega hoy en el EC2 de pruebas, con v1 y v2 compartiendo
+  // dominio bajo /v1 y /v2) — sin esto, navegar dentro de la app deriva la
+  // URL fuera de ese prefijo y un refresh/enlace directo 404 en el servidor.
+  basename: import.meta.env.BASE_URL,
+});
