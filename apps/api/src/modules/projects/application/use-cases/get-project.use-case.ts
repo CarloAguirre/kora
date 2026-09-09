@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { ForbiddenError, err, ok, type ApplicationError, type Result } from '@kora/core';
+import { CLOCK, ForbiddenError, err, ok, type ApplicationError, type Clock, type Result } from '@kora/core';
 import type { Permission, ProjectDetail } from '@kora/contracts';
 import { ProjectNotFoundError } from '../../domain/errors/project.errors';
 import { PROJECT_REPOSITORY, type ProjectRepository } from '../../domain/repositories/project.repository';
@@ -40,6 +40,7 @@ export class GetProjectUseCase implements UseCase<GetProjectCommand, ProjectDeta
     @Inject(PROJECT_USER_READER) private readonly users: ProjectUserReader,
     @Inject(PROJECT_CLIENT_READER) private readonly clients: ProjectClientReader,
     @Inject(PROJECT_CONTACT_READER) private readonly contacts: ProjectContactReader,
+    @Inject(CLOCK) private readonly clock: Clock,
   ) {}
 
   async execute(command: GetProjectCommand): Promise<Result<ProjectDetail, ApplicationError>> {
@@ -82,6 +83,8 @@ export class GetProjectUseCase implements UseCase<GetProjectCommand, ProjectDeta
         members,
         teams: projectTeams,
         observations: projectObservations,
+        actorUserId: command.actorUserId,
+        now: this.clock.now(),
       }),
     );
   }

@@ -43,6 +43,37 @@ export class DrizzleProjectObservationRepository implements ProjectObservationRe
     }));
   }
 
+  async findById(id: string, context?: TransactionContext): Promise<ProjectObservationRecord | null> {
+    const db = resolveDb(this.database, context);
+
+    const rows = await db
+      .select({
+        id: projectObservations.id,
+        projectId: projectObservations.projectId,
+        message: projectObservations.message,
+        authorUserId: projectObservations.authorUserId,
+        authorFirstName: users.firstName,
+        authorLastName: users.lastName,
+        createdAt: projectObservations.createdAt,
+      })
+      .from(projectObservations)
+      .innerJoin(users, eq(users.id, projectObservations.authorUserId))
+      .where(eq(projectObservations.id, id))
+      .limit(1);
+
+    const row = rows[0];
+    if (!row) return null;
+
+    return {
+      id: row.id,
+      projectId: row.projectId,
+      message: row.message,
+      authorUserId: row.authorUserId,
+      authorName: `${row.authorFirstName} ${row.authorLastName}`.trim(),
+      createdAt: row.createdAt,
+    };
+  }
+
   async add(
     projectId: string,
     message: string,
@@ -60,5 +91,20 @@ export class DrizzleProjectObservationRepository implements ProjectObservationRe
     const id = inserted[0]?.id;
     if (!id) throw new Error('La observación no devolvió identificador.');
     return id;
+  }
+
+  async update(id: string, message: string, now: Date, context?: TransactionContext): Promise<void> {
+    const db = resolveDb(this.database, context);
+
+    await db
+      .update(projectObservations)
+      .set({ message, updatedAt: now })
+      .where(eq(projectObservations.id, id));
+  }
+
+  async remove(id: string, context?: TransactionContext): Promise<void> {
+    const db = resolveDb(this.database, context);
+
+    await db.delete(projectObservations).where(eq(projectObservations.id, id));
   }
 }

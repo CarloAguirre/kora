@@ -7,6 +7,7 @@ import type {
   ListProjectsResponse,
   ProjectDetail,
   UpdateProjectInput,
+  UpdateProjectObservationInput,
 } from '@kora/contracts';
 import { api } from '@/shared/lib/api-client';
 
@@ -50,6 +51,12 @@ export const projectsApi = {
   },
   addObservation(projectId: string, input: AddProjectObservationInput): Promise<{ id: string }> {
     return api.post<{ id: string }>(`/projects/${projectId}/observations`, input);
+  },
+  updateObservation(projectId: string, observationId: string, input: UpdateProjectObservationInput): Promise<void> {
+    return api.patch<void>(`/projects/${projectId}/observations/${observationId}`, input);
+  },
+  removeObservation(projectId: string, observationId: string): Promise<void> {
+    return api.delete<void>(`/projects/${projectId}/observations/${observationId}`);
   },
 };
 

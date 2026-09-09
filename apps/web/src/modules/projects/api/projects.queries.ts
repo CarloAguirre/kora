@@ -6,6 +6,7 @@ import type {
   CreateProjectInput,
   ListProjectsQuery,
   UpdateProjectInput,
+  UpdateProjectObservationInput,
 } from '@kora/contracts';
 import { projectKeys, projectsApi } from './projects.api';
 
@@ -93,6 +94,31 @@ export function useAddProjectObservation() {
   return useMutation({
     mutationFn: ({ projectId, input }: { projectId: string; input: AddProjectObservationInput }) =>
       projectsApi.addObservation(projectId, input),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useUpdateProjectObservation() {
+  const invalidate = useInvalidateProjects();
+  return useMutation({
+    mutationFn: ({
+      projectId,
+      observationId,
+      input,
+    }: {
+      projectId: string;
+      observationId: string;
+      input: UpdateProjectObservationInput;
+    }) => projectsApi.updateObservation(projectId, observationId, input),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useDeleteProjectObservation() {
+  const invalidate = useInvalidateProjects();
+  return useMutation({
+    mutationFn: ({ projectId, observationId }: { projectId: string; observationId: string }) =>
+      projectsApi.removeObservation(projectId, observationId),
     onSuccess: () => invalidate(),
   });
 }

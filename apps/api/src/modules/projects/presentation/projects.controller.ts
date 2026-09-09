@@ -5,6 +5,7 @@ import {
   changeProjectStatusSchema,
   createProjectSchema,
   listProjectsQuerySchema,
+  updateProjectObservationSchema,
   updateProjectSchema,
   type AddProjectObservationInput,
   type AssignProjectTeamMemberInput,
@@ -14,6 +15,7 @@ import {
   type ListProjectsResponse,
   type ProjectDetail,
   type UpdateProjectInput,
+  type UpdateProjectObservationInput,
 } from '@kora/contracts';
 import { ZodValidationPipe } from '../../../shared/presentation/pipes/zod-validation.pipe';
 import { RequireAnyPermission, RequirePermissions } from '../../../shared/presentation/decorators/require-permissions.decorator';
@@ -29,6 +31,8 @@ import { DeleteProjectUseCase } from '../application/use-cases/delete-project.us
 import { AssignProjectTeamMemberUseCase } from '../application/use-cases/assign-project-team-member.use-case';
 import { UnassignProjectTeamMemberUseCase } from '../application/use-cases/unassign-project-team-member.use-case';
 import { AddProjectObservationUseCase } from '../application/use-cases/add-project-observation.use-case';
+import { UpdateProjectObservationUseCase } from '../application/use-cases/update-project-observation.use-case';
+import { DeleteProjectObservationUseCase } from '../application/use-cases/delete-project-observation.use-case';
 
 @Controller('projects')
 export class ProjectsController {
@@ -42,6 +46,8 @@ export class ProjectsController {
     private readonly assignMember: AssignProjectTeamMemberUseCase,
     private readonly unassignMember: UnassignProjectTeamMemberUseCase,
     private readonly addObservation: AddProjectObservationUseCase,
+    private readonly updateObservation: UpdateProjectObservationUseCase,
+    private readonly deleteObservation: DeleteProjectObservationUseCase,
   ) {}
 
   /**
@@ -157,6 +163,42 @@ export class ProjectsController {
         actor: toActorContext(actor),
         actorPermissions: actor.permissions,
       }),
+    );
+  }
+
+  /**
+   * Igual que al crear, el permiso solo abre la puerta: `UpdateProjectObservationUseCase`
+   * exige además ser el autor y estar dentro de los 15 minutos desde su creación.
+   */
+  @Patch(':id/observations/:observationId')
+  @RequireAnyPermission('projects:manage', 'projects:read_assigned')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async updateProjectObservation(
+    @Param('id') id: string,
+    @Param('observationId') observationId: string,
+    @Body(new ZodValidationPipe(updateProjectObservationSchema)) body: UpdateProjectObservationInput,
+    @CurrentUser() actor: RequestUser,
+  ): Promise<void> {
+    unwrapOrThrow(
+      await this.updateObservation.execute({
+        projectId: id,
+        observationId,
+        data: body,
+        actor: toActorContext(actor),
+      }),
+    );
+  }
+
+  @Delete(':id/observations/:observationId')
+  @RequireAnyPermission('projects:manage', 'projects:read_assigned')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deleteProjectObservation(
+    @Param('id') id: string,
+    @Param('observationId') observationId: string,
+    @CurrentUser() actor: RequestUser,
+  ): Promise<void> {
+    unwrapOrThrow(
+      await this.deleteObservation.execute({ projectId: id, observationId, actor: toActorContext(actor) }),
     );
   }
 }

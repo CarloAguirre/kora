@@ -6,6 +6,7 @@ import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Tabs } from '@/shared/components/ui/Tabs';
 import { KoraLogo } from '@/shared/components/layout/KoraLogo';
 import { ClientCompanyHeader } from '../components/ClientCompanyHeader';
+import { PortalPreviewNotice } from '../components/PortalPreviewNotice';
 import { PortalTable, type PortalTableColumn } from '../components/PortalTable';
 import { StatPill } from '../components/StatPill';
 import { StatusPill, type StatusPillTone } from '../components/StatusPill';
@@ -44,7 +45,27 @@ const PLAN_TYPE_LABEL: Readonly<Record<SupportPlanType, string>> = {
   on_demand: 'A demanda',
 };
 
-export function ClientPortalPage() {
+export interface ClientPortalPageProps {
+  /** Rutas reales del portal por defecto. La vista previa de admin
+   *  (`ClientPortalPreviewPage`) las reemplaza por `/clientes/:clientId/vista-cliente[...]`,
+   *  ya que un admin/PMO no tiene el permiso `projects:read_own_client` que
+   *  protege `/portal/*` a propósito — ver `docs/DECISION-PORTAL-CLIENTE.md`. */
+  readonly projectsPath?: string;
+  readonly supportPath?: string;
+  readonly getProjectPath?: (projectId: string) => string;
+  readonly getContractPath?: (contractId: string) => string;
+  /** Vista previa desde la ficha interna del cliente: mismo aviso que en
+   *  `ClientProjectDetailPage` — el contenido sigue siendo el mock de ejemplo. */
+  readonly preview?: boolean;
+}
+
+export function ClientPortalPage({
+  projectsPath = '/portal/proyectos',
+  supportPath = '/portal/soporte',
+  getProjectPath = (projectId) => `/portal/proyectos/${projectId}`,
+  getContractPath = (contractId) => `/portal/soporte/${contractId}`,
+  preview = false,
+}: ClientPortalPageProps = {}) {
   const location = useLocation();
   const navigate = useNavigate();
   const activeTab: 'proyectos' | 'soporte' = location.pathname.endsWith('/soporte') ? 'soporte' : 'proyectos';
@@ -52,6 +73,13 @@ export function ClientPortalPage() {
   return (
     <DashboardLayout title={activeTab === 'proyectos' ? 'Proyectos' : 'Soporte'}>
       <div className={styles.page}>
+        {preview && (
+          <PortalPreviewNotice>
+            Vista previa de cómo ve un cliente esta pantalla — la empresa y los proyectos de abajo son el dato de
+            ejemplo "{MOCK_CLIENT_COMPANY.name}", todavía no los datos reales de este cliente.
+          </PortalPreviewNotice>
+        )}
+
         <ClientCompanyHeader
           company={MOCK_CLIENT_COMPANY}
           contractLabel={activeTab === 'proyectos' ? 'Contacto' : 'Responsable'}
@@ -63,10 +91,14 @@ export function ClientPortalPage() {
             { id: 'soporte', label: 'Soporte' },
           ]}
           activeId={activeTab}
-          onSelect={(id) => navigate(id === 'soporte' ? '/portal/soporte' : '/portal/proyectos')}
+          onSelect={(id) => navigate(id === 'soporte' ? supportPath : projectsPath)}
         />
 
-        {activeTab === 'proyectos' ? <ClientProjectsSection /> : <ClientSupportSection />}
+        {activeTab === 'proyectos' ? (
+          <ClientProjectsSection getProjectPath={getProjectPath} />
+        ) : (
+          <ClientSupportSection getContractPath={getContractPath} />
+        )}
 
         <div className={styles.footer}>
           <span>Diseñado y desarrollado por</span>
@@ -77,7 +109,7 @@ export function ClientPortalPage() {
   );
 }
 
-function ClientProjectsSection() {
+function ClientProjectsSection({ getProjectPath }: { getProjectPath: (projectId: string) => string }) {
   const projects = MOCK_CLIENT_PROJECTS;
   const activeCount = projects.filter((p) => p.health === 'active').length;
   const attentionCount = projects.filter((p) => p.health === 'at_risk').length;
@@ -88,7 +120,7 @@ function ClientProjectsSection() {
       header: 'Proyecto',
       render: (project) => (
         <div className={styles.projectCell}>
-          <Link className={styles.projectLink} to={`/portal/proyectos/${project.id}`}>
+          <Link className={styles.projectLink} to={getProjectPath(project.id)}>
             {project.name}
           </Link>
           <span className={styles.projectMeta}>
@@ -136,7 +168,7 @@ function ClientProjectsSection() {
   );
 }
 
-function ClientSupportSection() {
+function ClientSupportSection({ getContractPath }: { getContractPath: (contractId: string) => string }) {
   const contracts = MOCK_CLIENT_SUPPORT_CONTRACTS;
   const [planFilter, setPlanFilter] = useState<SupportPlanType | null>(null);
 
@@ -151,12 +183,15 @@ function ClientSupportSection() {
   const columns: PortalTableColumn<ClientSupportContractRow>[] = [
     {
       key: 'name',
-      // El nombre del contrato es un enlace en el Figma (lleva al detalle del
-      // contrato de soporte, con su lista de tickets). Esa ficha no está
-      // construida todavía — ver docs/DECISION-PORTAL-CLIENTE.md — así que
-      // por ahora se muestra como texto, no como enlace roto.
+      // El nombre del contrato es un enlace en el Figma: lleva al detalle del
+      // contrato de soporte (`ClientSupportContractDetailPage`) con su lista
+      // de tickets — ver docs/DECISION-PORTAL-CLIENTE.md.
       header: 'Contrato',
-      render: (c) => <span className={styles.contractName}>{c.name}</span>,
+      render: (c) => (
+        <Link className={styles.contractName} to={getContractPath(c.id)}>
+          {c.name}
+        </Link>
+      ),
     },
     { key: 'kabeliOwner', header: 'Responsable Kabeli', render: (c) => c.kabeliOwnerName },
     { key: 'planType', header: 'Tipo', render: (c) => PLAN_TYPE_LABEL[c.planType] },

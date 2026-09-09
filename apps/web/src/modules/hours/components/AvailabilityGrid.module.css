@@ -113,40 +113,55 @@
 
 .incompleteFilter {
   display: flex;
-  align-items: flex-start;
-  gap: var(--kora-space-2);
+  flex-direction: column;
+  gap: var(--kora-space-1);
   max-width: 320px;
-  padding: var(--kora-space-2) var(--kora-space-3);
-  border: 1px solid var(--kora-border);
-  border-radius: var(--kora-radius-sm);
-  background: var(--kora-surface-alt);
   cursor: pointer;
 }
 
-.incompleteFilter input {
-  margin-top: 3px;
-  width: 16px;
-  height: 16px;
-  accent-color: var(--kora-navy);
+.incompleteFilterLabel {
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-medium);
+  line-height: 16px;
+}
+
+.incompleteFilterControl {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+  height: var(--kora-field-height);
+}
+
+.incompleteFilterToggle {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-2);
   cursor: pointer;
 }
 
 .incompleteFilterText {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.incompleteFilterTitle {
-  color: var(--kora-navy);
+  color: var(--kora-text);
   font-size: var(--kora-text-sm);
-  font-weight: var(--kora-weight-bold);
+  font-weight: var(--kora-weight-regular);
+  white-space: nowrap;
 }
 
-.incompleteFilterHelp {
+.incompleteFilterInfo {
+  display: inline-flex;
   color: var(--kora-text-muted);
-  font-size: var(--kora-text-xs);
-  font-weight: var(--kora-weight-medium);
+  cursor: help;
+}
+
+.incompleteFilterInfo:hover,
+.incompleteFilterInfo:focus-visible {
+  color: var(--kora-blue-600);
+}
+
+.incompleteFilterInfo:focus-visible {
+  outline: 2px solid var(--kora-blue-600);
+  outline-offset: 2px;
+  border-radius: 50%;
 }
 
 .empty {

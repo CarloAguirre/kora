@@ -34,6 +34,7 @@
   font-size: 14px;
   font-weight: var(--kora-weight-bold);
   color: #122235;
+  text-decoration: underline;
 }
 
 .stageCell {

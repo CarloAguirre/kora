@@ -9,7 +9,7 @@ import { DataTable, type Column, type SortState } from '@/shared/components/ui/D
 import { Pagination } from '@/shared/components/ui/Pagination';
 import { Tabs } from '@/shared/components/ui/Tabs';
 import { TextField } from '@/shared/components/ui/TextField';
-import { PencilIcon, PlusIcon, ChevronLeftIcon, SearchIcon } from '@/shared/components/icons/Icons';
+import { PencilIcon, PlusIcon, ChevronLeftIcon, SearchIcon, EyeIcon } from '@/shared/components/icons/Icons';
 import { ClientStatusBadge } from '../components/ClientStatusBadge';
 import { ClientFormDialog } from '../components/ClientFormDialog';
 import { useClientDetail } from '../api/clients.queries';
@@ -163,11 +163,18 @@ export function ClientDetailPage() {
             </Button>
             <h2 className={styles.clientName}>{client.companyName}</h2>
           </div>
-          {can('projects:manage') && (
-            <Link to={`/proyectos/nuevo?clientId=${client.id}`}>
-              <Button iconLeft={<PlusIcon size={18} />}>Agregar Proyecto</Button>
+          <div className={styles.headerRight}>
+            <Link to={`/clientes/${client.id}/vista-cliente`}>
+              <Button variant="outline" iconLeft={<EyeIcon size={18} />}>
+                Ver como cliente
+              </Button>
             </Link>
-          )}
+            {can('projects:manage') && (
+              <Link to={`/proyectos/nuevo?clientId=${client.id}`}>
+                <Button iconLeft={<PlusIcon size={18} />}>Agregar Proyecto</Button>
+              </Link>
+            )}
+          </div>
         </div>
 
         <Card>

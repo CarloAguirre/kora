@@ -8,6 +8,9 @@ import { UsersListPage } from '@/modules/users/pages/UsersListPage';
 import { LegacyImportPage } from '@/modules/admin-legacy-import/pages/LegacyImportPage';
 import { ClientsListPage } from '@/modules/clients/pages/ClientsListPage';
 import { ClientDetailPage } from '@/modules/clients/pages/ClientDetailPage';
+import { ClientPortalPreviewPage } from '@/modules/clients/pages/ClientPortalPreviewPage';
+import { ClientProjectPreviewPage } from '@/modules/clients/pages/ClientProjectPreviewPage';
+import { ClientSupportContractPreviewPage } from '@/modules/clients/pages/ClientSupportContractPreviewPage';
 import { TeamsListPage } from '@/modules/teams/pages/TeamsListPage';
 import { TeamDetailPage } from '@/modules/teams/pages/TeamDetailPage';
 import { TeamMemberDetailPage } from '@/modules/teams/pages/TeamMemberDetailPage';
@@ -23,6 +26,7 @@ import { ForecastPage } from '@/modules/forecast/pages/ForecastPage';
 import { DashboardPage } from '@/modules/dashboard/pages/DashboardPage';
 import { ClientPortalPage } from '@/modules/client-portal/pages/ClientPortalPage';
 import { ClientProjectDetailPage } from '@/modules/client-portal/pages/ClientProjectDetailPage';
+import { ClientSupportContractDetailPage } from '@/modules/client-portal/pages/ClientSupportContractDetailPage';
 import { ForbiddenPage } from '@/app/pages/ForbiddenPage';
 import { NotFoundPage } from '@/app/pages/NotFoundPage';
 
@@ -79,6 +83,10 @@ export const router = createBrowserRouter([
     children: [
       { path: '/clientes', element: <ClientsListPage /> },
       { path: '/clientes/:clientId', element: <ClientDetailPage /> },
+      { path: '/clientes/:clientId/vista-cliente', element: <ClientPortalPreviewPage /> },
+      { path: '/clientes/:clientId/vista-cliente/soporte', element: <ClientPortalPreviewPage /> },
+      { path: '/clientes/:clientId/vista-cliente/soporte/:contractId', element: <ClientSupportContractPreviewPage /> },
+      { path: '/clientes/:clientId/vista-cliente/:projectId', element: <ClientProjectPreviewPage /> },
     ],
   },
 
@@ -149,7 +157,10 @@ export const router = createBrowserRouter([
   },
   {
     element: <ProtectedRoute permission="tickets:read_own_client" />,
-    children: [{ path: '/portal/soporte', element: <ClientPortalPage /> }],
+    children: [
+      { path: '/portal/soporte', element: <ClientPortalPage /> },
+      { path: '/portal/soporte/:contractId', element: <ClientSupportContractDetailPage /> },
+    ],
   },
 
   { path: '*', element: <NotFoundPage /> },

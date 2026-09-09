@@ -98,8 +98,11 @@ export type ProjectTeam = z.infer<typeof projectTeamSchema>;
 export const projectObservationSchema = z.object({
   id: uuidSchema,
   message: z.string(),
+  authorUserId: uuidSchema,
   authorName: z.string(),
   createdAt: isoDateTimeSchema,
+  /** true solo para el autor, y solo dentro de la ventana de edición — ver `PROJECT_OBSERVATION_EDIT_WINDOW_MS`. */
+  canEdit: z.boolean(),
 });
 export type ProjectObservation = z.infer<typeof projectObservationSchema>;
 
@@ -221,6 +224,11 @@ export const addProjectObservationSchema = z.object({
   message: nonEmptyTrimmed(4000, 'El mensaje'),
 });
 export type AddProjectObservationInput = z.infer<typeof addProjectObservationSchema>;
+
+export const updateProjectObservationSchema = z.object({
+  message: nonEmptyTrimmed(4000, 'El mensaje'),
+});
+export type UpdateProjectObservationInput = z.infer<typeof updateProjectObservationSchema>;
 
 export const projectSortFieldSchema = z.enum([
   'name',

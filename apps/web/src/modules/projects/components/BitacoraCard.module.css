@@ -161,6 +161,19 @@
   font-weight: var(--kora-weight-semibold);
 }
 
+.observationActions {
+  display: inline-flex;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.observationEdit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-2);
+  margin-top: 4px;
+}
+
 /* ─── Compositor de observaciones (`obs-composer` en v1) ─── */
 .composer {
   display: flex;

@@ -11,6 +11,7 @@ export interface ProjectObservationRecord {
 
 export interface ProjectObservationRepository {
   listForProject(projectId: string, context?: TransactionContext): Promise<ProjectObservationRecord[]>;
+  findById(id: string, context?: TransactionContext): Promise<ProjectObservationRecord | null>;
   add(
     projectId: string,
     message: string,
@@ -18,6 +19,11 @@ export interface ProjectObservationRepository {
     now: Date,
     context?: TransactionContext,
   ): Promise<string>;
+  update(id: string, message: string, now: Date, context?: TransactionContext): Promise<void>;
+  remove(id: string, context?: TransactionContext): Promise<void>;
 }
 
 export const PROJECT_OBSERVATION_REPOSITORY = Symbol('ProjectObservationRepository');
+
+/** Solo quien creó la entrada puede editarla o borrarla, y solo dentro de este plazo desde su creación. */
+export const PROJECT_OBSERVATION_EDIT_WINDOW_MS = 15 * 60 * 1000;

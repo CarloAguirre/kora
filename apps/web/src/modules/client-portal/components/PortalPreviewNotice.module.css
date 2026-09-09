@@ -1,0 +1,15 @@
+.notice {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+  background: #eceafb;
+  color: #4a3fc4;
+  border: 1px solid #d7d2f7;
+  border-radius: var(--kora-radius-md);
+  padding: 10px 14px;
+  font-size: var(--kora-text-sm);
+}
+
+.notice svg {
+  flex-shrink: 0;
+}

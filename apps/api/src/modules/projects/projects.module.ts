@@ -11,6 +11,8 @@ import { DeleteProjectUseCase } from './application/use-cases/delete-project.use
 import { AssignProjectTeamMemberUseCase } from './application/use-cases/assign-project-team-member.use-case';
 import { UnassignProjectTeamMemberUseCase } from './application/use-cases/unassign-project-team-member.use-case';
 import { AddProjectObservationUseCase } from './application/use-cases/add-project-observation.use-case';
+import { UpdateProjectObservationUseCase } from './application/use-cases/update-project-observation.use-case';
+import { DeleteProjectObservationUseCase } from './application/use-cases/delete-project-observation.use-case';
 
 import { PROJECT_REPOSITORY } from './domain/repositories/project.repository';
 import { PROJECT_TEAM_REPOSITORY } from './domain/repositories/project-team.repository';
@@ -51,6 +53,8 @@ import { DrizzleProjectTeamMemberValidator } from './infrastructure/services/dri
     AssignProjectTeamMemberUseCase,
     UnassignProjectTeamMemberUseCase,
     AddProjectObservationUseCase,
+    UpdateProjectObservationUseCase,
+    DeleteProjectObservationUseCase,
 
     { provide: PROJECT_REPOSITORY, useClass: DrizzleProjectRepository },
     { provide: PROJECT_TEAM_REPOSITORY, useClass: DrizzleProjectTeamRepository },

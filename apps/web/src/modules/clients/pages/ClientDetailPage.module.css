@@ -19,6 +19,12 @@
   gap: var(--kora-space-2);
 }
 
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+}
+
 .clientName {
   font-size: var(--kora-text-2xl);
   font-weight: var(--kora-weight-bold);

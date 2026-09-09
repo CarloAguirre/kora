@@ -5,7 +5,7 @@ import styles from './BitacoraCard.module.css';
 import { Card } from '@/shared/components/ui/Card';
 import { Button } from '@/shared/components/ui/Button';
 import { Tabs } from '@/shared/components/ui/Tabs';
-import { AlertIcon, CheckIcon, PaperclipIcon, UsersIcon } from '@/shared/components/icons/Icons';
+import { AlertIcon, CheckIcon, CloseIcon, PaperclipIcon, PencilIcon, TrashIcon, UsersIcon } from '@/shared/components/icons/Icons';
 
 const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 2 });
 
@@ -37,6 +37,8 @@ interface BitacoraCardProps {
   observationError?: string;
   observationSubmitting: boolean;
   onSubmitObservation: (event: FormEvent<HTMLFormElement>) => void;
+  onUpdateObservation: (observationId: string, message: string) => Promise<void>;
+  onDeleteObservation: (observationId: string) => Promise<void>;
 }
 
 /** Réplica de `BitacoraPanel.tsx` (v1): tarjeta "Bitácora" con pestañas Eventos/Observaciones. */
@@ -48,8 +50,46 @@ export function BitacoraCard({
   observationError,
   observationSubmitting,
   onSubmitObservation,
+  onUpdateObservation,
+  onDeleteObservation,
 }: BitacoraCardProps) {
   const [tab, setTab] = useState<'events' | 'observations'>('events');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState('');
+  const [editSubmitting, setEditSubmitting] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const startEditing = (observation: ProjectObservation) => {
+    setEditingId(observation.id);
+    setEditValue(observation.message);
+  };
+
+  const cancelEditing = () => {
+    setEditingId(null);
+    setEditValue('');
+  };
+
+  const saveEditing = async (observationId: string) => {
+    const message = editValue.trim();
+    if (!message) return;
+    setEditSubmitting(true);
+    try {
+      await onUpdateObservation(observationId, message);
+      setEditingId(null);
+      setEditValue('');
+    } finally {
+      setEditSubmitting(false);
+    }
+  };
+
+  const deleteEntry = async (observationId: string) => {
+    setDeletingId(observationId);
+    try {
+      await onDeleteObservation(observationId);
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   return (
     <Card>
@@ -121,8 +161,59 @@ export function BitacoraCard({
                     <span className={styles.observationAuthor}>{observation.authorName}</span>
                     <span className={styles.eventDate}>{new Date(observation.createdAt).toLocaleString('es-CL')}</span>
                     {index === 0 && <span className={styles.observationNewest}>Más reciente</span>}
+                    {observation.canEdit && editingId !== observation.id && (
+                      <span className={styles.observationActions}>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => startEditing(observation)}
+                          aria-label="Editar entrada"
+                          title="Editar entrada (disponible por 15 minutos)"
+                        >
+                          <PencilIcon size={14} />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          disabled={deletingId === observation.id}
+                          onClick={() => void deleteEntry(observation.id)}
+                          aria-label="Borrar entrada"
+                          title="Borrar entrada (disponible por 15 minutos)"
+                        >
+                          <TrashIcon size={14} />
+                        </Button>
+                      </span>
+                    )}
                   </div>
-                  <p className={styles.observationMessage}>{observation.message}</p>
+                  {editingId === observation.id ? (
+                    <div className={styles.observationEdit}>
+                      <textarea
+                        className={styles.composerTextarea}
+                        value={editValue}
+                        onChange={(event) => setEditValue(event.target.value)}
+                        autoFocus
+                      />
+                      <div className={styles.composerRow}>
+                        <Button type="button" variant="ghost" size="icon" onClick={cancelEditing} aria-label="Cancelar edición">
+                          <CloseIcon size={14} />
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          loading={editSubmitting}
+                          loadingText="Guardando…"
+                          disabled={!editValue.trim()}
+                          onClick={() => void saveEditing(observation.id)}
+                        >
+                          Guardar cambios
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className={styles.observationMessage}>{observation.message}</p>
+                  )}
                 </div>
               </div>
             ))}

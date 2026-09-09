@@ -53,6 +53,67 @@ export interface ClientSupportContractRow {
 }
 
 /**
+ * Ficha de contrato de soporte ("Detalle contrato de soporte" del Figma, node
+ * 9007:8445) — la pieza que `docs/DECISION-PORTAL-CLIENTE.md` marcaba como no
+ * construida: el nombre de un contrato en la tabla de Soporte era texto
+ * plano, no un enlace a esta ficha con la lista de tickets del contrato.
+ */
+export type SupportTicketWorkflowStatus = 'pending' | 'in_progress' | 'closed';
+export type SupportTicketBillingStatus = 'to_invoice' | 'invoiced' | 'pending_invoice';
+export type SupportTicketPriority = 'low' | 'medium' | 'high';
+/** "IN" (Incidente) vs "ME" (Mejora) — el prefijo del código del ticket en el Figma. */
+export type SupportTicketType = 'incident' | 'improvement';
+
+export interface SupportTicketHistoryEntry {
+  readonly date: string;
+  readonly label: string;
+  /** Sub-items con viñeta bajo el label (Figma: "Edición de ticket:" seguido de
+   *  "Reasignado a…" / "Cambio de prioridad: …"). */
+  readonly details?: readonly string[];
+}
+
+export interface SupportTicket {
+  readonly code: string;
+  readonly type: SupportTicketType;
+  readonly title: string;
+  readonly workflowStatus: SupportTicketWorkflowStatus;
+  readonly billingStatus: SupportTicketBillingStatus;
+  readonly responsibleName: string;
+  readonly reportDate: string;
+  readonly solutionDate: string | null;
+  readonly estimatedHours: number;
+  readonly usedHours: number;
+  readonly priority: SupportTicketPriority;
+  /** Texto tal cual del Figma, p.ej. "06:53:18/8hr" (tiempo usado del SLA / tope). */
+  readonly sla: string;
+  readonly description: string;
+  readonly evidenceFiles: readonly string[];
+  readonly appliedSolution: string | null;
+  readonly history: readonly SupportTicketHistoryEntry[];
+}
+
+export interface SupportContractDetail {
+  readonly id: string;
+  readonly name: string;
+  readonly status: 'active' | 'finished';
+  readonly company: ClientCompanyInfo;
+  /** Título largo de la tarjeta, p.ej. "Proyecto del contrato: App Mobile Residentes con asistente IA". */
+  readonly description: string;
+  readonly planType: SupportPlanType;
+  readonly kabeliOwnerName: string;
+  readonly startDate: string;
+  readonly endDate: string;
+  readonly contractedHours: number;
+  readonly consumedHours: number;
+  readonly currentHourValueUf: number;
+  readonly extraHourValueUf: number;
+  /** Rango del selector de fechas sobre la lista de tickets. */
+  readonly rangeStartDate: string;
+  readonly rangeEndDate: string;
+  readonly tickets: readonly SupportTicket[];
+}
+
+/**
  * Sub-etapas dentro de una fase del roadmap del cliente ("Hoja de ruta" del
  * Figma) — NO es el mismo concepto que `ProjectPhase` de `@kora/contracts`:
  * ese describe la etapa vigente de TODO el proyecto, mientras que esto es el

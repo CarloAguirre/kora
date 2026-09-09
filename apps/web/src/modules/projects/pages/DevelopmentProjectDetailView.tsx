@@ -22,7 +22,13 @@ import { ProjectTimeline } from '../components/ProjectTimeline';
 import { TeamHoursSummaryChart } from '../components/TeamHoursSummaryChart';
 import { BitacoraCard } from '../components/BitacoraCard';
 import { PendingApprovalsCard } from '../components/PendingApprovalsCard';
-import { useAssignProjectMember, useUnassignProjectMember, useAddProjectObservation } from '../api/projects.queries';
+import {
+  useAssignProjectMember,
+  useUnassignProjectMember,
+  useAddProjectObservation,
+  useUpdateProjectObservation,
+  useDeleteProjectObservation,
+} from '../api/projects.queries';
 import { useTeamMemberOptions, useTeamsList } from '@/modules/teams/api/teams.queries';
 import { useHourEntriesList, useProjectPendingApprovals } from '@/modules/hours/api/hours.queries';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
@@ -65,6 +71,8 @@ export function DevelopmentProjectDetailView({ project, projectId }: { project: 
   const assignMember = useAssignProjectMember();
   const unassignMember = useUnassignProjectMember();
   const addObservation = useAddProjectObservation();
+  const updateObservation = useUpdateProjectObservation();
+  const deleteObservation = useDeleteProjectObservation();
   const { data: projectHourEntries } = useHourEntriesList({ projectId, page: 1, pageSize: 20, sortField: 'date', sortDirection: 'desc' });
   const { data: teamMemberOptions } = useTeamMemberOptions();
   const { data: teamsCatalog } = useTeamsList({ page: 1, pageSize: 50, sortField: 'name' });
@@ -235,6 +243,23 @@ export function DevelopmentProjectDetailView({ project, projectId }: { project: 
     await addObservation.mutateAsync({ projectId, input: values });
     observationForm.reset({ message: '' });
   });
+
+  const onUpdateObservation = async (observationId: string, message: string) => {
+    try {
+      await updateObservation.mutateAsync({ projectId, observationId, input: { message } });
+    } catch (error) {
+      toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo editar la entrada.');
+    }
+  };
+
+  const onDeleteObservation = async (observationId: string) => {
+    try {
+      await deleteObservation.mutateAsync({ projectId, observationId });
+      toast.success('Se borró la entrada.');
+    } catch (error) {
+      toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo borrar la entrada.');
+    }
+  };
 
   const membersByTeam = useMemo(() => {
     const map = new Map<string, ProjectTeamMember[]>();
@@ -448,6 +473,8 @@ export function DevelopmentProjectDetailView({ project, projectId }: { project: 
           observationError={observationForm.formState.errors.message?.message}
           observationSubmitting={observationForm.formState.isSubmitting}
           onSubmitObservation={onAddObservation}
+          onUpdateObservation={onUpdateObservation}
+          onDeleteObservation={onDeleteObservation}
         />
       </div>
     </div>

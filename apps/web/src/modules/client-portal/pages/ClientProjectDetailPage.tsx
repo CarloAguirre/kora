@@ -28,6 +28,7 @@ import {
   type IconProps,
 } from '@/shared/components/icons/Icons';
 import { PhaseProgressBar } from '../components/PhaseProgressBar';
+import { PortalPreviewNotice } from '../components/PortalPreviewNotice';
 import { ProjectGanttChart } from '../components/ProjectGanttChart';
 import { StatusPill, type StatusPillTone } from '../components/StatusPill';
 import { MOCK_CLIENT_PROJECT_DETAILS_BY_ID } from '../mocks/client-portal.mocks';
@@ -125,12 +126,28 @@ const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFr
  * es la única lista — el botón y la sección que controla nunca pueden
  * desincronizarse porque ambos leen de ahí.
  */
-export function ClientProjectDetailPage() {
-  const { projectId } = useParams<{ projectId: string }>();
+export interface ClientProjectDetailPageProps {
+  /** Fuerza el proyecto a mostrar en vez de leer `projectId` de la ruta —
+   *  usado por la vista previa desde `ClientDetailPage` (ver `preview`). */
+  readonly projectIdOverride?: string;
+  /** Destino del breadcrumb "Volver". Por defecto `/portal/proyectos` (la ruta
+   *  real del portal de cliente, que un admin/PMO no tiene permiso para ver). */
+  readonly backTo?: string;
+  readonly backLabel?: string;
+  /** Vista previa desde la ficha interna del cliente: los datos siguen siendo
+   *  el mock de ejemplo, no los de la empresa que se está viendo, así que se
+   *  avisa explícitamente en vez de dar a entender que son datos reales. */
+  readonly preview?: boolean;
+}
+
+export function ClientProjectDetailPage({ projectIdOverride, backTo, backLabel, preview = false }: ClientProjectDetailPageProps = {}) {
+  const { projectId: routeProjectId } = useParams<{ projectId: string }>();
+  const projectId = projectIdOverride ?? routeProjectId;
   const navigate = useNavigate();
   const toast = useToast();
   const project = projectId ? MOCK_CLIENT_PROJECT_DETAILS_BY_ID[projectId] : undefined;
   const [visible, setVisible] = useState<Record<SectionKey, boolean>>(ALL_SECTIONS_VISIBLE);
+  const resolvedBackTo = backTo ?? '/portal/proyectos';
 
   const notifyMock = (label: string) => toast.show(`"${label}" es una acción de ejemplo — todavía no está conectada.`, 'info');
   const toggleSection = (key: SectionKey) => setVisible((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -145,8 +162,8 @@ export function ClientProjectDetailPage() {
               Por ahora solo "Portal de Gestión Financiera + Agente IA de Tickets" tiene datos de muestra completos —
               ver <code>mocks/client-portal.mocks.ts</code>.
             </p>
-            <Button variant="outline" iconLeft={<ChevronLeftIcon size={16} />} onClick={() => navigate('/portal/proyectos')}>
-              Volver a proyectos
+            <Button variant="outline" iconLeft={<ChevronLeftIcon size={16} />} onClick={() => navigate(resolvedBackTo)}>
+              {backLabel ?? 'Volver a proyectos'}
             </Button>
           </Card>
         </div>
@@ -157,9 +174,16 @@ export function ClientProjectDetailPage() {
   return (
     <DashboardLayout title="Detalle de proyecto">
       <div className={styles.page}>
-        <Link className={styles.breadcrumb} to="/portal/proyectos">
-          <ChevronLeftIcon size={16} /> Volver a proyectos de {project.company.name}
+        <Link className={styles.breadcrumb} to={resolvedBackTo}>
+          <ChevronLeftIcon size={16} /> {backLabel ?? `Volver a proyectos de ${project.company.name}`}
         </Link>
+
+        {preview && (
+          <PortalPreviewNotice>
+            Vista previa de cómo ve un cliente esta pantalla — el contenido de abajo es el dato de ejemplo
+            "{project.company.name}", todavía no los datos reales de este cliente.
+          </PortalPreviewNotice>
+        )}
 
         <h2 className={styles.title}>{project.name}</h2>
 

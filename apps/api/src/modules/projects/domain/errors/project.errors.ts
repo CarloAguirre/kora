@@ -76,3 +76,9 @@ export class ReferencedClientNotFoundError extends NotFoundError {
     super('Cliente', identifier, 'PROJECT_CLIENT_NOT_FOUND');
   }
 }
+
+export class ProjectObservationNotFoundError extends NotFoundError {
+  constructor(identifier: string) {
+    super('Observación', identifier, 'PROJECT_OBSERVATION_NOT_FOUND');
+  }
+}

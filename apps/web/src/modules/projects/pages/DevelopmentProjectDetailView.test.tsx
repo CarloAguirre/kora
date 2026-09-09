@@ -20,6 +20,8 @@ vi.mock('../api/projects.queries', () => ({
   useAssignProjectMember: () => ({ mutateAsync: vi.fn() }),
   useUnassignProjectMember: () => ({ mutateAsync: vi.fn() }),
   useAddProjectObservation: () => ({ mutateAsync: vi.fn() }),
+  useUpdateProjectObservation: () => ({ mutateAsync: vi.fn() }),
+  useDeleteProjectObservation: () => ({ mutateAsync: vi.fn() }),
 }));
 
 vi.mock('@/modules/teams/api/teams.queries', () => ({

@@ -9,7 +9,10 @@ import type { Project } from '../../domain/entities/project.entity';
 import type { ProjectListItem } from '../../domain/repositories/project.repository';
 import type { ProjectTeamMemberRecord } from '../../domain/repositories/project-team-member.repository';
 import type { ProjectTeamRecord } from '../../domain/repositories/project-team.repository';
-import type { ProjectObservationRecord } from '../../domain/repositories/project-observation.repository';
+import {
+  PROJECT_OBSERVATION_EDIT_WINDOW_MS,
+  type ProjectObservationRecord,
+} from '../../domain/repositories/project-observation.repository';
 import type { ProjectUserReference } from '../ports/project-user-reader.port';
 import type { ProjectClientReference } from '../ports/project-client-reader.port';
 import type { ProjectContactReference } from '../ports/project-contact-reader.port';
@@ -48,6 +51,8 @@ export interface ProjectDetailSource {
   readonly members: readonly ProjectTeamMemberRecord[];
   readonly teams: readonly ProjectTeamRecord[];
   readonly observations: readonly ProjectObservationRecord[];
+  readonly actorUserId: string;
+  readonly now: Date;
 }
 
 export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
@@ -77,8 +82,12 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
   const observations: ProjectObservationDto[] = source.observations.map((observation) => ({
     id: observation.id,
     message: observation.message,
+    authorUserId: observation.authorUserId,
     authorName: observation.authorName,
     createdAt: observation.createdAt.toISOString(),
+    canEdit:
+      observation.authorUserId === source.actorUserId &&
+      source.now.getTime() - observation.createdAt.getTime() <= PROJECT_OBSERVATION_EDIT_WINDOW_MS,
   }));
 
   return {

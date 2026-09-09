@@ -3,7 +3,8 @@ import type { AvailabilityRoleFilter } from '@kora/contracts';
 import styles from './AvailabilityGrid.module.css';
 import { TextField } from '@/shared/components/ui/TextField';
 import { Select } from '@/shared/components/ui/Select';
-import { SearchIcon, UserIcon } from '@/shared/components/icons/Icons';
+import { Switch } from '@/shared/components/ui/Switch';
+import { InfoIcon, SearchIcon, UserIcon } from '@/shared/components/icons/Icons';
 import { useAvailability } from '../api/hours.queries';
 import { useTeamsList } from '@/modules/teams/api/teams.queries';
 import { buildLaborWeeks, currentLaborWeek, type LaborWeek } from '@/modules/forecast/lib/labor-weeks';
@@ -185,17 +186,22 @@ export function AvailabilityGrid() {
           value={teamId}
           onChange={(event) => setTeamId(event.target.value)}
         />
-        <label className={styles.incompleteFilter}>
-          <input
-            type="checkbox"
-            checked={incompleteWeekOnly}
-            onChange={(event) => setIncompleteWeekOnly(event.target.checked)}
-          />
-          <span className={styles.incompleteFilterText}>
-            <span className={styles.incompleteFilterTitle}>Solo con menos de 8h en días previos</span>
-            <span className={styles.incompleteFilterHelp}>Evalúa días hábiles anteriores de la semana actual; no incluye hoy.</span>
-          </span>
-        </label>
+        <div className={styles.incompleteFilter}>
+          <span className={styles.incompleteFilterLabel}>Alerta</span>
+          <div className={styles.incompleteFilterControl}>
+            <label className={styles.incompleteFilterToggle}>
+              <Switch checked={incompleteWeekOnly} onChange={setIncompleteWeekOnly} label="Solo con menos de 8h en días previos" />
+              <span className={styles.incompleteFilterText}>Menos de 8h en días previos</span>
+            </label>
+            <span
+              className={styles.incompleteFilterInfo}
+              tabIndex={0}
+              title="Evalúa días hábiles anteriores de la semana actual; no incluye hoy."
+            >
+              <InfoIcon size={14} />
+            </span>
+          </div>
+        </div>
       </div>
 
       {!isLoading && users.length === 0 && <p className={styles.empty}>Sin usuarios habilitados para mostrar disponibilidad.</p>}
