@@ -64,7 +64,7 @@
   z-index: var(--kora-z-dropdown);
   display: flex;
   flex-direction: column;
-  width: max-content;
+  width: 300px;
   background: var(--kora-surface);
   border: 1px solid var(--kora-blue-200);
   border-radius: var(--kora-radius-lg);
@@ -158,6 +158,15 @@
 
 .calDayInRange:hover {
   background: var(--kora-lime);
+}
+
+/* Semanas que se ven en pantalla junto con la semana elegida (vista "Semanal"), sin ser la selección en sí. */
+.calDayPreview {
+  background: var(--kora-lime-hover);
+}
+
+.calDayPreview:hover {
+  background: var(--kora-lime-hover);
 }
 
 .calDayRangeStart {

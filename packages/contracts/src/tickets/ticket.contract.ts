@@ -119,6 +119,13 @@ export const ticketDetailSchema = ticketSummarySchema.extend({
   /** Más restrictivo que `canManage` — ver `DeleteTicketUseCase`. */
   canDelete: z.boolean(),
   /**
+   * Más restrictivo que `canManage`: a diferencia de este, el simple
+   * responsable ("colaborador") sin autoridad sobre el proyecto NO puede
+   * editar el ticket completo — solo cargar su solución al completarlo (ver
+   * `UpdateTicketUseCase`). Gatilla el botón "Editar" en el front.
+   */
+  canEditDetails: z.boolean(),
+  /**
    * Réplica de `canRegisterTicketHH` (v1) — a propósito NO incluye
    * `tickets:manage`: un admin/PMO que solo supervisa no debe poder cargar
    * horas de un ticket ajeno, solo su responsable o quien tiene autoridad
@@ -129,6 +136,8 @@ export const ticketDetailSchema = ticketSummarySchema.extend({
   allowsOvertime: z.boolean(),
   /** Igual que `canRequestHh` pero para decidir SI el ticket admite horas extra — no basta con ser el simple responsable, ver `UpdateTicketUseCase`. */
   canAuthorizeOvertime: z.boolean(),
+  /** Quién decide las solicitudes de HH de este ticket (líder de equipo del responsable, o líder de proyecto a falta de ese líder) — mismo criterio que `canRequestHh`/`isProjectApprover`, para mostrarlo al enviar una solicitud. */
+  hhApprovers: z.array(z.object({ id: uuidSchema, fullName: z.string() })),
 });
 export type TicketDetail = z.infer<typeof ticketDetailSchema>;
 

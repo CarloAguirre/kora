@@ -21,6 +21,9 @@ class FakeProjectReader implements TicketProjectReader {
   async isProjectApprover(_projectId: string, actorUserId: string): Promise<boolean> {
     return this.approverId === actorUserId;
   }
+  async findHhApprovers(): Promise<{ id: string; fullName: string }[]> {
+    return [];
+  }
 }
 
 const NO_PERMISSIONS: Permission[] = [];

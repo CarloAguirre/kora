@@ -15,4 +15,8 @@ export class ProjectsModuleTicketProjectReader implements TicketProjectReader {
   isProjectApprover(projectId: string, actorUserId: string, assigneeUserId: string | null): Promise<boolean> {
     return this.projects.isProjectLeaderOrTeamLeaderOfMember(projectId, actorUserId, assigneeUserId);
   }
+
+  findHhApprovers(projectId: string, assigneeUserId: string | null): Promise<{ id: string; fullName: string }[]> {
+    return this.projects.findApproverCandidatesForMember(projectId, assigneeUserId);
+  }
 }

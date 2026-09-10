@@ -8,6 +8,7 @@ import {
   type InputHTMLAttributes,
   type ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
 import { CalendarIcon, ChevronLeftIcon, ChevronRightIcon } from "../icons/Icons";
 import styles from "./TextField.module.css";
 
@@ -116,6 +117,7 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(
     const isDate = rest.type === "date";
     const inputRef = useRef<HTMLInputElement | null>(null);
     const fieldRef = useRef<HTMLDivElement | null>(null);
+    const panelRef = useRef<HTMLDivElement | null>(null);
     const setRefs = (node: HTMLInputElement | null) => {
       inputRef.current = node;
       applyRef(ref, node);
@@ -124,13 +126,28 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(
     const [calendarOpen, setCalendarOpen] = useState(false);
     const [viewMonth, setViewMonth] = useState(() => new Date());
     const [selectedISO, setSelectedISO] = useState("");
+    // El panel se dibuja en un portal a `document.body` — de otro modo un
+    // ancestro con `overflow: auto/hidden` (p. ej. el modal de detalle de un
+    // ticket, que scrollea) lo recorta en vez de dejarlo flotar por encima.
+    const [panelPosition, setPanelPosition] = useState<{ top: number; left: number } | null>(null);
+
+    const updatePanelPosition = () => {
+      const rect = fieldRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const PANEL_WIDTH = 264; // ancho fijo de `.datePanel` en TextField.module.css
+      const PANEL_GAP = 8; // var(--kora-space-2)
+      setPanelPosition({ top: rect.bottom + PANEL_GAP, left: rect.right - PANEL_WIDTH });
+    };
 
     useEffect(() => {
       if (!calendarOpen) return;
+      updatePanelPosition();
       const handlePointerDown = (event: MouseEvent) => {
+        const target = event.target as Node;
         if (
           fieldRef.current &&
-          !fieldRef.current.contains(event.target as Node)
+          !fieldRef.current.contains(target) &&
+          !panelRef.current?.contains(target)
         ) {
           setCalendarOpen(false);
         }
@@ -138,11 +155,16 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(
       const handleKeyDown = (event: KeyboardEvent) => {
         if (event.key === "Escape") setCalendarOpen(false);
       };
+      const handleReposition = () => updatePanelPosition();
       document.addEventListener("mousedown", handlePointerDown);
       document.addEventListener("keydown", handleKeyDown);
+      window.addEventListener("scroll", handleReposition, true);
+      window.addEventListener("resize", handleReposition);
       return () => {
         document.removeEventListener("mousedown", handlePointerDown);
         document.removeEventListener("keydown", handleKeyDown);
+        window.removeEventListener("scroll", handleReposition, true);
+        window.removeEventListener("resize", handleReposition);
       };
     }, [calendarOpen]);
 
@@ -235,8 +257,14 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(
             <span className={styles.adornment}>{resolvedIconRight}</span>
           )}
 
-          {isDate && calendarOpen && (
-            <div className={styles.datePanel} role="dialog" aria-label="Seleccionar fecha">
+          {isDate && calendarOpen && panelPosition && createPortal(
+            <div
+              ref={panelRef}
+              className={styles.datePanel}
+              style={{ top: panelPosition.top, left: panelPosition.left }}
+              role="dialog"
+              aria-label="Seleccionar fecha"
+            >
               <div className={styles.datePanelHeader}>
                 <button
                   type="button"
@@ -313,7 +341,8 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(
                   Hoy
                 </button>
               </div>
-            </div>
+            </div>,
+            document.body,
           )}
         </div>
         {message && (

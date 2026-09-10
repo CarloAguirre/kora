@@ -53,10 +53,12 @@ export interface TicketDetailSource {
   readonly history: readonly TicketHistoryEntryRecord[];
   readonly canManage: boolean;
   readonly canDelete: boolean;
+  readonly canEditDetails: boolean;
   readonly canRequestHh: boolean;
   readonly canAuthorizeOvertime: boolean;
   readonly pendingHhRequestsCount: number;
   readonly pendingHhHours: number;
+  readonly hhApprovers: readonly { id: string; fullName: string }[];
 }
 
 export function toTicketDetail(source: TicketDetailSource): TicketDetail {
@@ -101,8 +103,10 @@ export function toTicketDetail(source: TicketDetailSource): TicketDetail {
     updatedAt: snapshot.updatedAt.toISOString(),
     canManage: source.canManage,
     canDelete: source.canDelete,
+    canEditDetails: source.canEditDetails,
     canRequestHh: source.canRequestHh,
     allowsOvertime: snapshot.allowsOvertime,
     canAuthorizeOvertime: source.canAuthorizeOvertime,
+    hhApprovers: source.hhApprovers.map((approver) => ({ id: approver.id, fullName: approver.fullName })),
   };
 }

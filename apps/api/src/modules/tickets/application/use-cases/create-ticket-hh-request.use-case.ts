@@ -5,6 +5,7 @@ import { TicketHhRequest } from '../../domain/entities/ticket-hh-request.entity'
 import { TicketNotFoundError } from '../../domain/errors/ticket.errors';
 import {
   CannotSubmitTicketHhRequestError,
+  TicketHhRequestDailyCapExceededError,
   TicketOvertimeNotAllowedError,
   TicketProjectMissingForHhRequestError,
 } from '../../domain/errors/ticket-hh-request.errors';
@@ -16,6 +17,9 @@ import { HOUR_ENTRY_REPOSITORY, type HourEntryRepository } from '../../../hours/
 import { buildApprovedHourEntry } from '../support/build-approved-hour-entry';
 import { AUDIT_RECORDER, type AuditRecorder } from '../../../../shared/application/ports/audit-recorder.port';
 import type { ActorContext, UseCase } from '../../../../shared/application/use-case';
+
+/** Tope diario salvo horas extra — mismo criterio que `DailyEntryForm` (Horas). */
+const DAILY_CAP_HOURS = 8;
 
 export interface CreateTicketHhRequestCommand {
   readonly ticketId: string;
@@ -65,13 +69,23 @@ export class CreateTicketHhRequestUseCase implements UseCase<CreateTicketHhReque
     const isApprover = isAdminTier ? true : await this.projects.isProjectApprover(ticket.projectId, actor.userId, actor.userId);
     if (!isAdminTier && !isAssignee && !isApprover) return err(new CannotSubmitTicketHhRequestError());
 
+    const requestDate = new Date(`${data.date}T00:00:00.000Z`);
+    if (!data.isOvertime) {
+      const [pendingTicketHours, otherHours] = await Promise.all([
+        this.requests.sumHoursForUserAndDate(actor.userId, requestDate),
+        this.hourEntries.sumHoursForUserAndDate(actor.userId, requestDate),
+      ]);
+      const totalHours = pendingTicketHours + otherHours + data.hours;
+      if (totalHours > DAILY_CAP_HOURS) return err(new TicketHhRequestDailyCapExceededError(totalHours));
+    }
+
     const now = this.clock.now();
     const created = TicketHhRequest.create({
       id: this.ids.generate(),
       ticketId,
       projectId: ticket.projectId,
       userId: actor.userId,
-      date: new Date(`${data.date}T00:00:00.000Z`),
+      date: requestDate,
       hours: data.hours,
       note: data.note ?? null,
       isOvertime: data.isOvertime,

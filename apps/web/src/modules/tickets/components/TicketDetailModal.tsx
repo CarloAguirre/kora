@@ -309,6 +309,7 @@ export function TicketDetailModal({ ticketId, onClose }: { ticketId: string; onC
               allowsOvertime={ticket.allowsOvertime}
               pendingHhRequestsCount={ticket.pendingHhRequestsCount}
               pendingHhHours={ticket.pendingHhHours}
+              hhApprovers={ticket.hhApprovers}
             />
 
             <div className={styles.historyBox}>
@@ -352,7 +353,7 @@ export function TicketDetailModal({ ticketId, onClose }: { ticketId: string; onC
                   </Button>
                 )}
                 <div className={styles.footerRight}>
-                  {ticket.status !== 'done' && (
+                  {ticket.status !== 'done' && ticket.canEditDetails && (
                     <Button variant="outlineDark" iconLeft={<PencilIcon size={16} />} onClick={() => setEditOpen(true)}>
                       Editar
                     </Button>

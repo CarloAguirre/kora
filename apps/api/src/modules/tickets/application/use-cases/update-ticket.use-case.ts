@@ -9,7 +9,9 @@ import { TICKET_USER_READER, type TicketUserReader } from '../ports/ticket-user-
 import { ensureAssignable } from '../services/ticket-assignee';
 import { AUDIT_RECORDER, type AuditRecorder } from '../../../../shared/application/ports/audit-recorder.port';
 import type { ActorContext, UseCase } from '../../../../shared/application/use-case';
-import { canManageTicket } from '../services/ticket-access';
+
+/** Campos que un mero responsable (sin `tickets:manage` ni autoridad sobre el proyecto) puede tocar al completar SU ticket — ver `UpdateTicketUseCase`. */
+const ASSIGNEE_ONLY_EDITABLE_FIELDS = new Set(['resolution']);
 
 export interface UpdateTicketCommand {
   readonly ticketId: string;
@@ -35,17 +37,31 @@ export class UpdateTicketUseCase implements UseCase<UpdateTicketCommand, void, A
     const ticket = await this.tickets.findById(ticketId);
     if (!ticket || ticket.isDeleted) return err(new TicketNotFoundError(ticketId));
 
-    if (!(await canManageTicket(ticket, actor.userId, command.actorPermissions, this.projects))) {
+    const hasManagePermission = command.actorPermissions.includes('tickets:manage');
+    const isAssignee = ticket.assigneeUserId === actor.userId;
+    const isApprover = ticket.projectId
+      ? await this.projects.isProjectApprover(ticket.projectId, actor.userId, ticket.assigneeUserId)
+      : false;
+
+    if (!hasManagePermission && !isAssignee && !isApprover) {
       return err(new CannotManageTicketError());
     }
 
-    if (data.allowsOvertime !== undefined) {
-      const isOvertimeApprover = ticket.projectId
-        ? await this.projects.isProjectApprover(ticket.projectId, actor.userId, ticket.assigneeUserId)
-        : false;
-      if (!command.actorPermissions.includes('tickets:manage') && !isOvertimeApprover) {
-        return err(new CannotAuthorizeTicketOvertimeError());
-      }
+    /**
+     * El responsable sin autoridad sobre el proyecto ("colaborador") solo
+     * puede completar SU ticket (cargar la solución) — editar el resto de
+     * los campos queda para quien administra o tiene autoridad real sobre el
+     * proyecto. Ver EditTicketDialog/CompleteTicketDialog en el front.
+     */
+    if (!hasManagePermission && !isApprover && isAssignee) {
+      const touchesOtherFields = Object.entries(data).some(
+        ([key, value]) => value !== undefined && !ASSIGNEE_ONLY_EDITABLE_FIELDS.has(key),
+      );
+      if (touchesOtherFields) return err(new CannotManageTicketError());
+    }
+
+    if (data.allowsOvertime !== undefined && !hasManagePermission && !isApprover) {
+      return err(new CannotAuthorizeTicketOvertimeError());
     }
 
     if (data.developmentProjectId) {

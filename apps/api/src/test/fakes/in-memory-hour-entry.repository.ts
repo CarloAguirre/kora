@@ -71,4 +71,10 @@ export class InMemoryHourEntryRepository implements HourEntryRepository {
       .filter((item) => item.projectId === projectId && item.status === 'approved')
       .reduce((sum, item) => sum + item.hours, 0);
   }
+
+  async sumHoursForUserAndDate(userId: string, date: Date): Promise<number> {
+    return this.items
+      .filter((item) => item.userId === userId && item.date.getTime() === date.getTime() && item.status !== 'rejected')
+      .reduce((sum, item) => sum + item.hours, 0);
+  }
 }

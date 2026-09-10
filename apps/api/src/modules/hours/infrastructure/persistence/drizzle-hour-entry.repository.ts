@@ -12,6 +12,7 @@ import {
   inArray,
   isNull,
   lte,
+  ne,
   or,
   projects,
   projectTeams,
@@ -232,6 +233,15 @@ export class DrizzleHourEntryRepository implements HourEntryRepository {
       .select({ total: sql<string>`coalesce(sum(${hourEntries.hours}), 0)` })
       .from(hourEntries)
       .where(and(eq(hourEntries.projectId, projectId), eq(hourEntries.status, 'approved')));
+    return Number(rows[0]?.total ?? 0);
+  }
+
+  async sumHoursForUserAndDate(userId: string, date: Date, context?: TransactionContext): Promise<number> {
+    const db = resolveDb(this.database, context);
+    const rows = await db
+      .select({ total: sql<string>`coalesce(sum(${hourEntries.hours}), 0)` })
+      .from(hourEntries)
+      .where(and(eq(hourEntries.userId, userId), eq(hourEntries.date, date), ne(hourEntries.status, 'rejected')));
     return Number(rows[0]?.total ?? 0);
   }
 

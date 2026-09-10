@@ -68,6 +68,9 @@ export interface HourEntryRepository {
 
   /** Suma de horas aprobadas de un proyecto — alimenta `projects.used_hours`. */
   sumApprovedHoursForProject(projectId: string, context?: TransactionContext): Promise<number>;
+
+  /** Horas no rechazadas que `userId` ya tiene registradas para `date` (cualquier asignación/proyecto) — alimenta el tope diario de 8h al crear una solicitud de HH de ticket (ver `CreateTicketHhRequestUseCase`). */
+  sumHoursForUserAndDate(userId: string, date: Date, context?: TransactionContext): Promise<number>;
 }
 
 export const HOUR_ENTRY_REPOSITORY = Symbol('HourEntryRepository');

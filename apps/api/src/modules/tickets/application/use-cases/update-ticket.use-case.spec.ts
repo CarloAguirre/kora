@@ -15,11 +15,13 @@ import type { ActorContext } from '../../../../shared/application/use-case';
 
 const ACTOR: ActorContext = { userId: 'user-1', email: 'user@kabeli.cl' };
 const MANAGE_PERMISSIONS: Permission[] = ['tickets:manage'];
+const NO_PERMISSIONS: Permission[] = [];
 const NOW = new Date('2026-08-25T12:00:00.000Z');
 
 class StubTicketProjectReader implements Partial<TicketProjectReader> {
-  async isProjectApprover(): Promise<boolean> {
-    return false;
+  constructor(private readonly approverId: string | null = null) {}
+  async isProjectApprover(_projectId: string, actorUserId: string): Promise<boolean> {
+    return this.approverId === actorUserId;
   }
 }
 
@@ -151,5 +153,89 @@ describe('UpdateTicketUseCase — responsable asignable', () => {
 
     expect(result.isOk()).toBe(true);
     expect((await tickets.findById('ticket-1'))?.assigneeUserId).toBeNull();
+  });
+});
+
+describe('UpdateTicketUseCase — el simple responsable no edita el ticket', () => {
+  const COLLABORATOR: ActorContext = { userId: 'collaborator-1', email: 'collab@kabeli.cl' };
+
+  function buildTicket(): Ticket {
+    return Ticket.create({
+      id: 'ticket-1',
+      title: 'Falla en login',
+      assigneeUserId: COLLABORATOR.userId,
+      projectId: 'project-1',
+      now: NOW,
+    }).unwrap();
+  }
+
+  it('rechaza que el responsable sin autoridad sobre el proyecto edite el título', async () => {
+    const tickets = new InMemoryTicketRepository();
+    tickets.seed(buildTicket());
+    const useCase = new UpdateTicketUseCase(
+      tickets as unknown as TicketRepository,
+      new RecordingTicketHistoryRepository(),
+      new StubTicketProjectReader(null) as unknown as TicketProjectReader,
+      new StubTicketUserReader(PEOPLE),
+      new RecordingAuditRecorder(),
+      new FixedClock(NOW),
+    );
+
+    const result = await useCase.execute({
+      ticketId: 'ticket-1',
+      data: { title: 'Otro título' },
+      actor: COLLABORATOR,
+      actorRole: 'collaborator',
+      actorPermissions: NO_PERMISSIONS,
+    });
+
+    expect(result.isErr() && result.error.code).toBe('TICKET_CANNOT_MANAGE');
+  });
+
+  it('permite que el responsable sin autoridad complete SU ticket con la solución', async () => {
+    const tickets = new InMemoryTicketRepository();
+    tickets.seed(buildTicket());
+    const useCase = new UpdateTicketUseCase(
+      tickets as unknown as TicketRepository,
+      new RecordingTicketHistoryRepository(),
+      new StubTicketProjectReader(null) as unknown as TicketProjectReader,
+      new StubTicketUserReader(PEOPLE),
+      new RecordingAuditRecorder(),
+      new FixedClock(NOW),
+    );
+
+    const result = await useCase.execute({
+      ticketId: 'ticket-1',
+      data: { resolution: 'Se reinició la sesión.' },
+      actor: COLLABORATOR,
+      actorRole: 'collaborator',
+      actorPermissions: NO_PERMISSIONS,
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect((await tickets.findById('ticket-1'))?.toSnapshot().resolution).toBe('Se reinició la sesión.');
+  });
+
+  it('permite editar el ticket a quien tiene autoridad sobre el proyecto', async () => {
+    const tickets = new InMemoryTicketRepository();
+    tickets.seed(buildTicket());
+    const useCase = new UpdateTicketUseCase(
+      tickets as unknown as TicketRepository,
+      new RecordingTicketHistoryRepository(),
+      new StubTicketProjectReader(COLLABORATOR.userId) as unknown as TicketProjectReader,
+      new StubTicketUserReader(PEOPLE),
+      new RecordingAuditRecorder(),
+      new FixedClock(NOW),
+    );
+
+    const result = await useCase.execute({
+      ticketId: 'ticket-1',
+      data: { title: 'Otro título' },
+      actor: COLLABORATOR,
+      actorRole: 'collaborator',
+      actorPermissions: NO_PERMISSIONS,
+    });
+
+    expect(result.isOk()).toBe(true);
   });
 });

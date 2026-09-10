@@ -3,10 +3,12 @@ import { TICKET_HH_REQUEST_STATUS_LABELS, type TicketHhRequest } from '@kora/con
 import styles from './TicketHhRequestsSection.module.css';
 import { Badge, type BadgeTone } from '@/shared/components/ui/Badge';
 import { Button } from '@/shared/components/ui/Button';
-import { ClockIcon, PlusIcon } from '@/shared/components/icons/Icons';
+import { AlertIcon, ClockIcon, PlusIcon } from '@/shared/components/icons/Icons';
 import { TextField } from '@/shared/components/ui/TextField';
 import { useToast } from '@/shared/components/ui/Toast';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
+import { useAuth } from '@/modules/auth/hooks/useAuth';
+import { useHourEntriesList } from '@/modules/hours/api/hours.queries';
 import {
   useApproveTicketHhRequest,
   useCreateTicketHhRequest,
@@ -20,6 +22,8 @@ const STATUS_TONE: Record<TicketHhRequest['status'], BadgeTone> = {
   approved: 'success',
   rejected: 'danger',
 };
+
+const DAILY_CAP_HOURS = 8;
 
 const formatDate = (value: string) => new Date(`${value}T00:00:00`).toLocaleDateString('es-CL');
 const formatDateTime = (value: string) => new Date(value).toLocaleString('es-CL');
@@ -35,6 +39,8 @@ interface TicketHhRequestsSectionProps {
   /** `ticket.pendingHhRequestsCount` / `ticket.pendingHhHours` — para avisar en el encabezado sin esperar a que cargue la lista. */
   pendingHhRequestsCount: number;
   pendingHhHours: number;
+  /** `ticket.hhApprovers` — quién(es) decidirán la solicitud (líder de equipo del responsable, o líder de proyecto a falta de ese líder). */
+  hhApprovers: { id: string; fullName: string }[];
 }
 
 /**
@@ -48,8 +54,10 @@ export function TicketHhRequestsSection({
   allowsOvertime,
   pendingHhRequestsCount,
   pendingHhHours,
+  hhApprovers,
 }: TicketHhRequestsSectionProps) {
   const { can } = usePermissions();
+  const { user } = useAuth();
   const toast = useToast();
   const { data: requests, isLoading } = useTicketHhRequestsList(ticketId);
   const createRequest = useCreateTicketHhRequest(ticketId);
@@ -69,9 +77,30 @@ export function TicketHhRequestsSection({
   const approvedBreakdown = useMemo(() => computeApprovedHhBreakdown(requests), [requests]);
   const approvedTotal = approvedBreakdown.reduce((sum, user) => sum + user.hours, 0);
 
+  /**
+   * Tope diario de 8h salvo horas extra — mismo criterio que `DailyEntryForm`
+   * (Horas) y que `CreateTicketHhRequestUseCase` en el backend (que es quien
+   * de verdad lo hace cumplir; esto es solo para avisar antes de enviar).
+   * Suma lo pendiente en ESTE ticket para la fecha elegida (`pending`: una
+   * solicitud `approved` ya generó su propio `hour_entries`, contarla de las
+   * dos formas la duplicaría) más los registros de horas del resto de
+   * procesos/tickets del usuario ese día.
+   */
+  const { data: entriesForDate } = useHourEntriesList(user ? { userId: user.id, dateFrom: date, dateTo: date, pageSize: 100 } : {});
+  const otherHoursForDate = (entriesForDate?.items ?? [])
+    .filter((entry) => entry.status !== 'rejected')
+    .reduce((sum, entry) => sum + entry.hours, 0);
+  const ticketHoursForDate = (requests ?? [])
+    .filter((request) => request.date === date && request.status === 'pending' && request.user.id === user?.id)
+    .reduce((sum, request) => sum + request.hours, 0);
+  const existingHoursForDate = otherHoursForDate + ticketHoursForDate;
+  const newHoursValue = Number(hours) || 0;
+  const totalHoursForDate = existingHoursForDate + newHoursValue;
+  const exceedsDailyCap = !isOvertime && totalHoursForDate > DAILY_CAP_HOURS;
+
   const submitRequest = async () => {
     const hoursValue = Number(hours);
-    if (!(hoursValue > 0)) return;
+    if (!(hoursValue > 0) || exceedsDailyCap) return;
     await createRequest.mutateAsync({ date, hours: hoursValue, note: note.trim() || undefined, isOvertime });
     toast.success('Solicitud de horas enviada.');
     setHours('');
@@ -119,6 +148,32 @@ export function TicketHhRequestsSection({
       {canRequest && (
         <div className={styles.form}>
           <span className={styles.formTitle}>Nueva solicitud de horas</span>
+          <span className={styles.approverNote}>
+            {hhApprovers.length > 0
+              ? `Aprobador${hhApprovers.length > 1 ? 'es' : ''}: ${hhApprovers.map((approver) => approver.fullName).join(', ')}`
+              : 'Este proyecto no tiene un aprobador definido para tu solicitud.'}
+          </span>
+
+          {!isOvertime && existingHoursForDate > 0 && existingHoursForDate < DAILY_CAP_HOURS && (
+            <div className={styles.noticeInfo} role="status">
+              <AlertIcon size={16} />
+              <span>
+                Ya tienes {formatHours(existingHoursForDate)}h registradas este día. Al superar {DAILY_CAP_HOURS}h, marca
+                horas extra.
+              </span>
+            </div>
+          )}
+
+          {exceedsDailyCap && (
+            <div className={styles.noticeWarning} role="alert">
+              <AlertIcon size={16} />
+              <span>
+                Superarías el límite diario de {DAILY_CAP_HOURS}h ({formatHours(totalHoursForDate)}h en total ese día). Marca
+                "Horas extra" para poder enviarla.
+              </span>
+            </div>
+          )}
+
           <div className={styles.formGrid}>
             <TextField label="Fecha" type="date" value={date} onChange={(event) => setDate(event.target.value)} />
             <TextField
@@ -148,7 +203,12 @@ export function TicketHhRequestsSection({
               <span className={styles.overtimeSwitch} />
               <span>Horas extra</span>
             </label>
-            <Button loading={createRequest.isPending} iconLeft={<PlusIcon size={16} />} onClick={() => void submitRequest()}>
+            <Button
+              disabled={exceedsDailyCap}
+              loading={createRequest.isPending}
+              iconLeft={<PlusIcon size={16} />}
+              onClick={() => void submitRequest()}
+            >
               Enviar solicitud
             </Button>
           </div>

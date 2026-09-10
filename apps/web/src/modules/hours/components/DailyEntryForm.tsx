@@ -88,6 +88,10 @@ export function DailyEntryForm({
   const existingHoursForDate = (entriesForDate?.items ?? [])
     .filter((e) => e.status !== 'rejected')
     .reduce((sum, e) => sum + e.hours, 0);
+  /** Solo lo NO marcado como horas extra cuenta contra el tope diario — el resto puede superarlo libremente. */
+  const existingNonOvertimeHoursForDate = (entriesForDate?.items ?? [])
+    .filter((e) => e.status !== 'rejected' && !e.isOvertime)
+    .reduce((sum, e) => sum + e.hours, 0);
   const holiday = holidaysForDate?.[0] ?? null;
   const weekend = isWeekend(date);
   const blockingMessage = weekend
@@ -121,6 +125,9 @@ export function DailyEntryForm({
 
   const dailyTotal = blocks.reduce((sum, block) => sum + (Number(block.hours) || 0), 0);
   const totalWithExisting = existingHoursForDate + dailyTotal;
+  const nonOvertimeBlockTotal = blocks.reduce((sum, block) => sum + (block.isOvertime ? 0 : Number(block.hours) || 0), 0);
+  const nonOvertimeTotalWithExisting = existingNonOvertimeHoursForDate + nonOvertimeBlockTotal;
+  const exceedsDailyCap = nonOvertimeTotalWithExisting > DAILY_CAP_HOURS;
 
   useEffect(() => {
     onTotalChange?.(totalWithExisting);
@@ -147,11 +154,11 @@ export function DailyEntryForm({
     return null;
   };
 
-  const canSubmit = !blockingMessage && blocks.every((block) => validateBlock(block) === null);
+  const canSubmit = !blockingMessage && !exceedsDailyCap && blocks.every((block) => validateBlock(block) === null);
 
   const onSubmit = async () => {
     setServerError(null);
-    if (blockingMessage) return;
+    if (blockingMessage || exceedsDailyCap) return;
     const nextErrors: Record<string, string> = {};
     for (const block of blocks) {
       const error = validateBlock(block);
@@ -201,22 +208,22 @@ export function DailyEntryForm({
 
       <TextField label="Fecha de registro" type="date" required value={date} onChange={(event) => setDate(event.target.value)} />
 
-      {!blockingMessage && existingHoursForDate > 0 && existingHoursForDate < DAILY_CAP_HOURS && (
+      {!blockingMessage && !exceedsDailyCap && existingNonOvertimeHoursForDate > 0 && existingNonOvertimeHoursForDate < DAILY_CAP_HOURS && (
         <div className={styles.noticeInfo} role="status">
           <AlertIcon size={16} />
           <span>
-            Ya tienes {existingHoursForDate.toLocaleString('es-CL', { maximumFractionDigits: 1 })}h registradas este día. Al
-            superar {DAILY_CAP_HOURS}h, considera marcar horas extra.
+            Ya tienes {existingNonOvertimeHoursForDate.toLocaleString('es-CL', { maximumFractionDigits: 1 })}h registradas este
+            día. Al superar {DAILY_CAP_HOURS}h, marca horas extra.
           </span>
         </div>
       )}
 
-      {!blockingMessage && totalWithExisting > DAILY_CAP_HOURS && (
-        <div className={styles.noticeWarning} role="status">
+      {!blockingMessage && exceedsDailyCap && (
+        <div className={styles.noticeWarning} role="alert">
           <AlertIcon size={16} />
           <span>
-            Estás superando el límite diario de {DAILY_CAP_HOURS}h. Este registro dejará el día con{' '}
-            {totalWithExisting.toLocaleString('es-CL', { maximumFractionDigits: 1 })}h en total.
+            Superarías el límite diario de {DAILY_CAP_HOURS}h ({totalWithExisting.toLocaleString('es-CL', { maximumFractionDigits: 1 })}h
+            en total ese día). Marca las horas que correspondan como "Horas Extra" para poder guardar.
           </span>
         </div>
       )}

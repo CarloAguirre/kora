@@ -12,6 +12,15 @@ export interface WeekRangePickerProps {
   periodEnd: string;
   onChange: (period: { periodStart: string; periodEnd: string }) => void;
   className?: string;
+  /**
+   * Fin real del rango visible en pantalla, si abarca más de la semana seleccionada
+   * (p. ej. una vista "Semanal" que muestra 4 semanas desde `periodStart`). Solo
+   * afecta la etiqueta del botón; la semana que se elige en el calendario sigue
+   * siendo `periodStart`–`periodEnd`. Por defecto es `periodEnd`.
+   */
+  displayPeriodEnd?: string;
+  /** Texto de ayuda bajo el calendario. Por defecto explica que la semana es lun-vie. */
+  hint?: string;
 }
 
 const WEEKDAY_LABELS = ['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá', 'Do'];
@@ -37,13 +46,27 @@ function toIsoDate(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
+function addDays(iso: string, amount: number): string {
+  const date = new Date(`${iso}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + amount);
+  return toIsoDate(date);
+}
+
 /**
  * Selector de semana laboral con calendario — reemplaza el `<select>` nativo
  * (lista plana de 15 rangos de fecha) por un botón que abre un mini
  * calendario mensual: se ve y se elige la semana (lun–vie) de un vistazo, sin
  * límite de semanas pasadas/futuras.
  */
-export function WeekRangePicker({ label = 'Período', periodStart, periodEnd, onChange, className }: WeekRangePickerProps) {
+export function WeekRangePicker({
+  label = 'Período',
+  periodStart,
+  periodEnd,
+  onChange,
+  className,
+  displayPeriodEnd,
+  hint = 'Semana laboral: lunes a viernes',
+}: WeekRangePickerProps) {
   const [open, setOpen] = useState(false);
   const [viewDate, setViewDate] = useState(() => new Date(`${periodStart}T00:00:00Z`));
   const [pending, setPending] = useState({ periodStart, periodEnd });
@@ -92,6 +115,17 @@ export function WeekRangePicker({ label = 'Período', periodStart, periodEnd, on
   const month = viewDate.getUTCMonth();
   const days = buildMonthGrid(year, month);
 
+  // Cuántos días más allá de la semana ancla se ven en pantalla (p. ej. 21 días
+  // si la vista "Semanal" muestra la semana elegida más las 3 siguientes). Se
+  // aplica sobre `pending` para que la previsualización se mueva junto con el
+  // día que se está por elegir, no con la selección ya aplicada.
+  const previewExtraDays = displayPeriodEnd
+    ? Math.round(
+        (new Date(`${displayPeriodEnd}T00:00:00Z`).getTime() - new Date(`${periodEnd}T00:00:00Z`).getTime()) / 86_400_000,
+      )
+    : 0;
+  const previewEnd = previewExtraDays > 0 ? addDays(pending.periodEnd, previewExtraDays) : null;
+
   return (
     <div className={[styles.wrapper, className].filter(Boolean).join(' ')} ref={containerRef}>
       <span className={styles.label}>{label}</span>
@@ -104,7 +138,7 @@ export function WeekRangePicker({ label = 'Período', periodStart, periodEnd, on
       >
         <span className={styles.triggerLabel}>
           <CalendarIcon size={16} className={styles.triggerIcon} />
-          {formatShortRange(periodStart, periodEnd)}
+          {formatShortRange(periodStart, displayPeriodEnd ?? periodEnd)}
         </span>
         <ChevronDownIcon size={16} className={styles.chevron} />
       </button>
@@ -143,6 +177,9 @@ export function WeekRangePicker({ label = 'Período', periodStart, periodEnd, on
             {days.map((date) => {
               const iso = toIsoDate(date);
               const inRange = iso >= pending.periodStart && iso <= pending.periodEnd;
+              const dayOfWeek = date.getUTCDay();
+              const isWeekday = dayOfWeek !== 0 && dayOfWeek !== 6;
+              const inPreview = !inRange && isWeekday && !!previewEnd && iso > pending.periodEnd && iso <= previewEnd;
               return (
                 <button
                   key={iso}
@@ -151,12 +188,14 @@ export function WeekRangePicker({ label = 'Período', periodStart, periodEnd, on
                     styles.calDayBtn,
                     date.getUTCMonth() !== month ? styles.calDayMuted : '',
                     inRange ? styles.calDayInRange : '',
+                    inPreview ? styles.calDayPreview : '',
                     iso === pending.periodStart ? styles.calDayRangeStart : '',
                     iso === pending.periodEnd ? styles.calDayRangeEnd : '',
                   ]
                     .filter(Boolean)
                     .join(' ')}
                   onClick={() => pickDay(date)}
+                  title={inPreview ? 'También visible en la vista semanal' : undefined}
                 >
                   {date.getUTCDate()}
                 </button>
@@ -164,7 +203,7 @@ export function WeekRangePicker({ label = 'Período', periodStart, periodEnd, on
             })}
           </div>
 
-          <p className={styles.calHint}>Semana laboral: lunes a viernes</p>
+          <p className={styles.calHint}>{hint}</p>
 
           <div className={styles.calActions}>
             <Button variant="outline" size="sm" onClick={() => setOpen(false)}>

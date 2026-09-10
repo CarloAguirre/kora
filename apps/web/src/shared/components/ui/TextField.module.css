@@ -138,11 +138,16 @@
   cursor: not-allowed;
 }
 
+/* `position: fixed` + portal a `document.body` (ver TextField.tsx): un
+   ancestro con overflow: auto/hidden (el modal de detalle de ticket, que
+   scrollea) recortaría el panel si fuera `absolute` dentro del campo. La
+   posición (`top`/`left`) la calcula JS a partir del `getBoundingClientRect`
+   del campo. z-index por encima de `--kora-z-modal`: al vivir en `body`,
+   compite en el stacking global contra el overlay del modal, no solo contra
+   sus hermanos dentro del campo. */
 .datePanel {
-  position: absolute;
-  top: calc(100% + var(--kora-space-2));
-  right: 0;
-  z-index: var(--kora-z-dropdown);
+  position: fixed;
+  z-index: calc(var(--kora-z-modal) + 10);
   display: flex;
   flex-direction: column;
   gap: var(--kora-space-2);

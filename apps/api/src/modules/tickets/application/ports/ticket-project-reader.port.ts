@@ -21,6 +21,8 @@ export interface TicketProjectReader {
    * ticket igual que su propio líder.
    */
   isProjectApprover(projectId: string, actorUserId: string, assigneeUserId: string | null): Promise<boolean>;
+  /** Enumerado de `isProjectApprover` — quién(es) decidirían una solicitud de HH de `assigneeUserId` en este proyecto, para mostrarlo al enviarla. */
+  findHhApprovers(projectId: string, assigneeUserId: string | null): Promise<{ id: string; fullName: string }[]>;
 }
 
 export const TICKET_PROJECT_READER = Symbol('TicketProjectReader');

@@ -54,6 +54,31 @@
   letter-spacing: 0.03em;
 }
 
+.approverNote {
+  font-size: var(--kora-text-xs);
+  color: var(--kora-text-muted);
+}
+
+.noticeInfo,
+.noticeWarning {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--kora-space-2);
+  padding: var(--kora-space-3);
+  border-radius: var(--kora-radius-sm);
+  font-size: var(--kora-text-sm);
+}
+
+.noticeInfo {
+  background: #eef5ff;
+  color: #1d4f91;
+}
+
+.noticeWarning {
+  background: #fff8e1;
+  color: #8b6914;
+}
+
 .formGrid {
   display: grid;
   grid-template-columns: minmax(130px, 150px) minmax(90px, 110px) 1fr;

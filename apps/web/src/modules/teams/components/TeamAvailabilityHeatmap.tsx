@@ -102,6 +102,12 @@ export function TeamAvailabilityHeatmap({ teamId, teamMemberId }: { teamId: stri
           className={styles.periodField}
           periodStart={selectedWeek.periodStart}
           periodEnd={selectedWeek.periodEnd}
+          displayPeriodEnd={dateTo}
+          hint={
+            viewMode === 'weekly'
+              ? 'Semana laboral: lunes a viernes · se muestra esta semana y las 3 siguientes'
+              : 'Semana laboral: lunes a viernes'
+          }
           onChange={(next) => setSelectedWeek({ ...next, label: '' })}
         />
       </div>

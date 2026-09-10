@@ -45,6 +45,8 @@ export class GetTicketUseCase implements UseCase<GetTicketCommand, TicketDetail,
     const isAssignee = snapshot.assigneeUserId === command.actorUserId;
     const canManage = command.actorPermissions.includes('tickets:manage') || isAssignee || isApprover;
     const canDelete = isAdminTier(command.actorRole) || (command.actorPermissions.includes('tickets:manage') && (isAssignee || isApprover));
+    /** Sin el atajo de `isAssignee` — ver `UpdateTicketUseCase`: el simple responsable no puede editar el ticket completo. */
+    const canEditDetails = command.actorPermissions.includes('tickets:manage') || isApprover;
     /**
      * Réplica de `canRegisterTicketHH` (v1): a diferencia de `canManage`, NO
      * basta con `tickets:manage` — un admin/PMO que solo supervisa no debe
@@ -60,13 +62,14 @@ export class GetTicketUseCase implements UseCase<GetTicketCommand, TicketDetail,
      */
     const canAuthorizeOvertime = command.actorPermissions.includes('tickets:manage') || isApprover;
 
-    const [client, project, developmentProject, assignee, historyEntries, hhRequestEntries] = await Promise.all([
+    const [client, project, developmentProject, assignee, historyEntries, hhRequestEntries, hhApprovers] = await Promise.all([
       snapshot.clientId ? this.clients.findById(snapshot.clientId) : Promise.resolve(null),
       snapshot.projectId ? this.projects.findById(snapshot.projectId) : Promise.resolve(null),
       snapshot.developmentProjectId ? this.projects.findById(snapshot.developmentProjectId) : Promise.resolve(null),
       snapshot.assigneeUserId ? this.users.findById(snapshot.assigneeUserId) : Promise.resolve(null),
       this.history.listForTicket(ticket.id),
       this.hhRequests.listForTicket(ticket.id),
+      snapshot.projectId ? this.projects.findHhApprovers(snapshot.projectId, snapshot.assigneeUserId) : Promise.resolve([]),
     ]);
 
     const pendingHhRequests = hhRequestEntries.filter((request) => request.status === 'pending');
@@ -81,10 +84,12 @@ export class GetTicketUseCase implements UseCase<GetTicketCommand, TicketDetail,
         history: historyEntries,
         canManage,
         canDelete,
+        canEditDetails,
         canRequestHh,
         canAuthorizeOvertime,
         pendingHhRequestsCount: pendingHhRequests.length,
         pendingHhHours: pendingHhRequests.reduce((sum, request) => sum + request.hours, 0),
+        hhApprovers,
       }),
     );
   }
