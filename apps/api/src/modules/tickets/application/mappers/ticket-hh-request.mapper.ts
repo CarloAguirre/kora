@@ -10,6 +10,7 @@ export function toTicketHhRequestDto(item: TicketHhRequestListItem): TicketHhReq
     date: item.date.toISOString().slice(0, 10),
     hours: item.hours,
     note: item.note,
+    isOvertime: item.isOvertime,
     status: item.status,
     rejectionReason: item.rejectionReason,
     reviewedBy: item.reviewedByUserId ? { id: item.reviewedByUserId, fullName: item.reviewedByFullName ?? '' } : null,

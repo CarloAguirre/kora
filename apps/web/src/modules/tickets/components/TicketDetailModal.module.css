@@ -28,7 +28,7 @@
 
 .modal {
   display: flex;
-  width: 560px;
+  width: 640px;
   max-width: 100%;
   max-height: 90vh;
   padding: var(--kora-space-4);
@@ -100,12 +100,6 @@
   background: var(--kora-surface-muted);
 }
 
-.row {
-  display: flex;
-  align-items: center;
-  gap: var(--kora-space-1);
-}
-
 .label {
   font-size: var(--kora-text-base);
   font-weight: var(--kora-weight-medium);
@@ -132,16 +126,85 @@
   color: var(--kora-text);
 }
 
-.dates {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--kora-space-4);
+.factsGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  row-gap: var(--kora-space-4);
+  column-gap: var(--kora-space-5);
+  padding: var(--kora-space-4);
+  border: 1px solid var(--kora-border-soft);
+  border-radius: var(--kora-radius);
 }
 
-.col {
+.factCell {
   display: flex;
   flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.factLabel {
+  font-size: 11px;
+  font-weight: var(--kora-weight-semibold);
+  color: var(--kora-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.factValue {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--kora-text-base);
+  color: var(--kora-text);
+}
+
+.assigneeValue {
+  display: flex;
+  align-items: center;
   gap: var(--kora-space-2);
+}
+
+.avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--kora-navy);
+  color: var(--kora-lime);
+  font-size: 10px;
+  font-weight: var(--kora-weight-bold);
+  flex-shrink: 0;
+}
+
+.hhProgressRow {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+}
+
+.hhProgressTrack {
+  width: 90px;
+  height: 6px;
+  border-radius: var(--kora-radius-pill);
+  background: var(--kora-surface-disabled);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.hhProgressFill {
+  display: block;
+  height: 100%;
+  background: var(--kora-lime-dark);
+}
+
+.overtimeValueRow {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+  flex-wrap: wrap;
 }
 
 .divider {
@@ -151,10 +214,31 @@
   margin: var(--kora-space-1) 0;
 }
 
-.section {
+.contentCard {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--kora-border-soft);
+  border-radius: var(--kora-radius);
+  overflow: hidden;
+}
+
+.contentSection {
   display: flex;
   flex-direction: column;
   gap: var(--kora-space-1);
+  padding: var(--kora-space-3) var(--kora-space-4);
+}
+
+.contentSectionHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+  color: var(--kora-text);
+}
+
+.contentDivider {
+  height: 1px;
+  background: var(--kora-border-soft);
 }
 
 .text {
@@ -170,8 +254,16 @@
   font-size: var(--kora-text-base);
 }
 
+.emptyInline {
+  margin-left: auto;
+  color: var(--kora-text-disabled);
+  font-size: var(--kora-text-sm);
+  font-style: italic;
+}
+
 .priorityChip {
   display: inline-flex;
+  align-self: flex-start;
   height: 24px;
   padding: 4px var(--kora-space-2);
   align-items: center;
@@ -183,10 +275,11 @@
 .historyBox {
   display: flex;
   flex-direction: column;
-  gap: var(--kora-space-2);
-  padding: var(--kora-space-3);
-  border-radius: var(--kora-radius-lg);
-  background: var(--kora-blue-surface-alt);
+  gap: var(--kora-space-3);
+  padding: var(--kora-space-4);
+  border: 1px solid var(--kora-border-soft);
+  border-radius: var(--kora-radius);
+  background: var(--kora-surface);
 }
 
 .historyToggle {
@@ -215,17 +308,19 @@
 .history {
   display: flex;
   flex-direction: column;
-  gap: var(--kora-space-2);
 }
 
 .historyEntry {
   display: flex;
-  align-items: flex-start;
+  align-items: stretch;
   gap: var(--kora-space-2);
-  padding: var(--kora-space-2) var(--kora-space-3);
-  border-radius: var(--kora-radius-sm);
-  background: var(--kora-surface-muted);
-  border: 1px solid var(--kora-surface-disabled);
+}
+
+.historyIconCol {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
 }
 
 .historyIcon {
@@ -235,14 +330,21 @@
   width: 22px;
   height: 22px;
   flex-shrink: 0;
-  margin-top: 1px;
   border-radius: 50%;
   background: var(--kora-blue-surface-alt);
   color: var(--kora-blue-600);
 }
 
+.historyLine {
+  width: 1px;
+  flex: 1;
+  background: var(--kora-border-soft);
+  margin: 2px 0;
+}
+
 .historyBody {
   min-width: 0;
+  padding-bottom: var(--kora-space-4);
 }
 
 .historyDescription {

@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CLOCK, err, ok, type ApplicationError, type Clock, type Result } from '@kora/core';
-import type { Permission, UpdateTicketInput } from '@kora/contracts';
-import { CannotManageTicketError, ReferencedProjectNotFoundError, TicketNotFoundError } from '../../domain/errors/ticket.errors';
+import type { Permission, RoleCode, UpdateTicketInput } from '@kora/contracts';
+import { CannotAuthorizeTicketOvertimeError, CannotManageTicketError, ReferencedProjectNotFoundError, TicketNotFoundError } from '../../domain/errors/ticket.errors';
 import { TICKET_REPOSITORY, type TicketRepository } from '../../domain/repositories/ticket.repository';
 import { TICKET_HISTORY_REPOSITORY, type TicketHistoryRepository } from '../../domain/repositories/ticket-history.repository';
 import { TICKET_PROJECT_READER, type TicketProjectReader } from '../ports/ticket-project-reader.port';
@@ -15,6 +15,7 @@ export interface UpdateTicketCommand {
   readonly ticketId: string;
   readonly data: UpdateTicketInput;
   readonly actor: ActorContext;
+  readonly actorRole: RoleCode;
   readonly actorPermissions: readonly Permission[];
 }
 
@@ -36,6 +37,15 @@ export class UpdateTicketUseCase implements UseCase<UpdateTicketCommand, void, A
 
     if (!(await canManageTicket(ticket, actor.userId, command.actorPermissions, this.projects))) {
       return err(new CannotManageTicketError());
+    }
+
+    if (data.allowsOvertime !== undefined) {
+      const isOvertimeApprover = ticket.projectId
+        ? await this.projects.isProjectApprover(ticket.projectId, actor.userId, ticket.assigneeUserId)
+        : false;
+      if (!command.actorPermissions.includes('tickets:manage') && !isOvertimeApprover) {
+        return err(new CannotAuthorizeTicketOvertimeError());
+      }
     }
 
     if (data.developmentProjectId) {
@@ -61,6 +71,7 @@ export class UpdateTicketUseCase implements UseCase<UpdateTicketCommand, void, A
         assigneeUserId: data.assigneeUserId,
         estimatedHours: data.estimatedHours,
         resolution: data.resolution,
+        allowsOvertime: data.allowsOvertime,
       },
       now,
     );
@@ -128,6 +139,15 @@ export class UpdateTicketUseCase implements UseCase<UpdateTicketCommand, void, A
         ticketId: ticket.id,
         eventType: 'estimated_hours_changed',
         description: 'Se actualizaron las HH estimadas del ticket.',
+        actorUserId: actor.userId,
+        occurredAt: now,
+      });
+    }
+    if (data.allowsOvertime !== undefined && after.allowsOvertime !== before.allowsOvertime) {
+      await this.history.append({
+        ticketId: ticket.id,
+        eventType: 'overtime_allowed_changed',
+        description: after.allowsOvertime ? 'Se autorizaron horas extra para este ticket.' : 'Se retiró la autorización de horas extra de este ticket.',
         actorUserId: actor.userId,
         occurredAt: now,
       });

@@ -7,6 +7,7 @@ import { Pagination } from '@/shared/components/ui/Pagination';
 import { Select } from '@/shared/components/ui/Select';
 import { useToast } from '@/shared/components/ui/Toast';
 import { PlusIcon, PencilIcon, TrashIcon } from '@/shared/components/icons/Icons';
+import { Badge } from '@/shared/components/ui/Badge';
 import { HourEntryStatusBadge } from './HourEntryStatusBadge';
 import { HourEntryFormDialog } from './HourEntryFormDialog';
 import { useDeleteHourEntry, useHourEntriesList } from '../api/hours.queries';
@@ -52,6 +53,11 @@ export function MyHourEntriesPanel() {
     { key: 'assignment', header: 'Asignación', render: (e) => e.assignment ?? 'Desarrollo' },
     { key: 'category', header: 'Actividad', render: (e) => e.category || <span className={styles.empty}>—</span> },
     { key: 'hours', header: 'Horas', render: (e) => formatHours(e.hours) },
+    {
+      key: 'overtime',
+      header: 'Horas Extra',
+      render: (e) => (e.isOvertime ? <Badge tone="warning">Extra</Badge> : <span className={styles.empty}>—</span>),
+    },
     {
       key: 'status',
       header: 'Estado',

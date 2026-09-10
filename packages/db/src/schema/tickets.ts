@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { date, integer, jsonb, numeric, pgEnum, pgSequence, pgTable, text, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
+import { boolean, date, integer, jsonb, numeric, pgEnum, pgSequence, pgTable, text, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
 import { primaryId, softDelete, timestamps } from './columns';
 import { clients } from './clients';
 import { users } from './identity';
@@ -46,6 +46,8 @@ export const tickets = pgTable(
     resolution: text('resolution'),
     resolvedAt: timestamp('resolved_at', { withTimezone: true, mode: 'date' }),
     usedHours: numeric('used_hours', { precision: 10, scale: 2 }).notNull().default('0'),
+    /** Habilitado por el líder del proyecto/equipo — sin esto, el ticket no admite solicitudes de HH marcadas como horas extra. */
+    allowsOvertime: boolean('allows_overtime').notNull().default(false),
 
     ...timestamps,
     ...softDelete,
@@ -99,6 +101,7 @@ export const ticketHhRequests = pgTable('ticket_hh_requests', {
   date: date('date', { mode: 'date' }).notNull(),
   hours: numeric('hours', { precision: 10, scale: 2 }).notNull(),
   note: text('note'),
+  isOvertime: boolean('is_overtime').notNull().default(false),
 
   status: ticketHhRequestStatusEnum('status').notNull().default('pending'),
   rejectionReason: text('rejection_reason'),

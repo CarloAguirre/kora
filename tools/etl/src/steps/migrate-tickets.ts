@@ -131,10 +131,10 @@ async function advanceTicketCodeSequence(context: EtlContext): Promise<void> {
     select setval(
       'tickets_code_seq',
       coalesce(
-        (select max((regexp_match(legacy_id, '^TK-(\d+)$'))[1]::int) from tickets where legacy_id ~ '^TK-\d+$'),
+        (select max((regexp_match(legacy_id, '^TK-(\\d+)$'))[1]::int) from tickets where legacy_id ~ '^TK-\\d+$'),
         0
-      ),
-      true
+      ) + 1,
+      false
     )
   `);
 }

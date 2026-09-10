@@ -3,6 +3,7 @@ import { TICKET_HH_REQUEST_STATUS_LABELS, type TicketHhRequest } from '@kora/con
 import styles from './TicketHhRequestsSection.module.css';
 import { Badge, type BadgeTone } from '@/shared/components/ui/Badge';
 import { Button } from '@/shared/components/ui/Button';
+import { ClockIcon, PlusIcon } from '@/shared/components/icons/Icons';
 import { TextField } from '@/shared/components/ui/TextField';
 import { useToast } from '@/shared/components/ui/Toast';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
@@ -29,6 +30,11 @@ interface TicketHhRequestsSectionProps {
   ticketId: string;
   /** `ticket.canRequestHh` — responsable o autoridad del proyecto, ticket no cerrado y con proyecto asociado (ver `GetTicketUseCase`). */
   canRequest: boolean;
+  /** `ticket.allowsOvertime` — el líder debe autorizar el ticket antes de poder marcar una solicitud como horas extra. */
+  allowsOvertime: boolean;
+  /** `ticket.pendingHhRequestsCount` / `ticket.pendingHhHours` — para avisar en el encabezado sin esperar a que cargue la lista. */
+  pendingHhRequestsCount: number;
+  pendingHhHours: number;
 }
 
 /**
@@ -36,7 +42,13 @@ interface TicketHhRequestsSectionProps {
  * docs/DECISION-M5-TICKETS.md. Pedir horas, aprobarlas (genera un registro de
  * horas ya aprobado) o rechazarlas, todo dentro de la misma ficha modal.
  */
-export function TicketHhRequestsSection({ ticketId, canRequest }: TicketHhRequestsSectionProps) {
+export function TicketHhRequestsSection({
+  ticketId,
+  canRequest,
+  allowsOvertime,
+  pendingHhRequestsCount,
+  pendingHhHours,
+}: TicketHhRequestsSectionProps) {
   const { can } = usePermissions();
   const toast = useToast();
   const { data: requests, isLoading } = useTicketHhRequestsList(ticketId);
@@ -47,6 +59,7 @@ export function TicketHhRequestsSection({ ticketId, canRequest }: TicketHhReques
   const [date, setDate] = useState(todayIso());
   const [hours, setHours] = useState('');
   const [note, setNote] = useState('');
+  const [isOvertime, setIsOvertime] = useState(false);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
 
@@ -59,10 +72,11 @@ export function TicketHhRequestsSection({ ticketId, canRequest }: TicketHhReques
   const submitRequest = async () => {
     const hoursValue = Number(hours);
     if (!(hoursValue > 0)) return;
-    await createRequest.mutateAsync({ date, hours: hoursValue, note: note.trim() || undefined });
+    await createRequest.mutateAsync({ date, hours: hoursValue, note: note.trim() || undefined, isOvertime });
     toast.success('Solicitud de horas enviada.');
     setHours('');
     setNote('');
+    setIsOvertime(false);
   };
 
   const approve = async (requestId: string) => {
@@ -81,7 +95,13 @@ export function TicketHhRequestsSection({ ticketId, canRequest }: TicketHhReques
   return (
     <div className={styles.section}>
       <div className={styles.header}>
-        <span className={styles.label}>Solicitudes de HH:</span>
+        <span className={styles.label}>Solicitudes de HH</span>
+        {pendingHhRequestsCount > 0 && (
+          <span className={styles.pendingChip} title={`${pendingHhRequestsCount} solicitud(es) pendientes de aprobar`}>
+            <ClockIcon size={12} />
+            {formatHours(pendingHhHours)}h por aprobar
+          </span>
+        )}
       </div>
 
       {approvedBreakdown.length > 0 && (
@@ -98,12 +118,40 @@ export function TicketHhRequestsSection({ ticketId, canRequest }: TicketHhReques
 
       {canRequest && (
         <div className={styles.form}>
-          <TextField label="Fecha" type="date" value={date} onChange={(event) => setDate(event.target.value)} />
-          <TextField label="Horas" type="number" min="0.5" max="24" step="0.5" value={hours} onChange={(event) => setHours(event.target.value)} />
-          <TextField label="Nota (opcional)" value={note} onChange={(event) => setNote(event.target.value)} />
-          <Button size="sm" loading={createRequest.isPending} onClick={() => void submitRequest()}>
-            Enviar solicitud
-          </Button>
+          <span className={styles.formTitle}>Nueva solicitud de horas</span>
+          <div className={styles.formGrid}>
+            <TextField label="Fecha" type="date" value={date} onChange={(event) => setDate(event.target.value)} />
+            <TextField
+              label="Horas"
+              type="number"
+              min="0.5"
+              max="24"
+              step="0.5"
+              placeholder="0.0"
+              value={hours}
+              onChange={(event) => setHours(event.target.value)}
+            />
+            <TextField label="Nota (opcional)" value={note} onChange={(event) => setNote(event.target.value)} />
+          </div>
+          <div className={styles.formFooter}>
+            <label
+              className={[styles.overtimeToggleRow, !allowsOvertime ? styles.overtimeToggleRowDisabled : ''].filter(Boolean).join(' ')}
+              title={allowsOvertime ? undefined : 'Este ticket no tiene autorizadas horas extra.'}
+            >
+              <input
+                type="checkbox"
+                className={styles.overtimeCheckbox}
+                disabled={!allowsOvertime}
+                checked={isOvertime}
+                onChange={(event) => setIsOvertime(event.target.checked)}
+              />
+              <span className={styles.overtimeSwitch} />
+              <span>Horas extra</span>
+            </label>
+            <Button loading={createRequest.isPending} iconLeft={<PlusIcon size={16} />} onClick={() => void submitRequest()}>
+              Enviar solicitud
+            </Button>
+          </div>
         </div>
       )}
 
@@ -116,6 +164,7 @@ export function TicketHhRequestsSection({ ticketId, canRequest }: TicketHhReques
               <span className={styles.itemMain}>
                 {request.hours}h — {formatDate(request.date)} · {request.user.fullName}
               </span>
+              {request.isOvertime && <Badge tone="warning">Extra</Badge>}
               <Badge tone={STATUS_TONE[request.status]}>{TICKET_HH_REQUEST_STATUS_LABELS[request.status]}</Badge>
             </div>
             {request.note && <p className={styles.itemNote}>{request.note}</p>}

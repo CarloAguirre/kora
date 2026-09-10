@@ -47,7 +47,8 @@ export class CreateHourEntryUseCase implements UseCase<CreateHourEntryCommand, {
 
     const owner = await this.users.findById(ownerId);
     if (!owner) return err(new ForbiddenError('El usuario indicado no existe.', 'HOUR_ENTRY_OWNER_NOT_FOUND'));
-    const ownerRequiresApproval = owner.role === 'collaborator';
+    // Horas extra siempre exigen aprobación de líder, aunque el rol del dueño no la requiera.
+    const ownerRequiresApproval = owner.role === 'collaborator' || data.isOvertime;
 
     let projectStageAtEntry: string | null = null;
     if (data.projectId) {

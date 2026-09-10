@@ -13,6 +13,7 @@ import { DataTable, type Column } from '@/shared/components/ui/DataTable';
 import { Pagination } from '@/shared/components/ui/Pagination';
 import { Select } from '@/shared/components/ui/Select';
 import { TextField } from '@/shared/components/ui/TextField';
+import { Badge } from '@/shared/components/ui/Badge';
 import { useToast } from '@/shared/components/ui/Toast';
 import { PlusIcon, PencilIcon, TrashIcon, EyeIcon, DownloadIcon } from '@/shared/components/icons/Icons';
 import { HourEntryStatusBadge } from './HourEntryStatusBadge';
@@ -108,6 +109,11 @@ export function TeamHourHistoryPanel({ teamId, userId }: { teamId?: string; user
     { key: 'assignment', header: 'Asignación', render: (e) => e.assignment ?? 'Desarrollo' },
     { key: 'category', header: 'Actividad', render: (e) => e.category || <span className={styles.empty}>—</span> },
     { key: 'hours', header: 'Horas', align: 'right', render: (e) => formatHours(e.hours) },
+    {
+      key: 'overtime',
+      header: 'Horas Extra',
+      render: (e) => (e.isOvertime ? <Badge tone="warning">Extra</Badge> : <span className={styles.empty}>—</span>),
+    },
     {
       key: 'projectStage',
       header: 'Estado',

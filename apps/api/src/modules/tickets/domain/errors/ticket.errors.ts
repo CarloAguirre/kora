@@ -85,3 +85,10 @@ export class CannotManageTicketError extends ForbiddenError {
     super('No tienes permiso para gestionar este ticket.', 'TICKET_CANNOT_MANAGE');
   }
 }
+
+/** Autorizar horas extra en un ticket es una decisión de líder — ser el simple responsable no basta, a diferencia de `canManage`. */
+export class CannotAuthorizeTicketOvertimeError extends ForbiddenError {
+  constructor() {
+    super('No tienes permiso para autorizar horas extra en este ticket.', 'TICKET_CANNOT_AUTHORIZE_OVERTIME');
+  }
+}

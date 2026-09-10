@@ -129,6 +129,13 @@
   align-items: center;
 }
 
+.hhChips {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-1);
+  flex-wrap: wrap;
+}
+
 .hhChip {
   display: inline-flex;
   height: 24px;
@@ -140,6 +147,21 @@
   color: var(--kora-info);
   font-size: var(--kora-text-xs);
   font-weight: var(--kora-weight-medium);
+}
+
+.pendingHhChip {
+  display: inline-flex;
+  height: 24px;
+  padding: 4px var(--kora-space-2);
+  align-items: center;
+  gap: 4px;
+  border-radius: var(--kora-radius-sm);
+  border: 1px solid var(--kora-warning);
+  background: var(--kora-warning-surface);
+  color: var(--kora-warning-text);
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-medium);
+  white-space: nowrap;
 }
 
 .divider {

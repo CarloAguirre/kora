@@ -49,3 +49,10 @@ export class CannotReviewTicketHhRequestError extends ForbiddenError {
     super('No puedes revisar esta solicitud.', 'TICKET_HH_REQUEST_CANNOT_REVIEW');
   }
 }
+
+/** El ticket no tiene autorizadas horas extra — el líder del proyecto/equipo debe habilitarlo primero. */
+export class TicketOvertimeNotAllowedError extends ConflictError {
+  constructor() {
+    super('Este ticket no tiene autorizadas horas extra.', 'TICKET_HH_REQUEST_OVERTIME_NOT_ALLOWED');
+  }
+}

@@ -23,6 +23,8 @@ function buildItem(overrides: Partial<TicketListItem>): TicketListItem {
     assigneeName: null,
     estimatedHours: null,
     usedHours: 0,
+    pendingHhRequestsCount: 0,
+    pendingHhHours: 0,
     createdAt: new Date('2026-08-01T00:00:00.000Z'),
     ...overrides,
   };

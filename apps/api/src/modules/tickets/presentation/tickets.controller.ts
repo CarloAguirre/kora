@@ -97,7 +97,13 @@ export class TicketsController {
     @CurrentUser() actor: RequestUser,
   ): Promise<void> {
     unwrapOrThrow(
-      await this.updateTicket.execute({ ticketId: id, data: body, actor: toActorContext(actor), actorPermissions: actor.permissions }),
+      await this.updateTicket.execute({
+        ticketId: id,
+        data: body,
+        actor: toActorContext(actor),
+        actorRole: actor.role,
+        actorPermissions: actor.permissions,
+      }),
     );
   }
 

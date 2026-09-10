@@ -38,6 +38,8 @@ export function toTicketSummary(item: TicketListItem): TicketSummary {
     assignee: item.assigneeUserId ? { id: item.assigneeUserId, fullName: item.assigneeName ?? '' } : null,
     estimatedHours: item.estimatedHours,
     usedHours: item.usedHours,
+    pendingHhRequestsCount: item.pendingHhRequestsCount,
+    pendingHhHours: item.pendingHhHours,
     createdAt: item.createdAt.toISOString(),
   };
 }
@@ -52,6 +54,9 @@ export interface TicketDetailSource {
   readonly canManage: boolean;
   readonly canDelete: boolean;
   readonly canRequestHh: boolean;
+  readonly canAuthorizeOvertime: boolean;
+  readonly pendingHhRequestsCount: number;
+  readonly pendingHhHours: number;
 }
 
 export function toTicketDetail(source: TicketDetailSource): TicketDetail {
@@ -77,6 +82,8 @@ export function toTicketDetail(source: TicketDetailSource): TicketDetail {
     assignee: snapshot.assigneeUserId ? { id: snapshot.assigneeUserId, fullName: source.assignee?.fullName ?? '' } : null,
     estimatedHours: snapshot.estimatedHours,
     usedHours: snapshot.usedHours,
+    pendingHhRequestsCount: source.pendingHhRequestsCount,
+    pendingHhHours: source.pendingHhHours,
     description: snapshot.description,
     evidenceUrl: snapshot.evidenceUrl,
     resolution: snapshot.resolution,
@@ -95,5 +102,7 @@ export function toTicketDetail(source: TicketDetailSource): TicketDetail {
     canManage: source.canManage,
     canDelete: source.canDelete,
     canRequestHh: source.canRequestHh,
+    allowsOvertime: snapshot.allowsOvertime,
+    canAuthorizeOvertime: source.canAuthorizeOvertime,
   };
 }

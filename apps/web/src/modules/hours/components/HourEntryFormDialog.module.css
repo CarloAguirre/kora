@@ -255,6 +255,16 @@
   align-items: center;
   gap: var(--kora-space-2);
   height: 40px;
+  cursor: pointer;
+  width: fit-content;
+}
+
+.overtimeCheckbox {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
 }
 
 .overtimeSwitch {
@@ -264,6 +274,8 @@
   border-radius: var(--kora-radius-pill);
   background: var(--kora-border-soft);
   position: relative;
+  transition: background 0.15s ease;
+  flex-shrink: 0;
 }
 
 .overtimeSwitch::after {
@@ -275,6 +287,19 @@
   height: 14px;
   border-radius: 50%;
   background: var(--kora-surface);
+  transition: transform 0.15s ease;
+}
+
+.overtimeCheckbox:checked + .overtimeSwitch {
+  background: var(--kora-blue-600);
+}
+
+.overtimeCheckbox:checked + .overtimeSwitch::after {
+  transform: translateX(16px);
+}
+
+.overtimeCheckbox:focus-visible + .overtimeSwitch {
+  box-shadow: 0 0 0 3px var(--kora-blue-surface);
 }
 
 .overtimeState {

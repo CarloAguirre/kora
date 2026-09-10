@@ -11,9 +11,11 @@ import {
   AlertIcon,
   ArrowUpDownIcon,
   CalendarIcon,
+  CheckIcon,
   ChevronDownIcon,
   ClockIcon,
   CloseIcon,
+  PaperclipIcon,
   PencilIcon,
   PlusIcon,
   SparklesIcon,
@@ -32,6 +34,14 @@ import { ApiRequestError } from '@/shared/lib/api-client';
 
 const formatDateTime = (value: string) => new Date(value).toLocaleString('es-CL');
 const formatDate = (value: string) => new Date(value).toLocaleDateString('es-CL');
+
+function initials(fullName: string): string {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  const first = parts[0]![0]!;
+  const second = parts.length > 1 ? parts[1]![0]! : (parts[0]![1] ?? '');
+  return (first + second).toUpperCase();
+}
 
 /** Sólo se enlaza si es http(s) — evita que un `javascript:` guardado como "evidencia" se ejecute al hacer clic. */
 function isSafeHttpUrl(value: string): boolean {
@@ -127,6 +137,16 @@ export function TicketDetailModal({ ticketId, onClose }: { ticketId: string; onC
     toast.success('Se registró la solución y se terminó el ticket.');
   };
 
+  const onToggleOvertime = async () => {
+    if (!ticket) return;
+    try {
+      await updateTicket.mutateAsync({ ticketId, input: { allowsOvertime: !ticket.allowsOvertime } });
+      toast.success(ticket.allowsOvertime ? 'Se retiró la autorización de horas extra.' : 'Se autorizaron horas extra para este ticket.');
+    } catch (error) {
+      reportError(error, 'No se pudo actualizar la autorización de horas extra.');
+    }
+  };
+
   if (!error && (isLoading || !ticket)) {
     return (
       <div className={styles.overlay} onClick={onClose}>
@@ -164,94 +184,132 @@ export function TicketDetailModal({ ticketId, onClose }: { ticketId: string; onC
               </div>
             )}
 
-            <div className={styles.row}>
-              <span className={styles.label}>Cliente:</span>
-              <span className={styles.value}>{ticket.client?.companyName ?? '—'}</span>
-            </div>
-            <div className={styles.row}>
-              <span className={styles.label}>Proyecto Soporte:</span>
-              <span className={styles.value}>{ticket.project?.name ?? '—'}</span>
-            </div>
-            <div className={styles.row}>
-              <span className={styles.label}>Proyecto Desarrollo:</span>
-              <span className={styles.value}>{ticket.developmentProject?.name ?? '—'}</span>
-            </div>
-            <div className={styles.row}>
-              <span className={styles.label}>Responsable:</span>
-              <span className={styles.value}>{ticket.assignee?.fullName ?? 'Sin asignar'}</span>
-            </div>
-
-            <div className={styles.dates}>
-              <div className={styles.col}>
-                <div className={styles.row}>
-                  <CalendarIcon size={16} />
-                  <span className={styles.label}>Fecha:</span>
-                  <span className={styles.value}>{formatDate(ticket.createdAt)}</span>
-                </div>
+            <div className={styles.factsGrid}>
+              <div className={styles.factCell}>
+                <span className={styles.factLabel}>Cliente</span>
+                <span className={styles.factValue}>{ticket.client?.companyName ?? '—'}</span>
               </div>
-              <div className={styles.col}>
-                <div className={styles.row}>
-                  <ClockIcon size={16} />
-                  <span className={styles.label}>HH Estimadas:</span>
-                  <span className={styles.value}>{ticket.estimatedHours ?? '—'}hrs</span>
-                </div>
-                <div className={styles.row}>
-                  <ClockIcon size={16} />
-                  <span className={styles.label}>HH Utilizadas:</span>
-                  <HhBreakdownTooltip breakdown={hhBreakdown}>
-                    <span className={styles.value}>{ticket.usedHours}hrs</span>
-                  </HhBreakdownTooltip>
-                </div>
+              <div className={styles.factCell}>
+                <span className={styles.factLabel}>Prioridad</span>
+                {ticket.priority ? (
+                  <span className={[styles.priorityChip, priorityStyles[ticket.priority]].join(' ')}>
+                    {TICKET_PRIORITY_LABELS[ticket.priority]}
+                  </span>
+                ) : (
+                  <span className={styles.factValue}>—</span>
+                )}
               </div>
-            </div>
 
-            {ticket.priority && (
-              <div className={styles.row}>
-                <span className={styles.label}>Prioridad:</span>
-                <span className={[styles.priorityChip, priorityStyles[ticket.priority]].join(' ')}>
-                  {TICKET_PRIORITY_LABELS[ticket.priority]}
+              <div className={styles.factCell}>
+                <span className={styles.factLabel}>Proyecto soporte</span>
+                <span className={styles.factValue}>{ticket.project?.name ?? '—'}</span>
+              </div>
+              <div className={styles.factCell}>
+                <span className={styles.factLabel}>Fecha de creación</span>
+                <span className={styles.factValue}>
+                  <CalendarIcon size={14} /> {formatDate(ticket.createdAt)}
                 </span>
               </div>
-            )}
 
-            <div className={styles.divider} />
+              <div className={styles.factCell}>
+                <span className={styles.factLabel}>Proyecto desarrollo</span>
+                <span className={styles.factValue}>{ticket.developmentProject?.name ?? '—'}</span>
+              </div>
+              <div className={styles.factCell}>
+                <span className={styles.factLabel}>HH utilizadas / estimadas</span>
+                <HhBreakdownTooltip breakdown={hhBreakdown}>
+                  <div className={styles.hhProgressRow}>
+                    <span className={styles.hhProgressTrack}>
+                      <span
+                        className={styles.hhProgressFill}
+                        style={{ width: `${ticket.estimatedHours ? Math.min(100, (ticket.usedHours / ticket.estimatedHours) * 100) : 0}%` }}
+                      />
+                    </span>
+                    <span className={styles.factValue}>
+                      {ticket.usedHours} / {ticket.estimatedHours ?? '—'}hrs
+                    </span>
+                  </div>
+                </HhBreakdownTooltip>
+              </div>
 
-            <div className={styles.section}>
-              <span className={styles.label}>Descripción del incidente:</span>
-              {ticket.description ? <p className={styles.text}>{ticket.description}</p> : <span className={styles.empty}>Sin descripción</span>}
-            </div>
-
-            <div className={styles.section}>
-              <span className={styles.label}>Evidencia:</span>
-              {ticket.evidenceUrl ? (
-                isSafeHttpUrl(ticket.evidenceUrl) ? (
-                  <a className={styles.text} href={ticket.evidenceUrl} target="_blank" rel="noreferrer">
-                    {ticket.evidenceUrl}
-                  </a>
+              <div className={styles.factCell}>
+                <span className={styles.factLabel}>Responsable</span>
+                {ticket.assignee ? (
+                  <div className={styles.assigneeValue}>
+                    <span className={styles.avatar}>{initials(ticket.assignee.fullName)}</span>
+                    <span className={styles.factValue}>{ticket.assignee.fullName}</span>
+                  </div>
                 ) : (
-                  <p className={styles.text}>{ticket.evidenceUrl}</p>
-                )
-              ) : (
-                <span className={styles.empty}>Sin evidencia adjunta</span>
-              )}
+                  <span className={styles.factValue}>Sin asignar</span>
+                )}
+              </div>
+              <div className={styles.factCell}>
+                <span className={styles.factLabel}>Horas extra</span>
+                <div className={styles.overtimeValueRow}>
+                  <span className={styles.factValue}>{ticket.allowsOvertime ? 'Autorizadas' : 'No autorizadas'}</span>
+                  {ticket.canAuthorizeOvertime && ticket.status !== 'closed' && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      loading={updateTicket.isPending}
+                      onClick={() => void onToggleOvertime()}
+                    >
+                      {ticket.allowsOvertime ? 'Retirar' : 'Autorizar'}
+                    </Button>
+                  )}
+                </div>
+              </div>
             </div>
 
-            <div className={styles.section}>
-              <span className={styles.label}>Solución aplicada:</span>
-              {/* Igual que en la v1: acá siempre es de solo lectura — la solución se
-                  pide al confirmar "Terminar Proceso"/"Marcar Terminado" (ver CompleteTicketDialog). */}
-              {ticket.resolution ? (
-                <p className={styles.text}>{ticket.resolution}</p>
-              ) : (
-                <span className={styles.empty}>Sin solución registrada</span>
-              )}
+            <div className={styles.contentCard}>
+              <div className={styles.contentSection}>
+                <div className={styles.contentSectionHeader}>
+                  <AlertIcon size={16} />
+                  <span className={styles.label}>Descripción del incidente</span>
+                  {!ticket.description && <span className={styles.emptyInline}>Sin descripción</span>}
+                </div>
+                {ticket.description && <p className={styles.text}>{ticket.description}</p>}
+              </div>
+
+              <div className={styles.contentDivider} />
+
+              <div className={styles.contentSection}>
+                <div className={styles.contentSectionHeader}>
+                  <PaperclipIcon size={16} />
+                  <span className={styles.label}>Evidencia</span>
+                  {!ticket.evidenceUrl && <span className={styles.emptyInline}>Sin evidencia adjunta</span>}
+                </div>
+                {ticket.evidenceUrl &&
+                  (isSafeHttpUrl(ticket.evidenceUrl) ? (
+                    <a className={styles.text} href={ticket.evidenceUrl} target="_blank" rel="noreferrer">
+                      {ticket.evidenceUrl}
+                    </a>
+                  ) : (
+                    <p className={styles.text}>{ticket.evidenceUrl}</p>
+                  ))}
+              </div>
+
+              <div className={styles.contentDivider} />
+
+              <div className={styles.contentSection}>
+                <div className={styles.contentSectionHeader}>
+                  <CheckIcon size={16} />
+                  <span className={styles.label}>Solución aplicada</span>
+                  {!ticket.resolution && <span className={styles.emptyInline}>Sin solución registrada</span>}
+                </div>
+                {/* Igual que en la v1: acá siempre es de solo lectura — la solución se
+                    pide al confirmar "Terminar Proceso"/"Marcar Terminado" (ver CompleteTicketDialog). */}
+                {ticket.resolution && <p className={styles.text}>{ticket.resolution}</p>}
+              </div>
             </div>
 
-            <div className={styles.section}>
-              <TicketHhRequestsSection ticketId={ticketId} canRequest={ticket.canRequestHh} />
-            </div>
-
-            <div className={styles.divider} />
+            <TicketHhRequestsSection
+              ticketId={ticketId}
+              canRequest={ticket.canRequestHh}
+              allowsOvertime={ticket.allowsOvertime}
+              pendingHhRequestsCount={ticket.pendingHhRequestsCount}
+              pendingHhHours={ticket.pendingHhHours}
+            />
 
             <div className={styles.historyBox}>
               <button
@@ -266,9 +324,12 @@ export function TicketDetailModal({ ticketId, onClose }: { ticketId: string; onC
               {historyOpen && (
                 <div className={styles.history}>
                   {ticket.history.length === 0 && <span className={styles.empty}>Sin eventos todavía.</span>}
-                  {ticket.history.map((entry) => (
+                  {ticket.history.map((entry, index) => (
                     <div key={entry.id} className={styles.historyEntry}>
-                      <span className={styles.historyIcon}>{historyEventIcon(entry.eventType)}</span>
+                      <div className={styles.historyIconCol}>
+                        <span className={styles.historyIcon}>{historyEventIcon(entry.eventType)}</span>
+                        {index < ticket.history.length - 1 && <span className={styles.historyLine} />}
+                      </div>
                       <div className={styles.historyBody}>
                         <p className={styles.historyDescription}>{entry.description}</p>
                         <p className={styles.historyMeta}>

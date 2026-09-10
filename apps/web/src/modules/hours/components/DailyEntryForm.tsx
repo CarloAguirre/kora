@@ -37,6 +37,7 @@ interface DailyBlock {
   category: string;
   hours: string;
   description: string;
+  isOvertime: boolean;
   designatedApproverUserId: string;
 }
 
@@ -49,6 +50,7 @@ const createEmptyBlock = (): DailyBlock => ({
   category: '',
   hours: '',
   description: '',
+  isOvertime: false,
   designatedApproverUserId: '',
 });
 
@@ -56,9 +58,9 @@ const createEmptyBlock = (): DailyBlock => ({
  * Registro diario — un mismo día, varios registros en un solo envío.
  * Equivalente a la pestaña "Registro diario" de `RegistroHHModal` en la v1
  * (bloques agregables); cada bloque se guarda como un `hour_entries`
- * independiente. "Horas Extra" se muestra pero deshabilitada — la v1 tampoco
- * la deja auto-marcar todavía ("Horas extra authorization ... placeholder,
- * always false for now"), pendiente de un flujo de autorización del líder.
+ * independiente. Marcar "Horas Extra" deja el registro `pending` y exige
+ * aprobador cuando no hay proyecto (el backend siempre lo exige, ver
+ * `HourEntry.create`).
  */
 export function DailyEntryForm({
   onClose,
@@ -133,7 +135,7 @@ export function DailyEntryForm({
     if (needsProject && !block.projectId) return 'Selecciona un proyecto para esta asignación.';
     // Horas de proyecto se aprueban por acceso al proyecto, no por aprobador
     // designado (docs/DECISION-M4-HORAS.md) — el backend rechaza ambos a la vez.
-    const needsApprover = !needsProject && user?.role === 'collaborator';
+    const needsApprover = !needsProject && (user?.role === 'collaborator' || block.isOvertime);
     if (needsApprover && !block.designatedApproverUserId) return 'Selecciona a quién aprueba estas horas.';
     if (block.description.trim().length > 0 && block.description.trim().length < MIN_DESCRIPTION_LENGTH) {
       return `La descripción debe tener al menos ${MIN_DESCRIPTION_LENGTH} caracteres.`;
@@ -165,7 +167,7 @@ export function DailyEntryForm({
           description: block.description || undefined,
           hours: Number(block.hours),
           date,
-          isOvertime: false,
+          isOvertime: block.isOvertime,
           designatedApproverUserId: block.designatedApproverUserId || undefined,
         };
         await createEntry.mutateAsync(input);
@@ -222,7 +224,8 @@ export function DailyEntryForm({
 
       {blocks.map((block, index) => {
         const needsProject = PROJECT_REQUIRING_ASSIGNMENTS.has(block.assignment as HourEntryAssignment);
-        const showApproverInRow = block.assignment !== '' && !needsProject && user?.role === 'collaborator';
+        const showApproverInRow =
+          block.assignment !== '' && !needsProject && (user?.role === 'collaborator' || block.isOvertime);
         return (
           <div key={block.key} className={styles.block}>
             <div
@@ -325,11 +328,23 @@ export function DailyEntryForm({
 
                   <div className={styles.overtimeField}>
                     <span className={styles.stepperLabel}>Horas Extra</span>
-                    <div className={styles.overtimeToggleRow}>
+                    <label className={styles.overtimeToggleRow}>
+                      <input
+                        type="checkbox"
+                        className={styles.overtimeCheckbox}
+                        checked={block.isOvertime}
+                        onChange={(event) => updateBlock(block.key, { isOvertime: event.target.checked })}
+                      />
                       <span className={styles.overtimeSwitch} aria-hidden="true" />
-                      <span className={styles.overtimeState}>No autorizado</span>
-                    </div>
-                    <span className={styles.overtimeHelp}>Solicita autorización a tu líder para registrar horas extra</span>
+                      <span className={styles.overtimeState}>{block.isOvertime ? 'Marcada' : 'No marcada'}</span>
+                    </label>
+                    {block.isOvertime && (
+                      <span className={styles.overtimeHelp}>
+                        {needsProject
+                          ? 'Quedará pendiente de aprobación del líder del proyecto.'
+                          : 'Quedará pendiente de aprobación del líder que selecciones.'}
+                      </span>
+                    )}
                   </div>
                 </div>
 

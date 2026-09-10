@@ -2,12 +2,17 @@
   display: flex;
   flex-direction: column;
   gap: var(--kora-space-3);
+  padding: var(--kora-space-4);
+  border: 1px solid var(--kora-border-soft);
+  border-radius: var(--kora-radius);
+  background: var(--kora-surface);
 }
 
 .header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: var(--kora-space-2);
 }
 
 .label {
@@ -15,15 +20,129 @@
   color: var(--kora-text);
 }
 
+.pendingChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 2px var(--kora-space-2);
+  border-radius: var(--kora-radius-sm);
+  border: 1px solid var(--kora-warning);
+  background: var(--kora-warning-surface);
+  color: var(--kora-warning-text);
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-medium);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
 .form {
   display: flex;
-  align-items: flex-end;
-  gap: var(--kora-space-2);
-  flex-wrap: wrap;
-  padding: var(--kora-space-3);
+  flex-direction: column;
+  gap: var(--kora-space-3);
+  padding: var(--kora-space-4);
   border: 1px solid var(--kora-border);
   border-radius: var(--kora-radius);
   background: var(--kora-surface-alt);
+}
+
+.formTitle {
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-semibold);
+  color: var(--kora-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: minmax(130px, 150px) minmax(90px, 110px) 1fr;
+  gap: var(--kora-space-3);
+}
+
+.formFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kora-space-3);
+  flex-wrap: wrap;
+}
+
+.overtimeToggleRow {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+  height: 40px;
+  font-size: var(--kora-text-sm);
+  color: var(--kora-navy);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.overtimeToggleRowDisabled {
+  color: var(--kora-text-disabled);
+  cursor: not-allowed;
+}
+
+.overtimeCheckbox {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+}
+
+.overtimeSwitch {
+  display: inline-block;
+  width: 34px;
+  height: 18px;
+  border-radius: var(--kora-radius-pill);
+  background: var(--kora-border-soft);
+  position: relative;
+  flex-shrink: 0;
+  transition: background 0.15s ease;
+}
+
+.overtimeSwitch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--kora-surface);
+  transition: transform 0.15s ease;
+}
+
+.overtimeCheckbox:checked + .overtimeSwitch {
+  background: var(--kora-blue-600);
+}
+
+.overtimeCheckbox:checked + .overtimeSwitch::after {
+  transform: translateX(16px);
+}
+
+.overtimeCheckbox:focus-visible + .overtimeSwitch {
+  box-shadow: 0 0 0 3px var(--kora-blue-surface);
+}
+
+.overtimeCheckbox:disabled + .overtimeSwitch {
+  opacity: 0.5;
+}
+
+@media (max-width: 480px) {
+  .formGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .formFooter {
+    justify-content: stretch;
+  }
+
+  .formFooter > button {
+    width: 100%;
+  }
 }
 
 .list {
@@ -41,10 +160,10 @@
 .item {
   display: flex;
   flex-direction: column;
-  gap: var(--kora-space-1);
-  padding: var(--kora-space-2) var(--kora-space-3);
-  border: 1px solid var(--kora-border);
-  border-radius: var(--kora-radius-sm);
+  gap: var(--kora-space-2);
+  padding: var(--kora-space-3);
+  border: 1px solid var(--kora-border-soft);
+  border-radius: var(--kora-radius);
 }
 
 .itemRow {

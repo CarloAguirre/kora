@@ -38,9 +38,11 @@ export class RunLegacyImportUseCase implements UseCase<RunLegacyImportCommand, L
       const result = await this.runner.run({ dump: parsed.dump, dryRun: command.dryRun });
       return ok({ ...result, parseErrors: [] });
     } catch (error) {
+      const caughtError = error as Error & { cause?: unknown };
+      const reason = caughtError.cause instanceof Error ? caughtError.cause.message : caughtError.message;
       return err(
         new ValidationError(
-          `La importación falló: ${(error as Error).message}. No se escribió nada (se revirtió la transacción).`,
+          `La importación falló: ${reason}. No se escribió nada (se revirtió la transacción).`,
           'LEGACY_IMPORT_FAILED',
           { cause: error },
         ),

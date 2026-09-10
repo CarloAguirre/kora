@@ -50,7 +50,9 @@ export class UpdateHourEntryUseCase implements UseCase<UpdateHourEntryCommand, v
     }
 
     const owner = await this.users.findById(entry.userId);
-    const ownerRequiresApproval = owner?.role === 'collaborator';
+    const isOvertime = data.isOvertime !== undefined ? data.isOvertime : entry.isOvertime;
+    // Horas extra siempre exigen aprobación de líder, aunque el rol del dueño no la requiera.
+    const ownerRequiresApproval = owner?.role === 'collaborator' || isOvertime;
 
     const result = entry.updateDetails(
       {

@@ -8,6 +8,7 @@ export interface BuildApprovedHourEntryParams {
   readonly hours: number;
   readonly date: Date;
   readonly note: string | null;
+  readonly isOvertime: boolean;
   readonly ticketDisplayId: string;
   readonly now: Date;
 }
@@ -28,6 +29,7 @@ export function buildApprovedHourEntry(params: BuildApprovedHourEntryParams): Re
     description: params.note ?? `Solicitud de HH — Ticket ${params.ticketDisplayId}`,
     hours: params.hours,
     date: params.date,
+    isOvertime: params.isOvertime,
     ownerRequiresApproval: false,
     now: params.now,
   });

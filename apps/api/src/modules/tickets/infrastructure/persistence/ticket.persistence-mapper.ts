@@ -18,6 +18,7 @@ export interface TicketRow {
   resolution: string | null;
   resolvedAt: Date | null;
   usedHours: string;
+  allowsOvertime: boolean;
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;
@@ -41,6 +42,7 @@ export function toDomain(row: TicketRow): Ticket {
     resolution: row.resolution,
     resolvedAt: row.resolvedAt,
     usedHours: Number(row.usedHours),
+    allowsOvertime: row.allowsOvertime,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     deletedAt: row.deletedAt,
@@ -65,6 +67,7 @@ export function toPersistence(ticket: Ticket) {
     resolution: snapshot.resolution,
     resolvedAt: snapshot.resolvedAt,
     usedHours: String(snapshot.usedHours),
+    allowsOvertime: snapshot.allowsOvertime,
     createdAt: snapshot.createdAt,
     updatedAt: snapshot.updatedAt,
     deletedAt: snapshot.deletedAt,

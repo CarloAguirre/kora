@@ -82,6 +82,7 @@ describe('UpdateTicketUseCase — responsable asignable', () => {
       ticketId: 'ticket-1',
       data,
       actor: ACTOR,
+      actorRole: 'admin',
       actorPermissions: MANAGE_PERMISSIONS,
     });
   }

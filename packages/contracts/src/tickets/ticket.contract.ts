@@ -96,6 +96,9 @@ export const ticketSummarySchema = z.object({
   assignee: z.object({ id: uuidSchema, fullName: z.string() }).nullable(),
   estimatedHours: z.number().int().nullable(),
   usedHours: z.number(),
+  /** Solicitudes de HH del ticket en estado `pending` — para avisar en el listado que hay horas por aprobar sin abrir la ficha. */
+  pendingHhRequestsCount: z.number().int(),
+  pendingHhHours: z.number(),
   createdAt: isoDateTimeSchema,
 });
 export type TicketSummary = z.infer<typeof ticketSummarySchema>;
@@ -122,6 +125,10 @@ export const ticketDetailSchema = ticketSummarySchema.extend({
    * real sobre el proyecto, y nunca sobre un ticket cerrado.
    */
   canRequestHh: z.boolean(),
+  /** Habilitado por el líder del proyecto/equipo — sin esto, no se pueden solicitar HH marcadas como horas extra en este ticket. */
+  allowsOvertime: z.boolean(),
+  /** Igual que `canRequestHh` pero para decidir SI el ticket admite horas extra — no basta con ser el simple responsable, ver `UpdateTicketUseCase`. */
+  canAuthorizeOvertime: z.boolean(),
 });
 export type TicketDetail = z.infer<typeof ticketDetailSchema>;
 
@@ -149,6 +156,7 @@ export const updateTicketSchema = z.object({
   assigneeUserId: uuidSchema.nullish(),
   estimatedHours: z.coerce.number().int().min(0).nullish(),
   resolution: z.string().trim().max(4000).optional(),
+  allowsOvertime: z.boolean().optional(),
 });
 export type UpdateTicketInput = z.infer<typeof updateTicketSchema>;
 

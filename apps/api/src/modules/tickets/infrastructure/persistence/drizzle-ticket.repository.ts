@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { alias, and, asc, clients, count, desc, eq, ilike, inArray, isNull, or, projects, tickets, users, type Database } from '@kora/db';
+import { alias, and, asc, clients, count, desc, eq, ilike, inArray, isNull, or, projects, sql, ticketHhRequests, tickets, users, type Database } from '@kora/db';
 import { buildPage, toOffset, type Page, type PageRequest, type SortRequest, type TransactionContext } from '@kora/core';
 import type { TicketFilters, TicketListItem, TicketRepository, TicketSortableField } from '../../domain/repositories/ticket.repository';
 import type { Ticket } from '../../domain/entities/ticket.entity';
@@ -42,6 +42,17 @@ export class DrizzleTicketRepository implements TicketRepository {
     const developmentProjects = alias(projects, 'development_projects');
     const supportLeaders = alias(users, 'support_leaders');
 
+    const pendingHh = db
+      .select({
+        ticketId: ticketHhRequests.ticketId,
+        pendingCount: count().as('pending_hh_count'),
+        pendingHours: sql<string>`coalesce(sum(${ticketHhRequests.hours}), 0)`.as('pending_hh_hours'),
+      })
+      .from(ticketHhRequests)
+      .where(eq(ticketHhRequests.status, 'pending'))
+      .groupBy(ticketHhRequests.ticketId)
+      .as('pending_hh');
+
     const [rows, totalRows] = await Promise.all([
       db
         .select({
@@ -66,6 +77,8 @@ export class DrizzleTicketRepository implements TicketRepository {
           assigneeLastName: users.lastName,
           estimatedHours: tickets.estimatedHours,
           usedHours: tickets.usedHours,
+          pendingHhRequestsCount: sql<number>`coalesce(${pendingHh.pendingCount}, 0)`,
+          pendingHhHours: sql<string>`coalesce(${pendingHh.pendingHours}, 0)`,
           createdAt: tickets.createdAt,
         })
         .from(tickets)
@@ -74,6 +87,7 @@ export class DrizzleTicketRepository implements TicketRepository {
         .leftJoin(supportLeaders, eq(supportLeaders.id, projects.leaderUserId))
         .leftJoin(developmentProjects, eq(developmentProjects.id, tickets.developmentProjectId))
         .leftJoin(users, eq(users.id, tickets.assigneeUserId))
+        .leftJoin(pendingHh, eq(pendingHh.ticketId, tickets.id))
         .where(where)
         .orderBy(...this.buildOrderBy(sort))
         .limit(page.pageSize)
@@ -102,6 +116,8 @@ export class DrizzleTicketRepository implements TicketRepository {
       assigneeName: row.assigneeFirstName ? `${row.assigneeFirstName} ${row.assigneeLastName ?? ''}`.trim() : null,
       estimatedHours: row.estimatedHours,
       usedHours: Number(row.usedHours),
+      pendingHhRequestsCount: Number(row.pendingHhRequestsCount),
+      pendingHhHours: Number(row.pendingHhHours),
       createdAt: row.createdAt,
     }));
 

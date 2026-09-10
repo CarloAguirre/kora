@@ -35,6 +35,9 @@ export interface TicketListItem {
   readonly assigneeName: string | null;
   readonly estimatedHours: number | null;
   readonly usedHours: number;
+  /** Solicitudes de HH en estado `pending` para este ticket. */
+  readonly pendingHhRequestsCount: number;
+  readonly pendingHhHours: number;
   readonly createdAt: Date;
 }
 

@@ -6,7 +6,7 @@ import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Button } from '@/shared/components/ui/Button';
 import { MultiSelect } from '@/shared/components/ui/MultiSelect';
 import { TextField } from '@/shared/components/ui/TextField';
-import { AlertIcon, CalendarIcon, PlusIcon, SearchIcon, SparklesIcon, UserIcon } from '@/shared/components/icons/Icons';
+import { AlertIcon, CalendarIcon, ClockIcon, PlusIcon, SearchIcon, SparklesIcon, UserIcon } from '@/shared/components/icons/Icons';
 import { TicketPriorityBadge } from '../components/TicketPriorityBadge';
 import { TicketDetailModal } from '../components/TicketDetailModal';
 import { NewTicketDialog } from '../components/NewTicketDialog';
@@ -26,6 +26,7 @@ const BOARD_STATUS_LABELS: Record<Exclude<TicketStatus, 'closed'>, string> = {
   done: 'Terminados',
 };
 const formatDate = (value: string) => new Date(value).toLocaleDateString('es-CL');
+const formatHours = (value: number) => String(Number(value.toFixed(2)));
 
 /**
  * Tablero Kanban de tickets — réplica de `Soporte/index.tsx` (v1): columnas
@@ -212,7 +213,18 @@ function TicketCard({
       onClick={onOpen}
     >
       <div className={styles.ticketHeader}>
-        <span className={styles.hhChip}>{ticket.estimatedHours ?? 0}hr</span>
+        <div className={styles.hhChips}>
+          <span className={styles.hhChip}>{ticket.estimatedHours ?? 0}hr</span>
+          {ticket.pendingHhRequestsCount > 0 && (
+            <span
+              className={styles.pendingHhChip}
+              title={`${ticket.pendingHhRequestsCount} solicitud(es) de HH pendientes de aprobar`}
+            >
+              <ClockIcon size={12} />
+              {formatHours(ticket.pendingHhHours)}h por aprobar
+            </span>
+          )}
+        </div>
         <TicketPriorityBadge priority={ticket.priority} />
       </div>
       <div className={styles.divider} />

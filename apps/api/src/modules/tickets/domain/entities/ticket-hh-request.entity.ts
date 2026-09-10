@@ -14,6 +14,7 @@ export interface TicketHhRequestProps {
   date: Date;
   hours: number;
   note: string | null;
+  isOvertime: boolean;
   status: TicketHhRequestStatus;
   rejectionReason: string | null;
   reviewedByUserId: string | null;
@@ -31,6 +32,7 @@ export interface CreateTicketHhRequestProps {
   readonly date: Date;
   readonly hours: number;
   readonly note?: string | null;
+  readonly isOvertime?: boolean;
   readonly now: Date;
 }
 
@@ -62,6 +64,7 @@ export class TicketHhRequest extends AggregateRoot<string> {
       date: props.date,
       hours: props.hours,
       note: props.note?.trim() || null,
+      isOvertime: props.isOvertime ?? false,
       status: 'pending',
       rejectionReason: null,
       reviewedByUserId: null,
@@ -104,6 +107,10 @@ export class TicketHhRequest extends AggregateRoot<string> {
 
   get note(): string | null {
     return this.props.note;
+  }
+
+  get isOvertime(): boolean {
+    return this.props.isOvertime;
   }
 
   get status(): TicketHhRequestStatus {

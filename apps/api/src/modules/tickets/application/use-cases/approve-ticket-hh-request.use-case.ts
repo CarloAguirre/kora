@@ -61,6 +61,7 @@ export class ApproveTicketHhRequestUseCase implements UseCase<ApproveTicketHhReq
       hours: request.hours,
       date: request.date,
       note: request.note,
+      isOvertime: request.isOvertime,
       ticketDisplayId: ticket.legacyId ?? ticket.id,
       now,
     });

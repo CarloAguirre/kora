@@ -11,6 +11,7 @@ export interface TicketHhRequestListItem {
   readonly date: Date;
   readonly hours: number;
   readonly note: string | null;
+  readonly isOvertime: boolean;
   readonly status: TicketHhRequestStatus;
   readonly rejectionReason: string | null;
   readonly reviewedByUserId: string | null;

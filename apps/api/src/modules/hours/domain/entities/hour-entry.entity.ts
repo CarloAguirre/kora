@@ -146,6 +146,10 @@ export class HourEntry extends AggregateRoot<string> {
     return this.props.hours;
   }
 
+  get isOvertime(): boolean {
+    return this.props.isOvertime;
+  }
+
   get legacyId(): string | null {
     return this.props.legacyId;
   }

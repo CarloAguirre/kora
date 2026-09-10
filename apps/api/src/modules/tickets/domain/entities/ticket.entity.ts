@@ -18,6 +18,7 @@ export interface TicketProps {
   resolution: string | null;
   resolvedAt: Date | null;
   usedHours: number;
+  allowsOvertime: boolean;
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;
@@ -80,6 +81,7 @@ export class Ticket extends AggregateRoot<string> {
       resolution: null,
       resolvedAt: null,
       usedHours: 0,
+      allowsOvertime: false,
       createdAt: props.now,
       updatedAt: props.now,
       deletedAt: null,
@@ -126,6 +128,10 @@ export class Ticket extends AggregateRoot<string> {
     return this.props.usedHours;
   }
 
+  get allowsOvertime(): boolean {
+    return this.props.allowsOvertime;
+  }
+
   /** `true` si el cambio de estado es un reabierto (retrocede desde Terminado/Cerrado). */
   changeStatus(status: TicketStatus, now: Date): { previous: TicketStatus; reopened: boolean } {
     const previous = this.props.status;
@@ -156,6 +162,7 @@ export class Ticket extends AggregateRoot<string> {
         | 'assigneeUserId'
         | 'estimatedHours'
         | 'resolution'
+        | 'allowsOvertime'
       >
     >,
     now: Date,

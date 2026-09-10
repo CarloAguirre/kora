@@ -8,6 +8,7 @@ export interface TicketHhRequestRow {
   date: Date;
   hours: string;
   note: string | null;
+  isOvertime: boolean;
   status: string;
   rejectionReason: string | null;
   reviewedByUserId: string | null;
@@ -26,6 +27,7 @@ export function toDomain(row: TicketHhRequestRow): TicketHhRequest {
     date: row.date,
     hours: Number(row.hours),
     note: row.note,
+    isOvertime: row.isOvertime,
     status: row.status as TicketHhRequestStatus,
     rejectionReason: row.rejectionReason,
     reviewedByUserId: row.reviewedByUserId,
@@ -45,6 +47,7 @@ export function toPersistence(request: TicketHhRequest) {
     date: snapshot.date,
     hours: String(snapshot.hours),
     note: snapshot.note,
+    isOvertime: snapshot.isOvertime,
     status: snapshot.status,
     rejectionReason: snapshot.rejectionReason,
     reviewedByUserId: snapshot.reviewedByUserId,

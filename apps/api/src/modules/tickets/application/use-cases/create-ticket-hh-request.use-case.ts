@@ -3,7 +3,11 @@ import { CLOCK, ID_GENERATOR, err, ok, type ApplicationError, type Clock, type I
 import type { CreateTicketHhRequestInput, RoleCode } from '@kora/contracts';
 import { TicketHhRequest } from '../../domain/entities/ticket-hh-request.entity';
 import { TicketNotFoundError } from '../../domain/errors/ticket.errors';
-import { CannotSubmitTicketHhRequestError, TicketProjectMissingForHhRequestError } from '../../domain/errors/ticket-hh-request.errors';
+import {
+  CannotSubmitTicketHhRequestError,
+  TicketOvertimeNotAllowedError,
+  TicketProjectMissingForHhRequestError,
+} from '../../domain/errors/ticket-hh-request.errors';
 import { TICKET_REPOSITORY, type TicketRepository } from '../../domain/repositories/ticket.repository';
 import { TICKET_HISTORY_REPOSITORY, type TicketHistoryRepository } from '../../domain/repositories/ticket-history.repository';
 import { TICKET_HH_REQUEST_REPOSITORY, type TicketHhRequestRepository } from '../../domain/repositories/ticket-hh-request.repository';
@@ -51,6 +55,7 @@ export class CreateTicketHhRequestUseCase implements UseCase<CreateTicketHhReque
     const ticket = await this.tickets.findById(ticketId);
     if (!ticket || ticket.isDeleted) return err(new TicketNotFoundError(ticketId));
     if (!ticket.projectId) return err(new TicketProjectMissingForHhRequestError());
+    if (data.isOvertime && !ticket.allowsOvertime) return err(new TicketOvertimeNotAllowedError());
 
     const isAdminTier = actorRole === 'admin' || actorRole === 'pmo';
     const isAssignee = ticket.assigneeUserId === actor.userId;
@@ -69,6 +74,7 @@ export class CreateTicketHhRequestUseCase implements UseCase<CreateTicketHhReque
       date: new Date(`${data.date}T00:00:00.000Z`),
       hours: data.hours,
       note: data.note ?? null,
+      isOvertime: data.isOvertime,
       now,
     });
     if (created.isErr()) return err(created.error);
@@ -82,6 +88,7 @@ export class CreateTicketHhRequestUseCase implements UseCase<CreateTicketHhReque
         hours: request.hours,
         date: request.date,
         note: request.note,
+        isOvertime: request.isOvertime,
         ticketDisplayId: ticket.legacyId ?? ticket.id,
         now,
       });

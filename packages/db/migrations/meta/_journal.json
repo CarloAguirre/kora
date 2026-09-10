@@ -71,6 +71,13 @@
       "when": 1787930946213,
       "tag": "0009_talented_thunderbird",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1788988077047,
+      "tag": "0010_hesitant_nicolaos",
+      "breakpoints": true
     }
   ]
 }
