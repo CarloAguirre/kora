@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import styles from './WeekRangePicker.module.css';
 import { Button } from './Button';
 import { CalendarIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon } from '../icons/Icons';
@@ -70,7 +70,20 @@ export function WeekRangePicker({
   const [open, setOpen] = useState(false);
   const [viewDate, setViewDate] = useState(() => new Date(`${periodStart}T00:00:00Z`));
   const [pending, setPending] = useState({ periodStart, periodEnd });
+  const [align, setAlign] = useState<'left' | 'right'>('left');
   const containerRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    const trigger = containerRef.current;
+    if (!trigger) return;
+    // El popover mide 300px (ver `.popover` en WeekRangePicker.module.css); si no
+    // cabe hacia la derecha del trigger, lo alineamos por la derecha para que
+    // crezca hacia la izquierda en vez de salirse de la pantalla.
+    const rect = trigger.getBoundingClientRect();
+    const popoverWidth = 300;
+    setAlign(rect.left + popoverWidth > window.innerWidth - 8 ? 'right' : 'left');
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -144,7 +157,11 @@ export function WeekRangePicker({
       </button>
 
       {open && (
-        <div className={styles.popover} role="dialog" aria-label="Elegir semana">
+        <div
+          className={[styles.popover, align === 'right' ? styles.popoverRight : ''].filter(Boolean).join(' ')}
+          role="dialog"
+          aria-label="Elegir semana"
+        >
           <div className={styles.calHeader}>
             <button
               type="button"

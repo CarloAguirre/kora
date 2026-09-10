@@ -74,6 +74,11 @@
   box-shadow: var(--kora-shadow-lg);
 }
 
+.panelRight {
+  left: auto;
+  right: 0;
+}
+
 .panelHeader {
   display: flex;
   align-items: baseline;

@@ -72,6 +72,11 @@
   padding: var(--kora-space-4);
 }
 
+.popoverRight {
+  left: auto;
+  right: 0;
+}
+
 .calHeader {
   display: flex;
   align-items: center;

@@ -201,6 +201,11 @@ export function HourEntriesApprovalTable({
     { key: 'category', header: 'Actividad', render: (entry) => entry.category || <span className={styles.empty}>—</span> },
     { key: 'hours', header: 'HH registradas', align: 'right', render: (entry) => formatHours(entry.hours) },
     {
+      key: 'overtime',
+      header: 'Horas Extra',
+      render: (entry) => (entry.isOvertime ? <Badge tone="warning">Extra</Badge> : <span className={styles.empty}>—</span>),
+    },
+    {
       key: 'actions',
       header: 'Acciones',
       align: 'right',

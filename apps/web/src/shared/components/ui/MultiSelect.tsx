@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import styles from './MultiSelect.module.css';
 import { Button } from './Button';
 import { ChevronDownIcon, SearchIcon } from '../icons/Icons';
@@ -40,8 +40,21 @@ export function MultiSelect({
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<string[]>(value as string[]);
   const [search, setSearch] = useState('');
+  const [align, setAlign] = useState<'left' | 'right'>('left');
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerId = useId();
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    const trigger = containerRef.current;
+    if (!trigger) return;
+    // El panel mide 280px (ver `.panel` en MultiSelect.module.css); si no cabe
+    // hacia la derecha del trigger, lo alineamos por la derecha para que crezca
+    // hacia la izquierda en vez de salirse de la pantalla.
+    const rect = trigger.getBoundingClientRect();
+    const panelWidth = 280;
+    setAlign(rect.left + panelWidth > window.innerWidth - 8 ? 'right' : 'left');
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -111,7 +124,11 @@ export function MultiSelect({
       </button>
 
       {open && (
-        <div className={styles.panel} role="dialog" aria-label={`Opciones de ${label}`}>
+        <div
+          className={[styles.panel, align === 'right' ? styles.panelRight : ''].filter(Boolean).join(' ')}
+          role="dialog"
+          aria-label={`Opciones de ${label}`}
+        >
           <div className={styles.panelHeader}>
             <span className={styles.panelTitle}>Buscar opciones de {label}</span>
             <button type="button" className={styles.clearLink} onClick={() => setDraft([])}>
