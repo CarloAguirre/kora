@@ -3,7 +3,7 @@ import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxi
 import type { ProjectSummary } from '@kora/contracts';
 import styles from './ProjectsSummaryChart.module.css';
 import { Card } from '@/shared/components/ui/Card';
-import { Select } from '@/shared/components/ui/Select';
+import { MultiSelect } from '@/shared/components/ui/MultiSelect';
 
 interface ProjectsSummaryChartProps {
   projects: readonly ProjectSummary[];
@@ -25,12 +25,21 @@ const SUB_PERIOD_OPTIONS: Record<PeriodOption, readonly string[]> = {
 
 const PERIOD_OPTIONS = (Object.keys(SUB_PERIOD_OPTIONS) as PeriodOption[]).map((period) => ({ value: period, label: period }));
 
-type StatusFilter = 'active' | 'finished' | 'all';
+// Cada valor de Detalle (S1, Q2, Marzo, 2026, ...) es único entre todos los
+// tipos de período, así que basta este mapa inverso para saber a qué tipo
+// pertenece sin depender de qué "Período" esté seleccionado en ese momento.
+const DETAIL_TO_PERIOD: Record<string, PeriodOption> = {};
+(Object.keys(SUB_PERIOD_OPTIONS) as PeriodOption[]).forEach((period) => {
+  SUB_PERIOD_OPTIONS[period].forEach((detail) => {
+    DETAIL_TO_PERIOD[detail] = period;
+  });
+});
+
+type StatusFilter = 'active' | 'finished';
 
 const STATUS_FILTER_OPTIONS: { value: StatusFilter; label: string }[] = [
   { value: 'active', label: 'Activos' },
   { value: 'finished', label: 'Finalizados' },
-  { value: 'all', label: 'Todos' },
 ];
 
 const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 2 });
@@ -51,9 +60,8 @@ function getPeriodRange(period: PeriodOption, detail: string) {
   return { start: new Date(currentYear, startMonth, 1), end: new Date(currentYear, startMonth + monthsPerPeriod, 0) };
 }
 
-function projectOverlapsPeriod(project: ProjectSummary, period: PeriodOption, detail: string) {
-  const range = getPeriodRange(period, detail);
-  if (!range) return true;
+function projectOverlapsPeriod(project: ProjectSummary, details: readonly string[]) {
+  if (details.length === 0) return true;
 
   const startDate = project.startDate ? new Date(project.startDate) : null;
   const endDate = project.endDate ? new Date(project.endDate) : null;
@@ -63,7 +71,13 @@ function projectOverlapsPeriod(project: ProjectSummary, period: PeriodOption, de
   const projectEnd = endDate ?? startDate!;
   const start = Math.min(projectStart.getTime(), projectEnd.getTime());
   const end = Math.max(projectStart.getTime(), projectEnd.getTime());
-  return start <= range.end.getTime() && end >= range.start.getTime();
+
+  return details.some((detail) => {
+    const periodType = DETAIL_TO_PERIOD[detail];
+    const range = periodType ? getPeriodRange(periodType, detail) : null;
+    if (!range) return true;
+    return start <= range.end.getTime() && end >= range.start.getTime();
+  });
 }
 
 /**
@@ -77,25 +91,50 @@ function projectOverlapsPeriod(project: ProjectSummary, period: PeriodOption, de
  * proyectos con status "active", igual que la v1.
  */
 export function ProjectsSummaryChart({ projects, clientOptions, showFinalizedToggle }: ProjectsSummaryChartProps) {
-  const [clientFilter, setClientFilter] = useState('');
-  const [period, setPeriod] = useState<PeriodOption>('Semestral');
-  const [detail, setDetail] = useState<string>(SUB_PERIOD_OPTIONS.Semestral[0] ?? '');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('active');
+  const [clientFilters, setClientFilters] = useState<string[]>([]);
+  const [periods, setPeriods] = useState<PeriodOption[]>(['Semestral']);
+  const [details, setDetails] = useState<string[]>([SUB_PERIOD_OPTIONS.Semestral[0] ?? '']);
+  const [statusFilters, setStatusFilters] = useState<StatusFilter[]>(['active']);
 
-  const changePeriod = (value: PeriodOption) => {
-    setPeriod(value);
-    setDetail(SUB_PERIOD_OPTIONS[value][0] ?? '');
+  // Sin períodos seleccionados, Detalle ofrece todas las sub-opciones (igual
+  // que Cliente/Estado: vacío = sin restricción, no "ninguno").
+  const availablePeriods = periods.length > 0 ? periods : (PERIOD_OPTIONS.map((o) => o.value) as PeriodOption[]);
+  const detailOptions = useMemo(() => {
+    const seen = new Set<string>();
+    const options: { value: string; label: string }[] = [];
+    for (const p of availablePeriods) {
+      for (const d of SUB_PERIOD_OPTIONS[p]) {
+        if (!seen.has(d)) {
+          seen.add(d);
+          options.push({ value: d, label: d });
+        }
+      }
+    }
+    return options;
+  }, [availablePeriods.join('|')]);
+
+  const changePeriods = (next: string[]) => {
+    const nextPeriods = next as PeriodOption[];
+    setPeriods(nextPeriods);
+    const allowed = new Set(
+      (nextPeriods.length > 0 ? nextPeriods : (PERIOD_OPTIONS.map((o) => o.value) as PeriodOption[])).flatMap(
+        (p) => SUB_PERIOD_OPTIONS[p],
+      ),
+    );
+    setDetails((current) => current.filter((d) => allowed.has(d)));
   };
 
   const filtered = useMemo(
     () =>
       projects.filter((p) => {
-        if (clientFilter && p.client?.id !== clientFilter) return false;
-        const statusOk = showFinalizedToggle ? statusFilter === 'all' || p.status === statusFilter : p.status === 'active';
+        if (clientFilters.length > 0 && (!p.client || !clientFilters.includes(p.client.id))) return false;
+        const statusOk = showFinalizedToggle
+          ? statusFilters.length === 0 || statusFilters.includes(p.status as StatusFilter)
+          : p.status === 'active';
         if (!statusOk) return false;
-        return projectOverlapsPeriod(p, period, detail);
+        return projectOverlapsPeriod(p, details);
       }),
-    [projects, clientFilter, showFinalizedToggle, statusFilter, period, detail],
+    [projects, clientFilters, showFinalizedToggle, statusFilters, details],
   );
 
   const chartData = useMemo(
@@ -132,35 +171,42 @@ export function ProjectsSummaryChart({ projects, clientOptions, showFinalizedTog
           <p className={styles.subtitle}>HH Vendidas vs Consumidas — Desviadas</p>
         </div>
         <div className={styles.filtersRow}>
-          <Select
+          <MultiSelect
             className={styles.clientFilter}
             label="Cliente"
             placeholder="Todos"
+            searchPlaceholder="Buscar cliente"
             options={clientOptions}
-            value={clientFilter}
-            onChange={(event) => setClientFilter(event.target.value)}
+            value={clientFilters}
+            onChange={setClientFilters}
           />
-          <Select
+          <MultiSelect
             className={styles.periodFilter}
             label="Período"
+            placeholder="Todos"
+            searchPlaceholder="Buscar período"
             options={PERIOD_OPTIONS}
-            value={period}
-            onChange={(event) => changePeriod(event.target.value as PeriodOption)}
+            value={periods}
+            onChange={changePeriods}
           />
-          <Select
+          <MultiSelect
             className={styles.periodFilter}
             label="Detalle"
-            options={SUB_PERIOD_OPTIONS[period].map((value) => ({ value, label: value }))}
-            value={detail}
-            onChange={(event) => setDetail(event.target.value)}
+            placeholder="Todos"
+            searchPlaceholder="Buscar detalle"
+            options={detailOptions}
+            value={details}
+            onChange={setDetails}
           />
           {showFinalizedToggle && (
-            <Select
+            <MultiSelect
               className={styles.periodFilter}
               label="Estado"
+              placeholder="Todos"
+              searchPlaceholder="Buscar estado"
               options={STATUS_FILTER_OPTIONS}
-              value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}
+              value={statusFilters}
+              onChange={(next) => setStatusFilters(next as StatusFilter[])}
             />
           )}
         </div>

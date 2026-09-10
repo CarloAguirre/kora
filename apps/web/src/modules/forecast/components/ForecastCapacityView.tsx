@@ -6,10 +6,11 @@ import { Select } from '@/shared/components/ui/Select';
 import { TextField } from '@/shared/components/ui/TextField';
 import { Button } from '@/shared/components/ui/Button';
 import { Pagination } from '@/shared/components/ui/Pagination';
+import { WeekRangePicker } from '@/shared/components/ui/WeekRangePicker';
 import { SearchIcon, ArrowUpDownIcon } from '@/shared/components/icons/Icons';
 import type { SortState } from '@/shared/components/ui/DataTable';
 import { useForecastCapacity } from '../api/forecast.queries';
-import { buildLaborWeeks, currentLaborWeek } from '../lib/labor-weeks';
+import { currentLaborWeek } from '../lib/labor-weeks';
 import { ForecastCapacityCard } from './ForecastCapacityCard';
 
 const PAGE_SIZE = 20;
@@ -21,8 +22,6 @@ const SORT_OPTIONS: { value: SortField; label: string }[] = [
   { value: 'loadPercent', label: 'Carga' },
   { value: 'assignedHours', label: 'HH asignadas' },
 ];
-
-const WEEKS = buildLaborWeeks();
 
 /**
  * Vista de solo lectura — réplica de `Forecast/index.tsx` (v1): la ve
@@ -102,14 +101,12 @@ export function ForecastCapacityView() {
         </div>
 
         <div className={styles.toolbar}>
-          <Select
-            className={styles.periodSelect}
-            label="Período"
-            options={WEEKS.map((week) => ({ value: `${week.periodStart}|${week.periodEnd}`, label: week.label }))}
-            value={`${period.periodStart}|${period.periodEnd}`}
-            onChange={(event) => {
-              const [periodStart, periodEnd] = event.target.value.split('|');
-              setPeriod({ periodStart: periodStart!, periodEnd: periodEnd!, label: '' });
+          <WeekRangePicker
+            className={styles.periodField}
+            periodStart={period.periodStart}
+            periodEnd={period.periodEnd}
+            onChange={(next) => {
+              setPeriod({ ...next, label: '' });
               setPage(1);
             }}
           />

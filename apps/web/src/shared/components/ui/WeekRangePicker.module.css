@@ -1,0 +1,182 @@
+/* Selector de semana laboral con calendario — misma caja que Select/TextField. */
+
+.wrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-1);
+}
+
+.label {
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-medium);
+  line-height: 16px;
+}
+
+.trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kora-space-2);
+  height: var(--kora-field-height);
+  padding: 0 var(--kora-space-3);
+  border-radius: var(--kora-radius-input);
+  border: 1px solid var(--kora-blue-200);
+  background: var(--kora-surface);
+  font-family: var(--kora-font);
+  color: var(--kora-text);
+  cursor: pointer;
+}
+
+.trigger:focus-visible,
+.triggerOpen {
+  border-color: var(--kora-blue-600);
+  box-shadow: 0 0 0 3px var(--kora-blue-surface);
+  outline: none;
+}
+
+.triggerLabel {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+  font-size: var(--kora-text-base);
+  font-weight: var(--kora-weight-semibold);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.triggerIcon {
+  color: var(--kora-text-muted);
+  flex-shrink: 0;
+}
+
+.chevron {
+  color: var(--kora-text-muted);
+  flex-shrink: 0;
+}
+
+.popover {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: var(--kora-z-dropdown);
+  display: flex;
+  flex-direction: column;
+  width: max-content;
+  background: var(--kora-surface);
+  border: 1px solid var(--kora-blue-200);
+  border-radius: var(--kora-radius-lg);
+  box-shadow: var(--kora-shadow-lg);
+  padding: var(--kora-space-4);
+}
+
+.calHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kora-space-6);
+  margin-bottom: var(--kora-space-3);
+}
+
+.calMonth {
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-navy);
+  text-transform: capitalize;
+}
+
+.calNavBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--kora-radius-sm);
+  border: none;
+  background: transparent;
+  color: var(--kora-navy);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.calNavBtn:hover {
+  background: var(--kora-surface-muted);
+}
+
+.calWeekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 36px);
+  margin-bottom: var(--kora-space-1);
+}
+
+.calWeekdays span {
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-semibold);
+  color: var(--kora-text-disabled);
+  text-align: center;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-transform: uppercase;
+}
+
+.calGrid {
+  display: grid;
+  grid-template-columns: repeat(7, 36px);
+  row-gap: 2px;
+}
+
+.calDayBtn {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--kora-font);
+  font-size: var(--kora-text-sm);
+  color: var(--kora-navy);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.calDayBtn:hover {
+  background: var(--kora-surface-muted);
+}
+
+.calDayMuted {
+  color: var(--kora-text-disabled);
+}
+
+.calDayInRange {
+  background: var(--kora-lime);
+  font-weight: var(--kora-weight-bold);
+}
+
+.calDayInRange:hover {
+  background: var(--kora-lime);
+}
+
+.calDayRangeStart {
+  border-radius: 16px 0 0 16px;
+}
+
+.calDayRangeEnd {
+  border-radius: 0 16px 16px 0;
+}
+
+.calHint {
+  font-size: var(--kora-text-xs);
+  color: var(--kora-text-muted);
+  margin-top: var(--kora-space-3);
+}
+
+.calActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--kora-space-2);
+  margin-top: var(--kora-space-4);
+}

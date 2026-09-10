@@ -1,11 +1,10 @@
 import { useMemo, useState } from 'react';
 import styles from './TeamAvailabilityHeatmap.module.css';
-import { Select } from '@/shared/components/ui/Select';
+import { WeekRangePicker } from '@/shared/components/ui/WeekRangePicker';
 import { UserIcon } from '@/shared/components/icons/Icons';
 import { useTeamAvailability } from '../api/teams.queries';
-import { buildLaborWeeks, currentLaborWeek, type LaborWeek } from '@/modules/forecast/lib/labor-weeks';
+import { currentLaborWeek, type LaborWeek } from '@/modules/forecast/lib/labor-weeks';
 
-const WEEKS = buildLaborWeeks();
 const WEEKDAY_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie'];
 
 type ViewMode = 'daily' | 'weekly';
@@ -61,9 +60,7 @@ function chipClass(hours: number) {
  */
 export function TeamAvailabilityHeatmap({ teamId, teamMemberId }: { teamId: string; teamMemberId?: string | null }) {
   const [viewMode, setViewMode] = useState<ViewMode>('weekly');
-  const [weekStartKey, setWeekStartKey] = useState(() => `${currentLaborWeek().periodStart}|${currentLaborWeek().periodEnd}`);
-
-  const selectedWeek = WEEKS.find((week) => `${week.periodStart}|${week.periodEnd}` === weekStartKey) ?? WEEKS[0]!;
+  const [selectedWeek, setSelectedWeek] = useState(() => currentLaborWeek());
 
   const columns = useMemo(
     () => (viewMode === 'daily' ? buildDailyColumns(selectedWeek) : buildWeeklyColumns(selectedWeek, 4)),
@@ -101,12 +98,11 @@ export function TeamAvailabilityHeatmap({ teamId, teamMemberId }: { teamId: stri
             </button>
           ))}
         </div>
-        <Select
+        <WeekRangePicker
           className={styles.periodField}
-          label="Período"
-          options={WEEKS.map((week) => ({ value: `${week.periodStart}|${week.periodEnd}`, label: week.label }))}
-          value={weekStartKey}
-          onChange={(event) => setWeekStartKey(event.target.value)}
+          periodStart={selectedWeek.periodStart}
+          periodEnd={selectedWeek.periodEnd}
+          onChange={(next) => setSelectedWeek({ ...next, label: '' })}
         />
       </div>
 

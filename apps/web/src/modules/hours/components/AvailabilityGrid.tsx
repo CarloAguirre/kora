@@ -4,12 +4,12 @@ import styles from './AvailabilityGrid.module.css';
 import { TextField } from '@/shared/components/ui/TextField';
 import { Select } from '@/shared/components/ui/Select';
 import { Switch } from '@/shared/components/ui/Switch';
+import { WeekRangePicker } from '@/shared/components/ui/WeekRangePicker';
 import { InfoIcon, SearchIcon, UserIcon } from '@/shared/components/icons/Icons';
 import { useAvailability } from '../api/hours.queries';
 import { useTeamsList } from '@/modules/teams/api/teams.queries';
-import { buildLaborWeeks, currentLaborWeek, type LaborWeek } from '@/modules/forecast/lib/labor-weeks';
+import { currentLaborWeek, type LaborWeek } from '@/modules/forecast/lib/labor-weeks';
 
-const WEEKS = buildLaborWeeks();
 const WEEKDAY_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie'];
 /** Igual que `DAILY_REGISTERED_HOURS_THRESHOLD` en la v1: umbral para marcar un día previo como "incompleto". */
 const DAILY_REGISTERED_HOURS_THRESHOLD = 8;
@@ -83,7 +83,7 @@ function priorBusinessDaysOfCurrentWeek(): string[] {
  */
 export function AvailabilityGrid() {
   const [viewMode, setViewMode] = useState<ViewMode>('daily');
-  const [weekStartKey, setWeekStartKey] = useState(() => `${currentLaborWeek().periodStart}|${currentLaborWeek().periodEnd}`);
+  const [selectedWeek, setSelectedWeek] = useState(() => currentLaborWeek());
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [role, setRole] = useState<AvailabilityRoleFilter | ''>('');
@@ -97,7 +97,6 @@ export function AvailabilityGrid() {
 
   const { data: teams } = useTeamsList({ page: 1, pageSize: 200, sortField: 'name' });
 
-  const selectedWeek = WEEKS.find((week) => `${week.periodStart}|${week.periodEnd}` === weekStartKey) ?? WEEKS[0]!;
   const columns = useMemo(
     () => (viewMode === 'daily' ? buildDailyColumns(selectedWeek) : buildWeeklyColumns(selectedWeek, 4)),
     [viewMode, selectedWeek],
@@ -150,12 +149,11 @@ export function AvailabilityGrid() {
               ))}
             </div>
           </div>
-          <Select
+          <WeekRangePicker
             className={styles.periodField}
-            label="Período"
-            options={WEEKS.map((week) => ({ value: `${week.periodStart}|${week.periodEnd}`, label: week.label }))}
-            value={weekStartKey}
-            onChange={(event) => setWeekStartKey(event.target.value)}
+            periodStart={selectedWeek.periodStart}
+            periodEnd={selectedWeek.periodEnd}
+            onChange={(next) => setSelectedWeek({ ...next, label: '' })}
           />
         </div>
       </div>

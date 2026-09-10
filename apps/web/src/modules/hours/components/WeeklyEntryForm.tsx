@@ -134,44 +134,33 @@ export function WeeklyEntryForm({
     );
   };
 
+  const validate = (): string | null => {
+    if (!assignment) return 'Selecciona una asignación.';
+    const activeDays = dayHours.map((value, index) => ({ index, hours: Number(value) })).filter((day) => day.hours > 0);
+    if (activeDays.length === 0) return 'Ingresa horas en al menos un día.';
+    if (activeDays.some((day) => day.hours > 24)) return 'No puede registrar más de 24 horas en un día.';
+    if (activeDays.some((day) => holidayDayIndexes.has(day.index))) return 'No se pueden registrar horas en un día feriado.';
+    if (needsProject && !projectId) return 'Selecciona un proyecto para esta asignación.';
+    if (needsApprover && !designatedApproverUserId) return 'Selecciona a quién aprueba estas horas.';
+    if (needsProject && isOvertime && overtimeDisabled) return 'Este proyecto no tiene autorizadas horas extra.';
+    if (description.trim().length > 0 && description.trim().length < MIN_DESCRIPTION_LENGTH) {
+      return `La descripción debe tener al menos ${MIN_DESCRIPTION_LENGTH} caracteres.`;
+    }
+    return null;
+  };
+
+  const canSubmit = validate() === null;
+
   const onSubmit = async () => {
     setError(null);
-    if (!assignment) {
-      setError('Selecciona una asignación.');
+    const validationError = validate();
+    if (validationError) {
+      setError(validationError);
       return;
     }
     const activeDays = dayHours
       .map((value, index) => ({ index, hours: Number(value) }))
       .filter((day) => day.hours > 0);
-
-    if (activeDays.length === 0) {
-      setError('Ingresa horas en al menos un día.');
-      return;
-    }
-    if (activeDays.some((day) => day.hours > 24)) {
-      setError('No puede registrar más de 24 horas en un día.');
-      return;
-    }
-    if (activeDays.some((day) => holidayDayIndexes.has(day.index))) {
-      setError('No se pueden registrar horas en un día feriado.');
-      return;
-    }
-    if (needsProject && !projectId) {
-      setError('Selecciona un proyecto para esta asignación.');
-      return;
-    }
-    if (needsApprover && !designatedApproverUserId) {
-      setError('Selecciona a quién aprueba estas horas.');
-      return;
-    }
-    if (needsProject && isOvertime && overtimeDisabled) {
-      setError('Este proyecto no tiene autorizadas horas extra.');
-      return;
-    }
-    if (description.trim().length > 0 && description.trim().length < MIN_DESCRIPTION_LENGTH) {
-      setError(`La descripción debe tener al menos ${MIN_DESCRIPTION_LENGTH} caracteres.`);
-      return;
-    }
 
     setSubmitting(true);
     try {
@@ -358,7 +347,7 @@ export function WeeklyEntryForm({
         <Button variant="outline" type="button" onClick={onClose}>
           Cancelar
         </Button>
-        <Button type="button" loading={submitting} loadingText="Guardando…" onClick={() => void onSubmit()}>
+        <Button type="button" disabled={!canSubmit} loading={submitting} loadingText="Guardando…" onClick={() => void onSubmit()}>
           Guardar semana y enviar para aprobación
         </Button>
       </div>

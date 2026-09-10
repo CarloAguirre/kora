@@ -147,6 +147,8 @@ export function DailyEntryForm({
     return null;
   };
 
+  const canSubmit = !blockingMessage && blocks.every((block) => validateBlock(block) === null);
+
   const onSubmit = async () => {
     setServerError(null);
     if (blockingMessage) return;
@@ -404,7 +406,7 @@ export function DailyEntryForm({
         <Button variant="outline" type="button" onClick={onClose}>
           Cancelar
         </Button>
-        <Button type="button" disabled={Boolean(blockingMessage)} loading={submitting} loadingText="Guardando…" onClick={() => void onSubmit()}>
+        <Button type="button" disabled={!canSubmit} loading={submitting} loadingText="Guardando…" onClick={() => void onSubmit()}>
           Guardar y enviar para aprobación
         </Button>
       </div>

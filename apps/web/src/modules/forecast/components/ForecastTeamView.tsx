@@ -5,13 +5,12 @@ import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Select } from '@/shared/components/ui/Select';
 import { Button } from '@/shared/components/ui/Button';
 import { Modal } from '@/shared/components/ui/Modal';
+import { WeekRangePicker } from '@/shared/components/ui/WeekRangePicker';
 import { useTeamDetail } from '@/modules/teams/api/teams.queries';
 import { useForecastAssignments, useForecastCapacity } from '../api/forecast.queries';
 import { ForecastMemberCard, type ForecastMemberCardMember } from './ForecastMemberCard';
 import { ForecastHistoryPanel } from './ForecastHistoryPanel';
-import { buildLaborWeeks, currentLaborWeek } from '../lib/labor-weeks';
-
-const WEEKS = buildLaborWeeks();
+import { currentLaborWeek, formatShortRange } from '../lib/labor-weeks';
 
 /**
  * Vista editable — réplica de `LiderEquipoForecast` (v1): tarjetas por
@@ -24,9 +23,7 @@ export function ForecastTeamView({ teams }: { teams: TeamSummary[] }) {
   const [showHistory, setShowHistory] = useState(false);
 
   const periodLabel = useMemo(
-    () =>
-      WEEKS.find((week) => week.periodStart === period.periodStart && week.periodEnd === period.periodEnd)?.label ??
-      `${period.periodStart} – ${period.periodEnd}`,
+    () => formatShortRange(period.periodStart, period.periodEnd),
     [period.periodStart, period.periodEnd],
   );
 
@@ -67,15 +64,11 @@ export function ForecastTeamView({ teams }: { teams: TeamSummary[] }) {
               onChange={(event) => setTeamId(event.target.value)}
             />
           )}
-          <Select
+          <WeekRangePicker
             className={styles.periodField}
-            label="Período"
-            options={WEEKS.map((week) => ({ value: `${week.periodStart}|${week.periodEnd}`, label: week.label }))}
-            value={`${period.periodStart}|${period.periodEnd}`}
-            onChange={(event) => {
-              const [periodStart, periodEnd] = event.target.value.split('|');
-              setPeriod({ periodStart: periodStart!, periodEnd: periodEnd!, label: '' });
-            }}
+            periodStart={period.periodStart}
+            periodEnd={period.periodEnd}
+            onChange={(next) => setPeriod({ ...next, label: '' })}
           />
           <Button variant="tertiary" size="sm" className={styles.historyToggle} onClick={() => setShowHistory(true)}>
             Ver historial

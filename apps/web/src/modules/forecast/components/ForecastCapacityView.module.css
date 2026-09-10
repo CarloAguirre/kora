@@ -40,7 +40,7 @@
   flex-wrap: wrap;
 }
 
-.periodSelect {
+.periodField {
   min-width: 220px;
 }
 
@@ -52,7 +52,7 @@
 
 .sortGroup {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: var(--kora-space-2);
   margin-left: auto;
 }
