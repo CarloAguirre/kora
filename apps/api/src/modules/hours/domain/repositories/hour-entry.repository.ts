@@ -14,6 +14,20 @@ export interface HourEntryFilters {
   readonly dateTo?: Date | undefined;
   /** Alcance de visibilidad ya resuelto por el caso de uso (propias, del equipo, todas). */
   readonly visibleToUserIds?: readonly string[] | undefined;
+  /**
+   * Alcance de `hours:read_team`, EXCLUYENTE y por fila — no un set plano de
+   * ids como `visibleToUserIds`, porque un mismo colaborador puede tener
+   * horas en un proyecto donde `leaderScopeUserId` lidera su equipo y en
+   * otro donde no (líder de "Desarrollo" en el Proyecto A ≠ líder de
+   * "Desarrollo" en el Proyecto B: `project_teams.leaderUserId` es por
+   * proyecto). Visible si la fila es propia, o si es de un colaborador cuyo
+   * equipo activo lidera `leaderScopeUserId` (registro sin proyecto), o si
+   * `leaderScopeUserId` es quien decidiría ESE registro puntual (mismo
+   * criterio que `ProjectRepository.isProjectLeaderOrTeamLeaderOfMember` —
+   * ver DECISION-M4-HORAS.md). Reemplaza a `visibleToUserIds` para
+   * `hours:read_team`; no se combinan.
+   */
+  readonly leaderScopeUserId?: string | undefined;
 }
 
 export type HourEntrySortableField = 'date' | 'createdAt' | 'status' | 'hours';

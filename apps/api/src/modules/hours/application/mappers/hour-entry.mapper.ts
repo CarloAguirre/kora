@@ -19,9 +19,18 @@ export function toHourEntrySummary(item: HourEntryListItem): HourEntrySummary {
     projectStageAtEntry: item.projectStageAtEntry,
     status: item.status,
     rejectionReason: item.rejectionReason,
-    designatedApprover: item.designatedApproverUserId
-      ? { id: item.designatedApproverUserId, fullName: item.designatedApproverFullName ?? '' }
-      : null,
+    // Un registro CON proyecto nunca se aprueba por aprobador designado (ver
+    // `DesignatedApproverNotAllowedError`) — el autorizador real siempre es
+    // `projectApprovers`. Datos migrados de la v1 dejaron
+    // `designated_approver_user_id` poblado igual en filas con proyecto, y
+    // ese valor puede haber quedado desactualizado frente al líder vigente
+    // (verificado: 9 de 52 horas pendientes con proyecto lo muestran
+    // distinto del aprobador real) — se ignora aquí para que nunca se
+    // muestre como "quien debe aprobar" a alguien sin autoridad real.
+    designatedApprover:
+      !item.projectId && item.designatedApproverUserId
+        ? { id: item.designatedApproverUserId, fullName: item.designatedApproverFullName ?? '' }
+        : null,
     projectApprovers: item.projectApprovers.map((approver) => ({ id: approver.id, fullName: approver.fullName })),
     createdAt: item.createdAt.toISOString(),
   };
@@ -53,9 +62,13 @@ export function toHourEntryDetail(source: HourEntryDetailSource): HourEntryDetai
     isOvertime: snapshot.isOvertime,
     status: snapshot.status,
     rejectionReason: snapshot.rejectionReason,
-    designatedApprover: snapshot.designatedApproverUserId
-      ? { id: snapshot.designatedApproverUserId, fullName: source.designatedApprover?.fullName ?? '' }
-      : null,
+    // Ver nota equivalente en `toHourEntrySummary`: un registro con proyecto
+    // nunca se aprueba por aprobador designado, aunque el dato migrado de la
+    // v1 haya quedado poblado.
+    designatedApprover:
+      !snapshot.projectId && snapshot.designatedApproverUserId
+        ? { id: snapshot.designatedApproverUserId, fullName: source.designatedApprover?.fullName ?? '' }
+        : null,
     projectApprovers: source.projectApprovers.map((approver) => ({ id: approver.id, fullName: approver.fullName })),
     projectStageAtEntry: snapshot.projectStageAtEntry,
     decisionBy: snapshot.decisionUserId ? { id: snapshot.decisionUserId, fullName: source.decisionBy?.fullName ?? '' } : null,

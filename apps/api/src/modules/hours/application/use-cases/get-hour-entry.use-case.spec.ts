@@ -9,12 +9,12 @@ import { GetHourEntryUseCase } from './get-hour-entry.use-case';
 
 const NOW = new Date('2026-08-25T12:00:00.000Z');
 
-function buildEntry(userId: string): HourEntry {
+function buildEntry(userId: string, projectId: string | null = 'project-1'): HourEntry {
   return HourEntryEntity.create({
     id: 'entry-1',
     userId,
-    assignment: 'Proyecto',
-    projectId: 'project-1',
+    assignment: projectId ? 'Proyecto' : 'Vacaciones',
+    projectId,
     hours: 4,
     date: new Date('2026-08-24'),
     ownerRequiresApproval: false,
@@ -57,6 +57,7 @@ class FakeUserReader implements HourEntryUserReader {
 }
 
 class FakeProjectReader implements HourEntryProjectReader {
+  constructor(private readonly approver = false) {}
   async findById(): Promise<null> {
     return null;
   }
@@ -64,7 +65,7 @@ class FakeProjectReader implements HourEntryProjectReader {
     return [];
   }
   async isProjectApprover(): Promise<boolean> {
-    return false;
+    return this.approver;
   }
   async findApprovers(): Promise<never[]> {
     return [];
@@ -73,8 +74,8 @@ class FakeProjectReader implements HourEntryProjectReader {
 
 class FakeTeamReader implements HourEntryTeamReader {
   constructor(private readonly teamMemberUserIds: string[] = []) {}
-  async isTeamLeaderOfMember(): Promise<boolean> {
-    return false;
+  async isTeamLeaderOfMember(_leaderUserId: string, memberUserId: string): Promise<boolean> {
+    return this.teamMemberUserIds.includes(memberUserId);
   }
   async findTeamMemberUserIds(): Promise<string[]> {
     return this.teamMemberUserIds;
@@ -84,12 +85,15 @@ class FakeTeamReader implements HourEntryTeamReader {
   }
 }
 
-function buildUseCase(ownerId: string, teamMemberUserIds: string[] = []) {
+function buildUseCase(
+  ownerId: string,
+  options: { projectId?: string | null; isProjectApprover?: boolean; teamMemberUserIds?: string[] } = {},
+) {
   return new GetHourEntryUseCase(
-    new FakeEntryRepository(buildEntry(ownerId)),
+    new FakeEntryRepository(buildEntry(ownerId, options.projectId === undefined ? 'project-1' : options.projectId)),
     new FakeUserReader(),
-    new FakeProjectReader(),
-    new FakeTeamReader(teamMemberUserIds),
+    new FakeProjectReader(options.isProjectApprover ?? false),
+    new FakeTeamReader(options.teamMemberUserIds ?? []),
   );
 }
 
@@ -110,8 +114,15 @@ describe('GetHourEntryUseCase', () => {
     expect(result.isOk()).toBe(true);
   });
 
-  it('con hours:read_team deja ver el de un miembro de su equipo', async () => {
-    const useCase = buildUseCase('user-2', ['user-2']);
+  /**
+   * Con proyecto, la visibilidad de `hours:read_team` pasa por
+   * `isProjectApprover` (EXCLUYENTE, acotado a ESE proyecto) — no por
+   * `findTeamMemberUserIds` (equipos que lidero en cualquier proyecto). Ver
+   * DECISION-M4-HORAS.md "Cuarta corrección": liderar "Desarrollo" en un
+   * proyecto ajeno no debe dar acceso a las horas de "Desarrollo" en este.
+   */
+  it('con proyecto y hours:read_team, deja ver el registro cuando SÍ es el aprobador de ese proyecto', async () => {
+    const useCase = buildUseCase('user-2', { isProjectApprover: true, teamMemberUserIds: ['user-2'] });
     const result = await useCase.execute({
       entryId: 'entry-1',
       actor: { userId: 'user-1', email: 'a@kabeli.cl' },
@@ -120,8 +131,30 @@ describe('GetHourEntryUseCase', () => {
     expect(result.isOk()).toBe(true);
   });
 
-  it('con hours:read_team NO deja ver el de alguien fuera de su equipo', async () => {
-    const useCase = buildUseCase('user-2', ['user-3']);
+  it('con proyecto y hours:read_team, NO deja ver el registro aunque lidere al dueño en OTRO proyecto', async () => {
+    // `teamMemberUserIds` simula que el actor lidera algún equipo de
+    // 'user-2' en otro proyecto — no debe alcanzar para ESTE registro.
+    const useCase = buildUseCase('user-2', { isProjectApprover: false, teamMemberUserIds: ['user-2'] });
+    const result = await useCase.execute({
+      entryId: 'entry-1',
+      actor: { userId: 'user-1', email: 'a@kabeli.cl' },
+      actorPermissions: ['hours:read_team'],
+    });
+    expect(result.isErr()).toBe(true);
+  });
+
+  it('sin proyecto y hours:read_team, deja ver el de un miembro de su equipo', async () => {
+    const useCase = buildUseCase('user-2', { projectId: null, teamMemberUserIds: ['user-2'] });
+    const result = await useCase.execute({
+      entryId: 'entry-1',
+      actor: { userId: 'user-1', email: 'a@kabeli.cl' },
+      actorPermissions: ['hours:read_team'],
+    });
+    expect(result.isOk()).toBe(true);
+  });
+
+  it('sin proyecto y hours:read_team, NO deja ver el de alguien fuera de su equipo', async () => {
+    const useCase = buildUseCase('user-2', { projectId: null, teamMemberUserIds: ['user-3'] });
     const result = await useCase.execute({
       entryId: 'entry-1',
       actor: { userId: 'user-1', email: 'a@kabeli.cl' },

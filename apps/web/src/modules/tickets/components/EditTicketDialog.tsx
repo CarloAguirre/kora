@@ -5,7 +5,7 @@ import { z } from 'zod';
 import {
   TICKET_PRIORITIES,
   TICKET_PRIORITY_LABELS,
-  TICKET_SERVICE_TYPES,
+  SELECTABLE_TICKET_SERVICE_TYPES,
   TICKET_SERVICE_TYPE_LABELS,
   updateTicketSchema,
   type TicketDetail,
@@ -25,7 +25,6 @@ import { ApiRequestError } from '@/shared/lib/api-client';
 
 type FormValues = z.input<typeof updateTicketSchema>;
 
-const SERVICE_TYPE_OPTIONS = TICKET_SERVICE_TYPES.map((type) => ({ value: type, label: TICKET_SERVICE_TYPE_LABELS[type] }));
 const PRIORITY_OPTIONS = TICKET_PRIORITIES.map((priority) => ({ value: priority, label: TICKET_PRIORITY_LABELS[priority] }));
 
 /**
@@ -37,6 +36,14 @@ const PRIORITY_OPTIONS = TICKET_PRIORITIES.map((priority) => ({ value: priority,
 export function EditTicketDialog({ ticket, open, onClose }: { ticket: TicketDetail; open: boolean; onClose: () => void }) {
   const toast = useToast();
   const updateTicket = useUpdateTicket();
+  // "Consulta" y "Error" ya no son seleccionables para tickets nuevos, pero un
+  // ticket viejo puede tenerlos: se agrega como opción extra solo en ese caso
+  // para no perder la clasificación existente si se guarda sin tocar el campo.
+  const serviceTypeOptions =
+    ticket.serviceType && !(SELECTABLE_TICKET_SERVICE_TYPES as readonly string[]).includes(ticket.serviceType)
+      ? [...SELECTABLE_TICKET_SERVICE_TYPES, ticket.serviceType]
+      : SELECTABLE_TICKET_SERVICE_TYPES;
+  const serviceTypeSelectOptions = serviceTypeOptions.map((type) => ({ value: type, label: TICKET_SERVICE_TYPE_LABELS[type] }));
   const { data: projects } = useProjectsList({
     page: 1,
     pageSize: 200,
@@ -129,7 +136,7 @@ export function EditTicketDialog({ ticket, open, onClose }: { ticket: TicketDeta
         <TextField label="Título" required errorText={errors.title?.message} {...register('title')} />
 
         <div className={styles.row}>
-          <Select label="Tipo de servicio" placeholder="Sin definir" options={SERVICE_TYPE_OPTIONS} {...register('serviceType')} />
+          <Select label="Tipo de servicio" placeholder="Sin definir" options={serviceTypeSelectOptions} {...register('serviceType')} />
           <Select label="Criticidad" placeholder="Sin definir" options={PRIORITY_OPTIONS} {...register('priority')} />
         </div>
 

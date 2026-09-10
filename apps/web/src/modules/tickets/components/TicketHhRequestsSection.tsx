@@ -6,6 +6,7 @@ import { Button } from '@/shared/components/ui/Button';
 import { AlertIcon, ClockIcon, PlusIcon } from '@/shared/components/icons/Icons';
 import { TextField } from '@/shared/components/ui/TextField';
 import { useToast } from '@/shared/components/ui/Toast';
+import { ApiRequestError } from '@/shared/lib/api-client';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { useHourEntriesList } from '@/modules/hours/api/hours.queries';
@@ -101,24 +102,36 @@ export function TicketHhRequestsSection({
   const submitRequest = async () => {
     const hoursValue = Number(hours);
     if (!(hoursValue > 0) || exceedsDailyCap) return;
-    await createRequest.mutateAsync({ date, hours: hoursValue, note: note.trim() || undefined, isOvertime });
-    toast.success('Solicitud de horas enviada.');
-    setHours('');
-    setNote('');
-    setIsOvertime(false);
+    try {
+      await createRequest.mutateAsync({ date, hours: hoursValue, note: note.trim() || undefined, isOvertime });
+      toast.success('Solicitud de horas enviada.');
+      setHours('');
+      setNote('');
+      setIsOvertime(false);
+    } catch (error) {
+      toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo enviar la solicitud.');
+    }
   };
 
   const approve = async (requestId: string) => {
-    await approveRequest.mutateAsync(requestId);
-    toast.success('Solicitud aprobada — se generó el registro de horas.');
+    try {
+      await approveRequest.mutateAsync(requestId);
+      toast.success('Solicitud aprobada — se generó el registro de horas.');
+    } catch (error) {
+      toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo aprobar la solicitud.');
+    }
   };
 
   const submitReject = async (requestId: string) => {
     if (!rejectionReason.trim()) return;
-    await rejectRequest.mutateAsync({ requestId, input: { reason: rejectionReason.trim() } });
-    toast.success('Solicitud rechazada.');
-    setRejectingId(null);
-    setRejectionReason('');
+    try {
+      await rejectRequest.mutateAsync({ requestId, input: { reason: rejectionReason.trim() } });
+      toast.success('Solicitud rechazada.');
+      setRejectingId(null);
+      setRejectionReason('');
+    } catch (error) {
+      toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo rechazar la solicitud.');
+    }
   };
 
   return (

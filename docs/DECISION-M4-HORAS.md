@@ -128,7 +128,69 @@ directo al líder de proyecto, sin equipo que consultar). Ver
 docs/DECISION-M5-TICKETS.md "Autoridad sobre un ticket" para el detalle del
 lado de Tickets.
 
-## Qué se dejó fuera de M4, deliberadamente
+### `designatedApprover` heredado de la v1 en filas con proyecto (2026-09-10)
+
+Mismo hallazgo, otro síntoma: la migración dejó `designated_approver_user_id`
+poblado en **1391 filas** de `hour_entries` que además tienen `project_id` —
+combinación que el dominio actual prohíbe activamente (`HourEntry.create`/
+`update` fuerzan `designatedApproverUserId = null` cuando hay proyecto, ver
+`DesignatedApproverNotAllowedError`), pero que existía igual en datos
+migrados de antes de esa regla. El mapper (`toHourEntrySummary`/
+`toHourEntryDetail`) exponía ese valor sin filtrar, y
+`resolvedApprover()` en el frontend lo prioriza sobre `projectApprovers` —
+así que la UI mostraba "debe aprobar" al aprobador designado viejo en vez
+del líder de equipo/proyecto vigente. Verificado contra la base real: de 52
+horas pendientes con proyecto, 46 traían este dato heredado, y en 9 ya no
+coincidía con el aprobador correcto (ejemplo real: "AurelIA - SPR" muestra a
+José Aponte como aprobador designado, pero la líder actual del proyecto es
+Solmary Castro).
+
+No era un problema de autorización — `HourEntryApprovalAuthorityService` ya
+ignoraba `designatedApproverUserId` para registros con proyecto al decidir
+quién puede aprobar/rechazar — solo de qué nombre se mostraba. Corregido en
+dos capas: el mapper ahora siempre devuelve `designatedApprover: null`
+cuando el registro tiene proyecto (sin importar qué quedó en la columna), y
+se limpiaron las 1391 filas en la base (`UPDATE ... SET
+designated_approver_user_id = null WHERE project_id IS NOT NULL AND
+designated_approver_user_id IS NOT NULL`) para que el dato en reposo
+tampoco quede engañoso si algo lo lee directo de la tabla.
+
+### Cuarta corrección: la VISIBILIDAD de `hours:read_team` tenía el mismo defecto que ya se había corregido para DECIDIR (2026-09-10)
+
+Reportado en producción: José Aponte veía, en su cola de aprobaciones, horas
+de "App Walvy" de gente que ni lidera ni puede aprobar ahí — Ana María Soto
+Lobos es la líder real de "Desarrollo" para ESE proyecto. El botón
+"Aprobar"/"Rechazar" ya fallaba correctamente (la Tercera corrección ya
+protegía la decisión), pero la fila igual aparecía en su pantalla.
+
+Causa: `ListHourEntriesUseCase` resolvía `hours:read_team` con
+`TeamRepository.findMemberUserIdsForLeader` — "todos los miembros activos de
+cualquier equipo que lidere, en cualquier proyecto" (`leadsTeamCondition`:
+`teams.leaderUserId = actor` O existe algún `project_teams.leaderUserId =
+actor`, SIN mirar a qué proyecto pertenece la fila que se está listando).
+José lidera "Desarrollo" como override de `project_teams` en 14 proyectos
+distintos (Meta, Kora, AurelIA - SPR...) — eso bastaba para que
+`findMemberUserIdsForLeader` devolviera a TODOS los miembros de "Desarrollo"
+(Miguel Herize, Sergio Vidal...) sin importar que en "App Walvy"
+específicamente el líder de ese equipo sea Ana María, no José. El resultado
+se usaba como un `IN (userId...)` plano — no podía distinguir "visible en el
+Proyecto A" de "visible en el Proyecto B" para la misma persona, porque el
+liderazgo es por-proyecto pero el filtro era por-persona.
+
+Mismo árbol de decisión que `isProjectLeaderOrTeamLeaderOfMember`, pero
+expresado como condición SQL por fila (no se puede resolver como una lista
+de ids cuando la visibilidad depende del proyecto de cada fila):
+`HourEntryFilters.leaderScopeUserId` reemplaza a `visibleToUserIds` para
+`hours:read_team`. Una fila es visible si es propia, o (sin proyecto) si el
+actor lidera al dueño en general, o (con proyecto) si el actor es el líder
+del equipo del dueño PARA ESE proyecto, o (con proyecto, sin líder de equipo
+resoluble) si el actor lidera el proyecto. `GetHourEntryUseCase` (detalle de
+un registro por id) tenía el mismo defecto vía `findTeamMemberUserIds` y se
+corrigió igual, delegando a `isProjectApprover` para registros con proyecto.
+
+Validado contra los 63 pendientes reales tras el cambio: cero falsos
+positivos de visibilidad para José sobre proyectos donde no lidera al
+equipo del autor.
 
 - **Filtro Período/Detalle del resumen de horas** (Usuarios → "Resumen de
   horas por colaborador" y "Disponibilidad" en la v1): esas dos pestañas SÍ

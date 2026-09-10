@@ -6,7 +6,7 @@ import {
   createTicketSchema,
   TICKET_PRIORITIES,
   TICKET_PRIORITY_LABELS,
-  TICKET_SERVICE_TYPES,
+  SELECTABLE_TICKET_SERVICE_TYPES,
   TICKET_SERVICE_TYPE_LABELS,
   type CreateTicketInput,
 } from '@kora/contracts';
@@ -26,7 +26,7 @@ import { ApiRequestError } from '@/shared/lib/api-client';
 
 type TicketFormValues = z.input<typeof createTicketSchema>;
 
-const SERVICE_TYPE_OPTIONS = TICKET_SERVICE_TYPES.map((type) => ({ value: type, label: TICKET_SERVICE_TYPE_LABELS[type] }));
+const SERVICE_TYPE_OPTIONS = SELECTABLE_TICKET_SERVICE_TYPES.map((type) => ({ value: type, label: TICKET_SERVICE_TYPE_LABELS[type] }));
 const PRIORITY_OPTIONS = TICKET_PRIORITIES.map((priority) => ({ value: priority, label: TICKET_PRIORITY_LABELS[priority] }));
 
 export interface NewTicketDialogProps {

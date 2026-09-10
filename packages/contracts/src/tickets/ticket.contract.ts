@@ -68,6 +68,15 @@ export const TICKET_SERVICE_TYPE_LABELS: Readonly<Record<TicketServiceType, stri
   bug: 'Error',
 };
 
+/**
+ * "Consulta" e "Error" quedaron deprecados como tipo de servicio (se dejan
+ * en `TICKET_SERVICE_TYPES`/`ticketServiceTypeSchema` solo para no romper la
+ * lectura ni la edición de tickets históricos que ya los tienen). Los
+ * tickets nuevos solo pueden ser Incidente o Mejora.
+ */
+export const SELECTABLE_TICKET_SERVICE_TYPES = ['incident', 'improvement'] as const satisfies readonly TicketServiceType[];
+export const selectableTicketServiceTypeSchema = z.enum(SELECTABLE_TICKET_SERVICE_TYPES);
+
 export const ticketHistoryEntrySchema = z.object({
   id: uuidSchema,
   eventType: z.string(),
@@ -146,7 +155,7 @@ export const createTicketSchema = z.object({
   clientId: uuidSchema.nullish(),
   projectId: uuidSchema.nullish(),
   developmentProjectId: uuidSchema.nullish(),
-  serviceType: ticketServiceTypeSchema.nullish(),
+  serviceType: selectableTicketServiceTypeSchema.nullish(),
   description: z.string().trim().max(400).optional(),
   evidenceUrl: z.string().trim().max(500).optional(),
   priority: ticketPrioritySchema.nullish(),

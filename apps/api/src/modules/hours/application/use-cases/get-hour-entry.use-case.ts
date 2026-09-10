@@ -37,9 +37,16 @@ export class GetHourEntryUseCase implements UseCase<GetHourEntryCommand, HourEnt
     const snapshot = entry.toSnapshot();
 
     if (!command.actorPermissions.includes('hours:read_all') && snapshot.userId !== command.actor.userId) {
+      // Con proyecto: EXCLUYENTE, mismo criterio que decide si puede
+      // aprobarlo — liderar "el mismo equipo en OTRO proyecto" no da acceso
+      // (ver `ListHourEntriesUseCase`/DECISION-M4-HORAS.md "Cuarta
+      // corrección"). Sin proyecto: sigue siendo "lidera al dueño en
+      // general", porque no hay proyecto que acote.
       const canReadAsTeamLead =
         command.actorPermissions.includes('hours:read_team') &&
-        (await this.teams.findTeamMemberUserIds(command.actor.userId)).includes(snapshot.userId);
+        (snapshot.projectId
+          ? await this.projects.isProjectApprover(snapshot.projectId, command.actor.userId, snapshot.userId)
+          : await this.teams.isTeamLeaderOfMember(command.actor.userId, snapshot.userId));
       if (!canReadAsTeamLead) {
         return err(new ForbiddenError('No tienes acceso a este registro de horas.', 'HOUR_ENTRY_NOT_ASSIGNED'));
       }

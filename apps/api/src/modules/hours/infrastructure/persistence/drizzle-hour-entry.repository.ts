@@ -271,6 +271,61 @@ export class DrizzleHourEntryRepository implements HourEntryRepository {
         filters.visibleToUserIds.length > 0 ? inArray(hourEntries.userId, [...filters.visibleToUserIds]) : sql`false`,
       );
     }
+    if (filters.leaderScopeUserId) {
+      const leaderId = filters.leaderScopeUserId;
+      conditions.push(
+        or(
+          eq(hourEntries.userId, leaderId),
+          // Sin proyecto: mismo criterio amplio que la autoridad de decisión
+          // para estos registros — lidera al dueño en general (no hay
+          // proyecto que acote).
+          sql`(
+            ${hourEntries.projectId} is null
+            and exists (
+              select 1 from ${teamMembers}
+              inner join ${teams} on ${teams.id} = ${teamMembers.teamId}
+              where ${teamMembers.userId} = ${hourEntries.userId}
+                and ${teamMembers.leftAt} is null
+                and (
+                  ${teams.leaderUserId} = ${leaderId}
+                  or exists (
+                    select 1 from ${projectTeams}
+                    where ${projectTeams.teamId} = ${teams.id} and ${projectTeams.leaderUserId} = ${leaderId}
+                  )
+                )
+            )
+          )`,
+          // Con proyecto, EXCLUYENTE: solo el líder del equipo del dueño
+          // PARA ESE PROYECTO — no cualquier equipo que lidere en general.
+          sql`(
+            ${hourEntries.projectId} is not null
+            and exists (
+              select 1 from ${projectTeams}
+              inner join ${teams} on ${teams.id} = ${projectTeams.teamId}
+              inner join ${teamMembers} on ${teamMembers.teamId} = ${teams.id}
+                and ${teamMembers.userId} = ${hourEntries.userId} and ${teamMembers.leftAt} is null
+              where ${projectTeams.projectId} = ${hourEntries.projectId}
+                and coalesce(${projectTeams.leaderUserId}, ${teams.leaderUserId}) = ${leaderId}
+            )
+          )`,
+          // Con proyecto y SIN líder de equipo resoluble para el dueño: cae
+          // al líder del proyecto — mismo respaldo que la autoridad de
+          // decisión.
+          sql`(
+            ${hourEntries.projectId} is not null
+            and exists (select 1 from ${projects} where ${projects.id} = ${hourEntries.projectId} and ${projects.leaderUserId} = ${leaderId})
+            and not exists (
+              select 1 from ${projectTeams}
+              inner join ${teams} on ${teams.id} = ${projectTeams.teamId}
+              inner join ${teamMembers} on ${teamMembers.teamId} = ${teams.id}
+                and ${teamMembers.userId} = ${hourEntries.userId} and ${teamMembers.leftAt} is null
+              where ${projectTeams.projectId} = ${hourEntries.projectId}
+                and coalesce(${projectTeams.leaderUserId}, ${teams.leaderUserId}) is not null
+            )
+          )`,
+        ),
+      );
+    }
     return conditions.length > 0 ? and(...conditions) : undefined;
   }
 
