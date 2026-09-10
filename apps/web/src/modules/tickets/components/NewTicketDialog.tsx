@@ -18,9 +18,8 @@ import { Select } from '@/shared/components/ui/Select';
 import { Combobox } from '@/shared/components/ui/Combobox';
 import { AlertIcon } from '@/shared/components/icons/Icons';
 import { useToast } from '@/shared/components/ui/Toast';
-import { useCreateTicket } from '../api/tickets.queries';
+import { useCreateTicket, useTicketLinkableProjects } from '../api/tickets.queries';
 import { useClientsList } from '@/modules/clients/api/clients.queries';
-import { useProjectsList } from '@/modules/projects/api/projects.queries';
 import { useUsersList } from '@/modules/users/api/users.queries';
 import { ApiRequestError } from '@/shared/lib/api-client';
 
@@ -71,20 +70,8 @@ export function NewTicketDialog({ open, onClose, onCreated }: NewTicketDialogPro
   const projectId = useWatch({ control, name: 'projectId' });
   const developmentProjectId = useWatch({ control, name: 'developmentProjectId' });
   const assigneeUserId = useWatch({ control, name: 'assigneeUserId' });
-  const { data: supportProjects } = useProjectsList({
-    page: 1,
-    pageSize: 200,
-    sortField: 'name',
-    type: 'support',
-    clientId: clientId || undefined,
-  });
-  const { data: developmentProjects } = useProjectsList({
-    page: 1,
-    pageSize: 200,
-    sortField: 'name',
-    type: 'development',
-    clientId: clientId || undefined,
-  });
+  const { data: supportProjects } = useTicketLinkableProjects(clientId || undefined, 'support');
+  const { data: developmentProjects } = useTicketLinkableProjects(clientId || undefined, 'development');
 
   const previousClientId = useRef(clientId);
   useEffect(() => {
@@ -153,7 +140,7 @@ export function NewTicketDialog({ open, onClose, onCreated }: NewTicketDialogPro
             placeholder="Buscar proyecto…"
             options={[
               { value: '', label: 'Sin proyecto' },
-              ...(supportProjects?.items ?? []).map((project) => ({ value: project.id, label: project.name })),
+              ...(supportProjects ?? []).map((project) => ({ value: project.id, label: project.name })),
             ]}
             value={projectId ?? ''}
             onChange={(value) => setValue('projectId', value || undefined, { shouldValidate: true })}
@@ -183,7 +170,7 @@ export function NewTicketDialog({ open, onClose, onCreated }: NewTicketDialogPro
           placeholder="Buscar proyecto de desarrollo…"
           options={[
             { value: '', label: 'Sin vincular' },
-            ...(developmentProjects?.items ?? []).map((project) => ({ value: project.id, label: project.name })),
+            ...(developmentProjects ?? []).map((project) => ({ value: project.id, label: project.name })),
           ]}
           value={developmentProjectId ?? ''}
           onChange={(value) => setValue('developmentProjectId', value || undefined, { shouldValidate: true })}

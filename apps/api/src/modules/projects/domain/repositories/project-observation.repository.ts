@@ -25,5 +25,5 @@ export interface ProjectObservationRepository {
 
 export const PROJECT_OBSERVATION_REPOSITORY = Symbol('ProjectObservationRepository');
 
-/** Solo quien creó la entrada puede editarla o borrarla, y solo dentro de este plazo desde su creación. */
-export const PROJECT_OBSERVATION_EDIT_WINDOW_MS = 15 * 60 * 1000;
+/** Solo quien creó la entrada puede borrarla, y solo dentro de este plazo desde su creación. La edición no tiene límite de tiempo. */
+export const PROJECT_OBSERVATION_DELETE_WINDOW_MS = 15 * 60 * 1000;

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { arrayQueryParam, isoDateTimeSchema, nonEmptyTrimmed, pageSchema, paginationQuerySchema, sortDirectionSchema, uuidSchema } from '../common/primitives';
+import { projectTypeSchema } from '../projects/project.contract';
 
 /** Ver docs/DECISION-M5-TICKETS.md. */
 
@@ -198,6 +199,25 @@ export type ListTicketsQuery = z.infer<typeof listTicketsQuerySchema>;
 
 export const listTicketsResponseSchema = pageSchema(ticketSummarySchema);
 export type ListTicketsResponse = z.infer<typeof listTicketsResponseSchema>;
+
+/**
+ * Proyecto seleccionable para vincular un ticket (selector "Proyecto"/"Proyecto
+ * de desarrollo" del modal). A propósito un tipo aparte, más angosto que
+ * `ProjectSummary`: lo sirve un endpoint sin el acotamiento a "mis proyectos
+ * asignados" de `GET /projects` (ver `ListLinkableTicketProjectsUseCase`), así
+ * que solo expone lo mínimo para poblar el combobox.
+ */
+export const ticketLinkableProjectSchema = z.object({
+  id: uuidSchema,
+  name: z.string(),
+});
+export type TicketLinkableProject = z.infer<typeof ticketLinkableProjectSchema>;
+
+export const listTicketLinkableProjectsQuerySchema = z.object({
+  clientId: uuidSchema,
+  type: projectTypeSchema,
+});
+export type ListTicketLinkableProjectsQuery = z.infer<typeof listTicketLinkableProjectsQuerySchema>;
 
 export const supportPlanAvailabilitySchema = z.object({
   hasActiveUsablePlan: z.boolean(),

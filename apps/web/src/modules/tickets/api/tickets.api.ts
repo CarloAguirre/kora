@@ -1,9 +1,11 @@
 import type {
   ChangeTicketStatusInput,
   CreateTicketInput,
+  ListTicketLinkableProjectsQuery,
   ListTicketsQuery,
   ListTicketsResponse,
   TicketDetail,
+  TicketLinkableProject,
   UpdateTicketInput,
 } from '@kora/contracts';
 import { api } from '@/shared/lib/api-client';
@@ -26,6 +28,12 @@ export const ticketsApi = {
   detail(ticketId: string): Promise<TicketDetail> {
     return api.get<TicketDetail>(`/tickets/${ticketId}`);
   },
+  linkableProjects(query: ListTicketLinkableProjectsQuery): Promise<TicketLinkableProject[]> {
+    return api.get<TicketLinkableProject[]>('/tickets/linkable-projects', {
+      clientId: query.clientId,
+      type: query.type,
+    });
+  },
   create(input: CreateTicketInput): Promise<{ id: string }> {
     return api.post<{ id: string }>('/tickets', input);
   },
@@ -46,4 +54,5 @@ export const ticketKeys = {
   list: (query: Partial<ListTicketsQuery>) => [...ticketKeys.lists(), query] as const,
   details: () => [...ticketKeys.all, 'detail'] as const,
   detail: (ticketId: string) => [...ticketKeys.details(), ticketId] as const,
+  linkableProjects: (query: ListTicketLinkableProjectsQuery) => [...ticketKeys.all, 'linkable-projects', query] as const,
 };

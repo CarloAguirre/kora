@@ -161,29 +161,33 @@ export function BitacoraCard({
                     <span className={styles.observationAuthor}>{observation.authorName}</span>
                     <span className={styles.eventDate}>{new Date(observation.createdAt).toLocaleString('es-CL')}</span>
                     {index === 0 && <span className={styles.observationNewest}>Más reciente</span>}
-                    {observation.canEdit && editingId !== observation.id && (
+                    {(observation.canEdit || observation.canDelete) && editingId !== observation.id && (
                       <span className={styles.observationActions}>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => startEditing(observation)}
-                          aria-label="Editar entrada"
-                          title="Editar entrada (disponible por 15 minutos)"
-                        >
-                          <PencilIcon size={14} />
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          disabled={deletingId === observation.id}
-                          onClick={() => void deleteEntry(observation.id)}
-                          aria-label="Borrar entrada"
-                          title="Borrar entrada (disponible por 15 minutos)"
-                        >
-                          <TrashIcon size={14} />
-                        </Button>
+                        {observation.canEdit && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => startEditing(observation)}
+                            aria-label="Editar entrada"
+                            title="Editar entrada"
+                          >
+                            <PencilIcon size={14} />
+                          </Button>
+                        )}
+                        {observation.canDelete && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            disabled={deletingId === observation.id}
+                            onClick={() => void deleteEntry(observation.id)}
+                            aria-label="Borrar entrada"
+                            title="Borrar entrada (disponible por 15 minutos)"
+                          >
+                            <TrashIcon size={14} />
+                          </Button>
+                        )}
                       </span>
                     )}
                   </div>

@@ -1,4 +1,4 @@
-import type { ProjectStatus } from '@kora/contracts';
+import type { ProjectStatus, ProjectType } from '@kora/contracts';
 
 export interface TicketProjectReference {
   readonly id: string;
@@ -6,8 +6,23 @@ export interface TicketProjectReference {
   readonly status: ProjectStatus;
 }
 
+export interface LinkableProjectReference {
+  readonly id: string;
+  readonly name: string;
+}
+
 export interface TicketProjectReader {
   findById(projectId: string): Promise<TicketProjectReference | null>;
+  /**
+   * Proyectos de `type` que pertenecen a `clientId`, para poblar el selector
+   * de proyecto al crear/editar un ticket. Sin acotar por asignación: a
+   * diferencia de `GET /projects` (ver `ListProjectsUseCase`), aquí cualquier
+   * actor con `tickets:create`/`tickets:manage` debe ver TODOS los proyectos
+   * de soporte del cliente, esté o no asignado a ellos — de lo contrario un
+   * colaborador no staffeado en el proyecto de soporte de un cliente no podría
+   * nunca abrirle un ticket.
+   */
+  findLinkableByClient(clientId: string, type: ProjectType): Promise<LinkableProjectReference[]>;
   /**
    * ¿Puede `actorUserId` gestionar el ticket de `assigneeUserId` en este
    * proyecto? EXCLUYENTE, mismo criterio que Horas (ver

@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { CLOCK, ForbiddenError, err, ok, type ApplicationError, type Clock, type Result } from '@kora/core';
 import { ProjectObservationNotFoundError } from '../../domain/errors/project.errors';
 import {
-  PROJECT_OBSERVATION_EDIT_WINDOW_MS,
+  PROJECT_OBSERVATION_DELETE_WINDOW_MS,
   PROJECT_OBSERVATION_REPOSITORY,
   type ProjectObservationRepository,
 } from '../../domain/repositories/project-observation.repository';
@@ -35,11 +35,11 @@ export class DeleteProjectObservationUseCase
     }
 
     const elapsedMs = this.clock.now().getTime() - observation.createdAt.getTime();
-    if (elapsedMs > PROJECT_OBSERVATION_EDIT_WINDOW_MS) {
+    if (elapsedMs > PROJECT_OBSERVATION_DELETE_WINDOW_MS) {
       return err(
         new ForbiddenError(
           'Ya no se puede borrar esta entrada: pasaron más de 15 minutos desde que se creó.',
-          'PROJECT_OBSERVATION_EDIT_WINDOW_EXPIRED',
+          'PROJECT_OBSERVATION_DELETE_WINDOW_EXPIRED',
         ),
       );
     }

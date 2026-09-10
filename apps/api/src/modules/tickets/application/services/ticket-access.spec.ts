@@ -24,6 +24,9 @@ class FakeProjectReader implements TicketProjectReader {
   async findHhApprovers(): Promise<{ id: string; fullName: string }[]> {
     return [];
   }
+  async findLinkableByClient(): Promise<{ id: string; name: string }[]> {
+    return [];
+  }
 }
 
 const NO_PERMISSIONS: Permission[] = [];

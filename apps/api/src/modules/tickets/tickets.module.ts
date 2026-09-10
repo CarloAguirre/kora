@@ -13,6 +13,7 @@ import { ListTicketHhRequestsUseCase } from './application/use-cases/list-ticket
 import { ApproveTicketHhRequestUseCase } from './application/use-cases/approve-ticket-hh-request.use-case';
 import { RejectTicketHhRequestUseCase } from './application/use-cases/reject-ticket-hh-request.use-case';
 import { GetSupportPlanSummaryUseCase } from './application/use-cases/get-support-plan-summary.use-case';
+import { ListLinkableTicketProjectsUseCase } from './application/use-cases/list-linkable-ticket-projects.use-case';
 import { SupportPlanAvailabilityService } from './application/services/support-plan-availability.service';
 
 import { TICKET_REPOSITORY } from './domain/repositories/ticket.repository';
@@ -60,6 +61,7 @@ import { HoursModule } from '../hours/hours.module';
     ApproveTicketHhRequestUseCase,
     RejectTicketHhRequestUseCase,
     GetSupportPlanSummaryUseCase,
+    ListLinkableTicketProjectsUseCase,
     SupportPlanAvailabilityService,
 
     { provide: TICKET_REPOSITORY, useClass: DrizzleTicketRepository },

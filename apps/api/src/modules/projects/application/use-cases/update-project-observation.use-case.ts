@@ -3,7 +3,6 @@ import { CLOCK, ForbiddenError, err, ok, type ApplicationError, type Clock, type
 import type { UpdateProjectObservationInput } from '@kora/contracts';
 import { ProjectObservationNotFoundError } from '../../domain/errors/project.errors';
 import {
-  PROJECT_OBSERVATION_EDIT_WINDOW_MS,
   PROJECT_OBSERVATION_REPOSITORY,
   type ProjectObservationRepository,
 } from '../../domain/repositories/project-observation.repository';
@@ -16,7 +15,7 @@ export interface UpdateProjectObservationCommand {
   readonly actor: ActorContext;
 }
 
-/** Solo quien creó la entrada puede editarla, y solo dentro de los 15 minutos siguientes a crearla. */
+/** Solo quien creó la entrada puede editarla; sin límite de tiempo. */
 @Injectable()
 export class UpdateProjectObservationUseCase
   implements UseCase<UpdateProjectObservationCommand, void, ApplicationError>
@@ -34,16 +33,6 @@ export class UpdateProjectObservationUseCase
 
     if (observation.authorUserId !== command.actor.userId) {
       return err(new ForbiddenError('Solo quien creó esta entrada puede editarla.', 'PROJECT_OBSERVATION_NOT_OWNED'));
-    }
-
-    const elapsedMs = this.clock.now().getTime() - observation.createdAt.getTime();
-    if (elapsedMs > PROJECT_OBSERVATION_EDIT_WINDOW_MS) {
-      return err(
-        new ForbiddenError(
-          'Ya no se puede editar esta entrada: pasaron más de 15 minutos desde que se creó.',
-          'PROJECT_OBSERVATION_EDIT_WINDOW_EXPIRED',
-        ),
-      );
     }
 
     await this.observations.update(command.observationId, command.data.message, this.clock.now());

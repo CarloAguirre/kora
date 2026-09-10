@@ -18,13 +18,17 @@ import { Tabs } from '@/shared/components/ui/Tabs';
 import { AlertIcon } from '@/shared/components/icons/Icons';
 import { useHourEntryDetail, useUpdateHourEntry } from '../api/hours.queries';
 import { useProjectsList } from '@/modules/projects/api/projects.queries';
+import { getProjectOptionLabel } from '@/modules/projects/lib/project-option-label';
 import { useUsersList } from '@/modules/users/api/users.queries';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { ApiRequestError } from '@/shared/lib/api-client';
 import { DailyEntryForm } from './DailyEntryForm';
 import { WeeklyEntryForm } from './WeeklyEntryForm';
 
-const ASSIGNMENT_OPTIONS = HOUR_ENTRY_ASSIGNMENTS.map((value) => ({ value, label: value }));
+/** Proyecto primero: es la asignación más común y el resto confundía al elegir. */
+const ASSIGNMENT_OPTIONS = [...HOUR_ENTRY_ASSIGNMENTS]
+  .sort((a, b) => (a === 'Proyecto' ? -1 : b === 'Proyecto' ? 1 : 0))
+  .map((value) => ({ value, label: value }));
 const formatDateTime = (value: string) => new Date(value).toLocaleString('es-CL');
 const NEW_ENTRY_TABS = [
   { id: 'diario', label: 'Registro diario' },
@@ -164,7 +168,7 @@ function EditEntryForm({
           label="Proyecto"
           required
           placeholder="Selecciona un proyecto"
-          options={(projects?.items ?? []).map((project) => ({ value: project.id, label: project.name }))}
+          options={(projects?.items ?? []).map((project) => ({ value: project.id, label: getProjectOptionLabel(project) }))}
           errorText={errors.projectId?.message}
           {...register('projectId')}
         />

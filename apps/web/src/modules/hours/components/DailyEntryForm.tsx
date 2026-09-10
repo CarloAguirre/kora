@@ -12,13 +12,14 @@ import { Select } from '@/shared/components/ui/Select';
 import { AlertIcon, ChevronDownIcon, ChevronRightIcon, PlusIcon, TrashIcon } from '@/shared/components/icons/Icons';
 import { useCreateHourEntry, useHolidays, useHourEntriesList } from '../api/hours.queries';
 import { useProjectsList } from '@/modules/projects/api/projects.queries';
+import { getProjectOptionLabel } from '@/modules/projects/lib/project-option-label';
 import { useUsersList } from '@/modules/users/api/users.queries';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { ApiRequestError } from '@/shared/lib/api-client';
 
-/** Mismo orden que "Seleccionar asignación..." en `RegistroHHModal` (v1) — Proyecto no va primero. */
+/** Proyecto primero: es la asignación más común y el resto confundía al elegir. */
 const ASSIGNMENT_OPTIONS = [...HOUR_ENTRY_ASSIGNMENTS]
-  .sort((a, b) => (a === 'Proyecto' ? 1 : b === 'Proyecto' ? -1 : 0))
+  .sort((a, b) => (a === 'Proyecto' ? -1 : b === 'Proyecto' ? 1 : 0))
   .map((value) => ({ value, label: value }));
 const DAILY_CAP_HOURS = 8;
 const MIN_DESCRIPTION_LENGTH = 5;
@@ -111,7 +112,7 @@ export function DailyEntryForm({
     setBlocks((prev) => prev.map((block) => (block.key === key ? { ...block, expanded: !block.expanded } : block)));
   const blockTitle = (block: DailyBlock, index: number) => {
     const project = (projects?.items ?? []).find((p) => p.id === block.projectId);
-    return project?.name ?? `Registro ${index + 1}`;
+    return project ? getProjectOptionLabel(project) : `Registro ${index + 1}`;
   };
   const adjustHours = (key: string, delta: number) => {
     setBlocks((prev) =>
@@ -306,7 +307,7 @@ export function DailyEntryForm({
                       required={needsProject}
                       disabled={!needsProject}
                       placeholder="Seleccionar proyecto..."
-                      options={(projects?.items ?? []).map((project) => ({ value: project.id, label: project.name }))}
+                      options={(projects?.items ?? []).map((project) => ({ value: project.id, label: getProjectOptionLabel(project) }))}
                       value={block.projectId}
                       onChange={(event) => {
                         const nextProject = (projects?.items ?? []).find((p) => p.id === event.target.value);

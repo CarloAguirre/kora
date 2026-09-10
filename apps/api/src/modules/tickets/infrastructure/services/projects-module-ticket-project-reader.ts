@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
+import type { ProjectType } from '@kora/contracts';
 import { PROJECT_REPOSITORY, type ProjectRepository } from '../../../projects/domain/repositories/project.repository';
-import type { TicketProjectReader, TicketProjectReference } from '../../application/ports/ticket-project-reader.port';
+import type { LinkableProjectReference, TicketProjectReader, TicketProjectReference } from '../../application/ports/ticket-project-reader.port';
 
 @Injectable()
 export class ProjectsModuleTicketProjectReader implements TicketProjectReader {
@@ -10,6 +11,15 @@ export class ProjectsModuleTicketProjectReader implements TicketProjectReader {
     const project = await this.projects.findById(projectId);
     if (!project || project.isDeleted) return null;
     return { id: project.id, name: project.name, status: project.status };
+  }
+
+  async findLinkableByClient(clientId: string, type: ProjectType): Promise<LinkableProjectReference[]> {
+    const page = await this.projects.search(
+      { clientId, type },
+      { page: 1, pageSize: 500 },
+      { field: 'name', direction: 'asc' },
+    );
+    return page.items.map((item) => ({ id: item.id, name: item.name }));
   }
 
   isProjectApprover(projectId: string, actorUserId: string, assigneeUserId: string | null): Promise<boolean> {

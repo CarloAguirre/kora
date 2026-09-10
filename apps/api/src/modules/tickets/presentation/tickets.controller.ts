@@ -3,17 +3,20 @@ import {
   changeTicketStatusSchema,
   createTicketHhRequestSchema,
   createTicketSchema,
+  listTicketLinkableProjectsQuerySchema,
   listTicketsQuerySchema,
   rejectTicketHhRequestSchema,
   updateTicketSchema,
   type ChangeTicketStatusInput,
   type CreateTicketHhRequestInput,
   type CreateTicketInput,
+  type ListTicketLinkableProjectsQuery,
   type ListTicketsQuery,
   type ListTicketsResponse,
   type RejectTicketHhRequestInput,
   type TicketDetail,
   type TicketHhRequest,
+  type TicketLinkableProject,
   type UpdateTicketInput,
 } from '@kora/contracts';
 import { ZodValidationPipe } from '../../../shared/presentation/pipes/zod-validation.pipe';
@@ -22,6 +25,7 @@ import { CurrentUser, type RequestUser } from '../../../shared/presentation/deco
 import type { ActorContext } from '../../../shared/application/use-case';
 import { unwrapOrThrow } from '../../../shared/presentation/unwrap-result';
 import { CreateTicketUseCase } from '../application/use-cases/create-ticket.use-case';
+import { ListLinkableTicketProjectsUseCase } from '../application/use-cases/list-linkable-ticket-projects.use-case';
 import { UpdateTicketUseCase } from '../application/use-cases/update-ticket.use-case';
 import { ListTicketsUseCase } from '../application/use-cases/list-tickets.use-case';
 import { GetTicketUseCase } from '../application/use-cases/get-ticket.use-case';
@@ -45,6 +49,7 @@ export class TicketsController {
     private readonly listHhRequests: ListTicketHhRequestsUseCase,
     private readonly approveHhRequest: ApproveTicketHhRequestUseCase,
     private readonly rejectHhRequest: RejectTicketHhRequestUseCase,
+    private readonly listLinkableProjects: ListLinkableTicketProjectsUseCase,
   ) {}
 
   @Get()
@@ -57,6 +62,21 @@ export class TicketsController {
       await this.listTickets.execute({ query, actor: toActorContext(actor), actorPermissions: actor.permissions }),
     );
     return { ...page, items: [...page.items] };
+  }
+
+  /**
+   * Sirve los selectores "Proyecto"/"Proyecto de desarrollo" del modal de
+   * ticket. Debe declararse antes de `:id` — de lo contrario Nest la
+   * confundiría con una búsqueda por id. Registrado bajo el permiso de
+   * creación/edición de tickets, no `projects:read*`: ver el comentario de
+   * `ListLinkableTicketProjectsUseCase`.
+   */
+  @Get('linkable-projects')
+  @RequireAnyPermission('tickets:create', 'tickets:manage', 'tickets:read_assigned')
+  async linkableProjects(
+    @Query(new ZodValidationPipe(listTicketLinkableProjectsQuerySchema)) query: ListTicketLinkableProjectsQuery,
+  ): Promise<TicketLinkableProject[]> {
+    return unwrapOrThrow(await this.listLinkableProjects.execute(query));
   }
 
   @Get(':id')

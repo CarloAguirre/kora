@@ -101,8 +101,10 @@ export const projectObservationSchema = z.object({
   authorUserId: uuidSchema,
   authorName: z.string(),
   createdAt: isoDateTimeSchema,
-  /** true solo para el autor, y solo dentro de la ventana de edición — ver `PROJECT_OBSERVATION_EDIT_WINDOW_MS`. */
+  /** true solo para el autor; la edición no tiene límite de tiempo. */
   canEdit: z.boolean(),
+  /** true solo para el autor, y solo dentro de la ventana de borrado — ver `PROJECT_OBSERVATION_DELETE_WINDOW_MS`. */
+  canDelete: z.boolean(),
 });
 export type ProjectObservation = z.infer<typeof projectObservationSchema>;
 

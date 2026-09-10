@@ -10,7 +10,7 @@ import type { ProjectListItem } from '../../domain/repositories/project.reposito
 import type { ProjectTeamMemberRecord } from '../../domain/repositories/project-team-member.repository';
 import type { ProjectTeamRecord } from '../../domain/repositories/project-team.repository';
 import {
-  PROJECT_OBSERVATION_EDIT_WINDOW_MS,
+  PROJECT_OBSERVATION_DELETE_WINDOW_MS,
   type ProjectObservationRecord,
 } from '../../domain/repositories/project-observation.repository';
 import type { ProjectUserReference } from '../ports/project-user-reader.port';
@@ -87,9 +87,10 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
     authorUserId: observation.authorUserId,
     authorName: observation.authorName,
     createdAt: observation.createdAt.toISOString(),
-    canEdit:
+    canEdit: observation.authorUserId === source.actorUserId,
+    canDelete:
       observation.authorUserId === source.actorUserId &&
-      source.now.getTime() - observation.createdAt.getTime() <= PROJECT_OBSERVATION_EDIT_WINDOW_MS,
+      source.now.getTime() - observation.createdAt.getTime() <= PROJECT_OBSERVATION_DELETE_WINDOW_MS,
   }));
 
   return {

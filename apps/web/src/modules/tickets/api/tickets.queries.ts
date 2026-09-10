@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { ChangeTicketStatusInput, CreateTicketInput, ListTicketsQuery, UpdateTicketInput } from '@kora/contracts';
+import type { ChangeTicketStatusInput, CreateTicketInput, ListTicketsQuery, ProjectType, UpdateTicketInput } from '@kora/contracts';
 import { ticketKeys, ticketsApi } from './tickets.api';
 
 export function useTicketsList(query: Partial<ListTicketsQuery>) {
@@ -16,6 +16,22 @@ export function useTicketDetail(ticketId: string | null) {
     queryKey: ticketKeys.detail(ticketId ?? ''),
     queryFn: () => ticketsApi.detail(ticketId as string),
     enabled: Boolean(ticketId),
+  });
+}
+
+/**
+ * Proyectos de `type` del cliente elegido, para los selectores del modal de
+ * ticket. Deliberadamente NO usa `useProjectsList`: ese hook pega a
+ * `GET /projects`, que un colaborador o líder solo ve acotado a sus propios
+ * proyectos asignados — un colaborador sin staffear en el proyecto de soporte
+ * de un cliente nunca vería nada en el combobox. Sin cliente elegido no hay
+ * qué listar (los proyectos siempre son de un cliente puntual).
+ */
+export function useTicketLinkableProjects(clientId: string | undefined, type: ProjectType) {
+  return useQuery({
+    queryKey: ticketKeys.linkableProjects({ clientId: clientId ?? '', type }),
+    queryFn: () => ticketsApi.linkableProjects({ clientId: clientId as string, type }),
+    enabled: Boolean(clientId),
   });
 }
 

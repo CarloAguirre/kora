@@ -17,8 +17,7 @@ import { Button } from '@/shared/components/ui/Button';
 import { TextField } from '@/shared/components/ui/TextField';
 import { Select } from '@/shared/components/ui/Select';
 import { Combobox } from '@/shared/components/ui/Combobox';
-import { useUpdateTicket } from '../api/tickets.queries';
-import { useProjectsList } from '@/modules/projects/api/projects.queries';
+import { useTicketLinkableProjects, useUpdateTicket } from '../api/tickets.queries';
 import { useUsersList } from '@/modules/users/api/users.queries';
 import { useToast } from '@/shared/components/ui/Toast';
 import { ApiRequestError } from '@/shared/lib/api-client';
@@ -44,13 +43,7 @@ export function EditTicketDialog({ ticket, open, onClose }: { ticket: TicketDeta
       ? [...SELECTABLE_TICKET_SERVICE_TYPES, ticket.serviceType]
       : SELECTABLE_TICKET_SERVICE_TYPES;
   const serviceTypeSelectOptions = serviceTypeOptions.map((type) => ({ value: type, label: TICKET_SERVICE_TYPE_LABELS[type] }));
-  const { data: projects } = useProjectsList({
-    page: 1,
-    pageSize: 200,
-    sortField: 'name',
-    type: 'development',
-    clientId: ticket.client?.id,
-  });
+  const { data: projects } = useTicketLinkableProjects(ticket.client?.id, 'development');
   // Cualquier persona del sistema puede ser responsable de un ticket — es
   // quien puede cargarle horas por tenerlo asignado, no solo colaboradores.
   // Los eliminados ya vienen fuera del listado; los deshabilitados se descartan
@@ -155,7 +148,7 @@ export function EditTicketDialog({ ticket, open, onClose }: { ticket: TicketDeta
         <Combobox
           label="Proyecto de desarrollo"
           placeholder="Buscar proyecto de desarrollo…"
-          options={[{ value: '', label: 'Sin vincular' }, ...(projects?.items ?? []).map((project) => ({ value: project.id, label: project.name }))]}
+          options={[{ value: '', label: 'Sin vincular' }, ...(projects ?? []).map((project) => ({ value: project.id, label: project.name }))]}
           value={developmentProjectId ?? ''}
           onChange={(value) => setValue('developmentProjectId', value || undefined, { shouldValidate: true })}
           emptyMessage="No se encontraron proyectos de desarrollo."

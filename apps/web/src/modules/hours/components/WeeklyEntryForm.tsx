@@ -12,12 +12,14 @@ import { Select } from '@/shared/components/ui/Select';
 import { AlertIcon, ChevronLeftIcon, ChevronRightIcon } from '@/shared/components/icons/Icons';
 import { useCreateHourEntry, useHolidays, useHourEntriesList } from '../api/hours.queries';
 import { useProjectsList } from '@/modules/projects/api/projects.queries';
+import { getProjectOptionLabel } from '@/modules/projects/lib/project-option-label';
 import { useUsersList } from '@/modules/users/api/users.queries';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { ApiRequestError } from '@/shared/lib/api-client';
 
+/** Proyecto primero: es la asignación más común y el resto confundía al elegir. */
 const ASSIGNMENT_OPTIONS = [...HOUR_ENTRY_ASSIGNMENTS]
-  .sort((a, b) => (a === 'Proyecto' ? 1 : b === 'Proyecto' ? -1 : 0))
+  .sort((a, b) => (a === 'Proyecto' ? -1 : b === 'Proyecto' ? 1 : 0))
   .map((value) => ({ value, label: value }));
 const WEEKDAY_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie'];
 const WEEKLY_CAP_HOURS = 40;
@@ -252,7 +254,7 @@ export function WeeklyEntryForm({
             required={needsProject}
             disabled={!needsProject}
             placeholder="Seleccionar proyecto..."
-            options={(projects?.items ?? []).map((project) => ({ value: project.id, label: project.name }))}
+            options={(projects?.items ?? []).map((project) => ({ value: project.id, label: getProjectOptionLabel(project) }))}
             value={projectId}
             onChange={(event) => {
               const nextProject = (projects?.items ?? []).find((p) => p.id === event.target.value);
