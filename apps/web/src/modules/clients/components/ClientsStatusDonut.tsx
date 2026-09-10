@@ -46,7 +46,6 @@ export function ClientsStatusDonut({ activeCount, inactiveCount, loading }: Clie
                 stroke="var(--kora-success)"
                 strokeWidth={STROKE}
                 strokeDasharray={`${activeLength} ${CIRCUMFERENCE - activeLength}`}
-                strokeLinecap="round"
                 transform={`rotate(-90 ${SIZE / 2} ${SIZE / 2})`}
               />
             )}
