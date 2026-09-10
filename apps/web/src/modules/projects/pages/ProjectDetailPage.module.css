@@ -19,7 +19,7 @@
 
 .topRowActions {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: var(--kora-space-3);
   flex-wrap: wrap;
 }
