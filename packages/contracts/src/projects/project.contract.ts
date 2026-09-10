@@ -127,6 +127,8 @@ export const projectSummarySchema = z.object({
   actualProgress: z.number().int().nullable(),
   supportPlanDescription: z.string().nullable(),
   supportHours: z.number(),
+  /** Habilitado por el líder del proyecto/equipo — sin esto, las horas cargadas contra este proyecto no pueden marcarse como horas extra. */
+  allowsOvertime: z.boolean(),
   createdAt: isoDateTimeSchema,
 });
 export type ProjectSummary = z.infer<typeof projectSummarySchema>;
@@ -139,6 +141,8 @@ export const projectDetailSchema = projectSummarySchema.extend({
   estimatedDeliveryDate: z.string().nullable(),
   expectedProgress: z.number().int().nullable(),
   overtimeRateUf: z.number(),
+  /** Igual criterio que el resto de los flags "puede gestionar" — no basta con `projects:manage`, ver `GetProjectUseCase`. */
+  canAuthorizeOvertime: z.boolean(),
   quotationLink: z.string().nullable(),
   contractLink: z.string().nullable(),
   additionalLinks: z.string().nullable(),
@@ -212,6 +216,9 @@ export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
 
 export const changeProjectStatusSchema = z.object({ status: projectStatusSchema });
 export type ChangeProjectStatusInput = z.infer<typeof changeProjectStatusSchema>;
+
+export const setProjectOvertimeAuthorizationSchema = z.object({ allowsOvertime: z.boolean() });
+export type SetProjectOvertimeAuthorizationInput = z.infer<typeof setProjectOvertimeAuthorizationSchema>;
 
 export const assignProjectTeamMemberSchema = z.object({
   teamMemberId: uuidSchema,

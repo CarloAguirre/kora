@@ -72,6 +72,15 @@ export class GetProjectUseCase implements UseCase<GetProjectCommand, ProjectDeta
       if (!isParticipant) return err(new ForbiddenError('No tienes acceso a este proyecto.', 'PROJECT_NOT_ASSIGNED'));
     }
 
+    /**
+     * Quién puede autorizar que ESTE proyecto admita horas extra: mismo
+     * criterio EXCLUYENTE que el resto del sistema (líder de proyecto o líder
+     * del equipo asignado a él), ver `SetProjectOvertimeAuthorizationUseCase`.
+     */
+    const canAuthorizeOvertime =
+      command.actorPermissions.includes('projects:manage') ||
+      (await this.projects.isProjectLeaderOrTeamLeaderOfMember(project.id, command.actorUserId, null));
+
     return ok(
       toProjectDetail({
         project,
@@ -84,6 +93,7 @@ export class GetProjectUseCase implements UseCase<GetProjectCommand, ProjectDeta
         teams: projectTeams,
         observations: projectObservations,
         actorUserId: command.actorUserId,
+        canAuthorizeOvertime,
         now: this.clock.now(),
       }),
     );

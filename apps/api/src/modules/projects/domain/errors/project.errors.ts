@@ -1,4 +1,4 @@
-import { ConflictError, DomainError, NotFoundError, ValidationError } from '@kora/core';
+import { ConflictError, DomainError, ForbiddenError, NotFoundError, ValidationError } from '@kora/core';
 
 export class InvalidProjectNameError extends ValidationError {
   constructor(message: string) {
@@ -80,5 +80,12 @@ export class ReferencedClientNotFoundError extends NotFoundError {
 export class ProjectObservationNotFoundError extends NotFoundError {
   constructor(identifier: string) {
     super('Observación', identifier, 'PROJECT_OBSERVATION_NOT_FOUND');
+  }
+}
+
+/** Autorizar horas extra en un proyecto es una decisión de líder — ni `projects:manage` por sí solo ni ser un miembro cualquiera bastan. */
+export class CannotAuthorizeProjectOvertimeError extends ForbiddenError {
+  constructor() {
+    super('No tienes permiso para autorizar horas extra en este proyecto.', 'PROJECT_CANNOT_AUTHORIZE_OVERTIME');
   }
 }

@@ -1,5 +1,6 @@
 import { relations, sql } from 'drizzle-orm';
 import {
+  boolean,
   date,
   integer,
   numeric,
@@ -71,6 +72,8 @@ export const projects = pgTable(
     supportPlanDescription: text('support_plan_description'),
     supportHours: numeric('support_hours', { precision: 10, scale: 2 }).notNull().default('0'),
     overtimeRateUf: numeric('overtime_rate_uf', { precision: 10, scale: 4 }).notNull().default('0'),
+    /** Habilitado por el líder del proyecto/equipo — sin esto, las horas cargadas contra este proyecto no pueden marcarse como horas extra. */
+    allowsOvertime: boolean('allows_overtime').notNull().default(false),
 
     quotationLink: text('quotation_link'),
     contractLink: text('contract_link'),

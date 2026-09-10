@@ -2,7 +2,12 @@ import { Inject, Injectable } from '@nestjs/common';
 import { CLOCK, ForbiddenError, ID_GENERATOR, err, ok, type ApplicationError, type Clock, type IdGenerator, type Result } from '@kora/core';
 import type { CreateHourEntryInput, RoleCode } from '@kora/contracts';
 import { HourEntry } from '../../domain/entities/hour-entry.entity';
-import { InvalidDesignatedApproverError, ProjectStoppedError, ReferencedProjectNotFoundError } from '../../domain/errors/hour-entry.errors';
+import {
+  InvalidDesignatedApproverError,
+  ProjectOvertimeNotAllowedError,
+  ProjectStoppedError,
+  ReferencedProjectNotFoundError,
+} from '../../domain/errors/hour-entry.errors';
 import { HOUR_ENTRY_REPOSITORY, type HourEntryRepository } from '../../domain/repositories/hour-entry.repository';
 import { HOUR_ENTRY_USER_READER, type HourEntryUserReader } from '../ports/hour-entry-user-reader.port';
 import { HOUR_ENTRY_PROJECT_READER, type HourEntryProjectReader } from '../ports/hour-entry-project-reader.port';
@@ -55,6 +60,7 @@ export class CreateHourEntryUseCase implements UseCase<CreateHourEntryCommand, {
       const project = await this.projects.findById(data.projectId);
       if (!project) return err(new ReferencedProjectNotFoundError(data.projectId));
       if (project.status === 'on_hold') return err(new ProjectStoppedError());
+      if (data.isOvertime && !project.allowsOvertime) return err(new ProjectOvertimeNotAllowedError());
       projectStageAtEntry = project.status;
     }
 

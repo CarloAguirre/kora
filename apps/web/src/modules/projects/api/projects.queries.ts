@@ -5,6 +5,7 @@ import type {
   ChangeProjectStatusInput,
   CreateProjectInput,
   ListProjectsQuery,
+  SetProjectOvertimeAuthorizationInput,
   UpdateProjectInput,
   UpdateProjectObservationInput,
 } from '@kora/contracts';
@@ -59,6 +60,15 @@ export function useChangeProjectStatus() {
   return useMutation({
     mutationFn: ({ projectId, input }: { projectId: string; input: ChangeProjectStatusInput }) =>
       projectsApi.changeStatus(projectId, input),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useSetProjectOvertimeAuthorization() {
+  const invalidate = useInvalidateProjects();
+  return useMutation({
+    mutationFn: ({ projectId, input }: { projectId: string; input: SetProjectOvertimeAuthorizationInput }) =>
+      projectsApi.setOvertimeAuthorization(projectId, input),
     onSuccess: () => invalidate(),
   });
 }

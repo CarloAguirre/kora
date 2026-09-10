@@ -1,7 +1,13 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CLOCK, ForbiddenError, err, ok, type ApplicationError, type Clock, type Result } from '@kora/core';
 import type { RoleCode, UpdateHourEntryInput } from '@kora/contracts';
-import { HourEntryNotFoundError, InvalidDesignatedApproverError, ProjectStoppedError, ReferencedProjectNotFoundError } from '../../domain/errors/hour-entry.errors';
+import {
+  HourEntryNotFoundError,
+  InvalidDesignatedApproverError,
+  ProjectOvertimeNotAllowedError,
+  ProjectStoppedError,
+  ReferencedProjectNotFoundError,
+} from '../../domain/errors/hour-entry.errors';
 import { HOUR_ENTRY_REPOSITORY, type HourEntryRepository } from '../../domain/repositories/hour-entry.repository';
 import { HOUR_ENTRY_USER_READER, type HourEntryUserReader } from '../ports/hour-entry-user-reader.port';
 import { HOUR_ENTRY_PROJECT_READER, type HourEntryProjectReader } from '../ports/hour-entry-project-reader.port';
@@ -36,10 +42,17 @@ export class UpdateHourEntryUseCase implements UseCase<UpdateHourEntryCommand, v
       return err(new ForbiddenError('No puedes editar este registro.', 'HOUR_ENTRY_CANNOT_EDIT'));
     }
 
+    const isOvertime = data.isOvertime !== undefined ? data.isOvertime : entry.isOvertime;
+    const projectId = data.projectId !== undefined ? data.projectId : entry.projectId;
+
     if (data.projectId) {
       const project = await this.projects.findById(data.projectId);
       if (!project) return err(new ReferencedProjectNotFoundError(data.projectId));
       if (project.status === 'on_hold') return err(new ProjectStoppedError());
+      if (isOvertime && !project.allowsOvertime) return err(new ProjectOvertimeNotAllowedError());
+    } else if (isOvertime && projectId) {
+      const project = await this.projects.findById(projectId);
+      if (project && !project.allowsOvertime) return err(new ProjectOvertimeNotAllowedError());
     }
 
     if (data.designatedApproverUserId) {
@@ -50,7 +63,6 @@ export class UpdateHourEntryUseCase implements UseCase<UpdateHourEntryCommand, v
     }
 
     const owner = await this.users.findById(entry.userId);
-    const isOvertime = data.isOvertime !== undefined ? data.isOvertime : entry.isOvertime;
     // Horas extra siempre exigen aprobación de líder, aunque el rol del dueño no la requiera.
     const ownerRequiresApproval = owner?.role === 'collaborator' || isOvertime;
 

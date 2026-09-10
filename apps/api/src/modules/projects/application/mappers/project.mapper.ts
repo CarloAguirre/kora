@@ -37,6 +37,7 @@ export function toProjectSummary(item: ProjectListItem): ProjectSummary {
     actualProgress: item.actualProgress,
     supportPlanDescription: item.supportPlanDescription,
     supportHours: item.supportHours,
+    allowsOvertime: item.allowsOvertime,
     createdAt: item.createdAt.toISOString(),
   };
 }
@@ -52,6 +53,7 @@ export interface ProjectDetailSource {
   readonly teams: readonly ProjectTeamRecord[];
   readonly observations: readonly ProjectObservationRecord[];
   readonly actorUserId: string;
+  readonly canAuthorizeOvertime: boolean;
   readonly now: Date;
 }
 
@@ -119,6 +121,8 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
     supportPlanDescription: snapshot.supportPlanDescription,
     supportHours: Number(snapshot.supportHours),
     overtimeRateUf: Number(snapshot.overtimeRateUf),
+    allowsOvertime: snapshot.allowsOvertime,
+    canAuthorizeOvertime: source.canAuthorizeOvertime,
     quotationLink: snapshot.quotationLink,
     contractLink: snapshot.contractLink,
     additionalLinks: snapshot.additionalLinks,

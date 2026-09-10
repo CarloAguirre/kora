@@ -133,6 +133,10 @@ export function DailyEntryForm({
     if (hours > 24) return 'No puede registrar más de 24 horas en un día.';
     const needsProject = PROJECT_REQUIRING_ASSIGNMENTS.has(block.assignment);
     if (needsProject && !block.projectId) return 'Selecciona un proyecto para esta asignación.';
+    if (needsProject && block.isOvertime) {
+      const project = (projects?.items ?? []).find((p) => p.id === block.projectId);
+      if (!project?.allowsOvertime) return 'Este proyecto no tiene autorizadas horas extra.';
+    }
     // Horas de proyecto se aprueban por acceso al proyecto, no por aprobador
     // designado (docs/DECISION-M4-HORAS.md) — el backend rechaza ambos a la vez.
     const needsApprover = !needsProject && (user?.role === 'collaborator' || block.isOvertime);
@@ -226,6 +230,8 @@ export function DailyEntryForm({
         const needsProject = PROJECT_REQUIRING_ASSIGNMENTS.has(block.assignment as HourEntryAssignment);
         const showApproverInRow =
           block.assignment !== '' && !needsProject && (user?.role === 'collaborator' || block.isOvertime);
+        const selectedProject = needsProject ? (projects?.items ?? []).find((p) => p.id === block.projectId) : undefined;
+        const overtimeDisabled = needsProject && !selectedProject?.allowsOvertime;
         return (
           <div key={block.key} className={styles.block}>
             <div
@@ -293,7 +299,13 @@ export function DailyEntryForm({
                       placeholder="Seleccionar proyecto..."
                       options={(projects?.items ?? []).map((project) => ({ value: project.id, label: project.name }))}
                       value={block.projectId}
-                      onChange={(event) => updateBlock(block.key, { projectId: event.target.value })}
+                      onChange={(event) => {
+                        const nextProject = (projects?.items ?? []).find((p) => p.id === event.target.value);
+                        updateBlock(block.key, {
+                          projectId: event.target.value,
+                          isOvertime: nextProject?.allowsOvertime ? block.isOvertime : false,
+                        });
+                      }}
                     />
                   )}
                 </div>
@@ -328,22 +340,32 @@ export function DailyEntryForm({
 
                   <div className={styles.overtimeField}>
                     <span className={styles.stepperLabel}>Horas Extra</span>
-                    <label className={styles.overtimeToggleRow}>
+                    <label
+                      className={styles.overtimeToggleRow}
+                      title={overtimeDisabled ? 'Este proyecto no tiene autorizadas horas extra.' : undefined}
+                    >
                       <input
                         type="checkbox"
                         className={styles.overtimeCheckbox}
+                        disabled={overtimeDisabled}
                         checked={block.isOvertime}
                         onChange={(event) => updateBlock(block.key, { isOvertime: event.target.checked })}
                       />
                       <span className={styles.overtimeSwitch} aria-hidden="true" />
                       <span className={styles.overtimeState}>{block.isOvertime ? 'Marcada' : 'No marcada'}</span>
                     </label>
-                    {block.isOvertime && (
+                    {block.isOvertime ? (
                       <span className={styles.overtimeHelp}>
                         {needsProject
                           ? 'Quedará pendiente de aprobación del líder del proyecto.'
                           : 'Quedará pendiente de aprobación del líder que selecciones.'}
                       </span>
+                    ) : (
+                      needsProject &&
+                      block.projectId &&
+                      overtimeDisabled && (
+                        <span className={styles.overtimeHelp}>Este proyecto no tiene autorizadas horas extra.</span>
+                      )
                     )}
                   </div>
                 </div>

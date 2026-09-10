@@ -27,6 +27,7 @@ export interface ProjectProps {
   supportPlanDescription: string | null;
   supportHours: number;
   overtimeRateUf: number;
+  allowsOvertime: boolean;
   quotationLink: string | null;
   contractLink: string | null;
   additionalLinks: string | null;
@@ -107,6 +108,7 @@ export class Project extends AggregateRoot<string> {
       supportPlanDescription: props.supportPlanDescription ?? null,
       supportHours: props.supportHours ?? 0,
       overtimeRateUf: 0,
+      allowsOvertime: false,
       quotationLink: props.quotationLink ?? null,
       contractLink: props.contractLink ?? null,
       additionalLinks: props.additionalLinks ?? null,
@@ -164,6 +166,10 @@ export class Project extends AggregateRoot<string> {
     return this.props.leaderUserId;
   }
 
+  get allowsOvertime(): boolean {
+    return this.props.allowsOvertime;
+  }
+
   get legacyId(): number | null {
     return this.props.legacyId;
   }
@@ -196,6 +202,7 @@ export class Project extends AggregateRoot<string> {
         | 'actualProgress'
         | 'supportPlanDescription'
         | 'supportHours'
+        | 'allowsOvertime'
         | 'quotationLink'
         | 'contractLink'
       >

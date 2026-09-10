@@ -7,6 +7,7 @@ import { UpdateProjectUseCase } from './application/use-cases/update-project.use
 import { ListProjectsUseCase } from './application/use-cases/list-projects.use-case';
 import { GetProjectUseCase } from './application/use-cases/get-project.use-case';
 import { ChangeProjectStatusUseCase } from './application/use-cases/change-project-status.use-case';
+import { SetProjectOvertimeAuthorizationUseCase } from './application/use-cases/set-project-overtime-authorization.use-case';
 import { DeleteProjectUseCase } from './application/use-cases/delete-project.use-case';
 import { AssignProjectTeamMemberUseCase } from './application/use-cases/assign-project-team-member.use-case';
 import { UnassignProjectTeamMemberUseCase } from './application/use-cases/unassign-project-team-member.use-case';
@@ -49,6 +50,7 @@ import { DrizzleProjectTeamMemberValidator } from './infrastructure/services/dri
     ListProjectsUseCase,
     GetProjectUseCase,
     ChangeProjectStatusUseCase,
+    SetProjectOvertimeAuthorizationUseCase,
     DeleteProjectUseCase,
     AssignProjectTeamMemberUseCase,
     UnassignProjectTeamMemberUseCase,

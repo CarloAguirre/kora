@@ -83,3 +83,10 @@ export class ProjectStoppedError extends ConflictError {
     super('No se pueden registrar horas en un proyecto detenido.', 'HOUR_ENTRY_PROJECT_STOPPED');
   }
 }
+
+/** El proyecto no tiene autorizadas horas extra — el líder del proyecto/equipo debe habilitarlo primero. */
+export class ProjectOvertimeNotAllowedError extends ConflictError {
+  constructor() {
+    super('Este proyecto no tiene autorizadas horas extra.', 'HOUR_ENTRY_PROJECT_OVERTIME_NOT_ALLOWED');
+  }
+}

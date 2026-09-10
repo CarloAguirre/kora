@@ -54,6 +54,7 @@ export interface ProjectListItem {
   readonly actualProgress: number | null;
   readonly supportPlanDescription: string | null;
   readonly supportHours: number;
+  readonly allowsOvertime: boolean;
   readonly createdAt: Date;
 }
 

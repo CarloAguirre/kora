@@ -86,7 +86,7 @@ describe('GetProjectPendingApprovalsUseCase', () => {
   it('rechaza a quien no es líder de este proyecto (ni admin/pmo)', async () => {
     const useCase = new GetProjectPendingApprovalsUseCase(
       new FakeEntryRepository([]),
-      new FakeProjectReader({ id: 'project-1', name: 'Proyecto', status: 'active', leaderUserId: PROJECT_LEADER.id }, {}),
+      new FakeProjectReader({ id: 'project-1', name: 'Proyecto', status: 'active', leaderUserId: PROJECT_LEADER.id, allowsOvertime: false }, {}),
     );
 
     const result = await useCase.execute({
@@ -102,7 +102,7 @@ describe('GetProjectPendingApprovalsUseCase', () => {
   it('deja ver el resumen al propio líder del proyecto', async () => {
     const useCase = new GetProjectPendingApprovalsUseCase(
       new FakeEntryRepository([]),
-      new FakeProjectReader({ id: 'project-1', name: 'Proyecto', status: 'active', leaderUserId: PROJECT_LEADER.id }, {}),
+      new FakeProjectReader({ id: 'project-1', name: 'Proyecto', status: 'active', leaderUserId: PROJECT_LEADER.id, allowsOvertime: false }, {}),
     );
 
     const result = await useCase.execute({
@@ -117,7 +117,7 @@ describe('GetProjectPendingApprovalsUseCase', () => {
   it('deja ver el resumen a admin/pmo aunque no lideren el proyecto', async () => {
     const useCase = new GetProjectPendingApprovalsUseCase(
       new FakeEntryRepository([]),
-      new FakeProjectReader({ id: 'project-1', name: 'Proyecto', status: 'active', leaderUserId: PROJECT_LEADER.id }, {}),
+      new FakeProjectReader({ id: 'project-1', name: 'Proyecto', status: 'active', leaderUserId: PROJECT_LEADER.id, allowsOvertime: false }, {}),
     );
 
     const result = await useCase.execute({
@@ -142,7 +142,7 @@ describe('GetProjectPendingApprovalsUseCase', () => {
     const useCase = new GetProjectPendingApprovalsUseCase(
       new FakeEntryRepository(items),
       new FakeProjectReader(
-        { id: 'project-1', name: 'Proyecto', status: 'active', leaderUserId: PROJECT_LEADER.id },
+        { id: 'project-1', name: 'Proyecto', status: 'active', leaderUserId: PROJECT_LEADER.id, allowsOvertime: false },
         {
           'owner-a1': [TEAM_LEADER_A],
           'owner-b1': [TEAM_LEADER_B],
@@ -200,7 +200,7 @@ describe('GetProjectPendingApprovalsUseCase', () => {
     const useCase = new GetProjectPendingApprovalsUseCase(
       new FakeEntryRepository(items),
       new FakeProjectReader(
-        { id: 'project-1', name: 'Proyecto', status: 'active', leaderUserId: PROJECT_LEADER.id },
+        { id: 'project-1', name: 'Proyecto', status: 'active', leaderUserId: PROJECT_LEADER.id, allowsOvertime: false },
         { 'owner-a1': [TEAM_LEADER_A], 'owner-a2': [TEAM_LEADER_A] },
       ),
     );

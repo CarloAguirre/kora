@@ -25,6 +25,7 @@ export interface ProjectRow {
   supportPlanDescription: string | null;
   supportHours: string;
   overtimeRateUf: string;
+  allowsOvertime: boolean;
   quotationLink: string | null;
   contractLink: string | null;
   additionalLinks: string | null;
@@ -57,6 +58,7 @@ export function toDomain(row: ProjectRow): Project {
     supportPlanDescription: row.supportPlanDescription,
     supportHours: Number(row.supportHours),
     overtimeRateUf: Number(row.overtimeRateUf),
+    allowsOvertime: row.allowsOvertime,
     quotationLink: row.quotationLink,
     contractLink: row.contractLink,
     additionalLinks: row.additionalLinks,
@@ -91,6 +93,7 @@ export function toPersistence(project: Project) {
     supportPlanDescription: snapshot.supportPlanDescription,
     supportHours: String(snapshot.supportHours),
     overtimeRateUf: String(snapshot.overtimeRateUf),
+    allowsOvertime: snapshot.allowsOvertime,
     quotationLink: snapshot.quotationLink,
     contractLink: snapshot.contractLink,
     additionalLinks: snapshot.additionalLinks,

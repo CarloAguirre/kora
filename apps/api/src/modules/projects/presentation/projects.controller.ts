@@ -5,6 +5,7 @@ import {
   changeProjectStatusSchema,
   createProjectSchema,
   listProjectsQuerySchema,
+  setProjectOvertimeAuthorizationSchema,
   updateProjectObservationSchema,
   updateProjectSchema,
   type AddProjectObservationInput,
@@ -14,6 +15,7 @@ import {
   type ListProjectsQuery,
   type ListProjectsResponse,
   type ProjectDetail,
+  type SetProjectOvertimeAuthorizationInput,
   type UpdateProjectInput,
   type UpdateProjectObservationInput,
 } from '@kora/contracts';
@@ -27,6 +29,7 @@ import { UpdateProjectUseCase } from '../application/use-cases/update-project.us
 import { ListProjectsUseCase } from '../application/use-cases/list-projects.use-case';
 import { GetProjectUseCase } from '../application/use-cases/get-project.use-case';
 import { ChangeProjectStatusUseCase } from '../application/use-cases/change-project-status.use-case';
+import { SetProjectOvertimeAuthorizationUseCase } from '../application/use-cases/set-project-overtime-authorization.use-case';
 import { DeleteProjectUseCase } from '../application/use-cases/delete-project.use-case';
 import { AssignProjectTeamMemberUseCase } from '../application/use-cases/assign-project-team-member.use-case';
 import { UnassignProjectTeamMemberUseCase } from '../application/use-cases/unassign-project-team-member.use-case';
@@ -42,6 +45,7 @@ export class ProjectsController {
     private readonly listProjects: ListProjectsUseCase,
     private readonly getProject: GetProjectUseCase,
     private readonly changeStatus: ChangeProjectStatusUseCase,
+    private readonly setOvertimeAuthorization: SetProjectOvertimeAuthorizationUseCase,
     private readonly deleteProject: DeleteProjectUseCase,
     private readonly assignMember: AssignProjectTeamMemberUseCase,
     private readonly unassignMember: UnassignProjectTeamMemberUseCase,
@@ -107,6 +111,31 @@ export class ProjectsController {
     @CurrentUser() actor: RequestUser,
   ): Promise<void> {
     unwrapOrThrow(await this.changeStatus.execute({ projectId: id, data: body, actor: toActorContext(actor) }));
+  }
+
+  /**
+   * Endpoint propio (no parte de `PATCH /projects/:id`) porque ese exige
+   * `projects:manage` a nivel de decorador — un líder de proyecto/equipo sin
+   * ese permiso igual debe poder autorizar horas extra en SU proyecto, sin
+   * abrir el resto de los campos del proyecto. La autorización fina vive en
+   * `SetProjectOvertimeAuthorizationUseCase`.
+   */
+  @Patch(':id/overtime')
+  @RequireAnyPermission('projects:manage', 'projects:read_assigned')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async setOvertime(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(setProjectOvertimeAuthorizationSchema)) body: SetProjectOvertimeAuthorizationInput,
+    @CurrentUser() actor: RequestUser,
+  ): Promise<void> {
+    unwrapOrThrow(
+      await this.setOvertimeAuthorization.execute({
+        projectId: id,
+        allowsOvertime: body.allowsOvertime,
+        actor: toActorContext(actor),
+        actorPermissions: actor.permissions,
+      }),
+    );
   }
 
   @Delete(':id')

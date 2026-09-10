@@ -5,6 +5,7 @@ export interface HourEntryProjectReference {
   readonly name: string;
   readonly status: ProjectStatus;
   readonly leaderUserId: string | null;
+  readonly allowsOvertime: boolean;
 }
 
 export interface HourEntryProjectApprover {

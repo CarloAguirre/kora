@@ -86,6 +86,8 @@ export function WeeklyEntryForm({
   // designado (docs/DECISION-M4-HORAS.md) — el backend rechaza ambos a la vez.
   const needsApprover = !needsProject && assignment !== '' && (user?.role === 'collaborator' || isOvertime);
   const showApproverInRow = needsApprover;
+  const selectedProject = needsProject ? (projects?.items ?? []).find((p) => p.id === projectId) : undefined;
+  const overtimeDisabled = needsProject && !selectedProject?.allowsOvertime;
   const weekTotal = dayHours.reduce((sum, value) => sum + (Number(value) || 0), 0);
 
   const friday = new Date(monday);
@@ -160,6 +162,10 @@ export function WeeklyEntryForm({
     }
     if (needsApprover && !designatedApproverUserId) {
       setError('Selecciona a quién aprueba estas horas.');
+      return;
+    }
+    if (needsProject && isOvertime && overtimeDisabled) {
+      setError('Este proyecto no tiene autorizadas horas extra.');
       return;
     }
     if (description.trim().length > 0 && description.trim().length < MIN_DESCRIPTION_LENGTH) {
@@ -259,7 +265,11 @@ export function WeeklyEntryForm({
             placeholder="Seleccionar proyecto..."
             options={(projects?.items ?? []).map((project) => ({ value: project.id, label: project.name }))}
             value={projectId}
-            onChange={(event) => setProjectId(event.target.value)}
+            onChange={(event) => {
+              const nextProject = (projects?.items ?? []).find((p) => p.id === event.target.value);
+              setProjectId(event.target.value);
+              if (!nextProject?.allowsOvertime) setIsOvertime(false);
+            }}
           />
         )}
       </div>
@@ -268,22 +278,30 @@ export function WeeklyEntryForm({
         <TextField label="Actividad" placeholder="Ej: Diseño webapp" value={category} onChange={(event) => setCategory(event.target.value)} />
         <div className={styles.overtimeField}>
           <span className={styles.stepperLabel}>Horas Extra</span>
-          <label className={styles.overtimeToggleRow}>
+          <label
+            className={styles.overtimeToggleRow}
+            title={overtimeDisabled ? 'Este proyecto no tiene autorizadas horas extra.' : undefined}
+          >
             <input
               type="checkbox"
               className={styles.overtimeCheckbox}
+              disabled={overtimeDisabled}
               checked={isOvertime}
               onChange={(event) => setIsOvertime(event.target.checked)}
             />
             <span className={styles.overtimeSwitch} aria-hidden="true" />
             <span className={styles.overtimeState}>{isOvertime ? 'Marcada' : 'No marcada'}</span>
           </label>
-          {isOvertime && (
+          {isOvertime ? (
             <span className={styles.overtimeHelp}>
               {needsProject
                 ? 'Quedará pendiente de aprobación del líder del proyecto.'
                 : 'Quedará pendiente de aprobación del líder que selecciones.'}
             </span>
+          ) : (
+            needsProject &&
+            projectId &&
+            overtimeDisabled && <span className={styles.overtimeHelp}>Este proyecto no tiene autorizadas horas extra.</span>
           )}
         </div>
       </div>

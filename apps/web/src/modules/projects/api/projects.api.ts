@@ -6,6 +6,7 @@ import type {
   ListProjectsQuery,
   ListProjectsResponse,
   ProjectDetail,
+  SetProjectOvertimeAuthorizationInput,
   UpdateProjectInput,
   UpdateProjectObservationInput,
 } from '@kora/contracts';
@@ -39,6 +40,9 @@ export const projectsApi = {
   },
   changeStatus(projectId: string, input: ChangeProjectStatusInput): Promise<void> {
     return api.patch<void>(`/projects/${projectId}/status`, input);
+  },
+  setOvertimeAuthorization(projectId: string, input: SetProjectOvertimeAuthorizationInput): Promise<void> {
+    return api.patch<void>(`/projects/${projectId}/overtime`, input);
   },
   remove(projectId: string): Promise<void> {
     return api.delete<void>(`/projects/${projectId}`);

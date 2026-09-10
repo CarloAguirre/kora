@@ -91,6 +91,7 @@ export class DrizzleProjectRepository implements ProjectRepository {
           actualProgress: projects.actualProgress,
           supportPlanDescription: projects.supportPlanDescription,
           supportHours: projects.supportHours,
+          allowsOvertime: projects.allowsOvertime,
           createdAt: projects.createdAt,
         })
         .from(projects)
@@ -126,6 +127,7 @@ export class DrizzleProjectRepository implements ProjectRepository {
       actualProgress: row.actualProgress,
       supportPlanDescription: row.supportPlanDescription,
       supportHours: Number(row.supportHours),
+      allowsOvertime: row.allowsOvertime,
       createdAt: row.createdAt,
     }));
 

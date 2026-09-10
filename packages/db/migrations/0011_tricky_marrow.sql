@@ -1,0 +1,1 @@
+ALTER TABLE "projects" ADD COLUMN "allows_overtime" boolean DEFAULT false NOT NULL;

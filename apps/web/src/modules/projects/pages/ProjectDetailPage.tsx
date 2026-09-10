@@ -9,7 +9,7 @@ import { ChevronLeftIcon, PencilIcon } from '@/shared/components/icons/Icons';
 import { useToast } from '@/shared/components/ui/Toast';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { ApiRequestError } from '@/shared/lib/api-client';
-import { useChangeProjectStatus, useProjectDetail } from '../api/projects.queries';
+import { useChangeProjectStatus, useProjectDetail, useSetProjectOvertimeAuthorization } from '../api/projects.queries';
 import { EditProjectDialog } from '../components/EditProjectDialog';
 import { DevelopmentProjectDetailView } from './DevelopmentProjectDetailView';
 import { SupportProjectDetailView } from './SupportProjectDetailView';
@@ -29,6 +29,7 @@ export function ProjectDetailPage() {
   const { can } = usePermissions();
   const toast = useToast();
   const changeStatus = useChangeProjectStatus();
+  const setOvertimeAuthorization = useSetProjectOvertimeAuthorization();
   const { data: project, isLoading, error } = useProjectDetail(projectId ?? null);
   const [editing, setEditing] = useState(false);
 
@@ -36,6 +37,20 @@ export function ProjectDetailPage() {
     if (!projectId) return;
     await changeStatus.mutateAsync({ projectId, input: { status } });
     toast.success('Se actualizó el estado del proyecto.');
+  };
+
+  const onToggleOvertime = async () => {
+    if (!projectId || !project) return;
+    try {
+      await setOvertimeAuthorization.mutateAsync({ projectId, input: { allowsOvertime: !project.allowsOvertime } });
+      toast.success(
+        project.allowsOvertime ? 'Se retiró la autorización de horas extra.' : 'Se autorizaron horas extra para este proyecto.',
+      );
+    } catch (toggleError) {
+      toast.error(
+        toggleError instanceof ApiRequestError ? toggleError.message : 'No se pudo actualizar la autorización de horas extra.',
+      );
+    }
   };
 
   if (error) {
@@ -72,6 +87,17 @@ export function ProjectDetailPage() {
             {can('projects:manage') && (
               <Button variant="outline" size="sm" iconLeft={<PencilIcon size={16} />} onClick={() => setEditing(true)}>
                 Editar proyecto
+              </Button>
+            )}
+
+            {project.canAuthorizeOvertime && (
+              <Button
+                variant="outline"
+                size="sm"
+                loading={setOvertimeAuthorization.isPending}
+                onClick={() => void onToggleOvertime()}
+              >
+                {project.allowsOvertime ? 'Retirar autorización de horas extra' : 'Autorizar horas extra'}
               </Button>
             )}
 
