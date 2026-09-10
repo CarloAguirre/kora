@@ -79,12 +79,23 @@ const CLIENT_PORTAL_ONLY_PERMISSIONS: readonly Permission[] = [
   'tickets:read_own_client',
 ];
 
+/** `hours:register` es de quien ejecuta trabajo facturable y debe registrar sus
+ *  propias horas (líder, colaborador): admin/pmo gestionan la operación pero no
+ *  registran horas propias, así que —a diferencia del resto de PERMISSIONS—
+ *  tampoco lo heredan por el patrón "todos los permisos salvo…". */
+const ADMIN_TIER_EXCLUDED_PERMISSIONS: readonly Permission[] = ['hours:register'];
+
 export const DEFAULT_ROLE_PERMISSIONS: Readonly<Record<RoleCode, readonly Permission[]>> = {
-  admin: [...PERMISSIONS].filter((p) => !CLIENT_PORTAL_ONLY_PERMISSIONS.includes(p)),
+  admin: [...PERMISSIONS].filter(
+    (p) => !CLIENT_PORTAL_ONLY_PERMISSIONS.includes(p) && !ADMIN_TIER_EXCLUDED_PERMISSIONS.includes(p),
+  ),
   // Reemplazar datos de negocio por un archivo es una operación destructiva, no
   // administración estándar: a diferencia del resto de PERMISSIONS, pmo no la hereda.
   pmo: [...PERMISSIONS].filter(
-    (p) => p !== 'admin:legacy_import' && !CLIENT_PORTAL_ONLY_PERMISSIONS.includes(p),
+    (p) =>
+      p !== 'admin:legacy_import' &&
+      !CLIENT_PORTAL_ONLY_PERMISSIONS.includes(p) &&
+      !ADMIN_TIER_EXCLUDED_PERMISSIONS.includes(p),
   ),
   leader: [
     'teams:read',
