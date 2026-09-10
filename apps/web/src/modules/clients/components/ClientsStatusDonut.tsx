@@ -10,11 +10,16 @@ const SIZE = 160;
 const STROKE = 18;
 const RADIUS = (SIZE - STROKE) / 2;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+// Asegura que un conteo pequeño (ej. 1 inactivo de 53) siga siendo visible como arco en el anillo.
+const MIN_SEGMENT_RATIO = 0.035;
 
 /** "Cantidad de Clientes" — anillo Activos/Inactivos, igual disposición que la card homónima de la v1. */
 export function ClientsStatusDonut({ activeCount, inactiveCount, loading }: ClientsStatusDonutProps) {
   const total = activeCount + inactiveCount;
-  const activeRatio = total === 0 ? 0 : activeCount / total;
+  let activeRatio = total === 0 ? 0 : activeCount / total;
+  if (inactiveCount > 0 && 1 - activeRatio < MIN_SEGMENT_RATIO) {
+    activeRatio = 1 - MIN_SEGMENT_RATIO;
+  }
   const activeLength = CIRCUMFERENCE * activeRatio;
 
   return (
@@ -29,7 +34,7 @@ export function ClientsStatusDonut({ activeCount, inactiveCount, loading }: Clie
               cy={SIZE / 2}
               r={RADIUS}
               fill="none"
-              stroke="var(--kora-surface-disabled)"
+              stroke="var(--kora-border)"
               strokeWidth={STROKE}
             />
             {total > 0 && (
