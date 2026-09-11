@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { DashboardSupportSummary } from '@kora/contracts';
 import styles from './DashboardSupportTab.module.css';
@@ -20,6 +21,20 @@ interface DashboardSupportTabProps {
 /** Tab "Soporte" del Dashboard — igual disposición que la tab Soporte del `Dashboard` admin en la v1. */
 export function DashboardSupportTab({ support, loading }: DashboardSupportTabProps) {
   const { can } = usePermissions();
+  const [exporting, setExporting] = useState(false);
+
+  const handleExport = async () => {
+    if (!support) return;
+    setExporting(true);
+    try {
+      // Delay artificial para que se alcance a ver el estado "Generando…"
+      // antes de que el navegador dispare la descarga.
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      exportSupportReport(support);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   return (
     <div className={styles.tab}>
@@ -30,7 +45,9 @@ export function DashboardSupportTab({ support, loading }: DashboardSupportTabPro
             variant="outlineDark"
             iconLeft={<DownloadIcon size={16} />}
             disabled={!support}
-            onClick={() => support && exportSupportReport(support)}
+            loading={exporting}
+            loadingText="Generando…"
+            onClick={() => void handleExport()}
           >
             Descargar Reporte
           </Button>

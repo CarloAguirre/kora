@@ -70,6 +70,7 @@ export function ProjectsListPage() {
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState<SortState<ProjectSortField>>({ field: 'priority', direction: 'desc' });
   const [deleteTarget, setDeleteTarget] = useState<ProjectSummary | null>(null);
+  const [exporting, setExporting] = useState(false);
   const deleteProject = useDeleteProject();
 
   const listQuery =
@@ -213,10 +214,18 @@ export function ProjectsListPage() {
 
   const columns = tab === 'development' ? developmentColumns : supportColumns;
 
-  const handleExport = () => {
-    const items = chartSourceData?.items ?? [];
-    if (tab === 'development') exportDevelopmentProjects(items);
-    else exportSupportProjects(items);
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      // Delay artificial para que se alcance a ver el estado "Generando…"
+      // antes de que el navegador dispare la descarga.
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const items = chartSourceData?.items ?? [];
+      if (tab === 'development') exportDevelopmentProjects(items);
+      else exportSupportProjects(items);
+    } finally {
+      setExporting(false);
+    }
   };
 
   return (
@@ -225,7 +234,13 @@ export function ProjectsListPage() {
         <div className={styles.tabsRow}>
           <Tabs tabs={TABS} activeId={tab} onSelect={changeTab} />
           <div className={styles.tabsActions}>
-            <Button variant="outlineDark" iconLeft={<DownloadIcon size={16} />} onClick={handleExport}>
+            <Button
+              variant="outlineDark"
+              iconLeft={<DownloadIcon size={16} />}
+              loading={exporting}
+              loadingText="Generando…"
+              onClick={() => void handleExport()}
+            >
               Descargar {tab === 'development' ? 'Proyectos Desarrollo' : 'Soporte'}
             </Button>
             {can('projects:manage') && (
