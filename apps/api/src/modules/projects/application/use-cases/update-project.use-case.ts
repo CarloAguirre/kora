@@ -1,5 +1,14 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { CLOCK, err, ok, type ApplicationError, type Clock, type Result } from '@kora/core';
+import {
+  CLOCK,
+  UNIT_OF_WORK,
+  err,
+  ok,
+  type ApplicationError,
+  type Clock,
+  type Result,
+  type UnitOfWork,
+} from '@kora/core';
 import type { UpdateProjectInput } from '@kora/contracts';
 import {
   ProjectNameAlreadyInUseError,
@@ -7,6 +16,7 @@ import {
   ReferencedClientNotFoundError,
 } from '../../domain/errors/project.errors';
 import { PROJECT_REPOSITORY, type ProjectRepository } from '../../domain/repositories/project.repository';
+import { PROJECT_TEAM_REPOSITORY, type ProjectTeamRepository } from '../../domain/repositories/project-team.repository';
 import { PROJECT_CLIENT_READER, type ProjectClientReader } from '../ports/project-client-reader.port';
 import {
   AUDIT_RECORDER,
@@ -25,8 +35,10 @@ export interface UpdateProjectCommand {
 export class UpdateProjectUseCase implements UseCase<UpdateProjectCommand, void, ApplicationError> {
   constructor(
     @Inject(PROJECT_REPOSITORY) private readonly projects: ProjectRepository,
+    @Inject(PROJECT_TEAM_REPOSITORY) private readonly projectTeams: ProjectTeamRepository,
     @Inject(PROJECT_CLIENT_READER) private readonly clients: ProjectClientReader,
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
+    @Inject(UNIT_OF_WORK) private readonly unitOfWork: UnitOfWork,
     @Inject(CLOCK) private readonly clock: Clock,
   ) {}
 
@@ -82,7 +94,23 @@ export class UpdateProjectUseCase implements UseCase<UpdateProjectCommand, void,
     if (updated.isErr()) return err(updated.error);
 
     try {
-      await this.projects.save(project);
+      await this.unitOfWork.run(async (tx) => {
+        await this.projects.save(project, tx);
+        if (data.teams) {
+          for (const team of data.teams) {
+            await this.projectTeams.save(
+              {
+                projectId: project.id,
+                teamId: team.teamId,
+                leaderUserId: team.leaderUserId ?? null,
+                memberCount: team.memberCount ?? null,
+                assignedHours: team.assignedHours ?? null,
+              },
+              tx,
+            );
+          }
+        }
+      });
     } catch (error) {
       if (isUniqueViolation(error)) return err(new ProjectNameAlreadyInUseError(data.name ?? project.name));
       throw error;

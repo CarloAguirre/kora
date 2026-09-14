@@ -213,6 +213,8 @@ export const updateProjectSchema = z.object({
   supportHours: z.coerce.number().min(0).optional(),
   quotationLink: z.string().trim().max(500).optional(),
   contractLink: z.string().trim().max(500).optional(),
+  /** Editar líder/colaboradores/horas de los equipos del proyecto (la UI de edición no ofrece agregar/quitar equipos). */
+  teams: z.array(createProjectTeamAssignmentSchema).max(20).optional(),
 });
 export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
 

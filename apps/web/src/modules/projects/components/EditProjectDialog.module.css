@@ -29,6 +29,27 @@
   margin-top: var(--kora-space-2);
 }
 
+.teamsSelected {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-3);
+}
+
+.teamDetailCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-2);
+  padding: var(--kora-space-3) var(--kora-space-4);
+  border-radius: var(--kora-radius);
+  background: var(--kora-surface-muted);
+}
+
+.teamDetailName {
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-navy);
+}
+
 .alert {
   display: flex;
   align-items: flex-start;

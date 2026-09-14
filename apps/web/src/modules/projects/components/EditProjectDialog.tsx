@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useFieldArray, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
@@ -44,9 +44,10 @@ export interface EditProjectDialogProps {
 
 /**
  * Edición de los datos generales de un proyecto ya creado. El tipo
- * (desarrollo/soporte) y los equipos asignados no se editan aquí: el tipo es
- * inmutable tras la creación y los equipos tienen su propio flujo de
- * asignación en la ficha (`DevelopmentProjectDetailView`).
+ * (desarrollo/soporte) no se edita aquí: es inmutable tras la creación. Los
+ * equipos asignados sí permiten editar líder/colaboradores/horas (como en la
+ * v1) — agregar o quitar equipos sigue siendo un flujo aparte en la ficha
+ * (`DevelopmentProjectDetailView`).
  */
 export function EditProjectDialog({ open, project, onClose, onSuccess }: EditProjectDialogProps) {
   const isDevelopment = project.type === 'development';
@@ -60,11 +61,14 @@ export function EditProjectDialog({ open, project, onClose, onSuccess }: EditPro
     setValue,
     reset,
     setError,
+    control,
     formState: { errors, isSubmitting },
   } = useForm<ProjectFormValues, unknown, UpdateProjectInput>({
     resolver: zodResolver(updateProjectSchema),
     defaultValues: toFormValues(project),
   });
+
+  const { fields: teamFields } = useFieldArray({ control, name: 'teams' });
 
   useEffect(() => {
     if (!open) return;
@@ -236,6 +240,29 @@ export function EditProjectDialog({ open, project, onClose, onSuccess }: EditPro
           )}
         </div>
 
+        {isDevelopment && teamFields.length > 0 && (
+          <div className={styles.section}>
+            <h3 className={styles.sectionTitle}>Equipos e involucrados</h3>
+            <div className={styles.teamsSelected}>
+              {teamFields.map((field, index) => (
+                <div key={field.id} className={styles.teamDetailCard}>
+                  <span className={styles.teamDetailName}>{project.teams[index]?.teamName ?? '—'}</span>
+                  <div className={styles.row3}>
+                    <Select
+                      label="Líder"
+                      placeholder="Sin asignar"
+                      options={(leaders?.items ?? []).map((user) => ({ value: user.id, label: user.fullName }))}
+                      {...register(`teams.${index}.leaderUserId`, { setValueAs: emptyToNull })}
+                    />
+                    <TextField label="N° colaboradores" type="number" min={0} {...register(`teams.${index}.memberCount`)} />
+                    <TextField label="Horas estimadas" type="number" min={0} {...register(`teams.${index}.assignedHours`)} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className={styles.section}>
           <h3 className={styles.sectionTitle}>Documentación</h3>
           <div className={styles.row}>
@@ -268,5 +295,11 @@ function toFormValues(project: ProjectDetail): ProjectFormValues {
     supportHours: project.supportHours,
     quotationLink: project.quotationLink ?? '',
     contractLink: project.contractLink ?? '',
+    teams: project.teams.map((team) => ({
+      teamId: team.teamId,
+      leaderUserId: team.leader?.id ?? undefined,
+      memberCount: team.memberCount ?? undefined,
+      assignedHours: team.assignedHours ?? undefined,
+    })),
   };
 }
