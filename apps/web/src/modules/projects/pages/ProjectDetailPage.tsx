@@ -78,7 +78,16 @@ export function ProjectDetailPage() {
     );
   }
 
-  const leaderTeam = !can('projects:manage') && user ? project.teams.find((t) => t.leader?.id === user.id) : undefined;
+  const leaderTeam = user ? project.teams.find((t) => t.leader?.id === user.id) : undefined;
+  /**
+   * Un líder puede ser a la vez líder de proyecto (o tener `projects:manage`)
+   * y líder de uno de los equipos asignados — en ese caso conserva la vista
+   * completa (`DevelopmentProjectDetailView`), no la acotada a un solo
+   * equipo, pero igual puede crear/editar las tareas de su equipo desde ahí
+   * (ver `leaderTeamId` más abajo).
+   */
+  const isProjectLeader = user !== null && project.leader?.id === user.id;
+  const showTeamOnlyView = !can('projects:manage') && !isProjectLeader && Boolean(leaderTeam);
 
   return (
     <DashboardLayout title={project.name}>
@@ -118,12 +127,12 @@ export function ProjectDetailPage() {
           </div>
         </div>
 
-        {leaderTeam ? (
+        {showTeamOnlyView && leaderTeam ? (
           <TeamLeaderProjectView project={project} projectId={projectId} teamId={leaderTeam.teamId} />
         ) : project.type === 'support' ? (
           <SupportProjectDetailView project={project} projectId={projectId} />
         ) : (
-          <DevelopmentProjectDetailView project={project} projectId={projectId} />
+          <DevelopmentProjectDetailView project={project} projectId={projectId} leaderTeamId={leaderTeam?.teamId} />
         )}
 
         <EditProjectDialog
