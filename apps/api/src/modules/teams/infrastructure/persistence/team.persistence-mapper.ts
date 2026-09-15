@@ -6,6 +6,7 @@ export interface TeamRow {
   name: string;
   description: string | null;
   leaderUserId: string | null;
+  teamTypeId: string | null;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -18,6 +19,7 @@ export function toDomain(row: TeamRow): Team {
     name: row.name,
     description: row.description,
     leaderUserId: row.leaderUserId,
+    teamTypeId: row.teamTypeId,
     isActive: row.isActive,
     legacyId: row.legacyId,
     createdAt: row.createdAt,
@@ -32,6 +34,7 @@ export function toPersistence(team: Team) {
     name: snapshot.name,
     description: snapshot.description,
     leaderUserId: snapshot.leaderUserId,
+    teamTypeId: snapshot.teamTypeId,
     isActive: snapshot.isActive,
     legacyId: snapshot.legacyId,
     createdAt: snapshot.createdAt,

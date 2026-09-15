@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import type { Permission, ProjectDetail, ProjectTeamMember } from '@kora/contracts';
 import { DevelopmentProjectDetailView } from './DevelopmentProjectDetailView';
 import { AuthContext, type AuthContextValue } from '@/modules/auth/context/AuthContext';
@@ -22,6 +23,28 @@ vi.mock('../api/projects.queries', () => ({
   useAddProjectObservation: () => ({ mutateAsync: vi.fn() }),
   useUpdateProjectObservation: () => ({ mutateAsync: vi.fn() }),
   useDeleteProjectObservation: () => ({ mutateAsync: vi.fn() }),
+  useUpdateProject: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useCreateProjectModule: () => ({ mutateAsync: vi.fn() }),
+  useUpdateProjectModule: () => ({ mutateAsync: vi.fn() }),
+  useDeleteProjectModule: () => ({ mutateAsync: vi.fn() }),
+  useAddProjectModuleDelivery: () => ({ mutateAsync: vi.fn() }),
+  useUpdateProjectModuleDelivery: () => ({ mutateAsync: vi.fn() }),
+  useRemoveProjectModuleDelivery: () => ({ mutateAsync: vi.fn() }),
+  useCreateProjectModuleSegment: () => ({ mutateAsync: vi.fn() }),
+  useUpdateProjectModuleSegment: () => ({ mutateAsync: vi.fn() }),
+  useDeleteProjectModuleSegment: () => ({ mutateAsync: vi.fn() }),
+  useCreateProjectModuleTask: () => ({ mutateAsync: vi.fn() }),
+  useUpdateProjectModuleTask: () => ({ mutateAsync: vi.fn() }),
+  useDeleteProjectModuleTask: () => ({ mutateAsync: vi.fn() }),
+  // Requeridos por `DailyEntryForm`/`WeeklyEntryForm`, montados siempre (aunque
+  // cerrado el diálogo) por el botón "+" de `BitacoraMiniCard`.
+  useProjectsList: () => ({ data: { items: [] } }),
+  useProjectDetail: () => ({ data: undefined }),
+}));
+
+vi.mock('@/modules/users/api/users.queries', () => ({
+  // Requerido por `DailyEntryForm`/`WeeklyEntryForm` (ver nota sobre `useProjectsList` más abajo).
+  useUsersList: () => ({ data: { items: [] } }),
 }));
 
 vi.mock('@/modules/teams/api/teams.queries', () => ({
@@ -43,6 +66,10 @@ const { useProjectPendingApprovalsMock } = vi.hoisted(() => ({ useProjectPending
 vi.mock('@/modules/hours/api/hours.queries', () => ({
   useHourEntriesList: () => ({ data: { items: [] } }),
   useProjectPendingApprovals: useProjectPendingApprovalsMock,
+  // `BitacoraMiniCard` monta `HourEntryFormDialog` (siempre en el DOM, aunque
+  // cerrado — ver `Modal`) para el botón "+", que a su vez usa estos hooks.
+  useCreateHourEntry: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useHolidays: () => ({ data: [] }),
 }));
 
 function buildMember(overrides: Partial<ProjectTeamMember>): ProjectTeamMember {
@@ -122,6 +149,29 @@ function buildProject(): ProjectDetail {
       buildMember({ id: 'm8', userId: 'user-qa', teamId: 'team-qa', teamName: 'QA', fullName: 'Nueva Persona', consumedHours: 0 }),
     ],
     observations: [],
+    onHoldReason: null,
+    stopsClock: false,
+    scopeNotes: null,
+    deliveryDocumentation: null,
+    demoLink: null,
+    testEnvironmentLink: null,
+    figmaLink: null,
+    documentationLink: null,
+    impactBeforeHours: null,
+    impactBeforePeople: null,
+    impactBeforeDuration: null,
+    impactBeforeModality: null,
+    impactAfterHours: null,
+    impactAfterPeople: null,
+    impactAfterDuration: null,
+    impactAfterModality: null,
+    qaTestingStartDate: null,
+    qaTestingEndDate: null,
+    qaEvaluatedModule: null,
+    qaPlannedTests: null,
+    qaExecutedTests: null,
+    qaFailedTests: null,
+    modules: [],
     legacyId: null,
     updatedAt: '2026-01-01T00:00:00.000Z',
   };
@@ -150,11 +200,13 @@ function renderView(permissions: Permission[] = ['projects:manage'], pendingAppr
   };
 
   return render(
-    <AuthContext.Provider value={auth}>
-      <ToastProvider>
-        <DevelopmentProjectDetailView project={buildProject()} projectId="project-1" />
-      </ToastProvider>
-    </AuthContext.Provider>,
+    <MemoryRouter>
+      <AuthContext.Provider value={auth}>
+        <ToastProvider>
+          <DevelopmentProjectDetailView project={buildProject()} projectId="project-1" />
+        </ToastProvider>
+      </AuthContext.Provider>
+    </MemoryRouter>,
   );
 }
 

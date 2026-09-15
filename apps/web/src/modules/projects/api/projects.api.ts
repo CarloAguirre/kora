@@ -1,14 +1,23 @@
 import type {
+  AddProjectModuleDeliveryInput,
   AddProjectObservationInput,
   AssignProjectTeamMemberInput,
   ChangeProjectStatusInput,
   CreateProjectInput,
+  CreateProjectModuleInput,
+  CreateProjectModuleSegmentInput,
+  CreateProjectModuleTaskInput,
   ListProjectsQuery,
   ListProjectsResponse,
   ProjectDetail,
   SetProjectOvertimeAuthorizationInput,
   UpdateProjectInput,
+  UpdateProjectModuleDeliveryInput,
+  UpdateProjectModuleInput,
+  UpdateProjectModuleSegmentInput,
+  UpdateProjectModuleTaskInput,
   UpdateProjectObservationInput,
+  UpdateProjectTeamMemberInput,
 } from '@kora/contracts';
 import { api } from '@/shared/lib/api-client';
 
@@ -53,6 +62,9 @@ export const projectsApi = {
   unassignMember(projectId: string, assignmentId: string): Promise<void> {
     return api.delete<void>(`/projects/${projectId}/members/${assignmentId}`);
   },
+  updateMember(projectId: string, assignmentId: string, input: UpdateProjectTeamMemberInput): Promise<void> {
+    return api.patch<void>(`/projects/${projectId}/members/${assignmentId}`, input);
+  },
   addObservation(projectId: string, input: AddProjectObservationInput): Promise<{ id: string }> {
     return api.post<{ id: string }>(`/projects/${projectId}/observations`, input);
   },
@@ -61,6 +73,65 @@ export const projectsApi = {
   },
   removeObservation(projectId: string, observationId: string): Promise<void> {
     return api.delete<void>(`/projects/${projectId}/observations/${observationId}`);
+  },
+  createModule(projectId: string, input: CreateProjectModuleInput): Promise<{ id: string }> {
+    return api.post<{ id: string }>(`/projects/${projectId}/modules`, input);
+  },
+  updateModule(projectId: string, moduleId: string, input: UpdateProjectModuleInput): Promise<void> {
+    return api.patch<void>(`/projects/${projectId}/modules/${moduleId}`, input);
+  },
+  deleteModule(projectId: string, moduleId: string): Promise<void> {
+    return api.delete<void>(`/projects/${projectId}/modules/${moduleId}`);
+  },
+  addModuleDelivery(
+    projectId: string,
+    moduleId: string,
+    input: AddProjectModuleDeliveryInput,
+  ): Promise<{ id: string }> {
+    return api.post<{ id: string }>(`/projects/${projectId}/modules/${moduleId}/deliveries`, input);
+  },
+  removeModuleDelivery(projectId: string, moduleId: string, deliveryId: string): Promise<void> {
+    return api.delete<void>(`/projects/${projectId}/modules/${moduleId}/deliveries/${deliveryId}`);
+  },
+  updateModuleDelivery(
+    projectId: string,
+    moduleId: string,
+    deliveryId: string,
+    input: UpdateProjectModuleDeliveryInput,
+  ): Promise<void> {
+    return api.patch<void>(`/projects/${projectId}/modules/${moduleId}/deliveries/${deliveryId}`, input);
+  },
+  createModuleSegment(
+    projectId: string,
+    moduleId: string,
+    input: CreateProjectModuleSegmentInput,
+  ): Promise<{ id: string }> {
+    return api.post<{ id: string }>(`/projects/${projectId}/modules/${moduleId}/segments`, input);
+  },
+  updateModuleSegment(
+    projectId: string,
+    moduleId: string,
+    segmentId: string,
+    input: UpdateProjectModuleSegmentInput,
+  ): Promise<void> {
+    return api.patch<void>(`/projects/${projectId}/modules/${moduleId}/segments/${segmentId}`, input);
+  },
+  deleteModuleSegment(projectId: string, moduleId: string, segmentId: string): Promise<void> {
+    return api.delete<void>(`/projects/${projectId}/modules/${moduleId}/segments/${segmentId}`);
+  },
+  createModuleTask(projectId: string, moduleId: string, input: CreateProjectModuleTaskInput): Promise<{ id: string }> {
+    return api.post<{ id: string }>(`/projects/${projectId}/modules/${moduleId}/tasks`, input);
+  },
+  updateModuleTask(
+    projectId: string,
+    moduleId: string,
+    taskId: string,
+    input: UpdateProjectModuleTaskInput,
+  ): Promise<void> {
+    return api.patch<void>(`/projects/${projectId}/modules/${moduleId}/tasks/${taskId}`, input);
+  },
+  deleteModuleTask(projectId: string, moduleId: string, taskId: string): Promise<void> {
+    return api.delete<void>(`/projects/${projectId}/modules/${moduleId}/tasks/${taskId}`);
   },
 };
 

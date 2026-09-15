@@ -1,20 +1,17 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
 import type { TeamSummary } from '@kora/contracts';
 import styles from './TeamsListPage.module.css';
 import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Button } from '@/shared/components/ui/Button';
-import { Badge } from '@/shared/components/ui/Badge';
 import { Card } from '@/shared/components/ui/Card';
-import { DataTable, type Column } from '@/shared/components/ui/DataTable';
-import { Pagination } from '@/shared/components/ui/Pagination';
 import { Select } from '@/shared/components/ui/Select';
 import { useToast } from '@/shared/components/ui/Toast';
-import { PlusIcon, PencilIcon, TrashIcon, DownloadIcon } from '@/shared/components/icons/Icons';
+import { PlusIcon, DownloadIcon } from '@/shared/components/icons/Icons';
 import { TextField } from '@/shared/components/ui/TextField';
 import { SearchIcon } from '@/shared/components/icons/Icons';
 import { ConfirmActionDialog } from '@/shared/components/ui/ConfirmActionDialog';
 import { TeamFormDialog } from '../components/TeamFormDialog';
+import { TeamCard } from '../components/TeamCard';
 import { LeaderTeamConsole } from './LeaderTeamConsole';
 import { useDeleteTeam, useTeamsList } from '../api/teams.queries';
 import { useHourEntriesExport } from '@/modules/hours/hooks/useHourEntriesExport';
@@ -52,7 +49,7 @@ export function TeamsListPage() {
   return <TeamsAdminListPage />;
 }
 
-/** Administración de equipos (M2). Sigue el mismo patrón compacto de Usuarios/Clientes. */
+/** Administración de equipos (M2). */
 function TeamsAdminListPage() {
   const { user } = useAuth();
   const { can } = usePermissions();
@@ -60,10 +57,12 @@ function TeamsAdminListPage() {
   const { exporting, exportError, exportEntries } = useHourEntriesExport();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  const [page, setPage] = useState(1);
+  // Sin paginación de servidor: hoy la organización tiene un puñado de equipos
+  // (ver captura de referencia), así que se trae todo de una vez y los KPIs se
+  // calculan en el cliente — mismo criterio que `useUsersList({ pageSize: 200 })`
+  // en `TeamDetailPage` para listas de este tamaño.
   const { data, isLoading, error } = useTeamsList({
-    page,
-    pageSize: 25,
+    pageSize: 100,
     search: search || undefined,
     isActive: statusFilter === '' ? undefined : statusFilter === 'true',
   });
@@ -84,46 +83,8 @@ function TeamsAdminListPage() {
     toast.success(`Se eliminó el equipo ${dialog.team.name}.`);
   };
 
-  const columns: Column<TeamSummary>[] = [
-    {
-      key: 'name',
-      header: 'Nombre',
-      render: (team) => (
-        <Link to={`/equipos/${team.id}`} className={styles.link}>
-          {team.name}
-        </Link>
-      ),
-    },
-    { key: 'leader', header: 'Líder', render: (team) => team.leader?.fullName ?? <span className={styles.empty}>—</span> },
-    { key: 'memberCount', header: 'Miembros', render: (team) => String(team.memberCount) },
-    {
-      key: 'status',
-      header: 'Estado',
-      render: (team) => <Badge tone={team.isActive ? 'success' : 'neutral'}>{team.isActive ? 'Activo' : 'Inactivo'}</Badge>,
-    },
-    {
-      key: 'actions',
-      header: 'Acciones',
-      align: 'right',
-      width: '110px',
-      render: (team) =>
-        can('teams:manage') ? (
-          <div className={styles.actions}>
-            <Button variant="ghost" size="icon" onClick={() => setDialog({ kind: 'form', team })} aria-label={`Editar ${team.name}`}>
-              <PencilIcon size={16} />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setDialog({ kind: 'delete', team })}
-              aria-label={`Eliminar ${team.name}`}
-            >
-              <TrashIcon size={16} />
-            </Button>
-          </div>
-        ) : null,
-    },
-  ];
+  const teams = data?.items ?? [];
+  const totalPeople = teams.reduce((sum, team) => sum + team.memberCount, 0);
 
   return (
     <DashboardLayout title="Equipos">
@@ -156,47 +117,55 @@ function TeamsAdminListPage() {
           </p>
         )}
 
-        <Card>
-          <div className={styles.filters}>
-            <TextField
-              className={styles.search}
-              label="Buscar"
-              type="search"
-              placeholder="Nombre del equipo"
-              value={search}
-              onChange={(event) => {
-                setSearch(event.target.value);
-                setPage(1);
-              }}
-              iconLeft={<SearchIcon size={16} />}
-            />
-            <Select
-              className={styles.statusFilter}
-              label="Estado"
-              placeholder="Todos"
-              options={STATUS_FILTER_OPTIONS}
-              value={statusFilter}
-              onChange={(event) => {
-                setStatusFilter(event.target.value);
-                setPage(1);
-              }}
-            />
-          </div>
+        <div className={styles.kpis}>
+          <Card className={styles.kpiCard}>
+            <span className={styles.kpiLabel}>Equipos activos</span>
+            <span className={styles.kpiValue}>{data ? teams.filter((team) => team.isActive).length : '…'}</span>
+          </Card>
+          <Card className={styles.kpiCard}>
+            <span className={styles.kpiLabel}>Personas en equipos</span>
+            <span className={styles.kpiValue}>{data ? totalPeople : '…'}</span>
+          </Card>
+        </div>
 
-          <DataTable
-            caption="Listado de equipos"
-            columns={columns}
-            items={data?.items ?? []}
-            getRowKey={(team) => team.id}
-            loading={isLoading}
-            error={error ? 'No se pudo cargar el listado de equipos.' : null}
-            emptyMessage="No hay equipos que coincidan con la búsqueda."
+        <div className={styles.filters}>
+          <TextField
+            className={styles.search}
+            label="Buscar"
+            type="search"
+            placeholder="Nombre del equipo"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            iconLeft={<SearchIcon size={16} />}
           />
+          <Select
+            className={styles.statusFilter}
+            label="Estado"
+            placeholder="Todos"
+            options={STATUS_FILTER_OPTIONS}
+            value={statusFilter}
+            onChange={(event) => setStatusFilter(event.target.value)}
+          />
+        </div>
 
-          {data && (
-            <Pagination page={page} pageCount={data.pageCount} total={data.total} pageSize={data.pageSize} onPageChange={setPage} />
+        <div className={styles.grid}>
+          {isLoading && <p className={styles.gridMessage}>Cargando…</p>}
+          {!isLoading && error && <p className={styles.gridMessage}>No se pudo cargar el listado de equipos.</p>}
+          {!isLoading && !error && teams.length === 0 && (
+            <p className={styles.gridMessage}>No hay equipos que coincidan con la búsqueda.</p>
           )}
-        </Card>
+          {!isLoading &&
+            !error &&
+            teams.map((team) => (
+              <TeamCard
+                key={team.id}
+                team={team}
+                canManage={can('teams:manage')}
+                onEdit={() => setDialog({ kind: 'form', team })}
+                onDelete={() => setDialog({ kind: 'delete', team })}
+              />
+            ))}
+        </div>
       </div>
 
       <TeamFormDialog

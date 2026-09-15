@@ -95,9 +95,210 @@ export const projectTeamSchema = z.object({
 });
 export type ProjectTeam = z.infer<typeof projectTeamSchema>;
 
+/** Catálogo propio de la etapa del módulo/fase — independiente de `projectPhaseSchema` (avance del proyecto completo). */
+export const PROJECT_MODULE_STAGES = ['discovery', 'development', 'production', 'pilot', 'closed'] as const;
+export const projectModuleStageSchema = z.enum(PROJECT_MODULE_STAGES);
+export type ProjectModuleStage = z.infer<typeof projectModuleStageSchema>;
+
+export const PROJECT_MODULE_STAGE_LABELS: Readonly<Record<ProjectModuleStage, string>> = {
+  discovery: 'Levantamiento',
+  development: 'Desarrollo',
+  production: 'Producción',
+  pilot: 'Marcha blanca',
+  closed: 'Finalizado',
+};
+
+export const PROJECT_MODULE_DELIVERY_STATUSES = ['planned', 'delivered'] as const;
+export const projectModuleDeliveryStatusSchema = z.enum(PROJECT_MODULE_DELIVERY_STATUSES);
+export type ProjectModuleDeliveryStatus = z.infer<typeof projectModuleDeliveryStatusSchema>;
+
+export const PROJECT_MODULE_DELIVERY_STATUS_LABELS: Readonly<Record<ProjectModuleDeliveryStatus, string>> = {
+  planned: 'Planificada',
+  delivered: 'Entregada',
+};
+
+export const projectModuleDeliverySchema = z.object({
+  id: uuidSchema,
+  teamId: uuidSchema.nullable(),
+  teamName: z.string().nullable(),
+  estimatedDate: z.string(),
+  status: projectModuleDeliveryStatusSchema,
+});
+export type ProjectModuleDelivery = z.infer<typeof projectModuleDeliverySchema>;
+
+/**
+ * Flujo real de una tarea ("Mis tareas" del colaborador asignado). "Atrasada"
+ * no es un valor guardado — se deriva en el cliente comparando `date` con hoy
+ * cuando `status !== 'done'`, igual que ya se hace con las entregas.
+ */
+export const PROJECT_MODULE_TASK_STATUSES = ['todo', 'in_progress', 'done'] as const;
+export const projectModuleTaskStatusSchema = z.enum(PROJECT_MODULE_TASK_STATUSES);
+export type ProjectModuleTaskStatus = z.infer<typeof projectModuleTaskStatusSchema>;
+
+export const PROJECT_MODULE_TASK_STATUS_LABELS: Readonly<Record<ProjectModuleTaskStatus, string>> = {
+  todo: 'Por hacer',
+  in_progress: 'En progreso',
+  done: 'Completada',
+};
+
+/** Ámbito de la tarea — base del % por ámbito en "Resumen de avance" del módulo. */
+export const PROJECT_MODULE_TASK_SCOPES = ['diseno', 'desarrollo', 'qa', 'revision_cliente'] as const;
+export const projectModuleTaskScopeSchema = z.enum(PROJECT_MODULE_TASK_SCOPES);
+export type ProjectModuleTaskScope = z.infer<typeof projectModuleTaskScopeSchema>;
+
+export const PROJECT_MODULE_TASK_SCOPE_LABELS: Readonly<Record<ProjectModuleTaskScope, string>> = {
+  diseno: 'Diseño',
+  desarrollo: 'Desarrollo',
+  qa: 'QA Funcional',
+  revision_cliente: 'Rev. Cliente',
+};
+
+/** Tramo de trabajo de un equipo dentro de una fase/módulo — con su propio rango de fechas (Roadmap). */
+export const projectModuleSegmentSchema = z.object({
+  id: uuidSchema,
+  teamId: uuidSchema,
+  teamName: z.string(),
+  name: z.string(),
+  startDate: z.string(),
+  endDate: z.string(),
+});
+export type ProjectModuleSegment = z.infer<typeof projectModuleSegmentSchema>;
+
+export const createProjectModuleSegmentSchema = z.object({
+  teamId: uuidSchema,
+  name: nonEmptyTrimmed(300, 'El nombre del tramo'),
+  startDate: z.iso.date(),
+  endDate: z.iso.date(),
+});
+export type CreateProjectModuleSegmentInput = z.infer<typeof createProjectModuleSegmentSchema>;
+
+export const updateProjectModuleSegmentSchema = createProjectModuleSegmentSchema.partial();
+export type UpdateProjectModuleSegmentInput = z.infer<typeof updateProjectModuleSegmentSchema>;
+
+/** Tarea puntual (una fecha) de una fase/módulo, por equipo y opcionalmente asignada a una persona — marcador en el Roadmap y base de "Mis tareas". */
+export const projectModuleTaskSchema = z.object({
+  id: uuidSchema,
+  teamId: uuidSchema.nullable(),
+  teamName: z.string().nullable(),
+  assigneeUserId: uuidSchema.nullable(),
+  assigneeName: z.string().nullable(),
+  name: z.string(),
+  description: z.string().nullable(),
+  startDate: z.string().nullable(),
+  date: z.string(),
+  estimatedHours: z.number().nullable(),
+  status: projectModuleTaskStatusSchema,
+  scope: projectModuleTaskScopeSchema,
+  completedAt: isoDateTimeSchema.nullable(),
+});
+export type ProjectModuleTask = z.infer<typeof projectModuleTaskSchema>;
+
+export const createProjectModuleTaskSchema = z.object({
+  teamId: uuidSchema.nullish(),
+  assigneeUserId: uuidSchema.nullish(),
+  name: nonEmptyTrimmed(300, 'El nombre de la tarea'),
+  description: z.string().trim().max(2000).nullish(),
+  startDate: z.iso.date().nullish(),
+  date: z.iso.date(),
+  estimatedHours: z.coerce.number().min(0).nullish(),
+  status: projectModuleTaskStatusSchema.optional(),
+  scope: projectModuleTaskScopeSchema.optional(),
+});
+export type CreateProjectModuleTaskInput = z.infer<typeof createProjectModuleTaskSchema>;
+
+export const updateProjectModuleTaskSchema = createProjectModuleTaskSchema.partial();
+export type UpdateProjectModuleTaskInput = z.infer<typeof updateProjectModuleTaskSchema>;
+
+/** Fase/módulo del proyecto — unidad de entrega con etapa, horas y fechas propias (ver "Fases · Módulos"). */
+export const projectModuleSchema = z.object({
+  id: uuidSchema,
+  name: z.string(),
+  initialStage: projectModuleStageSchema,
+  currentStage: projectModuleStageSchema,
+  estimatedHours: z.number().nullable(),
+  estimatedStartDate: z.string().nullable(),
+  estimatedEndDate: z.string().nullable(),
+  deliveries: z.array(projectModuleDeliverySchema),
+  segments: z.array(projectModuleSegmentSchema),
+  tasks: z.array(projectModuleTaskSchema),
+  /** Cantidad de registros de horas con `hasBlocker` contra este módulo — proxy simple de "incidentes reportados", sin estado abierto/resuelto. */
+  blockerCount: z.number().int(),
+});
+export type ProjectModule = z.infer<typeof projectModuleSchema>;
+
+export const createProjectModuleSchema = z.object({
+  name: nonEmptyTrimmed(300, 'El nombre del módulo'),
+  initialStage: projectModuleStageSchema,
+  estimatedHours: z.coerce.number().min(0).nullish(),
+  estimatedStartDate: z.iso.date().nullish(),
+  estimatedEndDate: z.iso.date().nullish(),
+});
+export type CreateProjectModuleInput = z.infer<typeof createProjectModuleSchema>;
+
+export const updateProjectModuleSchema = z.object({
+  name: nonEmptyTrimmed(300, 'El nombre del módulo').optional(),
+  currentStage: projectModuleStageSchema.optional(),
+  estimatedHours: z.coerce.number().min(0).nullish(),
+  estimatedStartDate: z.iso.date().nullish(),
+  estimatedEndDate: z.iso.date().nullish(),
+});
+export type UpdateProjectModuleInput = z.infer<typeof updateProjectModuleSchema>;
+
+export const addProjectModuleDeliverySchema = z.object({
+  estimatedDate: z.iso.date(),
+  teamId: uuidSchema.nullish(),
+});
+export type AddProjectModuleDeliveryInput = z.infer<typeof addProjectModuleDeliverySchema>;
+
+export const updateProjectModuleDeliverySchema = z.object({
+  status: projectModuleDeliveryStatusSchema.optional(),
+  teamId: uuidSchema.nullish(),
+});
+export type UpdateProjectModuleDeliveryInput = z.infer<typeof updateProjectModuleDeliverySchema>;
+
+/** "evento" (hora registrada) no está acá: no es un `project_observation`, viene de `hour_entries` — ver `apps/web/.../lib/hour-entry-log.ts`. */
+export const PROJECT_OBSERVATION_TYPES = ['hito', 'incidente', 'compromiso', 'atencion', 'observacion'] as const;
+export const projectObservationTypeSchema = z.enum(PROJECT_OBSERVATION_TYPES);
+export type ProjectObservationType = z.infer<typeof projectObservationTypeSchema>;
+
+export const PROJECT_OBSERVATION_TYPE_LABELS: Readonly<Record<ProjectObservationType, string>> = {
+  hito: 'Hito',
+  incidente: 'Incidente',
+  compromiso: 'Compromiso',
+  atencion: 'Punto de atención',
+  observacion: 'Observación general',
+};
+
+export const PROJECT_OBSERVATION_STATUSES = ['abierto', 'resuelto', 'pendiente', 'cumplido', 'activo'] as const;
+export const projectObservationStatusSchema = z.enum(PROJECT_OBSERVATION_STATUSES);
+export type ProjectObservationStatus = z.infer<typeof projectObservationStatusSchema>;
+
+export const PROJECT_OBSERVATION_STATUS_LABELS: Readonly<Record<ProjectObservationStatus, string>> = {
+  abierto: 'Abierto',
+  resuelto: 'Resuelto',
+  pendiente: 'Pendiente',
+  cumplido: 'Cumplido',
+  activo: 'Activo',
+};
+
+/** Estado inicial automático según el tipo — el formulario "Agregar registro" no lo pide. `null` = sin ciclo de vida (observación general). */
+export const PROJECT_OBSERVATION_DEFAULT_STATUS: Readonly<Record<ProjectObservationType, ProjectObservationStatus | null>> = {
+  hito: 'cumplido',
+  incidente: 'abierto',
+  compromiso: 'pendiente',
+  atencion: 'activo',
+  observacion: null,
+};
+
 export const projectObservationSchema = z.object({
   id: uuidSchema,
+  type: projectObservationTypeSchema,
+  title: z.string().nullable(),
   message: z.string(),
+  status: projectObservationStatusSchema.nullable(),
+  moduleId: uuidSchema.nullable(),
+  moduleName: z.string().nullable(),
+  date: z.iso.date(),
   authorUserId: uuidSchema,
   authorName: z.string(),
   createdAt: isoDateTimeSchema,
@@ -148,9 +349,37 @@ export const projectDetailSchema = projectSummarySchema.extend({
   quotationLink: z.string().nullable(),
   contractLink: z.string().nullable(),
   additionalLinks: z.string().nullable(),
+  /** Motivo declarado mientras `status = 'on_hold'`. */
+  onHoldReason: z.string().nullable(),
+  /** Si está activo, el período detenido no debería contar para plazos/desviación — ese cálculo no está implementado todavía. */
+  stopsClock: z.boolean(),
+  scopeNotes: z.string().nullable(),
+  deliveryDocumentation: z.string().nullable(),
+  /** Tab "Extras" — Accesos y enlaces. Solo se muestran/editan en la ficha interna, no en el portal cliente. */
+  demoLink: z.string().nullable(),
+  testEnvironmentLink: z.string().nullable(),
+  figmaLink: z.string().nullable(),
+  documentationLink: z.string().nullable(),
+  /** Tab "Extras" — Datos de impacto en el negocio (antes/después de automatizar), declarados por el líder. */
+  impactBeforeHours: z.number().nullable(),
+  impactBeforePeople: z.string().nullable(),
+  impactBeforeDuration: z.string().nullable(),
+  impactBeforeModality: z.string().nullable(),
+  impactAfterHours: z.number().nullable(),
+  impactAfterPeople: z.string().nullable(),
+  impactAfterDuration: z.string().nullable(),
+  impactAfterModality: z.string().nullable(),
+  /** Tab "Extras" — Métricas QA de la etapa de pruebas, declaradas por el líder. */
+  qaTestingStartDate: z.string().nullable(),
+  qaTestingEndDate: z.string().nullable(),
+  qaEvaluatedModule: z.string().nullable(),
+  qaPlannedTests: z.number().int().nullable(),
+  qaExecutedTests: z.number().int().nullable(),
+  qaFailedTests: z.number().int().nullable(),
   teams: z.array(projectTeamSchema),
   members: z.array(projectTeamMemberSchema),
   observations: z.array(projectObservationSchema),
+  modules: z.array(projectModuleSchema),
   legacyId: z.number().int().nullable(),
   updatedAt: isoDateTimeSchema,
 });
@@ -213,7 +442,29 @@ export const updateProjectSchema = z.object({
   supportHours: z.coerce.number().min(0).optional(),
   quotationLink: z.string().trim().max(500).optional(),
   contractLink: z.string().trim().max(500).optional(),
-  /** Editar líder/colaboradores/horas de los equipos del proyecto (la UI de edición no ofrece agregar/quitar equipos). */
+  onHoldReason: z.string().trim().max(2000).nullish(),
+  stopsClock: z.boolean().optional(),
+  scopeNotes: z.string().trim().max(2000).nullish(),
+  deliveryDocumentation: z.string().trim().max(500).nullish(),
+  demoLink: z.string().trim().max(500).nullish(),
+  testEnvironmentLink: z.string().trim().max(500).nullish(),
+  figmaLink: z.string().trim().max(500).nullish(),
+  documentationLink: z.string().trim().max(500).nullish(),
+  impactBeforeHours: z.coerce.number().min(0).nullish(),
+  impactBeforePeople: z.string().trim().max(500).nullish(),
+  impactBeforeDuration: z.string().trim().max(500).nullish(),
+  impactBeforeModality: z.string().trim().max(500).nullish(),
+  impactAfterHours: z.coerce.number().min(0).nullish(),
+  impactAfterPeople: z.string().trim().max(500).nullish(),
+  impactAfterDuration: z.string().trim().max(500).nullish(),
+  impactAfterModality: z.string().trim().max(500).nullish(),
+  qaTestingStartDate: z.iso.date().nullish(),
+  qaTestingEndDate: z.iso.date().nullish(),
+  qaEvaluatedModule: z.string().trim().max(300).nullish(),
+  qaPlannedTests: z.coerce.number().int().min(0).nullish(),
+  qaExecutedTests: z.coerce.number().int().min(0).nullish(),
+  qaFailedTests: z.coerce.number().int().min(0).nullish(),
+  /** Agregar/quitar equipos y editar líder/colaboradores/horas de los ya asignados — la lista reemplaza a la actual. */
   teams: z.array(createProjectTeamAssignmentSchema).max(20).optional(),
 });
 export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
@@ -231,8 +482,19 @@ export const assignProjectTeamMemberSchema = z.object({
 });
 export type AssignProjectTeamMemberInput = z.infer<typeof assignProjectTeamMemberSchema>;
 
+export const updateProjectTeamMemberSchema = z.object({
+  activity: z.string().trim().max(500).nullish(),
+  assignedHours: z.coerce.number().min(0).optional(),
+});
+export type UpdateProjectTeamMemberInput = z.infer<typeof updateProjectTeamMemberSchema>;
+
 export const addProjectObservationSchema = z.object({
+  /** El compositor rápido de la pestaña Observaciones no elige tipo: queda 'observacion'. */
+  type: projectObservationTypeSchema.default('observacion'),
+  title: z.string().trim().max(200).optional(),
   message: nonEmptyTrimmed(4000, 'El mensaje'),
+  date: z.iso.date().optional(),
+  moduleId: uuidSchema.nullish(),
 });
 export type AddProjectObservationInput = z.infer<typeof addProjectObservationSchema>;
 

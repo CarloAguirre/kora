@@ -31,6 +31,20 @@ export interface ProjectTeamRepository {
   /** Crea o actualiza la fila de `(projectId, teamId)` — esa pareja es única. */
   save(input: UpsertProjectTeamInput, context?: TransactionContext): Promise<void>;
   findByProject(projectId: string, context?: TransactionContext): Promise<ProjectTeamRecord[]>;
+  /** Quita el equipo del proyecto — usado cuando se destilda en la edición. */
+  remove(projectId: string, teamId: string, context?: TransactionContext): Promise<void>;
+  /**
+   * ¿`actorUserId` es el líder de `teamId` en `projectId`? `coalesce(project_teams.leader_user_id,
+   * teams.leader_user_id)` — el override del proyecto manda; si no hay override, el líder orgánico
+   * del equipo. Variante por `teamId` (no por `memberUserId`) de `isProjectLeaderOrTeamLeaderOfMember`,
+   * necesaria para asignar a alguien nuevo (todavía sin fila en `project_team_members`).
+   */
+  isTeamLeaderForProject(
+    projectId: string,
+    teamId: string,
+    actorUserId: string,
+    context?: TransactionContext,
+  ): Promise<boolean>;
 }
 
 export const PROJECT_TEAM_REPOSITORY = Symbol('ProjectTeamRepository');

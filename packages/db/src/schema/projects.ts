@@ -2,6 +2,7 @@ import { relations, sql } from 'drizzle-orm';
 import {
   boolean,
   date,
+  index,
   integer,
   numeric,
   pgEnum,
@@ -36,6 +37,41 @@ export const projectPhaseEnum = pgEnum('project_phase', [
 ]);
 export const projectPriorityEnum = pgEnum('project_priority', ['low', 'medium', 'high']);
 export const participationTypeEnum = pgEnum('participation_type', ['team', 'project_leader']);
+
+/** Catálogo propio del módulo/fase — independiente de `projectPhaseEnum` (que es el avance del proyecto completo). */
+export const projectModuleStageEnum = pgEnum('project_module_stage', [
+  'discovery',
+  'development',
+  'production',
+  'pilot',
+  'closed',
+]);
+export const projectModuleDeliveryStatusEnum = pgEnum('project_module_delivery_status', ['planned', 'delivered']);
+export const projectModuleTaskStatusEnum = pgEnum('project_module_task_status', ['todo', 'in_progress', 'done']);
+/** Ámbito de la tarea — permite calcular el % de avance por ámbito en "Resumen de avance" del módulo. */
+export const projectModuleTaskScopeEnum = pgEnum('project_module_task_scope', [
+  'diseno',
+  'desarrollo',
+  'qa',
+  'revision_cliente',
+]);
+
+/** Tipo de una entrada de bitácora — "evento" (hora registrada) no está acá: no es un `project_observation`, viene de `hour_entries`. */
+export const projectObservationTypeEnum = pgEnum('project_observation_type', [
+  'hito',
+  'incidente',
+  'compromiso',
+  'atencion',
+  'observacion',
+]);
+/** Estado de una entrada de bitácora — nulo para `observacion` (nota simple, sin ciclo de vida). */
+export const projectObservationStatusEnum = pgEnum('project_observation_status', [
+  'abierto',
+  'resuelto',
+  'pendiente',
+  'cumplido',
+  'activo',
+]);
 
 export const projects = pgTable(
   'projects',
@@ -78,6 +114,37 @@ export const projects = pgTable(
     quotationLink: text('quotation_link'),
     contractLink: text('contract_link'),
     additionalLinks: text('additional_links'),
+
+    /** Motivo declarado mientras `status = 'on_hold'`. */
+    onHoldReason: text('on_hold_reason'),
+    /** Si está activo, el período detenido no debería contar para plazos/desviación — ese cálculo no está implementado todavía. */
+    stopsClock: boolean('stops_clock').notNull().default(false),
+    scopeNotes: text('scope_notes'),
+    deliveryDocumentation: text('delivery_documentation'),
+
+    /** "Accesos y enlaces" del tab Extras — informativos, no se conectan al portal cliente todavía. */
+    demoLink: text('demo_link'),
+    testEnvironmentLink: text('test_environment_link'),
+    figmaLink: text('figma_link'),
+    documentationLink: text('documentation_link'),
+
+    /** "Datos de impacto en el negocio" del tab Extras — comparación manual vs. automatizado, declarada por el líder. */
+    impactBeforeHours: numeric('impact_before_hours', { precision: 10, scale: 2 }),
+    impactBeforePeople: text('impact_before_people'),
+    impactBeforeDuration: text('impact_before_duration'),
+    impactBeforeModality: text('impact_before_modality'),
+    impactAfterHours: numeric('impact_after_hours', { precision: 10, scale: 2 }),
+    impactAfterPeople: text('impact_after_people'),
+    impactAfterDuration: text('impact_after_duration'),
+    impactAfterModality: text('impact_after_modality'),
+
+    /** "Métricas QA" del tab Extras — datos de la etapa de pruebas, declarados por el líder. */
+    qaTestingStartDate: date('qa_testing_start_date', { mode: 'date' }),
+    qaTestingEndDate: date('qa_testing_end_date', { mode: 'date' }),
+    qaEvaluatedModule: text('qa_evaluated_module'),
+    qaPlannedTests: integer('qa_planned_tests'),
+    qaExecutedTests: integer('qa_executed_tests'),
+    qaFailedTests: integer('qa_failed_tests'),
 
     ...timestamps,
     ...softDelete,
@@ -157,18 +224,100 @@ export const projectParticipationHistory = pgTable('project_participation_histor
   ...timestamps,
 });
 
-/** Observaciones/bitácora de proyecto. Sin adjuntos todavía: pendiente de Storage. */
-export const projectObservations = pgTable('project_observations', {
+/** Fase/módulo del proyecto — unidad de entrega con su propia etapa, horas y fechas, independiente del resto. */
+export const projectModules = pgTable('project_modules', {
   id: primaryId(),
   projectId: uuid('project_id')
     .notNull()
     .references(() => projects.id, { onDelete: 'cascade' }),
-  message: text('message').notNull(),
-  authorUserId: uuid('author_user_id')
-    .notNull()
-    .references(() => users.id, { onDelete: 'restrict' }),
+  name: varchar('name', { length: 300 }).notNull(),
+  initialStage: projectModuleStageEnum('initial_stage').notNull(),
+  /** Se actualiza durante la ejecución del módulo — arranca igual a `initialStage`. */
+  currentStage: projectModuleStageEnum('current_stage').notNull(),
+  estimatedHours: numeric('estimated_hours', { precision: 10, scale: 2 }),
+  estimatedStartDate: date('estimated_start_date', { mode: 'date' }),
+  estimatedEndDate: date('estimated_end_date', { mode: 'date' }),
   ...timestamps,
 });
+
+/** Entrega estimada de un módulo — hace de hito "Entrega a cliente" (no existe un concepto de hito genérico separado). */
+export const projectModuleDeliveries = pgTable('project_module_deliveries', {
+  id: primaryId(),
+  moduleId: uuid('module_id')
+    .notNull()
+    .references(() => projectModules.id, { onDelete: 'cascade' }),
+  /** Equipo responsable de esta entrega — permite a un colaborador filtrar "las entregas de mi equipo". */
+  teamId: uuid('team_id').references(() => teams.id, { onDelete: 'set null' }),
+  estimatedDate: date('estimated_date', { mode: 'date' }).notNull(),
+  status: projectModuleDeliveryStatusEnum('status').notNull().default('planned'),
+  ...timestamps,
+});
+
+/** Tramo de trabajo de un equipo dentro de una fase/módulo — con su propio rango de fechas ("Roadmap"). */
+export const projectModuleSegments = pgTable('project_module_segments', {
+  id: primaryId(),
+  moduleId: uuid('module_id')
+    .notNull()
+    .references(() => projectModules.id, { onDelete: 'cascade' }),
+  teamId: uuid('team_id')
+    .notNull()
+    .references(() => teams.id, { onDelete: 'cascade' }),
+  name: varchar('name', { length: 300 }).notNull(),
+  startDate: date('start_date', { mode: 'date' }).notNull(),
+  endDate: date('end_date', { mode: 'date' }).notNull(),
+  ...timestamps,
+});
+
+/** Tarea puntual (una fecha) de una fase/módulo, por equipo y opcionalmente asignada a una persona — marcador en el Roadmap y base de "Mis tareas". */
+export const projectModuleTasks = pgTable('project_module_tasks', {
+  id: primaryId(),
+  moduleId: uuid('module_id')
+    .notNull()
+    .references(() => projectModules.id, { onDelete: 'cascade' }),
+  teamId: uuid('team_id').references(() => teams.id, { onDelete: 'set null' }),
+  assigneeUserId: uuid('assignee_user_id').references(() => users.id, { onDelete: 'set null' }),
+  name: varchar('name', { length: 300 }).notNull(),
+  description: text('description'),
+  /** Inicio opcional — cuando está presente, el Roadmap dibuja la tarea como barra (`date` sigue siendo el fin/fecha límite). */
+  startDate: date('start_date', { mode: 'date' }),
+  date: date('date', { mode: 'date' }).notNull(),
+  estimatedHours: numeric('estimated_hours', { precision: 10, scale: 2 }),
+  status: projectModuleTaskStatusEnum('status').notNull().default('todo'),
+  scope: projectModuleTaskScopeEnum('scope').notNull().default('desarrollo'),
+  completedAt: timestamp('completed_at', { withTimezone: true, mode: 'date' }),
+  ...timestamps,
+});
+
+/**
+ * Observaciones/bitácora de proyecto — el catálogo abierto de tipos
+ * (hito/incidente/compromiso/atención/observación) que se ve en "Agregar
+ * registro a la bitácora". Sin adjuntos todavía: pendiente de Storage.
+ */
+export const projectObservations = pgTable(
+  'project_observations',
+  {
+    id: primaryId(),
+    projectId: uuid('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    type: projectObservationTypeEnum('type').notNull().default('observacion'),
+    /** Corto, opcional — las notas rápidas del compositor original de Observaciones no lo llevan. */
+    title: varchar('title', { length: 200 }),
+    message: text('message').notNull(),
+    /** Nulo para `observacion`; para el resto, el mapper lo fija según `type` al crear (ver `PROJECT_OBSERVATION_DEFAULT_STATUS`). */
+    status: projectObservationStatusEnum('status'),
+    moduleId: uuid('module_id').references(() => projectModules.id, { onDelete: 'set null' }),
+    /** Fecha del hecho — puede ser distinta de `createdAt` (cuándo se registró en el sistema). */
+    date: date('date', { mode: 'date' })
+      .notNull()
+      .default(sql`now()`),
+    authorUserId: uuid('author_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+    ...timestamps,
+  },
+  (table) => [index('project_observations_module_idx').on(table.moduleId)],
+);
 
 export const projectsRelations = relations(projects, ({ one, many }) => ({
   client: one(clients, { fields: [projects.clientId], references: [clients.id] }),
@@ -176,6 +325,30 @@ export const projectsRelations = relations(projects, ({ one, many }) => ({
   teams: many(projectTeams),
   members: many(projectTeamMembers),
   observations: many(projectObservations),
+  modules: many(projectModules),
+}));
+
+export const projectModulesRelations = relations(projectModules, ({ one, many }) => ({
+  project: one(projects, { fields: [projectModules.projectId], references: [projects.id] }),
+  deliveries: many(projectModuleDeliveries),
+  segments: many(projectModuleSegments),
+  tasks: many(projectModuleTasks),
+}));
+
+export const projectModuleDeliveriesRelations = relations(projectModuleDeliveries, ({ one }) => ({
+  module: one(projectModules, { fields: [projectModuleDeliveries.moduleId], references: [projectModules.id] }),
+  team: one(teams, { fields: [projectModuleDeliveries.teamId], references: [teams.id] }),
+}));
+
+export const projectModuleSegmentsRelations = relations(projectModuleSegments, ({ one }) => ({
+  module: one(projectModules, { fields: [projectModuleSegments.moduleId], references: [projectModules.id] }),
+  team: one(teams, { fields: [projectModuleSegments.teamId], references: [teams.id] }),
+}));
+
+export const projectModuleTasksRelations = relations(projectModuleTasks, ({ one }) => ({
+  module: one(projectModules, { fields: [projectModuleTasks.moduleId], references: [projectModules.id] }),
+  team: one(teams, { fields: [projectModuleTasks.teamId], references: [teams.id] }),
+  assignee: one(users, { fields: [projectModuleTasks.assigneeUserId], references: [users.id] }),
 }));
 
 export const projectTeamsRelations = relations(projectTeams, ({ one }) => ({

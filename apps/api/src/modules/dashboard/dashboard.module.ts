@@ -4,6 +4,7 @@ import { TicketsModule } from '../tickets/tickets.module';
 import { ProjectsModule } from '../projects/projects.module';
 import { ForecastModule } from '../forecast/forecast.module';
 import { TeamsModule } from '../teams/teams.module';
+import { UsersModule } from '../users/users.module';
 import { DashboardController } from './presentation/dashboard.controller';
 import { GetDashboardSummaryUseCase } from './application/use-cases/get-dashboard-summary.use-case';
 
@@ -13,7 +14,7 @@ import { GetDashboardSummaryUseCase } from './application/use-cases/get-dashboar
  * cada dato, en vez de duplicar sus reglas.
  */
 @Module({
-  imports: [HoursModule, TicketsModule, ProjectsModule, ForecastModule, TeamsModule],
+  imports: [HoursModule, TicketsModule, ProjectsModule, ForecastModule, TeamsModule, UsersModule],
   controllers: [DashboardController],
   providers: [GetDashboardSummaryUseCase],
 })

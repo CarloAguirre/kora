@@ -12,6 +12,10 @@ import {
   PROJECT_OBSERVATION_REPOSITORY,
   type ProjectObservationRepository,
 } from '../../domain/repositories/project-observation.repository';
+import {
+  PROJECT_MODULE_REPOSITORY,
+  type ProjectModuleRepository,
+} from '../../domain/repositories/project-module.repository';
 import { PROJECT_USER_READER, type ProjectUserReader } from '../ports/project-user-reader.port';
 import { PROJECT_CLIENT_READER, type ProjectClientReader } from '../ports/project-client-reader.port';
 import { PROJECT_CONTACT_READER, type ProjectContactReader } from '../ports/project-contact-reader.port';
@@ -37,6 +41,7 @@ export class GetProjectUseCase implements UseCase<GetProjectCommand, ProjectDeta
     @Inject(PROJECT_TEAM_MEMBER_REPOSITORY) private readonly members: ProjectTeamMemberRepository,
     @Inject(PROJECT_TEAM_REPOSITORY) private readonly teams: ProjectTeamRepository,
     @Inject(PROJECT_OBSERVATION_REPOSITORY) private readonly observations: ProjectObservationRepository,
+    @Inject(PROJECT_MODULE_REPOSITORY) private readonly modules: ProjectModuleRepository,
     @Inject(PROJECT_USER_READER) private readonly users: ProjectUserReader,
     @Inject(PROJECT_CLIENT_READER) private readonly clients: ProjectClientReader,
     @Inject(PROJECT_CONTACT_READER) private readonly contacts: ProjectContactReader,
@@ -49,19 +54,29 @@ export class GetProjectUseCase implements UseCase<GetProjectCommand, ProjectDeta
 
     const snapshot = project.toSnapshot();
 
-    const [client, primaryContact, leader, developer, commercialManager, members, projectTeams, projectObservations] =
-      await Promise.all([
-        snapshot.clientId ? this.clients.findById(snapshot.clientId) : Promise.resolve(null),
-        snapshot.primaryContactId ? this.contacts.findById(snapshot.primaryContactId) : Promise.resolve(null),
-        snapshot.leaderUserId ? this.users.findById(snapshot.leaderUserId) : Promise.resolve(null),
-        snapshot.developerUserId ? this.users.findById(snapshot.developerUserId) : Promise.resolve(null),
-        snapshot.commercialManagerUserId
-          ? this.users.findById(snapshot.commercialManagerUserId)
-          : Promise.resolve(null),
-        this.members.listForProject(project.id),
-        this.teams.findByProject(project.id),
-        this.observations.listForProject(project.id),
-      ]);
+    const [
+      client,
+      primaryContact,
+      leader,
+      developer,
+      commercialManager,
+      members,
+      projectTeams,
+      projectObservations,
+      projectModules,
+    ] = await Promise.all([
+      snapshot.clientId ? this.clients.findById(snapshot.clientId) : Promise.resolve(null),
+      snapshot.primaryContactId ? this.contacts.findById(snapshot.primaryContactId) : Promise.resolve(null),
+      snapshot.leaderUserId ? this.users.findById(snapshot.leaderUserId) : Promise.resolve(null),
+      snapshot.developerUserId ? this.users.findById(snapshot.developerUserId) : Promise.resolve(null),
+      snapshot.commercialManagerUserId
+        ? this.users.findById(snapshot.commercialManagerUserId)
+        : Promise.resolve(null),
+      this.members.listForProject(project.id),
+      this.teams.findByProject(project.id),
+      this.observations.listForProject(project.id),
+      this.modules.listForProject(project.id),
+    ]);
 
     if (!command.actorPermissions.includes('projects:read')) {
       const isParticipant =
@@ -92,6 +107,7 @@ export class GetProjectUseCase implements UseCase<GetProjectCommand, ProjectDeta
         members,
         teams: projectTeams,
         observations: projectObservations,
+        modules: projectModules,
         actorUserId: command.actorUserId,
         canAuthorizeOvertime,
         now: this.clock.now(),

@@ -5,6 +5,7 @@ import type {
   AssignProjectTeamMemberRecord,
   ProjectTeamMemberRecord,
   ProjectTeamMemberRepository,
+  UpdateProjectTeamMemberPatch,
 } from '../../domain/repositories/project-team-member.repository';
 import { DATABASE } from '../../../../shared/infrastructure/database/database.module';
 import { resolveDb } from '../../../../shared/infrastructure/database/unit-of-work';
@@ -70,6 +71,17 @@ export class DrizzleProjectTeamMemberRepository implements ProjectTeamMemberRepo
   async unassign(id: string, context?: TransactionContext): Promise<void> {
     const db = resolveDb(this.database, context);
     await db.delete(projectTeamMembers).where(eq(projectTeamMembers.id, id));
+  }
+
+  async update(id: string, patch: UpdateProjectTeamMemberPatch, context?: TransactionContext): Promise<void> {
+    const db = resolveDb(this.database, context);
+    await db
+      .update(projectTeamMembers)
+      .set({
+        ...(patch.activity !== undefined ? { activity: patch.activity } : {}),
+        ...(patch.assignedHours !== undefined ? { assignedHours: String(patch.assignedHours) } : {}),
+      })
+      .where(eq(projectTeamMembers.id, id));
   }
 
   private baseQuery(db: Database) {

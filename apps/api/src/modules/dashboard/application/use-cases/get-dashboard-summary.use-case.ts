@@ -21,8 +21,13 @@ import {
   type ProjectListItem,
   type ProjectRepository,
 } from '../../../projects/domain/repositories/project.repository';
+import {
+  PROJECT_MODULE_REPOSITORY,
+  type ProjectModuleRepository,
+} from '../../../projects/domain/repositories/project-module.repository';
 import { ForecastCapacityService } from '../../../forecast/application/services/forecast-capacity.service';
 import { TEAM_REPOSITORY, type TeamRepository } from '../../../teams/domain/repositories/team.repository';
+import { USER_REPOSITORY, type UserRepository } from '../../../users/domain/repositories/user.repository';
 import type { ActorContext, UseCase } from '../../../../shared/application/use-case';
 
 export interface GetDashboardSummaryCommand {
@@ -59,7 +64,9 @@ export class GetDashboardSummaryUseCase implements UseCase<GetDashboardSummaryCo
     @Inject(HOUR_ENTRY_TEAM_READER) private readonly hourEntryTeams: HourEntryTeamReader,
     @Inject(TICKET_REPOSITORY) private readonly tickets: TicketRepository,
     @Inject(PROJECT_REPOSITORY) private readonly projects: ProjectRepository,
+    @Inject(PROJECT_MODULE_REPOSITORY) private readonly projectModules: ProjectModuleRepository,
     @Inject(TEAM_REPOSITORY) private readonly teams: TeamRepository,
+    @Inject(USER_REPOSITORY) private readonly users: UserRepository,
     private readonly forecastCapacity: ForecastCapacityService,
     @Inject(CLOCK) private readonly clock: Clock,
   ) {}
@@ -74,18 +81,54 @@ export class GetDashboardSummaryUseCase implements UseCase<GetDashboardSummaryCo
 
     const hasOwnHours = actorPermissions.includes('hours:read_own');
 
-    const [hours, approvals, tickets, projects, capacity, support, myActiveProjects, planning] = await Promise.all([
-      hasOwnHours ? this.buildHoursSummary(actor, now) : Promise.resolve(null),
-      actorPermissions.includes('hours:approve') ? this.buildApprovalsSummary(actor, actorPermissions) : Promise.resolve(null),
-      canReadTickets ? this.buildTicketsSummary(actor, actorPermissions) : Promise.resolve(null),
-      canReadProjects ? this.buildProjectsSummary(actor, actorPermissions, now) : Promise.resolve(null),
-      actorPermissions.includes('forecast:read') ? this.buildCapacitySummary(actor, weekStartOverride) : Promise.resolve(null),
-      actorPermissions.includes('billing:read') ? this.buildSupportSummary(actor, actorRole) : Promise.resolve(null),
-      hasOwnHours ? this.buildMyActiveProjects(actor) : Promise.resolve([]),
-      hasOwnHours ? this.buildMyPlanning(actor, weekStartOverride) : Promise.resolve(null),
-    ]);
+    const [hours, approvals, tickets, projects, capacity, support, myActiveProjects, planning, myTasks, myDeliveries] =
+      await Promise.all([
+        hasOwnHours ? this.buildHoursSummary(actor, now) : Promise.resolve(null),
+        actorPermissions.includes('hours:approve') ? this.buildApprovalsSummary(actor, actorPermissions) : Promise.resolve(null),
+        canReadTickets ? this.buildTicketsSummary(actor, actorPermissions) : Promise.resolve(null),
+        canReadProjects ? this.buildProjectsSummary(actor, actorPermissions, now) : Promise.resolve(null),
+        actorPermissions.includes('forecast:read') ? this.buildCapacitySummary(actor, weekStartOverride) : Promise.resolve(null),
+        actorPermissions.includes('billing:read') ? this.buildSupportSummary(actor, actorRole) : Promise.resolve(null),
+        hasOwnHours ? this.buildMyActiveProjects(actor) : Promise.resolve([]),
+        hasOwnHours ? this.buildMyPlanning(actor, weekStartOverride) : Promise.resolve(null),
+        hasOwnHours ? this.buildMyTasks(actor) : Promise.resolve([]),
+        hasOwnHours ? this.buildMyDeliveries(actor) : Promise.resolve([]),
+      ]);
 
-    return ok({ hours, approvals, tickets, projects, capacity, support, myActiveProjects, planning });
+    return ok({ hours, approvals, tickets, projects, capacity, support, myActiveProjects, planning, myTasks, myDeliveries });
+  }
+
+  /** "Mis tareas" — tareas de "Fases · Módulos" asignadas directamente al actor, en cualquier proyecto. */
+  private async buildMyTasks(actor: ActorContext) {
+    const rows = await this.projectModules.listTasksAssignedToUser(actor.userId);
+    return rows.map((row) => ({
+      id: row.id,
+      projectId: row.projectId,
+      projectName: row.projectName,
+      moduleId: row.moduleId,
+      moduleName: row.moduleName,
+      title: row.name,
+      date: toIsoDate(row.date),
+      status: row.status,
+      completedAt: row.completedAt?.toISOString() ?? null,
+    }));
+  }
+
+  /** "Mis entregas" — entregas del equipo del actor. Vacío si no pertenece a ningún equipo. */
+  private async buildMyDeliveries(actor: ActorContext) {
+    const user = await this.users.findById(actor.userId);
+    if (!user?.teamId) return [];
+
+    const rows = await this.projectModules.listDeliveriesForTeam(user.teamId);
+    return rows.map((row) => ({
+      id: row.id,
+      projectId: row.projectId,
+      projectName: row.projectName,
+      moduleId: row.moduleId,
+      moduleName: row.moduleName,
+      estimatedDate: toIsoDate(row.estimatedDate),
+      status: row.status,
+    }));
   }
 
   /**

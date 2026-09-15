@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CLOCK, ForbiddenError, err, ok, type ApplicationError, type Clock, type Result } from '@kora/core';
-import type { AddProjectObservationInput, Permission } from '@kora/contracts';
+import { PROJECT_OBSERVATION_DEFAULT_STATUS, type AddProjectObservationInput, type Permission } from '@kora/contracts';
 import { ProjectNotFoundError } from '../../domain/errors/project.errors';
 import { PROJECT_REPOSITORY, type ProjectRepository } from '../../domain/repositories/project.repository';
 import {
@@ -49,12 +49,18 @@ export class AddProjectObservationUseCase
       if (!isParticipant) return err(new ForbiddenError('No tienes acceso a este proyecto.', 'PROJECT_NOT_ASSIGNED'));
     }
 
-    const id = await this.observations.add(
-      command.projectId,
-      command.data.message,
-      command.actor.userId,
-      this.clock.now(),
-    );
+    const now = this.clock.now();
+    const id = await this.observations.add({
+      projectId: command.projectId,
+      type: command.data.type,
+      title: command.data.title?.trim() || null,
+      message: command.data.message,
+      status: PROJECT_OBSERVATION_DEFAULT_STATUS[command.data.type],
+      moduleId: command.data.moduleId ?? null,
+      date: command.data.date ? new Date(`${command.data.date}T00:00:00`) : now,
+      authorUserId: command.actor.userId,
+      now,
+    });
 
     return ok({ id });
   }

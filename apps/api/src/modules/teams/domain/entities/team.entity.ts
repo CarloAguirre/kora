@@ -4,6 +4,7 @@ export interface TeamProps {
   name: string;
   description: string | null;
   leaderUserId: string | null;
+  teamTypeId: string | null;
   isActive: boolean;
   legacyId: number | null;
   createdAt: Date;
@@ -16,6 +17,7 @@ export interface CreateTeamProps {
   readonly name: string;
   readonly description?: string | null;
   readonly leaderUserId?: string | null;
+  readonly teamTypeId?: string | null;
   readonly now: Date;
 }
 
@@ -37,6 +39,7 @@ export class Team extends AggregateRoot<string> {
       name: props.name.trim(),
       description: props.description?.trim() || null,
       leaderUserId: props.leaderUserId ?? null,
+      teamTypeId: props.teamTypeId ?? null,
       isActive: true,
       legacyId: null,
       createdAt: props.now,
@@ -65,6 +68,10 @@ export class Team extends AggregateRoot<string> {
     return this.props.leaderUserId;
   }
 
+  get teamTypeId(): string | null {
+    return this.props.teamTypeId;
+  }
+
   get isActive(): boolean {
     return this.props.isActive;
   }
@@ -86,7 +93,7 @@ export class Team extends AggregateRoot<string> {
   }
 
   updateDetails(
-    data: Partial<Pick<TeamProps, 'name' | 'description' | 'leaderUserId' | 'isActive'>>,
+    data: Partial<Pick<TeamProps, 'name' | 'description' | 'leaderUserId' | 'teamTypeId' | 'isActive'>>,
     now: Date,
   ): void {
     if (data.name !== undefined) data.name = data.name.trim();

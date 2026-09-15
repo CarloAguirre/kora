@@ -40,6 +40,17 @@
   font-weight: var(--kora-weight-semibold);
 }
 
+.typeBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kora-space-1);
+  padding: 4px var(--kora-space-2);
+  border-radius: var(--kora-radius-pill);
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-semibold);
+  width: fit-content;
+}
+
 .sectionTitle {
   font-size: var(--kora-text-lg);
   font-weight: var(--kora-weight-bold);

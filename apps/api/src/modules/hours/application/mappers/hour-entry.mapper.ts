@@ -9,6 +9,7 @@ export function toHourEntrySummary(item: HourEntryListItem): HourEntrySummary {
     id: item.id,
     user: { id: item.userId, fullName: item.userFullName },
     project: item.projectId ? { id: item.projectId, name: item.projectName ?? '' } : null,
+    module: item.moduleId ? { id: item.moduleId, name: item.moduleName ?? '' } : null,
     team: item.teamId ? { id: item.teamId, name: item.teamName ?? '' } : null,
     assignment: item.assignment,
     category: item.category,
@@ -19,6 +20,8 @@ export function toHourEntrySummary(item: HourEntryListItem): HourEntrySummary {
     projectStageAtEntry: item.projectStageAtEntry,
     status: item.status,
     rejectionReason: item.rejectionReason,
+    hasBlocker: item.hasBlocker,
+    blockerDescription: item.blockerDescription,
     // Un registro CON proyecto nunca se aprueba por aprobador designado (ver
     // `DesignatedApproverNotAllowedError`) — el autorizador real siempre es
     // `projectApprovers`. Datos migrados de la v1 dejaron
@@ -40,6 +43,7 @@ export interface HourEntryDetailSource {
   readonly entry: HourEntry;
   readonly owner: HourEntryUserReference | null;
   readonly project: HourEntryProjectReference | null;
+  readonly module: { id: string; name: string } | null;
   readonly designatedApprover: HourEntryUserReference | null;
   readonly decisionBy: HourEntryUserReference | null;
   readonly team: { id: string; name: string } | null;
@@ -53,6 +57,7 @@ export function toHourEntryDetail(source: HourEntryDetailSource): HourEntryDetai
     id: snapshot.id,
     user: { id: snapshot.userId, fullName: source.owner?.fullName ?? '' },
     project: snapshot.projectId ? { id: snapshot.projectId, name: source.project?.name ?? '' } : null,
+    module: snapshot.moduleId ? { id: snapshot.moduleId, name: source.module?.name ?? '' } : null,
     team: source.team,
     assignment: snapshot.assignment,
     category: snapshot.category,
@@ -62,6 +67,8 @@ export function toHourEntryDetail(source: HourEntryDetailSource): HourEntryDetai
     isOvertime: snapshot.isOvertime,
     status: snapshot.status,
     rejectionReason: snapshot.rejectionReason,
+    hasBlocker: snapshot.hasBlocker,
+    blockerDescription: snapshot.blockerDescription,
     // Ver nota equivalente en `toHourEntrySummary`: un registro con proyecto
     // nunca se aprueba por aprobador designado, aunque el dato migrado de la
     // v1 haya quedado poblado.

@@ -8,7 +8,7 @@
 .monthLabels {
   display: flex;
   justify-content: space-between;
-  margin-bottom: var(--kora-space-2);
+  margin-top: var(--kora-space-2);
   color: var(--kora-text-muted);
   font-size: var(--kora-text-xs);
 }
@@ -17,8 +17,9 @@
   display: flex;
   position: relative;
   width: 100%;
-  height: 28px;
-  border-radius: var(--kora-radius-pill);
+  height: 40px;
+  margin-top: 34px;
+  border-radius: var(--kora-radius);
   overflow: visible;
   background: var(--kora-surface-disabled);
 }
@@ -31,17 +32,24 @@
   font-size: var(--kora-text-sm);
   font-weight: var(--kora-weight-medium);
   text-align: center;
-  padding: 0 var(--kora-space-1);
+  padding: 0 var(--kora-space-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.segment:first-child {
-  border-top-left-radius: var(--kora-radius-pill);
-  border-bottom-left-radius: var(--kora-radius-pill);
+/* `:first-of-type`/`:last-of-type` (no `:first-child`/`:last-child`): el
+   marcador "HOY" se agrega como hermano DESPUÉS de los segmentos cuando hay
+   fechas, así que el último `.segment` deja de ser el último hijo del
+   contenedor — pero sigue siendo el último `<div>` entre los `<span>`. */
+.segment:first-of-type {
+  border-top-left-radius: var(--kora-radius);
+  border-bottom-left-radius: var(--kora-radius);
 }
 
-.segment:last-child {
-  border-top-right-radius: var(--kora-radius-pill);
-  border-bottom-right-radius: var(--kora-radius-pill);
+.segment:last-of-type {
+  border-top-right-radius: var(--kora-radius);
+  border-bottom-right-radius: var(--kora-radius);
 }
 
 .segmentPast {
@@ -89,26 +97,38 @@
 
 .today {
   position: absolute;
-  top: -32px;
+  top: -30px;
   transform: translateX(-50%);
   display: flex;
   flex-direction: column;
   align-items: center;
+  z-index: 1;
   pointer-events: none;
 }
 
 .todayPill {
+  position: relative;
   background: var(--kora-navy);
   color: var(--kora-surface);
-  padding: 4px var(--kora-space-2);
+  padding: 4px var(--kora-space-3);
   border-radius: var(--kora-radius-pill);
   font-size: 11px;
   font-weight: var(--kora-weight-bold);
   white-space: nowrap;
 }
 
+.todayPill::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: var(--kora-navy);
+}
+
 .todayLine {
   width: 2px;
-  height: 32px;
-  background: var(--kora-danger);
+  height: 46px;
+  background: var(--kora-navy);
 }

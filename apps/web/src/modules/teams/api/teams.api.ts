@@ -1,9 +1,11 @@
 import type {
   AddTeamMemberInput,
   CreateTeamInput,
+  CreateTeamTypeInput,
   ListTeamMemberOptionsResponse,
   ListTeamsQuery,
   ListTeamsResponse,
+  ListTeamTypesResponse,
   TeamAvailabilityQuery,
   TeamAvailabilityResponse,
   TeamDetail,
@@ -56,6 +58,15 @@ export const teamsApi = {
   },
 };
 
+export const teamTypesApi = {
+  list(): Promise<ListTeamTypesResponse> {
+    return api.get<ListTeamTypesResponse>('/teams/types');
+  },
+  create(input: CreateTeamTypeInput): Promise<{ id: string }> {
+    return api.post<{ id: string }>('/teams/types', input);
+  },
+};
+
 export const teamKeys = {
   all: ['teams'] as const,
   lists: () => [...teamKeys.all, 'list'] as const,
@@ -65,4 +76,5 @@ export const teamKeys = {
   memberOptions: () => [...teamKeys.all, 'member-options'] as const,
   availability: (teamId: string, query: TeamAvailabilityQuery) =>
     [...teamKeys.all, 'availability', teamId, query] as const,
+  types: () => [...teamKeys.all, 'types'] as const,
 };

@@ -21,6 +21,11 @@ export interface AssignProjectTeamMemberRecord {
   readonly assignedHours: number;
 }
 
+export interface UpdateProjectTeamMemberPatch {
+  readonly activity?: string | null;
+  readonly assignedHours?: number;
+}
+
 export interface ProjectTeamMemberRepository {
   listForProject(projectId: string, context?: TransactionContext): Promise<ProjectTeamMemberRecord[]>;
   findById(id: string, context?: TransactionContext): Promise<ProjectTeamMemberRecord | null>;
@@ -32,6 +37,7 @@ export interface ProjectTeamMemberRepository {
 
   assign(record: AssignProjectTeamMemberRecord, context?: TransactionContext): Promise<string>;
   unassign(id: string, context?: TransactionContext): Promise<void>;
+  update(id: string, patch: UpdateProjectTeamMemberPatch, context?: TransactionContext): Promise<void>;
 }
 
 export const PROJECT_TEAM_MEMBER_REPOSITORY = Symbol('ProjectTeamMemberRepository');

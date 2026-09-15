@@ -28,7 +28,6 @@ function getMonthLabels(startDate: string | null, endDate: string | null): strin
 
 interface ProjectTimelineProps {
   phase: ProjectPhase | null;
-  isActive: boolean;
   startDate: string | null;
   endDate: string | null;
 }
@@ -51,19 +50,13 @@ function getTodayPercent(startDate: string | null, endDate: string | null): numb
 }
 
 /** Réplica de la barra de fases + fila de meses de `LiderProyectoFicha` (v1). */
-export function ProjectTimeline({ phase, isActive, startDate, endDate }: ProjectTimelineProps) {
+export function ProjectTimeline({ phase, startDate, endDate }: ProjectTimelineProps) {
   const currentIndex = phase ? PROJECT_PHASES.indexOf(phase) : -1;
   const monthLabels = getMonthLabels(startDate, endDate);
-  const todayPercent = isActive ? getTodayPercent(startDate, endDate) : null;
+  const todayPercent = getTodayPercent(startDate, endDate);
 
   return (
     <div className={styles.timeline}>
-      <div className={styles.monthLabels}>
-        {monthLabels.map((label, index) => (
-          <span key={index}>{label}</span>
-        ))}
-      </div>
-
       <div className={styles.track}>
         {PROJECT_PHASES.map((step, index) => {
           const state = index < currentIndex ? 'past' : index === currentIndex ? 'current' : 'future';
@@ -85,6 +78,12 @@ export function ProjectTimeline({ phase, isActive, startDate, endDate }: Project
             <span className={styles.todayLine} />
           </span>
         )}
+      </div>
+
+      <div className={styles.monthLabels}>
+        {monthLabels.map((label, index) => (
+          <span key={index}>{label}</span>
+        ))}
       </div>
     </div>
   );

@@ -1,5 +1,9 @@
 import { z } from 'zod';
-import { projectPrioritySchema } from '../projects/project.contract';
+import {
+  projectModuleDeliveryStatusSchema,
+  projectModuleTaskStatusSchema,
+  projectPrioritySchema,
+} from '../projects/project.contract';
 import { forecastAssignmentTypeSchema } from '../forecast/forecast.contract';
 import { ticketStatusSchema } from '../tickets/ticket.contract';
 import { isoDateTimeSchema } from '../common/primitives';
@@ -191,6 +195,32 @@ export const dashboardMyActiveProjectSchema = z.object({
 });
 export type DashboardMyActiveProject = z.infer<typeof dashboardMyActiveProjectSchema>;
 
+/** "Mis tareas" — tareas de "Fases · Módulos" asignadas directamente al actor. */
+export const dashboardMyTaskSchema = z.object({
+  id: z.string(),
+  projectId: z.string(),
+  projectName: z.string(),
+  moduleId: z.string(),
+  moduleName: z.string(),
+  title: z.string(),
+  date: z.string(),
+  status: projectModuleTaskStatusSchema,
+  completedAt: isoDateTimeSchema.nullable(),
+});
+export type DashboardMyTask = z.infer<typeof dashboardMyTaskSchema>;
+
+/** "Mis entregas" — entregas de "Fases · Módulos" del equipo del actor. */
+export const dashboardMyDeliverySchema = z.object({
+  id: z.string(),
+  projectId: z.string(),
+  projectName: z.string(),
+  moduleId: z.string(),
+  moduleName: z.string(),
+  estimatedDate: z.string(),
+  status: projectModuleDeliveryStatusSchema,
+});
+export type DashboardMyDelivery = z.infer<typeof dashboardMyDeliverySchema>;
+
 export const dashboardSummarySchema = z.object({
   hours: dashboardHoursSummarySchema.nullable(),
   approvals: dashboardApprovalsSummarySchema.nullable(),
@@ -207,5 +237,9 @@ export const dashboardSummarySchema = z.object({
    * resumida para el panel "Proyectos de la Semana".
    */
   myActiveProjects: z.array(dashboardMyActiveProjectSchema),
+  /** Tareas asignadas directamente al actor, en cualquier proyecto — incondicional, igual criterio que `myActiveProjects`. */
+  myTasks: z.array(dashboardMyTaskSchema),
+  /** Entregas del equipo del actor — vacío si no pertenece a ningún equipo. */
+  myDeliveries: z.array(dashboardMyDeliverySchema),
 });
 export type DashboardSummary = z.infer<typeof dashboardSummarySchema>;

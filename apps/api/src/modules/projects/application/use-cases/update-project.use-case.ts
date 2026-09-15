@@ -88,6 +88,38 @@ export class UpdateProjectUseCase implements UseCase<UpdateProjectCommand, void,
         ...(data.supportHours !== undefined ? { supportHours: data.supportHours } : {}),
         ...(data.quotationLink !== undefined ? { quotationLink: data.quotationLink || null } : {}),
         ...(data.contractLink !== undefined ? { contractLink: data.contractLink || null } : {}),
+        ...(data.onHoldReason !== undefined ? { onHoldReason: data.onHoldReason || null } : {}),
+        ...(data.stopsClock !== undefined ? { stopsClock: data.stopsClock } : {}),
+        ...(data.scopeNotes !== undefined ? { scopeNotes: data.scopeNotes || null } : {}),
+        ...(data.deliveryDocumentation !== undefined
+          ? { deliveryDocumentation: data.deliveryDocumentation || null }
+          : {}),
+        ...(data.demoLink !== undefined ? { demoLink: data.demoLink || null } : {}),
+        ...(data.testEnvironmentLink !== undefined ? { testEnvironmentLink: data.testEnvironmentLink || null } : {}),
+        ...(data.figmaLink !== undefined ? { figmaLink: data.figmaLink || null } : {}),
+        ...(data.documentationLink !== undefined ? { documentationLink: data.documentationLink || null } : {}),
+        ...(data.impactBeforeHours !== undefined ? { impactBeforeHours: data.impactBeforeHours } : {}),
+        ...(data.impactBeforePeople !== undefined ? { impactBeforePeople: data.impactBeforePeople || null } : {}),
+        ...(data.impactBeforeDuration !== undefined
+          ? { impactBeforeDuration: data.impactBeforeDuration || null }
+          : {}),
+        ...(data.impactBeforeModality !== undefined
+          ? { impactBeforeModality: data.impactBeforeModality || null }
+          : {}),
+        ...(data.impactAfterHours !== undefined ? { impactAfterHours: data.impactAfterHours } : {}),
+        ...(data.impactAfterPeople !== undefined ? { impactAfterPeople: data.impactAfterPeople || null } : {}),
+        ...(data.impactAfterDuration !== undefined ? { impactAfterDuration: data.impactAfterDuration || null } : {}),
+        ...(data.impactAfterModality !== undefined ? { impactAfterModality: data.impactAfterModality || null } : {}),
+        ...(data.qaTestingStartDate !== undefined
+          ? { qaTestingStartDate: data.qaTestingStartDate ? new Date(data.qaTestingStartDate) : null }
+          : {}),
+        ...(data.qaTestingEndDate !== undefined
+          ? { qaTestingEndDate: data.qaTestingEndDate ? new Date(data.qaTestingEndDate) : null }
+          : {}),
+        ...(data.qaEvaluatedModule !== undefined ? { qaEvaluatedModule: data.qaEvaluatedModule || null } : {}),
+        ...(data.qaPlannedTests !== undefined ? { qaPlannedTests: data.qaPlannedTests } : {}),
+        ...(data.qaExecutedTests !== undefined ? { qaExecutedTests: data.qaExecutedTests } : {}),
+        ...(data.qaFailedTests !== undefined ? { qaFailedTests: data.qaFailedTests } : {}),
       },
       this.clock.now(),
     );
@@ -97,6 +129,13 @@ export class UpdateProjectUseCase implements UseCase<UpdateProjectCommand, void,
       await this.unitOfWork.run(async (tx) => {
         await this.projects.save(project, tx);
         if (data.teams) {
+          const existingTeams = await this.projectTeams.findByProject(project.id, tx);
+          const keptTeamIds = new Set(data.teams.map((team) => team.teamId));
+          for (const existing of existingTeams) {
+            if (!keptTeamIds.has(existing.teamId)) {
+              await this.projectTeams.remove(project.id, existing.teamId, tx);
+            }
+          }
           for (const team of data.teams) {
             await this.projectTeams.save(
               {

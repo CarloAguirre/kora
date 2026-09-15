@@ -1,0 +1,10 @@
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: var(--kora-radius-pill);
+  color: #ffffff;
+  font-weight: var(--kora-weight-semibold);
+  line-height: 1;
+}

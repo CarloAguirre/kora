@@ -1,17 +1,20 @@
 import { useEffect, useState } from 'react';
 import {
   HOUR_ENTRY_ASSIGNMENTS,
+  PROJECT_MODULE_STAGE_LABELS,
   PROJECT_REQUIRING_ASSIGNMENTS,
   type CreateHourEntryInput,
   type HourEntryAssignment,
+  type ProjectSummary,
 } from '@kora/contracts';
 import styles from './HourEntryFormDialog.module.css';
 import { Button } from '@/shared/components/ui/Button';
 import { TextField } from '@/shared/components/ui/TextField';
 import { Select } from '@/shared/components/ui/Select';
+import { Combobox } from '@/shared/components/ui/Combobox';
 import { AlertIcon, ChevronDownIcon, ChevronRightIcon, PlusIcon, TrashIcon } from '@/shared/components/icons/Icons';
 import { useCreateHourEntry, useHolidays, useHourEntriesList } from '../api/hours.queries';
-import { useProjectsList } from '@/modules/projects/api/projects.queries';
+import { useProjectDetail, useProjectsList } from '@/modules/projects/api/projects.queries';
 import { getProjectOptionLabel } from '@/modules/projects/lib/project-option-label';
 import { useUsersList } from '@/modules/users/api/users.queries';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
@@ -35,11 +38,14 @@ interface DailyBlock {
   expanded: boolean;
   assignment: HourEntryAssignment | '';
   projectId: string;
+  moduleId: string;
   category: string;
   hours: string;
   description: string;
   isOvertime: boolean;
   designatedApproverUserId: string;
+  hasBlocker: boolean;
+  blockerDescription: string;
 }
 
 let blockCounter = 0;
@@ -48,11 +54,14 @@ const createEmptyBlock = (): DailyBlock => ({
   expanded: true,
   assignment: '',
   projectId: '',
+  moduleId: '',
   category: '',
   hours: '',
   description: '',
   isOvertime: false,
   designatedApproverUserId: '',
+  hasBlocker: false,
+  blockerDescription: '',
 });
 
 /**
@@ -152,6 +161,7 @@ export function DailyEntryForm({
     if (block.description.trim().length > 0 && block.description.trim().length < MIN_DESCRIPTION_LENGTH) {
       return `La descripción debe tener al menos ${MIN_DESCRIPTION_LENGTH} caracteres.`;
     }
+    if (block.hasBlocker && !block.blockerDescription.trim()) return 'Describe el bloqueo reportado.';
     return null;
   };
 
@@ -177,12 +187,15 @@ export function DailyEntryForm({
         const input: CreateHourEntryInput = {
           assignment: block.assignment as HourEntryAssignment,
           projectId: needsProject ? block.projectId : undefined,
+          moduleId: needsProject && block.moduleId ? block.moduleId : undefined,
           category: block.category || undefined,
           description: block.description || undefined,
           hours: Number(block.hours),
           date,
           isOvertime: block.isOvertime,
           designatedApproverUserId: block.designatedApproverUserId || undefined,
+          hasBlocker: block.hasBlocker,
+          blockerDescription: block.hasBlocker ? block.blockerDescription : undefined,
         };
         await createEntry.mutateAsync(input);
         remaining.shift();
@@ -236,170 +249,23 @@ export function DailyEntryForm({
         </div>
       )}
 
-      {blocks.map((block, index) => {
-        const needsProject = PROJECT_REQUIRING_ASSIGNMENTS.has(block.assignment as HourEntryAssignment);
-        const showApproverInRow =
-          block.assignment !== '' && !needsProject && (user?.role === 'collaborator' || block.isOvertime);
-        const selectedProject = needsProject ? (projects?.items ?? []).find((p) => p.id === block.projectId) : undefined;
-        const overtimeDisabled = needsProject && !selectedProject?.allowsOvertime;
-        return (
-          <div key={block.key} className={styles.block}>
-            <div
-              className={[styles.blockHeader, block.expanded ? styles.blockHeaderExpanded : ''].join(' ')}
-              role="button"
-              tabIndex={0}
-              onClick={() => toggleExpand(block.key)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault();
-                  toggleExpand(block.key);
-                }
-              }}
-            >
-              {block.expanded ? <ChevronDownIcon size={14} /> : <ChevronRightIcon size={14} />}
-              <span className={styles.blockTitle}>{blockTitle(block, index)}</span>
-              {blocks.length > 1 && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    removeBlock(block.key);
-                  }}
-                  aria-label="Quitar registro"
-                >
-                  <TrashIcon size={16} />
-                </Button>
-              )}
-            </div>
-
-            {block.expanded && (
-              <div className={styles.blockBody}>
-                <div className={styles.row}>
-                  <Select
-                    label="Asignación"
-                    required
-                    placeholder="Seleccionar asignación..."
-                    options={ASSIGNMENT_OPTIONS}
-                    value={block.assignment}
-                    onChange={(event) => {
-                      const needsProjectNext = PROJECT_REQUIRING_ASSIGNMENTS.has(event.target.value);
-                      updateBlock(block.key, {
-                        assignment: event.target.value as HourEntryAssignment,
-                        projectId: needsProjectNext ? block.projectId : '',
-                        designatedApproverUserId: needsProjectNext ? '' : block.designatedApproverUserId,
-                      });
-                    }}
-                  />
-                  {showApproverInRow ? (
-                    <Select
-                      label="Líder aprobador"
-                      required
-                      placeholder="Selecciona a quién aprueba estas horas"
-                      options={(leaders?.items ?? []).map((leader) => ({ value: leader.id, label: leader.fullName }))}
-                      value={block.designatedApproverUserId}
-                      onChange={(event) => updateBlock(block.key, { designatedApproverUserId: event.target.value })}
-                    />
-                  ) : (
-                    <Select
-                      label="Proyecto"
-                      required={needsProject}
-                      disabled={!needsProject}
-                      placeholder="Seleccionar proyecto..."
-                      options={(projects?.items ?? []).map((project) => ({ value: project.id, label: getProjectOptionLabel(project) }))}
-                      value={block.projectId}
-                      onChange={(event) => {
-                        const nextProject = (projects?.items ?? []).find((p) => p.id === event.target.value);
-                        updateBlock(block.key, {
-                          projectId: event.target.value,
-                          isOvertime: nextProject?.allowsOvertime ? block.isOvertime : false,
-                        });
-                      }}
-                    />
-                  )}
-                </div>
-
-                <TextField
-                  label="Actividad"
-                  placeholder="Ej: Diseño de wireframes de alta fidelidad para módulo dashboard"
-                  value={block.category}
-                  onChange={(event) => updateBlock(block.key, { category: event.target.value })}
-                />
-
-                <div className={styles.row}>
-                  <div className={styles.stepperField}>
-                    <span className={styles.stepperLabel}>Horas Trabajadas</span>
-                    <div className={styles.stepper}>
-                      <button type="button" className={styles.stepperButton} onClick={() => adjustHours(block.key, -HOURS_STEP)}>
-                        −
-                      </button>
-                      <input
-                        className={styles.stepperInput}
-                        type="number"
-                        step={HOURS_STEP}
-                        min={0}
-                        value={block.hours}
-                        onChange={(event) => updateBlock(block.key, { hours: event.target.value })}
-                      />
-                      <button type="button" className={styles.stepperButton} onClick={() => adjustHours(block.key, HOURS_STEP)}>
-                        +
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className={styles.overtimeField}>
-                    <span className={styles.stepperLabel}>Horas Extra</span>
-                    <label
-                      className={styles.overtimeToggleRow}
-                      title={overtimeDisabled ? 'Este proyecto no tiene autorizadas horas extra.' : undefined}
-                    >
-                      <input
-                        type="checkbox"
-                        className={styles.overtimeCheckbox}
-                        disabled={overtimeDisabled}
-                        checked={block.isOvertime}
-                        onChange={(event) => updateBlock(block.key, { isOvertime: event.target.checked })}
-                      />
-                      <span className={styles.overtimeSwitch} aria-hidden="true" />
-                      <span className={styles.overtimeState}>{block.isOvertime ? 'Marcada' : 'No marcada'}</span>
-                    </label>
-                    {block.isOvertime ? (
-                      <span className={styles.overtimeHelp}>
-                        {needsProject
-                          ? 'Quedará pendiente de aprobación del líder del proyecto.'
-                          : 'Quedará pendiente de aprobación del líder que selecciones.'}
-                      </span>
-                    ) : (
-                      needsProject &&
-                      block.projectId &&
-                      overtimeDisabled && (
-                        <span className={styles.overtimeHelp}>Este proyecto no tiene autorizadas horas extra.</span>
-                      )
-                    )}
-                  </div>
-                </div>
-
-                <div className={styles.textareaField}>
-                  <label className={styles.textareaLabel}>Descripción / Bitácora Detallada</label>
-                  <textarea
-                    className={styles.textarea}
-                    placeholder="Describa detalladamente el avance técnico realizado (mínimo 5 caracteres)"
-                    value={block.description}
-                    onChange={(event) => updateBlock(block.key, { description: event.target.value })}
-                  />
-                </div>
-
-                {blockErrors[block.key] && (
-                  <span className={styles.blockError} role="alert">
-                    {blockErrors[block.key]}
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
-        );
-      })}
+      {blocks.map((block, index) => (
+        <DailyEntryBlockFields
+          key={block.key}
+          block={block}
+          index={index}
+          removable={blocks.length > 1}
+          projects={projects?.items ?? []}
+          leaders={leaders?.items ?? []}
+          isCollaborator={user?.role === 'collaborator'}
+          error={blockErrors[block.key]}
+          title={blockTitle(block, index)}
+          onUpdate={(patch) => updateBlock(block.key, patch)}
+          onRemove={() => removeBlock(block.key)}
+          onToggleExpand={() => toggleExpand(block.key)}
+          onAdjustHours={(delta) => adjustHours(block.key, delta)}
+        />
+      ))}
 
       <button type="button" className={styles.addBlockButton} onClick={addBlock}>
         <PlusIcon size={16} />
@@ -418,6 +284,244 @@ export function DailyEntryForm({
           Guardar y enviar para aprobación
         </Button>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Aislado del formulario principal porque necesita `useProjectDetail` (para
+ * el selector de Módulo) por bloque — llamarlo dentro de `blocks.map(...)`
+ * directamente rompería las reglas de hooks.
+ */
+function DailyEntryBlockFields({
+  block,
+  index,
+  removable,
+  projects,
+  leaders,
+  isCollaborator,
+  error,
+  title,
+  onUpdate,
+  onRemove,
+  onToggleExpand,
+  onAdjustHours,
+}: {
+  block: DailyBlock;
+  index: number;
+  removable: boolean;
+  projects: ProjectSummary[];
+  leaders: { id: string; fullName: string }[];
+  isCollaborator: boolean;
+  error?: string;
+  title: string;
+  onUpdate: (patch: Partial<DailyBlock>) => void;
+  onRemove: () => void;
+  onToggleExpand: () => void;
+  onAdjustHours: (delta: number) => void;
+}) {
+  const needsProject = PROJECT_REQUIRING_ASSIGNMENTS.has(block.assignment as HourEntryAssignment);
+  const showApproverInRow = block.assignment !== '' && !needsProject && (isCollaborator || block.isOvertime);
+  const selectedProject = needsProject ? projects.find((p) => p.id === block.projectId) : undefined;
+  const overtimeDisabled = needsProject && !selectedProject?.allowsOvertime;
+  const { data: projectDetail } = useProjectDetail(needsProject && block.projectId ? block.projectId : null);
+  const selectedModule = projectDetail?.modules.find((m) => m.id === block.moduleId);
+
+  return (
+    <div className={styles.block}>
+      <div
+        className={[styles.blockHeader, block.expanded ? styles.blockHeaderExpanded : ''].join(' ')}
+        role="button"
+        tabIndex={0}
+        onClick={onToggleExpand}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            onToggleExpand();
+          }
+        }}
+      >
+        {block.expanded ? <ChevronDownIcon size={14} /> : <ChevronRightIcon size={14} />}
+        <span className={styles.blockTitle}>{title}</span>
+        {removable && (
+          <Button
+            variant="ghost"
+            size="icon"
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onRemove();
+            }}
+            aria-label="Quitar registro"
+          >
+            <TrashIcon size={16} />
+          </Button>
+        )}
+      </div>
+
+      {block.expanded && (
+        <div className={styles.blockBody}>
+          <div className={styles.row}>
+            <Select
+              label="Asignación"
+              required
+              placeholder="Seleccionar asignación..."
+              options={ASSIGNMENT_OPTIONS}
+              value={block.assignment}
+              onChange={(event) => {
+                const needsProjectNext = PROJECT_REQUIRING_ASSIGNMENTS.has(event.target.value);
+                onUpdate({
+                  assignment: event.target.value as HourEntryAssignment,
+                  projectId: needsProjectNext ? block.projectId : '',
+                  moduleId: needsProjectNext ? block.moduleId : '',
+                  designatedApproverUserId: needsProjectNext ? '' : block.designatedApproverUserId,
+                });
+              }}
+            />
+            {showApproverInRow ? (
+              <Select
+                label="Líder aprobador"
+                required
+                placeholder="Selecciona a quién aprueba estas horas"
+                options={leaders.map((leader) => ({ value: leader.id, label: leader.fullName }))}
+                value={block.designatedApproverUserId}
+                onChange={(event) => onUpdate({ designatedApproverUserId: event.target.value })}
+              />
+            ) : (
+              <Combobox
+                label="Proyecto"
+                disabled={!needsProject}
+                placeholder="Buscar proyecto..."
+                options={projects.map((project) => ({ value: project.id, label: getProjectOptionLabel(project) }))}
+                value={block.projectId}
+                onChange={(nextProjectId) => {
+                  const nextProject = projects.find((p) => p.id === nextProjectId);
+                  onUpdate({
+                    projectId: nextProjectId,
+                    moduleId: '',
+                    isOvertime: nextProject?.allowsOvertime ? block.isOvertime : false,
+                  });
+                }}
+              />
+            )}
+          </div>
+
+          {needsProject && block.projectId && (projectDetail?.modules.length ?? 0) > 0 && (
+            <div className={styles.row}>
+              <Select
+                label="Módulo"
+                placeholder="Seleccionar módulo (opcional)"
+                options={(projectDetail?.modules ?? []).map((module) => ({ value: module.id, label: module.name }))}
+                value={block.moduleId}
+                onChange={(event) => onUpdate({ moduleId: event.target.value })}
+              />
+              {selectedModule && (
+                <span className={styles.stepperLabel}>Etapa: {PROJECT_MODULE_STAGE_LABELS[selectedModule.currentStage]}</span>
+              )}
+            </div>
+          )}
+
+          <TextField
+            label="Actividad"
+            placeholder="Ej: Diseño de wireframes de alta fidelidad para módulo dashboard"
+            value={block.category}
+            onChange={(event) => onUpdate({ category: event.target.value })}
+          />
+
+          <div className={styles.row}>
+            <div className={styles.stepperField}>
+              <span className={styles.stepperLabel}>Horas Trabajadas</span>
+              <div className={styles.stepper}>
+                <button type="button" className={styles.stepperButton} onClick={() => onAdjustHours(-HOURS_STEP)}>
+                  −
+                </button>
+                <input
+                  className={styles.stepperInput}
+                  type="number"
+                  step={HOURS_STEP}
+                  min={0}
+                  value={block.hours}
+                  onChange={(event) => onUpdate({ hours: event.target.value })}
+                />
+                <button type="button" className={styles.stepperButton} onClick={() => onAdjustHours(HOURS_STEP)}>
+                  +
+                </button>
+              </div>
+            </div>
+
+            <div className={styles.overtimeField}>
+              <span className={styles.stepperLabel}>Horas Extra</span>
+              <label
+                className={styles.overtimeToggleRow}
+                title={overtimeDisabled ? 'Este proyecto no tiene autorizadas horas extra.' : undefined}
+              >
+                <input
+                  type="checkbox"
+                  className={styles.overtimeCheckbox}
+                  disabled={overtimeDisabled}
+                  checked={block.isOvertime}
+                  onChange={(event) => onUpdate({ isOvertime: event.target.checked })}
+                />
+                <span className={styles.overtimeSwitch} aria-hidden="true" />
+                <span className={styles.overtimeState}>{block.isOvertime ? 'Marcada' : 'No marcada'}</span>
+              </label>
+              {block.isOvertime ? (
+                <span className={styles.overtimeHelp}>
+                  {needsProject
+                    ? 'Quedará pendiente de aprobación del líder del proyecto.'
+                    : 'Quedará pendiente de aprobación del líder que selecciones.'}
+                </span>
+              ) : (
+                needsProject &&
+                block.projectId &&
+                overtimeDisabled && <span className={styles.overtimeHelp}>Este proyecto no tiene autorizadas horas extra.</span>
+              )}
+            </div>
+          </div>
+
+          <div className={styles.textareaField}>
+            <label className={styles.textareaLabel}>Descripción / Bitácora Detallada</label>
+            <textarea
+              className={styles.textarea}
+              placeholder="Describa detalladamente el avance técnico realizado (mínimo 5 caracteres)"
+              value={block.description}
+              onChange={(event) => onUpdate({ description: event.target.value })}
+            />
+          </div>
+
+          <div className={styles.overtimeField}>
+            <span className={styles.stepperLabel}>¿Hubo algún bloqueo o problema?</span>
+            <label className={styles.overtimeToggleRow}>
+              <input
+                type="checkbox"
+                className={styles.overtimeCheckbox}
+                checked={block.hasBlocker}
+                onChange={(event) => onUpdate({ hasBlocker: event.target.checked })}
+              />
+              <span className={styles.overtimeSwitch} aria-hidden="true" />
+              <span className={styles.overtimeState}>{block.hasBlocker ? 'Sí' : 'No'}</span>
+            </label>
+          </div>
+
+          {block.hasBlocker && (
+            <div className={styles.textareaField}>
+              <label className={styles.textareaLabel}>Describe el bloqueo</label>
+              <textarea
+                className={styles.textarea}
+                placeholder="¿Qué te está bloqueando o generando un problema?"
+                value={block.blockerDescription}
+                onChange={(event) => onUpdate({ blockerDescription: event.target.value })}
+              />
+            </div>
+          )}
+
+          {error && (
+            <span className={styles.blockError} role="alert">
+              {error}
+            </span>
+          )}
+        </div>
+      )}
     </div>
   );
 }

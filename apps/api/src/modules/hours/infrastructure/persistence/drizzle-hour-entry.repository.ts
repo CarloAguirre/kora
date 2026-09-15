@@ -14,6 +14,7 @@ import {
   lte,
   ne,
   or,
+  projectModules,
   projects,
   projectTeams,
   sql,
@@ -73,6 +74,8 @@ export class DrizzleHourEntryRepository implements HourEntryRepository {
           projectSalesStage: projects.salesStage,
           clientId: projects.clientId,
           clientName: clients.companyName,
+          moduleId: hourEntries.moduleId,
+          moduleName: projectModules.name,
           assignment: hourEntries.assignment,
           category: hourEntries.category,
           description: hourEntries.description,
@@ -82,6 +85,8 @@ export class DrizzleHourEntryRepository implements HourEntryRepository {
           projectStageAtEntry: hourEntries.projectStageAtEntry,
           status: hourEntries.status,
           rejectionReason: hourEntries.rejectionReason,
+          hasBlocker: hourEntries.hasBlocker,
+          blockerDescription: hourEntries.blockerDescription,
           designatedApproverUserId: hourEntries.designatedApproverUserId,
           decisionUserId: hourEntries.decisionUserId,
           createdAt: hourEntries.createdAt,
@@ -90,6 +95,7 @@ export class DrizzleHourEntryRepository implements HourEntryRepository {
         .leftJoin(users, eq(users.id, hourEntries.userId))
         .leftJoin(projects, eq(projects.id, hourEntries.projectId))
         .leftJoin(clients, eq(clients.id, projects.clientId))
+        .leftJoin(projectModules, eq(projectModules.id, hourEntries.moduleId))
         .where(where)
         .orderBy(...this.buildOrderBy(sort))
         .limit(page.pageSize)
@@ -186,6 +192,8 @@ export class DrizzleHourEntryRepository implements HourEntryRepository {
       userFullName: `${row.userFirstName ?? ''} ${row.userLastName ?? ''}`.trim(),
       projectId: row.projectId,
       projectName: row.projectName,
+      moduleId: row.moduleId,
+      moduleName: row.moduleName,
       teamId: teamByUserId.get(row.userId)?.id ?? null,
       teamName: teamByUserId.get(row.userId)?.name ?? null,
       assignment: row.assignment,
@@ -197,6 +205,8 @@ export class DrizzleHourEntryRepository implements HourEntryRepository {
       projectStageAtEntry: row.projectStageAtEntry,
       status: row.status,
       rejectionReason: row.rejectionReason,
+      hasBlocker: row.hasBlocker,
+      blockerDescription: row.blockerDescription,
       designatedApproverUserId: row.designatedApproverUserId,
       designatedApproverFullName: row.designatedApproverUserId ? (approverNameById.get(row.designatedApproverUserId) ?? null) : null,
       projectApprovers: projectApproversByEntryId.get(row.id) ?? [],

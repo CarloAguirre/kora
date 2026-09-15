@@ -46,6 +46,7 @@ export class CreateTeamUseCase implements UseCase<CreateTeamCommand, { id: strin
       name: data.name,
       description: data.description,
       leaderUserId: data.leaderUserId,
+      teamTypeId: data.teamTypeId,
       now: this.clock.now(),
     });
 

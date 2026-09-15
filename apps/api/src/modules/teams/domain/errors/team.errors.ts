@@ -18,6 +18,14 @@ export class TeamNameAlreadyInUseError extends ConflictError {
   }
 }
 
+export class TeamTypeNameAlreadyInUseError extends ConflictError {
+  constructor(name: string) {
+    super(`Ya existe un tipo de equipo llamado "${name}".`, 'TEAM_TYPE_NAME_ALREADY_IN_USE', {
+      details: { name },
+    });
+  }
+}
+
 export class TeamMemberAlreadyActiveError extends ConflictError {
   constructor() {
     super('Esta persona ya pertenece activamente al equipo.', 'TEAM_MEMBER_ALREADY_ACTIVE');

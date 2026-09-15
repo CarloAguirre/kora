@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { err, ok, type ApplicationError, type Result } from '@kora/core';
-import type { AssignProjectTeamMemberInput } from '@kora/contracts';
+import { ForbiddenError, err, ok, type ApplicationError, type Result } from '@kora/core';
+import type { AssignProjectTeamMemberInput, Permission } from '@kora/contracts';
 import {
   InvalidTeamMemberAssignmentError,
   ProjectNotFoundError,
@@ -11,6 +11,7 @@ import {
   PROJECT_TEAM_MEMBER_REPOSITORY,
   type ProjectTeamMemberRepository,
 } from '../../domain/repositories/project-team-member.repository';
+import { PROJECT_TEAM_REPOSITORY, type ProjectTeamRepository } from '../../domain/repositories/project-team.repository';
 import {
   PROJECT_TEAM_MEMBER_VALIDATOR,
   type ProjectTeamMemberValidator,
@@ -25,8 +26,10 @@ export interface AssignProjectTeamMemberCommand {
   readonly projectId: string;
   readonly data: AssignProjectTeamMemberInput;
   readonly actor: ActorContext;
+  readonly actorPermissions: readonly Permission[];
 }
 
+/** Sin `projects:manage`, solo puede asignar quien lidera el equipo del `teamMemberId` en este proyecto. */
 @Injectable()
 export class AssignProjectTeamMemberUseCase
   implements UseCase<AssignProjectTeamMemberCommand, { id: string }, ApplicationError>
@@ -34,6 +37,7 @@ export class AssignProjectTeamMemberUseCase
   constructor(
     @Inject(PROJECT_REPOSITORY) private readonly projects: ProjectRepository,
     @Inject(PROJECT_TEAM_MEMBER_REPOSITORY) private readonly members: ProjectTeamMemberRepository,
+    @Inject(PROJECT_TEAM_REPOSITORY) private readonly projectTeams: ProjectTeamRepository,
     @Inject(PROJECT_TEAM_MEMBER_VALIDATOR) private readonly validator: ProjectTeamMemberValidator,
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
   ) {}
@@ -48,6 +52,14 @@ export class AssignProjectTeamMemberUseCase
 
     if (!(await this.validator.isActiveTeamMember(data.teamMemberId))) {
       return err(new InvalidTeamMemberAssignmentError());
+    }
+
+    if (!command.actorPermissions.includes('projects:manage')) {
+      const teamId = await this.validator.findTeamId(data.teamMemberId);
+      const isTeamLeader = teamId != null && (await this.projectTeams.isTeamLeaderForProject(projectId, teamId, actor.userId));
+      if (!isTeamLeader) {
+        return err(new ForbiddenError('No lideras el equipo de esta persona.', 'PROJECT_TEAM_NOT_LED'));
+      }
     }
 
     const existing = await this.members.findByProjectAndTeamMember(projectId, data.teamMemberId);

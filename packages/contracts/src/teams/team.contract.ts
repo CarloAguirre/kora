@@ -25,12 +25,32 @@ export const teamMemberSchema = z.object({
 });
 export type TeamMember = z.infer<typeof teamMemberSchema>;
 
+/** Categoría visual del equipo. Catálogo abierto: cualquiera con `teams:manage` puede crear tipos nuevos. */
+export const teamTypeSchema = z.object({
+  id: uuidSchema,
+  name: z.string(),
+  color: z.string(),
+  icon: z.string(),
+});
+export type TeamType = z.infer<typeof teamTypeSchema>;
+
+export const createTeamTypeSchema = z.object({
+  name: nonEmptyTrimmed(60, 'El nombre del tipo de equipo'),
+  color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'El color debe ser un hexadecimal, p. ej. #2563EB'),
+  icon: z.string().trim().min(1).max(40),
+});
+export type CreateTeamTypeInput = z.infer<typeof createTeamTypeSchema>;
+
+export const listTeamTypesResponseSchema = z.object({ items: z.array(teamTypeSchema) });
+export type ListTeamTypesResponse = z.infer<typeof listTeamTypesResponseSchema>;
+
 export const teamSummarySchema = z.object({
   id: uuidSchema,
   name: z.string(),
   description: z.string().nullable(),
   isActive: z.boolean(),
   leader: z.object({ id: uuidSchema, fullName: z.string() }).nullable(),
+  teamType: teamTypeSchema.nullable(),
   memberCount: z.number().int(),
   createdAt: isoDateTimeSchema,
 });
@@ -47,6 +67,7 @@ export const createTeamSchema = z.object({
   name: nonEmptyTrimmed(120, 'El nombre del equipo'),
   description: z.string().trim().max(500).optional(),
   leaderUserId: uuidSchema.nullish(),
+  teamTypeId: uuidSchema.nullish(),
 });
 export type CreateTeamInput = z.infer<typeof createTeamSchema>;
 

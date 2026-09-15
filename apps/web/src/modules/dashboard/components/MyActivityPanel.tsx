@@ -1,14 +1,22 @@
+import { useState } from 'react';
 import {
   FORECAST_ASSIGNMENT_TYPE_LABELS,
   type DashboardHoursSummary,
   type DashboardMyActiveProject,
+  type DashboardMyDelivery,
   type DashboardMyPlanning,
+  type DashboardMyTask,
   type DashboardPlanningItem,
 } from '@kora/contracts';
 import styles from './MyActivityPanel.module.css';
 import { Card } from '@/shared/components/ui/Card';
+import { Button } from '@/shared/components/ui/Button';
+import { Tabs } from '@/shared/components/ui/Tabs';
 import { AlertIcon, CheckIcon, CalendarIcon } from '@/shared/components/icons/Icons';
 import { RecentHistoryCard } from './RecentHistoryCard';
+import { useUpdateProjectModuleDelivery, useUpdateProjectModuleTask } from '@/modules/projects/api/projects.queries';
+import { useToast } from '@/shared/components/ui/Toast';
+import { ApiRequestError } from '@/shared/lib/api-client';
 
 const DAILY_TARGET_HOURS = 8;
 const PROJECT_COLORS = ['#EE7E23', '#57769B', '#4FAE32', '#C50000', '#19738C'];
@@ -44,9 +52,173 @@ function DailyProgressDonut({ percent }: { percent: number }) {
   );
 }
 
+const isPastDate = (isoDate: string) => new Date(`${isoDate}T00:00:00`) < new Date(new Date().toDateString());
+
+const TASK_STATUS_TAG_LABEL: Record<'todo' | 'in_progress' | 'done' | 'late', string> = {
+  todo: 'Por hacer',
+  in_progress: 'En progreso',
+  done: 'Completada',
+  late: 'Atrasada',
+};
+const TASK_STATUS_TAG_CLASS = {
+  todo: styles.statusTagTodo,
+  in_progress: styles.statusTagInProgress,
+  done: styles.statusTagDone,
+  late: styles.statusTagLate,
+} satisfies Record<'todo' | 'in_progress' | 'done' | 'late', string | undefined>;
+
+/** "Mis tareas" — tareas de "Fases · Módulos" asignadas directamente al colaborador. */
+function MyTasksCard({ tasks, loading }: { tasks: readonly DashboardMyTask[]; loading: boolean }) {
+  const toast = useToast();
+  const updateTask = useUpdateProjectModuleTask();
+  const [tab, setTab] = useState<'all' | 'todo' | 'in_progress' | 'done'>('all');
+
+  const visualStatus = (task: DashboardMyTask) =>
+    task.status === 'done' ? 'done' : isPastDate(task.date) ? 'late' : task.status;
+  const filtered = tasks.filter((task) => tab === 'all' || task.status === tab);
+
+  const onAdvance = async (task: DashboardMyTask, nextStatus: 'in_progress' | 'done') => {
+    try {
+      await updateTask.mutateAsync({
+        projectId: task.projectId,
+        moduleId: task.moduleId,
+        taskId: task.id,
+        input: { status: nextStatus },
+      });
+    } catch (error) {
+      toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo actualizar la tarea.');
+    }
+  };
+
+  return (
+    <Card className={styles.sectionCard}>
+      <h3 className={styles.sectionTitle}>Mis Tareas</h3>
+      <Tabs
+        tabs={[
+          { id: 'all', label: 'Todas' },
+          { id: 'todo', label: 'Por hacer' },
+          { id: 'in_progress', label: 'En progreso' },
+          { id: 'done', label: 'Completadas' },
+        ]}
+        activeId={tab}
+        onSelect={(id) => setTab(id as typeof tab)}
+      />
+      {loading ? (
+        <span className={styles.loadingText}>…</span>
+      ) : filtered.length === 0 ? (
+        <span className={styles.empty}>Sin tareas asignadas.</span>
+      ) : (
+        <div className={styles.itemList}>
+          {filtered.map((task) => {
+            const status = visualStatus(task);
+            return (
+              <div key={task.id} className={styles.itemRow}>
+                <div className={styles.itemMain}>
+                  <span className={styles.itemTitle}>{task.title}</span>
+                  <span className={styles.itemMeta}>
+                    {task.projectName} · {task.moduleName} · {new Date(`${task.date}T00:00:00`).toLocaleDateString('es-CL')}
+                  </span>
+                </div>
+                <span className={[styles.statusTag, TASK_STATUS_TAG_CLASS[status]].join(' ')}>
+                  {TASK_STATUS_TAG_LABEL[status]}
+                </span>
+                {task.status === 'todo' && (
+                  <Button size="sm" variant="outline" onClick={() => void onAdvance(task, 'in_progress')}>
+                    Iniciar
+                  </Button>
+                )}
+                {task.status !== 'done' && (
+                  <Button size="sm" onClick={() => void onAdvance(task, 'done')}>
+                    Marcar como realizada
+                  </Button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+/** "Mis entregas" — entregas de "Fases · Módulos" del equipo del colaborador. */
+function MyDeliveriesCard({ deliveries, loading }: { deliveries: readonly DashboardMyDelivery[]; loading: boolean }) {
+  const toast = useToast();
+  const updateDelivery = useUpdateProjectModuleDelivery();
+  const [tab, setTab] = useState<'all' | 'planned' | 'delivered'>('all');
+
+  const filtered = deliveries.filter((delivery) => tab === 'all' || delivery.status === tab);
+
+  const onComplete = async (delivery: DashboardMyDelivery) => {
+    try {
+      await updateDelivery.mutateAsync({
+        projectId: delivery.projectId,
+        moduleId: delivery.moduleId,
+        deliveryId: delivery.id,
+        input: { status: 'delivered' },
+      });
+    } catch (error) {
+      toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo actualizar la entrega.');
+    }
+  };
+
+  return (
+    <Card className={styles.sectionCard}>
+      <h3 className={styles.sectionTitle}>Mis Entregas</h3>
+      <Tabs
+        tabs={[
+          { id: 'all', label: 'Todas' },
+          { id: 'planned', label: 'Pendientes' },
+          { id: 'delivered', label: 'Completadas' },
+        ]}
+        activeId={tab}
+        onSelect={(id) => setTab(id as typeof tab)}
+      />
+      {loading ? (
+        <span className={styles.loadingText}>…</span>
+      ) : filtered.length === 0 ? (
+        <span className={styles.empty}>Sin entregas para tu equipo.</span>
+      ) : (
+        <div className={styles.itemList}>
+          {filtered.map((delivery) => {
+            const late = delivery.status === 'planned' && isPastDate(delivery.estimatedDate);
+            return (
+              <div key={delivery.id} className={styles.itemRow}>
+                <div className={styles.itemMain}>
+                  <span className={styles.itemTitle}>
+                    {delivery.projectName} · {delivery.moduleName}
+                  </span>
+                  <span className={styles.itemMeta}>
+                    {new Date(`${delivery.estimatedDate}T00:00:00`).toLocaleDateString('es-CL')}
+                  </span>
+                </div>
+                <span
+                  className={[
+                    styles.statusTag,
+                    delivery.status === 'delivered' ? styles.statusTagDone : late ? styles.statusTagLate : styles.statusTagTodo,
+                  ].join(' ')}
+                >
+                  {delivery.status === 'delivered' ? 'Entregada' : late ? 'Atrasada' : 'Comprometida'}
+                </span>
+                {delivery.status === 'planned' && (
+                  <Button size="sm" onClick={() => void onComplete(delivery)}>
+                    Marcar como completada
+                  </Button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </Card>
+  );
+}
+
 interface MyActivityPanelProps {
   hours: DashboardHoursSummary | null;
   myActiveProjects: readonly DashboardMyActiveProject[];
+  myTasks: readonly DashboardMyTask[];
+  myDeliveries: readonly DashboardMyDelivery[];
   planning: DashboardMyPlanning | null;
   loading: boolean;
   weekStart: string | undefined;
@@ -67,7 +239,16 @@ interface MyActivityPanelProps {
  * no exigirle a `collaborator` un permiso de forecast propio ni construir un
  * endpoint nuevo que exponga horas registradas de otras personas.
  */
-export function MyActivityPanel({ hours, myActiveProjects, planning, loading, weekStart, onWeekStartChange }: MyActivityPanelProps) {
+export function MyActivityPanel({
+  hours,
+  myActiveProjects,
+  myTasks,
+  myDeliveries,
+  planning,
+  loading,
+  weekStart,
+  onWeekStartChange,
+}: MyActivityPanelProps) {
   const todayHours = hours?.todayHours ?? 0;
   const weekHours = hours?.weekHours ?? 0;
   const weekTargetHours = hours?.weekTargetHours ?? 40;
@@ -154,6 +335,9 @@ export function MyActivityPanel({ hours, myActiveProjects, planning, loading, we
           )}
         </Card>
       </div>
+
+      <MyTasksCard tasks={myTasks} loading={loading} />
+      <MyDeliveriesCard deliveries={myDeliveries} loading={loading} />
 
       <Card className={styles.sectionCard}>
         <h3 className={styles.sectionTitle}>Planificación Semanal</h3>

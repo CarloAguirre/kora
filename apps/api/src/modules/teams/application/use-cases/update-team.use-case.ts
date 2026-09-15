@@ -41,6 +41,7 @@ export class UpdateTeamUseCase implements UseCase<UpdateTeamCommand, void, Appli
         ...(data.name !== undefined ? { name: data.name } : {}),
         ...(data.description !== undefined ? { description: data.description || null } : {}),
         ...(data.leaderUserId !== undefined ? { leaderUserId: data.leaderUserId } : {}),
+        ...(data.teamTypeId !== undefined ? { teamTypeId: data.teamTypeId } : {}),
         ...(data.isActive !== undefined ? { isActive: data.isActive } : {}),
       },
       this.clock.now(),

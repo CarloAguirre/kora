@@ -42,12 +42,17 @@ export const hourEntrySummarySchema = z.object({
   project: z.object({ id: uuidSchema, name: z.string() }).nullable(),
   /** Equipo activo del autor del registro al momento de listarlo (no se guarda histórico). */
   team: z.object({ id: uuidSchema, name: z.string() }).nullable(),
+  /** Fase/módulo contra la que se imputó la hora, si se eligió una. */
+  module: z.object({ id: uuidSchema, name: z.string() }).nullable(),
   assignment: z.string().nullable(),
   category: z.string(),
   description: z.string(),
   hours: z.number(),
   date: z.string(),
   isOvertime: z.boolean(),
+  /** Bloqueo reportado al registrar la hora — visible para el líder en la Bitácora del proyecto. */
+  hasBlocker: z.boolean(),
+  blockerDescription: z.string().nullable(),
   /** Fase del proyecto en el momento del registro — "Estado" en la v1 (Activo/No iniciado/Detenido). Null si el registro no tiene proyecto. */
   projectStageAtEntry: z.string().nullable(),
   status: hourEntryStatusSchema,
@@ -79,6 +84,7 @@ export const createHourEntrySchema = z
   .object({
     userId: uuidSchema.optional(),
     projectId: uuidSchema.nullish(),
+    moduleId: uuidSchema.nullish(),
     assignment: hourEntryAssignmentSchema,
     category: z.string().trim().max(300).optional(),
     description: z.string().trim().max(2000).optional(),
@@ -86,6 +92,8 @@ export const createHourEntrySchema = z
     date: z.iso.date(),
     isOvertime: z.boolean().default(false),
     designatedApproverUserId: uuidSchema.nullish(),
+    hasBlocker: z.boolean().default(false),
+    blockerDescription: z.string().trim().max(1000).optional(),
   })
   .refine((data) => !PROJECT_REQUIRING_ASSIGNMENTS.has(data.assignment) || Boolean(data.projectId), {
     message: 'Selecciona un proyecto para esta asignación.',
@@ -94,18 +102,29 @@ export const createHourEntrySchema = z
   .refine((data) => PROJECT_REQUIRING_ASSIGNMENTS.has(data.assignment) || !data.projectId, {
     message: 'Esta asignación no admite proyecto.',
     path: ['projectId'],
+  })
+  .refine((data) => !data.moduleId || Boolean(data.projectId), {
+    message: 'Selecciona un proyecto para elegir un módulo.',
+    path: ['moduleId'],
+  })
+  .refine((data) => !data.hasBlocker || Boolean(data.blockerDescription?.trim()), {
+    message: 'Describe el bloqueo.',
+    path: ['blockerDescription'],
   });
 export type CreateHourEntryInput = z.infer<typeof createHourEntrySchema>;
 
 export const updateHourEntrySchema = z.object({
   assignment: hourEntryAssignmentSchema.optional(),
   projectId: uuidSchema.nullish(),
+  moduleId: uuidSchema.nullish(),
   category: z.string().trim().max(300).optional(),
   description: z.string().trim().max(2000).optional(),
   hours: z.coerce.number().positive().max(24).optional(),
   date: z.iso.date().optional(),
   isOvertime: z.boolean().optional(),
   designatedApproverUserId: uuidSchema.nullish(),
+  hasBlocker: z.boolean().optional(),
+  blockerDescription: z.string().trim().max(1000).optional(),
 });
 export type UpdateHourEntryInput = z.infer<typeof updateHourEntrySchema>;
 

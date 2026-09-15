@@ -1,6 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { PROJECT_REPOSITORY, type ProjectRepository } from '../../../projects/domain/repositories/project.repository';
+import {
+  PROJECT_MODULE_REPOSITORY,
+  type ProjectModuleRepository,
+} from '../../../projects/domain/repositories/project-module.repository';
 import type {
+  HourEntryModuleReference,
   HourEntryProjectApprover,
   HourEntryProjectReader,
   HourEntryProjectReference,
@@ -8,7 +13,16 @@ import type {
 
 @Injectable()
 export class ProjectsModuleHourEntryProjectReader implements HourEntryProjectReader {
-  constructor(@Inject(PROJECT_REPOSITORY) private readonly projects: ProjectRepository) {}
+  constructor(
+    @Inject(PROJECT_REPOSITORY) private readonly projects: ProjectRepository,
+    @Inject(PROJECT_MODULE_REPOSITORY) private readonly modules: ProjectModuleRepository,
+  ) {}
+
+  async findModuleById(moduleId: string): Promise<HourEntryModuleReference | null> {
+    const module = await this.modules.findById(moduleId);
+    if (!module) return null;
+    return { id: module.id, name: module.name, projectId: module.projectId };
+  }
 
   async findById(projectId: string): Promise<HourEntryProjectReference | null> {
     const project = await this.projects.findById(projectId);

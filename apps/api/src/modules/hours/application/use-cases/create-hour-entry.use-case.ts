@@ -4,8 +4,10 @@ import type { CreateHourEntryInput, RoleCode } from '@kora/contracts';
 import { HourEntry } from '../../domain/entities/hour-entry.entity';
 import {
   InvalidDesignatedApproverError,
+  ModuleNotInProjectError,
   ProjectOvertimeNotAllowedError,
   ProjectStoppedError,
+  ReferencedModuleNotFoundError,
   ReferencedProjectNotFoundError,
 } from '../../domain/errors/hour-entry.errors';
 import { HOUR_ENTRY_REPOSITORY, type HourEntryRepository } from '../../domain/repositories/hour-entry.repository';
@@ -64,6 +66,12 @@ export class CreateHourEntryUseCase implements UseCase<CreateHourEntryCommand, {
       projectStageAtEntry = project.status;
     }
 
+    if (data.moduleId) {
+      const module = await this.projects.findModuleById(data.moduleId);
+      if (!module) return err(new ReferencedModuleNotFoundError(data.moduleId));
+      if (module.projectId !== data.projectId) return err(new ModuleNotInProjectError());
+    }
+
     if (data.designatedApproverUserId) {
       const approver = await this.users.findById(data.designatedApproverUserId);
       if (!approver || approver.role !== 'leader' || approver.status !== 'active') {
@@ -75,6 +83,7 @@ export class CreateHourEntryUseCase implements UseCase<CreateHourEntryCommand, {
       id: this.ids.generate(),
       userId: ownerId,
       projectId: data.projectId ?? null,
+      moduleId: data.moduleId ?? null,
       assignment: data.assignment,
       category: data.category,
       description: data.description,
@@ -83,6 +92,8 @@ export class CreateHourEntryUseCase implements UseCase<CreateHourEntryCommand, {
       isOvertime: data.isOvertime,
       projectStageAtEntry,
       designatedApproverUserId: data.designatedApproverUserId ?? null,
+      hasBlocker: data.hasBlocker,
+      blockerDescription: data.blockerDescription ?? null,
       ownerRequiresApproval,
       now: this.clock.now(),
     });

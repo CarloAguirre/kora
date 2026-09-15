@@ -1,24 +1,37 @@
 import type { TransactionContext } from '@kora/core';
+import type { ProjectObservationStatus, ProjectObservationType } from '@kora/contracts';
 
 export interface ProjectObservationRecord {
   readonly id: string;
   readonly projectId: string;
+  readonly type: ProjectObservationType;
+  readonly title: string | null;
   readonly message: string;
+  readonly status: ProjectObservationStatus | null;
+  readonly moduleId: string | null;
+  readonly moduleName: string | null;
+  readonly date: Date;
   readonly authorUserId: string;
   readonly authorName: string;
   readonly createdAt: Date;
 }
 
+export interface AddProjectObservationData {
+  readonly projectId: string;
+  readonly type: ProjectObservationType;
+  readonly title: string | null;
+  readonly message: string;
+  readonly status: ProjectObservationStatus | null;
+  readonly moduleId: string | null;
+  readonly date: Date;
+  readonly authorUserId: string;
+  readonly now: Date;
+}
+
 export interface ProjectObservationRepository {
   listForProject(projectId: string, context?: TransactionContext): Promise<ProjectObservationRecord[]>;
   findById(id: string, context?: TransactionContext): Promise<ProjectObservationRecord | null>;
-  add(
-    projectId: string,
-    message: string,
-    authorUserId: string,
-    now: Date,
-    context?: TransactionContext,
-  ): Promise<string>;
+  add(data: AddProjectObservationData, context?: TransactionContext): Promise<string>;
   update(id: string, message: string, now: Date, context?: TransactionContext): Promise<void>;
   remove(id: string, context?: TransactionContext): Promise<void>;
 }

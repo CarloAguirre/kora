@@ -23,6 +23,7 @@ export interface ComboboxProps {
   onChange: (value: string) => void;
   emptyMessage?: string;
   className?: string;
+  disabled?: boolean;
 }
 
 export function Combobox({
@@ -33,6 +34,7 @@ export function Combobox({
   onChange,
   emptyMessage = 'Sin resultados.',
   className,
+  disabled = false,
 }: ComboboxProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -83,7 +85,7 @@ export function Combobox({
         </label>
       )}
 
-      <div className={[styles.field, open ? styles.fieldOpen : ''].filter(Boolean).join(' ')}>
+      <div className={[styles.field, open ? styles.fieldOpen : '', disabled ? styles.fieldDisabled : ''].filter(Boolean).join(' ')}>
         <SearchIcon size={16} className={styles.searchIcon} />
         <input
           id={inputId}
@@ -92,10 +94,12 @@ export function Combobox({
           aria-expanded={open}
           aria-autocomplete="list"
           autoComplete="off"
+          disabled={disabled}
           className={styles.input}
           placeholder={placeholder}
           value={open ? query : selectedLabel}
           onFocus={() => {
+            if (disabled) return;
             setOpen(true);
             setQuery('');
           }}
@@ -108,6 +112,7 @@ export function Combobox({
           type="button"
           className={styles.chevronButton}
           tabIndex={-1}
+          disabled={disabled}
           aria-label="Mostrar opciones"
           onClick={() => setOpen((current) => !current)}
         >
@@ -115,7 +120,7 @@ export function Combobox({
         </button>
       </div>
 
-      {open && (
+      {open && !disabled && (
         <div className={styles.panel} role="listbox">
           {filteredOptions.length === 0 ? (
             <p className={styles.emptyState}>{emptyMessage}</p>

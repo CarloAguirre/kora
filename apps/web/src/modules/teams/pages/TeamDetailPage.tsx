@@ -21,6 +21,7 @@ import { ApiRequestError } from '@/shared/lib/api-client';
 import { TeamFormDialog } from '../components/TeamFormDialog';
 import { EditTeamMemberDialog } from '../components/EditTeamMemberDialog';
 import { TeamAvailabilityHeatmap } from '../components/TeamAvailabilityHeatmap';
+import { TeamTypeIcon, teamTypeBackground } from '../team-type-icons';
 import type { TeamMember } from '@kora/contracts';
 
 /**
@@ -148,6 +149,16 @@ export function TeamDetailPage() {
             </div>
           )}
         </div>
+
+        {team.teamType && (
+          <span
+            className={styles.typeBadge}
+            style={{ background: teamTypeBackground(team.teamType.color), color: team.teamType.color }}
+          >
+            <TeamTypeIcon icon={team.teamType.icon} size={14} />
+            {team.teamType.name}
+          </span>
+        )}
 
         {(team.description || team.leader) && (
           <Card>

@@ -35,6 +35,88 @@
   gap: var(--kora-space-3);
 }
 
+.teamsGrid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-2);
+  margin: var(--kora-space-2) 0 var(--kora-space-4);
+}
+
+.teamCheckbox {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+  color: var(--kora-navy);
+  font-size: var(--kora-text-sm);
+  cursor: pointer;
+}
+
+.teamCheckbox input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--kora-navy);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-2);
+}
+
+.label {
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-semibold);
+  color: var(--kora-navy);
+}
+
+.textarea {
+  font-family: inherit;
+  font-size: var(--kora-text-base);
+  color: var(--kora-navy);
+  border: 1px solid var(--kora-border);
+  border-radius: var(--kora-radius-sm);
+  padding: var(--kora-space-3);
+  min-height: 72px;
+  resize: vertical;
+}
+
+.textarea:focus {
+  outline: 2px solid var(--kora-blue-600);
+  outline-offset: 1px;
+}
+
+.checkboxLabel {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-semibold);
+  color: var(--kora-navy);
+  cursor: pointer;
+}
+
+.checkboxLabel input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--kora-navy);
+}
+
+.readonlyBox {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid var(--kora-border);
+  border-radius: var(--kora-radius-sm);
+  padding: var(--kora-space-3);
+  background: var(--kora-surface-muted);
+  font-size: var(--kora-text-sm);
+  color: var(--kora-navy);
+}
+
+.readonlyValue {
+  font-weight: var(--kora-weight-bold);
+}
+
 .teamDetailCard {
   display: flex;
   flex-direction: column;
@@ -64,6 +146,127 @@
 .alertIcon {
   flex-shrink: 0;
   margin-top: 1px;
+}
+
+.hint {
+  font-size: var(--kora-text-xs);
+  color: var(--kora-text-muted);
+  margin: 0;
+}
+
+.modulesList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-3);
+}
+
+.moduleEditCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-3);
+  padding: var(--kora-space-4);
+  border-radius: var(--kora-radius-lg);
+  border: 1px solid var(--kora-blue-200);
+  background: var(--kora-surface);
+  box-shadow: var(--kora-shadow-sm);
+}
+
+.moduleEditHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-navy);
+}
+
+.moduleEditSubsection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-3);
+  padding-top: var(--kora-space-3);
+  border-top: 1px dashed var(--kora-border-soft);
+}
+
+.moduleEditSubsectionLabel {
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-semibold);
+  color: var(--kora-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.moduleEditDeliveryList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-2);
+}
+
+.moduleEditRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kora-space-2);
+  padding: var(--kora-space-2) var(--kora-space-3);
+  border-radius: var(--kora-radius-sm);
+  background: var(--kora-surface-muted);
+  font-size: var(--kora-text-sm);
+  color: var(--kora-navy);
+}
+
+.moduleEditAddRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kora-space-3);
+}
+
+.moduleEditAddField {
+  flex: 1;
+  min-width: 160px;
+}
+
+.moduleDeliveries {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--kora-space-3);
+  padding-top: var(--kora-space-3);
+  border-top: 1px dashed var(--kora-border);
+}
+
+.deliveryRow {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-3);
+  width: 100%;
+}
+
+.deliveryLabel {
+  font-size: var(--kora-text-sm);
+  color: var(--kora-text-muted);
+  min-width: 72px;
+  flex-shrink: 0;
+}
+
+.deliveryInputWrapper {
+  flex: 1;
+  min-width: 0;
+}
+
+.newModuleForm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-3);
+  padding: var(--kora-space-3);
+  border-radius: var(--kora-radius);
+  border: 1px dashed var(--kora-border);
+}
+
+.newModuleActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--kora-space-2);
 }
 
 @media (max-width: 640px) {

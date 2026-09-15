@@ -16,6 +16,7 @@ import { TeamDetailPage } from '@/modules/teams/pages/TeamDetailPage';
 import { TeamMemberDetailPage } from '@/modules/teams/pages/TeamMemberDetailPage';
 import { ProjectsListPage } from '@/modules/projects/pages/ProjectsListPage';
 import { ProjectDetailPage } from '@/modules/projects/pages/ProjectDetailPage';
+import { ProjectTeamDetailPage } from '@/modules/projects/pages/ProjectTeamDetailPage';
 import { NewProjectPage } from '@/modules/projects/pages/NewProjectPage';
 import { HoursListPage } from '@/modules/hours/pages/HoursListPage';
 import { HoursApprovalsPage } from '@/modules/hours/pages/HoursApprovalsPage';
@@ -111,7 +112,10 @@ export const router = createBrowserRouter([
   },
   {
     element: <ProtectedRoute anyOf={['projects:read', 'projects:read_assigned']} />,
-    children: [{ path: '/proyectos/:projectId', element: <ProjectDetailPage /> }],
+    children: [
+      { path: '/proyectos/:projectId', element: <ProjectDetailPage /> },
+      { path: '/proyectos/:projectId/equipos/:teamId', element: <ProjectTeamDetailPage /> },
+    ],
   },
 
   // ── Módulo de horas ───────────────────────────────────────────────────

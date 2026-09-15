@@ -83,6 +83,30 @@ export class ProjectObservationNotFoundError extends NotFoundError {
   }
 }
 
+export class ProjectModuleNotFoundError extends NotFoundError {
+  constructor(identifier: string) {
+    super('Fase/módulo', identifier, 'PROJECT_MODULE_NOT_FOUND');
+  }
+}
+
+export class ProjectModuleDeliveryNotFoundError extends NotFoundError {
+  constructor(identifier: string) {
+    super('Entrega', identifier, 'PROJECT_MODULE_DELIVERY_NOT_FOUND');
+  }
+}
+
+export class ProjectModuleSegmentNotFoundError extends NotFoundError {
+  constructor(identifier: string) {
+    super('Tramo', identifier, 'PROJECT_MODULE_SEGMENT_NOT_FOUND');
+  }
+}
+
+export class ProjectModuleTaskNotFoundError extends NotFoundError {
+  constructor(identifier: string) {
+    super('Tarea', identifier, 'PROJECT_MODULE_TASK_NOT_FOUND');
+  }
+}
+
 /** Autorizar horas extra en un proyecto es una decisión de líder — ni `projects:manage` por sí solo ni ser un miembro cualquiera bastan. */
 export class CannotAuthorizeProjectOvertimeError extends ForbiddenError {
   constructor() {

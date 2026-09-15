@@ -78,6 +78,19 @@ export class ReferencedProjectNotFoundError extends NotFoundError {
   }
 }
 
+export class ReferencedModuleNotFoundError extends NotFoundError {
+  constructor(identifier: string) {
+    super('Módulo', identifier, 'HOUR_ENTRY_MODULE_NOT_FOUND');
+  }
+}
+
+/** El módulo elegido pertenece a otro proyecto — no tiene sentido imputar la hora ahí. */
+export class ModuleNotInProjectError extends DomainError {
+  constructor() {
+    super('HOUR_ENTRY_MODULE_NOT_IN_PROJECT', 'El módulo elegido no pertenece a este proyecto.');
+  }
+}
+
 export class ProjectStoppedError extends ConflictError {
   constructor() {
     super('No se pueden registrar horas en un proyecto detenido.', 'HOUR_ENTRY_PROJECT_STOPPED');

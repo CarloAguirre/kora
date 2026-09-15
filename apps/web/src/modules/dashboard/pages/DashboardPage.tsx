@@ -73,6 +73,8 @@ export function DashboardPage() {
             <MyActivityPanel
               hours={summary?.hours ?? null}
               myActiveProjects={summary?.myActiveProjects ?? []}
+              myTasks={summary?.myTasks ?? []}
+              myDeliveries={summary?.myDeliveries ?? []}
               planning={summary?.planning ?? null}
               loading={isLoading}
               weekStart={weekStart}

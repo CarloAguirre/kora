@@ -1,13 +1,22 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
+  AddProjectModuleDeliveryInput,
   AddProjectObservationInput,
   AssignProjectTeamMemberInput,
   ChangeProjectStatusInput,
   CreateProjectInput,
+  CreateProjectModuleInput,
+  CreateProjectModuleSegmentInput,
+  CreateProjectModuleTaskInput,
   ListProjectsQuery,
   SetProjectOvertimeAuthorizationInput,
   UpdateProjectInput,
+  UpdateProjectModuleDeliveryInput,
+  UpdateProjectModuleInput,
+  UpdateProjectModuleSegmentInput,
+  UpdateProjectModuleTaskInput,
   UpdateProjectObservationInput,
+  UpdateProjectTeamMemberInput,
 } from '@kora/contracts';
 import { projectKeys, projectsApi } from './projects.api';
 
@@ -99,6 +108,22 @@ export function useUnassignProjectMember() {
   });
 }
 
+export function useUpdateProjectMember() {
+  const invalidate = useInvalidateProjects();
+  return useMutation({
+    mutationFn: ({
+      projectId,
+      assignmentId,
+      input,
+    }: {
+      projectId: string;
+      assignmentId: string;
+      input: UpdateProjectTeamMemberInput;
+    }) => projectsApi.updateMember(projectId, assignmentId, input),
+    onSuccess: () => invalidate(),
+  });
+}
+
 export function useAddProjectObservation() {
   const invalidate = useInvalidateProjects();
   return useMutation({
@@ -129,6 +154,183 @@ export function useDeleteProjectObservation() {
   return useMutation({
     mutationFn: ({ projectId, observationId }: { projectId: string; observationId: string }) =>
       projectsApi.removeObservation(projectId, observationId),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useCreateProjectModule() {
+  const invalidate = useInvalidateProjects();
+  return useMutation({
+    mutationFn: ({ projectId, input }: { projectId: string; input: CreateProjectModuleInput }) =>
+      projectsApi.createModule(projectId, input),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useUpdateProjectModule() {
+  const invalidate = useInvalidateProjects();
+  return useMutation({
+    mutationFn: ({
+      projectId,
+      moduleId,
+      input,
+    }: {
+      projectId: string;
+      moduleId: string;
+      input: UpdateProjectModuleInput;
+    }) => projectsApi.updateModule(projectId, moduleId, input),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useDeleteProjectModule() {
+  const invalidate = useInvalidateProjects();
+  return useMutation({
+    mutationFn: ({ projectId, moduleId }: { projectId: string; moduleId: string }) =>
+      projectsApi.deleteModule(projectId, moduleId),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useAddProjectModuleDelivery() {
+  const invalidate = useInvalidateProjects();
+  return useMutation({
+    mutationFn: ({
+      projectId,
+      moduleId,
+      input,
+    }: {
+      projectId: string;
+      moduleId: string;
+      input: AddProjectModuleDeliveryInput;
+    }) => projectsApi.addModuleDelivery(projectId, moduleId, input),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useRemoveProjectModuleDelivery() {
+  const invalidate = useInvalidateProjects();
+  return useMutation({
+    mutationFn: ({
+      projectId,
+      moduleId,
+      deliveryId,
+    }: {
+      projectId: string;
+      moduleId: string;
+      deliveryId: string;
+    }) => projectsApi.removeModuleDelivery(projectId, moduleId, deliveryId),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useUpdateProjectModuleDelivery() {
+  const invalidate = useInvalidateProjects();
+  return useMutation({
+    mutationFn: ({
+      projectId,
+      moduleId,
+      deliveryId,
+      input,
+    }: {
+      projectId: string;
+      moduleId: string;
+      deliveryId: string;
+      input: UpdateProjectModuleDeliveryInput;
+    }) => projectsApi.updateModuleDelivery(projectId, moduleId, deliveryId, input),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useCreateProjectModuleSegment() {
+  const invalidate = useInvalidateProjects();
+  return useMutation({
+    mutationFn: ({
+      projectId,
+      moduleId,
+      input,
+    }: {
+      projectId: string;
+      moduleId: string;
+      input: CreateProjectModuleSegmentInput;
+    }) => projectsApi.createModuleSegment(projectId, moduleId, input),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useUpdateProjectModuleSegment() {
+  const invalidate = useInvalidateProjects();
+  return useMutation({
+    mutationFn: ({
+      projectId,
+      moduleId,
+      segmentId,
+      input,
+    }: {
+      projectId: string;
+      moduleId: string;
+      segmentId: string;
+      input: UpdateProjectModuleSegmentInput;
+    }) => projectsApi.updateModuleSegment(projectId, moduleId, segmentId, input),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useDeleteProjectModuleSegment() {
+  const invalidate = useInvalidateProjects();
+  return useMutation({
+    mutationFn: ({
+      projectId,
+      moduleId,
+      segmentId,
+    }: {
+      projectId: string;
+      moduleId: string;
+      segmentId: string;
+    }) => projectsApi.deleteModuleSegment(projectId, moduleId, segmentId),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useCreateProjectModuleTask() {
+  const invalidate = useInvalidateProjects();
+  return useMutation({
+    mutationFn: ({
+      projectId,
+      moduleId,
+      input,
+    }: {
+      projectId: string;
+      moduleId: string;
+      input: CreateProjectModuleTaskInput;
+    }) => projectsApi.createModuleTask(projectId, moduleId, input),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useUpdateProjectModuleTask() {
+  const invalidate = useInvalidateProjects();
+  return useMutation({
+    mutationFn: ({
+      projectId,
+      moduleId,
+      taskId,
+      input,
+    }: {
+      projectId: string;
+      moduleId: string;
+      taskId: string;
+      input: UpdateProjectModuleTaskInput;
+    }) => projectsApi.updateModuleTask(projectId, moduleId, taskId, input),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useDeleteProjectModuleTask() {
+  const invalidate = useInvalidateProjects();
+  return useMutation({
+    mutationFn: ({ projectId, moduleId, taskId }: { projectId: string; moduleId: string; taskId: string }) =>
+      projectsApi.deleteModuleTask(projectId, moduleId, taskId),
     onSuccess: () => invalidate(),
   });
 }

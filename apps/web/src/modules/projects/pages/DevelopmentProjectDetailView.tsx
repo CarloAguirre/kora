@@ -1,60 +1,49 @@
-import { useMemo, useState } from 'react';
+import { useAuth } from "@/modules/auth/hooks/useAuth";
+import { usePermissions } from "@/modules/auth/hooks/usePermissions";
 import {
-  addProjectObservationSchema,
+  useHourEntriesList,
+  useProjectPendingApprovals,
+} from "@/modules/hours/api/hours.queries";
+import {
+  useTeamMemberOptions,
+  useTeamsList,
+} from "@/modules/teams/api/teams.queries";
+import { CalendarIcon, ClockIcon, TrashIcon, TrendingUpIcon } from "@/shared/components/icons/Icons";
+import { Button } from "@/shared/components/ui/Button";
+import { Card } from "@/shared/components/ui/Card";
+import { Combobox } from "@/shared/components/ui/Combobox";
+import { TextField } from "@/shared/components/ui/TextField";
+import { useToast } from "@/shared/components/ui/Toast";
+import { ApiRequestError } from "@/shared/lib/api-client";
+import { zodResolver } from "@hookform/resolvers/zod";
+import {
   assignProjectTeamMemberSchema,
-  type AddProjectObservationInput,
   type AssignProjectTeamMemberInput,
   type ProjectDetail,
   type ProjectTeamMember,
-} from '@kora/contracts';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import styles from './ProjectDetailPage.module.css';
-import { Button } from '@/shared/components/ui/Button';
-import { Card } from '@/shared/components/ui/Card';
-import { Combobox } from '@/shared/components/ui/Combobox';
-import { TextField } from '@/shared/components/ui/TextField';
-import { useToast } from '@/shared/components/ui/Toast';
-import { TrashIcon } from '@/shared/components/icons/Icons';
-import { ProjectInfoBar, type ProjectDocument } from '../components/ProjectInfoBar';
-import { ProjectTimeline } from '../components/ProjectTimeline';
-import { TeamHoursSummaryChart } from '../components/TeamHoursSummaryChart';
-import { BitacoraCard } from '../components/BitacoraCard';
-import { PendingApprovalsCard } from '../components/PendingApprovalsCard';
+} from "@kora/contracts";
+import { useMemo, useState } from "react";
+import { useForm } from "react-hook-form";
+import { Link } from "react-router-dom";
+import { z } from "zod";
+import { useAssignProjectMember, useUnassignProjectMember } from "../api/projects.queries";
+import { BitacoraCard } from "../components/BitacoraCard";
+import { BitacoraMiniCard } from "../components/BitacoraMiniCard";
+import { ProjectExtrasTab } from "../components/ProjectExtrasTab";
 import {
-  useAssignProjectMember,
-  useUnassignProjectMember,
-  useAddProjectObservation,
-  useUpdateProjectObservation,
-  useDeleteProjectObservation,
-} from '../api/projects.queries';
-import { useTeamMemberOptions, useTeamsList } from '@/modules/teams/api/teams.queries';
-import { useHourEntriesList, useProjectPendingApprovals } from '@/modules/hours/api/hours.queries';
-import { usePermissions } from '@/modules/auth/hooks/usePermissions';
-import { useAuth } from '@/modules/auth/hooks/useAuth';
-import { ApiRequestError } from '@/shared/lib/api-client';
+  ProjectInfoBar,
+  type ProjectDocument,
+} from "../components/ProjectInfoBar";
+import { ProjectModulesCard } from "../components/ProjectModulesCard";
+import { ProjectTimeline } from "../components/ProjectTimeline";
+import { TeamHoursSummaryChart } from "../components/TeamHoursSummaryChart";
+import { getTeamStyle } from "../utils/team-style";
+import styles from "./ProjectDetailPage.module.css";
 
-const formatDate = (value: string | null) => (value ? new Date(`${value}T00:00:00`).toLocaleDateString('es-CL') : '—');
-const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 2 });
-
-/** Colores por área — réplica de `EQUIPO_COLOR_MAP` en `LiderProyectoFicha` (v1). */
-const TEAM_COLOR_MAP: Record<string, { color: string; bg: string; sigla: string }> = {
-  UX: { color: 'var(--kora-success)', bg: 'var(--kora-success-surface)', sigla: 'UX' },
-  'UX-UI': { color: 'var(--kora-success)', bg: 'var(--kora-success-surface)', sigla: 'UX' },
-  DEV: { color: 'var(--kora-warning)', bg: 'var(--kora-warning-surface)', sigla: 'DEV' },
-  Desarrollo: { color: 'var(--kora-warning)', bg: 'var(--kora-warning-surface)', sigla: 'DEV' },
-  RPA: { color: 'var(--kora-success)', bg: 'var(--kora-success-surface)', sigla: 'RPA' },
-  IA: { color: 'var(--kora-danger)', bg: 'var(--kora-danger-surface-soft)', sigla: 'IA' },
-  QA: { color: 'var(--kora-blue-400)', bg: 'var(--kora-blue-surface-alt)', sigla: 'QA' },
-};
-
-const getTeamStyle = (teamName: string) =>
-  TEAM_COLOR_MAP[teamName.toUpperCase()] ?? TEAM_COLOR_MAP[teamName] ?? {
-    color: 'var(--kora-blue-600)',
-    bg: 'var(--kora-blue-surface-alt)',
-    sigla: teamName.slice(0, 3).toUpperCase(),
-  };
+const formatDate = (value: string | null) =>
+  value ? new Date(`${value}T00:00:00`).toLocaleDateString("es-CL") : "—";
+const formatHours = (value: number) =>
+  value.toLocaleString("es-CL", { maximumFractionDigits: 2 });
 
 /**
  * Ficha de proyecto de desarrollo — réplica de `LiderProyectoFicha` (v1, la
@@ -64,31 +53,46 @@ const getTeamStyle = (teamName: string) =>
  * docs/PLAN-MODULOS.md). La ficha de soporte es una pantalla distinta —
  * ver `SupportProjectDetailView`.
  */
-export function DevelopmentProjectDetailView({ project, projectId }: { project: ProjectDetail; projectId: string }) {
+type DetailTab = "resumen" | "roadmap" | "bitacora" | "extras";
+
+export function DevelopmentProjectDetailView({
+  project,
+  projectId,
+}: {
+  project: ProjectDetail;
+  projectId: string;
+}) {
   const { can, canAny } = usePermissions();
   const { user } = useAuth();
   const toast = useToast();
+  const [tab, setTab] = useState<DetailTab>("resumen");
   const assignMember = useAssignProjectMember();
   const unassignMember = useUnassignProjectMember();
-  const addObservation = useAddProjectObservation();
-  const updateObservation = useUpdateProjectObservation();
-  const deleteObservation = useDeleteProjectObservation();
-  const { data: projectHourEntries } = useHourEntriesList({ projectId, page: 1, pageSize: 20, sortField: 'date', sortDirection: 'desc' });
+  const { data: projectHourEntries } = useHourEntriesList({
+    projectId,
+    page: 1,
+    pageSize: 20,
+    sortField: "date",
+    sortDirection: "desc",
+  });
   const { data: teamMemberOptions } = useTeamMemberOptions();
-  const { data: teamsCatalog } = useTeamsList({ page: 1, pageSize: 50, sortField: 'name' });
+  const { data: teamsCatalog } = useTeamsList({
+    page: 1,
+    pageSize: 50,
+    sortField: "name",
+  });
 
   const [memberError, setMemberError] = useState<string | null>(null);
 
-  const memberForm = useForm<z.input<typeof assignProjectTeamMemberSchema>, unknown, AssignProjectTeamMemberInput>({
+  const memberForm = useForm<
+    z.input<typeof assignProjectTeamMemberSchema>,
+    unknown,
+    AssignProjectTeamMemberInput
+  >({
     resolver: zodResolver(assignProjectTeamMemberSchema),
-    defaultValues: { teamMemberId: '', activity: '', assignedHours: 0 },
+    defaultValues: { teamMemberId: "", activity: "", assignedHours: 0 },
   });
-  const teamMemberId = memberForm.watch('teamMemberId');
-
-  const observationForm = useForm<z.input<typeof addProjectObservationSchema>, unknown, AddProjectObservationInput>({
-    resolver: zodResolver(addProjectObservationSchema),
-    defaultValues: { message: '' },
-  });
+  const teamMemberId = memberForm.watch("teamMemberId");
 
   /**
    * `project.teams` (v1: `equipo_proyecto`) trae el líder y las HH
@@ -168,9 +172,15 @@ export function DevelopmentProjectDetailView({ project, projectId }: { project: 
   const remainingHours = project.soldHours - project.usedHours;
 
   const projectDocuments: ProjectDocument[] = [
-    project.quotationLink ? { label: 'Cotización', url: project.quotationLink } : null,
-    project.contractLink ? { label: 'Contrato', url: project.contractLink } : null,
-    project.additionalLinks ? { label: 'Adicionales', url: project.additionalLinks } : null,
+    project.quotationLink
+      ? { label: "Cotización", url: project.quotationLink }
+      : null,
+    project.contractLink
+      ? { label: "Contrato", url: project.contractLink }
+      : null,
+    project.additionalLinks
+      ? { label: "Adicionales", url: project.additionalLinks }
+      : null,
   ].filter((doc): doc is ProjectDocument => doc !== null);
 
   /**
@@ -182,8 +192,8 @@ export function DevelopmentProjectDetailView({ project, projectId }: { project: 
    * acceso al proyecto".
    */
   const canAddObservation =
-    can('projects:manage') ||
-    (canAny('projects:read_assigned') &&
+    can("projects:manage") ||
+    (canAny("projects:read_assigned") &&
       user !== null &&
       (project.leader?.id === user.id ||
         project.developer?.id === user.id ||
@@ -197,18 +207,27 @@ export function DevelopmentProjectDetailView({ project, projectId }: { project: 
    * equipo — ver docs/DECISION-M4-HORAS.md.
    */
   const canSeePendingApprovals =
-    user !== null && (user.role === 'admin' || user.role === 'pmo' || project.leader?.id === user.id);
+    user !== null &&
+    (user.role === "admin" ||
+      user.role === "pmo" ||
+      project.leader?.id === user.id);
 
   // Misma consulta que `PendingApprovalsCard` (mismo query key) — React Query
   // la comparte, no duplica la llamada de red.
-  const { data: pendingApprovals } = useProjectPendingApprovals(projectId, canSeePendingApprovals);
+  const { data: pendingApprovals } = useProjectPendingApprovals(
+    projectId,
+    canSeePendingApprovals,
+  );
 
   /** Horas pendientes de ESE colaborador puntual, para pintarlas junto a su fila en "Equipo asignado". */
   const pendingHoursByUserId = useMemo(() => {
     const map = new Map<string, { entryCount: number; totalHours: number }>();
     for (const group of pendingApprovals?.groups ?? []) {
       for (const collaborator of group.collaborators) {
-        map.set(collaborator.userId, { entryCount: collaborator.entryCount, totalHours: collaborator.totalHours });
+        map.set(collaborator.userId, {
+          entryCount: collaborator.entryCount,
+          totalHours: collaborator.totalHours,
+        });
       }
     }
     return map;
@@ -218,47 +237,35 @@ export function DevelopmentProjectDetailView({ project, projectId }: { project: 
   const pendingHoursByApproverId = useMemo(() => {
     const map = new Map<string, { entryCount: number; totalHours: number }>();
     for (const group of pendingApprovals?.groups ?? []) {
-      map.set(group.approverUserId, { entryCount: group.entryCount, totalHours: group.totalHours });
+      map.set(group.approverUserId, {
+        entryCount: group.entryCount,
+        totalHours: group.totalHours,
+      });
     }
     return map;
   }, [pendingApprovals]);
+
+  /** Total pendiente de aprobación del proyecto completo, para la nota bajo "HH consumidas" en la tarjeta de Línea de tiempo. */
+  const totalPendingHours = (pendingApprovals?.groups ?? []).reduce((sum, group) => sum + group.totalHours, 0);
 
   const onAssignMember = memberForm.handleSubmit(async (values) => {
     setMemberError(null);
     try {
       await assignMember.mutateAsync({ projectId, input: values });
-      toast.success('Se asignó a la persona al proyecto.');
-      memberForm.reset({ teamMemberId: '', activity: '', assignedHours: 0 });
+      toast.success("Se asignó a la persona al proyecto.");
+      memberForm.reset({ teamMemberId: "", activity: "", assignedHours: 0 });
     } catch (error) {
-      setMemberError(error instanceof ApiRequestError ? error.message : 'No se pudo asignar.');
+      setMemberError(
+        error instanceof ApiRequestError
+          ? error.message
+          : "No se pudo asignar.",
+      );
     }
   });
 
   const onUnassign = async (assignmentId: string) => {
     await unassignMember.mutateAsync({ projectId, assignmentId });
-    toast.success('Se retiró a la persona del proyecto.');
-  };
-
-  const onAddObservation = observationForm.handleSubmit(async (values) => {
-    await addObservation.mutateAsync({ projectId, input: values });
-    observationForm.reset({ message: '' });
-  });
-
-  const onUpdateObservation = async (observationId: string, message: string) => {
-    try {
-      await updateObservation.mutateAsync({ projectId, observationId, input: { message } });
-    } catch (error) {
-      toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo editar la entrada.');
-    }
-  };
-
-  const onDeleteObservation = async (observationId: string) => {
-    try {
-      await deleteObservation.mutateAsync({ projectId, observationId });
-      toast.success('Se borró la entrada.');
-    } catch (error) {
-      toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo borrar la entrada.');
-    }
+    toast.success("Se retiró a la persona del proyecto.");
   };
 
   const membersByTeam = useMemo(() => {
@@ -271,212 +278,375 @@ export function DevelopmentProjectDetailView({ project, projectId }: { project: 
     return map;
   }, [project.members]);
 
-
   return (
-    <div className={styles.layout}>
-      <div className={styles.colLeft}>
-        <Card>
-          <ProjectInfoBar
-            clientName={project.client?.companyName ?? 'Sin cliente'}
-            leaderName={project.leader?.fullName ?? '—'}
-            dateRange={`${formatDate(project.startDate)} - ${formatDate(project.endDate)}`}
-            salesStage={project.salesStage}
-            status={project.status}
-            phase={project.phase}
-            documents={projectDocuments}
-          />
-        </Card>
+    <div className={styles.page}>
+      {/* Datos del proyecto y Timeline: siempre visibles, fuera de las tabs (igual que en el mockup del líder de proyecto). */}
+      <Card>
+        <ProjectInfoBar
+          clientName={project.client?.companyName ?? "Sin cliente"}
+          leaderName={project.leader?.fullName ?? "—"}
+          dateRange={`${formatDate(project.startDate)} - ${formatDate(project.endDate)}`}
+          salesStage={project.salesStage}
+          status={project.status}
+          phase={project.phase}
+          documents={projectDocuments}
+        />
+      </Card>
 
-        <div className={styles.kpis}>
-          <Card className={styles.kpiCard}>
-            <span className={styles.kpiLabel}>HH vendidas</span>
+      <Card>
+        <p className={styles.sectionTitle}>Línea de tiempo</p>
+        <div style={{ marginTop: "var(--kora-space-4)" }}>
+          <ProjectTimeline
+            phase={project.phase}
+            startDate={project.startDate}
+            endDate={project.estimatedDeliveryDate ?? project.endDate}
+          />
+        </div>
+
+        <div className={styles.metricsDivider} />
+        <div className={styles.metricsStrip}>
+          <div className={styles.metricItem}>
+            <span className={styles.kpiLabel}>
+              <CalendarIcon size={12} className={styles.iconBlue} /> Inicio
+            </span>
+            <span className={styles.kpiValue} style={{ fontSize: "var(--kora-text-lg)" }}>
+              {formatDate(project.startDate)}
+            </span>
+          </div>
+          <div className={styles.metricItem}>
+            <span className={styles.kpiLabel}>
+              <CalendarIcon size={12} className={styles.iconBlue} /> Entrega estimada
+            </span>
+            <span className={styles.kpiValue} style={{ fontSize: "var(--kora-text-lg)" }}>
+              {formatDate(project.estimatedDeliveryDate)}
+            </span>
+          </div>
+          <div className={styles.metricItem}>
+            <span className={styles.kpiLabel}>
+              <ClockIcon size={12} className={styles.iconMuted} /> HH vendidas
+            </span>
             <span className={styles.kpiValue}>{formatHours(project.soldHours)}</span>
-          </Card>
-          <Card className={styles.kpiCard}>
-            <span className={styles.kpiLabel}>HH consumidas</span>
+          </div>
+          <div className={styles.metricItem}>
+            <span className={styles.kpiLabel}>
+              <TrendingUpIcon size={12} className={styles.iconBlue} /> HH consumidas
+            </span>
             <span className={styles.kpiValue}>{formatHours(project.usedHours)}</span>
-          </Card>
-          <Card className={styles.kpiCard}>
-            <span className={styles.kpiLabel}>HH restantes</span>
+            {totalPendingHours > 0 && (
+              <span className={styles.metricSub}>{formatHours(totalPendingHours)} pendientes de aprobación</span>
+            )}
+          </div>
+          <div className={styles.metricItem}>
+            <span className={styles.kpiLabel}>
+              <ClockIcon size={12} className={styles.iconAmber} /> HH restantes
+            </span>
             <span className={[styles.kpiValue, remainingHours < 0 ? styles.kpiValueDanger : styles.kpiValueSuccess].join(' ')}>
               {formatHours(remainingHours)}
             </span>
-          </Card>
-          <Card className={styles.kpiCard}>
-            <span className={styles.kpiLabel}>Eficiencia</span>
-            <span className={[styles.kpiValue, project.usedHours > project.soldHours ? styles.kpiValueDanger : styles.kpiValueSuccess].join(' ')}>
-              {project.soldHours > 0 ? Math.round((project.usedHours / project.soldHours) * 100) : 0}%
-            </span>
-          </Card>
-          <Card className={styles.kpiCard}>
-            <span className={styles.kpiLabel}>Avance real / esperado</span>
-            <span className={styles.kpiValue} style={{ fontSize: 'var(--kora-text-lg)' }}>
-              {project.actualProgress ?? '—'}% / {project.expectedProgress ?? '—'}%
-            </span>
-          </Card>
+          </div>
+        </div>
+      </Card>
+
+      <div className={styles.tabsShell}>
+        <div className={styles.tabsShellBar}>
+          {DETAIL_TABS.map((tabDef) => (
+            <button
+              key={tabDef.id}
+              type="button"
+              className={[
+                styles.tabsShellButton,
+                tab === tabDef.id ? styles.tabsShellButtonActive : "",
+              ].join(" ")}
+              onClick={() => setTab(tabDef.id)}
+            >
+              {tabDef.id === "bitacora" && project.observations.length > 0
+                ? `${tabDef.label} ${project.observations.length}`
+                : tabDef.label}
+            </button>
+          ))}
         </div>
 
-        <Card>
-          <p className={styles.sectionTitle}>Línea de tiempo</p>
-          <div style={{ marginTop: 'var(--kora-space-4)' }}>
-            <ProjectTimeline
-              phase={project.phase}
-              isActive={project.status === 'active'}
-              startDate={project.startDate}
-              endDate={project.estimatedDeliveryDate ?? project.endDate}
-            />
-          </div>
-        </Card>
+        <div className={styles.tabsShellBody}>
+          {tab === "resumen" && (
+            <div className={styles.layout}>
+              <div className={styles.colLeft}>
+                <TeamHoursSummaryChart teams={teamSummaries} />
 
-        <TeamHoursSummaryChart teams={teamSummaries} />
+                <Card>
+                  <div className={styles.sectionHeader}>
+                    <p className={styles.sectionTitle}>
+                      Equipo asignado ({project.members.length})
+                    </p>
+                  </div>
 
-        <Card>
-          <div className={styles.sectionHeader}>
-            <p className={styles.sectionTitle}>Equipo asignado ({project.members.length})</p>
-          </div>
-
-          {teamSummaries.length > 0 ? (
-            <div className={styles.groupedTableWrap}>
-              <table className={styles.groupedTable}>
-                <caption className="srOnly">Personas asignadas, agrupadas por equipo</caption>
-                <thead>
-                  <tr>
-                    <th scope="col">Persona</th>
-                    <th scope="col">Actividad</th>
-                    <th scope="col">HH asignadas</th>
-                    <th scope="col">HH consumidas</th>
-                    {canSeePendingApprovals && <th scope="col">Pendiente aprob.</th>}
-                    <th scope="col" aria-label="Acciones" />
-                  </tr>
-                </thead>
-                {teamSummaries.map((team) => {
-                  const style = getTeamStyle(team.teamName);
-                  const deviatedHours = Math.max(0, team.consumedHours - team.assignedHours);
-                  const members = membersByTeam.get(team.teamId) ?? [];
-                  const columnCount = canSeePendingApprovals ? 6 : 5;
-                  const pendingWithLeader = team.leaderId ? pendingHoursByApproverId.get(team.leaderId) : undefined;
-                  return (
-                    <tbody key={team.teamId}>
-                      <tr className={styles.groupRow} style={{ background: style.bg }}>
-                        <td colSpan={columnCount}>
-                          <div className={styles.groupRowContent}>
-                            <span className={styles.groupAvatar} style={{ background: style.color }}>
-                              {style.sigla}
-                            </span>
-                            <span className={styles.groupName}>{team.teamName}</span>
-                            <span className={styles.groupLeader}>
-                              {team.leaderName ? <>Líder: <b>{team.leaderName}</b></> : 'Sin líder asignado'}
-                            </span>
-                            <span className={styles.groupStats}>
-                              {team.memberCount} persona{team.memberCount === 1 ? '' : 's'} · {formatHours(team.assignedHours)}h asig. ·{' '}
-                              {formatHours(team.consumedHours)}h cons. ·{' '}
-                              <span className={deviatedHours > 0 ? styles.teamHealthDanger : styles.teamHealthOk}>
-                                {deviatedHours > 0 ? `${formatHours(deviatedHours)}h desv.` : 'en rango'}
-                              </span>
-                              {pendingWithLeader && (
-                                <>
-                                  {' · '}
-                                  <span className={styles.pendingBadge}>
-                                    {formatHours(pendingWithLeader.totalHours)}h pendientes de aprobar ({pendingWithLeader.entryCount})
-                                  </span>
-                                </>
-                              )}
-                            </span>
-                          </div>
-                        </td>
-                      </tr>
-
-                      {members.length > 0 ? (
-                        members.map((m) => {
-                          const pending = pendingHoursByUserId.get(m.userId);
-                          return (
-                            <tr key={m.id} className={styles.memberRow}>
-                              <td>{m.fullName}</td>
-                              <td className={styles.memberCellMuted}>{m.activity ?? '—'}</td>
-                              <td>{formatHours(m.assignedHours)}</td>
-                              <td>{formatHours(m.consumedHours)}</td>
-                              {canSeePendingApprovals && (
-                                <td className={pending ? styles.pendingCell : styles.memberCellMuted}>
-                                  {pending ? `${formatHours(pending.totalHours)}h (${pending.entryCount})` : '—'}
-                                </td>
-                              )}
-                              <td className={styles.memberCellActions}>
-                                {can('projects:manage') && (
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => void onUnassign(m.id)}
-                                    aria-label={`Quitar a ${m.fullName}`}
-                                  >
-                                    <TrashIcon size={16} />
-                                  </Button>
-                                )}
-                              </td>
-                            </tr>
+                  {teamSummaries.length > 0 ? (
+                    <div className={styles.groupedTableWrap}>
+                      <table className={styles.groupedTable}>
+                        <caption className="srOnly">
+                          Personas asignadas, agrupadas por equipo
+                        </caption>
+                        <thead>
+                          <tr>
+                            <th scope="col">Persona</th>
+                            <th scope="col">Actividad</th>
+                            <th scope="col">HH asignadas</th>
+                            <th scope="col">HH consumidas</th>
+                            {canSeePendingApprovals && (
+                              <th scope="col">Pendiente aprob.</th>
+                            )}
+                            <th scope="col" aria-label="Acciones" />
+                          </tr>
+                        </thead>
+                        {teamSummaries.map((team) => {
+                          const style = getTeamStyle(team.teamName);
+                          const deviatedHours = Math.max(
+                            0,
+                            team.consumedHours - team.assignedHours,
                           );
-                        })
-                      ) : (
-                        <tr>
-                          <td colSpan={columnCount} className={styles.emptyGroupCell}>
-                            Sin colaboradores asignados en este equipo.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  );
-                })}
-              </table>
-            </div>
-          ) : (
-            <p className={styles.empty}>Nadie está asignado a este proyecto todavía.</p>
-          )}
+                          const members = membersByTeam.get(team.teamId) ?? [];
+                          const columnCount = canSeePendingApprovals ? 6 : 5;
+                          const pendingWithLeader = team.leaderId
+                            ? pendingHoursByApproverId.get(team.leaderId)
+                            : undefined;
+                          return (
+                            <tbody key={team.teamId}>
+                              <tr
+                                className={styles.groupRow}
+                                style={{ background: style.bg }}
+                              >
+                                <td colSpan={columnCount}>
+                                  <div className={styles.groupRowContent}>
+                                    <span
+                                      className={styles.groupAvatar}
+                                      style={{ background: style.color }}
+                                    >
+                                      {style.sigla}
+                                    </span>
+                                    <span className={styles.groupName}>
+                                      {team.teamName}
+                                    </span>
+                                    <span className={styles.groupLeader}>
+                                      {team.leaderName ? (
+                                        <>
+                                          Líder: <b>{team.leaderName}</b>
+                                        </>
+                                      ) : (
+                                        "Sin líder asignado"
+                                      )}
+                                    </span>
+                                    <span className={styles.groupStats}>
+                                      {team.memberCount} persona
+                                      {team.memberCount === 1 ? "" : "s"} ·{" "}
+                                      {formatHours(team.assignedHours)}h asig. ·{" "}
+                                      {formatHours(team.consumedHours)}h cons. ·{" "}
+                                      <span
+                                        className={
+                                          deviatedHours > 0
+                                            ? styles.teamHealthDanger
+                                            : styles.teamHealthOk
+                                        }
+                                      >
+                                        {deviatedHours > 0
+                                          ? `${formatHours(deviatedHours)}h desv.`
+                                          : "en rango"}
+                                      </span>
+                                      {pendingWithLeader && (
+                                        <>
+                                          {" · "}
+                                          <span className={styles.pendingBadge}>
+                                            {formatHours(
+                                              pendingWithLeader.totalHours,
+                                            )}
+                                            h pendientes de aprobar (
+                                            {pendingWithLeader.entryCount})
+                                          </span>
+                                        </>
+                                      )}
+                                    </span>
+                                    <Link
+                                      to={`/proyectos/${projectId}/equipos/${team.teamId}`}
+                                      className={styles.groupLeader}
+                                    >
+                                      Ver equipo
+                                    </Link>
+                                  </div>
+                                </td>
+                              </tr>
 
-          {can('projects:manage') && (
-            <form className={styles.inlineForm} onSubmit={onAssignMember}>
-              {memberError && <p className={styles.error}>{memberError}</p>}
-              <div className={styles.inlineFormRow}>
-                <div>
-                  <Combobox
-                    label="Persona"
-                    placeholder="Buscar por nombre…"
-                    options={(teamMemberOptions?.items ?? []).map((member) => ({
-                      value: member.id,
-                      label: `${member.fullName} — ${member.teamName}`,
-                    }))}
-                    value={teamMemberId}
-                    onChange={(value) => memberForm.setValue('teamMemberId', value, { shouldValidate: true })}
-                    emptyMessage="No se encontraron personas."
-                  />
-                  {memberForm.formState.errors.teamMemberId && (
-                    <p className={styles.error}>{memberForm.formState.errors.teamMemberId.message}</p>
+                              {members.length > 0 ? (
+                                members.map((m) => {
+                                  const pending = pendingHoursByUserId.get(
+                                    m.userId,
+                                  );
+                                  return (
+                                    <tr key={m.id} className={styles.memberRow}>
+                                      <td>{m.fullName}</td>
+                                      <td className={styles.memberCellMuted}>
+                                        {m.activity ?? "—"}
+                                      </td>
+                                      <td>{formatHours(m.assignedHours)}</td>
+                                      <td>{formatHours(m.consumedHours)}</td>
+                                      {canSeePendingApprovals && (
+                                        <td
+                                          className={
+                                            pending
+                                              ? styles.pendingCell
+                                              : styles.memberCellMuted
+                                          }
+                                        >
+                                          {pending
+                                            ? `${formatHours(pending.totalHours)}h (${pending.entryCount})`
+                                            : "—"}
+                                        </td>
+                                      )}
+                                      <td className={styles.memberCellActions}>
+                                        {can("projects:manage") && (
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() =>
+                                              void onUnassign(m.id)
+                                            }
+                                            aria-label={`Quitar a ${m.fullName}`}
+                                          >
+                                            <TrashIcon size={16} />
+                                          </Button>
+                                        )}
+                                      </td>
+                                    </tr>
+                                  );
+                                })
+                              ) : (
+                                <tr>
+                                  <td
+                                    colSpan={columnCount}
+                                    className={styles.emptyGroupCell}
+                                  >
+                                    Sin colaboradores asignados en este equipo.
+                                  </td>
+                                </tr>
+                              )}
+                            </tbody>
+                          );
+                        })}
+                      </table>
+                    </div>
+                  ) : (
+                    <p className={styles.empty}>
+                      Nadie está asignado a este proyecto todavía.
+                    </p>
                   )}
-                </div>
-                <TextField label="Actividad" {...memberForm.register('activity')} />
-                <TextField label="HH asignadas" type="number" {...memberForm.register('assignedHours')} />
-                <Button type="submit" loading={memberForm.formState.isSubmitting} loadingText="Asignando…">
-                  Asignar
-                </Button>
+
+                  {can("projects:manage") && (
+                    <form
+                      className={styles.inlineForm}
+                      onSubmit={onAssignMember}
+                    >
+                      {memberError && (
+                        <p className={styles.error}>{memberError}</p>
+                      )}
+                      <div className={styles.inlineFormRow}>
+                        <div>
+                          <Combobox
+                            label="Persona"
+                            placeholder="Buscar por nombre…"
+                            options={(teamMemberOptions?.items ?? []).map(
+                              (member) => ({
+                                value: member.id,
+                                label: `${member.fullName} — ${member.teamName}`,
+                              }),
+                            )}
+                            value={teamMemberId}
+                            onChange={(value) =>
+                              memberForm.setValue("teamMemberId", value, {
+                                shouldValidate: true,
+                              })
+                            }
+                            emptyMessage="No se encontraron personas."
+                          />
+                          {memberForm.formState.errors.teamMemberId && (
+                            <p className={styles.error}>
+                              {memberForm.formState.errors.teamMemberId.message}
+                            </p>
+                          )}
+                        </div>
+                        <TextField
+                          label="Actividad"
+                          {...memberForm.register("activity")}
+                        />
+                        <TextField
+                          label="HH asignadas"
+                          type="number"
+                          {...memberForm.register("assignedHours")}
+                        />
+                        <Button
+                          type="submit"
+                          loading={memberForm.formState.isSubmitting}
+                          loadingText="Asignando…"
+                        >
+                          Asignar
+                        </Button>
+                      </div>
+                    </form>
+                  )}
+                </Card>
               </div>
-            </form>
+
+              <div className={styles.colRight}>
+                <BitacoraMiniCard
+                  projectId={projectId}
+                  events={projectHourEntries?.items ?? []}
+                  observations={project.observations}
+                  modules={project.modules}
+                  canManage={canAddObservation}
+                  onViewMore={() => setTab("bitacora")}
+                />
+              </div>
+            </div>
           )}
-        </Card>
-      </div>
 
-      <div className={styles.colRight}>
-        <PendingApprovalsCard projectId={projectId} visible={canSeePendingApprovals} />
+          {tab === "roadmap" &&
+            (project.salesStage === "approved" ||
+            project.status === "finished" ? (
+              <ProjectModulesCard
+                projectId={projectId}
+                modules={project.modules}
+                canManage={can("projects:manage")}
+              />
+            ) : (
+              <Card>
+                <p className={styles.empty}>
+                  El Roadmap está disponible para proyectos aprobados o
+                  finalizados.
+                </p>
+              </Card>
+            ))}
 
-        <BitacoraCard
-          events={projectHourEntries?.items ?? []}
-          observations={project.observations}
-          canManage={canAddObservation}
-          observationRegister={observationForm.register('message')}
-          observationError={observationForm.formState.errors.message?.message}
-          observationSubmitting={observationForm.formState.isSubmitting}
-          onSubmitObservation={onAddObservation}
-          onUpdateObservation={onUpdateObservation}
-          onDeleteObservation={onDeleteObservation}
-        />
+          {tab === "bitacora" && (
+            <BitacoraCard
+              projectId={projectId}
+              events={projectHourEntries?.items ?? []}
+              observations={project.observations}
+              modules={project.modules}
+              canManage={canAddObservation}
+            />
+          )}
+
+          {tab === "extras" && (
+            <ProjectExtrasTab
+              project={project}
+              canManage={can("projects:manage")}
+            />
+          )}
+        </div>
       </div>
     </div>
   );
 }
+
+const DETAIL_TABS: ReadonlyArray<{ id: DetailTab; label: string }> = [
+  { id: "resumen", label: "Resumen" },
+  { id: "roadmap", label: "Roadmap" },
+  { id: "bitacora", label: "Bitácora" },
+  { id: "extras", label: "Extras" },
+];

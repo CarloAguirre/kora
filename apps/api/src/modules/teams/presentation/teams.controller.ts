@@ -2,15 +2,18 @@ import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post
 import {
   addTeamMemberSchema,
   createTeamSchema,
+  createTeamTypeSchema,
   listTeamsQuerySchema,
   teamAvailabilityQuerySchema,
   updateTeamMemberSchema,
   updateTeamSchema,
   type AddTeamMemberInput,
   type CreateTeamInput,
+  type CreateTeamTypeInput,
   type ListTeamMemberOptionsResponse,
   type ListTeamsQuery,
   type ListTeamsResponse,
+  type ListTeamTypesResponse,
   type TeamAvailabilityQuery,
   type TeamAvailabilityResponse,
   type TeamDetail,
@@ -32,6 +35,8 @@ import { AddTeamMemberUseCase } from '../application/use-cases/add-team-member.u
 import { RemoveTeamMemberUseCase } from '../application/use-cases/remove-team-member.use-case';
 import { UpdateTeamMemberUseCase } from '../application/use-cases/update-team-member.use-case';
 import { ListTeamMemberOptionsUseCase } from '../application/use-cases/list-team-member-options.use-case';
+import { ListTeamTypesUseCase } from '../application/use-cases/list-team-types.use-case';
+import { CreateTeamTypeUseCase } from '../application/use-cases/create-team-type.use-case';
 
 @Controller('teams')
 export class TeamsController {
@@ -46,6 +51,8 @@ export class TeamsController {
     private readonly removeMember: RemoveTeamMemberUseCase,
     private readonly updateMember: UpdateTeamMemberUseCase,
     private readonly listMemberOptions: ListTeamMemberOptionsUseCase,
+    private readonly listTeamTypes: ListTeamTypesUseCase,
+    private readonly createTeamType: CreateTeamTypeUseCase,
   ) {}
 
   /**
@@ -58,6 +65,24 @@ export class TeamsController {
   async memberOptions(): Promise<ListTeamMemberOptionsResponse> {
     const items = unwrapOrThrow(await this.listMemberOptions.execute());
     return { items };
+  }
+
+  /** Catálogo de tipos de equipo. Declarada antes de `:id` por la misma razón que `members`. */
+  @Get('types')
+  @RequirePermissions('teams:read')
+  async types(): Promise<ListTeamTypesResponse> {
+    const items = unwrapOrThrow(await this.listTeamTypes.execute());
+    return { items };
+  }
+
+  @Post('types')
+  @RequirePermissions('teams:manage')
+  @HttpCode(HttpStatus.CREATED)
+  async createType(
+    @Body(new ZodValidationPipe(createTeamTypeSchema)) body: CreateTeamTypeInput,
+  ): Promise<{ id: string }> {
+    const type = unwrapOrThrow(await this.createTeamType.execute(body));
+    return { id: type.id };
   }
 
   @Get()

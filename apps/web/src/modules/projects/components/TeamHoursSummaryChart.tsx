@@ -24,7 +24,10 @@ export function TeamHoursSummaryChart({ teams }: { teams: readonly TeamHoursSumm
       teams.map((team) => ({
         equipo: team.teamName,
         asignadas: team.assignedHours,
+        // Total real usado — para el tooltip. La barra apilada usa `utilizadasDentro`
+        // + `desviadas` en su lugar, para no contar dos veces el exceso.
         utilizadas: team.consumedHours,
+        utilizadasDentro: Math.min(team.assignedHours, team.consumedHours),
         desviadas: Math.max(0, team.consumedHours - team.assignedHours),
       })),
     [teams],
@@ -56,13 +59,55 @@ export function TeamHoursSummaryChart({ teams }: { teams: readonly TeamHoursSumm
           ) : (
             <ResponsiveContainer width="100%" height={260}>
               <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 8 }} barGap={4}>
+                {/* Grilla y ejes recesivos a propósito — cargan el ojo los datos, no los ejes. */}
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--kora-surface-disabled)" vertical={false} />
-                <XAxis dataKey="equipo" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 12 }} />
-                <Tooltip content={<ChartTooltip />} />
-                <Bar dataKey="asignadas" stackId="plan" fill="var(--kora-lime)" />
-                <Bar dataKey="desviadas" stackId="plan" fill="var(--kora-danger)" radius={[2, 2, 0, 0]} />
-                <Bar dataKey="utilizadas" fill="var(--kora-navy)" radius={[2, 2, 0, 0]} />
+                <XAxis
+                  dataKey="equipo"
+                  tick={{ fontSize: 12, fill: 'var(--kora-text-muted)' }}
+                  axisLine={{ stroke: 'var(--kora-surface-disabled)' }}
+                  tickLine={false}
+                />
+                <YAxis
+                  tick={{ fontSize: 12, fill: 'var(--kora-text-muted)' }}
+                  axisLine={false}
+                  tickLine={false}
+                  label={{ value: 'Horas', angle: -90, position: 'insideLeft', style: { fontSize: 12, fill: 'var(--kora-text-muted)' } }}
+                />
+                <Tooltip content={<ChartTooltip />} cursor={{ fill: 'var(--kora-surface-muted)' }} />
+                <Bar
+                  dataKey="asignadas"
+                  fill="var(--kora-lime)"
+                  stroke="var(--kora-surface)"
+                  strokeWidth={2}
+                  radius={[4, 4, 0, 0]}
+                  activeBar={{ fillOpacity: 0.85 }}
+                  animationDuration={700}
+                  animationEasing="ease-out"
+                />
+                {/* Lo "desviado" es exceso de USO sobre lo planificado — se apila sobre la barra de utilizadas (no sobre la de asignadas), para que se lea como "usamos esto, y esto de más". `utilizadasDentro` (no el total) evita contar el exceso dos veces. */}
+                <Bar
+                  dataKey="utilizadasDentro"
+                  stackId="uso"
+                  fill="var(--kora-navy)"
+                  stroke="var(--kora-surface)"
+                  strokeWidth={2}
+                  radius={[4, 4, 0, 0]}
+                  activeBar={{ fillOpacity: 0.85 }}
+                  animationDuration={700}
+                  animationEasing="ease-out"
+                />
+                <Bar
+                  dataKey="desviadas"
+                  stackId="uso"
+                  fill="var(--kora-danger)"
+                  stroke="var(--kora-surface)"
+                  strokeWidth={2}
+                  radius={[4, 4, 0, 0]}
+                  activeBar={{ fillOpacity: 0.85 }}
+                  animationDuration={700}
+                  animationEasing="ease-out"
+                  animationBegin={150}
+                />
               </BarChart>
             </ResponsiveContainer>
           )}
@@ -112,10 +157,25 @@ function ChartTooltip({ active, payload }: { active?: boolean; payload?: readonl
   const data = payload[0]?.payload as { equipo: string; asignadas: number; utilizadas: number; desviadas: number };
   return (
     <div className={styles.tooltip}>
-      <p className={styles.tooltipTitle}>{data.equipo}</p>
-      <p>HH Asignadas: {formatHours(data.asignadas)}</p>
-      <p>HH Utilizadas: {formatHours(data.utilizadas)}</p>
-      {data.desviadas > 0 && <p className={styles.tooltipDanger}>HH Desviadas: {formatHours(data.desviadas)}</p>}
+      <div className={styles.tooltipHead}>
+        <span className={styles.tooltipDot} aria-hidden="true" />
+        <span className={styles.tooltipTitle}>{data.equipo}</span>
+      </div>
+      {/* El texto siempre en tinta neutra — el color de la serie ya lo lleva el punto de arriba, no hace falta repetirlo en cada línea. */}
+      <p className={styles.tooltipRow}>
+        <span>Horas asignadas</span>
+        <b>{formatHours(data.asignadas)}</b>
+      </p>
+      <p className={styles.tooltipRow}>
+        <span>Horas utilizadas</span>
+        <b>{formatHours(data.utilizadas)}</b>
+      </p>
+      {data.desviadas > 0 && (
+        <p className={styles.tooltipRow}>
+          <span>Horas desviadas</span>
+          <b>{formatHours(data.desviadas)}</b>
+        </p>
+      )}
     </div>
   );
 }

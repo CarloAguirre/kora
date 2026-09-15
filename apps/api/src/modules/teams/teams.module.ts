@@ -11,13 +11,17 @@ import { AddTeamMemberUseCase } from './application/use-cases/add-team-member.us
 import { RemoveTeamMemberUseCase } from './application/use-cases/remove-team-member.use-case';
 import { UpdateTeamMemberUseCase } from './application/use-cases/update-team-member.use-case';
 import { ListTeamMemberOptionsUseCase } from './application/use-cases/list-team-member-options.use-case';
+import { ListTeamTypesUseCase } from './application/use-cases/list-team-types.use-case';
+import { CreateTeamTypeUseCase } from './application/use-cases/create-team-type.use-case';
 
 import { TEAM_REPOSITORY } from './domain/repositories/team.repository';
 import { TEAM_MEMBER_REPOSITORY } from './domain/repositories/team-member.repository';
+import { TEAM_TYPE_REPOSITORY } from './domain/repositories/team-type.repository';
 import { TEAM_USER_READER } from './application/ports/team-user-reader.port';
 
 import { DrizzleTeamRepository } from './infrastructure/persistence/drizzle-team.repository';
 import { DrizzleTeamMemberRepository } from './infrastructure/persistence/drizzle-team-member.repository';
+import { DrizzleTeamTypeRepository } from './infrastructure/persistence/drizzle-team-type.repository';
 import { DrizzleTeamUserReader } from './infrastructure/persistence/drizzle-team-user-reader';
 
 /**
@@ -40,9 +44,12 @@ import { DrizzleTeamUserReader } from './infrastructure/persistence/drizzle-team
     RemoveTeamMemberUseCase,
     UpdateTeamMemberUseCase,
     ListTeamMemberOptionsUseCase,
+    ListTeamTypesUseCase,
+    CreateTeamTypeUseCase,
 
     { provide: TEAM_REPOSITORY, useClass: DrizzleTeamRepository },
     { provide: TEAM_MEMBER_REPOSITORY, useClass: DrizzleTeamMemberRepository },
+    { provide: TEAM_TYPE_REPOSITORY, useClass: DrizzleTeamTypeRepository },
     { provide: TEAM_USER_READER, useClass: DrizzleTeamUserReader },
   ],
   exports: [TEAM_REPOSITORY, TEAM_MEMBER_REPOSITORY],

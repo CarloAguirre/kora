@@ -126,17 +126,34 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(
     const [calendarOpen, setCalendarOpen] = useState(false);
     const [viewMonth, setViewMonth] = useState(() => new Date());
     const [selectedISO, setSelectedISO] = useState("");
-    // El panel se dibuja en un portal a `document.body` — de otro modo un
-    // ancestro con `overflow: auto/hidden` (p. ej. el modal de detalle de un
-    // ticket, que scrollea) lo recorta en vez de dejarlo flotar por encima.
+    // El panel se dibuja en un portal — de otro modo un ancestro con
+    // `overflow: auto/hidden` (p. ej. el modal de detalle de un ticket, que
+    // scrollea) lo recorta en vez de dejarlo flotar por encima. El destino no
+    // es siempre `document.body`: un `<dialog>` abierto vive en la "top layer"
+    // del navegador, que pinta por ENCIMA de cualquier z-index del documento
+    // normal sin importar qué tan alto sea — así que un panel portado a
+    // `document.body` queda tapado por cualquier modal (`Modal.tsx` usa
+    // `<dialog>`). La salida es portar el panel DENTRO de ese `<dialog>`, para
+    // que herede su promoción a la top layer.
+    const getPortalTarget = (): Element =>
+      fieldRef.current?.closest("dialog") ?? document.body;
     const [panelPosition, setPanelPosition] = useState<{ top: number; left: number } | null>(null);
 
     const updatePanelPosition = () => {
       const rect = fieldRef.current?.getBoundingClientRect();
       if (!rect) return;
       const PANEL_WIDTH = 264; // ancho fijo de `.datePanel` en TextField.module.css
+      // Alto aproximado del panel: siempre son 6 filas de días (42 celdas fijas
+      // en `buildMonthGrid`) más cabecera/semana/pie, así que es estable sin
+      // necesidad de medirlo en el DOM.
+      const PANEL_HEIGHT = 320;
       const PANEL_GAP = 8; // var(--kora-space-2)
-      setPanelPosition({ top: rect.bottom + PANEL_GAP, left: rect.right - PANEL_WIDTH });
+      const left = rect.right - PANEL_WIDTH;
+      // Si no cabe debajo del campo (p. ej. un campo cerca del borde inferior de
+      // la pantalla), se abre hacia arriba en su lugar.
+      const fitsBelow = rect.bottom + PANEL_GAP + PANEL_HEIGHT <= window.innerHeight;
+      const top = fitsBelow ? rect.bottom + PANEL_GAP : Math.max(PANEL_GAP, rect.top - PANEL_GAP - PANEL_HEIGHT);
+      setPanelPosition({ top, left });
     };
 
     useEffect(() => {
@@ -342,7 +359,7 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(
                 </button>
               </div>
             </div>,
-            document.body,
+            getPortalTarget(),
           )}
         </div>
         {message && (

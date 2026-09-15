@@ -15,4 +15,13 @@ export class DrizzleProjectTeamMemberValidator implements ProjectTeamMemberValid
       .limit(1);
     return rows.length > 0;
   }
+
+  async findTeamId(teamMemberId: string): Promise<string | null> {
+    const rows = await this.database
+      .select({ teamId: teamMembers.teamId })
+      .from(teamMembers)
+      .where(eq(teamMembers.id, teamMemberId))
+      .limit(1);
+    return rows[0]?.teamId ?? null;
+  }
 }

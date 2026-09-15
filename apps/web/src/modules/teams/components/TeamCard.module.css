@@ -1,0 +1,99 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-4);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-3);
+}
+
+.typeIcon {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--kora-radius);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.identity {
+  min-width: 0;
+}
+
+.nameRow {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+}
+
+.name {
+  font-weight: var(--kora-weight-bold);
+  font-size: var(--kora-text-base);
+  color: var(--kora-navy);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.typeLabel {
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-semibold);
+  margin-top: 2px;
+}
+
+.rowLabel {
+  font-size: var(--kora-text-xs);
+  color: var(--kora-text-muted);
+  font-weight: var(--kora-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-bottom: var(--kora-space-1);
+}
+
+.leaderRow,
+.membersRow {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+}
+
+.leaderName {
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-semibold);
+  color: var(--kora-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.leaderMissing {
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-semibold);
+  color: var(--kora-warning-text);
+}
+
+.memberCount {
+  font-size: var(--kora-text-sm);
+  color: var(--kora-text-muted);
+}
+
+.foot {
+  margin-top: auto;
+  padding-top: var(--kora-space-1);
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+}
+
+.manageButton {
+  flex: 1;
+}
+
+.actions {
+  display: flex;
+  gap: var(--kora-space-1);
+}

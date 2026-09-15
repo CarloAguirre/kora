@@ -16,6 +16,7 @@ import {
   sql,
   teamMembers,
   teams,
+  teamTypes,
   users,
   type Database,
 } from '@kora/db';
@@ -83,11 +84,16 @@ export class DrizzleTeamRepository implements TeamRepository {
           leaderUserId: teams.leaderUserId,
           leaderFirstName: users.firstName,
           leaderLastName: users.lastName,
+          teamTypeId: teams.teamTypeId,
+          teamTypeName: teamTypes.name,
+          teamTypeColor: teamTypes.color,
+          teamTypeIcon: teamTypes.icon,
           memberCount: sql<number>`coalesce(${memberCountSubquery.value}, 0)`,
           createdAt: teams.createdAt,
         })
         .from(teams)
         .leftJoin(users, eq(users.id, teams.leaderUserId))
+        .leftJoin(teamTypes, eq(teamTypes.id, teams.teamTypeId))
         .leftJoin(memberCountSubquery, eq(memberCountSubquery.teamId, teams.id))
         .where(where)
         .orderBy(
@@ -113,6 +119,10 @@ export class DrizzleTeamRepository implements TeamRepository {
       isActive: row.isActive,
       leaderUserId: row.leaderUserId,
       leaderName: row.leaderFirstName ? `${row.leaderFirstName} ${row.leaderLastName ?? ''}`.trim() : null,
+      teamTypeId: row.teamTypeId,
+      teamTypeName: row.teamTypeName,
+      teamTypeColor: row.teamTypeColor,
+      teamTypeIcon: row.teamTypeIcon,
       memberCount: Number(row.memberCount),
       createdAt: row.createdAt,
     }));

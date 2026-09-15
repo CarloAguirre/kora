@@ -1,0 +1,101 @@
+/* Resumen compacto de la Bitácora — mismo lenguaje visual que `BitacoraCard.module.css`, comprimido para la columna lateral de la pestaña Resumen. */
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kora-space-2);
+}
+
+.title {
+  font-size: var(--kora-text-lg);
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-navy);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-3);
+  margin-top: var(--kora-space-3);
+}
+
+.empty {
+  color: var(--kora-text-disabled);
+  font-style: italic;
+  font-size: var(--kora-text-sm);
+  text-align: center;
+  padding: var(--kora-space-4) 0;
+}
+
+.item {
+  display: flex;
+  gap: var(--kora-space-2);
+}
+
+.dot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* Mismos pares fondo/tinta que `Badge.module.css`, para que el punto de estado
+   siempre combine con el badge de Estado que se ve más abajo en la misma fila. */
+.dot_success {
+  background: var(--kora-success-surface);
+  color: var(--kora-lime-dark);
+}
+
+.dot_danger {
+  background: var(--kora-danger-surface);
+  color: var(--kora-danger-hover);
+}
+
+.dot_warning {
+  background: var(--kora-warning-surface);
+  color: var(--kora-warning-text);
+}
+
+.dot_info {
+  background: var(--kora-blue-surface);
+  color: var(--kora-info);
+}
+
+.dot_neutral {
+  background: var(--kora-surface-disabled);
+  color: var(--kora-text-muted);
+}
+
+.itemBody {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.itemTitle {
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-semibold);
+  color: var(--kora-navy);
+}
+
+.itemMeta {
+  font-size: var(--kora-text-xs);
+  color: var(--kora-text-muted);
+}
+
+.itemBadge {
+  align-self: flex-start;
+  margin-top: 2px;
+}
+
+.viewMore {
+  width: 100%;
+  justify-content: center;
+  margin-top: var(--kora-space-3);
+}

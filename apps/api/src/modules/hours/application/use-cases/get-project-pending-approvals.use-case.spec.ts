@@ -15,6 +15,8 @@ function buildItem(overrides: Partial<HourEntryListItem>): HourEntryListItem {
     userFullName: overrides.userFullName ?? 'Persona',
     projectId: 'project-1',
     projectName: 'Proyecto',
+    moduleId: null,
+    moduleName: null,
     teamId: null,
     teamName: null,
     assignment: 'Proyecto',
@@ -26,6 +28,8 @@ function buildItem(overrides: Partial<HourEntryListItem>): HourEntryListItem {
     projectStageAtEntry: null,
     status: 'pending',
     rejectionReason: null,
+    hasBlocker: false,
+    blockerDescription: null,
     designatedApproverUserId: null,
     designatedApproverFullName: null,
     projectApprovers: [],
@@ -72,6 +76,9 @@ class FakeProjectReader implements HourEntryProjectReader {
   }
   async findManyByIds(): Promise<HourEntryProjectReference[]> {
     return this.project ? [this.project] : [];
+  }
+  async findModuleById(): Promise<null> {
+    return null;
   }
   async isProjectApprover(): Promise<boolean> {
     return false;

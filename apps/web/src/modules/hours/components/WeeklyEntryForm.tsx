@@ -9,6 +9,7 @@ import styles from './HourEntryFormDialog.module.css';
 import { Button } from '@/shared/components/ui/Button';
 import { TextField } from '@/shared/components/ui/TextField';
 import { Select } from '@/shared/components/ui/Select';
+import { Combobox } from '@/shared/components/ui/Combobox';
 import { AlertIcon, ChevronLeftIcon, ChevronRightIcon } from '@/shared/components/icons/Icons';
 import { useCreateHourEntry, useHolidays, useHourEntriesList } from '../api/hours.queries';
 import { useProjectsList } from '@/modules/projects/api/projects.queries';
@@ -178,6 +179,7 @@ export function WeeklyEntryForm({
           date: toIsoDate(date),
           isOvertime,
           designatedApproverUserId: designatedApproverUserId || undefined,
+          hasBlocker: false,
         };
         await createEntry.mutateAsync(input);
       }
@@ -249,16 +251,15 @@ export function WeeklyEntryForm({
             onChange={(event) => setDesignatedApproverUserId(event.target.value)}
           />
         ) : (
-          <Select
+          <Combobox
             label="Proyecto"
-            required={needsProject}
             disabled={!needsProject}
-            placeholder="Seleccionar proyecto..."
+            placeholder="Buscar proyecto..."
             options={(projects?.items ?? []).map((project) => ({ value: project.id, label: getProjectOptionLabel(project) }))}
             value={projectId}
-            onChange={(event) => {
-              const nextProject = (projects?.items ?? []).find((p) => p.id === event.target.value);
-              setProjectId(event.target.value);
+            onChange={(nextProjectId) => {
+              const nextProject = (projects?.items ?? []).find((p) => p.id === nextProjectId);
+              setProjectId(nextProjectId);
               if (!nextProject?.allowsOvertime) setIsOvertime(false);
             }}
           />

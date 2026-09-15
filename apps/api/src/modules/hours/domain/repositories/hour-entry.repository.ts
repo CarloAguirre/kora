@@ -38,6 +38,8 @@ export interface HourEntryListItem {
   readonly userFullName: string;
   readonly projectId: string | null;
   readonly projectName: string | null;
+  readonly moduleId: string | null;
+  readonly moduleName: string | null;
   /** Equipo activo del autor al momento de listar — no es histórico, refleja la membresía actual. */
   readonly teamId: string | null;
   readonly teamName: string | null;
@@ -50,6 +52,8 @@ export interface HourEntryListItem {
   readonly projectStageAtEntry: string | null;
   readonly status: HourEntryStatus;
   readonly rejectionReason: string | null;
+  readonly hasBlocker: boolean;
+  readonly blockerDescription: string | null;
   readonly designatedApproverUserId: string | null;
   readonly designatedApproverFullName: string | null;
   /** Líder del proyecto + líder del equipo del propio autor (si está asignado al proyecto), cuando `projectId` no es null. */

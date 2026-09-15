@@ -15,6 +15,7 @@ import {
 export interface HourEntryProps {
   userId: string;
   projectId: string | null;
+  moduleId: string | null;
   assignment: string | null;
   category: string;
   description: string;
@@ -27,6 +28,8 @@ export interface HourEntryProps {
   decisionUserId: string | null;
   decisionAt: Date | null;
   designatedApproverUserId: string | null;
+  hasBlocker: boolean;
+  blockerDescription: string | null;
   legacyId: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -36,6 +39,7 @@ export interface CreateHourEntryProps {
   readonly id: string;
   readonly userId: string;
   readonly projectId?: string | null;
+  readonly moduleId?: string | null;
   readonly assignment: string;
   readonly category?: string;
   readonly description?: string;
@@ -44,6 +48,8 @@ export interface CreateHourEntryProps {
   readonly isOvertime?: boolean;
   readonly projectStageAtEntry?: string | null;
   readonly designatedApproverUserId?: string | null;
+  readonly hasBlocker?: boolean;
+  readonly blockerDescription?: string | null;
   /** Solo un colaborador necesita aprobación — ver docs/DECISION-M4-HORAS.md. */
   readonly ownerRequiresApproval: boolean;
   readonly now: Date;
@@ -98,6 +104,7 @@ export class HourEntry extends AggregateRoot<string> {
     const entry = new HourEntry(props.id, {
       userId: props.userId,
       projectId,
+      moduleId: projectId ? (props.moduleId ?? null) : null,
       assignment: props.assignment,
       category: (props.category ?? '').trim(),
       description: (props.description ?? '').trim(),
@@ -110,6 +117,8 @@ export class HourEntry extends AggregateRoot<string> {
       decisionUserId: null,
       decisionAt: null,
       designatedApproverUserId: projectId ? null : designatedApproverUserId,
+      hasBlocker: props.hasBlocker ?? false,
+      blockerDescription: props.hasBlocker ? (props.blockerDescription ?? null) : null,
       legacyId: null,
       createdAt: props.now,
       updatedAt: props.now,
@@ -191,7 +200,17 @@ export class HourEntry extends AggregateRoot<string> {
     data: Partial<
       Pick<
         HourEntryProps,
-        'assignment' | 'projectId' | 'category' | 'description' | 'hours' | 'date' | 'isOvertime' | 'designatedApproverUserId'
+        | 'assignment'
+        | 'projectId'
+        | 'moduleId'
+        | 'category'
+        | 'description'
+        | 'hours'
+        | 'date'
+        | 'isOvertime'
+        | 'designatedApproverUserId'
+        | 'hasBlocker'
+        | 'blockerDescription'
       >
     >,
     ownerRequiresApproval: boolean,
@@ -218,6 +237,8 @@ export class HourEntry extends AggregateRoot<string> {
 
     assignDefined(this.props, data);
     this.props.designatedApproverUserId = projectId ? null : designatedApproverUserId;
+    if (!projectId) this.props.moduleId = null;
+    if (!this.props.hasBlocker) this.props.blockerDescription = null;
 
     const wasRejected = this.props.status === 'rejected';
     this.props.status = ownerRequiresApproval ? 'pending' : 'approved';

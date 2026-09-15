@@ -17,6 +17,10 @@ export interface TeamListItem {
   readonly isActive: boolean;
   readonly leaderUserId: string | null;
   readonly leaderName: string | null;
+  readonly teamTypeId: string | null;
+  readonly teamTypeName: string | null;
+  readonly teamTypeColor: string | null;
+  readonly teamTypeIcon: string | null;
   readonly memberCount: number;
   readonly createdAt: Date;
 }

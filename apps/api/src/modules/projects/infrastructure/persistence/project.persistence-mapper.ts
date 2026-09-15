@@ -29,6 +29,28 @@ export interface ProjectRow {
   quotationLink: string | null;
   contractLink: string | null;
   additionalLinks: string | null;
+  onHoldReason: string | null;
+  stopsClock: boolean;
+  scopeNotes: string | null;
+  deliveryDocumentation: string | null;
+  demoLink: string | null;
+  testEnvironmentLink: string | null;
+  figmaLink: string | null;
+  documentationLink: string | null;
+  impactBeforeHours: string | null;
+  impactBeforePeople: string | null;
+  impactBeforeDuration: string | null;
+  impactBeforeModality: string | null;
+  impactAfterHours: string | null;
+  impactAfterPeople: string | null;
+  impactAfterDuration: string | null;
+  impactAfterModality: string | null;
+  qaTestingStartDate: Date | null;
+  qaTestingEndDate: Date | null;
+  qaEvaluatedModule: string | null;
+  qaPlannedTests: number | null;
+  qaExecutedTests: number | null;
+  qaFailedTests: number | null;
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;
@@ -62,6 +84,28 @@ export function toDomain(row: ProjectRow): Project {
     quotationLink: row.quotationLink,
     contractLink: row.contractLink,
     additionalLinks: row.additionalLinks,
+    onHoldReason: row.onHoldReason,
+    stopsClock: row.stopsClock,
+    scopeNotes: row.scopeNotes,
+    deliveryDocumentation: row.deliveryDocumentation,
+    demoLink: row.demoLink,
+    testEnvironmentLink: row.testEnvironmentLink,
+    figmaLink: row.figmaLink,
+    documentationLink: row.documentationLink,
+    impactBeforeHours: row.impactBeforeHours === null ? null : Number(row.impactBeforeHours),
+    impactBeforePeople: row.impactBeforePeople,
+    impactBeforeDuration: row.impactBeforeDuration,
+    impactBeforeModality: row.impactBeforeModality,
+    impactAfterHours: row.impactAfterHours === null ? null : Number(row.impactAfterHours),
+    impactAfterPeople: row.impactAfterPeople,
+    impactAfterDuration: row.impactAfterDuration,
+    impactAfterModality: row.impactAfterModality,
+    qaTestingStartDate: row.qaTestingStartDate,
+    qaTestingEndDate: row.qaTestingEndDate,
+    qaEvaluatedModule: row.qaEvaluatedModule,
+    qaPlannedTests: row.qaPlannedTests,
+    qaExecutedTests: row.qaExecutedTests,
+    qaFailedTests: row.qaFailedTests,
     legacyId: row.legacyId,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
@@ -97,6 +141,28 @@ export function toPersistence(project: Project) {
     quotationLink: snapshot.quotationLink,
     contractLink: snapshot.contractLink,
     additionalLinks: snapshot.additionalLinks,
+    onHoldReason: snapshot.onHoldReason,
+    stopsClock: snapshot.stopsClock,
+    scopeNotes: snapshot.scopeNotes,
+    deliveryDocumentation: snapshot.deliveryDocumentation,
+    demoLink: snapshot.demoLink,
+    testEnvironmentLink: snapshot.testEnvironmentLink,
+    figmaLink: snapshot.figmaLink,
+    documentationLink: snapshot.documentationLink,
+    impactBeforeHours: snapshot.impactBeforeHours === null ? null : String(snapshot.impactBeforeHours),
+    impactBeforePeople: snapshot.impactBeforePeople,
+    impactBeforeDuration: snapshot.impactBeforeDuration,
+    impactBeforeModality: snapshot.impactBeforeModality,
+    impactAfterHours: snapshot.impactAfterHours === null ? null : String(snapshot.impactAfterHours),
+    impactAfterPeople: snapshot.impactAfterPeople,
+    impactAfterDuration: snapshot.impactAfterDuration,
+    impactAfterModality: snapshot.impactAfterModality,
+    qaTestingStartDate: snapshot.qaTestingStartDate,
+    qaTestingEndDate: snapshot.qaTestingEndDate,
+    qaEvaluatedModule: snapshot.qaEvaluatedModule,
+    qaPlannedTests: snapshot.qaPlannedTests,
+    qaExecutedTests: snapshot.qaExecutedTests,
+    qaFailedTests: snapshot.qaFailedTests,
     legacyId: snapshot.legacyId,
     createdAt: snapshot.createdAt,
     updatedAt: snapshot.updatedAt,

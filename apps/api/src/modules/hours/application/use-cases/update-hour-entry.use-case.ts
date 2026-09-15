@@ -4,8 +4,10 @@ import type { RoleCode, UpdateHourEntryInput } from '@kora/contracts';
 import {
   HourEntryNotFoundError,
   InvalidDesignatedApproverError,
+  ModuleNotInProjectError,
   ProjectOvertimeNotAllowedError,
   ProjectStoppedError,
+  ReferencedModuleNotFoundError,
   ReferencedProjectNotFoundError,
 } from '../../domain/errors/hour-entry.errors';
 import { HOUR_ENTRY_REPOSITORY, type HourEntryRepository } from '../../domain/repositories/hour-entry.repository';
@@ -62,6 +64,13 @@ export class UpdateHourEntryUseCase implements UseCase<UpdateHourEntryCommand, v
       }
     }
 
+    const moduleId = data.moduleId !== undefined ? data.moduleId : entry.toSnapshot().moduleId;
+    if (moduleId) {
+      const module = await this.projects.findModuleById(moduleId);
+      if (!module) return err(new ReferencedModuleNotFoundError(moduleId));
+      if (module.projectId !== projectId) return err(new ModuleNotInProjectError());
+    }
+
     const owner = await this.users.findById(entry.userId);
     // Horas extra siempre exigen aprobación de líder, aunque el rol del dueño no la requiera.
     const ownerRequiresApproval = owner?.role === 'collaborator' || isOvertime;
@@ -70,12 +79,15 @@ export class UpdateHourEntryUseCase implements UseCase<UpdateHourEntryCommand, v
       {
         assignment: data.assignment,
         projectId: data.projectId === undefined ? undefined : data.projectId,
+        moduleId: data.moduleId === undefined ? undefined : data.moduleId,
         category: data.category,
         description: data.description,
         hours: data.hours,
         date: data.date ? new Date(data.date) : undefined,
         isOvertime: data.isOvertime,
         designatedApproverUserId: data.designatedApproverUserId === undefined ? undefined : data.designatedApproverUserId,
+        hasBlocker: data.hasBlocker,
+        blockerDescription: data.blockerDescription === undefined ? undefined : data.blockerDescription,
       },
       ownerRequiresApproval,
       this.clock.now(),

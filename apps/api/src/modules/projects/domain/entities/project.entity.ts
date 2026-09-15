@@ -31,6 +31,28 @@ export interface ProjectProps {
   quotationLink: string | null;
   contractLink: string | null;
   additionalLinks: string | null;
+  onHoldReason: string | null;
+  stopsClock: boolean;
+  scopeNotes: string | null;
+  deliveryDocumentation: string | null;
+  demoLink: string | null;
+  testEnvironmentLink: string | null;
+  figmaLink: string | null;
+  documentationLink: string | null;
+  impactBeforeHours: number | null;
+  impactBeforePeople: string | null;
+  impactBeforeDuration: string | null;
+  impactBeforeModality: string | null;
+  impactAfterHours: number | null;
+  impactAfterPeople: string | null;
+  impactAfterDuration: string | null;
+  impactAfterModality: string | null;
+  qaTestingStartDate: Date | null;
+  qaTestingEndDate: Date | null;
+  qaEvaluatedModule: string | null;
+  qaPlannedTests: number | null;
+  qaExecutedTests: number | null;
+  qaFailedTests: number | null;
   legacyId: number | null;
   createdAt: Date;
   updatedAt: Date;
@@ -112,6 +134,28 @@ export class Project extends AggregateRoot<string> {
       quotationLink: props.quotationLink ?? null,
       contractLink: props.contractLink ?? null,
       additionalLinks: props.additionalLinks ?? null,
+      onHoldReason: null,
+      stopsClock: false,
+      scopeNotes: null,
+      deliveryDocumentation: null,
+      demoLink: null,
+      testEnvironmentLink: null,
+      figmaLink: null,
+      documentationLink: null,
+      impactBeforeHours: null,
+      impactBeforePeople: null,
+      impactBeforeDuration: null,
+      impactBeforeModality: null,
+      impactAfterHours: null,
+      impactAfterPeople: null,
+      impactAfterDuration: null,
+      impactAfterModality: null,
+      qaTestingStartDate: null,
+      qaTestingEndDate: null,
+      qaEvaluatedModule: null,
+      qaPlannedTests: null,
+      qaExecutedTests: null,
+      qaFailedTests: null,
       legacyId: null,
       createdAt: props.now,
       updatedAt: props.now,
@@ -205,6 +249,28 @@ export class Project extends AggregateRoot<string> {
         | 'allowsOvertime'
         | 'quotationLink'
         | 'contractLink'
+        | 'onHoldReason'
+        | 'stopsClock'
+        | 'scopeNotes'
+        | 'deliveryDocumentation'
+        | 'demoLink'
+        | 'testEnvironmentLink'
+        | 'figmaLink'
+        | 'documentationLink'
+        | 'impactBeforeHours'
+        | 'impactBeforePeople'
+        | 'impactBeforeDuration'
+        | 'impactBeforeModality'
+        | 'impactAfterHours'
+        | 'impactAfterPeople'
+        | 'impactAfterDuration'
+        | 'impactAfterModality'
+        | 'qaTestingStartDate'
+        | 'qaTestingEndDate'
+        | 'qaEvaluatedModule'
+        | 'qaPlannedTests'
+        | 'qaExecutedTests'
+        | 'qaFailedTests'
       >
     >,
     now: Date,

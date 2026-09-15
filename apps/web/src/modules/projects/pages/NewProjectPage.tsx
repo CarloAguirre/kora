@@ -1,10 +1,12 @@
-import { useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useFieldArray, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
   createProjectSchema,
+  PROJECT_MODULE_STAGES,
+  PROJECT_MODULE_STAGE_LABELS,
   PROJECT_PHASES,
   PROJECT_PHASE_LABELS,
   PROJECT_PRIORITY_LABELS,
@@ -15,6 +17,8 @@ import {
   PROJECT_TYPE_LABELS,
   type ClientDetail,
   type CreateProjectInput,
+  type CreateProjectModuleInput,
+  type ProjectModuleStage,
   type ProjectPriority,
   type ProjectType,
 } from '@kora/contracts';
@@ -26,9 +30,9 @@ import { TextField } from '@/shared/components/ui/TextField';
 import { Select } from '@/shared/components/ui/Select';
 import { Combobox } from '@/shared/components/ui/Combobox';
 import { Stepper } from '@/shared/components/ui/Stepper';
-import { AlertIcon, ChevronLeftIcon } from '@/shared/components/icons/Icons';
+import { AlertIcon, ChevronLeftIcon, CloseIcon, PlusIcon, TrashIcon } from '@/shared/components/icons/Icons';
 import { useToast } from '@/shared/components/ui/Toast';
-import { useCreateProject } from '../api/projects.queries';
+import { useAddProjectModuleDelivery, useCreateProject, useCreateProjectModule } from '../api/projects.queries';
 import { useClientsList, useClientDetail } from '@/modules/clients/api/clients.queries';
 import { useUsersList } from '@/modules/users/api/users.queries';
 import { useTeamsList } from '@/modules/teams/api/teams.queries';
@@ -51,10 +55,49 @@ const STATUS_OPTIONS = (['active', 'draft', 'on_hold'] as const).map((status) =>
   label: PROJECT_STATUS_LABELS[status],
 }));
 
-const STEPS = [{ label: 'Datos del cliente' }, { label: 'Datos del proyecto' }, { label: 'Resumen y confirmación' }];
+const STEPS = [
+  { label: 'Datos del cliente' },
+  { label: 'Datos del proyecto' },
+  { label: 'Fases · Módulos' },
+  { label: 'Resumen y confirmación' },
+];
+
+const MODULE_STAGE_OPTIONS = PROJECT_MODULE_STAGES.map((stage) => ({ value: stage, label: PROJECT_MODULE_STAGE_LABELS[stage] }));
 
 /** Convierte el `''` de un `<select>` sin elegir a `undefined`, para que los campos `nullish()` del contrato no reciban una cadena vacía. */
 const emptyToUndefined = (value: string) => value || undefined;
+
+interface DeliveryDraft {
+  localId: number;
+  estimatedDate: string;
+}
+
+/**
+ * Un módulo mientras se arma en el wizard: campos como texto plano de
+ * formulario (no el `CreateProjectModuleInput` final) porque se edita en
+ * línea, tecla a tecla, apenas se agrega la tarjeta — no hay un paso de
+ * "completar y confirmar" aparte como en `EditProjectDialog` (que sí llama
+ * a la API de inmediato porque el proyecto ya existe). La conversión a
+ * `CreateProjectModuleInput` ocurre recién al enviar el formulario completo.
+ */
+interface ModuleDraft {
+  localId: number;
+  name: string;
+  initialStage: ProjectModuleStage;
+  estimatedHours: string;
+  estimatedStartDate: string;
+  estimatedEndDate: string;
+  deliveries: DeliveryDraft[];
+}
+
+const EMPTY_MODULE_DRAFT: Omit<ModuleDraft, 'localId'> = {
+  name: '',
+  initialStage: 'discovery',
+  estimatedHours: '',
+  estimatedStartDate: '',
+  estimatedEndDate: '',
+  deliveries: [],
+};
 
 /** Encabezado de sección — mismo peso visual para todas, con línea divisoria entre secciones (ver `.module.css`). */
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -166,19 +209,118 @@ export function NewProjectPage() {
   const totalTeamHours = teamsValue.reduce((sum, team) => sum + (Number(team.assignedHours) || 0), 0);
   const hoursExceeded = equiposEnabled && totalTeamHours > (Number(soldHours) || 0);
 
+  // Los módulos aún no tienen dónde vivir en el backend: el proyecto no existe
+  // hasta el submit final. Se acumulan acá y recién se crean (uno por uno,
+  // reusando `useCreateProjectModule`, igual que hace `EditProjectDialog` para
+  // un proyecto ya existente) justo después de que `createProject` responde.
+  const createModule = useCreateProjectModule();
+  const addDelivery = useAddProjectModuleDelivery();
+  const [moduleDrafts, setModuleDrafts] = useState<ModuleDraft[]>([]);
+  const [moduleError, setModuleError] = useState<string | null>(null);
+  const nextModuleLocalId = useRef(1);
+  const nextDeliveryLocalId = useRef(1);
+
+  const addModuleDraft = () => {
+    setModuleDrafts((prev) => [...prev, { ...EMPTY_MODULE_DRAFT, localId: nextModuleLocalId.current++ }]);
+  };
+
+  const removeModuleDraft = (localId: number) => {
+    setModuleDrafts((prev) => prev.filter((draft) => draft.localId !== localId));
+  };
+
+  const updateModuleDraft = <K extends keyof Omit<ModuleDraft, 'localId' | 'deliveries'>>(
+    localId: number,
+    field: K,
+    value: ModuleDraft[K],
+  ) => {
+    setModuleDrafts((prev) => prev.map((draft) => (draft.localId === localId ? { ...draft, [field]: value } : draft)));
+  };
+
+  const addDeliveryDraft = (moduleLocalId: number) => {
+    setModuleDrafts((prev) =>
+      prev.map((draft) =>
+        draft.localId === moduleLocalId
+          ? { ...draft, deliveries: [...draft.deliveries, { localId: nextDeliveryLocalId.current++, estimatedDate: '' }] }
+          : draft,
+      ),
+    );
+  };
+
+  const removeDeliveryDraft = (moduleLocalId: number, deliveryLocalId: number) => {
+    setModuleDrafts((prev) =>
+      prev.map((draft) =>
+        draft.localId === moduleLocalId
+          ? { ...draft, deliveries: draft.deliveries.filter((delivery) => delivery.localId !== deliveryLocalId) }
+          : draft,
+      ),
+    );
+  };
+
+  const updateDeliveryDraftDate = (moduleLocalId: number, deliveryLocalId: number, estimatedDate: string) => {
+    setModuleDrafts((prev) =>
+      prev.map((draft) =>
+        draft.localId === moduleLocalId
+          ? {
+              ...draft,
+              deliveries: draft.deliveries.map((delivery) =>
+                delivery.localId === deliveryLocalId ? { ...delivery, estimatedDate } : delivery,
+              ),
+            }
+          : draft,
+      ),
+    );
+  };
+
   const goToStep2 = () => setStep(1);
 
-  const goToStep3 = async () => {
+  const goToFasesModulos = async () => {
     const fields: Array<keyof ProjectFormValues> = ['name', 'type'];
     if (type === 'development') fields.push('salesStage');
     const valid = await trigger(fields);
     if (valid && !hoursExceeded) setStep(2);
   };
 
+  const goToResumen = () => {
+    if (moduleDrafts.some((draft) => !draft.name.trim())) {
+      setModuleError('Ponle un nombre a todos los módulos agregados antes de continuar.');
+      return;
+    }
+    setModuleError(null);
+    setStep(3);
+  };
+
   const onSubmit = handleSubmit(async (values) => {
     setServerError(null);
     try {
       const result = await createProject.mutateAsync(values);
+      if (moduleDrafts.length > 0) {
+        await Promise.all(
+          moduleDrafts
+            .filter((draft) => draft.name.trim())
+            .map(async (draft) => {
+              const input: CreateProjectModuleInput = {
+                name: draft.name.trim(),
+                initialStage: draft.initialStage,
+                estimatedHours: draft.estimatedHours ? Number(draft.estimatedHours) : undefined,
+                estimatedStartDate: draft.estimatedStartDate || undefined,
+                estimatedEndDate: draft.estimatedEndDate || undefined,
+              };
+              const module = await createModule.mutateAsync({ projectId: result.id, input });
+              const pendingDeliveries = draft.deliveries.filter((delivery) => delivery.estimatedDate);
+              if (pendingDeliveries.length > 0) {
+                await Promise.all(
+                  pendingDeliveries.map((delivery) =>
+                    addDelivery.mutateAsync({
+                      projectId: result.id,
+                      moduleId: module.id,
+                      input: { estimatedDate: delivery.estimatedDate },
+                    }),
+                  ),
+                );
+              }
+            }),
+        );
+      }
       toast.success(`Se creó el proyecto ${values.name}.`);
       void navigate(`/proyectos/${result.id}`);
     } catch (error) {
@@ -392,7 +534,7 @@ export function NewProjectPage() {
                 <Button variant="outline" type="button" onClick={() => void navigate('/proyectos')}>
                   Cancelar
                 </Button>
-                <Button type="button" disabled={hoursExceeded} onClick={() => void goToStep3()}>
+                <Button type="button" disabled={hoursExceeded} onClick={() => void goToFasesModulos()}>
                   Continuar
                 </Button>
               </div>
@@ -400,6 +542,146 @@ export function NewProjectPage() {
           )}
 
           {step === 2 && (
+            <>
+              <Section title="Fases · Módulos">
+                {!equiposEnabled ? (
+                  <p className={styles.hint}>Disponible cuando la etapa comercial es "Aprobado".</p>
+                ) : (
+                  <>
+                    <p className={styles.hint}>
+                      Unidades de entrega del proyecto — cada una recorre las etapas del sistema (Levantamiento →
+                      Desarrollo → Producción → Marcha blanca → Finalizado) de forma independiente. Los tramos de
+                      equipo se agregan después, desde la ficha del proyecto.
+                    </p>
+
+                    {moduleError && (
+                      <div className={styles.alert} role="alert">
+                        <AlertIcon size={18} className={styles.alertIcon} />
+                        <span>{moduleError}</span>
+                      </div>
+                    )}
+
+                    {moduleDrafts.length === 0 && <p className={styles.hint}>Aún no hay módulos.</p>}
+
+                    <div className={styles.modulesList}>
+                      {moduleDrafts.map((draft, index) => (
+                        <div key={draft.localId} className={styles.moduleCard}>
+                          <div className={styles.moduleCardHead}>
+                            <span className={styles.moduleKicker}>Fase {index + 1}</span>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className={styles.iconDanger}
+                              onClick={() => removeModuleDraft(draft.localId)}
+                              aria-label={`Eliminar fase ${index + 1}`}
+                            >
+                              <TrashIcon size={16} />
+                            </Button>
+                          </div>
+
+                          <TextField
+                            label="Nombre del módulo"
+                            placeholder="Ej. Login y registro"
+                            value={draft.name}
+                            onChange={(event) => updateModuleDraft(draft.localId, 'name', event.target.value)}
+                          />
+
+                          <div className={styles.row3}>
+                            <Select
+                              label="Etapa inicial"
+                              options={MODULE_STAGE_OPTIONS}
+                              value={draft.initialStage}
+                              onChange={(event) =>
+                                updateModuleDraft(draft.localId, 'initialStage', event.target.value as ProjectModuleStage)
+                              }
+                            />
+                            <TextField
+                              label="Horas estimadas"
+                              type="number"
+                              min={0}
+                              value={draft.estimatedHours}
+                              onChange={(event) => updateModuleDraft(draft.localId, 'estimatedHours', event.target.value)}
+                            />
+                          </div>
+
+                          <div className={styles.row3}>
+                            <TextField
+                              label="Fecha de inicio estimada"
+                              type="date"
+                              value={draft.estimatedStartDate}
+                              onChange={(event) => updateModuleDraft(draft.localId, 'estimatedStartDate', event.target.value)}
+                            />
+                            <TextField
+                              label="Fecha de término estimada"
+                              type="date"
+                              value={draft.estimatedEndDate}
+                              onChange={(event) => updateModuleDraft(draft.localId, 'estimatedEndDate', event.target.value)}
+                            />
+                          </div>
+
+                          <div className={styles.moduleDeliveries}>
+                            <span className={styles.moduleDeliveriesLabel}>Entregas estimadas</span>
+                            {draft.deliveries.map((delivery, deliveryIndex) => (
+                              <div key={delivery.localId} className={styles.deliveryRow}>
+                                <span className={styles.deliveryLabel}>Entrega {deliveryIndex + 1}</span>
+                                <TextField
+                                  type="date"
+                                  className={styles.deliveryInputWrapper}
+                                  value={delivery.estimatedDate}
+                                  onChange={(event) => updateDeliveryDraftDate(draft.localId, delivery.localId, event.target.value)}
+                                />
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className={styles.iconDanger}
+                                  onClick={() => removeDeliveryDraft(draft.localId, delivery.localId)}
+                                  aria-label={`Quitar entrega ${deliveryIndex + 1}`}
+                                >
+                                  <CloseIcon size={14} />
+                                </Button>
+                              </div>
+                            ))}
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              iconLeft={<PlusIcon size={14} />}
+                              onClick={() => addDeliveryDraft(draft.localId)}
+                            >
+                              Agregar entrega
+                            </Button>
+                            <p className={styles.deliveryHint}>
+                              Cada entrega crea automáticamente un hito "Entrega a cliente" en estado Planificada.
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <Button type="button" variant="outline" iconLeft={<PlusIcon size={16} />} onClick={addModuleDraft}>
+                      Agregar fase / módulo
+                    </Button>
+                  </>
+                )}
+              </Section>
+
+              <div className={styles.actions}>
+                <Button variant="outline" type="button" onClick={() => setStep(1)}>
+                  Atrás
+                </Button>
+                <Button variant="outline" type="button" onClick={() => void navigate('/proyectos')}>
+                  Cancelar
+                </Button>
+                <Button type="button" onClick={goToResumen}>
+                  Continuar
+                </Button>
+              </div>
+            </>
+          )}
+
+          {step === 3 && (
             <>
               <Section title="Datos Proyecto">
                 <div className={styles.summaryGrid}>
@@ -409,6 +691,7 @@ export function NewProjectPage() {
                   <SummaryItem label="Cotización" value={quotationLink} />
                   <SummaryItem label="Contrato" value={contractLink} />
                   <SummaryItem label="Adicionales" value={additionalLinks} />
+                  {equiposEnabled && <SummaryItem label="Fases · Módulos" value={moduleDrafts.length ? `${moduleDrafts.length}` : undefined} />}
                 </div>
               </Section>
 
@@ -419,7 +702,7 @@ export function NewProjectPage() {
               )}
 
               <div className={styles.actions}>
-                <Button variant="outline" type="button" onClick={() => setStep(1)}>
+                <Button variant="outline" type="button" onClick={() => setStep(2)}>
                   Atrás
                 </Button>
                 <Button type="submit" loading={isSubmitting} loadingText="Creando…">

@@ -123,23 +123,48 @@
 }
 
 .tooltip {
+  min-width: 180px;
   background: var(--kora-surface);
   border: 1px solid var(--kora-blue-200);
-  border-radius: var(--kora-radius-sm);
-  box-shadow: var(--kora-shadow);
-  padding: var(--kora-space-2) var(--kora-space-3);
+  border-radius: var(--kora-radius);
+  box-shadow: var(--kora-shadow-lg);
+  padding: var(--kora-space-3) var(--kora-space-4);
   font-size: var(--kora-text-sm);
   color: var(--kora-text);
+}
+
+.tooltipHead {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+  margin-bottom: var(--kora-space-2);
+}
+
+.tooltipDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--kora-lime-dark);
+  flex-shrink: 0;
 }
 
 .tooltipTitle {
   font-weight: var(--kora-weight-bold);
   color: var(--kora-navy);
-  margin-bottom: var(--kora-space-1);
 }
 
-.tooltipDanger {
-  color: var(--kora-danger);
+.tooltipRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kora-space-4);
+  margin: var(--kora-space-1) 0;
+  color: var(--kora-text-muted);
+}
+
+.tooltipRow b {
+  color: var(--kora-navy);
+  font-weight: var(--kora-weight-semibold);
 }
 
 @media (max-width: 768px) {

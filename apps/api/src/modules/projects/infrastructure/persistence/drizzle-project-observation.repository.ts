@@ -1,12 +1,60 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { asc, eq, projectObservations, users, type Database } from '@kora/db';
+import { asc, eq, projectModules, projectObservations, users, type Database } from '@kora/db';
 import type { TransactionContext } from '@kora/core';
 import type {
+  AddProjectObservationData,
   ProjectObservationRecord,
   ProjectObservationRepository,
 } from '../../domain/repositories/project-observation.repository';
 import { DATABASE } from '../../../../shared/infrastructure/database/database.module';
 import { resolveDb } from '../../../../shared/infrastructure/database/unit-of-work';
+
+const SELECTION = {
+  id: projectObservations.id,
+  projectId: projectObservations.projectId,
+  type: projectObservations.type,
+  title: projectObservations.title,
+  message: projectObservations.message,
+  status: projectObservations.status,
+  moduleId: projectObservations.moduleId,
+  moduleName: projectModules.name,
+  date: projectObservations.date,
+  authorUserId: projectObservations.authorUserId,
+  authorFirstName: users.firstName,
+  authorLastName: users.lastName,
+  createdAt: projectObservations.createdAt,
+};
+
+function toRecord(row: {
+  id: string;
+  projectId: string;
+  type: ProjectObservationRecord['type'];
+  title: string | null;
+  message: string;
+  status: ProjectObservationRecord['status'];
+  moduleId: string | null;
+  moduleName: string | null;
+  date: Date;
+  authorUserId: string;
+  authorFirstName: string;
+  authorLastName: string;
+  createdAt: Date;
+}): ProjectObservationRecord {
+  return {
+    id: row.id,
+    projectId: row.projectId,
+    type: row.type,
+    title: row.title,
+    message: row.message,
+    status: row.status,
+    moduleId: row.moduleId,
+    moduleName: row.moduleName,
+    date: row.date,
+    authorUserId: row.authorUserId,
+    authorName: `${row.authorFirstName} ${row.authorLastName}`.trim(),
+    createdAt: row.createdAt,
+  };
+}
 
 @Injectable()
 export class DrizzleProjectObservationRepository implements ProjectObservationRepository {
@@ -19,73 +67,47 @@ export class DrizzleProjectObservationRepository implements ProjectObservationRe
     const db = resolveDb(this.database, context);
 
     const rows = await db
-      .select({
-        id: projectObservations.id,
-        projectId: projectObservations.projectId,
-        message: projectObservations.message,
-        authorUserId: projectObservations.authorUserId,
-        authorFirstName: users.firstName,
-        authorLastName: users.lastName,
-        createdAt: projectObservations.createdAt,
-      })
+      .select(SELECTION)
       .from(projectObservations)
       .innerJoin(users, eq(users.id, projectObservations.authorUserId))
+      .leftJoin(projectModules, eq(projectModules.id, projectObservations.moduleId))
       .where(eq(projectObservations.projectId, projectId))
       .orderBy(asc(projectObservations.createdAt));
 
-    return rows.map((row) => ({
-      id: row.id,
-      projectId: row.projectId,
-      message: row.message,
-      authorUserId: row.authorUserId,
-      authorName: `${row.authorFirstName} ${row.authorLastName}`.trim(),
-      createdAt: row.createdAt,
-    }));
+    return rows.map(toRecord);
   }
 
   async findById(id: string, context?: TransactionContext): Promise<ProjectObservationRecord | null> {
     const db = resolveDb(this.database, context);
 
     const rows = await db
-      .select({
-        id: projectObservations.id,
-        projectId: projectObservations.projectId,
-        message: projectObservations.message,
-        authorUserId: projectObservations.authorUserId,
-        authorFirstName: users.firstName,
-        authorLastName: users.lastName,
-        createdAt: projectObservations.createdAt,
-      })
+      .select(SELECTION)
       .from(projectObservations)
       .innerJoin(users, eq(users.id, projectObservations.authorUserId))
+      .leftJoin(projectModules, eq(projectModules.id, projectObservations.moduleId))
       .where(eq(projectObservations.id, id))
       .limit(1);
 
     const row = rows[0];
-    if (!row) return null;
-
-    return {
-      id: row.id,
-      projectId: row.projectId,
-      message: row.message,
-      authorUserId: row.authorUserId,
-      authorName: `${row.authorFirstName} ${row.authorLastName}`.trim(),
-      createdAt: row.createdAt,
-    };
+    return row ? toRecord(row) : null;
   }
 
-  async add(
-    projectId: string,
-    message: string,
-    authorUserId: string,
-    now: Date,
-    context?: TransactionContext,
-  ): Promise<string> {
+  async add(data: AddProjectObservationData, context?: TransactionContext): Promise<string> {
     const db = resolveDb(this.database, context);
 
     const inserted = await db
       .insert(projectObservations)
-      .values({ projectId, message, authorUserId, createdAt: now })
+      .values({
+        projectId: data.projectId,
+        type: data.type,
+        title: data.title,
+        message: data.message,
+        status: data.status,
+        moduleId: data.moduleId,
+        date: data.date,
+        authorUserId: data.authorUserId,
+        createdAt: data.now,
+      })
       .returning({ id: projectObservations.id });
 
     const id = inserted[0]?.id;

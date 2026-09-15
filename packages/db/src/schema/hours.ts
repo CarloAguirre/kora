@@ -2,7 +2,7 @@ import { sql } from 'drizzle-orm';
 import { boolean, date, numeric, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
 import { primaryId, timestamps } from './columns';
 import { users } from './identity';
-import { projects } from './projects';
+import { projectModules, projects } from './projects';
 
 /**
  * Ver docs/DECISION-M4-HORAS.md.
@@ -29,10 +29,16 @@ export const hourEntries = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: 'restrict' }),
     projectId: uuid('project_id').references(() => projects.id, { onDelete: 'set null' }),
+    /** Fase/módulo del proyecto contra la que se imputa esta hora — opcional. */
+    moduleId: uuid('module_id').references(() => projectModules.id, { onDelete: 'set null' }),
 
     assignment: text('assignment'),
     category: text('category').notNull().default(''),
     description: text('description').notNull().default(''),
+
+    /** Bloqueo reportado al registrar la hora — visible para el líder en la Bitácora del proyecto. No hay sistema de incidentes aparte. */
+    hasBlocker: boolean('has_blocker').notNull().default(false),
+    blockerDescription: text('blocker_description'),
 
     hours: numeric('hours', { precision: 10, scale: 2 }).notNull().default('0'),
     date: date('date', { mode: 'date' }).notNull(),

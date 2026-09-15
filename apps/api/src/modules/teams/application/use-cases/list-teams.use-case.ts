@@ -32,6 +32,9 @@ function toSummary(item: TeamListItem): TeamSummary {
     description: item.description,
     isActive: item.isActive,
     leader: item.leaderUserId ? { id: item.leaderUserId, fullName: item.leaderName ?? '' } : null,
+    teamType: item.teamTypeId
+      ? { id: item.teamTypeId, name: item.teamTypeName ?? '', color: item.teamTypeColor ?? '', icon: item.teamTypeIcon ?? '' }
+      : null,
     memberCount: item.memberCount,
     createdAt: item.createdAt.toISOString(),
   };

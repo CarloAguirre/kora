@@ -8,9 +8,11 @@ import { Select } from '@/shared/components/ui/Select';
 import { ChevronLeftIcon, PencilIcon } from '@/shared/components/icons/Icons';
 import { useToast } from '@/shared/components/ui/Toast';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
+import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { ApiRequestError } from '@/shared/lib/api-client';
 import { useChangeProjectStatus, useProjectDetail, useSetProjectOvertimeAuthorization } from '../api/projects.queries';
 import { EditProjectDialog } from '../components/EditProjectDialog';
+import { TeamLeaderProjectView } from '../components/TeamLeaderProjectView';
 import { DevelopmentProjectDetailView } from './DevelopmentProjectDetailView';
 import { SupportProjectDetailView } from './SupportProjectDetailView';
 
@@ -27,6 +29,7 @@ export function ProjectDetailPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
   const { can } = usePermissions();
+  const { user } = useAuth();
   const toast = useToast();
   const changeStatus = useChangeProjectStatus();
   const setOvertimeAuthorization = useSetProjectOvertimeAuthorization();
@@ -75,6 +78,8 @@ export function ProjectDetailPage() {
     );
   }
 
+  const leaderTeam = !can('projects:manage') && user ? project.teams.find((t) => t.leader?.id === user.id) : undefined;
+
   return (
     <DashboardLayout title={project.name}>
       <div className={styles.page}>
@@ -113,7 +118,9 @@ export function ProjectDetailPage() {
           </div>
         </div>
 
-        {project.type === 'support' ? (
+        {leaderTeam ? (
+          <TeamLeaderProjectView project={project} projectId={projectId} teamId={leaderTeam.teamId} />
+        ) : project.type === 'support' ? (
           <SupportProjectDetailView project={project} projectId={projectId} />
         ) : (
           <DevelopmentProjectDetailView project={project} projectId={projectId} />

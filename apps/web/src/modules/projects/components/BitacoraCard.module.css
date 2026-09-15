@@ -6,19 +6,6 @@
   color: var(--kora-navy);
 }
 
-.tabs {
-  margin-top: var(--kora-space-3);
-}
-
-.list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--kora-space-3);
-  margin-top: var(--kora-space-3);
-  max-height: 520px;
-  overflow-y: auto;
-}
-
 .empty {
   color: var(--kora-text-disabled);
   font-style: italic;
@@ -27,144 +14,112 @@
   padding: var(--kora-space-4) 0;
 }
 
-/* ─── Eventos ─── */
-.eventCard {
+/* ─── Eventos (tabla) ─── */
+.eventsPanel {
+  margin-top: var(--kora-space-3);
+}
+
+.eventsToolbar {
   display: flex;
+  align-items: flex-end;
   gap: var(--kora-space-3);
-  padding: var(--kora-space-4);
-  border-radius: var(--kora-radius-lg);
-  border: 1px solid var(--kora-blue-200);
-  background: var(--kora-surface);
+  flex-wrap: wrap;
+  margin-bottom: var(--kora-space-4);
 }
 
-.eventIcon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.eventIcon_approved {
-  background: #d4edda;
-  color: var(--kora-success-text);
-}
-
-.eventIcon_rejected {
-  background: var(--kora-danger-surface-soft);
-  color: var(--kora-danger);
-}
-
-.eventIcon_pending {
-  background: var(--kora-blue-surface);
-  color: var(--kora-blue-600);
-}
-
-.eventContent {
+/* Mismo alto/estructura que `TextField` (label + gap + control) — así el grupo
+   de alto fijo se alinea con Buscar/Desde/Hasta en la fila, en vez de quedar
+   descentrado por el `align-self: stretch` que trae el wrapper de `TextField`. */
+.filterField {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  min-width: 0;
+  gap: var(--kora-space-1);
 }
 
-.eventTitle {
-  font-size: var(--kora-text-sm);
-  font-weight: var(--kora-weight-semibold);
-  color: var(--kora-navy);
-}
-
-.eventDate {
-  font-size: var(--kora-text-xs);
+.filterFieldLabel {
   color: var(--kora-text-muted);
-}
-
-.eventDesc {
   font-size: var(--kora-text-xs);
-  color: var(--kora-text-muted);
-  line-height: 1.4;
+  font-weight: var(--kora-weight-medium);
+  line-height: 16px;
 }
 
-.eventBadge {
+.filterTabs {
   display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px var(--kora-space-2);
-  border-radius: var(--kora-radius-sm);
-  font-size: var(--kora-text-xs);
-  font-weight: var(--kora-weight-semibold);
-  width: fit-content;
-}
-
-.eventBadge_approved {
-  background: #d4edda;
-  color: var(--kora-success-text);
-}
-
-.eventBadge_rejected {
-  background: var(--kora-danger-surface-soft);
-  color: var(--kora-danger);
-}
-
-.eventBadge_pending {
-  background: var(--kora-blue-surface);
-  color: var(--kora-blue-600);
-}
-
-/* ─── Observaciones ─── */
-.observation {
-  display: flex;
-  gap: var(--kora-space-2);
-}
-
-.observationAvatar {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: var(--kora-blue-surface);
-  color: var(--kora-info);
-  font-size: var(--kora-text-xs);
-  font-weight: var(--kora-weight-bold);
+  align-items: stretch;
+  height: var(--kora-field-height);
+  padding: 3px;
+  border: 1px solid var(--kora-blue-200);
+  border-radius: var(--kora-radius-input);
+  background: var(--kora-surface);
   flex-shrink: 0;
 }
 
-.observationBody {
-  flex: 1;
-  min-width: 0;
-}
-
-.observationMeta {
-  display: flex;
-  gap: var(--kora-space-1);
-  align-items: baseline;
-  font-size: var(--kora-text-xs);
-}
-
-.observationAuthor {
+.filterTab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  padding: 0 var(--kora-space-4);
+  border-radius: calc(var(--kora-radius-input) - 3px);
+  background: transparent;
+  color: var(--kora-text-muted);
+  font-family: var(--kora-font);
+  font-size: var(--kora-text-sm);
   font-weight: var(--kora-weight-semibold);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--kora-transition), color var(--kora-transition);
+}
+
+.filterTab:hover {
   color: var(--kora-navy);
 }
 
-.observationMessage {
-  color: var(--kora-text);
-  white-space: pre-wrap;
-  font-size: var(--kora-text-sm);
-  margin-top: 2px;
+.filterTabActive,
+.filterTabActive:hover {
+  background: var(--kora-lime);
+  color: var(--kora-navy);
 }
 
-.observationNewest {
-  color: var(--kora-lime-dark);
-  font-weight: var(--kora-weight-semibold);
+.eventsSearch {
+  flex: 1;
+  min-width: 200px;
 }
 
-.observationActions {
-  display: inline-flex;
+.eventsDate {
+  min-width: 160px;
+}
+
+.descCell {
+  display: block;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ─── Detalle de una fila (modal) ─── */
+.detailGrid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-3);
+}
+
+.detailRow {
+  display: flex;
+  flex-direction: column;
   gap: 2px;
-  margin-left: auto;
+}
+
+.detailLabel {
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-medium);
+  color: var(--kora-text-muted);
+}
+
+.detailValue {
+  font-size: var(--kora-text-sm);
+  color: var(--kora-navy);
 }
 
 .observationEdit {
@@ -174,14 +129,35 @@
   margin-top: 4px;
 }
 
-/* ─── Compositor de observaciones (`obs-composer` en v1) ─── */
-.composer {
+/* ─── Formulario "Agregar registro a la bitácora" ─── */
+.addForm {
   display: flex;
   flex-direction: column;
+  gap: var(--kora-space-4);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-1);
+}
+
+.fieldLabel {
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-medium);
+  line-height: 16px;
+}
+
+.formError {
+  display: flex;
+  align-items: flex-start;
   gap: var(--kora-space-2);
-  margin-top: var(--kora-space-3);
-  padding-bottom: var(--kora-space-4);
-  border-bottom: 1px solid var(--kora-surface-disabled);
+  padding: var(--kora-space-3);
+  border-radius: var(--kora-radius-sm);
+  background: var(--kora-danger-surface-soft);
+  color: var(--kora-danger-hover);
+  font-size: var(--kora-text-base);
 }
 
 .composerTextarea {

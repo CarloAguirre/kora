@@ -30,6 +30,15 @@
   box-shadow: 0 0 0 3px var(--kora-blue-surface);
 }
 
+.fieldDisabled {
+  background: var(--kora-surface-disabled);
+  border-color: var(--kora-border);
+}
+
+.fieldDisabled .input {
+  cursor: not-allowed;
+}
+
 .searchIcon {
   flex-shrink: 0;
   color: var(--kora-text-muted);

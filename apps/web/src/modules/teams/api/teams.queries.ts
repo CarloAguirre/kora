@@ -2,12 +2,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   AddTeamMemberInput,
   CreateTeamInput,
+  CreateTeamTypeInput,
   ListTeamsQuery,
   TeamAvailabilityQuery,
   UpdateTeamInput,
   UpdateTeamMemberInput,
 } from '@kora/contracts';
-import { teamKeys, teamsApi } from './teams.api';
+import { teamKeys, teamsApi, teamTypesApi } from './teams.api';
 
 export function useTeamsList(query: Partial<ListTeamsQuery>) {
   return useQuery({
@@ -109,5 +110,22 @@ export function useRemoveTeamMember() {
     mutationFn: ({ teamId, memberId }: { teamId: string; memberId: string }) =>
       teamsApi.removeMember(teamId, memberId),
     onSuccess: () => invalidate(),
+  });
+}
+
+/** Catálogo de tipos de equipo: cambia poco, así que tolera datos más viejos. */
+export function useTeamTypes() {
+  return useQuery({
+    queryKey: teamKeys.types(),
+    queryFn: () => teamTypesApi.list(),
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useCreateTeamType() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateTeamTypeInput) => teamTypesApi.create(input),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: teamKeys.types() }),
   });
 }

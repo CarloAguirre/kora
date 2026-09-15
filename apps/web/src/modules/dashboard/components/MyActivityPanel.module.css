@@ -218,3 +218,68 @@
   font-weight: var(--kora-weight-bold);
   background: var(--kora-lime-surface);
 }
+
+.itemList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-2);
+}
+
+.itemRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--kora-space-2);
+  padding: var(--kora-space-3);
+  border: 1px solid var(--kora-border-soft);
+  border-radius: var(--kora-radius);
+}
+
+.itemMain {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 160px;
+}
+
+.itemTitle {
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-semibold);
+  color: var(--kora-navy);
+}
+
+.itemMeta {
+  font-size: var(--kora-text-xs);
+  color: var(--kora-blue-400);
+}
+
+.statusTag {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px var(--kora-space-2);
+  border-radius: var(--kora-radius-pill);
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-semibold);
+  white-space: nowrap;
+}
+
+.statusTagTodo {
+  background: var(--kora-blue-surface);
+  color: var(--kora-blue-600);
+}
+
+.statusTagInProgress {
+  background: var(--kora-lime-surface);
+  color: var(--kora-lime-dark);
+}
+
+.statusTagDone {
+  background: #d4edda;
+  color: var(--kora-success-text);
+}
+
+.statusTagLate {
+  background: var(--kora-danger-surface-soft);
+  color: var(--kora-danger);
+}

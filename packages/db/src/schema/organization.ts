@@ -22,6 +22,20 @@ import { primaryId, softDelete, timestamps } from './columns';
  * pertenencia y `users.team_id` guarda solo el equipo principal, derivado de ella.
  */
 
+export const teamTypes = pgTable(
+  'team_types',
+  {
+    id: primaryId(),
+    name: varchar('name', { length: 60 }).notNull(),
+    /** Hex `#RRGGBB`, elegido de una paleta fija en el frontend. */
+    color: varchar('color', { length: 7 }).notNull(),
+    /** Clave del set de íconos de tipo de equipo (frontend), p. ej. `code`, `palette`. */
+    icon: varchar('icon', { length: 40 }).notNull(),
+    ...timestamps,
+  },
+  (table) => [uniqueIndex('team_types_name_key').on(sql`lower(btrim(${table.name}))`)],
+);
+
 export const teams = pgTable(
   'teams',
   {
@@ -32,6 +46,8 @@ export const teams = pgTable(
     /** Líder responsable. FK declarada en la migración para evitar el ciclo
      *  teams → users → teams a nivel de módulo TypeScript. */
     leaderUserId: uuid('leader_user_id'),
+    /** Categoría visual del equipo (UX-UI, Desarrollo, QA, ...). Catálogo abierto: ver `team_types`. */
+    teamTypeId: uuid('team_type_id').references(() => teamTypes.id, { onDelete: 'set null' }),
     isActive: boolean('is_active').notNull().default(true),
     ...timestamps,
     ...softDelete,
@@ -44,6 +60,7 @@ export const teams = pgTable(
       .on(table.legacyId)
       .where(sql`${table.legacyId} is not null`),
     index('teams_leader_idx').on(table.leaderUserId),
+    index('teams_team_type_idx').on(table.teamTypeId),
   ],
 );
 
@@ -79,10 +96,15 @@ export const teamMembers = pgTable(
   ],
 );
 
-export const teamsRelations = relations(teams, ({ many }) => ({
+export const teamsRelations = relations(teams, ({ many, one }) => ({
   members: many(teamMembers),
+  teamType: one(teamTypes, { fields: [teams.teamTypeId], references: [teamTypes.id] }),
 }));
 
 export const teamMembersRelations = relations(teamMembers, ({ one }) => ({
   team: one(teams, { fields: [teamMembers.teamId], references: [teams.id] }),
+}));
+
+export const teamTypesRelations = relations(teamTypes, ({ many }) => ({
+  teams: many(teams),
 }));

@@ -64,6 +64,9 @@ class FakeProjectReader implements HourEntryProjectReader {
   async findManyByIds(): Promise<never[]> {
     return [];
   }
+  async findModuleById(): Promise<null> {
+    return null;
+  }
   async isProjectApprover(): Promise<boolean> {
     return this.approver;
   }

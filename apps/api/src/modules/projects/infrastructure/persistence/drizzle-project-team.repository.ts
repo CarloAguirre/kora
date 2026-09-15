@@ -29,6 +29,13 @@ export class DrizzleProjectTeamRepository implements ProjectTeamRepository {
       .onConflictDoUpdate({ target: [projectTeams.projectId, projectTeams.teamId], set: values });
   }
 
+  async remove(projectId: string, teamId: string, context?: TransactionContext): Promise<void> {
+    const db = resolveDb(this.database, context);
+    await db
+      .delete(projectTeams)
+      .where(and(eq(projectTeams.projectId, projectId), eq(projectTeams.teamId, teamId)));
+  }
+
   async findByProject(projectId: string, context?: TransactionContext): Promise<ProjectTeamRecord[]> {
     const db = resolveDb(this.database, context);
     const rows = await db
@@ -64,5 +71,26 @@ export class DrizzleProjectTeamRepository implements ProjectTeamRepository {
       assignedHours: row.assignedHours !== null ? Number(row.assignedHours) : null,
       memberCount: Number(row.memberCount),
     }));
+  }
+
+  async isTeamLeaderForProject(
+    projectId: string,
+    teamId: string,
+    actorUserId: string,
+    context?: TransactionContext,
+  ): Promise<boolean> {
+    const db = resolveDb(this.database, context);
+    const rows = await db
+      .select({ id: teams.id })
+      .from(teams)
+      .leftJoin(projectTeams, and(eq(projectTeams.teamId, teams.id), eq(projectTeams.projectId, projectId)))
+      .where(
+        and(
+          eq(teams.id, teamId),
+          sql`coalesce(${projectTeams.leaderUserId}, ${teams.leaderUserId}) = ${actorUserId}`,
+        ),
+      )
+      .limit(1);
+    return rows.length > 0;
   }
 }

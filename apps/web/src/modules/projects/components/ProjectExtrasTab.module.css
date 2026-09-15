@@ -1,0 +1,71 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-4);
+}
+
+.title {
+  font-size: var(--kora-text-base);
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-navy);
+  margin: 0 0 4px;
+}
+
+.hint {
+  font-size: var(--kora-text-xs);
+  color: var(--kora-text-muted, var(--kora-gray-500));
+  margin: 0 0 var(--kora-space-4);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--kora-space-4);
+  margin-bottom: var(--kora-space-3);
+}
+
+.row3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: var(--kora-space-4);
+  margin-bottom: var(--kora-space-3);
+}
+
+.impactCols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--kora-space-5, var(--kora-space-4));
+  margin-bottom: var(--kora-space-3);
+}
+
+.impactCol {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-3);
+}
+
+.impactColLabel {
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-navy);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.reduction {
+  font-size: var(--kora-text-sm);
+  color: var(--kora-navy);
+  margin: 0 0 var(--kora-space-3);
+}
+
+.saveButton {
+  align-self: flex-start;
+}
+
+@media (max-width: 640px) {
+  .row,
+  .row3,
+  .impactCols {
+    grid-template-columns: 1fr;
+  }
+}

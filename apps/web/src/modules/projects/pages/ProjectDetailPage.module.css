@@ -28,6 +28,50 @@
   min-width: 220px;
 }
 
+.tabsShell {
+  background: var(--kora-surface);
+  border: 1px solid #e7e9ee;
+  border-radius: var(--kora-radius-lg, 16px);
+  overflow: hidden;
+}
+
+.tabsShellBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  background: #eef1f4;
+  border-bottom: 1px solid #e7e9ee;
+  padding: var(--kora-space-3) var(--kora-space-4) 0;
+}
+
+.tabsShellButton {
+  font-family: inherit;
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-semibold);
+  color: var(--kora-text-muted);
+  background: #e3e7ec;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 10px 10px 0 0;
+  padding: 10px var(--kora-space-4);
+  cursor: pointer;
+  position: relative;
+  top: 1px;
+}
+
+.tabsShellButtonActive {
+  background: var(--kora-surface);
+  color: var(--kora-navy);
+  border-color: #e7e9ee;
+}
+
+.tabsShellBody {
+  padding: var(--kora-space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-4);
+}
+
 .layout {
   display: flex;
   gap: var(--kora-space-4);
@@ -54,23 +98,57 @@
 }
 
 /* ─── KPIs ─── */
-.kpis {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: var(--kora-space-3);
+.metricsStrip {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  row-gap: var(--kora-space-3);
 }
 
-.kpiCard {
+.metricItem {
   display: flex;
   flex-direction: column;
-  gap: var(--kora-space-1);
-  padding: var(--kora-space-4);
+  gap: 4px;
+  padding: 0 var(--kora-space-5, 24px);
+  border-left: 1px solid var(--kora-border);
+}
+
+.metricItem:first-child {
+  padding-left: 0;
+  border-left: none;
+}
+
+.metricSub {
+  font-size: var(--kora-text-xs);
+  color: var(--kora-lime-dark);
+  font-weight: var(--kora-weight-semibold);
+}
+
+.metricsDivider {
+  border-top: 1px solid var(--kora-border);
+  margin: var(--kora-space-4) 0 var(--kora-space-3);
 }
 
 .kpiLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   font-size: var(--kora-text-xs);
   color: var(--kora-text-muted);
   font-weight: var(--kora-weight-medium);
+  white-space: nowrap;
+}
+
+.iconBlue {
+  color: var(--kora-blue-600);
+}
+
+.iconAmber {
+  color: #b9860b;
+}
+
+.iconMuted {
+  color: var(--kora-text-muted);
 }
 
 .kpiValue {
@@ -281,6 +359,18 @@
   .colRight {
     position: static;
     width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .metricItem {
+    padding: var(--kora-space-2) 0 0;
+    border-left: none;
+    border-top: 1px solid var(--kora-border);
+    flex: 1 1 45%;
+  }
+  .metricItem:first-child {
+    border-top: none;
   }
 }
 

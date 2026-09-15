@@ -4,6 +4,7 @@ import type {
   ProjectTeam as ProjectTeamDto,
   ProjectTeamMember as ProjectTeamMemberDto,
   ProjectObservation as ProjectObservationDto,
+  ProjectModule as ProjectModuleDto,
 } from '@kora/contracts';
 import type { Project } from '../../domain/entities/project.entity';
 import type { ProjectListItem } from '../../domain/repositories/project.repository';
@@ -13,6 +14,7 @@ import {
   PROJECT_OBSERVATION_DELETE_WINDOW_MS,
   type ProjectObservationRecord,
 } from '../../domain/repositories/project-observation.repository';
+import type { ProjectModuleRecord } from '../../domain/repositories/project-module.repository';
 import type { ProjectUserReference } from '../ports/project-user-reader.port';
 import type { ProjectClientReference } from '../ports/project-client-reader.port';
 import type { ProjectContactReference } from '../ports/project-contact-reader.port';
@@ -52,6 +54,7 @@ export interface ProjectDetailSource {
   readonly members: readonly ProjectTeamMemberRecord[];
   readonly teams: readonly ProjectTeamRecord[];
   readonly observations: readonly ProjectObservationRecord[];
+  readonly modules: readonly ProjectModuleRecord[];
   readonly actorUserId: string;
   readonly canAuthorizeOvertime: boolean;
   readonly now: Date;
@@ -83,7 +86,13 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
 
   const observations: ProjectObservationDto[] = source.observations.map((observation) => ({
     id: observation.id,
+    type: observation.type,
+    title: observation.title,
     message: observation.message,
+    status: observation.status,
+    moduleId: observation.moduleId,
+    moduleName: observation.moduleName,
+    date: observation.date.toISOString().slice(0, 10),
     authorUserId: observation.authorUserId,
     authorName: observation.authorName,
     createdAt: observation.createdAt.toISOString(),
@@ -91,6 +100,47 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
     canDelete:
       observation.authorUserId === source.actorUserId &&
       source.now.getTime() - observation.createdAt.getTime() <= PROJECT_OBSERVATION_DELETE_WINDOW_MS,
+  }));
+
+  const modules: ProjectModuleDto[] = source.modules.map((module) => ({
+    id: module.id,
+    name: module.name,
+    initialStage: module.initialStage,
+    currentStage: module.currentStage,
+    estimatedHours: module.estimatedHours,
+    estimatedStartDate: module.estimatedStartDate?.toISOString().slice(0, 10) ?? null,
+    estimatedEndDate: module.estimatedEndDate?.toISOString().slice(0, 10) ?? null,
+    deliveries: module.deliveries.map((delivery) => ({
+      id: delivery.id,
+      teamId: delivery.teamId,
+      teamName: delivery.teamName,
+      estimatedDate: delivery.estimatedDate.toISOString().slice(0, 10),
+      status: delivery.status,
+    })),
+    segments: module.segments.map((segment) => ({
+      id: segment.id,
+      teamId: segment.teamId,
+      teamName: segment.teamName,
+      name: segment.name,
+      startDate: segment.startDate.toISOString().slice(0, 10),
+      endDate: segment.endDate.toISOString().slice(0, 10),
+    })),
+    tasks: module.tasks.map((task) => ({
+      id: task.id,
+      teamId: task.teamId,
+      teamName: task.teamName,
+      assigneeUserId: task.assigneeUserId,
+      assigneeName: task.assigneeName,
+      name: task.name,
+      description: task.description,
+      startDate: task.startDate ? task.startDate.toISOString().slice(0, 10) : null,
+      date: task.date.toISOString().slice(0, 10),
+      estimatedHours: task.estimatedHours,
+      status: task.status,
+      scope: task.scope,
+      completedAt: task.completedAt?.toISOString() ?? null,
+    })),
+    blockerCount: module.blockerCount,
   }));
 
   return {
@@ -127,9 +177,32 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
     quotationLink: snapshot.quotationLink,
     contractLink: snapshot.contractLink,
     additionalLinks: snapshot.additionalLinks,
+    onHoldReason: snapshot.onHoldReason,
+    stopsClock: snapshot.stopsClock,
+    scopeNotes: snapshot.scopeNotes,
+    deliveryDocumentation: snapshot.deliveryDocumentation,
+    demoLink: snapshot.demoLink,
+    testEnvironmentLink: snapshot.testEnvironmentLink,
+    figmaLink: snapshot.figmaLink,
+    documentationLink: snapshot.documentationLink,
+    impactBeforeHours: snapshot.impactBeforeHours,
+    impactBeforePeople: snapshot.impactBeforePeople,
+    impactBeforeDuration: snapshot.impactBeforeDuration,
+    impactBeforeModality: snapshot.impactBeforeModality,
+    impactAfterHours: snapshot.impactAfterHours,
+    impactAfterPeople: snapshot.impactAfterPeople,
+    impactAfterDuration: snapshot.impactAfterDuration,
+    impactAfterModality: snapshot.impactAfterModality,
+    qaTestingStartDate: snapshot.qaTestingStartDate?.toISOString().slice(0, 10) ?? null,
+    qaTestingEndDate: snapshot.qaTestingEndDate?.toISOString().slice(0, 10) ?? null,
+    qaEvaluatedModule: snapshot.qaEvaluatedModule,
+    qaPlannedTests: snapshot.qaPlannedTests,
+    qaExecutedTests: snapshot.qaExecutedTests,
+    qaFailedTests: snapshot.qaFailedTests,
     teams,
     members,
     observations,
+    modules,
     legacyId: snapshot.legacyId,
     createdAt: snapshot.createdAt.toISOString(),
     updatedAt: snapshot.updatedAt.toISOString(),

@@ -6,6 +6,7 @@ export interface HourEntryRow {
   legacyId: string | null;
   userId: string;
   projectId: string | null;
+  moduleId: string | null;
   assignment: string | null;
   category: string;
   description: string;
@@ -18,6 +19,8 @@ export interface HourEntryRow {
   decisionUserId: string | null;
   decisionAt: Date | null;
   designatedApproverUserId: string | null;
+  hasBlocker: boolean;
+  blockerDescription: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -27,6 +30,7 @@ export function toDomain(row: HourEntryRow): HourEntry {
     id: row.id,
     userId: row.userId,
     projectId: row.projectId,
+    moduleId: row.moduleId,
     assignment: row.assignment,
     category: row.category,
     description: row.description,
@@ -39,6 +43,8 @@ export function toDomain(row: HourEntryRow): HourEntry {
     decisionUserId: row.decisionUserId,
     decisionAt: row.decisionAt,
     designatedApproverUserId: row.designatedApproverUserId,
+    hasBlocker: row.hasBlocker,
+    blockerDescription: row.blockerDescription,
     legacyId: row.legacyId,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
@@ -50,6 +56,7 @@ export function toPersistence(entry: HourEntry) {
   return {
     userId: snapshot.userId,
     projectId: snapshot.projectId,
+    moduleId: snapshot.moduleId,
     assignment: snapshot.assignment,
     category: snapshot.category,
     description: snapshot.description,
@@ -62,6 +69,8 @@ export function toPersistence(entry: HourEntry) {
     decisionUserId: snapshot.decisionUserId,
     decisionAt: snapshot.decisionAt,
     designatedApproverUserId: snapshot.designatedApproverUserId,
+    hasBlocker: snapshot.hasBlocker,
+    blockerDescription: snapshot.blockerDescription,
     legacyId: snapshot.legacyId,
     createdAt: snapshot.createdAt,
     updatedAt: snapshot.updatedAt,
