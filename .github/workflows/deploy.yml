@@ -1,0 +1,24 @@
+name: Deploy to EC2 (kora-v2)
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger deploy.sh on the server
+        run: |
+          mkdir -p ~/.ssh
+          echo "$DEPLOY_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H ec2-3-144-154-163.us-east-2.compute.amazonaws.com >> ~/.ssh/known_hosts
+          # La clave está forzada a correr /opt/kora-v2/deploy.sh en el servidor
+          # (ver ~/.ssh/authorized_keys) — el comando de acá es solo el trigger,
+          # el script del lado del servidor decide qué hacer (fetch, migrar,
+          # sembrar, buildear con --base=/v2/, reiniciar kora-v2-api).
+          ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=yes \
+            ubuntu@ec2-3-144-154-163.us-east-2.compute.amazonaws.com "deploy"
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
