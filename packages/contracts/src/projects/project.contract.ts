@@ -469,6 +469,36 @@ export const updateProjectSchema = z.object({
 });
 export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
 
+/**
+ * Subconjunto de `updateProjectSchema` para la pestaña "Extras" (accesos,
+ * impacto de negocio, métricas QA) — endpoint propio, no `projects:manage`:
+ * mismo criterio que `setProjectOvertimeAuthorizationSchema`, el líder de
+ * proyecto/equipo también puede editar estos campos de bajo riesgo en su
+ * propio proyecto, sin abrir el resto de `PATCH /projects/:id` (cliente,
+ * líder, horas vendidas, equipos).
+ */
+export const updateProjectExtrasSchema = updateProjectSchema.pick({
+  demoLink: true,
+  testEnvironmentLink: true,
+  figmaLink: true,
+  documentationLink: true,
+  impactBeforeHours: true,
+  impactBeforePeople: true,
+  impactBeforeDuration: true,
+  impactBeforeModality: true,
+  impactAfterHours: true,
+  impactAfterPeople: true,
+  impactAfterDuration: true,
+  impactAfterModality: true,
+  qaTestingStartDate: true,
+  qaTestingEndDate: true,
+  qaEvaluatedModule: true,
+  qaPlannedTests: true,
+  qaExecutedTests: true,
+  qaFailedTests: true,
+});
+export type UpdateProjectExtrasInput = z.infer<typeof updateProjectExtrasSchema>;
+
 export const changeProjectStatusSchema = z.object({ status: projectStatusSchema });
 export type ChangeProjectStatusInput = z.infer<typeof changeProjectStatusSchema>;
 

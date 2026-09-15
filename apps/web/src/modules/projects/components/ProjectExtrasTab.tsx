@@ -5,7 +5,7 @@ import { Card } from '@/shared/components/ui/Card';
 import { Button } from '@/shared/components/ui/Button';
 import { TextField } from '@/shared/components/ui/TextField';
 import { useToast } from '@/shared/components/ui/Toast';
-import { useUpdateProject } from '../api/projects.queries';
+import { useUpdateProjectExtras } from '../api/projects.queries';
 import { ApiRequestError } from '@/shared/lib/api-client';
 
 interface AccessLinksDraft {
@@ -75,7 +75,7 @@ function toImpactDraft(project: ProjectDetail): ImpactDraft {
  */
 export function ProjectExtrasTab({ project, canManage }: { project: ProjectDetail; canManage: boolean }) {
   const toast = useToast();
-  const updateProject = useUpdateProject();
+  const updateProject = useUpdateProjectExtras();
   const [links, setLinks] = useState<AccessLinksDraft>(() => toAccessLinksDraft(project));
   const [impact, setImpact] = useState<ImpactDraft>(() => toImpactDraft(project));
   const [qa, setQa] = useState<QaMetricsDraft>(() => toQaMetricsDraft(project));

@@ -10,6 +10,7 @@ import type {
   CreateProjectModuleTaskInput,
   ListProjectsQuery,
   SetProjectOvertimeAuthorizationInput,
+  UpdateProjectExtrasInput,
   UpdateProjectInput,
   UpdateProjectModuleDeliveryInput,
   UpdateProjectModuleInput,
@@ -60,6 +61,15 @@ export function useUpdateProject() {
   return useMutation({
     mutationFn: ({ projectId, input }: { projectId: string; input: UpdateProjectInput }) =>
       projectsApi.update(projectId, input),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useUpdateProjectExtras() {
+  const invalidate = useInvalidateProjects();
+  return useMutation({
+    mutationFn: ({ projectId, input }: { projectId: string; input: UpdateProjectExtrasInput }) =>
+      projectsApi.updateExtras(projectId, input),
     onSuccess: () => invalidate(),
   });
 }

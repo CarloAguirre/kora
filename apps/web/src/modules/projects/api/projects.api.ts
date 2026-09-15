@@ -11,6 +11,7 @@ import type {
   ListProjectsResponse,
   ProjectDetail,
   SetProjectOvertimeAuthorizationInput,
+  UpdateProjectExtrasInput,
   UpdateProjectInput,
   UpdateProjectModuleDeliveryInput,
   UpdateProjectModuleInput,
@@ -46,6 +47,9 @@ export const projectsApi = {
   },
   update(projectId: string, input: UpdateProjectInput): Promise<void> {
     return api.patch<void>(`/projects/${projectId}`, input);
+  },
+  updateExtras(projectId: string, input: UpdateProjectExtrasInput): Promise<void> {
+    return api.patch<void>(`/projects/${projectId}/extras`, input);
   },
   changeStatus(projectId: string, input: ChangeProjectStatusInput): Promise<void> {
     return api.patch<void>(`/projects/${projectId}/status`, input);

@@ -4,6 +4,7 @@ import { TeamsModule } from '../teams/teams.module';
 
 import { CreateProjectUseCase } from './application/use-cases/create-project.use-case';
 import { UpdateProjectUseCase } from './application/use-cases/update-project.use-case';
+import { UpdateProjectExtrasUseCase } from './application/use-cases/update-project-extras.use-case';
 import { ListProjectsUseCase } from './application/use-cases/list-projects.use-case';
 import { GetProjectUseCase } from './application/use-cases/get-project.use-case';
 import { ChangeProjectStatusUseCase } from './application/use-cases/change-project-status.use-case';
@@ -62,6 +63,7 @@ import { DrizzleProjectTeamMemberValidator } from './infrastructure/services/dri
   providers: [
     CreateProjectUseCase,
     UpdateProjectUseCase,
+    UpdateProjectExtrasUseCase,
     ListProjectsUseCase,
     GetProjectUseCase,
     ChangeProjectStatusUseCase,

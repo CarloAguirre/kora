@@ -205,6 +205,18 @@ export function DevelopmentProjectDetailView({
         project.members.some((member) => member.userId === user.id)));
 
   /**
+   * Espejo de `isProjectLeaderOrTeamLeaderOfMember` (backend, usado por
+   * `UpdateProjectExtrasUseCase`): además de `projects:manage`, el líder del
+   * proyecto o el líder de cualquiera de los equipos asignados puede editar
+   * la pestaña "Extras" — es contenido de bajo riesgo, no administración del
+   * proyecto (eso sigue siendo `Editar proyecto`, exclusivo de `projects:manage`).
+   */
+  const canManageExtras =
+    can("projects:manage") ||
+    (user !== null &&
+      (project.leader?.id === user.id || project.teams.some((team) => team.leader?.id === user.id)));
+
+  /**
    * Mismo criterio que `GetProjectPendingApprovalsUseCase` en el backend: el
    * líder de proyecto (o admin/pmo) es quien necesita este aviso, porque ya
    * no puede aprobar directamente las horas que le tocan a un líder de
@@ -641,10 +653,7 @@ export function DevelopmentProjectDetailView({
           )}
 
           {tab === "extras" && (
-            <ProjectExtrasTab
-              project={project}
-              canManage={can("projects:manage")}
-            />
+            <ProjectExtrasTab project={project} canManage={canManageExtras} />
           )}
         </div>
       </div>

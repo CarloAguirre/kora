@@ -113,3 +113,10 @@ export class CannotAuthorizeProjectOvertimeError extends ForbiddenError {
     super('No tienes permiso para autorizar horas extra en este proyecto.', 'PROJECT_CANNOT_AUTHORIZE_OVERTIME');
   }
 }
+
+/** Mismo criterio que `CannotAuthorizeProjectOvertimeError` — editar la pestaña "Extras" de un proyecto es una decisión de líder, no de cualquier miembro. */
+export class CannotEditProjectExtrasError extends ForbiddenError {
+  constructor() {
+    super('No tienes permiso para editar los datos de "Extras" de este proyecto.', 'PROJECT_CANNOT_EDIT_EXTRAS');
+  }
+}

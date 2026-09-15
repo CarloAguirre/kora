@@ -11,6 +11,7 @@ import {
   listProjectsQuerySchema,
   setProjectOvertimeAuthorizationSchema,
   updateProjectModuleDeliverySchema,
+  updateProjectExtrasSchema,
   updateProjectModuleSchema,
   updateProjectModuleSegmentSchema,
   updateProjectModuleTaskSchema,
@@ -29,6 +30,7 @@ import {
   type ListProjectsResponse,
   type ProjectDetail,
   type SetProjectOvertimeAuthorizationInput,
+  type UpdateProjectExtrasInput,
   type UpdateProjectInput,
   type UpdateProjectModuleDeliveryInput,
   type UpdateProjectModuleInput,
@@ -44,6 +46,7 @@ import type { ActorContext } from '../../../shared/application/use-case';
 import { unwrapOrThrow } from '../../../shared/presentation/unwrap-result';
 import { CreateProjectUseCase } from '../application/use-cases/create-project.use-case';
 import { UpdateProjectUseCase } from '../application/use-cases/update-project.use-case';
+import { UpdateProjectExtrasUseCase } from '../application/use-cases/update-project-extras.use-case';
 import { ListProjectsUseCase } from '../application/use-cases/list-projects.use-case';
 import { GetProjectUseCase } from '../application/use-cases/get-project.use-case';
 import { ChangeProjectStatusUseCase } from '../application/use-cases/change-project-status.use-case';
@@ -73,6 +76,7 @@ export class ProjectsController {
   constructor(
     private readonly createProject: CreateProjectUseCase,
     private readonly updateProject: UpdateProjectUseCase,
+    private readonly updateProjectExtras: UpdateProjectExtrasUseCase,
     private readonly listProjects: ListProjectsUseCase,
     private readonly getProject: GetProjectUseCase,
     private readonly changeStatus: ChangeProjectStatusUseCase,
@@ -144,6 +148,32 @@ export class ProjectsController {
     @CurrentUser() actor: RequestUser,
   ): Promise<void> {
     unwrapOrThrow(await this.updateProject.execute({ projectId: id, data: body, actor: toActorContext(actor) }));
+  }
+
+  /**
+   * Endpoint propio (no parte de `PATCH /projects/:id`, que exige
+   * `projects:manage` a nivel de decorador) — mismo criterio que
+   * `PATCH /projects/:id/overtime`: la pestaña "Extras" (accesos, impacto de
+   * negocio, métricas QA) es contenido de bajo riesgo que el líder de
+   * proyecto/equipo también puede editar en su propio proyecto. La
+   * autorización fina vive en `UpdateProjectExtrasUseCase`.
+   */
+  @Patch(':id/extras')
+  @RequireAnyPermission('projects:manage', 'projects:read_assigned')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async updateExtras(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(updateProjectExtrasSchema)) body: UpdateProjectExtrasInput,
+    @CurrentUser() actor: RequestUser,
+  ): Promise<void> {
+    unwrapOrThrow(
+      await this.updateProjectExtras.execute({
+        projectId: id,
+        data: body,
+        actor: toActorContext(actor),
+        actorPermissions: actor.permissions,
+      }),
+    );
   }
 
   @Patch(':id/status')
