@@ -153,18 +153,29 @@ export const ticketDetailSchema = ticketSummarySchema.extend({
 });
 export type TicketDetail = z.infer<typeof ticketDetailSchema>;
 
-export const createTicketSchema = z.object({
-  title: nonEmptyTrimmed(300, 'El título'),
-  clientId: uuidSchema.nullish(),
-  projectId: uuidSchema.nullish(),
-  developmentProjectId: uuidSchema.nullish(),
-  serviceType: selectableTicketServiceTypeSchema.nullish(),
-  description: z.string().trim().max(400).optional(),
-  evidenceUrl: z.string().trim().max(500).optional(),
-  priority: ticketPrioritySchema.nullish(),
-  assigneeUserId: uuidSchema.nullish(),
-  estimatedHours: z.coerce.number().int().min(0).nullish(),
-});
+export const createTicketSchema = z
+  .object({
+    title: nonEmptyTrimmed(300, 'El título'),
+    clientId: uuidSchema.nullish(),
+    projectId: uuidSchema.nullish(),
+    developmentProjectId: uuidSchema.nullish(),
+    serviceType: selectableTicketServiceTypeSchema.nullish(),
+    description: z.string().trim().max(400).optional(),
+    evidenceUrl: z.string().trim().max(500).optional(),
+    // A propósito la única opcional del formulario — la criticidad se puede
+    // definir más tarde, a diferencia del resto de los campos de abajo.
+    priority: ticketPrioritySchema.nullish(),
+    assigneeUserId: uuidSchema.nullish(),
+    estimatedHours: z.coerce.number().int().min(0).nullish(),
+  })
+  .refine((data) => Boolean(data.clientId), { message: 'Selecciona un cliente.', path: ['clientId'] })
+  .refine((data) => Boolean(data.projectId), { message: 'Selecciona un proyecto.', path: ['projectId'] })
+  .refine((data) => Boolean(data.serviceType), { message: 'Selecciona un tipo de servicio.', path: ['serviceType'] })
+  .refine((data) => Boolean(data.assigneeUserId), { message: 'Selecciona un responsable.', path: ['assigneeUserId'] })
+  .refine((data) => Boolean(data.developmentProjectId), {
+    message: 'Selecciona un proyecto de desarrollo.',
+    path: ['developmentProjectId'],
+  });
 export type CreateTicketInput = z.infer<typeof createTicketSchema>;
 
 export const updateTicketSchema = z.object({

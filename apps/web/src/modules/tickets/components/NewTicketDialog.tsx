@@ -129,14 +129,17 @@ export function NewTicketDialog({ open, onClose, onCreated }: NewTicketDialogPro
         <div className={styles.row}>
           <Combobox
             label="Cliente"
+            required
             placeholder="Buscar cliente…"
             options={[{ value: '', label: 'Sin cliente' }, ...(clients?.items ?? []).map((client) => ({ value: client.id, label: client.companyName }))]}
             value={clientId ?? ''}
             onChange={(value) => setValue('clientId', value || undefined, { shouldValidate: true })}
             emptyMessage="No se encontraron clientes."
+            errorText={errors.clientId?.message}
           />
           <Combobox
             label="Proyecto"
+            required
             placeholder="Buscar proyecto…"
             options={[
               { value: '', label: 'Sin proyecto' },
@@ -145,28 +148,39 @@ export function NewTicketDialog({ open, onClose, onCreated }: NewTicketDialogPro
             value={projectId ?? ''}
             onChange={(value) => setValue('projectId', value || undefined, { shouldValidate: true })}
             emptyMessage="No se encontraron proyectos."
+            errorText={errors.projectId?.message}
           />
         </div>
 
         <div className={styles.row}>
-          <Select label="Tipo de servicio" placeholder="Sin definir" options={SERVICE_TYPE_OPTIONS} {...register('serviceType')} />
+          <Select
+            label="Tipo de servicio"
+            required
+            placeholder="Sin definir"
+            options={SERVICE_TYPE_OPTIONS}
+            errorText={errors.serviceType?.message}
+            {...register('serviceType')}
+          />
           <Select label="Criticidad" placeholder="Sin definir" options={PRIORITY_OPTIONS} {...register('priority')} />
         </div>
 
         <div className={styles.row}>
           <Combobox
             label="Responsable"
+            required
             placeholder="Buscar persona…"
             options={[{ value: '', label: 'Sin asignar' }, ...assignableUsers.map((user) => ({ value: user.id, label: user.fullName }))]}
             value={assigneeUserId ?? ''}
             onChange={(value) => setValue('assigneeUserId', value || undefined, { shouldValidate: true })}
             emptyMessage="No se encontraron personas."
+            errorText={errors.assigneeUserId?.message}
           />
           <TextField label="HH estimadas" type="number" {...register('estimatedHours')} />
         </div>
 
         <Combobox
           label="Proyecto de desarrollo"
+          required
           placeholder="Buscar proyecto de desarrollo…"
           options={[
             { value: '', label: 'Sin vincular' },
@@ -175,6 +189,7 @@ export function NewTicketDialog({ open, onClose, onCreated }: NewTicketDialogPro
           value={developmentProjectId ?? ''}
           onChange={(value) => setValue('developmentProjectId', value || undefined, { shouldValidate: true })}
           emptyMessage="No se encontraron proyectos de desarrollo."
+          errorText={errors.developmentProjectId?.message}
         />
 
         <TextField label="Descripción del incidente" placeholder="Detalle lo ocurrido" {...register('description')} />

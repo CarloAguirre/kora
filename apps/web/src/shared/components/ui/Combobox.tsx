@@ -24,6 +24,8 @@ export interface ComboboxProps {
   emptyMessage?: string;
   className?: string;
   disabled?: boolean;
+  required?: boolean;
+  errorText?: string;
 }
 
 export function Combobox({
@@ -35,6 +37,8 @@ export function Combobox({
   emptyMessage = 'Sin resultados.',
   className,
   disabled = false,
+  required = false,
+  errorText,
 }: ComboboxProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -71,6 +75,9 @@ export function Combobox({
     option.label.toLocaleLowerCase('es-CL').includes(query.trim().toLocaleLowerCase('es-CL')),
   );
 
+  const hasError = Boolean(errorText);
+  const helperId = `${inputId}-helper`;
+
   const select = (optionValue: string) => {
     onChange(optionValue);
     setOpen(false);
@@ -82,10 +89,24 @@ export function Combobox({
       {label && (
         <label className={styles.label} htmlFor={inputId}>
           {label}
+          {required && (
+            <span className={styles.required} aria-hidden="true">
+              *
+            </span>
+          )}
         </label>
       )}
 
-      <div className={[styles.field, open ? styles.fieldOpen : '', disabled ? styles.fieldDisabled : ''].filter(Boolean).join(' ')}>
+      <div
+        className={[
+          styles.field,
+          open ? styles.fieldOpen : '',
+          disabled ? styles.fieldDisabled : '',
+          hasError ? styles.fieldInvalid : '',
+        ]
+          .filter(Boolean)
+          .join(' ')}
+      >
         <SearchIcon size={16} className={styles.searchIcon} />
         <input
           id={inputId}
@@ -97,6 +118,8 @@ export function Combobox({
           disabled={disabled}
           className={styles.input}
           placeholder={placeholder}
+          aria-invalid={hasError || undefined}
+          aria-describedby={errorText ? helperId : undefined}
           value={open ? query : selectedLabel}
           onFocus={() => {
             if (disabled) return;
@@ -139,6 +162,12 @@ export function Combobox({
             ))
           )}
         </div>
+      )}
+
+      {errorText && (
+        <span id={helperId} className={[styles.helper, styles.helperError].join(' ')} role="alert">
+          {errorText}
+        </span>
       )}
     </div>
   );

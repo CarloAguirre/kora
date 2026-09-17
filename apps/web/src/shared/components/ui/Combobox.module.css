@@ -13,6 +13,11 @@
   line-height: 16px;
 }
 
+.required {
+  color: var(--kora-danger);
+  margin-left: 2px;
+}
+
 .field {
   display: flex;
   align-items: center;
@@ -28,6 +33,11 @@
 .field:focus-within {
   border-color: var(--kora-blue-600);
   box-shadow: 0 0 0 3px var(--kora-blue-surface);
+}
+
+.fieldInvalid,
+.fieldInvalid:focus-within {
+  border-color: var(--kora-danger);
 }
 
 .fieldDisabled {
@@ -122,4 +132,16 @@
   color: var(--kora-text-muted);
   font-size: var(--kora-text-sm);
   margin: 0;
+}
+
+.helper {
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-regular);
+  color: var(--kora-text-muted);
+  min-height: 16px;
+  line-height: 16px;
+}
+
+.helperError {
+  color: var(--kora-danger);
 }
