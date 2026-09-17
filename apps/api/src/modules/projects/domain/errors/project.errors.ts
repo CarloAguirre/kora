@@ -120,3 +120,41 @@ export class CannotEditProjectExtrasError extends ForbiddenError {
     super('No tienes permiso para editar los datos de "Extras" de este proyecto.', 'PROJECT_CANNOT_EDIT_EXTRAS');
   }
 }
+
+export class ProjectPaymentMilestoneNotFoundError extends NotFoundError {
+  constructor(identifier: string) {
+    super('Tramo de pago', identifier, 'PROJECT_PAYMENT_MILESTONE_NOT_FOUND');
+  }
+}
+
+/** Solo un tramo `pending` puede editarse/eliminarse — uno ya facturado o pagado es un hecho consumado. */
+export class ProjectPaymentMilestoneNotEditableError extends ConflictError {
+  constructor() {
+    super('Este tramo ya fue facturado o pagado y no puede editarse ni eliminarse.', 'PROJECT_PAYMENT_MILESTONE_NOT_EDITABLE');
+  }
+}
+
+export class ProjectPaymentMilestoneAlreadyIssuedError extends ConflictError {
+  constructor() {
+    super('Este tramo ya fue facturado.', 'PROJECT_PAYMENT_MILESTONE_ALREADY_ISSUED');
+  }
+}
+
+export class ProjectPaymentMilestoneNotIssuedError extends ConflictError {
+  constructor() {
+    super('Este tramo todavía no ha sido facturado.', 'PROJECT_PAYMENT_MILESTONE_NOT_ISSUED');
+  }
+}
+
+export class ProjectPaymentMilestoneAlreadyPaidError extends ConflictError {
+  constructor() {
+    super('Este tramo ya fue pagado.', 'PROJECT_PAYMENT_MILESTONE_ALREADY_PAID');
+  }
+}
+
+/** El botón "Activar proyecto" de un Hito 0 pausado solo aplica si en verdad hay uno pendiente. */
+export class ProjectManagementApprovalNotPendingError extends ConflictError {
+  constructor() {
+    super('Este proyecto no tiene una aprobación de Gerencia pendiente.', 'PROJECT_MANAGEMENT_APPROVAL_NOT_PENDING');
+  }
+}

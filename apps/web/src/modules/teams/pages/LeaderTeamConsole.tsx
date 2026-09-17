@@ -101,7 +101,7 @@ export function LeaderTeamConsole({ teams }: { teams: TeamSummary[] }) {
       key: 'name',
       header: 'Nombre',
       render: (p) => (
-        <Link to={`/proyectos/${p.id}`} className={styles.link}>
+        <Link to={`/proyectos/${p.id}/equipos/${teamId}`} className={styles.link}>
           {p.name}
         </Link>
       ),

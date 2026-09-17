@@ -71,12 +71,12 @@
 }
 
 .past {
-  background: #93a5b8;
+  background: #2e9e52;
   color: var(--kora-surface);
 }
 
 .current {
-  background: #8bc53f;
+  background: #ffae00;
   color: #17330a;
   font-weight: 800;
 }
@@ -86,24 +86,11 @@
   color: #93a0ac;
 }
 
-.todayLine {
+.expectedProgressLine {
   position: absolute;
   top: -10px;
   bottom: -10px;
   width: 2px;
   background: #d5504b;
   z-index: 1;
-}
-
-.todayTag {
-  position: absolute;
-  top: -22px;
-  left: -19px;
-  padding: 3px 8px;
-  border-radius: 6px;
-  background: #d5504b;
-  color: var(--kora-surface);
-  font-size: 10.5px;
-  font-weight: 800;
-  white-space: nowrap;
 }

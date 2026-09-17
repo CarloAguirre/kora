@@ -5,6 +5,7 @@ import type {
   ProjectTeamMember as ProjectTeamMemberDto,
   ProjectObservation as ProjectObservationDto,
   ProjectModule as ProjectModuleDto,
+  ProjectPaymentMilestone as ProjectPaymentMilestoneDto,
 } from '@kora/contracts';
 import type { Project } from '../../domain/entities/project.entity';
 import type { ProjectListItem } from '../../domain/repositories/project.repository';
@@ -15,6 +16,7 @@ import {
   type ProjectObservationRecord,
 } from '../../domain/repositories/project-observation.repository';
 import type { ProjectModuleRecord } from '../../domain/repositories/project-module.repository';
+import type { ProjectPaymentMilestoneRecord } from '../../domain/repositories/project-payment-milestone.repository';
 import type { ProjectUserReference } from '../ports/project-user-reader.port';
 import type { ProjectClientReference } from '../ports/project-client-reader.port';
 import type { ProjectContactReference } from '../ports/project-contact-reader.port';
@@ -55,6 +57,8 @@ export interface ProjectDetailSource {
   readonly teams: readonly ProjectTeamRecord[];
   readonly observations: readonly ProjectObservationRecord[];
   readonly modules: readonly ProjectModuleRecord[];
+  readonly paymentMilestones: readonly ProjectPaymentMilestoneRecord[];
+  readonly usedHoursUpdatedAt: Date | null;
   readonly actorUserId: string;
   readonly canAuthorizeOvertime: boolean;
   readonly now: Date;
@@ -143,6 +147,18 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
     blockerCount: module.blockerCount,
   }));
 
+  const paymentMilestones: ProjectPaymentMilestoneDto[] = source.paymentMilestones.map((milestone) => ({
+    id: milestone.id,
+    name: milestone.name,
+    percent: milestone.percent,
+    amount: milestone.amount,
+    invoiceNumber: milestone.invoiceNumber,
+    issuedAt: milestone.issuedAt?.toISOString().slice(0, 10) ?? null,
+    status: milestone.status,
+    paidAt: milestone.paidAt?.toISOString().slice(0, 10) ?? null,
+    sortOrder: milestone.sortOrder,
+  }));
+
   return {
     id: snapshot.id,
     name: snapshot.name,
@@ -199,6 +215,11 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
     qaPlannedTests: snapshot.qaPlannedTests,
     qaExecutedTests: snapshot.qaExecutedTests,
     qaFailedTests: snapshot.qaFailedTests,
+    periodReportDate: snapshot.periodReportDate?.toISOString().slice(0, 10) ?? null,
+    periodReportAchievements: snapshot.periodReportAchievements,
+    usedHoursUpdatedAt: source.usedHoursUpdatedAt?.toISOString().slice(0, 10) ?? null,
+    pendingManagementApproval: source.project.pendingManagementApproval,
+    paymentMilestones,
     teams,
     members,
     observations,

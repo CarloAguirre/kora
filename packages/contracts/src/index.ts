@@ -9,6 +9,7 @@ export * from './hours/hour-entry.contract';
 export * from './tickets/ticket.contract';
 export * from './tickets/ticket-hh-request.contract';
 export * from './tickets/support-plan.contract';
+export * from './tickets/support-invoice.contract';
 export * from './forecast/forecast.contract';
 export * from './dashboard/dashboard.contract';
 export * from './admin/legacy-import.contract';

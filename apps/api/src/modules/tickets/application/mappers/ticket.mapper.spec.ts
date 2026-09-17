@@ -25,6 +25,7 @@ function buildItem(overrides: Partial<TicketListItem>): TicketListItem {
     usedHours: 0,
     pendingHhRequestsCount: 0,
     pendingHhHours: 0,
+    invoiceId: null,
     createdAt: new Date('2026-08-01T00:00:00.000Z'),
     ...overrides,
   };

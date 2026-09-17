@@ -10,7 +10,12 @@ export class ProjectsModuleTicketProjectReader implements TicketProjectReader {
   async findById(projectId: string): Promise<TicketProjectReference | null> {
     const project = await this.projects.findById(projectId);
     if (!project || project.isDeleted) return null;
-    return { id: project.id, name: project.name, status: project.status };
+    return { id: project.id, name: project.name, status: project.status, type: project.type, clientId: project.clientId };
+  }
+
+  async findManyByIds(projectIds: readonly string[]): Promise<TicketProjectReference[]> {
+    const found = await Promise.all(projectIds.map((id) => this.findById(id)));
+    return found.filter((project): project is TicketProjectReference => project !== null);
   }
 
   async findLinkableByClient(clientId: string, type: ProjectType): Promise<LinkableProjectReference[]> {

@@ -5,10 +5,10 @@ import { ClientPortalPage } from '@/modules/client-portal/pages/ClientPortalPage
  * "Ver como cliente" desde `ClientDetailPage` — no es la ruta real del portal
  * (`/portal/proyectos`, que exige el permiso `projects:read_own_client` que
  * admin/pmo NO tienen a propósito, ver `roles.ts`). Reutiliza la misma lista
- * de proyectos/soporte en modo `preview`, con rutas propias bajo
- * `/clientes/:clientId/vista-cliente/...` para que el botón "Volver" y el
- * click en un proyecto se queden dentro de esta vista previa en vez de
- * mandar al admin a una ruta del portal a la que no tiene acceso.
+ * de proyectos/soporte, con rutas propias bajo `/clientes/:clientId/vista-cliente/...`
+ * para que el botón "Volver" y el click en un proyecto se queden dentro de
+ * esta vista previa en vez de mandar al admin a una ruta del portal a la que
+ * no tiene acceso.
  */
 export function ClientPortalPreviewPage() {
   const { clientId } = useParams<{ clientId: string }>();
@@ -16,7 +16,7 @@ export function ClientPortalPreviewPage() {
 
   return (
     <ClientPortalPage
-      preview
+      clientId={clientId}
       projectsPath={base}
       supportPath={`${base}/soporte`}
       getProjectPath={(projectId) => `${base}/${projectId}`}

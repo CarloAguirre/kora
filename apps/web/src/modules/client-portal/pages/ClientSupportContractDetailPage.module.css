@@ -49,6 +49,34 @@
   gap: var(--kora-space-5) var(--kora-space-4);
 }
 
+/* "Proyectos del consolidado" — Figma node 9007:8170: una pestaña por proyecto de desarrollo cubierto. */
+.consolidatedSection {
+  margin-bottom: var(--kora-space-5);
+}
+
+.consolidatedTabs {
+  display: flex;
+  gap: 26px;
+  margin-top: var(--kora-space-3);
+  border-bottom: 1px solid var(--kora-border-soft);
+}
+
+.consolidatedTab {
+  padding: 10px 2px 12px;
+  border: none;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  color: #5d6b7a;
+  font-size: 14.5px;
+  font-weight: var(--kora-weight-bold);
+  cursor: pointer;
+}
+
+.consolidatedTabActive {
+  border-bottom-color: #8bc53f;
+  color: #0f2a44;
+}
+
 .infoField {
   display: flex;
   flex-direction: column;

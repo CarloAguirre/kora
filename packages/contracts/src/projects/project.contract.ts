@@ -309,6 +309,78 @@ export const projectObservationSchema = z.object({
 });
 export type ProjectObservation = z.infer<typeof projectObservationSchema>;
 
+/** Estado de un tramo de pago del proyecto ("Facturación" del portal cliente) — independiente del estado de facturación de soporte. */
+export const PROJECT_PAYMENT_STATUSES = ['pending', 'invoiced', 'paid'] as const;
+export const projectPaymentStatusSchema = z.enum(PROJECT_PAYMENT_STATUSES);
+export type ProjectPaymentStatus = z.infer<typeof projectPaymentStatusSchema>;
+
+export const PROJECT_PAYMENT_STATUS_LABELS: Readonly<Record<ProjectPaymentStatus, string>> = {
+  pending: 'Pendiente',
+  invoiced: 'Facturado',
+  paid: 'Pagada',
+};
+
+export const projectPaymentMilestoneSchema = z.object({
+  id: uuidSchema,
+  /** p.ej. "Inicio", "Marcha blanca". */
+  name: z.string(),
+  /** Nulo para tramos que no son un % del contrato (p.ej. "Desvío de horas (extra)"). */
+  percent: z.number().nullable(),
+  amount: z.number(),
+  invoiceNumber: z.string().nullable(),
+  issuedAt: z.iso.date().nullable(),
+  status: projectPaymentStatusSchema,
+  paidAt: z.iso.date().nullable(),
+  sortOrder: z.number().int(),
+});
+export type ProjectPaymentMilestone = z.infer<typeof projectPaymentMilestoneSchema>;
+
+/** Configurar el cronograma de cobro (crear/editar/quitar tramos) es del líder/PMO — igual criterio que `createProjectModuleSchema`. */
+export const createProjectPaymentMilestoneSchema = z.object({
+  name: nonEmptyTrimmed(120, 'El nombre del tramo'),
+  percent: z.coerce.number().min(0).max(100).nullish(),
+  amount: z.coerce.number().min(0),
+  sortOrder: z.coerce.number().int().min(0).optional(),
+});
+export type CreateProjectPaymentMilestoneInput = z.infer<typeof createProjectPaymentMilestoneSchema>;
+
+export const updateProjectPaymentMilestoneSchema = createProjectPaymentMilestoneSchema.partial();
+export type UpdateProjectPaymentMilestoneInput = z.infer<typeof updateProjectPaymentMilestoneSchema>;
+
+/** Registrar que un tramo ya fue facturado — mismo criterio que `markSupportInvoiceIssuedSchema`: Kora no emite la factura, solo registra folio y fecha. */
+export const issueProjectPaymentMilestoneInvoiceSchema = z.object({
+  folio: nonEmptyTrimmed(50, 'El folio'),
+  issuedAt: z.iso.date(),
+  attachmentName: z.string().trim().max(255).optional(),
+});
+export type IssueProjectPaymentMilestoneInvoiceInput = z.infer<typeof issueProjectPaymentMilestoneInvoiceSchema>;
+
+export const markProjectPaymentMilestonePaidSchema = z.object({
+  paidAt: z.iso.date(),
+  attachmentName: z.string().trim().max(255).optional(),
+  /**
+   * Si pagar este tramo dispara Hito 0 (primer tramo, proyecto `aprobado` y
+   * todavía no activo), deja el proyecto pendiente de aprobación de Gerencia
+   * en vez de activarlo automáticamente — ver `project_billing_settings`.
+   */
+  pauseForManagementApproval: z.boolean().optional(),
+});
+export type MarkProjectPaymentMilestonePaidInput = z.infer<typeof markProjectPaymentMilestonePaidSchema>;
+
+/**
+ * Interruptor global de Hito 0 — fila única (`project_billing_settings`).
+ * Lo controla Gerencia (`admin`/`pmo`, `projects:manage`); Finanzas
+ * (`billing:read`) solo lo ve, informativo.
+ */
+export const projectBillingSettingsSchema = z.object({
+  autoActivateFirstPayment: z.boolean(),
+  updatedAt: isoDateTimeSchema.nullable(),
+});
+export type ProjectBillingSettings = z.infer<typeof projectBillingSettingsSchema>;
+
+export const updateProjectBillingSettingsSchema = z.object({ autoActivateFirstPayment: z.boolean() });
+export type UpdateProjectBillingSettingsInput = z.infer<typeof updateProjectBillingSettingsSchema>;
+
 export const projectSummarySchema = z.object({
   id: uuidSchema,
   name: z.string(),
@@ -376,6 +448,15 @@ export const projectDetailSchema = projectSummarySchema.extend({
   qaPlannedTests: z.number().int().nullable(),
   qaExecutedTests: z.number().int().nullable(),
   qaFailedTests: z.number().int().nullable(),
+  /** "Avance del periodo" del portal cliente — narrativa de logros declarada por el líder, igual criterio que impacto/QA. */
+  periodReportDate: z.string().nullable(),
+  periodReportAchievements: z.array(z.string()).nullable(),
+  /** Fecha de la hora aprobada más reciente del proyecto — "actualizado al" de la tarjeta de horas. `null` si no tiene ninguna. */
+  usedHoursUpdatedAt: z.string().nullable(),
+  /** "Facturación" del portal cliente — cronograma de tramos de pago. */
+  paymentMilestones: z.array(projectPaymentMilestoneSchema),
+  /** true si Hito 0 quedó pausado esperando que Gerencia active el proyecto a mano. */
+  pendingManagementApproval: z.boolean(),
   teams: z.array(projectTeamSchema),
   members: z.array(projectTeamMemberSchema),
   observations: z.array(projectObservationSchema),
@@ -416,10 +497,38 @@ export const createProjectSchema = z
     contractLink: z.string().trim().max(500).optional(),
     additionalLinks: z.string().trim().max(500).optional(),
     teams: z.array(createProjectTeamAssignmentSchema).max(20).default([]),
+    /**
+     * Contrato de soporte completo — solo para `type='support'`. Un proyecto
+     * de soporte creado desde cero (sin un proyecto de desarrollo terminado
+     * previo que consolidar) configura aquí mismo su contrato: se crea el
+     * proyecto y su `support_plans` juntos, enlazados directamente (no vía
+     * `support_plan_projects`, que es solo para consolidar proyectos ya
+     * existentes — ver `CreateSupportPlanUseCase`).
+     *
+     * Enums duplicados a propósito como literales (en vez de importar desde
+     * `tickets/support-plan.contract.ts`): ese archivo ya importa
+     * `projectStatusSchema` desde este mismo archivo, así que importar en
+     * sentido contrario crearía un ciclo dentro de `@kora/contracts`.
+     */
+    supportPlanType: z.enum(['monthly', 'bundle', 'on_demand']).optional(),
+    supportSurplusPolicy: z.enum(['accumulate', 'expire']).optional(),
+    supportPlanValueUf: z.coerce.number().min(0).optional(),
+    supportExtraHourValueUf: z.coerce.number().min(0).optional(),
+    /** Moneda del contrato — gobierna los dos valores de arriba pese al sufijo heredado. Mismo enum duplicado que `supportPlanType` y por el mismo motivo (evitar el ciclo con `tickets/support-plan.contract.ts`). */
+    supportCurrency: z.enum(['UF', 'CLP', 'USD']).optional(),
+    supportDueDayOfMonth: z.coerce.number().int().min(1).max(31).optional(),
+    supportTargetHoursCritical: z.coerce.number().min(0).optional(),
+    supportTargetHoursHigh: z.coerce.number().min(0).optional(),
+    supportTargetHoursMedium: z.coerce.number().min(0).optional(),
+    supportTargetHoursLow: z.coerce.number().min(0).optional(),
   })
   .refine((data) => data.type !== 'development' || data.salesStage, {
     message: 'Los proyectos de desarrollo requieren una etapa comercial.',
     path: ['salesStage'],
+  })
+  .refine((data) => data.type !== 'support' || data.supportPlanType, {
+    message: 'Los proyectos de soporte requieren un tipo de contrato.',
+    path: ['supportPlanType'],
   });
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;
 
@@ -464,6 +573,8 @@ export const updateProjectSchema = z.object({
   qaPlannedTests: z.coerce.number().int().min(0).nullish(),
   qaExecutedTests: z.coerce.number().int().min(0).nullish(),
   qaFailedTests: z.coerce.number().int().min(0).nullish(),
+  periodReportDate: z.iso.date().nullish(),
+  periodReportAchievements: z.array(z.string().trim().max(500)).max(20).nullish(),
   /** Agregar/quitar equipos y editar líder/colaboradores/horas de los ya asignados — la lista reemplaza a la actual. */
   teams: z.array(createProjectTeamAssignmentSchema).max(20).optional(),
 });
@@ -496,6 +607,8 @@ export const updateProjectExtrasSchema = updateProjectSchema.pick({
   qaPlannedTests: true,
   qaExecutedTests: true,
   qaFailedTests: true,
+  periodReportDate: true,
+  periodReportAchievements: true,
 });
 export type UpdateProjectExtrasInput = z.infer<typeof updateProjectExtrasSchema>;
 

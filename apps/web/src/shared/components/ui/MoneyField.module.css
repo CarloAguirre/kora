@@ -1,0 +1,74 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-1);
+  align-self: stretch;
+}
+
+.label {
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-medium);
+  line-height: 16px;
+}
+
+.field {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: var(--kora-field-height);
+  padding: 0 var(--kora-space-3);
+  align-self: stretch;
+  border-radius: var(--kora-radius-input);
+  border: 1px solid var(--kora-blue-200);
+  background: var(--kora-surface);
+  transition: border-color var(--kora-transition);
+}
+
+.field:focus-within {
+  border-color: var(--kora-blue-600);
+  box-shadow: 0 0 0 3px var(--kora-blue-surface);
+}
+
+.disabled {
+  background: var(--kora-surface-disabled);
+  border-color: var(--kora-border);
+}
+
+.currency {
+  flex-shrink: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: var(--kora-font);
+  font-size: var(--kora-text-base);
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-navy);
+  padding-right: var(--kora-space-2);
+  cursor: pointer;
+}
+
+.currency:disabled {
+  cursor: not-allowed;
+  color: var(--kora-text-disabled);
+}
+
+.divider {
+  width: 1px;
+  align-self: stretch;
+  margin: var(--kora-space-2) 0;
+  background: var(--kora-blue-200);
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  padding-left: var(--kora-space-2);
+  font-family: var(--kora-font);
+  font-size: var(--kora-text-base);
+  font-weight: var(--kora-weight-regular);
+  color: var(--kora-text);
+}

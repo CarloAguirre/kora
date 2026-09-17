@@ -51,6 +51,9 @@ export interface ProjectRow {
   qaPlannedTests: number | null;
   qaExecutedTests: number | null;
   qaFailedTests: number | null;
+  periodReportDate: Date | null;
+  periodReportAchievements: string[] | null;
+  pendingManagementApproval: boolean;
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;
@@ -106,6 +109,9 @@ export function toDomain(row: ProjectRow): Project {
     qaPlannedTests: row.qaPlannedTests,
     qaExecutedTests: row.qaExecutedTests,
     qaFailedTests: row.qaFailedTests,
+    periodReportDate: row.periodReportDate,
+    periodReportAchievements: row.periodReportAchievements,
+    pendingManagementApproval: row.pendingManagementApproval,
     legacyId: row.legacyId,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
@@ -163,6 +169,9 @@ export function toPersistence(project: Project) {
     qaPlannedTests: snapshot.qaPlannedTests,
     qaExecutedTests: snapshot.qaExecutedTests,
     qaFailedTests: snapshot.qaFailedTests,
+    periodReportDate: snapshot.periodReportDate,
+    periodReportAchievements: snapshot.periodReportAchievements,
+    pendingManagementApproval: snapshot.pendingManagementApproval,
     legacyId: snapshot.legacyId,
     createdAt: snapshot.createdAt,
     updatedAt: snapshot.updatedAt,

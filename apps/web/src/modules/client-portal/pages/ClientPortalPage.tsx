@@ -5,13 +5,16 @@ import styles from './ClientPortalPage.module.css';
 import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Tabs } from '@/shared/components/ui/Tabs';
 import { KoraLogo } from '@/shared/components/layout/KoraLogo';
+import { useClientDetail } from '@/modules/clients/api/clients.queries';
+import { useProjectsList } from '@/modules/projects/api/projects.queries';
+import { useSupportPlansForClient } from '@/modules/projects/api/support-plan.queries';
 import { ClientCompanyHeader } from '../components/ClientCompanyHeader';
-import { PortalPreviewNotice } from '../components/PortalPreviewNotice';
 import { PortalTable, type PortalTableColumn } from '../components/PortalTable';
 import { StatPill } from '../components/StatPill';
 import { StatusPill, type StatusPillTone } from '../components/StatusPill';
-import { MOCK_CLIENT_COMPANY, MOCK_CLIENT_PROJECTS, MOCK_CLIENT_SUPPORT_CONTRACTS } from '../mocks/client-portal.mocks';
+import { toClientCompanyInfo, toClientProjectRow, toClientSupportContractRow } from '../adapters/portal-list.adapter';
 import type { ClientProjectHealth, ClientProjectRow, ClientSupportContractRow } from '../types';
+import { formatMoney } from '@/shared/lib/format-money';
 
 /**
  * Portal de cliente — tabs "Proyectos Desarrollo" y "Soporte".
@@ -23,8 +26,8 @@ import type { ClientProjectHealth, ClientProjectRow, ClientSupportContractRow } 
  * de guardarse solo en estado local — al revés de como lo hace
  * `DashboardPage` (que sí tiene una única entrada de menú "Dashboard").
  *
- * DATOS: todo viene de `mocks/client-portal.mocks.ts`, no de la API — ver el
- * comentario de ese archivo para qué falta en el backend antes de conectarlo.
+ * DATOS: proyectos vía `useProjectsList({ clientId })`, contratos de soporte
+ * vía `useSupportPlansForClient(clientId)` — ver `adapters/portal-list.adapter.ts`.
  */
 
 const HEALTH_LABEL: Readonly<Record<ClientProjectHealth, string>> = {
@@ -46,6 +49,8 @@ const PLAN_TYPE_LABEL: Readonly<Record<SupportPlanType, string>> = {
 };
 
 export interface ClientPortalPageProps {
+  /** Empresa cuyos proyectos/contratos se muestran — sin esto, la lista queda vacía. */
+  readonly clientId?: string;
   /** Rutas reales del portal por defecto. La vista previa de admin
    *  (`ClientPortalPreviewPage`) las reemplaza por `/clientes/:clientId/vista-cliente[...]`,
    *  ya que un admin/PMO no tiene el permiso `projects:read_own_client` que
@@ -54,36 +59,25 @@ export interface ClientPortalPageProps {
   readonly supportPath?: string;
   readonly getProjectPath?: (projectId: string) => string;
   readonly getContractPath?: (contractId: string) => string;
-  /** Vista previa desde la ficha interna del cliente: mismo aviso que en
-   *  `ClientProjectDetailPage` — el contenido sigue siendo el mock de ejemplo. */
-  readonly preview?: boolean;
 }
 
 export function ClientPortalPage({
+  clientId,
   projectsPath = '/portal/proyectos',
   supportPath = '/portal/soporte',
   getProjectPath = (projectId) => `/portal/proyectos/${projectId}`,
   getContractPath = (contractId) => `/portal/soporte/${contractId}`,
-  preview = false,
 }: ClientPortalPageProps = {}) {
   const location = useLocation();
   const navigate = useNavigate();
   const activeTab: 'proyectos' | 'soporte' = location.pathname.endsWith('/soporte') ? 'soporte' : 'proyectos';
+  const { data: client } = useClientDetail(clientId ?? null);
+  const company = client ? toClientCompanyInfo(client) : { name: '—', contactName: '—', contactPosition: '' };
 
   return (
     <DashboardLayout title={activeTab === 'proyectos' ? 'Proyectos' : 'Soporte'}>
       <div className={styles.page}>
-        {preview && (
-          <PortalPreviewNotice>
-            Vista previa de cómo ve un cliente esta pantalla — la empresa y los proyectos de abajo son el dato de
-            ejemplo "{MOCK_CLIENT_COMPANY.name}", todavía no los datos reales de este cliente.
-          </PortalPreviewNotice>
-        )}
-
-        <ClientCompanyHeader
-          company={MOCK_CLIENT_COMPANY}
-          contractLabel={activeTab === 'proyectos' ? 'Contacto' : 'Responsable'}
-        />
+        <ClientCompanyHeader company={company} contractLabel={activeTab === 'proyectos' ? 'Contacto' : 'Responsable'} />
 
         <Tabs
           tabs={[
@@ -95,9 +89,9 @@ export function ClientPortalPage({
         />
 
         {activeTab === 'proyectos' ? (
-          <ClientProjectsSection getProjectPath={getProjectPath} />
+          <ClientProjectsSection clientId={clientId} clientOwnerName={company.contactName} getProjectPath={getProjectPath} />
         ) : (
-          <ClientSupportSection getContractPath={getContractPath} />
+          <ClientSupportSection clientId={clientId} getContractPath={getContractPath} />
         )}
 
         <div className={styles.footer}>
@@ -109,8 +103,20 @@ export function ClientPortalPage({
   );
 }
 
-function ClientProjectsSection({ getProjectPath }: { getProjectPath: (projectId: string) => string }) {
-  const projects = MOCK_CLIENT_PROJECTS;
+function ClientProjectsSection({
+  clientId,
+  clientOwnerName,
+  getProjectPath,
+}: {
+  clientId: string | undefined;
+  clientOwnerName: string;
+  getProjectPath: (projectId: string) => string;
+}) {
+  const { data } = useProjectsList({ clientId: clientId ?? undefined, pageSize: 100 });
+  const projects = useMemo(
+    () => (data?.items ?? []).map((project) => toClientProjectRow(project, clientOwnerName)),
+    [data, clientOwnerName],
+  );
   const activeCount = projects.filter((p) => p.health === 'active').length;
   const attentionCount = projects.filter((p) => p.health === 'at_risk').length;
 
@@ -123,9 +129,7 @@ function ClientProjectsSection({ getProjectPath }: { getProjectPath: (projectId:
           <Link className={styles.projectLink} to={getProjectPath(project.id)}>
             {project.name}
           </Link>
-          <span className={styles.projectMeta}>
-            {project.phaseCount} fase{project.phaseCount === 1 ? '' : 's'} · {project.tag}
-          </span>
+          <span className={styles.projectMeta}>{project.typeLabel}</span>
         </div>
       ),
     },
@@ -168,8 +172,15 @@ function ClientProjectsSection({ getProjectPath }: { getProjectPath: (projectId:
   );
 }
 
-function ClientSupportSection({ getContractPath }: { getContractPath: (contractId: string) => string }) {
-  const contracts = MOCK_CLIENT_SUPPORT_CONTRACTS;
+function ClientSupportSection({
+  clientId,
+  getContractPath,
+}: {
+  clientId: string | undefined;
+  getContractPath: (contractId: string) => string;
+}) {
+  const { data } = useSupportPlansForClient(clientId ?? null);
+  const contracts = useMemo(() => (data ?? []).map(toClientSupportContractRow), [data]);
   const [planFilter, setPlanFilter] = useState<SupportPlanType | null>(null);
 
   const countByPlan = useMemo(() => {
@@ -202,7 +213,7 @@ function ClientSupportSection({ getContractPath }: { getContractPath: (contractI
     },
     { key: 'contractedHours', header: 'N° horas', render: (c) => c.contractedHours ?? '--' },
     { key: 'consumedHours', header: 'HH consumidas', render: (c) => c.consumedHours != null ? `${c.consumedHours} UF` : '--' },
-    { key: 'hourValue', header: 'Valor HH', render: (c) => c.hourValueUf != null ? `${c.hourValueUf} UF` : '--' },
+    { key: 'hourValue', header: 'Valor HH', render: (c) => c.hourValueUf != null ? formatMoney(c.hourValueUf, c.currency) : '--' },
     { key: 'billingState', header: 'Por facturar', render: (c) => c.billingState },
     {
       key: 'status',

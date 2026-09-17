@@ -79,6 +79,7 @@ export class DrizzleTicketRepository implements TicketRepository {
           usedHours: tickets.usedHours,
           pendingHhRequestsCount: sql<number>`coalesce(${pendingHh.pendingCount}, 0)`,
           pendingHhHours: sql<string>`coalesce(${pendingHh.pendingHours}, 0)`,
+          invoiceId: tickets.invoiceId,
           createdAt: tickets.createdAt,
         })
         .from(tickets)
@@ -118,6 +119,7 @@ export class DrizzleTicketRepository implements TicketRepository {
       usedHours: Number(row.usedHours),
       pendingHhRequestsCount: Number(row.pendingHhRequestsCount),
       pendingHhHours: Number(row.pendingHhHours),
+      invoiceId: row.invoiceId,
       createdAt: row.createdAt,
     }));
 
@@ -132,6 +134,29 @@ export class DrizzleTicketRepository implements TicketRepository {
       .insert(tickets)
       .values({ id: ticket.id, ...values })
       .onConflictDoUpdate({ target: tickets.id, set: values });
+  }
+
+  async findClosedUnbilledIds(projectIds: readonly string[], context?: TransactionContext): Promise<string[]> {
+    if (projectIds.length === 0) return [];
+    const db = resolveDb(this.database, context);
+    const rows = await db
+      .select({ id: tickets.id })
+      .from(tickets)
+      .where(
+        and(
+          inArray(tickets.projectId, [...projectIds]),
+          eq(tickets.status, 'closed'),
+          isNull(tickets.invoiceId),
+          isNull(tickets.deletedAt),
+        ),
+      );
+    return rows.map((row) => row.id);
+  }
+
+  async linkToInvoice(ticketIds: readonly string[], invoiceId: string, context?: TransactionContext): Promise<void> {
+    if (ticketIds.length === 0) return;
+    const db = resolveDb(this.database, context);
+    await db.update(tickets).set({ invoiceId, updatedAt: new Date() }).where(inArray(tickets.id, [...ticketIds]));
   }
 
   private buildWhere(filters: TicketFilters) {

@@ -53,6 +53,11 @@ export interface ProjectProps {
   qaPlannedTests: number | null;
   qaExecutedTests: number | null;
   qaFailedTests: number | null;
+  /** "Avance del periodo" del portal cliente — narrativa de logros declarada por el líder, igual criterio que impacto/QA. */
+  periodReportDate: Date | null;
+  periodReportAchievements: string[] | null;
+  /** Hito 0 quedó pausado esperando que Gerencia active el proyecto a mano — ver `MarkProjectPaymentMilestonePaidUseCase`. */
+  pendingManagementApproval: boolean;
   legacyId: number | null;
   createdAt: Date;
   updatedAt: Date;
@@ -156,6 +161,9 @@ export class Project extends AggregateRoot<string> {
       qaPlannedTests: null,
       qaExecutedTests: null,
       qaFailedTests: null,
+      periodReportDate: null,
+      periodReportAchievements: null,
+      pendingManagementApproval: false,
       legacyId: null,
       createdAt: props.now,
       updatedAt: props.now,
@@ -212,6 +220,10 @@ export class Project extends AggregateRoot<string> {
 
   get allowsOvertime(): boolean {
     return this.props.allowsOvertime;
+  }
+
+  get pendingManagementApproval(): boolean {
+    return this.props.pendingManagementApproval;
   }
 
   get legacyId(): number | null {
@@ -271,6 +283,8 @@ export class Project extends AggregateRoot<string> {
         | 'qaPlannedTests'
         | 'qaExecutedTests'
         | 'qaFailedTests'
+        | 'periodReportDate'
+        | 'periodReportAchievements'
       >
     >,
     now: Date,
@@ -294,6 +308,24 @@ export class Project extends AggregateRoot<string> {
     if (status === 'finished' && !this.props.endDate) this.props.endDate = now;
     this.touch(now);
     this.addDomainEvent(createDomainEvent('project.status_changed', this.id, { from: previous, to: status }, now));
+  }
+
+  /** Hito 0 activado automáticamente al pagar el primer tramo (interruptor global en `true`) — ver `MarkProjectPaymentMilestonePaidUseCase`. */
+  activateFromFirstPayment(now: Date): void {
+    this.changeStatus('active', now);
+  }
+
+  /** Hito 0 disparado con el interruptor global en `false` (o pausado a mano) — queda a la espera de que Gerencia lo active. */
+  pauseForManagementApproval(now: Date): void {
+    if (this.props.pendingManagementApproval) return;
+    this.props.pendingManagementApproval = true;
+    this.touch(now);
+  }
+
+  /** Gerencia resuelve un Hito 0 pausado — activa el proyecto y limpia la marca. */
+  resolveManagementApproval(now: Date): void {
+    this.props.pendingManagementApproval = false;
+    this.changeStatus('active', now);
   }
 
   recordUsedHours(hours: number, now: Date): void {

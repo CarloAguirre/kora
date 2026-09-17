@@ -17,6 +17,7 @@ import { useTicketsList } from '@/modules/tickets/api/tickets.queries';
 import { TicketPriorityBadge } from '@/modules/tickets/components/TicketPriorityBadge';
 import { SupportHoursDonut } from '../components/SupportHoursDonut';
 import { SupportProgressChart } from '../components/SupportProgressChart';
+import { formatMoney } from '@/shared/lib/format-money';
 
 const STATUS_OPTIONS = PROJECT_STATUSES.map((status) => ({ value: status, label: PROJECT_STATUS_LABELS[status] }));
 const formatDate = (value: string | null) => (value ? new Date(`${value}T00:00:00`).toLocaleDateString('es-CL') : '—');
@@ -115,13 +116,13 @@ export function SupportProjectDetailView({ project, projectId }: { project: Proj
               <DataRow label="Término" value={formatDate(project.endDate)} />
             </div>
             <p className={styles.supportLine}>
-              {project.supportPlanDescription || 'Sin plan'} · {formatHours(project.supportHours)} hrs · Hora extra: UF{' '}
-              {formatHours(project.overtimeRateUf)}
+              {project.supportPlanDescription || 'Sin plan'} · {formatHours(project.supportHours)} hrs · Hora extra:{' '}
+              {formatMoney(project.overtimeRateUf, 'UF')}
             </p>
             {supportSummary && (
               <p className={styles.supportLine}>
-                Valor plan: UF {formatHours(supportSummary.planValueUf)} · Hora extra del plan: UF{' '}
-                {formatHours(supportSummary.extraHourValueUf)}
+                Valor plan: {formatMoney(supportSummary.planValueUf, supportSummary.currency)} · Hora extra del plan:{' '}
+                {formatMoney(supportSummary.extraHourValueUf, supportSummary.currency)}
               </p>
             )}
           </div>

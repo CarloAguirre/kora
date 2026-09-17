@@ -18,12 +18,15 @@ import { ProjectsListPage } from '@/modules/projects/pages/ProjectsListPage';
 import { ProjectDetailPage } from '@/modules/projects/pages/ProjectDetailPage';
 import { ProjectTeamDetailPage } from '@/modules/projects/pages/ProjectTeamDetailPage';
 import { NewProjectPage } from '@/modules/projects/pages/NewProjectPage';
+import { SupportPlanDetailPage } from '@/modules/projects/pages/SupportPlanDetailPage';
 import { HoursListPage } from '@/modules/hours/pages/HoursListPage';
 import { HoursApprovalsPage } from '@/modules/hours/pages/HoursApprovalsPage';
 import { TicketsListPage } from '@/modules/tickets/pages/TicketsListPage';
 import { TicketDetailPage } from '@/modules/tickets/pages/TicketDetailPage';
 import { TicketHistoryPage } from '@/modules/tickets/pages/TicketHistoryPage';
 import { ForecastPage } from '@/modules/forecast/pages/ForecastPage';
+import { SupportBillingDashboardPage } from '@/modules/billing/pages/SupportBillingDashboardPage';
+import { BillingLedgerPage } from '@/modules/billing/pages/BillingLedgerPage';
 import { DashboardPage } from '@/modules/dashboard/pages/DashboardPage';
 import { ClientPortalPage } from '@/modules/client-portal/pages/ClientPortalPage';
 import { ClientProjectDetailPage } from '@/modules/client-portal/pages/ClientProjectDetailPage';
@@ -116,6 +119,22 @@ export const router = createBrowserRouter([
       { path: '/proyectos/:projectId', element: <ProjectDetailPage /> },
       { path: '/proyectos/:projectId/equipos/:teamId', element: <ProjectTeamDetailPage /> },
     ],
+  },
+
+  // ── Contratos de soporte ──────────────────────────────────────────────
+  // Crear un contrato (nuevo o consolidando proyectos terminados) se hace
+  // desde `/proyectos/nuevo` eligiendo tipo Soporte — ver `NewProjectPage`.
+  {
+    element: <ProtectedRoute anyOf={['projects:read', 'projects:read_assigned']} />,
+    children: [{ path: '/soporte/:planId', element: <SupportPlanDetailPage /> }],
+  },
+  {
+    element: <ProtectedRoute permission="billing:read" />,
+    children: [{ path: '/facturacion-soporte', element: <SupportBillingDashboardPage /> }],
+  },
+  {
+    element: <ProtectedRoute permission="billing:read" />,
+    children: [{ path: '/facturacion', element: <BillingLedgerPage /> }],
   },
 
   // ── Módulo de horas ───────────────────────────────────────────────────

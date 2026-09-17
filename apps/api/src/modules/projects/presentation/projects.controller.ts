@@ -7,15 +7,20 @@ import {
   createProjectModuleSchema,
   createProjectModuleSegmentSchema,
   createProjectModuleTaskSchema,
+  createProjectPaymentMilestoneSchema,
   createProjectSchema,
+  issueProjectPaymentMilestoneInvoiceSchema,
   listProjectsQuerySchema,
+  markProjectPaymentMilestonePaidSchema,
   setProjectOvertimeAuthorizationSchema,
+  updateProjectBillingSettingsSchema,
   updateProjectModuleDeliverySchema,
   updateProjectExtrasSchema,
   updateProjectModuleSchema,
   updateProjectModuleSegmentSchema,
   updateProjectModuleTaskSchema,
   updateProjectObservationSchema,
+  updateProjectPaymentMilestoneSchema,
   updateProjectSchema,
   updateProjectTeamMemberSchema,
   type AddProjectModuleDeliveryInput,
@@ -26,10 +31,15 @@ import {
   type CreateProjectModuleInput,
   type CreateProjectModuleSegmentInput,
   type CreateProjectModuleTaskInput,
+  type CreateProjectPaymentMilestoneInput,
+  type IssueProjectPaymentMilestoneInvoiceInput,
   type ListProjectsQuery,
   type ListProjectsResponse,
+  type MarkProjectPaymentMilestonePaidInput,
+  type ProjectBillingSettings,
   type ProjectDetail,
   type SetProjectOvertimeAuthorizationInput,
+  type UpdateProjectBillingSettingsInput,
   type UpdateProjectExtrasInput,
   type UpdateProjectInput,
   type UpdateProjectModuleDeliveryInput,
@@ -37,6 +47,7 @@ import {
   type UpdateProjectModuleSegmentInput,
   type UpdateProjectModuleTaskInput,
   type UpdateProjectObservationInput,
+  type UpdateProjectPaymentMilestoneInput,
   type UpdateProjectTeamMemberInput,
 } from '@kora/contracts';
 import { ZodValidationPipe } from '../../../shared/presentation/pipes/zod-validation.pipe';
@@ -70,6 +81,14 @@ import { DeleteProjectModuleSegmentUseCase } from '../application/use-cases/dele
 import { CreateProjectModuleTaskUseCase } from '../application/use-cases/create-project-module-task.use-case';
 import { UpdateProjectModuleTaskUseCase } from '../application/use-cases/update-project-module-task.use-case';
 import { DeleteProjectModuleTaskUseCase } from '../application/use-cases/delete-project-module-task.use-case';
+import { CreateProjectPaymentMilestoneUseCase } from '../application/use-cases/create-project-payment-milestone.use-case';
+import { UpdateProjectPaymentMilestoneUseCase } from '../application/use-cases/update-project-payment-milestone.use-case';
+import { DeleteProjectPaymentMilestoneUseCase } from '../application/use-cases/delete-project-payment-milestone.use-case';
+import { IssueProjectPaymentMilestoneInvoiceUseCase } from '../application/use-cases/issue-project-payment-milestone-invoice.use-case';
+import { MarkProjectPaymentMilestonePaidUseCase } from '../application/use-cases/mark-project-payment-milestone-paid.use-case';
+import { GetProjectBillingSettingsUseCase } from '../application/use-cases/get-project-billing-settings.use-case';
+import { UpdateProjectBillingSettingsUseCase } from '../application/use-cases/update-project-billing-settings.use-case';
+import { ResolveProjectManagementApprovalUseCase } from '../application/use-cases/resolve-project-management-approval.use-case';
 
 @Controller('projects')
 export class ProjectsController {
@@ -100,7 +119,37 @@ export class ProjectsController {
     private readonly createModuleTask: CreateProjectModuleTaskUseCase,
     private readonly updateModuleTask: UpdateProjectModuleTaskUseCase,
     private readonly deleteModuleTask: DeleteProjectModuleTaskUseCase,
+    private readonly createPaymentMilestone: CreateProjectPaymentMilestoneUseCase,
+    private readonly updatePaymentMilestone: UpdateProjectPaymentMilestoneUseCase,
+    private readonly deletePaymentMilestone: DeleteProjectPaymentMilestoneUseCase,
+    private readonly issuePaymentMilestoneInvoice: IssueProjectPaymentMilestoneInvoiceUseCase,
+    private readonly markPaymentMilestonePaid: MarkProjectPaymentMilestonePaidUseCase,
+    private readonly getBillingSettings: GetProjectBillingSettingsUseCase,
+    private readonly updateBillingSettings: UpdateProjectBillingSettingsUseCase,
+    private readonly resolveManagementApproval: ResolveProjectManagementApprovalUseCase,
   ) {}
+
+  /**
+   * Interruptor global de Hito 0 — declarado ANTES de `:id` para que
+   * `GET /projects/billing-settings` no se confunda con la ficha de un
+   * proyecto llamado "billing-settings". Lo ve Finanzas (`billing:read`,
+   * informativo) y lo administra Gerencia (`projects:manage`).
+   */
+  @Get('billing-settings')
+  @RequireAnyPermission('billing:read', 'projects:manage')
+  async billingSettings(): Promise<ProjectBillingSettings> {
+    return unwrapOrThrow(await this.getBillingSettings.execute());
+  }
+
+  @Patch('billing-settings')
+  @RequirePermissions('projects:manage')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async updateBillingSettingsHandler(
+    @Body(new ZodValidationPipe(updateProjectBillingSettingsSchema)) body: UpdateProjectBillingSettingsInput,
+    @CurrentUser() actor: RequestUser,
+  ): Promise<void> {
+    unwrapOrThrow(await this.updateBillingSettings.execute({ data: body, actor: toActorContext(actor) }));
+  }
 
   /**
    * `hours:register` también da acceso a esta lista (siempre acotada a los
@@ -553,6 +602,93 @@ export class ProjectsController {
         actor: toActorContext(actor),
         actorPermissions: actor.permissions,
       }),
+    );
+  }
+
+  /** Configurar el cronograma de cobro ("Facturación de Proyectos") es una decisión de PM/PMO, no de Finanzas. */
+  @Post(':id/payment-milestones')
+  @RequirePermissions('projects:manage')
+  @HttpCode(HttpStatus.CREATED)
+  async createProjectPaymentMilestone(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(createProjectPaymentMilestoneSchema)) body: CreateProjectPaymentMilestoneInput,
+    @CurrentUser() actor: RequestUser,
+  ): Promise<{ id: string }> {
+    return unwrapOrThrow(
+      await this.createPaymentMilestone.execute({ projectId: id, data: body, actor: toActorContext(actor) }),
+    );
+  }
+
+  @Patch(':id/payment-milestones/:milestoneId')
+  @RequirePermissions('projects:manage')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async updateProjectPaymentMilestone(
+    @Param('id') id: string,
+    @Param('milestoneId') milestoneId: string,
+    @Body(new ZodValidationPipe(updateProjectPaymentMilestoneSchema)) body: UpdateProjectPaymentMilestoneInput,
+    @CurrentUser() actor: RequestUser,
+  ): Promise<void> {
+    unwrapOrThrow(
+      await this.updatePaymentMilestone.execute({
+        projectId: id,
+        milestoneId,
+        data: body,
+        actor: toActorContext(actor),
+      }),
+    );
+  }
+
+  @Delete(':id/payment-milestones/:milestoneId')
+  @RequirePermissions('projects:manage')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deleteProjectPaymentMilestone(
+    @Param('id') id: string,
+    @Param('milestoneId') milestoneId: string,
+    @CurrentUser() actor: RequestUser,
+  ): Promise<void> {
+    unwrapOrThrow(
+      await this.deletePaymentMilestone.execute({ projectId: id, milestoneId, actor: toActorContext(actor) }),
+    );
+  }
+
+  /** Registrar que un tramo ya fue facturado — mismo criterio que `support-invoices`: Finanzas, no PM/PMO. */
+  @Post(':id/payment-milestones/:milestoneId/invoice')
+  @RequirePermissions('billing:manage')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async issueProjectPaymentMilestoneInvoice(
+    @Param('milestoneId') milestoneId: string,
+    @Body(new ZodValidationPipe(issueProjectPaymentMilestoneInvoiceSchema)) body: IssueProjectPaymentMilestoneInvoiceInput,
+    @CurrentUser() actor: RequestUser,
+  ): Promise<void> {
+    unwrapOrThrow(
+      await this.issuePaymentMilestoneInvoice.execute({ milestoneId, data: body, actor: toActorContext(actor) }),
+    );
+  }
+
+  /** Puede disparar Hito 0 — ver `MarkProjectPaymentMilestonePaidUseCase`. */
+  @Patch(':id/payment-milestones/:milestoneId/paid')
+  @RequirePermissions('billing:manage')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async markProjectPaymentMilestonePaid(
+    @Param('milestoneId') milestoneId: string,
+    @Body(new ZodValidationPipe(markProjectPaymentMilestonePaidSchema)) body: MarkProjectPaymentMilestonePaidInput,
+    @CurrentUser() actor: RequestUser,
+  ): Promise<void> {
+    unwrapOrThrow(
+      await this.markPaymentMilestonePaid.execute({ milestoneId, data: body, actor: toActorContext(actor) }),
+    );
+  }
+
+  /** Botón "Activar proyecto" para un Hito 0 pausado esperando a Gerencia. */
+  @Patch(':id/resolve-management-approval')
+  @RequirePermissions('projects:manage')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async resolveProjectManagementApproval(
+    @Param('id') id: string,
+    @CurrentUser() actor: RequestUser,
+  ): Promise<void> {
+    unwrapOrThrow(
+      await this.resolveManagementApproval.execute({ projectId: id, actor: toActorContext(actor) }),
     );
   }
 }

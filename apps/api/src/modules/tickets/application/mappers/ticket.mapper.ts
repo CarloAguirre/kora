@@ -40,6 +40,7 @@ export function toTicketSummary(item: TicketListItem): TicketSummary {
     usedHours: item.usedHours,
     pendingHhRequestsCount: item.pendingHhRequestsCount,
     pendingHhHours: item.pendingHhHours,
+    invoiceId: item.invoiceId,
     createdAt: item.createdAt.toISOString(),
   };
 }
@@ -86,6 +87,7 @@ export function toTicketDetail(source: TicketDetailSource): TicketDetail {
     usedHours: snapshot.usedHours,
     pendingHhRequestsCount: source.pendingHhRequestsCount,
     pendingHhHours: source.pendingHhHours,
+    invoiceId: snapshot.invoiceId,
     description: snapshot.description,
     evidenceUrl: snapshot.evidenceUrl,
     resolution: snapshot.resolution,

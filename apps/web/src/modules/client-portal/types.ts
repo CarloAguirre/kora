@@ -1,13 +1,14 @@
-import type { SupportPlanType } from '@kora/contracts';
+import type { SupportPlanCurrency, SupportPlanType } from '@kora/contracts';
 
 /**
  * Tipos del portal de cliente.
  *
- * TODO(portal-cliente): estos tipos describen la forma que HOY tienen los
- * datos de ejemplo en `mocks/client-portal.mocks.ts`, no un contrato real de
- * `@kora/contracts`. No existe todavía un endpoint que agregue "los proyectos
- * y contratos de soporte de MI empresa" — ver docs/DECISION-PORTAL-CLIENTE.md
- * para el porqué y lo que falta para conectarlos a datos reales.
+ * No son un alias 1:1 de ningún contrato de `@kora/contracts`: son la forma
+ * que ya consumen las vistas del portal, y `adapters/*.adapter.ts` traduce
+ * los contratos reales (`ProjectDetail`, `SupportPlanWithInvoices`, etc.)
+ * hacia acá — ver docs/DECISION-PORTAL-CLIENTE.md para el detalle de qué
+ * vive en cada capa y qué huecos de datos reales quedan documentados en cada
+ * adaptador.
  */
 
 export interface ClientCompanyInfo {
@@ -27,8 +28,8 @@ export type ClientProjectHealth = 'active' | 'at_risk' | 'finished';
 export interface ClientProjectRow {
   readonly id: string;
   readonly name: string;
-  readonly phaseCount: number;
-  readonly tag: string;
+  /** "Desarrollo" / "Soporte" — `ProjectSummary` no trae equipos ni cantidad de fases para esta fila de lista, a diferencia de `ClientProjectDetail`. */
+  readonly typeLabel: string;
   readonly kabeliOwnerName: string;
   readonly clientOwnerName: string;
   readonly startDate: string;
@@ -48,6 +49,7 @@ export interface ClientSupportContractRow {
   readonly contractedHours: number | null;
   readonly consumedHours: number | null;
   readonly hourValueUf: number | null;
+  readonly currency: SupportPlanCurrency;
   readonly billingState: string;
   readonly contractStatus: 'active' | 'finished';
 }
@@ -73,6 +75,8 @@ export interface SupportTicketHistoryEntry {
 }
 
 export interface SupportTicket {
+  /** Id real del ticket — no se muestra, solo para pedir su detalle completo al seleccionarlo. */
+  readonly id: string;
   readonly code: string;
   readonly type: SupportTicketType;
   readonly title: string;
@@ -92,13 +96,22 @@ export interface SupportTicket {
   readonly history: readonly SupportTicketHistoryEntry[];
 }
 
+/** Proyecto de desarrollo cubierto por el contrato — una pestaña de "Proyectos del consolidado" cuando `scope === 'consolidated'`. */
+export interface SupportContractLinkedProject {
+  readonly id: string;
+  readonly name: string;
+}
+
 export interface SupportContractDetail {
   readonly id: string;
   readonly name: string;
   readonly status: 'active' | 'finished';
   readonly company: ClientCompanyInfo;
-  /** Título largo de la tarjeta, p.ej. "Proyecto del contrato: App Mobile Residentes con asistente IA". */
-  readonly description: string;
+  /** `single` = un proyecto de desarrollo cubierto (Figma node 9007:8445); `consolidated` = varios, con pestaña por proyecto (Figma node 9007:8170). */
+  readonly scope: 'single' | 'consolidated';
+  readonly linkedProjects: readonly SupportContractLinkedProject[];
+  /** Título largo de la tarjeta en `scope: 'single'`, p.ej. "Proyecto del contrato: App Mobile Residentes con asistente IA" — el consolidado no lo muestra, usa las pestañas. */
+  readonly description: string | null;
   readonly planType: SupportPlanType;
   readonly kabeliOwnerName: string;
   readonly startDate: string;
@@ -107,6 +120,7 @@ export interface SupportContractDetail {
   readonly consumedHours: number;
   readonly currentHourValueUf: number;
   readonly extraHourValueUf: number;
+  readonly currency: SupportPlanCurrency;
   /** Rango del selector de fechas sobre la lista de tickets. */
   readonly rangeStartDate: string;
   readonly rangeEndDate: string;
@@ -141,93 +155,173 @@ export interface ClientRoadmapPhase {
   readonly currentStep: RoadmapStep | null;
   /** Los 4 meses que cubre la barra de esta fase (Figma: "Mar/Abr/May/Jun" para la Fase 1). */
   readonly months: readonly [string, string, string, string];
-  /** Posición (0-100) de la línea "HOY" dentro de esta fase — solo la fase `in_progress` la muestra. */
-  readonly todayMarkerPercent?: number;
+  /** Posición (0-100) del marcador de avance esperado dentro de esta fase —
+   *  solo la fase `in_progress` lo muestra (Figma node 9663:24568: una línea
+   *  roja sin etiqueta "HOY", solo visual — el texto de apoyo la describe como
+   *  "el avance esperado a hoy", no como la fecha de hoy). */
+  readonly expectedProgressPercent?: number;
 }
 
 /**
- * Roadmap semanal por módulo ("Roadmap del proyecto" del Figma, node 9203:2583)
- * — un Gantt simplificado: un módulo por fase del proyecto, con 4 tareas fijas
- * cada uno (Diseño, Desarrollo, QA Funcional, Revisión y Aprobación Cliente).
- * `startPercent`/`widthPercent` ubican la barra de la tarea dentro del eje de
- * tiempo completo (0-100, cubre `GANTT_MONTHS`) — son aproximaciones visuales
- * de ejemplo, no un cálculo real a partir de fechas.
+ * Roadmap por fases ("Roadmap por Fases" del Figma, node 9669:31017) — un
+ * acordeón con una tarjeta por fase del proyecto (no por módulo fijo): cada
+ * fase agrupa sus propias tareas por ROL de equipo (cantidad variable, no
+ * siempre las mismas 4), sus entregas planificadas y las entradas de
+ * `ClientBitacoraEntry` relacionadas a esa fase. Reemplaza al Gantt anterior
+ * de 3 módulos fijos × 4 tareas fijas (`ProjectGantt`/`GanttModule`), que ya
+ * no calzaba con el Figma actualizado.
  */
-export type GanttTaskKey = 'design' | 'development' | 'qa' | 'approval';
-export type GanttTaskState = 'done' | 'in_progress' | 'upcoming';
+export type PhaseRoadmapRole = 'dev' | 'qa' | 'ia' | 'ux' | 'rpa';
 
-export const GANTT_TASK_LABELS: Readonly<Record<GanttTaskKey, string>> = {
-  design: 'Diseño (UX-UI)',
-  development: 'Desarrollo',
+export const PHASE_ROADMAP_ROLE_LABELS: Readonly<Record<PhaseRoadmapRole, string>> = {
+  dev: 'DEV',
+  qa: 'QA',
+  ia: 'IA',
+  ux: 'UX',
+  rpa: 'RPA',
+};
+
+/** Colores por rol tomados del Figma (node 9669:31017, fila de leyenda). */
+export const PHASE_ROADMAP_ROLE_COLORS: Readonly<Record<PhaseRoadmapRole, string>> = {
+  dev: '#2e9e52',
+  qa: '#6c63e8',
+  ia: '#4c7ef3',
+  ux: '#b8790e',
+  rpa: '#d5504b',
+};
+
+/** Ámbito de la tarea — base del % por ámbito en "Resumen de avance" de la fase (mismo criterio que `PROJECT_MODULE_TASK_SCOPES` del módulo interno de proyectos). */
+export type PhaseRoadmapTaskScope = 'diseno' | 'desarrollo' | 'qa' | 'revision_cliente';
+
+export const PHASE_ROADMAP_TASK_SCOPES: readonly PhaseRoadmapTaskScope[] = ['diseno', 'desarrollo', 'qa', 'revision_cliente'];
+
+export const PHASE_ROADMAP_TASK_SCOPE_LABELS: Readonly<Record<PhaseRoadmapTaskScope, string>> = {
+  diseno: 'Diseño',
+  desarrollo: 'Desarrollo',
   qa: 'QA Funcional',
-  approval: 'Rev. y Apro. Cliente',
+  revision_cliente: 'Rev. Cliente',
 };
 
-/** Nombre largo — solo la leyenda al pie del Gantt lo usa; las filas usan `GANTT_TASK_LABELS`. */
-export const GANTT_TASK_LEGEND_LABELS: Readonly<Record<GanttTaskKey, string>> = {
-  design: 'Diseño (UX-UI)',
-  development: 'Desarrollo',
-  qa: 'QA Funcional',
-  approval: 'Revisión y Aprobación Cliente',
-};
-
-export const GANTT_TASK_COLORS: Readonly<Record<GanttTaskKey, string>> = {
-  design: '#2e9e52',
-  development: '#4c7ef3',
-  qa: '#b8790e',
-  approval: '#6c63e8',
-};
-
-export interface GanttTask {
-  readonly key: GanttTaskKey;
-  readonly state: GanttTaskState;
-  readonly startPercent: number;
-  readonly widthPercent: number;
-  /** Texto dentro (o junto a) la barra: "✓", "✓ OK", "En curso", "Próximo", "Pendiente", "Estimado". */
-  readonly stateLabel: string;
+/**
+ * Tramo de trabajo de un rol dentro de la fase. Las fechas son ISO
+ * (`YYYY-MM-DD`) y el Gantt las posiciona como % del rango visible: el estado
+ * (terminada / en curso / futura) se deriva de ellas contra hoy, igual que en
+ * `ProjectModulesCard` del módulo interno, así que no se guarda aparte.
+ */
+export interface PhaseRoadmapTask {
+  readonly role: PhaseRoadmapRole;
+  readonly scope: PhaseRoadmapTaskScope;
+  /** Descripción corta bajo el código de rol, p.ej. "Diseño y levantamiento". */
+  readonly label: string;
+  readonly startDate: string;
+  readonly endDate: string;
 }
 
-export interface GanttModule {
+export type PhaseRoadmapDeliveryState = 'delivered' | 'committed' | 'delayed';
+
+export interface PhaseRoadmapDelivery {
+  readonly label: string;
+  /** ISO `YYYY-MM-DD`. */
+  readonly date: string;
+  readonly state: PhaseRoadmapDeliveryState;
+}
+
+export type PhaseRoadmapTaskItemState = 'done' | 'upcoming' | 'delayed';
+
+export interface PhaseRoadmapTaskItem {
+  readonly label: string;
+  /** ISO `YYYY-MM-DD`. */
+  readonly date: string;
+  readonly state: PhaseRoadmapTaskItemState;
+  /** La tarea "actual"/en foco de la fase se resalta con borde y fondo (Figma: "Casos de prueba conciliación"). */
+  readonly highlighted?: boolean;
+}
+
+export interface PhaseRoadmapPhase {
+  readonly id: string;
   readonly badge: string;
   readonly name: string;
   readonly status: 'finished' | 'in_progress' | 'upcoming';
-  readonly tasks: readonly GanttTask[];
+  /** "1 incidente" / "1 atraso" — badge rojo junto al chevron; `null` si la fase no tiene alertas. */
+  readonly alertLabel: string | null;
+  readonly tasks: readonly PhaseRoadmapTask[];
+  readonly deliveries: readonly PhaseRoadmapDelivery[];
+  readonly taskItems: readonly PhaseRoadmapTaskItem[];
+  readonly relatedBitacora: readonly ClientBitacoraEntry[];
 }
 
-export interface ProjectGantt {
-  /** Meses del eje de tiempo con su peso relativo (proporcional a días del mes, como en el Figma). */
-  readonly months: ReadonlyArray<{ label: string; weight: number }>;
-  readonly todayPercent: number;
-  readonly modules: readonly GanttModule[];
+export interface ProjectPhaseRoadmap {
+  readonly phaseCount: number;
+  readonly teamSegmentCount: number;
+  readonly plannedDeliveryCount: number;
+  /** Rango visible por defecto del Gantt, ISO `YYYY-MM-DD` (editable desde el filtro "Rango visible"). */
+  readonly rangeStartDate: string;
+  readonly rangeEndDate: string;
+  readonly phases: readonly PhaseRoadmapPhase[];
 }
 
-export type ClientMilestoneStatus = 'completed' | 'awaiting_approval' | 'pending';
+/**
+ * Bitácora del proyecto ("Bitácora" del Figma, node 9663:24685) — reemplaza
+ * las dos secciones separadas "Hitos y aprobaciones" y "Puntos de atención e
+ * incidentes": ahora es un solo feed cronológico donde cada entrada trae su
+ * propia etiqueta de fase, en vez de vivir agrupada bajo una sola fase activa
+ * (`milestonesCaption` ya no aplica a nada).
+ */
+export type ClientBitacoraEntryKind = 'completed' | 'marked' | 'attention' | 'milestone' | 'pending';
 
-export interface ClientMilestone {
+/** Tono del badge de estado de una entrada de bitácora — es un badge plano
+ *  (fondo + texto, sin punto), NO el mismo componente que `StatusPill`, así
+ *  que tiene su propio vocabulario de tonos en vez de reusar `StatusPillTone`. */
+export type ClientBitacoraStatusTone = 'success' | 'warning' | 'info' | 'danger';
+
+export interface ClientBitacoraEntry {
   readonly id: string;
+  readonly kind: ClientBitacoraEntryKind;
   readonly title: string;
-  readonly submittedBy: string;
-  readonly submittedAt: string;
-  readonly status: ClientMilestoneStatus;
-  /** Caja verde "✓ Aprobado por…" — solo en hitos `completed` que ya se aprobaron. */
-  readonly approvalNote?: string;
-  /** Caja gris "Esperando OK del cliente (…)" junto al botón "Dar OK" — solo en `awaiting_approval`. */
-  readonly waitingText?: string;
-  /** Caja gris informativa en hitos `pending` (Figma: el último hito de la fase). */
-  readonly pendingNote?: string;
+  readonly registeredByName: string;
+  /** Fecha y hora tal cual el Figma, p.ej. "02-09-2026, 10:20 a.m.". */
+  readonly registeredAt: string;
+  /** p.ej. "Fase 1 - Módulo Financiero" — `null` cuando la entrada no está atada a una fase (Figma: "Seguimiento general del proyecto"). */
+  readonly phaseTag: string | null;
+  readonly description: string;
+  readonly statusLabel: string;
+  readonly statusTone: ClientBitacoraStatusTone;
+  /** Cajita de confirmación bajo la descripción (Figma: "✓ Aprobado por Camila Reyes el 15-06-2026 09:15") — no todas las entradas la tienen. */
+  readonly secondaryNote?: string;
 }
 
-export interface ClientAttentionPoint {
-  readonly id: string;
-  readonly description: string;
-  readonly responsibleName: string;
-  readonly actionPlan: string;
-  readonly closingDate: string;
+/**
+ * Facturación del proyecto ("Facturación" del Figma, node 9663:24480) —
+ * distinto del billing de contratos de soporte (`ClientSupportContractRow`):
+ * esto es el cronograma de pago DEL PROYECTO, no de un plan de soporte.
+ */
+export interface ClientBillingScheduleRow {
+  readonly tramo: string;
+  readonly percent: number;
+  readonly amount: number;
+  readonly invoiceNumber: string | null;
+  readonly issueDate: string | null;
+  readonly status: 'paid' | 'pending';
+  readonly paymentDate: string | null;
 }
 
-export interface ClientIncident {
-  readonly id: string;
-  readonly description: string;
+export interface ClientProjectBilling {
+  readonly totalAmount: number;
+  readonly paid: { readonly amount: number; readonly percent: number };
+  readonly invoicedPendingCollection: { readonly amount: number; readonly percent: number };
+  readonly pendingToInvoice: { readonly amount: number; readonly percent: number };
+  readonly schedule: readonly ClientBillingScheduleRow[];
+}
+
+/**
+ * "Avance del periodo" del Figma (node 9663:25049 / 9663:24051 según la
+ * variante) — está OCULTA en ambas variantes del archivo (`get_screenshot`
+ * devuelve 1×1 px), pero se construye igual por pedido explícito: un reporte
+ * narrativo de logros del período, no una métrica calculada.
+ */
+export interface ClientPeriodReport {
+  readonly reportDate: string;
+  readonly achievements: readonly string[];
 }
 
 export interface ClientProjectDetail {
@@ -244,17 +338,18 @@ export interface ClientProjectDetail {
   readonly clientContactPosition: string;
   readonly startDate: string;
   readonly estimatedHours: number;
+  readonly hoursDeviation: number;
+  readonly usedHoursToDate: number;
+  readonly usedHoursUpdatedAt: string;
   readonly progressActualPercent: number;
   readonly progressExpectedPercent: number;
   readonly endDate: string;
   readonly daysRemaining: number;
+  readonly billing: ClientProjectBilling;
   readonly roadmap: readonly ClientRoadmapPhase[];
-  readonly gantt: ProjectGantt;
-  /** Subtítulo de "Hitos y aprobaciones" (Figma: "Fase 2 · Módulo de Tickets con Agente IA — registro de entregas y OK del cliente"). */
-  readonly milestonesCaption: string;
-  readonly milestones: readonly ClientMilestone[];
-  readonly attentionPoints: readonly ClientAttentionPoint[];
-  readonly incidents: readonly ClientIncident[];
+  readonly phaseRoadmap: ProjectPhaseRoadmap;
+  readonly bitacora: readonly ClientBitacoraEntry[];
+  readonly periodReport: ClientPeriodReport;
   /** Ver "Impacto en el negocio" del Figma — antes/después de automatizar. */
   readonly businessImpact: {
     readonly before: { readonly totalProcessHours: number; readonly peopleInvolved: number; readonly cycleDays: number; readonly modality: string };

@@ -19,6 +19,7 @@ export interface TicketRow {
   resolvedAt: Date | null;
   usedHours: string;
   allowsOvertime: boolean;
+  invoiceId: string | null;
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;
@@ -43,6 +44,7 @@ export function toDomain(row: TicketRow): Ticket {
     resolvedAt: row.resolvedAt,
     usedHours: Number(row.usedHours),
     allowsOvertime: row.allowsOvertime,
+    invoiceId: row.invoiceId,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     deletedAt: row.deletedAt,
@@ -68,6 +70,9 @@ export function toPersistence(ticket: Ticket) {
     resolvedAt: snapshot.resolvedAt,
     usedHours: String(snapshot.usedHours),
     allowsOvertime: snapshot.allowsOvertime,
+    // invoiceId a propósito NO viaja aquí: lo fija únicamente `linkToInvoice`
+    // (update dirigido). Si viajara, un `save()` con un snapshot cargado antes
+    // de facturar podría pisar el enlace de vuelta a null.
     createdAt: snapshot.createdAt,
     updatedAt: snapshot.updatedAt,
     deletedAt: snapshot.deletedAt,

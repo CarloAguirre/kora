@@ -12,11 +12,20 @@ import { TextField } from '@/shared/components/ui/TextField';
 import { PencilIcon, PlusIcon, ChevronLeftIcon, SearchIcon, EyeIcon } from '@/shared/components/icons/Icons';
 import { ClientStatusBadge } from '../components/ClientStatusBadge';
 import { ClientFormDialog } from '../components/ClientFormDialog';
+import type { SupportPlanListItem } from '@kora/contracts';
 import { useClientDetail } from '../api/clients.queries';
 import { useProjectsList } from '@/modules/projects/api/projects.queries';
+import { useSupportPlansForClient } from '@/modules/projects/api/support-plan.queries';
 import { ProjectStatusBadge } from '@/modules/projects/components/ProjectStatusBadge';
+import {
+  SupportInvoiceBillingStatusBadge,
+  SupportPlanScopeBadge,
+  SupportPlanStatusBadge,
+  SupportPlanTypeBadge,
+} from '@/modules/projects/components/SupportPlanBadges';
 import { getProjectStageLabel } from '@/modules/projects/lib/project-stage-display';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
+import { formatMoney } from '@/shared/lib/format-money';
 
 const PAGE_SIZE = 10;
 
@@ -48,6 +57,8 @@ function matchesTab(project: ProjectSummary, tab: ProjectTab): boolean {
 }
 
 const formatDate = (value: string | null) => (value ? new Date(value).toLocaleDateString('es-CL') : '—');
+/** A diferencia de `formatDate`: agrega la hora local antes de parsear, para que una fecha 'YYYY-MM-DD' no se lea como medianoche UTC y se corra un día atrás en husos horarios negativos (Chile). */
+const formatPlanDate = (value: string | null) => (value ? new Date(`${value}T00:00:00`).toLocaleDateString('es-CL') : '—');
 const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 2 });
 
 function formatDuration(start: string | null, end: string | null): string {
@@ -72,6 +83,7 @@ export function ClientDetailPage() {
   const { can } = usePermissions();
   const { data: client, isLoading } = useClientDetail(clientId ?? null);
   const { data: projects } = useProjectsList({ clientId: clientId ?? undefined, page: 1, pageSize: 100 });
+  const { data: supportPlans, isLoading: loadingSupportPlans } = useSupportPlansForClient(clientId ?? null);
   const [editing, setEditing] = useState(false);
   const [tab, setTab] = useState<ProjectTab>('all');
   const [search, setSearch] = useState('');
@@ -151,6 +163,43 @@ export function ClientDetailPage() {
     { key: 'soldHours', header: 'HH Vendidas', sortable: true, render: (p) => formatHours(p.soldHours) },
     { key: 'usedHours', header: 'HH Utilizadas', sortable: true, render: (p) => formatHours(p.usedHours) },
     { key: 'stage', header: 'Etapa', render: (p) => getProjectStageLabel(p) },
+  ];
+
+  const supportPlanColumns: Column<SupportPlanListItem>[] = [
+    {
+      key: 'name',
+      header: 'Contrato',
+      render: (p) => (
+        <Link to={`/soporte/${p.id}`} className={styles.link}>
+          {p.name}
+        </Link>
+      ),
+    },
+    {
+      key: 'type',
+      header: 'Tipo',
+      render: (p) => (
+        <div className={styles.supportTypeCell}>
+          <SupportPlanTypeBadge planType={p.planType} />
+          <SupportPlanScopeBadge scope={p.scope} />
+        </div>
+      ),
+    },
+    { key: 'leader', header: 'Responsable Kabeli', render: (p) => p.leaderName ?? '—' },
+    {
+      key: 'vigencia',
+      header: 'Vigencia',
+      render: (p) => `${formatPlanDate(p.startDate)} – ${p.endDate ? formatPlanDate(p.endDate) : '—'}`,
+    },
+    { key: 'contractedHours', header: 'N° Horas', align: 'right', render: (p) => (p.planType === 'on_demand' ? '—' : formatHours(p.contractedHours)) },
+    { key: 'usedHours', header: 'HH consumidas', align: 'right', render: (p) => formatHours(p.usedHours) },
+    { key: 'planValueUf', header: 'Valor HH', align: 'right', render: (p) => formatMoney(p.planValueUf, p.currency) },
+    {
+      key: 'billing',
+      header: 'Por facturar',
+      render: (p) => <SupportInvoiceBillingStatusBadge status={p.currentBillingStatus} />,
+    },
+    { key: 'status', header: 'Estado del contrato', render: (p) => <SupportPlanStatusBadge status={p.status} /> },
   ];
 
   return (
@@ -260,6 +309,19 @@ export function ClientDetailPage() {
           />
 
           <Pagination page={page} pageCount={pageCount} total={filteredProjects.length} pageSize={PAGE_SIZE} onPageChange={setPage} />
+        </Card>
+
+        <Card>
+          <p className={styles.sectionTitle}>Contratos de soporte ({supportPlans?.length ?? 0})</p>
+          <DataTable
+            caption="Contratos de soporte del cliente"
+            columns={supportPlanColumns}
+            items={supportPlans ?? []}
+            getRowKey={(p) => p.id}
+            loading={loadingSupportPlans}
+            error={null}
+            emptyMessage="Este cliente todavía no tiene contratos de soporte."
+          />
         </Card>
       </div>
 

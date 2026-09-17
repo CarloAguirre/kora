@@ -19,6 +19,8 @@ export interface TicketProps {
   resolvedAt: Date | null;
   usedHours: number;
   allowsOvertime: boolean;
+  /** Factura de soporte a la que quedó enlazado — se fija vía `linkToInvoice`, no aquí. */
+  invoiceId: string | null;
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;
@@ -82,6 +84,7 @@ export class Ticket extends AggregateRoot<string> {
       resolvedAt: null,
       usedHours: 0,
       allowsOvertime: false,
+      invoiceId: null,
       createdAt: props.now,
       updatedAt: props.now,
       deletedAt: null,

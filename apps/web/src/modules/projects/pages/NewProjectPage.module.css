@@ -72,6 +72,47 @@
   font-weight: var(--kora-weight-semibold);
 }
 
+/* Envoltorio de un control que no es un `TextField`/`Select` (p. ej. `SegmentedControl`) pero necesita el mismo label/error a su alrededor. */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-1);
+  align-self: stretch;
+}
+
+.fieldLabel {
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-medium);
+  line-height: 16px;
+}
+
+.required {
+  color: var(--kora-danger);
+  margin-left: 2px;
+}
+
+.fieldError {
+  margin: 0;
+  font-size: var(--kora-text-xs);
+  color: var(--kora-danger);
+}
+
+.checkboxLine {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+  color: var(--kora-navy);
+  font-size: var(--kora-text-sm);
+  cursor: pointer;
+}
+
+.checkboxLine input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--kora-lime-dark);
+}
+
 .clientCard {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -168,12 +209,17 @@
 .teamCheckbox input {
   width: 16px;
   height: 16px;
-  accent-color: var(--kora-navy);
+  accent-color: var(--kora-lime-dark);
 }
 
 .teamCheckboxDisabled {
   color: var(--kora-text-disabled);
   cursor: default;
+}
+
+.finishedProjectStatus {
+  color: var(--kora-text-muted);
+  font-weight: var(--kora-weight-regular);
 }
 
 .teamDetailCard {

@@ -4,6 +4,8 @@ export interface TicketProjectReference {
   readonly id: string;
   readonly name: string;
   readonly status: ProjectStatus;
+  readonly type: ProjectType;
+  readonly clientId: string | null;
 }
 
 export interface LinkableProjectReference {
@@ -13,6 +15,8 @@ export interface LinkableProjectReference {
 
 export interface TicketProjectReader {
   findById(projectId: string): Promise<TicketProjectReference | null>;
+  /** Para validar los proyectos que un contrato de soporte pretende cubrir (`CreateSupportPlanUseCase`): deben ser de desarrollo, estar terminados, y del mismo cliente. */
+  findManyByIds(projectIds: readonly string[]): Promise<TicketProjectReference[]>;
   /**
    * Proyectos de `type` que pertenecen a `clientId`, para poblar el selector
    * de proyecto al crear/editar un ticket. Sin acotar por asignación: a

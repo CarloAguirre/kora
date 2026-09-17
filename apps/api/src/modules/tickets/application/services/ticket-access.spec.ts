@@ -18,6 +18,9 @@ class FakeProjectReader implements TicketProjectReader {
   async findById(): Promise<TicketProjectReference | null> {
     return null;
   }
+  async findManyByIds(): Promise<TicketProjectReference[]> {
+    return [];
+  }
   async isProjectApprover(_projectId: string, actorUserId: string): Promise<boolean> {
     return this.approverId === actorUserId;
   }

@@ -16,9 +16,14 @@ import {
   PROJECT_MODULE_REPOSITORY,
   type ProjectModuleRepository,
 } from '../../domain/repositories/project-module.repository';
+import {
+  PROJECT_PAYMENT_MILESTONE_REPOSITORY,
+  type ProjectPaymentMilestoneRepository,
+} from '../../domain/repositories/project-payment-milestone.repository';
 import { PROJECT_USER_READER, type ProjectUserReader } from '../ports/project-user-reader.port';
 import { PROJECT_CLIENT_READER, type ProjectClientReader } from '../ports/project-client-reader.port';
 import { PROJECT_CONTACT_READER, type ProjectContactReader } from '../ports/project-contact-reader.port';
+import { PROJECT_HOUR_ENTRY_READER, type ProjectHourEntryReader } from '../ports/project-hour-entry-reader.port';
 import type { UseCase } from '../../../../shared/application/use-case';
 import { toProjectDetail } from '../mappers/project.mapper';
 
@@ -42,9 +47,11 @@ export class GetProjectUseCase implements UseCase<GetProjectCommand, ProjectDeta
     @Inject(PROJECT_TEAM_REPOSITORY) private readonly teams: ProjectTeamRepository,
     @Inject(PROJECT_OBSERVATION_REPOSITORY) private readonly observations: ProjectObservationRepository,
     @Inject(PROJECT_MODULE_REPOSITORY) private readonly modules: ProjectModuleRepository,
+    @Inject(PROJECT_PAYMENT_MILESTONE_REPOSITORY) private readonly paymentMilestones: ProjectPaymentMilestoneRepository,
     @Inject(PROJECT_USER_READER) private readonly users: ProjectUserReader,
     @Inject(PROJECT_CLIENT_READER) private readonly clients: ProjectClientReader,
     @Inject(PROJECT_CONTACT_READER) private readonly contacts: ProjectContactReader,
+    @Inject(PROJECT_HOUR_ENTRY_READER) private readonly hourEntries: ProjectHourEntryReader,
     @Inject(CLOCK) private readonly clock: Clock,
   ) {}
 
@@ -64,6 +71,8 @@ export class GetProjectUseCase implements UseCase<GetProjectCommand, ProjectDeta
       projectTeams,
       projectObservations,
       projectModules,
+      projectPaymentMilestones,
+      usedHoursUpdatedAt,
     ] = await Promise.all([
       snapshot.clientId ? this.clients.findById(snapshot.clientId) : Promise.resolve(null),
       snapshot.primaryContactId ? this.contacts.findById(snapshot.primaryContactId) : Promise.resolve(null),
@@ -76,6 +85,8 @@ export class GetProjectUseCase implements UseCase<GetProjectCommand, ProjectDeta
       this.teams.findByProject(project.id),
       this.observations.listForProject(project.id),
       this.modules.listForProject(project.id),
+      this.paymentMilestones.listForProject(project.id),
+      this.hourEntries.maxApprovedEntryDateForProject(project.id),
     ]);
 
     if (!command.actorPermissions.includes('projects:read')) {
@@ -108,6 +119,8 @@ export class GetProjectUseCase implements UseCase<GetProjectCommand, ProjectDeta
         teams: projectTeams,
         observations: projectObservations,
         modules: projectModules,
+        paymentMilestones: projectPaymentMilestones,
+        usedHoursUpdatedAt,
         actorUserId: command.actorUserId,
         canAuthorizeOvertime,
         now: this.clock.now(),

@@ -52,6 +52,10 @@ export function DashboardPage() {
   if (user?.role === 'cliente') {
     return <Navigate to="/portal/proyectos" replace />;
   }
+  // Mismo criterio para `finanzas`: perfil de un único propósito, su "inicio" es el libro de Facturación.
+  if (user?.role === 'finanzas') {
+    return <Navigate to="/facturacion" replace />;
+  }
 
   return (
     <DashboardLayout title="Dashboard Principal">

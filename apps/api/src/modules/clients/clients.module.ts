@@ -54,6 +54,6 @@ import { ProjectsModule } from '../projects/projects.module';
     { provide: CLIENT_CATALOG_LISTER, useClass: DrizzleClientCatalogLister },
     { provide: PROJECT_ACTIVITY_READER, useClass: ProjectsModuleActivityReader },
   ],
-  exports: [CLIENT_REPOSITORY, CATALOG_READER, COMMERCIAL_MANAGER_READER],
+  exports: [CLIENT_REPOSITORY, CLIENT_CONTACT_REPOSITORY, CATALOG_READER, COMMERCIAL_MANAGER_READER],
 })
 export class ClientsModule {}

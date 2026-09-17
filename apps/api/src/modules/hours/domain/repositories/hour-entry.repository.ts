@@ -87,6 +87,20 @@ export interface HourEntryRepository {
   /** Suma de horas aprobadas de un proyecto — alimenta `projects.used_hours`. */
   sumApprovedHoursForProject(projectId: string, context?: TransactionContext): Promise<number>;
 
+  /**
+   * Suma de horas aprobadas de varios proyectos en un rango de fechas —
+   * agregación real (`SUM` en SQL), no `search()` paginado: `search()` trunca
+   * en 2000 filas (`HOUR_ENTRY_PAGE_SIZE` en `GetSupportPlanSummaryUseCase`),
+   * tolerable para un gráfico de consumo pero no para un monto a cobrar
+   * (`SupportBillingCalculator`), donde truncar significa sub-facturar sin aviso.
+   */
+  sumApprovedHoursForProjects(
+    projectIds: readonly string[],
+    dateFrom: Date,
+    dateTo: Date,
+    context?: TransactionContext,
+  ): Promise<number>;
+
   /** Horas no rechazadas que `userId` ya tiene registradas para `date` (cualquier asignación/proyecto) — alimenta el tope diario de 8h al crear una solicitud de HH de ticket (ver `CreateTicketHhRequestUseCase`). */
   sumHoursForUserAndDate(userId: string, date: Date, context?: TransactionContext): Promise<number>;
 }

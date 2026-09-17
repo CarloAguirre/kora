@@ -14,6 +14,7 @@
     "push": "drizzle-kit push",
     "studio": "drizzle-kit studio",
     "seed": "tsx src/seeds/run.ts",
+    "seed:demo": "tsx src/seeds/run-demo.ts",
     "clean": "rimraf dist .turbo"
   },
   "dependencies": {

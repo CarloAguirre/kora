@@ -246,6 +246,28 @@ export class DrizzleHourEntryRepository implements HourEntryRepository {
     return Number(rows[0]?.total ?? 0);
   }
 
+  async sumApprovedHoursForProjects(
+    projectIds: readonly string[],
+    dateFrom: Date,
+    dateTo: Date,
+    context?: TransactionContext,
+  ): Promise<number> {
+    if (projectIds.length === 0) return 0;
+    const db = resolveDb(this.database, context);
+    const rows = await db
+      .select({ total: sql<string>`coalesce(sum(${hourEntries.hours}), 0)` })
+      .from(hourEntries)
+      .where(
+        and(
+          inArray(hourEntries.projectId, [...projectIds]),
+          eq(hourEntries.status, 'approved'),
+          gte(hourEntries.date, dateFrom),
+          lte(hourEntries.date, dateTo),
+        ),
+      );
+    return Number(rows[0]?.total ?? 0);
+  }
+
   async sumHoursForUserAndDate(userId: string, date: Date, context?: TransactionContext): Promise<number> {
     const db = resolveDb(this.database, context);
     const rows = await db

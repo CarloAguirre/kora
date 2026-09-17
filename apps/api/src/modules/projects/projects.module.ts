@@ -28,15 +28,26 @@ import { DeleteProjectModuleSegmentUseCase } from './application/use-cases/delet
 import { CreateProjectModuleTaskUseCase } from './application/use-cases/create-project-module-task.use-case';
 import { UpdateProjectModuleTaskUseCase } from './application/use-cases/update-project-module-task.use-case';
 import { DeleteProjectModuleTaskUseCase } from './application/use-cases/delete-project-module-task.use-case';
+import { CreateProjectPaymentMilestoneUseCase } from './application/use-cases/create-project-payment-milestone.use-case';
+import { UpdateProjectPaymentMilestoneUseCase } from './application/use-cases/update-project-payment-milestone.use-case';
+import { DeleteProjectPaymentMilestoneUseCase } from './application/use-cases/delete-project-payment-milestone.use-case';
+import { IssueProjectPaymentMilestoneInvoiceUseCase } from './application/use-cases/issue-project-payment-milestone-invoice.use-case';
+import { MarkProjectPaymentMilestonePaidUseCase } from './application/use-cases/mark-project-payment-milestone-paid.use-case';
+import { GetProjectBillingSettingsUseCase } from './application/use-cases/get-project-billing-settings.use-case';
+import { UpdateProjectBillingSettingsUseCase } from './application/use-cases/update-project-billing-settings.use-case';
+import { ResolveProjectManagementApprovalUseCase } from './application/use-cases/resolve-project-management-approval.use-case';
 
 import { PROJECT_REPOSITORY } from './domain/repositories/project.repository';
 import { PROJECT_TEAM_REPOSITORY } from './domain/repositories/project-team.repository';
 import { PROJECT_TEAM_MEMBER_REPOSITORY } from './domain/repositories/project-team-member.repository';
 import { PROJECT_OBSERVATION_REPOSITORY } from './domain/repositories/project-observation.repository';
 import { PROJECT_MODULE_REPOSITORY } from './domain/repositories/project-module.repository';
+import { PROJECT_PAYMENT_MILESTONE_REPOSITORY } from './domain/repositories/project-payment-milestone.repository';
+import { PROJECT_BILLING_SETTINGS_REPOSITORY } from './domain/repositories/project-billing-settings.repository';
 import { PROJECT_USER_READER } from './application/ports/project-user-reader.port';
 import { PROJECT_CLIENT_READER } from './application/ports/project-client-reader.port';
 import { PROJECT_CONTACT_READER } from './application/ports/project-contact-reader.port';
+import { PROJECT_HOUR_ENTRY_READER } from './application/ports/project-hour-entry-reader.port';
 import { PROJECT_TEAM_MEMBER_VALIDATOR } from './application/ports/project-team-member-validator.port';
 
 import { DrizzleProjectRepository } from './infrastructure/persistence/drizzle-project.repository';
@@ -44,9 +55,12 @@ import { DrizzleProjectTeamRepository } from './infrastructure/persistence/drizz
 import { DrizzleProjectTeamMemberRepository } from './infrastructure/persistence/drizzle-project-team-member.repository';
 import { DrizzleProjectObservationRepository } from './infrastructure/persistence/drizzle-project-observation.repository';
 import { DrizzleProjectModuleRepository } from './infrastructure/persistence/drizzle-project-module.repository';
+import { DrizzleProjectPaymentMilestoneRepository } from './infrastructure/persistence/drizzle-project-payment-milestone.repository';
+import { DrizzleProjectBillingSettingsRepository } from './infrastructure/persistence/drizzle-project-billing-settings.repository';
 import { DrizzleProjectUserReader } from './infrastructure/services/drizzle-project-user-reader';
 import { DrizzleProjectClientReader } from './infrastructure/services/drizzle-project-client-reader';
 import { DrizzleProjectContactReader } from './infrastructure/services/drizzle-project-contact-reader';
+import { DrizzleProjectHourEntryReader } from './infrastructure/services/drizzle-project-hour-entry-reader';
 import { DrizzleProjectTeamMemberValidator } from './infrastructure/services/drizzle-project-team-member-validator';
 
 /**
@@ -87,17 +101,28 @@ import { DrizzleProjectTeamMemberValidator } from './infrastructure/services/dri
     CreateProjectModuleTaskUseCase,
     UpdateProjectModuleTaskUseCase,
     DeleteProjectModuleTaskUseCase,
+    CreateProjectPaymentMilestoneUseCase,
+    UpdateProjectPaymentMilestoneUseCase,
+    DeleteProjectPaymentMilestoneUseCase,
+    IssueProjectPaymentMilestoneInvoiceUseCase,
+    MarkProjectPaymentMilestonePaidUseCase,
+    GetProjectBillingSettingsUseCase,
+    UpdateProjectBillingSettingsUseCase,
+    ResolveProjectManagementApprovalUseCase,
 
     { provide: PROJECT_REPOSITORY, useClass: DrizzleProjectRepository },
     { provide: PROJECT_TEAM_REPOSITORY, useClass: DrizzleProjectTeamRepository },
     { provide: PROJECT_TEAM_MEMBER_REPOSITORY, useClass: DrizzleProjectTeamMemberRepository },
     { provide: PROJECT_OBSERVATION_REPOSITORY, useClass: DrizzleProjectObservationRepository },
     { provide: PROJECT_MODULE_REPOSITORY, useClass: DrizzleProjectModuleRepository },
+    { provide: PROJECT_PAYMENT_MILESTONE_REPOSITORY, useClass: DrizzleProjectPaymentMilestoneRepository },
+    { provide: PROJECT_BILLING_SETTINGS_REPOSITORY, useClass: DrizzleProjectBillingSettingsRepository },
     { provide: PROJECT_USER_READER, useClass: DrizzleProjectUserReader },
     { provide: PROJECT_CLIENT_READER, useClass: DrizzleProjectClientReader },
     { provide: PROJECT_CONTACT_READER, useClass: DrizzleProjectContactReader },
+    { provide: PROJECT_HOUR_ENTRY_READER, useClass: DrizzleProjectHourEntryReader },
     { provide: PROJECT_TEAM_MEMBER_VALIDATOR, useClass: DrizzleProjectTeamMemberValidator },
   ],
-  exports: [PROJECT_REPOSITORY, PROJECT_MODULE_REPOSITORY],
+  exports: [PROJECT_REPOSITORY, PROJECT_MODULE_REPOSITORY, PROJECT_PAYMENT_MILESTONE_REPOSITORY],
 })
 export class ProjectsModule {}

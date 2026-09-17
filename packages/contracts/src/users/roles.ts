@@ -13,7 +13,7 @@ import { z } from 'zod';
  * caso de uso ni componente cambia.
  */
 
-export const ROLE_CODES = ['admin', 'pmo', 'leader', 'collaborator', 'commercial', 'cliente'] as const;
+export const ROLE_CODES = ['admin', 'pmo', 'leader', 'collaborator', 'commercial', 'finanzas', 'cliente'] as const;
 export const roleCodeSchema = z.enum(ROLE_CODES);
 export type RoleCode = z.infer<typeof roleCodeSchema>;
 
@@ -120,6 +120,10 @@ export const DEFAULT_ROLE_PERMISSIONS: Readonly<Record<RoleCode, readonly Permis
     'hours:read_own',
   ],
   commercial: ['clients:read', 'tickets:read_assigned', 'projects:read_assigned'],
+  /** Perfil restringido de un único propósito: gestionar la facturación de
+   *  Soporte y Proyectos (ver `kora-perfil-finanzas.html`) — nada de
+   *  clientes/tickets/horas/gestión de proyectos. */
+  finanzas: ['billing:read', 'billing:manage'],
   /** Usuario externo (contacto de una empresa cliente). Ve únicamente el
    *  portal de cliente — nunca datos de otras empresas ni pantallas internas. */
   cliente: ['projects:read_own_client', 'tickets:read_own_client'],
@@ -133,6 +137,7 @@ export const ROLE_LABELS: Readonly<Record<RoleCode, string>> = {
   leader: 'Líder',
   collaborator: 'Colaborador',
   commercial: 'Comercial',
+  finanzas: 'Finanzas',
   cliente: 'Cliente',
 };
 

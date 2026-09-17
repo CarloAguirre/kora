@@ -352,6 +352,21 @@
   font-weight: var(--kora-weight-semibold);
 }
 
+/* ─── Hito 0 pendiente de aprobación de Gerencia ─── */
+.hito0Banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kora-space-3);
+  flex-wrap: wrap;
+  background: var(--kora-warning-surface);
+  color: var(--kora-warning-text);
+  border-radius: var(--kora-radius);
+  padding: var(--kora-space-3) var(--kora-space-4);
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-medium);
+}
+
 @media (max-width: 1024px) {
   .layout {
     flex-direction: column;

@@ -141,6 +141,34 @@
       "when": 1789422489497,
       "tag": "0019_boring_komodo",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1789530898291,
+      "tag": "0020_living_black_panther",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1789585400322,
+      "tag": "0021_tearful_kronos",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1789619656809,
+      "tag": "0022_keen_stardust",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1789649250959,
+      "tag": "0023_public_chimera",
+      "breakpoints": true
     }
   ]
 }

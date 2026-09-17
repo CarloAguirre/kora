@@ -23,6 +23,8 @@ const TEAM_REQUIREMENT_BY_ROLE: Readonly<Record<RoleCode, TeamRequirement>> = {
   leader: 'optional',
   collaborator: 'required',
   commercial: 'forbidden',
+  // Perfil restringido de un único propósito (facturación) — no pertenece a un equipo de entrega.
+  finanzas: 'forbidden',
   // Un usuario cliente es externo a Kabeli: nunca pertenece a un equipo.
   cliente: 'forbidden',
 };

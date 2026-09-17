@@ -200,6 +200,14 @@
   border-color: #9dbbdf;
 }
 
+/* Los 4 íconos de "Accesos y enlaces" van en verde en el Figma (node
+   9663:24497), no en el navy del texto — currentColor del botón se
+   sobreescribe solo para el ícono. */
+.linkIcon {
+  color: #699c2c;
+  flex-shrink: 0;
+}
+
 .linkText {
   display: flex;
   flex-direction: column;
@@ -254,7 +262,7 @@
   color: #0f2a44;
 }
 
-/* "Horas estimadas" es la única de las 3 tarjetas con el valor a 28px en el Figma. */
+/* "Horas estimadas" es la única de las 4 tarjetas con el valor a 28px en el Figma. */
 .statValueLarge {
   font-size: 28px;
   letter-spacing: 0.3828px;
@@ -264,6 +272,25 @@
   font-size: 15px;
   font-weight: var(--kora-weight-bold);
   color: #93a0ac;
+}
+
+/* Sub-línea "Horas desviación" dentro de la tarjeta "Horas estimadas". */
+.hoursDeviationRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+/* Badge de desviación junto a "Avance real vs. esperado" (p.ej. "-36%") — es
+   un badge plano, no un `StatusPill` con punto. */
+.deviationBadge {
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #fff1da;
+  color: #966100;
+  font-size: 13px;
+  font-weight: var(--kora-weight-bold);
 }
 
 .progressTrack {
@@ -312,102 +339,6 @@
   font-size: 13px;
   font-weight: var(--kora-weight-bold);
   color: #8bc53f;
-}
-
-/* Hitos — Figma node 9203:2478: punto 14px, título 14px extra-bold, cajas de
-   nota (aprobado en verde, esperando OK en gris con botón, pendiente en gris). */
-.milestonesCard {
-  padding: 6px 22px;
-}
-
-.milestoneRow {
-  display: flex;
-  align-items: flex-start;
-  gap: 14px;
-  padding: 16px 0;
-  border-bottom: 1px solid #e4e9ee;
-}
-
-.milestoneRow:last-child {
-  border-bottom: none;
-}
-
-.milestoneDot {
-  width: 14px;
-  height: 14px;
-  border-radius: 7px;
-  flex-shrink: 0;
-  margin-top: 3px;
-}
-
-.milestoneDot_completed {
-  background: #2e9e52;
-}
-
-.milestoneDot_awaiting_approval {
-  background: #b8790e;
-}
-
-.milestoneDot_pending {
-  background: #93a0ac;
-}
-
-.milestoneBody {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  flex: 1 0 0;
-  min-width: 0;
-}
-
-.milestoneHeadRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--kora-space-3);
-}
-
-.milestoneTitle {
-  font-size: 14px;
-  font-weight: 800;
-  color: #0f2a44;
-}
-
-.milestoneMeta {
-  font-size: 12.5px;
-  color: #5d6b7a;
-}
-
-.milestoneApprovalBox {
-  margin-top: 7px;
-  padding: 11px 14px;
-  border-radius: 10px;
-  background: #e1f6e5;
-  font-size: 12.5px;
-  font-weight: var(--kora-weight-bold);
-  color: #2e9e52;
-}
-
-.milestoneWaitingBox {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--kora-space-3);
-  margin-top: 7px;
-  padding: 11px 14px;
-  border-radius: 10px;
-  background: #f1f4f7;
-  font-size: 12.5px;
-  color: #5d6b7a;
-}
-
-.milestonePendingBox {
-  margin-top: 7px;
-  padding: 11px 14px;
-  border-radius: 10px;
-  background: #f1f4f7;
-  font-size: 12.5px;
-  color: #5d6b7a;
 }
 
 /* Impacto en el negocio — Figma node 9203:2774: 3 columnas (antes/después/
@@ -507,80 +438,6 @@
 .impactCalloutCaption {
   font-size: 11.5px;
   font-weight: var(--kora-weight-bold);
-}
-
-/* Puntos de atención e incidentes — Figma node 9203:3147. */
-.attentionCard {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.attentionHeader {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  color: #ee7e23;
-}
-
-.attentionTitle {
-  font-size: 14.5px;
-  font-weight: 800;
-  color: #0f2a44;
-}
-
-.attentionSummary {
-  font-size: 12.5px;
-  color: #93a0ac;
-  margin-bottom: 12px;
-}
-
-.attentionSubheading {
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.6px;
-  text-transform: uppercase;
-  color: #93a0ac;
-  margin-top: 16px;
-}
-
-.attentionEmpty {
-  font-size: 12.5px;
-  font-style: italic;
-  color: #93a0ac;
-  margin-top: 12.5px;
-}
-
-.attentionGrid {
-  display: grid;
-  grid-template-columns: minmax(180px, 1.5fr) 1fr minmax(180px, 1.5fr) 1fr;
-  gap: 16px;
-  margin-top: 10px;
-  padding: 14px 16px;
-  border-radius: 12px;
-  background: #f1f4f7;
-}
-
-.attentionFieldLabel {
-  font-size: 11px;
-  font-weight: var(--kora-weight-bold);
-  letter-spacing: 0.0645px;
-  text-transform: uppercase;
-  color: #93a0ac;
-}
-
-.attentionFieldValue {
-  margin-top: 3px;
-  font-size: 13px;
-  font-weight: var(--kora-weight-semibold);
-  color: #0f2a44;
-  line-height: 1.4;
-}
-
-.attentionIncident {
-  font-size: 13px;
-  color: #0f2a44;
-  margin-top: 8px;
 }
 
 /* Métricas de QA — Figma node 9203:2972. */

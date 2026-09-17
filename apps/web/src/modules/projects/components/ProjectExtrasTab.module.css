@@ -62,10 +62,79 @@
   align-self: flex-start;
 }
 
+.milestoneList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-2);
+  margin-bottom: var(--kora-space-3);
+}
+
+.milestoneRow {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-3);
+  padding: var(--kora-space-3);
+  border: 1px solid var(--kora-surface-disabled);
+  border-radius: var(--kora-radius-sm);
+}
+
+.milestoneInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.milestoneName {
+  font-weight: var(--kora-weight-semibold);
+  color: var(--kora-navy);
+}
+
+.milestoneMeta {
+  font-size: var(--kora-text-xs);
+  color: var(--kora-text-muted);
+}
+
+.milestoneActions {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+  flex-shrink: 0;
+}
+
+.milestoneEditRow {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr auto;
+  gap: var(--kora-space-3);
+  align-items: end;
+  padding: var(--kora-space-3);
+  border: 1px solid var(--kora-surface-disabled);
+  border-radius: var(--kora-radius-sm);
+}
+
+.milestoneEditActions {
+  display: flex;
+  gap: var(--kora-space-2);
+}
+
+.milestoneAddForm {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr auto;
+  gap: var(--kora-space-3);
+  align-items: end;
+}
+
 @media (max-width: 640px) {
   .row,
   .row3,
-  .impactCols {
+  .impactCols,
+  .milestoneEditRow,
+  .milestoneAddForm {
     grid-template-columns: 1fr;
+  }
+
+  .milestoneRow {
+    flex-wrap: wrap;
   }
 }

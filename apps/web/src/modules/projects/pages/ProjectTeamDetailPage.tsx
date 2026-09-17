@@ -6,9 +6,13 @@ import { TeamLeaderProjectView } from '../components/TeamLeaderProjectView';
 import { useProjectDetail } from '../api/projects.queries';
 
 /**
- * Deep link a un equipo puntual dentro de un proyecto (`Ver equipo` en el
- * tab Resumen de `DevelopmentProjectDetailView`, para quien tiene
- * `projects:manage`). Comparte el mismo panel (`TeamLeaderProjectView`) que
+ * Deep link a un equipo puntual dentro de un proyecto. Dos entradas:
+ * `Ver equipo` en el tab Resumen de `DevelopmentProjectDetailView` (para
+ * quien tiene `projects:manage`), y la tabla "Proyectos del equipo" de
+ * `LeaderTeamConsole` (`/equipos`) — así un líder que también lidera el
+ * proyecto completo sigue viendo el panel acotado a su equipo al entrar
+ * desde Equipos, en vez de la ficha admin que vería entrando desde
+ * Proyectos. Comparte el mismo panel (`TeamLeaderProjectView`) que
  * `ProjectDetailPage` renderiza automáticamente cuando quien entra a
  * `/proyectos/:id` lidera solo ese equipo — no es una vista distinta.
  */

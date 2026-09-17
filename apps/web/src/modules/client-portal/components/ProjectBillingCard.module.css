@@ -1,0 +1,177 @@
+/* "Facturación" — Figma node 9663:24480 (variante "Kora · Proyectos y
+   Soporte 2"), colores tomados directo del design context de ese nodo. */
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 22px 24px;
+  border-radius: 16px;
+  border: 1px solid #e4e9ee;
+  background: var(--kora-surface);
+  box-shadow:
+    0px 1px 1px 0px rgba(15, 41, 66, 0.06),
+    0px 10px 14px 0px rgba(15, 41, 66, 0.16);
+}
+
+.kpiRow {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.kpi {
+  display: flex;
+  flex: 1 0 160px;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid #b9c9dd;
+  background: var(--kora-surface);
+}
+
+.kpiLabel {
+  font-size: 12px;
+  font-weight: var(--kora-weight-bold);
+  color: #6a7f99;
+}
+
+.kpiValue {
+  font-size: 24px;
+  font-weight: var(--kora-weight-bold);
+  color: #122235;
+}
+
+.kpiValuePaid {
+  color: #4fae32;
+}
+
+.kpiValuePendingCollection {
+  color: #f6c65b;
+}
+
+.kpiSub {
+  font-size: 12px;
+  font-weight: var(--kora-weight-medium);
+  color: #5a6470;
+}
+
+.progressTrack {
+  display: flex;
+  height: 12px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #e2e7eb;
+}
+
+.progressPaid {
+  background: #4fae32;
+  height: 100%;
+}
+
+.progressPendingCollection {
+  background: #f6c65b;
+  height: 100%;
+}
+
+.progressPendingToInvoice {
+  background: #e2e7eb;
+  height: 100%;
+}
+
+.legendRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: var(--kora-weight-medium);
+  color: #5a6470;
+}
+
+.legendDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 5px;
+  flex-shrink: 0;
+}
+
+.legendDotPaid {
+  background: #4fae32;
+}
+
+.legendDotPendingCollection {
+  background: #f6c65b;
+}
+
+.legendDotPendingToInvoice {
+  background: #a3a7ab;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th {
+  padding: 12px 8px;
+  border-bottom: 1px solid #e2e7eb;
+  text-align: left;
+  font-size: 12px;
+  font-weight: var(--kora-weight-bold);
+  color: #5a6470;
+}
+
+.table td {
+  padding: 16px 8px;
+  border-bottom: 1px solid #e2e7eb;
+  font-size: 14px;
+  color: #5a6470;
+}
+
+.table tr:last-child td {
+  border-bottom: none;
+}
+
+.tramoCell {
+  font-size: 16px;
+  font-weight: var(--kora-weight-medium);
+  color: #122235;
+}
+
+.amountCell {
+  font-weight: var(--kora-weight-bold);
+  color: #122235;
+}
+
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: var(--kora-weight-semibold);
+}
+
+.statusBadgePaid {
+  background: #e8ffe1;
+  color: #4e7511;
+}
+
+.statusBadgePending {
+  background: #fff1da;
+  color: #966100;
+}
+
+@media (max-width: 700px) {
+  .table {
+    display: block;
+    overflow-x: auto;
+  }
+}

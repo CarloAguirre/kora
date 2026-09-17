@@ -18,13 +18,17 @@ const STATUS_TONE: Readonly<Record<ClientRoadmapPhase['status'], StatusPillTone>
 
 /**
  * Una fila de "Hoja de ruta": nombre de fase + eje de meses + su mini-pipeline
- * de 5 pasos (Figma node 9203:2329). Los colores por paso dependen del
- * ESTADO DE LA FASE, no son verdes para "hecho" en general:
- * - fase `finished`: los 5 pasos en gris-azulado (#93a5b8), NUNCA verde.
+ * de 5 pasos (Figma node 9663:24531, variante "Kora · Proyectos y Soporte 2").
+ * Los colores por paso dependen del ESTADO DE LA FASE:
+ * - fase `finished`: los 5 pasos en verde (#2e9e52) — antes eran gris-azulado,
+ *   nunca verde; el Figma actualizado los pinta verdes.
  * - fase `upcoming`: los 5 pasos en gris claro (#f1f4f7), tarjeta punteada.
- * - fase `in_progress`: pasos anteriores al actual en gris-azulado, el actual
- *   en verde (#8bc53f), los siguientes en gris claro — y solo esta fase
- *   muestra la línea roja "HOY".
+ * - fase `in_progress`: pasos anteriores al actual en verde (#2e9e52), el
+ *   actual en ámbar (#ffae00) — antes el actual iba en verde —, los
+ *   siguientes en gris claro. La línea roja de esta fase ya NO lleva la
+ *   etiqueta "HOY": en el Figma esa etiqueta queda recortada fuera del área
+ *   visible (`overflow: hidden` del contenedor), y el texto de apoyo la
+ *   describe como el avance ESPERADO a hoy, no como "hoy" en sí.
  */
 export function PhaseProgressBar({ phase }: { phase: ClientRoadmapPhase }) {
   const currentIndex = phase.currentStep ? ROADMAP_STEPS.indexOf(phase.currentStep) : -1;
@@ -46,11 +50,7 @@ export function PhaseProgressBar({ phase }: { phase: ClientRoadmapPhase }) {
       </div>
 
       <div className={styles.steps}>
-        {phase.todayMarkerPercent != null && (
-          <div className={styles.todayLine} style={{ left: `${phase.todayMarkerPercent}%` }}>
-            <span className={styles.todayTag}>HOY</span>
-          </div>
-        )}
+        {phase.expectedProgressPercent != null && <div className={styles.expectedProgressLine} style={{ left: `${phase.expectedProgressPercent}%` }} />}
         {ROADMAP_STEPS.map((step, index) => {
           const style: 'past' | 'current' | 'future' =
             phase.status === 'finished' ? 'past' : phase.status === 'upcoming' ? 'future' : index < currentIndex ? 'past' : index === currentIndex ? 'current' : 'future';

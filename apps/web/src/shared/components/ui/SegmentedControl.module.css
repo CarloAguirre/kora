@@ -1,0 +1,30 @@
+.group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--kora-space-2);
+}
+
+.option {
+  height: var(--kora-control-height-sm);
+  padding: 6px var(--kora-space-4);
+  border-radius: var(--kora-radius);
+  border: 1px solid var(--kora-border-soft);
+  background: var(--kora-surface);
+  color: var(--kora-text-muted);
+  font-family: var(--kora-font);
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-medium);
+  cursor: pointer;
+  transition: background var(--kora-transition), color var(--kora-transition), border-color var(--kora-transition);
+}
+
+.option:hover:not(.selected) {
+  background: var(--kora-blue-surface);
+}
+
+.selected {
+  background: var(--kora-navy);
+  border-color: var(--kora-navy);
+  color: var(--kora-lime);
+  font-weight: var(--kora-weight-bold);
+}

@@ -109,6 +109,8 @@ export const ticketSummarySchema = z.object({
   /** Solicitudes de HH del ticket en estado `pending` — para avisar en el listado que hay horas por aprobar sin abrir la ficha. */
   pendingHhRequestsCount: z.number().int(),
   pendingHhHours: z.number(),
+  /** Factura de soporte a la que quedó enlazado — `null` = todavía no facturado (ver `support_invoices`). */
+  invoiceId: uuidSchema.nullable(),
   createdAt: isoDateTimeSchema,
 });
 export type TicketSummary = z.infer<typeof ticketSummarySchema>;

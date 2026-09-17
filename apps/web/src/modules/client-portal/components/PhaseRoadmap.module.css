@@ -1,0 +1,470 @@
+/* "Roadmap por Fases" — Figma node 9669:31017 (variante "Kora · Proyectos y
+   Soporte 2"), reemplaza al Gantt fijo anterior. */
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px 24px;
+  border-radius: 16px;
+  border: 1px solid #e4e9ee;
+  background: var(--kora-surface);
+  box-shadow:
+    0px 1px 1px 0px rgba(15, 41, 66, 0.06),
+    0px 10px 14px 0px rgba(15, 41, 66, 0.16);
+}
+
+.summaryRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.summaryChip {
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: #f1f4f7;
+  color: #5d6b7a;
+  font-size: 12.5px;
+  font-weight: var(--kora-weight-bold);
+}
+
+.filterRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+
+.filterLabel {
+  font-size: 12.5px;
+  color: #93a0ac;
+}
+
+.rangeDateField {
+  width: 148px;
+}
+
+.legendRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 22px;
+  padding: 14px 0;
+  border-top: 1px solid #e4e9ee;
+  border-bottom: 1px solid #e4e9ee;
+}
+
+.legendGroup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #5d6b7a;
+  white-space: nowrap;
+}
+
+.legendDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.legendDiamondDone {
+  color: #0f2a44;
+}
+
+.legendDiamondCommitted {
+  color: #93a0ac;
+}
+
+.legendDiamondDelayed {
+  color: #d5504b;
+}
+
+.taskDotDone {
+  background: #0f2a44;
+}
+
+.taskDotUpcoming {
+  background: var(--kora-surface);
+  border: 1.5px solid #93a0ac;
+}
+
+.taskDotDelayed {
+  background: #d5504b;
+}
+
+.legendHoy {
+  font-size: 12px;
+  font-weight: var(--kora-weight-bold);
+  color: #d5504b;
+}
+
+.hint {
+  font-size: 12px;
+  font-style: italic;
+  color: #93a0ac;
+}
+
+.phaseList {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.phaseCard {
+  border: 1px solid #e4e9ee;
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.phaseHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 14px 18px;
+  border: none;
+  background: var(--kora-surface);
+  cursor: pointer;
+  text-align: left;
+}
+
+.phaseHeader:hover {
+  background: #f9fafb;
+}
+
+.phaseBadge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 6px;
+  background: #0f2a44;
+  color: var(--kora-surface);
+  font-size: 10.5px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.phaseName {
+  font-size: 14.5px;
+  font-weight: 800;
+  color: #0f2a44;
+}
+
+.phaseHeaderSpacer {
+  flex: 1;
+}
+
+.alertBadge {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #fdecea;
+  color: #d5504b;
+  font-size: 12px;
+  font-weight: var(--kora-weight-bold);
+  white-space: nowrap;
+}
+
+.phaseBody {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+  border-top: 1px solid #e4e9ee;
+}
+
+.summaryOfProgressRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+}
+
+.summaryOfProgressLabel {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: #93a0ac;
+  white-space: nowrap;
+}
+
+/* Chips de ámbito (Diseño/Desarrollo/QA Funcional/Rev. Cliente) — Figma
+   (node 9669:31017) los pinta como píldoras navy sólidas de ancho fijo al
+   contenido, no como una barra de progreso segmentada por %. */
+.stageChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.stageChip {
+  padding: 8px 14px;
+  border: none;
+  border-radius: 8px;
+  background: #0f2a44;
+  color: var(--kora-surface);
+  font-size: 12.5px;
+  font-weight: var(--kora-weight-semibold);
+  cursor: pointer;
+}
+
+/* Zoom Semanas/Días — slider real con estado de vista local (como
+   `.zoomRow` de `ProjectModulesCard`), no un toggle decorativo sin acción. */
+.zoomRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  font-size: 12.5px;
+  color: #5d6b7a;
+}
+
+.zoomRow input[type='range'] {
+  width: 90px;
+  accent-color: #0f2a44;
+}
+
+/* Gantt de dos columnas: los nombres de fila quedan fijos a la izquierda y
+   solo `.ganttTracks` hace scroll horizontal — si scrollea todo junto se
+   pierde de vista a qué fila pertenece cada barra. */
+.ganttGrid {
+  display: flex;
+}
+
+.ganttLabels {
+  width: 190px;
+  flex: none;
+}
+
+/* Alinea la columna de nombres con la cabecera de meses/días de la pista. */
+.ganttLabelsHeader {
+  height: 40px;
+}
+
+.ganttTracks {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+/* El zoom ensancha esto por encima del 100%: aparece el scroll y el
+   cronograma se ve más en detalle. */
+.ganttScroll {
+  position: relative;
+  min-width: 100%;
+}
+
+.ganttHeader {
+  position: relative;
+  height: 40px;
+  border-bottom: 1px solid #e4e9ee;
+}
+
+.ganttMonth {
+  position: absolute;
+  top: 0;
+  display: flex;
+  align-items: center;
+  height: 20px;
+  padding-left: 6px;
+  border-left: 1px solid #e4e9ee;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: #5d6b7a;
+}
+
+.ganttDayTick {
+  position: absolute;
+  top: 20px;
+  display: flex;
+  align-items: center;
+  height: 18px;
+  transform: translateX(-50%);
+  font-size: 9.5px;
+  font-weight: var(--kora-weight-semibold);
+  color: #93a0ac;
+  white-space: nowrap;
+}
+
+.ganttDayLine {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: #f4f5f7;
+}
+
+.ganttWeekLine {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: #e7e9ee;
+}
+
+.ganttTodayLine {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: #d5504b;
+  z-index: 5;
+}
+
+.ganttTodayLabel {
+  position: absolute;
+  top: 2px;
+  transform: translateX(-50%);
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #d5504b;
+  color: var(--kora-surface);
+  font-size: 9.5px;
+  font-weight: 800;
+  white-space: nowrap;
+  z-index: 6;
+}
+
+/* La cuadrícula y las etiquetas por día solo aparecen al acercar el zoom. */
+.detailOnly {
+  display: none;
+}
+
+.ganttTracksDetail .detailOnly {
+  display: block;
+}
+
+.trackRow {
+  position: relative;
+  height: 46px;
+}
+
+.trackRowBg {
+  position: absolute;
+  top: 11px;
+  left: 0;
+  right: 0;
+  height: 24px;
+  border-radius: 6px;
+  background: #f8fafc;
+}
+
+.taskRowLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 46px;
+  min-width: 0;
+}
+
+.taskRowLabelText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.taskRoleName {
+  font-size: 12px;
+  font-weight: 800;
+  color: #0f2a44;
+}
+
+.taskLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11.5px;
+  color: #93a0ac;
+}
+
+.ganttBar {
+  position: absolute;
+  top: 11px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  padding: 0 8px;
+  font-size: 11px;
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-surface);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.ganttBarFuture {
+  opacity: 0.45;
+}
+
+.markerRowLabel {
+  display: flex;
+  align-items: center;
+  height: 46px;
+  font-size: 12px;
+  color: #5d6b7a;
+}
+
+/* Marcador de entrega/tarea posicionado por fecha, con su etiqueta al lado. */
+.markerItem {
+  position: absolute;
+  top: 13px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transform: translateX(-5px);
+  font-size: 12.5px;
+  color: #0f2a44;
+  white-space: nowrap;
+}
+
+.markerLabel {
+  font-size: 12.5px;
+}
+
+.markerItemHighlighted {
+  top: 9px;
+  padding: 4px 10px;
+  border: 1px solid #4c7ef3;
+  border-radius: 999px;
+  background: #eef4ff;
+}
+
+.relatedBitacora {
+  display: flex;
+  flex-direction: column;
+  padding-top: 14px;
+  border-top: 1px dashed #e4e9ee;
+}
+
+.relatedBitacoraLabel {
+  margin-bottom: 4px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: #93a0ac;
+}
+
+@media (max-width: 900px) {
+  .filterRow {
+    margin-left: 0;
+  }
+}

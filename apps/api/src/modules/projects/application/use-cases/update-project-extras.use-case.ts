@@ -69,6 +69,12 @@ export class UpdateProjectExtrasUseCase implements UseCase<UpdateProjectExtrasCo
         ...(data.qaPlannedTests !== undefined ? { qaPlannedTests: data.qaPlannedTests } : {}),
         ...(data.qaExecutedTests !== undefined ? { qaExecutedTests: data.qaExecutedTests } : {}),
         ...(data.qaFailedTests !== undefined ? { qaFailedTests: data.qaFailedTests } : {}),
+        ...(data.periodReportDate !== undefined
+          ? { periodReportDate: data.periodReportDate ? new Date(data.periodReportDate) : null }
+          : {}),
+        ...(data.periodReportAchievements !== undefined
+          ? { periodReportAchievements: data.periodReportAchievements }
+          : {}),
       },
       this.clock.now(),
     );

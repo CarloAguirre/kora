@@ -12,7 +12,6 @@ export function ClientProjectPreviewPage() {
     <ClientProjectDetailPage
       backTo={`/clientes/${clientId}/vista-cliente`}
       backLabel="Volver a proyectos"
-      preview
     />
   );
 }

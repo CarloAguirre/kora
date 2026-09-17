@@ -206,3 +206,109 @@ más fino, y arranca desde el módulo `Clientes` que YA EXISTE:
   `KoraLogo`, respectivamente: no hay assets de logo por cliente en este
   proyecto, y el resto de la app ya usa el logo de Kora para la mención
   "Diseñado y desarrollado por…" (pie de `DashboardSupportTab.tsx`).
+
+## Actualización de la ficha de proyecto al Figma más reciente (2026-09-16)
+
+El Figma de referencia (fileKey `Sqc5DJtmbLtnBhAM0y4Fww`, sección "Propuesta
+Mejoras Vista Cliente", node `8756:45807`) tiene **dos** variantes de la
+ficha de proyecto: `9663:23202` ("Kora · Proyectos y Soporte 1", la que se
+había implementado originalmente) y `9663:24207` ("Kora · Proyectos y Soporte
+2", más reciente). `ClientProjectDetailPage.tsx` se actualizó a la variante 2.
+Verificado capa por capa contra el código real, con `get_screenshot` (no solo
+la metadata en texto, que incluye capas ocultas engañosas), lo que cambió:
+
+- **Nueva sección "Facturación"** (`ProjectBillingCard`), justo después de la
+  tarjeta de info: 4 tarjetas de monto, barra de progreso segmentada y una
+  tabla de cronograma de pago por tramo.
+- **"Roadmap del proyecto" (Gantt fijo de 3 módulos × 4 tareas) reemplazado
+  por "Roadmap por Fases"** (`PhaseRoadmap`): un acordeón con una tarjeta por
+  fase del proyecto, cada una con sus propias tareas agrupadas por rol de
+  equipo (DEV/QA/IA/UX/RPA, cantidad variable), sus entregas y un mini-listado
+  de bitácora relacionado a esa fase.
+- **"Hitos y aprobaciones" + "Puntos de atención e incidentes" fusionadas en
+  una sola "Bitácora"** (`ProjectBitacora`): un feed cronológico único, cada
+  entrada con su propia etiqueta de fase en vez de vivir bajo el
+  `milestonesCaption` de una sola fase activa.
+- **"Horas y avance" pasó de 3 a 4 tarjetas**: se agregó "Horas utilizadas a
+  la fecha" y la tarjeta "Horas estimadas" ahora incluye una sub-línea "Horas
+  desviación" con badge de riesgo.
+- **"Hoja de ruta" recoloreada**: fase `finished` ahora pinta sus 5 pasos en
+  verde (antes gris-azulado, nunca verde); en la fase `in_progress` el paso
+  ACTUAL ahora es ámbar (antes verde). La línea roja perdió la etiqueta "HOY"
+  (queda recortada fuera del área visible en el propio Figma) y pasó a
+  describirse como el avance ESPERADO, no como "hoy".
+- **Nueva sección "Avance del periodo"** (`PeriodReportCard`): un reporte
+  narrativo con viñetas de logros del período. A diferencia de las anteriores,
+  esta sección está **oculta en el Figma en ambas variantes** (`get_screenshot`
+  devuelve 1×1 px) — se construyó igual por pedido explícito, no por hallazgo
+  de un cambio visible.
+- La fila de íconos "mostrar/ocultar sección" se quedó en 9 botones en el
+  archivo de Figma, sin sincronizar con las 2 secciones nuevas ni con la
+  fusión de Hitos+Atención en Bitácora. Se priorizó el invariante que el
+  propio código ya documentaba (un ícono por sección, `SECTION_TOGGLES` como
+  única fuente de verdad) por sobre copiar un conteo desactualizado: son 10
+  ahora.
+
+Sin cambios: "Accesos y enlaces", "Impacto en el negocio" y "Métricas de la
+etapa actual — QA" (verificados con captura, idénticos a la variante 1).
+
+Sigue siendo 100% mock — nada de esto conecta a datos reales; los bloqueos
+documentados arriba (sin `client_id` en `users`, sin caso de uso de
+agregación, sin endpoint) no cambiaron.
+
+### El calendario del Roadmap por Fases es de fechas reales
+
+El Gantt de cada fase no dibuja posiciones fijas: el prototipo
+`ficha_proyecto_lider` (entregado por el usuario) define cómo debe
+comportarse, y `PhaseRoadmap` lo sigue. Barras, marcadores, bloques de mes,
+cuadrícula y línea de HOY se calculan como % del rango visible a partir de
+fechas ISO en el mock, así que:
+
+- El **zoom Semanas/Días** es un `<input type="range">` real: ensancha la
+  pista (100% → 400%) y sobre 35 revela la cuadrícula y las etiquetas por día.
+- El **filtro "Rango visible"** (con `TextField type="date"`) y
+  Aplicar/Restablecer recalculan de verdad el eje: no son acciones de ejemplo.
+- Solo la columna de pistas hace scroll horizontal. Los nombres de fila viven
+  en una columna aparte de ancho fijo (`.ganttLabels`), igual que
+  `ProjectModulesCard` del módulo interno: si scrollea todo junto se pierde de
+  vista a qué fila pertenece cada barra.
+
+El estado de cada tramo (terminado / en curso / futuro) se deriva de sus
+fechas contra hoy, no se guarda aparte. Lo único sin lógica real ahí son los
+chips de "Resumen de avance", que el Figma pinta como píldoras navy de solo
+lectura.
+
+## El portal ya está conectado a datos reales (2026-09-16)
+
+Las tres pantallas (`ClientPortalPage`, `ClientProjectDetailPage`,
+`ClientSupportContractDetailPage`) dejaron de leer `mocks/client-portal.mocks.ts`
+(borrado) y ahora usan los hooks reales (`useProjectsList`, `useProjectDetail`,
+`useSupportPlansForClient`, `useSupportPlanDetail`, `useTicketsList`,
+`useTicketDetail`) a través de una capa de adaptadores nueva en
+`apps/web/src/modules/client-portal/adapters/` — las vistas y sus componentes
+no cambiaron, solo el origen del dato. Sigue sirviéndose por la **vista previa
+interna** (`/clientes/:clientId/vista-cliente/...`, con el PMO actual): el
+bloqueo real (`users` sin `client_id`, login de cliente) descrito arriba no se
+tocó, sigue pendiente.
+
+Esquema nuevo (`packages/db/src/schema/projects.ts`): tabla
+`project_payment_milestones` (tramos de pago — "Facturación") y columnas
+`projects.period_report_date` / `period_report_achievements` ("Avance del
+periodo"). Seed de ejemplo en `packages/db/src/seeds/demo-client-portal.ts`
+(`pnpm --filter @kora/db seed:demo`, idempotente) — reutiliza el cliente real
+"Edificate Inteligente" ya migrado de la v1 (no crea uno de mentira) y agrega
+un proyecto de desarrollo con 4 fases completas más los dos contratos de
+soporte de los Figma `9007:8170` (consolidado, 3 proyectos cubiertos) y
+`9007:8445` (único).
+
+Huecos de datos reales, documentados en el propio adaptador que los toca en
+vez de fingirlos:
+- `project_module_deliveries` no guarda nombre propio — la etiqueta de cada
+  entrega se arma con el equipo responsable ("Entrega DEV").
+- El SLA del Figma ("06:53:18/8hr") no tiene reloj real detrás — se muestra
+  "usadas/estimadas" en su lugar.
+- "Hoja de ruta" no guarda un % de avance propio por fase — se aproxima con
+  la fracción de tiempo transcurrido dentro del rango estimado.
+- La fila de la lista de proyectos (`ClientProjectRow`) perdió `phaseCount`/
+  `tag`: `GET /projects` (resumen) no trae módulos ni equipos, a diferencia
+  del detalle — se reemplazó por `typeLabel` ("Desarrollo"/"Soporte").

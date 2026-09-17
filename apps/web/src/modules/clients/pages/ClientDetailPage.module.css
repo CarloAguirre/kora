@@ -117,3 +117,10 @@
     grid-template-columns: 1fr;
   }
 }
+
+.supportTypeCell {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+  flex-wrap: wrap;
+}

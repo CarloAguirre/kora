@@ -13,7 +13,7 @@ export class SupportPlanAvailabilityService {
   constructor(@Inject(SUPPORT_PLAN_REPOSITORY) private readonly plans: SupportPlanRepository) {}
 
   async check(projectId: string, now: Date): Promise<SupportPlanAvailability> {
-    const plan = await this.plans.findActiveForProject(projectId);
+    const plan = await this.plans.findActiveForProjectOrLinked(projectId);
     if (!plan || plan.status !== 'active') return { hasActiveUsablePlan: false, plan: null };
 
     const today = startOfDay(now);

@@ -11,6 +11,7 @@ import {
   TrendingUpIcon,
   SettingsIcon,
   HelpCircleIcon,
+  BarChartIcon,
 } from '../icons/Icons';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
@@ -91,6 +92,22 @@ const NAVIGATION: readonly NavigationItem[] = [
     anyOf: ['tickets:read', 'tickets:read_assigned'],
   },
   {
+    to: '/facturacion-soporte',
+    label: 'Facturación de Soporte',
+    icon: <BarChartIcon size={20} />,
+    permission: 'billing:read',
+  },
+  // Libro combinado de Soporte + Proyectos del rol Finanzas — ver
+  // `kora-perfil-finanzas.html`. Mismo permiso que la entrada de arriba, así
+  // que admin/pmo ven ambas: la de soporte (con el detalle de contratos) y
+  // esta (el libro plano). No reemplaza a `/facturacion-soporte`.
+  {
+    to: '/facturacion',
+    label: 'Facturación',
+    icon: <BarChartIcon size={20} />,
+    permission: 'billing:read',
+  },
+  {
     to: '/usuarios',
     label: 'Administración',
     icon: <UsersIcon size={20} />,
@@ -119,7 +136,9 @@ export function Sidebar({ open, onNavigate }: SidebarProps) {
     // ninguno de esos permisos y de todos modos rebota a /portal/proyectos
     // (ver DashboardPage.tsx). Ocultarlo evita un enlace que solo lleva de
     // vuelta a donde ya está.
-    if (item.to === '/dashboard' && user?.role === 'cliente') return false;
+    // Mismo criterio para `finanzas`: perfil de un único propósito (ver
+    // `kora-perfil-finanzas.html`), su menú es solo "Facturación".
+    if (item.to === '/dashboard' && (user?.role === 'cliente' || user?.role === 'finanzas')) return false;
     if (item.permission) return can(item.permission);
     if (item.anyOf) return canAny(...item.anyOf);
     return true;

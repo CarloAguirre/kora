@@ -1,0 +1,185 @@
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kora-space-1);
+  font-size: var(--kora-text-sm);
+  color: var(--kora-text-muted);
+  text-decoration: none;
+  margin-bottom: var(--kora-space-3);
+}
+
+.backLink:hover {
+  color: var(--kora-navy);
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--kora-space-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--kora-space-4);
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-3);
+  flex-wrap: wrap;
+}
+
+.title {
+  font-size: var(--kora-text-2xl);
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-navy);
+  margin: 0;
+}
+
+.badgeRow {
+  display: flex;
+  gap: var(--kora-space-2);
+  margin-top: var(--kora-space-2);
+}
+
+.closedBanner {
+  background: var(--kora-success-surface);
+  color: var(--kora-success-text);
+  border-radius: var(--kora-radius);
+  padding: var(--kora-space-3) var(--kora-space-4);
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-medium);
+  margin-bottom: var(--kora-space-4);
+}
+
+.identityCard {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--kora-space-5);
+  margin-bottom: var(--kora-space-4);
+}
+
+.identityField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 140px;
+}
+
+.identityLabel {
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-medium);
+  color: var(--kora-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.identityValue {
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-semibold);
+  color: var(--kora-navy);
+}
+
+.identitySub {
+  font-size: var(--kora-text-xs);
+  color: var(--kora-text-muted);
+}
+
+.infoRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--kora-space-4);
+  margin-bottom: var(--kora-space-4);
+}
+
+.infoCard {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.infoLabel {
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.infoValue {
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-semibold);
+  color: var(--kora-navy);
+}
+
+.docLinks {
+  display: flex;
+  gap: var(--kora-space-3);
+  flex-wrap: wrap;
+}
+
+.docLinks a {
+  font-size: var(--kora-text-sm);
+  color: var(--kora-navy);
+}
+
+.sectionTitle {
+  font-size: var(--kora-text-lg);
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-navy);
+  margin: 0 0 var(--kora-space-3);
+}
+
+.slaRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--kora-space-4);
+}
+
+.slaItem {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.summaryRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--kora-space-4);
+  margin-bottom: var(--kora-space-4);
+}
+
+.billingAction {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kora-space-3);
+  padding: var(--kora-space-3) var(--kora-space-4);
+  background: var(--kora-surface-alt);
+  border-radius: var(--kora-radius);
+  margin-bottom: var(--kora-space-4);
+  font-size: var(--kora-text-sm);
+  color: var(--kora-navy);
+}
+
+.hint {
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-sm);
+  margin: 0 0 var(--kora-space-4);
+}
+
+.ticketLink {
+  color: var(--kora-navy);
+  font-weight: var(--kora-weight-semibold);
+  text-decoration: none;
+}
+
+.ticketLink:hover {
+  text-decoration: underline;
+}
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-4);
+  width: 100%;
+}

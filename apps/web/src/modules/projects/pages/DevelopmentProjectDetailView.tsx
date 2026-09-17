@@ -26,7 +26,11 @@ import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link } from "react-router-dom";
 import { z } from "zod";
-import { useAssignProjectMember, useUnassignProjectMember } from "../api/projects.queries";
+import {
+  useAssignProjectMember,
+  useResolveProjectManagementApproval,
+  useUnassignProjectMember,
+} from "../api/projects.queries";
 import { BitacoraCard } from "../components/BitacoraCard";
 import { BitacoraMiniCard } from "../components/BitacoraMiniCard";
 import { ProjectExtrasTab } from "../components/ProjectExtrasTab";
@@ -72,6 +76,7 @@ export function DevelopmentProjectDetailView({
   const [tab, setTab] = useState<DetailTab>("resumen");
   const assignMember = useAssignProjectMember();
   const unassignMember = useUnassignProjectMember();
+  const resolveManagementApproval = useResolveProjectManagementApproval();
   const { data: projectHourEntries } = useHourEntriesList({
     projectId,
     page: 1,
@@ -284,6 +289,17 @@ export function DevelopmentProjectDetailView({
     toast.success("Se retiró a la persona del proyecto.");
   };
 
+  const onResolveManagementApproval = async () => {
+    try {
+      await resolveManagementApproval.mutateAsync(projectId);
+      toast.success("Se activó el proyecto.");
+    } catch (error) {
+      toast.error(
+        error instanceof ApiRequestError ? error.message : "No se pudo activar el proyecto.",
+      );
+    }
+  };
+
   const membersByTeam = useMemo(() => {
     const map = new Map<string, ProjectTeamMember[]>();
     for (const member of project.members) {
@@ -296,6 +312,19 @@ export function DevelopmentProjectDetailView({
 
   return (
     <div className={styles.page}>
+      {project.pendingManagementApproval && can("projects:manage") && (
+        <div className={styles.hito0Banner}>
+          <span>Hito 0 pendiente de aprobación de Gerencia.</span>
+          <Button
+            size="sm"
+            loading={resolveManagementApproval.isPending}
+            onClick={() => void onResolveManagementApproval()}
+          >
+            Activar proyecto
+          </Button>
+        </div>
+      )}
+
       {/* Datos del proyecto y Timeline: siempre visibles, fuera de las tabs (igual que en el mockup del líder de proyecto). */}
       <Card>
         <ProjectInfoBar

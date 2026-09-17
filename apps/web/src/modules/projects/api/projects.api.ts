@@ -7,10 +7,15 @@ import type {
   CreateProjectModuleInput,
   CreateProjectModuleSegmentInput,
   CreateProjectModuleTaskInput,
+  CreateProjectPaymentMilestoneInput,
+  IssueProjectPaymentMilestoneInvoiceInput,
   ListProjectsQuery,
   ListProjectsResponse,
+  MarkProjectPaymentMilestonePaidInput,
+  ProjectBillingSettings,
   ProjectDetail,
   SetProjectOvertimeAuthorizationInput,
+  UpdateProjectBillingSettingsInput,
   UpdateProjectExtrasInput,
   UpdateProjectInput,
   UpdateProjectModuleDeliveryInput,
@@ -18,6 +23,7 @@ import type {
   UpdateProjectModuleSegmentInput,
   UpdateProjectModuleTaskInput,
   UpdateProjectObservationInput,
+  UpdateProjectPaymentMilestoneInput,
   UpdateProjectTeamMemberInput,
 } from '@kora/contracts';
 import { api } from '@/shared/lib/api-client';
@@ -137,6 +143,42 @@ export const projectsApi = {
   deleteModuleTask(projectId: string, moduleId: string, taskId: string): Promise<void> {
     return api.delete<void>(`/projects/${projectId}/modules/${moduleId}/tasks/${taskId}`);
   },
+  createPaymentMilestone(projectId: string, input: CreateProjectPaymentMilestoneInput): Promise<{ id: string }> {
+    return api.post<{ id: string }>(`/projects/${projectId}/payment-milestones`, input);
+  },
+  updatePaymentMilestone(
+    projectId: string,
+    milestoneId: string,
+    input: UpdateProjectPaymentMilestoneInput,
+  ): Promise<void> {
+    return api.patch<void>(`/projects/${projectId}/payment-milestones/${milestoneId}`, input);
+  },
+  deletePaymentMilestone(projectId: string, milestoneId: string): Promise<void> {
+    return api.delete<void>(`/projects/${projectId}/payment-milestones/${milestoneId}`);
+  },
+  issuePaymentMilestoneInvoice(
+    projectId: string,
+    milestoneId: string,
+    input: IssueProjectPaymentMilestoneInvoiceInput,
+  ): Promise<void> {
+    return api.post<void>(`/projects/${projectId}/payment-milestones/${milestoneId}/invoice`, input);
+  },
+  markPaymentMilestonePaid(
+    projectId: string,
+    milestoneId: string,
+    input: MarkProjectPaymentMilestonePaidInput,
+  ): Promise<void> {
+    return api.patch<void>(`/projects/${projectId}/payment-milestones/${milestoneId}/paid`, input);
+  },
+  resolveManagementApproval(projectId: string): Promise<void> {
+    return api.patch<void>(`/projects/${projectId}/resolve-management-approval`);
+  },
+  getBillingSettings(): Promise<ProjectBillingSettings> {
+    return api.get<ProjectBillingSettings>('/projects/billing-settings');
+  },
+  updateBillingSettings(input: UpdateProjectBillingSettingsInput): Promise<void> {
+    return api.patch<void>('/projects/billing-settings', input);
+  },
 };
 
 export const projectKeys = {
@@ -145,4 +187,5 @@ export const projectKeys = {
   list: (query: Partial<ListProjectsQuery>) => [...projectKeys.lists(), query] as const,
   details: () => [...projectKeys.all, 'detail'] as const,
   detail: (projectId: string) => [...projectKeys.details(), projectId] as const,
+  billingSettings: () => [...projectKeys.all, 'billing-settings'] as const,
 };

@@ -38,6 +38,8 @@ export interface TicketListItem {
   /** Solicitudes de HH en estado `pending` para este ticket. */
   readonly pendingHhRequestsCount: number;
   readonly pendingHhHours: number;
+  /** Factura de soporte a la que quedó enlazado — `null` = todavía no facturado. */
+  readonly invoiceId: string | null;
   readonly createdAt: Date;
 }
 
@@ -53,6 +55,11 @@ export interface TicketRepository {
   ): Promise<Page<TicketListItem>>;
 
   save(ticket: Ticket, context?: TransactionContext): Promise<void>;
+
+  /** Ids de tickets `closed` de estos proyectos que aún no están facturados — para `MarkSupportInvoiceIssuedUseCase` (planes `on_demand`). */
+  findClosedUnbilledIds(projectIds: readonly string[], context?: TransactionContext): Promise<string[]>;
+  /** Enlaza estos tickets a la factura recién emitida — evita facturar dos veces las mismas horas. Operación administrativa, no un cambio de estado del ticket: no pasa por el agregado `Ticket`. */
+  linkToInvoice(ticketIds: readonly string[], invoiceId: string, context?: TransactionContext): Promise<void>;
 }
 
 export const TICKET_REPOSITORY = Symbol('TicketRepository');

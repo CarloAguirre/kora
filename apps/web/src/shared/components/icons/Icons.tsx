@@ -394,6 +394,34 @@ export const RefreshIcon = (props: IconProps) => (
   </Icon>
 );
 
+/** Lucide `dollar-sign`. */
+export const DollarSignIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <line x1="12" x2="12" y1="2" y2="22" />
+    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+  </Icon>
+);
+
+/** Lucide `file-text`. */
+export const FileTextIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
+    <path d="M14 2v4a2 2 0 0 0 2 2h4" />
+    <path d="M10 9H8" />
+    <path d="M16 13H8" />
+    <path d="M16 17H8" />
+  </Icon>
+);
+
+/** Lucide `history`. */
+export const HistoryIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+    <path d="M3 3v5h5" />
+    <path d="M12 7v5l4 2" />
+  </Icon>
+);
+
 /**
  * Ícono de marca de Google, a color — no usa el wrapper `Icon` de trazo único
  * porque no es un ícono del set Lucide, es el logotipo oficial.

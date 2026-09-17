@@ -17,9 +17,11 @@ import {
   PaperclipIcon,
   SparklesIcon,
 } from '@/shared/components/icons/Icons';
-import { PortalPreviewNotice } from '../components/PortalPreviewNotice';
+import { useSupportPlanDetail } from '@/modules/projects/api/support-plan.queries';
+import { formatMoney } from '@/shared/lib/format-money';
+import { useTicketDetail, useTicketsList } from '@/modules/tickets/api/tickets.queries';
 import { StatusPill, type StatusPillTone } from '../components/StatusPill';
-import { MOCK_SUPPORT_CONTRACT_DETAILS_BY_ID } from '../mocks/client-portal.mocks';
+import { toSupportContractDetail, toSupportTicketFromDetail } from '../adapters/support-contract.adapter';
 import type {
   SupportTicket,
   SupportTicketBillingStatus,
@@ -78,13 +80,11 @@ const STATUS_FILTERS: readonly StatusFilter[] = [
 ];
 
 const formatHours = (value: number) => `${value.toLocaleString('es-CL', { maximumFractionDigits: 1 })}h`;
-const formatUf = (value: number) => `${value.toLocaleString('es-CL', { maximumFractionDigits: 2 })} UF`;
 
 export interface ClientSupportContractDetailPageProps {
   readonly contractIdOverride?: string;
   readonly backTo?: string;
   readonly backLabel?: string;
-  readonly preview?: boolean;
 }
 
 /**
@@ -93,28 +93,44 @@ export interface ClientSupportContractDetailPageProps {
  * pendiente: el nombre del contrato en la tabla de Soporte era texto plano,
  * no un enlace a esta pantalla con la lista de tickets del contrato.
  *
- * Mismo patrón que `ClientProjectDetailPage`: datos de `mocks/client-portal.mocks.ts`,
- * y `contractIdOverride`/`backTo`/`backLabel`/`preview` para la vista previa de
- * admin desde `ClientDetailPage` (ver `modules/clients/pages/ClientSupportContractPreviewPage.tsx`).
+ * Datos reales vía `useSupportPlanDetail(contractId)` + `useTicketsList({clientId})`
+ * (ver `adapters/support-contract.adapter.ts`). Soporta ambos tipos de contrato
+ * (Figma node 9007:8170 consolidado / 9007:8445 único) según `plan.scope`.
+ * `contractIdOverride`/`backTo`/`backLabel` son para la vista previa de admin
+ * desde `ClientDetailPage` (ver `modules/clients/pages/ClientSupportContractPreviewPage.tsx`).
  */
 export function ClientSupportContractDetailPage({
   contractIdOverride,
   backTo,
   backLabel,
-  preview = false,
 }: ClientSupportContractDetailPageProps = {}) {
   const { contractId: routeContractId } = useParams<{ contractId: string }>();
-  const contractId = contractIdOverride ?? routeContractId;
+  const contractId = contractIdOverride ?? routeContractId ?? null;
   const navigate = useNavigate();
   const toast = useToast();
-  const contract = contractId ? MOCK_SUPPORT_CONTRACT_DETAILS_BY_ID[contractId] : undefined;
+  const { data: plan, isLoading: planLoading, isError: planError } = useSupportPlanDetail(contractId);
   const resolvedBackTo = backTo ?? '/portal/soporte';
 
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [activeFilters, setActiveFilters] = useState<ReadonlySet<string>>(
     () => new Set(STATUS_FILTERS.filter((f) => f.key !== 'pending').map((f) => f.key)),
   );
-  const [selectedCode, setSelectedCode] = useState<string | null>(null);
+  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(true);
+
+  const currentProjectId = activeProjectId ?? plan?.linkedProjects[0]?.id ?? null;
+
+  const { data: ticketsPage } = useTicketsList({
+    clientId: plan?.clientId ? [plan.clientId] : undefined,
+    pageSize: 200,
+    sortField: 'createdAt',
+    sortDirection: 'desc',
+  });
+  const ticketsForActiveProject = useMemo(
+    () => (ticketsPage?.items ?? []).filter((t) => t.developmentProject?.id === currentProjectId),
+    [ticketsPage, currentProjectId],
+  );
+  const contract = plan ? toSupportContractDetail(plan, ticketsForActiveProject) : undefined;
 
   const notifyMock = (label: string) => toast.show(`"${label}" es una acción de ejemplo — todavía no está conectada.`, 'info');
 
@@ -134,8 +150,10 @@ export function ClientSupportContractDetailPage({
     );
   }, [contract, activeFilters]);
 
+  const selectedRow = filteredTickets.find((t) => t.id === selectedTicketId) ?? filteredTickets[0] ?? null;
+  const { data: ticketDetail } = useTicketDetail(selectedRow?.id ?? null);
   const selectedTicket =
-    filteredTickets.find((t) => t.code === selectedCode) ?? filteredTickets[0] ?? null;
+    selectedRow && ticketDetail && ticketDetail.id === selectedRow.id ? toSupportTicketFromDetail(ticketDetail) : selectedRow;
 
   const rangeStats = useMemo(() => {
     const used = filteredTickets.reduce((sum, t) => sum + t.usedHours, 0);
@@ -143,16 +161,25 @@ export function ClientSupportContractDetailPage({
     return { count: filteredTickets.length, used, totalValue };
   }, [filteredTickets, contract]);
 
-  if (!contract) {
+  if (planLoading) {
     return (
       <DashboardLayout title="Detalle del contrato de soporte">
         <div className={styles.page}>
           <Card className={styles.notFoundCard}>
-            <p>Todavía no hay una ficha de ejemplo cargada para este contrato.</p>
-            <p className={styles.notFoundHint}>
-              Por ahora solo "App Residentes" tiene datos de muestra completos — ver{' '}
-              <code>mocks/client-portal.mocks.ts</code>.
-            </p>
+            <p>Cargando contrato de soporte…</p>
+          </Card>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (!contract || planError) {
+    return (
+      <DashboardLayout title="Detalle del contrato de soporte">
+        <div className={styles.page}>
+          <Card className={styles.notFoundCard}>
+            <p>No se pudo cargar este contrato.</p>
+            <p className={styles.notFoundHint}>Verifica que el enlace apunte a un contrato existente.</p>
             <Button variant="outline" iconLeft={<ChevronLeftIcon size={16} />} onClick={() => navigate(resolvedBackTo)}>
               {backLabel ?? 'Volver a soporte'}
             </Button>
@@ -168,13 +195,6 @@ export function ClientSupportContractDetailPage({
         <Link className={styles.breadcrumb} to={resolvedBackTo}>
           <ChevronLeftIcon size={16} /> {backLabel ?? `Volver a vista cliente ${contract.company.name}`}
         </Link>
-
-        {preview && (
-          <PortalPreviewNotice>
-            Vista previa de cómo ve un cliente esta pantalla — el contrato y los tickets de abajo son el dato de
-            ejemplo "{contract.name}", todavía no los datos reales de este cliente.
-          </PortalPreviewNotice>
-        )}
 
         <div className={styles.headerRow}>
           <div className={styles.titleGroup}>
@@ -195,9 +215,40 @@ export function ClientSupportContractDetailPage({
         </div>
 
         <Card>
-          <p className={styles.sectionTitle} style={{ marginBottom: 'var(--kora-space-4)' }}>
-            {contract.description}
-          </p>
+          {contract.scope === 'single' && contract.description && (
+            <p className={styles.sectionTitle} style={{ marginBottom: 'var(--kora-space-4)' }}>
+              {contract.description}
+            </p>
+          )}
+
+          {contract.scope === 'consolidated' && (
+            <div className={styles.consolidatedSection}>
+              <h3 className={styles.sectionTitle}>Proyectos del consolidado</h3>
+              <div className={styles.consolidatedTabs} role="tablist" aria-label="Proyectos del consolidado">
+                {contract.linkedProjects.map((project) => (
+                  <button
+                    key={project.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={project.id === currentProjectId}
+                    className={[
+                      styles.consolidatedTab,
+                      project.id === currentProjectId ? styles.consolidatedTabActive : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' ')}
+                    onClick={() => {
+                      setActiveProjectId(project.id);
+                      setSelectedTicketId(null);
+                    }}
+                  >
+                    {project.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className={styles.infoBar}>
             <InfoField label="Tipo de contrato" value={PLAN_TYPE_LABEL[contract.planType] ?? contract.planType} />
             <InfoField label="Responsable Kabeli" value={contract.kabeliOwnerName} />
@@ -205,8 +256,8 @@ export function ClientSupportContractDetailPage({
             <InfoField label="Fecha de término" value={contract.endDate} />
             <InfoField label="HH contratadas" value={contract.contractedHours} />
             <InfoField label="HH consumidas" value={contract.consumedHours} />
-            <InfoField label="Valor HH actual" value={formatUf(contract.currentHourValueUf)} />
-            <InfoField label="Valor HH extra" value={formatUf(contract.extraHourValueUf)} />
+            <InfoField label="Valor HH actual" value={formatMoney(contract.currentHourValueUf, contract.currency)} />
+            <InfoField label="Valor HH extra" value={formatMoney(contract.extraHourValueUf, contract.currency)} />
           </div>
         </Card>
 
@@ -222,7 +273,7 @@ export function ClientSupportContractDetailPage({
                   HH utilizadas: <strong>{formatHours(rangeStats.used)}</strong>
                 </span>
                 <span>
-                  Total Valor: <strong>{formatUf(rangeStats.totalValue)}</strong>
+                  Total Valor: <strong>{formatMoney(rangeStats.totalValue, contract.currency)}</strong>
                 </span>
               </div>
             </div>
@@ -257,15 +308,15 @@ export function ClientSupportContractDetailPage({
             <div className={styles.ticketList}>
               {filteredTickets.map((ticket) => (
                 <button
-                  key={ticket.code}
+                  key={ticket.id}
                   type="button"
                   className={[
                     styles.ticketListItem,
-                    ticket.code === selectedTicket?.code ? styles.ticketListItemActive : '',
+                    ticket.id === selectedTicket?.id ? styles.ticketListItemActive : '',
                   ]
                     .filter(Boolean)
                     .join(' ')}
-                  onClick={() => setSelectedCode(ticket.code)}
+                  onClick={() => setSelectedTicketId(ticket.id)}
                 >
                   <div className={styles.ticketListItemMain}>
                     <span className={styles.ticketCode}>
@@ -289,7 +340,7 @@ export function ClientSupportContractDetailPage({
                   HH utilizadas: <strong>{formatHours(rangeStats.used)}</strong>
                 </span>
                 <span>
-                  Total Valor: <strong>{formatUf(rangeStats.totalValue)}</strong>
+                  Total Valor: <strong>{formatMoney(rangeStats.totalValue, contract.currency)}</strong>
                 </span>
               </div>
             </div>

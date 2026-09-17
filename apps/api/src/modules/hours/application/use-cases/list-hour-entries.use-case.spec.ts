@@ -18,6 +18,9 @@ class FakeEntryRepository implements HourEntryRepository {
   async sumApprovedHoursForProject(): Promise<number> {
     return 0;
   }
+  async sumApprovedHoursForProjects(): Promise<number> {
+    return 0;
+  }
   async sumHoursForUserAndDate(): Promise<number> {
     return 0;
   }

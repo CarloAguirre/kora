@@ -8,8 +8,12 @@ import type {
   CreateProjectModuleInput,
   CreateProjectModuleSegmentInput,
   CreateProjectModuleTaskInput,
+  CreateProjectPaymentMilestoneInput,
+  IssueProjectPaymentMilestoneInvoiceInput,
   ListProjectsQuery,
+  MarkProjectPaymentMilestonePaidInput,
   SetProjectOvertimeAuthorizationInput,
+  UpdateProjectBillingSettingsInput,
   UpdateProjectExtrasInput,
   UpdateProjectInput,
   UpdateProjectModuleDeliveryInput,
@@ -17,6 +21,7 @@ import type {
   UpdateProjectModuleSegmentInput,
   UpdateProjectModuleTaskInput,
   UpdateProjectObservationInput,
+  UpdateProjectPaymentMilestoneInput,
   UpdateProjectTeamMemberInput,
 } from '@kora/contracts';
 import { projectKeys, projectsApi } from './projects.api';
@@ -342,5 +347,98 @@ export function useDeleteProjectModuleTask() {
     mutationFn: ({ projectId, moduleId, taskId }: { projectId: string; moduleId: string; taskId: string }) =>
       projectsApi.deleteModuleTask(projectId, moduleId, taskId),
     onSuccess: () => invalidate(),
+  });
+}
+
+export function useCreateProjectPaymentMilestone() {
+  const invalidate = useInvalidateProjects();
+  return useMutation({
+    mutationFn: ({ projectId, input }: { projectId: string; input: CreateProjectPaymentMilestoneInput }) =>
+      projectsApi.createPaymentMilestone(projectId, input),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useUpdateProjectPaymentMilestone() {
+  const invalidate = useInvalidateProjects();
+  return useMutation({
+    mutationFn: ({
+      projectId,
+      milestoneId,
+      input,
+    }: {
+      projectId: string;
+      milestoneId: string;
+      input: UpdateProjectPaymentMilestoneInput;
+    }) => projectsApi.updatePaymentMilestone(projectId, milestoneId, input),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useDeleteProjectPaymentMilestone() {
+  const invalidate = useInvalidateProjects();
+  return useMutation({
+    mutationFn: ({ projectId, milestoneId }: { projectId: string; milestoneId: string }) =>
+      projectsApi.deletePaymentMilestone(projectId, milestoneId),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useIssueProjectPaymentMilestoneInvoice() {
+  const invalidate = useInvalidateProjects();
+  return useMutation({
+    mutationFn: ({
+      projectId,
+      milestoneId,
+      input,
+    }: {
+      projectId: string;
+      milestoneId: string;
+      input: IssueProjectPaymentMilestoneInvoiceInput;
+    }) => projectsApi.issuePaymentMilestoneInvoice(projectId, milestoneId, input),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useMarkProjectPaymentMilestonePaid() {
+  const invalidate = useInvalidateProjects();
+  return useMutation({
+    mutationFn: ({
+      projectId,
+      milestoneId,
+      input,
+    }: {
+      projectId: string;
+      milestoneId: string;
+      input: MarkProjectPaymentMilestonePaidInput;
+    }) => projectsApi.markPaymentMilestonePaid(projectId, milestoneId, input),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useResolveProjectManagementApproval() {
+  const invalidate = useInvalidateProjects();
+  return useMutation({
+    mutationFn: (projectId: string) => projectsApi.resolveManagementApproval(projectId),
+    onSuccess: () => invalidate(),
+  });
+}
+
+/** Interruptor global de Hito 0 — lo ve Finanzas (`billing:read`) y lo administra Gerencia (`projects:manage`). */
+export function useProjectBillingSettings(enabled = true) {
+  return useQuery({
+    queryKey: projectKeys.billingSettings(),
+    queryFn: () => projectsApi.getBillingSettings(),
+    enabled,
+  });
+}
+
+export function useUpdateProjectBillingSettings() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: UpdateProjectBillingSettingsInput) => projectsApi.updateBillingSettings(input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: projectKeys.billingSettings() });
+    },
   });
 }

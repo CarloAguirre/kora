@@ -1,0 +1,45 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-2);
+}
+
+.clickable {
+  cursor: pointer;
+  transition: box-shadow 0.12s, border-color 0.12s;
+  border: 1px solid transparent;
+}
+
+.clickable:hover {
+  box-shadow: 0 2px 10px rgba(15, 23, 41, 0.1);
+}
+
+.active {
+  border-color: var(--kora-navy);
+  box-shadow: 0 0 0 2px rgba(15, 23, 41, 0.08);
+}
+
+.label {
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-medium);
+  color: var(--kora-text-muted);
+}
+
+.value {
+  font-size: var(--kora-text-2xl);
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-navy);
+}
+
+.value.warning {
+  color: var(--kora-warning);
+}
+
+.value.danger {
+  color: var(--kora-danger);
+}
+
+.sub {
+  font-size: var(--kora-text-xs);
+  color: var(--kora-text-muted);
+}

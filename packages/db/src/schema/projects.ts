@@ -73,6 +73,9 @@ export const projectObservationStatusEnum = pgEnum('project_observation_status',
   'activo',
 ]);
 
+/** Estado de un tramo de pago del proyecto — independiente del estado de facturación de soporte (`support_invoices`). */
+export const projectPaymentStatusEnum = pgEnum('project_payment_status', ['pending', 'invoiced', 'paid']);
+
 export const projects = pgTable(
   'projects',
   {
@@ -145,6 +148,13 @@ export const projects = pgTable(
     qaPlannedTests: integer('qa_planned_tests'),
     qaExecutedTests: integer('qa_executed_tests'),
     qaFailedTests: integer('qa_failed_tests'),
+
+    /** "Avance del periodo" del portal cliente — narrativa de logros declarada por el líder, igual criterio que impacto/QA. */
+    periodReportDate: date('period_report_date', { mode: 'date' }),
+    periodReportAchievements: text('period_report_achievements').array(),
+
+    /** Hito 0 quedó pausado esperando que Gerencia (admin/pmo) active el proyecto a mano — ver `project_billing_settings`. */
+    pendingManagementApproval: boolean('pending_management_approval').notNull().default(false),
 
     ...timestamps,
     ...softDelete,
@@ -319,6 +329,25 @@ export const projectObservations = pgTable(
   (table) => [index('project_observations_module_idx').on(table.moduleId)],
 );
 
+/** Tramo de pago del proyecto ("Facturación" del portal cliente) — cronograma de cobro, independiente de `support_invoices` (eso es soporte). */
+export const projectPaymentMilestones = pgTable('project_payment_milestones', {
+  id: primaryId(),
+  projectId: uuid('project_id')
+    .notNull()
+    .references(() => projects.id, { onDelete: 'cascade' }),
+  /** p.ej. "Inicio", "Marcha blanca". */
+  name: varchar('name', { length: 120 }).notNull(),
+  /** Nulo para tramos que no son un % del contrato (p.ej. "Desvío de horas (extra)"). */
+  percent: numeric('percent', { precision: 5, scale: 2 }),
+  amount: numeric('amount', { precision: 14, scale: 2 }).notNull(),
+  invoiceNumber: varchar('invoice_number', { length: 50 }),
+  issuedAt: date('issued_at', { mode: 'date' }),
+  status: projectPaymentStatusEnum('status').notNull().default('pending'),
+  paidAt: date('paid_at', { mode: 'date' }),
+  sortOrder: integer('sort_order').notNull().default(0),
+  ...timestamps,
+});
+
 export const projectsRelations = relations(projects, ({ one, many }) => ({
   client: one(clients, { fields: [projects.clientId], references: [clients.id] }),
   leader: one(users, { fields: [projects.leaderUserId], references: [users.id] }),
@@ -326,6 +355,7 @@ export const projectsRelations = relations(projects, ({ one, many }) => ({
   members: many(projectTeamMembers),
   observations: many(projectObservations),
   modules: many(projectModules),
+  paymentMilestones: many(projectPaymentMilestones),
 }));
 
 export const projectModulesRelations = relations(projectModules, ({ one, many }) => ({
@@ -364,3 +394,22 @@ export const projectTeamMembersRelations = relations(projectTeamMembers, ({ one 
 export const projectObservationsRelations = relations(projectObservations, ({ one }) => ({
   project: one(projects, { fields: [projectObservations.projectId], references: [projects.id] }),
 }));
+
+export const projectPaymentMilestonesRelations = relations(projectPaymentMilestones, ({ one }) => ({
+  project: one(projects, { fields: [projectPaymentMilestones.projectId], references: [projects.id] }),
+}));
+
+/**
+ * Interruptor global de Hito 0 — fila única (`id` fijo). No es un motor de
+ * configuración genérico: es el único ajuste de este tipo que existe hoy.
+ */
+export const projectBillingSettings = pgTable('project_billing_settings', {
+  id: varchar('id', { length: 20 })
+    .primaryKey()
+    .default('singleton'),
+  autoActivateFirstPayment: boolean('auto_activate_first_payment').notNull().default(true),
+  updatedByUserId: uuid('updated_by_user_id').references(() => users.id, { onDelete: 'set null' }),
+  updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' })
+    .notNull()
+    .default(sql`now()`),
+});
