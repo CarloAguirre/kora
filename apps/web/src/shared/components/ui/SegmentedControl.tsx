@@ -10,12 +10,14 @@ export interface SegmentedControlProps {
   value: string;
   onChange: (value: string) => void;
   'aria-label'?: string;
+  /** Las opciones se reparten el ancho disponible en partes iguales, en vez de ajustarse a su contenido. */
+  fullWidth?: boolean;
 }
 
 /** Selector de una sola opción entre pocas alternativas — pastillas en vez de un `<select>`, para cuando todas las opciones caben a la vista. */
-export function SegmentedControl({ options, value, onChange, 'aria-label': ariaLabel }: SegmentedControlProps) {
+export function SegmentedControl({ options, value, onChange, 'aria-label': ariaLabel, fullWidth }: SegmentedControlProps) {
   return (
-    <div className={styles.group} role="radiogroup" aria-label={ariaLabel}>
+    <div className={[styles.group, fullWidth ? styles.fullWidth : ''].filter(Boolean).join(' ')} role="radiogroup" aria-label={ariaLabel}>
       {options.map((option) => {
         const selected = option.value === value;
         return (

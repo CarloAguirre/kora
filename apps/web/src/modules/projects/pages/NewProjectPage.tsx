@@ -504,6 +504,19 @@ export function NewProjectPage() {
           {step === 0 && (
             <>
               <Section title="Seleccionar cliente">
+                <div className={styles.field}>
+                  <span className={styles.fieldLabel}>
+                    Tipo de proyecto<span className={styles.required}>*</span>
+                  </span>
+                  <SegmentedControl
+                    aria-label="Tipo de proyecto"
+                    options={TYPE_OPTIONS}
+                    value={type}
+                    onChange={(value) => setValue('type', value as ProjectType, { shouldValidate: true })}
+                    fullWidth
+                  />
+                </div>
+
                 <Combobox
                   className={styles.clientField}
                   label="Cliente"
@@ -546,7 +559,6 @@ export function NewProjectPage() {
                 />
 
                 <div className={styles.row}>
-                  <Select label="Tipo de proyecto" required options={TYPE_OPTIONS} {...register('type')} />
                   {type === 'development' && (
                     <Select
                       label="Etapa comercial"

@@ -4,6 +4,26 @@
   gap: var(--kora-space-2);
 }
 
+.fullWidth {
+  flex-wrap: nowrap;
+  gap: 0;
+}
+
+.fullWidth .option {
+  flex: 1;
+  border-radius: 0;
+}
+
+.fullWidth .option:first-child {
+  border-top-left-radius: var(--kora-radius);
+  border-bottom-left-radius: var(--kora-radius);
+}
+
+.fullWidth .option:last-child {
+  border-top-right-radius: var(--kora-radius);
+  border-bottom-right-radius: var(--kora-radius);
+}
+
 .option {
   height: var(--kora-control-height-sm);
   padding: 6px var(--kora-space-4);
