@@ -511,6 +511,8 @@ export const createProjectSchema = z
      * sentido contrario crearía un ciclo dentro de `@kora/contracts`.
      */
     supportPlanType: z.enum(['monthly', 'bundle', 'on_demand']).optional(),
+    /** Override del contacto principal del cliente para este contrato — mismo campo que `CreateSupportPlanInput.primaryContactId`, duplicado aquí por el mismo motivo que los demás `support*` (evitar el ciclo con `tickets/support-plan.contract.ts`). */
+    primaryContactId: uuidSchema.nullish(),
     supportSurplusPolicy: z.enum(['accumulate', 'expire']).optional(),
     supportPlanValueUf: z.coerce.number().min(0).optional(),
     supportExtraHourValueUf: z.coerce.number().min(0).optional(),

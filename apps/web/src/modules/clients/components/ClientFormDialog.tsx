@@ -26,6 +26,8 @@ export interface ClientFormDialogProps {
   clientId: string | null;
   onClose: () => void;
   onSuccess: (message: string) => void;
+  /** Solo se dispara en un alta exitosa — para que quien abrió el diálogo pueda preseleccionar el cliente recién creado. */
+  onCreated?: (client: { id: string; companyName: string }) => void;
 }
 
 /**
@@ -36,7 +38,7 @@ export interface ClientFormDialogProps {
  * (`useClientDetail`) — la tabla muestra lo mínimo, el formulario pide lo
  * completo solo cuando hace falta.
  */
-export function ClientFormDialog({ open, clientId, onClose, onSuccess }: ClientFormDialogProps) {
+export function ClientFormDialog({ open, clientId, onClose, onSuccess, onCreated }: ClientFormDialogProps) {
   const isEditing = clientId !== null;
   const { data: client, isLoading: loadingClient } = useClientDetail(open ? clientId : null);
   const { data: options } = useClientFormOptions();
@@ -77,8 +79,9 @@ export function ClientFormDialog({ open, clientId, onClose, onSuccess }: ClientF
         await updateClient.mutateAsync({ clientId, input: values });
         onSuccess(`Se actualizaron los datos de ${values.companyName}.`);
       } else {
-        await createClient.mutateAsync(values);
+        const created = await createClient.mutateAsync(values);
         onSuccess(`Se creó el cliente ${values.companyName}.`);
+        onCreated?.({ id: created.id, companyName: values.companyName });
       }
       onClose();
     } catch (error) {

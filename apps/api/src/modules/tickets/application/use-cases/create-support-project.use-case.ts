@@ -16,7 +16,11 @@ import { Project } from '../../../projects/domain/entities/project.entity';
 import { ProjectNameAlreadyInUseError } from '../../../projects/domain/errors/project.errors';
 import { PROJECT_REPOSITORY, type ProjectRepository } from '../../../projects/domain/repositories/project.repository';
 import { SupportPlan } from '../../domain/entities/support-plan.entity';
-import { SupportPlanRequiresClientError, InvalidSupportProjectRequestError } from '../../domain/errors/support-plan.errors';
+import {
+  SupportPlanContactNotFoundError,
+  SupportPlanRequiresClientError,
+  InvalidSupportProjectRequestError,
+} from '../../domain/errors/support-plan.errors';
 import { ReferencedClientNotFoundError } from '../../domain/errors/ticket.errors';
 import { SUPPORT_PLAN_REPOSITORY, type SupportPlanRepository } from '../../domain/repositories/support-plan.repository';
 import { TICKET_CLIENT_READER, type TicketClientReader } from '../ports/ticket-client-reader.port';
@@ -69,6 +73,11 @@ export class CreateSupportProjectUseCase implements UseCase<CreateSupportProject
       return err(new ProjectNameAlreadyInUseError(data.name));
     }
 
+    if (data.primaryContactId) {
+      const contact = await this.clients.findContact(data.clientId, data.primaryContactId);
+      if (!contact) return err(new SupportPlanContactNotFoundError(data.primaryContactId));
+    }
+
     const createdProject = Project.create({
       id: this.ids.generate(),
       name: data.name,
@@ -103,6 +112,7 @@ export class CreateSupportProjectUseCase implements UseCase<CreateSupportProject
       currency: data.supportCurrency,
       name: data.name,
       leaderUserId: data.leaderUserId,
+      primaryContactId: data.primaryContactId,
       quotationLink: data.quotationLink,
       contractLink: data.contractLink,
       additionalLinks: data.additionalLinks,

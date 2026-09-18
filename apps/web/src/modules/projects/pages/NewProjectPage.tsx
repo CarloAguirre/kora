@@ -1,9 +1,10 @@
 import { useRef, useState, type ChangeEvent, type ReactNode } from 'react';
-import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useFieldArray, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
+  CLIENT_STATUS_LABELS,
   createProjectSchema,
   PROJECT_MODULE_STAGES,
   PROJECT_MODULE_STAGE_LABELS,
@@ -45,7 +46,9 @@ import { AlertIcon, ChevronLeftIcon, CloseIcon, PlusIcon, TrashIcon } from '@/sh
 import { useToast } from '@/shared/components/ui/Toast';
 import { useAddProjectModuleDelivery, useCreateProject, useCreateProjectModule, useProjectsList } from '../api/projects.queries';
 import { useCreateSupportPlan, useCreateSupportProject } from '../api/support-plan.queries';
-import { useClientsList, useClientDetail } from '@/modules/clients/api/clients.queries';
+import { useClientsList, useClientDetail, useUpdateClient } from '@/modules/clients/api/clients.queries';
+import { clientsApi } from '@/modules/clients/api/clients.api';
+import { ClientFormDialog } from '@/modules/clients/components/ClientFormDialog';
 import { useUsersList } from '@/modules/users/api/users.queries';
 import { useTeamsList } from '@/modules/teams/api/teams.queries';
 import { ApiRequestError } from '@/shared/lib/api-client';
@@ -68,7 +71,7 @@ const STATUS_OPTIONS = (['active', 'draft', 'on_hold'] as const).map((status) =>
   label: PROJECT_STATUS_LABELS[status],
 }));
 
-/** Soporte no tiene "Fases · Módulos" — ese paso solo aplica a proyectos de desarrollo aprobados. */
+/** Desarrollo tiene "Fases · Módulos" donde soporte tiene "Configuración de soporte" — mismo índice de paso (2) en ambos flujos. */
 const STEPS_DEVELOPMENT = [
   { label: 'Datos del cliente' },
   { label: 'Datos del proyecto' },
@@ -78,6 +81,7 @@ const STEPS_DEVELOPMENT = [
 const STEPS_SUPPORT = [
   { label: 'Datos del cliente' },
   { label: 'Datos del proyecto' },
+  { label: 'Configuración de soporte' },
   { label: 'Resumen y confirmación' },
 ];
 
@@ -185,6 +189,7 @@ export function NewProjectPage() {
   const createProject = useCreateProject();
   const createSupportProject = useCreateSupportProject();
   const createSupportPlan = useCreateSupportPlan();
+  const updateClient = useUpdateClient();
   const [searchParams] = useSearchParams();
   const preselectedClientId = searchParams.get('clientId') ?? '';
   const [step, setStep] = useState(preselectedClientId ? 1 : 0);
@@ -196,8 +201,12 @@ export function NewProjectPage() {
   // criterio que `moduleDrafts` para Fases · Módulos. Ver `CreateSupportPlanUseCase`.
   const [developmentProjectIds, setDevelopmentProjectIds] = useState<string[]>([]);
   const [useClientContact, setUseClientContact] = useState(true);
-  const [primaryContactId, setPrimaryContactId] = useState<string | undefined>(undefined);
+  const [contactName, setContactName] = useState('');
+  const [contactPosition, setContactPosition] = useState('');
+  const [contactPhone, setContactPhone] = useState('');
+  const [contactEmail, setContactEmail] = useState('');
   const [consolidateError, setConsolidateError] = useState<string | null>(null);
+  const [clientDialogOpen, setClientDialogOpen] = useState(false);
 
   const {
     register,
@@ -234,6 +243,7 @@ export function NewProjectPage() {
   const additionalLinks = watch('additionalLinks');
   const teamsValue = watch('teams') ?? [];
   const startDate = watch('startDate');
+  const estimatedDeliveryDate = watch('estimatedDeliveryDate');
   const supportPlanType = watch('supportPlanType') as SupportPlanType | undefined;
   const supportSurplusPolicy = watch('supportSurplusPolicy') as SupportSurplusPolicy | undefined;
   const supportCurrency = (watch('supportCurrency') as SupportPlanCurrency | undefined) ?? 'UF';
@@ -274,9 +284,7 @@ export function NewProjectPage() {
    *  ser "un contrato que consolida proyectos ya hechos" — mismo criterio que tenía el asistente
    *  retirado (1 proyecto = alcance Único, 2+ = Consolidado; nunca se elige aparte). */
   const isConsolidating = isSupport && developmentProjectIds.length > 0;
-  const contactLabel = useClientContact
-    ? (clientDetail?.primaryContactName ?? 'Contacto del cliente')
-    : (clientDetail?.contacts.find((c) => c.id === primaryContactId)?.name ?? '—');
+  const contactLabel = useClientContact ? (clientDetail?.primaryContactName ?? 'Contacto del cliente') : contactName || '—';
   const pageTitle = isConsolidating ? 'Nuevo contrato de soporte' : 'Nuevo proyecto';
 
   const onSupportSurplusPolicyChange = (value: string) => {
@@ -284,6 +292,70 @@ export function NewProjectPage() {
     if (value === 'expire' && !dueDayTouched && startDate) {
       setValue('supportDueDayOfMonth', dayOfIsoDate(startDate));
     }
+  };
+
+  /** Al desmarcar "usar el contacto del cliente" por primera vez, precarga el formulario libre con el contacto principal del cliente — el usuario parte de algo conocido en vez de una ficha en blanco. */
+  const onToggleUseClientContact = (checked: boolean) => {
+    setUseClientContact(checked);
+    if (!checked && !contactName && clientDetail) {
+      const primary = clientDetail.contacts.find(
+        (c) => c.name === clientDetail.primaryContactName && c.email === clientDetail.primaryContactEmail,
+      );
+      setContactName(primary?.name ?? clientDetail.primaryContactName ?? '');
+      setContactPosition(primary?.position ?? '');
+      setContactPhone(primary?.phone ?? clientDetail.primaryContactPhone ?? '');
+      setContactEmail(primary?.email ?? clientDetail.primaryContactEmail ?? '');
+    }
+  };
+
+  /**
+   * El contrato de soporte solo guarda un `primaryContactId` (un contacto ya existente del
+   * cliente) — no hay campo para un contacto "suelto". Si lo editado coincide con un contacto
+   * existente se reusa su id; si no, se agrega como contacto nuevo del cliente (mismo endpoint que
+   * `ClientFormDialog`, reemplazando la lista completa de contactos) y se recupera su id recién
+   * creado con una relectura del cliente.
+   */
+  const resolveProjectContactId = async (): Promise<string | undefined> => {
+    if (useClientContact || !clientDetail) return undefined;
+    const trimmedName = contactName.trim();
+    if (!trimmedName) return undefined;
+
+    const normalizedPosition = contactPosition.trim();
+    const normalizedPhone = contactPhone.trim();
+    const normalizedEmail = contactEmail.trim();
+
+    const existing = clientDetail.contacts.find(
+      (c) =>
+        c.name === trimmedName &&
+        (c.position ?? '') === normalizedPosition &&
+        (c.phone ?? '') === normalizedPhone &&
+        (c.email ?? '') === normalizedEmail,
+    );
+    if (existing) return existing.id;
+
+    const existingIds = new Set(clientDetail.contacts.map((c) => c.id));
+    await updateClient.mutateAsync({
+      clientId: clientDetail.id,
+      input: {
+        contacts: [
+          ...clientDetail.contacts.map((c) => ({
+            id: c.id,
+            name: c.name,
+            position: c.position ?? undefined,
+            email: c.email ?? undefined,
+            phone: c.phone ?? undefined,
+          })),
+          {
+            name: trimmedName,
+            position: normalizedPosition || undefined,
+            email: normalizedEmail || undefined,
+            phone: normalizedPhone || undefined,
+          },
+        ],
+      },
+    });
+    const refreshed = await clientsApi.detail(clientDetail.id);
+    return refreshed.contacts.find((c) => !existingIds.has(c.id))?.id;
   };
 
   const toggleTeam = (teamId: string) => {
@@ -359,19 +431,12 @@ export function NewProjectPage() {
 
   const goToStep2 = () => setStep(1);
 
-  const goToFasesModulos = async () => {
+  const goToStep3 = async () => {
     const fields: Array<keyof ProjectFormValues> = ['name', 'type'];
     if (type === 'development') fields.push('salesStage');
-    if (isSupport) fields.push('supportPlanType');
     const valid = await trigger(fields);
     if (!valid || hoursExceeded) return;
-    if (isConsolidating && !startDate) {
-      setConsolidateError('La fecha de inicio es obligatoria para consolidar un contrato.');
-      return;
-    }
-    setConsolidateError(null);
-    // Soporte no tiene "Fases · Módulos" (paso 2) — salta directo al resumen.
-    setStep(isSupport ? 3 : 2);
+    setStep(2);
   };
 
   const goToResumen = () => {
@@ -380,6 +445,17 @@ export function NewProjectPage() {
       return;
     }
     setModuleError(null);
+    setStep(3);
+  };
+
+  const goToResumenFromSupportConfig = async () => {
+    const valid = await trigger(['supportPlanType']);
+    if (!valid) return;
+    if (isConsolidating && !startDate) {
+      setConsolidateError('La fecha de inicio es obligatoria para consolidar un contrato.');
+      return;
+    }
+    setConsolidateError(null);
     setStep(3);
   };
 
@@ -397,7 +473,7 @@ export function NewProjectPage() {
             developmentProjectIds,
             name: values.name,
             leaderUserId: values.leaderUserId,
-            primaryContactId: useClientContact ? undefined : primaryContactId,
+            primaryContactId: await resolveProjectContactId(),
             quotationLink: values.quotationLink,
             contractLink: values.contractLink,
             additionalLinks: values.additionalLinks,
@@ -421,7 +497,7 @@ export function NewProjectPage() {
           return;
         }
 
-        const result = await createSupportProject.mutateAsync(values);
+        const result = await createSupportProject.mutateAsync({ ...values, primaryContactId: await resolveProjectContactId() });
         toast.success(`Se creó el proyecto y contrato de soporte de ${values.name}.`);
         // `result.id` es el proyecto (no el contrato) — la ficha de proyecto ya muestra el resumen
         // del plan vía `SupportProjectDetailView` (`useSupportPlanSummary(projectId)`).
@@ -477,11 +553,6 @@ export function NewProjectPage() {
               navigate(-1);
               return;
             }
-            // Soporte no pasa por el paso "Fases · Módulos" (2) — desde el resumen (3) vuelve directo a "Datos del proyecto" (1).
-            if (step === 3 && isSupport) {
-              setStep(1);
-              return;
-            }
             setStep(step - 1);
           }}
         >
@@ -490,7 +561,7 @@ export function NewProjectPage() {
         <h1 className={styles.title}>{pageTitle}</h1>
       </div>
 
-      <Stepper steps={isSupport ? STEPS_SUPPORT : STEPS_DEVELOPMENT} activeIndex={isSupport && step === 3 ? 2 : step} />
+      <Stepper steps={isSupport ? STEPS_SUPPORT : STEPS_DEVELOPMENT} activeIndex={step} />
 
       <Card>
         <form className={styles.form} onSubmit={onSubmit} noValidate>
@@ -528,9 +599,9 @@ export function NewProjectPage() {
                 />
                 <p className={styles.hint}>
                   ¿No encuentras el cliente?{' '}
-                  <Link className={styles.hintLink} to="/clientes">
+                  <button type="button" className={styles.hintLink} onClick={() => setClientDialogOpen(true)}>
                     Créalo primero
-                  </Link>
+                  </button>
                   .
                 </p>
 
@@ -598,39 +669,6 @@ export function NewProjectPage() {
                 />
               </Section>
 
-              <Section title="Documentación del proyecto">
-                <div className={styles.row}>
-                  <TextField label="Cotización" placeholder="Agregar un link" {...register('quotationLink')} />
-                  <TextField label="Contrato" placeholder="Agregar un link" {...register('contractLink')} />
-                  <TextField label="Adicionales" placeholder="Agregar un link" {...register('additionalLinks')} />
-                </div>
-              </Section>
-
-              <Section title="Estimación del Proyecto">
-                <div className={styles.row}>
-                  <TextField
-                    label="Fecha de inicio"
-                    type="date"
-                    disabled={type === 'development' && isProspecto}
-                    {...register('startDate', {
-                      setValueAs: emptyToUndefined,
-                      onChange: (event: ChangeEvent<HTMLInputElement>) => {
-                        if (isSupportMonthly && supportSurplusPolicy === 'expire' && !dueDayTouched && event.target.value) {
-                          setValue('supportDueDayOfMonth', dayOfIsoDate(event.target.value));
-                        }
-                      },
-                    })}
-                  />
-                  <TextField
-                    label="Fecha de fin"
-                    type="date"
-                    disabled={type === 'development' && isProspecto}
-                    {...register('estimatedDeliveryDate', { setValueAs: emptyToUndefined })}
-                  />
-                  {type === 'development' && <TextField label="Horas" type="number" disabled={isProspecto} {...register('soldHours')} />}
-                </div>
-              </Section>
-
               {isSupport && (
                 <Section title="Proyectos terminados incluidos en este contrato">
                   <p className={styles.hint} style={{ marginTop: 0 }}>
@@ -665,105 +703,53 @@ export function NewProjectPage() {
                 </Section>
               )}
 
-              {isConsolidating && (
-                <Section title="Contacto del contrato">
-                  <label className={styles.checkboxLine}>
-                    <input
-                      type="checkbox"
-                      checked={useClientContact}
-                      onChange={(event) => setUseClientContact(event.target.checked)}
-                    />
-                    Usar el contacto por defecto del cliente
-                  </label>
-                  {!useClientContact && (
-                    <Select
-                      label="Contacto"
-                      options={(clientDetail?.contacts ?? []).map((c) => ({ value: c.id, label: c.name }))}
-                      placeholder="Selecciona un contacto"
-                      value={primaryContactId ?? ''}
-                      onChange={(event) => setPrimaryContactId(event.target.value || undefined)}
-                    />
-                  )}
+              {isSupport && (
+                <Section title="Contacto del proyecto">
+                  <div className={styles.row}>
+                    {clientDetail && <ClientDetailCard client={clientDetail} />}
+
+                    <div>
+                      <label className={styles.checkboxLine}>
+                        <input
+                          type="checkbox"
+                          checked={useClientContact}
+                          onChange={(event) => onToggleUseClientContact(event.target.checked)}
+                        />
+                        Usar datos de contacto del cliente
+                      </label>
+
+                      {!useClientContact && (
+                        <div className={styles.section} style={{ paddingTop: 'var(--kora-space-3)' }}>
+                          <TextField
+                            label="Nombre"
+                            value={contactName}
+                            onChange={(event) => setContactName(event.target.value)}
+                          />
+                          <TextField
+                            label="Cargo"
+                            value={contactPosition}
+                            onChange={(event) => setContactPosition(event.target.value)}
+                          />
+                          <TextField
+                            label="Teléfono"
+                            value={contactPhone}
+                            onChange={(event) => setContactPhone(event.target.value)}
+                          />
+                          <TextField
+                            label="Correo electrónico"
+                            type="email"
+                            value={contactEmail}
+                            onChange={(event) => setContactEmail(event.target.value)}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </Section>
               )}
 
               {isSupport && (
-                <Section title="Configuración del contrato de soporte">
-                  <div className={styles.field}>
-                    <span className={styles.fieldLabel}>
-                      Tipo de contrato<span className={styles.required}>*</span>
-                    </span>
-                    <SegmentedControl
-                      aria-label="Tipo de contrato"
-                      options={SUPPORT_PLAN_TYPE_SEGMENTED_OPTIONS}
-                      value={supportPlanType ?? ''}
-                      onChange={(value) => setValue('supportPlanType', value as SupportPlanType, { shouldValidate: true })}
-                    />
-                    {errors.supportPlanType && <p className={styles.fieldError}>{errors.supportPlanType.message}</p>}
-                  </div>
-
-                  {isSupportMonthly && (
-                    <div className={styles.field}>
-                      <span className={styles.fieldLabel}>Política de excedente</span>
-                      <SegmentedControl
-                        aria-label="Política de excedente"
-                        options={SUPPORT_SURPLUS_POLICY_OPTIONS}
-                        value={supportSurplusPolicy ?? ''}
-                        onChange={onSupportSurplusPolicyChange}
-                      />
-                    </div>
-                  )}
-
-                  {isSupportBundleOrMonthly && (
-                    <div className={styles.row}>
-                      <TextField
-                        label={supportPlanType === 'bundle' ? 'Cantidad de HH de la bolsa' : 'Cantidad de HH mensuales'}
-                        type="number"
-                        min={0}
-                        {...register('supportHours')}
-                      />
-                    </div>
-                  )}
-                  <div className={styles.row}>
-                    <MoneyField
-                      label="Valor de la hora"
-                      currency={supportCurrency}
-                      onCurrencyChange={(value) => setValue('supportCurrency', value as SupportPlanCurrency)}
-                      currencyOptions={SUPPORT_CURRENCY_OPTIONS}
-                      step="0.01"
-                      min={0}
-                      {...register('supportPlanValueUf')}
-                    />
-                    {isSupportBundleOrMonthly && (
-                      <MoneyField
-                        label="Valor de horas extra"
-                        currency={supportCurrency}
-                        onCurrencyChange={(value) => setValue('supportCurrency', value as SupportPlanCurrency)}
-                        currencyOptions={SUPPORT_CURRENCY_OPTIONS}
-                        step="0.01"
-                        min={0}
-                        {...register('supportExtraHourValueUf')}
-                      />
-                    )}
-                    {showSupportDueDay && (
-                      <Select
-                        label="Vencimiento del cupo (día del mes)"
-                        options={SUPPORT_DUE_DAY_OPTIONS}
-                        value={supportDueDayOfMonth != null ? String(supportDueDayOfMonth) : ''}
-                        onChange={(event) => {
-                          setDueDayTouched(true);
-                          setValue('supportDueDayOfMonth', emptyToUndefined(event.target.value));
-                        }}
-                      />
-                    )}
-                  </div>
-                  {showSupportDueDay && (
-                    <p className={styles.hint}>
-                      Las HH no usadas vencen este día de cada mes — no pasan al mes siguiente. Se sugiere el mismo día de la fecha de
-                      inicio.
-                    </p>
-                  )}
-
+                <Section title="Tiempos de respuesta (SLA)">
                   <div className={styles.row3}>
                     <Select
                       label="Crítica"
@@ -789,6 +775,34 @@ export function NewProjectPage() {
                       placeholder="—"
                       {...register('supportTargetHoursLow', { setValueAs: emptyToUndefined })}
                     />
+                  </div>
+                </Section>
+              )}
+
+              <Section title="Documentación del proyecto">
+                <div className={styles.row}>
+                  <TextField label="Cotización" placeholder="Agregar un link" {...register('quotationLink')} />
+                  <TextField label="Contrato" placeholder="Agregar un link" {...register('contractLink')} />
+                  <TextField label="Adicionales" placeholder="Agregar un link" {...register('additionalLinks')} />
+                </div>
+              </Section>
+
+              {type === 'development' && (
+                <Section title="Estimación del Proyecto">
+                  <div className={styles.row}>
+                    <TextField
+                      label="Fecha de inicio"
+                      type="date"
+                      disabled={isProspecto}
+                      {...register('startDate', { setValueAs: emptyToUndefined })}
+                    />
+                    <TextField
+                      label="Fecha de fin"
+                      type="date"
+                      disabled={isProspecto}
+                      {...register('estimatedDeliveryDate', { setValueAs: emptyToUndefined })}
+                    />
+                    <TextField label="Horas" type="number" disabled={isProspecto} {...register('soldHours')} />
                   </div>
                 </Section>
               )}
@@ -874,14 +888,136 @@ export function NewProjectPage() {
                 <Button variant="outline" type="button" onClick={() => void navigate('/proyectos')}>
                   Cancelar
                 </Button>
-                <Button type="button" disabled={hoursExceeded} onClick={() => void goToFasesModulos()}>
+                <Button type="button" disabled={hoursExceeded} onClick={() => void goToStep3()}>
                   Continuar
                 </Button>
               </div>
             </>
           )}
 
-          {step === 2 && (
+          {step === 2 && isSupport && (
+            <>
+              <Section title="Duración del servicio">
+                <div className={styles.row}>
+                  <TextField
+                    label="Fecha de inicio"
+                    type="date"
+                    {...register('startDate', {
+                      setValueAs: emptyToUndefined,
+                      onChange: (event: ChangeEvent<HTMLInputElement>) => {
+                        if (isSupportMonthly && supportSurplusPolicy === 'expire' && !dueDayTouched && event.target.value) {
+                          setValue('supportDueDayOfMonth', dayOfIsoDate(event.target.value));
+                        }
+                      },
+                    })}
+                  />
+                  <TextField
+                    label="Fecha de término"
+                    type="date"
+                    {...register('estimatedDeliveryDate', { setValueAs: emptyToUndefined })}
+                  />
+                </div>
+              </Section>
+
+              <Section title="Tipo de soporte">
+                <div className={styles.field}>
+                  <span className={styles.fieldLabel}>
+                    Tipo de soporte<span className={styles.required}>*</span>
+                  </span>
+                  <SegmentedControl
+                    aria-label="Tipo de soporte"
+                    options={SUPPORT_PLAN_TYPE_SEGMENTED_OPTIONS}
+                    value={supportPlanType ?? ''}
+                    onChange={(value) => setValue('supportPlanType', value as SupportPlanType, { shouldValidate: true })}
+                  />
+                  {errors.supportPlanType && <p className={styles.fieldError}>{errors.supportPlanType.message}</p>}
+                </div>
+
+                {isSupportMonthly && (
+                  <div className={styles.field}>
+                    <span className={styles.fieldLabel}>Política de excedente</span>
+                    <SegmentedControl
+                      aria-label="Política de excedente"
+                      options={SUPPORT_SURPLUS_POLICY_OPTIONS}
+                      value={supportSurplusPolicy ?? ''}
+                      onChange={onSupportSurplusPolicyChange}
+                    />
+                  </div>
+                )}
+
+                {isSupportBundleOrMonthly && (
+                  <div className={styles.row}>
+                    <TextField
+                      label={supportPlanType === 'bundle' ? 'Cantidad de HH de la bolsa' : 'Cantidad de HH mensuales'}
+                      type="number"
+                      min={0}
+                      {...register('supportHours')}
+                    />
+                  </div>
+                )}
+                <div className={styles.row}>
+                  <MoneyField
+                    label="Valor de la hora"
+                    currency={supportCurrency}
+                    onCurrencyChange={(value) => setValue('supportCurrency', value as SupportPlanCurrency)}
+                    currencyOptions={SUPPORT_CURRENCY_OPTIONS}
+                    step="0.01"
+                    min={0}
+                    {...register('supportPlanValueUf')}
+                  />
+                  {isSupportBundleOrMonthly && (
+                    <MoneyField
+                      label="Valor de horas extra"
+                      currency={supportCurrency}
+                      onCurrencyChange={(value) => setValue('supportCurrency', value as SupportPlanCurrency)}
+                      currencyOptions={SUPPORT_CURRENCY_OPTIONS}
+                      step="0.01"
+                      min={0}
+                      {...register('supportExtraHourValueUf')}
+                    />
+                  )}
+                  {showSupportDueDay && (
+                    <Select
+                      label="Vencimiento del cupo (día del mes)"
+                      options={SUPPORT_DUE_DAY_OPTIONS}
+                      value={supportDueDayOfMonth != null ? String(supportDueDayOfMonth) : ''}
+                      onChange={(event) => {
+                        setDueDayTouched(true);
+                        setValue('supportDueDayOfMonth', emptyToUndefined(event.target.value));
+                      }}
+                    />
+                  )}
+                </div>
+                {showSupportDueDay && (
+                  <p className={styles.hint}>
+                    Las HH no usadas vencen este día de cada mes — no pasan al mes siguiente. Se sugiere el mismo día de la fecha de
+                    inicio.
+                  </p>
+                )}
+              </Section>
+
+              {consolidateError && (
+                <div className={styles.alert} role="alert">
+                  <AlertIcon size={18} className={styles.alertIcon} />
+                  <span>{consolidateError}</span>
+                </div>
+              )}
+
+              <div className={styles.actions}>
+                <Button variant="outline" type="button" onClick={() => setStep(1)}>
+                  Atrás
+                </Button>
+                <Button variant="outline" type="button" onClick={() => void navigate('/proyectos')}>
+                  Cancelar
+                </Button>
+                <Button type="button" onClick={() => void goToResumenFromSupportConfig()}>
+                  Continuar
+                </Button>
+              </div>
+            </>
+          )}
+
+          {step === 2 && !isSupport && (
             <>
               <Section title="Fases · Módulos">
                 {!equiposEnabled ? (
@@ -1021,64 +1157,101 @@ export function NewProjectPage() {
             </>
           )}
 
-          {step === 3 && (
+          {step === 3 && isSupport && (
             <>
-              <Section title={isConsolidating ? 'Datos del contrato' : 'Datos Proyecto'}>
-                <div className={styles.summaryGrid}>
+              <div className={styles.summaryCards}>
+                <div className={styles.summaryCard}>
+                  <h3 className={styles.summaryCardTitle}>Datos del cliente</h3>
+                  <SummaryItem label="Empresa" value={clientDetail?.companyName} />
+                  <SummaryItem label="Rut" value={clientDetail?.taxId} />
+                  <SummaryItem label="Estado" value={clientDetail ? CLIENT_STATUS_LABELS[clientDetail.status] : undefined} />
+                  <SummaryItem label="País" value={clientDetail?.country?.name} />
+                  <SummaryItem label="Contacto de la empresa" value={clientDetail?.primaryContactName} />
+                  <SummaryItem label="Teléfono" value={clientDetail?.primaryContactPhone} />
+                  <SummaryItem label="Correo electrónico" value={clientDetail?.primaryContactEmail} />
+                </div>
+
+                <div className={styles.summaryCard}>
+                  <h3 className={styles.summaryCardTitle}>Datos del proyecto</h3>
                   <SummaryItem label={isConsolidating ? 'Nombre del contrato' : 'Nombre del proyecto'} value={watch('name')} />
-                  <SummaryItem label="Tipo" value={type === 'development' && salesStage ? PROJECT_SALES_STAGE_LABELS[salesStage] : PROJECT_TYPE_LABELS[type]} />
+                  <SummaryItem label="Líder Kabeli a cargo" value={leaderLabel} />
+                  <SummaryItem
+                    label="Proyectos incluidos"
+                    value={
+                      (finishedProjects?.items ?? [])
+                        .filter((p) => developmentProjectIds.includes(p.id))
+                        .map((p) => p.name)
+                        .join(', ') || undefined
+                    }
+                  />
+                  <SummaryItem label="Contacto del proyecto" value={contactLabel} />
+                  <SummaryItem
+                    label="Teléfono"
+                    value={(useClientContact ? clientDetail?.primaryContactPhone : contactPhone) || undefined}
+                  />
+                  <SummaryItem
+                    label="Correo electrónico"
+                    value={(useClientContact ? clientDetail?.primaryContactEmail : contactEmail) || undefined}
+                  />
+                  <SummaryItem label="Cotización" value={quotationLink} />
+                  <SummaryItem label="Contrato" value={contractLink} />
+                  <SummaryItem label="Adicionales" value={additionalLinks} />
+                </div>
+
+                <div className={styles.summaryCard}>
+                  <h3 className={styles.summaryCardTitle}>Descripción del contrato de soporte</h3>
+                  <SummaryItem label="Tipo" value={supportPlanType ? SUPPORT_PLAN_TYPE_LABELS[supportPlanType] : undefined} />
+                  {isSupportMonthly && (
+                    <SummaryItem
+                      label="Política de excedente"
+                      value={supportSurplusPolicy ? SUPPORT_SURPLUS_POLICY_LABELS[supportSurplusPolicy] : undefined}
+                    />
+                  )}
+                  <SummaryItem label="Fecha de inicio" value={startDate} />
+                  <SummaryItem label="Fecha de término" value={estimatedDeliveryDate} />
+                  {isSupportBundleOrMonthly && (
+                    <SummaryItem
+                      label={supportPlanType === 'bundle' ? 'HH de la bolsa' : 'HH mensuales'}
+                      value={supportHours != null ? `${supportHours} h` : undefined}
+                    />
+                  )}
+                  <SummaryItem
+                    label="Valor hora pactado"
+                    value={supportPlanValueUf != null ? formatMoney(Number(supportPlanValueUf), supportCurrency) : undefined}
+                  />
+                  {isSupportBundleOrMonthly && (
+                    <SummaryItem
+                      label="Valor hora extra"
+                      value={supportExtraHourValueUf != null ? formatMoney(Number(supportExtraHourValueUf), supportCurrency) : undefined}
+                    />
+                  )}
+                </div>
+              </div>
+
+              <div className={styles.actions}>
+                <Button variant="outline" type="button" onClick={() => setStep(2)}>
+                  Atrás
+                </Button>
+                <Button type="submit" loading={isSubmitting} loadingText="Creando…">
+                  {isConsolidating ? 'Confirmar y crear contrato' : 'Guardar y Crear Proyecto'}
+                </Button>
+              </div>
+            </>
+          )}
+
+          {step === 3 && !isSupport && (
+            <>
+              <Section title="Datos Proyecto">
+                <div className={styles.summaryGrid}>
+                  <SummaryItem label="Nombre del proyecto" value={watch('name')} />
+                  <SummaryItem label="Tipo" value={salesStage ? PROJECT_SALES_STAGE_LABELS[salesStage] : PROJECT_TYPE_LABELS[type]} />
                   <SummaryItem label="Líder" value={leaderLabel} />
                   <SummaryItem label="Cotización" value={quotationLink} />
                   <SummaryItem label="Contrato" value={contractLink} />
                   <SummaryItem label="Adicionales" value={additionalLinks} />
                   {equiposEnabled && <SummaryItem label="Fases · Módulos" value={moduleDrafts.length ? `${moduleDrafts.length}` : undefined} />}
-                  {isConsolidating && (
-                    <>
-                      <SummaryItem label="Alcance" value={developmentProjectIds.length > 1 ? 'Consolidado' : 'Único'} />
-                      <SummaryItem
-                        label="Proyectos cubiertos"
-                        value={(finishedProjects?.items ?? [])
-                          .filter((p) => developmentProjectIds.includes(p.id))
-                          .map((p) => p.name)
-                          .join(', ')}
-                      />
-                      <SummaryItem label="Contacto" value={contactLabel} />
-                    </>
-                  )}
                 </div>
               </Section>
-
-              {isSupport && (
-                <Section title="Contrato de soporte">
-                  <div className={styles.summaryGrid}>
-                    <SummaryItem label="Tipo de contrato" value={supportPlanType ? SUPPORT_PLAN_TYPE_LABELS[supportPlanType] : undefined} />
-                    {isSupportMonthly && (
-                      <SummaryItem
-                        label="Política de excedente"
-                        value={supportSurplusPolicy ? SUPPORT_SURPLUS_POLICY_LABELS[supportSurplusPolicy] : undefined}
-                      />
-                    )}
-                    {isSupportBundleOrMonthly && (
-                      <SummaryItem
-                        label={supportPlanType === 'bundle' ? 'Cantidad de HH de la bolsa' : 'Cantidad de HH mensuales'}
-                        value={supportHours != null ? String(supportHours) : undefined}
-                      />
-                    )}
-                    <SummaryItem label="Moneda" value={SUPPORT_PLAN_CURRENCY_LABELS[supportCurrency]} />
-                    <SummaryItem
-                      label="Valor de la hora"
-                      value={supportPlanValueUf != null ? formatMoney(Number(supportPlanValueUf), supportCurrency) : undefined}
-                    />
-                    {isSupportBundleOrMonthly && (
-                      <SummaryItem
-                        label="Valor de horas extra"
-                        value={supportExtraHourValueUf != null ? formatMoney(Number(supportExtraHourValueUf), supportCurrency) : undefined}
-                      />
-                    )}
-                    <SummaryItem label="Fecha de inicio" value={startDate} />
-                  </div>
-                </Section>
-              )}
 
               {clientDetail && (
                 <Section title="Cliente">
@@ -1087,7 +1260,7 @@ export function NewProjectPage() {
               )}
 
               <div className={styles.actions}>
-                <Button variant="outline" type="button" onClick={() => setStep(isSupport ? 1 : 2)}>
+                <Button variant="outline" type="button" onClick={() => setStep(2)}>
                   Atrás
                 </Button>
                 <Button type="submit" loading={isSubmitting} loadingText="Creando…">
@@ -1098,6 +1271,14 @@ export function NewProjectPage() {
           )}
         </form>
       </Card>
+
+      <ClientFormDialog
+        open={clientDialogOpen}
+        clientId={null}
+        onClose={() => setClientDialogOpen(false)}
+        onSuccess={(message) => toast.success(message)}
+        onCreated={(client) => setValue('clientId', client.id, { shouldValidate: true })}
+      />
     </DashboardLayout>
   );
 }

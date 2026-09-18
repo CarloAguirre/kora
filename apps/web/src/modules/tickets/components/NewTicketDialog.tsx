@@ -28,6 +28,11 @@ type TicketFormValues = z.input<typeof createTicketSchema>;
 const SERVICE_TYPE_OPTIONS = SELECTABLE_TICKET_SERVICE_TYPES.map((type) => ({ value: type, label: TICKET_SERVICE_TYPE_LABELS[type] }));
 const PRIORITY_OPTIONS = TICKET_PRIORITIES.map((priority) => ({ value: priority, label: TICKET_PRIORITY_LABELS[priority] }));
 
+// El `<select>` nativo entrega '' para "Sin definir" — sin esto, un enum
+// `.nullish()` (como `priority`) rechaza el string vacío en vez de tratarlo
+// como "no elegido".
+const emptyToUndefined = (value: string) => value || undefined;
+
 export interface NewTicketDialogProps {
   open: boolean;
   onClose: () => void;
@@ -159,9 +164,14 @@ export function NewTicketDialog({ open, onClose, onCreated }: NewTicketDialogPro
             placeholder="Sin definir"
             options={SERVICE_TYPE_OPTIONS}
             errorText={errors.serviceType?.message}
-            {...register('serviceType')}
+            {...register('serviceType', { setValueAs: emptyToUndefined })}
           />
-          <Select label="Criticidad" placeholder="Sin definir" options={PRIORITY_OPTIONS} {...register('priority')} />
+          <Select
+            label="Criticidad"
+            placeholder="Sin definir"
+            options={PRIORITY_OPTIONS}
+            {...register('priority', { setValueAs: emptyToUndefined })}
+          />
         </div>
 
         <div className={styles.row}>
