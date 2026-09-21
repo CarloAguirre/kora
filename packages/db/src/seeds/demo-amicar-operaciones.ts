@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import type { Database } from '../client';
 import {
   hourEntries,
@@ -11,6 +11,7 @@ import {
   projects,
   projectTeamMembers,
   projectTeams,
+  teamMembers,
 } from '../schema';
 
 /**
@@ -30,6 +31,9 @@ import {
  * ambiente — mismo `legacy_id`/contenido, pero un `id` (uuid) generado en
  * cada corrida, DISTINTO entre local y el servidor. Por eso acá se resuelve
  * por `legacyId`, nunca por un uuid fijo copiado de un ambiente en particular.
+ * Mismo problema con `team_members.id`: la membresía de equipo tampoco tiene
+ * el mismo uuid en cada ambiente (confirmado: Marco Arraiz y Cristian Cancino
+ * difieren entre local y el servidor) — se resuelve por (team_id, user_id).
  *
  * Se corre a mano con `pnpm --filter @kora/db seed:demo-amicar`, nunca como
  * parte de un despliegue.
@@ -52,15 +56,6 @@ const REAL = {
   userJorgeHinojosa: 'b80aa895-55f5-4756-9e9b-bebccd5c04f2', // RPA
   userAnaSoto: '89cdcf98-2801-4e29-b181-db3ca22e71c7', // Desarrollo
   userSolmaryCastro: 'ea6d5a9b-e3bb-47f7-a064-60ac27a593fb', // Desarrollo
-
-  // team_members.id (membresía de equipo, distinto de users.id)
-  teamMemberPabloVega: '56a06d1a-6991-4cbf-8f23-ea70efd696ae',
-  teamMemberJoseAponte: 'bb8db163-a015-40e8-91ef-848d7baa1ba1',
-  teamMemberMarcoArraiz: '87aae901-4b7d-453c-9cbc-7b644983fa55',
-  teamMemberCristianCancino: '86fa647b-288b-4a92-9237-82582ab5b42e',
-  teamMemberJorgeHinojosa: '621540ca-88fd-42ae-9ab1-1c9476c47764',
-  teamMemberAnaSoto: '497bc6df-7cfb-4e2e-83b1-a5723d2e3362',
-  teamMemberSolmaryCastro: '257b94ce-8e5e-4ee3-981a-3e7dd502f220',
 } as const;
 
 // IDs nuevos, fijos para que el seed sea idempotente (upsert/reemplazo por padre).
@@ -95,6 +90,31 @@ export async function seedAmicarOperaciones(db: Database): Promise<SeedAmicarOpe
     );
   }
   const projectId = projectRow.id;
+
+  const resolveTeamMemberId = async (teamId: string, userId: string): Promise<string> => {
+    const [row] = await db
+      .select({ id: teamMembers.id })
+      .from(teamMembers)
+      .where(and(eq(teamMembers.teamId, teamId), eq(teamMembers.userId, userId), isNull(teamMembers.leftAt)))
+      .limit(1);
+    if (!row) throw new Error(`No se encontró team_members activo para team=${teamId} user=${userId} en esta base.`);
+    return row.id;
+  };
+  const [
+    teamMemberPabloVega,
+    teamMemberJoseAponte,
+    teamMemberMarcoArraiz,
+    teamMemberCristianCancino,
+    teamMemberAnaSoto,
+    teamMemberSolmaryCastro,
+  ] = await Promise.all([
+    resolveTeamMemberId(REAL.teamRpa, REAL.userPabloVega),
+    resolveTeamMemberId(REAL.teamRpa, REAL.userJoseAponte),
+    resolveTeamMemberId(REAL.teamRpa, REAL.userMarcoArraiz),
+    resolveTeamMemberId(REAL.teamRpa, REAL.userCristianCancino),
+    resolveTeamMemberId(REAL.teamDev, REAL.userAnaSoto),
+    resolveTeamMemberId(REAL.teamDev, REAL.userSolmaryCastro),
+  ]);
 
   // 1. Proyecto — completar campos que hoy están vacíos (era un prospecto recién creado).
   await db
@@ -255,12 +275,12 @@ export async function seedAmicarOperaciones(db: Database): Promise<SeedAmicarOpe
     { id: DEMO.projectTeamDev, projectId: projectId, teamId: REAL.teamDev, leaderUserId: REAL.userAnaSoto, assignedHours: '100', memberCount: 2 },
   ]);
   await db.insert(projectTeamMembers).values([
-    { projectId: projectId, teamId: REAL.teamRpa, teamMemberId: REAL.teamMemberPabloVega, activity: 'Liderazgo técnico y diseño de bots', assignedHours: '90', consumedHours: '65' },
-    { projectId: projectId, teamId: REAL.teamRpa, teamMemberId: REAL.teamMemberJoseAponte, activity: 'Desarrollo de automatizaciones de cobranza', assignedHours: '90', consumedHours: '70' },
-    { projectId: projectId, teamId: REAL.teamRpa, teamMemberId: REAL.teamMemberMarcoArraiz, activity: 'Desarrollo de bots de asignación de rutas', assignedHours: '70', consumedHours: '55' },
-    { projectId: projectId, teamId: REAL.teamRpa, teamMemberId: REAL.teamMemberCristianCancino, activity: 'QA funcional de bots', assignedHours: '30', consumedHours: '15' },
-    { projectId: projectId, teamId: REAL.teamDev, teamMemberId: REAL.teamMemberAnaSoto, activity: 'Integración con dashboard interno', assignedHours: '60', consumedHours: '30' },
-    { projectId: projectId, teamId: REAL.teamDev, teamMemberId: REAL.teamMemberSolmaryCastro, activity: 'Desarrollo de endpoints de reportería', assignedHours: '40', consumedHours: '20' },
+    { projectId: projectId, teamId: REAL.teamRpa, teamMemberId: teamMemberPabloVega, activity: 'Liderazgo técnico y diseño de bots', assignedHours: '90', consumedHours: '65' },
+    { projectId: projectId, teamId: REAL.teamRpa, teamMemberId: teamMemberJoseAponte, activity: 'Desarrollo de automatizaciones de cobranza', assignedHours: '90', consumedHours: '70' },
+    { projectId: projectId, teamId: REAL.teamRpa, teamMemberId: teamMemberMarcoArraiz, activity: 'Desarrollo de bots de asignación de rutas', assignedHours: '70', consumedHours: '55' },
+    { projectId: projectId, teamId: REAL.teamRpa, teamMemberId: teamMemberCristianCancino, activity: 'QA funcional de bots', assignedHours: '30', consumedHours: '15' },
+    { projectId: projectId, teamId: REAL.teamDev, teamMemberId: teamMemberAnaSoto, activity: 'Integración con dashboard interno', assignedHours: '60', consumedHours: '30' },
+    { projectId: projectId, teamId: REAL.teamDev, teamMemberId: teamMemberSolmaryCastro, activity: 'Desarrollo de endpoints de reportería', assignedHours: '40', consumedHours: '20' },
   ]);
 
   // 5. Horas — se AGREGAN sobre las 2 entradas reales ya existentes (no se borran).
