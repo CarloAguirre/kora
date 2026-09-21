@@ -1,4 +1,4 @@
-import { and, eq, isNull } from 'drizzle-orm';
+import { desc, eq, sql } from 'drizzle-orm';
 import type { Database } from '../client';
 import {
   hourEntries,
@@ -93,16 +93,18 @@ export async function seedAmicarOperaciones(db: Database): Promise<SeedAmicarOpe
 
   // La asignación de equipo de una persona puede haber cambiado desde el
   // snapshot local (confirmado: en el servidor Marco Arraiz pasó a
-  // Desarrollo y Cristian Cancino dejó su equipo) — se resuelve por la
-  // membresía ACTIVA actual de cada persona, sea cual sea su equipo hoy,
-  // en vez de asumir a qué equipo pertenece.
+  // Desarrollo y Cristian Cancino dejó su equipo) — se resuelve la
+  // membresía más reciente de cada persona (activa si existe, si no la
+  // última histórica) en vez de asumir a qué equipo pertenece o exigir que
+  // siga activa: el FK solo necesita que la fila exista.
   const resolveTeamMembership = async (userId: string): Promise<{ id: string; teamId: string }> => {
     const [row] = await db
       .select({ id: teamMembers.id, teamId: teamMembers.teamId })
       .from(teamMembers)
-      .where(and(eq(teamMembers.userId, userId), isNull(teamMembers.leftAt)))
+      .where(eq(teamMembers.userId, userId))
+      .orderBy(sql`${teamMembers.leftAt} is null desc`, desc(teamMembers.joinedAt))
       .limit(1);
-    if (!row) throw new Error(`No se encontró una membresía de equipo activa para user=${userId} en esta base.`);
+    if (!row) throw new Error(`No se encontró ninguna membresía de equipo para user=${userId} en esta base.`);
     return row;
   };
   const [memberPabloVega, memberJoseAponte, memberMarcoArraiz, memberCristianCancino, memberAnaSoto, memberSolmaryCastro] =
