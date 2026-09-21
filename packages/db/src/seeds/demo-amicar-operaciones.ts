@@ -91,30 +91,29 @@ export async function seedAmicarOperaciones(db: Database): Promise<SeedAmicarOpe
   }
   const projectId = projectRow.id;
 
-  const resolveTeamMemberId = async (teamId: string, userId: string): Promise<string> => {
+  // La asignación de equipo de una persona puede haber cambiado desde el
+  // snapshot local (confirmado: en el servidor Marco Arraiz pasó a
+  // Desarrollo y Cristian Cancino dejó su equipo) — se resuelve por la
+  // membresía ACTIVA actual de cada persona, sea cual sea su equipo hoy,
+  // en vez de asumir a qué equipo pertenece.
+  const resolveTeamMembership = async (userId: string): Promise<{ id: string; teamId: string }> => {
     const [row] = await db
-      .select({ id: teamMembers.id })
+      .select({ id: teamMembers.id, teamId: teamMembers.teamId })
       .from(teamMembers)
-      .where(and(eq(teamMembers.teamId, teamId), eq(teamMembers.userId, userId), isNull(teamMembers.leftAt)))
+      .where(and(eq(teamMembers.userId, userId), isNull(teamMembers.leftAt)))
       .limit(1);
-    if (!row) throw new Error(`No se encontró team_members activo para team=${teamId} user=${userId} en esta base.`);
-    return row.id;
+    if (!row) throw new Error(`No se encontró una membresía de equipo activa para user=${userId} en esta base.`);
+    return row;
   };
-  const [
-    teamMemberPabloVega,
-    teamMemberJoseAponte,
-    teamMemberMarcoArraiz,
-    teamMemberCristianCancino,
-    teamMemberAnaSoto,
-    teamMemberSolmaryCastro,
-  ] = await Promise.all([
-    resolveTeamMemberId(REAL.teamRpa, REAL.userPabloVega),
-    resolveTeamMemberId(REAL.teamRpa, REAL.userJoseAponte),
-    resolveTeamMemberId(REAL.teamRpa, REAL.userMarcoArraiz),
-    resolveTeamMemberId(REAL.teamRpa, REAL.userCristianCancino),
-    resolveTeamMemberId(REAL.teamDev, REAL.userAnaSoto),
-    resolveTeamMemberId(REAL.teamDev, REAL.userSolmaryCastro),
-  ]);
+  const [memberPabloVega, memberJoseAponte, memberMarcoArraiz, memberCristianCancino, memberAnaSoto, memberSolmaryCastro] =
+    await Promise.all([
+      resolveTeamMembership(REAL.userPabloVega),
+      resolveTeamMembership(REAL.userJoseAponte),
+      resolveTeamMembership(REAL.userMarcoArraiz),
+      resolveTeamMembership(REAL.userCristianCancino),
+      resolveTeamMembership(REAL.userAnaSoto),
+      resolveTeamMembership(REAL.userSolmaryCastro),
+    ]);
 
   // 1. Proyecto — completar campos que hoy están vacíos (era un prospecto recién creado).
   await db
@@ -275,12 +274,12 @@ export async function seedAmicarOperaciones(db: Database): Promise<SeedAmicarOpe
     { id: DEMO.projectTeamDev, projectId: projectId, teamId: REAL.teamDev, leaderUserId: REAL.userAnaSoto, assignedHours: '100', memberCount: 2 },
   ]);
   await db.insert(projectTeamMembers).values([
-    { projectId: projectId, teamId: REAL.teamRpa, teamMemberId: teamMemberPabloVega, activity: 'Liderazgo técnico y diseño de bots', assignedHours: '90', consumedHours: '65' },
-    { projectId: projectId, teamId: REAL.teamRpa, teamMemberId: teamMemberJoseAponte, activity: 'Desarrollo de automatizaciones de cobranza', assignedHours: '90', consumedHours: '70' },
-    { projectId: projectId, teamId: REAL.teamRpa, teamMemberId: teamMemberMarcoArraiz, activity: 'Desarrollo de bots de asignación de rutas', assignedHours: '70', consumedHours: '55' },
-    { projectId: projectId, teamId: REAL.teamRpa, teamMemberId: teamMemberCristianCancino, activity: 'QA funcional de bots', assignedHours: '30', consumedHours: '15' },
-    { projectId: projectId, teamId: REAL.teamDev, teamMemberId: teamMemberAnaSoto, activity: 'Integración con dashboard interno', assignedHours: '60', consumedHours: '30' },
-    { projectId: projectId, teamId: REAL.teamDev, teamMemberId: teamMemberSolmaryCastro, activity: 'Desarrollo de endpoints de reportería', assignedHours: '40', consumedHours: '20' },
+    { projectId: projectId, teamId: memberPabloVega.teamId, teamMemberId: memberPabloVega.id, activity: 'Liderazgo técnico y diseño de bots', assignedHours: '90', consumedHours: '65' },
+    { projectId: projectId, teamId: memberJoseAponte.teamId, teamMemberId: memberJoseAponte.id, activity: 'Desarrollo de automatizaciones de cobranza', assignedHours: '90', consumedHours: '70' },
+    { projectId: projectId, teamId: memberMarcoArraiz.teamId, teamMemberId: memberMarcoArraiz.id, activity: 'Desarrollo de bots de asignación de rutas', assignedHours: '70', consumedHours: '55' },
+    { projectId: projectId, teamId: memberCristianCancino.teamId, teamMemberId: memberCristianCancino.id, activity: 'QA funcional de bots', assignedHours: '30', consumedHours: '15' },
+    { projectId: projectId, teamId: memberAnaSoto.teamId, teamMemberId: memberAnaSoto.id, activity: 'Integración con dashboard interno', assignedHours: '60', consumedHours: '30' },
+    { projectId: projectId, teamId: memberSolmaryCastro.teamId, teamMemberId: memberSolmaryCastro.id, activity: 'Desarrollo de endpoints de reportería', assignedHours: '40', consumedHours: '20' },
   ]);
 
   // 5. Horas — se AGREGAN sobre las 2 entradas reales ya existentes (no se borran).
