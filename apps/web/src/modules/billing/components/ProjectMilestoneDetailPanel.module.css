@@ -1,0 +1,122 @@
+.hint {
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-sm);
+}
+
+.section {
+  margin-top: var(--kora-space-4);
+}
+
+.sectionTitle {
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-navy);
+  margin: 0 0 var(--kora-space-2);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kora-space-3);
+  padding: var(--kora-space-2) 0;
+  border-bottom: 1px solid var(--kora-blue-200);
+  font-size: var(--kora-text-sm);
+}
+
+.rowLabel {
+  color: var(--kora-text-muted);
+}
+
+.rowValue {
+  color: var(--kora-navy);
+  font-weight: var(--kora-weight-semibold);
+  text-align: right;
+}
+
+.divider {
+  border-top: 1px solid var(--kora-blue-200);
+  margin: var(--kora-space-2) 0;
+}
+
+.rowHighlight {
+  border-bottom: none;
+  font-size: var(--kora-text-base);
+}
+
+.rowValueHighlight {
+  color: var(--kora-navy);
+  font-weight: var(--kora-weight-bold);
+}
+
+.note {
+  margin: 0 0 var(--kora-space-4);
+  font-size: var(--kora-text-xs);
+  color: var(--kora-text-muted);
+  line-height: 1.5;
+}
+
+.footerContent {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.statusTrack {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-1);
+  margin-bottom: var(--kora-space-3);
+  flex-wrap: wrap;
+}
+
+.statusStepWrap {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-1);
+}
+
+.statusStep {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--kora-text-xs);
+  color: var(--kora-text-muted);
+}
+
+.statusStepDone {
+  color: var(--kora-success-text);
+  font-weight: var(--kora-weight-semibold);
+}
+
+.statusSep {
+  width: 14px;
+  height: 1px;
+  background: var(--kora-blue-200);
+}
+
+.record {
+  margin: 0 0 var(--kora-space-2);
+  font-size: var(--kora-text-sm);
+  color: var(--kora-text-muted);
+}
+
+.actionButton {
+  width: 100%;
+  margin-top: var(--kora-space-2);
+}
+
+.doneBadge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--kora-space-2);
+  width: 100%;
+  margin-top: var(--kora-space-2);
+  padding: var(--kora-space-2);
+  border-radius: var(--kora-radius);
+  background: var(--kora-success-surface);
+  color: var(--kora-success-text);
+  font-weight: var(--kora-weight-semibold);
+  font-size: var(--kora-text-sm);
+}

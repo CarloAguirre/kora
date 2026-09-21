@@ -25,7 +25,6 @@ import { TicketsListPage } from '@/modules/tickets/pages/TicketsListPage';
 import { TicketDetailPage } from '@/modules/tickets/pages/TicketDetailPage';
 import { TicketHistoryPage } from '@/modules/tickets/pages/TicketHistoryPage';
 import { ForecastPage } from '@/modules/forecast/pages/ForecastPage';
-import { SupportBillingDashboardPage } from '@/modules/billing/pages/SupportBillingDashboardPage';
 import { BillingLedgerPage } from '@/modules/billing/pages/BillingLedgerPage';
 import { DashboardPage } from '@/modules/dashboard/pages/DashboardPage';
 import { ClientPortalPage } from '@/modules/client-portal/pages/ClientPortalPage';
@@ -130,11 +129,11 @@ export const router = createBrowserRouter([
   },
   {
     element: <ProtectedRoute permission="billing:read" />,
-    children: [{ path: '/facturacion-soporte', element: <SupportBillingDashboardPage /> }],
-  },
-  {
-    element: <ProtectedRoute permission="billing:read" />,
-    children: [{ path: '/facturacion', element: <BillingLedgerPage /> }],
+    children: [
+      { path: '/facturacion', element: <BillingLedgerPage /> },
+      // La pestaña "Soporte" de arriba reemplazó a la página dedicada — se conserva el redirect por enlaces/marcadores viejos.
+      { path: '/facturacion-soporte', element: <Navigate to="/facturacion" replace /> },
+    ],
   },
 
   // ── Módulo de horas ───────────────────────────────────────────────────

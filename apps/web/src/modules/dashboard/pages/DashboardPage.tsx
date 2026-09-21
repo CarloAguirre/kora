@@ -37,7 +37,9 @@ export function DashboardPage() {
   const { can } = usePermissions();
   const toast = useToast();
   const isCollaborator = user?.role === 'collaborator';
-  const showSupportTab = can('billing:read');
+  // `leader` ya no tiene `billing:read` (no debe entrar a Facturación), pero esta tab es
+  // de métricas de soporte, no de facturación — se mantiene visible para ese rol aparte.
+  const showSupportTab = can('billing:read') || user?.role === 'leader';
   const tabs = showSupportTab ? ALL_TABS : ALL_TABS.filter((t) => t.id !== 'soporte');
   const [tab, setTab] = useState<'proyectos' | 'soporte'>('proyectos');
   const [weekStart, setWeekStart] = useState<string | undefined>(undefined);

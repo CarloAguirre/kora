@@ -91,16 +91,11 @@ const NAVIGATION: readonly NavigationItem[] = [
     icon: <TicketIcon size={20} />,
     anyOf: ['tickets:read', 'tickets:read_assigned'],
   },
-  {
-    to: '/facturacion-soporte',
-    label: 'Facturación de Soporte',
-    icon: <BarChartIcon size={20} />,
-    permission: 'billing:read',
-  },
-  // Libro combinado de Soporte + Proyectos del rol Finanzas — ver
-  // `kora-perfil-finanzas.html`. Mismo permiso que la entrada de arriba, así
-  // que admin/pmo ven ambas: la de soporte (con el detalle de contratos) y
-  // esta (el libro plano). No reemplaza a `/facturacion-soporte`.
+  // Único punto de entrada a facturación — pestañas Soporte/Proyectos dentro
+  // de la página (`BillingLedgerPage`). Antes había una entrada separada
+  // "Facturación de Soporte" (`/facturacion-soporte`); se retiró cuando la
+  // pestaña "Soporte" pasó a cubrir exactamente lo mismo (`SupportBillingSection`,
+  // compartida entre ambas).
   {
     to: '/facturacion',
     label: 'Facturación',

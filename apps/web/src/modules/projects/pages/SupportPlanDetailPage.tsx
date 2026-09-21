@@ -1,17 +1,18 @@
 import { useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import type { SupportInvoice, TicketSummary } from '@kora/contracts';
+import { SUPPORT_PLAN_TYPE_LABELS, type SupportInvoice } from '@kora/contracts';
 import styles from './SupportPlanDetailPage.module.css';
 import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Button } from '@/shared/components/ui/Button';
 import { Card } from '@/shared/components/ui/Card';
 import { Tabs } from '@/shared/components/ui/Tabs';
 import { DataTable, type Column } from '@/shared/components/ui/DataTable';
-import { ChevronLeftIcon } from '@/shared/components/icons/Icons';
+import { ChevronLeftIcon, DownloadIcon, LinkIcon } from '@/shared/components/icons/Icons';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { useToast } from '@/shared/components/ui/Toast';
 import { useTicketsList } from '@/modules/tickets/api/tickets.queries';
-import { TicketPriorityBadge } from '@/modules/tickets/components/TicketPriorityBadge';
+import { SupportTicketBrowser } from '../components/SupportTicketBrowser';
+import { SupportPlanBillingAction } from '../components/SupportPlanBillingAction';
 import {
   SupportInvoiceBillingStatusBadge,
   SupportInvoicePaymentStatusBadge,
@@ -19,11 +20,8 @@ import {
   SupportPlanStatusBadge,
   SupportPlanTypeBadge,
 } from '../components/SupportPlanBadges';
-import { IssueSupportInvoiceDialog } from '../components/IssueSupportInvoiceDialog';
 import { MarkSupportInvoicePaidDialog } from '../components/MarkSupportInvoicePaidDialog';
 import { CloseSupportPlanDialog } from '../components/CloseSupportPlanDialog';
-import { SupportHoursDonut } from '../components/SupportHoursDonut';
-import { SupportProgressChart } from '../components/SupportProgressChart';
 import {
   useCloseSupportPlan,
   useIssueSupportInvoice,
@@ -36,13 +34,23 @@ const formatDate = (value: string | null) => (value ? new Date(`${value}T00:00:0
 const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 2 });
 const TICKETS_PAGE_SIZE = 25;
 
-type InvoiceAction = { type: 'issue' } | { type: 'pay'; invoice: SupportInvoice } | null;
+type PayAction = { invoice: SupportInvoice } | null;
 
 /**
  * Ficha de contrato de soporte. Para `scope='consolidated'` muestra subtabs
  * por proyecto de desarrollo cubierto — igual mecanismo que la vista antigua
  * (`SupportProjectDetailView`) filtraba por `project.type`, aquí filtra
  * tickets por el proyecto activo entre los vinculados al contrato.
+ *
+ * Estructura calcada del mockup de referencia (`kora-facturacion-soporte.html`
+ * → detalle de contrato): fila de identidad con tipo de contrato (cliente
+ * enlaza a su ficha), fila de info condicional por tipo de plan, historial de
+ * facturaciones arriba del todo, alerta+acción de facturar combinadas en una
+ * tarjeta (`SupportPlanBillingAction`), y tickets en panel maestro-detalle en
+ * línea (`SupportTicketBrowser`, con `TicketDetailModal` disponible desde ahí
+ * para editar/cerrar/HH extra sin duplicar esa lógica acá). El chart/donut de
+ * consumo y el card de SLA que tenía esta ficha antes no están en el mockup
+ * — se sacaron a pedido explícito, no se movieron.
  */
 export function SupportPlanDetailPage() {
   const { planId } = useParams<{ planId: string }>();
@@ -52,7 +60,7 @@ export function SupportPlanDetailPage() {
 
   const { data: plan, isLoading } = useSupportPlanDetail(planId ?? null);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
-  const [invoiceAction, setInvoiceAction] = useState<InvoiceAction>(null);
+  const [payAction, setPayAction] = useState<PayAction>(null);
   const [closing, setClosing] = useState(false);
   const [ticketsPage, setTicketsPage] = useState(1);
 
@@ -81,37 +89,41 @@ export function SupportPlanDetailPage() {
   const canManageBilling = can('billing:manage');
   const canManagePlan = can('projects:manage');
 
-  const ticketColumns: Column<TicketSummary>[] = [
-    {
-      key: 'code',
-      header: 'ID ticket',
-      width: '110px',
-      render: (t) => (
-        <Link to={`/tickets/${t.id}`} className={styles.ticketLink}>
-          {t.code ?? '—'}
-        </Link>
-      ),
-    },
-    { key: 'title', header: 'Título', render: (t) => t.title },
-    { key: 'assignee', header: 'Responsable', render: (t) => t.assignee?.fullName ?? 'Sin asignar' },
-    { key: 'estimatedHours', header: 'HH Est.', align: 'right', render: (t) => t.estimatedHours ?? 0 },
-    { key: 'usedHours', header: 'HH Util.', align: 'right', render: (t) => formatHours(t.usedHours) },
-    { key: 'priority', header: 'Criticidad', render: (t) => <TicketPriorityBadge priority={t.priority} /> },
-  ];
+  const scopeText =
+    plan.scope === 'consolidated'
+      ? `Consolidado: ${plan.linkedProjects.map((p) => p.name).join(', ')}`
+      : `Proyecto único: ${plan.linkedProjects[0]?.name ?? plan.name}`;
+
+  const shareLink = () => {
+    void navigator.clipboard.writeText(window.location.href).then(
+      () => toast.success('Enlace copiado al portapapeles.'),
+      () => toast.error('No se pudo copiar el enlace.'),
+    );
+  };
 
   const invoiceColumns: Column<SupportInvoice>[] = [
-    { key: 'folio', header: 'Folio', render: (i) => i.folio },
+    {
+      key: 'folio',
+      header: 'Folio',
+      render: (i) => (
+        <span className={styles.folioCell}>
+          {i.folio}
+          <span className={styles.folioSub}>
+            emitida {formatDate(i.invoicedAt)}
+            {i.dueAt ? ` · vence ${formatDate(i.dueAt)}` : ''}
+          </span>
+        </span>
+      ),
+    },
     { key: 'period', header: 'Período', render: (i) => i.periodKey },
     { key: 'amount', header: 'Monto', align: 'right', render: (i) => formatMoney(i.amountUf, i.currency) },
-    { key: 'invoicedAt', header: 'Emitida', render: (i) => formatDate(i.invoicedAt) },
-    { key: 'dueAt', header: 'Vence', render: (i) => formatDate(i.dueAt) },
-    { key: 'status', header: 'Pago', render: (i) => <SupportInvoicePaymentStatusBadge status={i.paymentStatus} /> },
+    { key: 'status', header: 'Estado', render: (i) => <SupportInvoicePaymentStatusBadge status={i.paymentStatus} /> },
     {
       key: 'actions',
       header: '',
       render: (i) =>
         i.paymentStatus !== 'paid' && canManageBilling ? (
-          <Button variant="outline" size="sm" onClick={() => setInvoiceAction({ type: 'pay', invoice: i })}>
+          <Button variant="outline" size="sm" onClick={() => setPayAction({ invoice: i })}>
             Marcar como pagado
           </Button>
         ) : null,
@@ -121,9 +133,9 @@ export function SupportPlanDetailPage() {
   return (
     <DashboardLayout title="Contrato de soporte">
       <div className={styles.page}>
-      <Link to={`/clientes/${plan.clientId}`} className={styles.backLink}>
+      <Link to="/facturacion" className={styles.backLink}>
         <ChevronLeftIcon size={14} />
-        Volver a {plan.clientName}
+        Volver a Facturación
       </Link>
 
       <div className={styles.header}>
@@ -131,17 +143,25 @@ export function SupportPlanDetailPage() {
           <div className={styles.titleRow}>
             <h1 className={styles.title}>{plan.name}</h1>
             <SupportPlanStatusBadge status={plan.status} />
-          </div>
-          <div className={styles.badgeRow}>
-            <SupportPlanTypeBadge planType={plan.planType} />
             <SupportPlanScopeBadge scope={plan.scope} />
           </div>
+          <p className={styles.subtitle}>
+            Contrato de Soporte · {SUPPORT_PLAN_TYPE_LABELS[plan.planType]} · {scopeText}
+          </p>
         </div>
-        {plan.status === 'active' && canManagePlan && (
-          <Button variant="outline" onClick={() => setClosing(true)}>
-            Cerrar contrato
+        <div className={styles.headerActions}>
+          <Button variant="outline" iconLeft={<LinkIcon size={15} />} onClick={shareLink}>
+            Compartir PDF
           </Button>
-        )}
+          <Button variant="outline" iconLeft={<DownloadIcon size={15} />} onClick={() => window.print()}>
+            Descargar PDF
+          </Button>
+          {plan.status === 'active' && canManagePlan && (
+            <Button variant="outline" onClick={() => setClosing(true)}>
+              Cerrar contrato
+            </Button>
+          )}
+        </div>
       </div>
 
       {plan.status === 'ended' && plan.closedAt && (
@@ -151,16 +171,23 @@ export function SupportPlanDetailPage() {
       )}
 
       <Card className={styles.identityCard}>
-        <IdentityField label="Cliente" value={plan.clientName} />
+        <IdentityField
+          label="Cliente"
+          value={
+            <Link to={`/clientes/${plan.clientId}/vista-cliente`} className={styles.clientLink}>
+              {plan.clientName} ↗
+            </Link>
+          }
+        />
         <IdentityField label="Responsable Kabeli" value={plan.leaderName ?? '—'} />
-        <IdentityField label="Contacto" value={plan.contact?.name ?? '—'} sub={plan.contact?.position ?? undefined} />
-        <IdentityField label="Valor hora" value={formatMoney(plan.planValueUf, plan.currency)} />
+        <IdentityField label="Tipo de contrato" value={<SupportPlanTypeBadge planType={plan.planType} />} />
+        <IdentityField label="Valor hora actual" value={formatMoney(plan.planValueUf, plan.currency)} />
         <IdentityField
           label="Valor hora extra"
           value={plan.planType === 'on_demand' ? 'No aplica' : formatMoney(plan.extraHourValueUf, plan.currency)}
         />
         <IdentityField
-          label="Facturación de este período"
+          label="Estado de facturación y pago"
           value={<SupportInvoiceBillingStatusBadge status={plan.currentBillingStatus} />}
           sub={plan.currentBillingStatus ? formatMoney(plan.currentAmountUf, plan.currency) : undefined}
         />
@@ -175,53 +202,52 @@ export function SupportPlanDetailPage() {
           <span className={styles.infoLabel}>Fecha de término</span>
           <span className={styles.infoValue}>{formatDate(plan.endDate)}</span>
         </Card>
-        <Card className={styles.infoCard}>
-          <span className={styles.infoLabel}>Documentación</span>
-          <div className={styles.docLinks}>
-            {plan.quotationLink && <a href={plan.quotationLink} target="_blank" rel="noreferrer">Cotización</a>}
-            {plan.contractLink && <a href={plan.contractLink} target="_blank" rel="noreferrer">Contrato</a>}
-            {plan.additionalLinks && <a href={plan.additionalLinks} target="_blank" rel="noreferrer">Adicionales</a>}
-            {!plan.quotationLink && !plan.contractLink && !plan.additionalLinks && '—'}
-          </div>
-        </Card>
-      </div>
-
-      <Card>
-        <p className={styles.sectionTitle}>Tiempos de resolución (SLA)</p>
-        <div className={styles.slaRow}>
-          <SlaItem label="Crítica" hours={plan.targetHours.critical} />
-          <SlaItem label="Alta" hours={plan.targetHours.high} />
-          <SlaItem label="Media" hours={plan.targetHours.medium} />
-          <SlaItem label="Baja" hours={plan.targetHours.low} />
-        </div>
-      </Card>
-
-      <div className={styles.summaryRow}>
-        <Card>
-          <p className={styles.sectionTitle}>Estado del contrato</p>
-          <SupportHoursDonut summary={plan.summary} />
-        </Card>
-        {plan.summary.history.length > 0 && (
-          <Card>
-            <SupportProgressChart summary={plan.summary} />
+        {plan.planType === 'on_demand' && (
+          <Card className={styles.infoCard}>
+            <span className={styles.infoLabel}>Responsable cliente</span>
+            <span className={styles.infoValue}>{plan.contact?.name ?? '—'}</span>
+          </Card>
+        )}
+        {plan.planType === 'bundle' && (
+          <>
+            <Card className={styles.infoCard}>
+              <span className={styles.infoLabel}>HH contratadas</span>
+              <span className={styles.infoValue}>{formatHours(plan.contractedHours)} h</span>
+            </Card>
+            <Card className={styles.infoCard}>
+              <span className={styles.infoLabel}>HH consumidas</span>
+              <span className={[styles.infoValue, plan.usedHours > plan.contractedHours ? styles.infoValueDanger : ''].join(' ')}>
+                {formatHours(plan.usedHours)} h
+              </span>
+            </Card>
+          </>
+        )}
+        {plan.planType === 'monthly' && (
+          <>
+            <Card className={styles.infoCard}>
+              <span className={styles.infoLabel}>HH incluidas este período</span>
+              <span className={styles.infoValue}>{formatHours(plan.summary.currentPeriod?.capacityHours ?? plan.contractedHours)} h</span>
+            </Card>
+            <Card className={styles.infoCard}>
+              <span className={styles.infoLabel}>HH usadas este período</span>
+              <span className={styles.infoValue}>{formatHours(plan.summary.currentPeriod?.usedHours ?? plan.usedHours)} h</span>
+            </Card>
+          </>
+        )}
+        {(plan.quotationLink || plan.contractLink || plan.additionalLinks) && (
+          <Card className={styles.infoCard}>
+            <span className={styles.infoLabel}>Documentación</span>
+            <div className={styles.docLinks}>
+              {plan.quotationLink && <a href={plan.quotationLink} target="_blank" rel="noreferrer">Cotización</a>}
+              {plan.contractLink && <a href={plan.contractLink} target="_blank" rel="noreferrer">Contrato</a>}
+              {plan.additionalLinks && <a href={plan.additionalLinks} target="_blank" rel="noreferrer">Adicionales</a>}
+            </div>
           </Card>
         )}
       </div>
 
       <Card>
-        <p className={styles.sectionTitle}>Facturación</p>
-        {plan.currentBillingStatus === 'to_invoice' && (
-          <div className={styles.billingAction}>
-            <span>Monto a facturar este período: <strong>{formatMoney(plan.currentAmountUf, plan.currency)}</strong></span>
-            {canManageBilling && <Button onClick={() => setInvoiceAction({ type: 'issue' })}>Marcar como facturado</Button>}
-          </div>
-        )}
-        {plan.currentBillingStatus === 'invoiced' && (
-          <p className={styles.hint}>Ya se registró la factura de este período — para marcarla como pagada, usa el historial.</p>
-        )}
-        {plan.currentBillingStatus === null && <p className={styles.hint}>No hay nada por facturar en el período en curso.</p>}
-
-        <p className={styles.sectionTitle} style={{ marginTop: 'var(--kora-space-5)' }}>Historial de facturaciones</p>
+        <p className={styles.sectionTitle}>Historial de facturaciones del contrato</p>
         <DataTable
           caption="Historial de facturaciones del contrato"
           columns={invoiceColumns}
@@ -232,6 +258,15 @@ export function SupportPlanDetailPage() {
           emptyMessage="Primer ciclo del contrato — todavía no hay historial."
         />
       </Card>
+
+      <SupportPlanBillingAction
+        plan={plan}
+        canManageBilling={canManageBilling}
+        onIssue={async (input) => {
+          await issueInvoice.mutateAsync(input);
+          toast.success('Se registró la factura.');
+        }}
+      />
 
       {plan.linkedProjects.length > 1 && (
         <Tabs
@@ -246,35 +281,21 @@ export function SupportPlanDetailPage() {
 
       <Card>
         <p className={styles.sectionTitle}>Tickets del proyecto</p>
-        <DataTable
-          caption="Tickets del contrato"
-          columns={ticketColumns}
-          items={tickets?.items ?? []}
-          getRowKey={(t) => t.id}
-          loading={loadingTickets}
-          error={null}
-          emptyMessage="Sin tickets registrados."
-        />
+        <p className={styles.ticketSummaryLine}>
+          Tickets: <strong>{tickets?.total ?? 0}</strong> · HH utilizadas: <strong>{formatHours(plan.usedHours)}h</strong>
+        </p>
+
+        <SupportTicketBrowser tickets={tickets} loading={loadingTickets} page={ticketsPage} onPageChange={setTicketsPage} />
       </Card>
       </div>
 
-      <IssueSupportInvoiceDialog
-        open={invoiceAction?.type === 'issue'}
-        amountUf={plan.currentAmountUf}
-        currency={plan.currency}
-        onClose={() => setInvoiceAction(null)}
-        onConfirm={async (input) => {
-          await issueInvoice.mutateAsync(input);
-          toast.success('Se registró la factura.');
-        }}
-      />
       <MarkSupportInvoicePaidDialog
-        open={invoiceAction?.type === 'pay'}
-        folio={invoiceAction?.type === 'pay' ? invoiceAction.invoice.folio : ''}
-        onClose={() => setInvoiceAction(null)}
+        open={payAction !== null}
+        folio={payAction?.invoice.folio ?? ''}
+        onClose={() => setPayAction(null)}
         onConfirm={async (input) => {
-          if (invoiceAction?.type !== 'pay') return;
-          await markPaid.mutateAsync({ invoiceId: invoiceAction.invoice.id, input });
+          if (!payAction) return;
+          await markPaid.mutateAsync({ invoiceId: payAction.invoice.id, input });
           toast.success('Se registró el pago.');
         }}
       />
@@ -297,15 +318,6 @@ function IdentityField({ label, value, sub }: { label: string; value: ReactNode;
       <span className={styles.identityLabel}>{label}</span>
       <span className={styles.identityValue}>{value}</span>
       {sub && <span className={styles.identitySub}>{sub}</span>}
-    </div>
-  );
-}
-
-function SlaItem({ label, hours }: { label: string; hours: number | null }) {
-  return (
-    <div className={styles.slaItem}>
-      <span className={styles.infoLabel}>{label}</span>
-      <span className={styles.infoValue}>{hours !== null ? `${hours}h` : '—'}</span>
     </div>
   );
 }

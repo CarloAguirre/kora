@@ -20,7 +20,7 @@ export interface KpiCardProps {
  * necesita 5 veces y no vale la pena duplicar esa hoja de estilos otra vez.
  */
 export function KpiCard({ label, value, sub, tone = 'default', className, onClick, active }: KpiCardProps) {
-  const classes = [styles.card, onClick ? styles.clickable : '', active ? styles.active : '', className]
+  const classes = [styles.card, tone === 'danger' ? styles.dangerCard : '', onClick ? styles.clickable : '', active ? styles.active : '', className]
     .filter(Boolean)
     .join(' ');
 

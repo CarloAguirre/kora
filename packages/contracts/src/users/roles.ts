@@ -111,7 +111,6 @@ export const DEFAULT_ROLE_PERMISSIONS: Readonly<Record<RoleCode, readonly Permis
     'hours:approve',
     'forecast:read',
     'forecast:manage',
-    'billing:read',
   ],
   collaborator: [
     'tickets:read_assigned',

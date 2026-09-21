@@ -21,6 +21,12 @@
   margin-bottom: var(--kora-space-4);
 }
 
+.headerActions {
+  display: flex;
+  gap: var(--kora-space-2);
+  flex-wrap: wrap;
+}
+
 .titleRow {
   display: flex;
   align-items: center;
@@ -35,10 +41,10 @@
   margin: 0;
 }
 
-.badgeRow {
-  display: flex;
-  gap: var(--kora-space-2);
-  margin-top: var(--kora-space-2);
+.subtitle {
+  margin: var(--kora-space-1) 0 0;
+  font-size: var(--kora-text-sm);
+  color: var(--kora-text-muted);
 }
 
 .closedBanner {
@@ -52,9 +58,9 @@
 }
 
 .identityCard {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--kora-space-5);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--kora-space-4);
   margin-bottom: var(--kora-space-4);
 }
 
@@ -84,6 +90,15 @@
   color: var(--kora-text-muted);
 }
 
+.clientLink {
+  color: var(--kora-navy);
+  text-decoration: none;
+}
+
+.clientLink:hover {
+  text-decoration: underline;
+}
+
 .infoRow {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -111,6 +126,10 @@
   color: var(--kora-navy);
 }
 
+.infoValueDanger {
+  color: var(--kora-danger);
+}
+
 .docLinks {
   display: flex;
   gap: var(--kora-space-3);
@@ -129,52 +148,22 @@
   margin: 0 0 var(--kora-space-3);
 }
 
-.slaRow {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: var(--kora-space-4);
-}
-
-.slaItem {
+.folioCell {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 
-.summaryRow {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: var(--kora-space-4);
-  margin-bottom: var(--kora-space-4);
-}
-
-.billingAction {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--kora-space-3);
-  padding: var(--kora-space-3) var(--kora-space-4);
-  background: var(--kora-surface-alt);
-  border-radius: var(--kora-radius);
-  margin-bottom: var(--kora-space-4);
-  font-size: var(--kora-text-sm);
-  color: var(--kora-navy);
-}
-
-.hint {
+.folioSub {
+  font-size: var(--kora-text-xs);
   color: var(--kora-text-muted);
+  font-weight: var(--kora-weight-regular);
+}
+
+.ticketSummaryLine {
   font-size: var(--kora-text-sm);
-  margin: 0 0 var(--kora-space-4);
-}
-
-.ticketLink {
-  color: var(--kora-navy);
-  font-weight: var(--kora-weight-semibold);
-  text-decoration: none;
-}
-
-.ticketLink:hover {
-  text-decoration: underline;
+  color: var(--kora-text-muted);
+  margin: 0 0 var(--kora-space-3);
 }
 
 .page {

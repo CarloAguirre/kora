@@ -1,0 +1,94 @@
+.hint {
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-sm);
+  margin: 0;
+}
+
+.alertCard,
+.resolvedCard {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: var(--kora-space-3);
+}
+
+.alertCard {
+  background: var(--kora-danger-surface-soft);
+  border-color: var(--kora-danger-surface);
+}
+
+.resolvedCard {
+  background: var(--kora-success-surface);
+  border-color: var(--kora-success-surface);
+}
+
+.alertIcon {
+  color: var(--kora-danger);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.resolvedIcon {
+  color: var(--kora-success-text);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-2);
+  width: 100%;
+  align-items: flex-start;
+}
+
+.alertBlock {
+  display: flex;
+  flex-direction: column;
+}
+
+.alertTitle {
+  font-size: var(--kora-text-sm);
+  color: var(--kora-navy);
+}
+
+.alertText {
+  margin: 2px 0 0;
+  font-size: var(--kora-text-sm);
+  color: var(--kora-text-muted);
+  line-height: 1.45;
+}
+
+.montoLine {
+  margin: 0;
+  font-size: var(--kora-text-sm);
+  color: var(--kora-navy);
+}
+
+.resolvedNote {
+  margin: 0;
+  font-size: var(--kora-text-sm);
+  color: var(--kora-success-text);
+  font-weight: var(--kora-weight-medium);
+}
+
+.inlineForm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-3);
+  width: 100%;
+  max-width: 360px;
+  margin-top: var(--kora-space-1);
+}
+
+.inlineFormActions {
+  display: flex;
+  gap: var(--kora-space-2);
+}
+
+.formAlert {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+  color: var(--kora-danger);
+  font-size: var(--kora-text-sm);
+}
