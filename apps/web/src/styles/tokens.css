@@ -28,6 +28,7 @@
   --kora-blue-200: #b9c9dd;
   --kora-blue-surface: #e6f1f8;
   --kora-blue-surface-alt: #ecf5ff;
+  --kora-blue-surface-soft: #eaf4ff;
   --kora-blue-link: #155dfc;
 
   /* ── Neutros ─────────────────────────────────────────────────────────── */
@@ -37,6 +38,7 @@
   --kora-border: #a3a7ab;
   --kora-border-strong: #5a6470;
   --kora-border-soft: #d6dbe0;
+  --kora-border-subtle: #dce5ee;
   --kora-surface: #ffffff;
   --kora-surface-alt: #f9fcff;
   --kora-surface-muted: #f5f6f8;
@@ -56,8 +58,22 @@
   --kora-warning-surface: #fee6c9;
   --kora-warning-strong: #e5c636;
 
+  /* Píldoras de estado (`Badge`) — tonos exactos del Figma de tablas
+     (fileKey Sqc5DJtmbLtnBhAM0y4Fww, nodes 9895:29804/29697/29050). Son tokens
+     propios y no una redefinición de los `--kora-success-surface` etc. de
+     arriba, que también pintan botones/toasts/alertas y cuyo tono no cambió. */
+  --kora-badge-success-bg: #e7f7ec;
+  --kora-badge-success-text: #237a43;
+  --kora-badge-warning-bg: #fff3d6;
+  --kora-badge-warning-text: #a96500;
+  --kora-badge-danger-bg: #fdebed;
+  --kora-badge-danger-text: #b4232c;
+  --kora-badge-neutral-bg: #eef2f6;
+  --kora-badge-neutral-text: #66758a;
+
   /* ── Tipografía ──────────────────────────────────────────────────────── */
   --kora-font: 'Red Hat Display', -apple-system, Roboto, Helvetica, sans-serif;
+  --kora-text-2xs: 11px;
   --kora-text-xs: 12px;
   --kora-text-sm: 13px;
   --kora-text-base: 14px;
@@ -83,9 +99,11 @@
 
   /* ── Formas ──────────────────────────────────────────────────────────── */
   --kora-radius-sm: 4px;
+  --kora-radius-md: 6px;
   --kora-radius: 8px;
   --kora-radius-input: 10px;
   --kora-radius-lg: 16px;
+  --kora-radius-table: 14px;
   --kora-radius-pill: 999px;
   --kora-radius-sidebar: 0 48px 0 0;
 
@@ -102,6 +120,8 @@
   --kora-shadow-lg: 0 8px 24px rgba(18, 34, 53, 0.16);
   /* Sombra de las tarjetas de contenido (`.card-container` / `.form-card` en la v1). */
   --kora-shadow-card: 2px 2px 10px 0 rgba(22, 81, 97, 0.21);
+  /* Sombra sutil de `DataTable` en el Figma de tablas — mucho más leve que `--kora-shadow-card`. */
+  --kora-shadow-table: 0 3px 10px 0 rgba(18, 34, 53, 0.04);
 
   /* ── Movimiento ──────────────────────────────────────────────────────── */
   --kora-transition: 0.2s ease;

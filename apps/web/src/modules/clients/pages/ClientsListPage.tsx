@@ -5,7 +5,7 @@ import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Button } from '@/shared/components/ui/Button';
 import { Card } from '@/shared/components/ui/Card';
 import { Pagination } from '@/shared/components/ui/Pagination';
-import { Tabs } from '@/shared/components/ui/Tabs';
+import { SegmentedControl } from '@/shared/components/ui/SegmentedControl';
 import { useToast } from '@/shared/components/ui/Toast';
 import { PlusIcon } from '@/shared/components/icons/Icons';
 import { ClientsFilters } from '../components/ClientsFilters';
@@ -39,10 +39,10 @@ export function ClientsListPage() {
   const [dialog, setDialog] = useState<DialogState>({ kind: 'none' });
   const closeDialog = () => setDialog({ kind: 'none' });
 
-  const tabs = [
-    { id: 'all', label: `Todos${stats ? ` (${stats.totalCount})` : ''}` },
-    { id: 'active', label: `Activos${stats ? ` (${stats.activeCount})` : ''}` },
-    { id: 'inactive', label: `Inactivos${stats ? ` (${stats.inactiveCount})` : ''}` },
+  const statusOptions = [
+    { value: 'all', label: `Todos${stats ? ` (${stats.totalCount})` : ''}` },
+    { value: 'active', label: `Activos${stats ? ` (${stats.activeCount})` : ''}` },
+    { value: 'inactive', label: `Inactivos${stats ? ` (${stats.inactiveCount})` : ''}` },
   ];
 
   return (
@@ -67,7 +67,12 @@ export function ClientsListPage() {
 
         <Card>
           <div className={styles.filterRow}>
-            <Tabs tabs={tabs} activeId={tab} onSelect={(id) => setTab(id as ClientsStatusTab)} />
+            <SegmentedControl
+              options={statusOptions}
+              value={tab}
+              onChange={(value) => setTab(value as ClientsStatusTab)}
+              aria-label="Filtrar clientes por estado"
+            />
             <ClientsFilters value={filters} onChange={setFilters} />
           </div>
 

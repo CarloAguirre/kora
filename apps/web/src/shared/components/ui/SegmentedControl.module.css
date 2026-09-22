@@ -25,26 +25,24 @@
 }
 
 .option {
-  height: var(--kora-control-height-sm);
-  padding: 6px var(--kora-space-4);
-  border-radius: var(--kora-radius);
-  border: 1px solid var(--kora-border-soft);
+  padding: 12px var(--kora-space-4);
+  border-radius: var(--kora-radius-input);
+  border: 1px solid var(--kora-border-subtle);
   background: var(--kora-surface);
-  color: var(--kora-text-muted);
+  color: var(--kora-navy);
   font-family: var(--kora-font);
-  font-size: var(--kora-text-sm);
-  font-weight: var(--kora-weight-medium);
+  font-size: var(--kora-text-base);
+  font-weight: var(--kora-weight-bold);
   cursor: pointer;
   transition: background var(--kora-transition), color var(--kora-transition), border-color var(--kora-transition);
 }
 
 .option:hover:not(.selected) {
-  background: var(--kora-blue-surface);
+  background: var(--kora-blue-surface-soft);
 }
 
 .selected {
   background: var(--kora-navy);
   border-color: var(--kora-navy);
-  color: var(--kora-lime);
-  font-weight: var(--kora-weight-bold);
+  color: var(--kora-surface);
 }

@@ -304,17 +304,15 @@ export function ProjectsBillingSection() {
         </div>
       </div>
 
-      <Card>
-        <DataTable
-          caption="Tramos de pago de proyectos"
-          columns={columns}
-          items={rows}
-          getRowKey={(e) => e.id}
-          loading={isLoading}
-          error={null}
-          emptyMessage="No hay resultados para estos filtros."
-        />
-      </Card>
+      <DataTable
+        caption="Tramos de pago de proyectos"
+        columns={columns}
+        items={rows}
+        getRowKey={(e) => e.id}
+        loading={isLoading}
+        error={null}
+        emptyMessage="No hay resultados para estos filtros."
+      />
 
       <IssueProjectMilestoneInvoiceDialog
         open={dialog?.kind === 'issue-milestone'}

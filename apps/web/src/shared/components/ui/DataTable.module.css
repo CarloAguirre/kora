@@ -1,10 +1,16 @@
-/* Tabla — cabecera lima y bordes grises, igual que .proy-table-th de la v1. */
+/* Tabla — tarjeta blanca redondeada con cabecera celeste, igual al Figma de tablas
+   (fileKey Sqc5DJtmbLtnBhAM0y4Fww, nodes 9895:29804/29697/29050). */
 
 .container {
   width: 100%;
-  overflow-x: auto;
-  /* La tabla desborda dentro de su propio contenedor: la página nunca hace
-     scroll horizontal, que es lo que rompe la lectura en pantallas pequeñas. */
+  overflow: auto;
+  background: var(--kora-surface);
+  border: 1px solid var(--kora-border-subtle);
+  border-radius: var(--kora-radius-table);
+  box-shadow: var(--kora-shadow-table);
+  /* `overflow: auto` (no solo `overflow-x`) recorta el contenido a las esquinas
+     redondeadas del contenedor; la tabla no queda con alto fijo, así que no
+     aparece un scroll vertical de más. */
 }
 
 .table {
@@ -15,15 +21,15 @@
 }
 
 .headerCell {
-  padding: 15px 10px;
-  border-top: 1px solid var(--kora-border-strong);
-  border-bottom: 1px solid var(--kora-border-strong);
-  background: var(--kora-lime-surface);
+  padding: 14px 16px;
+  background: var(--kora-blue-surface-soft);
   text-align: left;
   white-space: nowrap;
-  color: var(--kora-navy);
-  font-size: var(--kora-text-base);
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-2xs);
   font-weight: var(--kora-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
 }
 
 .sortable {
@@ -32,7 +38,7 @@
 }
 
 .sortable:hover {
-  background: var(--kora-lime-hover);
+  background: var(--kora-blue-surface);
 }
 
 .headerButton {
@@ -56,7 +62,11 @@
 }
 
 .row {
-  border-bottom: 1px solid var(--kora-surface-disabled);
+  border-bottom: 1px solid var(--kora-border-subtle);
+}
+
+.row:last-child {
+  border-bottom: none;
 }
 
 .row:nth-child(even) {
@@ -68,8 +78,8 @@
 }
 
 .cell {
-  padding: 12px 10px;
-  font-size: var(--kora-text-base);
+  padding: 14px 16px;
+  font-size: var(--kora-text-sm);
   color: var(--kora-text);
   vertical-align: middle;
 }

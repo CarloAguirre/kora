@@ -25,8 +25,8 @@
   min-width: 32px;
   height: 32px;
   padding: 0 var(--kora-space-2);
-  border: 1px solid var(--kora-border-soft);
-  border-radius: var(--kora-radius-sm);
+  border: 1px solid var(--kora-border-subtle);
+  border-radius: var(--kora-radius-md);
   background: var(--kora-surface);
   color: var(--kora-text);
   font-size: var(--kora-text-base);
@@ -34,7 +34,7 @@
 }
 
 .pageButton:hover:not(:disabled):not(.current) {
-  background: var(--kora-lime-hover);
+  background: var(--kora-blue-surface-soft);
   border-color: var(--kora-navy);
 }
 
@@ -46,7 +46,7 @@
 .current {
   background: var(--kora-navy);
   border-color: var(--kora-navy);
-  color: var(--kora-lime);
+  color: var(--kora-surface);
   font-weight: var(--kora-weight-bold);
 }
 

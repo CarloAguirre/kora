@@ -70,3 +70,34 @@ del `.card-container`, se aplicó a Proyectos/Clientes/Equipos/Usuarios
 Verificado por comparación directa contra la v1 corriendo en `localhost:8080`
 (no solo contra el CSS leído). El rediseño completo del Figma sigue diferido
 por la decisión de arriba — esto solo corrige un drift accidental hacia él.
+
+## Reversión: modernización del diseño de tablas (2026-09-21)
+
+A pedido explícito del usuario (no un drift accidental como el de arriba), se
+adoptó el lenguaje visual de tablas de un Figma más reciente del mismo archivo
+(nodes `9895:29804`, `9895:29697`, `9895:29050`: Facturación de proyectos,
+Portafolio de proyectos y Clientes) para **todas** las tablas de la app:
+
+- `Badge` pasó de la etiqueta rectangular de la v1 a la píldora con punto de
+  color del Figma, en toda la app (no solo en tablas) — se preguntó
+  explícitamente al usuario si el alcance debía ser global o solo dentro de
+  `DataTable`, y se eligió global. Colores exactos en tokens nuevos
+  (`--kora-badge-*-bg/text`), independientes de `--kora-success-surface` y
+  afines (que siguen pintando botones/toasts/alertas sin cambios).
+- `DataTable` ganó cabecera celeste (`--kora-blue-surface-soft`), tarjeta
+  blanca redondeada con sombra sutil propia (`--kora-radius-table`,
+  `--kora-shadow-table`) y separadores más suaves (`--kora-border-subtle`),
+  en vez de la cabecera lima y los bordes grises fuertes de la v1.
+- `Pagination` y `SegmentedControl` (las píldoras de filtro "Todos (N)") se
+  recolorearon a juego (texto blanco sobre navy en el estado activo, en vez
+  de lima).
+- Se quitó el `<Card>` que envolvía únicamente a `DataTable` en
+  `ProjectsBillingSection`/`SupportBillingSection` (quedaba una tarjeta
+  dentro de otra, ahora que la propia tabla trae su tarjeta); no se tocaron
+  los `<Card>` que agrupan tabla + filtros + paginación en una sola sección
+  (`ClientsListPage`, `ProjectsListPage`), ni ningún filtro/KPI/exportación
+  existente que el Figma simplificado no mostraba — el Figma manda en lo
+  visual, no autoriza a quitar funcionalidad ya construida.
+- `PortalTable`/`StatusPill` (portal de cliente) no se tocaron: siguen siendo
+  el componente aparte que documenta `docs/DECISION-PORTAL-CLIENTE.md`, aunque
+  ahora coincidan visualmente con el `Badge` compartido casi por completo.

@@ -9,9 +9,11 @@ import styles from './Badge.module.css';
  * estado a tono—, así que cambiar esa correspondencia no obliga a buscar
  * colores sueltos por las pantallas.
  *
- * Forma y colores replican `.badge`/`.usuario-badge` de la v1 (etiqueta
- * rectangular de esquinas suaves) — no la píldora con punto de color del
- * Figma de referencia, ver docs/DECISION-DISENO-FIGMA.md.
+ * Píldora + punto de color, igual que el Figma de referencia de las tablas
+ * (fileKey Sqc5DJtmbLtnBhAM0y4Fww). Antes replicaba la etiqueta rectangular
+ * `.badge`/`.usuario-badge` de la v1 a propósito (ver docs/DECISION-DISENO-FIGMA.md);
+ * se adoptó la forma del Figma en toda la app a pedido explícito, como parte
+ * de la modernización del diseño de tablas.
  */
 
 export type BadgeTone = 'success' | 'danger' | 'warning' | 'info' | 'neutral' | 'brand';
@@ -23,5 +25,10 @@ export interface BadgeProps {
 }
 
 export function Badge({ tone = 'neutral', children, className }: BadgeProps) {
-  return <span className={[styles.badge, styles[tone], className].filter(Boolean).join(' ')}>{children}</span>;
+  return (
+    <span className={[styles.badge, styles[tone], className].filter(Boolean).join(' ')}>
+      <span className={styles.dot} aria-hidden="true" />
+      {children}
+    </span>
+  );
 }

@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { SupportBillingKpiGroup, SupportBillingRow } from '@kora/contracts';
 import styles from './SupportBillingSection.module.css';
-import { Card } from '@/shared/components/ui/Card';
 import { KpiCard } from '@/shared/components/ui/KpiCard';
 import { MultiSelect } from '@/shared/components/ui/MultiSelect';
 import { Tabs } from '@/shared/components/ui/Tabs';
@@ -161,17 +160,15 @@ export function SupportBillingSection() {
         />
       </div>
 
-      <Card>
-        <DataTable
-          caption="Contratos por facturar en el período"
-          columns={columns}
-          items={rows}
-          getRowKey={(r) => r.planId}
-          loading={isLoading}
-          error={null}
-          emptyMessage="No hay contratos en este filtro."
-        />
-      </Card>
+      <DataTable
+        caption="Contratos por facturar en el período"
+        columns={columns}
+        items={rows}
+        getRowKey={(r) => r.planId}
+        loading={isLoading}
+        error={null}
+        emptyMessage="No hay contratos en este filtro."
+      />
     </div>
   );
 }
