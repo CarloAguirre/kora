@@ -16,7 +16,6 @@ import {
   DiamondIcon,
   DollarSignIcon,
   DownloadIcon,
-  FileTextIcon,
   HistoryIcon,
   LinkIcon,
   ListIcon,
@@ -33,7 +32,6 @@ import { PhaseProgressBar } from '../components/PhaseProgressBar';
 import { PhaseRoadmap } from '../components/PhaseRoadmap';
 import { ProjectBillingCard } from '../components/ProjectBillingCard';
 import { ProjectBitacora } from '../components/ProjectBitacora';
-import { PeriodReportCard } from '../components/PeriodReportCard';
 import { StatusPill, type StatusPillTone } from '../components/StatusPill';
 import { toClientProjectDetail } from '../adapters/project-detail.adapter';
 import type { ClientProjectHealth } from '../types';
@@ -51,7 +49,7 @@ const ACCESS_LINKS: readonly AccessLink[] = [
   { label: 'Documentación', subtitle: 'Especificaciones', icon: AlignLeftIcon },
 ];
 
-type SectionKey = 'info' | 'billing' | 'links' | 'roadmap' | 'hours' | 'gantt' | 'impact' | 'periodReport' | 'qa' | 'bitacora';
+type SectionKey = 'info' | 'billing' | 'links' | 'roadmap' | 'hours' | 'gantt' | 'impact' | 'qa' | 'bitacora';
 
 /**
  * Un botón por sección — "esta botonera muestra o esconde las secciones de
@@ -59,7 +57,8 @@ type SectionKey = 'info' | 'billing' | 'links' | 'roadmap' | 'hours' | 'gantt' |
  * sincronizó con las 2 secciones nuevas de la variante "Kora · Proyectos y
  * Soporte 2" del node 9663:24207). Se prioriza el invariante que esta misma
  * lista ya documentaba (un ícono = una sección, nunca desincronizados) sobre
- * copiar un conteo de Figma que quedó desactualizado: son 10 ahora.
+ * copiar un conteo de Figma que quedó desactualizado: son 9 ahora ("Avance
+ * del periodo" se quitó — su contenido ya vive en "Bitácora").
  */
 const SECTION_TOGGLES: ReadonlyArray<{ key: SectionKey; label: string; icon: typeof LinkIcon }> = [
   { key: 'links', label: 'Accesos y enlaces', icon: LinkIcon },
@@ -70,7 +69,6 @@ const SECTION_TOGGLES: ReadonlyArray<{ key: SectionKey; label: string; icon: typ
   { key: 'impact', label: 'Impacto en el negocio', icon: TrendingUpIcon },
   { key: 'qa', label: 'Métricas de la etapa actual', icon: BarChartIcon },
   { key: 'gantt', label: 'Roadmap por Fases', icon: CalendarIcon },
-  { key: 'periodReport', label: 'Avance del periodo', icon: FileTextIcon },
   { key: 'bitacora', label: 'Bitácora', icon: HistoryIcon },
 ];
 
@@ -82,7 +80,6 @@ const ALL_SECTIONS_VISIBLE: Record<SectionKey, boolean> = {
   hours: true,
   gantt: true,
   impact: true,
-  periodReport: true,
   qa: true,
   bitacora: true,
 };
@@ -301,22 +298,28 @@ export function ClientProjectDetailPage({ projectIdOverride, backTo, backLabel }
               <span className={[styles.statValue, styles.statValueLarge].join(' ')}>{formatHours(project.estimatedHours)}</span>
               <div className={styles.hoursDeviationRow}>
                 <span className={styles.statLabel}>Horas desviación</span>
-                <span className={styles.statSub}>{formatHours(project.hoursDeviation)}</span>
-                <StatusPill tone="warning">En riesgo</StatusPill>
+                <div className={styles.hoursDeviationValueRow}>
+                  <span className={styles.statSub}>{formatHours(project.hoursDeviation)}</span>
+                  <StatusPill tone="warning">En riesgo</StatusPill>
+                </div>
               </div>
             </Card>
             <Card className={styles.statCard}>
               <span className={styles.statLabel}>Horas utilizadas a la fecha</span>
               <span className={styles.statValue}>{formatHours(project.usedHoursToDate)}</span>
-              <span className={styles.statSub}>actualizado al {project.usedHoursUpdatedAt}</span>
+              <span className={styles.statSub}>
+                actualizado al
+                <br />
+                {project.usedHoursUpdatedAt}
+              </span>
             </Card>
             <Card className={styles.statCard}>
               <span className={styles.statLabel}>Avance real vs. esperado</span>
-              <span className={styles.statValue}>
-                {project.progressActualPercent}%{' '}
-                <span className={styles.statSub}>vs {project.progressExpectedPercent}% esperado</span>
+              <div className={styles.progressValueRow}>
+                <span className={styles.statValue}>{project.progressActualPercent}%</span>
                 <span className={styles.deviationBadge}>{project.progressActualPercent - project.progressExpectedPercent}%</span>
-              </span>
+              </div>
+              <span className={styles.statSub}>vs {project.progressExpectedPercent}% esperado</span>
               <div className={styles.progressTrack}>
                 <div className={styles.progressFill} style={{ width: `${project.progressActualPercent}%` }} />
                 <div className={styles.progressExpectedMarker} style={{ left: `${project.progressExpectedPercent}%` }} />
@@ -337,7 +340,7 @@ export function ClientProjectDetailPage({ projectIdOverride, backTo, backLabel }
             <h3 className={styles.sectionTitle}>Roadmap por Fases</h3>
             <span className={styles.sectionCaption}>Vista por semana de diseño, desarrollo, QA y aprobación por fase</span>
           </div>
-          <PhaseRoadmap phaseRoadmap={project.phaseRoadmap} onNonFunctionalAction={() => notifyMock('Roadmap por Fases')} />
+          <PhaseRoadmap phaseRoadmap={project.phaseRoadmap} />
         </section>
         )}
 
@@ -377,13 +380,6 @@ export function ClientProjectDetailPage({ projectIdOverride, backTo, backLabel }
         </section>
           );
         })()}
-
-        {visible.periodReport && (
-        <section className={styles.section}>
-          <h3 className={styles.sectionTitle}>Avance del periodo</h3>
-          <PeriodReportCard report={project.periodReport} />
-        </section>
-        )}
 
         {visible.qa && project.qaMetrics && (() => {
           const qa = project.qaMetrics;

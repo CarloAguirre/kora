@@ -233,6 +233,8 @@ export interface PhaseRoadmapTaskItem {
   /** ISO `YYYY-MM-DD`. */
   readonly date: string;
   readonly state: PhaseRoadmapTaskItemState;
+  /** Ámbito de la tarea — conecta los chips de "Resumen de avance" (antes solo decorativos) con las tareas reales de la fase. */
+  readonly scope: PhaseRoadmapTaskScope;
   /** La tarea "actual"/en foco de la fase se resalta con borde y fondo (Figma: "Casos de prueba conciliación"). */
   readonly highlighted?: boolean;
 }
@@ -313,17 +315,6 @@ export interface ClientProjectBilling {
   readonly schedule: readonly ClientBillingScheduleRow[];
 }
 
-/**
- * "Avance del periodo" del Figma (node 9663:25049 / 9663:24051 según la
- * variante) — está OCULTA en ambas variantes del archivo (`get_screenshot`
- * devuelve 1×1 px), pero se construye igual por pedido explícito: un reporte
- * narrativo de logros del período, no una métrica calculada.
- */
-export interface ClientPeriodReport {
-  readonly reportDate: string;
-  readonly achievements: readonly string[];
-}
-
 export interface ClientProjectDetail {
   readonly id: string;
   readonly name: string;
@@ -349,7 +340,6 @@ export interface ClientProjectDetail {
   readonly roadmap: readonly ClientRoadmapPhase[];
   readonly phaseRoadmap: ProjectPhaseRoadmap;
   readonly bitacora: readonly ClientBitacoraEntry[];
-  readonly periodReport: ClientPeriodReport;
   /** Ver "Impacto en el negocio" del Figma — antes/después de automatizar. */
   readonly businessImpact: {
     readonly before: { readonly totalProcessHours: number; readonly peopleInvolved: number; readonly cycleDays: number; readonly modality: string };

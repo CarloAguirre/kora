@@ -168,14 +168,24 @@
   flex: 1;
 }
 
+/* Es un `<button>` (para poder seleccionarse sin activar el toggle de la fase,
+   ver PhaseRoadmap.tsx) — reset de estilos nativos de botón. */
 .alertBadge {
   padding: 4px 10px;
+  border: none;
   border-radius: 999px;
   background: #fdecea;
   color: #d5504b;
+  font: inherit;
   font-size: 12px;
   font-weight: var(--kora-weight-bold);
   white-space: nowrap;
+  cursor: pointer;
+}
+
+.alertBadgeActive {
+  background: #d5504b;
+  color: var(--kora-surface);
 }
 
 .phaseBody {
@@ -212,6 +222,9 @@
 }
 
 .stageChip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   padding: 8px 14px;
   border: none;
   border-radius: 8px;
@@ -220,6 +233,19 @@
   font-size: 12.5px;
   font-weight: var(--kora-weight-semibold);
   cursor: pointer;
+}
+
+/* Ámbito seleccionado — filtra/atenúa la fila "Tareas" que no son de ese ámbito. */
+.stageChipActive {
+  background: #4c7ef3;
+}
+
+.stageChipPercent {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  font-size: 11px;
+  font-weight: 800;
 }
 
 /* Zoom Semanas/Días — slider real con estado de vista local (como
@@ -422,7 +448,9 @@
   color: #5d6b7a;
 }
 
-/* Marcador de entrega/tarea posicionado por fecha, con su etiqueta al lado. */
+/* Marcador de entrega/tarea posicionado por fecha, con su etiqueta al lado —
+   es un `<button>` clicable (selecciona qué se ve en "Registros de bitácora
+   relacionados", ver PhaseRoadmap.tsx), de ahí el reset de estilos nativos. */
 .markerItem {
   position: absolute;
   top: 13px;
@@ -430,21 +458,35 @@
   align-items: center;
   gap: 6px;
   transform: translateX(-5px);
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
   font-size: 12.5px;
   color: #0f2a44;
   white-space: nowrap;
+  cursor: pointer;
 }
 
 .markerLabel {
   font-size: 12.5px;
 }
 
+/* El padding que infla la píldora empuja su contenido — se compensa con
+   `top`/`transform` para que el punto/diamante quede anclado en el mismo
+   lugar exacto que tenía sin seleccionar, en vez de "moverse" al seleccionar. */
 .markerItemHighlighted {
   top: 9px;
   padding: 4px 10px;
   border: 1px solid #4c7ef3;
   border-radius: 999px;
   background: #eef4ff;
+  transform: translateX(-15px);
+}
+
+/* Tarea fuera del ámbito seleccionado en los chips de "Resumen de avance". */
+.markerItemDimmed {
+  opacity: 0.35;
 }
 
 .relatedBitacora {
@@ -454,12 +496,35 @@
   border-top: 1px dashed #e4e9ee;
 }
 
-.relatedBitacoraLabel {
+.relatedBitacoraLabelRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
   margin-bottom: 4px;
+}
+
+.relatedBitacoraLabel {
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.6px;
   text-transform: uppercase;
+  color: #93a0ac;
+}
+
+.relatedBitacoraReset {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 12px;
+  font-weight: var(--kora-weight-bold);
+  color: #4c7ef3;
+  cursor: pointer;
+}
+
+.relatedBitacoraEmpty {
+  font-size: 12.5px;
   color: #93a0ac;
 }
 

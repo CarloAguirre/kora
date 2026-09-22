@@ -12,6 +12,7 @@ import {
   PHASE_ROADMAP_TASK_SCOPE_LABELS,
   type PhaseRoadmapPhase,
   type PhaseRoadmapTask,
+  type PhaseRoadmapTaskScope,
   type ProjectPhaseRoadmap,
 } from '../types';
 
@@ -129,13 +130,13 @@ function buildTimelineAxis(range: DateRange): TimelineAxis {
  * columna de pistas hace scroll horizontal: los nombres de cada fila quedan
  * siempre visibles a la izquierda.
  *
- * Los chips de "Resumen de avance" siguen el Figma tal cual (píldoras navy de
- * solo lectura) y no tienen lógica real detrás: llaman a
- * `onNonFunctionalAction`, mismo patrón que "Compartir PDF" o "Dar OK" en
- * `ClientProjectDetailPage.tsx` vía `notifyMock`, para no dejar botones sin
- * ningún feedback al hacer clic.
+ * Los chips de "Resumen de avance" mantienen la píldora navy sólida del
+ * Figma, pero están conectados a las tareas reales de la fase (`taskItems`,
+ * cada una con su `scope`): el tooltip muestra el % completado por ámbito
+ * (mismo cálculo que `ProjectModulesCard` del Roadmap interno) y el clic
+ * filtra/atenúa en la fila "Tareas" las que no son de ese ámbito.
  */
-export function PhaseRoadmap({ phaseRoadmap, onNonFunctionalAction }: { phaseRoadmap: ProjectPhaseRoadmap; onNonFunctionalAction: () => void }) {
+export function PhaseRoadmap({ phaseRoadmap }: { phaseRoadmap: ProjectPhaseRoadmap }) {
   const [expandedPhaseId, setExpandedPhaseId] = useState<string | null>(phaseRoadmap.phases[0]?.id ?? null);
   const [rangeDraft, setRangeDraft] = useState({ from: phaseRoadmap.rangeStartDate, to: phaseRoadmap.rangeEndDate });
   const [appliedRange, setAppliedRange] = useState({ from: phaseRoadmap.rangeStartDate, to: phaseRoadmap.rangeEndDate });
@@ -224,7 +225,6 @@ export function PhaseRoadmap({ phaseRoadmap, onNonFunctionalAction }: { phaseRoa
             axis={axis}
             expanded={expandedPhaseId === phase.id}
             onToggle={() => setExpandedPhaseId((current) => (current === phase.id ? null : phase.id))}
-            onNonFunctionalAction={onNonFunctionalAction}
           />
         ))}
       </div>
@@ -242,24 +242,82 @@ function barGeometry(task: PhaseRoadmapTask, range: DateRange) {
   return { leftPercent, widthPercent: Math.max(rightPercent - leftPercent, 0.8) };
 }
 
+/**
+ * Qué entrega/tarea/incidente está seleccionado dentro de una fase — decide
+ * qué se muestra en "Registros de bitácora relacionados" (antes se mostraban
+ * TODAS las entradas de la fase sin importar la tarea abierta). No hay un id
+ * real que conecte una `ProjectObservation` con una tarea o entrega puntual
+ * (solo con el módulo/fase completa — ver `project-detail.adapter.ts`), así
+ * que el cruce se hace por texto: el título de la entrada contiene la
+ * etiqueta de la tarea/entrega (p.ej. "Tarea completada: Casos de prueba
+ * conciliación" contiene "Casos de prueba conciliación").
+ */
+type RelatedBitacoraSelection = { kind: 'task' | 'delivery'; label: string } | { kind: 'incident' };
+
+const sameSelection = (a: RelatedBitacoraSelection | null, b: RelatedBitacoraSelection) => {
+  if (!a) return false;
+  if (a.kind === 'incident' || b.kind === 'incident') return a.kind === b.kind;
+  return a.kind === b.kind && a.label === b.label;
+};
+
 function PhaseCard({
   phase,
   axis,
   expanded,
   onToggle,
-  onNonFunctionalAction,
 }: {
   phase: PhaseRoadmapPhase;
   axis: TimelineAxis;
   expanded: boolean;
   onToggle: () => void;
-  onNonFunctionalAction: () => void;
 }) {
   /** Igual que `zoomByModule` en `ProjectModulesCard` (Roadmap interno): un slider real, no un
       toggle decorativo. Es estado de vista local, no una acción a conectar. */
   const [zoom, setZoom] = useState(15);
   const today = startOfToday();
+  /** Por debajo de este zoom la pista no ensancha lo suficiente (`scrollWidthPercent`)
+   *  para separar tareas cercanas entre sí: sus etiquetas se solapan y quedan
+   *  ilegibles. Se reutiliza el mismo umbral que ya revela la cuadrícula/
+   *  etiquetas por día — a ese punto ya hay espacio de sobra para ambos. */
   const showDetail = zoom >= DETAIL_ZOOM_THRESHOLD;
+  const isFullPeriodView = !showDetail;
+
+  /** Por defecto se selecciona la tarea marcada como "en foco" (`highlighted`)
+   *  — así "Registros de bitácora relacionados" arranca mostrando una sola
+   *  entrada, igual que al hacer clic en una tarea/entrega/el incidente. */
+  const [selectedRelated, setSelectedRelated] = useState<RelatedBitacoraSelection | null>(() => {
+    const focusedTask = phase.taskItems.find((taskItem) => taskItem.highlighted);
+    return focusedTask ? { kind: 'task', label: focusedTask.label } : null;
+  });
+
+  const toggleSelection = (selection: RelatedBitacoraSelection) =>
+    setSelectedRelated((current) => (sameSelection(current, selection) ? null : selection));
+
+  /** Sin selección no se muestra nada — mostrar TODAS las entradas de la fase
+   *  por defecto era justo lo que se quería evitar (ver el comentario de
+   *  `RelatedBitacoraSelection`). */
+  const filteredBitacora = useMemo(() => {
+    if (!selectedRelated) return [];
+    if (selectedRelated.kind === 'incident') return phase.relatedBitacora.filter((entry) => entry.kind === 'attention');
+    const label = selectedRelated.label.trim().toLowerCase();
+    return phase.relatedBitacora.filter((entry) => entry.title.toLowerCase().includes(label));
+  }, [phase.relatedBitacora, selectedRelated]);
+
+  /** Chips de "Resumen de avance": % completado por ámbito (mismo cálculo que
+   *  `ProjectModulesCard` del Roadmap interno) — clic filtra/atenúa en la fila
+   *  "Tareas" las que no son de ese ámbito. */
+  const [activeScope, setActiveScope] = useState<PhaseRoadmapTaskScope | null>(null);
+
+  const scopeStats = useMemo(() => {
+    const stats = new Map<PhaseRoadmapTaskScope, { total: number; done: number }>();
+    for (const item of phase.taskItems) {
+      const entry = stats.get(item.scope) ?? { total: 0, done: 0 };
+      entry.total += 1;
+      if (item.state === 'done') entry.done += 1;
+      stats.set(item.scope, entry);
+    }
+    return stats;
+  }, [phase.taskItems]);
 
   const visibleDeliveries = phase.deliveries
     .map((delivery) => ({ delivery, leftPercent: percentOf(toDate(delivery.date), axis.range) }))
@@ -270,25 +328,63 @@ function PhaseCard({
 
   return (
     <div className={styles.phaseCard}>
-      <button type="button" className={styles.phaseHeader} onClick={onToggle} aria-expanded={expanded}>
+      <div
+        role="button"
+        tabIndex={0}
+        className={styles.phaseHeader}
+        onClick={onToggle}
+        onKeyDown={(event) => {
+          if (event.key !== 'Enter' && event.key !== ' ') return;
+          event.preventDefault();
+          onToggle();
+        }}
+        aria-expanded={expanded}
+      >
         <span className={styles.phaseBadge}>{phase.badge}</span>
         <span className={styles.phaseName}>{phase.name}</span>
         <StatusPill tone={STATUS_TONE[phase.status]}>{STATUS_LABEL[phase.status]}</StatusPill>
         <span className={styles.phaseHeaderSpacer} />
-        {phase.alertLabel && <span className={styles.alertBadge}>⚑ {phase.alertLabel}</span>}
+        {phase.alertLabel && (
+          <button
+            type="button"
+            className={[styles.alertBadge, sameSelection(selectedRelated, { kind: 'incident' }) ? styles.alertBadgeActive : ''].join(' ')}
+            onClick={(event) => {
+              event.stopPropagation();
+              toggleSelection({ kind: 'incident' });
+              if (!expanded) onToggle();
+            }}
+          >
+            ⚑ {phase.alertLabel}
+          </button>
+        )}
         {expanded ? <ChevronDownIcon size={16} /> : <ChevronRightIcon size={16} />}
-      </button>
+      </div>
 
       {expanded && (
         <div className={styles.phaseBody}>
           <div className={styles.summaryOfProgressRow}>
             <span className={styles.summaryOfProgressLabel}>Resumen de avance</span>
             <div className={styles.stageChips}>
-              {PHASE_ROADMAP_TASK_SCOPES.map((scope) => (
-                <button key={scope} type="button" className={styles.stageChip} onClick={onNonFunctionalAction}>
-                  {PHASE_ROADMAP_TASK_SCOPE_LABELS[scope]}
-                </button>
-              ))}
+              {PHASE_ROADMAP_TASK_SCOPES.map((scope) => {
+                const stats = scopeStats.get(scope);
+                const percent = stats && stats.total > 0 ? Math.round((stats.done / stats.total) * 100) : null;
+                const title =
+                  percent !== null
+                    ? `${PHASE_ROADMAP_TASK_SCOPE_LABELS[scope]}: ${percent}% (${stats!.done}/${stats!.total} completadas)`
+                    : `${PHASE_ROADMAP_TASK_SCOPE_LABELS[scope]}: sin tareas registradas`;
+                return (
+                  <button
+                    key={scope}
+                    type="button"
+                    className={[styles.stageChip, activeScope === scope ? styles.stageChipActive : ''].join(' ')}
+                    title={title}
+                    onClick={() => setActiveScope((current) => (current === scope ? null : scope))}
+                  >
+                    {PHASE_ROADMAP_TASK_SCOPE_LABELS[scope]}
+                    {percent !== null && <span className={styles.stageChipPercent}>{percent}%</span>}
+                  </button>
+                );
+              })}
             </div>
             <div className={styles.zoomRow}>
               <span>Semanas</span>
@@ -379,49 +475,72 @@ function PhaseCard({
 
                 {phase.deliveries.length > 0 && (
                   <div className={styles.trackRow}>
-                    {visibleDeliveries.map(({ delivery, leftPercent }, index) => (
-                      <span key={index} className={styles.markerItem} style={{ left: `${leftPercent}%` }}>
-                        <DiamondIcon
-                          size={10}
-                          className={
-                            delivery.state === 'delivered'
-                              ? styles.legendDiamondDone
-                              : delivery.state === 'delayed'
-                                ? styles.legendDiamondDelayed
-                                : styles.legendDiamondCommitted
-                          }
-                        />
-                        <span className={styles.markerLabel}>
-                          {delivery.label} ({formatShortDate(delivery.date)})
-                        </span>
-                      </span>
-                    ))}
+                    {visibleDeliveries.map(({ delivery, leftPercent }, index) => {
+                      const isSelected = sameSelection(selectedRelated, { kind: 'delivery', label: delivery.label });
+                      return (
+                        <button
+                          key={index}
+                          type="button"
+                          className={[styles.markerItem, isSelected ? styles.markerItemHighlighted : ''].join(' ')}
+                          style={{ left: `${leftPercent}%` }}
+                          onClick={() => toggleSelection({ kind: 'delivery', label: delivery.label })}
+                        >
+                          <DiamondIcon
+                            size={10}
+                            className={
+                              delivery.state === 'delivered'
+                                ? styles.legendDiamondDone
+                                : delivery.state === 'delayed'
+                                  ? styles.legendDiamondDelayed
+                                  : styles.legendDiamondCommitted
+                            }
+                          />
+                          {!isFullPeriodView && (
+                            <span className={styles.markerLabel}>
+                              {delivery.label} ({formatShortDate(delivery.date)})
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
 
                 {phase.taskItems.length > 0 && (
                   <div className={styles.trackRow}>
-                    {visibleTaskItems.map(({ taskItem, leftPercent }, index) => (
-                      <span
-                        key={index}
-                        className={[styles.markerItem, taskItem.highlighted ? styles.markerItemHighlighted : ''].join(' ')}
-                        style={{ left: `${leftPercent}%` }}
-                      >
-                        <span
+                    {visibleTaskItems.map(({ taskItem, leftPercent }, index) => {
+                      const isSelected = sameSelection(selectedRelated, { kind: 'task', label: taskItem.label });
+                      const isDimmed = activeScope !== null && taskItem.scope !== activeScope;
+                      return (
+                        <button
+                          key={index}
+                          type="button"
                           className={[
-                            styles.legendDot,
-                            taskItem.state === 'done'
-                              ? styles.taskDotDone
-                              : taskItem.state === 'delayed'
-                                ? styles.taskDotDelayed
-                                : styles.taskDotUpcoming,
+                            styles.markerItem,
+                            isSelected ? styles.markerItemHighlighted : '',
+                            isDimmed ? styles.markerItemDimmed : '',
                           ].join(' ')}
-                        />
-                        <span className={styles.markerLabel}>
-                          {taskItem.label} ({formatShortDate(taskItem.date)})
-                        </span>
-                      </span>
-                    ))}
+                          style={{ left: `${leftPercent}%` }}
+                          onClick={() => toggleSelection({ kind: 'task', label: taskItem.label })}
+                        >
+                          <span
+                            className={[
+                              styles.legendDot,
+                              taskItem.state === 'done'
+                                ? styles.taskDotDone
+                                : taskItem.state === 'delayed'
+                                  ? styles.taskDotDelayed
+                                  : styles.taskDotUpcoming,
+                            ].join(' ')}
+                          />
+                          {!isFullPeriodView && (
+                            <span className={styles.markerLabel}>
+                              {taskItem.label} ({formatShortDate(taskItem.date)})
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -430,10 +549,21 @@ function PhaseCard({
 
           {phase.relatedBitacora.length > 0 && (
             <div className={styles.relatedBitacora}>
-              <span className={styles.relatedBitacoraLabel}>Registros de bitácora relacionados</span>
-              {phase.relatedBitacora.map((entry) => (
-                <BitacoraEntryRow key={entry.id} entry={entry} />
-              ))}
+              <div className={styles.relatedBitacoraLabelRow}>
+                <span className={styles.relatedBitacoraLabel}>Registros de bitácora relacionados</span>
+                {selectedRelated && (
+                  <button type="button" className={styles.relatedBitacoraReset} onClick={() => setSelectedRelated(null)}>
+                    Quitar selección
+                  </button>
+                )}
+              </div>
+              {!selectedRelated ? (
+                <p className={styles.relatedBitacoraEmpty}>Haz clic en una tarea, entrega o el incidente para ver su detalle.</p>
+              ) : filteredBitacora.length > 0 ? (
+                filteredBitacora.map((entry) => <BitacoraEntryRow key={entry.id} entry={entry} />)
+              ) : (
+                <p className={styles.relatedBitacoraEmpty}>No hay registros de bitácora para esta selección.</p>
+              )}
             </div>
           )}
         </div>

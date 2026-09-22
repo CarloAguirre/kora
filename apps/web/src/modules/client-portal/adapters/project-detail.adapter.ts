@@ -180,6 +180,7 @@ function toPhaseRoadmapPhase(
       label: task.name,
       date: task.date,
       state: taskItemState(task),
+      scope: task.scope,
     })),
     relatedBitacora: (observationsByModule.get(module.id) ?? []).map((observation) =>
       toBitacoraEntry(observation, moduleBadgeByModuleId),
@@ -371,10 +372,6 @@ export function toClientProjectDetail(project: ProjectDetail): ClientProjectDeta
     bitacora: project.observations
       .filter((observation) => !observation.moduleId || moduleBadgeByModuleId.has(observation.moduleId))
       .map((observation) => toBitacoraEntry(observation, moduleBadgeByModuleId)),
-    periodReport: {
-      reportDate: project.periodReportDate ? formatDMY(project.periodReportDate) : '--',
-      achievements: project.periodReportAchievements ?? [],
-    },
     businessImpact: { before: impactBefore, after: impactAfter, reductionPercent },
     qaMetrics:
       project.qaPlannedTests != null

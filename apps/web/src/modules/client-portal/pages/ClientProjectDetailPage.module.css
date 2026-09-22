@@ -99,8 +99,10 @@
 .infoBar {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
+  align-items: center;
   gap: var(--kora-space-6);
+  flex-direction: row;
+  justify-content: space-between;
 }
 
 .infoClient {
@@ -274,12 +276,29 @@
   color: #93a0ac;
 }
 
-/* Sub-línea "Horas desviación" dentro de la tarjeta "Horas estimadas". */
+/* Sub-línea "Horas desviación" dentro de la tarjeta "Horas estimadas" — la
+   etiqueta va arriba y el número + StatusPill abajo, para que el pill nunca
+   se salga de la caja (ver .hoursDeviationValueRow). */
 .hoursDeviationRow {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.hoursDeviationValueRow {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-top: 4px;
+}
+
+/* Fila "% real" + badge de desviación dentro de "Avance real vs. esperado" —
+   separada del "vs X% esperado" (que va debajo, en .statSub) para que la
+   línea de arriba no se rompa. */
+.progressValueRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 /* Badge de desviación junto a "Avance real vs. esperado" (p.ej. "-36%") — es
