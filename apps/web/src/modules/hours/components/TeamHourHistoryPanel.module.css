@@ -51,6 +51,23 @@
   min-width: 160px;
 }
 
+.reset {
+  flex-shrink: 0;
+  /* Alinea el botón con la caja de los campos, no con su etiqueta. */
+  margin-bottom: 20px;
+}
+
+@media (max-width: 640px) {
+  .filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .reset {
+    margin-bottom: 0;
+  }
+}
+
 .empty {
   color: var(--kora-text-disabled);
 }

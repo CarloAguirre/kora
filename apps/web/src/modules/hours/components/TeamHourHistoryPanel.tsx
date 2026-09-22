@@ -15,7 +15,7 @@ import { Select } from '@/shared/components/ui/Select';
 import { TextField } from '@/shared/components/ui/TextField';
 import { Badge } from '@/shared/components/ui/Badge';
 import { useToast } from '@/shared/components/ui/Toast';
-import { PlusIcon, PencilIcon, TrashIcon, EyeIcon, DownloadIcon } from '@/shared/components/icons/Icons';
+import { PlusIcon, PencilIcon, TrashIcon, EyeIcon, DownloadIcon, SearchIcon } from '@/shared/components/icons/Icons';
 import { HourEntryStatusBadge } from './HourEntryStatusBadge';
 import { HourEntryFormDialog } from './HourEntryFormDialog';
 import { useDeleteHourEntry, useHourEntriesList } from '../api/hours.queries';
@@ -210,6 +210,7 @@ export function TeamHourHistoryPanel({ teamId, userId }: { teamId?: string; user
             setPersonSearch(event.target.value);
             setPage(1);
           }}
+          iconLeft={<SearchIcon size={16} />}
         />
         <TextField
           className={styles.filter}
@@ -243,7 +244,7 @@ export function TeamHourHistoryPanel({ teamId, userId }: { teamId?: string; user
           }}
         />
         {hasFilters && (
-          <Button variant="outlineDark" onClick={clearFilters}>
+          <Button className={styles.reset} variant="tertiary" size="sm" onClick={clearFilters}>
             Limpiar filtros
           </Button>
         )}

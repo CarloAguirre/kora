@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
-import { CalendarIcon, ChevronLeftIcon, ChevronRightIcon } from "../icons/Icons";
+import { CalendarIcon, ChevronLeftIcon, ChevronRightIcon, CloseIcon } from "../icons/Icons";
 import styles from "./TextField.module.css";
 
 /**
@@ -115,6 +115,7 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(
     const message = errorText ?? helperText;
 
     const isDate = rest.type === "date";
+    const isSearch = rest.type === "search";
     const inputRef = useRef<HTMLInputElement | null>(null);
     const fieldRef = useRef<HTMLDivElement | null>(null);
     const panelRef = useRef<HTMLDivElement | null>(null);
@@ -200,6 +201,13 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(
       setCalendarOpen(false);
     };
 
+    const clearSearch = () => {
+      if (inputRef.current) setNativeInputValue(inputRef.current, "");
+      inputRef.current?.focus();
+    };
+
+    const hasSearchValue = isSearch && typeof rest.value === "string" && rest.value.length > 0;
+
     const resolvedIconRight =
       iconRight ??
       (isDate ? (
@@ -211,6 +219,16 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(
           onClick={openCalendar}
         >
           <CalendarIcon size={16} />
+        </button>
+      ) : hasSearchValue ? (
+        <button
+          type="button"
+          className={styles.clearTrigger}
+          disabled={disabled}
+          aria-label="Limpiar búsqueda"
+          onClick={clearSearch}
+        >
+          <CloseIcon size={14} />
         </button>
       ) : undefined);
 

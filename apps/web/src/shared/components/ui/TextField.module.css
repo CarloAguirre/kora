@@ -79,6 +79,12 @@
   outline: none;
 }
 
+/* El botón de limpiar es propio (`.clearTrigger` abajo), así que se oculta el
+   que dibuja el navegador para `type="search"` — de otro modo saldrían dos. */
+.input::-webkit-search-cancel-button {
+  display: none;
+}
+
 .adornment {
   display: flex;
   align-items: center;
@@ -136,6 +142,38 @@
 .dateTrigger:disabled {
   color: var(--kora-text-disabled);
   cursor: not-allowed;
+}
+
+.clearTrigger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-right: calc(var(--kora-space-1) * -1);
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: var(--kora-radius-sm);
+  color: var(--kora-text-muted);
+  cursor: pointer;
+  transition:
+    background-color var(--kora-transition),
+    color var(--kora-transition);
+}
+
+.clearTrigger:hover:not(:disabled) {
+  background: var(--kora-lime-surface);
+  color: var(--kora-lime-dark);
+}
+
+.clearTrigger:active:not(:disabled) {
+  background: var(--kora-lime-hover);
+}
+
+.clearTrigger:focus-visible {
+  outline: 2px solid var(--kora-blue-600);
+  outline-offset: 1px;
 }
 
 /* `position: fixed` + portal a `document.body` (ver TextField.tsx): un
