@@ -1,61 +1,69 @@
-import { useMemo, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import type {
-  BillingLedgerEntry,
-  IssueProjectPaymentMilestoneInvoiceInput,
-  MarkProjectPaymentMilestonePaidInput,
-} from '@kora/contracts';
-import styles from './ProjectsBillingSection.module.css';
-import { Card } from '@/shared/components/ui/Card';
-import { KpiCard } from '@/shared/components/ui/KpiCard';
-import { MultiSelect } from '@/shared/components/ui/MultiSelect';
-import { Tabs } from '@/shared/components/ui/Tabs';
-import { Switch } from '@/shared/components/ui/Switch';
-import { Button } from '@/shared/components/ui/Button';
-import { Badge, type BadgeTone } from '@/shared/components/ui/Badge';
-import { DataTable, type Column } from '@/shared/components/ui/DataTable';
-import { useToast } from '@/shared/components/ui/Toast';
-import { usePermissions } from '@/modules/auth/hooks/usePermissions';
-import { ApiRequestError } from '@/shared/lib/api-client';
-import { formatMoney } from '@/shared/lib/format-money';
-import { billingKeys } from '../api/billing.api';
-import { useBillingLedger } from '../api/billing.queries';
-import { IssueProjectMilestoneInvoiceDialog } from '@/modules/projects/components/IssueProjectMilestoneInvoiceDialog';
-import { MarkProjectMilestonePaidDialog } from '@/modules/projects/components/MarkProjectMilestonePaidDialog';
-import { ProjectMilestoneDetailPanel } from './ProjectMilestoneDetailPanel';
+import { usePermissions } from "@/modules/auth/hooks/usePermissions";
 import {
   useIssueProjectPaymentMilestoneInvoice,
   useMarkProjectPaymentMilestonePaid,
   useProjectBillingSettings,
   useProjectDetail,
   useUpdateProjectBillingSettings,
-} from '@/modules/projects/api/projects.queries';
+} from "@/modules/projects/api/projects.queries";
+import { IssueProjectMilestoneInvoiceDialog } from "@/modules/projects/components/IssueProjectMilestoneInvoiceDialog";
+import { MarkProjectMilestonePaidDialog } from "@/modules/projects/components/MarkProjectMilestonePaidDialog";
+import { Badge, type BadgeTone } from "@/shared/components/ui/Badge";
+import { Button } from "@/shared/components/ui/Button";
+import { DataTable, type Column } from "@/shared/components/ui/DataTable";
+import { KpiCard } from "@/shared/components/ui/KpiCard";
+import { MultiSelect } from "@/shared/components/ui/MultiSelect";
+import { Tabs } from "@/shared/components/ui/Tabs";
+import { useToast } from "@/shared/components/ui/Toast";
+import { ApiRequestError } from "@/shared/lib/api-client";
+import { formatMoney } from "@/shared/lib/format-money";
+import type {
+  BillingLedgerEntry,
+  IssueProjectPaymentMilestoneInvoiceInput,
+  MarkProjectPaymentMilestonePaidInput,
+} from "@kora/contracts";
+import { useQueryClient } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
+import { billingKeys } from "../api/billing.api";
+import { useBillingLedger } from "../api/billing.queries";
+import { ProjectMilestoneDetailPanel } from "./ProjectMilestoneDetailPanel";
+import styles from "./ProjectsBillingSection.module.css";
 
-type StatusFilter = 'todos' | 'activos' | 'resueltos';
+type StatusFilter = "todos" | "activos" | "resueltos";
 const STATUS_TABS: ReadonlyArray<{ id: StatusFilter; label: string }> = [
-  { id: 'todos', label: 'Todos' },
-  { id: 'activos', label: 'Con alerta activa' },
-  { id: 'resueltos', label: 'Resueltos' },
+  { id: "todos", label: "Todos" },
+  { id: "activos", label: "Con alerta activa" },
+  { id: "resueltos", label: "Resueltos" },
 ];
 
-const formatAmount = (entry: BillingLedgerEntry) => formatMoney(entry.amount, entry.currency);
+const formatAmount = (entry: BillingLedgerEntry) =>
+  formatMoney(entry.amount, entry.currency);
 
 /** Antes de tener factura, "pendiente" no distingue estado de pago — no hay nada que mostrar todavía. */
-function facturacionLabel(status: BillingLedgerEntry['status']) {
-  return status === 'pendiente' ? 'Por facturar' : 'Facturado';
+function facturacionLabel(status: BillingLedgerEntry["status"]) {
+  return status === "pendiente" ? "Por facturar" : "Facturado";
 }
-function facturacionTone(status: BillingLedgerEntry['status']): BadgeTone {
-  return status === 'pendiente' ? 'warning' : 'info';
+function facturacionTone(status: BillingLedgerEntry["status"]): BadgeTone {
+  return status === "pendiente" ? "warning" : "info";
 }
-function pagoLabel(status: BillingLedgerEntry['status']) {
-  return { facturado: 'Pago pendiente', atrasado: 'Atrasado', pagado: 'Pagado' }[status as 'facturado' | 'atrasado' | 'pagado'] ?? null;
+function pagoLabel(status: BillingLedgerEntry["status"]) {
+  return (
+    { facturado: "Pago pendiente", atrasado: "Atrasado", pagado: "Pagado" }[
+      status as "facturado" | "atrasado" | "pagado"
+    ] ?? null
+  );
 }
-const PAGO_TONE: Readonly<Record<'facturado' | 'atrasado' | 'pagado', BadgeTone>> = { facturado: 'info', atrasado: 'danger', pagado: 'success' };
-function pagoTone(status: BillingLedgerEntry['status']): BadgeTone {
-  return PAGO_TONE[status as 'facturado' | 'atrasado' | 'pagado'] ?? 'neutral';
+const PAGO_TONE: Readonly<
+  Record<"facturado" | "atrasado" | "pagado", BadgeTone>
+> = { facturado: "info", atrasado: "danger", pagado: "success" };
+function pagoTone(status: BillingLedgerEntry["status"]): BadgeTone {
+  return PAGO_TONE[status as "facturado" | "atrasado" | "pagado"] ?? "neutral";
 }
 
-type DialogState = { kind: 'issue-milestone' | 'pay-milestone'; entry: BillingLedgerEntry } | null;
+type DialogState = {
+  kind: "issue-milestone" | "pay-milestone";
+  entry: BillingLedgerEntry;
+} | null;
 
 /**
  * Contenido de la pestaña "Proyectos" de `/facturacion` — tramos de pago de
@@ -70,98 +78,150 @@ export function ProjectsBillingSection() {
   const toast = useToast();
   const queryClient = useQueryClient();
   const { data, isLoading } = useBillingLedger();
-  const entries = useMemo(() => (data?.entries ?? []).filter((e) => e.line === 'proyecto'), [data]);
+  const entries = useMemo(
+    () => (data?.entries ?? []).filter((e) => e.line === "proyecto"),
+    [data],
+  );
 
-  const [status, setStatus] = useState<StatusFilter>('todos');
+  const [status, setStatus] = useState<StatusFilter>("todos");
   const [clientFilter, setClientFilter] = useState<string[]>([]);
   const [dialog, setDialog] = useState<DialogState>(null);
-  const [detailEntry, setDetailEntry] = useState<BillingLedgerEntry | null>(null);
+  const [detailEntry, setDetailEntry] = useState<BillingLedgerEntry | null>(
+    null,
+  );
 
   const issueMilestoneInvoice = useIssueProjectPaymentMilestoneInvoice();
   const markMilestonePaid = useMarkProjectPaymentMilestonePaid();
 
-  const canManageBilling = can('projects:manage');
+  const canManageBilling = can("projects:manage");
   const { data: billingSettings } = useProjectBillingSettings();
   const updateBillingSettings = useUpdateProjectBillingSettings();
 
-  const { data: milestoneProject } = useProjectDetail(dialog?.kind === 'pay-milestone' ? dialog.entry.projectId : null);
+  const { data: milestoneProject } = useProjectDetail(
+    dialog?.kind === "pay-milestone" ? dialog.entry.projectId : null,
+  );
 
   const clientOptions = useMemo(() => {
     const seen = new Map<string, string>();
     for (const entry of entries) seen.set(entry.clientId, entry.clientName);
-    return [...seen.entries()].sort((a, b) => a[1].localeCompare(b[1])).map(([value, label]) => ({ value, label }));
+    return [...seen.entries()]
+      .sort((a, b) => a[1].localeCompare(b[1]))
+      .map(([value, label]) => ({ value, label }));
   }, [entries]);
 
   const rows = useMemo(() => {
     return entries.filter((entry) => {
-      if (clientFilter.length > 0 && !clientFilter.includes(entry.clientId)) return false;
-      if (status === 'activos') return entry.status !== 'pagado';
-      if (status === 'resueltos') return entry.status === 'pagado';
+      if (clientFilter.length > 0 && !clientFilter.includes(entry.clientId))
+        return false;
+      if (status === "activos") return entry.status !== "pagado";
+      if (status === "resueltos") return entry.status === "pagado";
       return true;
     });
   }, [entries, status, clientFilter]);
 
   // Sumar monedas distintas inventaría un número sin sentido — hoy `proyecto` siempre es CLP, pero se agrupa igual por si eso cambia.
   const kpisByCurrency = useMemo(() => {
-    const groups = new Map<string, { toInvoice: number; invoiced: number; paid: number; overdue: number }>();
+    const groups = new Map<
+      string,
+      { toInvoice: number; invoiced: number; paid: number; overdue: number }
+    >();
     for (const entry of entries) {
       let group = groups.get(entry.currency);
       if (!group) {
         group = { toInvoice: 0, invoiced: 0, paid: 0, overdue: 0 };
         groups.set(entry.currency, group);
       }
-      if (entry.status === 'pendiente') group.toInvoice += entry.amount;
-      else if (entry.status === 'facturado') group.invoiced += entry.amount;
-      else if (entry.status === 'atrasado') group.overdue += entry.amount;
-      else if (entry.status === 'pagado') group.paid += entry.amount;
+      if (entry.status === "pendiente") group.toInvoice += entry.amount;
+      else if (entry.status === "facturado") group.invoiced += entry.amount;
+      else if (entry.status === "atrasado") group.overdue += entry.amount;
+      else if (entry.status === "pagado") group.paid += entry.amount;
     }
-    return [...groups.entries()].map(([currency, totals]) => ({ currency: currency as BillingLedgerEntry['currency'], ...totals }));
+    return [...groups.entries()].map(([currency, totals]) => ({
+      currency: currency as BillingLedgerEntry["currency"],
+      ...totals,
+    }));
   }, [entries]);
 
   const closeDialog = () => setDialog(null);
 
-  const onIssueMilestoneInvoice = async (input: IssueProjectPaymentMilestoneInvoiceInput) => {
-    if (dialog?.kind !== 'issue-milestone' || !dialog.entry.projectId) return;
-    await issueMilestoneInvoice.mutateAsync({ projectId: dialog.entry.projectId, milestoneId: dialog.entry.referenceId as string, input });
+  const onIssueMilestoneInvoice = async (
+    input: IssueProjectPaymentMilestoneInvoiceInput,
+  ) => {
+    if (dialog?.kind !== "issue-milestone" || !dialog.entry.projectId) return;
+    await issueMilestoneInvoice.mutateAsync({
+      projectId: dialog.entry.projectId,
+      milestoneId: dialog.entry.referenceId as string,
+      input,
+    });
     await queryClient.invalidateQueries({ queryKey: billingKeys.ledger() });
-    toast.success('Factura registrada correctamente.');
+    toast.success("Factura registrada correctamente.");
   };
 
-  const onMarkMilestonePaid = async (input: MarkProjectPaymentMilestonePaidInput) => {
-    if (dialog?.kind !== 'pay-milestone' || !dialog.entry.projectId) return;
-    await markMilestonePaid.mutateAsync({ projectId: dialog.entry.projectId, milestoneId: dialog.entry.referenceId as string, input });
+  const onMarkMilestonePaid = async (
+    input: MarkProjectPaymentMilestonePaidInput,
+  ) => {
+    if (dialog?.kind !== "pay-milestone" || !dialog.entry.projectId) return;
+    await markMilestonePaid.mutateAsync({
+      projectId: dialog.entry.projectId,
+      milestoneId: dialog.entry.referenceId as string,
+      input,
+    });
     await queryClient.invalidateQueries({ queryKey: billingKeys.ledger() });
-    toast.success('Pago registrado correctamente.');
+    toast.success("Pago registrado correctamente.");
   };
 
   const showHito0Notice = useMemo(() => {
-    if (dialog?.kind !== 'pay-milestone' || !milestoneProject) return false;
-    if (milestoneProject.salesStage !== 'approved' || milestoneProject.status !== 'draft') return false;
-    const minSortOrder = Math.min(...milestoneProject.paymentMilestones.map((m) => m.sortOrder));
-    const milestone = milestoneProject.paymentMilestones.find((m) => m.id === dialog.entry.referenceId);
+    if (dialog?.kind !== "pay-milestone" || !milestoneProject) return false;
+    if (
+      milestoneProject.salesStage !== "approved" ||
+      milestoneProject.status !== "draft"
+    )
+      return false;
+    const minSortOrder = Math.min(
+      ...milestoneProject.paymentMilestones.map((m) => m.sortOrder),
+    );
+    const milestone = milestoneProject.paymentMilestones.find(
+      (m) => m.id === dialog.entry.referenceId,
+    );
     return milestone !== undefined && milestone.sortOrder === minSortOrder;
   }, [dialog, milestoneProject]);
 
   const onToggleAutoActivate = async (checked: boolean) => {
     try {
-      await updateBillingSettings.mutateAsync({ autoActivateFirstPayment: checked });
-      toast.success(checked ? 'Se activó la activación automática de Hito 0.' : 'Se desactivó la activación automática de Hito 0.');
+      await updateBillingSettings.mutateAsync({
+        autoActivateFirstPayment: checked,
+      });
+      toast.success(
+        checked
+          ? "Se activó la activación automática de Hito 0."
+          : "Se desactivó la activación automática de Hito 0.",
+      );
     } catch (error) {
-      toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo actualizar la configuración.');
+      toast.error(
+        error instanceof ApiRequestError
+          ? error.message
+          : "No se pudo actualizar la configuración.",
+      );
     }
   };
 
   const renderAction = (entry: BillingLedgerEntry) => {
-    if (entry.status === 'pendiente') {
+    if (entry.status === "pendiente") {
       return (
-        <Button size="sm" onClick={() => setDialog({ kind: 'issue-milestone', entry })}>
+        <Button
+          size="sm"
+          onClick={() => setDialog({ kind: "issue-milestone", entry })}
+        >
           Subir factura
         </Button>
       );
     }
-    if (entry.status === 'facturado') {
+    if (entry.status === "facturado") {
       return (
-        <Button size="sm" onClick={() => setDialog({ kind: 'pay-milestone', entry })}>
+        <Button
+          size="sm"
+          onClick={() => setDialog({ kind: "pay-milestone", entry })}
+        >
           Marcar pagado
         </Button>
       );
@@ -170,38 +230,71 @@ export function ProjectsBillingSection() {
   };
 
   const columns: Column<BillingLedgerEntry>[] = [
-    { key: 'client', header: 'Cliente', render: (e) => e.clientName },
+    { key: "client", header: "Cliente", render: (e) => e.clientName },
     {
-      key: 'detail',
-      header: 'Proyecto',
+      key: "detail",
+      header: "Proyecto",
       render: (e) => (
-        <button type="button" className={styles.detailLink} onClick={() => setDetailEntry(e)}>
+        <button
+          type="button"
+          className={styles.detailLink}
+          onClick={() => setDetailEntry(e)}
+        >
           {e.detail}
         </button>
       ),
     },
-    { key: 'amount', header: 'Monto', align: 'right', render: formatAmount },
-    { key: 'billing', header: 'Estado facturación', render: (e) => <Badge tone={facturacionTone(e.status)}>{facturacionLabel(e.status)}</Badge> },
+    { key: "amount", header: "Monto", align: "right", render: formatAmount },
     {
-      key: 'payment',
-      header: 'Estado de pago',
-      render: (e) => (pagoLabel(e.status) ? <Badge tone={pagoTone(e.status)}>{pagoLabel(e.status)}</Badge> : <span className={styles.noAction}>—</span>),
+      key: "billing",
+      header: "Estado facturación",
+      render: (e) => (
+        <Badge tone={facturacionTone(e.status)}>
+          {facturacionLabel(e.status)}
+        </Badge>
+      ),
     },
-    { key: 'action', header: '', render: renderAction },
+    {
+      key: "payment",
+      header: "Estado de pago",
+      render: (e) =>
+        pagoLabel(e.status) ? (
+          <Badge tone={pagoTone(e.status)}>{pagoLabel(e.status)}</Badge>
+        ) : (
+          <span className={styles.noAction}>—</span>
+        ),
+    },
+    { key: "action", header: "", render: renderAction },
   ];
 
   const downloadExcel = () => {
     if (rows.length === 0) {
-      toast.error('No hay datos para los filtros seleccionados.');
+      toast.error("No hay datos para los filtros seleccionados.");
       return;
     }
-    const header = ['Cliente', 'Proyecto', 'Monto', 'Estado facturación', 'Estado de pago'];
-    const csv = [header.join(';')]
-      .concat(rows.map((e) => [e.clientName, e.detail, formatAmount(e), facturacionLabel(e.status), pagoLabel(e.status) ?? ''].join(';')))
-      .join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const header = [
+      "Cliente",
+      "Proyecto",
+      "Monto",
+      "Estado facturación",
+      "Estado de pago",
+    ];
+    const csv = [header.join(";")]
+      .concat(
+        rows.map((e) =>
+          [
+            e.clientName,
+            e.detail,
+            formatAmount(e),
+            facturacionLabel(e.status),
+            pagoLabel(e.status) ?? "",
+          ].join(";"),
+        ),
+      )
+      .join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
+    const link = document.createElement("a");
     link.href = url;
     link.download = `facturacion-proyectos-${Date.now()}.csv`;
     link.click();
@@ -210,21 +303,24 @@ export function ProjectsBillingSection() {
 
   const downloadPdf = () => {
     if (rows.length === 0) {
-      toast.error('No hay datos para los filtros seleccionados.');
+      toast.error("No hay datos para los filtros seleccionados.");
       return;
     }
-    const win = window.open('', '_blank');
+    const win = window.open("", "_blank");
     if (!win) {
-      toast.error('El navegador bloqueó la ventana emergente. Habilítala para generar el PDF.');
+      toast.error(
+        "El navegador bloqueó la ventana emergente. Habilítala para generar el PDF.",
+      );
       return;
     }
     const tableRows = rows
       .map(
         (e) =>
-          `<tr><td>${e.clientName}</td><td>${e.detail}</td><td>${formatAmount(e)}</td><td>${facturacionLabel(e.status)}</td><td>${pagoLabel(e.status) ?? '—'}</td></tr>`,
+          `<tr><td>${e.clientName}</td><td>${e.detail}</td><td>${formatAmount(e)}</td><td>${facturacionLabel(e.status)}</td><td>${pagoLabel(e.status) ?? "—"}</td></tr>`,
       )
-      .join('');
-    win.document.write(`<html><head><title>Facturación de Proyectos — Kora</title><style>
+      .join("");
+    win.document
+      .write(`<html><head><title>Facturación de Proyectos — Kora</title><style>
       body{font-family:Arial,sans-serif;padding:30px;color:#111;}
       h1{font-size:18px;margin-bottom:2px;}
       p.meta{color:#666;font-size:12px;margin-top:0;}
@@ -233,7 +329,7 @@ export function ProjectsBillingSection() {
       th{background:#f5f6fa;}
     </style></head><body>
       <h1>Facturación de Proyectos — Kora</h1>
-      <p class="meta">Generado el ${new Date().toLocaleDateString('es-CL')}</p>
+      <p class="meta">Generado el ${new Date().toLocaleDateString("es-CL")}</p>
       <table><thead><tr><th>Cliente</th><th>Proyecto</th><th>Monto</th><th>Estado facturación</th><th>Estado de pago</th></tr></thead>
       <tbody>${tableRows}</tbody></table>
     </body></html>`);
@@ -246,10 +342,12 @@ export function ProjectsBillingSection() {
       <div className={styles.sectionHead}>
         <div>
           <p className={styles.sectionTitle}>Proyectos</p>
-          <p className={styles.sectionSubtitle}>Cobro por tramos de proyecto, activados por el cambio de etapa.</p>
+          <p className={styles.sectionSubtitle}>
+            Cobro por tramos de proyecto, activados por el cambio de etapa.
+          </p>
         </div>
       </div>
-
+      {/* 
       {canManageBilling ? (
         <Card className={styles.hito0Settings}>
           <Switch
@@ -269,22 +367,57 @@ export function ProjectsBillingSection() {
             </span>
           </Card>
         )
-      )}
+      )} 
+      */}
 
-      {(kpisByCurrency.length > 0 ? kpisByCurrency : [{ currency: 'CLP' as const, toInvoice: 0, invoiced: 0, paid: 0, overdue: 0 }]).map((group) => {
-        const tag = kpisByCurrency.length > 1 ? ` (${group.currency})` : '';
+      {(kpisByCurrency.length > 0
+        ? kpisByCurrency
+        : [
+            {
+              currency: "CLP" as const,
+              toInvoice: 0,
+              invoiced: 0,
+              paid: 0,
+              overdue: 0,
+            },
+          ]
+      ).map((group) => {
+        const tag = kpisByCurrency.length > 1 ? ` (${group.currency})` : "";
         return (
           <div className={styles.kpis} key={group.currency}>
-            <KpiCard label={`Por facturar${tag}`} value={isLoading ? '…' : formatMoney(group.toInvoice, group.currency)} />
-            <KpiCard label={`Facturado, pendiente de pago${tag}`} value={isLoading ? '…' : formatMoney(group.invoiced, group.currency)} />
-            <KpiCard label={`Pagado${tag}`} value={isLoading ? '…' : formatMoney(group.paid, group.currency)} />
-            <KpiCard label={`Pagos atrasados${tag}`} tone="danger" value={isLoading ? '…' : formatMoney(group.overdue, group.currency)} />
+            <KpiCard
+              label={`Por facturar${tag}`}
+              value={
+                isLoading ? "…" : formatMoney(group.toInvoice, group.currency)
+              }
+            />
+            <KpiCard
+              label={`Facturado, pendiente de pago${tag}`}
+              value={
+                isLoading ? "…" : formatMoney(group.invoiced, group.currency)
+              }
+            />
+            <KpiCard
+              label={`Pagado${tag}`}
+              value={isLoading ? "…" : formatMoney(group.paid, group.currency)}
+            />
+            <KpiCard
+              label={`Pagos atrasados${tag}`}
+              tone="danger"
+              value={
+                isLoading ? "…" : formatMoney(group.overdue, group.currency)
+              }
+            />
           </div>
         );
       })}
 
       <div className={styles.filtersRow}>
-        <Tabs tabs={STATUS_TABS} activeId={status} onSelect={(id) => setStatus(id as StatusFilter)} />
+        <Tabs
+          tabs={STATUS_TABS}
+          activeId={status}
+          onSelect={(id) => setStatus(id as StatusFilter)}
+        />
         <div className={styles.filtersRight}>
           <MultiSelect
             label="Cliente"
@@ -315,16 +448,20 @@ export function ProjectsBillingSection() {
       />
 
       <IssueProjectMilestoneInvoiceDialog
-        open={dialog?.kind === 'issue-milestone'}
-        milestoneName={dialog?.kind === 'issue-milestone' ? dialog.entry.detail : ''}
-        amount={dialog?.kind === 'issue-milestone' ? dialog.entry.amount : 0}
+        open={dialog?.kind === "issue-milestone"}
+        milestoneName={
+          dialog?.kind === "issue-milestone" ? dialog.entry.detail : ""
+        }
+        amount={dialog?.kind === "issue-milestone" ? dialog.entry.amount : 0}
         onClose={closeDialog}
         onConfirm={onIssueMilestoneInvoice}
       />
 
       <MarkProjectMilestonePaidDialog
-        open={dialog?.kind === 'pay-milestone'}
-        milestoneName={dialog?.kind === 'pay-milestone' ? dialog.entry.detail : ''}
+        open={dialog?.kind === "pay-milestone"}
+        milestoneName={
+          dialog?.kind === "pay-milestone" ? dialog.entry.detail : ""
+        }
         showHito0Notice={showHito0Notice}
         onClose={closeDialog}
         onConfirm={onMarkMilestonePaid}
@@ -334,8 +471,14 @@ export function ProjectsBillingSection() {
         projectId={detailEntry?.projectId ?? null}
         milestoneId={detailEntry?.referenceId ?? null}
         onClose={() => setDetailEntry(null)}
-        onIssue={() => detailEntry && setDialog({ kind: 'issue-milestone', entry: detailEntry })}
-        onMarkPaid={() => detailEntry && setDialog({ kind: 'pay-milestone', entry: detailEntry })}
+        onIssue={() =>
+          detailEntry &&
+          setDialog({ kind: "issue-milestone", entry: detailEntry })
+        }
+        onMarkPaid={() =>
+          detailEntry &&
+          setDialog({ kind: "pay-milestone", entry: detailEntry })
+        }
       />
     </div>
   );

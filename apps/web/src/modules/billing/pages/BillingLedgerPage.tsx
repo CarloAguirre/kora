@@ -1,14 +1,14 @@
-import { useState } from 'react';
-import styles from './BillingLedgerPage.module.css';
-import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
-import { Tabs } from '@/shared/components/ui/Tabs';
-import { SupportBillingSection } from '../components/SupportBillingSection';
-import { ProjectsBillingSection } from '../components/ProjectsBillingSection';
+import { DashboardLayout } from "@/shared/components/layout/DashboardLayout";
+import { Tabs } from "@/shared/components/ui/Tabs";
+import { useState } from "react";
+import { ProjectsBillingSection } from "../components/ProjectsBillingSection";
+import { SupportBillingSection } from "../components/SupportBillingSection";
+import styles from "./BillingLedgerPage.module.css";
 
-type Module = 'soporte' | 'proyectos';
+type Module = "soporte" | "proyectos";
 const MODULE_TABS: ReadonlyArray<{ id: Module; label: string }> = [
-  { id: 'soporte', label: 'Soporte' },
-  { id: 'proyectos', label: 'Proyectos' },
+  { id: "soporte", label: "Soporte" },
+  { id: "proyectos", label: "Proyectos" },
 ];
 
 /**
@@ -20,16 +20,22 @@ const MODULE_TABS: ReadonlyArray<{ id: Module; label: string }> = [
  * referencia de diseño en Figma (`kora-facturacion-soporte.html`).
  */
 export function BillingLedgerPage() {
-  const [module, setModule] = useState<Module>('soporte');
+  const [module, setModule] = useState<Module>("soporte");
 
   return (
     <DashboardLayout title="Facturación">
       <div className={styles.page}>
-        <p className={styles.subtitle}>Registra facturas, marca su estado y deja constancia de los pagos recibidos — de Soporte y de Proyectos.</p>
+        <Tabs
+          tabs={MODULE_TABS}
+          activeId={module}
+          onSelect={(id) => setModule(id as Module)}
+        />
 
-        <Tabs tabs={MODULE_TABS} activeId={module} onSelect={(id) => setModule(id as Module)} />
-
-        {module === 'soporte' ? <SupportBillingSection /> : <ProjectsBillingSection />}
+        {module === "soporte" ? (
+          <SupportBillingSection />
+        ) : (
+          <ProjectsBillingSection />
+        )}
       </div>
     </DashboardLayout>
   );

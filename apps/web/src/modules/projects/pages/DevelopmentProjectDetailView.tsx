@@ -660,6 +660,7 @@ export function DevelopmentProjectDetailView({
               <ProjectModulesCard
                 projectId={projectId}
                 modules={project.modules}
+                hourEntries={projectHourEntries?.items ?? []}
                 canManage={can("projects:manage")}
               />
             ) : (

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   PROJECT_MODULE_DELIVERY_STATUS_LABELS,
   PROJECT_MODULE_STAGES,
@@ -7,6 +7,7 @@ import {
   PROJECT_MODULE_TASK_SCOPE_LABELS,
   PROJECT_MODULE_TASK_STATUSES,
   PROJECT_MODULE_TASK_STATUS_LABELS,
+  type HourEntrySummary,
   type ProjectModule,
   type ProjectModuleDelivery,
   type ProjectModuleDeliveryStatus,
@@ -170,9 +171,25 @@ function weekGridlines(range: DateRange): number[] {
   return lines;
 }
 
+/** Líneas verticales por día, solo en modo "detalle" del zoom — igual que `axis.dayLines` en `PhaseRoadmap`. */
+function dayGridlines(range: DateRange): number[] {
+  const lines: number[] = [];
+  const cursor = new Date(range.min);
+  while (cursor <= range.max) {
+    lines.push(pct(cursor, range));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return lines;
+}
+
+/** El zoom pasa de "Semanas" a "Días" ensanchando la pista: 0 → 100% (cabe entera), 100 → 400% (igual que en `PhaseRoadmap`, vista cliente). */
+const scrollWidthPercent = (zoom: number) => 100 + zoom * 3;
+
 interface ProjectModulesCardProps {
   projectId: string;
   modules: readonly ProjectModule[];
+  /** Registros de horas del proyecto (incluye `hasBlocker`/`blockerDescription`) — se filtran aquí por módulo para mostrar el detalle de los incidentes. */
+  hourEntries: readonly HourEntrySummary[];
   canManage: boolean;
 }
 
@@ -185,7 +202,7 @@ interface ProjectModulesCardProps {
  * zoom Semanas/Días y rango visible) y permite cambiar estado (etapa del
  * módulo, estado de tarea/entrega).
  */
-export function ProjectModulesCard({ projectId, modules, canManage }: ProjectModulesCardProps) {
+export function ProjectModulesCard({ projectId, modules, hourEntries, canManage }: ProjectModulesCardProps) {
   const toast = useToast();
   const updateModule = useUpdateProjectModule();
   const updateTask = useUpdateProjectModuleTask();
@@ -194,6 +211,21 @@ export function ProjectModulesCard({ projectId, modules, canManage }: ProjectMod
   const [rangeDraft, setRangeDraft] = useState({ from: '', to: '' });
   const [appliedRange, setAppliedRange] = useState<DateRange | null>(null);
   const [zoomByModule, setZoomByModule] = useState<Record<string, number>>({});
+  const [selectedTaskByModule, setSelectedTaskByModule] = useState<Record<string, string | null>>({});
+  const [selectedDeliveryByModule, setSelectedDeliveryByModule] = useState<Record<string, string | null>>({});
+  const [openIncidentsByModule, setOpenIncidentsByModule] = useState<Record<string, boolean>>({});
+  const taskRowRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const deliveryRowRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  const selectTask = (moduleId: string, taskId: string) => {
+    setSelectedTaskByModule((prev) => ({ ...prev, [moduleId]: prev[moduleId] === taskId ? null : taskId }));
+    taskRowRefs.current[taskId]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  };
+
+  const selectDelivery = (moduleId: string, deliveryId: string) => {
+    setSelectedDeliveryByModule((prev) => ({ ...prev, [moduleId]: prev[moduleId] === deliveryId ? null : deliveryId }));
+    deliveryRowRefs.current[deliveryId]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  };
 
   const onChangeStage = async (moduleId: string, currentStage: ProjectModuleStage) => {
     try {
@@ -325,6 +357,10 @@ export function ProjectModulesCard({ projectId, modules, canManage }: ProjectMod
           const zoom = zoomByModule[module.id] ?? 15;
           const detail = zoom > 50;
           const phaseStatus = phaseVisualStatus(module);
+          const selectedTaskId = selectedTaskByModule[module.id] ?? null;
+          const selectedDeliveryId = selectedDeliveryByModule[module.id] ?? null;
+          const incidentsOpen = openIncidentsByModule[module.id] ?? false;
+          const moduleIncidents = hourEntries.filter((entry) => entry.hasBlocker && entry.module?.id === module.id);
 
           return (
             <div key={module.id} className={styles.moduleCard}>
@@ -337,11 +373,37 @@ export function ProjectModulesCard({ projectId, modules, canManage }: ProjectMod
                   </span>
                 </div>
                 {module.blockerCount > 0 && (
-                  <span className={styles.blockerBadge} title={`${module.blockerCount} registro(s) de horas con bloqueo reportado`}>
+                  <button
+                    type="button"
+                    className={styles.blockerBadge}
+                    aria-expanded={incidentsOpen}
+                    onClick={() => setOpenIncidentsByModule((prev) => ({ ...prev, [module.id]: !incidentsOpen }))}
+                    title={`${module.blockerCount} registro(s) de horas con bloqueo reportado`}
+                  >
                     <AlertIcon size={12} /> {module.blockerCount} incidente{module.blockerCount > 1 ? 's' : ''}
-                  </span>
+                  </button>
                 )}
               </div>
+
+              {incidentsOpen && module.blockerCount > 0 && (
+                <div className={styles.incidentsPanel}>
+                  <span className={styles.subsectionLabel}>Incidentes</span>
+                  {moduleIncidents.length === 0 && (
+                    <p className={styles.incidentsEmpty}>
+                      No se encontraron detalles de estos incidentes en los registros de horas recientes.
+                    </p>
+                  )}
+                  {moduleIncidents.map((entry) => (
+                    <div key={entry.id} className={styles.incidentRow}>
+                      <span className={styles.incidentMeta}>
+                        {formatDate(entry.date)} · {entry.user.fullName}
+                        {entry.team?.name ? ` · ${entry.team.name}` : ''}
+                      </span>
+                      <span className={styles.incidentDescription}>{entry.blockerDescription || 'Sin detalle'}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               <div className={styles.pipelineSection}>
                 <span className={styles.pipelineLabel}>Resumen de avance</span>
@@ -401,6 +463,7 @@ export function ProjectModulesCard({ projectId, modules, canManage }: ProjectMod
                       max={100}
                       value={zoom}
                       onChange={(event) => setZoomByModule((prev) => ({ ...prev, [module.id]: Number(event.target.value) }))}
+                      aria-label="Zoom del cronograma: de vista por semanas a vista por días"
                     />
                     <span>Días</span>
                   </div>
@@ -425,91 +488,143 @@ export function ProjectModulesCard({ projectId, modules, canManage }: ProjectMod
                     </div>
 
                     <div className={styles.ganttTracksCol}>
-                      <div className={styles.ganttHeader}>
-                        {monthTicks(range).map((tick, tickIndex) => (
-                          <span
-                            key={`${tick.label}-${tickIndex}`}
-                            className={styles.ganttMonthTick}
-                            style={{ left: `${tick.leftPct}%`, width: `${tick.widthPct}%` }}
-                          >
-                            {tick.label}
-                          </span>
-                        ))}
-                      </div>
-                      {detail && (
-                        <div className={styles.ganttDayRow}>
-                          {dayTicks(range).map((tick, tickIndex) => (
-                            <span key={`${tick.label}-${tickIndex}`} className={styles.ganttDayTick} style={{ left: `${tick.leftPct}%` }}>
+                      <div className={styles.ganttScroll} style={{ width: `${scrollWidthPercent(zoom)}%` }}>
+                        <div className={styles.ganttHeader}>
+                          {monthTicks(range).map((tick, tickIndex) => (
+                            <span
+                              key={`${tick.label}-${tickIndex}`}
+                              className={styles.ganttMonthTick}
+                              style={{ left: `${tick.leftPct}%`, width: `${tick.widthPct}%` }}
+                            >
                               {tick.label}
                             </span>
                           ))}
                         </div>
-                      )}
+                        {detail && (
+                          <div className={styles.ganttDayRow}>
+                            {dayTicks(range).map((tick, tickIndex) => (
+                              <span key={`${tick.label}-${tickIndex}`} className={styles.ganttDayTick} style={{ left: `${tick.leftPct}%` }}>
+                                {tick.label}
+                              </span>
+                            ))}
+                          </div>
+                        )}
 
-                      {weekGridlines(range).map((leftPct, gridIndex) => (
-                        <div key={gridIndex} className={styles.timelineGridline} style={{ left: `${leftPct}%` }} />
-                      ))}
-                      {todayPct !== null && (
-                        <div className={styles.timelineToday} style={{ left: `${todayPct}%` }} title="Hoy">
-                          <span className={styles.timelineTodayPill}>HOY</span>
-                        </div>
-                      )}
+                        {detail &&
+                          dayGridlines(range).map((leftPct, gridIndex) => (
+                            <div key={`day-${gridIndex}`} className={styles.ganttDayLine} style={{ left: `${leftPct}%` }} />
+                          ))}
+                        {weekGridlines(range).map((leftPct, gridIndex) => (
+                          <div key={gridIndex} className={styles.timelineGridline} style={{ left: `${leftPct}%` }} />
+                        ))}
+                        {todayPct !== null && (
+                          <div className={styles.timelineToday} style={{ left: `${todayPct}%` }} title="Hoy">
+                            <span className={styles.timelineTodayPill}>HOY</span>
+                          </div>
+                        )}
 
-                      {module.tasks.map((task) => {
-                        const teamStyle = getTeamStyle(task.teamName ?? 'Sin equipo');
-                        const visual = taskVisualStatus(task);
-                        if (task.startDate) {
-                          const left = pct(parseDate(task.startDate), range);
-                          const width = Math.max(pct(parseDate(task.date), range) - left, 1.5);
-                          const startDate = parseDate(task.startDate);
-                          const isDone = task.status === 'done';
-                          const isCurrent = !isDone && startDate <= today() && today() <= parseDate(task.date);
-                          const isFuture = !isDone && startDate > today();
+                        {module.tasks.map((task) => {
+                          const teamStyle = getTeamStyle(task.teamName ?? 'Sin equipo');
+                          const visual = taskVisualStatus(task);
+                          if (task.startDate) {
+                            const left = pct(parseDate(task.startDate), range);
+                            const width = Math.max(pct(parseDate(task.date), range) - left, 1.5);
+                            const startDate = parseDate(task.startDate);
+                            const isDone = task.status === 'done';
+                            const isCurrent = !isDone && startDate <= today() && today() <= parseDate(task.date);
+                            const isFuture = !isDone && startDate > today();
+                            return (
+                              <div key={task.id} className={styles.ganttTrackRow}>
+                                <div className={styles.ganttTrackBg} />
+                                <div
+                                  className={[
+                                    styles.ganttBar,
+                                    isFuture ? styles.ganttBarFuture : '',
+                                    selectedTaskId === task.id ? styles.ganttBarSelected : '',
+                                  ]
+                                    .filter(Boolean)
+                                    .join(' ')}
+                                  style={{ left: `${left}%`, width: `${width}%`, background: teamStyle.color }}
+                                  title={`${task.name}${task.teamName ? ` · ${task.teamName}` : ''} · ${formatDate(task.startDate)} a ${formatDate(task.date)}`}
+                                  role="button"
+                                  tabIndex={0}
+                                  aria-pressed={selectedTaskId === task.id}
+                                  onClick={() => selectTask(module.id, task.id)}
+                                  onKeyDown={(event) => {
+                                    if (event.key === 'Enter' || event.key === ' ') {
+                                      event.preventDefault();
+                                      selectTask(module.id, task.id);
+                                    }
+                                  }}
+                                >
+                                  {isDone ? '✓' : isCurrent ? 'En curso' : ''}
+                                </div>
+                              </div>
+                            );
+                          }
                           return (
                             <div key={task.id} className={styles.ganttTrackRow}>
                               <div className={styles.ganttTrackBg} />
                               <div
-                                className={[styles.ganttBar, isFuture ? styles.ganttBarFuture : ''].filter(Boolean).join(' ')}
-                                style={{ left: `${left}%`, width: `${width}%`, background: teamStyle.color }}
-                                title={`${task.name}${task.teamName ? ` · ${task.teamName}` : ''} · ${formatDate(task.startDate)} a ${formatDate(task.date)}`}
-                              >
-                                {isDone ? '✓' : isCurrent ? 'En curso' : ''}
-                              </div>
-                            </div>
-                          );
-                        }
-                        return (
-                          <div key={task.id} className={styles.ganttTrackRow}>
-                            <div className={styles.ganttTrackBg} />
-                            <div
-                              className={[styles.timelineMarker, styles.timelineMarkerTask, styles[`marker-${visual}`]]
-                                .filter(Boolean)
-                                .join(' ')}
-                              style={{ left: `${pct(parseDate(task.date), range)}%` }}
-                              title={`${task.name}${task.teamName ? ` · ${task.teamName}` : ''} · ${formatDate(task.date)}`}
-                            />
-                          </div>
-                        );
-                      })}
-
-                      {module.deliveries.length > 0 && (
-                        <div className={styles.ganttTrackRow}>
-                          <div className={styles.ganttTrackBg} />
-                          {module.deliveries.map((delivery) => {
-                            const visual = deliveryVisualStatus(delivery);
-                            return (
-                              <div
-                                key={delivery.id}
-                                className={[styles.timelineMarker, styles.timelineMarkerDelivery, styles[`marker-${visual}`]]
+                                className={[
+                                  styles.timelineMarker,
+                                  styles.timelineMarkerTask,
+                                  styles[`marker-${visual}`],
+                                  selectedTaskId === task.id ? styles.timelineMarkerSelected : '',
+                                ]
                                   .filter(Boolean)
                                   .join(' ')}
-                                style={{ left: `${pct(parseDate(delivery.estimatedDate), range)}%` }}
-                                title={`Entrega · ${formatDate(delivery.estimatedDate)} · ${PROJECT_MODULE_DELIVERY_STATUS_LABELS[delivery.status]}`}
+                                style={{ left: `${pct(parseDate(task.date), range)}%` }}
+                                title={`${task.name}${task.teamName ? ` · ${task.teamName}` : ''} · ${formatDate(task.date)}`}
+                                role="button"
+                                tabIndex={0}
+                                aria-pressed={selectedTaskId === task.id}
+                                onClick={() => selectTask(module.id, task.id)}
+                                onKeyDown={(event) => {
+                                  if (event.key === 'Enter' || event.key === ' ') {
+                                    event.preventDefault();
+                                    selectTask(module.id, task.id);
+                                  }
+                                }}
                               />
-                            );
-                          })}
-                        </div>
-                      )}
+                            </div>
+                          );
+                        })}
+
+                        {module.deliveries.length > 0 && (
+                          <div className={styles.ganttTrackRow}>
+                            <div className={styles.ganttTrackBg} />
+                            {module.deliveries.map((delivery) => {
+                              const visual = deliveryVisualStatus(delivery);
+                              return (
+                                <div
+                                  key={delivery.id}
+                                  className={[
+                                    styles.timelineMarker,
+                                    styles.timelineMarkerDelivery,
+                                    styles[`marker-${visual}`],
+                                    selectedDeliveryId === delivery.id ? styles.timelineMarkerSelected : '',
+                                  ]
+                                    .filter(Boolean)
+                                    .join(' ')}
+                                  style={{ left: `${pct(parseDate(delivery.estimatedDate), range)}%` }}
+                                  title={`Entrega · ${formatDate(delivery.estimatedDate)} · ${PROJECT_MODULE_DELIVERY_STATUS_LABELS[delivery.status]}`}
+                                  role="button"
+                                  tabIndex={0}
+                                  aria-pressed={selectedDeliveryId === delivery.id}
+                                  onClick={() => selectDelivery(module.id, delivery.id)}
+                                  onKeyDown={(event) => {
+                                    if (event.key === 'Enter' || event.key === ' ') {
+                                      event.preventDefault();
+                                      selectDelivery(module.id, delivery.id);
+                                    }
+                                  }}
+                                />
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -518,47 +633,88 @@ export function ProjectModulesCard({ projectId, modules, canManage }: ProjectMod
               {module.tasks.length > 0 && (
                 <div className={styles.subsection}>
                   <span className={styles.subsectionLabel}>Tareas</span>
-                  {module.tasks.map((task) => (
-                    <div key={task.id} className={styles.taskRow}>
-                      <span className={styles.taskName}>
-                        {task.name}
-                        {task.teamName && <span className={styles.segmentTeam}> · {task.teamName}</span>}
-                        {task.assigneeName && <span className={styles.segmentTeam}> · {task.assigneeName}</span>}
-                      </span>
-                      <span className={styles.segmentDates}>{formatDate(task.date)}</span>
-                      <Select
-                        options={TASK_STATUS_OPTIONS}
-                        value={task.status}
-                        disabled={!canManage}
-                        onChange={(event) =>
-                          void onChangeTaskStatus(module.id, task.id, event.target.value as ProjectModuleTaskStatus)
-                        }
-                      />
-                    </div>
-                  ))}
+                  {module.tasks.map((task) => {
+                    const isSelected = selectedTaskId === task.id;
+                    return (
+                      <div
+                        key={task.id}
+                        ref={(el) => {
+                          taskRowRefs.current[task.id] = el;
+                        }}
+                        className={[styles.taskRow, isSelected ? styles.taskRowSelected : ''].filter(Boolean).join(' ')}
+                        onClick={() => selectTask(module.id, task.id)}
+                      >
+                        <span className={styles.taskName}>
+                          {task.name}
+                          {task.teamName && <span className={styles.segmentTeam}> · {task.teamName}</span>}
+                          {task.assigneeName && <span className={styles.segmentTeam}> · {task.assigneeName}</span>}
+                        </span>
+                        <span className={styles.segmentDates}>{formatDate(task.date)}</span>
+                        <Select
+                          options={TASK_STATUS_OPTIONS}
+                          value={task.status}
+                          disabled={!canManage}
+                          onClick={(event) => event.stopPropagation()}
+                          onChange={(event) =>
+                            void onChangeTaskStatus(module.id, task.id, event.target.value as ProjectModuleTaskStatus)
+                          }
+                        />
+                        {isSelected && (
+                          <div className={styles.taskDetail}>
+                            <DetailField label="Ámbito" value={PROJECT_MODULE_TASK_SCOPE_LABELS[task.scope]} />
+                            <DetailField label="Horas estimadas" value={task.estimatedHours != null ? `${task.estimatedHours} hh` : 'Sin definir'} />
+                            <DetailField label="Fecha de inicio" value={formatDate(task.startDate)} />
+                            <DetailField
+                              label="Completada"
+                              value={task.completedAt ? new Date(task.completedAt).toLocaleString('es-CL') : 'Aún no'}
+                            />
+                            <DetailField label="Descripción" value={task.description || 'Sin descripción'} full />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
 
               {module.deliveries.length > 0 && (
                 <div className={styles.deliveries}>
                   <span className={styles.deliveriesLabel}>Entregas estimadas</span>
-                  {module.deliveries.map((delivery, deliveryIndex) => (
-                    <div key={delivery.id} className={styles.deliveryRow}>
-                      <span className={styles.deliveryLabel}>
-                        Entrega {deliveryIndex + 1}
-                        {delivery.teamName && <span className={styles.segmentTeam}> · {delivery.teamName}</span>}
-                      </span>
-                      <span>{formatDate(delivery.estimatedDate)}</span>
-                      <Select
-                        options={DELIVERY_STATUS_OPTIONS}
-                        value={delivery.status}
-                        disabled={!canManage}
-                        onChange={(event) =>
-                          void onChangeDeliveryStatus(module.id, delivery.id, event.target.value as ProjectModuleDeliveryStatus)
-                        }
-                      />
-                    </div>
-                  ))}
+                  {module.deliveries.map((delivery, deliveryIndex) => {
+                    const isSelected = selectedDeliveryId === delivery.id;
+                    return (
+                      <div
+                        key={delivery.id}
+                        ref={(el) => {
+                          deliveryRowRefs.current[delivery.id] = el;
+                        }}
+                        className={[styles.deliveryRow, isSelected ? styles.taskRowSelected : ''].filter(Boolean).join(' ')}
+                        onClick={() => selectDelivery(module.id, delivery.id)}
+                      >
+                        <span className={styles.deliveryLabel}>
+                          Entrega {deliveryIndex + 1}
+                          {delivery.teamName && <span className={styles.segmentTeam}> · {delivery.teamName}</span>}
+                        </span>
+                        <span>{formatDate(delivery.estimatedDate)}</span>
+                        <Select
+                          options={DELIVERY_STATUS_OPTIONS}
+                          value={delivery.status}
+                          disabled={!canManage}
+                          onClick={(event) => event.stopPropagation()}
+                          onChange={(event) =>
+                            void onChangeDeliveryStatus(module.id, delivery.id, event.target.value as ProjectModuleDeliveryStatus)
+                          }
+                        />
+                        {isSelected && (
+                          <div className={styles.taskDetail}>
+                            <DetailField label="Estado" value={PROJECT_MODULE_DELIVERY_STATUS_LABELS[delivery.status]} />
+                            <DetailField label="Fecha estimada" value={formatDate(delivery.estimatedDate)} />
+                            <DetailField label="Equipo" value={delivery.teamName ?? 'Sin equipo'} />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -566,5 +722,14 @@ export function ProjectModulesCard({ projectId, modules, canManage }: ProjectMod
         })}
       </div>
     </Card>
+  );
+}
+
+function DetailField({ label, value, full }: { label: string; value: string; full?: boolean }) {
+  return (
+    <div className={[styles.taskDetailField, full ? styles.taskDetailFieldFull : ''].filter(Boolean).join(' ')}>
+      <span className={styles.taskDetailLabel}>{label}</span>
+      <span className={styles.taskDetailValue}>{value}</span>
+    </div>
   );
 }
