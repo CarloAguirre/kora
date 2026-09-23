@@ -9,6 +9,7 @@ import {
   ilike,
   inArray,
   isNull,
+  isUuid,
   ne,
   or,
   projectTeamMembers,
@@ -37,8 +38,15 @@ export class DrizzleProjectRepository implements ProjectRepository {
   constructor(@Inject(DATABASE) private readonly database: Database) {}
 
   async findById(id: string, context?: TransactionContext): Promise<Project | null> {
+    if (!isUuid(id)) return this.findBySlug(id, context);
     const db = resolveDb(this.database, context);
     const rows = await db.select().from(projects).where(eq(projects.id, id)).limit(1);
+    return rows[0] ? toDomain(rows[0]) : null;
+  }
+
+  async findBySlug(slug: string, context?: TransactionContext): Promise<Project | null> {
+    const db = resolveDb(this.database, context);
+    const rows = await db.select().from(projects).where(eq(projects.slug, slug)).limit(1);
     return rows[0] ? toDomain(rows[0]) : null;
   }
 
@@ -72,6 +80,7 @@ export class DrizzleProjectRepository implements ProjectRepository {
         .select({
           id: projects.id,
           name: projects.name,
+          slug: projects.slug,
           clientId: projects.clientId,
           clientName: clients.companyName,
           type: projects.type,
@@ -109,6 +118,7 @@ export class DrizzleProjectRepository implements ProjectRepository {
     const items: ProjectListItem[] = rows.map((row) => ({
       id: row.id,
       name: row.name,
+      slug: row.slug,
       clientId: row.clientId,
       clientName: row.clientName,
       type: row.type,

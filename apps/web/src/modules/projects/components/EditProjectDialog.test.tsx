@@ -45,6 +45,7 @@ function buildProject(overrides: Partial<ProjectDetail> = {}): ProjectDetail {
   return {
     id: 'project-1',
     name: 'Proyecto de prueba',
+    slug: 'proyecto-de-prueba',
     client: { id: '11111111-1111-4111-8111-111111111111', companyName: 'Cliente SA' },
     type: 'development',
     salesStage: 'approved',

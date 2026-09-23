@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { err, ok, type ApplicationError, type Result } from '@kora/core';
+import { isUuid } from '@kora/core';
 import type { ClientDetail } from '@kora/contracts';
 import { ClientNotFoundError } from '../../domain/errors/client.errors';
 import { CLIENT_REPOSITORY, type ClientRepository } from '../../domain/repositories/client.repository';
@@ -29,7 +30,9 @@ export class GetClientUseCase implements UseCase<GetClientCommand, ClientDetail,
   ) {}
 
   async execute(command: GetClientCommand): Promise<Result<ClientDetail, ApplicationError>> {
-    const client = await this.clients.findById(command.clientId);
+    const client = isUuid(command.clientId)
+      ? await this.clients.findById(command.clientId)
+      : await this.clients.findBySlug(command.clientId);
     if (!client || client.isDeleted) return err(new ClientNotFoundError(command.clientId));
 
     const snapshot = client.toSnapshot();

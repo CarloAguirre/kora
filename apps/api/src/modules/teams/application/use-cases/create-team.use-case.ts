@@ -9,6 +9,7 @@ import {
   type IdGenerator,
   type Result,
 } from '@kora/core';
+import { slugify, withUniqueSuffix } from '@kora/core';
 import type { CreateTeamInput } from '@kora/contracts';
 import { Team } from '../../domain/entities/team.entity';
 import { TeamNameAlreadyInUseError } from '../../domain/errors/team.errors';
@@ -41,9 +42,12 @@ export class CreateTeamUseCase implements UseCase<CreateTeamCommand, { id: strin
       return err(new TeamNameAlreadyInUseError(data.name));
     }
 
+    const slug = await withUniqueSuffix(slugify(data.name), async (candidate) => (await this.teams.findBySlug(candidate)) !== null);
+
     const team = Team.create({
       id: this.ids.generate(),
       name: data.name,
+      slug,
       description: data.description,
       leaderUserId: data.leaderUserId,
       teamTypeId: data.teamTypeId,

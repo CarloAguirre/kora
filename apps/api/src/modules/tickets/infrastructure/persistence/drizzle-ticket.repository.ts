@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { alias, and, asc, clients, count, desc, eq, ilike, inArray, isNull, or, projects, sql, ticketHhRequests, tickets, users, type Database } from '@kora/db';
+import { alias, and, asc, clients, count, desc, eq, ilike, inArray, isNull, isUuid, or, projects, sql, ticketHhRequests, tickets, users, type Database } from '@kora/db';
 import { buildPage, toOffset, type Page, type PageRequest, type SortRequest, type TransactionContext } from '@kora/core';
 import type { TicketFilters, TicketListItem, TicketRepository, TicketSortableField } from '../../domain/repositories/ticket.repository';
 import type { Ticket } from '../../domain/entities/ticket.entity';
@@ -20,6 +20,7 @@ export class DrizzleTicketRepository implements TicketRepository {
   constructor(@Inject(DATABASE) private readonly database: Database) {}
 
   async findById(id: string, context?: TransactionContext): Promise<Ticket | null> {
+    if (!isUuid(id)) return this.findByLegacyId(id, context);
     const db = resolveDb(this.database, context);
     const rows = await db.select().from(tickets).where(eq(tickets.id, id)).limit(1);
     return rows[0] ? toDomain(rows[0]) : null;

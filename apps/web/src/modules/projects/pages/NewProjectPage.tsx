@@ -53,6 +53,7 @@ import { useUsersList } from '@/modules/users/api/users.queries';
 import { useTeamsList } from '@/modules/teams/api/teams.queries';
 import { ApiRequestError } from '@/shared/lib/api-client';
 import { formatMoney } from '@/shared/lib/format-money';
+import { projectPath, supportPlanPath } from '@/app/router/paths';
 
 type ProjectFormValues = z.input<typeof createProjectSchema>;
 
@@ -493,7 +494,7 @@ export function NewProjectPage() {
           };
           const result = await createSupportPlan.mutateAsync(planInput);
           toast.success(`Se creó el contrato de soporte de ${values.name}.`);
-          void navigate(`/soporte/${result.id}`);
+          void navigate(supportPlanPath(result));
           return;
         }
 
@@ -501,7 +502,7 @@ export function NewProjectPage() {
         toast.success(`Se creó el proyecto y contrato de soporte de ${values.name}.`);
         // `result.id` es el proyecto (no el contrato) — la ficha de proyecto ya muestra el resumen
         // del plan vía `SupportProjectDetailView` (`useSupportPlanSummary(projectId)`).
-        void navigate(`/proyectos/${result.id}`);
+        void navigate(projectPath(result));
         return;
       }
 
@@ -535,7 +536,7 @@ export function NewProjectPage() {
         );
       }
       toast.success(`Se creó el proyecto ${values.name}.`);
-      void navigate(`/proyectos/${result.id}`);
+      void navigate(projectPath(result));
     } catch (error) {
       setServerError(error instanceof ApiRequestError ? error.message : 'No se pudo crear el proyecto.');
     }

@@ -15,6 +15,7 @@ import { StatusPill, type StatusPillTone } from '../components/StatusPill';
 import { toClientCompanyInfo, toClientProjectRow, toClientSupportContractRow } from '../adapters/portal-list.adapter';
 import type { ClientProjectHealth, ClientProjectRow, ClientSupportContractRow } from '../types';
 import { formatMoney } from '@/shared/lib/format-money';
+import { portalProjectPath, portalSupportContractPath } from '@/app/router/paths';
 
 /**
  * Portal de cliente — tabs "Proyectos Desarrollo" y "Soporte".
@@ -57,16 +58,16 @@ export interface ClientPortalPageProps {
    *  protege `/portal/*` a propósito — ver `docs/DECISION-PORTAL-CLIENTE.md`. */
   readonly projectsPath?: string;
   readonly supportPath?: string;
-  readonly getProjectPath?: (projectId: string) => string;
-  readonly getContractPath?: (contractId: string) => string;
+  readonly getProjectPath?: (project: ClientProjectRow) => string;
+  readonly getContractPath?: (contract: ClientSupportContractRow) => string;
 }
 
 export function ClientPortalPage({
   clientId,
   projectsPath = '/portal/proyectos',
   supportPath = '/portal/soporte',
-  getProjectPath = (projectId) => `/portal/proyectos/${projectId}`,
-  getContractPath = (contractId) => `/portal/soporte/${contractId}`,
+  getProjectPath = portalProjectPath,
+  getContractPath = portalSupportContractPath,
 }: ClientPortalPageProps = {}) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -110,7 +111,7 @@ function ClientProjectsSection({
 }: {
   clientId: string | undefined;
   clientOwnerName: string;
-  getProjectPath: (projectId: string) => string;
+  getProjectPath: (project: ClientProjectRow) => string;
 }) {
   const { data } = useProjectsList({ clientId: clientId ?? undefined, pageSize: 100 });
   const projects = useMemo(
@@ -126,7 +127,7 @@ function ClientProjectsSection({
       header: 'Proyecto',
       render: (project) => (
         <div className={styles.projectCell}>
-          <Link className={styles.projectLink} to={getProjectPath(project.id)}>
+          <Link className={styles.projectLink} to={getProjectPath(project)}>
             {project.name}
           </Link>
           <span className={styles.projectMeta}>{project.typeLabel}</span>
@@ -177,7 +178,7 @@ function ClientSupportSection({
   getContractPath,
 }: {
   clientId: string | undefined;
-  getContractPath: (contractId: string) => string;
+  getContractPath: (contract: ClientSupportContractRow) => string;
 }) {
   const { data } = useSupportPlansForClient(clientId ?? null);
   const contracts = useMemo(() => (data ?? []).map(toClientSupportContractRow), [data]);
@@ -199,7 +200,7 @@ function ClientSupportSection({
       // de tickets — ver docs/DECISION-PORTAL-CLIENTE.md.
       header: 'Contrato',
       render: (c) => (
-        <Link className={styles.contractName} to={getContractPath(c.id)}>
+        <Link className={styles.contractName} to={getContractPath(c)}>
           {c.name}
         </Link>
       ),

@@ -18,6 +18,7 @@ import { TicketPriorityBadge } from '@/modules/tickets/components/TicketPriority
 import { SupportHoursDonut } from '../components/SupportHoursDonut';
 import { SupportProgressChart } from '../components/SupportProgressChart';
 import { formatMoney } from '@/shared/lib/format-money';
+import { ticketPath } from '@/app/router/paths';
 
 const STATUS_OPTIONS = PROJECT_STATUSES.map((status) => ({ value: status, label: PROJECT_STATUS_LABELS[status] }));
 const formatDate = (value: string | null) => (value ? new Date(`${value}T00:00:00`).toLocaleDateString('es-CL') : '—');
@@ -63,7 +64,7 @@ export function SupportProjectDetailView({ project, projectId }: { project: Proj
       header: 'ID ticket',
       width: '110px',
       render: (t) => (
-        <Link to={`/tickets/${t.id}`} className={styles.ticketLink}>
+        <Link to={ticketPath(t)} className={styles.ticketLink}>
           {t.code ?? '—'}
         </Link>
       ),

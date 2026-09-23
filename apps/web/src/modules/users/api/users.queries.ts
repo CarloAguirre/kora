@@ -18,7 +18,7 @@ import { userKeys, usersApi } from './users.api';
  * propios fallos sutiles al desmontar o al llegar dos respuestas desordenadas.
  */
 
-export function useUsersList(query: Partial<ListUsersQuery>) {
+export function useUsersList(query: Partial<ListUsersQuery>, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: userKeys.list(query),
     queryFn: () => usersApi.list(query),
@@ -26,6 +26,7 @@ export function useUsersList(query: Partial<ListUsersQuery>) {
     // esto, cambiar de página vacía la tabla y la interfaz da un salto.
     placeholderData: (previous) => previous,
     staleTime: 30_000,
+    enabled: options?.enabled,
   });
 }
 

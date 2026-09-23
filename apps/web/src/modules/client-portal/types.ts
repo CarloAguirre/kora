@@ -27,6 +27,7 @@ export type ClientProjectHealth = 'active' | 'at_risk' | 'finished';
 
 export interface ClientProjectRow {
   readonly id: string;
+  readonly slug?: string | null;
   readonly name: string;
   /** "Desarrollo" / "Soporte" — `ProjectSummary` no trae equipos ni cantidad de fases para esta fila de lista, a diferencia de `ClientProjectDetail`. */
   readonly typeLabel: string;
@@ -41,6 +42,7 @@ export interface ClientProjectRow {
 
 export interface ClientSupportContractRow {
   readonly id: string;
+  readonly slug?: string | null;
   readonly name: string;
   readonly planType: SupportPlanType;
   readonly kabeliOwnerName: string;
@@ -328,6 +330,7 @@ export interface ClientAccessLinks {
 
 export interface ClientProjectDetail {
   readonly id: string;
+  readonly slug?: string | null;
   readonly name: string;
   readonly health: ClientProjectHealth;
   readonly tag: string;

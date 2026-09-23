@@ -384,6 +384,7 @@ export type UpdateProjectBillingSettingsInput = z.infer<typeof updateProjectBill
 export const projectSummarySchema = z.object({
   id: uuidSchema,
   name: z.string(),
+  slug: z.string(),
   client: z.object({ id: uuidSchema, companyName: z.string() }).nullable(),
   type: projectTypeSchema,
   salesStage: projectSalesStageSchema.nullable(),
@@ -672,12 +673,13 @@ export const listProjectsQuerySchema = paginationQuerySchema.extend({
   type: projectTypeSchema.optional(),
   status: arrayQueryParam(projectStatusSchema),
   phase: arrayQueryParam(projectPhaseSchema),
-  clientId: uuidSchema.optional(),
+  /** Acepta id o slug: la ficha de cliente filtra por el `clientId` de la URL, que ahora es el slug del cliente — se resuelve a UUID en `ListProjectsUseCase`. */
+  clientId: z.string().optional(),
   leaderUserId: arrayQueryParam(uuidSchema),
   /** Filtra a los proyectos donde el usuario indicado participa (líder, desarrollador o miembro). */
   assignedToUserId: uuidSchema.optional(),
-  /** Filtra a los proyectos con al menos un miembro de este equipo asignado. */
-  teamId: uuidSchema.optional(),
+  /** Filtra a los proyectos con al menos un miembro de este equipo asignado. Acepta id o slug — ver `clientId`. */
+  teamId: z.string().optional(),
   sortField: projectSortFieldSchema.default('priority'),
   sortDirection: sortDirectionSchema.default('desc'),
 });

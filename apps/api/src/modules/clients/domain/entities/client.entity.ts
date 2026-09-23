@@ -4,6 +4,7 @@ import { TaxId } from '../value-objects/tax-id.vo';
 
 export interface ClientProps {
   companyName: string;
+  slug: string;
   legalName: string;
   taxId: TaxId;
   website: string | null;
@@ -26,6 +27,7 @@ export interface ClientProps {
 export interface CreateClientProps {
   readonly id: string;
   readonly companyName: string;
+  readonly slug: string;
   readonly legalName: string;
   readonly taxId: TaxId;
   readonly website?: string | null;
@@ -63,6 +65,7 @@ export class Client extends AggregateRoot<string> {
   static create(props: CreateClientProps): Client {
     const client = new Client(props.id, {
       companyName: props.companyName.trim(),
+      slug: props.slug,
       legalName: props.legalName.trim(),
       taxId: props.taxId,
       website: props.website?.trim() || null,
@@ -96,6 +99,10 @@ export class Client extends AggregateRoot<string> {
 
   get companyName(): string {
     return this.props.companyName;
+  }
+
+  get slug(): string {
+    return this.props.slug;
   }
 
   get legalName(): string {

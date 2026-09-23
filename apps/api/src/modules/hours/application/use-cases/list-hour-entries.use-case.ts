@@ -1,7 +1,8 @@
 import { Injectable, Inject } from '@nestjs/common';
-import { mapPage, ok, type Page, type Result } from '@kora/core';
+import { buildPage, mapPage, ok, type Page, type Result } from '@kora/core';
 import type { HourEntrySummary, ListHourEntriesQuery, Permission } from '@kora/contracts';
 import { HOUR_ENTRY_REPOSITORY, type HourEntryRepository } from '../../domain/repositories/hour-entry.repository';
+import { HOUR_ENTRY_PROJECT_READER, type HourEntryProjectReader } from '../ports/hour-entry-project-reader.port';
 import type { ActorContext, UseCase } from '../../../../shared/application/use-case';
 import { toHourEntrySummary } from '../mappers/hour-entry.mapper';
 
@@ -27,10 +28,17 @@ export interface ListHourEntriesCommand {
  */
 @Injectable()
 export class ListHourEntriesUseCase implements UseCase<ListHourEntriesCommand, Page<HourEntrySummary>, never> {
-  constructor(@Inject(HOUR_ENTRY_REPOSITORY) private readonly entries: HourEntryRepository) {}
+  constructor(
+    @Inject(HOUR_ENTRY_REPOSITORY) private readonly entries: HourEntryRepository,
+    @Inject(HOUR_ENTRY_PROJECT_READER) private readonly projects: HourEntryProjectReader,
+  ) {}
 
   async execute(command: ListHourEntriesCommand): Promise<Result<Page<HourEntrySummary>, never>> {
     const { query, actor, actorPermissions } = command;
+
+    // `query.projectId` llega como el slug de la URL (ficha de proyecto), no como UUID.
+    const project = query.projectId ? await this.projects.findById(query.projectId) : null;
+    if (query.projectId && !project) return ok(buildPage<HourEntrySummary>([], 0, { page: query.page, pageSize: query.pageSize }));
 
     let visibleToUserIds: readonly string[] | undefined;
     let leaderScopeUserId: string | undefined;
@@ -49,7 +57,7 @@ export class ListHourEntriesUseCase implements UseCase<ListHourEntriesCommand, P
     const page = await this.entries.search(
       {
         userId,
-        projectId: query.projectId,
+        projectId: project?.id,
         search: query.search,
         teamId: query.teamId,
         status: query.status,

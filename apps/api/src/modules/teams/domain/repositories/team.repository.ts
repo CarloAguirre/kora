@@ -13,6 +13,7 @@ export type TeamSortableField = 'name' | 'memberCount' | 'createdAt';
 export interface TeamListItem {
   readonly id: string;
   readonly name: string;
+  readonly slug: string;
   readonly description: string | null;
   readonly isActive: boolean;
   readonly leaderUserId: string | null;
@@ -27,6 +28,7 @@ export interface TeamListItem {
 
 export interface TeamRepository {
   findById(id: string, context?: TransactionContext): Promise<Team | null>;
+  findBySlug(slug: string, context?: TransactionContext): Promise<Team | null>;
   findByName(name: string, context?: TransactionContext): Promise<Team | null>;
   findByLegacyId(legacyId: number, context?: TransactionContext): Promise<Team | null>;
 

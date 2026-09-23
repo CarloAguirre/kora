@@ -31,6 +31,7 @@ import { useDeleteProject, useProjectsList } from '../api/projects.queries';
 import { useClientsList } from '@/modules/clients/api/clients.queries';
 import { useUsersList } from '@/modules/users/api/users.queries';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
+import { projectPath } from '@/app/router/paths';
 
 const STATUS_OPTIONS = PROJECT_STATUSES.map((status) => ({ value: status, label: PROJECT_STATUS_LABELS[status] }));
 const PHASE_OPTIONS = PROJECT_PHASES.map((phase) => ({ value: phase, label: PROJECT_PHASE_LABELS[phase] }));
@@ -167,7 +168,7 @@ export function ProjectsListPage() {
       header: 'Nombre',
       sortable: true,
       render: (p) => (
-        <Link to={`/proyectos/${p.id}`} className={styles.link}>
+        <Link to={projectPath(p)} className={styles.link}>
           {p.name}
         </Link>
       ),
@@ -191,7 +192,7 @@ export function ProjectsListPage() {
       header: 'Nombre proyecto',
       sortable: true,
       render: (p) => (
-        <Link to={`/proyectos/${p.id}`} className={styles.link}>
+        <Link to={projectPath(p)} className={styles.link}>
           {p.name}
         </Link>
       ),

@@ -42,6 +42,8 @@ export const teams = pgTable(
     id: primaryId(),
     legacyId: integer('legacy_id'),
     name: varchar('name', { length: 120 }).notNull(),
+    /** Segmento de URL amigable, generado del nombre al crear — no cambia si el nombre se edita después. */
+    slug: varchar('slug', { length: 90 }).notNull(),
     description: varchar('description', { length: 500 }),
     /** Líder responsable. FK declarada en la migración para evitar el ciclo
      *  teams → users → teams a nivel de módulo TypeScript. */
@@ -59,6 +61,7 @@ export const teams = pgTable(
     uniqueIndex('teams_legacy_id_key')
       .on(table.legacyId)
       .where(sql`${table.legacyId} is not null`),
+    uniqueIndex('teams_slug_key').on(table.slug),
     index('teams_leader_idx').on(table.leaderUserId),
     index('teams_team_type_idx').on(table.teamTypeId),
   ],

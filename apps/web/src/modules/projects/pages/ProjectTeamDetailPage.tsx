@@ -4,6 +4,7 @@ import { Button } from '@/shared/components/ui/Button';
 import { ChevronLeftIcon } from '@/shared/components/icons/Icons';
 import { TeamLeaderProjectView } from '../components/TeamLeaderProjectView';
 import { useProjectDetail } from '../api/projects.queries';
+import { projectPath } from '@/app/router/paths';
 
 /**
  * Deep link a un equipo puntual dentro de un proyecto. Dos entradas:
@@ -33,7 +34,7 @@ export function ProjectTeamDetailPage() {
 
   return (
     <DashboardLayout title={`${teamName} — ${project.name}`}>
-      <Button variant="tertiary" size="sm" onClick={() => void navigate(`/proyectos/${projectId}`)}>
+      <Button variant="tertiary" size="sm" onClick={() => void navigate(projectPath(project))}>
         <ChevronLeftIcon size={16} /> Volver al proyecto
       </Button>
       <TeamLeaderProjectView project={project} projectId={projectId} teamId={teamId} />

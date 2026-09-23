@@ -26,6 +26,7 @@ import {
 import { getProjectStageLabel } from '@/modules/projects/lib/project-stage-display';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { formatMoney } from '@/shared/lib/format-money';
+import { clientPortalPreviewPath, projectPath, supportPlanPath } from '@/app/router/paths';
 
 const PAGE_SIZE = 10;
 
@@ -151,7 +152,7 @@ export function ClientDetailPage() {
       header: 'Nombre Proyecto',
       sortable: true,
       render: (p) => (
-        <Link to={`/proyectos/${p.id}`} className={styles.link}>
+        <Link to={projectPath(p)} className={styles.link}>
           {p.name}
         </Link>
       ),
@@ -170,7 +171,7 @@ export function ClientDetailPage() {
       key: 'name',
       header: 'Contrato',
       render: (p) => (
-        <Link to={`/soporte/${p.id}`} className={styles.link}>
+        <Link to={supportPlanPath(p)} className={styles.link}>
           {p.name}
         </Link>
       ),
@@ -213,7 +214,7 @@ export function ClientDetailPage() {
             <h2 className={styles.clientName}>{client.companyName}</h2>
           </div>
           <div className={styles.headerRight}>
-            <Link to={`/clientes/${client.id}/vista-cliente`}>
+            <Link to={clientPortalPreviewPath(client)}>
               <Button variant="outline" iconLeft={<EyeIcon size={18} />}>
                 Ver como cliente
               </Button>

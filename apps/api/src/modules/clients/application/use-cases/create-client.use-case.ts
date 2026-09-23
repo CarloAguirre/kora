@@ -11,6 +11,7 @@ import {
   type Result,
   type UnitOfWork,
 } from '@kora/core';
+import { slugify, withUniqueSuffix } from '@kora/core';
 import type { CreateClientInput } from '@kora/contracts';
 import { Client } from '../../domain/entities/client.entity';
 import { TaxId } from '../../domain/value-objects/tax-id.vo';
@@ -62,10 +63,13 @@ export class CreateClientUseCase implements UseCase<CreateClientCommand, { id: s
       return err(new TaxIdAlreadyInUseError(taxId.value));
     }
 
+    const slug = await withUniqueSuffix(slugify(data.companyName), async (candidate) => (await this.clients.findBySlug(candidate)) !== null);
+
     const now = this.clock.now();
     const client = Client.create({
       id: this.ids.generate(),
       companyName: data.companyName,
+      slug,
       legalName: data.legalName,
       taxId,
       website: data.website,

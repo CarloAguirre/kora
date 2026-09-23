@@ -1,8 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { mapPage, ok, type Page, type Result } from '@kora/core';
+import { buildPage, mapPage, ok, type Page, type Result } from '@kora/core';
 import type { ListProjectsQuery, Permission, ProjectSummary } from '@kora/contracts';
 import { PROJECT_REPOSITORY, type ProjectRepository } from '../../domain/repositories/project.repository';
 import { TEAM_REPOSITORY, type TeamRepository } from '../../../teams/domain/repositories/team.repository';
+import { PROJECT_CLIENT_READER, type ProjectClientReader } from '../ports/project-client-reader.port';
 import type { ActorContext, UseCase } from '../../../../shared/application/use-case';
 import { toProjectSummary } from '../mappers/project.mapper';
 
@@ -37,13 +38,21 @@ export class ListProjectsUseCase implements UseCase<ListProjectsQueryCommand, Pa
   constructor(
     @Inject(PROJECT_REPOSITORY) private readonly projects: ProjectRepository,
     @Inject(TEAM_REPOSITORY) private readonly teams: TeamRepository,
+    @Inject(PROJECT_CLIENT_READER) private readonly clients: ProjectClientReader,
   ) {}
 
   async execute(command: ListProjectsQueryCommand): Promise<Result<Page<ProjectSummary>>> {
     const { query, actor, actorPermissions } = command;
     const hasFullRead = actorPermissions.includes('projects:read');
 
-    let teamId = query.teamId;
+    // `query.clientId`/`query.teamId` llegan como el slug de la URL (ficha de cliente/equipo), no como UUID.
+    const client = query.clientId ? await this.clients.findById(query.clientId) : null;
+    if (query.clientId && !client) return ok(buildPage<ProjectSummary>([], 0, { page: query.page, pageSize: query.pageSize }));
+
+    const team = query.teamId ? await this.teams.findById(query.teamId) : null;
+    if (query.teamId && !team) return ok(buildPage<ProjectSummary>([], 0, { page: query.page, pageSize: query.pageSize }));
+
+    let teamId = team?.id;
     if (teamId && !hasFullRead) {
       const isLeader = await this.teams.isLeaderOfTeam(actor.userId, teamId);
       if (!isLeader) teamId = undefined;
@@ -67,7 +76,7 @@ export class ListProjectsUseCase implements UseCase<ListProjectsQueryCommand, Pa
         type: query.type,
         status: query.status,
         phase: query.phase,
-        clientId: query.clientId,
+        clientId: client?.id,
         leaderUserId: query.leaderUserId,
         teamId,
         assignedToUserId,

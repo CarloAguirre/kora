@@ -8,6 +8,7 @@ function buildClient(): Client {
   return Client.create({
     id: 'client-1',
     companyName: 'Acme SpA',
+    slug: 'acme-spa',
     legalName: 'Acme Servicios Limitada',
     taxId: TaxId.create('76.123.456-7').unwrap(),
     now: NOW,
@@ -27,6 +28,7 @@ describe('Client', () => {
     const client = Client.create({
       id: 'client-1',
       companyName: '  Acme SpA  ',
+      slug: 'acme-spa',
       legalName: 'Acme',
       taxId: TaxId.create('1-9').unwrap(),
       now: NOW,

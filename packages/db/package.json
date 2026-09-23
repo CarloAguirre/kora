@@ -16,6 +16,7 @@
     "seed": "tsx src/seeds/run.ts",
     "seed:demo": "tsx src/seeds/run-demo.ts",
     "seed:demo-amicar": "tsx src/seeds/run-demo-amicar.ts",
+    "backfill:slugs": "tsx src/backfill-slugs.ts",
     "clean": "rimraf dist .turbo"
   },
   "dependencies": {

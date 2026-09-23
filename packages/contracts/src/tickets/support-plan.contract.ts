@@ -131,6 +131,7 @@ export type SupportPlanLinkedProject = z.infer<typeof supportPlanLinkedProjectSc
 /** Fila de la tabla "Contratos" en la ficha de cliente. */
 export const supportPlanListItemSchema = z.object({
   id: uuidSchema,
+  slug: z.string(),
   name: z.string(),
   scope: supportPlanScopeSchema,
   planType: supportPlanTypeSchema,

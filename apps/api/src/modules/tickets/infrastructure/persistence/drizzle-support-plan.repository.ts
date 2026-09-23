@@ -80,6 +80,13 @@ export class DrizzleSupportPlanRepository implements SupportPlanRepository {
     return row ? toDomain(row as SupportPlanRow) : null;
   }
 
+  async findBySlug(slug: string, context?: TransactionContext): Promise<SupportPlan | null> {
+    const db = resolveDb(this.database, context);
+    const rows = await db.select().from(supportPlans).where(eq(supportPlans.slug, slug)).limit(1);
+    const row = rows[0];
+    return row ? toDomain(row as SupportPlanRow) : null;
+  }
+
   async listForClient(clientId: string, context?: TransactionContext): Promise<SupportPlanRecord[]> {
     const db = resolveDb(this.database, context);
     const rows = await db.select().from(supportPlans).where(eq(supportPlans.clientId, clientId));

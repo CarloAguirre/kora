@@ -36,10 +36,11 @@ export class GetProjectPendingApprovalsUseCase
   async execute(
     command: GetProjectPendingApprovalsCommand,
   ): Promise<Result<ProjectPendingApprovalsResponse, ApplicationError>> {
-    const { projectId, actor, actorRole } = command;
+    const { actor, actorRole } = command;
 
-    const project = await this.projects.findById(projectId);
-    if (!project) return err(new ReferencedProjectNotFoundError(projectId));
+    const project = await this.projects.findById(command.projectId);
+    if (!project) return err(new ReferencedProjectNotFoundError(command.projectId));
+    const projectId = project.id;
 
     const isAdminTier = actorRole === 'admin' || actorRole === 'pmo';
     if (!isAdminTier && project.leaderUserId !== actor.userId) {

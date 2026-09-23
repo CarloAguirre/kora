@@ -11,6 +11,7 @@ import {
   ilike,
   industries,
   isNull,
+  isUuid,
   ne,
   or,
   users,
@@ -35,8 +36,15 @@ export class DrizzleClientRepository implements ClientRepository {
   constructor(@Inject(DATABASE) private readonly database: Database) {}
 
   async findById(id: string, context?: TransactionContext): Promise<Client | null> {
+    if (!isUuid(id)) return this.findBySlug(id, context);
     const db = resolveDb(this.database, context);
     const rows = await db.select().from(clients).where(eq(clients.id, id)).limit(1);
+    return rows[0] ? toDomain(rows[0]) : null;
+  }
+
+  async findBySlug(slug: string, context?: TransactionContext): Promise<Client | null> {
+    const db = resolveDb(this.database, context);
+    const rows = await db.select().from(clients).where(eq(clients.slug, slug)).limit(1);
     return rows[0] ? toDomain(rows[0]) : null;
   }
 
@@ -70,6 +78,7 @@ export class DrizzleClientRepository implements ClientRepository {
         .select({
           id: clients.id,
           companyName: clients.companyName,
+          slug: clients.slug,
           legalName: clients.legalName,
           taxId: clients.taxId,
           status: clients.status,
@@ -102,6 +111,7 @@ export class DrizzleClientRepository implements ClientRepository {
     const items: ClientListItem[] = rows.map((row) => ({
       id: row.id,
       companyName: row.companyName,
+      slug: row.slug,
       legalName: row.legalName,
       taxId: row.taxId,
       status: row.status,

@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CLOCK, ForbiddenError, err, ok, type ApplicationError, type Clock, type Result } from '@kora/core';
+import { isUuid } from '@kora/core';
 import type { Permission, ProjectDetail } from '@kora/contracts';
 import { ProjectNotFoundError } from '../../domain/errors/project.errors';
 import { PROJECT_REPOSITORY, type ProjectRepository } from '../../domain/repositories/project.repository';
@@ -56,7 +57,9 @@ export class GetProjectUseCase implements UseCase<GetProjectCommand, ProjectDeta
   ) {}
 
   async execute(command: GetProjectCommand): Promise<Result<ProjectDetail, ApplicationError>> {
-    const project = await this.projects.findById(command.projectId);
+    const project = isUuid(command.projectId)
+      ? await this.projects.findById(command.projectId)
+      : await this.projects.findBySlug(command.projectId);
     if (!project || project.isDeleted) return err(new ProjectNotFoundError(command.projectId));
 
     const snapshot = project.toSnapshot();

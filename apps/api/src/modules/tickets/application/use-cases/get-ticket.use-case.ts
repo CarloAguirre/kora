@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { ForbiddenError, err, ok, type ApplicationError, type Result } from '@kora/core';
+import { isUuid } from '@kora/core';
 import { isAdminTier, type Permission, type RoleCode, type TicketDetail } from '@kora/contracts';
 import { TicketNotFoundError } from '../../domain/errors/ticket.errors';
 import { TICKET_REPOSITORY, type TicketRepository } from '../../domain/repositories/ticket.repository';
@@ -31,7 +32,9 @@ export class GetTicketUseCase implements UseCase<GetTicketCommand, TicketDetail,
   ) {}
 
   async execute(command: GetTicketCommand): Promise<Result<TicketDetail, ApplicationError>> {
-    const ticket = await this.tickets.findById(command.ticketId);
+    const ticket = isUuid(command.ticketId)
+      ? await this.tickets.findById(command.ticketId)
+      : await this.tickets.findByLegacyId(command.ticketId);
     if (!ticket || ticket.isDeleted) return err(new TicketNotFoundError(command.ticketId));
 
     if (!command.actorPermissions.includes('tickets:read') && ticket.assigneeUserId !== command.actorUserId) {

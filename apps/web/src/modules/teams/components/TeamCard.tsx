@@ -7,6 +7,7 @@ import { Badge } from '@/shared/components/ui/Badge';
 import { Avatar } from '@/shared/components/ui/Avatar';
 import { PencilIcon, TrashIcon, UsersIcon } from '@/shared/components/icons/Icons';
 import { TeamTypeIcon, teamTypeBackground } from '../team-type-icons';
+import { teamPath } from '@/app/router/paths';
 
 export interface TeamCardProps {
   team: TeamSummary;
@@ -32,7 +33,7 @@ export function TeamCard({ team, canManage, onEdit, onDelete }: TeamCardProps) {
         </div>
         <div className={styles.identity}>
           <div className={styles.nameRow}>
-            <Link to={`/equipos/${team.id}`} className={styles.name}>
+            <Link to={teamPath(team)} className={styles.name}>
               {team.name}
             </Link>
             {!team.isActive && <Badge tone="neutral">Inactivo</Badge>}
@@ -68,7 +69,7 @@ export function TeamCard({ team, canManage, onEdit, onDelete }: TeamCardProps) {
       </div>
 
       <div className={styles.foot}>
-        <Link to={`/equipos/${team.id}`} className={styles.manageButton}>
+        <Link to={teamPath(team)} className={styles.manageButton}>
           <Button variant="outline" size="sm" style={{ width: '100%' }}>
             Gestionar equipo
           </Button>

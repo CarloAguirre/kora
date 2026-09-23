@@ -6,6 +6,7 @@ import { Card } from '@/shared/components/ui/Card';
 import { Select } from '@/shared/components/ui/Select';
 import { ChevronRightIcon } from '@/shared/components/icons/Icons';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
+import { teamPath } from '@/app/router/paths';
 
 function mondayOf(date: Date): Date {
   const result = new Date(date);
@@ -90,7 +91,7 @@ export function CapacityPlanningSection({ capacity, loading, weekStart, onWeekSt
                 <div className={styles.teamHeader}>
                   <div className={styles.teamNameGroup}>
                     {can('teams:read') ? (
-                      <Link to={`/equipos/${team.teamId}`} className={styles.teamNameLink}>
+                      <Link to={teamPath({ id: team.teamId })} className={styles.teamNameLink}>
                         {team.teamName}
                       </Link>
                     ) : (
@@ -108,7 +109,7 @@ export function CapacityPlanningSection({ capacity, loading, weekStart, onWeekSt
                       </span>
                     </span>
                     {can('teams:read') && (
-                      <Link to={`/equipos/${team.teamId}`} aria-label={`Ir a ${team.teamName}`} className={styles.teamLinkIcon}>
+                      <Link to={teamPath({ id: team.teamId })} aria-label={`Ir a ${team.teamName}`} className={styles.teamLinkIcon}>
                         <ChevronRightIcon size={16} />
                       </Link>
                     )}

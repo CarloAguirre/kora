@@ -4,6 +4,7 @@ import type { SupportPlan } from '../entities/support-plan.entity';
 export interface SupportPlanRecord {
   readonly id: string;
   readonly clientId: string;
+  readonly slug: string;
   /** `null` en contratos creados desde la v2 — ver el comentario en el schema (`support_plans.project_id`). */
   readonly projectId: string | null;
   readonly planType: 'monthly' | 'bundle' | 'on_demand';
@@ -89,6 +90,7 @@ export interface SupportPlanRepository {
   createInitialPeriod(input: CreateInitialSupportMonthlyPeriodInput, context?: TransactionContext): Promise<void>;
 
   findById(id: string, context?: TransactionContext): Promise<SupportPlan | null>;
+  findBySlug(slug: string, context?: TransactionContext): Promise<SupportPlan | null>;
   listForClient(clientId: string, context?: TransactionContext): Promise<SupportPlanRecord[]>;
   /** Todos los planes `status='active'` — alimenta el panel de Facturación de Soporte. */
   listAllActive(context?: TransactionContext): Promise<SupportPlanRecord[]>;

@@ -83,6 +83,8 @@ export const projects = pgTable(
     legacyId: integer('legacy_id'),
 
     name: varchar('name', { length: 300 }).notNull(),
+    /** Segmento de URL amigable, generado del nombre al crear — no cambia si el nombre se edita después. */
+    slug: varchar('slug', { length: 90 }).notNull(),
     clientId: uuid('client_id').references(() => clients.id, { onDelete: 'set null' }),
     primaryContactId: uuid('primary_contact_id'),
 
@@ -164,6 +166,7 @@ export const projects = pgTable(
     uniqueIndex('projects_client_name_key')
       .on(sql`coalesce(${table.clientId}::text, '-')`, sql`lower(btrim(${table.name}))`)
       .where(sql`${table.deletedAt} is null`),
+    uniqueIndex('projects_slug_key').on(table.slug),
   ],
 );
 

@@ -36,6 +36,7 @@ export type ProjectSortableField =
 export interface ProjectListItem {
   readonly id: string;
   readonly name: string;
+  readonly slug: string;
   readonly clientId: string | null;
   readonly clientName: string | null;
   readonly type: ProjectType;
@@ -60,6 +61,7 @@ export interface ProjectListItem {
 
 export interface ProjectRepository {
   findById(id: string, context?: TransactionContext): Promise<Project | null>;
+  findBySlug(slug: string, context?: TransactionContext): Promise<Project | null>;
   findByLegacyId(legacyId: number, context?: TransactionContext): Promise<Project | null>;
 
   search(

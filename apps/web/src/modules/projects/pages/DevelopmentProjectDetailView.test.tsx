@@ -92,6 +92,7 @@ function buildProject(): ProjectDetail {
   return {
     id: 'project-1',
     name: 'Proyecto de prueba',
+    slug: 'proyecto-de-prueba',
     client: { id: 'client-1', companyName: 'Cliente SA' },
     type: 'development',
     salesStage: 'approved',

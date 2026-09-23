@@ -4,6 +4,7 @@ export interface TeamRow {
   id: string;
   legacyId: number | null;
   name: string;
+  slug: string;
   description: string | null;
   leaderUserId: string | null;
   teamTypeId: string | null;
@@ -17,6 +18,7 @@ export function toDomain(row: TeamRow): Team {
   return Team.restore({
     id: row.id,
     name: row.name,
+    slug: row.slug,
     description: row.description,
     leaderUserId: row.leaderUserId,
     teamTypeId: row.teamTypeId,
@@ -32,6 +34,7 @@ export function toPersistence(team: Team) {
   const snapshot = team.toSnapshot();
   return {
     name: snapshot.name,
+    slug: snapshot.slug,
     description: snapshot.description,
     leaderUserId: snapshot.leaderUserId,
     teamTypeId: snapshot.teamTypeId,

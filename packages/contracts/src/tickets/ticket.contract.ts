@@ -201,7 +201,8 @@ export type TicketSortField = z.infer<typeof ticketSortFieldSchema>;
 export const listTicketsQuerySchema = paginationQuerySchema.extend({
   search: z.string().trim().max(120).optional(),
   clientId: arrayQueryParam(uuidSchema),
-  projectId: uuidSchema.optional(),
+  /** Acepta id o slug: `SupportProjectDetailView` filtra por el `projectId` de la URL, que ahora es el slug del proyecto — se resuelve a UUID en `ListTicketsUseCase`. */
+  projectId: z.string().optional(),
   assigneeUserId: arrayQueryParam(uuidSchema),
   status: ticketStatusSchema.optional(),
   priority: ticketPrioritySchema.optional(),

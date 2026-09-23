@@ -29,6 +29,7 @@ import {
   useSupportPlanDetail,
 } from '../api/support-plan.queries';
 import { formatMoney } from '@/shared/lib/format-money';
+import { clientPath, clientPortalPreviewPath } from '@/app/router/paths';
 
 const formatDate = (value: string | null) => (value ? new Date(`${value}T00:00:00`).toLocaleDateString('es-CL') : '—');
 const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 2 });
@@ -174,7 +175,7 @@ export function SupportPlanDetailPage() {
         <IdentityField
           label="Cliente"
           value={
-            <Link to={`/clientes/${plan.clientId}/vista-cliente`} className={styles.clientLink}>
+            <Link to={clientPortalPreviewPath({ id: plan.clientId })} className={styles.clientLink}>
               {plan.clientName} ↗
             </Link>
           }
@@ -305,7 +306,7 @@ export function SupportPlanDetailPage() {
         onConfirm={async (input) => {
           await closePlan.mutateAsync(input);
           toast.success('Se cerró el contrato.');
-          navigate(`/clientes/${plan.clientId}`);
+          navigate(clientPath({ id: plan.clientId }));
         }}
       />
     </DashboardLayout>

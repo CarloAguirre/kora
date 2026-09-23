@@ -19,8 +19,8 @@ export function ClientPortalPreviewPage() {
       clientId={clientId}
       projectsPath={base}
       supportPath={`${base}/soporte`}
-      getProjectPath={(projectId) => `${base}/${projectId}`}
-      getContractPath={(contractId) => `${base}/soporte/${contractId}`}
+      getProjectPath={(project) => `${base}/${project.slug || project.id}`}
+      getContractPath={(contract) => `${base}/soporte/${contract.slug || contract.id}`}
     />
   );
 }

@@ -8,6 +8,7 @@ export function toClientSummary(item: ClientListItem): ClientSummary {
   return {
     id: item.id,
     companyName: item.companyName,
+    slug: item.slug,
     legalName: item.legalName,
     taxId: item.taxId,
     status: item.status,
@@ -54,6 +55,7 @@ export function toClientDetail(source: ClientDetailSource): ClientDetail {
   return {
     id: snapshot.id,
     companyName: snapshot.companyName,
+    slug: snapshot.slug,
     legalName: snapshot.legalName,
     taxId: snapshot.taxId.value,
     status: snapshot.status,

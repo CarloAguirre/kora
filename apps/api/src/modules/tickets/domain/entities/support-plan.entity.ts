@@ -5,6 +5,7 @@ import { InvalidSupportPlanDateRangeError, SupportPlanAlreadyClosedError } from 
 export interface SupportPlanProps {
   legacyId: number | null;
   clientId: string;
+  slug: string;
   /** Proyecto "contenedor" legado — `null` en contratos creados desde la v2 (ver `support_plan_projects`). */
   projectId: string | null;
   planType: SupportPlanType;
@@ -38,6 +39,7 @@ export interface SupportPlanProps {
 export interface CreateSupportPlanProps {
   readonly id: string;
   readonly clientId: string;
+  readonly slug: string;
   /** Solo para un contrato de soporte creado junto con su propio proyecto (ver `CreateSupportProjectUseCase`) — enlace directo, distinto de `support_plan_projects` (que consolida proyectos de desarrollo YA existentes). */
   readonly projectId?: string | null;
   readonly scope: SupportPlanScope;
@@ -119,6 +121,7 @@ export class SupportPlan extends AggregateRoot<string> {
     const plan = new SupportPlan(props.id, {
       legacyId: null,
       clientId: props.clientId,
+      slug: props.slug,
       projectId: props.projectId ?? null,
       planType: props.planType,
       scope: props.scope,
@@ -158,6 +161,10 @@ export class SupportPlan extends AggregateRoot<string> {
 
   get clientId(): string {
     return this.props.clientId;
+  }
+
+  get slug(): string {
+    return this.props.slug;
   }
 
   /** `null` salvo en contratos legados migrados por el ETL — ver el comentario del schema. */

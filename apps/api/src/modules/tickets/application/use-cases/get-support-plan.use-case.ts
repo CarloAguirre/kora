@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CLOCK, err, ok, type ApplicationError, type Clock, type Result } from '@kora/core';
+import { isUuid } from '@kora/core';
 import type { SupportPlanWithInvoices } from '@kora/contracts';
 import { SupportPlanNotFoundError } from '../../domain/errors/support-plan.errors';
 import { SUPPORT_PLAN_REPOSITORY, type SupportPlanRecord, type SupportPlanRepository } from '../../domain/repositories/support-plan.repository';
@@ -33,7 +34,9 @@ export class GetSupportPlanUseCase implements UseCase<GetSupportPlanQuery, Suppo
   ) {}
 
   async execute(query: GetSupportPlanQuery): Promise<Result<SupportPlanWithInvoices, ApplicationError>> {
-    const plan = await this.plans.findById(query.planId);
+    const plan = isUuid(query.planId)
+      ? await this.plans.findById(query.planId)
+      : await this.plans.findBySlug(query.planId);
     if (!plan) return err(new SupportPlanNotFoundError(query.planId));
     const record = plan.toSnapshot() as SupportPlanRecord;
     const now = this.clock.now();
@@ -55,6 +58,7 @@ export class GetSupportPlanUseCase implements UseCase<GetSupportPlanQuery, Suppo
 
     return ok({
       id: record.id,
+      slug: record.slug,
       name: resolveSupportPlanName(record.name, record.scope, linkedProjects.map((p) => p.name), client?.companyName ?? ''),
       scope: record.scope,
       planType: record.planType,

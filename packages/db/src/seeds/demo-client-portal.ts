@@ -1,5 +1,6 @@
 import { eq } from 'drizzle-orm';
 import type { Database } from '../client';
+import { slugify } from '../lib/slug';
 import {
   clientContacts,
   hourEntries,
@@ -114,6 +115,7 @@ export async function seedDemoClientPortal(db: Database): Promise<SeedDemoClient
     .values({
       id: DEMO.projectMain,
       name: 'Portal de Gestión Financiera + Agente IA de Tickets',
+      slug: slugify('Portal de Gestión Financiera + Agente IA de Tickets'),
       clientId: REAL.clientId,
       primaryContactId: REAL.contactJoseMiguel,
       type: 'development',
@@ -393,6 +395,7 @@ export async function seedDemoClientPortal(db: Database): Promise<SeedDemoClient
       .values({
         id: row.id,
         name: row.name,
+        slug: slugify(row.name),
         clientId: REAL.clientId,
         primaryContactId: REAL.contactJoseMiguel,
         type: 'development',
@@ -412,6 +415,7 @@ export async function seedDemoClientPortal(db: Database): Promise<SeedDemoClient
       scope: 'single',
       planType: 'bundle',
       name: 'App Residentes',
+      slug: slugify('App Residentes'),
       leaderUserId: REAL.userJoseAponte,
       startDate: d('2026-08-20'),
       endDate: d('2026-11-20'),
@@ -435,6 +439,7 @@ export async function seedDemoClientPortal(db: Database): Promise<SeedDemoClient
       scope: 'consolidated',
       planType: 'on_demand',
       name: 'Consolidado Edifícate',
+      slug: slugify('Consolidado Edifícate'),
       leaderUserId: REAL.userJoseAponte,
       startDate: d('2026-04-01'),
       extraHourValueUf: '0.86',

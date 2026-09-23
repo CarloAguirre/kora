@@ -6,6 +6,7 @@ function basePlan(overrides: Partial<SupportPlanRecord> = {}): SupportPlanRecord
   return {
     id: 'plan-1',
     clientId: 'client-1',
+    slug: 'plan-1',
     projectId: null,
     planType: 'on_demand',
     scope: 'single',

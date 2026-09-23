@@ -16,6 +16,7 @@ import {
 } from '@/modules/projects/components/SupportPlanBadges';
 import { formatMoney } from '@/shared/lib/format-money';
 import { useSupportBillingOverview } from '../api/billing.queries';
+import { supportPlanPath } from '@/app/router/paths';
 
 /** Fila vacía en UF para cuando aún no hay contratos activos ni carga en curso — mantiene el layout de 5 tarjetas de siempre. */
 const EMPTY_KPI_GROUP: SupportBillingKpiGroup = {
@@ -86,7 +87,7 @@ export function SupportBillingSection() {
       key: 'plan',
       header: 'Contrato',
       render: (r) => (
-        <Link to={`/soporte/${r.planId}`} className={styles.planCell}>
+        <Link to={supportPlanPath({ id: r.planId })} className={styles.planCell}>
           {r.planName}
           {r.scope === 'consolidated' && <SupportPlanScopeBadge scope={r.scope} />}
         </Link>

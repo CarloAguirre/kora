@@ -15,6 +15,7 @@ import { HourEntriesApprovalTable } from '@/modules/hours/components/HourEntries
 import { HourEntryStatusBadge } from '@/modules/hours/components/HourEntryStatusBadge';
 import { ProjectStatusBadge } from '@/modules/projects/components/ProjectStatusBadge';
 import { getProjectStageLabel } from '@/modules/projects/lib/project-stage-display';
+import { projectPath } from '@/app/router/paths';
 
 const HISTORY_STATUS_OPTIONS = (['approved', 'rejected'] as const).map((status) => ({
   value: status,
@@ -54,7 +55,7 @@ export function TeamMemberDetailPage() {
       key: 'name',
       header: 'Nombre',
       render: (project) => (
-        <Link to={`/proyectos/${project.id}`} className={styles.link}>
+        <Link to={projectPath(project)} className={styles.link}>
           {project.name}
         </Link>
       ),

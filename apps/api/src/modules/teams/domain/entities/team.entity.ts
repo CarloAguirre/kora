@@ -2,6 +2,7 @@ import { AggregateRoot, assignDefined, createDomainEvent } from '@kora/core';
 
 export interface TeamProps {
   name: string;
+  slug: string;
   description: string | null;
   leaderUserId: string | null;
   teamTypeId: string | null;
@@ -15,6 +16,7 @@ export interface TeamProps {
 export interface CreateTeamProps {
   readonly id: string;
   readonly name: string;
+  readonly slug: string;
   readonly description?: string | null;
   readonly leaderUserId?: string | null;
   readonly teamTypeId?: string | null;
@@ -37,6 +39,7 @@ export class Team extends AggregateRoot<string> {
   static create(props: CreateTeamProps): Team {
     const team = new Team(props.id, {
       name: props.name.trim(),
+      slug: props.slug,
       description: props.description?.trim() || null,
       leaderUserId: props.leaderUserId ?? null,
       teamTypeId: props.teamTypeId ?? null,
@@ -58,6 +61,10 @@ export class Team extends AggregateRoot<string> {
 
   get name(): string {
     return this.props.name;
+  }
+
+  get slug(): string {
+    return this.props.slug;
   }
 
   get description(): string | null {

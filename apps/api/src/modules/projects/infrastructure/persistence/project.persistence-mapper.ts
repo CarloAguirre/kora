@@ -5,6 +5,7 @@ export interface ProjectRow {
   id: string;
   legacyId: number | null;
   name: string;
+  slug: string;
   clientId: string | null;
   primaryContactId: string | null;
   type: string;
@@ -63,6 +64,7 @@ export function toDomain(row: ProjectRow): Project {
   return Project.restore({
     id: row.id,
     name: row.name,
+    slug: row.slug,
     clientId: row.clientId,
     primaryContactId: row.primaryContactId,
     type: row.type as ProjectType,
@@ -123,6 +125,7 @@ export function toPersistence(project: Project) {
   const snapshot = project.toSnapshot();
   return {
     name: snapshot.name,
+    slug: snapshot.slug,
     clientId: snapshot.clientId,
     primaryContactId: snapshot.primaryContactId,
     type: snapshot.type,

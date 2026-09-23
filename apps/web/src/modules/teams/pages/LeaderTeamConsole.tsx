@@ -15,6 +15,7 @@ import { getProjectStageLabel } from '@/modules/projects/lib/project-stage-displ
 import { useProjectsList } from '@/modules/projects/api/projects.queries';
 import { TeamHourHistoryPanel } from '@/modules/hours/components/TeamHourHistoryPanel';
 import { TeamContextBar } from '../components/TeamContextBar';
+import { projectTeamPath } from '@/app/router/paths';
 
 const PROJECT_TAB_KEYS = ['all', 'active', 'draft', 'on_hold', 'support', 'finished', 'quoted'] as const;
 type ProjectTabKey = (typeof PROJECT_TAB_KEYS)[number];
@@ -60,6 +61,7 @@ function matchesTab(project: ProjectSummary, tab: ProjectTabKey): boolean {
  */
 export function LeaderTeamConsole({ teams }: { teams: TeamSummary[] }) {
   const [teamId, setTeamId] = useState(teams[0]?.id ?? '');
+  const activeTeam = teams.find((t) => t.id === teamId) ?? { id: teamId };
   const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
   const [tab, setTab] = useState<ProjectTabKey>('all');
   const [search, setSearch] = useState('');
@@ -101,7 +103,7 @@ export function LeaderTeamConsole({ teams }: { teams: TeamSummary[] }) {
       key: 'name',
       header: 'Nombre',
       render: (p) => (
-        <Link to={`/proyectos/${p.id}/equipos/${teamId}`} className={styles.link}>
+        <Link to={projectTeamPath(p, activeTeam)} className={styles.link}>
           {p.name}
         </Link>
       ),

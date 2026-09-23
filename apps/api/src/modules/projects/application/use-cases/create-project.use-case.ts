@@ -11,6 +11,7 @@ import {
   type Result,
   type UnitOfWork,
 } from '@kora/core';
+import { slugify, withUniqueSuffix } from '@kora/core';
 import type { CreateProjectInput } from '@kora/contracts';
 import { Project } from '../../domain/entities/project.entity';
 import { ProjectNameAlreadyInUseError, ReferencedClientNotFoundError } from '../../domain/errors/project.errors';
@@ -55,9 +56,12 @@ export class CreateProjectUseCase
       return err(new ProjectNameAlreadyInUseError(data.name));
     }
 
+    const slug = await withUniqueSuffix(slugify(data.name), async (candidate) => (await this.projects.findBySlug(candidate)) !== null);
+
     const created = Project.create({
       id: this.ids.generate(),
       name: data.name,
+      slug,
       clientId: data.clientId,
       type: data.type,
       salesStage: data.salesStage,

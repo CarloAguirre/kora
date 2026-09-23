@@ -6,6 +6,7 @@ import { Button } from '@/shared/components/ui/Button';
 import { ClockIcon, CheckIcon, TicketIcon, ChevronRightIcon } from '@/shared/components/icons/Icons';
 import { SegmentedBar } from '@/shared/components/ui/SegmentedBar';
 import { CATEGORICAL_CHART_COLORS } from '@/shared/lib/chart-colors';
+import { ticketPath } from '@/app/router/paths';
 
 const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 1 });
 
@@ -132,7 +133,7 @@ export function DashboardMySummary({ hours, approvals, tickets, loading }: Dashb
             </>
           )}
           {!!tickets?.oldestOpenTicket && (
-            <Link to={`/tickets/${tickets.oldestOpenTicket.id}`} className={styles.oldestLink}>
+            <Link to={ticketPath(tickets.oldestOpenTicket)} className={styles.oldestLink}>
               Más antiguo: {tickets.oldestOpenTicket.title} · {formatDaysAgo(tickets.oldestOpenTicket.createdAt)}
             </Link>
           )}

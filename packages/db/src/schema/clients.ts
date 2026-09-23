@@ -23,6 +23,8 @@ export const clients = pgTable(
     legacyId: integer('legacy_id'),
 
     companyName: varchar('company_name', { length: 200 }).notNull(),
+    /** Segmento de URL amigable, generado del nombre al crear (ver `apps/api/src/shared/domain/slug.ts`) — no cambia si el nombre se edita después. */
+    slug: varchar('slug', { length: 90 }).notNull(),
     legalName: varchar('legal_name', { length: 200 }).notNull(),
     taxId: varchar('tax_id', { length: 50 }).notNull(),
     website: varchar('website', { length: 255 }),
@@ -52,6 +54,7 @@ export const clients = pgTable(
       .on(table.taxId)
       .where(sql`${table.deletedAt} is null and ${table.taxId} <> ''`),
     uniqueIndex('clients_legacy_id_key').on(table.legacyId).where(sql`${table.legacyId} is not null`),
+    uniqueIndex('clients_slug_key').on(table.slug),
   ],
 );
 

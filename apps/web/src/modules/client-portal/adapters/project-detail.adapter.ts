@@ -346,6 +346,7 @@ export function toClientProjectDetail(project: ProjectDetail): ClientProjectDeta
 
   return {
     id: project.id,
+    slug: project.slug,
     name: project.name,
     health: health(project),
     tag: tag(project),

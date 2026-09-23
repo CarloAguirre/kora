@@ -11,6 +11,7 @@ import {
   type Result,
   type UnitOfWork,
 } from '@kora/core';
+import { slugify, withUniqueSuffix } from '@kora/core';
 import type { CreateProjectInput } from '@kora/contracts';
 import { Project } from '../../../projects/domain/entities/project.entity';
 import { ProjectNameAlreadyInUseError } from '../../../projects/domain/errors/project.errors';
@@ -78,9 +79,12 @@ export class CreateSupportProjectUseCase implements UseCase<CreateSupportProject
       if (!contact) return err(new SupportPlanContactNotFoundError(data.primaryContactId));
     }
 
+    const slug = await withUniqueSuffix(slugify(data.name), async (candidate) => (await this.projects.findBySlug(candidate)) !== null);
+
     const createdProject = Project.create({
       id: this.ids.generate(),
       name: data.name,
+      slug,
       clientId: data.clientId,
       type: 'support',
       priority: data.priority,
@@ -97,9 +101,12 @@ export class CreateSupportProjectUseCase implements UseCase<CreateSupportProject
     if (createdProject.isErr()) return err(createdProject.error);
     const project = createdProject.value;
 
+    const planSlug = await withUniqueSuffix(slugify(data.name), async (candidate) => (await this.plans.findBySlug(candidate)) !== null);
+
     const createdPlan = SupportPlan.create({
       id: this.ids.generate(),
       clientId: data.clientId,
+      slug: planSlug,
       projectId: project.id,
       scope: 'single',
       planType: data.supportPlanType!,

@@ -169,6 +169,20 @@
       "when": 1789649250959,
       "tag": "0023_public_chimera",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1790128956206,
+      "tag": "0024_add_entity_slugs",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1790128956207,
+      "tag": "0025_slug_not_null",
+      "breakpoints": true
     }
   ]
 }

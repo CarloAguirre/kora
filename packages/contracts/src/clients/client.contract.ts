@@ -44,6 +44,7 @@ export type ClientContact = z.infer<typeof clientContactSchema>;
 export const clientSummarySchema = z.object({
   id: uuidSchema,
   companyName: z.string(),
+  slug: z.string(),
   legalName: z.string(),
   taxId: z.string(),
   status: clientStatusSchema,

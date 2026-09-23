@@ -6,7 +6,9 @@ import {
   countries,
   eq,
   industries,
+  slugify,
   users,
+  withUniqueSuffix,
 } from '@kora/db';
 import { StepTracker, type EtlContext } from '../lib/context';
 
@@ -115,7 +117,14 @@ export async function migrateClients(context: EtlContext): Promise<void> {
       await context.target.update(clients).set({ ...values, updatedAt: new Date() }).where(eq(clients.id, clientId));
       tracker.updated += 1;
     } else {
-      const inserted = await context.target.insert(clients).values({ legacyId: row.id_cliente, ...values }).returning({ id: clients.id });
+      const slug = await withUniqueSuffix(slugify(values.companyName), async (candidate) => {
+        const taken = await context.target.select({ id: clients.id }).from(clients).where(eq(clients.slug, candidate)).limit(1);
+        return taken.length > 0;
+      });
+      const inserted = await context.target
+        .insert(clients)
+        .values({ legacyId: row.id_cliente, slug, ...values })
+        .returning({ id: clients.id });
       const createdId = inserted[0]?.id;
       if (!createdId) {
         tracker.warn(`cliente ${row.id_cliente}: la inserción no devolvió identificador`);

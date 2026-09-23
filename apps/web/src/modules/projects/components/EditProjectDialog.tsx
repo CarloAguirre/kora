@@ -171,11 +171,11 @@ export function EditProjectDialog({ open, project, onClose, onSuccess }: EditPro
   const clientId = watch('clientId') ?? '';
   const teamsValue = watch('teams') ?? [];
 
-  const { data: clients } = useClientsList({ page: 1, pageSize: 200, sortField: 'companyName' });
-  const { data: leaders } = useUsersList({ page: 1, pageSize: 200, sortField: 'firstName', role: 'leader' });
-  const { data: developers } = useUsersList({ page: 1, pageSize: 200, sortField: 'firstName', role: 'collaborator' });
-  const { data: commercialUsers } = useUsersList({ page: 1, pageSize: 200, sortField: 'firstName', role: 'commercial' });
-  const { data: teamsCatalog } = useTeamsList({ page: 1, pageSize: 50, sortField: 'name' });
+  const { data: clients } = useClientsList({ page: 1, pageSize: 200, sortField: 'companyName' }, { enabled: open });
+  const { data: leaders } = useUsersList({ page: 1, pageSize: 200, sortField: 'firstName', role: 'leader' }, { enabled: open });
+  const { data: developers } = useUsersList({ page: 1, pageSize: 200, sortField: 'firstName', role: 'collaborator' }, { enabled: open });
+  const { data: commercialUsers } = useUsersList({ page: 1, pageSize: 200, sortField: 'firstName', role: 'commercial' }, { enabled: open });
+  const { data: teamsCatalog } = useTeamsList({ page: 1, pageSize: 50, sortField: 'name' }, { enabled: open });
 
   const newModuleForm = useForm<z.input<typeof createProjectModuleSchema>, unknown, CreateProjectModuleInput>({
     resolver: zodResolver(createProjectModuleSchema),

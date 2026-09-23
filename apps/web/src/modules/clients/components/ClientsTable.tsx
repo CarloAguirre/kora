@@ -6,6 +6,7 @@ import { Button } from '@/shared/components/ui/Button';
 import { ClientStatusBadge } from './ClientStatusBadge';
 import { PencilIcon, TrashIcon } from '@/shared/components/icons/Icons';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
+import { clientPath } from '@/app/router/paths';
 
 export interface ClientsTableProps {
   clients: readonly ClientSummary[];
@@ -34,7 +35,7 @@ export function ClientsTable({
       header: 'Empresa',
       sortable: true,
       render: (client) => (
-        <Link to={`/clientes/${client.id}`} className={styles.identity}>
+        <Link to={clientPath(client)} className={styles.identity}>
           <span className={styles.name}>{client.companyName}</span>
           <span className={styles.legalName}>{client.legalName}</span>
         </Link>

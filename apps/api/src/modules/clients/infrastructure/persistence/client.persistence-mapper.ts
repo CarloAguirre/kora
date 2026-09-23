@@ -6,6 +6,7 @@ export interface ClientRow {
   id: string;
   legacyId: number | null;
   companyName: string;
+  slug: string;
   legalName: string;
   taxId: string;
   website: string | null;
@@ -30,6 +31,7 @@ export function toDomain(row: ClientRow): Client {
   return Client.restore({
     id: row.id,
     companyName: row.companyName,
+    slug: row.slug,
     legalName: row.legalName,
     taxId,
     website: row.website,
@@ -54,6 +56,7 @@ export function toPersistence(client: Client) {
   const snapshot = client.toSnapshot();
   return {
     companyName: snapshot.companyName,
+    slug: snapshot.slug,
     legalName: snapshot.legalName,
     taxId: snapshot.taxId.value,
     website: snapshot.website,

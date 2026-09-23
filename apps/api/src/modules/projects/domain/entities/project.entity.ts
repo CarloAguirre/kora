@@ -7,6 +7,7 @@ import {
 
 export interface ProjectProps {
   name: string;
+  slug: string;
   clientId: string | null;
   primaryContactId: string | null;
   type: ProjectType;
@@ -67,6 +68,7 @@ export interface ProjectProps {
 export interface CreateProjectProps {
   readonly id: string;
   readonly name: string;
+  readonly slug: string;
   readonly clientId?: string | null;
   readonly type: ProjectType;
   readonly salesStage?: ProjectSalesStage | null;
@@ -115,6 +117,7 @@ export class Project extends AggregateRoot<string> {
 
     const project = new Project(props.id, {
       name: props.name.trim(),
+      slug: props.slug,
       clientId: props.clientId ?? null,
       primaryContactId: null,
       type: props.type,
@@ -192,6 +195,10 @@ export class Project extends AggregateRoot<string> {
 
   get name(): string {
     return this.props.name;
+  }
+
+  get slug(): string {
+    return this.props.slug;
   }
 
   get clientId(): string | null {

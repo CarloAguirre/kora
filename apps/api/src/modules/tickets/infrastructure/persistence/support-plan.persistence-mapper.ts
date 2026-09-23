@@ -7,6 +7,7 @@ export interface SupportPlanRow {
   id: string;
   legacyId: number | null;
   clientId: string;
+  slug: string;
   projectId: string | null;
   planType: string;
   scope: string;
@@ -39,6 +40,7 @@ export function toRecord(row: SupportPlanRow): SupportPlanRecord {
   return {
     id: row.id,
     clientId: row.clientId,
+    slug: row.slug,
     projectId: row.projectId,
     planType: row.planType as SupportPlanType,
     scope: row.scope as SupportPlanScope,
@@ -73,6 +75,7 @@ export function toDomain(row: SupportPlanRow): SupportPlan {
     id: row.id,
     legacyId: row.legacyId,
     clientId: row.clientId,
+    slug: row.slug,
     projectId: row.projectId,
     planType: row.planType as SupportPlanType,
     scope: row.scope as SupportPlanScope,
@@ -107,6 +110,7 @@ export function toPersistence(plan: SupportPlan) {
   return {
     legacyId: snapshot.legacyId,
     clientId: snapshot.clientId,
+    slug: snapshot.slug,
     projectId: snapshot.projectId,
     planType: snapshot.planType,
     scope: snapshot.scope,

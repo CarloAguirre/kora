@@ -4,7 +4,7 @@ import { Team } from './team.entity';
 const NOW = new Date('2026-08-25T12:00:00.000Z');
 
 function buildTeam(): Team {
-  return Team.create({ id: 'team-1', name: '  Desarrollo  ', now: NOW });
+  return Team.create({ id: 'team-1', name: '  Desarrollo  ', slug: 'desarrollo', now: NOW });
 }
 
 describe('Team', () => {

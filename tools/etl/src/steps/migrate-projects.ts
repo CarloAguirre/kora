@@ -7,9 +7,11 @@ import {
   projectTeamMembers,
   projectTeams,
   projects,
+  slugify,
   teamMembers,
   teams,
   users,
+  withUniqueSuffix,
 } from '@kora/db';
 import { StepTracker, type EtlContext } from '../lib/context';
 import {
@@ -185,7 +187,14 @@ export async function migrateProjects(context: EtlContext): Promise<void> {
       await context.target.update(projects).set({ ...values, updatedAt: new Date() }).where(eq(projects.id, existing[0].id));
       tracker.updated += 1;
     } else {
-      const inserted = await context.target.insert(projects).values({ legacyId: row.id_proyecto, ...values }).returning({ id: projects.id });
+      // Slug único a nivel global (no por cliente, a diferencia de `projects_client_name_key`):
+      // se calcula una sola vez al crear y no se toca en `update`, para que quede estable.
+      const slug = await withUniqueSuffix(slugify(values.name), async (candidate) => {
+        const taken = await context.target.select({ id: projects.id }).from(projects).where(eq(projects.slug, candidate)).limit(1);
+        return taken.length > 0;
+      });
+
+      const inserted = await context.target.insert(projects).values({ legacyId: row.id_proyecto, slug, ...values }).returning({ id: projects.id });
       if (!inserted[0]) {
         tracker.warn(`proyecto ${row.id_proyecto}: la inserción no devolvió identificador`);
         tracker.skipped += 1;

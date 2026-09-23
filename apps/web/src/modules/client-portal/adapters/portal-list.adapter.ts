@@ -35,6 +35,7 @@ export function toClientCompanyInfo(client: ClientDetail): ClientCompanyInfo {
 export function toClientProjectRow(project: ProjectSummary, clientOwnerName: string): ClientProjectRow {
   return {
     id: project.id,
+    slug: project.slug,
     name: project.name,
     typeLabel: project.type === 'development' ? 'Desarrollo' : 'Soporte',
     kabeliOwnerName: project.leader?.fullName ?? '—',
@@ -52,6 +53,7 @@ export function toClientSupportContractRow(plan: SupportPlanListItem): ClientSup
     plan.currentBillingStatus === 'invoiced' ? 'Facturada' : plan.currentBillingStatus === 'to_invoice' ? 'Por Facturar' : '--';
   return {
     id: plan.id,
+    slug: plan.slug,
     name: plan.name,
     planType: plan.planType,
     kabeliOwnerName: plan.leaderName ?? '—',

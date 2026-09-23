@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { err, ok, type ApplicationError, type Result } from '@kora/core';
+import { isUuid } from '@kora/core';
 import type { TeamDetail } from '@kora/contracts';
 import { TeamNotFoundError } from '../../domain/errors/team.errors';
 import { TEAM_REPOSITORY, type TeamRepository } from '../../domain/repositories/team.repository';
@@ -25,7 +26,9 @@ export class GetTeamUseCase implements UseCase<GetTeamCommand, TeamDetail, Appli
   ) {}
 
   async execute(command: GetTeamCommand): Promise<Result<TeamDetail, ApplicationError>> {
-    const team = await this.teams.findById(command.teamId);
+    const team = isUuid(command.teamId)
+      ? await this.teams.findById(command.teamId)
+      : await this.teams.findBySlug(command.teamId);
     if (!team || team.isDeleted) return err(new TeamNotFoundError(command.teamId));
 
     const [activeMembers, memberList, leader, teamType] = await Promise.all([
@@ -40,6 +43,7 @@ export class GetTeamUseCase implements UseCase<GetTeamCommand, TeamDetail, Appli
     return ok({
       id: snapshot.id,
       name: snapshot.name,
+      slug: snapshot.slug,
       description: snapshot.description,
       isActive: snapshot.isActive,
       leader: leader ? { id: leader.id, fullName: leader.fullName } : null,

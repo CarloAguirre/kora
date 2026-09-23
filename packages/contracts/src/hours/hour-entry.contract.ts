@@ -140,7 +140,8 @@ export const listHourEntriesQuerySchema = paginationQuerySchema.extend({
   search: z.string().trim().max(120).optional(),
   /** Acota a los autores con membresía activa en este equipo, dentro del alcance de visibilidad ya resuelto. */
   teamId: uuidSchema.optional(),
-  projectId: uuidSchema.optional(),
+  /** Acepta id o slug: la ficha de proyecto filtra por el `projectId` de la URL, que ahora es el slug del proyecto — se resuelve a UUID en `ListHourEntriesUseCase`. */
+  projectId: z.string().optional(),
   status: hourEntryStatusSchema.optional(),
   dateFrom: z.iso.date().optional(),
   dateTo: z.iso.date().optional(),

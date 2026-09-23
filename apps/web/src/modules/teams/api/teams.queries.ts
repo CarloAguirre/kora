@@ -10,12 +10,13 @@ import type {
 } from '@kora/contracts';
 import { teamKeys, teamsApi, teamTypesApi } from './teams.api';
 
-export function useTeamsList(query: Partial<ListTeamsQuery>) {
+export function useTeamsList(query: Partial<ListTeamsQuery>, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: teamKeys.list(query),
     queryFn: () => teamsApi.list(query),
     placeholderData: (previous) => previous,
     staleTime: 30_000,
+    enabled: options?.enabled,
   });
 }
 

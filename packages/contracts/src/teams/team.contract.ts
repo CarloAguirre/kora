@@ -47,6 +47,7 @@ export type ListTeamTypesResponse = z.infer<typeof listTeamTypesResponseSchema>;
 export const teamSummarySchema = z.object({
   id: uuidSchema,
   name: z.string(),
+  slug: z.string(),
   description: z.string().nullable(),
   isActive: z.boolean(),
   leader: z.object({ id: uuidSchema, fullName: z.string() }).nullable(),

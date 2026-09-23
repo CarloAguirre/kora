@@ -32,7 +32,8 @@ export class ListSupportPlansForClientUseCase
 
   async execute(query: ListSupportPlansForClientQuery): Promise<Result<SupportPlanListItem[], ApplicationError>> {
     const now = this.clock.now();
-    const [records, client] = await Promise.all([this.plans.listForClient(query.clientId), this.clients.findById(query.clientId)]);
+    const client = await this.clients.findById(query.clientId);
+    const records = client ? await this.plans.listForClient(client.id) : [];
 
     const items = await Promise.all(records.map((record) => this.toListItem(record, client?.companyName ?? '', now)));
     return ok(items);
@@ -54,6 +55,7 @@ export class ListSupportPlansForClientUseCase
 
     return {
       id: record.id,
+      slug: record.slug,
       name: resolveSupportPlanName(record.name, record.scope, linkedProjects.map((p) => p.name), clientName),
       scope: record.scope,
       planType: record.planType,

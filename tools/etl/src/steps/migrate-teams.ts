@@ -1,4 +1,4 @@
-import { eq, teams } from '@kora/db';
+import { eq, slugify, teams, withUniqueSuffix } from '@kora/db';
 import { StepTracker, type EtlContext } from '../lib/context';
 
 /**
@@ -54,9 +54,15 @@ export async function migrateTeams(context: EtlContext): Promise<void> {
         .where(eq(teams.legacyId, row.id));
       tracker.updated += 1;
     } else {
+      const slug = await withUniqueSuffix(slugify(name), async (candidate) => {
+        const taken = await context.target.select({ id: teams.id }).from(teams).where(eq(teams.slug, candidate)).limit(1);
+        return taken.length > 0;
+      });
+
       await context.target.insert(teams).values({
         legacyId: row.id,
         name,
+        slug,
         isActive: true,
         createdAt: row.created_at ?? new Date(),
       });

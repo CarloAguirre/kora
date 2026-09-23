@@ -1,4 +1,4 @@
-import { clients, eq, projects, sql, supportMonthlyPeriods, supportPlans, ticketHistoryEntries, tickets } from '@kora/db';
+import { clients, eq, projects, slugify, sql, supportMonthlyPeriods, supportPlans, ticketHistoryEntries, tickets, withUniqueSuffix } from '@kora/db';
 import type { TicketPriority, TicketServiceType, TicketStatus } from '@kora/contracts';
 import { StepTracker, type EtlContext } from '../lib/context';
 import { loadLegacyEmailByAuthId, loadUserIdsByEmail, loadUserIdsByLegacyAuthId, loadUserIdsByLegacyId, resolveUserId } from '../lib/user-lookup';
@@ -262,6 +262,15 @@ async function migrateTicketHistory(
   context.report.add(tracker.toResult());
 }
 
+/** Réplica de `resolveSupportPlanName` (apps/api) para el único caso que produce este ETL: plan `scope='single'` sin `name`. */
+async function resolveLegacyPlanBaseName(context: EtlContext, clientId: string, projectId: string): Promise<string> {
+  const [project] = await context.target.select({ name: projects.name }).from(projects).where(eq(projects.id, projectId)).limit(1);
+  if (project?.name) return /^soporte\b/i.test(project.name) ? project.name : `Soporte ${project.name}`;
+
+  const [client] = await context.target.select({ companyName: clients.companyName }).from(clients).where(eq(clients.id, clientId)).limit(1);
+  return `Soporte ${client?.companyName ?? 'cliente'}`;
+}
+
 async function migrateSupportPlans(context: EtlContext, clientIds: Map<number, string>, projectIds: Map<number, string>): Promise<void> {
   const planTracker = new StepTracker('planes de soporte');
 
@@ -300,7 +309,14 @@ async function migrateSupportPlans(context: EtlContext, clientIds: Map<number, s
       planId = existing[0].id;
       planTracker.updated += 1;
     } else {
-      const inserted = await context.target.insert(supportPlans).values({ legacyId: row.id, ...values }).returning({ id: supportPlans.id });
+      const slug = await withUniqueSuffix(slugify(await resolveLegacyPlanBaseName(context, clientId, projectId)), async (candidate) => {
+        const taken = await context.target.select({ id: supportPlans.id }).from(supportPlans).where(eq(supportPlans.slug, candidate)).limit(1);
+        return taken.length > 0;
+      });
+      const inserted = await context.target
+        .insert(supportPlans)
+        .values({ legacyId: row.id, slug, ...values })
+        .returning({ id: supportPlans.id });
       planId = inserted[0]!.id;
       planTracker.created += 1;
     }

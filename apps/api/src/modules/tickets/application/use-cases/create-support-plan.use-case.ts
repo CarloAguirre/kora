@@ -11,6 +11,7 @@ import {
   type Result,
   type UnitOfWork,
 } from '@kora/core';
+import { slugify, withUniqueSuffix } from '@kora/core';
 import type { CreateSupportPlanInput } from '@kora/contracts';
 import { SupportPlan } from '../../domain/entities/support-plan.entity';
 import {
@@ -72,6 +73,7 @@ export class CreateSupportPlanUseCase implements UseCase<CreateSupportPlanComman
 
     const scope = data.developmentProjectIds.length > 1 ? 'consolidated' : 'single';
     const name = resolveSupportPlanName(data.name?.trim() || null, scope, eligibleProjects.map((p) => p.name), client.companyName);
+    const slug = await withUniqueSuffix(slugify(name), async (candidate) => (await this.plans.findBySlug(candidate)) !== null);
     const startDate = new Date(data.startDate);
     const endDate = data.endDate ? new Date(data.endDate) : null;
     const dueDayOfMonth =
@@ -80,6 +82,7 @@ export class CreateSupportPlanUseCase implements UseCase<CreateSupportPlanComman
     const created = SupportPlan.create({
       id: this.ids.generate(),
       clientId: data.clientId,
+      slug,
       scope,
       planType: data.planType,
       surplusPolicy: data.surplusPolicy,

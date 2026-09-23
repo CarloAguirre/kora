@@ -6,6 +6,7 @@ import { Badge } from '@/shared/components/ui/Badge';
 import { Button } from '@/shared/components/ui/Button';
 import { UsersIcon } from '@/shared/components/icons/Icons';
 import { PriorityIndicator } from '@/modules/projects/components/PriorityIndicator';
+import { projectPath } from '@/app/router/paths';
 
 const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 1 });
 
@@ -65,7 +66,7 @@ export function CriticalProjectCard({ project }: { project: DashboardCriticalPro
         <Badge tone="neutral">Etapa: {project.stageLabel}</Badge>
       </div>
 
-      <Link to={`/proyectos/${project.id}`} className={styles.link}>
+      <Link to={projectPath(project)} className={styles.link}>
         <Button variant="tertiary" className={styles.linkButton}>
           Ver detalle
         </Button>

@@ -158,6 +158,8 @@ export const supportPlans = pgTable(
 
     /** Nombre visible del contrato (ej. "Consolidado – Edificate"). En `scope='single'` se autogenera del proyecto vinculado si se deja vacío. */
     name: text('name'),
+    /** Segmento de URL amigable, generado al crear a partir del nombre resuelto (ver `resolveSupportPlanName`) — no cambia si el nombre se edita después. */
+    slug: varchar('slug', { length: 90 }).notNull(),
     /** Líder Kabeli a cargo del contrato — independiente del líder de cualquiera de los proyectos que cubre. */
     leaderUserId: uuid('leader_user_id').references(() => users.id, { onDelete: 'set null' }),
     /** Override de contacto del contrato; `null` = usar el contacto por defecto del cliente. Mismo patrón sin FK que `projects.primary_contact_id`. */
@@ -181,7 +183,10 @@ export const supportPlans = pgTable(
 
     ...timestamps,
   },
-  (table) => [uniqueIndex('support_plans_legacy_id_key').on(table.legacyId).where(sql`${table.legacyId} is not null`)],
+  (table) => [
+    uniqueIndex('support_plans_legacy_id_key').on(table.legacyId).where(sql`${table.legacyId} is not null`),
+    uniqueIndex('support_plans_slug_key').on(table.slug),
+  ],
 );
 
 export const supportPeriodStatusEnum = pgEnum('support_period_status', ['active', 'expired', 'closed', 'cancelled']);

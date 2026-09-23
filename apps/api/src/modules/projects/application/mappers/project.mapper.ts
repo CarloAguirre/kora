@@ -25,6 +25,7 @@ export function toProjectSummary(item: ProjectListItem): ProjectSummary {
   return {
     id: item.id,
     name: item.name,
+    slug: item.slug,
     client: item.clientId ? { id: item.clientId, companyName: item.clientName ?? '' } : null,
     type: item.type,
     salesStage: item.salesStage as ProjectSummary['salesStage'],
@@ -162,6 +163,7 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
   return {
     id: snapshot.id,
     name: snapshot.name,
+    slug: snapshot.slug,
     client: snapshot.clientId ? { id: snapshot.clientId, companyName: source.client?.companyName ?? '' } : null,
     primaryContact: source.primaryContact,
     type: snapshot.type,

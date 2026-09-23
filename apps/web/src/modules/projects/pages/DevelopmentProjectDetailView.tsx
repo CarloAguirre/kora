@@ -44,6 +44,7 @@ import { TeamHoursSummaryChart } from "../components/TeamHoursSummaryChart";
 import { TeamTasksCard } from "../components/TeamTasksCard";
 import { getTeamStyle } from "../utils/team-style";
 import styles from "./ProjectDetailPage.module.css";
+import { projectTeamPath } from "@/app/router/paths";
 
 const formatDate = (value: string | null) =>
   value ? new Date(`${value}T00:00:00`).toLocaleDateString("es-CL") : "—";
@@ -513,7 +514,7 @@ export function DevelopmentProjectDetailView({
                                       )}
                                     </span>
                                     <Link
-                                      to={`/proyectos/${projectId}/equipos/${team.teamId}`}
+                                      to={projectTeamPath(project, { id: team.teamId })}
                                       className={styles.groupLeader}
                                     >
                                       Ver equipo

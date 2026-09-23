@@ -9,6 +9,7 @@ import {
   hourEntries,
   ilike,
   isNull,
+  isUuid,
   lte,
   ne,
   or,
@@ -37,8 +38,15 @@ export class DrizzleTeamRepository implements TeamRepository {
   constructor(@Inject(DATABASE) private readonly database: Database) {}
 
   async findById(id: string, context?: TransactionContext): Promise<Team | null> {
+    if (!isUuid(id)) return this.findBySlug(id, context);
     const db = resolveDb(this.database, context);
     const rows = await db.select().from(teams).where(eq(teams.id, id)).limit(1);
+    return rows[0] ? toDomain(rows[0]) : null;
+  }
+
+  async findBySlug(slug: string, context?: TransactionContext): Promise<Team | null> {
+    const db = resolveDb(this.database, context);
+    const rows = await db.select().from(teams).where(eq(teams.slug, slug)).limit(1);
     return rows[0] ? toDomain(rows[0]) : null;
   }
 
@@ -79,6 +87,7 @@ export class DrizzleTeamRepository implements TeamRepository {
         .select({
           id: teams.id,
           name: teams.name,
+          slug: teams.slug,
           description: teams.description,
           isActive: teams.isActive,
           leaderUserId: teams.leaderUserId,
@@ -115,6 +124,7 @@ export class DrizzleTeamRepository implements TeamRepository {
     const items: TeamListItem[] = rows.map((row) => ({
       id: row.id,
       name: row.name,
+      slug: row.slug,
       description: row.description,
       isActive: row.isActive,
       leaderUserId: row.leaderUserId,
@@ -197,7 +207,7 @@ export class DrizzleTeamRepository implements TeamRepository {
     const rows = await db
       .select({ id: teams.id })
       .from(teams)
-      .where(and(eq(teams.id, teamId), eq(teams.leaderUserId, userId)))
+      .where(and(isUuid(teamId) ? eq(teams.id, teamId) : eq(teams.slug, teamId), eq(teams.leaderUserId, userId)))
       .limit(1);
     return rows.length > 0;
   }

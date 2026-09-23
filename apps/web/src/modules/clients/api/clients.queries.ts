@@ -7,12 +7,13 @@ import type {
 } from '@kora/contracts';
 import { clientKeys, clientsApi } from './clients.api';
 
-export function useClientsList(query: Partial<ListClientsQuery>) {
+export function useClientsList(query: Partial<ListClientsQuery>, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: clientKeys.list(query),
     queryFn: () => clientsApi.list(query),
     placeholderData: (previous) => previous,
     staleTime: 30_000,
+    enabled: options?.enabled,
   });
 }
 
