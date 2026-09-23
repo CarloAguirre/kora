@@ -29,7 +29,7 @@ export interface AssignProjectTeamMemberCommand {
   readonly actorPermissions: readonly Permission[];
 }
 
-/** Sin `projects:manage`, solo puede asignar quien lidera el equipo del `teamMemberId` en este proyecto. */
+/** Sin `projects:manage`, puede asignar quien lidera el equipo del `teamMemberId` en este proyecto, o el líder DE ESTE PROYECTO. */
 @Injectable()
 export class AssignProjectTeamMemberUseCase
   implements UseCase<AssignProjectTeamMemberCommand, { id: string }, ApplicationError>
@@ -45,16 +45,18 @@ export class AssignProjectTeamMemberUseCase
   async execute(
     command: AssignProjectTeamMemberCommand,
   ): Promise<Result<{ id: string }, ApplicationError>> {
-    const { projectId, data, actor } = command;
+    const { data, actor } = command;
 
-    const project = await this.projects.findById(projectId);
-    if (!project || project.isDeleted) return err(new ProjectNotFoundError(projectId));
+    const project = await this.projects.findById(command.projectId);
+    if (!project || project.isDeleted) return err(new ProjectNotFoundError(command.projectId));
+
+    const projectId = project.id;
 
     if (!(await this.validator.isActiveTeamMember(data.teamMemberId))) {
       return err(new InvalidTeamMemberAssignmentError());
     }
 
-    if (!command.actorPermissions.includes('projects:manage')) {
+    if (!command.actorPermissions.includes('projects:manage') && project.leaderUserId !== actor.userId) {
       const teamId = await this.validator.findTeamId(data.teamMemberId);
       const isTeamLeader = teamId != null && (await this.projectTeams.isTeamLeaderForProject(projectId, teamId, actor.userId));
       if (!isTeamLeader) {

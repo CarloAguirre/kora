@@ -94,6 +94,11 @@
   font-variant-numeric: tabular-nums;
 }
 
+.cellCenter {
+  text-align: center;
+  white-space: nowrap;
+}
+
 .stateCell {
   padding: var(--kora-space-10) var(--kora-space-4);
   text-align: center;

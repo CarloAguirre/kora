@@ -25,7 +25,11 @@ function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-const TYPE_OPTIONS = PROJECT_OBSERVATION_TYPES.map((type) => ({ value: type, label: PROJECT_OBSERVATION_TYPE_LABELS[type] }));
+/** `cambio_proyecto` no aparece: lo genera el sistema, no se crea a mano desde este formulario. */
+const TYPE_OPTIONS = PROJECT_OBSERVATION_TYPES.filter((type) => type !== 'cambio_proyecto').map((type) => ({
+  value: type,
+  label: PROJECT_OBSERVATION_TYPE_LABELS[type],
+}));
 
 export interface AddBitacoraRecordModalProps {
   open: boolean;

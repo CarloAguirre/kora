@@ -271,6 +271,7 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
       .set({
         ...(input.teamId !== undefined ? { teamId: input.teamId } : {}),
         ...(input.status !== undefined ? { status: input.status } : {}),
+        ...(input.estimatedDate !== undefined ? { estimatedDate: input.estimatedDate } : {}),
         updatedAt: now,
       })
       .where(eq(projectModuleDeliveries.id, id));

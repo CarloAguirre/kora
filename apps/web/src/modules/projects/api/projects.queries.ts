@@ -12,6 +12,7 @@ import type {
   IssueProjectPaymentMilestoneInvoiceInput,
   ListProjectsQuery,
   MarkProjectPaymentMilestonePaidInput,
+  ResolveProjectObservationInput,
   SetProjectOvertimeAuthorizationInput,
   UpdateProjectBillingSettingsInput,
   UpdateProjectExtrasInput,
@@ -160,6 +161,22 @@ export function useUpdateProjectObservation() {
       observationId: string;
       input: UpdateProjectObservationInput;
     }) => projectsApi.updateObservation(projectId, observationId, input),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useResolveProjectObservation() {
+  const invalidate = useInvalidateProjects();
+  return useMutation({
+    mutationFn: ({
+      projectId,
+      observationId,
+      input,
+    }: {
+      projectId: string;
+      observationId: string;
+      input: ResolveProjectObservationInput;
+    }) => projectsApi.resolveObservation(projectId, observationId, input),
     onSuccess: () => invalidate(),
   });
 }

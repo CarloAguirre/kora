@@ -1,0 +1,1 @@
+ALTER TYPE "public"."project_module_delivery_status" ADD VALUE 'approved';

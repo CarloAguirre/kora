@@ -46,7 +46,11 @@ export const projectModuleStageEnum = pgEnum('project_module_stage', [
   'pilot',
   'closed',
 ]);
-export const projectModuleDeliveryStatusEnum = pgEnum('project_module_delivery_status', ['planned', 'delivered']);
+export const projectModuleDeliveryStatusEnum = pgEnum('project_module_delivery_status', [
+  'planned',
+  'delivered',
+  'approved',
+]);
 export const projectModuleTaskStatusEnum = pgEnum('project_module_task_status', ['todo', 'in_progress', 'done']);
 /** Ámbito de la tarea — permite calcular el % de avance por ámbito en "Resumen de avance" del módulo. */
 export const projectModuleTaskScopeEnum = pgEnum('project_module_task_scope', [
@@ -63,14 +67,16 @@ export const projectObservationTypeEnum = pgEnum('project_observation_type', [
   'compromiso',
   'atencion',
   'observacion',
+  'cambio_proyecto',
 ]);
-/** Estado de una entrada de bitácora — nulo para `observacion` (nota simple, sin ciclo de vida). */
+/** Estado de una entrada de bitácora — nulo para `observacion`/`cambio_proyecto` (sin ciclo de vida). */
 export const projectObservationStatusEnum = pgEnum('project_observation_status', [
   'abierto',
   'resuelto',
   'pendiente',
   'cumplido',
   'activo',
+  'rechazado',
 ]);
 
 /** Estado de un tramo de pago del proyecto — independiente del estado de facturación de soporte (`support_invoices`). */

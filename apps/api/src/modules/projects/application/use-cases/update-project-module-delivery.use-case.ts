@@ -31,10 +31,12 @@ export interface UpdateProjectModuleDeliveryCommand {
 }
 
 /**
- * Además del líder (`projects:manage`), cualquier participante del proyecto
- * (líder, developer, comercial o miembro de equipo asignado — mismo criterio
- * que `AddProjectObservationUseCase`) puede marcar una entrega como
- * entregada; solo el líder puede reasignarle el equipo.
+ * Además del líder (`projects:manage` o `project.leaderUserId`), cualquier
+ * participante del proyecto (developer, comercial o miembro de equipo
+ * asignado — mismo criterio que `AddProjectObservationUseCase`) puede marcar
+ * una entrega como entregada; aprobarla, rechazarla, reasignarle el equipo o
+ * mover su fecha estimada requiere ser quien administra el proyecto (líder
+ * de proyecto, PMO o admin).
  */
 @Injectable()
 export class UpdateProjectModuleDeliveryUseCase
@@ -53,7 +55,7 @@ export class UpdateProjectModuleDeliveryUseCase
     if (!project || project.isDeleted) return err(new ProjectNotFoundError(command.projectId));
 
     const module = await this.modules.findById(command.moduleId);
-    if (!module || module.projectId !== command.projectId) {
+    if (!module || module.projectId !== project.id) {
       return err(new ProjectModuleNotFoundError(command.moduleId));
     }
 
@@ -61,14 +63,25 @@ export class UpdateProjectModuleDeliveryUseCase
       return err(new ProjectModuleDeliveryNotFoundError(command.deliveryId));
     }
 
-    const canManage = command.actorPermissions.includes('projects:manage');
+    const snapshot = project.toSnapshot();
+    const canManage =
+      command.actorPermissions.includes('projects:manage') || snapshot.leaderUserId === command.actor.userId;
     if (!canManage) {
       if (command.data.teamId !== undefined) {
         return err(
           new ForbiddenError('Solo quien administra el proyecto puede reasignar el equipo.', 'PROJECT_MODULE_DELIVERY_LIMITED_UPDATE'),
         );
       }
-      const snapshot = project.toSnapshot();
+      if (command.data.estimatedDate !== undefined) {
+        return err(
+          new ForbiddenError('Solo quien administra el proyecto puede mover la fecha estimada.', 'PROJECT_MODULE_DELIVERY_LIMITED_UPDATE'),
+        );
+      }
+      if (command.data.status !== undefined && command.data.status !== 'delivered') {
+        return err(
+          new ForbiddenError('Solo quien administra el proyecto puede aprobar o rechazar una entrega.', 'PROJECT_MODULE_DELIVERY_LIMITED_UPDATE'),
+        );
+      }
       const projectMembers = await this.members.listForProject(project.id);
       const isParticipant =
         snapshot.leaderUserId === command.actor.userId ||
@@ -83,6 +96,7 @@ export class UpdateProjectModuleDeliveryUseCase
       {
         ...(command.data.teamId !== undefined ? { teamId: command.data.teamId ?? null } : {}),
         ...(command.data.status !== undefined ? { status: command.data.status } : {}),
+        ...(command.data.estimatedDate !== undefined ? { estimatedDate: new Date(command.data.estimatedDate) } : {}),
       },
       this.clock.now(),
     );
@@ -91,7 +105,7 @@ export class UpdateProjectModuleDeliveryUseCase
       actor: { userId: command.actor.userId, email: command.actor.email },
       action: 'update',
       entityType: 'project',
-      entityId: command.projectId,
+      entityId: project.id,
       metadata: { event: 'module_delivery_updated', moduleId: command.moduleId, deliveryId: command.deliveryId },
     });
 

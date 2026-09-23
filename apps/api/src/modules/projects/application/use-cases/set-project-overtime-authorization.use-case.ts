@@ -38,7 +38,7 @@ export class SetProjectOvertimeAuthorizationUseCase
     if (!project || project.isDeleted) return err(new ProjectNotFoundError(projectId));
 
     if (!command.actorPermissions.includes('projects:manage')) {
-      const isApprover = await this.projects.isProjectLeaderOrTeamLeaderOfMember(projectId, actor.userId, null);
+      const isApprover = await this.projects.isProjectLeaderOrTeamLeaderOfMember(project.id, actor.userId, null);
       if (!isApprover) return err(new CannotAuthorizeProjectOvertimeError());
     }
 

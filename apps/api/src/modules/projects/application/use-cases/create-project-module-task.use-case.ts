@@ -24,10 +24,10 @@ export interface CreateProjectModuleTaskCommand {
 
 /**
  * Tarea puntual de una fase/módulo — marcador en el Roadmap. Sin
- * `projects:manage`, solo puede crearla el líder del equipo indicado en
- * `data.teamId` (ver `ProjectTeamRepository.isTeamLeaderForProject`) — sin
- * equipo no hay contra qué verificar liderazgo, así que exige el permiso
- * amplio.
+ * `projects:manage`, puede crearla el líder del equipo indicado en
+ * `data.teamId` (ver `ProjectTeamRepository.isTeamLeaderForProject`) o el
+ * líder DE ESTE PROYECTO — sin equipo ni liderazgo de proyecto no hay contra
+ * qué verificar, así que exige el permiso amplio.
  */
 @Injectable()
 export class CreateProjectModuleTaskUseCase
@@ -46,15 +46,15 @@ export class CreateProjectModuleTaskUseCase
     if (!project || project.isDeleted) return err(new ProjectNotFoundError(command.projectId));
 
     const module = await this.modules.findById(command.moduleId);
-    if (!module || module.projectId !== command.projectId) {
+    if (!module || module.projectId !== project.id) {
       return err(new ProjectModuleNotFoundError(command.moduleId));
     }
 
-    if (!command.actorPermissions.includes('projects:manage')) {
+    if (!command.actorPermissions.includes('projects:manage') && project.leaderUserId !== command.actor.userId) {
       const teamId = command.data.teamId;
       const isTeamLeader =
         teamId != null &&
-        (await this.projectTeams.isTeamLeaderForProject(command.projectId, teamId, command.actor.userId));
+        (await this.projectTeams.isTeamLeaderForProject(project.id, teamId, command.actor.userId));
       if (!isTeamLeader) {
         return err(new ForbiddenError('No lideras el equipo de esta tarea.', 'PROJECT_TEAM_NOT_LED'));
       }
@@ -81,7 +81,7 @@ export class CreateProjectModuleTaskUseCase
       actor: { userId: command.actor.userId, email: command.actor.email },
       action: 'update',
       entityType: 'project',
-      entityId: command.projectId,
+      entityId: project.id,
       metadata: { event: 'module_task_created', moduleId: command.moduleId, taskId: id },
     });
 

@@ -9,8 +9,9 @@ import {
   type Result,
   type UnitOfWork,
 } from '@kora/core';
-import type { UpdateProjectInput } from '@kora/contracts';
+import type { Permission, UpdateProjectInput } from '@kora/contracts';
 import {
+  CannotManageProjectError,
   ProjectNameAlreadyInUseError,
   ProjectNotFoundError,
   ReferencedClientNotFoundError,
@@ -18,17 +19,23 @@ import {
 import { PROJECT_REPOSITORY, type ProjectRepository } from '../../domain/repositories/project.repository';
 import { PROJECT_TEAM_REPOSITORY, type ProjectTeamRepository } from '../../domain/repositories/project-team.repository';
 import { PROJECT_CLIENT_READER, type ProjectClientReader } from '../ports/project-client-reader.port';
+import { PROJECT_USER_READER, type ProjectUserReader } from '../ports/project-user-reader.port';
 import {
   AUDIT_RECORDER,
   type AuditRecorder,
 } from '../../../../shared/application/ports/audit-recorder.port';
 import { isUniqueViolation } from '../../../../shared/infrastructure/database/postgres-errors';
 import type { ActorContext, UseCase } from '../../../../shared/application/use-case';
+import { ProjectChangeLogRecorder, type ProjectChangeLogEntry } from '../services/project-change-log.recorder';
+
+const formatDate = (value: Date | null): string =>
+  value ? value.toLocaleDateString('es-CL') : 'sin definir';
 
 export interface UpdateProjectCommand {
   readonly projectId: string;
   readonly data: UpdateProjectInput;
   readonly actor: ActorContext;
+  readonly actorPermissions: readonly Permission[];
 }
 
 @Injectable()
@@ -37,7 +44,9 @@ export class UpdateProjectUseCase implements UseCase<UpdateProjectCommand, void,
     @Inject(PROJECT_REPOSITORY) private readonly projects: ProjectRepository,
     @Inject(PROJECT_TEAM_REPOSITORY) private readonly projectTeams: ProjectTeamRepository,
     @Inject(PROJECT_CLIENT_READER) private readonly clients: ProjectClientReader,
+    @Inject(PROJECT_USER_READER) private readonly users: ProjectUserReader,
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
+    private readonly changeLog: ProjectChangeLogRecorder,
     @Inject(UNIT_OF_WORK) private readonly unitOfWork: UnitOfWork,
     @Inject(CLOCK) private readonly clock: Clock,
   ) {}
@@ -47,6 +56,10 @@ export class UpdateProjectUseCase implements UseCase<UpdateProjectCommand, void,
 
     const project = await this.projects.findById(projectId);
     if (!project || project.isDeleted) return err(new ProjectNotFoundError(projectId));
+
+    if (!command.actorPermissions.includes('projects:manage') && project.leaderUserId !== actor.userId) {
+      return err(new CannotManageProjectError());
+    }
 
     if (data.clientId !== undefined && data.clientId !== null) {
       const client = await this.clients.findById(data.clientId);
@@ -59,6 +72,9 @@ export class UpdateProjectUseCase implements UseCase<UpdateProjectCommand, void,
         return err(new ProjectNameAlreadyInUseError(data.name));
       }
     }
+
+    const before = project.toSnapshot();
+    const now = this.clock.now();
 
     const updated = project.updateDetails(
       {
@@ -121,9 +137,57 @@ export class UpdateProjectUseCase implements UseCase<UpdateProjectCommand, void,
         ...(data.qaExecutedTests !== undefined ? { qaExecutedTests: data.qaExecutedTests } : {}),
         ...(data.qaFailedTests !== undefined ? { qaFailedTests: data.qaFailedTests } : {}),
       },
-      this.clock.now(),
+      now,
     );
     if (updated.isErr()) return err(updated.error);
+
+    const after = project.toSnapshot();
+    const changeEntries: ProjectChangeLogEntry[] = [];
+
+    if (before.leaderUserId !== after.leaderUserId) {
+      const ids = [before.leaderUserId, after.leaderUserId].filter((id): id is string => id !== null);
+      const resolved = ids.length > 0 ? await this.users.findManyByIds(ids) : [];
+      const nameOf = (id: string | null) => (id ? (resolved.find((u) => u.id === id)?.fullName ?? 'desconocido') : null);
+      const oldName = nameOf(before.leaderUserId);
+      const newName = nameOf(after.leaderUserId);
+      changeEntries.push({
+        projectId: project.id,
+        message:
+          !before.leaderUserId && newName
+            ? `Líder asignado: ${newName}.`
+            : !after.leaderUserId && oldName
+              ? `Líder removido (antes ${oldName}).`
+              : `Líder cambiado de ${oldName} a ${newName}.`,
+      });
+    }
+
+    if (before.soldHours !== after.soldHours) {
+      changeEntries.push({
+        projectId: project.id,
+        message: `HH vendidas actualizadas de ${before.soldHours} a ${after.soldHours}.`,
+      });
+    }
+
+    if (before.startDate?.getTime() !== after.startDate?.getTime()) {
+      changeEntries.push({
+        projectId: project.id,
+        message: `Fecha de inicio actualizada de ${formatDate(before.startDate)} a ${formatDate(after.startDate)}.`,
+      });
+    }
+
+    if (before.endDate?.getTime() !== after.endDate?.getTime()) {
+      changeEntries.push({
+        projectId: project.id,
+        message: `Fecha de fin actualizada de ${formatDate(before.endDate)} a ${formatDate(after.endDate)}.`,
+      });
+    }
+
+    if (before.estimatedDeliveryDate?.getTime() !== after.estimatedDeliveryDate?.getTime()) {
+      changeEntries.push({
+        projectId: project.id,
+        message: `Fecha de entrega estimada actualizada de ${formatDate(before.estimatedDeliveryDate)} a ${formatDate(after.estimatedDeliveryDate)}.`,
+      });
+    }
 
     try {
       await this.unitOfWork.run(async (tx) => {
@@ -134,6 +198,10 @@ export class UpdateProjectUseCase implements UseCase<UpdateProjectCommand, void,
           for (const existing of existingTeams) {
             if (!keptTeamIds.has(existing.teamId)) {
               await this.projectTeams.remove(project.id, existing.teamId, tx);
+              changeEntries.push({
+                projectId: project.id,
+                message: `Equipo "${existing.teamName}" retirado del proyecto.`,
+              });
             }
           }
           for (const team of data.teams) {
@@ -148,6 +216,19 @@ export class UpdateProjectUseCase implements UseCase<UpdateProjectCommand, void,
               tx,
             );
           }
+          const existingTeamIds = new Set(existingTeams.map((t) => t.teamId));
+          const addedTeamIds = data.teams.map((t) => t.teamId).filter((id) => !existingTeamIds.has(id));
+          if (addedTeamIds.length > 0) {
+            const updatedTeams = await this.projectTeams.findByProject(project.id, tx);
+            for (const teamId of addedTeamIds) {
+              const teamName = updatedTeams.find((t) => t.teamId === teamId)?.teamName ?? teamId;
+              changeEntries.push({ projectId: project.id, message: `Equipo "${teamName}" agregado al proyecto.` });
+            }
+          }
+        }
+
+        if (changeEntries.length > 0) {
+          await this.changeLog.record(changeEntries, actor.userId, now, tx);
         }
       });
     } catch (error) {

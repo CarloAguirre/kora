@@ -28,10 +28,11 @@ export interface UpdateProjectModuleTaskCommand {
 }
 
 /**
- * Además del líder (`projects:manage`) y de quien lidera el equipo de la
- * tarea (edición completa, igual que si pudiera crearla), la persona asignada
- * puede actualizarla — pero solo su `status` ("Iniciar"/"Marcar como
- * realizada" en "Mis tareas"), no reasignarla ni cambiar sus fechas.
+ * Además del líder (`projects:manage`), de quien lidera el equipo de la tarea
+ * y de quien lidera EL PROYECTO (edición completa, igual que si pudiera
+ * crearla), la persona asignada puede actualizarla — pero solo su `status`
+ * ("Iniciar"/"Marcar como realizada" en "Mis tareas"), no reasignarla ni
+ * cambiar sus fechas.
  */
 @Injectable()
 export class UpdateProjectModuleTaskUseCase
@@ -50,18 +51,19 @@ export class UpdateProjectModuleTaskUseCase
     if (!project || project.isDeleted) return err(new ProjectNotFoundError(command.projectId));
 
     const module = await this.modules.findById(command.moduleId);
-    if (!module || module.projectId !== command.projectId) {
+    if (!module || module.projectId !== project.id) {
       return err(new ProjectModuleNotFoundError(command.moduleId));
     }
 
     const task = module.tasks.find((t) => t.id === command.taskId);
     if (!task) return err(new ProjectModuleTaskNotFoundError(command.taskId));
 
-    const canManage = command.actorPermissions.includes('projects:manage');
+    const canManage =
+      command.actorPermissions.includes('projects:manage') || project.leaderUserId === command.actor.userId;
     if (!canManage) {
       const isTeamLeader =
         task.teamId != null &&
-        (await this.projectTeams.isTeamLeaderForProject(command.projectId, task.teamId, command.actor.userId));
+        (await this.projectTeams.isTeamLeaderForProject(project.id, task.teamId, command.actor.userId));
       if (!isTeamLeader) {
         if (task.assigneeUserId !== command.actor.userId) {
           return err(new ForbiddenError('No tienes acceso a esta tarea.', 'PROJECT_MODULE_TASK_NOT_ASSIGNEE'));
@@ -109,7 +111,7 @@ export class UpdateProjectModuleTaskUseCase
       actor: { userId: command.actor.userId, email: command.actor.email },
       action: 'update',
       entityType: 'project',
-      entityId: command.projectId,
+      entityId: project.id,
       metadata: { event: 'module_task_updated', moduleId: command.moduleId, taskId: command.taskId },
     });
 

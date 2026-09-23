@@ -170,7 +170,13 @@ export class DrizzleTicketRepository implements TicketRepository {
     if (filters.priority) conditions.push(eq(tickets.priority, filters.priority));
     if (filters.search) {
       const term = `%${filters.search.trim()}%`;
-      conditions.push(or(ilike(tickets.title, term), ilike(tickets.legacyId, term)));
+      // El código visible ("IN0948"/"ME0012") no se persiste: se arma en
+      // `formatTicketCode` (ticket.mapper). Se replica aquí para poder buscarlo.
+      // `lpad` trunca en Postgres, por eso solo se aplica bajo 4 dígitos.
+      const digits = sql`regexp_replace(${tickets.legacyId}, '\\D', '', 'g')`;
+      const code = sql<string>`(case when ${tickets.serviceType} = 'improvement' then 'ME' else 'IN' end
+        || case when length(${digits}) >= 4 then ${digits} else lpad(${digits}, 4, '0') end)`;
+      conditions.push(or(ilike(tickets.title, term), ilike(tickets.legacyId, term), ilike(code, term)));
     }
     return conditions.length > 0 ? and(...conditions) : undefined;
   }

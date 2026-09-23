@@ -1,7 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CLOCK, err, ok, type ApplicationError, type Clock, type Result } from '@kora/core';
-import type { UpdateProjectModuleSegmentInput } from '@kora/contracts';
+import type { Permission, UpdateProjectModuleSegmentInput } from '@kora/contracts';
 import {
+  CannotManageProjectError,
   ProjectModuleNotFoundError,
   ProjectModuleSegmentNotFoundError,
   ProjectNotFoundError,
@@ -23,6 +24,7 @@ export interface UpdateProjectModuleSegmentCommand {
   readonly segmentId: string;
   readonly data: UpdateProjectModuleSegmentInput;
   readonly actor: ActorContext;
+  readonly actorPermissions: readonly Permission[];
 }
 
 @Injectable()
@@ -41,12 +43,16 @@ export class UpdateProjectModuleSegmentUseCase
     if (!project || project.isDeleted) return err(new ProjectNotFoundError(command.projectId));
 
     const module = await this.modules.findById(command.moduleId);
-    if (!module || module.projectId !== command.projectId) {
+    if (!module || module.projectId !== project.id) {
       return err(new ProjectModuleNotFoundError(command.moduleId));
     }
 
     if (!module.segments.some((segment) => segment.id === command.segmentId)) {
       return err(new ProjectModuleSegmentNotFoundError(command.segmentId));
+    }
+
+    if (!command.actorPermissions.includes('projects:manage') && project.leaderUserId !== command.actor.userId) {
+      return err(new CannotManageProjectError());
     }
 
     await this.modules.updateSegment(
@@ -64,7 +70,7 @@ export class UpdateProjectModuleSegmentUseCase
       actor: { userId: command.actor.userId, email: command.actor.email },
       action: 'update',
       entityType: 'project',
-      entityId: command.projectId,
+      entityId: project.id,
       metadata: { event: 'module_segment_updated', moduleId: command.moduleId, segmentId: command.segmentId },
     });
 

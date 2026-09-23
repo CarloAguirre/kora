@@ -98,6 +98,11 @@
   white-space: nowrap;
 }
 
+.actionsTriggerActive {
+  border-color: var(--kora-blue-600);
+  color: var(--kora-navy);
+}
+
 /* ─── Detalle de una fila (modal) ─── */
 .detailGrid {
   display: flex;

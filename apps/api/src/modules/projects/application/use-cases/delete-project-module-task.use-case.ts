@@ -42,17 +42,17 @@ export class DeleteProjectModuleTaskUseCase
     if (!project || project.isDeleted) return err(new ProjectNotFoundError(command.projectId));
 
     const module = await this.modules.findById(command.moduleId);
-    if (!module || module.projectId !== command.projectId) {
+    if (!module || module.projectId !== project.id) {
       return err(new ProjectModuleNotFoundError(command.moduleId));
     }
 
     const task = module.tasks.find((t) => t.id === command.taskId);
     if (!task) return err(new ProjectModuleTaskNotFoundError(command.taskId));
 
-    if (!command.actorPermissions.includes('projects:manage')) {
+    if (!command.actorPermissions.includes('projects:manage') && project.leaderUserId !== command.actor.userId) {
       const isTeamLeader =
         task.teamId != null &&
-        (await this.projectTeams.isTeamLeaderForProject(command.projectId, task.teamId, command.actor.userId));
+        (await this.projectTeams.isTeamLeaderForProject(project.id, task.teamId, command.actor.userId));
       if (!isTeamLeader) {
         return err(new ForbiddenError('No lideras el equipo de esta tarea.', 'PROJECT_TEAM_NOT_LED'));
       }
@@ -64,7 +64,7 @@ export class DeleteProjectModuleTaskUseCase
       actor: { userId: command.actor.userId, email: command.actor.email },
       action: 'update',
       entityType: 'project',
-      entityId: command.projectId,
+      entityId: project.id,
       metadata: { event: 'module_task_deleted', moduleId: command.moduleId, taskId: command.taskId },
     });
 

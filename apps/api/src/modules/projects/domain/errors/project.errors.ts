@@ -83,6 +83,34 @@ export class ProjectObservationNotFoundError extends NotFoundError {
   }
 }
 
+/** Solo el líder del proyecto, PMO o admin puede aprobar/rechazar/cerrar/reabrir una entrada de bitácora. */
+export class CannotResolveProjectObservationError extends ForbiddenError {
+  constructor() {
+    super('No tienes permiso para resolver esta entrada de la bitácora.', 'PROJECT_OBSERVATION_CANNOT_RESOLVE');
+  }
+}
+
+/** Ej.: cerrar un incidente ya resuelto, o aprobar un hito (sin ciclo de vida accionable) — ver `PROJECT_OBSERVATION_ALLOWED_TRANSITIONS`. */
+export class InvalidProjectObservationTransitionError extends ValidationError {
+  constructor() {
+    super('Esta entrada no admite ese cambio de estado.', 'PROJECT_OBSERVATION_INVALID_TRANSITION');
+  }
+}
+
+/** Un `cambio_proyecto` lo genera el sistema — no lo edita ni lo borra nadie. */
+export class ProjectObservationNotEditableError extends ForbiddenError {
+  constructor() {
+    super('Este registro lo generó el sistema y no puede editarse.', 'PROJECT_OBSERVATION_NOT_EDITABLE');
+  }
+}
+
+/** `cambio_proyecto` no se crea a mano — lo escribe `ProjectChangeLogRecorder` cuando cambian datos clave del proyecto. */
+export class ProjectObservationTypeNotAllowedError extends ValidationError {
+  constructor() {
+    super('Este tipo de registro lo genera el sistema; no se puede crear a mano.', 'PROJECT_OBSERVATION_TYPE_NOT_ALLOWED');
+  }
+}
+
 export class ProjectModuleNotFoundError extends NotFoundError {
   constructor(identifier: string) {
     super('Fase/módulo', identifier, 'PROJECT_MODULE_NOT_FOUND');
@@ -118,6 +146,17 @@ export class CannotAuthorizeProjectOvertimeError extends ForbiddenError {
 export class CannotEditProjectExtrasError extends ForbiddenError {
   constructor() {
     super('No tienes permiso para editar los datos de "Extras" de este proyecto.', 'PROJECT_CANNOT_EDIT_EXTRAS');
+  }
+}
+
+/**
+ * Gestión operativa de un proyecto (editar datos, fases/módulos, tareas, entregas, tramos de pago) sin
+ * `projects:manage`: solo el líder DE ESE PROYECTO (`project.leaderUserId`), no un líder de equipo
+ * cualquiera — mismo criterio que `ResolveProjectObservationUseCase` aplica a la bitácora.
+ */
+export class CannotManageProjectError extends ForbiddenError {
+  constructor() {
+    super('No tienes permiso para gestionar este proyecto.', 'PROJECT_CANNOT_MANAGE');
   }
 }
 

@@ -88,6 +88,8 @@ export function ProjectDetailPage() {
    */
   const isProjectLeader = user !== null && project.leader?.id === user.id;
   const showTeamOnlyView = !can('projects:manage') && !isProjectLeader && Boolean(leaderTeam);
+  /** Sin `projects:manage`, el líder de ESTE proyecto también puede editarlo y cambiar su estado. */
+  const canManageProject = can('projects:manage') || isProjectLeader;
 
   return (
     <DashboardLayout title={project.name}>
@@ -98,7 +100,7 @@ export function ProjectDetailPage() {
           </Button>
 
           <div className={styles.topRowActions}>
-            {can('projects:manage') && (
+            {canManageProject && (
               <Button variant="outline" size="sm" iconLeft={<PencilIcon size={16} />} onClick={() => setEditing(true)}>
                 Editar proyecto
               </Button>
@@ -115,7 +117,7 @@ export function ProjectDetailPage() {
               </Button>
             )}
 
-            {project.type !== 'support' && can('projects:manage') && (
+            {project.type !== 'support' && canManageProject && (
               <Select
                 className={styles.statusControl}
                 label="Cambiar estado"

@@ -1,6 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { err, ok, type ApplicationError, type Result } from '@kora/core';
+import type { Permission } from '@kora/contracts';
 import {
+  CannotManageProjectError,
   ProjectModuleDeliveryNotFoundError,
   ProjectModuleNotFoundError,
   ProjectNotFoundError,
@@ -21,6 +23,7 @@ export interface RemoveProjectModuleDeliveryCommand {
   readonly moduleId: string;
   readonly deliveryId: string;
   readonly actor: ActorContext;
+  readonly actorPermissions: readonly Permission[];
 }
 
 @Injectable()
@@ -38,12 +41,16 @@ export class RemoveProjectModuleDeliveryUseCase
     if (!project || project.isDeleted) return err(new ProjectNotFoundError(command.projectId));
 
     const module = await this.modules.findById(command.moduleId);
-    if (!module || module.projectId !== command.projectId) {
+    if (!module || module.projectId !== project.id) {
       return err(new ProjectModuleNotFoundError(command.moduleId));
     }
 
     if (!module.deliveries.some((delivery) => delivery.id === command.deliveryId)) {
       return err(new ProjectModuleDeliveryNotFoundError(command.deliveryId));
+    }
+
+    if (!command.actorPermissions.includes('projects:manage') && project.leaderUserId !== command.actor.userId) {
+      return err(new CannotManageProjectError());
     }
 
     await this.modules.removeDelivery(command.deliveryId);
@@ -52,7 +59,7 @@ export class RemoveProjectModuleDeliveryUseCase
       actor: { userId: command.actor.userId, email: command.actor.email },
       action: 'update',
       entityType: 'project',
-      entityId: command.projectId,
+      entityId: project.id,
       metadata: { event: 'module_delivery_removed', moduleId: command.moduleId, deliveryId: command.deliveryId },
     });
 

@@ -15,6 +15,7 @@ import { Badge, type BadgeTone } from '@/shared/components/ui/Badge';
 import { useToast } from '@/shared/components/ui/Toast';
 import { PencilIcon, TrashIcon } from '@/shared/components/icons/Icons';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
+import { useAuth } from '@/modules/auth/hooks/useAuth';
 import {
   useCreateProjectPaymentMilestone,
   useDeleteProjectPaymentMilestone,
@@ -123,12 +124,14 @@ const formatDate = (value: string | null) => (value ? new Date(`${value}T00:00:0
 export function ProjectExtrasTab({ project, canManage }: { project: ProjectDetail; canManage: boolean }) {
   const toast = useToast();
   const { can } = usePermissions();
+  const { user } = useAuth();
   const updateProject = useUpdateProjectExtras();
   const [links, setLinks] = useState<AccessLinksDraft>(() => toAccessLinksDraft(project));
   const [impact, setImpact] = useState<ImpactDraft>(() => toImpactDraft(project));
   const [qa, setQa] = useState<QaMetricsDraft>(() => toQaMetricsDraft(project));
 
-  const canManageMilestones = can('projects:manage');
+  /** Sin `projects:manage`, el líder DE ESTE PROYECTO también configura el cronograma de cobro. */
+  const canManageMilestones = can('projects:manage') || (user !== null && project.leader?.id === user.id);
   const canManageBillingActions = can('billing:manage');
   const canViewBilling = canManageMilestones || canManageBillingActions || can('billing:read');
 

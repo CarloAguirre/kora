@@ -1,18 +1,20 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CLOCK, err, ok, type ApplicationError, type Clock, type Result } from '@kora/core';
-import type { ChangeProjectStatusInput } from '@kora/contracts';
-import { ProjectNotFoundError } from '../../domain/errors/project.errors';
+import { PROJECT_STATUS_LABELS, type ChangeProjectStatusInput, type Permission } from '@kora/contracts';
+import { CannotManageProjectError, ProjectNotFoundError } from '../../domain/errors/project.errors';
 import { PROJECT_REPOSITORY, type ProjectRepository } from '../../domain/repositories/project.repository';
 import {
   AUDIT_RECORDER,
   type AuditRecorder,
 } from '../../../../shared/application/ports/audit-recorder.port';
 import type { ActorContext, UseCase } from '../../../../shared/application/use-case';
+import { ProjectChangeLogRecorder } from '../services/project-change-log.recorder';
 
 export interface ChangeProjectStatusCommand {
   readonly projectId: string;
   readonly data: ChangeProjectStatusInput;
   readonly actor: ActorContext;
+  readonly actorPermissions: readonly Permission[];
 }
 
 @Injectable()
@@ -22,6 +24,7 @@ export class ChangeProjectStatusUseCase
   constructor(
     @Inject(PROJECT_REPOSITORY) private readonly projects: ProjectRepository,
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
+    private readonly changeLog: ProjectChangeLogRecorder,
     @Inject(CLOCK) private readonly clock: Clock,
   ) {}
 
@@ -29,11 +32,27 @@ export class ChangeProjectStatusUseCase
     const project = await this.projects.findById(command.projectId);
     if (!project || project.isDeleted) return err(new ProjectNotFoundError(command.projectId));
 
+    if (!command.actorPermissions.includes('projects:manage') && project.leaderUserId !== command.actor.userId) {
+      return err(new CannotManageProjectError());
+    }
+
     const previousStatus = project.status;
     if (previousStatus === command.data.status) return ok(undefined);
 
-    project.changeStatus(command.data.status, this.clock.now());
+    const now = this.clock.now();
+    project.changeStatus(command.data.status, now);
     await this.projects.save(project);
+
+    await this.changeLog.record(
+      [
+        {
+          projectId: project.id,
+          message: `Estado del proyecto cambiado de "${PROJECT_STATUS_LABELS[previousStatus]}" a "${PROJECT_STATUS_LABELS[command.data.status]}".`,
+        },
+      ],
+      command.actor.userId,
+      now,
+    );
 
     await this.audit.record({
       actor: { userId: command.actor.userId, email: command.actor.email },

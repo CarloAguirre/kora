@@ -110,6 +110,10 @@ export class GetProjectUseCase implements UseCase<GetProjectCommand, ProjectDeta
       command.actorPermissions.includes('projects:manage') ||
       (await this.projects.isProjectLeaderOrTeamLeaderOfMember(project.id, command.actorUserId, null));
 
+    /** Mismo criterio que `ResolveProjectObservationUseCase`: líder de este proyecto, PMO o admin. */
+    const canManagePendings =
+      command.actorPermissions.includes('projects:manage') || snapshot.leaderUserId === command.actorUserId;
+
     return ok(
       toProjectDetail({
         project,
@@ -125,6 +129,7 @@ export class GetProjectUseCase implements UseCase<GetProjectCommand, ProjectDeta
         paymentMilestones: projectPaymentMilestones,
         usedHoursUpdatedAt,
         actorUserId: command.actorUserId,
+        canManagePendings,
         canAuthorizeOvertime,
         now: this.clock.now(),
       }),

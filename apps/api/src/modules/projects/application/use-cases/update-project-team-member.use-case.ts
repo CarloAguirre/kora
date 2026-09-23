@@ -1,7 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { ForbiddenError, err, ok, type ApplicationError, type Result } from '@kora/core';
 import type { Permission, UpdateProjectTeamMemberInput } from '@kora/contracts';
-import { ProjectTeamMemberNotFoundError } from '../../domain/errors/project.errors';
+import { ProjectNotFoundError, ProjectTeamMemberNotFoundError } from '../../domain/errors/project.errors';
+import { PROJECT_REPOSITORY, type ProjectRepository } from '../../domain/repositories/project.repository';
 import {
   PROJECT_TEAM_MEMBER_REPOSITORY,
   type ProjectTeamMemberRepository,
@@ -27,6 +28,7 @@ export class UpdateProjectTeamMemberUseCase
   implements UseCase<UpdateProjectTeamMemberCommand, void, ApplicationError>
 {
   constructor(
+    @Inject(PROJECT_REPOSITORY) private readonly projects: ProjectRepository,
     @Inject(PROJECT_TEAM_MEMBER_REPOSITORY) private readonly members: ProjectTeamMemberRepository,
     @Inject(PROJECT_TEAM_REPOSITORY) private readonly projectTeams: ProjectTeamRepository,
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
@@ -35,13 +37,16 @@ export class UpdateProjectTeamMemberUseCase
   async execute(command: UpdateProjectTeamMemberCommand): Promise<Result<void, ApplicationError>> {
     const { projectId, assignmentId, data, actor } = command;
 
+    const project = await this.projects.findById(projectId);
+    if (!project || project.isDeleted) return err(new ProjectNotFoundError(projectId));
+
     const assignment = await this.members.findById(assignmentId);
-    if (!assignment || assignment.projectId !== projectId) {
+    if (!assignment || assignment.projectId !== project.id) {
       return err(new ProjectTeamMemberNotFoundError(assignmentId));
     }
 
-    if (!command.actorPermissions.includes('projects:manage')) {
-      const isTeamLeader = await this.projectTeams.isTeamLeaderForProject(projectId, assignment.teamId, actor.userId);
+    if (!command.actorPermissions.includes('projects:manage') && project.leaderUserId !== actor.userId) {
+      const isTeamLeader = await this.projectTeams.isTeamLeaderForProject(project.id, assignment.teamId, actor.userId);
       if (!isTeamLeader) {
         return err(new ForbiddenError('No lideras el equipo de esta persona.', 'PROJECT_TEAM_NOT_LED'));
       }
@@ -56,7 +61,7 @@ export class UpdateProjectTeamMemberUseCase
       actor: { userId: actor.userId, email: actor.email },
       action: 'update',
       entityType: 'project',
-      entityId: projectId,
+      entityId: project.id,
       metadata: { event: 'member_updated', userId: assignment.userId },
     });
 

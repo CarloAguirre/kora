@@ -34,6 +34,7 @@ const TASK_STATUS_OPTIONS = PROJECT_MODULE_TASK_STATUSES.map((status) => ({
 const DELIVERY_STATUS_OPTIONS = [
   { value: 'planned', label: PROJECT_MODULE_DELIVERY_STATUS_LABELS.planned },
   { value: 'delivered', label: PROJECT_MODULE_DELIVERY_STATUS_LABELS.delivered },
+  { value: 'approved', label: PROJECT_MODULE_DELIVERY_STATUS_LABELS.approved },
 ];
 const MONTH_LABELS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 

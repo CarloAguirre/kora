@@ -1,6 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { err, ok, type ApplicationError, type Result } from '@kora/core';
+import type { Permission } from '@kora/contracts';
 import {
+  CannotManageProjectError,
   ProjectModuleNotFoundError,
   ProjectModuleSegmentNotFoundError,
   ProjectNotFoundError,
@@ -21,6 +23,7 @@ export interface DeleteProjectModuleSegmentCommand {
   readonly moduleId: string;
   readonly segmentId: string;
   readonly actor: ActorContext;
+  readonly actorPermissions: readonly Permission[];
 }
 
 @Injectable()
@@ -38,12 +41,16 @@ export class DeleteProjectModuleSegmentUseCase
     if (!project || project.isDeleted) return err(new ProjectNotFoundError(command.projectId));
 
     const module = await this.modules.findById(command.moduleId);
-    if (!module || module.projectId !== command.projectId) {
+    if (!module || module.projectId !== project.id) {
       return err(new ProjectModuleNotFoundError(command.moduleId));
     }
 
     if (!module.segments.some((segment) => segment.id === command.segmentId)) {
       return err(new ProjectModuleSegmentNotFoundError(command.segmentId));
+    }
+
+    if (!command.actorPermissions.includes('projects:manage') && project.leaderUserId !== command.actor.userId) {
+      return err(new CannotManageProjectError());
     }
 
     await this.modules.removeSegment(command.segmentId);
@@ -52,7 +59,7 @@ export class DeleteProjectModuleSegmentUseCase
       actor: { userId: command.actor.userId, email: command.actor.email },
       action: 'update',
       entityType: 'project',
-      entityId: command.projectId,
+      entityId: project.id,
       metadata: { event: 'module_segment_deleted', moduleId: command.moduleId, segmentId: command.segmentId },
     });
 

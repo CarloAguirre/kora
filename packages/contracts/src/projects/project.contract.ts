@@ -108,13 +108,14 @@ export const PROJECT_MODULE_STAGE_LABELS: Readonly<Record<ProjectModuleStage, st
   closed: 'Finalizado',
 };
 
-export const PROJECT_MODULE_DELIVERY_STATUSES = ['planned', 'delivered'] as const;
+export const PROJECT_MODULE_DELIVERY_STATUSES = ['planned', 'delivered', 'approved'] as const;
 export const projectModuleDeliveryStatusSchema = z.enum(PROJECT_MODULE_DELIVERY_STATUSES);
 export type ProjectModuleDeliveryStatus = z.infer<typeof projectModuleDeliveryStatusSchema>;
 
 export const PROJECT_MODULE_DELIVERY_STATUS_LABELS: Readonly<Record<ProjectModuleDeliveryStatus, string>> = {
   planned: 'Planificada',
   delivered: 'Entregada',
+  approved: 'Aprobada',
 };
 
 export const projectModuleDeliverySchema = z.object({
@@ -253,11 +254,18 @@ export type AddProjectModuleDeliveryInput = z.infer<typeof addProjectModuleDeliv
 export const updateProjectModuleDeliverySchema = z.object({
   status: projectModuleDeliveryStatusSchema.optional(),
   teamId: uuidSchema.nullish(),
+  estimatedDate: z.iso.date().optional(),
 });
 export type UpdateProjectModuleDeliveryInput = z.infer<typeof updateProjectModuleDeliverySchema>;
 
-/** "evento" (hora registrada) no está acá: no es un `project_observation`, viene de `hour_entries` — ver `apps/web/.../lib/hour-entry-log.ts`. */
-export const PROJECT_OBSERVATION_TYPES = ['hito', 'incidente', 'compromiso', 'atencion', 'observacion'] as const;
+/**
+ * "evento" (hora registrada) no está acá: no es un `project_observation`, viene de `hour_entries` — ver
+ * `apps/web/.../lib/hour-entry-log.ts`. "cambio_proyecto" tampoco lo crea una persona: lo genera el sistema
+ * cuando cambian datos clave del proyecto (líder, HH vendidas, equipos, entregas, estado, fechas) — ver
+ * `ProjectChangeLogRecorder` en el backend. Sin ciclo de vida (`status` siempre `null`), y no editable ni
+ * eliminable por nadie: es un registro de auditoría, no una entrada de trabajo.
+ */
+export const PROJECT_OBSERVATION_TYPES = ['hito', 'incidente', 'compromiso', 'atencion', 'observacion', 'cambio_proyecto'] as const;
 export const projectObservationTypeSchema = z.enum(PROJECT_OBSERVATION_TYPES);
 export type ProjectObservationType = z.infer<typeof projectObservationTypeSchema>;
 
@@ -267,9 +275,10 @@ export const PROJECT_OBSERVATION_TYPE_LABELS: Readonly<Record<ProjectObservation
   compromiso: 'Compromiso',
   atencion: 'Punto de atención',
   observacion: 'Observación general',
+  cambio_proyecto: 'Cambio de proyecto',
 };
 
-export const PROJECT_OBSERVATION_STATUSES = ['abierto', 'resuelto', 'pendiente', 'cumplido', 'activo'] as const;
+export const PROJECT_OBSERVATION_STATUSES = ['abierto', 'resuelto', 'pendiente', 'cumplido', 'activo', 'rechazado'] as const;
 export const projectObservationStatusSchema = z.enum(PROJECT_OBSERVATION_STATUSES);
 export type ProjectObservationStatus = z.infer<typeof projectObservationStatusSchema>;
 
@@ -279,15 +288,30 @@ export const PROJECT_OBSERVATION_STATUS_LABELS: Readonly<Record<ProjectObservati
   pendiente: 'Pendiente',
   cumplido: 'Cumplido',
   activo: 'Activo',
+  rechazado: 'Rechazado',
 };
 
-/** Estado inicial automático según el tipo — el formulario "Agregar registro" no lo pide. `null` = sin ciclo de vida (observación general). */
+/** Estado inicial automático según el tipo — el formulario "Agregar registro" no lo pide. `null` = sin ciclo de vida (observación general / cambio de proyecto). */
 export const PROJECT_OBSERVATION_DEFAULT_STATUS: Readonly<Record<ProjectObservationType, ProjectObservationStatus | null>> = {
   hito: 'cumplido',
   incidente: 'abierto',
   compromiso: 'pendiente',
   atencion: 'activo',
   observacion: null,
+  cambio_proyecto: null,
+};
+
+/**
+ * Transiciones de estado que un líder de proyecto, PMO o admin puede resolver a mano desde la bitácora
+ * (aprobar/rechazar/cerrar/reabrir) — ver `ResolveProjectObservationUseCase`. Los demás tipos no tienen
+ * ciclo de vida accionable acá (un hito nace `cumplido`, una atención se resuelve editando su estado desde
+ * el formulario, y `cambio_proyecto` no es editable por nadie).
+ */
+export const PROJECT_OBSERVATION_ALLOWED_TRANSITIONS: Readonly<
+  Partial<Record<ProjectObservationType, Readonly<Partial<Record<ProjectObservationStatus, readonly ProjectObservationStatus[]>>>>>
+> = {
+  incidente: { abierto: ['resuelto'], resuelto: ['abierto'] },
+  compromiso: { pendiente: ['cumplido', 'rechazado'] },
 };
 
 export const projectObservationSchema = z.object({
@@ -302,10 +326,12 @@ export const projectObservationSchema = z.object({
   authorUserId: uuidSchema,
   authorName: z.string(),
   createdAt: isoDateTimeSchema,
-  /** true solo para el autor; la edición no tiene límite de tiempo. */
+  /** true para el autor, o para quien puede resolver (`canResolve`) — nunca para `cambio_proyecto`, que nadie edita. */
   canEdit: z.boolean(),
   /** true solo para el autor, y solo dentro de la ventana de borrado — ver `PROJECT_OBSERVATION_DELETE_WINDOW_MS`. */
   canDelete: z.boolean(),
+  /** true si es líder de este proyecto, PMO o admin: puede aprobar/rechazar/cerrar/reabrir desde la bitácora. */
+  canResolve: z.boolean(),
 });
 export type ProjectObservation = z.infer<typeof projectObservationSchema>;
 
@@ -648,6 +674,12 @@ export const updateProjectObservationSchema = z.object({
   message: nonEmptyTrimmed(4000, 'El mensaje'),
 });
 export type UpdateProjectObservationInput = z.infer<typeof updateProjectObservationSchema>;
+
+/** Aprobar/rechazar/cerrar/reabrir — transición de `status` sin tocar el mensaje. Ver `PROJECT_OBSERVATION_ALLOWED_TRANSITIONS`. */
+export const resolveProjectObservationSchema = z.object({
+  status: projectObservationStatusSchema,
+});
+export type ResolveProjectObservationInput = z.infer<typeof resolveProjectObservationSchema>;
 
 export const projectSortFieldSchema = z.enum([
   'name',

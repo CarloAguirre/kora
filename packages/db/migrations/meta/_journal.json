@@ -183,6 +183,20 @@
       "when": 1790128956207,
       "tag": "0025_slug_not_null",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1790170801097,
+      "tag": "0026_shocking_puck",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1790176687482,
+      "tag": "0027_short_mercury",
+      "breakpoints": true
     }
   ]
 }

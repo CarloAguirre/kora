@@ -33,6 +33,7 @@ export interface ProjectObservationRepository {
   findById(id: string, context?: TransactionContext): Promise<ProjectObservationRecord | null>;
   add(data: AddProjectObservationData, context?: TransactionContext): Promise<string>;
   update(id: string, message: string, now: Date, context?: TransactionContext): Promise<void>;
+  updateStatus(id: string, status: ProjectObservationStatus, now: Date, context?: TransactionContext): Promise<void>;
   remove(id: string, context?: TransactionContext): Promise<void>;
 }
 

@@ -125,6 +125,7 @@ export interface CreateProjectModuleDeliveryInput {
 export interface UpdateProjectModuleDeliveryInput {
   readonly teamId?: string | null;
   readonly status?: ProjectModuleDeliveryStatus;
+  readonly estimatedDate?: Date;
 }
 
 /** Fila de "Mis tareas" — tarea asignada a una persona, con el nombre de su proyecto/módulo. */

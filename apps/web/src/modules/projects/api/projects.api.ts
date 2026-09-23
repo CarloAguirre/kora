@@ -14,6 +14,7 @@ import type {
   MarkProjectPaymentMilestonePaidInput,
   ProjectBillingSettings,
   ProjectDetail,
+  ResolveProjectObservationInput,
   SetProjectOvertimeAuthorizationInput,
   UpdateProjectBillingSettingsInput,
   UpdateProjectExtrasInput,
@@ -80,6 +81,9 @@ export const projectsApi = {
   },
   updateObservation(projectId: string, observationId: string, input: UpdateProjectObservationInput): Promise<void> {
     return api.patch<void>(`/projects/${projectId}/observations/${observationId}`, input);
+  },
+  resolveObservation(projectId: string, observationId: string, input: ResolveProjectObservationInput): Promise<void> {
+    return api.patch<void>(`/projects/${projectId}/observations/${observationId}/status`, input);
   },
   removeObservation(projectId: string, observationId: string): Promise<void> {
     return api.delete<void>(`/projects/${projectId}/observations/${observationId}`);

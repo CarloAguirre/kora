@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CLOCK, ForbiddenError, err, ok, type ApplicationError, type Clock, type Result } from '@kora/core';
 import { PROJECT_OBSERVATION_DEFAULT_STATUS, type AddProjectObservationInput, type Permission } from '@kora/contracts';
-import { ProjectNotFoundError } from '../../domain/errors/project.errors';
+import { ProjectNotFoundError, ProjectObservationTypeNotAllowedError } from '../../domain/errors/project.errors';
 import { PROJECT_REPOSITORY, type ProjectRepository } from '../../domain/repositories/project.repository';
 import {
   PROJECT_TEAM_MEMBER_REPOSITORY,
@@ -35,6 +35,8 @@ export class AddProjectObservationUseCase
   async execute(
     command: AddProjectObservationCommand,
   ): Promise<Result<{ id: string }, ApplicationError>> {
+    if (command.data.type === 'cambio_proyecto') return err(new ProjectObservationTypeNotAllowedError());
+
     const project = await this.projects.findById(command.projectId);
     if (!project || project.isDeleted) return err(new ProjectNotFoundError(command.projectId));
 
@@ -51,7 +53,7 @@ export class AddProjectObservationUseCase
 
     const now = this.clock.now();
     const id = await this.observations.add({
-      projectId: command.projectId,
+      projectId: project.id,
       type: command.data.type,
       title: command.data.title?.trim() || null,
       message: command.data.message,

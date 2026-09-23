@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CLOCK, err, ok, type ApplicationError, type Clock, type Result } from '@kora/core';
-import type { CreateProjectModuleSegmentInput } from '@kora/contracts';
-import { ProjectModuleNotFoundError, ProjectNotFoundError } from '../../domain/errors/project.errors';
+import type { CreateProjectModuleSegmentInput, Permission } from '@kora/contracts';
+import { CannotManageProjectError, ProjectModuleNotFoundError, ProjectNotFoundError } from '../../domain/errors/project.errors';
 import { PROJECT_REPOSITORY, type ProjectRepository } from '../../domain/repositories/project.repository';
 import {
   PROJECT_MODULE_REPOSITORY,
@@ -18,6 +18,7 @@ export interface CreateProjectModuleSegmentCommand {
   readonly moduleId: string;
   readonly data: CreateProjectModuleSegmentInput;
   readonly actor: ActorContext;
+  readonly actorPermissions: readonly Permission[];
 }
 
 /** Tramo de trabajo de un equipo dentro de una fase/módulo (Roadmap). */
@@ -39,8 +40,12 @@ export class CreateProjectModuleSegmentUseCase
     if (!project || project.isDeleted) return err(new ProjectNotFoundError(command.projectId));
 
     const module = await this.modules.findById(command.moduleId);
-    if (!module || module.projectId !== command.projectId) {
+    if (!module || module.projectId !== project.id) {
       return err(new ProjectModuleNotFoundError(command.moduleId));
+    }
+
+    if (!command.actorPermissions.includes('projects:manage') && project.leaderUserId !== command.actor.userId) {
+      return err(new CannotManageProjectError());
     }
 
     const now = this.clock.now();
@@ -59,7 +64,7 @@ export class CreateProjectModuleSegmentUseCase
       actor: { userId: command.actor.userId, email: command.actor.email },
       action: 'update',
       entityType: 'project',
-      entityId: command.projectId,
+      entityId: project.id,
       metadata: { event: 'module_segment_created', moduleId: command.moduleId, segmentId: id },
     });
 

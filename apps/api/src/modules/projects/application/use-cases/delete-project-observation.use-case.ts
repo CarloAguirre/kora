@@ -1,6 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CLOCK, ForbiddenError, err, ok, type ApplicationError, type Clock, type Result } from '@kora/core';
-import { ProjectObservationNotFoundError } from '../../domain/errors/project.errors';
+import {
+  ProjectNotFoundError,
+  ProjectObservationNotEditableError,
+  ProjectObservationNotFoundError,
+} from '../../domain/errors/project.errors';
+import { PROJECT_REPOSITORY, type ProjectRepository } from '../../domain/repositories/project.repository';
 import {
   PROJECT_OBSERVATION_DELETE_WINDOW_MS,
   PROJECT_OBSERVATION_REPOSITORY,
@@ -20,15 +25,21 @@ export class DeleteProjectObservationUseCase
   implements UseCase<DeleteProjectObservationCommand, void, ApplicationError>
 {
   constructor(
+    @Inject(PROJECT_REPOSITORY) private readonly projects: ProjectRepository,
     @Inject(PROJECT_OBSERVATION_REPOSITORY) private readonly observations: ProjectObservationRepository,
     @Inject(CLOCK) private readonly clock: Clock,
   ) {}
 
   async execute(command: DeleteProjectObservationCommand): Promise<Result<void, ApplicationError>> {
+    const project = await this.projects.findById(command.projectId);
+    if (!project || project.isDeleted) return err(new ProjectNotFoundError(command.projectId));
+
     const observation = await this.observations.findById(command.observationId);
-    if (!observation || observation.projectId !== command.projectId) {
+    if (!observation || observation.projectId !== project.id) {
       return err(new ProjectObservationNotFoundError(command.observationId));
     }
+
+    if (observation.type === 'cambio_proyecto') return err(new ProjectObservationNotEditableError());
 
     if (observation.authorUserId !== command.actor.userId) {
       return err(new ForbiddenError('Solo quien creó esta entrada puede borrarla.', 'PROJECT_OBSERVATION_NOT_OWNED'));

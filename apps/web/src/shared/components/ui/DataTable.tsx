@@ -18,7 +18,7 @@ export interface Column<T> {
   readonly header: string;
   readonly render: (item: T) => ReactNode;
   readonly sortable?: boolean;
-  readonly align?: 'left' | 'right';
+  readonly align?: 'left' | 'right' | 'center';
   readonly width?: string;
 }
 
@@ -72,6 +72,7 @@ export function DataTable<T>({
                     styles.headerCell,
                     canSort ? styles.sortable : '',
                     column.align === 'right' ? styles.cellActions : '',
+                    column.align === 'center' ? styles.cellCenter : '',
                   ]
                     .filter(Boolean)
                     .join(' ')}
@@ -138,6 +139,7 @@ export function DataTable<T>({
                     className={[
                       styles.cell,
                       column.align === 'right' ? styles.cellActions : '',
+                      column.align === 'center' ? styles.cellCenter : '',
                     ]
                       .filter(Boolean)
                       .join(' ')}

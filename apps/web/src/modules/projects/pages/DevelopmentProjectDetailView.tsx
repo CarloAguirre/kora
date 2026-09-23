@@ -223,6 +223,15 @@ export function DevelopmentProjectDetailView({
       (project.leader?.id === user.id || project.teams.some((team) => team.leader?.id === user.id)));
 
   /**
+   * Gestión operativa completa del proyecto (editar fases/módulos, entregas,
+   * tramos de pago, asignar/quitar equipo) sin `projects:manage`: solo el
+   * líder DE ESTE PROYECTO, no un líder de equipo cualquiera — mismo criterio
+   * que el backend en `UpdateProjectUseCase` y afines.
+   */
+  const canManageProject =
+    can("projects:manage") || (user !== null && project.leader?.id === user.id);
+
+  /**
    * Mismo criterio que `GetProjectPendingApprovalsUseCase` en el backend: el
    * líder de proyecto (o admin/pmo) es quien necesita este aviso, porque ya
    * no puede aprobar directamente las horas que le tocan a un líder de
@@ -405,9 +414,7 @@ export function DevelopmentProjectDetailView({
               ].join(" ")}
               onClick={() => setTab(tabDef.id)}
             >
-              {tabDef.id === "bitacora" && project.observations.length > 0
-                ? `${tabDef.label} ${project.observations.length}`
-                : tabDef.label}
+              {tabDef.label}
             </button>
           ))}
         </div>
@@ -550,7 +557,7 @@ export function DevelopmentProjectDetailView({
                                         </td>
                                       )}
                                       <td className={styles.memberCellActions}>
-                                        {can("projects:manage") && (
+                                        {canManageProject && (
                                           <Button
                                             variant="ghost"
                                             size="icon"
@@ -587,7 +594,7 @@ export function DevelopmentProjectDetailView({
                     </p>
                   )}
 
-                  {can("projects:manage") && (
+                  {canManageProject && (
                     <form
                       className={styles.inlineForm}
                       onSubmit={onAssignMember}
@@ -662,7 +669,7 @@ export function DevelopmentProjectDetailView({
                 projectId={projectId}
                 modules={project.modules}
                 hourEntries={projectHourEntries?.items ?? []}
-                canManage={can("projects:manage")}
+                canManage={canManageProject}
               />
             ) : (
               <Card>
@@ -679,6 +686,7 @@ export function DevelopmentProjectDetailView({
               events={projectHourEntries?.items ?? []}
               observations={project.observations}
               modules={project.modules}
+              teams={project.teams}
               canManage={canAddObservation}
             />
           )}

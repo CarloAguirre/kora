@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { err, ok, type ApplicationError, type Result } from '@kora/core';
-import type { CreateProjectPaymentMilestoneInput } from '@kora/contracts';
-import { ProjectNotFoundError } from '../../domain/errors/project.errors';
+import type { CreateProjectPaymentMilestoneInput, Permission } from '@kora/contracts';
+import { CannotManageProjectError, ProjectNotFoundError } from '../../domain/errors/project.errors';
 import { PROJECT_REPOSITORY, type ProjectRepository } from '../../domain/repositories/project.repository';
 import {
   PROJECT_PAYMENT_MILESTONE_REPOSITORY,
@@ -14,9 +14,14 @@ export interface CreateProjectPaymentMilestoneCommand {
   readonly projectId: string;
   readonly data: CreateProjectPaymentMilestoneInput;
   readonly actor: ActorContext;
+  readonly actorPermissions: readonly Permission[];
 }
 
-/** Configurar el cronograma de cobro de un proyecto — decisión de PM/PMO, ver `projects:manage` en el controlador. */
+/**
+ * Configurar el cronograma de cobro de un proyecto — decisión de PM/PMO o del líder DE ESE PROYECTO.
+ * Marcar un tramo como facturado/pagado sigue siendo exclusivo de Finanzas (`billing:manage`), ver
+ * `IssueProjectPaymentMilestoneInvoiceUseCase`/`MarkProjectPaymentMilestonePaidUseCase`.
+ */
 @Injectable()
 export class CreateProjectPaymentMilestoneUseCase
   implements UseCase<CreateProjectPaymentMilestoneCommand, { id: string }, ApplicationError>
@@ -33,8 +38,12 @@ export class CreateProjectPaymentMilestoneUseCase
     const project = await this.projects.findById(command.projectId);
     if (!project || project.isDeleted) return err(new ProjectNotFoundError(command.projectId));
 
+    if (!command.actorPermissions.includes('projects:manage') && project.leaderUserId !== command.actor.userId) {
+      return err(new CannotManageProjectError());
+    }
+
     const id = await this.milestones.create({
-      projectId: command.projectId,
+      projectId: project.id,
       name: command.data.name,
       percent: command.data.percent ?? null,
       amount: command.data.amount,
@@ -45,7 +54,7 @@ export class CreateProjectPaymentMilestoneUseCase
       actor: { userId: command.actor.userId, email: command.actor.email },
       action: 'update',
       entityType: 'project',
-      entityId: command.projectId,
+      entityId: project.id,
       metadata: { event: 'payment_milestone_created', milestoneId: id },
     });
 

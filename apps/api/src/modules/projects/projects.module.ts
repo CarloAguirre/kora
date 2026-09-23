@@ -15,7 +15,9 @@ import { UnassignProjectTeamMemberUseCase } from './application/use-cases/unassi
 import { UpdateProjectTeamMemberUseCase } from './application/use-cases/update-project-team-member.use-case';
 import { AddProjectObservationUseCase } from './application/use-cases/add-project-observation.use-case';
 import { UpdateProjectObservationUseCase } from './application/use-cases/update-project-observation.use-case';
+import { ResolveProjectObservationUseCase } from './application/use-cases/resolve-project-observation.use-case';
 import { DeleteProjectObservationUseCase } from './application/use-cases/delete-project-observation.use-case';
+import { ProjectChangeLogRecorder } from './application/services/project-change-log.recorder';
 import { CreateProjectModuleUseCase } from './application/use-cases/create-project-module.use-case';
 import { UpdateProjectModuleUseCase } from './application/use-cases/update-project-module.use-case';
 import { DeleteProjectModuleUseCase } from './application/use-cases/delete-project-module.use-case';
@@ -88,7 +90,9 @@ import { DrizzleProjectTeamMemberValidator } from './infrastructure/services/dri
     UpdateProjectTeamMemberUseCase,
     AddProjectObservationUseCase,
     UpdateProjectObservationUseCase,
+    ResolveProjectObservationUseCase,
     DeleteProjectObservationUseCase,
+    ProjectChangeLogRecorder,
     CreateProjectModuleUseCase,
     UpdateProjectModuleUseCase,
     DeleteProjectModuleUseCase,

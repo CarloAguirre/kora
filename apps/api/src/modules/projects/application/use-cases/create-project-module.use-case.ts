@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CLOCK, err, ok, type ApplicationError, type Clock, type Result } from '@kora/core';
-import type { CreateProjectModuleInput } from '@kora/contracts';
-import { ProjectNotFoundError } from '../../domain/errors/project.errors';
+import type { CreateProjectModuleInput, Permission } from '@kora/contracts';
+import { CannotManageProjectError, ProjectNotFoundError } from '../../domain/errors/project.errors';
 import { PROJECT_REPOSITORY, type ProjectRepository } from '../../domain/repositories/project.repository';
 import {
   PROJECT_MODULE_REPOSITORY,
@@ -17,6 +17,7 @@ export interface CreateProjectModuleCommand {
   readonly projectId: string;
   readonly data: CreateProjectModuleInput;
   readonly actor: ActorContext;
+  readonly actorPermissions: readonly Permission[];
 }
 
 @Injectable()
@@ -34,10 +35,14 @@ export class CreateProjectModuleUseCase
     const project = await this.projects.findById(command.projectId);
     if (!project || project.isDeleted) return err(new ProjectNotFoundError(command.projectId));
 
+    if (!command.actorPermissions.includes('projects:manage') && project.leaderUserId !== command.actor.userId) {
+      return err(new CannotManageProjectError());
+    }
+
     const now = this.clock.now();
     const id = await this.modules.create(
       {
-        projectId: command.projectId,
+        projectId: project.id,
         name: command.data.name,
         initialStage: command.data.initialStage,
         estimatedHours: command.data.estimatedHours ?? null,
@@ -51,7 +56,7 @@ export class CreateProjectModuleUseCase
       actor: { userId: command.actor.userId, email: command.actor.email },
       action: 'update',
       entityType: 'project',
-      entityId: command.projectId,
+      entityId: project.id,
       metadata: { event: 'module_created', moduleId: id, name: command.data.name },
     });
 

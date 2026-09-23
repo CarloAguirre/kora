@@ -124,6 +124,20 @@ export class DrizzleProjectObservationRepository implements ProjectObservationRe
       .where(eq(projectObservations.id, id));
   }
 
+  async updateStatus(
+    id: string,
+    status: ProjectObservationRecord['status'],
+    now: Date,
+    context?: TransactionContext,
+  ): Promise<void> {
+    const db = resolveDb(this.database, context);
+
+    await db
+      .update(projectObservations)
+      .set({ status, updatedAt: now })
+      .where(eq(projectObservations.id, id));
+  }
+
   async remove(id: string, context?: TransactionContext): Promise<void> {
     const db = resolveDb(this.database, context);
 

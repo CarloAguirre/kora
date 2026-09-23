@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CLOCK, err, ok, type ApplicationError, type Clock, type Result } from '@kora/core';
-import type { UpdateProjectModuleInput } from '@kora/contracts';
-import { ProjectModuleNotFoundError, ProjectNotFoundError } from '../../domain/errors/project.errors';
+import type { Permission, UpdateProjectModuleInput } from '@kora/contracts';
+import { CannotManageProjectError, ProjectModuleNotFoundError, ProjectNotFoundError } from '../../domain/errors/project.errors';
 import { PROJECT_REPOSITORY, type ProjectRepository } from '../../domain/repositories/project.repository';
 import {
   PROJECT_MODULE_REPOSITORY,
@@ -18,6 +18,7 @@ export interface UpdateProjectModuleCommand {
   readonly moduleId: string;
   readonly data: UpdateProjectModuleInput;
   readonly actor: ActorContext;
+  readonly actorPermissions: readonly Permission[];
 }
 
 @Injectable()
@@ -34,8 +35,12 @@ export class UpdateProjectModuleUseCase implements UseCase<UpdateProjectModuleCo
     if (!project || project.isDeleted) return err(new ProjectNotFoundError(command.projectId));
 
     const module = await this.modules.findById(command.moduleId);
-    if (!module || module.projectId !== command.projectId) {
+    if (!module || module.projectId !== project.id) {
       return err(new ProjectModuleNotFoundError(command.moduleId));
+    }
+
+    if (!command.actorPermissions.includes('projects:manage') && project.leaderUserId !== command.actor.userId) {
+      return err(new CannotManageProjectError());
     }
 
     await this.modules.update(
@@ -58,7 +63,7 @@ export class UpdateProjectModuleUseCase implements UseCase<UpdateProjectModuleCo
       actor: { userId: command.actor.userId, email: command.actor.email },
       action: 'update',
       entityType: 'project',
-      entityId: command.projectId,
+      entityId: project.id,
       metadata: { event: 'module_updated', moduleId: command.moduleId },
     });
 

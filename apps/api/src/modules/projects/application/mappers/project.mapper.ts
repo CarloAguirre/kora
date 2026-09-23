@@ -61,6 +61,8 @@ export interface ProjectDetailSource {
   readonly paymentMilestones: readonly ProjectPaymentMilestoneRecord[];
   readonly usedHoursUpdatedAt: Date | null;
   readonly actorUserId: string;
+  /** Líder de este proyecto, PMO o admin: puede editar cualquier entrada de bitácora y resolver pendientes. */
+  readonly canManagePendings: boolean;
   readonly canAuthorizeOvertime: boolean;
   readonly now: Date;
 }
@@ -101,10 +103,14 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
     authorUserId: observation.authorUserId,
     authorName: observation.authorName,
     createdAt: observation.createdAt.toISOString(),
-    canEdit: observation.authorUserId === source.actorUserId,
+    canEdit:
+      observation.type !== 'cambio_proyecto' &&
+      (observation.authorUserId === source.actorUserId || source.canManagePendings),
     canDelete:
+      observation.type !== 'cambio_proyecto' &&
       observation.authorUserId === source.actorUserId &&
       source.now.getTime() - observation.createdAt.getTime() <= PROJECT_OBSERVATION_DELETE_WINDOW_MS,
+    canResolve: source.canManagePendings,
   }));
 
   const modules: ProjectModuleDto[] = source.modules.map((module) => ({

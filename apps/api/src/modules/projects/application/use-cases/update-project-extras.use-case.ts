@@ -37,7 +37,7 @@ export class UpdateProjectExtrasUseCase implements UseCase<UpdateProjectExtrasCo
     if (!project || project.isDeleted) return err(new ProjectNotFoundError(projectId));
 
     if (!command.actorPermissions.includes('projects:manage')) {
-      const isLeader = await this.projects.isProjectLeaderOrTeamLeaderOfMember(projectId, actor.userId, null);
+      const isLeader = await this.projects.isProjectLeaderOrTeamLeaderOfMember(project.id, actor.userId, null);
       if (!isLeader) return err(new CannotEditProjectExtrasError());
     }
 

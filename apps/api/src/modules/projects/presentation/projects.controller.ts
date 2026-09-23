@@ -12,6 +12,7 @@ import {
   issueProjectPaymentMilestoneInvoiceSchema,
   listProjectsQuerySchema,
   markProjectPaymentMilestonePaidSchema,
+  resolveProjectObservationSchema,
   setProjectOvertimeAuthorizationSchema,
   updateProjectBillingSettingsSchema,
   updateProjectModuleDeliverySchema,
@@ -38,6 +39,7 @@ import {
   type MarkProjectPaymentMilestonePaidInput,
   type ProjectBillingSettings,
   type ProjectDetail,
+  type ResolveProjectObservationInput,
   type SetProjectOvertimeAuthorizationInput,
   type UpdateProjectBillingSettingsInput,
   type UpdateProjectExtrasInput,
@@ -68,6 +70,7 @@ import { UnassignProjectTeamMemberUseCase } from '../application/use-cases/unass
 import { UpdateProjectTeamMemberUseCase } from '../application/use-cases/update-project-team-member.use-case';
 import { AddProjectObservationUseCase } from '../application/use-cases/add-project-observation.use-case';
 import { UpdateProjectObservationUseCase } from '../application/use-cases/update-project-observation.use-case';
+import { ResolveProjectObservationUseCase } from '../application/use-cases/resolve-project-observation.use-case';
 import { DeleteProjectObservationUseCase } from '../application/use-cases/delete-project-observation.use-case';
 import { CreateProjectModuleUseCase } from '../application/use-cases/create-project-module.use-case';
 import { UpdateProjectModuleUseCase } from '../application/use-cases/update-project-module.use-case';
@@ -106,6 +109,7 @@ export class ProjectsController {
     private readonly updateMember: UpdateProjectTeamMemberUseCase,
     private readonly addObservation: AddProjectObservationUseCase,
     private readonly updateObservation: UpdateProjectObservationUseCase,
+    private readonly resolveObservation: ResolveProjectObservationUseCase,
     private readonly deleteObservation: DeleteProjectObservationUseCase,
     private readonly createModule: CreateProjectModuleUseCase,
     private readonly updateModule: UpdateProjectModuleUseCase,
@@ -188,15 +192,23 @@ export class ProjectsController {
     return unwrapOrThrow(await this.createProject.execute({ data: body, actor: toActorContext(actor) }));
   }
 
+  /** Sin `projects:manage`, el líder DE ESTE PROYECTO también puede editarlo — ver `UpdateProjectUseCase`. */
   @Patch(':id')
-  @RequirePermissions('projects:manage')
+  @RequireAnyPermission('projects:manage', 'projects:read_assigned')
   @HttpCode(HttpStatus.NO_CONTENT)
   async update(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(updateProjectSchema)) body: UpdateProjectInput,
     @CurrentUser() actor: RequestUser,
   ): Promise<void> {
-    unwrapOrThrow(await this.updateProject.execute({ projectId: id, data: body, actor: toActorContext(actor) }));
+    unwrapOrThrow(
+      await this.updateProject.execute({
+        projectId: id,
+        data: body,
+        actor: toActorContext(actor),
+        actorPermissions: actor.permissions,
+      }),
+    );
   }
 
   /**
@@ -225,15 +237,23 @@ export class ProjectsController {
     );
   }
 
+  /** Sin `projects:manage`, el líder DE ESTE PROYECTO también puede cambiar su estado. */
   @Patch(':id/status')
-  @RequirePermissions('projects:manage')
+  @RequireAnyPermission('projects:manage', 'projects:read_assigned')
   @HttpCode(HttpStatus.NO_CONTENT)
   async setStatus(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(changeProjectStatusSchema)) body: ChangeProjectStatusInput,
     @CurrentUser() actor: RequestUser,
   ): Promise<void> {
-    unwrapOrThrow(await this.changeStatus.execute({ projectId: id, data: body, actor: toActorContext(actor) }));
+    unwrapOrThrow(
+      await this.changeStatus.execute({
+        projectId: id,
+        data: body,
+        actor: toActorContext(actor),
+        actorPermissions: actor.permissions,
+      }),
+    );
   }
 
   /**
@@ -355,7 +375,7 @@ export class ProjectsController {
 
   /**
    * Igual que al crear, el permiso solo abre la puerta: `UpdateProjectObservationUseCase`
-   * exige además ser el autor y estar dentro de los 15 minutos desde su creación.
+   * exige además ser el autor (o líder/PMO/admin) — y no admite tocar un `cambio_proyecto`.
    */
   @Patch(':id/observations/:observationId')
   @RequireAnyPermission('projects:manage', 'projects:read_assigned')
@@ -372,6 +392,31 @@ export class ProjectsController {
         observationId,
         data: body,
         actor: toActorContext(actor),
+        actorPermissions: actor.permissions,
+      }),
+    );
+  }
+
+  /**
+   * Aprobar/rechazar un compromiso, cerrar/reabrir un incidente — reservado a quien
+   * administra los pendientes del proyecto (líder, PMO o admin); ver `ResolveProjectObservationUseCase`.
+   */
+  @Patch(':id/observations/:observationId/status')
+  @RequireAnyPermission('projects:manage', 'projects:read_assigned')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async resolveProjectObservation(
+    @Param('id') id: string,
+    @Param('observationId') observationId: string,
+    @Body(new ZodValidationPipe(resolveProjectObservationSchema)) body: ResolveProjectObservationInput,
+    @CurrentUser() actor: RequestUser,
+  ): Promise<void> {
+    unwrapOrThrow(
+      await this.resolveObservation.execute({
+        projectId: id,
+        observationId,
+        data: body,
+        actor: toActorContext(actor),
+        actorPermissions: actor.permissions,
       }),
     );
   }
@@ -389,8 +434,9 @@ export class ProjectsController {
     );
   }
 
+  /** Sin `projects:manage`, el líder DE ESTE PROYECTO también puede crear fases/módulos. */
   @Post(':id/modules')
-  @RequirePermissions('projects:manage')
+  @RequireAnyPermission('projects:manage', 'projects:read_assigned')
   @HttpCode(HttpStatus.CREATED)
   async createProjectModule(
     @Param('id') id: string,
@@ -398,12 +444,17 @@ export class ProjectsController {
     @CurrentUser() actor: RequestUser,
   ): Promise<{ id: string }> {
     return unwrapOrThrow(
-      await this.createModule.execute({ projectId: id, data: body, actor: toActorContext(actor) }),
+      await this.createModule.execute({
+        projectId: id,
+        data: body,
+        actor: toActorContext(actor),
+        actorPermissions: actor.permissions,
+      }),
     );
   }
 
   @Patch(':id/modules/:moduleId')
-  @RequirePermissions('projects:manage')
+  @RequireAnyPermission('projects:manage', 'projects:read_assigned')
   @HttpCode(HttpStatus.NO_CONTENT)
   async updateProjectModule(
     @Param('id') id: string,
@@ -412,23 +463,36 @@ export class ProjectsController {
     @CurrentUser() actor: RequestUser,
   ): Promise<void> {
     unwrapOrThrow(
-      await this.updateModule.execute({ projectId: id, moduleId, data: body, actor: toActorContext(actor) }),
+      await this.updateModule.execute({
+        projectId: id,
+        moduleId,
+        data: body,
+        actor: toActorContext(actor),
+        actorPermissions: actor.permissions,
+      }),
     );
   }
 
   @Delete(':id/modules/:moduleId')
-  @RequirePermissions('projects:manage')
+  @RequireAnyPermission('projects:manage', 'projects:read_assigned')
   @HttpCode(HttpStatus.NO_CONTENT)
   async deleteProjectModule(
     @Param('id') id: string,
     @Param('moduleId') moduleId: string,
     @CurrentUser() actor: RequestUser,
   ): Promise<void> {
-    unwrapOrThrow(await this.deleteModule.execute({ projectId: id, moduleId, actor: toActorContext(actor) }));
+    unwrapOrThrow(
+      await this.deleteModule.execute({
+        projectId: id,
+        moduleId,
+        actor: toActorContext(actor),
+        actorPermissions: actor.permissions,
+      }),
+    );
   }
 
   @Post(':id/modules/:moduleId/deliveries')
-  @RequirePermissions('projects:manage')
+  @RequireAnyPermission('projects:manage', 'projects:read_assigned')
   @HttpCode(HttpStatus.CREATED)
   async addProjectModuleDelivery(
     @Param('id') id: string,
@@ -437,7 +501,13 @@ export class ProjectsController {
     @CurrentUser() actor: RequestUser,
   ): Promise<{ id: string }> {
     return unwrapOrThrow(
-      await this.addModuleDelivery.execute({ projectId: id, moduleId, data: body, actor: toActorContext(actor) }),
+      await this.addModuleDelivery.execute({
+        projectId: id,
+        moduleId,
+        data: body,
+        actor: toActorContext(actor),
+        actorPermissions: actor.permissions,
+      }),
     );
   }
 
@@ -470,7 +540,7 @@ export class ProjectsController {
   }
 
   @Delete(':id/modules/:moduleId/deliveries/:deliveryId')
-  @RequirePermissions('projects:manage')
+  @RequireAnyPermission('projects:manage', 'projects:read_assigned')
   @HttpCode(HttpStatus.NO_CONTENT)
   async removeProjectModuleDelivery(
     @Param('id') id: string,
@@ -484,12 +554,13 @@ export class ProjectsController {
         moduleId,
         deliveryId,
         actor: toActorContext(actor),
+        actorPermissions: actor.permissions,
       }),
     );
   }
 
   @Post(':id/modules/:moduleId/segments')
-  @RequirePermissions('projects:manage')
+  @RequireAnyPermission('projects:manage', 'projects:read_assigned')
   @HttpCode(HttpStatus.CREATED)
   async createProjectModuleSegment(
     @Param('id') id: string,
@@ -498,12 +569,18 @@ export class ProjectsController {
     @CurrentUser() actor: RequestUser,
   ): Promise<{ id: string }> {
     return unwrapOrThrow(
-      await this.createModuleSegment.execute({ projectId: id, moduleId, data: body, actor: toActorContext(actor) }),
+      await this.createModuleSegment.execute({
+        projectId: id,
+        moduleId,
+        data: body,
+        actor: toActorContext(actor),
+        actorPermissions: actor.permissions,
+      }),
     );
   }
 
   @Patch(':id/modules/:moduleId/segments/:segmentId')
-  @RequirePermissions('projects:manage')
+  @RequireAnyPermission('projects:manage', 'projects:read_assigned')
   @HttpCode(HttpStatus.NO_CONTENT)
   async updateProjectModuleSegment(
     @Param('id') id: string,
@@ -519,12 +596,13 @@ export class ProjectsController {
         segmentId,
         data: body,
         actor: toActorContext(actor),
+        actorPermissions: actor.permissions,
       }),
     );
   }
 
   @Delete(':id/modules/:moduleId/segments/:segmentId')
-  @RequirePermissions('projects:manage')
+  @RequireAnyPermission('projects:manage', 'projects:read_assigned')
   @HttpCode(HttpStatus.NO_CONTENT)
   async deleteProjectModuleSegment(
     @Param('id') id: string,
@@ -533,7 +611,13 @@ export class ProjectsController {
     @CurrentUser() actor: RequestUser,
   ): Promise<void> {
     unwrapOrThrow(
-      await this.deleteModuleSegment.execute({ projectId: id, moduleId, segmentId, actor: toActorContext(actor) }),
+      await this.deleteModuleSegment.execute({
+        projectId: id,
+        moduleId,
+        segmentId,
+        actor: toActorContext(actor),
+        actorPermissions: actor.permissions,
+      }),
     );
   }
 
@@ -605,9 +689,12 @@ export class ProjectsController {
     );
   }
 
-  /** Configurar el cronograma de cobro ("Facturación de Proyectos") es una decisión de PM/PMO, no de Finanzas. */
+  /**
+   * Configurar el cronograma de cobro ("Facturación de Proyectos") es una decisión de PM/PMO — o del
+   * líder DE ESTE PROYECTO. Marcar un tramo como facturado/pagado sigue siendo solo de Finanzas.
+   */
   @Post(':id/payment-milestones')
-  @RequirePermissions('projects:manage')
+  @RequireAnyPermission('projects:manage', 'projects:read_assigned')
   @HttpCode(HttpStatus.CREATED)
   async createProjectPaymentMilestone(
     @Param('id') id: string,
@@ -615,12 +702,17 @@ export class ProjectsController {
     @CurrentUser() actor: RequestUser,
   ): Promise<{ id: string }> {
     return unwrapOrThrow(
-      await this.createPaymentMilestone.execute({ projectId: id, data: body, actor: toActorContext(actor) }),
+      await this.createPaymentMilestone.execute({
+        projectId: id,
+        data: body,
+        actor: toActorContext(actor),
+        actorPermissions: actor.permissions,
+      }),
     );
   }
 
   @Patch(':id/payment-milestones/:milestoneId')
-  @RequirePermissions('projects:manage')
+  @RequireAnyPermission('projects:manage', 'projects:read_assigned')
   @HttpCode(HttpStatus.NO_CONTENT)
   async updateProjectPaymentMilestone(
     @Param('id') id: string,
@@ -634,12 +726,13 @@ export class ProjectsController {
         milestoneId,
         data: body,
         actor: toActorContext(actor),
+        actorPermissions: actor.permissions,
       }),
     );
   }
 
   @Delete(':id/payment-milestones/:milestoneId')
-  @RequirePermissions('projects:manage')
+  @RequireAnyPermission('projects:manage', 'projects:read_assigned')
   @HttpCode(HttpStatus.NO_CONTENT)
   async deleteProjectPaymentMilestone(
     @Param('id') id: string,
@@ -647,7 +740,12 @@ export class ProjectsController {
     @CurrentUser() actor: RequestUser,
   ): Promise<void> {
     unwrapOrThrow(
-      await this.deletePaymentMilestone.execute({ projectId: id, milestoneId, actor: toActorContext(actor) }),
+      await this.deletePaymentMilestone.execute({
+        projectId: id,
+        milestoneId,
+        actor: toActorContext(actor),
+        actorPermissions: actor.permissions,
+      }),
     );
   }
 
