@@ -1,5 +1,9 @@
+import { useState } from 'react';
 import styles from './ProjectBitacora.module.css';
 import type { ClientBitacoraEntry, ClientBitacoraEntryKind } from '../types';
+
+/** Cuántas entradas se ven antes de tener que pedir "Ver más". */
+const PAGE_SIZE = 5;
 
 /**
  * Glifos tal cual el Figma (node 9663:24685, variante "Kora · Proyectos y
@@ -28,15 +32,20 @@ const KIND_ICON_CLASS: Readonly<Record<ClientBitacoraEntryKind, string>> = {
  * entrada con su propia etiqueta de fase en vez de vivir bajo un solo
  * `milestonesCaption` de la fase activa.
  */
-export function ProjectBitacora({ entries, onSeeMore }: { entries: readonly ClientBitacoraEntry[]; onSeeMore: () => void }) {
+export function ProjectBitacora({ entries }: { entries: readonly ClientBitacoraEntry[] }) {
+  const [expanded, setExpanded] = useState(false);
+  const visibleEntries = expanded ? entries : entries.slice(0, PAGE_SIZE);
+
   return (
     <div className={styles.card}>
-      {entries.map((entry) => (
+      {visibleEntries.map((entry) => (
         <BitacoraEntryRow key={entry.id} entry={entry} />
       ))}
-      <button type="button" className={styles.seeMore} onClick={onSeeMore}>
-        Ver más
-      </button>
+      {!expanded && entries.length > PAGE_SIZE && (
+        <button type="button" className={styles.seeMore} onClick={() => setExpanded(true)}>
+          Ver más ({entries.length - PAGE_SIZE})
+        </button>
+      )}
     </div>
   );
 }

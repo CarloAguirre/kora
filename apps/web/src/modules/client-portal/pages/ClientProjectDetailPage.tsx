@@ -34,19 +34,24 @@ import { ProjectBillingCard } from '../components/ProjectBillingCard';
 import { ProjectBitacora } from '../components/ProjectBitacora';
 import { StatusPill, type StatusPillTone } from '../components/StatusPill';
 import { toClientProjectDetail } from '../adapters/project-detail.adapter';
-import type { ClientProjectHealth } from '../types';
+import type { ClientAccessLinks, ClientProjectHealth } from '../types';
 
 interface AccessLink {
+  readonly key: keyof ClientAccessLinks;
   readonly label: string;
   readonly subtitle: string;
   readonly icon: ComponentType<IconProps>;
 }
 
+/** Fuente real en `project.accessLinks` (`demoLink`/`testEnvironmentLink`/
+ *  `figmaLink`/`documentationLink`, declarados en la pestaña "Extras" de la
+ *  ficha interna) — solo se muestra la tarjeta de las que el proyecto tiene
+ *  configuradas, ver `configuredAccessLinks` más abajo. */
 const ACCESS_LINKS: readonly AccessLink[] = [
-  { label: 'Ver demo', subtitle: 'Ambiente de demostración', icon: PlayIcon },
-  { label: 'Ambiente de prueba', subtitle: 'Acceso a usuarios', icon: CircleCheckIcon },
-  { label: 'Figma', subtitle: 'Diseño', icon: DiamondIcon },
-  { label: 'Documentación', subtitle: 'Especificaciones', icon: AlignLeftIcon },
+  { key: 'demo', label: 'Ver demo', subtitle: 'Ambiente de demostración', icon: PlayIcon },
+  { key: 'testEnvironment', label: 'Ambiente de prueba', subtitle: 'Acceso a usuarios', icon: CircleCheckIcon },
+  { key: 'figma', label: 'Figma', subtitle: 'Diseño', icon: DiamondIcon },
+  { key: 'documentation', label: 'Documentación', subtitle: 'Especificaciones', icon: AlignLeftIcon },
 ];
 
 type SectionKey = 'info' | 'billing' | 'links' | 'roadmap' | 'hours' | 'gantt' | 'impact' | 'qa' | 'bitacora';
@@ -107,21 +112,25 @@ const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFr
  *
  * DATOS REALES vía `useProjectDetail` + `toClientProjectDetail` (ver
  * `adapters/project-detail.adapter.ts`) — ver docs/DECISION-PORTAL-CLIENTE.md.
- * RECORTES DELIBERADOS que siguen sin lógica real detrás (muestran un aviso
- * en vez de fallar en silencio):
- * - La pestaña "Vista Interna" del Figma se muestra deshabilitada con un
- *   candado (igual que en el propio Figma): esta ruta ES la vista cliente,
- *   no hay una pantalla interna a la que alternar desde aquí.
- * - Los botones "Compartir PDF" / "Descargar PDF", los accesos ("Ver demo",
- *   "Ambiente de prueba", etc.) y los controles de "Roadmap por Fases"
- *   (filtro de rango, Aplicar/Restablecer, "Ver más" de la Bitácora) — el
- *   zoom Semanas/Días de "Roadmap por Fases" sí es real, ver el componente.
+ * Ya no quedan botones puramente decorativos en esta vista:
+ * - "Compartir PDF" copia el link de esta misma ficha al portapapeles y
+ *   "Descargar PDF" abre el diálogo de impresión del navegador (no hay
+ *   generación de PDF en el backend, así que no hay nada real que "conectar"
+ *   más allá de eso — ver `handleSharePdf`/`handleDownloadPdf`).
+ * - "Accesos y enlaces" ("Ver demo", "Ambiente de prueba", etc.) lee de
+ *   `project.accessLinks` (declarados en la pestaña "Extras" de la ficha
+ *   interna) y solo muestra las tarjetas que el proyecto tiene configuradas.
+ * - Los controles de "Roadmap por Fases" (zoom, filtro de rango, chips de
+ *   ámbito, selección de tarea/entrega/incidente) y el "Ver más" de la
+ *   Bitácora son reales — ver esos componentes.
+ * La única pieza deliberadamente deshabilitada es la pestaña "Vista Interna"
+ * del Figma, con un candado (igual que en el propio Figma): esta ruta YA ES
+ * la vista cliente, no hay una pantalla interna a la que alternar desde aquí.
  *
  * La botonera de íconos bajo el título replica la del Figma en el orden y
  * los conceptos, no en la cantidad exacta: el archivo se quedó con 9 botones
- * sin sincronizar con las secciones nuevas ("Facturación", "Avance del
- * periodo") ni con la fusión de "Hitos y aprobaciones" + "Puntos de atención
- * e incidentes" en una sola "Bitácora" — acá son 10, uno por sección.
+ * sin sincronizar con la fusión de "Hitos y aprobaciones" + "Puntos de
+ * atención e incidentes" en una sola "Bitácora" — acá son 9, uno por sección.
  * `SECTION_TOGGLES` es la única lista — el botón y la sección que controla
  * nunca pueden desincronizarse porque ambos leen de ahí.
  */
@@ -145,8 +154,21 @@ export function ClientProjectDetailPage({ projectIdOverride, backTo, backLabel }
   const [visible, setVisible] = useState<Record<SectionKey, boolean>>(ALL_SECTIONS_VISIBLE);
   const resolvedBackTo = backTo ?? '/portal/proyectos';
 
-  const notifyMock = (label: string) => toast.show(`"${label}" es una acción de ejemplo — todavía no está conectada.`, 'info');
   const toggleSection = (key: SectionKey) => setVisible((prev) => ({ ...prev, [key]: !prev[key] }));
+
+  /** No hay generación de PDF en el backend — "Compartir" copia el enlace de
+   *  esta misma ficha (quien lo reciba necesita acceso al portal cliente) y
+   *  "Descargar" abre el diálogo de impresión del navegador, que ya ofrece
+   *  "Guardar como PDF". */
+  const handleSharePdf = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      toast.show('Enlace copiado al portapapeles.', 'success');
+    } catch {
+      toast.show('No se pudo copiar el enlace.', 'error');
+    }
+  };
+  const handleDownloadPdf = () => window.print();
 
   if (isLoading) {
     return (
@@ -176,6 +198,10 @@ export function ClientProjectDetailPage({ projectIdOverride, backTo, backLabel }
     );
   }
 
+  const configuredAccessLinks = ACCESS_LINKS.map((link) => ({ ...link, url: project.accessLinks[link.key] })).filter(
+    (link): link is AccessLink & { url: string } => Boolean(link.url),
+  );
+
   return (
     <DashboardLayout title="Detalle de proyecto">
       <div className={styles.page}>
@@ -187,10 +213,10 @@ export function ClientProjectDetailPage({ projectIdOverride, backTo, backLabel }
 
         <div className={styles.statusActionsRow}>
           <StatusPill tone={HEALTH_TONE[project.health]}>{HEALTH_LABEL[project.health]}</StatusPill>
-          <Button variant="outline" iconLeft={<LinkIcon size={15} />} onClick={() => notifyMock('Compartir PDF')}>
+          <Button variant="outline" iconLeft={<LinkIcon size={15} />} onClick={handleSharePdf}>
             Compartir PDF
           </Button>
-          <Button variant="outline" iconLeft={<DownloadIcon size={15} />} onClick={() => notifyMock('Descargar PDF')}>
+          <Button variant="outline" iconLeft={<DownloadIcon size={15} />} onClick={handleDownloadPdf}>
             Descargar PDF
           </Button>
         </div>
@@ -258,18 +284,18 @@ export function ClientProjectDetailPage({ projectIdOverride, backTo, backLabel }
         </section>
         )}
 
-        {visible.links && (
+        {visible.links && configuredAccessLinks.length > 0 && (
         <section className={styles.section}>
           <h3 className={styles.sectionTitle}>Accesos y enlaces</h3>
           <div className={styles.linksRow}>
-            {ACCESS_LINKS.map(({ label, subtitle, icon: LinkIconCmp }) => (
-              <button key={label} type="button" className={styles.linkCard} onClick={() => notifyMock(label)}>
+            {configuredAccessLinks.map(({ key, label, subtitle, icon: LinkIconCmp, url }) => (
+              <a key={key} href={url} target="_blank" rel="noopener noreferrer" className={styles.linkCard}>
                 <LinkIconCmp size={16} className={styles.linkIcon} />
                 <span className={styles.linkText}>
                   <span className={styles.linkTitle}>{label}</span>
                   <span className={styles.linkSubtitle}>{subtitle}</span>
                 </span>
-              </button>
+              </a>
             ))}
           </div>
         </section>
@@ -427,7 +453,7 @@ export function ClientProjectDetailPage({ projectIdOverride, backTo, backLabel }
         {visible.bitacora && (
         <section className={styles.section}>
           <h3 className={styles.sectionTitle}>Bitácora</h3>
-          <ProjectBitacora entries={project.bitacora} onSeeMore={() => notifyMock('Ver más')} />
+          <ProjectBitacora entries={project.bitacora} />
         </section>
         )}
       </div>

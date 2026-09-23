@@ -372,6 +372,12 @@ export function toClientProjectDetail(project: ProjectDetail): ClientProjectDeta
     bitacora: project.observations
       .filter((observation) => !observation.moduleId || moduleBadgeByModuleId.has(observation.moduleId))
       .map((observation) => toBitacoraEntry(observation, moduleBadgeByModuleId)),
+    accessLinks: {
+      demo: project.demoLink,
+      testEnvironment: project.testEnvironmentLink,
+      figma: project.figmaLink,
+      documentation: project.documentationLink,
+    },
     businessImpact: { before: impactBefore, after: impactAfter, reductionPercent },
     qaMetrics:
       project.qaPlannedTests != null

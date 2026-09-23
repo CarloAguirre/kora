@@ -29,7 +29,9 @@
 }
 
 .filterRow > *:last-child {
-  flex: 0 1 360px;
+  /* Debe caber el buscador (260px) + el botón "Limpiar filtros" en la misma
+     línea; con 360px el botón siempre quedaba huérfano en una línea aparte. */
+  flex: 0 1 440px;
 }
 
 .tableSection {

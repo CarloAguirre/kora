@@ -315,6 +315,17 @@ export interface ClientProjectBilling {
   readonly schedule: readonly ClientBillingScheduleRow[];
 }
 
+/** "Accesos y enlaces" — declarados en la pestaña "Extras" de la ficha interna
+ *  (`demoLink`/`testEnvironmentLink`/`figmaLink`/`documentationLink` de
+ *  `ProjectDetail`); `null` cuando el proyecto no tiene ese link configurado,
+ *  así la vista cliente solo muestra las tarjetas que sí tienen destino. */
+export interface ClientAccessLinks {
+  readonly demo: string | null;
+  readonly testEnvironment: string | null;
+  readonly figma: string | null;
+  readonly documentation: string | null;
+}
+
 export interface ClientProjectDetail {
   readonly id: string;
   readonly name: string;
@@ -340,6 +351,7 @@ export interface ClientProjectDetail {
   readonly roadmap: readonly ClientRoadmapPhase[];
   readonly phaseRoadmap: ProjectPhaseRoadmap;
   readonly bitacora: readonly ClientBitacoraEntry[];
+  readonly accessLinks: ClientAccessLinks;
   /** Ver "Impacto en el negocio" del Figma — antes/después de automatizar. */
   readonly businessImpact: {
     readonly before: { readonly totalProcessHours: number; readonly peopleInvolved: number; readonly cycleDays: number; readonly modality: string };

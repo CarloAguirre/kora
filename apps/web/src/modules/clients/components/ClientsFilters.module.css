@@ -13,7 +13,11 @@
 
 .reset {
   flex-shrink: 0;
-  margin-bottom: 20px;
+  /* margin-left: auto lo empuja al borde derecho de su línea, incluso si el
+     buscador ocupa toda la primera y el botón cae solo a la siguiente.
+     Sin margin-bottom: align-items: flex-end ya lo deja al ras de la caja
+     del campo — agregarlo lo subía hasta la altura de la etiqueta. */
+  margin-left: auto;
 }
 
 @media (max-width: 640px) {
@@ -23,6 +27,7 @@
   }
 
   .reset {
-    margin-bottom: 0;
+    align-self: flex-end;
+    margin-top: var(--kora-space-1);
   }
 }

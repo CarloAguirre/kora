@@ -196,6 +196,7 @@
   color: #0f2a44;
   cursor: pointer;
   text-align: left;
+  text-decoration: none;
 }
 
 .linkCard:hover {

@@ -53,8 +53,11 @@
 
 .reset {
   flex-shrink: 0;
-  /* Alinea el botón con la caja de los campos, no con su etiqueta. */
-  margin-bottom: 20px;
+  /* align-items: flex-end en .filters ya lo deja al ras de la caja de los
+     campos — un margin-bottom aquí lo subía hasta la altura de la etiqueta. */
+  /* Lo empuja al borde derecho de su línea, incluso si cae solo en una
+     línea propia por falta de espacio. */
+  margin-left: auto;
 }
 
 @media (max-width: 640px) {
@@ -64,7 +67,8 @@
   }
 
   .reset {
-    margin-bottom: 0;
+    align-self: flex-end;
+    margin-top: var(--kora-space-1);
   }
 }
 
