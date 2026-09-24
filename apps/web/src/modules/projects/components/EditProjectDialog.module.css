@@ -106,6 +106,7 @@
 }
 
 .textarea:focus-visible {
+  outline: none;
   border-color: var(--kora-blue-600);
   box-shadow: 0 0 0 3px var(--kora-blue-surface);
 }
