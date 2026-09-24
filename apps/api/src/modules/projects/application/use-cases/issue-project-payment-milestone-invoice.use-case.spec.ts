@@ -9,7 +9,9 @@ import {
 import type { ProjectPaymentMilestoneRecord, ProjectPaymentMilestoneRepository } from '../../domain/repositories/project-payment-milestone.repository';
 import type { ProjectRepository } from '../../domain/repositories/project.repository';
 import type { ProjectBillingSettingsRepository } from '../../domain/repositories/project-billing-settings.repository';
+import type { ProjectUserReader } from '../ports/project-user-reader.port';
 import type { AuditRecorder } from '../../../../shared/application/ports/audit-recorder.port';
+import type { NotificationSender } from '../../../../shared/application/ports/notification.port';
 import { FixedClock } from '../../../../test/fakes';
 
 const NOW = new Date('2026-09-24T00:00:00.000Z');
@@ -70,24 +72,35 @@ function buildUseCase(options: {
     get: vi.fn().mockResolvedValue({ autoActivateFirstPayment: options.autoActivateFirstPayment ?? true, updatedAt: null }),
   } as unknown as ProjectBillingSettingsRepository;
 
+  const users = {
+    findActiveAdminTierRecipients: vi.fn().mockResolvedValue([{ id: 'admin-1', fullName: 'Gerente Uno', email: 'gerente@kabeli.cl' }]),
+  } as unknown as ProjectUserReader;
+
   const audit = { record: vi.fn().mockResolvedValue(undefined) } as unknown as AuditRecorder;
+  const notifications = {
+    sendProjectInvoiceBlocked: vi.fn().mockResolvedValue(undefined),
+    sendProjectAutoActivated: vi.fn().mockResolvedValue(undefined),
+    sendProjectReactivatedFromHold: vi.fn().mockResolvedValue(undefined),
+  } as unknown as NotificationSender;
   const unitOfWork = { run: vi.fn((work: (tx: unknown) => Promise<unknown>) => work({})) } as unknown as UnitOfWork;
 
   const useCase = new IssueProjectPaymentMilestoneInvoiceUseCase(
     milestones,
     projects,
     billingSettings,
+    users,
     audit,
+    notifications,
     unitOfWork,
     new FixedClock(NOW),
   );
 
-  return { useCase, milestones, projects, billingSettings };
+  return { useCase, milestones, projects, billingSettings, notifications };
 }
 
 describe('IssueProjectPaymentMilestoneInvoiceUseCase', () => {
-  it('bloquea facturar si el proyecto de desarrollo no está Aprobado', async () => {
-    const { useCase, milestones } = buildUseCase({ project: buildProject({ salesStage: 'quoted' }) });
+  it('bloquea facturar si el proyecto de desarrollo no está Aprobado, y avisa a Gerencia/PMO igual', async () => {
+    const { useCase, milestones, notifications } = buildUseCase({ project: buildProject({ salesStage: 'quoted' }) });
 
     const result = await useCase.execute({
       milestoneId: 'milestone-1',
@@ -98,6 +111,9 @@ describe('IssueProjectPaymentMilestoneInvoiceUseCase', () => {
     expect(result.isErr()).toBe(true);
     expect(result.isErr() && result.error).toBeInstanceOf(ProjectNotApprovedForInvoicingError);
     expect(milestones.markIssued).not.toHaveBeenCalled();
+    expect(notifications.sendProjectInvoiceBlocked).toHaveBeenCalledWith(
+      expect.objectContaining({ recipientEmail: 'gerente@kabeli.cl', projectId: 'project-1' }),
+    );
   });
 
   it('rechaza un tramo que ya fue facturado', async () => {
@@ -113,8 +129,8 @@ describe('IssueProjectPaymentMilestoneInvoiceUseCase', () => {
     expect(result.isErr() && result.error).toBeInstanceOf(ProjectPaymentMilestoneAlreadyIssuedError);
   });
 
-  it('dispara Hito 0 (activa) al facturar el primer tramo de un proyecto Aprobado/No iniciado', async () => {
-    const { useCase, projects } = buildUseCase({});
+  it('dispara Hito 0 (activa) al facturar el primer tramo de un proyecto Aprobado/No iniciado, y avisa a Gerencia/PMO', async () => {
+    const { useCase, projects, notifications } = buildUseCase({});
 
     const result = await useCase.execute({
       milestoneId: 'milestone-1',
@@ -128,6 +144,10 @@ describe('IssueProjectPaymentMilestoneInvoiceUseCase', () => {
     expect(saved.status).toBe('active');
     expect(saved.hito0Source).toBe('auto_invoice');
     expect(saved.hito0At).toEqual(NOW);
+    expect(notifications.sendProjectAutoActivated).toHaveBeenCalledWith(
+      expect.objectContaining({ recipientEmail: 'gerente@kabeli.cl', projectId: 'project-1' }),
+    );
+    expect(notifications.sendProjectReactivatedFromHold).not.toHaveBeenCalled();
   });
 
   it('deja pendiente de aprobación de Gerencia si el interruptor global está apagado', async () => {
@@ -145,12 +165,12 @@ describe('IssueProjectPaymentMilestoneInvoiceUseCase', () => {
     expect(saved.pendingManagementApproval).toBe(true);
   });
 
-  it('reactiva un proyecto Aprobado/Detenido sin tocar la fecha de Hito 0 original', async () => {
+  it('reactiva un proyecto Aprobado/Detenido sin tocar la fecha de Hito 0 original, y avisa con alerta de confirmación', async () => {
     const project = buildProject({ status: 'on_hold' });
     project.activateFromHito0(new Date('2026-01-10T00:00:00.000Z'), 'auto_invoice', null);
     project.changeStatus('on_hold', new Date('2026-01-10T00:00:00.000Z'));
 
-    const { useCase, projects } = buildUseCase({ project });
+    const { useCase, projects, notifications } = buildUseCase({ project });
 
     const result = await useCase.execute({
       milestoneId: 'milestone-1',
@@ -162,6 +182,10 @@ describe('IssueProjectPaymentMilestoneInvoiceUseCase', () => {
     const saved = (projects.save as ReturnType<typeof vi.fn>).mock.calls[0]![0] as Project;
     expect(saved.status).toBe('active');
     expect(saved.hito0At).toEqual(new Date('2026-01-10T00:00:00.000Z'));
+    expect(notifications.sendProjectReactivatedFromHold).toHaveBeenCalledWith(
+      expect.objectContaining({ recipientEmail: 'gerente@kabeli.cl', projectId: 'project-1' }),
+    );
+    expect(notifications.sendProjectAutoActivated).not.toHaveBeenCalled();
   });
 
   it('no dispara Hito 0 si el tramo facturado no es el primero (sortOrder mínimo)', async () => {

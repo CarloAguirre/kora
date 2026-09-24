@@ -1,6 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { eq, inArray, users, type Database } from '@kora/db';
-import type { ProjectUserReader, ProjectUserReference } from '../../application/ports/project-user-reader.port';
+import { and, eq, inArray, isNull, roles, users, type Database } from '@kora/db';
+import type {
+  ProjectNotificationRecipient,
+  ProjectUserReader,
+  ProjectUserReference,
+} from '../../application/ports/project-user-reader.port';
 import { DATABASE } from '../../../../shared/infrastructure/database/database.module';
 
 @Injectable()
@@ -24,5 +28,14 @@ export class DrizzleProjectUserReader implements ProjectUserReader {
       .from(users)
       .where(inArray(users.id, [...userIds]));
     return rows.map((row) => ({ id: row.id, fullName: `${row.firstName} ${row.lastName}`.trim() }));
+  }
+
+  async findActiveAdminTierRecipients(): Promise<ProjectNotificationRecipient[]> {
+    const rows = await this.database
+      .select({ id: users.id, firstName: users.firstName, lastName: users.lastName, email: users.email })
+      .from(users)
+      .innerJoin(roles, eq(roles.id, users.roleId))
+      .where(and(eq(roles.isAdminTier, true), eq(users.status, 'active'), isNull(users.deletedAt)));
+    return rows.map((row) => ({ id: row.id, fullName: `${row.firstName} ${row.lastName}`.trim(), email: row.email }));
   }
 }

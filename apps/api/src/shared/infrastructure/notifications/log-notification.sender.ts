@@ -4,6 +4,9 @@ import type {
   AccountStatusNotification,
   NotificationSender,
   PasswordResetNotification,
+  ProjectAutoActivatedNotification,
+  ProjectInvoiceBlockedNotification,
+  ProjectReactivatedFromHoldNotification,
   UserInvitation,
 } from '../../application/ports/notification.port';
 
@@ -48,6 +51,30 @@ export class LogNotificationSender implements NotificationSender {
       to: notification.email,
       status: notification.status,
       reason: notification.reason ?? null,
+    });
+  }
+
+  async sendProjectInvoiceBlocked(notification: ProjectInvoiceBlockedNotification): Promise<void> {
+    this.logger.info('[notificación] Factura bloqueada: proyecto no está Aprobado', {
+      to: notification.recipientEmail,
+      projectId: notification.projectId,
+      projectName: notification.projectName,
+    });
+  }
+
+  async sendProjectAutoActivated(notification: ProjectAutoActivatedNotification): Promise<void> {
+    this.logger.info('[notificación] Proyecto activado automáticamente (Hito 0)', {
+      to: notification.recipientEmail,
+      projectId: notification.projectId,
+      projectName: notification.projectName,
+    });
+  }
+
+  async sendProjectReactivatedFromHold(notification: ProjectReactivatedFromHoldNotification): Promise<void> {
+    this.logger.info('[notificación] Proyecto reactivado desde Detenido', {
+      to: notification.recipientEmail,
+      projectId: notification.projectId,
+      projectName: notification.projectName,
     });
   }
 }

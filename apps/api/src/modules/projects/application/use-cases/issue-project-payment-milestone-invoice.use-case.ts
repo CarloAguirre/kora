@@ -15,7 +15,9 @@ import {
   PROJECT_BILLING_SETTINGS_REPOSITORY,
   type ProjectBillingSettingsRepository,
 } from '../../domain/repositories/project-billing-settings.repository';
+import { PROJECT_USER_READER, type ProjectUserReader } from '../ports/project-user-reader.port';
 import { AUDIT_RECORDER, type AuditRecorder } from '../../../../shared/application/ports/audit-recorder.port';
+import { NOTIFICATION_SENDER, type NotificationSender } from '../../../../shared/application/ports/notification.port';
 import type { ActorContext, UseCase } from '../../../../shared/application/use-case';
 
 export interface IssueProjectPaymentMilestoneInvoiceCommand {
@@ -46,10 +48,20 @@ export class IssueProjectPaymentMilestoneInvoiceUseCase
     @Inject(PROJECT_PAYMENT_MILESTONE_REPOSITORY) private readonly milestones: ProjectPaymentMilestoneRepository,
     @Inject(PROJECT_REPOSITORY) private readonly projects: ProjectRepository,
     @Inject(PROJECT_BILLING_SETTINGS_REPOSITORY) private readonly billingSettings: ProjectBillingSettingsRepository,
+    @Inject(PROJECT_USER_READER) private readonly users: ProjectUserReader,
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
+    @Inject(NOTIFICATION_SENDER) private readonly notifications: NotificationSender,
     @Inject(UNIT_OF_WORK) private readonly unitOfWork: UnitOfWork,
     @Inject(CLOCK) private readonly clock: Clock,
   ) {}
+
+  /** Gerencia + líder PMO — destinatarios de las 3 alertas de este caso de uso. */
+  private async notifyAdminTier(send: (recipient: { email: string; firstName: string }) => Promise<void>): Promise<void> {
+    const recipients = await this.users.findActiveAdminTierRecipients();
+    await Promise.all(
+      recipients.map((recipient) => send({ email: recipient.email, firstName: recipient.fullName.split(' ')[0] ?? recipient.fullName })),
+    );
+  }
 
   async execute(command: IssueProjectPaymentMilestoneInvoiceCommand): Promise<Result<void, ApplicationError>> {
     const milestone = await this.milestones.findById(command.milestoneId);
@@ -58,6 +70,14 @@ export class IssueProjectPaymentMilestoneInvoiceUseCase
 
     const project = await this.projects.findById(milestone.projectId);
     if (project && !project.isDeleted && project.type === 'development' && project.salesStage !== 'approved') {
+      await this.notifyAdminTier((recipient) =>
+        this.notifications.sendProjectInvoiceBlocked({
+          recipientEmail: recipient.email,
+          recipientFirstName: recipient.firstName,
+          projectId: project.id,
+          projectName: project.name,
+        }),
+      );
       return err(new ProjectNotApprovedForInvoicingError());
     }
 
@@ -108,6 +128,26 @@ export class IssueProjectPaymentMilestoneInvoiceUseCase
       entityId: milestone.projectId,
       metadata: { event: 'payment_milestone_issued', milestoneId: command.milestoneId, folio: command.data.folio, hito0: hito0Outcome },
     });
+
+    if (project && hito0Outcome === 'activated') {
+      await this.notifyAdminTier((recipient) =>
+        this.notifications.sendProjectAutoActivated({
+          recipientEmail: recipient.email,
+          recipientFirstName: recipient.firstName,
+          projectId: project.id,
+          projectName: project.name,
+        }),
+      );
+    } else if (project && hito0Outcome === 'reactivated') {
+      await this.notifyAdminTier((recipient) =>
+        this.notifications.sendProjectReactivatedFromHold({
+          recipientEmail: recipient.email,
+          recipientFirstName: recipient.firstName,
+          projectId: project.id,
+          projectName: project.name,
+        }),
+      );
+    }
 
     return ok(undefined);
   }

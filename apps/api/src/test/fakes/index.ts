@@ -7,6 +7,9 @@ import type {
   AccountStatusNotification,
   NotificationSender,
   PasswordResetNotification,
+  ProjectAutoActivatedNotification,
+  ProjectInvoiceBlockedNotification,
+  ProjectReactivatedFromHoldNotification,
   UserInvitation,
 } from '../../shared/application/ports/notification.port';
 import type { OpaqueTokenGenerator } from '../../shared/application/ports/token.port';
@@ -120,6 +123,25 @@ export class RecordingNotificationSender implements NotificationSender {
   async sendAccountStatusChanged(notification: AccountStatusNotification): Promise<void> {
     if (this.shouldFail) throw new Error('proveedor de correo caído');
     this.statusChanges.push(notification);
+  }
+
+  readonly projectInvoiceBlocked: ProjectInvoiceBlockedNotification[] = [];
+  readonly projectAutoActivated: ProjectAutoActivatedNotification[] = [];
+  readonly projectReactivatedFromHold: ProjectReactivatedFromHoldNotification[] = [];
+
+  async sendProjectInvoiceBlocked(notification: ProjectInvoiceBlockedNotification): Promise<void> {
+    if (this.shouldFail) throw new Error('proveedor de correo caído');
+    this.projectInvoiceBlocked.push(notification);
+  }
+
+  async sendProjectAutoActivated(notification: ProjectAutoActivatedNotification): Promise<void> {
+    if (this.shouldFail) throw new Error('proveedor de correo caído');
+    this.projectAutoActivated.push(notification);
+  }
+
+  async sendProjectReactivatedFromHold(notification: ProjectReactivatedFromHoldNotification): Promise<void> {
+    if (this.shouldFail) throw new Error('proveedor de correo caído');
+    this.projectReactivatedFromHold.push(notification);
   }
 }
 
