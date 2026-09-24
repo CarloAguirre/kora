@@ -119,6 +119,28 @@
   accent-color: var(--kora-lime-dark);
 }
 
+.textarea {
+  width: 100%;
+  min-height: 76px;
+  padding: 9px 11px;
+  border: 1px solid var(--kora-border-soft);
+  border-radius: var(--kora-radius-sm);
+  font: inherit;
+  font-size: var(--kora-text-sm);
+  color: var(--kora-text);
+  background: var(--kora-surface);
+  resize: vertical;
+}
+
+.textarea:focus-visible {
+  outline: 2px solid var(--kora-navy);
+  outline-offset: 1px;
+}
+
+.textareaError {
+  border-color: var(--kora-danger);
+}
+
 .clientCard {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -382,11 +404,181 @@
   margin-top: var(--kora-space-2);
 }
 
+.actionsSplit {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--kora-space-3);
+  margin-top: var(--kora-space-2);
+}
+
+.actionsRight {
+  display: flex;
+  gap: var(--kora-space-3);
+}
+
+/* Cajas informativas — mismo layout que `.alert`, distinto tono según la intención. */
+.infoBox,
+.warnBox {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--kora-space-2);
+  padding: var(--kora-space-3);
+  border-radius: var(--kora-radius-sm);
+  font-size: var(--kora-text-sm);
+  line-height: 1.5;
+}
+
+.infoBox {
+  background: var(--kora-blue-surface);
+  color: var(--kora-blue-700);
+}
+
+.warnBox {
+  background: var(--kora-warning-surface);
+  color: var(--kora-warning-text);
+}
+
+.infoBox svg,
+.warnBox svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* Sub-tarjeta condicional según Estado (Detenido / Activación manual) — dentro de "Datos del proyecto". */
+.subCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-3);
+  padding: var(--kora-space-4);
+  border-radius: var(--kora-radius);
+  border: 1px solid var(--kora-border-soft);
+  background: var(--kora-surface-muted);
+}
+
+.subCardDetenido {
+  border-color: var(--kora-danger-surface);
+  background: var(--kora-danger-surface-soft);
+}
+
+.subCardActivo {
+  border-color: var(--kora-success);
+  background: var(--kora-success-surface);
+}
+
+.subCardTitle {
+  margin: 0;
+  font-size: var(--kora-text-base);
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-navy);
+}
+
+.subCardSub {
+  margin: calc(var(--kora-space-2) * -1) 0 0;
+  font-size: var(--kora-text-sm);
+  color: var(--kora-text-muted);
+}
+
+/* Panel de horas de 4 celdas — paso "Equipos y fases". */
+.hoursPanel {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border: 1px solid var(--kora-border-soft);
+  border-radius: var(--kora-radius);
+  overflow: hidden;
+}
+
+.hoursCell {
+  padding: var(--kora-space-3) var(--kora-space-4);
+  background: var(--kora-surface);
+}
+
+.hoursCell + .hoursCell {
+  border-left: 1px solid var(--kora-border-soft);
+}
+
+.hoursCellLabel {
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-semibold);
+  color: var(--kora-text-muted);
+  margin-bottom: var(--kora-space-1);
+}
+
+.hoursCellValue {
+  font-size: var(--kora-text-lg);
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-navy);
+}
+
+.hoursCellNote {
+  font-size: var(--kora-text-xs);
+  color: var(--kora-text-muted);
+  margin-top: 3px;
+  line-height: 1.4;
+}
+
+.hoursCellOk .hoursCellValue {
+  color: var(--kora-success);
+}
+
+.hoursCellOver .hoursCellValue {
+  color: var(--kora-danger);
+}
+
+/* "Fase 1 · Prospecto/Cotización" — informativa, no editable. */
+.phaseCardLocked {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-3);
+  padding: var(--kora-space-4);
+  border: 1px dashed var(--kora-border-soft);
+  border-radius: var(--kora-radius);
+  background: var(--kora-surface-muted);
+}
+
+.phaseCardLockedHead {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+}
+
+/* "Qué pasa al crear el proyecto" — paso Resumen. */
+.nextBox {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-2);
+  padding: var(--kora-space-4);
+  border-radius: var(--kora-radius);
+  border: 1px solid var(--kora-border-soft);
+  border-left: 4px solid var(--kora-navy);
+  background: var(--kora-surface);
+}
+
+.nextBoxTitle {
+  margin: 0;
+  font-size: var(--kora-text-base);
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-navy);
+}
+
+.nextBoxList {
+  margin: 0;
+  padding-left: 18px;
+  font-size: var(--kora-text-sm);
+  color: var(--kora-text);
+  line-height: 1.5;
+}
+
 @media (max-width: 640px) {
   .row,
   .row3,
   .clientCard,
-  .summaryGrid {
+  .summaryGrid,
+  .hoursPanel {
     grid-template-columns: 1fr;
+  }
+
+  .hoursCell + .hoursCell {
+    border-left: none;
+    border-top: 1px solid var(--kora-border-soft);
   }
 }
