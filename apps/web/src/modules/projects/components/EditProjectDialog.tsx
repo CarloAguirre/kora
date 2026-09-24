@@ -147,8 +147,16 @@ const TIPO_TO_SALES_STAGE: Record<ProjectTipo, ProjectSalesStage | null> = {
 const ESTADO_OPTIONS_BY_TIPO: Record<ProjectTipo, ProjectStatus[]> = {
   prospecto: ['draft', 'on_hold'],
   cotizacion: ['draft', 'on_hold'],
-  aprobado: ['on_hold', 'active'],
+  aprobado: ['active', 'on_hold'],
   finalizado: ['finished'],
+};
+
+/** Estado que toma un proyecto al cambiar de Tipo cuando el que tenía ya no es válido — "No iniciado" mientras no está aprobado, "Activo" apenas se aprueba, ver docs de arriba. */
+const ESTADO_DEFAULT_BY_TIPO: Record<ProjectTipo, ProjectStatus> = {
+  prospecto: 'draft',
+  cotizacion: 'draft',
+  aprobado: 'active',
+  finalizado: 'finished',
 };
 
 export interface EditProjectDialogProps {
@@ -218,7 +226,10 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, canReassi
 
   const { data: clients } = useClientsList({ page: 1, pageSize: 200, sortField: 'companyName' }, { enabled: open });
   const { data: leaders } = useUsersList({ page: 1, pageSize: 200, sortField: 'firstName', role: 'leader' }, { enabled: open });
-  const { data: commercialUsers } = useUsersList({ page: 1, pageSize: 200, sortField: 'firstName', role: 'commercial' }, { enabled: open });
+  const { data: commercialUsers } = useUsersList(
+    { page: 1, pageSize: 200, sortField: 'firstName', isCommercialManager: true },
+    { enabled: open },
+  );
   const { data: teamsCatalog } = useTeamsList({ page: 1, pageSize: 50, sortField: 'name' }, { enabled: open });
 
   const newModuleForm = useForm<z.input<typeof createProjectModuleSchema>, unknown, CreateProjectModuleInput>({
@@ -438,7 +449,7 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, canReassi
     const mappedSalesStage = TIPO_TO_SALES_STAGE[nextTipo];
     if (mappedSalesStage) setValue('salesStage', mappedSalesStage, { shouldValidate: true });
     const options = ESTADO_OPTIONS_BY_TIPO[nextTipo];
-    if (!options.includes(estado)) setEstado(options[0] ?? 'draft');
+    if (!options.includes(estado)) setEstado(ESTADO_DEFAULT_BY_TIPO[nextTipo]);
   };
 
   const toggleTeam = (teamId: string) => {

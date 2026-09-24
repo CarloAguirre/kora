@@ -45,7 +45,7 @@ describe('Project', () => {
       expect(result.isOk()).toBe(true);
     });
 
-    it('nace en estado activo', () => {
+    it('un desarrollo sin aprobar nace en "No iniciado"', () => {
       const project = Project.create({
         id: 'p1',
         name: 'Portal',
@@ -55,7 +55,46 @@ describe('Project', () => {
         now: NOW,
       }).unwrap();
 
+      expect(project.status).toBe('draft');
+    });
+
+    it('un desarrollo ya aprobado nace activo', () => {
+      const project = Project.create({
+        id: 'p1',
+        name: 'Portal',
+        slug: 'portal',
+        type: 'development',
+        salesStage: 'approved',
+        now: NOW,
+      }).unwrap();
+
       expect(project.status).toBe('active');
+    });
+
+    it('un proyecto de soporte nace activo', () => {
+      const project = Project.create({
+        id: 'p1',
+        name: 'Soporte Acme',
+        slug: 'soporte-acme',
+        type: 'support',
+        now: NOW,
+      }).unwrap();
+
+      expect(project.status).toBe('active');
+    });
+
+    it('respeta el estado explícito por sobre el default', () => {
+      const project = Project.create({
+        id: 'p1',
+        name: 'Portal',
+        slug: 'portal',
+        type: 'development',
+        salesStage: 'prospect',
+        status: 'on_hold',
+        now: NOW,
+      }).unwrap();
+
+      expect(project.status).toBe('on_hold');
     });
   });
 

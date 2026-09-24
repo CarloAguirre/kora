@@ -115,14 +115,24 @@ export class Project extends AggregateRoot<string> {
     const salesStageCheck = Project.validateSalesStage(props.type, props.salesStage ?? null);
     if (salesStageCheck.isErr()) return err(salesStageCheck.error);
 
+    const salesStage = props.type === 'development' ? (props.salesStage ?? null) : null;
+    /**
+     * Sin `status` explícito: un proyecto de desarrollo que todavía no está
+     * aprobado (prospecto/cotización) arranca "No iniciado" — pasa a "Activo"
+     * automáticamente recién cuando se aprueba (ver `ESTADO_OPTIONS_BY_TIPO`
+     * en `EditProjectDialog`). Soporte no tiene etapa comercial, así que sigue
+     * arrancando activo, como siempre.
+     */
+    const defaultStatus = props.type === 'development' && salesStage !== 'approved' ? 'draft' : 'active';
+
     const project = new Project(props.id, {
       name: props.name.trim(),
       slug: props.slug,
       clientId: props.clientId ?? null,
       primaryContactId: null,
       type: props.type,
-      salesStage: props.type === 'development' ? (props.salesStage ?? null) : null,
-      status: props.status ?? 'active',
+      salesStage,
+      status: props.status ?? defaultStatus,
       phase: props.phase ?? null,
       priority: props.priority ?? null,
       leaderUserId: props.leaderUserId ?? null,
