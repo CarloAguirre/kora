@@ -86,19 +86,28 @@
 }
 
 .textarea {
-  font-family: inherit;
+  font-family: var(--kora-font);
   font-size: var(--kora-text-base);
-  color: var(--kora-navy);
-  border: 1px solid var(--kora-border);
-  border-radius: var(--kora-radius-sm);
-  padding: var(--kora-space-3);
+  font-weight: var(--kora-weight-regular);
+  color: var(--kora-text);
+  background: var(--kora-surface);
+  border: 1px solid var(--kora-blue-200);
+  border-radius: var(--kora-radius-input);
+  padding: var(--kora-space-2) var(--kora-space-3);
   min-height: 72px;
   resize: vertical;
+  outline: none;
+  transition: border-color var(--kora-transition);
 }
 
-.textarea:focus {
-  outline: 2px solid var(--kora-blue-600);
-  outline-offset: 1px;
+.textarea::placeholder {
+  color: var(--kora-text-disabled);
+  font-style: italic;
+}
+
+.textarea:focus-visible {
+  border-color: var(--kora-blue-600);
+  box-shadow: 0 0 0 3px var(--kora-blue-surface);
 }
 
 .checkboxLabel {
