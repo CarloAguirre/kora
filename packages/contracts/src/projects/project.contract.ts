@@ -610,6 +610,8 @@ export type CreateProjectInput = z.infer<typeof createProjectSchema>;
 export const updateProjectSchema = z.object({
   name: nonEmptyTrimmed(300, 'El nombre del proyecto').optional(),
   clientId: uuidSchema.nullish(),
+  /** Contacto principal DE ESTE PROYECTO (v1: `proyecto.id_contacto`) — puede diferir del contacto del cliente. Antes solo se fijaba al crear un contrato de soporte (`SupportPlan.primaryContactId`, un concepto distinto); esto lo habilita para cualquier proyecto. */
+  primaryContactId: uuidSchema.nullish(),
   salesStage: projectSalesStageSchema.nullish(),
   phase: projectPhaseSchema.nullish(),
   priority: projectPrioritySchema.nullish(),

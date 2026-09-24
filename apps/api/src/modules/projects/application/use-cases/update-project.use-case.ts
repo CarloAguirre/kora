@@ -152,6 +152,10 @@ export class UpdateProjectUseCase implements UseCase<UpdateProjectCommand, void,
     );
     if (updated.isErr()) return err(updated.error);
 
+    if (data.primaryContactId !== undefined) {
+      project.setPrimaryContact(data.primaryContactId ?? null, now);
+    }
+
     const after = project.toSnapshot();
     const changeEntries: ProjectChangeLogEntry[] = [];
 

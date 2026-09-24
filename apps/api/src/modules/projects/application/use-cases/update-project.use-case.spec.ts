@@ -100,3 +100,49 @@ describe('UpdateProjectUseCase — reasignar líder', () => {
     expect(projects.save).toHaveBeenCalledTimes(1);
   });
 });
+
+/** `primaryContactId` — contacto propio del proyecto, distinto del contacto del cliente. Antes solo se fijaba al crear un contrato de soporte; esto lo habilita para cualquier proyecto vía edición. */
+describe('UpdateProjectUseCase — primaryContactId', () => {
+  it('fija el contacto propio del proyecto', async () => {
+    const { useCase, projects } = buildUseCase('leader-1');
+
+    const result = await useCase.execute({
+      projectId: 'project-1',
+      data: { primaryContactId: 'contact-1' },
+      actor: { userId: 'leader-1', email: 'leader@kabeli.cl' },
+      actorPermissions: ['projects:read_assigned'],
+    });
+
+    expect(result.isOk()).toBe(true);
+    const saved = (projects.save as ReturnType<typeof vi.fn>).mock.calls[0]![0] as Project;
+    expect(saved.toSnapshot().primaryContactId).toBe('contact-1');
+  });
+
+  it('limpia el contacto propio del proyecto cuando se envía null', async () => {
+    const { useCase, projects } = buildUseCase('leader-1');
+
+    await useCase.execute({
+      projectId: 'project-1',
+      data: { primaryContactId: null },
+      actor: { userId: 'leader-1', email: 'leader@kabeli.cl' },
+      actorPermissions: ['projects:read_assigned'],
+    });
+
+    const saved = (projects.save as ReturnType<typeof vi.fn>).mock.calls[0]![0] as Project;
+    expect(saved.toSnapshot().primaryContactId).toBeNull();
+  });
+
+  it('no toca el contacto si el campo no viene en la petición', async () => {
+    const { useCase, projects } = buildUseCase('leader-1');
+
+    await useCase.execute({
+      projectId: 'project-1',
+      data: { name: 'Otro nombre' },
+      actor: { userId: 'leader-1', email: 'leader@kabeli.cl' },
+      actorPermissions: ['projects:read_assigned'],
+    });
+
+    const saved = (projects.save as ReturnType<typeof vi.fn>).mock.calls[0]![0] as Project;
+    expect(saved.toSnapshot().primaryContactId).toBeNull();
+  });
+});
