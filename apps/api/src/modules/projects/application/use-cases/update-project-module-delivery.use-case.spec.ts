@@ -18,8 +18,8 @@ function buildModule(overrides: Partial<ProjectModuleRecord['deliveries'][number
     id: 'module-1',
     projectId: 'project-1',
     name: 'Módulo Financiero',
-    initialStage: 'design',
-    currentStage: 'design',
+    initialStage: 'development',
+    currentStage: 'development',
     estimatedHours: null,
     estimatedStartDate: null,
     estimatedEndDate: null,
@@ -80,7 +80,7 @@ describe('UpdateProjectModuleDeliveryUseCase — bitácora automática', () => {
 
     expect(result.isOk()).toBe(true);
     expect(changeLogRecord).toHaveBeenCalledTimes(1);
-    const [entries, actorUserId] = changeLogRecord.mock.calls[0];
+    const [entries, actorUserId] = changeLogRecord.mock.calls[0]!;
     expect(actorUserId).toBe('leader-1');
     expect(entries).toEqual([
       expect.objectContaining({
@@ -105,7 +105,7 @@ describe('UpdateProjectModuleDeliveryUseCase — bitácora automática', () => {
     });
 
     expect(changeLogRecord).toHaveBeenCalledTimes(1);
-    const [entries] = changeLogRecord.mock.calls[0];
+    const [entries] = changeLogRecord.mock.calls[0]!;
     expect(entries[0].message).toContain('rechazada en fase "Módulo Financiero": Faltan gráficos clave');
   });
 
