@@ -1,7 +1,12 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CLOCK, err, ok, type ApplicationError, type Clock, type Result } from '@kora/core';
 import { PROJECT_STATUS_LABELS, type ChangeProjectStatusInput, type Permission } from '@kora/contracts';
-import { CannotManageProjectError, ProjectNotFoundError } from '../../domain/errors/project.errors';
+import {
+  CannotManageProjectError,
+  CannotManuallyActivateProjectError,
+  ManualHito0ReasonRequiredError,
+  ProjectNotFoundError,
+} from '../../domain/errors/project.errors';
 import { PROJECT_REPOSITORY, type ProjectRepository } from '../../domain/repositories/project.repository';
 import {
   AUDIT_RECORDER,
@@ -39,8 +44,22 @@ export class ChangeProjectStatusUseCase
     const previousStatus = project.status;
     if (previousStatus === command.data.status) return ok(undefined);
 
+    /**
+     * Hito 0 manual (sin factura): activar a mano un proyecto `development`
+     * `aprobado` que seguía "No iniciado" — Gerencia/PMO, no el líder por sí
+     * solo, y con motivo/referencia obligatorio (contrato firmado, OC, etc).
+     */
+    const isManualHito0 =
+      previousStatus === 'draft' && command.data.status === 'active' && project.type === 'development' && project.salesStage === 'approved';
+
     const now = this.clock.now();
-    project.changeStatus(command.data.status, now);
+    if (isManualHito0) {
+      if (!command.actorPermissions.includes('projects:manage')) return err(new CannotManuallyActivateProjectError());
+      if (!command.data.reason?.trim()) return err(new ManualHito0ReasonRequiredError());
+      project.activateFromHito0(now, 'manual', command.data.reason.trim());
+    } else {
+      project.changeStatus(command.data.status, now);
+    }
     await this.projects.save(project);
 
     await this.changeLog.record(

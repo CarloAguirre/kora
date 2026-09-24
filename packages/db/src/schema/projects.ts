@@ -36,6 +36,8 @@ export const projectPhaseEnum = pgEnum('project_phase', [
   'closed',
 ]);
 export const projectPriorityEnum = pgEnum('project_priority', ['low', 'medium', 'high']);
+/** Qué disparó el Hito 0 — ver `hito0At`/`hito0Reason` más abajo. */
+export const projectHito0SourceEnum = pgEnum('project_hito0_source', ['auto_invoice', 'manual']);
 export const participationTypeEnum = pgEnum('participation_type', ['team', 'project_leader']);
 
 /** Catálogo propio del módulo/fase — independiente de `projectPhaseEnum` (que es el avance del proyecto completo). */
@@ -168,6 +170,17 @@ export const projects = pgTable(
 
     /** Hito 0 quedó pausado esperando que Gerencia (admin/pmo) active el proyecto a mano — ver `project_billing_settings`. */
     pendingManagementApproval: boolean('pending_management_approval').notNull().default(false),
+
+    /**
+     * Hito 0 (kickoff): fecha en que el proyecto pasó a Activo por primera vez
+     * — automático (primera factura del tramo con `sortOrder` más bajo) o
+     * manual (Gerencia/PMO, sin factura). Editable por Gerencia/PMO después
+     * ("corregir fecha" — ver docs pegados de Leslie). `hito0Reason` es
+     * obligatorio solo cuando `hito0Source = 'manual'`.
+     */
+    hito0At: timestamp('hito0_at', { withTimezone: true }),
+    hito0Source: projectHito0SourceEnum('hito0_source'),
+    hito0Reason: text('hito0_reason'),
 
     ...timestamps,
     ...softDelete,

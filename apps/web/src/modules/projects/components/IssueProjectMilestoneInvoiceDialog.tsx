@@ -5,7 +5,7 @@ import { Modal } from '@/shared/components/ui/Modal';
 import { Button } from '@/shared/components/ui/Button';
 import { TextField } from '@/shared/components/ui/TextField';
 import { FileField } from '@/shared/components/ui/FileField';
-import { AlertIcon } from '@/shared/components/icons/Icons';
+import { AlertIcon, InfoIcon } from '@/shared/components/icons/Icons';
 import { ApiRequestError } from '@/shared/lib/api-client';
 
 export interface IssueProjectMilestoneInvoiceDialogProps {
@@ -14,6 +14,16 @@ export interface IssueProjectMilestoneInvoiceDialogProps {
   amount: number;
   onClose: () => void;
   onConfirm: (input: IssueProjectPaymentMilestoneInvoiceInput) => Promise<void>;
+  /**
+   * true si este es el primer tramo de un proyecto `aprobado` — facturarlo
+   * dispara Hito 0 (ver `IssueProjectPaymentMilestoneInvoiceUseCase`). Lo
+   * decide quien abre el diálogo, comparando el `sortOrder` del tramo contra
+   * el resto del proyecto ya cargado. Si el proyecto está `Detenido`, en
+   * cambio, factura lo reactiva directamente (sin pasar por Gerencia) — el
+   * checkbox de pausa no aplica ahí.
+   */
+  showHito0Notice?: boolean;
+  showReactivationNotice?: boolean;
 }
 
 /**
@@ -26,10 +36,13 @@ export function IssueProjectMilestoneInvoiceDialog({
   amount,
   onClose,
   onConfirm,
+  showHito0Notice = false,
+  showReactivationNotice = false,
 }: IssueProjectMilestoneInvoiceDialogProps) {
   const [folio, setFolio] = useState('');
   const [issuedAt, setIssuedAt] = useState('');
   const [attachmentName, setAttachmentName] = useState<string | null>(null);
+  const [pauseForManagementApproval, setPauseForManagementApproval] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
 
@@ -38,6 +51,7 @@ export function IssueProjectMilestoneInvoiceDialog({
       setFolio('');
       setIssuedAt(new Date().toISOString().slice(0, 10));
       setAttachmentName(null);
+      setPauseForManagementApproval(false);
       setError(null);
     }
   }, [open]);
@@ -50,7 +64,12 @@ export function IssueProjectMilestoneInvoiceDialog({
     setError(null);
     setRunning(true);
     try {
-      await onConfirm({ folio: folio.trim(), issuedAt, attachmentName: attachmentName ?? undefined });
+      await onConfirm({
+        folio: folio.trim(),
+        issuedAt,
+        attachmentName: attachmentName ?? undefined,
+        ...(showHito0Notice ? { pauseForManagementApproval } : {}),
+      });
       onClose();
     } catch (caught) {
       setError(caught instanceof ApiRequestError ? caught.message : 'No se pudo registrar la factura. Inténtalo de nuevo.');
@@ -91,6 +110,32 @@ export function IssueProjectMilestoneInvoiceDialog({
           accept="application/pdf"
         />
       </div>
+
+      {showHito0Notice && (
+        <div className={styles.hito0Box}>
+          <div className={styles.hito0Text}>
+            <InfoIcon size={16} className={styles.hito0Icon} />
+            <span>Este es el primer tramo del proyecto. Al registrar la factura, el proyecto se activará automáticamente.</span>
+          </div>
+          <label className={styles.hito0Check}>
+            <input
+              type="checkbox"
+              checked={pauseForManagementApproval}
+              onChange={(e) => setPauseForManagementApproval(e.target.checked)}
+            />
+            Dejar en espera de aprobación de Gerencia
+          </label>
+        </div>
+      )}
+
+      {showReactivationNotice && (
+        <div className={styles.hito0Box}>
+          <div className={styles.hito0Text}>
+            <InfoIcon size={16} className={styles.hito0Icon} />
+            <span>Este proyecto está Detenido. Al registrar la factura, se reactivará a Activo.</span>
+          </div>
+        </div>
+      )}
 
       {error && (
         <div className={styles.alert} role="alert">

@@ -4,6 +4,7 @@ import type {
   AddProjectObservationInput,
   AssignProjectTeamMemberInput,
   ChangeProjectStatusInput,
+  CorrectProjectHito0DateInput,
   CreateProjectInput,
   CreateProjectModuleInput,
   CreateProjectModuleSegmentInput,
@@ -437,6 +438,15 @@ export function useResolveProjectManagementApproval() {
   const invalidate = useInvalidateProjects();
   return useMutation({
     mutationFn: (projectId: string) => projectsApi.resolveManagementApproval(projectId),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useCorrectProjectHito0Date() {
+  const invalidate = useInvalidateProjects();
+  return useMutation({
+    mutationFn: ({ projectId, input }: { projectId: string; input: CorrectProjectHito0DateInput }) =>
+      projectsApi.correctHito0Date(projectId, input),
     onSuccess: () => invalidate(),
   });
 }

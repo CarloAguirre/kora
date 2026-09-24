@@ -215,3 +215,35 @@ export class ProjectManagementApprovalNotPendingError extends ConflictError {
     super('Este proyecto no tiene una aprobación de Gerencia pendiente.', 'PROJECT_MANAGEMENT_APPROVAL_NOT_PENDING');
   }
 }
+
+/**
+ * Solo un proyecto de desarrollo `aprobado` puede facturar un tramo de pago —
+ * evita casos de borde (proyecto activo sin equipos/horas/cotización). No
+ * aplica a `type='support'`, que no tiene etapa comercial.
+ */
+export class ProjectNotApprovedForInvoicingError extends ValidationError {
+  constructor() {
+    super(
+      'Este proyecto aún no está Aprobado. Para asociar la factura, primero hay que actualizar el tipo de proyecto y completar sus datos.',
+      'PROJECT_NOT_APPROVED_FOR_INVOICING',
+    );
+  }
+}
+
+/**
+ * Hito 0 manual (activar un proyecto `aprobado`/`No iniciado` sin factura,
+ * p.ej. contrato firmado u orden de compra) exige un motivo o referencia —
+ * mismo criterio que `RejectionReasonRequiredError`.
+ */
+export class ManualHito0ReasonRequiredError extends ValidationError {
+  constructor() {
+    super('Escribe el motivo o la referencia de la activación antes de continuar.', 'PROJECT_MANUAL_HITO0_REASON_REQUIRED');
+  }
+}
+
+/** Activar manualmente un proyecto (Hito 0 sin factura) es de Gerencia/PMO — el líder del proyecto por sí solo no basta. */
+export class CannotManuallyActivateProjectError extends ForbiddenError {
+  constructor() {
+    super('Solo Gerencia/PMO puede activar manualmente este proyecto.', 'PROJECT_CANNOT_MANUALLY_ACTIVATE');
+  }
+}

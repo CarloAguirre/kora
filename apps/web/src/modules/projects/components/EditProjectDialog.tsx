@@ -194,6 +194,7 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, canReassi
   const [serverError, setServerError] = useState<string | null>(null);
   const [tipo, setTipo] = useState<ProjectTipo>(() => deriveTipo(project.salesStage, project.status));
   const [estado, setEstado] = useState<ProjectStatus>(project.status);
+  const [manualActivationReason, setManualActivationReason] = useState('');
 
   const {
     register,
@@ -443,6 +444,8 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, canReassi
 
   const estadoOptions = ESTADO_OPTIONS_BY_TIPO[tipo];
   const totalTeamHours = teamsValue.reduce((sum, team) => sum + (Number(team.assignedHours) || 0), 0);
+  /** Hito 0 manual: activar a mano (sin factura) un proyecto Aprobado que seguía "No iniciado" — exige motivo (ver `ChangeProjectStatusUseCase`). */
+  const isManualHito0 = isDevelopment && tipo === 'aprobado' && project.status === 'draft' && estado === 'active';
 
   const handleTipoChange = (nextTipo: ProjectTipo) => {
     setTipo(nextTipo);
@@ -460,10 +463,17 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, canReassi
 
   const onSubmit = handleSubmit(async (values) => {
     setServerError(null);
+    if (isManualHito0 && !manualActivationReason.trim()) {
+      setServerError('Escribe el motivo o la referencia de la activación (ej. contrato firmado, orden de compra).');
+      return;
+    }
     try {
       await updateProject.mutateAsync({ projectId: project.id, input: values });
       if (isDevelopment && estado !== project.status) {
-        await changeStatus.mutateAsync({ projectId: project.id, input: { status: estado } });
+        await changeStatus.mutateAsync({
+          projectId: project.id,
+          input: { status: estado, ...(isManualHito0 ? { reason: manualActivationReason.trim() } : {}) },
+        });
       }
       onSuccess(`Se actualizaron los datos de ${values.name ?? project.name}.`);
       onClose();
@@ -597,7 +607,7 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, canReassi
           </div>
         </div>
 
-        {isDevelopment && tipo === 'aprobado' && estado === 'on_hold' && (
+        {isDevelopment && estado === 'on_hold' && (
           <div className={styles.section}>
             <h3 className={styles.sectionTitle}>Proyecto detenido</h3>
             <div className={styles.field}>
@@ -617,6 +627,29 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, canReassi
             </label>
             <p className={styles.hint}>
               Mientras esté activo, este período no cuenta para plazos ni cálculo de desviación.
+            </p>
+          </div>
+        )}
+
+        {isManualHito0 && (
+          <div className={styles.section}>
+            <h3 className={styles.sectionTitle}>Activación manual (Hito 0 sin factura)</h3>
+            <div className={styles.field}>
+              <label className={styles.label} htmlFor="manualActivationReason">
+                Motivo o referencia
+              </label>
+              <textarea
+                id="manualActivationReason"
+                className={styles.textarea}
+                placeholder="Ej. Contrato firmado el 20-09-2026, orden de compra N°123, etc."
+                value={manualActivationReason}
+                onChange={(e) => setManualActivationReason(e.target.value)}
+              />
+            </div>
+            <p className={styles.hint}>
+              {canReassignLeader
+                ? 'Este proyecto no tiene ninguna factura registrada. Al activarlo manualmente queda como Hito 0 de origen manual.'
+                : 'Solo Gerencia/PMO puede activar manualmente un proyecto sin factura.'}
             </p>
           </div>
         )}

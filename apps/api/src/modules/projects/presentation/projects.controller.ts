@@ -4,6 +4,7 @@ import {
   addProjectObservationSchema,
   assignProjectTeamMemberSchema,
   changeProjectStatusSchema,
+  correctProjectHito0DateSchema,
   createProjectModuleSchema,
   createProjectModuleSegmentSchema,
   createProjectModuleTaskSchema,
@@ -28,6 +29,7 @@ import {
   type AddProjectObservationInput,
   type AssignProjectTeamMemberInput,
   type ChangeProjectStatusInput,
+  type CorrectProjectHito0DateInput,
   type CreateProjectInput,
   type CreateProjectModuleInput,
   type CreateProjectModuleSegmentInput,
@@ -92,6 +94,7 @@ import { MarkProjectPaymentMilestonePaidUseCase } from '../application/use-cases
 import { GetProjectBillingSettingsUseCase } from '../application/use-cases/get-project-billing-settings.use-case';
 import { UpdateProjectBillingSettingsUseCase } from '../application/use-cases/update-project-billing-settings.use-case';
 import { ResolveProjectManagementApprovalUseCase } from '../application/use-cases/resolve-project-management-approval.use-case';
+import { CorrectProjectHito0DateUseCase } from '../application/use-cases/correct-project-hito0-date.use-case';
 
 @Controller('projects')
 export class ProjectsController {
@@ -131,6 +134,7 @@ export class ProjectsController {
     private readonly getBillingSettings: GetProjectBillingSettingsUseCase,
     private readonly updateBillingSettings: UpdateProjectBillingSettingsUseCase,
     private readonly resolveManagementApproval: ResolveProjectManagementApprovalUseCase,
+    private readonly correctHito0Date: CorrectProjectHito0DateUseCase,
   ) {}
 
   /**
@@ -749,7 +753,11 @@ export class ProjectsController {
     );
   }
 
-  /** Registrar que un tramo ya fue facturado — mismo criterio que `support-invoices`: Finanzas, no PM/PMO. */
+  /**
+   * Registrar que un tramo ya fue facturado — mismo criterio que
+   * `support-invoices`: Finanzas, no PM/PMO. Puede disparar Hito 0 (o
+   * reactivar un proyecto `on_hold`) — ver `IssueProjectPaymentMilestoneInvoiceUseCase`.
+   */
   @Post(':id/payment-milestones/:milestoneId/invoice')
   @RequirePermissions('billing:manage')
   @HttpCode(HttpStatus.NO_CONTENT)
@@ -763,7 +771,6 @@ export class ProjectsController {
     );
   }
 
-  /** Puede disparar Hito 0 — ver `MarkProjectPaymentMilestonePaidUseCase`. */
   @Patch(':id/payment-milestones/:milestoneId/paid')
   @RequirePermissions('billing:manage')
   @HttpCode(HttpStatus.NO_CONTENT)
@@ -787,6 +794,20 @@ export class ProjectsController {
   ): Promise<void> {
     unwrapOrThrow(
       await this.resolveManagementApproval.execute({ projectId: id, actor: toActorContext(actor) }),
+    );
+  }
+
+  /** Gerencia/PMO corrige la fecha del Hito 0 ya registrado. */
+  @Patch(':id/hito0-date')
+  @RequirePermissions('projects:manage')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async correctProjectHito0Date(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(correctProjectHito0DateSchema)) body: CorrectProjectHito0DateInput,
+    @CurrentUser() actor: RequestUser,
+  ): Promise<void> {
+    unwrapOrThrow(
+      await this.correctHito0Date.execute({ projectId: id, data: body, actor: toActorContext(actor) }),
     );
   }
 }

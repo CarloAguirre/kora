@@ -55,6 +55,11 @@ export const PROJECT_PHASE_LABELS: Readonly<Record<ProjectPhase, string>> = {
   closed: 'Cerrado',
 };
 
+/** Qué disparó el Hito 0 (kickoff) de un proyecto — ver `projectDetailSchema.hito0Source`. */
+export const PROJECT_HITO0_SOURCES = ['auto_invoice', 'manual'] as const;
+export const projectHito0SourceSchema = z.enum(PROJECT_HITO0_SOURCES);
+export type ProjectHito0Source = z.infer<typeof projectHito0SourceSchema>;
+
 export const PROJECT_PRIORITIES = ['low', 'medium', 'high'] as const;
 export const projectPrioritySchema = z.enum(PROJECT_PRIORITIES);
 export type ProjectPriority = z.infer<typeof projectPrioritySchema>;
@@ -395,25 +400,30 @@ export type CreateProjectPaymentMilestoneInput = z.infer<typeof createProjectPay
 export const updateProjectPaymentMilestoneSchema = createProjectPaymentMilestoneSchema.partial();
 export type UpdateProjectPaymentMilestoneInput = z.infer<typeof updateProjectPaymentMilestoneSchema>;
 
-/** Registrar que un tramo ya fue facturado — mismo criterio que `markSupportInvoiceIssuedSchema`: Kora no emite la factura, solo registra folio y fecha. */
+/**
+ * Registrar que un tramo ya fue facturado — mismo criterio que
+ * `markSupportInvoiceIssuedSchema`: Kora no emite la factura, solo registra
+ * folio y fecha. Si es el primer tramo del proyecto y dispara Hito 0,
+ * `pauseForManagementApproval` deja el proyecto pendiente de aprobación de
+ * Gerencia en vez de activarlo automáticamente — ver `project_billing_settings`.
+ */
 export const issueProjectPaymentMilestoneInvoiceSchema = z.object({
   folio: nonEmptyTrimmed(50, 'El folio'),
   issuedAt: z.iso.date(),
   attachmentName: z.string().trim().max(255).optional(),
+  pauseForManagementApproval: z.boolean().optional(),
 });
 export type IssueProjectPaymentMilestoneInvoiceInput = z.infer<typeof issueProjectPaymentMilestoneInvoiceSchema>;
 
 export const markProjectPaymentMilestonePaidSchema = z.object({
   paidAt: z.iso.date(),
   attachmentName: z.string().trim().max(255).optional(),
-  /**
-   * Si pagar este tramo dispara Hito 0 (primer tramo, proyecto `aprobado` y
-   * todavía no activo), deja el proyecto pendiente de aprobación de Gerencia
-   * en vez de activarlo automáticamente — ver `project_billing_settings`.
-   */
-  pauseForManagementApproval: z.boolean().optional(),
 });
 export type MarkProjectPaymentMilestonePaidInput = z.infer<typeof markProjectPaymentMilestonePaidSchema>;
+
+/** Gerencia/PMO corrige la fecha del Hito 0 ya registrado — no reabre ni cambia el estado del proyecto. */
+export const correctProjectHito0DateSchema = z.object({ date: z.iso.date() });
+export type CorrectProjectHito0DateInput = z.infer<typeof correctProjectHito0DateSchema>;
 
 /**
  * Interruptor global de Hito 0 — fila única (`project_billing_settings`).
@@ -506,6 +516,12 @@ export const projectDetailSchema = projectSummarySchema.extend({
   paymentMilestones: z.array(projectPaymentMilestoneSchema),
   /** true si Hito 0 quedó pausado esperando que Gerencia active el proyecto a mano. */
   pendingManagementApproval: z.boolean(),
+  /** Fecha del Hito 0 (kickoff) — `null` si el proyecto nunca se activó. Editable por Gerencia/PMO. */
+  hito0At: isoDateTimeSchema.nullable(),
+  /** Qué disparó el Hito 0 — `null` junto con `hito0At`. */
+  hito0Source: projectHito0SourceSchema.nullable(),
+  /** Motivo/referencia del Hito 0 manual — solo cuando `hito0Source === 'manual'`. */
+  hito0Reason: z.string().nullable(),
   teams: z.array(projectTeamSchema),
   members: z.array(projectTeamMemberSchema),
   observations: z.array(projectObservationSchema),
@@ -663,7 +679,15 @@ export const updateProjectExtrasSchema = updateProjectSchema.pick({
 });
 export type UpdateProjectExtrasInput = z.infer<typeof updateProjectExtrasSchema>;
 
-export const changeProjectStatusSchema = z.object({ status: projectStatusSchema });
+export const changeProjectStatusSchema = z.object({
+  status: projectStatusSchema,
+  /**
+   * Obligatorio solo para el Hito 0 manual: activar a mano (sin factura) un
+   * proyecto `development`/`approved` que estaba `draft` — ver
+   * `ChangeProjectStatusUseCase`. Se ignora en cualquier otra transición.
+   */
+  reason: z.string().trim().max(2000).optional(),
+});
 export type ChangeProjectStatusInput = z.infer<typeof changeProjectStatusSchema>;
 
 export const setProjectOvertimeAuthorizationSchema = z.object({ allowsOvertime: z.boolean() });

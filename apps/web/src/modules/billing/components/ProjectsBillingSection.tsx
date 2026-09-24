@@ -98,7 +98,7 @@ export function ProjectsBillingSection() {
   const updateBillingSettings = useUpdateProjectBillingSettings();
 
   const { data: milestoneProject } = useProjectDetail(
-    dialog?.kind === "pay-milestone" ? dialog.entry.projectId : null,
+    dialog?.kind === "issue-milestone" ? dialog.entry.projectId : null,
   );
 
   const clientOptions = useMemo(() => {
@@ -170,13 +170,9 @@ export function ProjectsBillingSection() {
     toast.success("Pago registrado correctamente.");
   };
 
-  const showHito0Notice = useMemo(() => {
-    if (dialog?.kind !== "pay-milestone" || !milestoneProject) return false;
-    if (
-      milestoneProject.salesStage !== "approved" ||
-      milestoneProject.status !== "draft"
-    )
-      return false;
+  const invoiceDialogIsFirstMilestone = useMemo(() => {
+    if (dialog?.kind !== "issue-milestone" || !milestoneProject) return false;
+    if (milestoneProject.salesStage !== "approved") return false;
     const minSortOrder = Math.min(
       ...milestoneProject.paymentMilestones.map((m) => m.sortOrder),
     );
@@ -185,6 +181,10 @@ export function ProjectsBillingSection() {
     );
     return milestone !== undefined && milestone.sortOrder === minSortOrder;
   }, [dialog, milestoneProject]);
+  const showHito0Notice =
+    invoiceDialogIsFirstMilestone && milestoneProject?.status === "draft";
+  const showReactivationNotice =
+    invoiceDialogIsFirstMilestone && milestoneProject?.status === "on_hold";
 
   const onToggleAutoActivate = async (checked: boolean) => {
     try {
@@ -453,6 +453,8 @@ export function ProjectsBillingSection() {
           dialog?.kind === "issue-milestone" ? dialog.entry.detail : ""
         }
         amount={dialog?.kind === "issue-milestone" ? dialog.entry.amount : 0}
+        showHito0Notice={showHito0Notice}
+        showReactivationNotice={showReactivationNotice}
         onClose={closeDialog}
         onConfirm={onIssueMilestoneInvoice}
       />
@@ -462,7 +464,6 @@ export function ProjectsBillingSection() {
         milestoneName={
           dialog?.kind === "pay-milestone" ? dialog.entry.detail : ""
         }
-        showHito0Notice={showHito0Notice}
         onClose={closeDialog}
         onConfirm={onMarkMilestonePaid}
       />

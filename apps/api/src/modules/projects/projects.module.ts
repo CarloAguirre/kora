@@ -38,6 +38,7 @@ import { MarkProjectPaymentMilestonePaidUseCase } from './application/use-cases/
 import { GetProjectBillingSettingsUseCase } from './application/use-cases/get-project-billing-settings.use-case';
 import { UpdateProjectBillingSettingsUseCase } from './application/use-cases/update-project-billing-settings.use-case';
 import { ResolveProjectManagementApprovalUseCase } from './application/use-cases/resolve-project-management-approval.use-case';
+import { CorrectProjectHito0DateUseCase } from './application/use-cases/correct-project-hito0-date.use-case';
 
 import { PROJECT_REPOSITORY } from './domain/repositories/project.repository';
 import { PROJECT_TEAM_REPOSITORY } from './domain/repositories/project-team.repository';
@@ -113,6 +114,7 @@ import { DrizzleProjectTeamMemberValidator } from './infrastructure/services/dri
     GetProjectBillingSettingsUseCase,
     UpdateProjectBillingSettingsUseCase,
     ResolveProjectManagementApprovalUseCase,
+    CorrectProjectHito0DateUseCase,
 
     { provide: PROJECT_REPOSITORY, useClass: DrizzleProjectRepository },
     { provide: PROJECT_TEAM_REPOSITORY, useClass: DrizzleProjectTeamRepository },

@@ -219,11 +219,10 @@ export function ProjectExtrasTab({ project, canManage }: { project: ProjectDetai
     toast.success('Pago registrado correctamente.');
   };
 
-  const showHito0Notice =
-    paidDialogMilestone !== null &&
-    project.salesStage === 'approved' &&
-    project.status === 'draft' &&
-    paidDialogMilestone.sortOrder === minMilestoneSortOrder;
+  const invoiceDialogIsFirstMilestone =
+    invoiceDialogMilestone !== null && invoiceDialogMilestone.sortOrder === minMilestoneSortOrder && project.salesStage === 'approved';
+  const showHito0Notice = invoiceDialogIsFirstMilestone && project.status === 'draft';
+  const showReactivationNotice = invoiceDialogIsFirstMilestone && project.status === 'on_hold';
 
   const onSaveLinks = async () => {
     try {
@@ -603,6 +602,8 @@ export function ProjectExtrasTab({ project, canManage }: { project: ProjectDetai
         open={invoiceDialogMilestone !== null}
         milestoneName={invoiceDialogMilestone?.name ?? ''}
         amount={invoiceDialogMilestone?.amount ?? 0}
+        showHito0Notice={showHito0Notice}
+        showReactivationNotice={showReactivationNotice}
         onClose={() => setInvoiceDialogMilestone(null)}
         onConfirm={onConfirmIssueInvoice}
       />
@@ -610,7 +611,6 @@ export function ProjectExtrasTab({ project, canManage }: { project: ProjectDetai
       <MarkProjectMilestonePaidDialog
         open={paidDialogMilestone !== null}
         milestoneName={paidDialogMilestone?.name ?? ''}
-        showHito0Notice={showHito0Notice}
         onClose={() => setPaidDialogMilestone(null)}
         onConfirm={onConfirmMarkPaid}
       />

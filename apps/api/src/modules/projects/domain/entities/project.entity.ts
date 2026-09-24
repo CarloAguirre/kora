@@ -1,5 +1,12 @@
 import { AggregateRoot, assignDefined, createDomainEvent, err, ok, type Result } from '@kora/core';
-import type { ProjectPhase, ProjectPriority, ProjectSalesStage, ProjectStatus, ProjectType } from '@kora/contracts';
+import type {
+  ProjectHito0Source,
+  ProjectPhase,
+  ProjectPriority,
+  ProjectSalesStage,
+  ProjectStatus,
+  ProjectType,
+} from '@kora/contracts';
 import {
   SalesStageNotAllowedForSupportError,
   SalesStageRequiredForDevelopmentError,
@@ -57,8 +64,14 @@ export interface ProjectProps {
   /** "Avance del periodo" del portal cliente — narrativa de logros declarada por el líder, igual criterio que impacto/QA. */
   periodReportDate: Date | null;
   periodReportAchievements: string[] | null;
-  /** Hito 0 quedó pausado esperando que Gerencia active el proyecto a mano — ver `MarkProjectPaymentMilestonePaidUseCase`. */
+  /** Hito 0 quedó pausado esperando que Gerencia active el proyecto a mano — ver `IssueProjectPaymentMilestoneInvoiceUseCase`. */
   pendingManagementApproval: boolean;
+  /** Fecha del Hito 0 (kickoff) — editable por Gerencia/PMO. `null` si el proyecto nunca se activó. */
+  hito0At: Date | null;
+  /** Qué disparó el Hito 0 — `null` junto con `hito0At`. */
+  hito0Source: ProjectHito0Source | null;
+  /** Motivo/referencia del Hito 0 manual — obligatorio solo cuando `hito0Source === 'manual'`. */
+  hito0Reason: string | null;
   legacyId: number | null;
   createdAt: Date;
   updatedAt: Date;
@@ -177,6 +190,9 @@ export class Project extends AggregateRoot<string> {
       periodReportDate: null,
       periodReportAchievements: null,
       pendingManagementApproval: false,
+      hito0At: null,
+      hito0Source: null,
+      hito0Reason: null,
       legacyId: null,
       createdAt: props.now,
       updatedAt: props.now,
@@ -241,6 +257,18 @@ export class Project extends AggregateRoot<string> {
 
   get pendingManagementApproval(): boolean {
     return this.props.pendingManagementApproval;
+  }
+
+  get hito0At(): Date | null {
+    return this.props.hito0At;
+  }
+
+  get hito0Source(): ProjectHito0Source | null {
+    return this.props.hito0Source;
+  }
+
+  get hito0Reason(): string | null {
+    return this.props.hito0Reason;
   }
 
   get legacyId(): number | null {
@@ -327,8 +355,18 @@ export class Project extends AggregateRoot<string> {
     this.addDomainEvent(createDomainEvent('project.status_changed', this.id, { from: previous, to: status }, now));
   }
 
-  /** Hito 0 activado automáticamente al pagar el primer tramo (interruptor global en `true`) — ver `MarkProjectPaymentMilestonePaidUseCase`. */
-  activateFromFirstPayment(now: Date): void {
+  /**
+   * Hito 0 (primera activación): deja registrada fecha/origen/motivo y pasa
+   * a Activo — ver `IssueProjectPaymentMilestoneInvoiceUseCase` (automático,
+   * al facturar el primer tramo) y `ChangeProjectStatusUseCase` (manual, sin
+   * factura — `reason` obligatorio ahí, no acá). No usar para reactivar un
+   * proyecto `on_hold`: eso no toca `hito0At` — ver `changeStatus`.
+   */
+  activateFromHito0(now: Date, source: ProjectHito0Source, reason: string | null): void {
+    this.props.hito0At = now;
+    this.props.hito0Source = source;
+    this.props.hito0Reason = reason;
+    this.props.pendingManagementApproval = false;
     this.changeStatus('active', now);
   }
 
@@ -342,7 +380,17 @@ export class Project extends AggregateRoot<string> {
   /** Gerencia resuelve un Hito 0 pausado — activa el proyecto y limpia la marca. */
   resolveManagementApproval(now: Date): void {
     this.props.pendingManagementApproval = false;
+    if (!this.props.hito0At) {
+      this.props.hito0At = now;
+      this.props.hito0Source = 'auto_invoice';
+    }
     this.changeStatus('active', now);
+  }
+
+  /** Gerencia/PMO corrige la fecha del Hito 0 ya registrado — no cambia `status` ni `source`/`reason`. */
+  correctHito0Date(date: Date, now: Date): void {
+    this.props.hito0At = date;
+    this.touch(now);
   }
 
   recordUsedHours(hours: number, now: Date): void {

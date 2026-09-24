@@ -1,4 +1,11 @@
-import type { ProjectPhase, ProjectPriority, ProjectSalesStage, ProjectStatus, ProjectType } from '@kora/contracts';
+import type {
+  ProjectHito0Source,
+  ProjectPhase,
+  ProjectPriority,
+  ProjectSalesStage,
+  ProjectStatus,
+  ProjectType,
+} from '@kora/contracts';
 import { Project } from '../../domain/entities/project.entity';
 
 export interface ProjectRow {
@@ -55,6 +62,9 @@ export interface ProjectRow {
   periodReportDate: Date | null;
   periodReportAchievements: string[] | null;
   pendingManagementApproval: boolean;
+  hito0At: Date | null;
+  hito0Source: string | null;
+  hito0Reason: string | null;
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;
@@ -114,6 +124,9 @@ export function toDomain(row: ProjectRow): Project {
     periodReportDate: row.periodReportDate,
     periodReportAchievements: row.periodReportAchievements,
     pendingManagementApproval: row.pendingManagementApproval,
+    hito0At: row.hito0At,
+    hito0Source: row.hito0Source as ProjectHito0Source | null,
+    hito0Reason: row.hito0Reason,
     legacyId: row.legacyId,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
@@ -175,6 +188,9 @@ export function toPersistence(project: Project) {
     periodReportDate: snapshot.periodReportDate,
     periodReportAchievements: snapshot.periodReportAchievements,
     pendingManagementApproval: snapshot.pendingManagementApproval,
+    hito0At: snapshot.hito0At,
+    hito0Source: snapshot.hito0Source,
+    hito0Reason: snapshot.hito0Reason,
     legacyId: snapshot.legacyId,
     createdAt: snapshot.createdAt,
     updatedAt: snapshot.updatedAt,

@@ -3,6 +3,7 @@ import type {
   AddProjectObservationInput,
   AssignProjectTeamMemberInput,
   ChangeProjectStatusInput,
+  CorrectProjectHito0DateInput,
   CreateProjectInput,
   CreateProjectModuleInput,
   CreateProjectModuleSegmentInput,
@@ -176,6 +177,9 @@ export const projectsApi = {
   },
   resolveManagementApproval(projectId: string): Promise<void> {
     return api.patch<void>(`/projects/${projectId}/resolve-management-approval`);
+  },
+  correctHito0Date(projectId: string, input: CorrectProjectHito0DateInput): Promise<void> {
+    return api.patch<void>(`/projects/${projectId}/hito0-date`, input);
   },
   getBillingSettings(): Promise<ProjectBillingSettings> {
     return api.get<ProjectBillingSettings>('/projects/billing-settings');

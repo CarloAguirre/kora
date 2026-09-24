@@ -5,7 +5,7 @@ import { Modal } from '@/shared/components/ui/Modal';
 import { Button } from '@/shared/components/ui/Button';
 import { TextField } from '@/shared/components/ui/TextField';
 import { FileField } from '@/shared/components/ui/FileField';
-import { AlertIcon, InfoIcon } from '@/shared/components/icons/Icons';
+import { AlertIcon } from '@/shared/components/icons/Icons';
 import { ApiRequestError } from '@/shared/lib/api-client';
 
 export interface MarkProjectMilestonePaidDialogProps {
@@ -13,30 +13,22 @@ export interface MarkProjectMilestonePaidDialogProps {
   milestoneName: string;
   onClose: () => void;
   onConfirm: (input: MarkProjectPaymentMilestonePaidInput) => Promise<void>;
-  /**
-   * true si este es el primer tramo de un proyecto `aprobado`/`no iniciado` —
-   * pagarlo dispara Hito 0 (ver `MarkProjectPaymentMilestonePaidUseCase`).
-   * Lo decide quien abre el diálogo, comparando el `sortOrder` del tramo
-   * contra el resto del proyecto ya cargado.
-   */
-  showHito0Notice?: boolean;
 }
 
 /**
- * Copia de `MarkSupportInvoicePaidDialog`, con dos diferencias propias de
- * proyectos: adjunto de comprobante (el de soporte no lo pide) y el aviso de
- * Hito 0 con la opción de pausar la activación automática.
+ * Copia de `MarkSupportInvoicePaidDialog`, con una diferencia propia de
+ * proyectos: adjunto de comprobante (el de soporte no lo pide). El aviso de
+ * Hito 0 vive en `IssueProjectMilestoneInvoiceDialog` — pagar un tramo ya no
+ * dispara la activación, solo facturarlo (ver `IssueProjectPaymentMilestoneInvoiceUseCase`).
  */
 export function MarkProjectMilestonePaidDialog({
   open,
   milestoneName,
   onClose,
   onConfirm,
-  showHito0Notice = false,
 }: MarkProjectMilestonePaidDialogProps) {
   const [paidAt, setPaidAt] = useState('');
   const [attachmentName, setAttachmentName] = useState<string | null>(null);
-  const [pauseForManagementApproval, setPauseForManagementApproval] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
 
@@ -44,7 +36,6 @@ export function MarkProjectMilestonePaidDialog({
     if (open) {
       setPaidAt(new Date().toISOString().slice(0, 10));
       setAttachmentName(null);
-      setPauseForManagementApproval(false);
       setError(null);
     }
   }, [open]);
@@ -57,11 +48,7 @@ export function MarkProjectMilestonePaidDialog({
     setError(null);
     setRunning(true);
     try {
-      await onConfirm({
-        paidAt,
-        attachmentName: attachmentName ?? undefined,
-        ...(showHito0Notice ? { pauseForManagementApproval } : {}),
-      });
+      await onConfirm({ paidAt, attachmentName: attachmentName ?? undefined });
       onClose();
     } catch (caught) {
       setError(caught instanceof ApiRequestError ? caught.message : 'No se pudo registrar el pago. Inténtalo de nuevo.');
@@ -99,23 +86,6 @@ export function MarkProjectMilestonePaidDialog({
           accept="application/pdf"
         />
       </div>
-
-      {showHito0Notice && (
-        <div className={styles.hito0Box}>
-          <div className={styles.hito0Text}>
-            <InfoIcon size={16} className={styles.hito0Icon} />
-            <span>Este es el primer tramo del proyecto. Al registrar el pago, el proyecto se activará automáticamente.</span>
-          </div>
-          <label className={styles.hito0Check}>
-            <input
-              type="checkbox"
-              checked={pauseForManagementApproval}
-              onChange={(e) => setPauseForManagementApproval(e.target.checked)}
-            />
-            Dejar en espera de aprobación de Gerencia
-          </label>
-        </div>
-      )}
 
       {error && (
         <div className={styles.alert} role="alert">
