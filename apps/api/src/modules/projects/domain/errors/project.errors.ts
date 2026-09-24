@@ -167,6 +167,17 @@ export class CannotManageProjectError extends ForbiddenError {
   }
 }
 
+/**
+ * Reasignar el líder DE UN proyecto a otra persona es decisión de Gerencia/PMO (`projects:manage`), no
+ * del propio líder saliente — sin esto, cualquier líder podía entregarle "su" proyecto a quien quisiera
+ * sin pasar por Gerencia. Ver `UpdateProjectUseCase`.
+ */
+export class CannotReassignProjectLeaderError extends ForbiddenError {
+  constructor() {
+    super('Solo Gerencia/PMO puede reasignar el líder de un proyecto.', 'PROJECT_CANNOT_REASSIGN_LEADER');
+  }
+}
+
 export class ProjectPaymentMilestoneNotFoundError extends NotFoundError {
   constructor(identifier: string) {
     super('Tramo de pago', identifier, 'PROJECT_PAYMENT_MILESTONE_NOT_FOUND');

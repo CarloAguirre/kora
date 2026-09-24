@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ProjectDetail } from '@kora/contracts';
@@ -37,8 +37,10 @@ vi.mock('@/modules/clients/api/clients.queries', () => ({
   }),
 }));
 
+const useUsersListMock = vi.fn(() => ({ data: { items: [] } }) as { data: { items: { id: string; fullName: string }[] } | undefined });
+
 vi.mock('@/modules/users/api/users.queries', () => ({
-  useUsersList: () => ({ data: { items: [] } }),
+  useUsersList: (...args: unknown[]) => useUsersListMock(...(args as [])),
 }));
 
 vi.mock('@/modules/teams/api/teams.queries', () => ({
@@ -116,15 +118,75 @@ function buildProject(overrides: Partial<ProjectDetail> = {}): ProjectDetail {
 }
 
 describe('EditProjectDialog', () => {
+  beforeEach(() => {
+    useUsersListMock.mockReturnValue({ data: { items: [] } });
+  });
+
   it('precarga el formulario con los datos actuales del proyecto', () => {
-    renderDialog({ open: true, project: buildProject(), onClose: vi.fn(), onSuccess: vi.fn() });
+    renderDialog({ open: true, project: buildProject(), onClose: vi.fn(), onSuccess: vi.fn(), canReassignLeader: true });
 
     expect(screen.getByLabelText(/Nombre del proyecto/)).toHaveValue('Proyecto de prueba');
     expect(screen.getByLabelText('HH vendidas')).toHaveValue(500);
   });
 
+  it('bloquea "Líder Kabeli a cargo" cuando el actor no puede reasignar el proyecto (solo Gerencia/PMO puede)', () => {
+    renderDialog({ open: true, project: buildProject(), onClose: vi.fn(), onSuccess: vi.fn(), canReassignLeader: false });
+
+    expect(screen.getByLabelText('Líder Kabeli a cargo')).toBeDisabled();
+    expect(screen.getByText('Solo Gerencia/PMO puede reasignar el proyecto a otro líder.')).toBeInTheDocument();
+  });
+
+  it('muestra el líder ya asignado aunque la lista de líderes cargue después del primer render', () => {
+    // Simula la carrera real: al montar, `useUsersList` todavía no tiene datos (como en el primer
+    // render de una query en curso); el select no debe quedarse pegado en "Sin asignar" cuando la
+    // lista llega después — antes de controlar el campo con `value`/`onChange`, exactamente eso pasaba.
+    useUsersListMock.mockReturnValue({ data: undefined });
+    const { rerender } = renderDialog({
+      open: true,
+      project: buildProject({ leader: { id: 'leader-1', fullName: 'José Aponte' } }),
+      onClose: vi.fn(),
+      onSuccess: vi.fn(),
+      canReassignLeader: true,
+    });
+
+    expect(screen.getByLabelText('Líder Kabeli a cargo')).toHaveValue('');
+
+    useUsersListMock.mockReturnValue({ data: { items: [{ id: 'leader-1', fullName: 'José Aponte' }] } });
+    rerender(
+      <ToastProvider>
+        <EditProjectDialog
+          open
+          project={buildProject({ leader: { id: 'leader-1', fullName: 'José Aponte' } })}
+          onClose={vi.fn()}
+          onSuccess={vi.fn()}
+          canReassignLeader
+        />
+      </ToastProvider>,
+    );
+
+    expect(screen.getByLabelText('Líder Kabeli a cargo')).toHaveValue('leader-1');
+  });
+
+  it('no muestra "Responsable comercial" para un proyecto ya aprobado', () => {
+    renderDialog({ open: true, project: buildProject(), onClose: vi.fn(), onSuccess: vi.fn(), canReassignLeader: true });
+
+    expect(screen.queryByLabelText('Responsable comercial')).not.toBeInTheDocument();
+  });
+
+  it('muestra "Responsable comercial" mientras el proyecto está en prospecto/cotización', () => {
+    renderDialog({
+      open: true,
+      project: buildProject({ salesStage: 'prospect' }),
+      onClose: vi.fn(),
+      onSuccess: vi.fn(),
+      canReassignLeader: true,
+    });
+
+    expect(screen.getByLabelText('Responsable comercial')).toBeInTheDocument();
+  });
+
   it('muestra los campos de desarrollo (etapa, avance) y no los de soporte', () => {
-    renderDialog({ open: true, project: buildProject({ type: 'development' }), onClose: vi.fn(), onSuccess: vi.fn() });
+    renderDialog({ open: true, project: buildProject({ type: 'development' }), onClose: vi.fn(), onSuccess: vi.fn(), canReassignLeader: true });
 
     expect(screen.getByLabelText('Tipo de proyecto')).toBeInTheDocument();
     expect(screen.getByLabelText('Avance real (%)')).toBeInTheDocument();
@@ -137,6 +199,7 @@ describe('EditProjectDialog', () => {
       project: buildProject({ type: 'support', salesStage: null, phase: null, actualProgress: null, expectedProgress: null }),
       onClose: vi.fn(),
       onSuccess: vi.fn(),
+      canReassignLeader: true,
     });
 
     expect(screen.getByLabelText('Horas de soporte')).toBeInTheDocument();
@@ -147,7 +210,7 @@ describe('EditProjectDialog', () => {
   it('envía los cambios al guardar', async () => {
     const onSuccess = vi.fn();
     const user = userEvent.setup();
-    renderDialog({ open: true, project: buildProject(), onClose: vi.fn(), onSuccess });
+    renderDialog({ open: true, project: buildProject(), onClose: vi.fn(), onSuccess, canReassignLeader: true });
 
     const nameField = screen.getByLabelText(/Nombre del proyecto/);
     await user.clear(nameField);

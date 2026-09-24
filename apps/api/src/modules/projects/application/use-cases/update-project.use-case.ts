@@ -12,6 +12,7 @@ import {
 import type { Permission, UpdateProjectInput } from '@kora/contracts';
 import {
   CannotManageProjectError,
+  CannotReassignProjectLeaderError,
   ProjectNameAlreadyInUseError,
   ProjectNotFoundError,
   ReferencedClientNotFoundError,
@@ -57,8 +58,18 @@ export class UpdateProjectUseCase implements UseCase<UpdateProjectCommand, void,
     const project = await this.projects.findById(projectId);
     if (!project || project.isDeleted) return err(new ProjectNotFoundError(projectId));
 
-    if (!command.actorPermissions.includes('projects:manage') && project.leaderUserId !== actor.userId) {
+    const hasFullManage = command.actorPermissions.includes('projects:manage');
+    if (!hasFullManage && project.leaderUserId !== actor.userId) {
       return err(new CannotManageProjectError());
+    }
+
+    /**
+     * Reasignar a otro líder es de Gerencia/PMO, no del líder saliente — ver
+     * `CannotReassignProjectLeaderError`. `data.leaderUserId === project.leaderUserId` (no-op) se
+     * deja pasar para no romper un submit del formulario que reenvía el mismo valor sin tocarlo.
+     */
+    if (!hasFullManage && data.leaderUserId !== undefined && data.leaderUserId !== project.leaderUserId) {
+      return err(new CannotReassignProjectLeaderError());
     }
 
     if (data.clientId !== undefined && data.clientId !== null) {

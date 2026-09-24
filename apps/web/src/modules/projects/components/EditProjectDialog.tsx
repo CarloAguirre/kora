@@ -156,6 +156,8 @@ export interface EditProjectDialogProps {
   project: ProjectDetail;
   onClose: () => void;
   onSuccess: (message: string) => void;
+  /** Reasignar el proyecto a otro líder es de Gerencia/PMO — el propio líder (sin `projects:manage`) ve el campo bloqueado. El backend exige lo mismo (`CannotReassignProjectLeaderError`). */
+  canReassignLeader: boolean;
 }
 
 /**
@@ -165,7 +167,7 @@ export interface EditProjectDialogProps {
  * v1) — agregar o quitar equipos sigue siendo un flujo aparte en la ficha
  * (`DevelopmentProjectDetailView`).
  */
-export function EditProjectDialog({ open, project, onClose, onSuccess }: EditProjectDialogProps) {
+export function EditProjectDialog({ open, project, onClose, onSuccess, canReassignLeader }: EditProjectDialogProps) {
   const isDevelopment = project.type === 'development';
   const updateProject = useUpdateProject();
   const changeStatus = useChangeProjectStatus();
@@ -210,11 +212,12 @@ export function EditProjectDialog({ open, project, onClose, onSuccess }: EditPro
   }, [open, project, reset]);
 
   const clientId = watch('clientId') ?? '';
+  const leaderUserId = watch('leaderUserId') ?? '';
+  const commercialManagerUserId = watch('commercialManagerUserId') ?? '';
   const teamsValue = watch('teams') ?? [];
 
   const { data: clients } = useClientsList({ page: 1, pageSize: 200, sortField: 'companyName' }, { enabled: open });
   const { data: leaders } = useUsersList({ page: 1, pageSize: 200, sortField: 'firstName', role: 'leader' }, { enabled: open });
-  const { data: developers } = useUsersList({ page: 1, pageSize: 200, sortField: 'firstName', role: 'collaborator' }, { enabled: open });
   const { data: commercialUsers } = useUsersList({ page: 1, pageSize: 200, sortField: 'firstName', role: 'commercial' }, { enabled: open });
   const { data: teamsCatalog } = useTeamsList({ page: 1, pageSize: 50, sortField: 'name' }, { enabled: open });
 
@@ -519,25 +522,33 @@ export function EditProjectDialog({ open, project, onClose, onSuccess }: EditPro
             emptyMessage="No se encontraron clientes."
           />
 
-          <div className={styles.row3}>
+          <div className={styles.row}>
             <Select
               label="Líder Kabeli a cargo"
               placeholder="Sin asignar"
               options={(leaders?.items ?? []).map((user) => ({ value: user.id, label: user.fullName }))}
-              {...register('leaderUserId', { setValueAs: emptyToNull })}
+              disabled={!canReassignLeader}
+              helperText={canReassignLeader ? undefined : 'Solo Gerencia/PMO puede reasignar el proyecto a otro líder.'}
+              // Controlado (no `register` directo): si la lista de líderes todavía no cargó cuando el
+              // form hace su `reset()` inicial, un `<select>` no controlado se queda pegado en el
+              // placeholder aunque el proyecto sí tenga líder — el valor real vive en el form, la opción
+              // simplemente no existía todavía en el DOM. Controlado, React la selecciona apenas aparece.
+              // Controlado (no `register` directo): si la lista de líderes todavía no cargó cuando el
+              // form hace su `reset()` inicial, un `<select>` no controlado se queda pegado en el
+              // placeholder aunque el proyecto sí tenga líder — el valor real vive en el form, la opción
+              // simplemente no existía todavía en el DOM. Controlado, React la selecciona apenas aparece.
+              value={leaderUserId}
+              onChange={(event) => setValue('leaderUserId', event.target.value || null, { shouldValidate: true })}
             />
-            <Select
-              label="Desarrollador"
-              placeholder="Sin asignar"
-              options={(developers?.items ?? []).map((user) => ({ value: user.id, label: user.fullName }))}
-              {...register('developerUserId', { setValueAs: emptyToNull })}
-            />
-            <Select
-              label="Responsable comercial"
-              placeholder="Sin asignar"
-              options={(commercialUsers?.items ?? []).map((user) => ({ value: user.id, label: user.fullName }))}
-              {...register('commercialManagerUserId', { setValueAs: emptyToNull })}
-            />
+            {isDevelopment && (tipo === 'prospecto' || tipo === 'cotizacion') && (
+              <Select
+                label="Responsable comercial"
+                placeholder="Sin asignar"
+                options={(commercialUsers?.items ?? []).map((user) => ({ value: user.id, label: user.fullName }))}
+                value={commercialManagerUserId}
+                onChange={(event) => setValue('commercialManagerUserId', event.target.value || null, { shouldValidate: true })}
+              />
+            )}
           </div>
 
           <div className={styles.row3}>
