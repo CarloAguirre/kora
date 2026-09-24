@@ -102,6 +102,11 @@ export class CreateHourEntryUseCase implements UseCase<CreateHourEntryCommand, {
 
     await this.entries.save(entry);
 
+    if (entry.projectId && entry.status === 'approved') {
+      const usedHours = await this.entries.sumApprovedHoursForProject(entry.projectId);
+      await this.projects.recalculateUsedHours(entry.projectId, usedHours);
+    }
+
     await this.audit.record({
       actor: { userId: actor.userId, email: actor.email },
       action: 'create',

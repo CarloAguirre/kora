@@ -45,6 +45,7 @@ class FakeProjectReader implements HourEntryProjectReader {
   async findModuleById(): Promise<null> {
     return null;
   }
+  async recalculateUsedHours(): Promise<void> {}
 }
 
 function baseQuery() {

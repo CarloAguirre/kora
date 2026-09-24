@@ -441,6 +441,9 @@ export function DevelopmentProjectDetailView({
             {totalPendingHours > 0 && (
               <span className={styles.metricSub}>{formatHours(totalPendingHours)} pendientes de aprobación</span>
             )}
+            {project.prospectPhaseHours > 0 && (
+              <span className={styles.metricSub}>{formatHours(project.prospectPhaseHours)} en fase Prospecto/Cotización</span>
+            )}
           </div>
           <div className={styles.metricItem}>
             <span className={styles.kpiLabel}>

@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { CLOCK, type Clock } from '@kora/core';
 import { PROJECT_REPOSITORY, type ProjectRepository } from '../../../projects/domain/repositories/project.repository';
 import {
   PROJECT_MODULE_REPOSITORY,
@@ -16,6 +17,7 @@ export class ProjectsModuleHourEntryProjectReader implements HourEntryProjectRea
   constructor(
     @Inject(PROJECT_REPOSITORY) private readonly projects: ProjectRepository,
     @Inject(PROJECT_MODULE_REPOSITORY) private readonly modules: ProjectModuleRepository,
+    @Inject(CLOCK) private readonly clock: Clock,
   ) {}
 
   async findModuleById(moduleId: string): Promise<HourEntryModuleReference | null> {
@@ -47,5 +49,12 @@ export class ProjectsModuleHourEntryProjectReader implements HourEntryProjectRea
 
   findApprovers(projectId: string, memberUserId: string): Promise<HourEntryProjectApprover[]> {
     return this.projects.findApproverCandidatesForMember(projectId, memberUserId);
+  }
+
+  async recalculateUsedHours(projectId: string, usedHours: number): Promise<void> {
+    const project = await this.projects.findById(projectId);
+    if (!project || project.isDeleted) return;
+    project.recordUsedHours(usedHours, this.clock.now());
+    await this.projects.save(project);
   }
 }

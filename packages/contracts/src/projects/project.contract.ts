@@ -512,6 +512,14 @@ export const projectDetailSchema = projectSummarySchema.extend({
   periodReportAchievements: z.array(z.string()).nullable(),
   /** Fecha de la hora aprobada más reciente del proyecto — "actualizado al" de la tarjeta de horas. `null` si no tiene ninguna. */
   usedHoursUpdatedAt: z.string().nullable(),
+  /**
+   * Horas aprobadas registradas antes del día del Hito 0 — fase
+   * "Prospecto/Cotización" del documento de Leslie. Ya están incluidas en
+   * `usedHours` (suman al consumo total, la cotización ya las considera);
+   * este campo solo las separa para mostrarlas aparte. Sin Hito 0 todavía,
+   * es igual a `usedHours` completo.
+   */
+  prospectPhaseHours: z.number(),
   /** "Facturación" del portal cliente — cronograma de tramos de pago. */
   paymentMilestones: z.array(projectPaymentMilestoneSchema),
   /** true si Hito 0 quedó pausado esperando que Gerencia active el proyecto a mano. */

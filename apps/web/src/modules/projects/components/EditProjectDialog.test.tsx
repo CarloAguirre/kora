@@ -105,6 +105,7 @@ function buildProject(overrides: Partial<ProjectDetail> = {}): ProjectDetail {
     periodReportDate: null,
     periodReportAchievements: null,
     usedHoursUpdatedAt: null,
+    prospectPhaseHours: 0,
     paymentMilestones: [],
     pendingManagementApproval: false,
     hito0At: null,

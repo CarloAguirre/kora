@@ -52,6 +52,7 @@ class FakeProjectReader implements HourEntryProjectReader {
   async findModuleById(): Promise<null> {
     return null;
   }
+  async recalculateUsedHours(): Promise<void> {}
   async isProjectApprover(_projectId: string, actorUserId: string): Promise<boolean> {
     return this.approverId === actorUserId;
   }

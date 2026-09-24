@@ -28,6 +28,13 @@ export interface HourEntryProjectReader {
   findApprovers(projectId: string, memberUserId: string): Promise<HourEntryProjectApprover[]>;
   /** Módulo ("Fases · Módulos") contra el que se puede imputar una hora — valida que pertenezca al proyecto elegido. */
   findModuleById(moduleId: string): Promise<HourEntryModuleReference | null>;
+  /**
+   * Persiste `usedHours` en el proyecto — única escritura de este puerto
+   * (por lo demás de solo lectura). `usedHours` ya viene calculado por quien
+   * llama (`HourEntryRepository.sumApprovedHoursForProject`); este método
+   * solo lo guarda. Ver `ApproveHourEntryUseCase`/`CreateHourEntryUseCase`/`UpdateHourEntryUseCase`.
+   */
+  recalculateUsedHours(projectId: string, usedHours: number): Promise<void>;
 }
 
 export const HOUR_ENTRY_PROJECT_READER = Symbol('HourEntryProjectReader');

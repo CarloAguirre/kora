@@ -92,6 +92,20 @@ export class GetProjectUseCase implements UseCase<GetProjectCommand, ProjectDeta
       this.hourEntries.maxApprovedEntryDateForProject(project.id),
     ]);
 
+    /**
+     * Fase "Prospecto/Cotización": horas aprobadas con fecha anterior al
+     * DÍA del Hito 0 (no al instante exacto — una hora cargada el mismo día
+     * en que se facturó ya es del proyecto, ver el documento de Leslie
+     * "Corte por fecha"). Sin Hito 0 todavía, el proyecto nunca se activó:
+     * todo lo consumido es de esta fase.
+     */
+    const prospectPhaseHours = snapshot.hito0At
+      ? await this.hourEntries.sumApprovedHoursBeforeDateForProject(
+          project.id,
+          new Date(snapshot.hito0At.toISOString().slice(0, 10)),
+        )
+      : snapshot.usedHours;
+
     if (!command.actorPermissions.includes('projects:read')) {
       const isParticipant =
         snapshot.leaderUserId === command.actorUserId ||
@@ -129,6 +143,7 @@ export class GetProjectUseCase implements UseCase<GetProjectCommand, ProjectDeta
         modules: projectModules,
         paymentMilestones: projectPaymentMilestones,
         usedHoursUpdatedAt,
+        prospectPhaseHours,
         actorUserId: command.actorUserId,
         canManagePendings,
         canAuthorizeOvertime,
