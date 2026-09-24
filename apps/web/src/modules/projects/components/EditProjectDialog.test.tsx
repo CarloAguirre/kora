@@ -23,8 +23,12 @@ vi.mock('../api/projects.queries', () => ({
   useCreateProjectModule: () => ({ mutateAsync: vi.fn() }),
   useUpdateProjectModule: () => ({ mutateAsync: vi.fn() }),
   useDeleteProjectModule: () => ({ mutateAsync: vi.fn() }),
-  useAddProjectModuleDelivery: () => ({ mutateAsync: vi.fn() }),
+  useAddProjectModuleDelivery: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useUpdateProjectModuleDelivery: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useRemoveProjectModuleDelivery: () => ({ mutateAsync: vi.fn() }),
+  useCreateProjectModuleSegment: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useUpdateProjectModuleSegment: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useDeleteProjectModuleSegment: () => ({ mutateAsync: vi.fn() }),
 }));
 
 vi.mock('@/modules/clients/api/clients.queries', () => ({

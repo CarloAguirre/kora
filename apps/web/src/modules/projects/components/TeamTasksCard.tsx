@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import {
   PROJECT_MODULE_TASK_SCOPES,
   PROJECT_MODULE_TASK_SCOPE_LABELS,
-  PROJECT_MODULE_TASK_STATUSES,
   PROJECT_MODULE_TASK_STATUS_LABELS,
   type ProjectDetail,
   type ProjectModuleTaskScope,
@@ -15,8 +14,11 @@ import { Select } from '@/shared/components/ui/Select';
 import { TextField } from '@/shared/components/ui/TextField';
 import { Tabs } from '@/shared/components/ui/Tabs';
 import { Modal } from '@/shared/components/ui/Modal';
+import { DataTable } from '@/shared/components/ui/DataTable';
+import { DropdownMenu, type DropdownMenuItem } from '@/shared/components/ui/DropdownMenu';
 import { useToast } from '@/shared/components/ui/Toast';
-import { TrashIcon } from '@/shared/components/icons/Icons';
+import { ReviewActionModal, type ReviewAction } from './ReviewActionModal';
+import { AssignCollaboratorModal } from './AssignCollaboratorModal';
 import { useCreateProjectModuleTask, useDeleteProjectModuleTask, useUpdateProjectModuleTask } from '../api/projects.queries';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
@@ -28,14 +30,23 @@ const TASK_TABS = [
   { id: 'all', label: 'Todas' },
   { id: 'todo', label: 'Por hacer' },
   { id: 'in_progress', label: 'En progreso' },
+  { id: 'in_review', label: 'En revisión' },
   { id: 'done', label: 'Completadas' },
 ] as const;
 type TaskFilter = (typeof TASK_TABS)[number]['id'];
 
-const TASK_STATUS_OPTIONS = PROJECT_MODULE_TASK_STATUSES.map((status) => ({
+/** El líder edita a mano entre estos tres — `in_review` solo se alcanza cuando el colaborador envía la tarea a revisión, o el líder la revierte desde el badge de Acciones. */
+const TASK_STATUS_OPTIONS = (['todo', 'in_progress', 'done'] as const).map((status) => ({
   value: status,
   label: PROJECT_MODULE_TASK_STATUS_LABELS[status],
 }));
+
+const TASK_STATUS_BADGE_CLASS: Record<ProjectModuleTaskStatus, string> = {
+  todo: 'badgeMuted',
+  in_progress: 'badgeInfo',
+  in_review: 'badgeWarning',
+  done: 'badgeSuccess',
+};
 
 const TASK_SCOPE_OPTIONS = PROJECT_MODULE_TASK_SCOPES.map((scope) => ({
   value: scope,
@@ -50,7 +61,6 @@ interface TaskDraft {
   status: ProjectModuleTaskStatus;
   scope: ProjectModuleTaskScope;
   estimatedHours: string;
-  startDate: string;
   date: string;
 }
 
@@ -62,7 +72,6 @@ const EMPTY_TASK_DRAFT: TaskDraft = {
   status: 'todo',
   scope: 'desarrollo',
   estimatedHours: '',
-  startDate: '',
   date: '',
 };
 
@@ -129,7 +138,6 @@ export function TeamTasksCard({ project, projectId, teamId }: TeamTasksCardProps
       status: task.status,
       scope: task.scope,
       estimatedHours: task.estimatedHours != null ? String(task.estimatedHours) : '',
-      startDate: task.startDate ?? '',
       date: task.date,
     });
     setTaskModalOpen(true);
@@ -147,7 +155,6 @@ export function TeamTasksCard({ project, projectId, teamId }: TeamTasksCardProps
             name: taskDraft.name,
             description: taskDraft.description || undefined,
             assigneeUserId: taskDraft.assigneeUserId || undefined,
-            startDate: taskDraft.startDate || null,
             date: taskDraft.date,
             estimatedHours: taskDraft.estimatedHours === '' ? undefined : Number(taskDraft.estimatedHours),
             status: taskDraft.status,
@@ -164,7 +171,6 @@ export function TeamTasksCard({ project, projectId, teamId }: TeamTasksCardProps
             name: taskDraft.name,
             description: taskDraft.description || undefined,
             assigneeUserId: taskDraft.assigneeUserId || undefined,
-            startDate: taskDraft.startDate || undefined,
             date: taskDraft.date,
             estimatedHours: taskDraft.estimatedHours === '' ? undefined : Number(taskDraft.estimatedHours),
             status: taskDraft.status,
@@ -188,6 +194,107 @@ export function TeamTasksCard({ project, projectId, teamId }: TeamTasksCardProps
     }
   };
 
+  // Revisar (aprobar/rechazar/revertir) una tarea que el colaborador ya marcó como lista, o
+  // revertir una decisión anterior — mismo modal para tareas y entregas, ver `ReviewActionModal`.
+  const [reviewTarget, setReviewTarget] = useState<{ moduleId: string; taskId: string; action: ReviewAction } | null>(null);
+  const reviewingTask = reviewTarget ? teamTasks.find((t) => t.id === reviewTarget.taskId) : null;
+
+  const onConfirmReview = async (reason?: string) => {
+    if (!reviewTarget || !reviewingTask) return;
+    const input =
+      reviewTarget.action === 'approve'
+        ? { status: 'done' as const, rejectionReason: null }
+        : reviewTarget.action === 'reject'
+          ? { status: 'in_progress' as const, rejectionReason: reason ?? '' }
+          : { status: 'in_review' as const, rejectionReason: null };
+    try {
+      await updateTask.mutateAsync({ projectId, moduleId: reviewTarget.moduleId, taskId: reviewTarget.taskId, input });
+      toast.success(
+        reviewTarget.action === 'approve' ? 'Tarea aprobada.' : reviewTarget.action === 'reject' ? 'Tarea rechazada.' : 'Tarea revertida a en revisión.',
+      );
+      setReviewTarget(null);
+    } catch (error) {
+      toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo actualizar la tarea.');
+    }
+  };
+
+  // Reasignar el colaborador de una tarea — mismo modal que usa `TeamDeliveriesCard` para entregas.
+  const [reassignTarget, setReassignTarget] = useState<{ moduleId: string; taskId: string } | null>(null);
+  const reassigningTask = reassignTarget ? teamTasks.find((t) => t.id === reassignTarget.taskId) : null;
+
+  const onConfirmReassign = async (userId: string) => {
+    if (!reassignTarget) return;
+    try {
+      await updateTask.mutateAsync({
+        projectId,
+        moduleId: reassignTarget.moduleId,
+        taskId: reassignTarget.taskId,
+        input: { assigneeUserId: userId },
+      });
+      toast.success('Se reasignó la tarea.');
+      setReassignTarget(null);
+    } catch (error) {
+      toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo reasignar la tarea.');
+    }
+  };
+
+  const taskMenuItems = (task: (typeof teamTasks)[number]): DropdownMenuItem[] => {
+    const items: DropdownMenuItem[] =
+      task.status === 'in_review'
+        ? [
+            {
+              key: 'aprobar',
+              label: 'Aprobar',
+              tone: 'success',
+              onSelect: () => setReviewTarget({ moduleId: task.moduleId, taskId: task.id, action: 'approve' }),
+            },
+            {
+              key: 'rechazar',
+              label: 'Rechazar',
+              tone: 'danger',
+              onSelect: () => setReviewTarget({ moduleId: task.moduleId, taskId: task.id, action: 'reject' }),
+            },
+            {
+              key: 'reasignar',
+              label: 'Reasignar',
+              onSelect: () => setReassignTarget({ moduleId: task.moduleId, taskId: task.id }),
+            },
+          ]
+        : task.status === 'done' || task.rejectionReason
+          ? [
+              {
+                key: 'revertir',
+                label: 'Editar / revertir decisión',
+                onSelect: () => setReviewTarget({ moduleId: task.moduleId, taskId: task.id, action: 'revert' }),
+              },
+              {
+                key: 'reasignar',
+                label: 'Reasignar',
+                onSelect: () => setReassignTarget({ moduleId: task.moduleId, taskId: task.id }),
+              },
+            ]
+          : [
+              {
+                key: 'completar',
+                label: 'Marcar como completada',
+                tone: 'success',
+                onSelect: () => setReviewTarget({ moduleId: task.moduleId, taskId: task.id, action: 'approve' }),
+              },
+              {
+                key: 'reasignar',
+                label: 'Reasignar',
+                onSelect: () => setReassignTarget({ moduleId: task.moduleId, taskId: task.id }),
+              },
+            ];
+    items.push({
+      key: 'eliminar',
+      label: 'Eliminar',
+      tone: 'danger',
+      onSelect: () => void onDeleteTask(task.moduleId, task.id),
+    });
+    return items;
+  };
+
   return (
     <>
       <Card>
@@ -202,49 +309,55 @@ export function TeamTasksCard({ project, projectId, teamId }: TeamTasksCardProps
 
         <Tabs tabs={[...TASK_TABS]} activeId={taskFilter} onSelect={(id) => setTaskFilter(id as TaskFilter)} />
 
-        {filteredTasks.length === 0 ? (
-          <p className={styles.empty}>Sin tareas en este filtro.</p>
-        ) : (
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th>Tarea</th>
-                <th>Colaborador</th>
-                <th>Módulo</th>
-                <th>Estado</th>
-                <th>Fecha límite</th>
-                <th>HH est.</th>
-                <th aria-label="Acciones" />
-              </tr>
-            </thead>
-            <tbody>
-              {filteredTasks.map((task) => (
-                <tr key={task.id}>
-                  <td className={styles.taskNameCell} onClick={() => canManageTeam && openEditTaskModal(task.moduleId, task)}>
-                    {task.name}
-                  </td>
-                  <td>{task.assigneeName ?? '—'}</td>
-                  <td>{task.moduleName}</td>
-                  <td>{PROJECT_MODULE_TASK_STATUS_LABELS[task.status]}</td>
-                  <td>{formatDate(task.date)}</td>
-                  <td>{task.estimatedHours ?? '—'}</td>
-                  <td>
-                    {canManageTeam && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => void onDeleteTask(task.moduleId, task.id)}
-                        aria-label={`Quitar ${task.name}`}
-                      >
-                        <TrashIcon size={16} />
+        <DataTable
+          columns={[
+            {
+              key: 'name',
+              header: 'Tarea',
+              render: (task) => (
+                <span
+                  className={styles.taskNameCell}
+                  onClick={() => canManageTeam && task.status !== 'in_review' && openEditTaskModal(task.moduleId, task)}
+                >
+                  {task.name}
+                  {task.rejectionReason && <span className={styles.rejectionNote}>Rechazada: {task.rejectionReason}</span>}
+                </span>
+              ),
+            },
+            { key: 'assignee', header: 'Colaborador', render: (task) => task.assigneeName ?? '—' },
+            { key: 'module', header: 'Módulo', render: (task) => task.moduleName },
+            {
+              key: 'status',
+              header: 'Estado',
+              render: (task) => (
+                <span className={[styles.badge, styles[TASK_STATUS_BADGE_CLASS[task.status]]].join(' ')}>
+                  {PROJECT_MODULE_TASK_STATUS_LABELS[task.status]}
+                </span>
+              ),
+            },
+            { key: 'date', header: 'Fecha límite', render: (task) => formatDate(task.date) },
+            { key: 'hours', header: 'HH est.', render: (task) => task.estimatedHours ?? '—' },
+            {
+              key: 'actions',
+              header: '',
+              align: 'right',
+              render: (task) =>
+                canManageTeam ? (
+                  <DropdownMenu
+                    items={taskMenuItems(task)}
+                    trigger={({ onClick }) => (
+                      <Button variant="ghost" size="icon" onClick={onClick} aria-label={`Acciones de ${task.name}`}>
+                        ⋮
                       </Button>
                     )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+                  />
+                ) : null,
+            },
+          ]}
+          items={filteredTasks}
+          getRowKey={(task) => task.id}
+          emptyMessage="Sin tareas en este filtro."
+        />
       </Card>
 
       <Modal
@@ -269,6 +382,7 @@ export function TeamTasksCard({ project, projectId, teamId }: TeamTasksCardProps
         <div className={styles.taskForm}>
           <TextField
             label="Título de la tarea"
+            placeholder="Ej. Prototipo de checkout"
             value={taskDraft.name}
             onChange={(event) => setTaskDraft((prev) => ({ ...prev, name: event.target.value }))}
           />
@@ -276,6 +390,7 @@ export function TeamTasksCard({ project, projectId, teamId }: TeamTasksCardProps
             <label className={styles.fieldLabel}>Descripción</label>
             <textarea
               className={styles.textarea}
+              placeholder="Qué incluye esta tarea"
               value={taskDraft.description}
               onChange={(event) => setTaskDraft((prev) => ({ ...prev, description: event.target.value }))}
             />
@@ -315,22 +430,59 @@ export function TeamTasksCard({ project, projectId, teamId }: TeamTasksCardProps
               onChange={(event) => setTaskDraft((prev) => ({ ...prev, estimatedHours: event.target.value }))}
             />
           </div>
-          <div className={styles.row2}>
-            <TextField
-              label="Fecha de inicio"
-              type="date"
-              value={taskDraft.startDate}
-              onChange={(event) => setTaskDraft((prev) => ({ ...prev, startDate: event.target.value }))}
-            />
-            <TextField
-              label="Fecha límite"
-              type="date"
-              value={taskDraft.date}
-              onChange={(event) => setTaskDraft((prev) => ({ ...prev, date: event.target.value }))}
-            />
-          </div>
+          <TextField
+            label="Fecha límite"
+            type="date"
+            value={taskDraft.date}
+            onChange={(event) => setTaskDraft((prev) => ({ ...prev, date: event.target.value }))}
+          />
         </div>
       </Modal>
+
+      <ReviewActionModal
+        open={reviewTarget !== null}
+        action={reviewTarget?.action ?? 'approve'}
+        title={
+          reviewTarget?.action === 'revert'
+            ? 'Editar / revertir decisión — tarea'
+            : reviewTarget?.action === 'reject'
+              ? 'Rechazar tarea'
+              : 'Aprobar tarea'
+        }
+        summary={
+          reviewingTask
+            ? [
+                { label: 'Tarea', value: reviewingTask.name },
+                { label: 'Colaborador', value: reviewingTask.assigneeName ?? 'Sin asignar' },
+                { label: 'Módulo', value: reviewingTask.moduleName },
+                { label: 'HH estimadas', value: reviewingTask.estimatedHours != null ? `${reviewingTask.estimatedHours} hh` : '—' },
+                { label: 'Fecha límite', value: formatDate(reviewingTask.date) },
+              ]
+            : []
+        }
+        submitting={updateTask.isPending}
+        onCancel={() => setReviewTarget(null)}
+        onConfirm={(reason) => void onConfirmReview(reason)}
+      />
+
+      <AssignCollaboratorModal
+        open={reassignTarget !== null}
+        isReassign={Boolean(reassigningTask?.assigneeUserId)}
+        summary={
+          reassigningTask
+            ? [
+                { label: 'Tarea', value: reassigningTask.name },
+                { label: 'Módulo', value: reassigningTask.moduleName },
+                { label: 'Fecha límite', value: formatDate(reassigningTask.date) },
+              ]
+            : []
+        }
+        memberOptions={team.members.map((m) => ({ value: m.userId, label: m.fullName }))}
+        initialUserId={reassigningTask?.assigneeUserId ?? ''}
+        submitting={updateTask.isPending}
+        onCancel={() => setReassignTarget(null)}
+        onConfirm={(userId) => void onConfirmReassign(userId)}
+      />
     </>
   );
 }

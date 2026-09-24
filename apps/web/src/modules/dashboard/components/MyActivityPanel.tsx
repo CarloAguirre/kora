@@ -54,30 +54,37 @@ function DailyProgressDonut({ percent }: { percent: number }) {
 
 const isPastDate = (isoDate: string) => new Date(`${isoDate}T00:00:00`) < new Date(new Date().toDateString());
 
-const TASK_STATUS_TAG_LABEL: Record<'todo' | 'in_progress' | 'done' | 'late', string> = {
+const TASK_STATUS_TAG_LABEL: Record<'todo' | 'in_progress' | 'in_review' | 'done' | 'late', string> = {
   todo: 'Por hacer',
   in_progress: 'En progreso',
+  in_review: 'En revisión',
   done: 'Completada',
   late: 'Atrasada',
 };
 const TASK_STATUS_TAG_CLASS = {
   todo: styles.statusTagTodo,
   in_progress: styles.statusTagInProgress,
+  in_review: styles.statusTagInProgress,
   done: styles.statusTagDone,
   late: styles.statusTagLate,
-} satisfies Record<'todo' | 'in_progress' | 'done' | 'late', string | undefined>;
+} satisfies Record<'todo' | 'in_progress' | 'in_review' | 'done' | 'late', string | undefined>;
 
-/** "Mis tareas" — tareas de "Fases · Módulos" asignadas directamente al colaborador. */
+/**
+ * "Mis tareas" — tareas de "Fases · Módulos" asignadas directamente al
+ * colaborador. "Marcar como lista" solo la manda a revisión (`in_review`):
+ * quien lidera el equipo o el proyecto recién ahí la aprueba (`done`) o la
+ * rechaza con motivo — el colaborador nunca la marca `done` directamente.
+ */
 function MyTasksCard({ tasks, loading }: { tasks: readonly DashboardMyTask[]; loading: boolean }) {
   const toast = useToast();
   const updateTask = useUpdateProjectModuleTask();
-  const [tab, setTab] = useState<'all' | 'todo' | 'in_progress' | 'done'>('all');
+  const [tab, setTab] = useState<'all' | 'todo' | 'in_progress' | 'in_review' | 'done'>('all');
 
   const visualStatus = (task: DashboardMyTask) =>
-    task.status === 'done' ? 'done' : isPastDate(task.date) ? 'late' : task.status;
+    task.status === 'done' || task.status === 'in_review' ? task.status : isPastDate(task.date) ? 'late' : task.status;
   const filtered = tasks.filter((task) => tab === 'all' || task.status === tab);
 
-  const onAdvance = async (task: DashboardMyTask, nextStatus: 'in_progress' | 'done') => {
+  const onAdvance = async (task: DashboardMyTask, nextStatus: 'in_progress' | 'in_review') => {
     try {
       await updateTask.mutateAsync({
         projectId: task.projectId,
@@ -98,6 +105,7 @@ function MyTasksCard({ tasks, loading }: { tasks: readonly DashboardMyTask[]; lo
           { id: 'all', label: 'Todas' },
           { id: 'todo', label: 'Por hacer' },
           { id: 'in_progress', label: 'En progreso' },
+          { id: 'in_review', label: 'En revisión' },
           { id: 'done', label: 'Completadas' },
         ]}
         activeId={tab}
@@ -118,6 +126,11 @@ function MyTasksCard({ tasks, loading }: { tasks: readonly DashboardMyTask[]; lo
                   <span className={styles.itemMeta}>
                     {task.projectName} · {task.moduleName} · {new Date(`${task.date}T00:00:00`).toLocaleDateString('es-CL')}
                   </span>
+                  {task.rejectionReason && (
+                    <span className={styles.itemMeta} style={{ color: 'var(--kora-danger)' }}>
+                      Rechazada: {task.rejectionReason}
+                    </span>
+                  )}
                 </div>
                 <span className={[styles.statusTag, TASK_STATUS_TAG_CLASS[status]].join(' ')}>
                   {TASK_STATUS_TAG_LABEL[status]}
@@ -127,9 +140,9 @@ function MyTasksCard({ tasks, loading }: { tasks: readonly DashboardMyTask[]; lo
                     Iniciar
                   </Button>
                 )}
-                {task.status !== 'done' && (
-                  <Button size="sm" onClick={() => void onAdvance(task, 'done')}>
-                    Marcar como realizada
+                {(task.status === 'todo' || task.status === 'in_progress') && (
+                  <Button size="sm" onClick={() => void onAdvance(task, 'in_review')}>
+                    Marcar como lista
                   </Button>
                 )}
               </div>
@@ -141,11 +154,16 @@ function MyTasksCard({ tasks, loading }: { tasks: readonly DashboardMyTask[]; lo
   );
 }
 
-/** "Mis entregas" — entregas de "Fases · Módulos" del equipo del colaborador. */
+/**
+ * "Mis entregas" — entregas de "Fases · Módulos" asignadas directamente al
+ * colaborador. "Marcar como completada" solo la manda como entregada
+ * (`delivered`, "en revisión" para el líder) — la aprobación final es de
+ * quien lidera el equipo o el proyecto.
+ */
 function MyDeliveriesCard({ deliveries, loading }: { deliveries: readonly DashboardMyDelivery[]; loading: boolean }) {
   const toast = useToast();
   const updateDelivery = useUpdateProjectModuleDelivery();
-  const [tab, setTab] = useState<'all' | 'planned' | 'delivered'>('all');
+  const [tab, setTab] = useState<'all' | 'planned' | 'delivered' | 'approved'>('all');
 
   const filtered = deliveries.filter((delivery) => tab === 'all' || delivery.status === tab);
 
@@ -169,7 +187,8 @@ function MyDeliveriesCard({ deliveries, loading }: { deliveries: readonly Dashbo
         tabs={[
           { id: 'all', label: 'Todas' },
           { id: 'planned', label: 'Pendientes' },
-          { id: 'delivered', label: 'Completadas' },
+          { id: 'delivered', label: 'En revisión' },
+          { id: 'approved', label: 'Completadas' },
         ]}
         activeId={tab}
         onSelect={(id) => setTab(id as typeof tab)}
@@ -177,11 +196,20 @@ function MyDeliveriesCard({ deliveries, loading }: { deliveries: readonly Dashbo
       {loading ? (
         <span className={styles.loadingText}>…</span>
       ) : filtered.length === 0 ? (
-        <span className={styles.empty}>Sin entregas para tu equipo.</span>
+        <span className={styles.empty}>Sin entregas asignadas.</span>
       ) : (
         <div className={styles.itemList}>
           {filtered.map((delivery) => {
             const late = delivery.status === 'planned' && isPastDate(delivery.estimatedDate);
+            const label = delivery.status === 'approved' ? 'Completada' : delivery.status === 'delivered' ? 'En revisión' : late ? 'Atrasada' : 'Comprometida';
+            const tagClass =
+              delivery.status === 'approved'
+                ? styles.statusTagDone
+                : delivery.status === 'delivered'
+                  ? styles.statusTagInProgress
+                  : late
+                    ? styles.statusTagLate
+                    : styles.statusTagTodo;
             return (
               <div key={delivery.id} className={styles.itemRow}>
                 <div className={styles.itemMain}>
@@ -191,15 +219,13 @@ function MyDeliveriesCard({ deliveries, loading }: { deliveries: readonly Dashbo
                   <span className={styles.itemMeta}>
                     {new Date(`${delivery.estimatedDate}T00:00:00`).toLocaleDateString('es-CL')}
                   </span>
+                  {delivery.rejectionReason && (
+                    <span className={styles.itemMeta} style={{ color: 'var(--kora-danger)' }}>
+                      Rechazada: {delivery.rejectionReason}
+                    </span>
+                  )}
                 </div>
-                <span
-                  className={[
-                    styles.statusTag,
-                    delivery.status === 'delivered' ? styles.statusTagDone : late ? styles.statusTagLate : styles.statusTagTodo,
-                  ].join(' ')}
-                >
-                  {delivery.status === 'delivered' ? 'Entregada' : late ? 'Atrasada' : 'Comprometida'}
-                </span>
+                <span className={[styles.statusTag, tagClass].join(' ')}>{label}</span>
                 {delivery.status === 'planned' && (
                   <Button size="sm" onClick={() => void onComplete(delivery)}>
                     Marcar como completada

@@ -5,7 +5,6 @@ import {
   PROJECT_OBSERVATION_TYPE_LABELS,
   type HourEntrySummary,
   type ProjectModule,
-  type ProjectModuleDeliveryStatus,
   type ProjectObservation,
   type ProjectObservationStatus,
   type ProjectTeam,
@@ -20,7 +19,7 @@ import { DataTable, type Column } from '@/shared/components/ui/DataTable';
 import { Modal } from '@/shared/components/ui/Modal';
 import { DropdownMenu, type DropdownMenuItem } from '@/shared/components/ui/DropdownMenu';
 import { useToast } from '@/shared/components/ui/Toast';
-import { CloseIcon, EyeIcon, PencilIcon, PlusIcon, SearchIcon, TrashIcon } from '@/shared/components/icons/Icons';
+import { EyeIcon, PencilIcon, PlusIcon, SearchIcon, TrashIcon } from '@/shared/components/icons/Icons';
 import {
   useDeleteProjectObservation,
   useResolveProjectObservation,
@@ -31,7 +30,6 @@ import { ApiRequestError } from '@/shared/lib/api-client';
 import { EVENT_STATUS_LABEL, formatEntryHours } from '../lib/hour-entry-log';
 import {
   rowDateDisplay,
-  rowDeliveryActions,
   rowFilterDate,
   rowId,
   rowIsIncident,
@@ -45,7 +43,6 @@ import {
   toBitacoraRows,
   type BitacoraRow,
   type BitacoraRowAction,
-  type DeliveryRowAction,
 } from '../lib/bitacora-row';
 import { AddBitacoraRecordModal } from './AddBitacoraRecordModal';
 
@@ -72,23 +69,10 @@ const RESOLVE_ACTION_TONE: Record<BitacoraRowAction, DropdownMenuItem['tone']> =
   reabrir: 'default',
 };
 
-const DELIVERY_ACTION_LABEL: Record<DeliveryRowAction, string> = {
-  entregar: 'Marcar como entregada',
-  aprobar: 'Aprobar',
-  rechazar: 'Rechazar',
-};
-
-const DELIVERY_ACTION_TONE: Record<DeliveryRowAction, DropdownMenuItem['tone']> = {
-  entregar: 'default',
-  aprobar: 'success',
-  rechazar: 'danger',
-};
-
 /** Bitácora unificada del proyecto: eventos (horas) + registros manuales, en una sola tabla filtrable con alta desde "Agregar registro". */
 export function BitacoraCard({ projectId, events, observations, modules, teams, canManage }: BitacoraCardProps) {
   const toast = useToast();
   const resolveObservation = useResolveProjectObservation();
-  const updateDelivery = useUpdateProjectModuleDelivery();
 
   const [filter, setFilter] = useState<'all' | 'incidents'>('all');
   const [search, setSearch] = useState('');
@@ -127,21 +111,6 @@ export function BitacoraCard({ projectId, events, observations, modules, teams, 
       toast.success(`${actionLabel}: listo.`);
     } catch (err) {
       toast.error(err instanceof ApiRequestError ? err.message : 'No se pudo actualizar el registro.');
-    }
-  };
-
-  const resolveDelivery = async (row: BitacoraRow, nextStatus: ProjectModuleDeliveryStatus, actionLabel: string) => {
-    if (row.kind !== 'entrega') return;
-    try {
-      await updateDelivery.mutateAsync({
-        projectId,
-        moduleId: row.moduleId,
-        deliveryId: row.delivery.id,
-        input: { status: nextStatus },
-      });
-      toast.success(`${actionLabel}: listo.`);
-    } catch (err) {
-      toast.error(err instanceof ApiRequestError ? err.message : 'No se pudo actualizar la entrega.');
     }
   };
 
@@ -194,8 +163,7 @@ export function BitacoraCard({ projectId, events, observations, modules, teams, 
         const canEdit = row.kind !== 'evento' && row.kind !== 'entrega' && row.observation.canEdit;
         const canEditDelivery = row.kind === 'entrega' && canManage;
         const resolveActions = rowResolveActions(row);
-        const deliveryActions = row.kind === 'entrega' && canManage ? rowDeliveryActions(row) : [];
-        if (!canEdit && !canEditDelivery && resolveActions.length === 0 && deliveryActions.length === 0) return null;
+        if (!canEdit && !canEditDelivery && resolveActions.length === 0) return null;
 
         const items: DropdownMenuItem[] = [
           ...resolveActions.map(({ action, nextStatus }) => ({
@@ -203,12 +171,6 @@ export function BitacoraCard({ projectId, events, observations, modules, teams, 
             label: RESOLVE_ACTION_LABEL[action],
             tone: RESOLVE_ACTION_TONE[action],
             onSelect: () => void resolveRow(row, nextStatus, RESOLVE_ACTION_LABEL[action]),
-          })),
-          ...deliveryActions.map(({ action, nextStatus }) => ({
-            key: action,
-            label: DELIVERY_ACTION_LABEL[action],
-            tone: DELIVERY_ACTION_TONE[action],
-            onSelect: () => void resolveDelivery(row, nextStatus, DELIVERY_ACTION_LABEL[action]),
           })),
           ...(canEdit || canEditDelivery
             ? [{ key: 'editar', label: 'Editar detalle', onSelect: () => openDetail(row, 'edit') }]
@@ -303,7 +265,11 @@ export function BitacoraCard({ projectId, events, observations, modules, teams, 
               : 'Detalle del registro'
         }
         onClose={() => setDetailRow(null)}
-        footer={<Button onClick={() => setDetailRow(null)}>Cerrar</Button>}
+        footer={
+          <Button variant="outline" onClick={() => setDetailRow(null)}>
+            Cerrar
+          </Button>
+        }
       >
         {detailRow?.kind === 'evento' && <EventDetail entry={detailRow.entry} />}
         {detailRow?.kind === 'entrega' && (
@@ -406,8 +372,8 @@ function DeliveryDetail({
         <TextField label="Fecha estimada" type="date" value={estimatedDate} onChange={(event) => setEstimatedDate(event.target.value)} />
         {error && <span className={styles.composerError}>{error}</span>}
         <div className={styles.composerRow}>
-          <Button type="button" variant="ghost" size="icon" onClick={() => setEditing(false)} aria-label="Cancelar edición">
-            <CloseIcon size={14} />
+          <Button type="button" variant="outline" size="sm" onClick={() => setEditing(false)}>
+            Cancelar
           </Button>
           <Button
             type="button"
@@ -497,8 +463,8 @@ function ObservationDetail({
           <textarea className={styles.composerTextarea} value={editValue} onChange={(event) => setEditValue(event.target.value)} autoFocus />
           {error && <span className={styles.composerError}>{error}</span>}
           <div className={styles.composerRow}>
-            <Button type="button" variant="ghost" size="icon" onClick={() => setEditing(false)} aria-label="Cancelar edición">
-              <CloseIcon size={14} />
+            <Button type="button" variant="outline" size="sm" onClick={() => setEditing(false)}>
+              Cancelar
             </Button>
             <Button
               type="button"

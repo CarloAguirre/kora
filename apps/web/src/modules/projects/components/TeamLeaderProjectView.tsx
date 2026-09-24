@@ -4,11 +4,15 @@ import styles from './TeamLeaderProjectView.module.css';
 import { Button } from '@/shared/components/ui/Button';
 import { Card } from '@/shared/components/ui/Card';
 import { Select } from '@/shared/components/ui/Select';
+import { TextField } from '@/shared/components/ui/TextField';
 import { Modal } from '@/shared/components/ui/Modal';
+import { DataTable } from '@/shared/components/ui/DataTable';
 import { useToast } from '@/shared/components/ui/Toast';
 import { AlertIcon, PencilIcon, TrashIcon } from '@/shared/components/icons/Icons';
 import { ProjectTimeline } from './ProjectTimeline';
 import { TeamTasksCard } from './TeamTasksCard';
+import { TeamDeliveriesCard } from './TeamDeliveriesCard';
+import deliveryModalStyles from './DeliveryModal.module.css';
 import { useAssignProjectMember, useUnassignProjectMember, useUpdateProjectMember } from '../api/projects.queries';
 import { useTeamMemberOptions } from '@/modules/teams/api/teams.queries';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
@@ -258,28 +262,23 @@ export function TeamLeaderProjectView({
                 )}
               </div>
             ) : (
-              <table className={styles.table}>
-                <thead>
-                  <tr>
-                    <th>Nombre</th>
-                    <th>Actividad</th>
-                    <th>HH asignadas</th>
-                    <th>HH consumidas</th>
-                    <th>% participación</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {team.members.map((member) => (
-                    <tr key={member.id}>
-                      <td>{member.fullName}</td>
-                      <td>{member.activity ?? '—'}</td>
-                      <td>{formatHours(member.assignedHours)}</td>
-                      <td>{formatHours(member.consumedHours)}</td>
-                      <td>{team.assignedHours > 0 ? `${Math.round((member.assignedHours / team.assignedHours) * 100)}%` : '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <DataTable
+                columns={[
+                  { key: 'name', header: 'Nombre', render: (member) => member.fullName },
+                  { key: 'activity', header: 'Actividad', render: (member) => member.activity ?? '—' },
+                  { key: 'assigned', header: 'HH asignadas', align: 'right', render: (member) => formatHours(member.assignedHours) },
+                  { key: 'consumed', header: 'HH consumidas', align: 'right', render: (member) => formatHours(member.consumedHours) },
+                  {
+                    key: 'participation',
+                    header: '% participación',
+                    align: 'right',
+                    render: (member) =>
+                      team.assignedHours > 0 ? `${Math.round((member.assignedHours / team.assignedHours) * 100)}%` : '—',
+                  },
+                ]}
+                items={team.members}
+                getRowKey={(member) => member.id}
+              />
             )}
           </div>
         </div>
@@ -297,6 +296,7 @@ export function TeamLeaderProjectView({
       </Card>
 
       <TeamTasksCard project={project} projectId={projectId} teamId={teamId} />
+      <TeamDeliveriesCard project={project} projectId={projectId} teamId={teamId} />
 
       <Modal
         open={teamModalOpen}
@@ -390,28 +390,22 @@ export function TeamLeaderProjectView({
                         )}
                       </td>
                       <td>
-                        <input
-                          className={styles.modalInput}
+                        <TextField
                           value={row.activity}
                           placeholder="Actividad"
                           onChange={(event) => updateDraftRow(row.key, { activity: event.target.value })}
                         />
                       </td>
                       <td>
-                        <input
-                          className={styles.modalInput}
+                        <TextField
                           type="number"
                           min={row.consumedHours}
                           value={row.assignedHours}
                           onChange={(event) => updateDraftRow(row.key, { assignedHours: event.target.value })}
                         />
                       </td>
-                      <td>
-                        <input className={styles.modalInput} type="number" value={row.consumedHours} disabled />
-                      </td>
-                      <td>
-                        <input className={styles.modalInput} value={`${pct}%`} disabled />
-                      </td>
+                      <td className={styles.modalReadonlyCell}>{row.consumedHours}</td>
+                      <td className={styles.modalReadonlyCell}>{pct}%</td>
                       <td>
                         {locked ? (
                           <span
@@ -436,7 +430,14 @@ export function TeamLeaderProjectView({
                 })}
               </tbody>
             </table>
-            <Button type="button" variant="outline" size="sm" disabled={poolLeft.length === 0} onClick={addDraftRow}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className={deliveryModalStyles.addButton}
+              disabled={poolLeft.length === 0}
+              onClick={addDraftRow}
+            >
               + Agregar
             </Button>
             <p className={styles.cupoHint}>

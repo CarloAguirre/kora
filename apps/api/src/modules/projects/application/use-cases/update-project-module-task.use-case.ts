@@ -5,6 +5,7 @@ import {
   ProjectModuleNotFoundError,
   ProjectModuleTaskNotFoundError,
   ProjectNotFoundError,
+  RejectionReasonRequiredError,
 } from '../../domain/errors/project.errors';
 import { PROJECT_REPOSITORY, type ProjectRepository } from '../../domain/repositories/project.repository';
 import {
@@ -31,9 +32,13 @@ export interface UpdateProjectModuleTaskCommand {
  * Además del líder (`projects:manage`), de quien lidera el equipo de la tarea
  * y de quien lidera EL PROYECTO (edición completa, igual que si pudiera
  * crearla), la persona asignada puede actualizarla — pero solo su `status`
- * ("Iniciar"/"Marcar como realizada" en "Mis tareas"), no reasignarla ni
- * cambiar sus fechas.
+ * ("Iniciar"/"Marcar como lista para revisión" en "Mis tareas"), no
+ * reasignarla ni cambiar sus fechas, y sin poder saltar directo a
+ * `done`: solo quien administra el proyecto o lidera el equipo puede
+ * aprobar (`done`), rechazar (`in_progress` + `rejectionReason`) o revertir
+ * (`in_review`) — ver `PROJECT_MODULE_TASK_ASSIGNEE_ALLOWED_STATUSES`.
  */
+const PROJECT_MODULE_TASK_ASSIGNEE_ALLOWED_STATUSES = new Set(['todo', 'in_progress', 'in_review']);
 @Injectable()
 export class UpdateProjectModuleTaskUseCase
   implements UseCase<UpdateProjectModuleTaskCommand, void, ApplicationError>
@@ -72,11 +77,19 @@ export class UpdateProjectModuleTaskUseCase
         if (!onlyStatus) {
           return err(new ForbiddenError('Solo puedes cambiar el estado de tu tarea.', 'PROJECT_MODULE_TASK_LIMITED_UPDATE'));
         }
+        if (command.data.status !== undefined && !PROJECT_MODULE_TASK_ASSIGNEE_ALLOWED_STATUSES.has(command.data.status)) {
+          return err(
+            new ForbiddenError('Solo quien lidera el equipo o el proyecto puede aprobar tu tarea.', 'PROJECT_MODULE_TASK_LIMITED_UPDATE'),
+          );
+        }
       }
     }
 
     const now = this.clock.now();
     const nextStatus = command.data.status;
+    if (nextStatus === 'in_progress' && task.status === 'in_review' && !command.data.rejectionReason?.trim()) {
+      return err(new RejectionReasonRequiredError());
+    }
     const completedAt =
       nextStatus === undefined
         ? undefined
@@ -85,6 +98,14 @@ export class UpdateProjectModuleTaskUseCase
           : task.status === 'done'
             ? null
             : undefined;
+    // Cualquier cambio de estado limpia el motivo de un rechazo anterior, salvo que este mismo
+    // llamado sea el que lo está fijando (rechazo explícito con su motivo).
+    const rejectionReason =
+      command.data.rejectionReason !== undefined
+        ? (command.data.rejectionReason ?? null)
+        : nextStatus !== undefined
+          ? null
+          : undefined;
 
     await this.modules.updateTask(
       command.taskId,
@@ -103,6 +124,7 @@ export class UpdateProjectModuleTaskUseCase
         ...(nextStatus !== undefined ? { status: nextStatus } : {}),
         ...(command.data.scope !== undefined ? { scope: command.data.scope } : {}),
         ...(completedAt !== undefined ? { completedAt } : {}),
+        ...(rejectionReason !== undefined ? { rejectionReason } : {}),
       },
       now,
     );

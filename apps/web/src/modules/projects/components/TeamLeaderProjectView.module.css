@@ -291,31 +291,22 @@
 }
 
 .modalTable td {
-  padding: 4px 6px;
+  padding: var(--kora-space-2) var(--kora-space-2) var(--kora-space-3);
   vertical-align: middle;
 }
 
-.modalInput {
-  width: 100%;
-  font-family: inherit;
-  font-size: var(--kora-text-xs);
-  border: 1px solid var(--kora-border);
-  border-radius: var(--kora-radius-sm);
-  padding: 6px 7px;
-  background: #fff;
-}
-
-.modalInput:disabled {
-  background: var(--kora-surface-muted);
-  color: var(--kora-gray-500);
+.modalReadonlyCell {
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-medium);
+  color: var(--kora-text-muted);
 }
 
 .modalLockedText {
   display: block;
-  font-size: var(--kora-text-xs);
+  font-size: var(--kora-text-sm);
   font-weight: var(--kora-weight-semibold);
   color: var(--kora-navy);
-  padding: 6px 2px;
+  padding: 9px 2px;
 }
 
 .warnIcon {
@@ -330,4 +321,68 @@
   font-size: var(--kora-text-xs);
   color: var(--kora-gray-500);
   margin: var(--kora-space-2) 0 0;
+}
+
+.reviewSummary {
+  background: var(--kora-surface-muted);
+  border: 1px solid var(--kora-border);
+  border-radius: var(--kora-radius-sm);
+  padding: var(--kora-space-3) var(--kora-space-4);
+}
+
+.reviewRow {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--kora-space-3);
+  font-size: var(--kora-text-sm);
+  color: var(--kora-navy);
+  padding: 3px 0;
+}
+
+.reviewRow span:first-child {
+  color: var(--kora-gray-500);
+}
+
+.actionsCell {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-bold);
+  padding: 3px var(--kora-space-2);
+  border-radius: var(--kora-radius-pill);
+  white-space: nowrap;
+}
+
+.badgeMuted {
+  background: var(--kora-surface-muted);
+  color: var(--kora-gray-500);
+}
+
+.badgeInfo {
+  background: var(--kora-blue-surface, #eff6ff);
+  color: var(--kora-blue-600);
+}
+
+.badgeWarning {
+  background: var(--kora-warning-surface, #fffbeb);
+  color: var(--kora-warning, #92400e);
+}
+
+.badgeSuccess {
+  background: var(--kora-lime-surface, #f0fdf4);
+  color: var(--kora-success-text, #16a34a);
+}
+
+.rejectionNote {
+  display: block;
+  font-weight: var(--kora-weight-medium);
+  font-size: var(--kora-text-xs);
+  color: var(--kora-danger);
+  margin-top: 2px;
 }

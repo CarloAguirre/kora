@@ -17,12 +17,13 @@ import { entryTitle, EVENT_STATUS_LABEL, EVENT_STATUS_TONE } from './hour-entry-
 /**
  * Una fila de la bitácora unificada: un evento (hora registrada, de solo
  * lectura acá), un registro manual (hito/incidente/compromiso/atención/
- * observación, creado desde "Agregar registro"), o una entrega de fase
- * (Roadmap — su ciclo de vida sigue viviendo ahí, pero también se puede
- * marcar como entregada desde acá). `kind` distingue los tres casos, con el
- * mismo valor que ya trae `ProjectObservation.type` para el segundo.
- * Compartido entre `BitacoraCard` (tabla completa) y `BitacoraMiniCard`
- * (resumen).
+ * observación, creado desde "Agregar registro"), o una entrega de fase — de
+ * solo lectura acá también: su ciclo de vida (asignar, marcar entregada,
+ * aprobar/rechazar) se gestiona desde la vista de líder de equipo
+ * (`TeamDeliveriesCard`), no desde la bitácora. `kind` distingue los tres
+ * casos, con el mismo valor que ya trae `ProjectObservation.type` para el
+ * segundo. Compartido entre `BitacoraCard` (tabla completa) y
+ * `BitacoraMiniCard` (resumen).
  */
 export type BitacoraRow =
   | { kind: 'evento'; entry: HourEntrySummary }
@@ -174,28 +175,3 @@ export function rowResolveActions(row: BitacoraRow): readonly { action: Bitacora
   return [];
 }
 
-export type DeliveryRowAction = 'entregar' | 'aprobar' | 'rechazar';
-
-const DELIVERY_ACTIONS_BY_STATUS: Readonly<
-  Record<ProjectModuleDeliveryStatus, readonly { action: DeliveryRowAction; nextStatus: ProjectModuleDeliveryStatus }[]>
-> = {
-  planned: [{ action: 'entregar', nextStatus: 'delivered' }],
-  delivered: [
-    { action: 'aprobar', nextStatus: 'approved' },
-    { action: 'rechazar', nextStatus: 'planned' },
-  ],
-  approved: [],
-};
-
-/**
- * Ciclo de vida de una entrega: Planificada → (equipo marca) Entregada →
- * (líder/PMO) Aprobada, estado terminal; o Rechazar la devuelve a
- * Planificada. `approved` no tiene más acciones, igual que un compromiso
- * ya `cumplido`.
- */
-export function rowDeliveryActions(
-  row: BitacoraRow,
-): readonly { action: DeliveryRowAction; nextStatus: ProjectModuleDeliveryStatus }[] {
-  if (row.kind !== 'entrega') return [];
-  return DELIVERY_ACTIONS_BY_STATUS[row.delivery.status];
-}

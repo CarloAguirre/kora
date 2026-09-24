@@ -51,7 +51,12 @@ export const projectModuleDeliveryStatusEnum = pgEnum('project_module_delivery_s
   'delivered',
   'approved',
 ]);
-export const projectModuleTaskStatusEnum = pgEnum('project_module_task_status', ['todo', 'in_progress', 'done']);
+export const projectModuleTaskStatusEnum = pgEnum('project_module_task_status', [
+  'todo',
+  'in_progress',
+  'in_review',
+  'done',
+]);
 /** Ámbito de la tarea — permite calcular el % de avance por ámbito en "Resumen de avance" del módulo. */
 export const projectModuleTaskScopeEnum = pgEnum('project_module_task_scope', [
   'diseno',
@@ -267,8 +272,15 @@ export const projectModuleDeliveries = pgTable('project_module_deliveries', {
     .references(() => projectModules.id, { onDelete: 'cascade' }),
   /** Equipo responsable de esta entrega — permite a un colaborador filtrar "las entregas de mi equipo". */
   teamId: uuid('team_id').references(() => teams.id, { onDelete: 'set null' }),
+  /** Nullable por entregas creadas antes de este campo — las nuevas siempre lo piden (ver `addProjectModuleDeliverySchema`). */
+  name: varchar('name', { length: 300 }),
+  description: text('description'),
+  /** Colaborador del equipo responsable a quien se le asignó esta entrega — `null` ⇔ "Sin asignar". */
+  assigneeUserId: uuid('assignee_user_id').references(() => users.id, { onDelete: 'set null' }),
   estimatedDate: date('estimated_date', { mode: 'date' }).notNull(),
   status: projectModuleDeliveryStatusEnum('status').notNull().default('planned'),
+  /** Motivo del último rechazo del líder — se limpia al aprobar o al volver a marcarla entregada. */
+  rejectionReason: text('rejection_reason'),
   ...timestamps,
 });
 
@@ -304,6 +316,8 @@ export const projectModuleTasks = pgTable('project_module_tasks', {
   status: projectModuleTaskStatusEnum('status').notNull().default('todo'),
   scope: projectModuleTaskScopeEnum('scope').notNull().default('desarrollo'),
   completedAt: timestamp('completed_at', { withTimezone: true, mode: 'date' }),
+  /** Motivo del último rechazo del líder — se limpia al aprobar o al volver a marcarla en revisión. */
+  rejectionReason: text('rejection_reason'),
   ...timestamps,
 });
 
@@ -377,6 +391,7 @@ export const projectModulesRelations = relations(projectModules, ({ one, many })
 export const projectModuleDeliveriesRelations = relations(projectModuleDeliveries, ({ one }) => ({
   module: one(projectModules, { fields: [projectModuleDeliveries.moduleId], references: [projectModules.id] }),
   team: one(teams, { fields: [projectModuleDeliveries.teamId], references: [teams.id] }),
+  assignee: one(users, { fields: [projectModuleDeliveries.assigneeUserId], references: [users.id] }),
 }));
 
 export const projectModuleSegmentsRelations = relations(projectModuleSegments, ({ one }) => ({

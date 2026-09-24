@@ -55,6 +55,9 @@ export class AddProjectModuleDeliveryUseCase
       {
         moduleId: command.moduleId,
         teamId: command.data.teamId ?? null,
+        name: command.data.name,
+        description: command.data.description ?? null,
+        assigneeUserId: command.data.assigneeUserId ?? null,
         estimatedDate: new Date(command.data.estimatedDate),
       },
       now,
@@ -65,7 +68,7 @@ export class AddProjectModuleDeliveryUseCase
         {
           projectId: project.id,
           moduleId: command.moduleId,
-          message: `Nueva entrega agregada en fase "${module.name}", estimada para ${new Date(command.data.estimatedDate).toLocaleDateString('es-CL')}.`,
+          message: `Nueva entrega "${command.data.name}" agregada en fase "${module.name}", estimada para ${new Date(command.data.estimatedDate).toLocaleDateString('es-CL')}.`,
         },
       ],
       command.actor.userId,

@@ -1,41 +1,31 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import {
   PROJECT_MODULE_DELIVERY_STATUS_LABELS,
   PROJECT_MODULE_STAGES,
   PROJECT_MODULE_STAGE_LABELS,
   PROJECT_MODULE_TASK_SCOPES,
   PROJECT_MODULE_TASK_SCOPE_LABELS,
-  PROJECT_MODULE_TASK_STATUSES,
   PROJECT_MODULE_TASK_STATUS_LABELS,
   type HourEntrySummary,
   type ProjectModule,
   type ProjectModuleDelivery,
-  type ProjectModuleDeliveryStatus,
+  type ProjectModuleSegment,
   type ProjectModuleStage,
   type ProjectModuleTask,
-  type ProjectModuleTaskStatus,
+  type ProjectObservation,
 } from '@kora/contracts';
 import styles from './ProjectModulesCard.module.css';
 import { Card } from '@/shared/components/ui/Card';
 import { Button } from '@/shared/components/ui/Button';
 import { Select } from '@/shared/components/ui/Select';
 import { TextField } from '@/shared/components/ui/TextField';
-import { AlertIcon } from '@/shared/components/icons/Icons';
+import { AlertIcon, CloseIcon } from '@/shared/components/icons/Icons';
 import { useToast } from '@/shared/components/ui/Toast';
-import { useUpdateProjectModule, useUpdateProjectModuleDelivery, useUpdateProjectModuleTask } from '../api/projects.queries';
+import { useUpdateProjectModule } from '../api/projects.queries';
 import { getTeamStyle } from '../utils/team-style';
 import { ApiRequestError } from '@/shared/lib/api-client';
 
 const STAGE_OPTIONS = PROJECT_MODULE_STAGES.map((stage) => ({ value: stage, label: PROJECT_MODULE_STAGE_LABELS[stage] }));
-const TASK_STATUS_OPTIONS = PROJECT_MODULE_TASK_STATUSES.map((status) => ({
-  value: status,
-  label: PROJECT_MODULE_TASK_STATUS_LABELS[status],
-}));
-const DELIVERY_STATUS_OPTIONS = [
-  { value: 'planned', label: PROJECT_MODULE_DELIVERY_STATUS_LABELS.planned },
-  { value: 'delivered', label: PROJECT_MODULE_DELIVERY_STATUS_LABELS.delivered },
-  { value: 'approved', label: PROJECT_MODULE_DELIVERY_STATUS_LABELS.approved },
-];
 const MONTH_LABELS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 
 const formatDate = (value: string | null) =>
@@ -59,6 +49,104 @@ function taskVisualStatus(task: ProjectModuleTask): TaskVisualStatus {
   return parseDate(task.date) < today() ? 'late' : 'upcoming';
 }
 
+const formatDateTime = (iso: string) =>
+  new Date(iso).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' });
+
+/** Ícono/color del punto de "Registros de bitácora relacionados" — un dot sólido por tipo, igual criterio que `tipoMeta` del prototipo (ficha_proyecto_lider-actualizada.html). */
+function observationDot(observation: ProjectObservation): { className: string | undefined; glyph: string } {
+  switch (observation.type) {
+    case 'hito':
+      return { className: styles.regDotHito, glyph: '★' };
+    case 'incidente':
+      return observation.status === 'resuelto'
+        ? { className: styles.regDotIncidentResolved, glyph: '✓' }
+        : { className: styles.regDotIncidentOpen, glyph: '⚑' };
+    case 'compromiso':
+      return { className: styles.regDotCompromiso, glyph: '◆' };
+    case 'atencion':
+      return { className: styles.regDotAtencion, glyph: '⚠' };
+    case 'cambio_proyecto':
+      return { className: styles.regDotCambio, glyph: '➜' };
+    default:
+      return { className: styles.regDotObservacion, glyph: '✎' };
+  }
+}
+
+/**
+ * No existe un vínculo real (FK) entre una `ProjectObservation` y la tarea/entrega puntual que la
+ * originó — solo con el módulo/fase completa. Mismo criterio pragmático que ya usa el Roadmap del
+ * portal cliente (`project-detail.adapter.ts`/`PhaseRoadmap`): se cruza por texto, buscando la
+ * etiqueta de la tarea/entrega dentro del título o mensaje del registro.
+ */
+function relatedObservations(
+  observations: readonly ProjectObservation[],
+  moduleId: string,
+  label: string,
+): ProjectObservation[] {
+  const needle = label.trim().toLowerCase();
+  if (!needle) return [];
+  return observations
+    .filter(
+      (observation) =>
+        observation.moduleId === moduleId &&
+        ((observation.title ?? '').toLowerCase().includes(needle) || observation.message.toLowerCase().includes(needle)),
+    )
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+function RelatedObservations({ observations, moduleId, label }: { observations: readonly ProjectObservation[]; moduleId: string; label: string }) {
+  const matches = relatedObservations(observations, moduleId, label);
+  return (
+    <div className={styles.regPanel}>
+      <p className={styles.regPanelHead}>Registros de bitácora relacionados</p>
+      {matches.length === 0 ? (
+        <p className={styles.regEmpty}>No hay registros de bitácora asociados a este ítem todavía.</p>
+      ) : (
+        matches.map((observation) => {
+          const dot = observationDot(observation);
+          return (
+            <div key={observation.id} className={styles.regItem}>
+              <span className={[styles.regDot, dot.className].filter(Boolean).join(' ')}>{dot.glyph}</span>
+              <div className={styles.regItemBody}>
+                <b>{observation.title || observation.message}</b>
+                <span className={styles.regMeta}>
+                  {formatDateTime(observation.createdAt)} · {observation.authorName}
+                </span>
+              </div>
+            </div>
+          );
+        })
+      )}
+    </div>
+  );
+}
+
+type GanttRowItem = { kind: 'segment'; segment: ProjectModuleSegment } | { kind: 'task'; task: ProjectModuleTask };
+
+function ganttRowTeamName(item: GanttRowItem): string {
+  return item.kind === 'segment' ? item.segment.teamName : (item.task.teamName ?? 'Sin equipo');
+}
+
+/**
+ * Tramos y tareas del módulo, agrupados por equipo (mismo equipo = filas contiguas) — cada fila
+ * sigue mostrando su propio punto y nombre de equipo, esto solo ordena las filas de un mismo
+ * equipo una junto a otra en vez de intercalarlas con las de otros equipos.
+ */
+function groupedGanttItems(module: ProjectModule): GanttRowItem[] {
+  const byTeam = new Map<string, GanttRowItem[]>();
+  const teamOrder: string[] = [];
+  const addItem = (teamName: string, item: GanttRowItem) => {
+    if (!byTeam.has(teamName)) {
+      byTeam.set(teamName, []);
+      teamOrder.push(teamName);
+    }
+    byTeam.get(teamName)!.push(item);
+  };
+  module.segments.forEach((segment) => addItem(segment.teamName, { kind: 'segment', segment }));
+  module.tasks.forEach((task) => addItem(task.teamName ?? 'Sin equipo', { kind: 'task', task }));
+  return teamOrder.flatMap((teamName) => byTeam.get(teamName)!);
+}
+
 type PhaseVisualStatus = 'proximo' | 'en_proceso' | 'finalizado';
 const PHASE_STATUS_LABELS: Record<PhaseVisualStatus, string> = {
   proximo: 'Próximo',
@@ -71,15 +159,16 @@ const PHASE_STATUS_CHIP_CLASS: Record<PhaseVisualStatus, 'stageChipMuted' | 'sta
   finalizado: 'stageChipDone',
 };
 /**
- * Estado visual de la fase, derivado de sus tareas (no de `currentStage`,
- * que es un campo aparte y manual). "Próximo": ninguna tarea empezó ni
- * vence hoy o antes. "Finalizado": todas las tareas ya vencieron y están
- * completadas. Cualquier otro caso: "En Proceso".
+ * Estado visual de la fase. "Finalizado" es 100% la decisión manual del líder
+ * (`currentStage === 'closed'`, el hito de cierre): si la cerró, quedó
+ * cerrada, sin importar tareas pendientes — no se puede "reabrir" calculando
+ * desde las tareas. "Próximo"/"En Proceso" sí se derivan de las tareas:
+ * "Próximo" es ninguna tarea empezada ni vencida hoy o antes; cualquier otro
+ * caso (mientras no esté cerrada a mano) es "En Proceso".
  */
 function phaseVisualStatus(module: ProjectModule): PhaseVisualStatus {
+  if (module.currentStage === 'closed') return 'finalizado';
   if (module.tasks.length === 0) return 'proximo';
-  const allDonePast = module.tasks.every((t) => t.status === 'done' && parseDate(t.date) <= today());
-  if (allDonePast) return 'finalizado';
   const anyStartedOrDue = module.tasks.some((t) => parseDate(t.startDate ?? t.date) <= today());
   return anyStartedOrDue ? 'en_proceso' : 'proximo';
 }
@@ -89,9 +178,13 @@ interface DateRange {
   max: Date;
 }
 
-/** Rango de fechas que cubre el módulo, para posicionar la línea de tiempo (tareas y entregas). Incluye siempre "hoy" para que la línea de HOY nunca quede fuera de vista. */
+/** Rango de fechas que cubre el módulo, para posicionar la línea de tiempo (tramos, tareas y entregas). Incluye siempre "hoy" para que la línea de HOY nunca quede fuera de vista. */
 function computeModuleRange(module: ProjectModule): DateRange | null {
   const dates: Date[] = [today()];
+  module.segments.forEach((s) => {
+    dates.push(parseDate(s.startDate));
+    dates.push(parseDate(s.endDate));
+  });
   module.tasks.forEach((t) => {
     dates.push(parseDate(t.date));
     if (t.startDate) dates.push(parseDate(t.startDate));
@@ -191,41 +284,42 @@ interface ProjectModulesCardProps {
   modules: readonly ProjectModule[];
   /** Registros de horas del proyecto (incluye `hasBlocker`/`blockerDescription`) — se filtran aquí por módulo para mostrar el detalle de los incidentes. */
   hourEntries: readonly HourEntrySummary[];
+  /** Bitácora del proyecto — al seleccionar una tarea/entrega, se filtra por módulo + texto para mostrar sus "Registros de bitácora relacionados". */
+  observations: readonly ProjectObservation[];
   canManage: boolean;
 }
 
 /**
- * "Fases · Módulos" — Roadmap de solo lectura de la estructura del proyecto
- * (fases y entregas): crear/quitar esa estructura vive en "Crear/editar
- * proyecto" (`EditProjectDialog`), no aquí. Las tareas (con su equipo, fechas
- * y ámbito) se crean desde la ficha del proyecto y son las que dibujan el
- * avance real de cada fase. Esta tarjeta solo visualiza (Gantt simple, con
- * zoom Semanas/Días y rango visible) y permite cambiar estado (etapa del
- * módulo, estado de tarea/entrega).
+ * "Fases · Módulos" — Roadmap de solo lectura del proyecto completo: crear/
+ * quitar fases y entregas vive en "Crear/editar proyecto" (`EditProjectDialog`)
+ * y las tareas se crean/gestionan (aprobar, rechazar, revertir) desde la
+ * vista de líder de equipo (`TeamTasksCard`/`TeamDeliveriesCard`), no aquí.
+ * Esta tarjeta solo visualiza (Gantt simple, con zoom Semanas/Días y rango
+ * visible) y permite cambiar la etapa del módulo — el estado de cada
+ * tarea/entrega se muestra como texto, sin poder editarlo.
  */
-export function ProjectModulesCard({ projectId, modules, hourEntries, canManage }: ProjectModulesCardProps) {
+export function ProjectModulesCard({ projectId, modules, hourEntries, observations, canManage }: ProjectModulesCardProps) {
   const toast = useToast();
   const updateModule = useUpdateProjectModule();
-  const updateTask = useUpdateProjectModuleTask();
-  const updateDelivery = useUpdateProjectModuleDelivery();
 
   const [rangeDraft, setRangeDraft] = useState({ from: '', to: '' });
   const [appliedRange, setAppliedRange] = useState<DateRange | null>(null);
   const [zoomByModule, setZoomByModule] = useState<Record<string, number>>({});
   const [selectedTaskByModule, setSelectedTaskByModule] = useState<Record<string, string | null>>({});
   const [selectedDeliveryByModule, setSelectedDeliveryByModule] = useState<Record<string, string | null>>({});
+  const [selectedSegmentByModule, setSelectedSegmentByModule] = useState<Record<string, string | null>>({});
   const [openIncidentsByModule, setOpenIncidentsByModule] = useState<Record<string, boolean>>({});
-  const taskRowRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  const deliveryRowRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const selectTask = (moduleId: string, taskId: string) => {
     setSelectedTaskByModule((prev) => ({ ...prev, [moduleId]: prev[moduleId] === taskId ? null : taskId }));
-    taskRowRefs.current[taskId]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   };
 
   const selectDelivery = (moduleId: string, deliveryId: string) => {
     setSelectedDeliveryByModule((prev) => ({ ...prev, [moduleId]: prev[moduleId] === deliveryId ? null : deliveryId }));
-    deliveryRowRefs.current[deliveryId]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  };
+
+  const selectSegment = (moduleId: string, segmentId: string) => {
+    setSelectedSegmentByModule((prev) => ({ ...prev, [moduleId]: prev[moduleId] === segmentId ? null : segmentId }));
   };
 
   const onChangeStage = async (moduleId: string, currentStage: ProjectModuleStage) => {
@@ -233,22 +327,6 @@ export function ProjectModulesCard({ projectId, modules, hourEntries, canManage 
       await updateModule.mutateAsync({ projectId, moduleId, input: { currentStage } });
     } catch (error) {
       toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo actualizar la etapa.');
-    }
-  };
-
-  const onChangeTaskStatus = async (moduleId: string, taskId: string, status: ProjectModuleTaskStatus) => {
-    try {
-      await updateTask.mutateAsync({ projectId, moduleId, taskId, input: { status } });
-    } catch (error) {
-      toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo actualizar la tarea.');
-    }
-  };
-
-  const onChangeDeliveryStatus = async (moduleId: string, deliveryId: string, status: ProjectModuleDeliveryStatus) => {
-    try {
-      await updateDelivery.mutateAsync({ projectId, moduleId, deliveryId, input: { status } });
-    } catch (error) {
-      toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo actualizar la entrega.');
     }
   };
 
@@ -274,7 +352,8 @@ export function ProjectModulesCard({ projectId, modules, hourEntries, canManage 
         <p className={styles.title}>Fases · Módulos</p>
         <p className={styles.hint}>
           Roadmap del proyecto. La estructura (fases y entregas) se agrega/edita desde "Editar proyecto"; las
-          barras de cada fase se dibujan a partir de las tareas creadas.
+          barras de cada fase se dibujan a partir de las tareas creadas. La gestión de tareas y entregas
+          (aprobar, rechazar, asignar) se hace desde la vista de líder de equipo.
         </p>
       </div>
 
@@ -360,6 +439,8 @@ export function ProjectModulesCard({ projectId, modules, hourEntries, canManage 
           const phaseStatus = phaseVisualStatus(module);
           const selectedTaskId = selectedTaskByModule[module.id] ?? null;
           const selectedDeliveryId = selectedDeliveryByModule[module.id] ?? null;
+          const selectedSegmentId = selectedSegmentByModule[module.id] ?? null;
+          const ganttItems = groupedGanttItems(module);
           const incidentsOpen = openIncidentsByModule[module.id] ?? false;
           const moduleIncidents = hourEntries.filter((entry) => entry.hasBlocker && entry.module?.id === module.id);
 
@@ -454,7 +535,7 @@ export function ProjectModulesCard({ projectId, modules, hourEntries, canManage 
                 </span>
               </div>
 
-              {range && (module.tasks.length > 0 || module.deliveries.length > 0) && (
+              {range && (module.segments.length > 0 || module.tasks.length > 0 || module.deliveries.length > 0) && (
                 <div className={styles.timeline}>
                   <div className={styles.zoomRow}>
                     <span>Semanas</span>
@@ -473,14 +554,17 @@ export function ProjectModulesCard({ projectId, modules, hourEntries, canManage 
                     <div className={styles.ganttLabels}>
                       <div className={styles.ganttHeader} />
                       {detail && <div className={styles.ganttDayRow} />}
-                      {module.tasks.map((task) => {
-                        const teamStyle = getTeamStyle(task.teamName ?? 'Sin equipo');
+                      {ganttItems.map((item) => {
+                        const teamName = ganttRowTeamName(item);
+                        const teamStyle = getTeamStyle(teamName);
+                        const label = item.kind === 'segment' ? item.segment.name : item.task.name;
+                        const key = item.kind === 'segment' ? `segment-${item.segment.id}` : `task-${item.task.id}`;
                         return (
-                          <div key={task.id} className={styles.ganttRowLabel}>
+                          <div key={key} className={styles.ganttRowLabel}>
                             <span className={styles.ganttRowDot} style={{ background: teamStyle.color }} />
                             <span className={styles.ganttRowLabelText}>
-                              <span className={styles.ganttRowLabelTeam}>{task.teamName ?? 'Sin equipo'}</span>
-                              <span className={styles.ganttRowLabelTask}>{task.name}</span>
+                              <span className={styles.ganttRowLabelTeam}>{teamName}</span>
+                              <span className={styles.ganttRowLabelTask}>{label}</span>
                             </span>
                           </div>
                         );
@@ -524,7 +608,48 @@ export function ProjectModulesCard({ projectId, modules, hourEntries, canManage 
                           </div>
                         )}
 
-                        {module.tasks.map((task) => {
+                        {ganttItems.map((item) => {
+                          if (item.kind === 'segment') {
+                            const { segment } = item;
+                            const teamStyle = getTeamStyle(segment.teamName);
+                            const left = pct(parseDate(segment.startDate), range);
+                            const width = Math.max(pct(parseDate(segment.endDate), range) - left, 1.5);
+                            const startDate = parseDate(segment.startDate);
+                            const endDate = parseDate(segment.endDate);
+                            const isDone = endDate < today();
+                            const isCurrent = !isDone && startDate <= today() && today() <= endDate;
+                            const isFuture = !isDone && startDate > today();
+                            return (
+                              <div key={`segment-${segment.id}`} className={styles.ganttTrackRow}>
+                                <div className={styles.ganttTrackBg} />
+                                <div
+                                  className={[
+                                    styles.ganttBar,
+                                    isFuture ? styles.ganttBarFuture : '',
+                                    selectedSegmentId === segment.id ? styles.ganttBarSelected : '',
+                                  ]
+                                    .filter(Boolean)
+                                    .join(' ')}
+                                  style={{ left: `${left}%`, width: `${width}%`, background: teamStyle.color }}
+                                  title={`${segment.teamName} — ${segment.name} · ${formatDate(segment.startDate)} a ${formatDate(segment.endDate)}`}
+                                  role="button"
+                                  tabIndex={0}
+                                  aria-pressed={selectedSegmentId === segment.id}
+                                  onClick={() => selectSegment(module.id, segment.id)}
+                                  onKeyDown={(event) => {
+                                    if (event.key === 'Enter' || event.key === ' ') {
+                                      event.preventDefault();
+                                      selectSegment(module.id, segment.id);
+                                    }
+                                  }}
+                                >
+                                  {isDone ? '✓' : isCurrent ? 'En curso' : ''}
+                                </div>
+                              </div>
+                            );
+                          }
+
+                          const { task } = item;
                           const teamStyle = getTeamStyle(task.teamName ?? 'Sin equipo');
                           const visual = taskVisualStatus(task);
                           if (task.startDate) {
@@ -535,7 +660,7 @@ export function ProjectModulesCard({ projectId, modules, hourEntries, canManage 
                             const isCurrent = !isDone && startDate <= today() && today() <= parseDate(task.date);
                             const isFuture = !isDone && startDate > today();
                             return (
-                              <div key={task.id} className={styles.ganttTrackRow}>
+                              <div key={`task-${task.id}`} className={styles.ganttTrackRow}>
                                 <div className={styles.ganttTrackBg} />
                                 <div
                                   className={[
@@ -564,7 +689,7 @@ export function ProjectModulesCard({ projectId, modules, hourEntries, canManage 
                             );
                           }
                           return (
-                            <div key={task.id} className={styles.ganttTrackRow}>
+                            <div key={`task-${task.id}`} className={styles.ganttTrackRow}>
                               <div className={styles.ganttTrackBg} />
                               <div
                                 className={[
@@ -609,7 +734,7 @@ export function ProjectModulesCard({ projectId, modules, hourEntries, canManage 
                                     .filter(Boolean)
                                     .join(' ')}
                                   style={{ left: `${pct(parseDate(delivery.estimatedDate), range)}%` }}
-                                  title={`Entrega · ${formatDate(delivery.estimatedDate)} · ${PROJECT_MODULE_DELIVERY_STATUS_LABELS[delivery.status]}`}
+                                  title={`${delivery.name ?? 'Entrega'} · ${formatDate(delivery.estimatedDate)} · ${PROJECT_MODULE_DELIVERY_STATUS_LABELS[delivery.status]}`}
                                   role="button"
                                   tabIndex={0}
                                   aria-pressed={selectedDeliveryId === delivery.id}
@@ -631,93 +756,110 @@ export function ProjectModulesCard({ projectId, modules, hourEntries, canManage 
                 </div>
               )}
 
-              {module.tasks.length > 0 && (
-                <div className={styles.subsection}>
-                  <span className={styles.subsectionLabel}>Tareas</span>
-                  {module.tasks.map((task) => {
-                    const isSelected = selectedTaskId === task.id;
-                    return (
-                      <div
-                        key={task.id}
-                        ref={(el) => {
-                          taskRowRefs.current[task.id] = el;
-                        }}
-                        className={[styles.taskRow, isSelected ? styles.taskRowSelected : ''].filter(Boolean).join(' ')}
-                        onClick={() => selectTask(module.id, task.id)}
-                      >
-                        <span className={styles.taskName}>
+              {selectedTaskId &&
+                (() => {
+                  const task = module.tasks.find((t) => t.id === selectedTaskId);
+                  if (!task) return null;
+                  return (
+                    <div className={styles.subsection}>
+                      <div className={styles.taskDetailHead}>
+                        <span className={styles.subsectionLabel}>
                           {task.name}
                           {task.teamName && <span className={styles.segmentTeam}> · {task.teamName}</span>}
                           {task.assigneeName && <span className={styles.segmentTeam}> · {task.assigneeName}</span>}
                         </span>
-                        <span className={styles.segmentDates}>{formatDate(task.date)}</span>
-                        <Select
-                          options={TASK_STATUS_OPTIONS}
-                          value={task.status}
-                          disabled={!canManage}
-                          onClick={(event) => event.stopPropagation()}
-                          onChange={(event) =>
-                            void onChangeTaskStatus(module.id, task.id, event.target.value as ProjectModuleTaskStatus)
-                          }
-                        />
-                        {isSelected && (
-                          <div className={styles.taskDetail}>
-                            <DetailField label="Ámbito" value={PROJECT_MODULE_TASK_SCOPE_LABELS[task.scope]} />
-                            <DetailField label="Horas estimadas" value={task.estimatedHours != null ? `${task.estimatedHours} hh` : 'Sin definir'} />
-                            <DetailField label="Fecha de inicio" value={formatDate(task.startDate)} />
-                            <DetailField
-                              label="Completada"
-                              value={task.completedAt ? new Date(task.completedAt).toLocaleString('es-CL') : 'Aún no'}
-                            />
-                            <DetailField label="Descripción" value={task.description || 'Sin descripción'} full />
-                          </div>
-                        )}
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => selectTask(module.id, task.id)}
+                          aria-label="Cerrar detalle de la tarea"
+                        >
+                          <CloseIcon size={14} />
+                        </Button>
                       </div>
-                    );
-                  })}
-                </div>
-              )}
+                      <div className={styles.taskDetail}>
+                        <DetailField label="Estado" value={PROJECT_MODULE_TASK_STATUS_LABELS[task.status]} />
+                        <DetailField label="Ámbito" value={PROJECT_MODULE_TASK_SCOPE_LABELS[task.scope]} />
+                        <DetailField label="Fecha límite" value={formatDate(task.date)} />
+                        <DetailField label="Horas estimadas" value={task.estimatedHours != null ? `${task.estimatedHours} hh` : 'Sin definir'} />
+                        <DetailField label="Fecha de inicio" value={formatDate(task.startDate)} />
+                        <DetailField
+                          label="Completada"
+                          value={task.completedAt ? new Date(task.completedAt).toLocaleString('es-CL') : 'Aún no'}
+                        />
+                        <DetailField label="Descripción" value={task.description || 'Sin descripción'} full />
+                      </div>
+                      <RelatedObservations observations={observations} moduleId={module.id} label={task.name} />
+                    </div>
+                  );
+                })()}
 
-              {module.deliveries.length > 0 && (
-                <div className={styles.deliveries}>
-                  <span className={styles.deliveriesLabel}>Entregas estimadas</span>
-                  {module.deliveries.map((delivery, deliveryIndex) => {
-                    const isSelected = selectedDeliveryId === delivery.id;
-                    return (
-                      <div
-                        key={delivery.id}
-                        ref={(el) => {
-                          deliveryRowRefs.current[delivery.id] = el;
-                        }}
-                        className={[styles.deliveryRow, isSelected ? styles.taskRowSelected : ''].filter(Boolean).join(' ')}
-                        onClick={() => selectDelivery(module.id, delivery.id)}
-                      >
-                        <span className={styles.deliveryLabel}>
-                          Entrega {deliveryIndex + 1}
+              {selectedDeliveryId &&
+                (() => {
+                  const delivery = module.deliveries.find((d) => d.id === selectedDeliveryId);
+                  if (!delivery) return null;
+                  return (
+                    <div className={styles.deliveries}>
+                      <div className={styles.taskDetailHead}>
+                        <span className={styles.deliveriesLabel}>
+                          {delivery.name ?? 'Entrega'}
                           {delivery.teamName && <span className={styles.segmentTeam}> · {delivery.teamName}</span>}
                         </span>
-                        <span>{formatDate(delivery.estimatedDate)}</span>
-                        <Select
-                          options={DELIVERY_STATUS_OPTIONS}
-                          value={delivery.status}
-                          disabled={!canManage}
-                          onClick={(event) => event.stopPropagation()}
-                          onChange={(event) =>
-                            void onChangeDeliveryStatus(module.id, delivery.id, event.target.value as ProjectModuleDeliveryStatus)
-                          }
-                        />
-                        {isSelected && (
-                          <div className={styles.taskDetail}>
-                            <DetailField label="Estado" value={PROJECT_MODULE_DELIVERY_STATUS_LABELS[delivery.status]} />
-                            <DetailField label="Fecha estimada" value={formatDate(delivery.estimatedDate)} />
-                            <DetailField label="Equipo" value={delivery.teamName ?? 'Sin equipo'} />
-                          </div>
-                        )}
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => selectDelivery(module.id, delivery.id)}
+                          aria-label="Cerrar detalle de la entrega"
+                        >
+                          <CloseIcon size={14} />
+                        </Button>
                       </div>
-                    );
-                  })}
-                </div>
-              )}
+                      <div className={styles.taskDetail}>
+                        <DetailField label="Estado" value={PROJECT_MODULE_DELIVERY_STATUS_LABELS[delivery.status]} />
+                        <DetailField label="Fecha estimada" value={formatDate(delivery.estimatedDate)} />
+                        <DetailField label="Equipo" value={delivery.teamName ?? 'Sin equipo'} />
+                        <DetailField label="Descripción" value={delivery.description || 'Sin descripción'} full />
+                      </div>
+                      <RelatedObservations
+                        observations={observations}
+                        moduleId={module.id}
+                        label={delivery.name ?? (delivery.teamName ? `Entrega ${delivery.teamName}` : 'Entrega')}
+                      />
+                    </div>
+                  );
+                })()}
+
+              {selectedSegmentId &&
+                (() => {
+                  const segment = module.segments.find((s) => s.id === selectedSegmentId);
+                  if (!segment) return null;
+                  return (
+                    <div className={styles.subsection}>
+                      <div className={styles.taskDetailHead}>
+                        <span className={styles.subsectionLabel}>
+                          {segment.teamName}
+                          <span className={styles.segmentTeam}> — {segment.name}</span>
+                        </span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => selectSegment(module.id, segment.id)}
+                          aria-label="Cerrar detalle del tiempo de ejecución"
+                        >
+                          <CloseIcon size={14} />
+                        </Button>
+                      </div>
+                      <div className={styles.taskDetail}>
+                        <DetailField label="Equipo" value={segment.teamName} />
+                        <DetailField label="Fecha de inicio" value={formatDate(segment.startDate)} />
+                        <DetailField label="Fecha de término" value={formatDate(segment.endDate)} />
+                      </div>
+                    </div>
+                  );
+                })()}
             </div>
           );
         })}

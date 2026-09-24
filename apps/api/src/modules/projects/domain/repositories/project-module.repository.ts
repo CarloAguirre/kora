@@ -11,8 +11,13 @@ export interface ProjectModuleDeliveryRecord {
   readonly moduleId: string;
   readonly teamId: string | null;
   readonly teamName: string | null;
+  readonly name: string | null;
+  readonly description: string | null;
+  readonly assigneeUserId: string | null;
+  readonly assigneeName: string | null;
   readonly estimatedDate: Date;
   readonly status: ProjectModuleDeliveryStatus;
+  readonly rejectionReason: string | null;
 }
 
 export interface ProjectModuleSegmentRecord {
@@ -40,6 +45,7 @@ export interface ProjectModuleTaskRecord {
   readonly status: ProjectModuleTaskStatus;
   readonly scope: ProjectModuleTaskScope;
   readonly completedAt: Date | null;
+  readonly rejectionReason: string | null;
 }
 
 export interface ProjectModuleRecord {
@@ -114,18 +120,26 @@ export interface UpdateProjectModuleTaskInput {
   readonly status?: ProjectModuleTaskStatus;
   readonly scope?: ProjectModuleTaskScope;
   readonly completedAt?: Date | null;
+  readonly rejectionReason?: string | null;
 }
 
 export interface CreateProjectModuleDeliveryInput {
   readonly moduleId: string;
   readonly teamId: string | null;
+  readonly name: string;
+  readonly description: string | null;
+  readonly assigneeUserId: string | null;
   readonly estimatedDate: Date;
 }
 
 export interface UpdateProjectModuleDeliveryInput {
   readonly teamId?: string | null;
+  readonly name?: string;
+  readonly description?: string | null;
+  readonly assigneeUserId?: string | null;
   readonly status?: ProjectModuleDeliveryStatus;
   readonly estimatedDate?: Date;
+  readonly rejectionReason?: string | null;
 }
 
 /** Fila de "Mis tareas" — tarea asignada a una persona, con el nombre de su proyecto/módulo. */
@@ -139,10 +153,11 @@ export interface TaskAssignedToUserRecord {
   readonly date: Date;
   readonly status: ProjectModuleTaskStatus;
   readonly completedAt: Date | null;
+  readonly rejectionReason: string | null;
 }
 
-/** Fila de "Mis entregas" — entrega del equipo del actor, con el nombre de su proyecto/módulo. */
-export interface DeliveryForTeamRecord {
+/** Fila de "Mis entregas" — entrega asignada a una persona, con el nombre de su proyecto/módulo. */
+export interface DeliveryAssignedToUserRecord {
   readonly id: string;
   readonly projectId: string;
   readonly projectName: string;
@@ -150,6 +165,7 @@ export interface DeliveryForTeamRecord {
   readonly moduleName: string;
   readonly estimatedDate: Date;
   readonly status: ProjectModuleDeliveryStatus;
+  readonly rejectionReason: string | null;
 }
 
 /** Fases/módulos del proyecto — sin entidad de agregado propia, igual patrón que `ProjectObservationRepository`. */
@@ -179,7 +195,7 @@ export interface ProjectModuleRepository {
   updateTask(id: string, input: UpdateProjectModuleTaskInput, now: Date, context?: TransactionContext): Promise<void>;
   removeTask(id: string, context?: TransactionContext): Promise<void>;
   listTasksAssignedToUser(userId: string, context?: TransactionContext): Promise<TaskAssignedToUserRecord[]>;
-  listDeliveriesForTeam(teamId: string, context?: TransactionContext): Promise<DeliveryForTeamRecord[]>;
+  listDeliveriesAssignedToUser(userId: string, context?: TransactionContext): Promise<DeliveryAssignedToUserRecord[]>;
 }
 
 export const PROJECT_MODULE_REPOSITORY = Symbol('ProjectModuleRepository');

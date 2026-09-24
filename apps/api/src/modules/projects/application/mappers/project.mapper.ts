@@ -125,8 +125,13 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
       id: delivery.id,
       teamId: delivery.teamId,
       teamName: delivery.teamName,
+      name: delivery.name,
+      description: delivery.description,
+      assigneeUserId: delivery.assigneeUserId,
+      assigneeName: delivery.assigneeName,
       estimatedDate: delivery.estimatedDate.toISOString().slice(0, 10),
       status: delivery.status,
+      rejectionReason: delivery.rejectionReason,
     })),
     segments: module.segments.map((segment) => ({
       id: segment.id,
@@ -150,6 +155,7 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
       status: task.status,
       scope: task.scope,
       completedAt: task.completedAt?.toISOString() ?? null,
+      rejectionReason: task.rejectionReason,
     })),
     blockerCount: module.blockerCount,
   }));

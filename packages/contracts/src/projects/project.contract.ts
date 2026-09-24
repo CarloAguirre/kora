@@ -122,8 +122,16 @@ export const projectModuleDeliverySchema = z.object({
   id: uuidSchema,
   teamId: uuidSchema.nullable(),
   teamName: z.string().nullable(),
+  /** Nulo en entregas creadas antes de este campo. */
+  name: z.string().nullable(),
+  description: z.string().nullable(),
+  /** Colaborador del equipo responsable a quien se le asignó esta entrega — `null` ⇔ "Sin asignar". */
+  assigneeUserId: uuidSchema.nullable(),
+  assigneeName: z.string().nullable(),
   estimatedDate: z.string(),
   status: projectModuleDeliveryStatusSchema,
+  /** Motivo del último rechazo del líder — se limpia al aprobar o al volver a marcarla entregada. */
+  rejectionReason: z.string().nullable(),
 });
 export type ProjectModuleDelivery = z.infer<typeof projectModuleDeliverySchema>;
 
@@ -132,13 +140,14 @@ export type ProjectModuleDelivery = z.infer<typeof projectModuleDeliverySchema>;
  * no es un valor guardado — se deriva en el cliente comparando `date` con hoy
  * cuando `status !== 'done'`, igual que ya se hace con las entregas.
  */
-export const PROJECT_MODULE_TASK_STATUSES = ['todo', 'in_progress', 'done'] as const;
+export const PROJECT_MODULE_TASK_STATUSES = ['todo', 'in_progress', 'in_review', 'done'] as const;
 export const projectModuleTaskStatusSchema = z.enum(PROJECT_MODULE_TASK_STATUSES);
 export type ProjectModuleTaskStatus = z.infer<typeof projectModuleTaskStatusSchema>;
 
 export const PROJECT_MODULE_TASK_STATUS_LABELS: Readonly<Record<ProjectModuleTaskStatus, string>> = {
   todo: 'Por hacer',
   in_progress: 'En progreso',
+  in_review: 'En revisión',
   done: 'Completada',
 };
 
@@ -191,6 +200,8 @@ export const projectModuleTaskSchema = z.object({
   status: projectModuleTaskStatusSchema,
   scope: projectModuleTaskScopeSchema,
   completedAt: isoDateTimeSchema.nullable(),
+  /** Motivo del último rechazo del líder — se limpia al aprobar o al volver a marcarla en revisión. */
+  rejectionReason: z.string().nullable(),
 });
 export type ProjectModuleTask = z.infer<typeof projectModuleTaskSchema>;
 
@@ -207,7 +218,10 @@ export const createProjectModuleTaskSchema = z.object({
 });
 export type CreateProjectModuleTaskInput = z.infer<typeof createProjectModuleTaskSchema>;
 
-export const updateProjectModuleTaskSchema = createProjectModuleTaskSchema.partial();
+export const updateProjectModuleTaskSchema = createProjectModuleTaskSchema.partial().extend({
+  /** Solo la persona que aprueba/rechaza (líder de equipo/proyecto) puede enviarlo — obligatorio al rechazar, se limpia (`null`) en cualquier otra transición. */
+  rejectionReason: z.string().trim().max(1000).nullish(),
+});
 export type UpdateProjectModuleTaskInput = z.infer<typeof updateProjectModuleTaskSchema>;
 
 /** Fase/módulo del proyecto — unidad de entrega con etapa, horas y fechas propias (ver "Fases · Módulos"). */
@@ -246,15 +260,23 @@ export const updateProjectModuleSchema = z.object({
 export type UpdateProjectModuleInput = z.infer<typeof updateProjectModuleSchema>;
 
 export const addProjectModuleDeliverySchema = z.object({
+  name: nonEmptyTrimmed(300, 'El nombre de la entrega'),
+  description: z.string().trim().max(2000).nullish(),
   estimatedDate: z.iso.date(),
   teamId: uuidSchema.nullish(),
+  assigneeUserId: uuidSchema.nullish(),
 });
 export type AddProjectModuleDeliveryInput = z.infer<typeof addProjectModuleDeliverySchema>;
 
 export const updateProjectModuleDeliverySchema = z.object({
+  name: nonEmptyTrimmed(300, 'El nombre de la entrega').optional(),
+  description: z.string().trim().max(2000).nullish(),
   status: projectModuleDeliveryStatusSchema.optional(),
   teamId: uuidSchema.nullish(),
+  assigneeUserId: uuidSchema.nullish(),
   estimatedDate: z.iso.date().optional(),
+  /** Solo quien aprueba/rechaza puede enviarlo — obligatorio al rechazar, se limpia (`null`) en cualquier otra transición. */
+  rejectionReason: z.string().trim().max(1000).nullish(),
 });
 export type UpdateProjectModuleDeliveryInput = z.infer<typeof updateProjectModuleDeliverySchema>;
 

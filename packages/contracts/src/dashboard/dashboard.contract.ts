@@ -206,10 +206,11 @@ export const dashboardMyTaskSchema = z.object({
   date: z.string(),
   status: projectModuleTaskStatusSchema,
   completedAt: isoDateTimeSchema.nullable(),
+  rejectionReason: z.string().nullable(),
 });
 export type DashboardMyTask = z.infer<typeof dashboardMyTaskSchema>;
 
-/** "Mis entregas" — entregas de "Fases · Módulos" del equipo del actor. */
+/** "Mis entregas" — entregas de "Fases · Módulos" asignadas directamente al actor. */
 export const dashboardMyDeliverySchema = z.object({
   id: z.string(),
   projectId: z.string(),
@@ -218,6 +219,7 @@ export const dashboardMyDeliverySchema = z.object({
   moduleName: z.string(),
   estimatedDate: z.string(),
   status: projectModuleDeliveryStatusSchema,
+  rejectionReason: z.string().nullable(),
 });
 export type DashboardMyDelivery = z.infer<typeof dashboardMyDeliverySchema>;
 

@@ -135,6 +135,13 @@ export class ProjectModuleTaskNotFoundError extends NotFoundError {
   }
 }
 
+/** Rechazar una tarea/entrega en revisión exige explicar qué falta o qué hay que corregir. */
+export class RejectionReasonRequiredError extends ValidationError {
+  constructor() {
+    super('Escribe el motivo del rechazo antes de continuar.', 'REJECTION_REASON_REQUIRED');
+  }
+}
+
 /** Autorizar horas extra en un proyecto es una decisión de líder — ni `projects:manage` por sí solo ni ser un miembro cualquiera bastan. */
 export class CannotAuthorizeProjectOvertimeError extends ForbiddenError {
   constructor() {

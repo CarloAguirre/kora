@@ -76,12 +76,15 @@ function roleFromTeamName(teamName: string | null): PhaseRoadmapRole {
   return 'dev';
 }
 
-/** Mismo criterio que `phaseVisualStatus` de `ProjectModulesCard`: se deriva de las tareas, no de `currentStage` (campo manual aparte). */
+/**
+ * Mismo criterio que `phaseVisualStatus` de `ProjectModulesCard`: "finished" es 100% la decisión
+ * manual del líder (`currentStage === 'closed'`), no se calcula desde las tareas; "upcoming"/
+ * "in_progress" sí se derivan de ellas.
+ */
 function phaseStatus(module: ProjectModule): PhaseRoadmapPhase['status'] {
+  if (module.currentStage === 'closed') return 'finished';
   if (module.tasks.length === 0) return 'upcoming';
   const today = startOfToday();
-  const allDonePast = module.tasks.every((task) => task.status === 'done' && toDate(task.date) <= today);
-  if (allDonePast) return 'finished';
   const anyStarted = module.tasks.some((task) => toDate(task.startDate ?? task.date) <= today);
   return anyStarted ? 'in_progress' : 'upcoming';
 }
@@ -97,6 +100,7 @@ function taskItemState(task: ProjectModuleTask): PhaseRoadmapTaskItem['state'] {
 }
 
 function deliveryLabel(delivery: ProjectModuleDelivery): string {
+  if (delivery.name) return delivery.name;
   return delivery.teamName ? `Entrega ${delivery.teamName}` : 'Entrega';
 }
 

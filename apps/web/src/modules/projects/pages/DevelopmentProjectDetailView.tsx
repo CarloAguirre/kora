@@ -42,6 +42,7 @@ import { ProjectModulesCard } from "../components/ProjectModulesCard";
 import { ProjectTimeline } from "../components/ProjectTimeline";
 import { TeamHoursSummaryChart } from "../components/TeamHoursSummaryChart";
 import { TeamTasksCard } from "../components/TeamTasksCard";
+import { TeamDeliveriesCard } from "../components/TeamDeliveriesCard";
 import { getTeamStyle } from "../utils/team-style";
 import styles from "./ProjectDetailPage.module.css";
 import { projectTeamPath } from "@/app/router/paths";
@@ -426,7 +427,10 @@ export function DevelopmentProjectDetailView({
                 <TeamHoursSummaryChart teams={teamSummaries} />
 
                 {leaderTeamId && (
-                  <TeamTasksCard project={project} projectId={projectId} teamId={leaderTeamId} />
+                  <>
+                    <TeamTasksCard project={project} projectId={projectId} teamId={leaderTeamId} />
+                    <TeamDeliveriesCard project={project} projectId={projectId} teamId={leaderTeamId} />
+                  </>
                 )}
 
                 <Card>
@@ -669,6 +673,7 @@ export function DevelopmentProjectDetailView({
                 projectId={projectId}
                 modules={project.modules}
                 hourEntries={projectHourEntries?.items ?? []}
+                observations={project.observations}
                 canManage={canManageProject}
               />
             ) : (

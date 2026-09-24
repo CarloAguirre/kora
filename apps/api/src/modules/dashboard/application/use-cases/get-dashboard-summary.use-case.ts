@@ -27,7 +27,6 @@ import {
 } from '../../../projects/domain/repositories/project-module.repository';
 import { ForecastCapacityService } from '../../../forecast/application/services/forecast-capacity.service';
 import { TEAM_REPOSITORY, type TeamRepository } from '../../../teams/domain/repositories/team.repository';
-import { USER_REPOSITORY, type UserRepository } from '../../../users/domain/repositories/user.repository';
 import type { ActorContext, UseCase } from '../../../../shared/application/use-case';
 
 export interface GetDashboardSummaryCommand {
@@ -66,7 +65,6 @@ export class GetDashboardSummaryUseCase implements UseCase<GetDashboardSummaryCo
     @Inject(PROJECT_REPOSITORY) private readonly projects: ProjectRepository,
     @Inject(PROJECT_MODULE_REPOSITORY) private readonly projectModules: ProjectModuleRepository,
     @Inject(TEAM_REPOSITORY) private readonly teams: TeamRepository,
-    @Inject(USER_REPOSITORY) private readonly users: UserRepository,
     private readonly forecastCapacity: ForecastCapacityService,
     @Inject(CLOCK) private readonly clock: Clock,
   ) {}
@@ -111,15 +109,13 @@ export class GetDashboardSummaryUseCase implements UseCase<GetDashboardSummaryCo
       date: toIsoDate(row.date),
       status: row.status,
       completedAt: row.completedAt?.toISOString() ?? null,
+      rejectionReason: row.rejectionReason,
     }));
   }
 
-  /** "Mis entregas" — entregas del equipo del actor. Vacío si no pertenece a ningún equipo. */
+  /** "Mis entregas" — entregas de "Fases · Módulos" asignadas directamente al actor. */
   private async buildMyDeliveries(actor: ActorContext) {
-    const user = await this.users.findById(actor.userId);
-    if (!user?.teamId) return [];
-
-    const rows = await this.projectModules.listDeliveriesForTeam(user.teamId);
+    const rows = await this.projectModules.listDeliveriesAssignedToUser(actor.userId);
     return rows.map((row) => ({
       id: row.id,
       projectId: row.projectId,
@@ -128,6 +124,7 @@ export class GetDashboardSummaryUseCase implements UseCase<GetDashboardSummaryCo
       moduleName: row.moduleName,
       estimatedDate: toIsoDate(row.estimatedDate),
       status: row.status,
+      rejectionReason: row.rejectionReason,
     }));
   }
 

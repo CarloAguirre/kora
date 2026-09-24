@@ -518,7 +518,10 @@
   outline-offset: 1px;
 }
 
-.timelineMarkerSelected {
+/* `.timelineMarker` (más abajo) también define `box-shadow` (el halo blanco) — sin la
+   especificidad extra de encadenar ambas clases, esa regla gana por venir después en el
+   archivo y el aro de selección quedaba tapado. */
+.timelineMarker.timelineMarkerSelected {
   box-shadow: 0 0 0 3px var(--kora-blue-surface), 0 0 0 5px var(--kora-blue-600);
 }
 
@@ -547,7 +550,9 @@
   bottom: 0;
   width: 2px;
   background: var(--kora-navy);
-  z-index: 3;
+  /* Por debajo de barras/marcadores (z-index 1): es una referencia de fondo, no
+     debe tapar una entrega o tarea cuya fecha caiga justo en "hoy" o al lado. */
+  z-index: 0;
 }
 
 .timelineTodayPill {
@@ -573,6 +578,9 @@
   transform: translateX(-50%);
   border: 2px solid var(--kora-gray-500);
   background: var(--kora-white, #fff);
+  /* Halo blanco: sin esto, una entrega "realizada" (navy) que cae justo sobre
+     la línea de "HOY" (mismo --kora-navy) queda invisible, fundida con la línea. */
+  box-shadow: 0 0 0 2px var(--kora-white, #fff);
   z-index: 1;
 }
 
@@ -643,6 +651,18 @@
   margin-bottom: var(--kora-space-2);
 }
 
+.taskDetailHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kora-space-2);
+}
+
+.taskDetailHead .subsectionLabel,
+.taskDetailHead .deliveriesLabel {
+  margin-bottom: 0;
+}
+
 .segmentRow,
 .taskRow {
   display: flex;
@@ -701,6 +721,92 @@
   font-size: var(--kora-text-sm);
   color: var(--kora-navy);
   overflow-wrap: break-word;
+}
+
+/* "Registros de bitácora relacionados" — mismo look que el prototipo (ficha_proyecto_lider-actualizada.html: .reg-panel-head/.reg-mini-item/.dot/.meta). */
+.regPanel {
+  margin-top: var(--kora-space-3);
+  padding-top: var(--kora-space-3);
+  border-top: 1px dashed var(--kora-border-soft);
+}
+
+.regPanelHead {
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-navy);
+  margin-bottom: var(--kora-space-2);
+}
+
+.regEmpty {
+  font-size: var(--kora-text-xs);
+  color: var(--kora-text-muted);
+}
+
+.regItem {
+  display: flex;
+  gap: var(--kora-space-2);
+  padding: var(--kora-space-2) 0;
+  border-bottom: 1px solid var(--kora-border-soft);
+}
+
+.regItem:last-child {
+  border-bottom: none;
+}
+
+.regItemBody {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  font-size: var(--kora-text-sm);
+  color: var(--kora-navy);
+}
+
+.regMeta {
+  font-size: 11px;
+  color: var(--kora-text-muted);
+}
+
+.regDot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  line-height: 1;
+  color: var(--kora-white, #fff);
+  margin-top: 1px;
+}
+
+.regDotHito {
+  background: #6c63e8;
+}
+
+.regDotIncidentOpen {
+  background: var(--kora-danger);
+}
+
+.regDotIncidentResolved {
+  background: var(--kora-blue-600);
+}
+
+.regDotCompromiso {
+  background: var(--kora-warning);
+}
+
+.regDotAtencion {
+  background: var(--kora-warning-text);
+}
+
+.regDotCambio {
+  background: var(--kora-blue-600);
+}
+
+.regDotObservacion {
+  background: var(--kora-success);
 }
 
 .eqDot {

@@ -25,6 +25,8 @@ export interface ModalProps {
   dismissible?: boolean;
   /** Contenido adicional junto al botón de cierre, p. ej. un contador de horas. */
   headerExtra?: ReactNode;
+  /** Panel lateral (desliza desde la derecha, alto completo) en vez de diálogo centrado — para formularios largos. */
+  side?: boolean;
 }
 
 export function Modal({
@@ -37,6 +39,7 @@ export function Modal({
   wide = false,
   dismissible = true,
   headerExtra,
+  side = false,
 }: ModalProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   // Único por instancia: dos diálogos (uno abierto, otro cerrado) coexisten
@@ -81,7 +84,7 @@ export function Modal({
   return (
     <dialog
       ref={dialogRef}
-      className={[styles.dialog, wide ? styles.wide : ''].filter(Boolean).join(' ')}
+      className={[styles.dialog, wide ? styles.wide : '', side ? styles.side : ''].filter(Boolean).join(' ')}
       onClick={handleBackdropClick}
       aria-labelledby={titleId}
     >

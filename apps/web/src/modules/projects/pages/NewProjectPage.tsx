@@ -44,11 +44,24 @@ import { MoneyField } from '@/shared/components/ui/MoneyField';
 import { Stepper } from '@/shared/components/ui/Stepper';
 import { AlertIcon, ChevronLeftIcon, CloseIcon, PlusIcon, TrashIcon } from '@/shared/components/icons/Icons';
 import { useToast } from '@/shared/components/ui/Toast';
-import { useAddProjectModuleDelivery, useCreateProject, useCreateProjectModule, useProjectsList } from '../api/projects.queries';
+import {
+  useAddProjectModuleDelivery,
+  useCreateProject,
+  useCreateProjectModule,
+  useCreateProjectModuleSegment,
+  useProjectsList,
+} from '../api/projects.queries';
 import { useCreateSupportPlan, useCreateSupportProject } from '../api/support-plan.queries';
 import { useClientsList, useClientDetail, useUpdateClient } from '@/modules/clients/api/clients.queries';
 import { clientsApi } from '@/modules/clients/api/clients.api';
 import { ClientFormDialog } from '@/modules/clients/components/ClientFormDialog';
+import { DeliveryModal, EMPTY_DELIVERY_MODAL_VALUES, type DeliveryModalValues } from '../components/DeliveryModal';
+import deliveryModalStyles from '../components/DeliveryModal.module.css';
+import {
+  ExecutionSegmentModal,
+  EMPTY_EXECUTION_SEGMENT_MODAL_VALUES,
+  type ExecutionSegmentModalValues,
+} from '../components/ExecutionSegmentModal';
 import { useUsersList } from '@/modules/users/api/users.queries';
 import { useTeamsList } from '@/modules/teams/api/teams.queries';
 import { ApiRequestError } from '@/shared/lib/api-client';
@@ -109,11 +122,26 @@ function dayOfIsoDate(isoDate: string): number {
   return Number(day ?? month ?? 1);
 }
 
-interface DeliveryDraft {
-  localId: number;
-  estimatedDate: string;
+/** `2026-05-08` → `08-05-2026` — mismo formato que el resto de la ficha de proyecto. */
+function formatDeliveryDate(isoDate: string): string {
+  const [year, month, day] = isoDate.split('-');
+  return `${day}-${month}-${year}`;
 }
 
+interface DeliveryDraft {
+  localId: number;
+  name: string;
+  teamId: string;
+  estimatedDate: string;
+  description: string;
+}
+interface SegmentDraft {
+  localId: number;
+  teamId: string;
+  name: string;
+  startDate: string;
+  endDate: string;
+}
 /**
  * Un módulo mientras se arma en el wizard: campos como texto plano de
  * formulario (no el `CreateProjectModuleInput` final) porque se edita en
@@ -130,6 +158,7 @@ interface ModuleDraft {
   estimatedStartDate: string;
   estimatedEndDate: string;
   deliveries: DeliveryDraft[];
+  segments: SegmentDraft[];
 }
 
 const EMPTY_MODULE_DRAFT: Omit<ModuleDraft, 'localId'> = {
@@ -139,6 +168,7 @@ const EMPTY_MODULE_DRAFT: Omit<ModuleDraft, 'localId'> = {
   estimatedStartDate: '',
   estimatedEndDate: '',
   deliveries: [],
+  segments: [],
 };
 
 /** Encabezado de sección — mismo peso visual para todas, con línea divisoria entre secciones (ver `.module.css`). */
@@ -374,10 +404,12 @@ export function NewProjectPage() {
   // un proyecto ya existente) justo después de que `createProject` responde.
   const createModule = useCreateProjectModule();
   const addDelivery = useAddProjectModuleDelivery();
+  const createSegment = useCreateProjectModuleSegment();
   const [moduleDrafts, setModuleDrafts] = useState<ModuleDraft[]>([]);
   const [moduleError, setModuleError] = useState<string | null>(null);
   const nextModuleLocalId = useRef(1);
   const nextDeliveryLocalId = useRef(1);
+  const nextSegmentLocalId = useRef(1);
 
   const addModuleDraft = () => {
     setModuleDrafts((prev) => [...prev, { ...EMPTY_MODULE_DRAFT, localId: nextModuleLocalId.current++ }]);
@@ -395,16 +427,6 @@ export function NewProjectPage() {
     setModuleDrafts((prev) => prev.map((draft) => (draft.localId === localId ? { ...draft, [field]: value } : draft)));
   };
 
-  const addDeliveryDraft = (moduleLocalId: number) => {
-    setModuleDrafts((prev) =>
-      prev.map((draft) =>
-        draft.localId === moduleLocalId
-          ? { ...draft, deliveries: [...draft.deliveries, { localId: nextDeliveryLocalId.current++, estimatedDate: '' }] }
-          : draft,
-      ),
-    );
-  };
-
   const removeDeliveryDraft = (moduleLocalId: number, deliveryLocalId: number) => {
     setModuleDrafts((prev) =>
       prev.map((draft) =>
@@ -415,19 +437,79 @@ export function NewProjectPage() {
     );
   };
 
-  const updateDeliveryDraftDate = (moduleLocalId: number, deliveryLocalId: number, estimatedDate: string) => {
+  const removeSegmentDraft = (moduleLocalId: number, segmentLocalId: number) => {
     setModuleDrafts((prev) =>
       prev.map((draft) =>
         draft.localId === moduleLocalId
-          ? {
-              ...draft,
-              deliveries: draft.deliveries.map((delivery) =>
-                delivery.localId === deliveryLocalId ? { ...delivery, estimatedDate } : delivery,
-              ),
-            }
+          ? { ...draft, segments: draft.segments.filter((segment) => segment.localId !== segmentLocalId) }
           : draft,
       ),
     );
+  };
+
+  // Modal "Nueva entrega" / "Editar entrega" — un solo modal reusado por todas las fases del wizard
+  // (ver `DeliveryModal`); `deliveryLocalId: null` significa que se está creando una entrega nueva.
+  const [deliveryModal, setDeliveryModal] = useState<{ moduleLocalId: number; deliveryLocalId: number | null } | null>(null);
+
+  const deliveryModalInitialValues: DeliveryModalValues = (() => {
+    if (!deliveryModal) return EMPTY_DELIVERY_MODAL_VALUES;
+    const draft = moduleDrafts.find((m) => m.localId === deliveryModal.moduleLocalId);
+    const delivery = draft?.deliveries.find((d) => d.localId === deliveryModal.deliveryLocalId);
+    return delivery
+      ? { teamId: delivery.teamId, name: delivery.name, description: delivery.description, estimatedDate: delivery.estimatedDate }
+      : EMPTY_DELIVERY_MODAL_VALUES;
+  })();
+
+  const onConfirmDeliveryModal = (values: DeliveryModalValues) => {
+    if (!deliveryModal) return;
+    const { moduleLocalId, deliveryLocalId } = deliveryModal;
+    setModuleDrafts((prev) =>
+      prev.map((draft) => {
+        if (draft.localId !== moduleLocalId) return draft;
+        if (deliveryLocalId === null) {
+          return { ...draft, deliveries: [...draft.deliveries, { ...values, localId: nextDeliveryLocalId.current++ }] };
+        }
+        return {
+          ...draft,
+          deliveries: draft.deliveries.map((delivery) =>
+            delivery.localId === deliveryLocalId ? { ...values, localId: delivery.localId } : delivery,
+          ),
+        };
+      }),
+    );
+    setDeliveryModal(null);
+  };
+
+  // Modal "Nuevo tiempo de ejecución" / "Editar tiempo de ejecución" — mismo criterio que `deliveryModal`.
+  const [segmentModal, setSegmentModal] = useState<{ moduleLocalId: number; segmentLocalId: number | null } | null>(null);
+
+  const segmentModalInitialValues: ExecutionSegmentModalValues = (() => {
+    if (!segmentModal) return EMPTY_EXECUTION_SEGMENT_MODAL_VALUES;
+    const draft = moduleDrafts.find((m) => m.localId === segmentModal.moduleLocalId);
+    const segment = draft?.segments.find((s) => s.localId === segmentModal.segmentLocalId);
+    return segment
+      ? { teamId: segment.teamId, name: segment.name, startDate: segment.startDate, endDate: segment.endDate }
+      : EMPTY_EXECUTION_SEGMENT_MODAL_VALUES;
+  })();
+
+  const onConfirmSegmentModal = (values: ExecutionSegmentModalValues) => {
+    if (!segmentModal) return;
+    const { moduleLocalId, segmentLocalId } = segmentModal;
+    setModuleDrafts((prev) =>
+      prev.map((draft) => {
+        if (draft.localId !== moduleLocalId) return draft;
+        if (segmentLocalId === null) {
+          return { ...draft, segments: [...draft.segments, { ...values, localId: nextSegmentLocalId.current++ }] };
+        }
+        return {
+          ...draft,
+          segments: draft.segments.map((segment) =>
+            segment.localId === segmentLocalId ? { ...values, localId: segment.localId } : segment,
+          ),
+        };
+      }),
+    );
+    setSegmentModal(null);
   };
 
   const goToStep2 = () => setStep(1);
@@ -520,14 +602,38 @@ export function NewProjectPage() {
                 estimatedEndDate: draft.estimatedEndDate || undefined,
               };
               const module = await createModule.mutateAsync({ projectId: result.id, input });
-              const pendingDeliveries = draft.deliveries.filter((delivery) => delivery.estimatedDate);
+              const pendingDeliveries = draft.deliveries.filter((delivery) => delivery.estimatedDate && delivery.name.trim());
               if (pendingDeliveries.length > 0) {
                 await Promise.all(
                   pendingDeliveries.map((delivery) =>
                     addDelivery.mutateAsync({
                       projectId: result.id,
                       moduleId: module.id,
-                      input: { estimatedDate: delivery.estimatedDate },
+                      input: {
+                        name: delivery.name.trim(),
+                        description: delivery.description.trim() || undefined,
+                        teamId: delivery.teamId || undefined,
+                        estimatedDate: delivery.estimatedDate,
+                      },
+                    }),
+                  ),
+                );
+              }
+              const pendingSegments = draft.segments.filter(
+                (segment) => segment.teamId && segment.name.trim() && segment.startDate && segment.endDate,
+              );
+              if (pendingSegments.length > 0) {
+                await Promise.all(
+                  pendingSegments.map((segment) =>
+                    createSegment.mutateAsync({
+                      projectId: result.id,
+                      moduleId: module.id,
+                      input: {
+                        teamId: segment.teamId,
+                        name: segment.name.trim(),
+                        startDate: segment.startDate,
+                        endDate: segment.endDate,
+                      },
                     }),
                   ),
                 );
@@ -1027,8 +1133,7 @@ export function NewProjectPage() {
                   <>
                     <p className={styles.hint}>
                       Unidades de entrega del proyecto — cada una recorre las etapas del sistema (Levantamiento →
-                      Desarrollo → Producción → Marcha blanca → Finalizado) de forma independiente. Los tramos de
-                      equipo se agregan después, desde la ficha del proyecto.
+                      Desarrollo → Producción → Marcha blanca → Finalizado) de forma independiente.
                     </p>
 
                     {moduleError && (
@@ -1098,37 +1203,124 @@ export function NewProjectPage() {
                           </div>
 
                           <div className={styles.moduleDeliveries}>
-                            <span className={styles.moduleDeliveriesLabel}>Entregas estimadas</span>
-                            {draft.deliveries.map((delivery, deliveryIndex) => (
-                              <div key={delivery.localId} className={styles.deliveryRow}>
-                                <span className={styles.deliveryLabel}>Entrega {deliveryIndex + 1}</span>
-                                <TextField
-                                  type="date"
-                                  className={styles.deliveryInputWrapper}
-                                  value={delivery.estimatedDate}
-                                  onChange={(event) => updateDeliveryDraftDate(draft.localId, delivery.localId, event.target.value)}
-                                />
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  className={styles.iconDanger}
-                                  onClick={() => removeDeliveryDraft(draft.localId, delivery.localId)}
-                                  aria-label={`Quitar entrega ${deliveryIndex + 1}`}
-                                >
-                                  <CloseIcon size={14} />
-                                </Button>
+                            <div className={styles.moduleCardHead}>
+                              <span className={styles.moduleDeliveriesLabel}>Tiempos de ejecución por equipo</span>
+                              <span className={styles.deliveryHint}>
+                                Semanas/días de cada equipo en esta Fase — es lo que dibuja el Roadmap.
+                              </span>
+                            </div>
+                            {draft.segments.length === 0 && <p className={styles.hint}>Aún no hay tiempos de ejecución para esta fase.</p>}
+                            {draft.segments.map((segment) => (
+                              <div key={segment.localId} className={deliveryModalStyles.listRow}>
+                                <div className={deliveryModalStyles.listInfo}>
+                                  <span className={deliveryModalStyles.listName}>
+                                    {teams?.items.find((team) => team.id === segment.teamId)?.name ?? ''}
+                                    {segment.name && <span className={deliveryModalStyles.listNameTeam}> — {segment.name}</span>}
+                                  </span>
+                                  <span className={deliveryModalStyles.listMeta}>
+                                    {formatDeliveryDate(segment.startDate)} → {formatDeliveryDate(segment.endDate)}
+                                  </span>
+                                </div>
+                                <div className={deliveryModalStyles.listActions}>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className={deliveryModalStyles.listEditButton}
+                                    onClick={() => setSegmentModal({ moduleLocalId: draft.localId, segmentLocalId: segment.localId })}
+                                  >
+                                    Editar
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className={deliveryModalStyles.listDeleteButton}
+                                    onClick={() => removeSegmentDraft(draft.localId, segment.localId)}
+                                    aria-label={`Quitar tiempo de ejecución "${segment.name}"`}
+                                  >
+                                    <CloseIcon size={14} />
+                                  </Button>
+                                </div>
                               </div>
                             ))}
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              iconLeft={<PlusIcon size={14} />}
-                              onClick={() => addDeliveryDraft(draft.localId)}
-                            >
-                              Agregar entrega
-                            </Button>
+                            {teamFields.length === 0 ? (
+                              <p className={styles.hint}>
+                                Primero asigná equipos en "Equipos e involucrados" para poder agregar tiempos de ejecución.
+                              </p>
+                            ) : (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className={deliveryModalStyles.addButton}
+                                iconLeft={<PlusIcon size={14} />}
+                                onClick={() => setSegmentModal({ moduleLocalId: draft.localId, segmentLocalId: null })}
+                              >
+                                Agregar tiempo de ejecución
+                              </Button>
+                            )}
+                          </div>
+
+                          <div className={styles.moduleDeliveries}>
+                            <span className={styles.moduleDeliveriesLabel}>Entregas estimadas</span>
+                            {draft.deliveries.length === 0 && <p className={styles.hint}>Aún no hay entregas para esta fase.</p>}
+                            {draft.deliveries.map((delivery) => (
+                              <div key={delivery.localId} className={deliveryModalStyles.listRow}>
+                                <div className={deliveryModalStyles.listInfo}>
+                                  <span className={deliveryModalStyles.listName}>
+                                    {delivery.name}
+                                    {delivery.teamId && (
+                                      <span className={deliveryModalStyles.listNameTeam}>
+                                        {' '}
+                                        · {teams?.items.find((team) => team.id === delivery.teamId)?.name ?? ''}
+                                      </span>
+                                    )}
+                                  </span>
+                                  <span className={deliveryModalStyles.listMeta}>
+                                    {formatDeliveryDate(delivery.estimatedDate)}
+                                    {delivery.description ? ` · ${delivery.description}` : ''}
+                                  </span>
+                                </div>
+                                <div className={deliveryModalStyles.listActions}>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className={deliveryModalStyles.listEditButton}
+                                    onClick={() => setDeliveryModal({ moduleLocalId: draft.localId, deliveryLocalId: delivery.localId })}
+                                  >
+                                    Editar
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className={deliveryModalStyles.listDeleteButton}
+                                    onClick={() => removeDeliveryDraft(draft.localId, delivery.localId)}
+                                    aria-label={`Quitar entrega "${delivery.name}"`}
+                                  >
+                                    <CloseIcon size={14} />
+                                  </Button>
+                                </div>
+                              </div>
+                            ))}
+                            {teamFields.length === 0 ? (
+                              <p className={styles.hint}>
+                                Primero asigná equipos en "Equipos e involucrados" para poder agregar entregas.
+                              </p>
+                            ) : (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className={deliveryModalStyles.addButton}
+                                iconLeft={<PlusIcon size={14} />}
+                                onClick={() => setDeliveryModal({ moduleLocalId: draft.localId, deliveryLocalId: null })}
+                              >
+                                Agregar entrega
+                              </Button>
+                            )}
                             <p className={styles.deliveryHint}>
                               Cada entrega crea automáticamente un hito "Entrega a cliente" en estado Planificada.
                             </p>
@@ -1279,6 +1471,30 @@ export function NewProjectPage() {
         onClose={() => setClientDialogOpen(false)}
         onSuccess={(message) => toast.success(message)}
         onCreated={(client) => setValue('clientId', client.id, { shouldValidate: true })}
+      />
+
+      <DeliveryModal
+        open={deliveryModal !== null}
+        mode={deliveryModal?.deliveryLocalId === null ? 'create' : 'edit'}
+        teamOptions={teamFields.map((field) => ({
+          value: field.teamId,
+          label: teams?.items.find((team) => team.id === field.teamId)?.name ?? field.teamId,
+        }))}
+        initialValues={deliveryModalInitialValues}
+        onCancel={() => setDeliveryModal(null)}
+        onConfirm={onConfirmDeliveryModal}
+      />
+
+      <ExecutionSegmentModal
+        open={segmentModal !== null}
+        mode={segmentModal?.segmentLocalId === null ? 'create' : 'edit'}
+        teamOptions={teamFields.map((field) => ({
+          value: field.teamId,
+          label: teams?.items.find((team) => team.id === field.teamId)?.name ?? field.teamId,
+        }))}
+        initialValues={segmentModalInitialValues}
+        onCancel={() => setSegmentModal(null)}
+        onConfirm={onConfirmSegmentModal}
       />
     </DashboardLayout>
   );

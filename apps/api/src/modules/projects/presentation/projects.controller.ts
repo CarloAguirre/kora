@@ -512,10 +512,10 @@ export class ProjectsController {
   }
 
   /**
-   * También `hours:register` (todo colaborador que registra horas): quien
-   * participa en el proyecto puede marcar la entrega de su equipo como
-   * entregada — solo reasignar el equipo exige `projects:manage`, ver
-   * `UpdateProjectModuleDeliveryUseCase`.
+   * También `hours:register` (todo colaborador que registra horas): el
+   * colaborador asignado a la entrega puede marcarla como entregada —
+   * aprobar, rechazar, revertir o reasignar exige liderar el equipo o el
+   * proyecto (ver `UpdateProjectModuleDeliveryUseCase`).
    */
   @Patch(':id/modules/:moduleId/deliveries/:deliveryId')
   @RequireAnyPermission('projects:manage', 'hours:register')

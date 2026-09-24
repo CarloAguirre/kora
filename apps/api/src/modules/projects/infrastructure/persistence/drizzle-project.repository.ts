@@ -299,12 +299,19 @@ export class DrizzleProjectRepository implements ProjectRepository {
       conditions.push(ilike(projects.name, `%${filters.search.trim()}%`));
     }
     if (filters.assignedToUserId) {
-      // Lidera, desarrolla, es el responsable comercial, o está asignado como miembro del proyecto.
+      // Lidera el proyecto, desarrolla, es el responsable comercial, lidera alguno de sus
+      // equipos asignados (`project_teams.leaderUserId` — puede ser distinto del líder
+      // orgánico del equipo, `teams.leaderUserId`), o está asignado como miembro del proyecto.
       conditions.push(
         or(
           eq(projects.leaderUserId, filters.assignedToUserId),
           eq(projects.developerUserId, filters.assignedToUserId),
           eq(projects.commercialManagerUserId, filters.assignedToUserId),
+          sql`exists (
+            select 1 from ${projectTeams}
+            where ${projectTeams.projectId} = ${projects.id}
+              and ${projectTeams.leaderUserId} = ${filters.assignedToUserId}
+          )`,
           sql`exists (
             select 1 from ${projectTeamMembers}
             inner join ${teamMembers} on ${teamMembers.id} = ${projectTeamMembers.teamMemberId}

@@ -1,0 +1,134 @@
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-4);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-2);
+}
+
+.label {
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-semibold);
+  color: var(--kora-navy);
+}
+
+.textarea {
+  font-family: inherit;
+  font-size: var(--kora-text-base);
+  color: var(--kora-navy);
+  border: 1px solid var(--kora-border);
+  border-radius: var(--kora-radius-sm);
+  padding: var(--kora-space-3);
+  min-height: 72px;
+  resize: vertical;
+}
+
+.textarea:focus {
+  outline: 2px solid var(--kora-blue-600);
+  outline-offset: 1px;
+}
+
+.listRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kora-space-3);
+  width: 100%;
+  padding: var(--kora-space-3);
+  border-radius: var(--kora-radius-input);
+  background: var(--kora-surface);
+  border: 1px solid var(--kora-border-soft);
+}
+
+.listInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.listName {
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-navy);
+}
+
+.listNameTeam {
+  font-weight: var(--kora-weight-medium);
+  color: var(--kora-text-muted);
+}
+
+.listMeta {
+  font-size: var(--kora-text-xs);
+  color: var(--kora-text-muted);
+}
+
+.listActions {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+  flex-shrink: 0;
+}
+
+/* `button.xxx` (elemento + clase) en toda esta sección para ganarle en cascada a las variantes de
+   `Button` sin depender del orden de carga de los módulos CSS. */
+button.listEditButton {
+  height: auto;
+  min-width: 0;
+  font-weight: var(--kora-weight-medium);
+  font-size: var(--kora-text-sm);
+  padding: 6px var(--kora-space-3);
+  border-radius: var(--kora-radius-md);
+}
+
+button.listDeleteButton {
+  height: auto;
+  width: auto;
+  min-width: 0;
+  padding: 4px;
+  border-radius: var(--kora-radius-sm);
+  color: var(--kora-danger);
+}
+
+button.listDeleteButton:not(:disabled):hover {
+  color: var(--kora-danger-hover);
+  background: var(--kora-danger-surface-soft);
+}
+
+/* Encabezado de subsección: etiqueta + hint alineados en la misma línea (ver prototipo de referencia). */
+.subsectionHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--kora-space-3);
+  flex-wrap: wrap;
+}
+
+.subsectionLabel {
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-navy);
+}
+
+/* `button.addButton` (elemento + clase) para ganarle en cascada a las variantes de `Button` sin depender del orden de carga de los módulos CSS. */
+button.addButton {
+  align-self: flex-start;
+  height: auto;
+  min-width: 0;
+  gap: 6px;
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-semibold);
+  color: var(--kora-blue-link);
+  background: transparent;
+  border: 1px dashed var(--kora-blue-200);
+  border-radius: var(--kora-radius-input);
+  padding: 6px var(--kora-space-3);
+}
+
+button.addButton:not(:disabled):hover {
+  background: var(--kora-blue-surface-alt);
+}

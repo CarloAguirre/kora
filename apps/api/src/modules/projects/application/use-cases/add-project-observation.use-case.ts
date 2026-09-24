@@ -7,10 +7,15 @@ import {
   PROJECT_TEAM_MEMBER_REPOSITORY,
   type ProjectTeamMemberRepository,
 } from '../../domain/repositories/project-team-member.repository';
+import { PROJECT_TEAM_REPOSITORY, type ProjectTeamRepository } from '../../domain/repositories/project-team.repository';
 import {
   PROJECT_OBSERVATION_REPOSITORY,
   type ProjectObservationRepository,
 } from '../../domain/repositories/project-observation.repository';
+import {
+  PROJECT_MODULE_REPOSITORY,
+  type ProjectModuleRepository,
+} from '../../domain/repositories/project-module.repository';
 import type { ActorContext, UseCase } from '../../../../shared/application/use-case';
 
 export interface AddProjectObservationCommand {
@@ -20,7 +25,13 @@ export interface AddProjectObservationCommand {
   readonly actorPermissions: readonly Permission[];
 }
 
-/** Bitácora de proyecto. Sin adjuntos: pendiente de integrar Storage (ver docs/PLAN-MODULOS.md). */
+/**
+ * Bitácora de proyecto. Sin adjuntos: pendiente de integrar Storage (ver
+ * docs/PLAN-MODULOS.md). Registrar un Hito con una Fase seleccionada cierra
+ * esa fase automáticamente (`currentStage = 'closed'`) — es la forma en que
+ * el líder declara una fase terminada, sin pasar por `avanzar_etapa` módulo
+ * por módulo.
+ */
 @Injectable()
 export class AddProjectObservationUseCase
   implements UseCase<AddProjectObservationCommand, { id: string }, ApplicationError>
@@ -28,7 +39,9 @@ export class AddProjectObservationUseCase
   constructor(
     @Inject(PROJECT_REPOSITORY) private readonly projects: ProjectRepository,
     @Inject(PROJECT_TEAM_MEMBER_REPOSITORY) private readonly members: ProjectTeamMemberRepository,
+    @Inject(PROJECT_TEAM_REPOSITORY) private readonly projectTeams: ProjectTeamRepository,
     @Inject(PROJECT_OBSERVATION_REPOSITORY) private readonly observations: ProjectObservationRepository,
+    @Inject(PROJECT_MODULE_REPOSITORY) private readonly modules: ProjectModuleRepository,
     @Inject(CLOCK) private readonly clock: Clock,
   ) {}
 
@@ -42,11 +55,15 @@ export class AddProjectObservationUseCase
 
     if (!command.actorPermissions.includes('projects:manage')) {
       const snapshot = project.toSnapshot();
-      const projectMembers = await this.members.listForProject(project.id);
+      const [projectMembers, teams] = await Promise.all([
+        this.members.listForProject(project.id),
+        this.projectTeams.findByProject(project.id),
+      ]);
       const isParticipant =
         snapshot.leaderUserId === command.actor.userId ||
         snapshot.developerUserId === command.actor.userId ||
         snapshot.commercialManagerUserId === command.actor.userId ||
+        teams.some((team) => team.leaderUserId === command.actor.userId) ||
         projectMembers.some((member) => member.userId === command.actor.userId);
       if (!isParticipant) return err(new ForbiddenError('No tienes acceso a este proyecto.', 'PROJECT_NOT_ASSIGNED'));
     }
@@ -63,6 +80,10 @@ export class AddProjectObservationUseCase
       authorUserId: command.actor.userId,
       now,
     });
+
+    if (command.data.type === 'hito' && command.data.moduleId) {
+      await this.modules.update(command.data.moduleId, { currentStage: 'closed' }, now);
+    }
 
     return ok({ id });
   }

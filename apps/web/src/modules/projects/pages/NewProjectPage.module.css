@@ -225,28 +225,50 @@
 
 .teamsGrid {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   gap: var(--kora-space-2);
 }
 
 .teamCheckbox {
   display: flex;
   align-items: center;
-  gap: var(--kora-space-2);
+  gap: 6px;
+  padding: 6px var(--kora-space-3);
+  border: 1px solid var(--kora-border-soft);
+  border-radius: var(--kora-radius-pill);
+  background: var(--kora-surface);
   color: var(--kora-navy);
   font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-medium);
   cursor: pointer;
+  transition: background var(--kora-transition), border-color var(--kora-transition), color var(--kora-transition);
+}
+
+.teamCheckbox:hover {
+  border-color: var(--kora-blue-200);
+}
+
+.teamCheckbox:has(input:checked) {
+  background: var(--kora-navy);
+  border-color: var(--kora-navy);
+  color: var(--kora-surface);
 }
 
 .teamCheckbox input {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   accent-color: var(--kora-lime-dark);
 }
 
 .teamCheckboxDisabled {
   color: var(--kora-text-disabled);
   cursor: default;
+}
+
+.teamCheckboxDisabled:has(input:checked) {
+  background: var(--kora-surface-disabled);
+  border-color: var(--kora-surface-disabled);
+  color: var(--kora-text-disabled);
 }
 
 .finishedProjectStatus {
@@ -329,25 +351,6 @@
   font-size: var(--kora-text-sm);
   font-weight: var(--kora-weight-bold);
   color: var(--kora-navy);
-}
-
-.deliveryRow {
-  display: flex;
-  align-items: center;
-  gap: var(--kora-space-3);
-  width: 100%;
-}
-
-.deliveryLabel {
-  font-size: var(--kora-text-sm);
-  color: var(--kora-text-muted);
-  min-width: 72px;
-  flex-shrink: 0;
-}
-
-.deliveryInputWrapper {
-  flex: 1;
-  min-width: 0;
 }
 
 .deliveryHint {
