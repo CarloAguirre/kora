@@ -74,6 +74,26 @@ function historyEventIcon(eventType: string) {
  * El retroceso de estado no vive en el modal: en la v1 se hace arrastrando la
  * tarjeta en el tablero, no hay selector de estado en la ficha.
  */
+/** Umbral a partir del cual un texto largo (descripción/solución) se colapsa por defecto — evita que un incidente muy narrado empuje el resto de la ficha fuera de vista. */
+const LONG_TEXT_THRESHOLD = 280;
+
+/** Texto colapsable con "Ver más"/"Ver menos" — usado por "Descripción del incidente" y "Solución aplicada". */
+function ExpandableText({ text }: { text: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const isLong = text.length > LONG_TEXT_THRESHOLD;
+
+  return (
+    <div>
+      <p className={isLong && !expanded ? `${styles.text} ${styles.textClamped}` : styles.text}>{text}</p>
+      {isLong && (
+        <button type="button" className={styles.seeMoreText} onClick={() => setExpanded((value) => !value)}>
+          {expanded ? 'Ver menos' : 'Ver más'}
+        </button>
+      )}
+    </div>
+  );
+}
+
 function forwardActionLabel(current: TicketStatus, target: TicketStatus): string {
   switch (target) {
     case 'pending':
@@ -268,7 +288,7 @@ export function TicketDetailModal({ ticketId, onClose }: { ticketId: string; onC
                   <span className={styles.label}>Descripción del incidente</span>
                   {!ticket.description && <span className={styles.emptyInline}>Sin descripción</span>}
                 </div>
-                {ticket.description && <p className={styles.text}>{ticket.description}</p>}
+                {ticket.description && <ExpandableText text={ticket.description} />}
               </div>
 
               <div className={styles.contentDivider} />
@@ -299,7 +319,7 @@ export function TicketDetailModal({ ticketId, onClose }: { ticketId: string; onC
                 </div>
                 {/* Igual que en la v1: acá siempre es de solo lectura — la solución se
                     pide al confirmar "Terminar Proceso"/"Marcar Terminado" (ver CompleteTicketDialog). */}
-                {ticket.resolution && <p className={styles.text}>{ticket.resolution}</p>}
+                {ticket.resolution && <ExpandableText text={ticket.resolution} />}
               </div>
             </div>
 

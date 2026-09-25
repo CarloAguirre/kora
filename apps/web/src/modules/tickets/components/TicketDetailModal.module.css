@@ -249,6 +249,25 @@
   white-space: pre-wrap;
 }
 
+.textClamped {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  overflow: hidden;
+}
+
+.seeMoreText {
+  margin-top: var(--kora-space-1);
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--kora-blue-600);
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-semibold);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 .empty {
   color: var(--kora-text-disabled);
   font-size: var(--kora-text-base);
