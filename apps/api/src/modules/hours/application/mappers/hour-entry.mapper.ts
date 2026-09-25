@@ -35,6 +35,7 @@ export function toHourEntrySummary(item: HourEntryListItem): HourEntrySummary {
         ? { id: item.designatedApproverUserId, fullName: item.designatedApproverFullName ?? '' }
         : null,
     projectApprovers: item.projectApprovers.map((approver) => ({ id: approver.id, fullName: approver.fullName })),
+    ticket: item.ticket,
     createdAt: item.createdAt.toISOString(),
   };
 }
@@ -77,6 +78,9 @@ export function toHourEntryDetail(source: HourEntryDetailSource): HourEntryDetai
         ? { id: snapshot.designatedApproverUserId, fullName: source.designatedApprover?.fullName ?? '' }
         : null,
     projectApprovers: source.projectApprovers.map((approver) => ({ id: approver.id, fullName: approver.fullName })),
+    // La ficha de detalle no resuelve el origen de ticket (solo la cola de
+    // aprobaciones, vía `HourEntryListItem.ticket` — `DrizzleHourEntryRepository.search`).
+    ticket: null,
     projectStageAtEntry: snapshot.projectStageAtEntry,
     decisionBy: snapshot.decisionUserId ? { id: snapshot.decisionUserId, fullName: source.decisionBy?.fullName ?? '' } : null,
     decisionAt: snapshot.decisionAt?.toISOString() ?? null,

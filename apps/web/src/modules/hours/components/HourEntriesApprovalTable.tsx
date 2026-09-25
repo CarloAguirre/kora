@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import type { HourEntrySummary, ListHourEntriesQuery } from '@kora/contracts';
 import styles from './HourEntriesApprovalTable.module.css';
+import { ticketPath } from '@/app/router/paths';
 import { Badge } from '@/shared/components/ui/Badge';
 import { Button } from '@/shared/components/ui/Button';
 import { DataTable, type Column } from '@/shared/components/ui/DataTable';
@@ -187,7 +189,23 @@ export function HourEntriesApprovalTable({
           } satisfies Column<HourEntrySummary>,
         ]
       : []),
-    { key: 'project', header: 'Proyecto', render: (entry) => entry.project?.name ?? <span className={styles.empty}>—</span> },
+    {
+      key: 'project',
+      header: 'Proyecto',
+      render: (entry) =>
+        entry.project?.name || entry.ticket ? (
+          <div className={styles.projectCell}>
+            {entry.project?.name && <span>{entry.project.name}</span>}
+            {entry.ticket && (
+              <Link to={ticketPath(entry.ticket)} className={styles.ticketLink}>
+                <Badge tone="info">{entry.ticket.legacyId ?? 'Ticket'}</Badge>
+              </Link>
+            )}
+          </div>
+        ) : (
+          <span className={styles.empty}>—</span>
+        ),
+    },
     ...(!groupByUser
       ? [
           {

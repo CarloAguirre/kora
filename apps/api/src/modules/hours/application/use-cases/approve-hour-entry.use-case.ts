@@ -5,6 +5,7 @@ import { HourEntryNotFoundError } from '../../domain/errors/hour-entry.errors';
 import { HOUR_ENTRY_REPOSITORY, type HourEntryRepository } from '../../domain/repositories/hour-entry.repository';
 import { HourEntryApprovalAuthorityService } from '../services/hour-entry-approval-authority.service';
 import { HOUR_ENTRY_PROJECT_READER, type HourEntryProjectReader } from '../ports/hour-entry-project-reader.port';
+import { TICKET_HH_REQUEST_SYNC, type TicketHhRequestSyncPort } from '../ports/ticket-hh-request-sync.port';
 import { AUDIT_RECORDER, type AuditRecorder } from '../../../../shared/application/ports/audit-recorder.port';
 import type { ActorContext, UseCase } from '../../../../shared/application/use-case';
 
@@ -20,6 +21,7 @@ export class ApproveHourEntryUseCase implements UseCase<ApproveHourEntryCommand,
     @Inject(HOUR_ENTRY_REPOSITORY) private readonly entries: HourEntryRepository,
     private readonly authority: HourEntryApprovalAuthorityService,
     @Inject(HOUR_ENTRY_PROJECT_READER) private readonly projects: HourEntryProjectReader,
+    @Inject(TICKET_HH_REQUEST_SYNC) private readonly ticketSync: TicketHhRequestSyncPort,
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
     @Inject(CLOCK) private readonly clock: Clock,
   ) {}
@@ -31,7 +33,8 @@ export class ApproveHourEntryUseCase implements UseCase<ApproveHourEntryCommand,
     const canDecide = await this.authority.canDecide(command.actor.userId, command.actorRole, entry);
     if (!canDecide) return err(new ForbiddenError('No puedes aprobar este registro.', 'HOUR_ENTRY_CANNOT_APPROVE'));
 
-    const result = entry.approve(command.actor.userId, this.clock.now());
+    const now = this.clock.now();
+    const result = entry.approve(command.actor.userId, now);
     if (result.isErr()) return err(result.error);
 
     await this.entries.save(entry);
@@ -40,6 +43,8 @@ export class ApproveHourEntryUseCase implements UseCase<ApproveHourEntryCommand,
       const usedHours = await this.entries.sumApprovedHoursForProject(entry.projectId);
       await this.projects.recalculateUsedHours(entry.projectId, usedHours);
     }
+
+    await this.ticketSync.onHourEntryApproved(entry.id, command.actor.userId, now);
 
     await this.audit.record({
       actor: { userId: command.actor.userId, email: command.actor.email },

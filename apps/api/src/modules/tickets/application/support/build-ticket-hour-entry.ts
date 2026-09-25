@@ -1,7 +1,7 @@
 import type { IdGenerator, Result } from '@kora/core';
 import { HourEntry, type CreateHourEntryError } from '../../../hours/domain/entities/hour-entry.entity';
 
-export interface BuildApprovedHourEntryParams {
+export interface BuildTicketHourEntryParams {
   readonly ids: IdGenerator;
   readonly userId: string;
   readonly projectId: string;
@@ -10,16 +10,18 @@ export interface BuildApprovedHourEntryParams {
   readonly note: string | null;
   readonly isOvertime: boolean;
   readonly ticketDisplayId: string;
+  /** `true` para la solicitud que queda pendiente de revisión; `false` para la autoaprobación. */
+  readonly ownerRequiresApproval: boolean;
   readonly now: Date;
 }
 
 /**
- * Construye el `hour_entries` ya aprobado que resulta de aprobar (o
- * autoaprobar) una solicitud de HH de ticket — mismo bloque usado por
- * `approve-ticket-hh-request.use-case.ts` y por la autoaprobación en
- * `create-ticket-hh-request.use-case.ts`. Ver docs/DECISION-M5-TICKETS.md.
+ * Construye el `hour_entries` (pendiente o ya aprobado, según
+ * `ownerRequiresApproval`) que resulta de una solicitud de HH de ticket —
+ * usado por `create-ticket-hh-request.use-case.ts` (ambas ramas: pendiente y
+ * autoaprobación). Ver docs/DECISION-M5-TICKETS.md.
  */
-export function buildApprovedHourEntry(params: BuildApprovedHourEntryParams): Result<HourEntry, CreateHourEntryError> {
+export function buildTicketHourEntry(params: BuildTicketHourEntryParams): Result<HourEntry, CreateHourEntryError> {
   return HourEntry.create({
     id: params.ids.generate(),
     userId: params.userId,
@@ -30,7 +32,7 @@ export function buildApprovedHourEntry(params: BuildApprovedHourEntryParams): Re
     hours: params.hours,
     date: params.date,
     isOvertime: params.isOvertime,
-    ownerRequiresApproval: false,
+    ownerRequiresApproval: params.ownerRequiresApproval,
     now: params.now,
   });
 }

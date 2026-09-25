@@ -20,6 +20,8 @@ import {
   sql,
   teamMembers,
   teams,
+  ticketHhRequests,
+  tickets,
   users,
   type Database,
 } from '@kora/db';
@@ -90,12 +92,19 @@ export class DrizzleHourEntryRepository implements HourEntryRepository {
           designatedApproverUserId: hourEntries.designatedApproverUserId,
           decisionUserId: hourEntries.decisionUserId,
           createdAt: hourEntries.createdAt,
+          ticketId: tickets.id,
+          ticketLegacyId: tickets.legacyId,
         })
         .from(hourEntries)
         .leftJoin(users, eq(users.id, hourEntries.userId))
         .leftJoin(projects, eq(projects.id, hourEntries.projectId))
         .leftJoin(clients, eq(clients.id, projects.clientId))
         .leftJoin(projectModules, eq(projectModules.id, hourEntries.moduleId))
+        // Un `hour_entries` viene de a lo más UNA solicitud de HH de ticket
+        // (índice único parcial en `ticket_hh_requests.hour_entry_id`), así
+        // que este join no duplica filas.
+        .leftJoin(ticketHhRequests, eq(ticketHhRequests.hourEntryId, hourEntries.id))
+        .leftJoin(tickets, eq(tickets.id, ticketHhRequests.ticketId))
         .where(where)
         .orderBy(...this.buildOrderBy(sort))
         .limit(page.pageSize)
@@ -211,6 +220,7 @@ export class DrizzleHourEntryRepository implements HourEntryRepository {
       designatedApproverFullName: row.designatedApproverUserId ? (approverNameById.get(row.designatedApproverUserId) ?? null) : null,
       projectApprovers: projectApproversByEntryId.get(row.id) ?? [],
       createdAt: row.createdAt,
+      ticket: row.ticketId ? { id: row.ticketId, legacyId: row.ticketLegacyId } : null,
       decisionUserId: row.decisionUserId,
       decisionByFullName: row.decisionUserId ? (approverNameById.get(row.decisionUserId) ?? null) : null,
       clientId: row.clientId,

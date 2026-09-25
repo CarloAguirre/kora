@@ -59,6 +59,8 @@ export interface HourEntryListItem {
   /** Líder del proyecto + líder del equipo del propio autor (si está asignado al proyecto), cuando `projectId` no es null. */
   readonly projectApprovers: readonly { id: string; fullName: string }[];
   readonly createdAt: Date;
+  /** Si este registro viene de una solicitud de HH de ticket (`ticket_hh_requests.hourEntryId`), el ticket de origen — para mostrar "Ticket TK-0001" en la cola general de aprobaciones. */
+  readonly ticket: { id: string; legacyId: string | null } | null;
   /** Quién aprobó/rechazó el registro — alimenta el reporte de Capacity ("Responsable"). */
   readonly decisionUserId: string | null;
   readonly decisionByFullName: string | null;

@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CLOCK, err, ok, type ApplicationError, type Clock, type Result } from '@kora/core';
 import type { RejectTicketHhRequestInput, RoleCode } from '@kora/contracts';
+import { HOUR_ENTRY_REPOSITORY, type HourEntryRepository } from '../../../hours/domain/repositories/hour-entry.repository';
 import { CannotReviewOwnTicketHhRequestError, CannotReviewTicketHhRequestError, TicketHhRequestNotFoundError } from '../../domain/errors/ticket-hh-request.errors';
 import { TICKET_HISTORY_REPOSITORY, type TicketHistoryRepository } from '../../domain/repositories/ticket-history.repository';
 import { TICKET_HH_REQUEST_REPOSITORY, type TicketHhRequestRepository } from '../../domain/repositories/ticket-hh-request.repository';
@@ -22,6 +23,7 @@ export class RejectTicketHhRequestUseCase implements UseCase<RejectTicketHhReque
     @Inject(TICKET_HH_REQUEST_REPOSITORY) private readonly requests: TicketHhRequestRepository,
     @Inject(TICKET_HISTORY_REPOSITORY) private readonly history: TicketHistoryRepository,
     @Inject(TICKET_PROJECT_READER) private readonly projects: TicketProjectReader,
+    @Inject(HOUR_ENTRY_REPOSITORY) private readonly hourEntries: HourEntryRepository,
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
     @Inject(CLOCK) private readonly clock: Clock,
   ) {}
@@ -39,6 +41,19 @@ export class RejectTicketHhRequestUseCase implements UseCase<RejectTicketHhReque
     }
 
     const now = this.clock.now();
+
+    // La solicitud pendiente ya tiene un `hour_entries` vinculado (ver
+    // `CreateTicketHhRequestUseCase`) — hay que rechazarlo también para que no
+    // se quede colgado como pendiente en la cola general de "Aprobaciones de
+    // horas". Si es una solicitud de antes de este cambio sin `hourEntryId`
+    // (backfill pendiente), no hay nada que rechazar del lado de horas.
+    const existingEntry = request.hourEntryId ? await this.hourEntries.findById(request.hourEntryId) : null;
+    if (existingEntry) {
+      const rejectedEntry = existingEntry.reject(actor.userId, data.reason, now);
+      if (rejectedEntry.isErr()) return err(rejectedEntry.error);
+      await this.hourEntries.save(existingEntry);
+    }
+
     const rejected = request.reject(actor.userId, data.reason, now);
     if (rejected.isErr()) return err(rejected.error);
 

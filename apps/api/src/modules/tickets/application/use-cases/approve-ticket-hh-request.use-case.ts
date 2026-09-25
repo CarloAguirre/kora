@@ -2,13 +2,14 @@ import { Inject, Injectable } from '@nestjs/common';
 import { CLOCK, ID_GENERATOR, err, ok, type ApplicationError, type Clock, type IdGenerator, type Result } from '@kora/core';
 import type { RoleCode } from '@kora/contracts';
 import { HOUR_ENTRY_REPOSITORY, type HourEntryRepository } from '../../../hours/domain/repositories/hour-entry.repository';
+import type { HourEntry } from '../../../hours/domain/entities/hour-entry.entity';
 import { TicketNotFoundError } from '../../domain/errors/ticket.errors';
 import { CannotReviewOwnTicketHhRequestError, CannotReviewTicketHhRequestError, TicketHhRequestNotFoundError } from '../../domain/errors/ticket-hh-request.errors';
 import { TICKET_REPOSITORY, type TicketRepository } from '../../domain/repositories/ticket.repository';
 import { TICKET_HISTORY_REPOSITORY, type TicketHistoryRepository } from '../../domain/repositories/ticket-history.repository';
 import { TICKET_HH_REQUEST_REPOSITORY, type TicketHhRequestRepository } from '../../domain/repositories/ticket-hh-request.repository';
 import { TICKET_PROJECT_READER, type TicketProjectReader } from '../ports/ticket-project-reader.port';
-import { buildApprovedHourEntry } from '../support/build-approved-hour-entry';
+import { buildTicketHourEntry } from '../support/build-ticket-hour-entry';
 import { AUDIT_RECORDER, type AuditRecorder } from '../../../../shared/application/ports/audit-recorder.port';
 import type { ActorContext, UseCase } from '../../../../shared/application/use-case';
 
@@ -20,10 +21,13 @@ export interface ApproveTicketHhRequestCommand {
 }
 
 /**
- * Aprobar genera directamente un `hour_entries` ya aprobado (no pasa por
- * `pending`) — la aprobación ya ocurrió aquí, igual que
- * `approve_ticket_hh_requests` en la v1 inserta `registro_hh` con
- * `estado='aprobado'` en el mismo paso. Ver docs/DECISION-M5-TICKETS.md.
+ * Aprueba la solicitud aprobando el `hour_entries` pendiente ya creado junto
+ * con ella (`request.hourEntryId`, ver `CreateTicketHhRequestUseCase`) — así
+ * la misma fila que ya era visible en la cola general de "Aprobaciones de
+ * horas" pasa a `approved`, en vez de crearse una nueva. Si la solicitud es de
+ * antes de este cambio y todavía no tiene `hourEntryId` (backfill pendiente),
+ * se cae al comportamiento anterior: crear el `hour_entries` ya aprobado en
+ * este mismo paso. Ver docs/DECISION-M5-TICKETS.md.
  */
 @Injectable()
 export class ApproveTicketHhRequestUseCase implements UseCase<ApproveTicketHhRequestCommand, void, ApplicationError> {
@@ -54,19 +58,29 @@ export class ApproveTicketHhRequestUseCase implements UseCase<ApproveTicketHhReq
     }
 
     const now = this.clock.now();
-    const entryCreated = buildApprovedHourEntry({
-      ids: this.ids,
-      userId: request.userId,
-      projectId: request.projectId,
-      hours: request.hours,
-      date: request.date,
-      note: request.note,
-      isOvertime: request.isOvertime,
-      ticketDisplayId: ticket.legacyId ?? ticket.id,
-      now,
-    });
-    if (entryCreated.isErr()) return err(entryCreated.error);
-    const entry = entryCreated.value;
+    const existingEntry = request.hourEntryId ? await this.hourEntries.findById(request.hourEntryId) : null;
+
+    let entry: HourEntry;
+    if (existingEntry) {
+      const approvedEntry = existingEntry.approve(actor.userId, now);
+      if (approvedEntry.isErr()) return err(approvedEntry.error);
+      entry = existingEntry;
+    } else {
+      const entryCreated = buildTicketHourEntry({
+        ids: this.ids,
+        userId: request.userId,
+        projectId: request.projectId,
+        hours: request.hours,
+        date: request.date,
+        note: request.note,
+        isOvertime: request.isOvertime,
+        ticketDisplayId: ticket.legacyId ?? ticket.id,
+        ownerRequiresApproval: false,
+        now,
+      });
+      if (entryCreated.isErr()) return err(entryCreated.error);
+      entry = entryCreated.value;
+    }
 
     const approved = request.approve(actor.userId, entry.id, now);
     if (approved.isErr()) return err(approved.error);

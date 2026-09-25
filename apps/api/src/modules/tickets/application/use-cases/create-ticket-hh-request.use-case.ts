@@ -14,7 +14,7 @@ import { TICKET_HISTORY_REPOSITORY, type TicketHistoryRepository } from '../../d
 import { TICKET_HH_REQUEST_REPOSITORY, type TicketHhRequestRepository } from '../../domain/repositories/ticket-hh-request.repository';
 import { TICKET_PROJECT_READER, type TicketProjectReader } from '../ports/ticket-project-reader.port';
 import { HOUR_ENTRY_REPOSITORY, type HourEntryRepository } from '../../../hours/domain/repositories/hour-entry.repository';
-import { buildApprovedHourEntry } from '../support/build-approved-hour-entry';
+import { buildTicketHourEntry } from '../support/build-ticket-hour-entry';
 import { AUDIT_RECORDER, type AuditRecorder } from '../../../../shared/application/ports/audit-recorder.port';
 import type { ActorContext, UseCase } from '../../../../shared/application/use-case';
 
@@ -71,11 +71,11 @@ export class CreateTicketHhRequestUseCase implements UseCase<CreateTicketHhReque
 
     const requestDate = new Date(`${data.date}T00:00:00.000Z`);
     if (!data.isOvertime) {
-      const [pendingTicketHours, otherHours] = await Promise.all([
-        this.requests.sumHoursForUserAndDate(actor.userId, requestDate),
-        this.hourEntries.sumHoursForUserAndDate(actor.userId, requestDate),
-      ]);
-      const totalHours = pendingTicketHours + otherHours + data.hours;
+      // Ya cubre las horas pendientes de ticket: toda solicitud no autoaprobada
+      // ahora crea de inmediato su `hour_entries` pendiente (ver más abajo), así
+      // que sumarlas aparte contaría el mismo tramo dos veces.
+      const otherHours = await this.hourEntries.sumHoursForUserAndDate(actor.userId, requestDate);
+      const totalHours = otherHours + data.hours;
       if (totalHours > DAILY_CAP_HOURS) return err(new TicketHhRequestDailyCapExceededError(totalHours));
     }
 
@@ -95,7 +95,7 @@ export class CreateTicketHhRequestUseCase implements UseCase<CreateTicketHhReque
     const request = created.value;
 
     if (isApprover) {
-      const entryCreated = buildApprovedHourEntry({
+      const entryCreated = buildTicketHourEntry({
         ids: this.ids,
         userId: actor.userId,
         projectId: ticket.projectId,
@@ -104,6 +104,7 @@ export class CreateTicketHhRequestUseCase implements UseCase<CreateTicketHhReque
         note: request.note,
         isOvertime: request.isOvertime,
         ticketDisplayId: ticket.legacyId ?? ticket.id,
+        ownerRequiresApproval: false,
         now,
       });
       if (entryCreated.isErr()) return err(entryCreated.error);
@@ -126,7 +127,28 @@ export class CreateTicketHhRequestUseCase implements UseCase<CreateTicketHhReque
         occurredAt: now,
       });
     } else {
+      // La solicitud queda pendiente de revisión — se crea de inmediato su
+      // `hour_entries` pendiente y vinculado, para que aparezca desde ya en la
+      // cola general de "Aprobaciones de horas" (no solo en el ticket).
+      const entryCreated = buildTicketHourEntry({
+        ids: this.ids,
+        userId: actor.userId,
+        projectId: ticket.projectId,
+        hours: request.hours,
+        date: request.date,
+        note: request.note,
+        isOvertime: request.isOvertime,
+        ticketDisplayId: ticket.legacyId ?? ticket.id,
+        ownerRequiresApproval: true,
+        now,
+      });
+      if (entryCreated.isErr()) return err(entryCreated.error);
+      const entry = entryCreated.value;
+      request.linkHourEntry(entry.id);
+
+      await this.hourEntries.save(entry);
       await this.requests.save(request);
+
       await this.history.append({
         ticketId,
         eventType: 'ticket_hh_requested',

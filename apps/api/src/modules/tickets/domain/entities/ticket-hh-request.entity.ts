@@ -117,6 +117,10 @@ export class TicketHhRequest extends AggregateRoot<string> {
     return this.props.status;
   }
 
+  get hourEntryId(): string | null {
+    return this.props.hourEntryId;
+  }
+
   approve(reviewerUserId: string, hourEntryId: string, now: Date): Result<void, TicketHhRequestNotPendingError> {
     if (this.props.status !== 'pending') return err(new TicketHhRequestNotPendingError());
 
@@ -145,6 +149,11 @@ export class TicketHhRequest extends AggregateRoot<string> {
     this.touch(now);
     this.addDomainEvent(createDomainEvent('ticket_hh_request.rejected', this.id, { reviewerUserId }, now));
     return ok(undefined);
+  }
+
+  /** Vincula el `hour_entries` pendiente creado junto con la solicitud — sin cambiar `status` ni emitir evento, mismo patrón que `HourEntry.linkLegacyId`. */
+  linkHourEntry(hourEntryId: string): void {
+    this.props.hourEntryId = hourEntryId;
   }
 
   private touch(now: Date): void {

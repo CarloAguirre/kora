@@ -4,6 +4,7 @@ import type { RejectHourEntryInput, RoleCode } from '@kora/contracts';
 import { HourEntryNotFoundError } from '../../domain/errors/hour-entry.errors';
 import { HOUR_ENTRY_REPOSITORY, type HourEntryRepository } from '../../domain/repositories/hour-entry.repository';
 import { HourEntryApprovalAuthorityService } from '../services/hour-entry-approval-authority.service';
+import { TICKET_HH_REQUEST_SYNC, type TicketHhRequestSyncPort } from '../ports/ticket-hh-request-sync.port';
 import { AUDIT_RECORDER, type AuditRecorder } from '../../../../shared/application/ports/audit-recorder.port';
 import type { ActorContext, UseCase } from '../../../../shared/application/use-case';
 
@@ -19,6 +20,7 @@ export class RejectHourEntryUseCase implements UseCase<RejectHourEntryCommand, v
   constructor(
     @Inject(HOUR_ENTRY_REPOSITORY) private readonly entries: HourEntryRepository,
     private readonly authority: HourEntryApprovalAuthorityService,
+    @Inject(TICKET_HH_REQUEST_SYNC) private readonly ticketSync: TicketHhRequestSyncPort,
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
     @Inject(CLOCK) private readonly clock: Clock,
   ) {}
@@ -30,10 +32,13 @@ export class RejectHourEntryUseCase implements UseCase<RejectHourEntryCommand, v
     const canDecide = await this.authority.canDecide(command.actor.userId, command.actorRole, entry);
     if (!canDecide) return err(new ForbiddenError('No puedes rechazar este registro.', 'HOUR_ENTRY_CANNOT_REJECT'));
 
-    const result = entry.reject(command.actor.userId, command.data.reason, this.clock.now());
+    const now = this.clock.now();
+    const result = entry.reject(command.actor.userId, command.data.reason, now);
     if (result.isErr()) return err(result.error);
 
     await this.entries.save(entry);
+
+    await this.ticketSync.onHourEntryRejected(entry.id, command.actor.userId, command.data.reason, now);
 
     await this.audit.record({
       actor: { userId: command.actor.userId, email: command.actor.email },

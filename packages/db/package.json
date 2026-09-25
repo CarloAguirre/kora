@@ -17,6 +17,7 @@
     "seed:demo": "tsx src/seeds/run-demo.ts",
     "seed:demo-amicar": "tsx src/seeds/run-demo-amicar.ts",
     "backfill:slugs": "tsx src/backfill-slugs.ts",
+    "backfill:ticket-hh-request-hour-entries": "tsx src/backfill-ticket-hh-request-hour-entries.ts",
     "clean": "rimraf dist .turbo"
   },
   "dependencies": {

@@ -23,17 +23,10 @@ export interface TicketHhRequestListItem {
 
 export interface TicketHhRequestRepository {
   findById(id: string, context?: TransactionContext): Promise<TicketHhRequest | null>;
+  /** Solicitud vinculada a este `hour_entries.id` (1:1, ver índice único en `ticket_hh_requests.hour_entry_id`), o `null` si el registro no viene de un ticket. Usada al sincronizar aprobar/rechazar desde la cola general de horas. */
+  findByHourEntryId(hourEntryId: string, context?: TransactionContext): Promise<TicketHhRequest | null>;
   /** Más recientes primero. */
   listForTicket(ticketId: string, context?: TransactionContext): Promise<TicketHhRequestListItem[]>;
-  /**
-   * Horas PENDIENTES que `userId` ya tiene solicitadas para `date`, en
-   * CUALQUIER ticket — alimenta el tope diario de 8h al crear una nueva
-   * solicitud (ver `CreateTicketHhRequestUseCase`). Solo `pending`: una
-   * solicitud `approved` ya generó su propio `hour_entries` (ver
-   * `buildApprovedHourEntry`), que `HourEntryRepository.sumHoursForUserAndDate`
-   * cuenta aparte — sumar ambas la contaría dos veces.
-   */
-  sumHoursForUserAndDate(userId: string, date: Date, context?: TransactionContext): Promise<number>;
   save(request: TicketHhRequest, context?: TransactionContext): Promise<void>;
 }
 

@@ -84,35 +84,45 @@ export const ticketHhRequestStatusEnum = pgEnum('ticket_hh_request_status', ['pe
 
 /**
  * Solicitud de horas desde un ticket ("siguiente paso de M5" —
- * ver docs/DECISION-M5-TICKETS.md). Al aprobarse genera un `hour_entries` ya
- * aprobado (`hourEntryId`); no pasa por el flujo normal de `pending → approved`
- * de horas, porque la aprobación ya ocurrió aquí.
+ * ver docs/DECISION-M5-TICKETS.md). Si queda pendiente de revisión, se crea de
+ * inmediato su `hour_entries` vinculado (`hourEntryId`) en estado `pending` —
+ * así aparece a la vez en el ticket y en la cola general de "Aprobaciones de
+ * horas". Aprobar/rechazar la solicitud transiciona ESE MISMO `hour_entries`
+ * (o viceversa, si se decide desde la cola general — ver
+ * `TicketHhRequestSyncPort`). La autoaprobación (quien pide sería su propio
+ * aprobador) es la única excepción: crea el `hour_entries` directamente
+ * `approved`, sin pasar por `pending`.
  */
-export const ticketHhRequests = pgTable('ticket_hh_requests', {
-  id: primaryId(),
-  ticketId: uuid('ticket_id')
-    .notNull()
-    .references(() => tickets.id, { onDelete: 'cascade' }),
-  projectId: uuid('project_id')
-    .notNull()
-    .references(() => projects.id, { onDelete: 'cascade' }),
-  userId: uuid('user_id')
-    .notNull()
-    .references(() => users.id, { onDelete: 'cascade' }),
+export const ticketHhRequests = pgTable(
+  'ticket_hh_requests',
+  {
+    id: primaryId(),
+    ticketId: uuid('ticket_id')
+      .notNull()
+      .references(() => tickets.id, { onDelete: 'cascade' }),
+    projectId: uuid('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
 
-  date: date('date', { mode: 'date' }).notNull(),
-  hours: numeric('hours', { precision: 10, scale: 2 }).notNull(),
-  note: text('note'),
-  isOvertime: boolean('is_overtime').notNull().default(false),
+    date: date('date', { mode: 'date' }).notNull(),
+    hours: numeric('hours', { precision: 10, scale: 2 }).notNull(),
+    note: text('note'),
+    isOvertime: boolean('is_overtime').notNull().default(false),
 
-  status: ticketHhRequestStatusEnum('status').notNull().default('pending'),
-  rejectionReason: text('rejection_reason'),
-  reviewedByUserId: uuid('reviewed_by_user_id').references(() => users.id, { onDelete: 'set null' }),
-  reviewedAt: timestamp('reviewed_at', { withTimezone: true, mode: 'date' }),
-  hourEntryId: uuid('hour_entry_id').references(() => hourEntries.id, { onDelete: 'set null' }),
+    status: ticketHhRequestStatusEnum('status').notNull().default('pending'),
+    rejectionReason: text('rejection_reason'),
+    reviewedByUserId: uuid('reviewed_by_user_id').references(() => users.id, { onDelete: 'set null' }),
+    reviewedAt: timestamp('reviewed_at', { withTimezone: true, mode: 'date' }),
+    /** Ahora también se pobla al CREAR una solicitud que queda pendiente (no solo al aprobarla) — ver `CreateTicketHhRequestUseCase`. */
+    hourEntryId: uuid('hour_entry_id').references(() => hourEntries.id, { onDelete: 'set null' }),
 
-  ...timestamps,
-});
+    ...timestamps,
+  },
+  (table) => [uniqueIndex('ticket_hh_requests_hour_entry_id_key').on(table.hourEntryId).where(sql`${table.hourEntryId} is not null`)],
+);
 
 export const supportPlanTypeEnum = pgEnum('support_plan_type', ['monthly', 'bundle', 'on_demand']);
 export const supportPlanStatusEnum = pgEnum('support_plan_status', ['active', 'ended', 'cancelled']);

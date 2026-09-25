@@ -33,6 +33,7 @@ function buildItem(overrides: Partial<HourEntryListItem>): HourEntryListItem {
     designatedApproverUserId: null,
     designatedApproverFullName: null,
     projectApprovers: [],
+    ticket: null,
     createdAt: new Date('2026-08-20'),
     decisionUserId: null,
     decisionByFullName: null,

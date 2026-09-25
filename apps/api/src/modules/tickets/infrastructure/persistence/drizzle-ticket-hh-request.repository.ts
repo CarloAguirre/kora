@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, desc, eq, inArray, projects, ticketHhRequests, users, type Database } from '@kora/db';
+import { desc, eq, inArray, projects, ticketHhRequests, users, type Database } from '@kora/db';
 import type { TransactionContext } from '@kora/core';
 import type {
   TicketHhRequestListItem,
@@ -17,6 +17,12 @@ export class DrizzleTicketHhRequestRepository implements TicketHhRequestReposito
   async findById(id: string, context?: TransactionContext): Promise<TicketHhRequest | null> {
     const db = resolveDb(this.database, context);
     const rows = await db.select().from(ticketHhRequests).where(eq(ticketHhRequests.id, id)).limit(1);
+    return rows[0] ? toDomain(rows[0]) : null;
+  }
+
+  async findByHourEntryId(hourEntryId: string, context?: TransactionContext): Promise<TicketHhRequest | null> {
+    const db = resolveDb(this.database, context);
+    const rows = await db.select().from(ticketHhRequests).where(eq(ticketHhRequests.hourEntryId, hourEntryId)).limit(1);
     return rows[0] ? toDomain(rows[0]) : null;
   }
 
@@ -77,15 +83,6 @@ export class DrizzleTicketHhRequestRepository implements TicketHhRequestReposito
       hourEntryId: row.hourEntryId,
       createdAt: row.createdAt,
     }));
-  }
-
-  async sumHoursForUserAndDate(userId: string, date: Date, context?: TransactionContext): Promise<number> {
-    const db = resolveDb(this.database, context);
-    const rows = await db
-      .select({ hours: ticketHhRequests.hours })
-      .from(ticketHhRequests)
-      .where(and(eq(ticketHhRequests.userId, userId), eq(ticketHhRequests.date, date), eq(ticketHhRequests.status, 'pending')));
-    return rows.reduce((sum, row) => sum + Number(row.hours), 0);
   }
 
   async save(request: TicketHhRequest, context?: TransactionContext): Promise<void> {

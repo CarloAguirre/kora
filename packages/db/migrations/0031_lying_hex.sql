@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "ticket_hh_requests_hour_entry_id_key" ON "ticket_hh_requests" USING btree ("hour_entry_id") WHERE "ticket_hh_requests"."hour_entry_id" is not null;

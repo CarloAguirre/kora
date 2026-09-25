@@ -27,10 +27,6 @@ class StubTicketProjectReader implements Partial<TicketProjectReader> {
 }
 
 class StubTicketHhRequestRepository implements Partial<TicketHhRequestRepository> {
-  constructor(private readonly pendingHoursForUser: number = 0) {}
-  async sumHoursForUserAndDate(): Promise<number> {
-    return this.pendingHoursForUser;
-  }
   async save(): Promise<void> {}
 }
 
@@ -39,6 +35,7 @@ class StubHourEntryRepository implements Partial<HourEntryRepository> {
   async sumHoursForUserAndDate(): Promise<number> {
     return this.otherHoursForUser;
   }
+  async save(): Promise<void> {}
 }
 
 function buildTicket(allowsOvertime = false): Ticket {
@@ -53,13 +50,11 @@ function buildTicket(allowsOvertime = false): Ticket {
   return ticket;
 }
 
-function buildUseCase(
-  options: { pendingTicketHours?: number; otherHours?: number; allowsOvertime?: boolean } = {},
-): CreateTicketHhRequestUseCase {
+function buildUseCase(options: { otherHours?: number; allowsOvertime?: boolean } = {}): CreateTicketHhRequestUseCase {
   return new CreateTicketHhRequestUseCase(
     new StubTicketRepository(buildTicket(options.allowsOvertime ?? false)) as unknown as TicketRepository,
     { append: async () => {} } as unknown as TicketHistoryRepository,
-    new StubTicketHhRequestRepository(options.pendingTicketHours ?? 0) as unknown as TicketHhRequestRepository,
+    new StubTicketHhRequestRepository() as unknown as TicketHhRequestRepository,
     new StubTicketProjectReader() as unknown as TicketProjectReader,
     new StubHourEntryRepository(options.otherHours ?? 0) as unknown as HourEntryRepository,
     new RecordingAuditRecorder(),
@@ -82,20 +77,7 @@ describe('CreateTicketHhRequestUseCase — tope diario de 8h', () => {
     expect(result.isErr() && result.error.code).toBe('TICKET_HH_REQUEST_DAILY_CAP_EXCEEDED');
   });
 
-  it('rechaza cuando, sumada a otras solicitudes pendientes de OTRO ticket, supera las 8h', async () => {
-    const useCase = buildUseCase({ pendingTicketHours: 6 });
-
-    const result = await useCase.execute({
-      ticketId: 'ticket-1',
-      data: { date: '2026-09-10', hours: 4, isOvertime: false },
-      actor: ACTOR,
-      actorRole: 'collaborator',
-    });
-
-    expect(result.isErr() && result.error.code).toBe('TICKET_HH_REQUEST_DAILY_CAP_EXCEEDED');
-  });
-
-  it('rechaza cuando, sumada a horas ya registradas en otro proceso, supera las 8h', async () => {
+  it('rechaza cuando, sumada a horas ya registradas en otro proceso (incluida una solicitud pendiente de OTRO ticket, que ya vive como hour_entries pendiente), supera las 8h', async () => {
     const useCase = buildUseCase({ otherHours: 5 });
 
     const result = await useCase.execute({

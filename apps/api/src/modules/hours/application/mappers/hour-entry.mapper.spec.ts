@@ -27,6 +27,7 @@ function buildItem(overrides: Partial<HourEntryListItem> = {}): HourEntryListIte
     designatedApproverUserId: null,
     designatedApproverFullName: null,
     projectApprovers: [],
+    ticket: null,
     createdAt: new Date('2026-01-01'),
     decisionUserId: null,
     decisionByFullName: null,

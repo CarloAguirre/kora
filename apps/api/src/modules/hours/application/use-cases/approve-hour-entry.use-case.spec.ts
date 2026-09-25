@@ -3,6 +3,7 @@ import { ApproveHourEntryUseCase } from './approve-hour-entry.use-case';
 import { HourEntry } from '../../domain/entities/hour-entry.entity';
 import type { HourEntryRepository } from '../../domain/repositories/hour-entry.repository';
 import type { HourEntryProjectReader } from '../ports/hour-entry-project-reader.port';
+import type { TicketHhRequestSyncPort } from '../ports/ticket-hh-request-sync.port';
 import type { HourEntryApprovalAuthorityService } from '../services/hour-entry-approval-authority.service';
 import type { AuditRecorder } from '../../../../shared/application/ports/audit-recorder.port';
 import { FixedClock } from '../../../../test/fakes';
@@ -40,10 +41,12 @@ function buildUseCase(entry: HourEntry, options: { canDecide?: boolean; usedHour
     canDecide: vi.fn().mockResolvedValue(options.canDecide ?? true),
   } as unknown as HourEntryApprovalAuthorityService;
 
+  const ticketSync = { onHourEntryApproved: vi.fn().mockResolvedValue(undefined) } as unknown as TicketHhRequestSyncPort;
+
   const audit = { record: vi.fn().mockResolvedValue(undefined) } as unknown as AuditRecorder;
 
-  const useCase = new ApproveHourEntryUseCase(entries, authority, projects, audit, new FixedClock(NOW));
-  return { useCase, entries, projects };
+  const useCase = new ApproveHourEntryUseCase(entries, authority, projects, ticketSync, audit, new FixedClock(NOW));
+  return { useCase, entries, projects, ticketSync };
 }
 
 describe('ApproveHourEntryUseCase', () => {

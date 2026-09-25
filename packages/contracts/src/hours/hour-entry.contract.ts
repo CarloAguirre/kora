@@ -68,6 +68,8 @@ export const hourEntrySummarySchema = z.object({
    * para registros sin proyecto — ahí el aprobador es `designatedApprover`.
    */
   projectApprovers: z.array(z.object({ id: uuidSchema, fullName: z.string() })),
+  /** Ticket de origen si este registro viene de una solicitud de HH de ticket (ver `TicketHhRequestSyncPort`), null si es un registro de horas normal. */
+  ticket: z.object({ id: uuidSchema, legacyId: z.string().nullable() }).nullable(),
   createdAt: isoDateTimeSchema,
 });
 export type HourEntrySummary = z.infer<typeof hourEntrySummarySchema>;
