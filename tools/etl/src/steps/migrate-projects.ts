@@ -14,6 +14,7 @@ import {
   withUniqueSuffix,
 } from '@kora/db';
 import { StepTracker, type EtlContext } from '../lib/context';
+import { pruneOne } from '../lib/prune';
 import {
   mapPriority,
   mapProjectPhase,
@@ -105,6 +106,17 @@ export async function migrateProjects(context: EtlContext): Promise<void> {
     }))
     .sort((a, b) => a.id_proyecto - b.id_proyecto);
   tracker.read = rows.length;
+
+  // Poda temprano (antes del upsert de abajo, no al final como el resto de
+  // `pruneStaleLegacyRows`): un proyecto que el origen borró puede dejar
+  // vacante un nombre que el origen le puso a OTRO proyecto (renombre real, no
+  // duplicado) — ver caso real: se borró "Feria ExpoMina Perú" (legacy_id 253)
+  // y, en el mismo dump, "UX - Expomina Perú" (legacy_id 235) pasó a llamarse
+  // "Feria Expomina Perú". Si la fila huérfana de 253 sigue viva cuando se
+  // intenta el update/insert de 235, choca con `projects_client_name_key`
+  // (case-insensitive) porque la poda de proyectos recién corre al final del
+  // pipeline. Podar acá, antes del bucle, deja el nombre libre a tiempo.
+  await pruneOne(context, 'proyectos huérfanos (poda temprana)', projects, projects.legacyId, rows.map((row) => row.id_proyecto));
 
   const clientIds = await loadLegacyIdMap(context, clients);
   const contactIds = await loadLegacyIdMap(context, clientContacts);

@@ -56,7 +56,11 @@ export async function pruneStaleLegacyRows(context: EtlContext, dump: Readonly<R
   await pruneOne(context, 'hour_entries', hourEntries, hourEntries.legacyId, ids('registro_hh', 'id'));
   await pruneOne(context, 'project_team_members', projectTeamMembers, projectTeamMembers.legacyId, ids('proyecto_colaborador', 'id'));
   await pruneOne(context, 'project_teams', projectTeams, projectTeams.legacyId, ids('equipo_proyecto', 'id'));
-  await pruneOne(context, 'projects', projects, projects.legacyId, ids('proyecto', 'id_proyecto'));
+  // `projects` ya se podó al principio de `migrateProjects` (antes del
+  // upsert), no acá: un proyecto huérfano puede dejar libre un nombre que el
+  // dump le da a OTRO proyecto en el mismo `proyecto_client_name_key`, y
+  // podar recién al final del pipeline es tarde para eso — ver el comentario
+  // en `migrate-projects.ts`.
   await pruneOne(context, 'client_contacts', clientContacts, clientContacts.legacyId, ids('contacto_cliente', 'id_contacto'));
   await pruneOne(context, 'clients', clients, clients.legacyId, ids('cliente', 'id_cliente'));
 }
@@ -80,7 +84,7 @@ type PruneableTable =
  * `ids(...)` arriba), así que el tipo se relaja a `any` acá adentro en vez de
  * pelear con los genéricos de Drizzle por un helper interno de un solo uso.
  */
-async function pruneOne(
+export async function pruneOne(
   context: EtlContext,
   label: string,
   table: PruneableTable,
