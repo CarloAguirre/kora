@@ -57,6 +57,16 @@
   text-decoration: underline;
 }
 
+.alertIcons {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.alertIcons svg {
+  flex-shrink: 0;
+}
+
 .alertIcon {
   color: var(--kora-warning);
 }

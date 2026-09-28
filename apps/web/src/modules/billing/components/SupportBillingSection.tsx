@@ -29,12 +29,14 @@ const EMPTY_KPI_GROUP: SupportBillingKpiGroup = {
   overdueCount: 0,
 };
 
-type TypeFilter = 'all' | 'on_demand' | 'bundle' | 'monthly';
+/** `alerts` no es un tipo de contrato, pero va en la misma fila de tabs (Figma) — es el mismo filtro que activa la tarjeta "Alertas activas". */
+type TypeFilter = 'all' | 'on_demand' | 'bundle' | 'monthly' | 'alerts';
 const FILTERS: Readonly<{ id: TypeFilter; label: string }[]> = [
   { id: 'all', label: 'Todos' },
   { id: 'on_demand', label: 'A demanda' },
   { id: 'bundle', label: 'Bolsa' },
   { id: 'monthly', label: 'Mensual' },
+  { id: 'alerts', label: 'Con alertas' },
 ];
 
 function currentPeriod(): { year: number; month: number } {
@@ -61,7 +63,6 @@ function currentPeriod(): { year: number; month: number } {
 export function SupportBillingSection() {
   const [{ year, month }, setPeriod] = useState(currentPeriod());
   const [filter, setFilter] = useState<TypeFilter>('all');
-  const [onlyAlerts, setOnlyAlerts] = useState(false);
   const [clientFilter, setClientFilter] = useState<string[]>([]);
 
   const period = `${year}-${String(month).padStart(2, '0')}`;
@@ -75,11 +76,11 @@ export function SupportBillingSection() {
 
   const rows = useMemo(() => {
     let list = overview?.rows ?? [];
-    if (filter !== 'all') list = list.filter((r) => r.planType === filter);
-    if (onlyAlerts) list = list.filter((r) => r.hasAlert);
+    if (filter === 'alerts') list = list.filter((r) => r.hasAlert);
+    else if (filter !== 'all') list = list.filter((r) => r.planType === filter);
     if (clientFilter.length > 0) list = list.filter((r) => clientFilter.includes(r.clientId));
     return list;
-  }, [overview, filter, onlyAlerts, clientFilter]);
+  }, [overview, filter, clientFilter]);
 
   const columns: Column<SupportBillingRow>[] = [
     { key: 'client', header: 'Cliente', render: (r) => r.clientName },
@@ -100,8 +101,15 @@ export function SupportBillingSection() {
     {
       key: 'alert',
       header: '',
-      width: '32px',
-      render: (r) => (r.hasAlert || r.isOverdue ? <TriangleAlertIcon size={16} className={r.isOverdue ? styles.overdueIcon : styles.alertIcon} /> : null),
+      // 2 íconos de 16px + separación + 16px de padding por lado — con `box-sizing: border-box`, un ancho menor deja la celda sin espacio para el ícono.
+      width: '72px',
+      render: (r) =>
+        r.hasAlert || r.isOverdue ? (
+          <span className={styles.alertIcons}>
+            {r.hasAlert && <TriangleAlertIcon size={16} className={styles.alertIcon} role="img" aria-hidden={false} aria-label="Alerta del contrato" />}
+            {r.isOverdue && <TriangleAlertIcon size={16} className={styles.overdueIcon} role="img" aria-hidden={false} aria-label="Factura atrasada" />}
+          </span>
+        ) : null,
     },
   ];
 
@@ -140,8 +148,8 @@ export function SupportBillingSection() {
                 tone="warning"
                 value={isLoading ? '…' : (overview?.alertsCount ?? 0)}
                 sub="Requieren revisión antes de facturar"
-                onClick={() => setOnlyAlerts((prev) => !prev)}
-                active={onlyAlerts}
+                onClick={() => setFilter((prev) => (prev === 'alerts' ? 'all' : 'alerts'))}
+                active={filter === 'alerts'}
               />
             )}
           </div>

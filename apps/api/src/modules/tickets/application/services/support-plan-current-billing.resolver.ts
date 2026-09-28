@@ -27,11 +27,19 @@ export class SupportPlanCurrentBillingResolver {
 
   async resolve(plan: SupportPlanRecord, linkedProjectIds: readonly string[], now: Date): Promise<CurrentBillingStatus> {
     const calculation = await this.calculator.calculate(plan, linkedProjectIds, now);
-    if (!calculation) return { billingStatus: null, amountUf: 0 };
+    if (!calculation) {
+      /** Sin monto nuevo no significa "sin movimiento": una bolsa cuyo excedente ya se facturó este mes calcula 0, pero su factura del mes existe y debe seguir viéndose. */
+      const invoicedThisMonth = await this.invoices.findByPlanAndPeriod(plan.id, periodKeyOf(now));
+      return invoicedThisMonth ? { billingStatus: 'invoiced', amountUf: invoicedThisMonth.amountUf } : { billingStatus: null, amountUf: 0 };
+    }
 
     const existing = await this.invoices.findByPlanAndPeriod(plan.id, calculation.periodKey);
     if (existing) return { billingStatus: 'invoiced', amountUf: existing.amountUf };
 
     return { billingStatus: 'to_invoice', amountUf: calculation.amountUf };
   }
+}
+
+function periodKeyOf(date: Date): string {
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
 }
