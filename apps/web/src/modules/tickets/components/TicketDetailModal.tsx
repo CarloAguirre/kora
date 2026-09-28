@@ -363,37 +363,38 @@ export function TicketDetailModal({ ticketId, onClose }: { ticketId: string; onC
               )}
             </div>
 
-            <div className={styles.divider} />
-
             {ticket.canManage && ticket.status !== 'closed' && (
-              <div className={styles.footer}>
-                {ticket.status !== 'done' && ticket.canDelete && (
-                  <Button variant="tertiary" onClick={() => setDeleteOpen(true)}>
-                    Eliminar ticket
-                  </Button>
-                )}
-                <div className={styles.footerRight}>
-                  {ticket.status !== 'done' && ticket.canEditDetails && (
-                    <Button variant="outlineDark" iconLeft={<PencilIcon size={16} />} onClick={() => setEditOpen(true)}>
-                      Editar
+              <>
+                <div className={styles.divider} />
+                <div className={styles.footer}>
+                  {ticket.status !== 'done' && ticket.canDelete && (
+                    <Button variant="tertiary" onClick={() => setDeleteOpen(true)}>
+                      Eliminar ticket
                     </Button>
                   )}
-                  {forwardStatus && (
-                    <Button
-                      variant="primary"
-                      disabled={isUnassignedPending}
-                      loading={changeStatus.isPending}
-                      onClick={() => {
-                        if (forwardStatus === 'closed') return setCloseOpen(true);
-                        if (forwardStatus === 'done' && !ticket.resolution) return setCompleteOpen(true);
-                        void onStatusChange(forwardStatus);
-                      }}
-                    >
-                      {forwardActionLabel(ticket.status, forwardStatus)}
-                    </Button>
-                  )}
+                  <div className={styles.footerRight}>
+                    {ticket.status !== 'done' && ticket.canEditDetails && (
+                      <Button variant="outlineDark" iconLeft={<PencilIcon size={16} />} onClick={() => setEditOpen(true)}>
+                        Editar
+                      </Button>
+                    )}
+                    {forwardStatus && (
+                      <Button
+                        variant="primary"
+                        disabled={isUnassignedPending}
+                        loading={changeStatus.isPending}
+                        onClick={() => {
+                          if (forwardStatus === 'closed') return setCloseOpen(true);
+                          if (forwardStatus === 'done' && !ticket.resolution) return setCompleteOpen(true);
+                          void onStatusChange(forwardStatus);
+                        }}
+                      >
+                        {forwardActionLabel(ticket.status, forwardStatus)}
+                      </Button>
+                    )}
+                  </div>
                 </div>
-              </div>
+              </>
             )}
 
             <EditTicketDialog ticket={ticket} open={editOpen} onClose={() => setEditOpen(false)} />

@@ -41,6 +41,12 @@
   overflow-y: auto;
 }
 
+/* Sin esto las tarjetas (en especial `.contentCard`, que lleva `overflow: hidden`)
+   se encogen para caber en el `max-height` y recortan su texto en vez de que el modal haga scroll. */
+.modal > * {
+  flex-shrink: 0;
+}
+
 .header {
   display: flex;
   align-items: center;
@@ -389,4 +395,43 @@
   display: flex;
   align-items: center;
   gap: var(--kora-space-2);
+  margin-left: auto;
+}
+
+@media (max-width: 640px) {
+  .overlay {
+    padding: var(--kora-space-2);
+  }
+
+  .modal {
+    max-height: calc(100dvh - 2 * var(--kora-space-2));
+    padding: var(--kora-space-3);
+  }
+
+  .factsGrid {
+    grid-template-columns: 1fr;
+    row-gap: var(--kora-space-3);
+    padding: var(--kora-space-3);
+  }
+
+  .contentSection {
+    padding: var(--kora-space-3);
+  }
+
+  .historyBox {
+    padding: var(--kora-space-3);
+  }
+
+  .warningBanner {
+    font-size: var(--kora-text-base);
+  }
+
+  .footer {
+    flex-wrap: wrap;
+  }
+
+  .footerRight {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
 }
