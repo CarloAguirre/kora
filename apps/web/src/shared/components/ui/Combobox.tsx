@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import styles from './Combobox.module.css';
 import { ChevronDownIcon, SearchIcon } from '../icons/Icons';
 
@@ -28,6 +29,18 @@ export interface ComboboxProps {
   errorText?: string;
 }
 
+interface PanelPosition {
+  readonly left: number;
+  readonly width: number;
+  readonly maxHeight: number;
+  readonly top?: number;
+  readonly bottom?: number;
+}
+
+const PANEL_MAX_HEIGHT = 260;
+const PANEL_GAP = 4; // var(--kora-space-1)
+const VIEWPORT_MARGIN = 8;
+
 export function Combobox({
   label,
   placeholder,
@@ -43,15 +56,46 @@ export function Combobox({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
+  const fieldRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const inputId = useId();
+  // El panel se dibuja en un portal con `position: fixed` — como `absolute`
+  // dentro del campo, un ancestro con `overflow: auto/hidden` (p. ej. la card
+  // del equipo asignado) lo recortaba. Mismo patrón que el calendario de
+  // `TextField`: se porta dentro del `<dialog>` abierto si lo hay, para heredar
+  // su top layer.
+  const [panelPosition, setPanelPosition] = useState<PanelPosition | null>(null);
+
+  const updatePanelPosition = () => {
+    const rect = fieldRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const spaceBelow = window.innerHeight - rect.bottom - PANEL_GAP - VIEWPORT_MARGIN;
+    const spaceAbove = rect.top - PANEL_GAP - VIEWPORT_MARGIN;
+    // Si no cabe completo abajo y arriba hay más espacio, se abre hacia arriba.
+    const openUp = spaceBelow < PANEL_MAX_HEIGHT && spaceAbove > spaceBelow;
+    setPanelPosition({
+      left: rect.left,
+      width: rect.width,
+      maxHeight: Math.min(PANEL_MAX_HEIGHT, openUp ? spaceAbove : spaceBelow),
+      ...(openUp
+        ? { bottom: window.innerHeight - rect.top + PANEL_GAP }
+        : { top: rect.bottom + PANEL_GAP }),
+    });
+  };
 
   const selectedLabel = options.find((option) => option.value === value)?.label ?? '';
 
   useEffect(() => {
     if (!open) return;
+    updatePanelPosition();
 
     const handlePointerDown = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(target) &&
+        !panelRef.current?.contains(target)
+      ) {
         setOpen(false);
         setQuery('');
       }
@@ -63,11 +107,17 @@ export function Combobox({
       }
     };
 
+    const handleReposition = () => updatePanelPosition();
+
     document.addEventListener('mousedown', handlePointerDown);
     document.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('scroll', handleReposition, true);
+    window.addEventListener('resize', handleReposition);
     return () => {
       document.removeEventListener('mousedown', handlePointerDown);
       document.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('scroll', handleReposition, true);
+      window.removeEventListener('resize', handleReposition);
     };
   }, [open]);
 
@@ -98,6 +148,7 @@ export function Combobox({
       )}
 
       <div
+        ref={fieldRef}
         className={[
           styles.field,
           open ? styles.fieldOpen : '',
@@ -143,8 +194,16 @@ export function Combobox({
         </button>
       </div>
 
-      {open && !disabled && (
-        <div className={styles.panel} role="listbox">
+      {open && !disabled && panelPosition && createPortal(
+        <div
+          ref={panelRef}
+          className={styles.panel}
+          style={panelPosition}
+          role="listbox"
+          // Evita que el input pierda el foco al hacer clic en el panel (que ya
+          // no es descendiente del campo).
+          onMouseDown={(event) => event.preventDefault()}
+        >
           {filteredOptions.length === 0 ? (
             <p className={styles.emptyState}>{emptyMessage}</p>
           ) : (
@@ -161,7 +220,8 @@ export function Combobox({
               </button>
             ))
           )}
-        </div>
+        </div>,
+        fieldRef.current?.closest('dialog') ?? document.body,
       )}
 
       {errorText && (

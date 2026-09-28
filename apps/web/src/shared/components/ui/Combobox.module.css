@@ -85,16 +85,15 @@
   color: var(--kora-text-muted);
 }
 
+/* `position: fixed` + portal (ver Combobox.tsx): `top`/`bottom`/`left`/`width`/
+   `max-height` los calcula JS desde el `getBoundingClientRect` del campo. Al
+   vivir en `body` compite en el stacking global, por eso va sobre el modal. */
 .panel {
-  position: absolute;
-  top: calc(100% + var(--kora-space-1));
-  left: 0;
-  right: 0;
-  z-index: var(--kora-z-dropdown);
+  position: fixed;
+  z-index: calc(var(--kora-z-modal) + 10);
   display: flex;
   flex-direction: column;
   gap: 2px;
-  max-height: 260px;
   overflow-y: auto;
   padding: var(--kora-space-2);
   border-radius: var(--kora-radius);
@@ -105,6 +104,7 @@
 
 .option {
   display: block;
+  flex-shrink: 0;
   width: 100%;
   padding: var(--kora-space-2);
   border: none;
