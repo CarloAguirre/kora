@@ -168,6 +168,12 @@ export const billingLedgerEntrySchema = z.object({
   referenceId: z.string().nullable(),
   /** Solo `line: 'proyecto'` — el proyecto dueño del tramo, para las acciones de la fila. */
   projectId: uuidSchema.nullable(),
+  /** Solo `line: 'proyecto'` — nombre del proyecto, sin el del tramo (`detail` los concatena). */
+  projectName: z.string().nullable(),
+  /** Solo `line: 'proyecto'` — nombre del tramo (ej. "Inicio"). */
+  milestoneName: z.string().nullable(),
+  /** Solo `line: 'proyecto'` — porcentaje del tramo sobre el total, si se configuró. */
+  milestonePercent: z.number().nullable(),
 });
 export type BillingLedgerEntry = z.infer<typeof billingLedgerEntrySchema>;
 

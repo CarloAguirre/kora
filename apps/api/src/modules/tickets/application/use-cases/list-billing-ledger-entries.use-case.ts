@@ -95,6 +95,9 @@ export class ListBillingLedgerEntriesUseCase implements UseCase<void, BillingLed
         paidAt: null,
         referenceId: null,
         projectId: null,
+        projectName: null,
+        milestoneName: null,
+        milestonePercent: null,
       });
     }
     return entries;
@@ -146,6 +149,9 @@ export class ListBillingLedgerEntriesUseCase implements UseCase<void, BillingLed
       paidAt: invoice.paidAt?.toISOString().slice(0, 10) ?? null,
       referenceId: invoice.id,
       projectId: null,
+      projectName: null,
+      milestoneName: null,
+      milestonePercent: null,
     };
   }
 
@@ -169,6 +175,9 @@ export class ListBillingLedgerEntriesUseCase implements UseCase<void, BillingLed
         paidAt: milestone.paidAt?.toISOString().slice(0, 10) ?? null,
         referenceId: milestone.id,
         projectId: milestone.projectId,
+        projectName: milestone.projectName,
+        milestoneName: milestone.name,
+        milestonePercent: milestone.percent,
       }));
   }
 }

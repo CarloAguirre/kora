@@ -39,6 +39,17 @@ const STATUS_TABS: ReadonlyArray<{ id: StatusFilter; label: string }> = [
 const formatAmount = (entry: BillingLedgerEntry) =>
   formatMoney(entry.amount, entry.currency);
 
+const projectLabel = (entry: BillingLedgerEntry) =>
+  entry.projectName ?? entry.detail;
+
+/** "Inicio (50%)" — el porcentaje solo si el tramo lo tiene configurado. */
+function tramoLabel(entry: BillingLedgerEntry) {
+  if (!entry.milestoneName) return "—";
+  return entry.milestonePercent !== null
+    ? `${entry.milestoneName} (${entry.milestonePercent.toLocaleString("es-CL")}%)`
+    : entry.milestoneName;
+}
+
 /** Antes de tener factura, "pendiente" no distingue estado de pago — no hay nada que mostrar todavía. */
 function facturacionLabel(status: BillingLedgerEntry["status"]) {
   return status === "pendiente" ? "Por facturar" : "Facturado";
@@ -240,10 +251,11 @@ export function ProjectsBillingSection() {
           className={styles.detailLink}
           onClick={() => setDetailEntry(e)}
         >
-          {e.detail}
+          {projectLabel(e)}
         </button>
       ),
     },
+    { key: "tramo", header: "Tramo", render: tramoLabel },
     { key: "amount", header: "Monto", align: "right", render: formatAmount },
     {
       key: "billing",
@@ -275,6 +287,7 @@ export function ProjectsBillingSection() {
     const header = [
       "Cliente",
       "Proyecto",
+      "Tramo",
       "Monto",
       "Estado facturación",
       "Estado de pago",
@@ -284,7 +297,8 @@ export function ProjectsBillingSection() {
         rows.map((e) =>
           [
             e.clientName,
-            e.detail,
+            projectLabel(e),
+            tramoLabel(e),
             formatAmount(e),
             facturacionLabel(e.status),
             pagoLabel(e.status) ?? "",
@@ -316,7 +330,7 @@ export function ProjectsBillingSection() {
     const tableRows = rows
       .map(
         (e) =>
-          `<tr><td>${e.clientName}</td><td>${e.detail}</td><td>${formatAmount(e)}</td><td>${facturacionLabel(e.status)}</td><td>${pagoLabel(e.status) ?? "—"}</td></tr>`,
+          `<tr><td>${e.clientName}</td><td>${projectLabel(e)}</td><td>${tramoLabel(e)}</td><td>${formatAmount(e)}</td><td>${facturacionLabel(e.status)}</td><td>${pagoLabel(e.status) ?? "—"}</td></tr>`,
       )
       .join("");
     win.document
@@ -330,7 +344,7 @@ export function ProjectsBillingSection() {
     </style></head><body>
       <h1>Facturación de Proyectos — Kora</h1>
       <p class="meta">Generado el ${new Date().toLocaleDateString("es-CL")}</p>
-      <table><thead><tr><th>Cliente</th><th>Proyecto</th><th>Monto</th><th>Estado facturación</th><th>Estado de pago</th></tr></thead>
+      <table><thead><tr><th>Cliente</th><th>Proyecto</th><th>Tramo</th><th>Monto</th><th>Estado facturación</th><th>Estado de pago</th></tr></thead>
       <tbody>${tableRows}</tbody></table>
     </body></html>`);
     win.document.close();
