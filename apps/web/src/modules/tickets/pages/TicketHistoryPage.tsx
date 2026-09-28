@@ -238,6 +238,7 @@ export function TicketHistoryPage() {
               emptyMessage="No hay tickets que coincidan con la búsqueda."
               sort={sort}
               onSortChange={toggleSort}
+              topScrollbar
             />
 
             {data && (

@@ -23,7 +23,6 @@ import { useToast } from '@/shared/components/ui/Toast';
 import { ConfirmActionDialog } from '@/shared/components/ui/ConfirmActionDialog';
 import { SearchIcon, PlusIcon, DownloadIcon, TrashIcon } from '@/shared/components/icons/Icons';
 import { ProjectStatusBadge } from '../components/ProjectStatusBadge';
-import { PriorityIndicator } from '../components/PriorityIndicator';
 import { ProjectsSummaryChart } from '../components/ProjectsSummaryChart';
 import { getProjectStageLabel } from '../lib/project-stage-display';
 import { exportDevelopmentProjects, exportSupportProjects } from '../lib/project-export';
@@ -69,7 +68,7 @@ export function ProjectsListPage() {
   const [statuses, setStatuses] = useState<ProjectStatus[]>([]);
   const [phases, setPhases] = useState<ProjectPhase[]>([]);
   const [page, setPage] = useState(1);
-  const [sort, setSort] = useState<SortState<ProjectSortField>>({ field: 'priority', direction: 'desc' });
+  const [sort, setSort] = useState<SortState<ProjectSortField>>({ field: 'createdAt', direction: 'desc' });
   const [deleteTarget, setDeleteTarget] = useState<ProjectSummary | null>(null);
   const [exporting, setExporting] = useState(false);
   const deleteProject = useDeleteProject();
@@ -116,7 +115,7 @@ export function ProjectsListPage() {
 
   const changeTab = (id: string) => {
     setTab(id as 'development' | 'support');
-    setSort({ field: 'priority', direction: 'desc' });
+    setSort({ field: 'createdAt', direction: 'desc' });
     setPage(1);
   };
 
@@ -162,7 +161,6 @@ export function ProjectsListPage() {
   };
 
   const developmentColumns: Column<ProjectSummary>[] = [
-    { key: 'priority', header: 'Prioridad', sortable: true, render: (p) => <PriorityIndicator priority={p.priority} /> },
     {
       key: 'name',
       header: 'Nombre',

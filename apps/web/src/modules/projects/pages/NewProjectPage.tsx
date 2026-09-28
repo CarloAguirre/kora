@@ -10,7 +10,6 @@ import {
   PROJECT_MODULE_STAGE_LABELS,
   PROJECT_PHASES,
   PROJECT_PHASE_LABELS,
-  PROJECT_PRIORITY_LABELS,
   PROJECT_SALES_STAGES,
   PROJECT_SALES_STAGE_LABELS,
   PROJECT_STATUS_LABELS,
@@ -26,7 +25,6 @@ import {
   type CreateProjectModuleInput,
   type CreateSupportPlanInput,
   type ProjectModuleStage,
-  type ProjectPriority,
   type ProjectSalesStage,
   type ProjectType,
   type SupportPlanCurrency,
@@ -80,9 +78,6 @@ const SALES_STAGE_OPTIONS = PROJECT_SALES_STAGES.map((stage) => ({
   value: stage,
   label: PROJECT_SALES_STAGE_LABELS[stage],
 }));
-/** Mismo orden que la v1 (Alta/Media/Baja), no el orden alfabético del enum. */
-const PRIORITY_ORDER: readonly ProjectPriority[] = ['high', 'medium', 'low'];
-const PRIORITY_OPTIONS = PRIORITY_ORDER.map((priority) => ({ value: priority, label: PROJECT_PRIORITY_LABELS[priority] }));
 const PHASE_OPTIONS = PROJECT_PHASES.map((phase) => ({ value: phase, label: PROJECT_PHASE_LABELS[phase] }));
 /**
  * Opciones de "Estado" al crear — dependen de la etapa comercial, mismo criterio que
@@ -881,8 +876,8 @@ export function NewProjectPage() {
                   {...register('name')}
                 />
 
-                <div className={styles.row}>
-                  {type === 'development' && (
+                {type === 'development' && (
+                  <div className={styles.row}>
                     <Select
                       label="Etapa comercial"
                       required
@@ -891,8 +886,6 @@ export function NewProjectPage() {
                       {...register('salesStage')}
                       onChange={onSalesStageChange}
                     />
-                  )}
-                  {type === 'development' && (
                     <Select
                       label="Estado"
                       placeholder={statusPlaceholder}
@@ -903,8 +896,6 @@ export function NewProjectPage() {
                         setEstadoExtraErrors({});
                       }}
                     />
-                  )}
-                  {type === 'development' && (
                     <Select
                       label="Etapa"
                       placeholder={phaseEnabled ? 'Sin definir' : 'Disponible al aprobar y activo'}
@@ -912,9 +903,8 @@ export function NewProjectPage() {
                       options={PHASE_OPTIONS}
                       {...register('phase', { setValueAs: emptyToUndefined })}
                     />
-                  )}
-                  <Select label="Prioridad" placeholder="Sin definir" options={PRIORITY_OPTIONS} {...register('priority', { setValueAs: emptyToUndefined })} />
-                </div>
+                  </div>
+                )}
 
                 <div className={styles.row}>
                   <Select

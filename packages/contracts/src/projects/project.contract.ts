@@ -785,7 +785,7 @@ export const listProjectsQuerySchema = paginationQuerySchema.extend({
   assignedToUserId: uuidSchema.optional(),
   /** Filtra a los proyectos con al menos un miembro de este equipo asignado. Acepta id o slug — ver `clientId`. */
   teamId: z.string().optional(),
-  sortField: projectSortFieldSchema.default('priority'),
+  sortField: projectSortFieldSchema.default('createdAt'),
   sortDirection: sortDirectionSchema.default('desc'),
 });
 export type ListProjectsQuery = z.infer<typeof listProjectsQuerySchema>;
