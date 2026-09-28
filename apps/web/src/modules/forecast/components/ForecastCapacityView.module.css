@@ -1,74 +1,138 @@
+/* Forecast (solo lectura) — Figma "PANTALLA REFERENCIA FORECAST"
+   (fileKey Sqc5DJtmbLtnBhAM0y4Fww, node 9449:21787). */
+
 .page {
   display: flex;
   flex-direction: column;
-  gap: var(--kora-space-4);
+  gap: var(--kora-space-8);
   width: 100%;
+}
+
+.header {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.periodField {
+  width: 266px;
 }
 
 .kpis {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: var(--kora-space-4);
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--kora-space-6);
 }
 
-.kpiCard {
-  display: flex;
-  flex-direction: column;
-  gap: var(--kora-space-1);
+.section {
+  gap: var(--kora-space-6);
+  padding: var(--kora-space-6);
+  border-radius: 12px;
 }
 
-.kpiLabel {
-  font-size: var(--kora-text-sm);
-  color: var(--kora-text-muted);
-  font-weight: var(--kora-weight-medium);
-}
-
-.kpiValue {
-  font-size: var(--kora-text-title);
+.sectionTitle {
+  text-align: center;
+  font-size: var(--kora-text-xl);
   font-weight: var(--kora-weight-bold);
+  line-height: 28px;
   color: var(--kora-navy);
 }
 
-.kpiValueWarning {
-  color: var(--kora-warning-strong);
+.banner {
+  padding: var(--kora-space-4) var(--kora-space-4) var(--kora-space-4) var(--kora-space-5);
+  border-radius: var(--kora-radius);
+  border-left: 4px solid var(--kora-lime);
+  background: var(--kora-lime-surface);
+  font-size: var(--kora-text-lg);
+  font-weight: var(--kora-weight-semibold);
+  color: var(--kora-navy);
 }
 
-.toolbar {
+.banner strong {
+  font-size: var(--kora-text-2xl);
+}
+
+.searchRow {
   display: flex;
-  align-items: flex-end;
-  gap: var(--kora-space-3);
-  flex-wrap: wrap;
-}
-
-.periodField {
-  min-width: 220px;
+  justify-content: flex-end;
 }
 
 .search {
-  max-width: 480px;
-  flex: 1;
-  min-width: 220px;
+  width: 317px;
+  max-width: 100%;
 }
 
-.sortGroup {
+.chips {
   display: flex;
-  align-items: flex-end;
-  gap: var(--kora-space-2);
-  margin-left: auto;
+  flex-wrap: wrap;
+  gap: var(--kora-space-2) var(--kora-space-4);
 }
 
-.sortField {
-  min-width: 180px;
+.chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--kora-space-2);
+  border-radius: var(--kora-radius);
+  font-size: var(--kora-text-base);
+  font-weight: var(--kora-weight-medium);
+  line-height: 24px;
+  color: var(--kora-navy);
+  white-space: nowrap;
 }
 
-.empty {
-  color: var(--kora-text-disabled);
-  font-size: var(--kora-text-sm);
+.chipProject {
+  background: var(--kora-blue-300);
 }
 
-.cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  align-items: start;
+.chipNonProject {
+  background: var(--kora-gold);
+}
+
+.chipUnassigned {
+  background: var(--kora-badge-warning-bg);
+  color: var(--kora-badge-warning-text);
+}
+
+.chipOver {
+  background: var(--kora-orange);
+}
+
+.load {
+  display: flex;
+  align-items: center;
   gap: var(--kora-space-3);
+}
+
+.track {
+  flex: 1;
+  max-width: 192px;
+  height: 12px;
+  border-radius: var(--kora-radius-pill);
+  background: var(--kora-surface-disabled);
+  overflow: hidden;
+}
+
+.fill {
+  height: 100%;
+  border-radius: var(--kora-radius-pill);
+  transition: width 0.3s ease;
+}
+
+.fillFull {
+  background: var(--kora-lime-mid);
+}
+
+.fillPartial {
+  background: var(--kora-yellow);
+}
+
+.fillOver {
+  background: var(--kora-warning);
+}
+
+.loadValue {
+  min-width: 44px;
+  font-size: var(--kora-text-base);
+  font-weight: var(--kora-weight-medium);
+  color: var(--kora-navy);
+  font-variant-numeric: tabular-nums;
 }

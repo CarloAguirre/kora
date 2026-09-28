@@ -24,9 +24,17 @@
 }
 
 .label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kora-space-2);
   font-size: var(--kora-text-sm);
   font-weight: var(--kora-weight-medium);
   color: var(--kora-text-muted);
+}
+
+.icon {
+  display: inline-flex;
+  flex-shrink: 0;
 }
 
 .value {
@@ -35,11 +43,25 @@
   color: var(--kora-navy);
 }
 
-.value.warning {
+.valueLg {
+  font-size: 36px;
+  line-height: 40px;
+  letter-spacing: -0.5px;
+}
+
+.info {
+  color: var(--kora-cyan);
+}
+
+.success {
+  color: var(--kora-lime-mid);
+}
+
+.warning {
   color: var(--kora-warning);
 }
 
-.value.danger {
+.danger {
   color: var(--kora-danger);
 }
 

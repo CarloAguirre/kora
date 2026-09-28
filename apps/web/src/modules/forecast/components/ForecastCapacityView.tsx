@@ -1,26 +1,75 @@
 import { useMemo, useState } from 'react';
+import { FORECAST_ASSIGNMENT_TYPE_LABELS, type ForecastCapacityItem, type ForecastCapacityMember } from '@kora/contracts';
 import styles from './ForecastCapacityView.module.css';
 import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Card } from '@/shared/components/ui/Card';
-import { Select } from '@/shared/components/ui/Select';
+import { KpiCard } from '@/shared/components/ui/KpiCard';
 import { TextField } from '@/shared/components/ui/TextField';
-import { Button } from '@/shared/components/ui/Button';
 import { Pagination } from '@/shared/components/ui/Pagination';
 import { WeekRangePicker } from '@/shared/components/ui/WeekRangePicker';
-import { SearchIcon, ArrowUpDownIcon } from '@/shared/components/icons/Icons';
-import type { SortState } from '@/shared/components/ui/DataTable';
+import { DataTable, type Column, type SortState } from '@/shared/components/ui/DataTable';
+import { SearchIcon, TriangleAlertIcon } from '@/shared/components/icons/Icons';
 import { useForecastCapacity } from '../api/forecast.queries';
 import { currentLaborWeek } from '../lib/labor-weeks';
-import { ForecastCapacityCard } from './ForecastCapacityCard';
 
 const PAGE_SIZE = 20;
 type SortField = 'fullName' | 'teamName' | 'assignedHours' | 'loadPercent';
 
-const SORT_OPTIONS: { value: SortField; label: string }[] = [
-  { value: 'fullName', label: 'Nombre' },
-  { value: 'teamName', label: 'Equipo' },
-  { value: 'loadPercent', label: 'Carga' },
-  { value: 'assignedHours', label: 'HH asignadas' },
+/** Tiempo que no es de proyecto ni soporte — en el Figma, "Capacitación" va en dorado. */
+const NON_PROJECT_TYPES = new Set<ForecastCapacityItem['type']>(['vacation', 'admin_day', 'day_off', 'sick_leave', 'training', 'other']);
+
+function itemLabel(item: ForecastCapacityItem): string {
+  return item.projectName ?? FORECAST_ASSIGNMENT_TYPE_LABELS[item.type];
+}
+
+function loadTone(member: ForecastCapacityMember): 'full' | 'partial' | 'over' {
+  if (member.assignedHours > member.capacityHours) return 'over';
+  return member.assignedHours === member.capacityHours ? 'full' : 'partial';
+}
+
+function ProjectChips({ member }: { member: ForecastCapacityMember }) {
+  const tone = loadTone(member);
+  const unassigned = Math.max(0, member.capacityHours - member.assignedHours);
+
+  return (
+    <div className={styles.chips}>
+      {member.items.map((item, index) => {
+        const chipClass = tone === 'over' ? styles.chipOver : NON_PROJECT_TYPES.has(item.type) ? styles.chipNonProject : styles.chipProject;
+        return (
+          <span
+            key={`${item.type}-${item.projectId ?? index}`}
+            className={[styles.chip, chipClass].join(' ')}
+            title={item.comments.join(' · ') || undefined}
+          >
+            {itemLabel(item)}: {item.hours}hh
+          </span>
+        );
+      })}
+      {unassigned > 0 && <span className={[styles.chip, styles.chipUnassigned].join(' ')}>Sin asignación: {unassigned}hh</span>}
+    </div>
+  );
+}
+
+function LoadBar({ member }: { member: ForecastCapacityMember }) {
+  const tone = loadTone(member);
+  const width = Math.min(100, Math.max(0, member.loadPercent));
+  const fillClass = tone === 'over' ? styles.fillOver : tone === 'full' ? styles.fillFull : styles.fillPartial;
+
+  return (
+    <div className={styles.load}>
+      <div className={styles.track}>
+        <div className={[styles.fill, fillClass].join(' ')} style={{ width: `${width}%` }} />
+      </div>
+      <span className={styles.loadValue}>{member.loadPercent}%</span>
+    </div>
+  );
+}
+
+const COLUMNS: ReadonlyArray<Column<ForecastCapacityMember>> = [
+  { key: 'fullName', header: 'Colaborador', sortable: true, width: '160px', render: (member) => member.fullName },
+  { key: 'teamName', header: 'Equipo', sortable: true, width: '120px', render: (member) => member.teamName },
+  { key: 'assignedHours', header: 'Proyectos/HH', sortable: true, render: (member) => <ProjectChips member={member} /> },
+  { key: 'loadPercent', header: 'Carga', sortable: true, width: '280px', render: (member) => <LoadBar member={member} /> },
 ];
 
 /**
@@ -28,7 +77,8 @@ const SORT_OPTIONS: { value: SortField; label: string }[] = [
  * admin, PMO y líderes sin equipo propio. Reemplaza el RPC
  * `get_forecast_capacity_view` + la agregación en el cliente
  * (`buildColaboradores`) por una respuesta ya agregada en el backend — ver
- * docs/DECISION-M6-FORECAST.md.
+ * docs/DECISION-M6-FORECAST.md. Disposición según el Figma "PANTALLA
+ * REFERENCIA FORECAST" (node 9449:21787).
  */
 export function ForecastCapacityView() {
   const [period, setPeriod] = useState(() => currentLaborWeek());
@@ -68,39 +118,35 @@ export function ForecastCapacityView() {
 
   const kpis = useMemo(() => {
     const members = data?.members ?? [];
-    const totalMembers = members.length;
-    const unassigned = members.filter((member) => member.assignedHours < member.capacityHours).length;
+    const teamCount = new Set(members.map((member) => member.teamId)).size;
+    const underAssigned = members.filter((member) => member.assignedHours < member.capacityHours);
+    const unassignedHours = underAssigned.reduce((sum, member) => sum + (member.capacityHours - member.assignedHours), 0);
     const totalCapacity = members.reduce((sum, member) => sum + member.capacityHours, 0);
     const totalAssigned = members.reduce((sum, member) => sum + member.assignedHours, 0);
     const availability = totalCapacity > 0 ? Math.round(((totalCapacity - totalAssigned) / totalCapacity) * 100) : 0;
-    return { totalMembers, unassigned, availability };
+    return {
+      totalMembers: members.length,
+      teamCount,
+      underAssigned: underAssigned.length,
+      unassignedHours,
+      totalCapacity,
+      availability,
+    };
   }, [data]);
+
+  const handleSortChange = (field: string) => {
+    setSort((prev) => ({
+      field: field as SortField,
+      direction: prev.field === field && prev.direction === 'asc' ? 'desc' : 'asc',
+    }));
+    setPage(1);
+  };
 
   return (
     <DashboardLayout title="Forecast">
       <div className={styles.page}>
-        <div className={styles.kpis}>
-          <Card>
-            <div className={styles.kpiCard}>
-              <span className={styles.kpiLabel}>Total colaboradores</span>
-              <span className={styles.kpiValue}>{kpis.totalMembers}</span>
-            </div>
-          </Card>
-          <Card>
-            <div className={styles.kpiCard}>
-              <span className={styles.kpiLabel}>Sin asignación completa</span>
-              <span className={[styles.kpiValue, styles.kpiValueWarning].join(' ')}>{kpis.unassigned}</span>
-            </div>
-          </Card>
-          <Card>
-            <div className={styles.kpiCard}>
-              <span className={styles.kpiLabel}>Disponibilidad</span>
-              <span className={styles.kpiValue}>{kpis.availability}%</span>
-            </div>
-          </Card>
-        </div>
-
-        <div className={styles.toolbar}>
+        {/* El título "Forecast" del Figma ya lo pinta la TopBar; aquí solo queda el período. */}
+        <div className={styles.header}>
           <WeekRangePicker
             className={styles.periodField}
             periodStart={period.periodStart}
@@ -110,52 +156,69 @@ export function ForecastCapacityView() {
               setPage(1);
             }}
           />
+        </div>
 
-          <TextField
-            className={styles.search}
-            label="Buscar"
-            type="search"
-            placeholder="Colaborador, equipo o proyecto"
-            value={search}
-            onChange={(event) => {
-              setSearch(event.target.value);
-              setPage(1);
-            }}
-            iconLeft={<SearchIcon size={16} />}
+        <div className={styles.kpis}>
+          <KpiCard
+            size="lg"
+            tone="info"
+            label="Total colaboradores"
+            value={kpis.totalMembers}
+            sub={`En ${kpis.teamCount} ${kpis.teamCount === 1 ? 'equipo' : 'equipos'}`}
+          />
+          <KpiCard
+            size="lg"
+            tone="danger"
+            icon={<TriangleAlertIcon size={14} />}
+            label="Sin asignación"
+            value={kpis.underAssigned}
+            sub={`${kpis.unassignedHours} hrs. sin asignar en el período`}
+          />
+          <KpiCard
+            size="lg"
+            tone="success"
+            label="Disponibilidad"
+            value={`${kpis.availability}%`}
+            sub={`De ${kpis.totalCapacity} hrs. de capacidad total`}
+          />
+        </div>
+
+        <Card className={styles.section}>
+          <h3 className={styles.sectionTitle}>Capacidad y Planificación</h3>
+
+          <div className={styles.banner}>
+            Disponibilidad global del equipo durante el período: <strong>{kpis.unassignedHours} horas libres</strong>
+          </div>
+
+          <div className={styles.searchRow}>
+            <TextField
+              className={styles.search}
+              aria-label="Buscar por nombre, equipo, proyecto"
+              type="search"
+              placeholder="Buscar por nombre, equipo, proyecto"
+              value={search}
+              onChange={(event) => {
+                setSearch(event.target.value);
+                setPage(1);
+              }}
+              iconRight={<SearchIcon size={16} />}
+            />
+          </div>
+
+          <DataTable
+            caption="Capacidad por colaborador"
+            columns={COLUMNS}
+            items={pageItems}
+            getRowKey={(member) => member.teamMemberId}
+            loading={isLoading}
+            error={error ? 'No se pudo cargar el forecast.' : null}
+            emptyMessage="No hay colaboradores que coincidan con la búsqueda."
+            sort={sort}
+            onSortChange={handleSortChange}
           />
 
-          <div className={styles.sortGroup}>
-            <Select
-              className={styles.sortField}
-              label="Ordenar por"
-              options={SORT_OPTIONS}
-              value={sort.field}
-              onChange={(event) => setSort((prev) => ({ field: event.target.value as SortField, direction: prev.direction }))}
-            />
-            <Button
-              variant="outline"
-              size="icon"
-              aria-label={sort.direction === 'asc' ? 'Cambiar a orden descendente' : 'Cambiar a orden ascendente'}
-              onClick={() => setSort((prev) => ({ ...prev, direction: prev.direction === 'asc' ? 'desc' : 'asc' }))}
-            >
-              <ArrowUpDownIcon size={16} />
-            </Button>
-          </div>
-        </div>
-
-        {isLoading && <p className={styles.empty}>Cargando…</p>}
-        {error && <p className={styles.empty}>No se pudo cargar el forecast.</p>}
-        {!isLoading && !error && pageItems.length === 0 && (
-          <p className={styles.empty}>No hay colaboradores que coincidan con la búsqueda.</p>
-        )}
-
-        <div className={styles.cards}>
-          {pageItems.map((member) => (
-            <ForecastCapacityCard key={member.teamMemberId} member={member} />
-          ))}
-        </div>
-
-        <Pagination page={page} pageCount={pageCount} total={total} pageSize={PAGE_SIZE} onPageChange={setPage} />
+          <Pagination page={page} pageCount={pageCount} total={total} pageSize={PAGE_SIZE} onPageChange={setPage} />
+        </Card>
       </div>
     </DashboardLayout>
   );

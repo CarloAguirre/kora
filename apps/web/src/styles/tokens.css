@@ -30,6 +30,13 @@
   --kora-blue-surface-alt: #ecf5ff;
   --kora-blue-surface-soft: #eaf4ff;
   --kora-blue-link: #155dfc;
+  --kora-blue-300: #9dbbdf;
+  --kora-cyan: #23abc1;
+
+  /* ── Carga de Forecast (Figma "PANTALLA REFERENCIA FORECAST", node 9449:21787) ── */
+  --kora-yellow: #ffc805;
+  --kora-orange: #f1863e;
+  --kora-gold: #f6c65b;
 
   /* ── Neutros ─────────────────────────────────────────────────────────── */
   --kora-text: #122235;
