@@ -164,8 +164,12 @@ const ESTADO_DEFAULT_BY_TIPO: Record<ProjectTipo, ProjectStatus> = {
   finalizado: 'finished',
 };
 
+/** Antes de Aprobado, `draft` es "sin estado" y se muestra "—" (prototipo: `estadosDisponibles()` → ['—','Detenido']); "No iniciado" solo existe desde Aprobado. */
+const SIN_ESTADO_LABEL = '—';
+
 function estadoLabel(tipo: ProjectTipo, status: ProjectStatus, currentStatus: ProjectStatus): string {
   if (status === 'active' && tipo === 'aprobado' && currentStatus === 'draft') return 'Activo (activación manual)';
+  if (status === 'draft' && (tipo === 'prospecto' || tipo === 'cotizacion')) return SIN_ESTADO_LABEL;
   return PROJECT_STATUS_LABELS[status];
 }
 

@@ -189,6 +189,21 @@ describe('EditProjectDialog', () => {
     expect(screen.getByLabelText('Responsable comercial')).toBeInTheDocument();
   });
 
+  it.each(['prospect', 'quoted'] as const)('en %s el Estado solo ofrece "—" (sin estado) y Detenido, sin "No iniciado"', (salesStage) => {
+    renderDialog({
+      open: true,
+      project: buildProject({ salesStage, status: 'draft', phase: null }),
+      onClose: vi.fn(),
+      onSuccess: vi.fn(),
+      canReassignLeader: true,
+    });
+
+    const estado = screen.getByLabelText('Estado') as HTMLSelectElement;
+    const labels = Array.from(estado.options).map((option) => option.textContent);
+    expect(labels).toEqual(['—', 'Detenido']);
+    expect(estado).toHaveValue('draft');
+  });
+
   it('muestra los campos de desarrollo (etapa, avance) y no los de soporte', () => {
     renderDialog({ open: true, project: buildProject({ type: 'development' }), onClose: vi.fn(), onSuccess: vi.fn(), canReassignLeader: true });
 
