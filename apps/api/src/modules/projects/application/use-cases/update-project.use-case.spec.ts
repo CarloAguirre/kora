@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { UpdateProjectUseCase } from './update-project.use-case';
 import { Project } from '../../domain/entities/project.entity';
-import { CannotReassignProjectLeaderError } from '../../domain/errors/project.errors';
+import { CannotReassignProjectLeaderError, SoldHoursLockedAfterHito0Error } from '../../domain/errors/project.errors';
 import type { ProjectRepository } from '../../domain/repositories/project.repository';
 import type { ProjectTeamRepository } from '../../domain/repositories/project-team.repository';
 import type { ProjectClientReader } from '../ports/project-client-reader.port';
@@ -25,8 +25,7 @@ function buildProject(leaderUserId: string | null) {
   }).unwrap();
 }
 
-function buildUseCase(leaderUserId: string | null) {
-  const project = buildProject(leaderUserId);
+function buildUseCase(leaderUserId: string | null, project: Project = buildProject(leaderUserId)) {
   const projects = {
     findById: vi.fn().mockResolvedValue(project),
     nameIsTakenByAnother: vi.fn().mockResolvedValue(false),
@@ -144,5 +143,51 @@ describe('UpdateProjectUseCase — primaryContactId', () => {
 
     const saved = (projects.save as ReturnType<typeof vi.fn>).mock.calls[0]![0] as Project;
     expect(saved.toSnapshot().primaryContactId).toBeNull();
+  });
+});
+
+/** Desde el Hito 0 corren las horas vendidas: quedan fijas aunque el proyecto después se detenga o finalice. */
+describe('UpdateProjectUseCase — HH vendidas tras el Hito 0', () => {
+  const PMO = { actor: { userId: 'pmo-1', email: 'pmo@kabeli.cl' }, actorPermissions: ['projects:manage'] as const };
+
+  function activatedProject() {
+    const project = Project.create({
+      id: 'project-1',
+      name: 'Proyecto de prueba',
+      slug: 'proyecto-de-prueba',
+      type: 'development',
+      salesStage: 'approved',
+      soldHours: 1000,
+      now: NOW,
+    }).unwrap();
+    project.activateFromHito0(NOW, 'manual', 'Contrato firmado');
+    return project;
+  }
+
+  it('rechaza cambiar las HH vendidas de un proyecto con Hito 0', async () => {
+    const { useCase, projects } = buildUseCase(null, activatedProject());
+
+    const result = await useCase.execute({ projectId: 'project-1', data: { soldHours: 1200 }, ...PMO });
+
+    expect(result.isErr() && result.error).toBeInstanceOf(SoldHoursLockedAfterHito0Error);
+    expect(projects.save).not.toHaveBeenCalled();
+  });
+
+  it('permite reenviar las mismas HH vendidas sin cambiarlas', async () => {
+    const { useCase } = buildUseCase(null, activatedProject());
+
+    const result = await useCase.execute({ projectId: 'project-1', data: { soldHours: 1000, name: 'Otro nombre' }, ...PMO });
+
+    expect(result.isOk()).toBe(true);
+  });
+
+  it('permite cambiar las HH vendidas antes del Hito 0', async () => {
+    const { useCase, projects } = buildUseCase(null);
+
+    const result = await useCase.execute({ projectId: 'project-1', data: { soldHours: 1200 }, ...PMO });
+
+    expect(result.isOk()).toBe(true);
+    const saved = (projects.save as ReturnType<typeof vi.fn>).mock.calls[0]![0] as Project;
+    expect(saved.toSnapshot().soldHours).toBe(1200);
   });
 });

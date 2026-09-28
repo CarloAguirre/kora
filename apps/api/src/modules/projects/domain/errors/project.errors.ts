@@ -178,6 +178,19 @@ export class CannotReassignProjectLeaderError extends ForbiddenError {
   }
 }
 
+/**
+ * Desde el Hito 0 corren las horas vendidas: quedan fijas aunque el proyecto después se detenga o
+ * finalice. Ver `UpdateProjectUseCase`.
+ */
+export class SoldHoursLockedAfterHito0Error extends ConflictError {
+  constructor() {
+    super(
+      'Las HH vendidas no se pueden modificar desde que el proyecto se activó (Hito 0).',
+      'PROJECT_SOLD_HOURS_LOCKED',
+    );
+  }
+}
+
 export class ProjectPaymentMilestoneNotFoundError extends NotFoundError {
   constructor(identifier: string) {
     super('Tramo de pago', identifier, 'PROJECT_PAYMENT_MILESTONE_NOT_FOUND');

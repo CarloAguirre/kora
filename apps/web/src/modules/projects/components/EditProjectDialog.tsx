@@ -460,6 +460,12 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, canReassi
   const totalTeamHours = teamsValue.reduce((sum, team) => sum + (Number(team.assignedHours) || 0), 0);
   /** Hito 0 manual: activar a mano (sin factura) un proyecto Aprobado que seguía "No iniciado" — exige motivo (ver `ChangeProjectStatusUseCase`). */
   const isManualHito0 = isDevelopment && tipo === 'aprobado' && project.status === 'draft' && estado === 'active';
+  /** Con Hito 0 registrado (el proyecto ya se activó, aunque después se haya detenido o finalizado) las HH vendidas quedan fijas. */
+  const soldHoursLocked = isDevelopment && project.hito0At != null;
+  /** En Prospecto la estimación aún no se completa: fechas y horas se ingresan al pasar a Cotización (prototipo: `renderEstimacion()`). */
+  const estimationDisabled = isDevelopment && tipo === 'prospecto';
+  /** Antes de Aprobado son horas estimadas para la cotización; al aprobarse quedan como horas vendidas. */
+  const hoursLabel = isDevelopment && (tipo === 'prospecto' || tipo === 'cotizacion') ? 'HH estimadas' : 'HH vendidas';
 
   const handleTipoChange = (nextTipo: ProjectTipo) => {
     setTipo(nextTipo);
@@ -612,12 +618,14 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, canReassi
                 {...register('phase', { setValueAs: emptyToNull })}
               />
             )}
-            <Select
-              label="Prioridad"
-              placeholder="Sin definir"
-              options={PRIORITY_OPTIONS}
-              {...register('priority', { setValueAs: emptyToNull })}
-            />
+            {!isDevelopment && (
+              <Select
+                label="Prioridad"
+                placeholder="Sin definir"
+                options={PRIORITY_OPTIONS}
+                {...register('priority', { setValueAs: emptyToNull })}
+              />
+            )}
           </div>
         </div>
 
@@ -670,42 +678,41 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, canReassi
 
         <div className={styles.section}>
           <h3 className={styles.sectionTitle}>Fechas y horas</h3>
+          {estimationDisabled && (
+            <p className={styles.hint}>
+              En Prospecto la estimación aún no se completa. Las fechas y horas estimadas se ingresan cuando el
+              proyecto pasa a Cotización.
+            </p>
+          )}
           <div className={styles.row3}>
-            <TextField label="Fecha de inicio" type="date" {...register('startDate', { setValueAs: emptyToNull })} />
-            <TextField label="Fecha de fin" type="date" {...register('endDate', { setValueAs: emptyToNull })} />
-            {isDevelopment && (
-              <TextField
-                label="Fecha estimada de entrega"
-                type="date"
-                {...register('estimatedDeliveryDate', { setValueAs: emptyToNull })}
-              />
-            )}
+            <TextField
+              label="Fecha de inicio"
+              type="date"
+              disabled={estimationDisabled}
+              {...register('startDate', { setValueAs: emptyToNull })}
+            />
+            <TextField
+              label="Fecha de fin"
+              type="date"
+              disabled={estimationDisabled}
+              {...register('endDate', { setValueAs: emptyToNull })}
+            />
+            <TextField
+              label={hoursLabel}
+              type="number"
+              min={0}
+              // Desde el Hito 0 corren las horas vendidas: quedan fijas (`SoldHoursLockedAfterHito0Error`).
+              // Deshabilitado, react-hook-form no lo envía y `UpdateProjectUseCase` no toca `soldHours`.
+              disabled={soldHoursLocked || estimationDisabled}
+              helperText={soldHoursLocked ? 'No editable desde que el proyecto se activó (Hito 0).' : undefined}
+              errorText={errors.soldHours?.message}
+              {...register('soldHours')}
+            />
           </div>
 
-          <div className={styles.row3}>
-            <TextField label="HH vendidas" type="number" min={0} errorText={errors.soldHours?.message} {...register('soldHours')} />
-            {isDevelopment && (
-              <>
-                <TextField
-                  label="Avance real (%)"
-                  type="number"
-                  min={0}
-                  max={100}
-                  {...register('actualProgress', { setValueAs: (v) => (v === '' ? null : Number(v)) })}
-                />
-                <TextField
-                  label="Avance esperado (%)"
-                  type="number"
-                  min={0}
-                  max={100}
-                  {...register('expectedProgress', { setValueAs: (v) => (v === '' ? null : Number(v)) })}
-                />
-              </>
-            )}
-            {!isDevelopment && (
-              <TextField label="Horas de soporte" type="number" min={0} {...register('supportHours')} />
-            )}
-          </div>
+          {!isDevelopment && (
+            <TextField label="Horas de soporte" type="number" min={0} {...register('supportHours')} />
+          )}
 
           {!isDevelopment && (
             <TextField

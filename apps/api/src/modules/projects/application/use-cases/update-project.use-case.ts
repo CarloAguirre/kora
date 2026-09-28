@@ -16,6 +16,7 @@ import {
   ProjectNameAlreadyInUseError,
   ProjectNotFoundError,
   ReferencedClientNotFoundError,
+  SoldHoursLockedAfterHito0Error,
 } from '../../domain/errors/project.errors';
 import { PROJECT_REPOSITORY, type ProjectRepository } from '../../domain/repositories/project.repository';
 import { PROJECT_TEAM_REPOSITORY, type ProjectTeamRepository } from '../../domain/repositories/project-team.repository';
@@ -70,6 +71,11 @@ export class UpdateProjectUseCase implements UseCase<UpdateProjectCommand, void,
      */
     if (!hasFullManage && data.leaderUserId !== undefined && data.leaderUserId !== project.leaderUserId) {
       return err(new CannotReassignProjectLeaderError());
+    }
+
+    /** Mismo criterio no-op que `leaderUserId`: reenviar el mismo valor sin tocarlo se deja pasar. */
+    if (project.hito0At && data.soldHours !== undefined && data.soldHours !== project.toSnapshot().soldHours) {
+      return err(new SoldHoursLockedAfterHito0Error());
     }
 
     if (data.clientId !== undefined && data.clientId !== null) {
