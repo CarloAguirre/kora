@@ -1,11 +1,17 @@
-import type {
-  ProjectDetail,
-  ProjectModule,
-  ProjectModuleDelivery,
-  ProjectModuleTask,
-  ProjectObservation,
+import {
+  PROJECT_MODULE_DELIVERY_STATUS_LABELS,
+  type HourEntryStatus,
+  type HourEntrySummary,
+  type ProjectDetail,
+  type ProjectModule,
+  type ProjectModuleDelivery,
+  type ProjectModuleDeliveryStatus,
+  type ProjectModuleTask,
+  type ProjectObservation,
 } from '@kora/contracts';
 import { getTeamStyle } from '@/modules/projects/utils/team-style';
+import { toBitacoraRows, type BitacoraRow } from '@/modules/projects/lib/bitacora-row';
+import { entryTitle, EVENT_STATUS_LABEL } from '@/modules/projects/lib/hour-entry-log';
 import type {
   ClientBitacoraEntry,
   ClientBitacoraEntryKind,
@@ -143,6 +149,58 @@ function toBitacoraEntry(observation: ProjectObservation, moduleBadgeByModuleId:
     statusLabel: OBSERVATION_STATUS_LABELS[status] ?? 'Registrado',
     statusTone: OBSERVATION_STATUS_TONES[status] ?? 'info',
   };
+}
+
+const EVENT_STATUS_TONES: Record<HourEntryStatus, ClientBitacoraStatusTone> = {
+  approved: 'success',
+  pending: 'warning',
+  rejected: 'danger',
+};
+
+const DELIVERY_STATUS_TONES: Record<ProjectModuleDeliveryStatus, ClientBitacoraStatusTone> = {
+  planned: 'warning',
+  delivered: 'info',
+  approved: 'success',
+};
+
+function phaseTagFor(moduleId: string | null | undefined, moduleName: string | null | undefined, moduleBadgeByModuleId: ReadonlyMap<string, string>): string | null {
+  return moduleId && moduleName ? `${moduleBadgeByModuleId.get(moduleId) ?? ''} - ${moduleName}` : null;
+}
+
+/** Misma fila que la Bitácora interna (`toBitacoraRows`: horas registradas + registros manuales + entregas de fase), en la forma del feed del portal. */
+function rowToBitacoraEntry(row: BitacoraRow, moduleBadgeByModuleId: ReadonlyMap<string, string>): ClientBitacoraEntry {
+  if (row.kind === 'evento') {
+    const { entry } = row;
+    const description = [entry.description, entry.hasBlocker ? `Bloqueo: ${entry.blockerDescription ?? 'sin detalle'}` : null]
+      .filter(Boolean)
+      .join(' — ');
+    return {
+      id: entry.id,
+      kind: entry.hasBlocker ? 'attention' : 'marked',
+      title: entryTitle(entry),
+      registeredByName: entry.user.fullName,
+      registeredAt: `${formatDMY(entry.date)}, ${formatTimeOfDay(entry.createdAt)}`,
+      phaseTag: phaseTagFor(entry.module?.id, entry.module?.name, moduleBadgeByModuleId),
+      description,
+      statusLabel: EVENT_STATUS_LABEL[entry.status],
+      statusTone: EVENT_STATUS_TONES[entry.status],
+    };
+  }
+  if (row.kind === 'entrega') {
+    const { delivery } = row;
+    return {
+      id: delivery.id,
+      kind: delivery.status === 'planned' ? 'pending' : 'completed',
+      title: `Entrega de fase: ${row.moduleName}`,
+      registeredByName: delivery.teamName ?? '—',
+      registeredAt: formatDMY(delivery.estimatedDate),
+      phaseTag: phaseTagFor(row.moduleId, row.moduleName, moduleBadgeByModuleId),
+      description: deliveryLabel(delivery),
+      statusLabel: PROJECT_MODULE_DELIVERY_STATUS_LABELS[delivery.status],
+      statusTone: DELIVERY_STATUS_TONES[delivery.status],
+    };
+  }
+  return toBitacoraEntry(row.observation, moduleBadgeByModuleId);
 }
 
 function toPhaseRoadmapPhase(
@@ -310,7 +368,7 @@ function tag(project: ProjectDetail): string {
   return teamNames.size > 0 ? [...teamNames].slice(0, 2).join('/') : '—';
 }
 
-export function toClientProjectDetail(project: ProjectDetail): ClientProjectDetail {
+export function toClientProjectDetail(project: ProjectDetail, hourEntries: readonly HourEntrySummary[] = []): ClientProjectDetail {
   const contactName = project.primaryContact?.name ?? '—';
   const contactPosition = project.primaryContact?.position ?? '';
   const usedHours = project.usedHours;
@@ -374,9 +432,11 @@ export function toClientProjectDetail(project: ProjectDetail): ClientProjectDeta
     billing: toBilling(project),
     roadmap: project.modules.map((module, index) => toRoadmapPhase(module, index)),
     phaseRoadmap: toPhaseRoadmap(project),
-    bitacora: project.observations
-      .filter((observation) => !observation.moduleId || moduleBadgeByModuleId.has(observation.moduleId))
-      .map((observation) => toBitacoraEntry(observation, moduleBadgeByModuleId)),
+    bitacora: toBitacoraRows(
+      hourEntries,
+      project.observations.filter((observation) => !observation.moduleId || moduleBadgeByModuleId.has(observation.moduleId)),
+      project.modules,
+    ).map((row) => rowToBitacoraEntry(row, moduleBadgeByModuleId)),
     accessLinks: {
       demo: project.demoLink,
       testEnvironment: project.testEnvironmentLink,

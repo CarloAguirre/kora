@@ -28,6 +28,7 @@ import {
   type IconProps,
 } from '@/shared/components/icons/Icons';
 import { useProjectDetail } from '@/modules/projects/api/projects.queries';
+import { useHourEntriesList } from '@/modules/hours/api/hours.queries';
 import { PhaseProgressBar } from '../components/PhaseProgressBar';
 import { PhaseRoadmap } from '../components/PhaseRoadmap';
 import { ProjectBillingCard } from '../components/ProjectBillingCard';
@@ -150,7 +151,12 @@ export function ClientProjectDetailPage({ projectIdOverride, backTo, backLabel }
   const navigate = useNavigate();
   const toast = useToast();
   const { data: projectDetail, isLoading, isError } = useProjectDetail(projectId);
-  const project = projectDetail ? toClientProjectDetail(projectDetail) : undefined;
+  /** Mismas horas que alimentan la Bitácora interna (`DevelopmentProjectDetailView`) — por id real, no por el slug de la ruta. */
+  const { data: projectHourEntries } = useHourEntriesList(
+    { projectId: projectDetail?.id, page: 1, pageSize: 20, sortField: 'date', sortDirection: 'desc' },
+    { enabled: Boolean(projectDetail?.id) },
+  );
+  const project = projectDetail ? toClientProjectDetail(projectDetail, projectHourEntries?.items ?? []) : undefined;
   const [visible, setVisible] = useState<Record<SectionKey, boolean>>(ALL_SECTIONS_VISIBLE);
   const resolvedBackTo = backTo ?? '/portal/proyectos';
 

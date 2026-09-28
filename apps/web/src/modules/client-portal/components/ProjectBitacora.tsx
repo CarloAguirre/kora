@@ -38,6 +38,7 @@ export function ProjectBitacora({ entries }: { entries: readonly ClientBitacoraE
 
   return (
     <div className={styles.card}>
+      {entries.length === 0 && <p className={styles.empty}>Aún no hay registros en la bitácora de este proyecto.</p>}
       {visibleEntries.map((entry) => (
         <BitacoraEntryRow key={entry.id} entry={entry} />
       ))}

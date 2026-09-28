@@ -11,6 +11,13 @@
     0px 10px 14px 0px rgba(15, 41, 66, 0.16);
 }
 
+.empty {
+  padding: 20px 0;
+  font-size: 13px;
+  color: #5d6b7a;
+  text-align: center;
+}
+
 .row {
   display: flex;
   align-items: flex-start;

@@ -10,12 +10,13 @@ import type {
 } from '@kora/contracts';
 import { hourKeys, hoursApi } from './hours.api';
 
-export function useHourEntriesList(query: Partial<ListHourEntriesQuery>) {
+export function useHourEntriesList(query: Partial<ListHourEntriesQuery>, options: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: hourKeys.list(query),
     queryFn: () => hoursApi.list(query),
     placeholderData: (previous) => previous,
     staleTime: 15_000,
+    enabled: options.enabled ?? true,
   });
 }
 
