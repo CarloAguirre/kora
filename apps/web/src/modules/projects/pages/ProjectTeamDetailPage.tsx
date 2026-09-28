@@ -30,14 +30,16 @@ export function ProjectTeamDetailPage() {
     );
   }
 
-  const teamName = project.teams.find((t) => t.teamId === teamId)?.teamName ?? 'Equipo';
+  /** `projectTeamPath` arma la URL con el slug del equipo; la vista trabaja con el UUID. */
+  const teamRow = project.teams.find((t) => t.teamId === teamId || t.teamSlug === teamId);
+  const teamName = teamRow?.teamName ?? 'Equipo';
 
   return (
     <DashboardLayout title={`${teamName} — ${project.name}`}>
       <Button variant="tertiary" size="sm" onClick={() => void navigate(projectPath(project))}>
         <ChevronLeftIcon size={16} /> Volver al proyecto
       </Button>
-      <TeamLeaderProjectView project={project} projectId={projectId} teamId={teamId} />
+      <TeamLeaderProjectView project={project} projectId={projectId} teamId={teamRow?.teamId ?? teamId} />
     </DashboardLayout>
   );
 }

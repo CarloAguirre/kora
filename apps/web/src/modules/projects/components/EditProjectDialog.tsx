@@ -483,6 +483,10 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, canReassi
 
   const onSubmit = handleSubmit(async (values) => {
     setServerError(null);
+    if (isDevelopment && !values.commercialManagerUserId) {
+      setError('commercialManagerUserId', { message: 'Selecciona el responsable comercial.' });
+      return;
+    }
     if (isManualHito0 && !manualActivationReason.trim()) {
       setServerError('Escribe el motivo o la referencia de la activación (ej. contrato firmado, orden de compra).');
       return;
@@ -574,17 +578,17 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, canReassi
               // form hace su `reset()` inicial, un `<select>` no controlado se queda pegado en el
               // placeholder aunque el proyecto sí tenga líder — el valor real vive en el form, la opción
               // simplemente no existía todavía en el DOM. Controlado, React la selecciona apenas aparece.
-              // Controlado (no `register` directo): si la lista de líderes todavía no cargó cuando el
-              // form hace su `reset()` inicial, un `<select>` no controlado se queda pegado en el
-              // placeholder aunque el proyecto sí tenga líder — el valor real vive en el form, la opción
-              // simplemente no existía todavía en el DOM. Controlado, React la selecciona apenas aparece.
               value={leaderUserId}
               onChange={(event) => setValue('leaderUserId', event.target.value || null, { shouldValidate: true })}
             />
-            {isDevelopment && (tipo === 'prospecto' || tipo === 'cotizacion') && (
+            {/* Prototipo `kora-editar-proyecto.html`: visible y obligatorio en todos los tipos, no solo Prospecto/Cotización. */}
+            {isDevelopment && (
               <Select
                 label="Responsable comercial"
                 placeholder="Sin asignar"
+                required
+                helperText="Ejecutivo comercial de Kabeli a cargo de la cuenta."
+                errorText={errors.commercialManagerUserId?.message}
                 options={(commercialUsers?.items ?? []).map((user) => ({ value: user.id, label: user.fullName }))}
                 value={commercialManagerUserId}
                 onChange={(event) => setValue('commercialManagerUserId', event.target.value || null, { shouldValidate: true })}

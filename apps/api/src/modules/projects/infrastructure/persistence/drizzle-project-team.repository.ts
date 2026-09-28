@@ -42,6 +42,7 @@ export class DrizzleProjectTeamRepository implements ProjectTeamRepository {
       .select({
         id: projectTeams.id,
         teamId: projectTeams.teamId,
+        teamSlug: teams.slug,
         teamName: teams.name,
         leaderUserId: projectTeams.leaderUserId,
         leaderFirstName: users.firstName,
@@ -61,11 +62,12 @@ export class DrizzleProjectTeamRepository implements ProjectTeamRepository {
         ),
       )
       .where(eq(projectTeams.projectId, projectId))
-      .groupBy(projectTeams.id, teams.name, users.firstName, users.lastName);
+      .groupBy(projectTeams.id, teams.slug, teams.name, users.firstName, users.lastName);
 
     return rows.map((row) => ({
       id: row.id,
       teamId: row.teamId,
+      teamSlug: row.teamSlug,
       teamName: row.teamName,
       leaderUserId: row.leaderUserId,
       leaderName: row.leaderUserId ? `${row.leaderFirstName ?? ''} ${row.leaderLastName ?? ''}`.trim() : null,

@@ -171,10 +171,10 @@ describe('EditProjectDialog', () => {
     expect(screen.getByLabelText('Líder Kabeli a cargo')).toHaveValue('leader-1');
   });
 
-  it('no muestra "Responsable comercial" para un proyecto ya aprobado', () => {
+  it('muestra "Responsable comercial" también para un proyecto ya aprobado', () => {
     renderDialog({ open: true, project: buildProject(), onClose: vi.fn(), onSuccess: vi.fn(), canReassignLeader: true });
 
-    expect(screen.queryByLabelText('Responsable comercial')).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/Responsable comercial/)).toBeInTheDocument();
   });
 
   it('muestra "Responsable comercial" mientras el proyecto está en prospecto/cotización', () => {
@@ -186,7 +186,7 @@ describe('EditProjectDialog', () => {
       canReassignLeader: true,
     });
 
-    expect(screen.getByLabelText('Responsable comercial')).toBeInTheDocument();
+    expect(screen.getByLabelText(/Responsable comercial/)).toBeInTheDocument();
   });
 
   it.each(['prospect', 'quoted'] as const)('en %s el Estado solo ofrece "—" (sin estado) y Detenido, sin "No iniciado"', (salesStage) => {
@@ -229,7 +229,13 @@ describe('EditProjectDialog', () => {
   it('envía los cambios al guardar', async () => {
     const onSuccess = vi.fn();
     const user = userEvent.setup();
-    renderDialog({ open: true, project: buildProject(), onClose: vi.fn(), onSuccess, canReassignLeader: true });
+    renderDialog({
+      open: true,
+      project: buildProject({ commercialManager: { id: '22222222-2222-4222-8222-222222222222', fullName: 'Rodrigo Riveros' } }),
+      onClose: vi.fn(),
+      onSuccess,
+      canReassignLeader: true,
+    });
 
     const nameField = screen.getByLabelText(/Nombre del proyecto/);
     await user.clear(nameField);

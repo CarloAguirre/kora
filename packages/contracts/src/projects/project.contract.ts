@@ -94,6 +94,8 @@ export type ProjectTeamMember = z.infer<typeof projectTeamMemberSchema>;
 export const projectTeamSchema = z.object({
   id: uuidSchema,
   teamId: uuidSchema,
+  /** Slug del equipo — `projectTeamPath` lo usa en la URL, así que la ficha del equipo resuelve por id o slug. */
+  teamSlug: z.string(),
   teamName: z.string(),
   leader: z.object({ id: uuidSchema, fullName: z.string() }).nullable(),
   assignedHours: z.number().nullable(),

@@ -87,6 +87,7 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
   const teams: ProjectTeamDto[] = source.teams.map((team) => ({
     id: team.id,
     teamId: team.teamId,
+    teamSlug: team.teamSlug,
     teamName: team.teamName,
     leader: team.leaderUserId ? { id: team.leaderUserId, fullName: team.leaderName ?? '' } : null,
     assignedHours: team.assignedHours,

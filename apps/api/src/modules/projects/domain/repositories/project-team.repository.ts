@@ -19,6 +19,7 @@ export interface UpsertProjectTeamInput {
 export interface ProjectTeamRecord {
   readonly id: string;
   readonly teamId: string;
+  readonly teamSlug: string;
   readonly teamName: string;
   readonly leaderUserId: string | null;
   readonly leaderName: string | null;
