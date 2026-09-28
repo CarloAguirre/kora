@@ -48,6 +48,7 @@ export class DrizzleProjectTeamRepository implements ProjectTeamRepository {
         leaderLastName: users.lastName,
         assignedHours: projectTeams.assignedHours,
         memberCount: sql<string>`count(${projectTeamMembers.id})`,
+        maxMembers: projectTeams.memberCount,
       })
       .from(projectTeams)
       .innerJoin(teams, eq(teams.id, projectTeams.teamId))
@@ -70,6 +71,7 @@ export class DrizzleProjectTeamRepository implements ProjectTeamRepository {
       leaderName: row.leaderUserId ? `${row.leaderFirstName ?? ''} ${row.leaderLastName ?? ''}`.trim() : null,
       assignedHours: row.assignedHours !== null ? Number(row.assignedHours) : null,
       memberCount: Number(row.memberCount),
+      maxMembers: row.maxMembers,
     }));
   }
 

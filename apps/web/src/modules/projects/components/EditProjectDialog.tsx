@@ -1210,7 +1210,8 @@ function toFormValues(project: ProjectDetail): ProjectFormValues {
     teams: project.teams.map((team) => ({
       teamId: team.teamId,
       leaderUserId: team.leader?.id ?? undefined,
-      memberCount: team.memberCount ?? undefined,
+      // `||`: el 0 que dejaba el guardado viejo con el campo vacío se muestra vacío (sin tope).
+      memberCount: team.maxMembers || undefined,
       assignedHours: team.assignedHours ?? undefined,
     })),
   };

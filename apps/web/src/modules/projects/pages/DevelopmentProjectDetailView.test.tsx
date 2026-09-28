@@ -123,9 +123,9 @@ function buildProject(): ProjectDetail {
     contractLink: null,
     additionalLinks: null,
     teams: [
-      { id: 'pt-dev', teamId: 'team-dev', teamName: 'Desarrollo', leader: { id: 'u-jose', fullName: 'José Aponte' }, assignedHours: 0, memberCount: 2 },
-      { id: 'pt-ux', teamId: 'team-ux', teamName: 'UX-UI', leader: { id: 'u-eduardo', fullName: 'Eduardo Aranda' }, assignedHours: 0, memberCount: 2 },
-      { id: 'pt-rpa', teamId: 'team-rpa', teamName: 'RPA', leader: null, assignedHours: 0, memberCount: 3 },
+      { id: 'pt-dev', teamId: 'team-dev', teamName: 'Desarrollo', leader: { id: 'u-jose', fullName: 'José Aponte' }, assignedHours: 0, memberCount: 2, maxMembers: null },
+      { id: 'pt-ux', teamId: 'team-ux', teamName: 'UX-UI', leader: { id: 'u-eduardo', fullName: 'Eduardo Aranda' }, assignedHours: 0, memberCount: 2, maxMembers: null },
+      { id: 'pt-rpa', teamId: 'team-rpa', teamName: 'RPA', leader: null, assignedHours: 0, memberCount: 3, maxMembers: null },
     ],
     members: [
       buildMember({ id: 'm1', userId: 'user-jose', teamId: 'team-rpa', teamName: 'RPA', fullName: 'José Aponte', consumedHours: 16 }),

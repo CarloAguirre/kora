@@ -15,6 +15,7 @@ import {
   CannotReassignProjectLeaderError,
   ProjectNameAlreadyInUseError,
   ProjectNotFoundError,
+  ProjectTeamMaxMembersBelowAssignedError,
   ReferencedClientNotFoundError,
   SoldHoursLockedAfterHito0Error,
 } from '../../domain/errors/project.errors';
@@ -76,6 +77,18 @@ export class UpdateProjectUseCase implements UseCase<UpdateProjectCommand, void,
     /** Mismo criterio no-op que `leaderUserId`: reenviar el mismo valor sin tocarlo se deja pasar. */
     if (project.hito0At && data.soldHours !== undefined && data.soldHours !== project.toSnapshot().soldHours) {
       return err(new SoldHoursLockedAfterHito0Error());
+    }
+
+    if (data.teams) {
+      const assignedByTeam = new Map(
+        (await this.projectTeams.findByProject(project.id)).map((team) => [team.teamId, team]),
+      );
+      for (const team of data.teams) {
+        const current = assignedByTeam.get(team.teamId);
+        if (current && team.memberCount != null && team.memberCount < current.memberCount) {
+          return err(new ProjectTeamMaxMembersBelowAssignedError(current.teamName, current.memberCount));
+        }
+      }
     }
 
     if (data.clientId !== undefined && data.clientId !== null) {

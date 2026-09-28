@@ -57,6 +57,26 @@ export class ProjectTeamMemberAlreadyAssignedError extends ConflictError {
   }
 }
 
+export class ProjectTeamMemberLimitReachedError extends ConflictError {
+  constructor(teamName: string, maxMembers: number) {
+    super(
+      `El equipo "${teamName}" ya tiene ${maxMembers} colaborador(es) asignado(s), que es el máximo definido para este proyecto.`,
+      'PROJECT_TEAM_MEMBER_LIMIT_REACHED',
+      { details: { maxMembers } },
+    );
+  }
+}
+
+export class ProjectTeamMaxMembersBelowAssignedError extends ValidationError {
+  constructor(teamName: string, assigned: number) {
+    super(
+      `El equipo "${teamName}" ya tiene ${assigned} colaborador(es) asignado(s): el N° de colaboradores no puede ser menor.`,
+      'PROJECT_TEAM_MAX_MEMBERS_BELOW_ASSIGNED',
+      { details: { assigned } },
+    );
+  }
+}
+
 export class InvalidTeamMemberAssignmentError extends ValidationError {
   constructor() {
     super('La persona indicada no es un miembro de equipo activo.', 'PROJECT_INVALID_TEAM_MEMBER');

@@ -136,6 +136,7 @@ export function DevelopmentProjectDetailView({
         leaderId: string | null;
         leaderName: string | null;
         memberCount: number;
+        maxMembers: number | null;
         assignedHours: number;
         consumedHours: number;
       }
@@ -150,6 +151,7 @@ export function DevelopmentProjectDetailView({
         leaderId: leader?.id ?? null,
         leaderName: leader?.fullName ?? null,
         memberCount: team.memberCount,
+        maxMembers: team.maxMembers || null,
         assignedHours: team.assignedHours ?? 0,
         consumedHours: 0,
       });
@@ -171,6 +173,7 @@ export function DevelopmentProjectDetailView({
           leaderId: leader?.id ?? null,
           leaderName: leader?.fullName ?? null,
           memberCount: 1,
+          maxMembers: null,
           assignedHours: member.assignedHours,
           consumedHours: member.consumedHours,
         });
@@ -499,8 +502,10 @@ export function DevelopmentProjectDetailView({
                                       )}
                                     </span>
                                     <span className={styles.groupStats}>
-                                      {team.memberCount} persona
-                                      {team.memberCount === 1 ? "" : "s"} ·{" "}
+                                      {team.maxMembers != null
+                                        ? `${team.memberCount}/${team.maxMembers} personas`
+                                        : `${team.memberCount} persona${team.memberCount === 1 ? "" : "s"}`}{" "}
+                                      ·{" "}
                                       {formatHours(team.assignedHours)}h asig. ·{" "}
                                       {formatHours(team.consumedHours)}h cons. ·{" "}
                                       <span

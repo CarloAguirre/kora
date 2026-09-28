@@ -91,6 +91,7 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
     leader: team.leaderUserId ? { id: team.leaderUserId, fullName: team.leaderName ?? '' } : null,
     assignedHours: team.assignedHours,
     memberCount: team.memberCount,
+    maxMembers: team.maxMembers,
   }));
 
   const observations: ProjectObservationDto[] = source.observations.map((observation) => ({

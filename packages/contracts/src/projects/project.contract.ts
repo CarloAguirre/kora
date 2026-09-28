@@ -87,8 +87,9 @@ export type ProjectTeamMember = z.infer<typeof projectTeamMemberSchema>;
  * Equipo asignado al proyecto (v1: `equipo_proyecto`) — distinto de
  * `projectTeamMemberSchema`: este es el nivel equipo (líder, HH
  * presupuestadas), no la persona individual. `memberCount` se recalcula en
- * vivo contando `project_team_members`, no se usa el valor migrado (la v1 no
- * lo tenía, así que siempre llegaba nulo).
+ * vivo contando `project_team_members`; `maxMembers` es el tope de
+ * colaboradores que se definió al crear/editar el proyecto (`N° colaboradores`,
+ * columna `project_teams.member_count`) — nulo = sin tope.
  */
 export const projectTeamSchema = z.object({
   id: uuidSchema,
@@ -97,6 +98,7 @@ export const projectTeamSchema = z.object({
   leader: z.object({ id: uuidSchema, fullName: z.string() }).nullable(),
   assignedHours: z.number().nullable(),
   memberCount: z.number().int(),
+  maxMembers: z.number().int().nullable(),
 });
 export type ProjectTeam = z.infer<typeof projectTeamSchema>;
 
@@ -545,7 +547,11 @@ export type ProjectDetail = z.infer<typeof projectDetailSchema>;
 export const createProjectTeamAssignmentSchema = z.object({
   teamId: uuidSchema,
   leaderUserId: uuidSchema.nullish(),
-  memberCount: z.coerce.number().int().min(0).nullish(),
+  /** Tope de colaboradores del equipo en el proyecto. Vacío = sin tope (no 0: `coerce` convertiría '' en 0). */
+  memberCount: z.preprocess(
+    (value) => (value === '' ? null : value),
+    z.coerce.number().int().min(1, 'El N° de colaboradores debe ser al menos 1 (o déjalo vacío).').nullish(),
+  ),
   assignedHours: z.coerce.number().min(0).nullish(),
 });
 export type CreateProjectTeamAssignmentInput = z.infer<typeof createProjectTeamAssignmentSchema>;

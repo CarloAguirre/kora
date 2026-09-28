@@ -25,6 +25,8 @@ export interface ProjectTeamRecord {
   readonly assignedHours: number | null;
   /** Contado en vivo desde `project_team_members` — la v1 no traía este dato, así que el valor migrado siempre es nulo. */
   readonly memberCount: number;
+  /** Tope de colaboradores definido en el formulario (`project_teams.member_count`); nulo = sin tope. */
+  readonly maxMembers: number | null;
 }
 
 export interface ProjectTeamRepository {

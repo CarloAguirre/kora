@@ -5,6 +5,7 @@ import {
   InvalidTeamMemberAssignmentError,
   ProjectNotFoundError,
   ProjectTeamMemberAlreadyAssignedError,
+  ProjectTeamMemberLimitReachedError,
 } from '../../domain/errors/project.errors';
 import { PROJECT_REPOSITORY, type ProjectRepository } from '../../domain/repositories/project.repository';
 import {
@@ -56,8 +57,9 @@ export class AssignProjectTeamMemberUseCase
       return err(new InvalidTeamMemberAssignmentError());
     }
 
+    const teamId = await this.validator.findTeamId(data.teamMemberId);
+
     if (!command.actorPermissions.includes('projects:manage') && project.leaderUserId !== actor.userId) {
-      const teamId = await this.validator.findTeamId(data.teamMemberId);
       const isTeamLeader = teamId != null && (await this.projectTeams.isTeamLeaderForProject(projectId, teamId, actor.userId));
       if (!isTeamLeader) {
         return err(new ForbiddenError('No lideras el equipo de esta persona.', 'PROJECT_TEAM_NOT_LED'));
@@ -66,6 +68,12 @@ export class AssignProjectTeamMemberUseCase
 
     const existing = await this.members.findByProjectAndTeamMember(projectId, data.teamMemberId);
     if (existing) return err(new ProjectTeamMemberAlreadyAssignedError());
+
+    // `N° colaboradores` del proyecto es el tope de personas del equipo; nulo o 0 (dato viejo) = sin tope.
+    const projectTeam = (await this.projectTeams.findByProject(projectId)).find((team) => team.teamId === teamId);
+    if (projectTeam?.maxMembers && projectTeam.memberCount >= projectTeam.maxMembers) {
+      return err(new ProjectTeamMemberLimitReachedError(projectTeam.teamName, projectTeam.maxMembers));
+    }
 
     const id = await this.members.assign({
       projectId,
