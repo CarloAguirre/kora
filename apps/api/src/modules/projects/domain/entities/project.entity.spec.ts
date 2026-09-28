@@ -58,7 +58,7 @@ describe('Project', () => {
       expect(project.status).toBe('draft');
     });
 
-    it('un desarrollo ya aprobado nace activo', () => {
+    it('un desarrollo ya aprobado nace No iniciado — solo el Hito 0 lo activa', () => {
       const project = Project.create({
         id: 'p1',
         name: 'Portal',
@@ -68,7 +68,8 @@ describe('Project', () => {
         now: NOW,
       }).unwrap();
 
-      expect(project.status).toBe('active');
+      expect(project.status).toBe('draft');
+      expect(project.hito0At).toBeNull();
     });
 
     it('un proyecto de soporte nace activo', () => {
@@ -151,7 +152,7 @@ describe('Project', () => {
       }).unwrap();
       project.pullDomainEvents();
 
-      project.changeStatus('active', NOW);
+      project.changeStatus('draft', NOW);
 
       expect(project.pullDomainEvents()).toHaveLength(0);
     });

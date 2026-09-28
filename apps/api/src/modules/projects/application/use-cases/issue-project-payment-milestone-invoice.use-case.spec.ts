@@ -10,6 +10,7 @@ import type { ProjectPaymentMilestoneRecord, ProjectPaymentMilestoneRepository }
 import type { ProjectRepository } from '../../domain/repositories/project.repository';
 import type { ProjectBillingSettingsRepository } from '../../domain/repositories/project-billing-settings.repository';
 import type { ProjectUserReader } from '../ports/project-user-reader.port';
+import type { ProjectChangeLogRecorder } from '../services/project-change-log.recorder';
 import type { AuditRecorder } from '../../../../shared/application/ports/audit-recorder.port';
 import type { NotificationSender } from '../../../../shared/application/ports/notification.port';
 import { FixedClock } from '../../../../test/fakes';
@@ -82,6 +83,7 @@ function buildUseCase(options: {
     sendProjectAutoActivated: vi.fn().mockResolvedValue(undefined),
     sendProjectReactivatedFromHold: vi.fn().mockResolvedValue(undefined),
   } as unknown as NotificationSender;
+  const changeLog = { record: vi.fn().mockResolvedValue(undefined) } as unknown as ProjectChangeLogRecorder;
   const unitOfWork = { run: vi.fn((work: (tx: unknown) => Promise<unknown>) => work({})) } as unknown as UnitOfWork;
 
   const useCase = new IssueProjectPaymentMilestoneInvoiceUseCase(
@@ -91,11 +93,12 @@ function buildUseCase(options: {
     users,
     audit,
     notifications,
+    changeLog,
     unitOfWork,
     new FixedClock(NOW),
   );
 
-  return { useCase, milestones, projects, billingSettings, notifications };
+  return { useCase, milestones, projects, billingSettings, notifications, changeLog };
 }
 
 describe('IssueProjectPaymentMilestoneInvoiceUseCase', () => {
@@ -130,7 +133,7 @@ describe('IssueProjectPaymentMilestoneInvoiceUseCase', () => {
   });
 
   it('dispara Hito 0 (activa) al facturar el primer tramo de un proyecto Aprobado/No iniciado, y avisa a Gerencia/PMO', async () => {
-    const { useCase, projects, notifications } = buildUseCase({});
+    const { useCase, projects, notifications, changeLog } = buildUseCase({});
 
     const result = await useCase.execute({
       milestoneId: 'milestone-1',
@@ -144,6 +147,12 @@ describe('IssueProjectPaymentMilestoneInvoiceUseCase', () => {
     expect(saved.status).toBe('active');
     expect(saved.hito0Source).toBe('auto_invoice');
     expect(saved.hito0At).toEqual(NOW);
+    expect(changeLog.record).toHaveBeenCalledWith(
+      [expect.objectContaining({ projectId: 'project-1', message: expect.stringContaining('activado automáticamente (Hito 0)') })],
+      ACTOR.userId,
+      NOW,
+      expect.anything(),
+    );
     expect(notifications.sendProjectAutoActivated).toHaveBeenCalledWith(
       expect.objectContaining({ recipientEmail: 'gerente@kabeli.cl', projectId: 'project-1' }),
     );
@@ -191,7 +200,7 @@ describe('IssueProjectPaymentMilestoneInvoiceUseCase', () => {
   it('no dispara Hito 0 si el tramo facturado no es el primero (sortOrder mínimo)', async () => {
     const first = milestone({ id: 'milestone-0', sortOrder: 0, status: 'invoiced' });
     const second = milestone({ id: 'milestone-1', sortOrder: 1 });
-    const { useCase, projects } = buildUseCase({ milestone: second, siblings: [first, second] });
+    const { useCase, projects, changeLog } = buildUseCase({ milestone: second, siblings: [first, second] });
 
     const result = await useCase.execute({
       milestoneId: 'milestone-1',
@@ -201,5 +210,6 @@ describe('IssueProjectPaymentMilestoneInvoiceUseCase', () => {
 
     expect(result.isOk()).toBe(true);
     expect(projects.save).not.toHaveBeenCalled();
+    expect(changeLog.record).not.toHaveBeenCalled();
   });
 });

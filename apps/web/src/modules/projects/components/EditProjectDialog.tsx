@@ -144,20 +144,31 @@ const TIPO_TO_SALES_STAGE: Record<ProjectTipo, ProjectSalesStage | null> = {
   finalizado: null,
 };
 
+/**
+ * Mismo criterio que `STATUS_OPTIONS_APPROVED`/`STATUS_OPTIONS_NOT_APPROVED` de `NewProjectPage`:
+ * antes de Aprobado solo "—" (`draft` sin rotular como "No iniciado") o Detenido; Aprobado
+ * arranca "No iniciado" y pasa a Activo por Hito 0 (factura del primer tramo, o manual con motivo).
+ */
 const ESTADO_OPTIONS_BY_TIPO: Record<ProjectTipo, ProjectStatus[]> = {
   prospecto: ['draft', 'on_hold'],
   cotizacion: ['draft', 'on_hold'],
-  aprobado: ['active', 'on_hold'],
+  aprobado: ['draft', 'active', 'on_hold', 'finished'],
   finalizado: ['finished'],
 };
 
-/** Estado que toma un proyecto al cambiar de Tipo cuando el que tenía ya no es válido — "No iniciado" mientras no está aprobado, "Activo" apenas se aprueba, ver docs de arriba. */
+/** Estado que toma un proyecto al cambiar de Tipo cuando el que tenía ya no es válido — "No iniciado" también al aprobarse: solo el Hito 0 lo activa. */
 const ESTADO_DEFAULT_BY_TIPO: Record<ProjectTipo, ProjectStatus> = {
   prospecto: 'draft',
   cotizacion: 'draft',
-  aprobado: 'active',
+  aprobado: 'draft',
   finalizado: 'finished',
 };
+
+function estadoLabel(tipo: ProjectTipo, status: ProjectStatus, currentStatus: ProjectStatus): string {
+  if (status === 'draft' && (tipo === 'prospecto' || tipo === 'cotizacion')) return '—';
+  if (status === 'active' && tipo === 'aprobado' && currentStatus === 'draft') return 'Activo (activación manual)';
+  return PROJECT_STATUS_LABELS[status];
+}
 
 export interface EditProjectDialogProps {
   open: boolean;
@@ -584,7 +595,7 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, canReassi
             {isDevelopment && (
               <Select
                 label="Estado"
-                options={estadoOptions.map((status) => ({ value: status, label: PROJECT_STATUS_LABELS[status] }))}
+                options={estadoOptions.map((status) => ({ value: status, label: estadoLabel(tipo, status, project.status) }))}
                 value={estado}
                 disabled={tipo === 'finalizado'}
                 onChange={(event) => setEstado(event.target.value as ProjectStatus)}
@@ -648,7 +659,7 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, canReassi
             </div>
             <p className={styles.hint}>
               {canReassignLeader
-                ? 'Este proyecto no tiene ninguna factura registrada. Al activarlo manualmente queda como Hito 0 de origen manual.'
+                ? 'Aún no hay factura del primer tramo. Al activarlo manualmente queda como Hito 0 de origen manual, comienzan a correr las horas y el motivo queda registrado en la bitácora.'
                 : 'Solo Gerencia/PMO puede activar manualmente un proyecto sin factura.'}
             </p>
           </div>

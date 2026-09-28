@@ -32,7 +32,7 @@ function buildUseCase(project: Project) {
   const changeLog = { record: vi.fn().mockResolvedValue(undefined) } as unknown as ProjectChangeLogRecorder;
 
   const useCase = new ChangeProjectStatusUseCase(projects, audit, changeLog, new FixedClock(NOW));
-  return { useCase, projects };
+  return { useCase, projects, changeLog };
 }
 
 describe('ChangeProjectStatusUseCase — Hito 0 manual', () => {
@@ -66,8 +66,8 @@ describe('ChangeProjectStatusUseCase — Hito 0 manual', () => {
     expect(projects.save).not.toHaveBeenCalled();
   });
 
-  it('activa manualmente con projects:manage y motivo, registrando Hito 0 origen "manual"', async () => {
-    const { useCase, projects } = buildUseCase(buildApprovedDraftProject());
+  it('activa manualmente con projects:manage y motivo, registrando Hito 0 origen "manual" y el motivo en la bitácora', async () => {
+    const { useCase, projects, changeLog } = buildUseCase(buildApprovedDraftProject());
 
     const result = await useCase.execute({
       projectId: 'project-1',
@@ -81,6 +81,11 @@ describe('ChangeProjectStatusUseCase — Hito 0 manual', () => {
     expect(saved.status).toBe('active');
     expect(saved.hito0Source).toBe('manual');
     expect(saved.hito0Reason).toBe('Contrato firmado, orden de compra N°123.');
+    expect(changeLog.record).toHaveBeenCalledWith(
+      [expect.objectContaining({ projectId: 'project-1', message: expect.stringContaining('Motivo: Contrato firmado, orden de compra N°123.') })],
+      ACTOR.userId,
+      NOW,
+    );
   });
 
   it('no exige motivo para otras transiciones (ej. pausar a Detenido)', async () => {

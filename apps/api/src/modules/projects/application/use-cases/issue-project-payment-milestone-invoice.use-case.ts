@@ -16,6 +16,7 @@ import {
   type ProjectBillingSettingsRepository,
 } from '../../domain/repositories/project-billing-settings.repository';
 import { PROJECT_USER_READER, type ProjectUserReader } from '../ports/project-user-reader.port';
+import { ProjectChangeLogRecorder } from '../services/project-change-log.recorder';
 import { AUDIT_RECORDER, type AuditRecorder } from '../../../../shared/application/ports/audit-recorder.port';
 import { NOTIFICATION_SENDER, type NotificationSender } from '../../../../shared/application/ports/notification.port';
 import type { ActorContext, UseCase } from '../../../../shared/application/use-case';
@@ -51,6 +52,7 @@ export class IssueProjectPaymentMilestoneInvoiceUseCase
     @Inject(PROJECT_USER_READER) private readonly users: ProjectUserReader,
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
     @Inject(NOTIFICATION_SENDER) private readonly notifications: NotificationSender,
+    private readonly changeLog: ProjectChangeLogRecorder,
     @Inject(UNIT_OF_WORK) private readonly unitOfWork: UnitOfWork,
     @Inject(CLOCK) private readonly clock: Clock,
   ) {}
@@ -114,10 +116,35 @@ export class IssueProjectPaymentMilestoneInvoiceUseCase
           hito0Outcome = 'pending_approval';
         }
         await this.projects.save(project, tx);
+        await this.changeLog.record(
+          [
+            {
+              projectId: project.id,
+              message:
+                hito0Outcome === 'activated'
+                  ? `Proyecto activado automáticamente (Hito 0) al facturar el primer tramo (folio ${command.data.folio}) — comienzan a correr las horas.`
+                  : `Primer tramo facturado (folio ${command.data.folio}) — Hito 0 pendiente de activación por Gerencia.`,
+            },
+          ],
+          command.actor.userId,
+          now,
+          tx,
+        );
       } else if (triggersReactivation && project) {
         project.changeStatus('active', now);
         hito0Outcome = 'reactivated';
         await this.projects.save(project, tx);
+        await this.changeLog.record(
+          [
+            {
+              projectId: project.id,
+              message: `Proyecto reactivado de "Detenido" a "Activo" al facturar el primer tramo (folio ${command.data.folio}).`,
+            },
+          ],
+          command.actor.userId,
+          now,
+          tx,
+        );
       }
     });
 

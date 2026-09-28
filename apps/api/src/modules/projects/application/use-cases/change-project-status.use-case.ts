@@ -53,25 +53,19 @@ export class ChangeProjectStatusUseCase
       previousStatus === 'draft' && command.data.status === 'active' && project.type === 'development' && project.salesStage === 'approved';
 
     const now = this.clock.now();
+    let message = `Estado del proyecto cambiado de "${PROJECT_STATUS_LABELS[previousStatus]}" a "${PROJECT_STATUS_LABELS[command.data.status]}".`;
     if (isManualHito0) {
       if (!command.actorPermissions.includes('projects:manage')) return err(new CannotManuallyActivateProjectError());
-      if (!command.data.reason?.trim()) return err(new ManualHito0ReasonRequiredError());
-      project.activateFromHito0(now, 'manual', command.data.reason.trim());
+      const reason = command.data.reason?.trim();
+      if (!reason) return err(new ManualHito0ReasonRequiredError());
+      project.activateFromHito0(now, 'manual', reason);
+      message = `Proyecto activado manualmente (Hito 0) — comienzan a correr las horas. Motivo: ${reason}`;
     } else {
       project.changeStatus(command.data.status, now);
     }
     await this.projects.save(project);
 
-    await this.changeLog.record(
-      [
-        {
-          projectId: project.id,
-          message: `Estado del proyecto cambiado de "${PROJECT_STATUS_LABELS[previousStatus]}" a "${PROJECT_STATUS_LABELS[command.data.status]}".`,
-        },
-      ],
-      command.actor.userId,
-      now,
-    );
+    await this.changeLog.record([{ projectId: project.id, message }], command.actor.userId, now);
 
     await this.audit.record({
       actor: { userId: command.actor.userId, email: command.actor.email },
