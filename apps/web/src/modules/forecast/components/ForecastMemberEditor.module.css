@@ -1,0 +1,74 @@
+.editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-3);
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-2);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.4fr) minmax(160px, 1fr) 110px 32px;
+  gap: var(--kora-space-2);
+  align-items: end;
+}
+
+.typeGroup {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--kora-space-2);
+}
+
+.typeGroupWithProject {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+.deleteButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--kora-field-height);
+  height: var(--kora-field-height);
+  /* Los campos de al lado (Select/TextField) siempre reservan una línea de
+     16px debajo para su mensaje de error, así que su caja realmente termina
+     16px por encima del final de la fila (`align-items: end`) — sin este
+     margen el botón queda más abajo que los campos. */
+  margin-bottom: 16px;
+  border: none;
+  background: none;
+  color: var(--kora-danger);
+  cursor: pointer;
+  border-radius: 50%;
+}
+
+.deleteButton:hover {
+  background: var(--kora-danger-surface);
+}
+
+.unassignedRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--kora-space-3);
+  border-radius: var(--kora-radius);
+  background: var(--kora-lime-surface);
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-sm);
+}
+
+.addRow {
+  align-self: flex-start;
+}
+
+@media (max-width: 900px) {
+  .row {
+    grid-template-columns: 1fr;
+  }
+  .typeGroupWithProject {
+    grid-template-columns: 1fr;
+  }
+}

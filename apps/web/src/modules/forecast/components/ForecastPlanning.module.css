@@ -1,21 +1,5 @@
-/* Forecast (solo lectura) — Figma "PANTALLA REFERENCIA FORECAST"
+/* Forecast — Figma "PANTALLA REFERENCIA FORECAST"
    (fileKey Sqc5DJtmbLtnBhAM0y4Fww, node 9449:21787). */
-
-.page {
-  display: flex;
-  flex-direction: column;
-  gap: var(--kora-space-8);
-  width: 100%;
-}
-
-.header {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.periodField {
-  width: 266px;
-}
 
 .kpis {
   display: grid;

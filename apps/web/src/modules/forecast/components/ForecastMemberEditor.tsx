@@ -6,12 +6,11 @@ import {
   type ForecastAssignment,
   type ForecastAssignmentType,
 } from '@kora/contracts';
-import styles from './ForecastMemberCard.module.css';
-import { Card } from '@/shared/components/ui/Card';
+import styles from './ForecastMemberEditor.module.css';
 import { Button } from '@/shared/components/ui/Button';
 import { Select } from '@/shared/components/ui/Select';
 import { TextField } from '@/shared/components/ui/TextField';
-import { CheckIcon, CloseIcon, PlusIcon } from '@/shared/components/icons/Icons';
+import { CloseIcon, PlusIcon } from '@/shared/components/icons/Icons';
 import { useClientsList } from '@/modules/clients/api/clients.queries';
 import { useProjectsList } from '@/modules/projects/api/projects.queries';
 import {
@@ -22,151 +21,65 @@ import {
 
 const TYPE_OPTIONS = FORECAST_ASSIGNMENT_TYPES.map((type) => ({ value: type, label: FORECAST_ASSIGNMENT_TYPE_LABELS[type] }));
 
-const TYPE_CHIP_CLASS: Record<ForecastAssignmentType, string | undefined> = {
-  project: styles.chipProject,
-  support: styles.chipSupport,
-  vacation: styles.chipVacation,
-  admin_day: styles.chipNeutral,
-  day_off: styles.chipNeutral,
-  sick_leave: styles.chipSick,
-  training: styles.chipTraining,
-  other: styles.chipNeutral,
-};
-
-function initials(fullName: string): string {
-  const parts = fullName.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return '?';
-  const first = parts[0]![0]!;
-  const second = parts.length > 1 ? parts[1]![0]! : (parts[0]![1] ?? '');
-  return (first + second).toUpperCase();
-}
-
-function chipLabel(assignment: ForecastAssignment): string {
-  if (FORECAST_TYPES_WITH_PROJECT.includes(assignment.type) && assignment.project) {
-    return assignment.project.name;
-  }
-  return FORECAST_ASSIGNMENT_TYPE_LABELS[assignment.type];
-}
-
-export interface ForecastMemberCardMember {
+export interface ForecastMemberEditorMember {
   readonly teamMemberId: string;
-  readonly fullName: string;
   readonly capacityHours: number;
   readonly assignedHours: number;
 }
 
-export function ForecastMemberCard({
+/**
+ * Editor de las asignaciones de un colaborador en el período — lo que en la
+ * v1 (`LiderEquipoForecast`) se abría al expandir su tarjeta. En la v2 vive
+ * dentro del modal "Editar" de la tabla de Forecast.
+ */
+export function ForecastMemberEditor({
   member,
   assignments,
   periodStart,
   periodEnd,
-  canEdit,
 }: {
-  member: ForecastMemberCardMember;
+  member: ForecastMemberEditorMember;
   assignments: ForecastAssignment[];
   periodStart: string;
   periodEnd: string;
-  canEdit: boolean;
 }) {
-  const [expanded, setExpanded] = useState(false);
   const createAssignment = useCreateForecastAssignment();
   const remaining = Math.max(0, member.capacityHours - member.assignedHours);
-  const isOverloaded = member.assignedHours > member.capacityHours;
-  const percent = member.capacityHours > 0 ? Math.round((member.assignedHours / member.capacityHours) * 100) : 0;
-
-  const barClass = isOverloaded ? styles.barDanger : percent === 100 ? styles.barSuccess : styles.barWarning;
-  const statusClass = isOverloaded ? styles.statusDanger : percent === 100 ? styles.statusSuccess : styles.statusWarning;
-
-  const statusLabel = isOverloaded
-    ? `Sobrecargado (+${member.assignedHours - member.capacityHours}h)`
-    : percent === 100
-      ? 'Completo'
-      : member.assignedHours === 0
-        ? 'Sin asignación'
-        : `${remaining}h libres`;
 
   return (
-    <Card className={[styles.card, expanded ? styles.expandedSpan : ''].filter(Boolean).join(' ')}>
-      <div className={styles.header}>
-        <span className={styles.avatar}>{initials(member.fullName)}</span>
-        <div className={styles.identity}>
-          <span className={styles.name} title={member.fullName}>
-            {member.fullName}
-          </span>
-          <div className={styles.loadRow}>
-            <div className={styles.barTrack}>
-              <div className={[styles.barFill, barClass].join(' ')} style={{ width: `${Math.min(100, percent)}%` }} />
-            </div>
-            <span className={[styles.statusText, statusClass].join(' ')}>
-              {percent}% · {statusLabel}
-            </span>
+    <div className={styles.editor}>
+      <div className={styles.rows}>
+        {assignments.map((assignment) => (
+          <ForecastAssignmentRow key={assignment.id} assignment={assignment} maxHours={member.capacityHours} canEdit />
+        ))}
+
+        {remaining > 0 && (
+          <div className={styles.unassignedRow}>
+            <span>Sin asignación</span>
+            <span>{remaining}h</span>
           </div>
-        </div>
-        {canEdit && (
-          <Button
-            variant={expanded ? 'secondary' : 'outline'}
-            size="sm"
-            iconLeft={expanded ? <CheckIcon size={14} /> : undefined}
-            onClick={() => setExpanded((prev) => !prev)}
-          >
-            {expanded ? 'Listo' : 'Editar'}
-          </Button>
         )}
       </div>
 
-      {!expanded && (
-        <div className={styles.chips}>
-          {assignments.map((assignment) => (
-            <span key={assignment.id} className={[styles.chip, TYPE_CHIP_CLASS[assignment.type]].join(' ')}>
-              {chipLabel(assignment)} · {assignment.assignedHours}h
-            </span>
-          ))}
-          {remaining > 0 && (
-            <span className={styles.chipUnassigned}>
-              Sin asignación · {remaining}h{assignments.length === 0 ? ' libres' : ''}
-            </span>
-          )}
-        </div>
-      )}
-
-      {expanded && (
-        <>
-          <div className={styles.rows}>
-            {assignments.map((assignment) => (
-              <ForecastAssignmentRow key={assignment.id} assignment={assignment} maxHours={member.capacityHours} canEdit={canEdit} />
-            ))}
-
-            {remaining > 0 && (
-              <div className={styles.unassignedRow}>
-                <span>Sin asignación</span>
-                <span>{remaining}h</span>
-              </div>
-            )}
-          </div>
-
-          {canEdit && (
-            <Button
-              variant="outline"
-              size="sm"
-              className={styles.addRow}
-              iconLeft={<PlusIcon size={16} />}
-              loading={createAssignment.isPending}
-              onClick={() =>
-                createAssignment.mutate({
-                  teamMemberId: member.teamMemberId,
-                  periodStart,
-                  periodEnd,
-                  type: 'other',
-                  assignedHours: 0,
-                })
-              }
-            >
-              Agregar
-            </Button>
-          )}
-        </>
-      )}
-    </Card>
+      <Button
+        variant="outline"
+        size="sm"
+        className={styles.addRow}
+        iconLeft={<PlusIcon size={16} />}
+        loading={createAssignment.isPending}
+        onClick={() =>
+          createAssignment.mutate({
+            teamMemberId: member.teamMemberId,
+            periodStart,
+            periodEnd,
+            type: 'other',
+            assignedHours: 0,
+          })
+        }
+      >
+        Agregar
+      </Button>
+    </div>
   );
 }
 

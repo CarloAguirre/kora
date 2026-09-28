@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
-import type { ForecastAssignment, TeamSummary } from '@kora/contracts';
-import styles from './ForecastTeamView.module.css';
+import { useCallback, useMemo, useState } from 'react';
+import type { ForecastAssignment, ForecastCapacityMember, TeamSummary } from '@kora/contracts';
+import styles from './ForecastLayout.module.css';
 import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Select } from '@/shared/components/ui/Select';
 import { Button } from '@/shared/components/ui/Button';
@@ -8,38 +8,58 @@ import { Modal } from '@/shared/components/ui/Modal';
 import { WeekRangePicker } from '@/shared/components/ui/WeekRangePicker';
 import { useTeamDetail } from '@/modules/teams/api/teams.queries';
 import { useForecastAssignments, useForecastCapacity } from '../api/forecast.queries';
-import { ForecastMemberCard, type ForecastMemberCardMember } from './ForecastMemberCard';
+import { ForecastKpis, ForecastPlanningSection } from './ForecastPlanning';
+import { ForecastMemberEditor } from './ForecastMemberEditor';
 import { ForecastHistoryPanel } from './ForecastHistoryPanel';
 import { currentLaborWeek, formatShortRange } from '../lib/labor-weeks';
 
 /**
- * Vista editable — réplica de `LiderEquipoForecast` (v1): tarjetas por
- * colaborador, selector de equipo (si lidera más de uno) y panel de
- * historial. Ver docs/DECISION-M6-FORECAST.md.
+ * Vista editable — réplica de `LiderEquipoForecast` (v1): selector de equipo
+ * (si lidera más de uno), historial y edición de asignaciones por
+ * colaborador. Usa la misma tabla que la vista de solo lectura, con un botón
+ * "Editar" por fila que abre el editor en un modal. Ver
+ * docs/DECISION-M6-FORECAST.md.
  */
 export function ForecastTeamView({ teams }: { teams: TeamSummary[] }) {
   const [teamId, setTeamId] = useState(teams[0]?.id ?? '');
   const [period, setPeriod] = useState(() => currentLaborWeek());
   const [showHistory, setShowHistory] = useState(false);
+  const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
 
   const periodLabel = useMemo(
     () => formatShortRange(period.periodStart, period.periodEnd),
     [period.periodStart, period.periodEnd],
   );
 
-  const { data: team } = useTeamDetail(teamId || null);
+  const { data: team, isLoading: teamLoading } = useTeamDetail(teamId || null);
   const { data: assignments } = useForecastAssignments(
     teamId ? { teamId, periodStart: period.periodStart, periodEnd: period.periodEnd } : null,
   );
-  const { data: capacity } = useForecastCapacity({ periodStart: period.periodStart, periodEnd: period.periodEnd });
+  const { data: capacity, isLoading: capacityLoading, error } = useForecastCapacity({
+    periodStart: period.periodStart,
+    periodEnd: period.periodEnd,
+  });
 
-  const capacityByMember = useMemo(() => {
-    const map = new Map<string, { capacityHours: number; assignedHours: number }>();
-    for (const member of capacity?.members ?? []) {
-      if (member.teamId === teamId) map.set(member.teamMemberId, member);
-    }
-    return map;
-  }, [capacity, teamId]);
+  // Se parte de los miembros del equipo (no de la respuesta de capacidad) para
+  // que un colaborador recién agregado aparezca aunque aún no tenga fila de
+  // capacidad: se muestra con su jornada semanal y 0 horas asignadas.
+  const members = useMemo<ForecastCapacityMember[]>(() => {
+    if (!team) return [];
+    const capacityById = new Map((capacity?.members ?? []).filter((m) => m.teamId === teamId).map((m) => [m.teamMemberId, m]));
+    return team.members.map(
+      (member) =>
+        capacityById.get(member.id) ?? {
+          teamMemberId: member.id,
+          fullName: member.fullName,
+          teamId: team.id,
+          teamName: team.name,
+          capacityHours: member.weeklyHours,
+          assignedHours: 0,
+          loadPercent: 0,
+          items: [],
+        },
+    );
+  }, [team, capacity, teamId]);
 
   const assignmentsByMember = useMemo(() => {
     const map = new Map<string, ForecastAssignment[]>();
@@ -51,10 +71,21 @@ export function ForecastTeamView({ teams }: { teams: TeamSummary[] }) {
     return map;
   }, [assignments]);
 
+  const editingMember = editingMemberId ? members.find((member) => member.teamMemberId === editingMemberId) : undefined;
+
+  const renderActions = useCallback(
+    (member: ForecastCapacityMember) => (
+      <Button variant="outline" size="sm" onClick={() => setEditingMemberId(member.teamMemberId)}>
+        Editar
+      </Button>
+    ),
+    [],
+  );
+
   return (
     <DashboardLayout title="Forecast">
       <div className={styles.page}>
-        <div className={styles.filters}>
+        <div className={styles.header}>
           {teams.length > 1 && (
             <Select
               className={styles.teamField}
@@ -70,35 +101,41 @@ export function ForecastTeamView({ teams }: { teams: TeamSummary[] }) {
             periodEnd={period.periodEnd}
             onChange={(next) => setPeriod({ ...next, label: '' })}
           />
-          <Button variant="tertiary" size="sm" className={styles.historyToggle} onClick={() => setShowHistory(true)}>
+          <Button variant="outline" onClick={() => setShowHistory(true)}>
             Ver historial
           </Button>
         </div>
 
-        <div className={styles.cards}>
-          {(team?.members ?? []).length === 0 && <p className={styles.empty}>Este equipo no tiene colaboradores activos.</p>}
+        <ForecastKpis members={members} />
 
-          {(team?.members ?? []).map((member) => {
-            const capacityInfo = capacityByMember.get(member.id);
-            const memberForCard: ForecastMemberCardMember = {
-              teamMemberId: member.id,
-              fullName: member.fullName,
-              capacityHours: capacityInfo?.capacityHours ?? member.weeklyHours,
-              assignedHours: capacityInfo?.assignedHours ?? 0,
-            };
+        <ForecastPlanningSection
+          members={members}
+          loading={teamLoading || capacityLoading}
+          error={error ? 'No se pudo cargar el forecast.' : null}
+          renderActions={renderActions}
+        />
 
-            return (
-              <ForecastMemberCard
-                key={member.id}
-                member={memberForCard}
-                assignments={assignmentsByMember.get(member.id) ?? []}
-                periodStart={period.periodStart}
-                periodEnd={period.periodEnd}
-                canEdit
-              />
-            );
-          })}
-        </div>
+        <Modal
+          open={Boolean(editingMember)}
+          onClose={() => setEditingMemberId(null)}
+          title={editingMember?.fullName ?? ''}
+          description={
+            editingMember
+              ? `${periodLabel} · ${editingMember.assignedHours}/${editingMember.capacityHours}h asignadas (${editingMember.loadPercent}%)`
+              : undefined
+          }
+          wide
+          footer={<Button onClick={() => setEditingMemberId(null)}>Listo</Button>}
+        >
+          {editingMember && (
+            <ForecastMemberEditor
+              member={editingMember}
+              assignments={assignmentsByMember.get(editingMember.teamMemberId) ?? []}
+              periodStart={period.periodStart}
+              periodEnd={period.periodEnd}
+            />
+          )}
+        </Modal>
 
         <Modal
           open={showHistory}
