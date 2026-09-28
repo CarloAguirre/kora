@@ -11,6 +11,8 @@ export interface ProjectObservationRecord {
   readonly moduleId: string | null;
   readonly moduleName: string | null;
   readonly date: Date;
+  /** Registro de activación del proyecto (Hito 0) — su `date` es la fecha del Hito 0. */
+  readonly isHito0: boolean;
   readonly authorUserId: string;
   readonly authorName: string;
   readonly createdAt: Date;
@@ -24,6 +26,7 @@ export interface AddProjectObservationData {
   readonly status: ProjectObservationStatus | null;
   readonly moduleId: string | null;
   readonly date: Date;
+  readonly isHito0?: boolean;
   readonly authorUserId: string;
   readonly now: Date;
 }
@@ -34,6 +37,8 @@ export interface ProjectObservationRepository {
   add(data: AddProjectObservationData, context?: TransactionContext): Promise<string>;
   update(id: string, message: string, now: Date, context?: TransactionContext): Promise<void>;
   updateStatus(id: string, status: ProjectObservationStatus, now: Date, context?: TransactionContext): Promise<void>;
+  /** Alinea la fecha del registro de Hito 0 del proyecto (si existe) con una corrección de `hito0At`. */
+  updateHito0Date(projectId: string, date: Date, now: Date, context?: TransactionContext): Promise<void>;
   remove(id: string, context?: TransactionContext): Promise<void>;
 }
 

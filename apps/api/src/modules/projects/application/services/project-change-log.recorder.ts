@@ -9,6 +9,8 @@ export interface ProjectChangeLogEntry {
   readonly projectId: string;
   readonly message: string;
   readonly moduleId?: string | null;
+  /** Registro de activación (Hito 0) — queda como el registro editable de la fecha del Hito 0 en la bitácora. */
+  readonly isHito0?: boolean;
 }
 
 /**
@@ -40,6 +42,7 @@ export class ProjectChangeLogRecorder {
           status: null,
           moduleId: entry.moduleId ?? null,
           date: now,
+          isHito0: entry.isHito0 ?? false,
           authorUserId: actorUserId,
           now,
         },

@@ -225,6 +225,13 @@
       "when": 1790353048837,
       "tag": "0031_lying_hex",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1790611703329,
+      "tag": "0032_project_observation_hito0",
+      "breakpoints": true
     }
   ]
 }

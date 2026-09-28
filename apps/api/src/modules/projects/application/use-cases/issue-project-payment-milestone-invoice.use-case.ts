@@ -124,6 +124,7 @@ export class IssueProjectPaymentMilestoneInvoiceUseCase
                 hito0Outcome === 'activated'
                   ? `Proyecto activado automáticamente (Hito 0) al facturar el primer tramo (folio ${command.data.folio}) — comienzan a correr las horas.`
                   : `Primer tramo facturado (folio ${command.data.folio}) — Hito 0 pendiente de activación por Gerencia.`,
+              isHito0: hito0Outcome === 'activated',
             },
           ],
           command.actor.userId,

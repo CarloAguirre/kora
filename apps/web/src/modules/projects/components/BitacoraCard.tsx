@@ -21,6 +21,7 @@ import { DropdownMenu, type DropdownMenuItem } from '@/shared/components/ui/Drop
 import { useToast } from '@/shared/components/ui/Toast';
 import { EyeIcon, PencilIcon, PlusIcon, SearchIcon, TrashIcon } from '@/shared/components/icons/Icons';
 import {
+  useCorrectProjectHito0Date,
   useDeleteProjectObservation,
   useResolveProjectObservation,
   useUpdateProjectModuleDelivery,
@@ -53,6 +54,8 @@ interface BitacoraCardProps {
   modules: readonly ProjectModule[];
   teams: readonly ProjectTeam[];
   canManage: boolean;
+  /** Gerencia/PMO (`projects:manage`): puede corregir la fecha del Hito 0 desde su registro de activación. */
+  canCorrectHito0?: boolean;
 }
 
 const RESOLVE_ACTION_LABEL: Record<BitacoraRowAction, string> = {
@@ -70,7 +73,7 @@ const RESOLVE_ACTION_TONE: Record<BitacoraRowAction, DropdownMenuItem['tone']> =
 };
 
 /** Bitácora unificada del proyecto: eventos (horas) + registros manuales, en una sola tabla filtrable con alta desde "Agregar registro". */
-export function BitacoraCard({ projectId, events, observations, modules, teams, canManage }: BitacoraCardProps) {
+export function BitacoraCard({ projectId, events, observations, modules, teams, canManage, canCorrectHito0 = false }: BitacoraCardProps) {
   const toast = useToast();
   const resolveObservation = useResolveProjectObservation();
 
@@ -162,8 +165,9 @@ export function BitacoraCard({ projectId, events, observations, modules, teams, 
       render: (row) => {
         const canEdit = row.kind !== 'evento' && row.kind !== 'entrega' && row.observation.canEdit;
         const canEditDelivery = row.kind === 'entrega' && canManage;
+        const canEditHito0 = row.kind !== 'evento' && row.kind !== 'entrega' && row.observation.isHito0 && canCorrectHito0;
         const resolveActions = rowResolveActions(row);
-        if (!canEdit && !canEditDelivery && resolveActions.length === 0) return null;
+        if (!canEdit && !canEditDelivery && !canEditHito0 && resolveActions.length === 0) return null;
 
         const items: DropdownMenuItem[] = [
           ...resolveActions.map(({ action, nextStatus }) => ({
@@ -174,6 +178,9 @@ export function BitacoraCard({ projectId, events, observations, modules, teams, 
           })),
           ...(canEdit || canEditDelivery
             ? [{ key: 'editar', label: 'Editar detalle', onSelect: () => openDetail(row, 'edit') }]
+            : []),
+          ...(canEditHito0
+            ? [{ key: 'corregir-hito0', label: 'Corregir fecha Hito 0', onSelect: () => openDetail(row, 'edit') }]
             : []),
         ];
 
@@ -262,7 +269,9 @@ export function BitacoraCard({ projectId, events, observations, modules, teams, 
             ? 'Detalle del evento'
             : detailRow?.kind === 'entrega'
               ? 'Detalle de la entrega'
-              : 'Detalle del registro'
+              : detailRow?.observation.isHito0
+                ? 'Activación del proyecto (Hito 0)'
+                : 'Detalle del registro'
         }
         onClose={() => setDetailRow(null)}
         footer={
@@ -286,6 +295,7 @@ export function BitacoraCard({ projectId, events, observations, modules, teams, 
             projectId={projectId}
             observation={detailRow.observation}
             initialEditing={detailMode === 'edit'}
+            canCorrectHito0={canCorrectHito0}
             onClose={() => setDetailRow(null)}
           />
         )}
@@ -411,11 +421,13 @@ function ObservationDetail({
   projectId,
   observation,
   initialEditing = false,
+  canCorrectHito0,
   onClose,
 }: {
   projectId: string;
   observation: ProjectObservation;
   initialEditing?: boolean;
+  canCorrectHito0: boolean;
   onClose: () => void;
 }) {
   const toast = useToast();
@@ -452,7 +464,16 @@ function ObservationDetail({
     <div className={styles.detailGrid}>
       <DetailRow label="Tipo" value={PROJECT_OBSERVATION_TYPE_LABELS[observation.type]} />
       {observation.title && <DetailRow label="Título" value={observation.title} />}
-      <DetailRow label="Fecha" value={observation.date} />
+      {observation.isHito0 ? (
+        <Hito0DateField
+          projectId={projectId}
+          date={observation.date}
+          canEdit={canCorrectHito0}
+          initialEditing={initialEditing && canCorrectHito0}
+        />
+      ) : (
+        <DetailRow label="Fecha" value={observation.date} />
+      )}
       <DetailRow label="Fase" value={observation.moduleName ?? '—'} />
       {observation.status && <DetailRow label="Estado" value={PROJECT_OBSERVATION_STATUS_LABELS[observation.status]} />}
       <DetailRow label="Autor" value={observation.authorName} />
@@ -504,6 +525,90 @@ function ObservationDetail({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Fecha del Hito 0 en su registro de activación — corregirla actualiza `project.hito0At` (y con ello el
+ * corte de horas pre-activación), sin cambiar el estado del proyecto. Reemplaza la antigua franja
+ * "Hito 0: … / Corregir fecha" de la ficha.
+ */
+function Hito0DateField({
+  projectId,
+  date,
+  canEdit,
+  initialEditing,
+}: {
+  projectId: string;
+  date: string;
+  canEdit: boolean;
+  initialEditing: boolean;
+}) {
+  const toast = useToast();
+  const correctHito0Date = useCorrectProjectHito0Date();
+  const [editing, setEditing] = useState(initialEditing);
+  // La fila del modal es una foto tomada al abrirlo — se guarda acá la fecha ya corregida para no mostrar la anterior.
+  const [currentDate, setCurrentDate] = useState(date);
+  const [draft, setDraft] = useState(date);
+  const [error, setError] = useState<string | null>(null);
+
+  const save = async () => {
+    if (!draft) return;
+    setError(null);
+    try {
+      await correctHito0Date.mutateAsync({ projectId, input: { date: draft } });
+      toast.success('Se corrigió la fecha del Hito 0.');
+      setCurrentDate(draft);
+      setEditing(false);
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : 'No se pudo corregir la fecha del Hito 0.');
+    }
+  };
+
+  if (editing) {
+    return (
+      <div className={styles.observationEdit}>
+        <TextField label="Fecha del Hito 0" type="date" value={draft} onChange={(event) => setDraft(event.target.value)} />
+        {error && <span className={styles.composerError}>{error}</span>}
+        <div className={styles.composerRow}>
+          <Button type="button" variant="outline" size="sm" onClick={() => setEditing(false)}>
+            Cancelar
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            loading={correctHito0Date.isPending}
+            loadingText="Guardando…"
+            disabled={!draft || draft === currentDate}
+            onClick={() => void save()}
+          >
+            Guardar fecha
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <DetailRow label="Fecha del Hito 0" value={new Date(`${currentDate}T00:00:00`).toLocaleDateString('es-CL')} />
+      {canEdit && (
+        <div className={styles.composerRow}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            iconLeft={<PencilIcon size={14} />}
+            onClick={() => {
+              setDraft(currentDate);
+              setEditing(true);
+            }}
+          >
+            Corregir fecha
+          </Button>
+        </div>
+      )}
+    </>
   );
 }
 

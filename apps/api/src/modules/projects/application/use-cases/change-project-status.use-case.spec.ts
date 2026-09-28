@@ -82,7 +82,13 @@ describe('ChangeProjectStatusUseCase — Hito 0 manual', () => {
     expect(saved.hito0Source).toBe('manual');
     expect(saved.hito0Reason).toBe('Contrato firmado, orden de compra N°123.');
     expect(changeLog.record).toHaveBeenCalledWith(
-      [expect.objectContaining({ projectId: 'project-1', message: expect.stringContaining('Motivo: Contrato firmado, orden de compra N°123.') })],
+      [
+        expect.objectContaining({
+          projectId: 'project-1',
+          message: expect.stringContaining('Motivo: Contrato firmado, orden de compra N°123.'),
+          isHito0: true,
+        }),
+      ],
       ACTOR.userId,
       NOW,
     );

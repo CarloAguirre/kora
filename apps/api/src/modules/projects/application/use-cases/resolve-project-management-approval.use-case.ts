@@ -33,7 +33,13 @@ export class ResolveProjectManagementApprovalUseCase
     await this.projects.save(project);
 
     await this.changeLog.record(
-      [{ projectId: project.id, message: 'Gerencia activó el proyecto (Hito 0 pendiente de aprobación) — comienzan a correr las horas.' }],
+      [
+        {
+          projectId: project.id,
+          message: 'Gerencia activó el proyecto (Hito 0 pendiente de aprobación) — comienzan a correr las horas.',
+          isHito0: true,
+        },
+      ],
       command.actor.userId,
       now,
     );

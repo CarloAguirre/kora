@@ -49,6 +49,7 @@ import { useToast } from '@/shared/components/ui/Toast';
 import {
   useAddProjectModuleDelivery,
   useChangeProjectStatus,
+  useCorrectProjectHito0Date,
   useCreateProject,
   useCreateProjectModule,
   useCreateProjectModuleSegment,
@@ -250,6 +251,7 @@ export function NewProjectPage() {
   const createSupportPlan = useCreateSupportPlan();
   const updateProject = useUpdateProject();
   const changeStatus = useChangeProjectStatus();
+  const correctHito0Date = useCorrectProjectHito0Date();
   const updateClient = useUpdateClient();
   const [searchParams] = useSearchParams();
   const preselectedClientId = searchParams.get('clientId') ?? '';
@@ -282,13 +284,6 @@ export function NewProjectPage() {
   const [motivoActivacion, setMotivoActivacion] = useState('');
   const [estadoExtraErrors, setEstadoExtraErrors] = useState<Record<string, string>>({});
 
-  /**
-   * "Responsable comercial" (NUEVO al crear) — mismo caso que arriba: `createProjectSchema` no
-   * tiene `commercialManagerUserId` (sí `updateProjectSchema`, ver `EditProjectDialog.tsx:225`), así
-   * que vive en `useState` local y se manda en el `updateProject` de seguimiento.
-   */
-  const [commercialManagerUserId, setCommercialManagerUserId] = useState('');
-
   const {
     register,
     handleSubmit,
@@ -318,6 +313,7 @@ export function NewProjectPage() {
   const salesStage = watch('salesStage');
   const status = watch('status');
   const leaderUserId = watch('leaderUserId');
+  const commercialManagerUserId = watch('commercialManagerUserId');
   const soldHours = watch('soldHours');
   const quotationLink = watch('quotationLink');
   const contractLink = watch('contractLink');
@@ -594,7 +590,7 @@ export function NewProjectPage() {
   /** Deja "Datos del proyecto" — valida los campos del formulario más los del estado extra local (motivo Detenido / Hito 0 manual), ninguno de los dos vive en `createProjectSchema`. */
   const goToEstimacion = async () => {
     const fields: Array<keyof ProjectFormValues> = ['name', 'type'];
-    if (type === 'development') fields.push('salesStage');
+    if (type === 'development') fields.push('salesStage', 'leaderUserId', 'commercialManagerUserId');
     const valid = await trigger(fields);
     const extraErrors: Record<string, string> = {};
     if (status === 'on_hold' && !motivoDetenido.trim()) {
@@ -689,7 +685,6 @@ export function NewProjectPage() {
       if (values.type === 'development') {
         const primaryContactId = await resolveProjectContactId();
         const followUpUpdate: UpdateProjectInput = {};
-        if (commercialManagerUserId) followUpUpdate.commercialManagerUserId = commercialManagerUserId;
         if (primaryContactId) followUpUpdate.primaryContactId = primaryContactId;
         if (values.status === 'on_hold') {
           followUpUpdate.onHoldReason = motivoDetenido.trim();
@@ -703,6 +698,8 @@ export function NewProjectPage() {
             projectId: result.id,
             input: { status: 'active', reason: `${respaldoActivacion}: ${motivoActivacion.trim()}` },
           });
+          // La activación deja el Hito 0 en "ahora" — se alinea con la fecha indicada en el formulario.
+          await correctHito0Date.mutateAsync({ projectId: result.id, input: { date: fechaActivacion } });
         }
       }
 
@@ -924,6 +921,8 @@ export function NewProjectPage() {
                     className={styles.leaderField}
                     label="Líder Kabeli a cargo"
                     placeholder="Sin asignar"
+                    required={type === 'development'}
+                    errorText={errors.leaderUserId?.message}
                     options={(leaders?.items ?? []).map((user) => ({ value: user.id, label: user.fullName }))}
                     {...register('leaderUserId', { setValueAs: emptyToUndefined })}
                   />
@@ -931,9 +930,10 @@ export function NewProjectPage() {
                     <Select
                       label="Responsable comercial"
                       placeholder="Sin asignar"
+                      required
+                      errorText={errors.commercialManagerUserId?.message}
                       options={(commercialUsers?.items ?? []).map((user) => ({ value: user.id, label: user.fullName }))}
-                      value={commercialManagerUserId}
-                      onChange={(event) => setCommercialManagerUserId(event.target.value)}
+                      {...register('commercialManagerUserId', { setValueAs: emptyToUndefined })}
                     />
                   )}
                 </div>

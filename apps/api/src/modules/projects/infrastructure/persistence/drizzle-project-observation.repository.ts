@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { asc, eq, projectModules, projectObservations, users, type Database } from '@kora/db';
+import { and, asc, eq, projectModules, projectObservations, users, type Database } from '@kora/db';
 import type { TransactionContext } from '@kora/core';
 import type {
   AddProjectObservationData,
@@ -19,6 +19,7 @@ const SELECTION = {
   moduleId: projectObservations.moduleId,
   moduleName: projectModules.name,
   date: projectObservations.date,
+  isHito0: projectObservations.isHito0,
   authorUserId: projectObservations.authorUserId,
   authorFirstName: users.firstName,
   authorLastName: users.lastName,
@@ -35,6 +36,7 @@ function toRecord(row: {
   moduleId: string | null;
   moduleName: string | null;
   date: Date;
+  isHito0: boolean;
   authorUserId: string;
   authorFirstName: string;
   authorLastName: string;
@@ -50,6 +52,7 @@ function toRecord(row: {
     moduleId: row.moduleId,
     moduleName: row.moduleName,
     date: row.date,
+    isHito0: row.isHito0,
     authorUserId: row.authorUserId,
     authorName: `${row.authorFirstName} ${row.authorLastName}`.trim(),
     createdAt: row.createdAt,
@@ -105,6 +108,7 @@ export class DrizzleProjectObservationRepository implements ProjectObservationRe
         status: data.status,
         moduleId: data.moduleId,
         date: data.date,
+        isHito0: data.isHito0 ?? false,
         authorUserId: data.authorUserId,
         createdAt: data.now,
       })
@@ -136,6 +140,15 @@ export class DrizzleProjectObservationRepository implements ProjectObservationRe
       .update(projectObservations)
       .set({ status, updatedAt: now })
       .where(eq(projectObservations.id, id));
+  }
+
+  async updateHito0Date(projectId: string, date: Date, now: Date, context?: TransactionContext): Promise<void> {
+    const db = resolveDb(this.database, context);
+
+    await db
+      .update(projectObservations)
+      .set({ date, updatedAt: now })
+      .where(and(eq(projectObservations.projectId, projectId), eq(projectObservations.isHito0, true)));
   }
 
   async remove(id: string, context?: TransactionContext): Promise<void> {

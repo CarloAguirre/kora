@@ -28,7 +28,6 @@ import { Link } from "react-router-dom";
 import { z } from "zod";
 import {
   useAssignProjectMember,
-  useCorrectProjectHito0Date,
   useResolveProjectManagementApproval,
   useUnassignProjectMember,
 } from "../api/projects.queries";
@@ -80,9 +79,6 @@ export function DevelopmentProjectDetailView({
   const assignMember = useAssignProjectMember();
   const unassignMember = useUnassignProjectMember();
   const resolveManagementApproval = useResolveProjectManagementApproval();
-  const correctHito0Date = useCorrectProjectHito0Date();
-  const [editingHito0Date, setEditingHito0Date] = useState(false);
-  const [hito0DateDraft, setHito0DateDraft] = useState("");
   const { data: projectHourEntries } = useHourEntriesList({
     projectId,
     page: 1,
@@ -315,24 +311,6 @@ export function DevelopmentProjectDetailView({
     }
   };
 
-  const onStartEditHito0Date = () => {
-    setHito0DateDraft(project.hito0At ? project.hito0At.slice(0, 10) : "");
-    setEditingHito0Date(true);
-  };
-
-  const onSaveHito0Date = async () => {
-    if (!hito0DateDraft) return;
-    try {
-      await correctHito0Date.mutateAsync({ projectId, input: { date: hito0DateDraft } });
-      toast.success("Se corrigió la fecha del Hito 0.");
-      setEditingHito0Date(false);
-    } catch (error) {
-      toast.error(
-        error instanceof ApiRequestError ? error.message : "No se pudo corregir la fecha del Hito 0.",
-      );
-    }
-  };
-
   const membersByTeam = useMemo(() => {
     const map = new Map<string, ProjectTeamMember[]>();
     for (const member of project.members) {
@@ -355,34 +333,6 @@ export function DevelopmentProjectDetailView({
           >
             Activar proyecto
           </Button>
-        </div>
-      )}
-
-      {project.hito0At && can("projects:manage") && (
-        <div className={styles.hito0Banner}>
-          {editingHito0Date ? (
-            <>
-              <TextField
-                label="Fecha de Hito 0"
-                type="date"
-                value={hito0DateDraft}
-                onChange={(e) => setHito0DateDraft(e.target.value)}
-              />
-              <Button size="sm" loading={correctHito0Date.isPending} onClick={() => void onSaveHito0Date()}>
-                Guardar
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => setEditingHito0Date(false)}>
-                Cancelar
-              </Button>
-            </>
-          ) : (
-            <>
-              <span>Hito 0: {formatDate(project.hito0At.slice(0, 10))}</span>
-              <Button size="sm" variant="outline" onClick={onStartEditHito0Date}>
-                Corregir fecha
-              </Button>
-            </>
-          )}
         </div>
       )}
 
@@ -746,6 +696,7 @@ export function DevelopmentProjectDetailView({
               modules={project.modules}
               teams={project.teams}
               canManage={canAddObservation}
+              canCorrectHito0={can("projects:manage")}
             />
           )}
 

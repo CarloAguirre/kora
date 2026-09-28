@@ -65,7 +65,7 @@ export class ChangeProjectStatusUseCase
     }
     await this.projects.save(project);
 
-    await this.changeLog.record([{ projectId: project.id, message }], command.actor.userId, now);
+    await this.changeLog.record([{ projectId: project.id, message, isHito0: isManualHito0 }], command.actor.userId, now);
 
     await this.audit.record({
       actor: { userId: command.actor.userId, email: command.actor.email },

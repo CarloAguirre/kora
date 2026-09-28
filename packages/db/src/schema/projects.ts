@@ -357,6 +357,12 @@ export const projectObservations = pgTable(
     date: date('date', { mode: 'date' })
       .notNull()
       .default(sql`now()`),
+    /**
+     * Registro de activación del proyecto (Hito 0) — uno por proyecto. Su `date` es la fecha del
+     * Hito 0 y se mantiene en sync con `projects.hito0_at`: "Corregir fecha" se hace desde este
+     * registro en la bitácora (ver `CorrectProjectHito0DateUseCase`).
+     */
+    isHito0: boolean('is_hito0').notNull().default(false),
     authorUserId: uuid('author_user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'restrict' }),

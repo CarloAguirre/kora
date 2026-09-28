@@ -63,6 +63,10 @@ export function rowDateDisplay(row: BitacoraRow): string {
   if (row.kind === 'entrega') {
     return new Date(`${row.delivery.estimatedDate}T00:00:00`).toLocaleDateString('es-CL', { dateStyle: 'short' });
   }
+  // El registro de activación muestra la fecha del Hito 0 (corregible), no cuándo se registró.
+  if (row.kind !== 'evento' && row.observation.isHito0) {
+    return new Date(`${row.observation.date}T00:00:00`).toLocaleDateString('es-CL', { dateStyle: 'short' });
+  }
   const iso = row.kind === 'evento' ? row.entry.createdAt : row.observation.createdAt;
   return new Date(iso).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' });
 }

@@ -350,6 +350,8 @@ export const projectObservationSchema = z.object({
   moduleId: uuidSchema.nullable(),
   moduleName: z.string().nullable(),
   date: z.iso.date(),
+  /** Registro de activación del proyecto (Hito 0): `date` es la fecha del Hito 0, corregible por Gerencia/PMO (`projects:manage`) desde la bitácora. */
+  isHito0: z.boolean(),
   authorUserId: uuidSchema,
   authorName: z.string(),
   createdAt: isoDateTimeSchema,
@@ -601,6 +603,21 @@ export const createProjectSchema = z
     message: 'Los proyectos de desarrollo requieren una etapa comercial.',
     path: ['salesStage'],
   })
+  /** Desde que se crea, al proyecto de desarrollo se le pueden cargar horas — necesita un líder que las apruebe. */
+  .refine((data) => data.type !== 'development' || data.leaderUserId, {
+    message: 'Selecciona el líder a cargo del proyecto.',
+    path: ['leaderUserId'],
+  })
+  .refine(
+    (data) =>
+      data.type !== 'development' ||
+      (data.salesStage !== 'prospect' && data.salesStage !== 'quoted') ||
+      data.commercialManagerUserId,
+    {
+      message: 'Selecciona el responsable comercial del proyecto.',
+      path: ['commercialManagerUserId'],
+    },
+  )
   .refine((data) => data.type !== 'support' || data.supportPlanType, {
     message: 'Los proyectos de soporte requieren un tipo de contrato.',
     path: ['supportPlanType'],
