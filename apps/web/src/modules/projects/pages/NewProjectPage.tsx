@@ -87,13 +87,14 @@ const PHASE_OPTIONS = PROJECT_PHASES.map((phase) => ({ value: phase, label: PROJ
  * Opciones de "Estado" al crear — dependen de la etapa comercial, mismo criterio que
  * `estadosDisponibles()` del prototipo de referencia (KORA · Definiciones de tipos, estados,
  * activación y horas de proyecto): Aprobado habilita los 3 estados operativos; antes de Aprobado
- * solo tiene sentido "—" (sin definir, valor `draft` por defecto pero sin mostrarlo como "No
- * iniciado" — esa etiqueta es propia de un proyecto ya aprobado) o Detenido.
+ * solo No iniciado o Detenido. "No iniciado" es el placeholder del Select (valor vacío → sin
+ * `status`, y el backend asigna `draft` por defecto a todo proyecto de desarrollo).
  */
-const STATUS_OPTIONS_APPROVED = (['draft', 'active', 'on_hold'] as const).map((status) => ({
-  value: status,
-  label: status === 'active' ? 'Activo (activación manual)' : PROJECT_STATUS_LABELS[status],
-}));
+const STATUS_PLACEHOLDER = PROJECT_STATUS_LABELS.draft;
+const STATUS_OPTIONS_APPROVED = [
+  { value: 'active', label: 'Activo (activación manual)' },
+  { value: 'on_hold', label: PROJECT_STATUS_LABELS.on_hold },
+];
 const STATUS_OPTIONS_NOT_APPROVED = [{ value: 'on_hold', label: PROJECT_STATUS_LABELS.on_hold }];
 
 /** Soporte no cambia: "Configuración de soporte" en el mismo índice donde Desarrollo tenía "Fases · Módulos". */
@@ -895,7 +896,7 @@ export function NewProjectPage() {
                   {type === 'development' && (
                     <Select
                       label="Estado"
-                      placeholder="—"
+                      placeholder={STATUS_PLACEHOLDER}
                       options={statusOptions}
                       {...register('status', { setValueAs: emptyToUndefined })}
                       onChange={(event) => {
@@ -1736,7 +1737,7 @@ export function NewProjectPage() {
                   <h3 className={styles.summaryCardTitle}>Datos del proyecto</h3>
                   <SummaryItem label="Nombre del proyecto" value={watch('name')} />
                   <SummaryItem label="Etapa comercial" value={salesStage ? PROJECT_SALES_STAGE_LABELS[salesStage] : undefined} />
-                  <SummaryItem label="Estado" value={status ? PROJECT_STATUS_LABELS[status] : '—'} />
+                  <SummaryItem label="Estado" value={PROJECT_STATUS_LABELS[status ?? 'draft']} />
                   <SummaryItem label="Líder" value={leaderLabel} />
                   <SummaryItem
                     label="Responsable comercial"

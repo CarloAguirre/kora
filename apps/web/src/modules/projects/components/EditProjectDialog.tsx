@@ -146,8 +146,8 @@ const TIPO_TO_SALES_STAGE: Record<ProjectTipo, ProjectSalesStage | null> = {
 
 /**
  * Mismo criterio que `STATUS_OPTIONS_APPROVED`/`STATUS_OPTIONS_NOT_APPROVED` de `NewProjectPage`:
- * antes de Aprobado solo "—" (`draft` sin rotular como "No iniciado") o Detenido; Aprobado
- * arranca "No iniciado" y pasa a Activo por Hito 0 (factura del primer tramo, o manual con motivo).
+ * antes de Aprobado solo No iniciado o Detenido; Aprobado arranca "No iniciado" y pasa a Activo
+ * por Hito 0 (factura del primer tramo, o manual con motivo).
  */
 const ESTADO_OPTIONS_BY_TIPO: Record<ProjectTipo, ProjectStatus[]> = {
   prospecto: ['draft', 'on_hold'],
@@ -165,7 +165,6 @@ const ESTADO_DEFAULT_BY_TIPO: Record<ProjectTipo, ProjectStatus> = {
 };
 
 function estadoLabel(tipo: ProjectTipo, status: ProjectStatus, currentStatus: ProjectStatus): string {
-  if (status === 'draft' && (tipo === 'prospecto' || tipo === 'cotizacion')) return '—';
   if (status === 'active' && tipo === 'aprobado' && currentStatus === 'draft') return 'Activo (activación manual)';
   return PROJECT_STATUS_LABELS[status];
 }
