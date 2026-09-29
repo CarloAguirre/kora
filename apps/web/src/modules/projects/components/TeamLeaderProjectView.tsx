@@ -84,8 +84,6 @@ export function TeamLeaderProjectView({
   const canManageTeam = can('projects:manage') || (user !== null && team.leaderId === user.id);
 
   const availableMembers = (teamMemberOptions?.items ?? []).filter((m) => m.teamId === teamId);
-  const assignedTeamMemberIds = new Set(team.members.map((m) => m.teamMemberId));
-  const unassignedMembers = availableMembers.filter((m) => !assignedTeamMemberIds.has(m.id));
 
   const teamStyle = getTeamStyle(team.teamName);
   const totalAssignedHours = team.members.reduce((sum, m) => sum + m.assignedHours, 0);
@@ -111,7 +109,9 @@ export function TeamLeaderProjectView({
   const draftTotalConsumed = teamDraft.reduce((sum, row) => sum + row.consumedHours, 0);
   const draftOverBudget = team.assignedHours > 0 && draftTotalAssigned > team.assignedHours;
   const usedTeamMemberIds = new Set(teamDraft.map((row) => row.teamMemberId));
-  const poolLeft = unassignedMembers.filter((m) => !usedTeamMemberIds.has(m.id));
+  // Todo el equipo, no solo quienes no estaban asignados: si en el borrador se
+  // quita o reemplaza a alguien, vuelve a quedar disponible para otra fila.
+  const poolLeft = availableMembers.filter((m) => !usedTeamMemberIds.has(m.id));
   // Cupos libres según el `N° colaboradores` definido en el proyecto (nulo = sin tope).
   const slotsLeft = team.maxMembers != null ? Math.max(0, team.maxMembers - teamDraft.length) : Infinity;
   const addableCount = Math.min(poolLeft.length, slotsLeft);
@@ -146,14 +146,22 @@ export function TeamLeaderProjectView({
     if (draftOverBudget) return;
     setSavingTeam(true);
     try {
-      const draftAssignmentIds = new Set(teamDraft.filter((row) => !row.isNew).map((row) => row.assignmentId));
+      // La asignación no admite cambiar de persona (`updateProjectTeamMemberSchema`
+      // solo trae actividad y horas): reemplazar a alguien es quitar la
+      // asignación original y crear una nueva. Primero se quita, para no
+      // chocar con el tope de colaboradores del equipo.
+      const isReplaced = (row: TeamMemberDraftRow) =>
+        !row.isNew && team.members.find((m) => m.id === row.assignmentId)?.teamMemberId !== row.teamMemberId;
+      const keptAssignmentIds = new Set(
+        teamDraft.filter((row) => !row.isNew && !isReplaced(row)).map((row) => row.assignmentId),
+      );
       for (const member of team.members) {
-        if (!draftAssignmentIds.has(member.id)) {
+        if (!keptAssignmentIds.has(member.id)) {
           await unassignMember.mutateAsync({ projectId, assignmentId: member.id });
         }
       }
       for (const row of teamDraft) {
-        if (row.isNew) {
+        if (row.isNew || isReplaced(row)) {
           await assignMember.mutateAsync({
             projectId,
             input: { teamMemberId: row.teamMemberId, activity: row.activity || undefined, assignedHours: Number(row.assignedHours) || 0 },
@@ -376,18 +384,27 @@ export function TeamLeaderProjectView({
                 {teamDraft.map((row) => {
                   const locked = !row.isNew && row.consumedHours > 0;
                   const pct = team.assignedHours > 0 ? Math.round(((Number(row.assignedHours) || 0) / team.assignedHours) * 100) : 0;
-                  const rowOptions = poolLeft.filter((m) => m.id !== row.teamMemberId).concat(
-                    unassignedMembers.filter((m) => m.id === row.teamMemberId),
-                  );
+                  // Quien sigue en esta fila + quienes nadie más ocupa. La persona
+                  // actual se agrega a mano si ya no figura en el catálogo del
+                  // equipo, para que el Select no quede en blanco.
+                  const rowOptions = [
+                    ...(availableMembers.some((m) => m.id === row.teamMemberId)
+                      ? []
+                      : [{ value: row.teamMemberId, label: row.fullName }]),
+                    ...availableMembers
+                      .filter((m) => m.id === row.teamMemberId || !usedTeamMemberIds.has(m.id))
+                      .map((m) => ({ value: m.id, label: m.fullName })),
+                  ];
                   return (
                     <tr key={row.key}>
                       <td>
-                        {row.isNew ? (
+                        {!locked ? (
                           <Select
-                            options={rowOptions.map((m) => ({ value: m.id, label: m.fullName }))}
+                            options={rowOptions}
                             value={row.teamMemberId}
+                            aria-label="Colaborador"
                             onChange={(event) => {
-                              const picked = unassignedMembers.find((m) => m.id === event.target.value);
+                              const picked = availableMembers.find((m) => m.id === event.target.value);
                               updateDraftRow(row.key, {
                                 teamMemberId: event.target.value,
                                 fullName: picked?.fullName ?? row.fullName,
