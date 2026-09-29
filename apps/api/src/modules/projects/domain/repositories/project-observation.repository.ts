@@ -13,6 +13,9 @@ export interface ProjectObservationRecord {
   readonly date: Date;
   /** Registro de activación del proyecto (Hito 0) — su `date` es la fecha del Hito 0. */
   readonly isHito0: boolean;
+  /** Entrega/tarea a la que se refiere un registro automático — ver `ProjectChangeLogRecorder`. */
+  readonly deliveryId: string | null;
+  readonly taskId: string | null;
   readonly authorUserId: string;
   readonly authorName: string;
   readonly createdAt: Date;
@@ -27,6 +30,8 @@ export interface AddProjectObservationData {
   readonly moduleId: string | null;
   readonly date: Date;
   readonly isHito0?: boolean;
+  readonly deliveryId?: string | null;
+  readonly taskId?: string | null;
   readonly authorUserId: string;
   readonly now: Date;
 }

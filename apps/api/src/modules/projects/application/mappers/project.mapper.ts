@@ -107,6 +107,8 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
     moduleName: observation.moduleName,
     date: observation.date.toISOString().slice(0, 10),
     isHito0: observation.isHito0,
+    deliveryId: observation.deliveryId,
+    taskId: observation.taskId,
     authorUserId: observation.authorUserId,
     authorName: observation.authorName,
     createdAt: observation.createdAt.toISOString(),

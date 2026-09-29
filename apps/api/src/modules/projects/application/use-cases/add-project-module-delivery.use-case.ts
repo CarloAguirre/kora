@@ -12,6 +12,7 @@ import {
   type AuditRecorder,
 } from '../../../../shared/application/ports/audit-recorder.port';
 import type { ActorContext, UseCase } from '../../../../shared/application/use-case';
+import { formatCommittedDate } from '../services/deadline-note';
 import { ProjectChangeLogRecorder } from '../services/project-change-log.recorder';
 
 export interface AddProjectModuleDeliveryCommand {
@@ -68,7 +69,8 @@ export class AddProjectModuleDeliveryUseCase
         {
           projectId: project.id,
           moduleId: command.moduleId,
-          message: `Nueva entrega "${command.data.name}" agregada en fase "${module.name}", estimada para ${new Date(command.data.estimatedDate).toLocaleDateString('es-CL')}.`,
+          deliveryId: id,
+          message: `Nueva entrega "${command.data.name}" agregada en fase "${module.name}", estimada para ${formatCommittedDate(new Date(command.data.estimatedDate))}.`,
         },
       ],
       command.actor.userId,

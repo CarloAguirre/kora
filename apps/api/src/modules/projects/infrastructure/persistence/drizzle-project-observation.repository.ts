@@ -20,6 +20,8 @@ const SELECTION = {
   moduleName: projectModules.name,
   date: projectObservations.date,
   isHito0: projectObservations.isHito0,
+  deliveryId: projectObservations.deliveryId,
+  taskId: projectObservations.taskId,
   authorUserId: projectObservations.authorUserId,
   authorFirstName: users.firstName,
   authorLastName: users.lastName,
@@ -37,6 +39,8 @@ function toRecord(row: {
   moduleName: string | null;
   date: Date;
   isHito0: boolean;
+  deliveryId: string | null;
+  taskId: string | null;
   authorUserId: string;
   authorFirstName: string;
   authorLastName: string;
@@ -53,6 +57,8 @@ function toRecord(row: {
     moduleName: row.moduleName,
     date: row.date,
     isHito0: row.isHito0,
+    deliveryId: row.deliveryId,
+    taskId: row.taskId,
     authorUserId: row.authorUserId,
     authorName: `${row.authorFirstName} ${row.authorLastName}`.trim(),
     createdAt: row.createdAt,
@@ -109,6 +115,8 @@ export class DrizzleProjectObservationRepository implements ProjectObservationRe
         moduleId: data.moduleId,
         date: data.date,
         isHito0: data.isHito0 ?? false,
+        deliveryId: data.deliveryId ?? null,
+        taskId: data.taskId ?? null,
         authorUserId: data.authorUserId,
         createdAt: data.now,
       })

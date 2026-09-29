@@ -11,6 +11,9 @@ export interface ProjectChangeLogEntry {
   readonly moduleId?: string | null;
   /** Registro de activación (Hito 0) — queda como el registro editable de la fecha del Hito 0 en la bitácora. */
   readonly isHito0?: boolean;
+  /** Entrega/tarea a la que se refiere el cambio — arma su historial (ver `project_observations.delivery_id`). */
+  readonly deliveryId?: string | null;
+  readonly taskId?: string | null;
 }
 
 /**
@@ -43,6 +46,8 @@ export class ProjectChangeLogRecorder {
           moduleId: entry.moduleId ?? null,
           date: now,
           isHito0: entry.isHito0 ?? false,
+          deliveryId: entry.deliveryId ?? null,
+          taskId: entry.taskId ?? null,
           authorUserId: actorUserId,
           now,
         },

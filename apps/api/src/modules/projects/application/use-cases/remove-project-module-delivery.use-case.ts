@@ -63,6 +63,7 @@ export class RemoveProjectModuleDeliveryUseCase
         {
           projectId: project.id,
           moduleId: command.moduleId,
+          // Sin `deliveryId`: la entrega ya no existe (FK), y sus registros previos quedan sin vínculo (`set null`).
           message: `Entrega${delivery.name ? ` "${delivery.name}"` : ''} eliminada de la fase "${module.name}".`,
         },
       ],

@@ -32,6 +32,7 @@ import {
 } from '../../../../shared/application/ports/audit-recorder.port';
 import type { ActorContext, UseCase } from '../../../../shared/application/use-case';
 import { ProjectChangeLogRecorder, type ProjectChangeLogEntry } from '../services/project-change-log.recorder';
+import { deadlineNote, formatCommittedDate } from '../services/deadline-note';
 
 export interface UpdateProjectModuleDeliveryCommand {
   readonly projectId: string;
@@ -41,8 +42,6 @@ export interface UpdateProjectModuleDeliveryCommand {
   readonly actor: ActorContext;
   readonly actorPermissions: readonly Permission[];
 }
-
-const formatDate = (value: Date): string => value.toLocaleDateString('es-CL', { timeZone: 'UTC' });
 
 /**
  * Además del líder (`projects:manage` o `project.leaderUserId`) y de quien
@@ -207,7 +206,7 @@ export class UpdateProjectModuleDeliveryUseCase
       const nextDate = new Date(command.data.estimatedDate);
       if (nextDate.getTime() !== delivery.estimatedDate.getTime()) {
         messages.push(
-          `Entrega${label} ${inPhase}: fecha estimada cambiada de ${formatDate(delivery.estimatedDate)} a ${formatDate(nextDate)}.`,
+          `Entrega${label} ${inPhase}: fecha estimada cambiada de ${formatCommittedDate(delivery.estimatedDate)} a ${formatCommittedDate(nextDate)}.`,
         );
       }
     }
@@ -215,11 +214,13 @@ export class UpdateProjectModuleDeliveryUseCase
       messages.push(`Entrega${label} ${inPhase}: descripción actualizada.`);
     }
     if (statusChanged) {
+      // Contra la fecha estimada vigente (la de este mismo llamado si también la cambia).
+      const committedDate = command.data.estimatedDate !== undefined ? new Date(command.data.estimatedDate) : delivery.estimatedDate;
       messages.push(
         delivery.status === 'planned'
-          ? `Entrega${label} marcada como terminada ${inPhase}; queda pendiente de aprobación.`
+          ? `Entrega${label} marcada como terminada ${inPhase}, ${deadlineNote(committedDate, now)}; queda pendiente de aprobación.`
           : nextStatus === 'approved'
-            ? `Entrega${label} aprobada ${inPhase}.`
+            ? `Entrega${label} aprobada ${inPhase}, ${deadlineNote(committedDate, now)}.`
             : nextStatus === 'planned'
               ? `Entrega${label} rechazada ${inPhase}: ${rejectionReason}`
               : `Se revirtió la aprobación de la entrega${label} ${inPhase}; vuelve a quedar pendiente de aprobación.`,
@@ -230,6 +231,7 @@ export class UpdateProjectModuleDeliveryUseCase
       const entries: ProjectChangeLogEntry[] = messages.map((message) => ({
         projectId: project.id,
         moduleId: command.moduleId,
+        deliveryId: command.deliveryId,
         message,
       }));
       await this.changeLog.record(entries, command.actor.userId, now);

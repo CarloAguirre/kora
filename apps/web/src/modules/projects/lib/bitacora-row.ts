@@ -85,6 +85,9 @@ export function rowTypeBadge(row: BitacoraRow): { label: string; tone: BadgeTone
     return row.entry.hasBlocker ? { label: 'Incidente', tone: 'danger' } : { label: 'Evento', tone: 'neutral' };
   }
   if (row.kind === 'entrega') return { label: 'Entrega', tone: 'info' };
+  // Registro automático sobre una entrega/tarea concreta (asignada, terminada, aprobada, rechazada…).
+  if (row.observation.deliveryId) return { label: 'Registro de entrega', tone: 'brand' };
+  if (row.observation.taskId) return { label: 'Registro de tarea', tone: 'brand' };
   return { label: PROJECT_OBSERVATION_TYPE_LABELS[row.kind], tone: OBS_TYPE_TONE[row.kind] };
 }
 
@@ -155,6 +158,12 @@ export function rowStatusBadge(row: BitacoraRow): { label: string; tone: BadgeTo
 /** El filtro "Incidentes" junta los dos únicos indicios de "algo anda mal" que existen hoy: un registro tipo Incidente, y una hora con bloqueo reportado. */
 export function rowIsIncident(row: BitacoraRow): boolean {
   return row.kind === 'incidente' || (row.kind === 'evento' && row.entry.hasBlocker);
+}
+
+/** Filtro "Entregas y tareas": la fila viva de cada entrega y todos los registros de cambios sobre entregas o tareas. */
+export function rowIsDeliveryOrTask(row: BitacoraRow): boolean {
+  if (row.kind === 'entrega') return true;
+  return row.kind !== 'evento' && (row.observation.deliveryId !== null || row.observation.taskId !== null);
 }
 
 export type BitacoraRowAction = 'aprobar' | 'rechazar' | 'cerrar' | 'reabrir';

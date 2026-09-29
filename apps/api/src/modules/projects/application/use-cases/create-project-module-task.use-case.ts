@@ -9,10 +9,16 @@ import {
 } from '../../domain/repositories/project-module.repository';
 import { PROJECT_TEAM_REPOSITORY, type ProjectTeamRepository } from '../../domain/repositories/project-team.repository';
 import {
+  PROJECT_TEAM_MEMBER_REPOSITORY,
+  type ProjectTeamMemberRepository,
+} from '../../domain/repositories/project-team-member.repository';
+import {
   AUDIT_RECORDER,
   type AuditRecorder,
 } from '../../../../shared/application/ports/audit-recorder.port';
 import type { ActorContext, UseCase } from '../../../../shared/application/use-case';
+import { ProjectChangeLogRecorder } from '../services/project-change-log.recorder';
+import { formatCommittedDate } from '../services/deadline-note';
 
 export interface CreateProjectModuleTaskCommand {
   readonly projectId: string;
@@ -37,7 +43,9 @@ export class CreateProjectModuleTaskUseCase
     @Inject(PROJECT_REPOSITORY) private readonly projects: ProjectRepository,
     @Inject(PROJECT_MODULE_REPOSITORY) private readonly modules: ProjectModuleRepository,
     @Inject(PROJECT_TEAM_REPOSITORY) private readonly projectTeams: ProjectTeamRepository,
+    @Inject(PROJECT_TEAM_MEMBER_REPOSITORY) private readonly projectTeamMembers: ProjectTeamMemberRepository,
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
+    private readonly changeLog: ProjectChangeLogRecorder,
     @Inject(CLOCK) private readonly clock: Clock,
   ) {}
 
@@ -74,6 +82,23 @@ export class CreateProjectModuleTaskUseCase
         status: command.data.status ?? 'todo',
         scope: command.data.scope ?? 'desarrollo',
       },
+      now,
+    );
+
+    const assigneeUserId = command.data.assigneeUserId ?? null;
+    const assigneeName = assigneeUserId
+      ? (await this.projectTeamMembers.listForProject(project.id)).find((member) => member.userId === assigneeUserId)?.fullName
+      : null;
+    await this.changeLog.record(
+      [
+        {
+          projectId: project.id,
+          moduleId: command.moduleId,
+          taskId: id,
+          message: `Nueva tarea "${command.data.name}" creada en fase "${module.name}"${assigneeName ? `, asignada a ${assigneeName}` : ''}, con fecha límite ${formatCommittedDate(new Date(command.data.date))}.`,
+        },
+      ],
+      command.actor.userId,
       now,
     );
 

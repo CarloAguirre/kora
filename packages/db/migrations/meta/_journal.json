@@ -239,6 +239,13 @@
       "when": 1790689091457,
       "tag": "0033_support_monthly_periods_plan_start",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1790711017125,
+      "tag": "0034_project_observation_delivery_task",
+      "breakpoints": true
     }
   ]
 }

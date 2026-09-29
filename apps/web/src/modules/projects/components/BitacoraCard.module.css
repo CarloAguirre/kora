@@ -127,6 +127,30 @@
   color: var(--kora-navy);
 }
 
+.historyList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.historyItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: var(--kora-space-2);
+  border-left: 2px solid var(--kora-border-soft);
+}
+
+.historyMeta {
+  font-size: var(--kora-text-xs);
+  color: var(--kora-text-muted);
+}
+
 .observationEdit {
   display: flex;
   flex-direction: column;

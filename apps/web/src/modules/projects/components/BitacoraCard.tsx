@@ -33,6 +33,7 @@ import {
   rowDateDisplay,
   rowFilterDate,
   rowId,
+  rowIsDeliveryOrTask,
   rowIsIncident,
   rowPhase,
   rowResolveActions,
@@ -97,7 +98,7 @@ export function BitacoraCard({
   const toast = useToast();
   const resolveObservation = useResolveProjectObservation();
 
-  const [filter, setFilter] = useState<'all' | 'incidents'>('all');
+  const [filter, setFilter] = useState<'all' | 'incidents' | 'work'>('all');
   const [search, setSearch] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
@@ -117,6 +118,7 @@ export function BitacoraCard({
     const q = search.trim().toLowerCase();
     return rows.filter((row) => {
       if (filter === 'incidents' && !rowIsIncident(row)) return false;
+      if (filter === 'work' && !rowIsDeliveryOrTask(row)) return false;
       const date = rowFilterDate(row);
       if (dateFrom && date < dateFrom) return false;
       if (dateTo && date > dateTo) return false;
@@ -263,6 +265,14 @@ export function BitacoraCard({
               >
                 Incidentes
               </button>
+              <button
+                type="button"
+                aria-pressed={filter === 'work'}
+                className={[styles.filterTab, filter === 'work' ? styles.filterTabActive : ''].join(' ')}
+                onClick={() => setFilter('work')}
+              >
+                Entregas y tareas
+              </button>
             </div>
           </div>
           <TextField
@@ -318,6 +328,7 @@ export function BitacoraCard({
             projectId={projectId}
             row={detailRow}
             teams={teams}
+            history={observations.filter((observation) => observation.deliveryId === detailRow.delivery.id)}
             canEdit={detailRow.delivery.canManage}
             initialEditing={detailMode === 'edit'}
           />
@@ -369,12 +380,15 @@ function DeliveryDetail({
   projectId,
   row,
   teams,
+  history,
   canEdit,
   initialEditing = false,
 }: {
   projectId: string;
   row: Extract<BitacoraRow, { kind: 'entrega' }>;
   teams: readonly ProjectTeam[];
+  /** Registros automáticos de esta entrega (`observation.deliveryId`) — quién la asignó, terminó, aprobó o rechazó, y cuándo. */
+  history: readonly ProjectObservation[];
   canEdit: boolean;
   initialEditing?: boolean;
 }) {
@@ -411,7 +425,7 @@ function DeliveryDetail({
     const teamChanged = (teamId || null) !== row.delivery.teamId;
     return (
       <div className={styles.detailGrid}>
-        <DetailRow label="Entrega" value={row.delivery.name ?? 'Entrega'} />
+        <DetailRow label="Entrega" value={rowTitle(row)} />
         <DetailRow label="Fase" value={row.moduleName} />
         <DetailRow label="Estado" value={deliveryStatusLabel(row.delivery)} />
         <Combobox label="Equipo" options={teamOptions} value={teamId} onChange={setTeamId} />
@@ -443,7 +457,7 @@ function DeliveryDetail({
 
   return (
     <div className={styles.detailGrid}>
-      <DetailRow label="Entrega" value={row.delivery.name ?? 'Entrega'} />
+      <DetailRow label="Entrega" value={rowTitle(row)} />
       {row.delivery.description && <DetailRow label="Descripción" value={row.delivery.description} />}
       <DetailRow label="Fase" value={row.moduleName} />
       <DetailRow label="Equipo" value={row.delivery.teamName ?? 'Sin asignar'} />
@@ -451,6 +465,25 @@ function DeliveryDetail({
       <DetailRow label="Fecha estimada" value={new Date(`${row.delivery.estimatedDate}T00:00:00`).toLocaleDateString('es-CL')} />
       <DetailRow label="Estado" value={deliveryStatusLabel(row.delivery)} />
       {row.delivery.rejectionReason && <DetailRow label="Motivo del rechazo" value={row.delivery.rejectionReason} />}
+      <div className={styles.detailRow}>
+        <span className={styles.detailLabel}>Historial</span>
+        {history.length === 0 ? (
+          <span className={styles.detailValue}>Sin movimientos registrados todavía.</span>
+        ) : (
+          <ul className={styles.historyList}>
+            {[...history]
+              .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+              .map((entry) => (
+                <li key={entry.id} className={styles.historyItem}>
+                  <span className={styles.historyMeta}>
+                    {new Date(entry.createdAt).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' })} · {entry.authorName}
+                  </span>
+                  <span className={styles.detailValue}>{entry.message}</span>
+                </li>
+              ))}
+          </ul>
+        )}
+      </div>
       {canEdit && (
         <div className={styles.composerRow}>
           <Button type="button" variant="outline" size="sm" iconLeft={<PencilIcon size={14} />} onClick={() => setEditing(true)}>

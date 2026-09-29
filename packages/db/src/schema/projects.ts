@@ -363,12 +363,23 @@ export const projectObservations = pgTable(
      * registro en la bitácora (ver `CorrectProjectHito0DateUseCase`).
      */
     isHito0: boolean('is_hito0').notNull().default(false),
+    /**
+     * Registros automáticos (`cambio_proyecto`) sobre una entrega o tarea concreta — asignación,
+     * terminada, aprobada, rechazada, editada — para armar su historial (quién y cuándo, a tiempo o
+     * con atraso). `set null` al borrarla: el registro "eliminada" y los anteriores se conservan.
+     */
+    deliveryId: uuid('delivery_id').references(() => projectModuleDeliveries.id, { onDelete: 'set null' }),
+    taskId: uuid('task_id').references(() => projectModuleTasks.id, { onDelete: 'set null' }),
     authorUserId: uuid('author_user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'restrict' }),
     ...timestamps,
   },
-  (table) => [index('project_observations_module_idx').on(table.moduleId)],
+  (table) => [
+    index('project_observations_module_idx').on(table.moduleId),
+    index('project_observations_delivery_idx').on(table.deliveryId),
+    index('project_observations_task_idx').on(table.taskId),
+  ],
 );
 
 /** Tramo de pago del proyecto ("Facturación" del portal cliente) — cronograma de cobro, independiente de `support_invoices` (eso es soporte). */

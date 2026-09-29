@@ -380,6 +380,9 @@ export const projectObservationSchema = z.object({
   date: z.iso.date(),
   /** Registro de activación del proyecto (Hito 0): `date` es la fecha del Hito 0, corregible por Gerencia/PMO (`projects:manage`) desde la bitácora. */
   isHito0: z.boolean(),
+  /** Entrega/tarea a la que se refiere un registro automático (`cambio_proyecto`) — su historial. */
+  deliveryId: uuidSchema.nullable(),
+  taskId: uuidSchema.nullable(),
   authorUserId: uuidSchema,
   authorName: z.string(),
   createdAt: isoDateTimeSchema,
