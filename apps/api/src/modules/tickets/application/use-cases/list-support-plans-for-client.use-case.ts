@@ -6,6 +6,7 @@ import { TICKET_CLIENT_READER, type TicketClientReader } from '../ports/ticket-c
 import { TICKET_PROJECT_READER, type TicketProjectReader } from '../ports/ticket-project-reader.port';
 import { TICKET_USER_READER, type TicketUserReader } from '../ports/ticket-user-reader.port';
 import { computeSupportPlanAlerts } from '../services/support-plan-alerts';
+import { SupportMonthlyPeriodReconciler } from '../services/support-monthly-period-reconciler';
 import { SupportPlanCurrentBillingResolver } from '../services/support-plan-current-billing.resolver';
 import { resolveSupportPlanName } from '../services/support-plan-naming';
 import { SupportPlanSummaryBuilder } from '../services/support-plan-summary-builder';
@@ -27,6 +28,7 @@ export class ListSupportPlansForClientUseCase
     @Inject(TICKET_USER_READER) private readonly users: TicketUserReader,
     private readonly currentBilling: SupportPlanCurrentBillingResolver,
     private readonly summaryBuilder: SupportPlanSummaryBuilder,
+    private readonly periods: SupportMonthlyPeriodReconciler,
     @Inject(CLOCK) private readonly clock: Clock,
   ) {}
 
@@ -41,7 +43,7 @@ export class ListSupportPlansForClientUseCase
 
   private async toListItem(record: SupportPlanRecord, clientName: string, now: Date): Promise<SupportPlanListItem> {
     const linkedIds = await this.summaryBuilder.resolveLinkedProjectIds(record);
-    const periods = await this.plans.listPeriodsForPlan(record.id);
+    const periods = await this.periods.listPeriods(record, now);
 
     const [leader, summary, current, linkedProjects] = await Promise.all([
       record.leaderUserId ? this.users.findById(record.leaderUserId) : Promise.resolve(null),

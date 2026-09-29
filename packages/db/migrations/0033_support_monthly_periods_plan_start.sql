@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "support_monthly_periods_plan_start_key" ON "support_monthly_periods" USING btree ("plan_id","start_date") WHERE "support_monthly_periods"."status" <> 'cancelled';

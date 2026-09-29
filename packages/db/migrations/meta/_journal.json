@@ -232,6 +232,13 @@
       "when": 1790611703329,
       "tag": "0032_project_observation_hito0",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1790689091457,
+      "tag": "0033_support_monthly_periods_plan_start",
+      "breakpoints": true
     }
   ]
 }

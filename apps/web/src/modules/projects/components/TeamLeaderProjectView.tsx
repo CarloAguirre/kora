@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { PROJECT_PHASE_LABELS, PROJECT_STATUS_LABELS, type ProjectDetail } from '@kora/contracts';
 import styles from './TeamLeaderProjectView.module.css';
 import { Button } from '@/shared/components/ui/Button';
@@ -64,6 +64,10 @@ export function TeamLeaderProjectView({
   const [teamModalOpen, setTeamModalOpen] = useState(false);
   const [teamDraft, setTeamDraft] = useState<TeamMemberDraftRow[]>([]);
   const [savingTeam, setSavingTeam] = useState(false);
+  // Key propia por fila nueva: no puede derivarse de la persona elegida,
+  // porque se puede cambiar en el Select y dos filas terminarían con la misma
+  // key (y `updateDraftRow` editaría ambas a la vez).
+  const draftRowSeq = useRef(0);
 
   const team = useMemo(() => {
     const teamRow = project.teams.find((t) => t.teamId === teamId);
@@ -122,7 +126,7 @@ export function TeamLeaderProjectView({
     setTeamDraft((prev) => [
       ...prev,
       {
-        key: `new-${next.id}`,
+        key: `new-${++draftRowSeq.current}`,
         assignmentId: null,
         teamMemberId: next.id,
         fullName: next.fullName,
@@ -306,6 +310,7 @@ export function TeamLeaderProjectView({
         open={teamModalOpen}
         title="Editar Equipo"
         wide
+        className={styles.teamModal}
         onClose={() => setTeamModalOpen(false)}
         footer={
           <>
@@ -405,7 +410,9 @@ export function TeamLeaderProjectView({
                           type="number"
                           min={row.consumedHours}
                           value={row.assignedHours}
-                          onChange={(event) => updateDraftRow(row.key, { assignedHours: event.target.value })}
+                          onChange={(event) =>
+                            updateDraftRow(row.key, { assignedHours: event.target.value.replace(/^0+(?=\d)/, '') })
+                          }
                         />
                       </td>
                       <td className={styles.modalReadonlyCell}>{row.consumedHours}</td>

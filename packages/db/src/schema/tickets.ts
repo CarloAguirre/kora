@@ -233,7 +233,11 @@ export const supportMonthlyPeriods = pgTable(
 
     ...timestamps,
   },
-  (table) => [uniqueIndex('support_monthly_periods_legacy_id_key').on(table.legacyId).where(sql`${table.legacyId} is not null`)],
+  (table) => [
+    uniqueIndex('support_monthly_periods_legacy_id_key').on(table.legacyId).where(sql`${table.legacyId} is not null`),
+    // Los períodos siguientes se crean de forma perezosa al leer el plan: dos requests simultáneos no deben duplicar el mes.
+    uniqueIndex('support_monthly_periods_plan_start_key').on(table.planId, table.startDate).where(sql`${table.status} <> 'cancelled'`),
+  ],
 );
 
 /**

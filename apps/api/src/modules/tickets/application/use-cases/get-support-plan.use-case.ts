@@ -9,6 +9,7 @@ import { TICKET_CLIENT_READER, type TicketClientReader, type TicketClientContact
 import { TICKET_PROJECT_READER, type TicketProjectReader } from '../ports/ticket-project-reader.port';
 import { TICKET_USER_READER, type TicketUserReader } from '../ports/ticket-user-reader.port';
 import { computeSupportPlanAlerts } from '../services/support-plan-alerts';
+import { SupportMonthlyPeriodReconciler } from '../services/support-monthly-period-reconciler';
 import { SupportPlanCurrentBillingResolver } from '../services/support-plan-current-billing.resolver';
 import { resolveSupportPlanName } from '../services/support-plan-naming';
 import { SupportPlanSummaryBuilder } from '../services/support-plan-summary-builder';
@@ -30,6 +31,7 @@ export class GetSupportPlanUseCase implements UseCase<GetSupportPlanQuery, Suppo
     @Inject(TICKET_USER_READER) private readonly users: TicketUserReader,
     private readonly summaryBuilder: SupportPlanSummaryBuilder,
     private readonly currentBilling: SupportPlanCurrentBillingResolver,
+    private readonly periods: SupportMonthlyPeriodReconciler,
     @Inject(CLOCK) private readonly clock: Clock,
   ) {}
 
@@ -42,12 +44,13 @@ export class GetSupportPlanUseCase implements UseCase<GetSupportPlanQuery, Suppo
     const now = this.clock.now();
 
     const linkedIds = await this.summaryBuilder.resolveLinkedProjectIds(record);
+    // Antes del Promise.all: renueva los períodos una sola vez, así el resumen y la facturación ya leen la cadena al día.
+    const periods = await this.periods.listPeriods(record, now);
 
-    const [client, linkedProjects, leader, periods, invoiceRows, contact, current, summary] = await Promise.all([
+    const [client, linkedProjects, leader, invoiceRows, contact, current, summary] = await Promise.all([
       this.clients.findById(record.clientId),
       this.projects.findManyByIds(linkedIds),
       record.leaderUserId ? this.users.findById(record.leaderUserId) : Promise.resolve(null),
-      this.plans.listPeriodsForPlan(record.id),
       this.invoices.listForPlan(record.id),
       this.resolveContact(record),
       this.currentBilling.resolve(record, linkedIds, now),

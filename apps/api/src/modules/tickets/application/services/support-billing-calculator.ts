@@ -1,11 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { HOUR_ENTRY_REPOSITORY, type HourEntryRepository } from '../../../hours/domain/repositories/hour-entry.repository';
-import {
-  SUPPORT_PLAN_REPOSITORY,
-  type SupportPlanRecord,
-  type SupportPlanRepository,
-} from '../../domain/repositories/support-plan.repository';
+import type { SupportPlanRecord } from '../../domain/repositories/support-plan.repository';
 import { SUPPORT_INVOICE_REPOSITORY, type SupportInvoiceRepository } from '../../domain/repositories/support-invoice.repository';
+import { SupportMonthlyPeriodReconciler } from './support-monthly-period-reconciler';
 
 export interface SupportBillingCalculation {
   readonly amountUf: number;
@@ -32,7 +29,7 @@ export interface SupportBillingCalculation {
 @Injectable()
 export class SupportBillingCalculator {
   constructor(
-    @Inject(SUPPORT_PLAN_REPOSITORY) private readonly plans: SupportPlanRepository,
+    private readonly periods: SupportMonthlyPeriodReconciler,
     @Inject(HOUR_ENTRY_REPOSITORY) private readonly hourEntries: HourEntryRepository,
     @Inject(SUPPORT_INVOICE_REPOSITORY) private readonly invoices: SupportInvoiceRepository,
   ) {}
@@ -85,7 +82,7 @@ export class SupportBillingCalculator {
 
   private async calculateMonthly(plan: SupportPlanRecord, today: Date): Promise<SupportBillingCalculation | null> {
     const day = toUtcDate(today);
-    const periods = await this.plans.listPeriodsForPlan(plan.id);
+    const periods = await this.periods.listPeriods(plan, today);
     const current = periods.find(
       (period) => period.status === 'active' && period.startDate.getTime() <= day.getTime() && day.getTime() < period.endDate.getTime(),
     );

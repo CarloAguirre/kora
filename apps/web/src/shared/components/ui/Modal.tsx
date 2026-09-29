@@ -27,6 +27,8 @@ export interface ModalProps {
   headerExtra?: ReactNode;
   /** Panel lateral (desliza desde la derecha, alto completo) en vez de diálogo centrado — para formularios largos. */
   side?: boolean;
+  /** Clase extra para el `<dialog>`, p. ej. para un ancho a medida. */
+  className?: string;
 }
 
 export function Modal({
@@ -40,6 +42,7 @@ export function Modal({
   dismissible = true,
   headerExtra,
   side = false,
+  className,
 }: ModalProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   // Único por instancia: dos diálogos (uno abierto, otro cerrado) coexisten
@@ -84,7 +87,7 @@ export function Modal({
   return (
     <dialog
       ref={dialogRef}
-      className={[styles.dialog, wide ? styles.wide : '', side ? styles.side : ''].filter(Boolean).join(' ')}
+      className={[styles.dialog, wide ? styles.wide : '', side ? styles.side : '', className].filter(Boolean).join(' ')}
       onClick={handleBackdropClick}
       aria-labelledby={titleId}
     >

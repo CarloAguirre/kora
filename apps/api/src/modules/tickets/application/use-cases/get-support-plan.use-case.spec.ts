@@ -7,6 +7,7 @@ import type { TicketProjectReader } from '../ports/ticket-project-reader.port';
 import type { TicketUserReader } from '../ports/ticket-user-reader.port';
 import type { SupportPlanSummaryBuilder } from '../services/support-plan-summary-builder';
 import type { SupportPlanCurrentBillingResolver } from '../services/support-plan-current-billing.resolver';
+import type { SupportMonthlyPeriodReconciler } from '../services/support-monthly-period-reconciler';
 import { FixedClock } from '../../../../test/fakes';
 
 class FakeSupportPlanRepository implements Partial<SupportPlanRepository> {
@@ -25,6 +26,7 @@ function buildUseCase(plans: FakeSupportPlanRepository) {
     NEVER_USED as TicketUserReader,
     NEVER_USED as SupportPlanSummaryBuilder,
     NEVER_USED as SupportPlanCurrentBillingResolver,
+    NEVER_USED as SupportMonthlyPeriodReconciler,
     new FixedClock(),
   );
 }

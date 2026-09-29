@@ -29,6 +29,7 @@ import { SupportPlanAvailabilityService } from './application/services/support-p
 import { SupportBillingCalculator } from './application/services/support-billing-calculator';
 import { SupportPlanCurrentBillingResolver } from './application/services/support-plan-current-billing.resolver';
 import { SupportPlanSummaryBuilder } from './application/services/support-plan-summary-builder';
+import { SupportMonthlyPeriodReconciler } from './application/services/support-monthly-period-reconciler';
 
 import { TICKET_REPOSITORY } from './domain/repositories/ticket.repository';
 import { TICKET_HISTORY_REPOSITORY } from './domain/repositories/ticket-history.repository';
@@ -96,6 +97,7 @@ import { HoursModule } from '../hours/hours.module';
     SupportBillingCalculator,
     SupportPlanCurrentBillingResolver,
     SupportPlanSummaryBuilder,
+    SupportMonthlyPeriodReconciler,
 
     { provide: TICKET_REPOSITORY, useClass: DrizzleTicketRepository },
     { provide: TICKET_HISTORY_REPOSITORY, useClass: DrizzleTicketHistoryRepository },

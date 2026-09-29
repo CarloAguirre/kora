@@ -6,6 +6,7 @@ import { SUPPORT_INVOICE_REPOSITORY, type SupportInvoiceRecord, type SupportInvo
 import { TICKET_CLIENT_READER, type TicketClientReader } from '../ports/ticket-client-reader.port';
 import { TICKET_PROJECT_READER, type TicketProjectReader } from '../ports/ticket-project-reader.port';
 import { computeSupportPlanAlerts } from '../services/support-plan-alerts';
+import { SupportMonthlyPeriodReconciler } from '../services/support-monthly-period-reconciler';
 import { SupportPlanCurrentBillingResolver } from '../services/support-plan-current-billing.resolver';
 import { resolveSupportPlanName } from '../services/support-plan-naming';
 import { SupportPlanSummaryBuilder } from '../services/support-plan-summary-builder';
@@ -38,6 +39,7 @@ export class GetSupportBillingOverviewUseCase implements UseCase<GetSupportBilli
     @Inject(TICKET_PROJECT_READER) private readonly projects: TicketProjectReader,
     private readonly currentBilling: SupportPlanCurrentBillingResolver,
     private readonly summaryBuilder: SupportPlanSummaryBuilder,
+    private readonly periods: SupportMonthlyPeriodReconciler,
     @Inject(CLOCK) private readonly clock: Clock,
   ) {}
 
@@ -63,7 +65,7 @@ export class GetSupportBillingOverviewUseCase implements UseCase<GetSupportBilli
 
     for (const record of records) {
       const linkedIds = await this.summaryBuilder.resolveLinkedProjectIds(record);
-      const periods = await this.plans.listPeriodsForPlan(record.id);
+      const periods = await this.periods.listPeriods(record, now);
       const summary = await this.summaryBuilder.build(record, linkedIds, now);
       const usedHours = summary.usedHours;
       if (computeSupportPlanAlerts(record, periods, usedHours, now).length > 0) alertsCount++;

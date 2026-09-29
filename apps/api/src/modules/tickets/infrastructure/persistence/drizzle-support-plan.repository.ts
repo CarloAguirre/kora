@@ -4,7 +4,9 @@ import type { TransactionContext } from '@kora/core';
 import type { SupportPlan } from '../../domain/entities/support-plan.entity';
 import type {
   CreateInitialSupportMonthlyPeriodInput,
+  CreateNextSupportMonthlyPeriodInput,
   SupportMonthlyPeriodRecord,
+  SupportMonthlyPeriodUsageUpdate,
   SupportPlanRecord,
   SupportPlanRepository,
 } from '../../domain/repositories/support-plan.repository';
@@ -71,6 +73,43 @@ export class DrizzleSupportPlanRepository implements SupportPlanRepository {
       surplusHours: '0',
       status: 'active',
     });
+  }
+
+  async createNextPeriod(input: CreateNextSupportMonthlyPeriodInput, context?: TransactionContext): Promise<boolean> {
+    const db = resolveDb(this.database, context);
+    const inserted = await db
+      .insert(supportMonthlyPeriods)
+      .values({
+        id: input.id,
+        planId: input.planId,
+        projectId: null,
+        startDate: input.startDate,
+        endDate: input.endDate,
+        surplusPolicy: input.surplusPolicy,
+        contractedHours: String(input.contractedHours),
+        reusedBalanceHours: String(input.reusedBalanceHours),
+        consumedHoursStart: String(input.consumedHoursStart),
+        consumedHoursPeriod: '0',
+        surplusHours: '0',
+        status: 'active',
+      })
+      .onConflictDoNothing()
+      .returning({ id: supportMonthlyPeriods.id });
+    return inserted.length > 0;
+  }
+
+  async updatePeriodUsage(periodId: string, usage: SupportMonthlyPeriodUsageUpdate, context?: TransactionContext): Promise<void> {
+    const db = resolveDb(this.database, context);
+    await db
+      .update(supportMonthlyPeriods)
+      .set({
+        consumedHoursPeriod: String(usage.consumedHoursPeriod),
+        consumedHoursEnd: usage.consumedHoursEnd === null ? null : String(usage.consumedHoursEnd),
+        surplusHours: String(usage.surplusHours),
+        status: usage.status,
+        updatedAt: new Date(),
+      })
+      .where(eq(supportMonthlyPeriods.id, periodId));
   }
 
   async findById(id: string, context?: TransactionContext): Promise<SupportPlan | null> {

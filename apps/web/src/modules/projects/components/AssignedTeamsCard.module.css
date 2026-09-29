@@ -1,0 +1,126 @@
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kora-space-2);
+  flex-wrap: wrap;
+  margin-bottom: var(--kora-space-4);
+}
+
+.title {
+  font-size: var(--kora-text-lg);
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-navy);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.teamCard {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 150px;
+  padding: 22px 20px;
+  border-radius: 12px;
+  color: inherit;
+  text-decoration: none;
+  transition: box-shadow 0.15s ease;
+}
+
+.teamCard:hover {
+  box-shadow: 0 4px 14px rgb(22 38 77 / 0.1);
+}
+
+.teamCard:focus-visible {
+  outline: 2px solid var(--kora-blue-600);
+  outline-offset: 2px;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  color: var(--kora-surface);
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-bold);
+}
+
+.leader {
+  min-width: 0;
+  font-size: var(--kora-text-xs);
+  color: var(--kora-text-muted);
+}
+
+.leader b {
+  display: block;
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-navy);
+}
+
+.figs {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--kora-space-3);
+  font-size: var(--kora-text-xs);
+  color: var(--kora-text-muted);
+}
+
+.figs b {
+  display: block;
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-navy);
+}
+
+.figRight {
+  text-align: right;
+}
+
+.health {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 8px;
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-bold);
+}
+
+.excelente {
+  color: var(--kora-success);
+}
+
+.rango {
+  color: var(--kora-blue-600);
+}
+
+.critico {
+  color: var(--kora-danger);
+}
+
+.empty {
+  color: var(--kora-text-disabled);
+  font-style: italic;
+  font-size: var(--kora-text-sm);
+}
+
+@media (max-width: 640px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}

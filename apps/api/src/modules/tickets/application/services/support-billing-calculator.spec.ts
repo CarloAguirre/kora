@@ -1,12 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { HourEntryRepository } from '../../../hours/domain/repositories/hour-entry.repository';
-import type {
-  SupportMonthlyPeriodRecord,
-  SupportPlanRecord,
-  SupportPlanRepository,
-} from '../../domain/repositories/support-plan.repository';
+import type { SupportMonthlyPeriodRecord, SupportPlanRecord } from '../../domain/repositories/support-plan.repository';
 import type { SupportInvoiceRepository } from '../../domain/repositories/support-invoice.repository';
 import { SupportBillingCalculator } from './support-billing-calculator';
+import type { SupportMonthlyPeriodReconciler } from './support-monthly-period-reconciler';
 
 /** Solo implementa lo que el calculador usa — el resto lanza si se llama por error. */
 class FakeHourEntryRepository implements Pick<HourEntryRepository, 'sumApprovedHoursForProjects'> {
@@ -16,9 +13,9 @@ class FakeHourEntryRepository implements Pick<HourEntryRepository, 'sumApprovedH
   }
 }
 
-class FakeSupportPlanRepository implements Pick<SupportPlanRepository, 'listPeriodsForPlan'> {
+class FakePeriodReconciler implements Pick<SupportMonthlyPeriodReconciler, 'listPeriods'> {
   constructor(private readonly periods: SupportMonthlyPeriodRecord[]) {}
-  async listPeriodsForPlan(): Promise<SupportMonthlyPeriodRecord[]> {
+  async listPeriods(): Promise<SupportMonthlyPeriodRecord[]> {
     return this.periods;
   }
 }
@@ -32,7 +29,7 @@ class FakeSupportInvoiceRepository implements Pick<SupportInvoiceRepository, 'su
 
 function buildCalculator(hours: number, periods: SupportMonthlyPeriodRecord[] = [], alreadyBilled = 0): SupportBillingCalculator {
   return new SupportBillingCalculator(
-    new FakeSupportPlanRepository(periods) as unknown as SupportPlanRepository,
+    new FakePeriodReconciler(periods) as unknown as SupportMonthlyPeriodReconciler,
     new FakeHourEntryRepository(hours) as unknown as HourEntryRepository,
     new FakeSupportInvoiceRepository(alreadyBilled) as unknown as SupportInvoiceRepository,
   );

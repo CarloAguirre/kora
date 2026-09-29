@@ -6,6 +6,7 @@ import type { TicketProjectReader } from '../ports/ticket-project-reader.port';
 import type { TicketUserReader } from '../ports/ticket-user-reader.port';
 import type { SupportPlanCurrentBillingResolver } from '../services/support-plan-current-billing.resolver';
 import type { SupportPlanSummaryBuilder } from '../services/support-plan-summary-builder';
+import type { SupportMonthlyPeriodReconciler } from '../services/support-monthly-period-reconciler';
 import { FixedClock } from '../../../../test/fakes';
 
 class FakeSupportPlanRepository implements Partial<SupportPlanRepository> {
@@ -25,6 +26,7 @@ const NEVER_USED_PROJECTS = {} as unknown as TicketProjectReader;
 const NEVER_USED_USERS = {} as unknown as TicketUserReader;
 const NEVER_USED_BILLING = {} as unknown as SupportPlanCurrentBillingResolver;
 const NEVER_USED_BUILDER = {} as unknown as SupportPlanSummaryBuilder;
+const NEVER_USED_PERIODS = {} as unknown as SupportMonthlyPeriodReconciler;
 
 /**
  * `clientId` llega desde la URL como slug (ficha de cliente), no como UUID —
@@ -40,6 +42,7 @@ describe('ListSupportPlansForClientUseCase — resolución de slug en clientId',
       NEVER_USED_USERS,
       NEVER_USED_BILLING,
       NEVER_USED_BUILDER,
+      NEVER_USED_PERIODS,
       new FixedClock(NOW),
     );
   }

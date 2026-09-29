@@ -250,6 +250,11 @@
   }
 }
 
+/* Más ancho que `wide`: la tabla de 6 columnas no cabe en 840px sin scroll horizontal. */
+.teamModal {
+  max-width: min(1100px, calc(100vw - 32px));
+}
+
 .teamModalBody {
   display: flex;
   gap: var(--kora-space-5, 24px);

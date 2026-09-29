@@ -307,9 +307,19 @@ export async function seedDemoSupportBilling(db: Database, today: Date = new Dat
     entry('bundleInvoicedPaid', -2, 12, 10, 'Ajuste de plantillas de correo de cobranza.'),
     entry('bundleInvoicedPaid', -1, 20, 6, 'Nuevo tramo de mora en reglas del bot.'),
     entry('bundleInvoicedPaid', 0, 3, 2, 'Soporte a campaña de cobranza.', REAL.userSolmaryCastro),
+
+    // Mensuales — el consumo del período vigente se recalcula con estas horas (`SupportMonthlyPeriodReconciler`),
+    // así que deben sumar lo mismo que `consumed` en el período de este mes (paso 5).
+    entry('monthlyAccumulateToInvoice', 0, 2, 4, 'Ajuste de integración con SII.'),
+    entry('monthlyAccumulateToInvoice', 0, 8, 2, 'Soporte a cierre contable.', REAL.userSolmaryCastro),
+    entry('monthlyAccumulateOverdue', 0, 3, 5, 'Corrección de cálculo de despacho.'),
+    entry('monthlyAccumulateOverdue', 0, 9, 3, 'Soporte a campaña de descuentos.', REAL.userSolmaryCastro),
+    entry('monthlyExpirePaid', 0, 4, 5, 'Nuevo indicador de ventas por zona.'),
+    entry('monthlyExpireLastPeriodOverage', 0, 2, 8, 'Sincronización offline de visitas.'),
+    entry('monthlyExpireLastPeriodOverage', 0, 7, 6, 'Corrección de geolocalización en Android.', REAL.userSolmaryCastro),
   ]);
 
-  // 5. Períodos mensuales (los mensuales NO miran las horas, sino el consumo guardado en el período) ——
+  // 5. Períodos mensuales — los cerrados guardan su consumo tal cual; el de este mes debe calzar con las horas del paso 4 ——
   const periods = (
     variant: Variant,
     surplusPolicy: 'accumulate' | 'expire',

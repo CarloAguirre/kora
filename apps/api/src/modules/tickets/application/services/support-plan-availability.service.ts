@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { SupportPlanAvailability } from '@kora/contracts';
 import { SUPPORT_PLAN_REPOSITORY, type SupportPlanRepository } from '../../domain/repositories/support-plan.repository';
+import { SupportMonthlyPeriodReconciler } from './support-monthly-period-reconciler';
 
 /**
  * Reimplementación de `soporte_has_active_usable_plan` como servicio de
@@ -10,7 +11,10 @@ import { SUPPORT_PLAN_REPOSITORY, type SupportPlanRepository } from '../../domai
  */
 @Injectable()
 export class SupportPlanAvailabilityService {
-  constructor(@Inject(SUPPORT_PLAN_REPOSITORY) private readonly plans: SupportPlanRepository) {}
+  constructor(
+    @Inject(SUPPORT_PLAN_REPOSITORY) private readonly plans: SupportPlanRepository,
+    private readonly periods: SupportMonthlyPeriodReconciler,
+  ) {}
 
   async check(projectId: string, now: Date): Promise<SupportPlanAvailability> {
     const plan = await this.plans.findActiveForProjectOrLinked(projectId);
@@ -29,7 +33,7 @@ export class SupportPlanAvailabilityService {
       };
     }
 
-    const periods = await this.plans.listPeriodsForPlan(plan.id);
+    const periods = await this.periods.listPeriods(plan, now);
     const activePeriod = periods.find(
       (period) => period.status === 'active' && today >= startOfDay(period.startDate) && today < startOfDay(period.endDate),
     );

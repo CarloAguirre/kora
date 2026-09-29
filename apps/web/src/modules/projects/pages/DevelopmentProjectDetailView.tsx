@@ -4,33 +4,16 @@ import {
   useHourEntriesList,
   useProjectPendingApprovals,
 } from "@/modules/hours/api/hours.queries";
-import {
-  useTeamMemberOptions,
-  useTeamsList,
-} from "@/modules/teams/api/teams.queries";
-import { CalendarIcon, ClockIcon, TrashIcon, TrendingUpIcon } from "@/shared/components/icons/Icons";
+import { useTeamsList } from "@/modules/teams/api/teams.queries";
+import { CalendarIcon, ClockIcon, TrendingUpIcon } from "@/shared/components/icons/Icons";
 import { Button } from "@/shared/components/ui/Button";
 import { Card } from "@/shared/components/ui/Card";
-import { Combobox } from "@/shared/components/ui/Combobox";
-import { TextField } from "@/shared/components/ui/TextField";
 import { useToast } from "@/shared/components/ui/Toast";
 import { ApiRequestError } from "@/shared/lib/api-client";
-import { zodResolver } from "@hookform/resolvers/zod";
-import {
-  assignProjectTeamMemberSchema,
-  type AssignProjectTeamMemberInput,
-  type ProjectDetail,
-  type ProjectTeamMember,
-} from "@kora/contracts";
+import type { ProjectDetail } from "@kora/contracts";
 import { useMemo, useState } from "react";
-import { useForm } from "react-hook-form";
-import { Link } from "react-router-dom";
-import { z } from "zod";
-import {
-  useAssignProjectMember,
-  useResolveProjectManagementApproval,
-  useUnassignProjectMember,
-} from "../api/projects.queries";
+import { useResolveProjectManagementApproval } from "../api/projects.queries";
+import { AssignedTeamsCard, type AssignedTeamSummary } from "../components/AssignedTeamsCard";
 import { BitacoraCard } from "../components/BitacoraCard";
 import { BitacoraMiniCard } from "../components/BitacoraMiniCard";
 import { ProjectExtrasTab } from "../components/ProjectExtrasTab";
@@ -43,9 +26,7 @@ import { ProjectTimeline } from "../components/ProjectTimeline";
 import { TeamHoursSummaryChart } from "../components/TeamHoursSummaryChart";
 import { TeamTasksCard } from "../components/TeamTasksCard";
 import { TeamDeliveriesCard } from "../components/TeamDeliveriesCard";
-import { getTeamStyle } from "../utils/team-style";
 import styles from "./ProjectDetailPage.module.css";
-import { projectTeamPath } from "@/app/router/paths";
 
 const formatDate = (value: string | null) =>
   value ? new Date(`${value}T00:00:00`).toLocaleDateString("es-CL") : "—";
@@ -76,8 +57,6 @@ export function DevelopmentProjectDetailView({
   const { user } = useAuth();
   const toast = useToast();
   const [tab, setTab] = useState<DetailTab>("resumen");
-  const assignMember = useAssignProjectMember();
-  const unassignMember = useUnassignProjectMember();
   const resolveManagementApproval = useResolveProjectManagementApproval();
   const { data: projectHourEntries } = useHourEntriesList({
     projectId,
@@ -86,24 +65,11 @@ export function DevelopmentProjectDetailView({
     sortField: "date",
     sortDirection: "desc",
   });
-  const { data: teamMemberOptions } = useTeamMemberOptions();
   const { data: teamsCatalog } = useTeamsList({
     page: 1,
     pageSize: 50,
     sortField: "name",
   });
-
-  const [memberError, setMemberError] = useState<string | null>(null);
-
-  const memberForm = useForm<
-    z.input<typeof assignProjectTeamMemberSchema>,
-    unknown,
-    AssignProjectTeamMemberInput
-  >({
-    resolver: zodResolver(assignProjectTeamMemberSchema),
-    defaultValues: { teamMemberId: "", activity: "", assignedHours: 0 },
-  });
-  const teamMemberId = memberForm.watch("teamMemberId");
 
   /**
    * `project.teams` (v1: `equipo_proyecto`) trae el líder y las HH
@@ -128,30 +94,16 @@ export function DevelopmentProjectDetailView({
   }, [teamsCatalog]);
 
   const teamSummaries = useMemo(() => {
-    const summaries = new Map<
-      string,
-      {
-        teamId: string;
-        teamName: string;
-        leaderId: string | null;
-        leaderName: string | null;
-        memberCount: number;
-        maxMembers: number | null;
-        assignedHours: number;
-        consumedHours: number;
-      }
-    >();
+    const summaries = new Map<string, AssignedTeamSummary>();
     const hasRealTeamRow = new Set(project.teams.map((team) => team.teamId));
 
     for (const team of project.teams) {
       const leader = team.leader ?? teamLeaderCatalog.get(team.teamId) ?? null;
       summaries.set(team.teamId, {
         teamId: team.teamId,
+        teamSlug: team.teamSlug,
         teamName: team.teamName,
-        leaderId: leader?.id ?? null,
         leaderName: leader?.fullName ?? null,
-        memberCount: team.memberCount,
-        maxMembers: team.maxMembers || null,
         assignedHours: team.assignedHours ?? 0,
         consumedHours: 0,
       });
@@ -162,7 +114,6 @@ export function DevelopmentProjectDetailView({
       if (existing) {
         existing.consumedHours += member.consumedHours;
         if (!hasRealTeamRow.has(member.teamId)) {
-          existing.memberCount += 1;
           existing.assignedHours += member.assignedHours;
         }
       } else {
@@ -170,10 +121,7 @@ export function DevelopmentProjectDetailView({
         summaries.set(member.teamId, {
           teamId: member.teamId,
           teamName: member.teamName,
-          leaderId: leader?.id ?? null,
           leaderName: leader?.fullName ?? null,
-          memberCount: 1,
-          maxMembers: null,
           assignedHours: member.assignedHours,
           consumedHours: member.consumedHours,
         });
@@ -254,54 +202,8 @@ export function DevelopmentProjectDetailView({
     canSeePendingApprovals,
   );
 
-  /** Horas pendientes de ESE colaborador puntual, para pintarlas junto a su fila en "Equipo asignado". */
-  const pendingHoursByUserId = useMemo(() => {
-    const map = new Map<string, { entryCount: number; totalHours: number }>();
-    for (const group of pendingApprovals?.groups ?? []) {
-      for (const collaborator of group.collaborators) {
-        map.set(collaborator.userId, {
-          entryCount: collaborator.entryCount,
-          totalHours: collaborator.totalHours,
-        });
-      }
-    }
-    return map;
-  }, [pendingApprovals]);
-
-  /** Total pendiente con el líder de ESE equipo, para pintarlo en el encabezado del grupo. */
-  const pendingHoursByApproverId = useMemo(() => {
-    const map = new Map<string, { entryCount: number; totalHours: number }>();
-    for (const group of pendingApprovals?.groups ?? []) {
-      map.set(group.approverUserId, {
-        entryCount: group.entryCount,
-        totalHours: group.totalHours,
-      });
-    }
-    return map;
-  }, [pendingApprovals]);
-
   /** Total pendiente de aprobación del proyecto completo, para la nota bajo "HH consumidas" en la tarjeta de Línea de tiempo. */
   const totalPendingHours = (pendingApprovals?.groups ?? []).reduce((sum, group) => sum + group.totalHours, 0);
-
-  const onAssignMember = memberForm.handleSubmit(async (values) => {
-    setMemberError(null);
-    try {
-      await assignMember.mutateAsync({ projectId, input: values });
-      toast.success("Se asignó a la persona al proyecto.");
-      memberForm.reset({ teamMemberId: "", activity: "", assignedHours: 0 });
-    } catch (error) {
-      setMemberError(
-        error instanceof ApiRequestError
-          ? error.message
-          : "No se pudo asignar.",
-      );
-    }
-  });
-
-  const onUnassign = async (assignmentId: string) => {
-    await unassignMember.mutateAsync({ projectId, assignmentId });
-    toast.success("Se retiró a la persona del proyecto.");
-  };
 
   const onResolveManagementApproval = async () => {
     try {
@@ -313,16 +215,6 @@ export function DevelopmentProjectDetailView({
       );
     }
   };
-
-  const membersByTeam = useMemo(() => {
-    const map = new Map<string, ProjectTeamMember[]>();
-    for (const member of project.members) {
-      const list = map.get(member.teamId);
-      if (list) list.push(member);
-      else map.set(member.teamId, [member]);
-    }
-    return map;
-  }, [project.members]);
 
   return (
     <div className={styles.page}>
@@ -432,233 +324,18 @@ export function DevelopmentProjectDetailView({
               <div className={styles.colLeft}>
                 <TeamHoursSummaryChart teams={teamSummaries} />
 
+                <AssignedTeamsCard
+                  project={project}
+                  teams={teamSummaries}
+                  onViewHours={() => setTab("bitacora")}
+                />
+
                 {leaderTeamId && (
                   <>
                     <TeamTasksCard project={project} projectId={projectId} teamId={leaderTeamId} />
                     <TeamDeliveriesCard project={project} projectId={projectId} teamId={leaderTeamId} />
                   </>
                 )}
-
-                <Card>
-                  <div className={styles.sectionHeader}>
-                    <p className={styles.sectionTitle}>
-                      Equipo asignado ({project.members.length})
-                    </p>
-                  </div>
-
-                  {teamSummaries.length > 0 ? (
-                    <div className={styles.groupedTableWrap}>
-                      <table className={styles.groupedTable}>
-                        <caption className="srOnly">
-                          Personas asignadas, agrupadas por equipo
-                        </caption>
-                        <thead>
-                          <tr>
-                            <th scope="col">Persona</th>
-                            <th scope="col">Actividad</th>
-                            <th scope="col">HH asignadas</th>
-                            <th scope="col">HH consumidas</th>
-                            {canSeePendingApprovals && (
-                              <th scope="col">Pendiente aprob.</th>
-                            )}
-                            <th scope="col" aria-label="Acciones" />
-                          </tr>
-                        </thead>
-                        {teamSummaries.map((team) => {
-                          const style = getTeamStyle(team.teamName);
-                          const deviatedHours = Math.max(
-                            0,
-                            team.consumedHours - team.assignedHours,
-                          );
-                          const members = membersByTeam.get(team.teamId) ?? [];
-                          const columnCount = canSeePendingApprovals ? 6 : 5;
-                          const pendingWithLeader = team.leaderId
-                            ? pendingHoursByApproverId.get(team.leaderId)
-                            : undefined;
-                          return (
-                            <tbody key={team.teamId}>
-                              <tr
-                                className={styles.groupRow}
-                                style={{ background: style.bg }}
-                              >
-                                <td colSpan={columnCount}>
-                                  <div className={styles.groupRowContent}>
-                                    <span
-                                      className={styles.groupAvatar}
-                                      style={{ background: style.color }}
-                                    >
-                                      {style.sigla}
-                                    </span>
-                                    <span className={styles.groupName}>
-                                      {team.teamName}
-                                    </span>
-                                    <span className={styles.groupLeader}>
-                                      {team.leaderName ? (
-                                        <>
-                                          Líder: <b>{team.leaderName}</b>
-                                        </>
-                                      ) : (
-                                        "Sin líder asignado"
-                                      )}
-                                    </span>
-                                    <span className={styles.groupStats}>
-                                      {team.maxMembers != null
-                                        ? `${team.memberCount}/${team.maxMembers} personas`
-                                        : `${team.memberCount} persona${team.memberCount === 1 ? "" : "s"}`}{" "}
-                                      ·{" "}
-                                      {formatHours(team.assignedHours)}h asig. ·{" "}
-                                      {formatHours(team.consumedHours)}h cons. ·{" "}
-                                      <span
-                                        className={
-                                          deviatedHours > 0
-                                            ? styles.teamHealthDanger
-                                            : styles.teamHealthOk
-                                        }
-                                      >
-                                        {deviatedHours > 0
-                                          ? `${formatHours(deviatedHours)}h desv.`
-                                          : "en rango"}
-                                      </span>
-                                      {pendingWithLeader && (
-                                        <>
-                                          {" · "}
-                                          <span className={styles.pendingBadge}>
-                                            {formatHours(
-                                              pendingWithLeader.totalHours,
-                                            )}
-                                            h pendientes de aprobar (
-                                            {pendingWithLeader.entryCount})
-                                          </span>
-                                        </>
-                                      )}
-                                    </span>
-                                    <Link
-                                      to={projectTeamPath(project, { id: team.teamId })}
-                                      className={styles.groupLeader}
-                                    >
-                                      Ver equipo
-                                    </Link>
-                                  </div>
-                                </td>
-                              </tr>
-
-                              {members.length > 0 ? (
-                                members.map((m) => {
-                                  const pending = pendingHoursByUserId.get(
-                                    m.userId,
-                                  );
-                                  return (
-                                    <tr key={m.id} className={styles.memberRow}>
-                                      <td>{m.fullName}</td>
-                                      <td className={styles.memberCellMuted}>
-                                        {m.activity ?? "—"}
-                                      </td>
-                                      <td>{formatHours(m.assignedHours)}</td>
-                                      <td>{formatHours(m.consumedHours)}</td>
-                                      {canSeePendingApprovals && (
-                                        <td
-                                          className={
-                                            pending
-                                              ? styles.pendingCell
-                                              : styles.memberCellMuted
-                                          }
-                                        >
-                                          {pending
-                                            ? `${formatHours(pending.totalHours)}h (${pending.entryCount})`
-                                            : "—"}
-                                        </td>
-                                      )}
-                                      <td className={styles.memberCellActions}>
-                                        {canManageProject && (
-                                          <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            onClick={() =>
-                                              void onUnassign(m.id)
-                                            }
-                                            aria-label={`Quitar a ${m.fullName}`}
-                                          >
-                                            <TrashIcon size={16} />
-                                          </Button>
-                                        )}
-                                      </td>
-                                    </tr>
-                                  );
-                                })
-                              ) : (
-                                <tr>
-                                  <td
-                                    colSpan={columnCount}
-                                    className={styles.emptyGroupCell}
-                                  >
-                                    Sin colaboradores asignados en este equipo.
-                                  </td>
-                                </tr>
-                              )}
-                            </tbody>
-                          );
-                        })}
-                      </table>
-                    </div>
-                  ) : (
-                    <p className={styles.empty}>
-                      Nadie está asignado a este proyecto todavía.
-                    </p>
-                  )}
-
-                  {canManageProject && (
-                    <form
-                      className={styles.inlineForm}
-                      onSubmit={onAssignMember}
-                    >
-                      {memberError && (
-                        <p className={styles.error}>{memberError}</p>
-                      )}
-                      <div className={styles.inlineFormRow}>
-                        <div>
-                          <Combobox
-                            label="Persona"
-                            placeholder="Buscar por nombre…"
-                            options={(teamMemberOptions?.items ?? []).map(
-                              (member) => ({
-                                value: member.id,
-                                label: `${member.fullName} — ${member.teamName}`,
-                              }),
-                            )}
-                            value={teamMemberId}
-                            onChange={(value) =>
-                              memberForm.setValue("teamMemberId", value, {
-                                shouldValidate: true,
-                              })
-                            }
-                            emptyMessage="No se encontraron personas."
-                          />
-                          {memberForm.formState.errors.teamMemberId && (
-                            <p className={styles.error}>
-                              {memberForm.formState.errors.teamMemberId.message}
-                            </p>
-                          )}
-                        </div>
-                        <TextField
-                          label="Actividad"
-                          {...memberForm.register("activity")}
-                        />
-                        <TextField
-                          label="HH asignadas"
-                          type="number"
-                          {...memberForm.register("assignedHours")}
-                        />
-                        <Button
-                          type="submit"
-                          loading={memberForm.formState.isSubmitting}
-                          loadingText="Asignando…"
-                        >
-                          Asignar
-                        </Button>
-                      </div>
-                    </form>
-                  )}
-                </Card>
               </div>
 
               <div className={styles.colRight}>

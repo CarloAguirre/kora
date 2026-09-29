@@ -64,6 +64,20 @@ export interface CreateInitialSupportMonthlyPeriodInput {
   readonly surplusPolicy: 'accumulate' | 'expire';
 }
 
+/** Período siguiente de la cadena — lo crea `SupportMonthlyPeriodReconciler` al vencer el anterior. */
+export interface CreateNextSupportMonthlyPeriodInput extends CreateInitialSupportMonthlyPeriodInput {
+  readonly reusedBalanceHours: number;
+  readonly consumedHoursStart: number;
+}
+
+/** Consumo recalculado de un período — v1: lo reescribía `recalc_proyecto_hh_utilizadas` con cada cambio de horas. */
+export interface SupportMonthlyPeriodUsageUpdate {
+  readonly consumedHoursPeriod: number;
+  readonly consumedHoursEnd: number | null;
+  readonly surplusHours: number;
+  readonly status: 'active' | 'expired';
+}
+
 /**
  * Planes de soporte. La lectura (`findActiveForProject`/`listPeriodsForPlan`)
  * es la que ya existía para el gate de creación de tickets — ver
@@ -81,13 +95,14 @@ export interface SupportPlanRepository {
   findActiveForProjectOrLinked(projectId: string, context?: TransactionContext): Promise<SupportPlanRecord | null>;
   listPeriodsForPlan(planId: string, context?: TransactionContext): Promise<SupportMonthlyPeriodRecord[]>;
   /**
-   * Crea el primer período de un plan `monthly` recién creado. Los períodos
-   * siguientes NO se generan automáticamente todavía — a diferencia de la v1
-   * (donde el sistema en producción los iba creando mes a mes), la v2 no
-   * tiene aún un job recurrente para esto; queda documentado como brecha
-   * conocida, no resuelta en silencio (ver el caso de uso de creación).
+   * Crea el primer período de un plan `monthly` recién creado. Los
+   * siguientes los va agregando `SupportMonthlyPeriodReconciler` a medida que
+   * vence el anterior (`createNextPeriod`).
    */
   createInitialPeriod(input: CreateInitialSupportMonthlyPeriodInput, context?: TransactionContext): Promise<void>;
+  /** No hace nada si otro request ya creó el período con ese inicio (índice único por plan + inicio) — devuelve si lo insertó. */
+  createNextPeriod(input: CreateNextSupportMonthlyPeriodInput, context?: TransactionContext): Promise<boolean>;
+  updatePeriodUsage(periodId: string, usage: SupportMonthlyPeriodUsageUpdate, context?: TransactionContext): Promise<void>;
 
   findById(id: string, context?: TransactionContext): Promise<SupportPlan | null>;
   findBySlug(slug: string, context?: TransactionContext): Promise<SupportPlan | null>;

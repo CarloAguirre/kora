@@ -7,6 +7,8 @@ import {
   type SupportPlanRecord,
   type SupportPlanRepository,
 } from '../../domain/repositories/support-plan.repository';
+import { SupportMonthlyPeriodReconciler } from './support-monthly-period-reconciler';
+import { resolveSupportPlanProjectIds } from './support-plan-linked-projects';
 
 const MONTH_LABELS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 const HOUR_ENTRY_PAGE_SIZE = 2000;
@@ -28,12 +30,13 @@ export class SupportPlanSummaryBuilder {
   constructor(
     @Inject(SUPPORT_PLAN_REPOSITORY) private readonly plans: SupportPlanRepository,
     @Inject(HOUR_ENTRY_REPOSITORY) private readonly hourEntries: HourEntryRepository,
+    private readonly periods: SupportMonthlyPeriodReconciler,
   ) {}
 
   async build(plan: SupportPlanRecord, linkedProjectIds: readonly string[], now: Date): Promise<SupportProjectSummary> {
     if (plan.planType === 'monthly') {
       return this.buildMonthlySummary(
-        plan.id,
+        plan,
         plan.contractedHours,
         plan.planValueUf,
         plan.extraHourValueUf,
@@ -45,21 +48,13 @@ export class SupportPlanSummaryBuilder {
     return this.buildUsageSummary(linkedProjectIds, plan.planType, plan.contractedHours, plan.planValueUf, plan.extraHourValueUf, plan.currency);
   }
 
-  /**
-   * Contratos `consolidated` pool-ean las horas entre varios proyectos de
-   * desarrollo (`support_plan_projects`) — sumar solo un proyecto
-   * subcontaría el consumo real del contrato. Legado (`plan.projectId`
-   * directo) sigue funcionando igual que antes: sin filas de enlace, cae al
-   * único proyecto de siempre.
-   */
+  /** Ver `resolveSupportPlanProjectIds`. */
   async resolveLinkedProjectIds(plan: SupportPlanRecord): Promise<string[]> {
-    const linked = await this.plans.listLinkedProjectIds(plan.id);
-    if (linked.length > 0) return linked;
-    return plan.projectId ? [plan.projectId] : [];
+    return resolveSupportPlanProjectIds(this.plans, plan);
   }
 
   private async buildMonthlySummary(
-    planId: string,
+    plan: SupportPlanRecord,
     contractedHours: number,
     planValueUf: number,
     extraHourValueUf: number,
@@ -67,7 +62,7 @@ export class SupportPlanSummaryBuilder {
     isAccumulate: boolean,
     now: Date,
   ): Promise<SupportProjectSummary> {
-    const periods = (await this.plans.listPeriodsForPlan(planId)).sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
+    const periods = (await this.periods.listPeriods(plan, now)).sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
 
     /** El saldo reutilizado ya viene calculado en el período (v1: `hh_saldo_reutilizado`) — no hace falta adivinarlo buscando el período cuyo fin calce con este inicio. */
     const priorSurplusOf = (period: SupportMonthlyPeriodRecord) => (isAccumulate ? period.reusedBalanceHours : 0);

@@ -7,19 +7,16 @@ import { AuthContext, type AuthContextValue } from '@/modules/auth/context/AuthC
 import { ToastProvider } from '@/shared/components/ui/Toast';
 
 /**
- * El pedido fue "que se vea quién es el líder de equipo y cuáles son sus
- * personas": este test cubre eso — que la ficha agrupe a cada colaborador
- * bajo SU equipo (no una tabla plana mezclando a todos) y que el líder de
- * cada equipo se muestre en el encabezado del grupo, incluso cuando ese
- * equipo no tiene una fila propia en `project_teams` (cae al líder general
- * del equipo, catálogo de equipos) — el caso real reportado: RPA sí tiene
- * líder (José Aponte) pero la ficha del proyecto no lo mostraba porque el
- * proyecto nunca fijó un líder específico para RPA.
+ * "Equipos Asignados" es una grilla de tarjetas resumidas (una por equipo,
+ * como en `ficha_proyecto_lider-actualizada.html`), no una tabla por persona
+ * ni un formulario de asignación — eso vive en la ficha del equipo. Cada
+ * tarjeta muestra al líder del equipo incluso cuando el proyecto no fijó uno
+ * en `project_teams` (cae al líder general del equipo, catálogo de equipos) —
+ * el caso real reportado: RPA sí tiene líder (José Aponte) pero la ficha no
+ * lo mostraba porque el proyecto nunca fijó un líder específico para RPA.
  */
 
 vi.mock('../api/projects.queries', () => ({
-  useAssignProjectMember: () => ({ mutateAsync: vi.fn() }),
-  useUnassignProjectMember: () => ({ mutateAsync: vi.fn() }),
   useResolveProjectManagementApproval: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useCorrectProjectHito0Date: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useAddProjectObservation: () => ({ mutateAsync: vi.fn() }),
@@ -50,7 +47,6 @@ vi.mock('@/modules/users/api/users.queries', () => ({
 }));
 
 vi.mock('@/modules/teams/api/teams.queries', () => ({
-  useTeamMemberOptions: () => ({ data: { items: [] } }),
   useTeamsList: () => ({
     data: {
       items: [
@@ -123,9 +119,9 @@ function buildProject(): ProjectDetail {
     contractLink: null,
     additionalLinks: null,
     teams: [
-      { id: 'pt-dev', teamId: 'team-dev', teamSlug: 'desarrollo', teamName: 'Desarrollo', leader: { id: 'u-jose', fullName: 'José Aponte' }, assignedHours: 0, memberCount: 2, maxMembers: null },
-      { id: 'pt-ux', teamId: 'team-ux', teamSlug: 'ux-ui', teamName: 'UX-UI', leader: { id: 'u-eduardo', fullName: 'Eduardo Aranda' }, assignedHours: 0, memberCount: 2, maxMembers: null },
-      { id: 'pt-rpa', teamId: 'team-rpa', teamSlug: 'rpa', teamName: 'RPA', leader: null, assignedHours: 0, memberCount: 3, maxMembers: null },
+      { id: 'pt-dev', teamId: 'team-dev', teamSlug: 'desarrollo', teamName: 'Desarrollo', leader: { id: 'u-jose', fullName: 'José Aponte' }, assignedHours: 400, memberCount: 2, maxMembers: null },
+      { id: 'pt-ux', teamId: 'team-ux', teamSlug: 'ux-ui', teamName: 'UX-UI', leader: { id: 'u-eduardo', fullName: 'Eduardo Aranda' }, assignedHours: 200, memberCount: 2, maxMembers: null },
+      { id: 'pt-rpa', teamId: 'team-rpa', teamSlug: 'rpa', teamName: 'RPA', leader: null, assignedHours: 45, memberCount: 3, maxMembers: null },
     ],
     members: [
       buildMember({ id: 'm1', userId: 'user-jose', teamId: 'team-rpa', teamName: 'RPA', fullName: 'José Aponte', consumedHours: 16 }),
@@ -222,97 +218,48 @@ function renderView(permissions: Permission[] = ['projects:manage'], pendingAppr
   );
 }
 
-/** Cada equipo es un `<tbody>` propio: su fila divisoria trae el nombre del equipo. */
-function getTeamGroupNode(teamName: string): HTMLElement {
-  const name = screen.getByText(teamName, { selector: '[class*="groupName"]' });
-  return name.closest('tbody') as HTMLElement;
+/** Cada equipo es una tarjeta-enlace propia, identificada por su nombre (texto solo para lectores de pantalla). */
+function getTeamCard(teamName: string) {
+  return screen.getByText(`Equipo ${teamName}`).closest('a') as HTMLAnchorElement;
 }
 
-function getTeamGroup(teamName: string) {
-  return within(getTeamGroupNode(teamName));
-}
-
-function getGroupLeaderText(teamName: string): string {
-  const node = getTeamGroupNode(teamName).querySelector('[class*="groupLeader"]');
-  return (node?.textContent ?? '').replace(/\s+/g, ' ').trim();
-}
-
-describe('DevelopmentProjectDetailView — equipo asignado', () => {
+describe('DevelopmentProjectDetailView — equipos asignados', () => {
   it('muestra el líder de cada equipo, incluso si no está fijado a nivel de proyecto', () => {
     renderView();
 
-    expect(getGroupLeaderText('Desarrollo')).toBe('Líder: José Aponte');
-    expect(getGroupLeaderText('UX-UI')).toBe('Líder: Eduardo Aranda');
+    expect(within(getTeamCard('Desarrollo')).getByText('José Aponte')).toBeInTheDocument();
+    expect(within(getTeamCard('UX-UI')).getByText('Eduardo Aranda')).toBeInTheDocument();
     // RPA no tiene líder fijado para ESTE proyecto (project_teams.leader_user_id
     // nulo), pero el equipo sí tiene líder en general — debe mostrarse igual.
-    expect(getGroupLeaderText('RPA')).toBe('Líder: José Aponte');
+    expect(within(getTeamCard('RPA')).getByText('José Aponte')).toBeInTheDocument();
     // QA no tiene líder ni a nivel de proyecto ni en el catálogo de equipos.
-    expect(getGroupLeaderText('QA')).toBe('Sin líder asignado');
+    expect(within(getTeamCard('QA')).getByText('Sin líder asignado')).toBeInTheDocument();
   });
 
-  it('agrupa a cada persona bajo su propio equipo, no en una tabla plana', () => {
+  it('resume HH asignadas/utilizadas y la salud de cada equipo', () => {
     renderView();
-    // Las filas de persona son <td>: eso las distingue del <b> del líder en la
-    // fila divisoria, que puede repetir el mismo nombre (p. ej. José Aponte
-    // lidera Desarrollo y a la vez es miembro de RPA).
-    const memberRow = { selector: 'td' } as const;
 
-    const desarrollo = getTeamGroup('Desarrollo');
-    expect(desarrollo.getByText('Claudio Andres Flores Vilches', memberRow)).toBeInTheDocument();
-    expect(desarrollo.getByText('Cristian Esteban Cancino Espinoza', memberRow)).toBeInTheDocument();
-    expect(desarrollo.queryByText('José Aponte', memberRow)).not.toBeInTheDocument();
+    const desarrollo = within(getTeamCard('Desarrollo'));
+    expect(desarrollo.getByText('400 hrs')).toBeInTheDocument();
+    expect(desarrollo.getByText('474 hrs')).toBeInTheDocument();
+    expect(desarrollo.getByText(/Crítico — 74 hrs sobre presupuesto/)).toBeInTheDocument();
 
-    const rpa = getTeamGroup('RPA');
-    expect(rpa.getByText('José Aponte', memberRow)).toBeInTheDocument();
-    expect(rpa.getByText('Pablo Vega', memberRow)).toBeInTheDocument();
-    expect(rpa.getByText('Karen de Souza', memberRow)).toBeInTheDocument();
-
-    const uxUi = getTeamGroup('UX-UI');
-    expect(uxUi.getByText('Eduardo Aranda', memberRow)).toBeInTheDocument();
-    expect(uxUi.getByText('Leslie Galaz Contreras', memberRow)).toBeInTheDocument();
+    expect(within(getTeamCard('UX-UI')).getByText(/Excelente/)).toBeInTheDocument();
+    expect(within(getTeamCard('RPA')).getByText(/En rango/)).toBeInTheDocument();
+    expect(within(getTeamCard('QA')).getByText(/Crítico — sin iniciar/)).toBeInTheDocument();
   });
 
-  it('permite quitar a una persona del equipo cuando hay permiso de gestión', () => {
+  it('cada tarjeta lleva a la ficha del equipo dentro del proyecto', () => {
+    renderView();
+
+    expect(getTeamCard('Desarrollo')).toHaveAttribute('href', '/proyectos/proyecto-de-prueba/equipos/desarrollo');
+  });
+
+  it('no lista personas ni permite asignar o quitar gente desde la ficha', () => {
     renderView(['projects:manage']);
 
-    const desarrollo = getTeamGroup('Desarrollo');
-    expect(desarrollo.getByRole('button', { name: /Quitar a Claudio Andres Flores Vilches/ })).toBeInTheDocument();
-  });
-
-  it('oculta las acciones de gestión sin el permiso correspondiente', () => {
-    renderView([]);
-
-    const desarrollo = getTeamGroup('Desarrollo');
-    expect(desarrollo.queryByRole('button', { name: /Quitar a/ })).not.toBeInTheDocument();
-  });
-
-  it('el pedido fue "de qué colaborador son y el total por líder": muestra ambos', () => {
-    renderView(['projects:manage'], {
-      groups: [
-        {
-          approverUserId: 'u-jose',
-          approverName: 'José Aponte',
-          entryCount: 2,
-          totalHours: 6,
-          oldestPendingDate: '2026-01-05',
-          collaborators: [
-            { userId: 'user-cristian', userName: 'Cristian Esteban Cancino Espinoza', entryCount: 2, totalHours: 6, oldestPendingDate: '2026-01-05' },
-          ],
-        },
-      ],
-    });
-
-    // Total por líder, en el encabezado del grupo que lidera.
-    const desarrollo = getTeamGroup('Desarrollo');
-    expect(desarrollo.getByText(/6h pendientes de aprobar \(2\)/)).toBeInTheDocument();
-
-    // De qué colaborador son, en su propia fila.
-    const cristianRow = desarrollo.getByText('Cristian Esteban Cancino Espinoza', { selector: 'td' }).closest('tr');
-    expect(within(cristianRow as HTMLElement).getByText('6h (2)')).toBeInTheDocument();
-
-    // Quien no tiene horas pendientes muestra un guion, no vacío (uno para
-    // "Actividad", que tampoco tiene dato, y otro para "Pendiente aprob.").
-    const claudioRow = desarrollo.getByText('Claudio Andres Flores Vilches', { selector: 'td' }).closest('tr');
-    expect(within(claudioRow as HTMLElement).getAllByText('—')).toHaveLength(2);
+    expect(screen.queryByText('Claudio Andres Flores Vilches')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Quitar a/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Asignar' })).not.toBeInTheDocument();
   });
 });
