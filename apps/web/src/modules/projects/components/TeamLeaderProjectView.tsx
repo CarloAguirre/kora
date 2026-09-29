@@ -71,9 +71,10 @@ export function TeamLeaderProjectView({
     const teamName = teamRow?.teamName ?? members[0]?.teamName ?? 'Equipo';
     const leaderId = teamRow?.leader?.id ?? null;
     const leaderName = teamRow?.leader?.fullName ?? null;
+    const maxMembers = teamRow?.maxMembers || null;
     const assignedHours = teamRow?.assignedHours ?? members.reduce((sum, m) => sum + m.assignedHours, 0);
     const consumedHours = members.reduce((sum, m) => sum + m.consumedHours, 0);
-    return { teamId, teamName, leaderId, leaderName, assignedHours, consumedHours, members };
+    return { teamId, teamName, leaderId, leaderName, maxMembers, assignedHours, consumedHours, members };
   }, [project, teamId]);
 
   const canManageTeam = can('projects:manage') || (user !== null && team.leaderId === user.id);
@@ -107,6 +108,9 @@ export function TeamLeaderProjectView({
   const draftOverBudget = team.assignedHours > 0 && draftTotalAssigned > team.assignedHours;
   const usedTeamMemberIds = new Set(teamDraft.map((row) => row.teamMemberId));
   const poolLeft = unassignedMembers.filter((m) => !usedTeamMemberIds.has(m.id));
+  // Cupos libres según el `N° colaboradores` definido en el proyecto (nulo = sin tope).
+  const slotsLeft = team.maxMembers != null ? Math.max(0, team.maxMembers - teamDraft.length) : Infinity;
+  const addableCount = Math.min(poolLeft.length, slotsLeft);
 
   const updateDraftRow = (key: string, patch: Partial<TeamMemberDraftRow>) => {
     setTeamDraft((prev) => prev.map((row) => (row.key === key ? { ...row, ...patch } : row)));
@@ -114,7 +118,7 @@ export function TeamLeaderProjectView({
 
   const addDraftRow = () => {
     const next = poolLeft[0];
-    if (!next) return;
+    if (!next || addableCount === 0) return;
     setTeamDraft((prev) => [
       ...prev,
       {
@@ -435,15 +439,17 @@ export function TeamLeaderProjectView({
               variant="ghost"
               size="sm"
               className={deliveryModalStyles.addButton}
-              disabled={poolLeft.length === 0}
+              disabled={addableCount === 0}
               onClick={addDraftRow}
             >
               + Agregar
             </Button>
             <p className={styles.cupoHint}>
-              {poolLeft.length === 0
-                ? 'No hay más personas disponibles en este equipo para agregar.'
-                : `Puedes agregar hasta ${poolLeft.length} colaborador(es) más.`}
+              {slotsLeft === 0
+                ? `Se alcanzó el tope de ${team.maxMembers} colaborador(es) definido para este equipo en el proyecto.`
+                : poolLeft.length === 0
+                  ? 'No hay más personas disponibles en este equipo para agregar.'
+                  : `Puedes agregar hasta ${addableCount} colaborador(es) más.`}
             </p>
           </div>
         </div>
