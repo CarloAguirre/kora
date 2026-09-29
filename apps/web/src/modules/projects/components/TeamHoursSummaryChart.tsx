@@ -14,6 +14,15 @@ export interface TeamHoursSummary {
 const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 2 });
 
 /**
+ * Alto mínimo (px) de una barra con valor > 0. Contra una escala de miles de
+ * HH, unas pocas horas miden menos de 2px y el borde blanco de 2px las tapa
+ * entera — el gráfico parecía no registrar el consumo. Un valor 0 sigue sin
+ * dibujarse, para no inventar barras.
+ */
+const MIN_VISIBLE_BAR_PX = 6;
+const minVisibleBar = (value: number | undefined | null) => ((value ?? 0) > 0 ? MIN_VISIBLE_BAR_PX : 0);
+
+/**
  * Franja "Resumen de HH por equipo" — réplica del bloque `fpd-chart-*` de
  * `LiderProyectoFicha` (v1): gráfico de barras (Asignadas + Desviadas apiladas,
  * Utilizadas aparte) por equipo, con totalizadores y % de avance a la derecha.
@@ -80,6 +89,7 @@ export function TeamHoursSummaryChart({ teams }: { teams: readonly TeamHoursSumm
                   stroke="var(--kora-surface)"
                   strokeWidth={2}
                   radius={[4, 4, 0, 0]}
+                  minPointSize={minVisibleBar}
                   activeBar={{ fillOpacity: 0.85 }}
                   animationDuration={700}
                   animationEasing="ease-out"
@@ -92,6 +102,7 @@ export function TeamHoursSummaryChart({ teams }: { teams: readonly TeamHoursSumm
                   stroke="var(--kora-surface)"
                   strokeWidth={2}
                   radius={[4, 4, 0, 0]}
+                  minPointSize={minVisibleBar}
                   activeBar={{ fillOpacity: 0.85 }}
                   animationDuration={700}
                   animationEasing="ease-out"
@@ -103,6 +114,7 @@ export function TeamHoursSummaryChart({ teams }: { teams: readonly TeamHoursSumm
                   stroke="var(--kora-surface)"
                   strokeWidth={2}
                   radius={[4, 4, 0, 0]}
+                  minPointSize={minVisibleBar}
                   activeBar={{ fillOpacity: 0.85 }}
                   animationDuration={700}
                   animationEasing="ease-out"
@@ -126,7 +138,8 @@ export function TeamHoursSummaryChart({ teams }: { teams: readonly TeamHoursSumm
 
           <div className={styles.avanceBox}>
             <span className={styles.avanceLabel}>Avance equipos</span>
-            <span className={styles.avanceValue}>{totals.avancePct}%</span>
+            {/* Con consumo real pero < 0,5% el redondeo daría "0%", que se lee como "no ha partido". */}
+            <span className={styles.avanceValue}>{totals.avancePct === 0 && totals.totalUtilizadas > 0 ? '<1' : totals.avancePct}%</span>
           </div>
         </div>
       </div>
