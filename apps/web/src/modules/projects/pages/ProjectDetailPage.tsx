@@ -83,8 +83,7 @@ export function ProjectDetailPage() {
    * Un líder puede ser a la vez líder de proyecto (o tener `projects:manage`)
    * y líder de uno de los equipos asignados — en ese caso conserva la vista
    * completa (`DevelopmentProjectDetailView`), no la acotada a un solo
-   * equipo, pero igual puede crear/editar las tareas de su equipo desde ahí
-   * (ver `leaderTeamId` más abajo).
+   * equipo.
    */
   const isProjectLeader = user !== null && project.leader?.id === user.id;
   const showTeamOnlyView = !can('projects:manage') && !isProjectLeader && Boolean(leaderTeam);
@@ -134,7 +133,7 @@ export function ProjectDetailPage() {
         ) : project.type === 'support' ? (
           <SupportProjectDetailView project={project} projectId={projectId} />
         ) : (
-          <DevelopmentProjectDetailView project={project} projectId={projectId} leaderTeamId={leaderTeam?.teamId} />
+          <DevelopmentProjectDetailView project={project} projectId={projectId} />
         )}
 
         <EditProjectDialog

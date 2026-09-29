@@ -7,7 +7,7 @@ import { TICKET_CLIENT_READER, type TicketClientReader } from '../ports/ticket-c
 import { TICKET_PROJECT_READER, type TicketProjectReader } from '../ports/ticket-project-reader.port';
 import { computeSupportPlanAlerts } from '../services/support-plan-alerts';
 import { SupportMonthlyPeriodReconciler } from '../services/support-monthly-period-reconciler';
-import { SupportPlanCurrentBillingResolver } from '../services/support-plan-current-billing.resolver';
+import { SupportPlanCurrentBillingResolver, type CurrentBillingStatus } from '../services/support-plan-current-billing.resolver';
 import { resolveSupportPlanName } from '../services/support-plan-naming';
 import { SupportPlanSummaryBuilder } from '../services/support-plan-summary-builder';
 import { paymentStatusOf } from '../services/support-invoice-payment-status';
@@ -67,8 +67,10 @@ export class GetSupportBillingOverviewUseCase implements UseCase<GetSupportBilli
       const linkedIds = await this.summaryBuilder.resolveLinkedProjectIds(record);
       const periods = await this.periods.listPeriods(record, now);
       const summary = await this.summaryBuilder.build(record, linkedIds, now);
-      const usedHours = summary.usedHours;
-      if (computeSupportPlanAlerts(record, periods, usedHours, now).length > 0) alertsCount++;
+      const current = await this.currentBilling.resolve(record, linkedIds, now);
+      // Mismo criterio que la ficha del contrato (`SupportPlanBillingAction`): una alerta solo pide revisión mientras el período en curso siga por facturar — una vez registrada la factura, queda resuelta y no debe seguir contando acá.
+      const hasAlert = current.billingStatus === 'to_invoice' && computeSupportPlanAlerts(record, periods, summary.usedHours, now).length > 0;
+      if (hasAlert) alertsCount++;
 
       const planInvoices = await this.invoices.listForPlan(record.id);
       const isOverdue = planInvoices.some((invoice) => paymentStatusOf(invoice, now) === 'overdue');
@@ -78,7 +80,7 @@ export class GetSupportBillingOverviewUseCase implements UseCase<GetSupportBilli
       const planName = resolveSupportPlanName(record.name, record.scope, linkedProjects.map((p) => p.name), clientNames.get(record.clientId) ?? '');
 
       const { amountUf, billingStatus, paymentStatus } = isLivePeriod
-        ? await this.currentPeriodRow(record, linkedIds, now)
+        ? await this.currentPeriodRow(record, current, now)
         : this.pastPeriodRow(planInvoices, query.period, now);
 
       if (billingStatus === 'to_invoice') {
@@ -102,7 +104,7 @@ export class GetSupportBillingOverviewUseCase implements UseCase<GetSupportBilli
         currency: record.currency,
         billingStatus,
         paymentStatus,
-        hasAlert: computeSupportPlanAlerts(record, periods, usedHours, now).length > 0,
+        hasAlert,
         isOverdue,
       });
     }
@@ -134,10 +136,9 @@ export class GetSupportBillingOverviewUseCase implements UseCase<GetSupportBilli
 
   private async currentPeriodRow(
     record: SupportPlanRecord,
-    linkedIds: readonly string[],
+    current: CurrentBillingStatus,
     now: Date,
   ): Promise<{ amountUf: number | null; billingStatus: 'to_invoice' | 'invoiced' | null; paymentStatus: SupportBillingRow['paymentStatus'] }> {
-    const current = await this.currentBilling.resolve(record, linkedIds, now);
     if (current.billingStatus === null) return { amountUf: null, billingStatus: null, paymentStatus: null };
 
     if (current.billingStatus === 'invoiced') {

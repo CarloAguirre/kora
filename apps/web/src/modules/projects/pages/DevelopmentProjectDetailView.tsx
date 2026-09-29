@@ -24,8 +24,6 @@ import {
 import { ProjectModulesCard } from "../components/ProjectModulesCard";
 import { ProjectTimeline } from "../components/ProjectTimeline";
 import { TeamHoursSummaryChart } from "../components/TeamHoursSummaryChart";
-import { TeamTasksCard } from "../components/TeamTasksCard";
-import { TeamDeliveriesCard } from "../components/TeamDeliveriesCard";
 import styles from "./ProjectDetailPage.module.css";
 
 const formatDate = (value: string | null) =>
@@ -46,12 +44,9 @@ type DetailTab = "resumen" | "roadmap" | "bitacora" | "extras";
 export function DevelopmentProjectDetailView({
   project,
   projectId,
-  leaderTeamId,
 }: {
   project: ProjectDetail;
   projectId: string;
-  /** Presente cuando quien ve esta ficha (líder de proyecto o `projects:manage`) también lidera uno de los equipos asignados — habilita "Tareas del equipo" para ESE equipo, sin perder la vista completa. */
-  leaderTeamId?: string;
 }) {
   const { can, canAny } = usePermissions();
   const { user } = useAuth();
@@ -329,13 +324,6 @@ export function DevelopmentProjectDetailView({
                   teams={teamSummaries}
                   onViewHours={() => setTab("bitacora")}
                 />
-
-                {leaderTeamId && (
-                  <>
-                    <TeamTasksCard project={project} projectId={projectId} teamId={leaderTeamId} />
-                    <TeamDeliveriesCard project={project} projectId={projectId} teamId={leaderTeamId} />
-                  </>
-                )}
               </div>
 
               <div className={styles.colRight}>
