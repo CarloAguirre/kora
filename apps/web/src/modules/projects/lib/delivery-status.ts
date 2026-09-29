@@ -27,23 +27,29 @@ export const DELIVERY_DISPLAY_STATUS_TONE: Readonly<Record<DeliveryDisplayStatus
 export const deliveryStatusLabel = (delivery: Pick<ProjectModuleDelivery, 'status' | 'rejectionReason'>): string =>
   DELIVERY_DISPLAY_STATUS_LABEL[deliveryDisplayStatus(delivery)];
 
-export type DeliveryAction = 'assign' | 'approve' | 'reject' | 'revert';
+export type DeliveryAction = 'complete' | 'assign' | 'approve' | 'reject' | 'revert';
 
 /**
  * Acciones de gestión según el estado — ver `PROJECT_MODULE_DELIVERY_ALLOWED_TRANSITIONS`. Solo para
  * quien puede gestionarla (`delivery.canManage`: líder del proyecto, PMO/admin o líder del equipo).
- * Aprobar/rechazar recién cuando el colaborador la marcó como terminada; una aprobada solo se revierte.
+ * Aprobar/rechazar recién cuando se marcó como terminada; una aprobada solo se revierte. El líder
+ * también puede marcarla como terminada en nombre del colaborador asignado (sin asignar, no: el
+ * backend exige un responsable antes de dejarla pendiente de aprobación).
  */
-export function deliveryActions(delivery: Pick<ProjectModuleDelivery, 'status' | 'canManage' | 'teamId'>): readonly DeliveryAction[] {
+export function deliveryActions(
+  delivery: Pick<ProjectModuleDelivery, 'status' | 'canManage' | 'teamId' | 'assigneeUserId'>,
+): readonly DeliveryAction[] {
   if (!delivery.canManage) return [];
   const assign: DeliveryAction[] = delivery.teamId ? ['assign'] : [];
   if (delivery.status === 'delivered') return ['approve', 'reject', ...assign];
   if (delivery.status === 'approved') return ['revert'];
-  return assign;
+  return delivery.assigneeUserId ? ['complete', ...assign] : assign;
 }
 
 export function deliveryActionLabel(action: DeliveryAction, delivery: Pick<ProjectModuleDelivery, 'assigneeUserId'>): string {
   switch (action) {
+    case 'complete':
+      return 'Marcar como terminada';
     case 'assign':
       return delivery.assigneeUserId ? 'Reasignar' : 'Asignar colaborador';
     case 'approve':

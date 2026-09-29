@@ -176,6 +176,16 @@ export class DeliveryAssigneeNotInTeamError extends ValidationError {
   }
 }
 
+/** Marcar terminada una entrega en nombre del colaborador exige explicar por qué (queda en la bitácora). */
+export class DeliveryOnBehalfCommentRequiredError extends ValidationError {
+  constructor() {
+    super(
+      'Explica por qué la marcas como terminada en nombre del colaborador antes de continuar.',
+      'PROJECT_MODULE_DELIVERY_ON_BEHALF_COMMENT_REQUIRED',
+    );
+  }
+}
+
 export class DeliveryTeamNotInProjectError extends ValidationError {
   constructor() {
     super('El equipo no está asignado a este proyecto.', 'PROJECT_MODULE_DELIVERY_TEAM_NOT_IN_PROJECT');

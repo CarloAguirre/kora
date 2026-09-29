@@ -22,16 +22,24 @@ interface DeliveryActionDialogsProps {
 }
 
 const REVIEW_TITLE = {
+  complete: 'Marcar entrega como terminada',
   approve: 'Aprobar entrega',
   reject: 'Rechazar entrega',
   revert: 'Revertir aprobación',
 } as const;
 
+/** El líder la marca terminada sin que el colaborador la haya enviado: el porqué queda en la bitácora. */
+const ON_BEHALF_PROMPT = {
+  label: 'Motivo',
+  placeholder: 'Explica por qué la marcas como terminada sin que el colaborador la haya enviado',
+  missingMessage: 'Escribe el motivo antes de continuar: queda registrado en la bitácora.',
+};
+
 const formatDate = (value: string) => new Date(`${value}T00:00:00`).toLocaleDateString('es-CL');
 
 /**
- * Modales de gestión de una entrega (asignar/reasignar, aprobar, rechazar con motivo, revertir una
- * aprobación) — compartidos entre la bitácora (`BitacoraCard`) y "Entregas del equipo"
+ * Modales de gestión de una entrega (marcarla terminada en nombre del colaborador, asignar/reasignar,
+ * aprobar, rechazar con motivo, revertir una aprobación) — compartidos entre la bitácora (`BitacoraCard`) y "Entregas del equipo"
  * (`TeamDeliveriesCard`), para que el líder de proyecto y el de equipo hagan lo mismo desde donde estén.
  */
 export function DeliveryActionDialogs({ projectId, members, target, onClose }: DeliveryActionDialogsProps) {
@@ -57,15 +65,19 @@ export function DeliveryActionDialogs({ projectId, members, target, onClose }: D
         ? { status: 'approved' as const, rejectionReason: null }
         : reviewAction === 'reject'
           ? { status: 'planned' as const, rejectionReason: reason ?? '' }
-          : { status: 'delivered' as const, rejectionReason: null };
+          : reviewAction === 'complete'
+            ? { status: 'delivered' as const, rejectionReason: null, comment: reason ?? '' }
+            : { status: 'delivered' as const, rejectionReason: null };
     try {
       await updateDelivery.mutateAsync({ projectId, moduleId: target.moduleId, deliveryId: target.delivery.id, input });
       toast.success(
-        reviewAction === 'approve'
-          ? 'Entrega aprobada.'
-          : reviewAction === 'reject'
-            ? 'Entrega rechazada: vuelve al colaborador.'
-            : 'Se revirtió la aprobación: la entrega vuelve a quedar pendiente de aprobación.',
+        reviewAction === 'complete'
+          ? 'Entrega marcada como terminada: queda pendiente de aprobación.'
+          : reviewAction === 'approve'
+            ? 'Entrega aprobada.'
+            : reviewAction === 'reject'
+              ? 'Entrega rechazada: vuelve al colaborador.'
+              : 'Se revirtió la aprobación: la entrega vuelve a quedar pendiente de aprobación.',
       );
       onClose();
     } catch (error) {
@@ -93,9 +105,12 @@ export function DeliveryActionDialogs({ projectId, members, target, onClose }: D
     <>
       <ReviewActionModal
         open={reviewAction !== null}
-        action={reviewAction ?? 'approve'}
+        action={reviewAction === 'complete' || reviewAction === null ? 'approve' : reviewAction}
         title={REVIEW_TITLE[reviewAction ?? 'approve']}
-        confirmLabel={reviewAction === 'revert' ? 'Revertir aprobación' : undefined}
+        confirmLabel={
+          reviewAction === 'revert' ? 'Revertir aprobación' : reviewAction === 'complete' ? 'Marcar como terminada' : undefined
+        }
+        reasonPrompt={reviewAction === 'complete' ? ON_BEHALF_PROMPT : undefined}
         summary={summary}
         submitting={updateDelivery.isPending}
         onCancel={onClose}

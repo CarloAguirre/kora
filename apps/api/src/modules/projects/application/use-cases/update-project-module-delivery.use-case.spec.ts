@@ -205,6 +205,33 @@ describe('UpdateProjectModuleDeliveryUseCase — ciclo de vida', () => {
     expect(changeLogRecord.mock.calls[0]![1]).toBe('collab-1');
   });
 
+  it('el líder puede marcarla como terminada por el colaborador, y el registro dice en nombre de quién', async () => {
+    const { useCase, changeLogRecord } = buildUseCase(
+      buildModule({ status: 'planned', assigneeUserId: 'collab-1', assigneeName: 'Ana Rojas' }),
+    );
+
+    const result = await useCase.execute({
+      ...TARGET,
+      ...LEADER,
+      data: { status: 'delivered', comment: 'La entregó por correo al cliente' },
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(changeLogRecord.mock.calls[0]![1]).toBe('leader-1');
+    expect(loggedMessages(changeLogRecord)).toEqual([
+      expect.stringMatching(/marcada como terminada en nombre de Ana Rojas .* Motivo: La entregó por correo al cliente$/),
+    ]);
+  });
+
+  it('marcarla terminada en nombre del colaborador sin explicar por qué no se permite', async () => {
+    const { useCase, modules } = buildUseCase(buildModule({ status: 'planned', assigneeUserId: 'collab-1' }));
+
+    const result = await useCase.execute({ ...TARGET, ...LEADER, data: { status: 'delivered' } });
+
+    expect(errorCode(result)).toBe('PROJECT_MODULE_DELIVERY_ON_BEHALF_COMMENT_REQUIRED');
+    expect(modules.updateDelivery).not.toHaveBeenCalled();
+  });
+
   it('el colaborador no puede deshacer una aprobación volviendo a marcarla como terminada', async () => {
     const { useCase, modules } = buildUseCase(buildModule({ status: 'approved', assigneeUserId: 'collab-1' }));
 

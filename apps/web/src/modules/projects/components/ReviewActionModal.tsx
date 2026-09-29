@@ -13,9 +13,15 @@ export interface ReviewActionModalProps {
   summary: ReadonlyArray<{ label: string; value: string }>;
   /** Texto del botón de confirmar — por defecto, según `action`. */
   confirmLabel?: string;
+  /**
+   * Pide un texto obligatorio antes de confirmar (se pasa a `onConfirm`). `reject` lo trae por defecto
+   * ("Motivo del rechazo"); otras acciones pueden pedirlo también — p.ej. marcar una entrega como
+   * terminada en nombre del colaborador.
+   */
+  reasonPrompt?: { label: string; placeholder: string; missingMessage: string };
   submitting?: boolean;
   onCancel: () => void;
-  /** `reason` solo aplica a `action === 'reject'`. */
+  /** `reason` llega cuando se pidió (`reject` o `reasonPrompt`). */
   onConfirm: (reason?: string) => void;
 }
 
@@ -31,7 +37,24 @@ const CONFIRM_LABEL: Record<ReviewAction, string> = {
  * entidades (ver `TeamTasksCard`/`TeamDeliveriesCard`), igual criterio que el
  * prototipo de referencia ("Revisar"). Rechazar exige un motivo.
  */
-export function ReviewActionModal({ open, action, title, summary, confirmLabel, submitting, onCancel, onConfirm }: ReviewActionModalProps) {
+const REJECT_REASON_PROMPT = {
+  label: 'Motivo del rechazo',
+  placeholder: 'Explica qué falta o qué hay que corregir',
+  missingMessage: 'Escribe el motivo del rechazo antes de continuar.',
+};
+
+export function ReviewActionModal({
+  open,
+  action,
+  title,
+  summary,
+  confirmLabel,
+  reasonPrompt,
+  submitting,
+  onCancel,
+  onConfirm,
+}: ReviewActionModalProps) {
+  const prompt = reasonPrompt ?? (action === 'reject' ? REJECT_REASON_PROMPT : null);
   const [reason, setReason] = useState('');
   const [showReasonError, setShowReasonError] = useState(false);
 
@@ -43,11 +66,11 @@ export function ReviewActionModal({ open, action, title, summary, confirmLabel, 
   }, [open]);
 
   const onSubmit = () => {
-    if (action === 'reject' && !reason.trim()) {
+    if (prompt && !reason.trim()) {
       setShowReasonError(true);
       return;
     }
-    onConfirm(action === 'reject' ? reason.trim() : undefined);
+    onConfirm(prompt ? reason.trim() : undefined);
   };
 
   return (
@@ -82,22 +105,22 @@ export function ReviewActionModal({ open, action, title, summary, confirmLabel, 
           ))}
         </div>
 
-        {action === 'reject' && (
+        {prompt && (
           <div className={styles.field}>
             <label className={styles.fieldLabel} htmlFor="review-reject-reason">
-              Motivo del rechazo
+              {prompt.label}
             </label>
             <textarea
               id="review-reject-reason"
               className={styles.textarea}
-              placeholder="Explica qué falta o qué hay que corregir"
+              placeholder={prompt.placeholder}
               value={reason}
               onChange={(event) => {
                 setReason(event.target.value);
                 setShowReasonError(false);
               }}
             />
-            {showReasonError && <p className={styles.modalError}>Escribe el motivo del rechazo antes de continuar.</p>}
+            {showReasonError && <p className={styles.modalError}>{prompt.missingMessage}</p>}
           </div>
         )}
       </div>

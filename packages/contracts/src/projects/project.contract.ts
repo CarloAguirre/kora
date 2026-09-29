@@ -310,6 +310,11 @@ export const updateProjectModuleDeliverySchema = z.object({
   estimatedDate: z.iso.date().optional(),
   /** Solo quien aprueba/rechaza puede enviarlo — obligatorio al rechazar, se limpia (`null`) en cualquier otra transición. */
   rejectionReason: z.string().trim().max(1000).nullish(),
+  /**
+   * No se guarda en la entrega: va al registro de la bitácora. Obligatorio cuando un líder la marca
+   * como terminada en nombre del colaborador asignado — por qué lo hizo sin que el colaborador la enviara.
+   */
+  comment: z.string().trim().max(1000).optional(),
 });
 export type UpdateProjectModuleDeliveryInput = z.infer<typeof updateProjectModuleDeliverySchema>;
 

@@ -9,6 +9,7 @@ import {
 } from '@kora/contracts';
 import {
   DeliveryAssigneeNotInTeamError,
+  DeliveryOnBehalfCommentRequiredError,
   DeliveryTeamNotInProjectError,
   InvalidDeliveryStatusTransitionError,
   ProjectModuleDeliveryNotFoundError,
@@ -146,6 +147,14 @@ export class UpdateProjectModuleDeliveryUseCase
       if (nextStatus === 'planned' && !command.data.rejectionReason?.trim()) {
         return err(new RejectionReasonRequiredError());
       }
+      if (
+        nextStatus === 'delivered' &&
+        delivery.status === 'planned' &&
+        nextAssigneeUserId !== command.actor.userId &&
+        !command.data.comment?.trim()
+      ) {
+        return err(new DeliveryOnBehalfCommentRequiredError());
+      }
     }
 
     const now = this.clock.now();
@@ -216,9 +225,13 @@ export class UpdateProjectModuleDeliveryUseCase
     if (statusChanged) {
       // Contra la fecha estimada vigente (la de este mismo llamado si también la cambia).
       const committedDate = command.data.estimatedDate !== undefined ? new Date(command.data.estimatedDate) : delivery.estimatedDate;
+      // Un líder puede marcarla terminada por el colaborador — que se sepa que no fue él.
+      const assigneeName =
+        members.find((member) => member.userId === nextAssigneeUserId)?.fullName ?? delivery.assigneeName ?? 'el colaborador asignado';
+      const onBehalfOf = nextAssigneeUserId !== command.actor.userId ? ` en nombre de ${assigneeName}` : '';
       messages.push(
         delivery.status === 'planned'
-          ? `Entrega${label} marcada como terminada ${inPhase}, ${deadlineNote(committedDate, now)}; queda pendiente de aprobación.`
+          ? `Entrega${label} marcada como terminada${onBehalfOf} ${inPhase}, ${deadlineNote(committedDate, now)}; queda pendiente de aprobación.${onBehalfOf ? ` Motivo: ${command.data.comment?.trim()}` : ''}`
           : nextStatus === 'approved'
             ? `Entrega${label} aprobada ${inPhase}, ${deadlineNote(committedDate, now)}.`
             : nextStatus === 'planned'

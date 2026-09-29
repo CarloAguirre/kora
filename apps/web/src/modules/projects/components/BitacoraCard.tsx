@@ -78,6 +78,7 @@ const RESOLVE_ACTION_TONE: Record<BitacoraRowAction, DropdownMenuItem['tone']> =
 };
 
 const DELIVERY_ACTION_TONE: Record<DeliveryAction, DropdownMenuItem['tone']> = {
+  complete: 'default',
   assign: 'default',
   approve: 'success',
   reject: 'danger',
