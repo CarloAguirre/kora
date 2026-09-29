@@ -1,12 +1,18 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import type { SupportBillingKpiGroup, SupportBillingRow } from '@kora/contracts';
+import {
+  SUPPORT_PLAN_TYPE_LABELS,
+  type SupportBillingKpiGroup,
+  type SupportBillingRow,
+  type SupportInvoiceBillingStatus,
+  type SupportInvoicePaymentStatus,
+} from '@kora/contracts';
 import styles from './SupportBillingSection.module.css';
 import { KpiCard } from '@/shared/components/ui/KpiCard';
 import { MultiSelect } from '@/shared/components/ui/MultiSelect';
 import { Tabs } from '@/shared/components/ui/Tabs';
 import { PeriodSelector } from '@/shared/components/ui/PeriodSelector';
-import { DataTable, type Column } from '@/shared/components/ui/DataTable';
+import { DataTable, type Column, type SortState } from '@/shared/components/ui/DataTable';
 import { TriangleAlertIcon } from '@/shared/components/icons/Icons';
 import {
   SupportInvoiceBillingStatusBadge,
@@ -17,6 +23,7 @@ import {
 import { formatMoney } from '@/shared/lib/format-money';
 import { useSupportBillingOverview } from '../api/billing.queries';
 import { supportPlanPath } from '@/app/router/paths';
+import { compareSortValues, nextSortState, type SortValue } from '@/shared/lib/sort';
 
 /** Fila vacía en UF para cuando aún no hay contratos activos ni carga en curso — mantiene el layout de 5 tarjetas de siempre. */
 const EMPTY_KPI_GROUP: SupportBillingKpiGroup = {
@@ -38,6 +45,20 @@ const FILTERS: Readonly<{ id: TypeFilter; label: string }[]> = [
   { id: 'monthly', label: 'Mensual' },
   { id: 'alerts', label: 'Con alertas' },
 ];
+
+/** Los estados se ordenan por su avance en el flujo de cobro, no alfabéticamente. "Sin movimiento" (`null`) queda al final. */
+const BILLING_STATUS_ORDER: Readonly<Record<SupportInvoiceBillingStatus, number>> = { to_invoice: 0, invoiced: 1 };
+const PAYMENT_STATUS_ORDER: Readonly<Record<SupportInvoicePaymentStatus, number>> = { pending: 0, overdue: 1, paid: 2 };
+
+type SortField = 'client' | 'plan' | 'type' | 'amount' | 'billing' | 'payment';
+const SORT_VALUE: Record<SortField, (row: SupportBillingRow) => SortValue> = {
+  client: (r) => r.clientName,
+  plan: (r) => r.planName,
+  type: (r) => SUPPORT_PLAN_TYPE_LABELS[r.planType],
+  amount: (r) => r.amountUf,
+  billing: (r) => (r.billingStatus ? BILLING_STATUS_ORDER[r.billingStatus] : null),
+  payment: (r) => (r.paymentStatus ? PAYMENT_STATUS_ORDER[r.paymentStatus] : null),
+};
 
 function currentPeriod(): { year: number; month: number } {
   const now = new Date();
@@ -64,6 +85,8 @@ export function SupportBillingSection() {
   const [{ year, month }, setPeriod] = useState(currentPeriod());
   const [filter, setFilter] = useState<TypeFilter>('all');
   const [clientFilter, setClientFilter] = useState<string[]>([]);
+  // `null` = el orden en que llegan de la API, hasta que se hace clic en un encabezado.
+  const [sort, setSort] = useState<SortState<SortField> | null>(null);
 
   const period = `${year}-${String(month).padStart(2, '0')}`;
   const { data: overview, isLoading } = useSupportBillingOverview(period);
@@ -79,14 +102,17 @@ export function SupportBillingSection() {
     if (filter === 'alerts') list = list.filter((r) => r.hasAlert);
     else if (filter !== 'all') list = list.filter((r) => r.planType === filter);
     if (clientFilter.length > 0) list = list.filter((r) => clientFilter.includes(r.clientId));
-    return list;
-  }, [overview, filter, clientFilter]);
+    if (!sort) return list;
+    const valueOf = SORT_VALUE[sort.field];
+    return [...list].sort((a, b) => compareSortValues(valueOf(a), valueOf(b), sort.direction));
+  }, [overview, filter, clientFilter, sort]);
 
   const columns: Column<SupportBillingRow>[] = [
-    { key: 'client', header: 'Cliente', render: (r) => r.clientName },
+    { key: 'client', header: 'Cliente', sortable: true, render: (r) => r.clientName },
     {
       key: 'plan',
       header: 'Contrato',
+      sortable: true,
       render: (r) => (
         <Link to={supportPlanPath({ id: r.planId })} className={styles.planCell}>
           {r.planName}
@@ -94,10 +120,10 @@ export function SupportBillingSection() {
         </Link>
       ),
     },
-    { key: 'type', header: 'Tipo', render: (r) => <SupportPlanTypeBadge planType={r.planType} /> },
-    { key: 'amount', header: 'Monto', align: 'right', render: (r) => (r.amountUf !== null ? formatMoney(r.amountUf, r.currency) : '—') },
-    { key: 'billing', header: 'Estado facturación', render: (r) => <SupportInvoiceBillingStatusBadge status={r.billingStatus} /> },
-    { key: 'payment', header: 'Estado de pago', render: (r) => <SupportInvoicePaymentStatusBadge status={r.paymentStatus} /> },
+    { key: 'type', header: 'Tipo', sortable: true, render: (r) => <SupportPlanTypeBadge planType={r.planType} /> },
+    { key: 'amount', header: 'Monto', align: 'right', sortable: true, render: (r) => (r.amountUf !== null ? formatMoney(r.amountUf, r.currency) : '—') },
+    { key: 'billing', header: 'Estado facturación', sortable: true, render: (r) => <SupportInvoiceBillingStatusBadge status={r.billingStatus} /> },
+    { key: 'payment', header: 'Estado de pago', sortable: true, render: (r) => <SupportInvoicePaymentStatusBadge status={r.paymentStatus} /> },
     {
       key: 'alert',
       header: '',
@@ -174,6 +200,8 @@ export function SupportBillingSection() {
         columns={columns}
         items={rows}
         getRowKey={(r) => r.planId}
+        sort={sort ?? undefined}
+        onSortChange={(field) => setSort((prev) => nextSortState(prev, field as SortField))}
         loading={isLoading}
         error={null}
         emptyMessage="No hay contratos en este filtro."

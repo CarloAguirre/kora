@@ -10,13 +10,22 @@ import { IssueProjectMilestoneInvoiceDialog } from "@/modules/projects/component
 import { MarkProjectMilestonePaidDialog } from "@/modules/projects/components/MarkProjectMilestonePaidDialog";
 import { Badge, type BadgeTone } from "@/shared/components/ui/Badge";
 import { Button } from "@/shared/components/ui/Button";
-import { DataTable, type Column } from "@/shared/components/ui/DataTable";
+import {
+  DataTable,
+  type Column,
+  type SortState,
+} from "@/shared/components/ui/DataTable";
 import { KpiCard } from "@/shared/components/ui/KpiCard";
 import { MultiSelect } from "@/shared/components/ui/MultiSelect";
 import { Tabs } from "@/shared/components/ui/Tabs";
 import { useToast } from "@/shared/components/ui/Toast";
 import { ApiRequestError } from "@/shared/lib/api-client";
 import { formatMoney } from "@/shared/lib/format-money";
+import {
+  compareSortValues,
+  nextSortState,
+  type SortValue,
+} from "@/shared/lib/sort";
 import type {
   BillingLedgerEntry,
   IssueProjectPaymentMilestoneInvoiceInput,
@@ -71,6 +80,24 @@ function pagoTone(status: BillingLedgerEntry["status"]): BadgeTone {
   return PAGO_TONE[status as "facturado" | "atrasado" | "pagado"] ?? "neutral";
 }
 
+/** Los estados se ordenan por su avance en el flujo de cobro, no alfabéticamente. Sin estado de pago (aún por facturar) queda al final. */
+const PAGO_ORDER: Readonly<
+  Record<"facturado" | "atrasado" | "pagado", number>
+> = { facturado: 0, atrasado: 1, pagado: 2 };
+
+type SortField =
+  "client" | "detail" | "tramo" | "amount" | "billing" | "payment";
+const SORT_VALUE: Record<SortField, (entry: BillingLedgerEntry) => SortValue> =
+  {
+    client: (e) => e.clientName,
+    detail: projectLabel,
+    tramo: (e) => (e.milestoneName ? tramoLabel(e) : null),
+    amount: (e) => e.amount,
+    billing: (e) => (e.status === "pendiente" ? 0 : 1),
+    payment: (e) =>
+      PAGO_ORDER[e.status as "facturado" | "atrasado" | "pagado"] ?? null,
+  };
+
 type DialogState = {
   kind: "issue-milestone" | "pay-milestone";
   entry: BillingLedgerEntry;
@@ -96,6 +123,8 @@ export function ProjectsBillingSection() {
 
   const [status, setStatus] = useState<StatusFilter>("todos");
   const [clientFilter, setClientFilter] = useState<string[]>([]);
+  // `null` = el orden en que llegan de la API (más recientes primero), hasta que se hace clic en un encabezado.
+  const [sort, setSort] = useState<SortState<SortField> | null>(null);
   const [dialog, setDialog] = useState<DialogState>(null);
   const [detailEntry, setDetailEntry] = useState<BillingLedgerEntry | null>(
     null,
@@ -120,15 +149,21 @@ export function ProjectsBillingSection() {
       .map(([value, label]) => ({ value, label }));
   }, [entries]);
 
+  // Excel y PDF exportan estas mismas filas, así que respetan también el orden elegido.
   const rows = useMemo(() => {
-    return entries.filter((entry) => {
+    const filtered = entries.filter((entry) => {
       if (clientFilter.length > 0 && !clientFilter.includes(entry.clientId))
         return false;
       if (status === "activos") return entry.status !== "pagado";
       if (status === "resueltos") return entry.status === "pagado";
       return true;
     });
-  }, [entries, status, clientFilter]);
+    if (!sort) return filtered;
+    const valueOf = SORT_VALUE[sort.field];
+    return filtered.sort((a, b) =>
+      compareSortValues(valueOf(a), valueOf(b), sort.direction),
+    );
+  }, [entries, status, clientFilter, sort]);
 
   // Sumar monedas distintas inventaría un número sin sentido — hoy `proyecto` siempre es CLP, pero se agrupa igual por si eso cambia.
   const kpisByCurrency = useMemo(() => {
@@ -241,10 +276,16 @@ export function ProjectsBillingSection() {
   };
 
   const columns: Column<BillingLedgerEntry>[] = [
-    { key: "client", header: "Cliente", render: (e) => e.clientName },
+    {
+      key: "client",
+      header: "Cliente",
+      sortable: true,
+      render: (e) => e.clientName,
+    },
     {
       key: "detail",
       header: "Proyecto",
+      sortable: true,
       render: (e) => (
         <button
           type="button"
@@ -255,11 +296,18 @@ export function ProjectsBillingSection() {
         </button>
       ),
     },
-    { key: "tramo", header: "Tramo", render: tramoLabel },
-    { key: "amount", header: "Monto", align: "right", render: formatAmount },
+    { key: "tramo", header: "Tramo", sortable: true, render: tramoLabel },
+    {
+      key: "amount",
+      header: "Monto",
+      align: "right",
+      sortable: true,
+      render: formatAmount,
+    },
     {
       key: "billing",
       header: "Estado facturación",
+      sortable: true,
       render: (e) => (
         <Badge tone={facturacionTone(e.status)}>
           {facturacionLabel(e.status)}
@@ -269,6 +317,7 @@ export function ProjectsBillingSection() {
     {
       key: "payment",
       header: "Estado de pago",
+      sortable: true,
       render: (e) =>
         pagoLabel(e.status) ? (
           <Badge tone={pagoTone(e.status)}>{pagoLabel(e.status)}</Badge>
@@ -456,6 +505,10 @@ export function ProjectsBillingSection() {
         columns={columns}
         items={rows}
         getRowKey={(e) => e.id}
+        sort={sort ?? undefined}
+        onSortChange={(field) =>
+          setSort((prev) => nextSortState(prev, field as SortField))
+        }
         loading={isLoading}
         error={null}
         emptyMessage="No hay resultados para estos filtros."
