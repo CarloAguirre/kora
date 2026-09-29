@@ -64,12 +64,18 @@ export function AssignCollaboratorModal({
           ))}
         </div>
 
-        <Select
-          label="Colaborador del equipo"
-          options={memberOptions}
-          value={userId}
-          onChange={(event) => setUserId(event.target.value)}
-        />
+        {memberOptions.length === 0 ? (
+          <p className={styles.modalError}>
+            Este equipo todavía no tiene colaboradores en el proyecto: primero hay que sumarlos al equipo del proyecto.
+          </p>
+        ) : (
+          <Select
+            label="Colaborador del equipo"
+            options={memberOptions}
+            value={userId}
+            onChange={(event) => setUserId(event.target.value)}
+          />
+        )}
       </div>
     </Modal>
   );

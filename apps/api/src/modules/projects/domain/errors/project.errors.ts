@@ -162,6 +162,26 @@ export class RejectionReasonRequiredError extends ValidationError {
   }
 }
 
+/** Ver `PROJECT_MODULE_DELIVERY_ALLOWED_TRANSITIONS` — p.ej. no se aprueba algo que el colaborador todavía no marcó como terminado. */
+export class InvalidDeliveryStatusTransitionError extends ValidationError {
+  constructor(message: string) {
+    super(message, 'PROJECT_MODULE_DELIVERY_INVALID_TRANSITION');
+  }
+}
+
+/** Una entrega se asigna a un colaborador de SU equipo en este proyecto (fila en `project_team_members`). */
+export class DeliveryAssigneeNotInTeamError extends ValidationError {
+  constructor() {
+    super('El colaborador debe pertenecer al equipo responsable de la entrega en este proyecto.', 'PROJECT_MODULE_DELIVERY_ASSIGNEE_NOT_IN_TEAM');
+  }
+}
+
+export class DeliveryTeamNotInProjectError extends ValidationError {
+  constructor() {
+    super('El equipo no está asignado a este proyecto.', 'PROJECT_MODULE_DELIVERY_TEAM_NOT_IN_PROJECT');
+  }
+}
+
 /** Autorizar horas extra en un proyecto es una decisión de líder — ni `projects:manage` por sí solo ni ser un miembro cualquiera bastan. */
 export class CannotAuthorizeProjectOvertimeError extends ForbiddenError {
   constructor() {

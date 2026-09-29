@@ -159,6 +159,7 @@ export interface TaskAssignedToUserRecord {
 /** Fila de "Mis entregas" — entrega asignada a una persona, con el nombre de su proyecto/módulo. */
 export interface DeliveryAssignedToUserRecord {
   readonly id: string;
+  readonly name: string | null;
   readonly projectId: string;
   readonly projectName: string;
   readonly moduleId: string;

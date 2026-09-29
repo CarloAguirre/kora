@@ -11,6 +11,8 @@ export interface ReviewActionModalProps {
   title: string;
   /** Filas de resumen de solo lectura — nombre, colaborador, módulo, fecha, etc. */
   summary: ReadonlyArray<{ label: string; value: string }>;
+  /** Texto del botón de confirmar — por defecto, según `action`. */
+  confirmLabel?: string;
   submitting?: boolean;
   onCancel: () => void;
   /** `reason` solo aplica a `action === 'reject'`. */
@@ -29,7 +31,7 @@ const CONFIRM_LABEL: Record<ReviewAction, string> = {
  * entidades (ver `TeamTasksCard`/`TeamDeliveriesCard`), igual criterio que el
  * prototipo de referencia ("Revisar"). Rechazar exige un motivo.
  */
-export function ReviewActionModal({ open, action, title, summary, submitting, onCancel, onConfirm }: ReviewActionModalProps) {
+export function ReviewActionModal({ open, action, title, summary, confirmLabel, submitting, onCancel, onConfirm }: ReviewActionModalProps) {
   const [reason, setReason] = useState('');
   const [showReasonError, setShowReasonError] = useState(false);
 
@@ -65,7 +67,7 @@ export function ReviewActionModal({ open, action, title, summary, submitting, on
             loading={submitting}
             loadingText="Guardando…"
           >
-            {CONFIRM_LABEL[action]}
+            {confirmLabel ?? CONFIRM_LABEL[action]}
           </Button>
         </>
       }

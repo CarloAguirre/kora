@@ -365,6 +365,7 @@ export function DevelopmentProjectDetailView({
               observations={project.observations}
               modules={project.modules}
               teams={project.teams}
+              members={project.members}
               canManage={canAddObservation}
               canCorrectHito0={can("projects:manage")}
             />

@@ -1,26 +1,26 @@
 import type { BadgeTone } from '@/shared/components/ui/Badge';
 import {
-  PROJECT_MODULE_DELIVERY_STATUS_LABELS,
   PROJECT_OBSERVATION_ALLOWED_TRANSITIONS,
   PROJECT_OBSERVATION_STATUS_LABELS,
   PROJECT_OBSERVATION_TYPE_LABELS,
   type HourEntrySummary,
   type ProjectModule,
   type ProjectModuleDelivery,
-  type ProjectModuleDeliveryStatus,
   type ProjectObservation,
   type ProjectObservationStatus,
   type ProjectObservationType,
 } from '@kora/contracts';
 import { entryTitle, EVENT_STATUS_LABEL, EVENT_STATUS_TONE } from './hour-entry-log';
+import { DELIVERY_DISPLAY_STATUS_LABEL, DELIVERY_DISPLAY_STATUS_TONE, deliveryDisplayStatus } from './delivery-status';
 
 /**
  * Una fila de la bitácora unificada: un evento (hora registrada, de solo
  * lectura acá), un registro manual (hito/incidente/compromiso/atención/
- * observación, creado desde "Agregar registro"), o una entrega de fase — de
- * solo lectura acá también: su ciclo de vida (asignar, marcar entregada,
- * aprobar/rechazar) se gestiona desde la vista de líder de equipo
- * (`TeamDeliveriesCard`), no desde la bitácora. `kind` distingue los tres
+ * observación, creado desde "Agregar registro"), o una entrega de fase — con
+ * su estado actual; el líder de proyecto o de equipo la asigna, aprueba,
+ * rechaza o revierte desde el menú de acciones (ver `deliveryActions`), y
+ * cada uno de esos cambios queda además como un registro `cambio_proyecto`
+ * propio (lo escribe el backend). `kind` distingue los tres
  * casos, con el mismo valor que ya trae `ProjectObservation.type` para el
  * segundo. Compartido entre `BitacoraCard` (tabla completa) y
  * `BitacoraMiniCard` (resumen).
@@ -90,7 +90,7 @@ export function rowTypeBadge(row: BitacoraRow): { label: string; tone: BadgeTone
 
 export function rowTitle(row: BitacoraRow): string {
   if (row.kind === 'evento') return entryTitle(row.entry);
-  if (row.kind === 'entrega') return `Entrega de fase: ${row.moduleName}`;
+  if (row.kind === 'entrega') return row.delivery.name ?? `Entrega de fase: ${row.moduleName}`;
   return row.observation.title || row.observation.message;
 }
 
@@ -110,7 +110,14 @@ export function rowTooltip(row: BitacoraRow): string {
 }
 
 function deliveryTooltip(row: { moduleName: string; delivery: ProjectModuleDelivery }): string {
-  return row.delivery.teamName ? `${row.moduleName} — equipo ${row.delivery.teamName}` : row.moduleName;
+  const { delivery } = row;
+  return [
+    delivery.description,
+    delivery.teamName ? `Equipo ${delivery.teamName}` : null,
+    delivery.rejectionReason ? `Rechazada: ${delivery.rejectionReason}` : null,
+  ]
+    .filter(Boolean)
+    .join(' — ');
 }
 
 export function rowPhase(row: BitacoraRow): string {
@@ -121,7 +128,8 @@ export function rowPhase(row: BitacoraRow): string {
 
 export function rowResponsible(row: BitacoraRow): string {
   if (row.kind === 'evento') return row.entry.user.fullName;
-  if (row.kind === 'entrega') return row.delivery.teamName ?? '—';
+  // El colaborador asignado es quien responde por la entrega; sin asignar, el equipo a cargo.
+  if (row.kind === 'entrega') return row.delivery.assigneeName ?? (row.delivery.teamName ? `${row.delivery.teamName} (sin asignar)` : '—');
   return row.observation.authorName;
 }
 
@@ -134,16 +142,11 @@ const OBS_STATUS_TONE: Record<ProjectObservationStatus, BadgeTone> = {
   rechazado: 'danger',
 };
 
-const DELIVERY_STATUS_TONE: Record<ProjectModuleDeliveryStatus, BadgeTone> = {
-  planned: 'warning',
-  delivered: 'info',
-  approved: 'success',
-};
-
 export function rowStatusBadge(row: BitacoraRow): { label: string; tone: BadgeTone } | null {
   if (row.kind === 'evento') return { label: EVENT_STATUS_LABEL[row.entry.status], tone: EVENT_STATUS_TONE[row.entry.status] };
   if (row.kind === 'entrega') {
-    return { label: PROJECT_MODULE_DELIVERY_STATUS_LABELS[row.delivery.status], tone: DELIVERY_STATUS_TONE[row.delivery.status] };
+    const status = deliveryDisplayStatus(row.delivery);
+    return { label: DELIVERY_DISPLAY_STATUS_LABEL[status], tone: DELIVERY_DISPLAY_STATUS_TONE[status] };
   }
   if (!row.observation.status) return null;
   return { label: PROJECT_OBSERVATION_STATUS_LABELS[row.observation.status], tone: OBS_STATUS_TONE[row.observation.status] };

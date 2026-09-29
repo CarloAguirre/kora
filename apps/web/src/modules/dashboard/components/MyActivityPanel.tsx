@@ -12,6 +12,7 @@ import styles from './MyActivityPanel.module.css';
 import { Card } from '@/shared/components/ui/Card';
 import { Button } from '@/shared/components/ui/Button';
 import { Tabs } from '@/shared/components/ui/Tabs';
+import { Modal } from '@/shared/components/ui/Modal';
 import { AlertIcon, CheckIcon, CalendarIcon } from '@/shared/components/icons/Icons';
 import { RecentHistoryCard } from './RecentHistoryCard';
 import { useUpdateProjectModuleDelivery, useUpdateProjectModuleTask } from '@/modules/projects/api/projects.queries';
@@ -156,25 +157,29 @@ function MyTasksCard({ tasks, loading }: { tasks: readonly DashboardMyTask[]; lo
 
 /**
  * "Mis entregas" — entregas de "Fases · Módulos" asignadas directamente al
- * colaborador. "Marcar como completada" solo la manda como entregada
- * (`delivered`, "en revisión" para el líder) — la aprobación final es de
- * quien lidera el equipo o el proyecto.
+ * colaborador. "Marcar como terminada" la deja "Pendiente de aprobación"
+ * (`delivered`) — la aprobación final es de quien lidera el equipo o el
+ * proyecto; si la rechazan, vuelve acá como "Rechazada" con el motivo.
  */
 function MyDeliveriesCard({ deliveries, loading }: { deliveries: readonly DashboardMyDelivery[]; loading: boolean }) {
   const toast = useToast();
   const updateDelivery = useUpdateProjectModuleDelivery();
   const [tab, setTab] = useState<'all' | 'planned' | 'delivered' | 'approved'>('all');
+  const [confirming, setConfirming] = useState<DashboardMyDelivery | null>(null);
 
   const filtered = deliveries.filter((delivery) => tab === 'all' || delivery.status === tab);
 
-  const onComplete = async (delivery: DashboardMyDelivery) => {
+  const onComplete = async () => {
+    if (!confirming) return;
     try {
       await updateDelivery.mutateAsync({
-        projectId: delivery.projectId,
-        moduleId: delivery.moduleId,
-        deliveryId: delivery.id,
+        projectId: confirming.projectId,
+        moduleId: confirming.moduleId,
+        deliveryId: confirming.id,
         input: { status: 'delivered' },
       });
+      toast.success('Entrega marcada como terminada: queda pendiente de aprobación.');
+      setConfirming(null);
     } catch (error) {
       toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo actualizar la entrega.');
     }
@@ -186,9 +191,9 @@ function MyDeliveriesCard({ deliveries, loading }: { deliveries: readonly Dashbo
       <Tabs
         tabs={[
           { id: 'all', label: 'Todas' },
-          { id: 'planned', label: 'Pendientes' },
-          { id: 'delivered', label: 'En revisión' },
-          { id: 'approved', label: 'Completadas' },
+          { id: 'planned', label: 'Por entregar' },
+          { id: 'delivered', label: 'Pendientes de aprobación' },
+          { id: 'approved', label: 'Aprobadas' },
         ]}
         activeId={tab}
         onSelect={(id) => setTab(id as typeof tab)}
@@ -200,23 +205,32 @@ function MyDeliveriesCard({ deliveries, loading }: { deliveries: readonly Dashbo
       ) : (
         <div className={styles.itemList}>
           {filtered.map((delivery) => {
+            const rejected = delivery.status === 'planned' && Boolean(delivery.rejectionReason);
             const late = delivery.status === 'planned' && isPastDate(delivery.estimatedDate);
-            const label = delivery.status === 'approved' ? 'Completada' : delivery.status === 'delivered' ? 'En revisión' : late ? 'Atrasada' : 'Comprometida';
+            const label =
+              delivery.status === 'approved'
+                ? 'Aprobada'
+                : delivery.status === 'delivered'
+                  ? 'Pendiente de aprobación'
+                  : rejected
+                    ? 'Rechazada'
+                    : late
+                      ? 'Atrasada'
+                      : 'Comprometida';
             const tagClass =
               delivery.status === 'approved'
                 ? styles.statusTagDone
                 : delivery.status === 'delivered'
                   ? styles.statusTagInProgress
-                  : late
+                  : rejected || late
                     ? styles.statusTagLate
                     : styles.statusTagTodo;
             return (
               <div key={delivery.id} className={styles.itemRow}>
                 <div className={styles.itemMain}>
-                  <span className={styles.itemTitle}>
-                    {delivery.projectName} · {delivery.moduleName}
-                  </span>
+                  <span className={styles.itemTitle}>{delivery.name ?? delivery.moduleName}</span>
                   <span className={styles.itemMeta}>
+                    {delivery.projectName} · {delivery.moduleName} ·{' '}
                     {new Date(`${delivery.estimatedDate}T00:00:00`).toLocaleDateString('es-CL')}
                   </span>
                   {delivery.rejectionReason && (
@@ -227,8 +241,8 @@ function MyDeliveriesCard({ deliveries, loading }: { deliveries: readonly Dashbo
                 </div>
                 <span className={[styles.statusTag, tagClass].join(' ')}>{label}</span>
                 {delivery.status === 'planned' && (
-                  <Button size="sm" onClick={() => void onComplete(delivery)}>
-                    Marcar como completada
+                  <Button size="sm" onClick={() => setConfirming(delivery)}>
+                    Marcar como terminada
                   </Button>
                 )}
               </div>
@@ -236,6 +250,30 @@ function MyDeliveriesCard({ deliveries, loading }: { deliveries: readonly Dashbo
           })}
         </div>
       )}
+
+      <Modal
+        open={confirming !== null}
+        title="Marcar entrega como terminada"
+        onClose={() => setConfirming(null)}
+        dismissible={!updateDelivery.isPending}
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setConfirming(null)} disabled={updateDelivery.isPending}>
+              Cancelar
+            </Button>
+            <Button onClick={() => void onComplete()} loading={updateDelivery.isPending} loadingText="Guardando…">
+              Marcar como terminada
+            </Button>
+          </>
+        }
+      >
+        {confirming && (
+          <p>
+            <strong>{confirming.name ?? confirming.moduleName}</strong> ({confirming.projectName} · {confirming.moduleName}) quedará
+            pendiente de aprobación del líder del equipo o del proyecto. Mientras tanto no podrás volver a modificarla.
+          </p>
+        )}
+      </Modal>
     </Card>
   );
 }

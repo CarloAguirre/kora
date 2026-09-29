@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 import {
-  PROJECT_MODULE_DELIVERY_STATUS_LABELS,
   PROJECT_OBSERVATION_STATUS_LABELS,
   PROJECT_OBSERVATION_TYPE_LABELS,
   type HourEntrySummary,
@@ -8,6 +7,7 @@ import {
   type ProjectObservation,
   type ProjectObservationStatus,
   type ProjectTeam,
+  type ProjectTeamMember,
 } from '@kora/contracts';
 import styles from './BitacoraCard.module.css';
 import { Card } from '@/shared/components/ui/Card';
@@ -45,7 +45,9 @@ import {
   type BitacoraRow,
   type BitacoraRowAction,
 } from '../lib/bitacora-row';
+import { deliveryActionLabel, deliveryActions, deliveryStatusLabel, type DeliveryAction } from '../lib/delivery-status';
 import { AddBitacoraRecordModal } from './AddBitacoraRecordModal';
+import { DeliveryActionDialogs, type DeliveryActionTarget } from './DeliveryActionDialogs';
 
 interface BitacoraCardProps {
   projectId: string;
@@ -53,6 +55,8 @@ interface BitacoraCardProps {
   observations: readonly ProjectObservation[];
   modules: readonly ProjectModule[];
   teams: readonly ProjectTeam[];
+  /** Colaboradores del proyecto — para asignar/reasignar una entrega desde su menú de acciones. */
+  members: readonly ProjectTeamMember[];
   canManage: boolean;
   /** Gerencia/PMO (`projects:manage`): puede corregir la fecha del Hito 0 desde su registro de activación. */
   canCorrectHito0?: boolean;
@@ -72,8 +76,24 @@ const RESOLVE_ACTION_TONE: Record<BitacoraRowAction, DropdownMenuItem['tone']> =
   reabrir: 'default',
 };
 
+const DELIVERY_ACTION_TONE: Record<DeliveryAction, DropdownMenuItem['tone']> = {
+  assign: 'default',
+  approve: 'success',
+  reject: 'danger',
+  revert: 'default',
+};
+
 /** Bitácora unificada del proyecto: eventos (horas) + registros manuales, en una sola tabla filtrable con alta desde "Agregar registro". */
-export function BitacoraCard({ projectId, events, observations, modules, teams, canManage, canCorrectHito0 = false }: BitacoraCardProps) {
+export function BitacoraCard({
+  projectId,
+  events,
+  observations,
+  modules,
+  teams,
+  members,
+  canManage,
+  canCorrectHito0 = false,
+}: BitacoraCardProps) {
   const toast = useToast();
   const resolveObservation = useResolveProjectObservation();
 
@@ -84,6 +104,7 @@ export function BitacoraCard({ projectId, events, observations, modules, teams, 
   const [detailRow, setDetailRow] = useState<BitacoraRow | null>(null);
   const [detailMode, setDetailMode] = useState<'view' | 'edit'>('view');
   const [addOpen, setAddOpen] = useState(false);
+  const [deliveryAction, setDeliveryAction] = useState<DeliveryActionTarget | null>(null);
 
   const openDetail = (row: BitacoraRow, mode: 'view' | 'edit' = 'view') => {
     setDetailRow(row);
@@ -164,12 +185,23 @@ export function BitacoraCard({ projectId, events, observations, modules, teams, 
       width: '56px',
       render: (row) => {
         const canEdit = row.kind !== 'evento' && row.kind !== 'entrega' && row.observation.canEdit;
-        const canEditDelivery = row.kind === 'entrega' && canManage;
+        // Solo quien puede gestionar ESA entrega (líder del proyecto, PMO/admin o líder de su equipo) — lo decide el backend.
+        const canEditDelivery = row.kind === 'entrega' && row.delivery.canManage;
+        const deliveryItems: DropdownMenuItem[] =
+          row.kind === 'entrega'
+            ? deliveryActions(row.delivery).map((action) => ({
+                key: `entrega-${action}`,
+                label: deliveryActionLabel(action, row.delivery),
+                tone: DELIVERY_ACTION_TONE[action],
+                onSelect: () => setDeliveryAction({ action, moduleId: row.moduleId, moduleName: row.moduleName, delivery: row.delivery }),
+              }))
+            : [];
         const canEditHito0 = row.kind !== 'evento' && row.kind !== 'entrega' && row.observation.isHito0 && canCorrectHito0;
         const resolveActions = rowResolveActions(row);
         if (!canEdit && !canEditDelivery && !canEditHito0 && resolveActions.length === 0) return null;
 
         const items: DropdownMenuItem[] = [
+          ...deliveryItems,
           ...resolveActions.map(({ action, nextStatus }) => ({
             key: action,
             label: RESOLVE_ACTION_LABEL[action],
@@ -286,7 +318,7 @@ export function BitacoraCard({ projectId, events, observations, modules, teams, 
             projectId={projectId}
             row={detailRow}
             teams={teams}
-            canEdit={canManage}
+            canEdit={detailRow.delivery.canManage}
             initialEditing={detailMode === 'edit'}
           />
         )}
@@ -308,6 +340,8 @@ export function BitacoraCard({ projectId, events, observations, modules, teams, 
         onClose={() => setAddOpen(false)}
         onSuccess={(message) => toast.success(message)}
       />
+
+      <DeliveryActionDialogs projectId={projectId} members={members} target={deliveryAction} onClose={() => setDeliveryAction(null)} />
     </Card>
   );
 }
@@ -374,11 +408,18 @@ function DeliveryDetail({
   };
 
   if (editing) {
+    const teamChanged = (teamId || null) !== row.delivery.teamId;
     return (
       <div className={styles.detailGrid}>
+        <DetailRow label="Entrega" value={row.delivery.name ?? 'Entrega'} />
         <DetailRow label="Fase" value={row.moduleName} />
-        <DetailRow label="Estado" value={PROJECT_MODULE_DELIVERY_STATUS_LABELS[row.delivery.status]} />
+        <DetailRow label="Estado" value={deliveryStatusLabel(row.delivery)} />
         <Combobox label="Equipo" options={teamOptions} value={teamId} onChange={setTeamId} />
+        {teamChanged && row.delivery.assigneeUserId && (
+          <span className={styles.detailLabel}>
+            Si {row.delivery.assigneeName ?? 'el colaborador asignado'} no pertenece al nuevo equipo, la entrega quedará sin asignar.
+          </span>
+        )}
         <TextField label="Fecha estimada" type="date" value={estimatedDate} onChange={(event) => setEstimatedDate(event.target.value)} />
         {error && <span className={styles.composerError}>{error}</span>}
         <div className={styles.composerRow}>
@@ -402,10 +443,14 @@ function DeliveryDetail({
 
   return (
     <div className={styles.detailGrid}>
+      <DetailRow label="Entrega" value={row.delivery.name ?? 'Entrega'} />
+      {row.delivery.description && <DetailRow label="Descripción" value={row.delivery.description} />}
       <DetailRow label="Fase" value={row.moduleName} />
       <DetailRow label="Equipo" value={row.delivery.teamName ?? 'Sin asignar'} />
+      <DetailRow label="Colaborador" value={row.delivery.assigneeName ?? 'Sin asignar'} />
       <DetailRow label="Fecha estimada" value={new Date(`${row.delivery.estimatedDate}T00:00:00`).toLocaleDateString('es-CL')} />
-      <DetailRow label="Estado" value={PROJECT_MODULE_DELIVERY_STATUS_LABELS[row.delivery.status]} />
+      <DetailRow label="Estado" value={deliveryStatusLabel(row.delivery)} />
+      {row.delivery.rejectionReason && <DetailRow label="Motivo del rechazo" value={row.delivery.rejectionReason} />}
       {canEdit && (
         <div className={styles.composerRow}>
           <Button type="button" variant="outline" size="sm" iconLeft={<PencilIcon size={14} />} onClick={() => setEditing(true)}>

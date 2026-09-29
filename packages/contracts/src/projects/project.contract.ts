@@ -121,10 +121,29 @@ export const PROJECT_MODULE_DELIVERY_STATUSES = ['planned', 'delivered', 'approv
 export const projectModuleDeliveryStatusSchema = z.enum(PROJECT_MODULE_DELIVERY_STATUSES);
 export type ProjectModuleDeliveryStatus = z.infer<typeof projectModuleDeliveryStatusSchema>;
 
+/**
+ * `delivered` = el colaborador la marcó como terminada y queda esperando que un líder la apruebe o
+ * rechace — por eso "Pendiente de aprobación" y no "Entregada". Un rechazo la devuelve a `planned`
+ * con `rejectionReason`; en pantalla se muestra como "Rechazada" hasta que se vuelva a enviar.
+ */
 export const PROJECT_MODULE_DELIVERY_STATUS_LABELS: Readonly<Record<ProjectModuleDeliveryStatus, string>> = {
   planned: 'Planificada',
-  delivered: 'Entregada',
+  delivered: 'Pendiente de aprobación',
   approved: 'Aprobada',
+};
+
+/**
+ * Ciclo de vida de una entrega — ver `UpdateProjectModuleDeliveryUseCase`:
+ * - `planned → delivered`: el colaborador asignado la marca como terminada (o un líder en su nombre).
+ * - `delivered → approved | planned`: un líder (de proyecto o del equipo) la aprueba o la rechaza con motivo.
+ * - `approved → delivered`: un líder revierte la aprobación y la devuelve a revisión.
+ */
+export const PROJECT_MODULE_DELIVERY_ALLOWED_TRANSITIONS: Readonly<
+  Record<ProjectModuleDeliveryStatus, readonly ProjectModuleDeliveryStatus[]>
+> = {
+  planned: ['delivered'],
+  delivered: ['approved', 'planned'],
+  approved: ['delivered'],
 };
 
 export const projectModuleDeliverySchema = z.object({
@@ -141,6 +160,11 @@ export const projectModuleDeliverySchema = z.object({
   status: projectModuleDeliveryStatusSchema,
   /** Motivo del último rechazo del líder — se limpia al aprobar o al volver a marcarla entregada. */
   rejectionReason: z.string().nullable(),
+  /**
+   * ¿Quien consulta puede gestionarla (asignar, aprobar, rechazar, revertir, editar)? Líder del proyecto,
+   * PMO/admin o líder del equipo responsable — mismo criterio que `UpdateProjectModuleDeliveryUseCase`.
+   */
+  canManage: z.boolean(),
 });
 export type ProjectModuleDelivery = z.infer<typeof projectModuleDeliverySchema>;
 

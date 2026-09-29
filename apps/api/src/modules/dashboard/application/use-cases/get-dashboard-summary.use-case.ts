@@ -118,6 +118,7 @@ export class GetDashboardSummaryUseCase implements UseCase<GetDashboardSummaryCo
     const rows = await this.projectModules.listDeliveriesAssignedToUser(actor.userId);
     return rows.map((row) => ({
       id: row.id,
+      name: row.name,
       projectId: row.projectId,
       projectName: row.projectName,
       moduleId: row.moduleId,

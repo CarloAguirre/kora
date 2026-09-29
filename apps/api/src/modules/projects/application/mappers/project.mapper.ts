@@ -65,6 +65,8 @@ export interface ProjectDetailSource {
   readonly actorUserId: string;
   /** Líder de este proyecto, PMO o admin: puede editar cualquier entrada de bitácora y resolver pendientes. */
   readonly canManagePendings: boolean;
+  /** Equipos que lidera quien consulta en este proyecto — junto con `canManagePendings`, decide `delivery.canManage`. */
+  readonly ledTeamIds: ReadonlySet<string>;
   readonly canAuthorizeOvertime: boolean;
   readonly now: Date;
 }
@@ -137,6 +139,7 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
       estimatedDate: delivery.estimatedDate.toISOString().slice(0, 10),
       status: delivery.status,
       rejectionReason: delivery.rejectionReason,
+      canManage: source.canManagePendings || (delivery.teamId !== null && source.ledTeamIds.has(delivery.teamId)),
     })),
     segments: module.segments.map((segment) => ({
       id: segment.id,

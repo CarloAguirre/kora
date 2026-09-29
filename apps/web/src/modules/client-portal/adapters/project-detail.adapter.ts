@@ -96,7 +96,7 @@ function phaseStatus(module: ProjectModule): PhaseRoadmapPhase['status'] {
 }
 
 function deliveryState(delivery: ProjectModuleDelivery): PhaseRoadmapDeliveryState {
-  if (delivery.status === 'delivered') return 'delivered';
+  if (delivery.status === 'delivered' || delivery.status === 'approved') return 'delivered';
   return toDate(delivery.estimatedDate) < startOfToday() ? 'delayed' : 'committed';
 }
 
@@ -157,6 +157,15 @@ const EVENT_STATUS_TONES: Record<HourEntryStatus, ClientBitacoraStatusTone> = {
   rejected: 'danger',
 };
 
+/**
+ * El cliente no ve la revisión interna: para él, `delivered` es "Entregada" — no el "Pendiente de
+ * aprobación" que ve el equipo (`PROJECT_MODULE_DELIVERY_STATUS_LABELS`).
+ */
+const CLIENT_DELIVERY_STATUS_LABELS: Record<ProjectModuleDeliveryStatus, string> = {
+  ...PROJECT_MODULE_DELIVERY_STATUS_LABELS,
+  delivered: 'Entregada',
+};
+
 const DELIVERY_STATUS_TONES: Record<ProjectModuleDeliveryStatus, ClientBitacoraStatusTone> = {
   planned: 'warning',
   delivered: 'info',
@@ -196,7 +205,7 @@ function rowToBitacoraEntry(row: BitacoraRow, moduleBadgeByModuleId: ReadonlyMap
       registeredAt: formatDMY(delivery.estimatedDate),
       phaseTag: phaseTagFor(row.moduleId, row.moduleName, moduleBadgeByModuleId),
       description: deliveryLabel(delivery),
-      statusLabel: PROJECT_MODULE_DELIVERY_STATUS_LABELS[delivery.status],
+      statusLabel: CLIENT_DELIVERY_STATUS_LABELS[delivery.status],
       statusTone: DELIVERY_STATUS_TONES[delivery.status],
     };
   }

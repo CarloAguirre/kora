@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { eq, and, projectTeamMembers, teamMembers, teams, users, type Database } from '@kora/db';
+import { eq, and, hourEntries, projectTeamMembers, sql, teamMembers, teams, users, type Database } from '@kora/db';
 import type { TransactionContext } from '@kora/core';
 import type {
   AssignProjectTeamMemberRecord,
@@ -97,7 +97,17 @@ export class DrizzleProjectTeamMemberRepository implements ProjectTeamMemberRepo
         userLastName: users.lastName,
         activity: projectTeamMembers.activity,
         assignedHours: projectTeamMembers.assignedHours,
-        consumedHours: projectTeamMembers.consumedHours,
+        // Se calcula en vivo desde las horas aprobadas (igual que `projects.used_hours`)
+        // en vez de leer `project_team_members.consumed_hours`, que nadie actualiza
+        // al aprobar horas — solo trae el dato congelado del ETL de v1. Las horas no
+        // guardan equipo: si la persona estuviera en dos equipos del mismo proyecto,
+        // ambas filas mostrarían el mismo total.
+        consumedHours: sql<string>`coalesce((
+          select sum(${hourEntries.hours}) from ${hourEntries}
+          where ${hourEntries.projectId} = ${projectTeamMembers.projectId}
+            and ${hourEntries.userId} = ${teamMembers.userId}
+            and ${hourEntries.status} = 'approved'
+        ), 0)`,
       })
       .from(projectTeamMembers)
       .innerJoin(teams, eq(teams.id, projectTeamMembers.teamId))

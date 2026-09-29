@@ -452,6 +452,7 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
     const rows = await db
       .select({
         id: projectModuleDeliveries.id,
+        name: projectModuleDeliveries.name,
         projectId: projectModules.projectId,
         projectName: projects.name,
         moduleId: projectModules.id,

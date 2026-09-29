@@ -129,6 +129,25 @@ export class GetProjectUseCase implements UseCase<GetProjectCommand, ProjectDeta
     const canManagePendings =
       command.actorPermissions.includes('projects:manage') || snapshot.leaderUserId === command.actorUserId;
 
+    /**
+     * Equipos que lidera quien consulta — `coalesce(project_teams.leader, teams.leader)`, el mismo criterio
+     * con que `UpdateProjectModuleDeliveryUseCase` deja al líder de equipo gestionar sus entregas.
+     */
+    const deliveryTeamIds = [
+      ...new Set(projectModules.flatMap((module) => module.deliveries.flatMap((delivery) => (delivery.teamId ? [delivery.teamId] : [])))),
+    ];
+    const ledTeamIds = new Set(
+      canManagePendings
+        ? []
+        : (
+            await Promise.all(
+              deliveryTeamIds.map(async (teamId) =>
+                (await this.teams.isTeamLeaderForProject(project.id, teamId, command.actorUserId)) ? teamId : null,
+              ),
+            )
+          ).filter((teamId): teamId is string => teamId !== null),
+    );
+
     return ok(
       toProjectDetail({
         project,
@@ -146,6 +165,7 @@ export class GetProjectUseCase implements UseCase<GetProjectCommand, ProjectDeta
         prospectPhaseHours,
         actorUserId: command.actorUserId,
         canManagePendings,
+        ledTeamIds,
         canAuthorizeOvertime,
         now: this.clock.now(),
       }),

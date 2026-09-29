@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { err, ok, type ApplicationError, type Result } from '@kora/core';
+import { CLOCK, err, ok, type ApplicationError, type Clock, type Result } from '@kora/core';
 import type { Permission } from '@kora/contracts';
 import {
   CannotManageProjectError,
@@ -17,6 +17,7 @@ import {
   type AuditRecorder,
 } from '../../../../shared/application/ports/audit-recorder.port';
 import type { ActorContext, UseCase } from '../../../../shared/application/use-case';
+import { ProjectChangeLogRecorder } from '../services/project-change-log.recorder';
 
 export interface RemoveProjectModuleDeliveryCommand {
   readonly projectId: string;
@@ -34,6 +35,8 @@ export class RemoveProjectModuleDeliveryUseCase
     @Inject(PROJECT_REPOSITORY) private readonly projects: ProjectRepository,
     @Inject(PROJECT_MODULE_REPOSITORY) private readonly modules: ProjectModuleRepository,
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
+    private readonly changeLog: ProjectChangeLogRecorder,
+    @Inject(CLOCK) private readonly clock: Clock,
   ) {}
 
   async execute(command: RemoveProjectModuleDeliveryCommand): Promise<Result<void, ApplicationError>> {
@@ -45,15 +48,27 @@ export class RemoveProjectModuleDeliveryUseCase
       return err(new ProjectModuleNotFoundError(command.moduleId));
     }
 
-    if (!module.deliveries.some((delivery) => delivery.id === command.deliveryId)) {
-      return err(new ProjectModuleDeliveryNotFoundError(command.deliveryId));
-    }
+    const delivery = module.deliveries.find((d) => d.id === command.deliveryId);
+    if (!delivery) return err(new ProjectModuleDeliveryNotFoundError(command.deliveryId));
 
     if (!command.actorPermissions.includes('projects:manage') && project.leaderUserId !== command.actor.userId) {
       return err(new CannotManageProjectError());
     }
 
     await this.modules.removeDelivery(command.deliveryId);
+
+    // Es un borrado físico: sin este registro no quedaría rastro de que la entrega existió.
+    await this.changeLog.record(
+      [
+        {
+          projectId: project.id,
+          moduleId: command.moduleId,
+          message: `Entrega${delivery.name ? ` "${delivery.name}"` : ''} eliminada de la fase "${module.name}".`,
+        },
+      ],
+      command.actor.userId,
+      this.clock.now(),
+    );
 
     await this.audit.record({
       actor: { userId: command.actor.userId, email: command.actor.email },

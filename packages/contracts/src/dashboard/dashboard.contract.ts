@@ -213,6 +213,8 @@ export type DashboardMyTask = z.infer<typeof dashboardMyTaskSchema>;
 /** "Mis entregas" — entregas de "Fases · Módulos" asignadas directamente al actor. */
 export const dashboardMyDeliverySchema = z.object({
   id: z.string(),
+  /** Nulo en entregas creadas antes de que existiera el nombre. */
+  name: z.string().nullable(),
   projectId: z.string(),
   projectName: z.string(),
   moduleId: z.string(),

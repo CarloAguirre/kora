@@ -39,7 +39,8 @@ const today = () => {
 
 type DeliveryVisualStatus = 'entregada' | 'comprometida' | 'atrasada';
 function deliveryVisualStatus(delivery: ProjectModuleDelivery): DeliveryVisualStatus {
-  if (delivery.status === 'delivered') return 'entregada';
+  // Una aprobada también se entregó — sin esto, pasada su fecha estimada se mostraba como atrasada.
+  if (delivery.status === 'delivered' || delivery.status === 'approved') return 'entregada';
   return parseDate(delivery.estimatedDate) < today() ? 'atrasada' : 'comprometida';
 }
 
