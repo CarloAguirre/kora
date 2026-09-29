@@ -225,6 +225,32 @@
   color: var(--kora-navy);
 }
 
+.moduleFlags {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+/* "⚑ N atrasos" — mismo look que .flag del prototipo, sin cursor (no abre panel). */
+.lateBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px var(--kora-space-2);
+  border-radius: var(--kora-radius-sm);
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-semibold);
+  background: var(--kora-danger-surface-soft);
+  color: var(--kora-danger);
+  white-space: nowrap;
+}
+
+.taskDetailValueDanger {
+  color: var(--kora-danger);
+  font-weight: var(--kora-weight-semibold);
+}
+
 .blockerBadge {
   display: inline-flex;
   align-items: center;

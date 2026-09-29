@@ -44,6 +44,11 @@ function deliveryVisualStatus(delivery: ProjectModuleDelivery): DeliveryVisualSt
   return parseDate(delivery.estimatedDate) < today() ? 'atrasada' : 'comprometida';
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+/** Días corridos desde la fecha estimada hasta hoy — solo tiene sentido para una entrega 'atrasada'. */
+const deliveryDelayDays = (delivery: ProjectModuleDelivery) =>
+  Math.round((today().getTime() - parseDate(delivery.estimatedDate).getTime()) / DAY_MS);
+
 type TaskVisualStatus = 'done' | 'upcoming' | 'late';
 function taskVisualStatus(task: ProjectModuleTask): TaskVisualStatus {
   if (task.status === 'done') return 'done';
@@ -203,7 +208,6 @@ function computeModuleRange(module: ProjectModule): DateRange | null {
   }
   // Margen a cada lado (como el scroll de 145% del ancho en el mockup): evita que "hoy" u otra
   // fecha caiga justo en el borde visible y choque con la primera/última etiqueta de mes.
-  const DAY_MS = 24 * 60 * 60 * 1000;
   const pad = Math.max((max.getTime() - min.getTime()) * 0.12, 3 * DAY_MS);
   min = new Date(min.getTime() - pad);
   max = new Date(max.getTime() + pad);
@@ -444,6 +448,8 @@ export function ProjectModulesCard({ projectId, modules, hourEntries, observatio
           const ganttItems = groupedGanttItems(module);
           const incidentsOpen = openIncidentsByModule[module.id] ?? false;
           const moduleIncidents = hourEntries.filter((entry) => entry.hasBlocker && entry.module?.id === module.id);
+          // Mismo criterio que el flag "⚑ N atrasos" del prototipo (ficha_proyecto_lider-actualizada.html).
+          const lateDeliveryCount = module.deliveries.filter((d) => deliveryVisualStatus(d) === 'atrasada').length;
 
           return (
             <div key={module.id} className={styles.moduleCard}>
@@ -455,16 +461,28 @@ export function ProjectModulesCard({ projectId, modules, hourEntries, observatio
                     {PHASE_STATUS_LABELS[phaseStatus]}
                   </span>
                 </div>
-                {module.blockerCount > 0 && (
-                  <button
-                    type="button"
-                    className={styles.blockerBadge}
-                    aria-expanded={incidentsOpen}
-                    onClick={() => setOpenIncidentsByModule((prev) => ({ ...prev, [module.id]: !incidentsOpen }))}
-                    title={`${module.blockerCount} registro(s) de horas con bloqueo reportado`}
-                  >
-                    <AlertIcon size={12} /> {module.blockerCount} incidente{module.blockerCount > 1 ? 's' : ''}
-                  </button>
+                {(module.blockerCount > 0 || lateDeliveryCount > 0) && (
+                  <div className={styles.moduleFlags}>
+                    {module.blockerCount > 0 && (
+                      <button
+                        type="button"
+                        className={styles.blockerBadge}
+                        aria-expanded={incidentsOpen}
+                        onClick={() => setOpenIncidentsByModule((prev) => ({ ...prev, [module.id]: !incidentsOpen }))}
+                        title={`${module.blockerCount} registro(s) de horas con bloqueo reportado`}
+                      >
+                        <AlertIcon size={12} /> {module.blockerCount} incidente{module.blockerCount > 1 ? 's' : ''}
+                      </button>
+                    )}
+                    {lateDeliveryCount > 0 && (
+                      <span
+                        className={styles.lateBadge}
+                        title={`${lateDeliveryCount} entrega(s) con fecha estimada vencida y sin entregar`}
+                      >
+                        ⚑ {lateDeliveryCount} atraso{lateDeliveryCount > 1 ? 's' : ''}
+                      </span>
+                    )}
+                  </div>
                 )}
               </div>
 
@@ -820,6 +838,13 @@ export function ProjectModulesCard({ projectId, modules, hourEntries, observatio
                       <div className={styles.taskDetail}>
                         <DetailField label="Estado" value={PROJECT_MODULE_DELIVERY_STATUS_LABELS[delivery.status]} />
                         <DetailField label="Fecha estimada" value={formatDate(delivery.estimatedDate)} />
+                        {deliveryVisualStatus(delivery) === 'atrasada' && (
+                          <DetailField
+                            label="Atraso"
+                            value={`${deliveryDelayDays(delivery)} día${deliveryDelayDays(delivery) === 1 ? '' : 's'}`}
+                            danger
+                          />
+                        )}
                         <DetailField label="Equipo" value={delivery.teamName ?? 'Sin equipo'} />
                         <DetailField label="Descripción" value={delivery.description || 'Sin descripción'} full />
                       </div>
@@ -869,11 +894,11 @@ export function ProjectModulesCard({ projectId, modules, hourEntries, observatio
   );
 }
 
-function DetailField({ label, value, full }: { label: string; value: string; full?: boolean }) {
+function DetailField({ label, value, full, danger }: { label: string; value: string; full?: boolean; danger?: boolean }) {
   return (
     <div className={[styles.taskDetailField, full ? styles.taskDetailFieldFull : ''].filter(Boolean).join(' ')}>
       <span className={styles.taskDetailLabel}>{label}</span>
-      <span className={styles.taskDetailValue}>{value}</span>
+      <span className={[styles.taskDetailValue, danger ? styles.taskDetailValueDanger : ''].filter(Boolean).join(' ')}>{value}</span>
     </div>
   );
 }
