@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CLOCK, ok, type ApplicationError, type Clock, type Result } from '@kora/core';
 import {
+  isAdminTier,
   PROJECT_PHASE_LABELS,
   PROJECT_SALES_STAGE_LABELS,
   type DashboardApprovalsTeam,
@@ -14,7 +15,6 @@ import {
   type RoleCode,
 } from '@kora/contracts';
 import { HOUR_ENTRY_REPOSITORY, type HourEntryRepository } from '../../../hours/domain/repositories/hour-entry.repository';
-import { HOUR_ENTRY_TEAM_READER, type HourEntryTeamReader } from '../../../hours/application/ports/hour-entry-team-reader.port';
 import { TICKET_REPOSITORY, type TicketRepository, type TicketListItem } from '../../../tickets/domain/repositories/ticket.repository';
 import {
   PROJECT_REPOSITORY,
@@ -60,7 +60,6 @@ const MONTH_LABELS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'S
 export class GetDashboardSummaryUseCase implements UseCase<GetDashboardSummaryCommand, DashboardSummary, ApplicationError> {
   constructor(
     @Inject(HOUR_ENTRY_REPOSITORY) private readonly hourEntries: HourEntryRepository,
-    @Inject(HOUR_ENTRY_TEAM_READER) private readonly hourEntryTeams: HourEntryTeamReader,
     @Inject(TICKET_REPOSITORY) private readonly tickets: TicketRepository,
     @Inject(PROJECT_REPOSITORY) private readonly projects: ProjectRepository,
     @Inject(PROJECT_MODULE_REPOSITORY) private readonly projectModules: ProjectModuleRepository,
@@ -83,8 +82,8 @@ export class GetDashboardSummaryUseCase implements UseCase<GetDashboardSummaryCo
       await Promise.all([
         hasOwnHours ? this.buildHoursSummary(actor, now) : Promise.resolve(null),
         actorPermissions.includes('hours:approve') ? this.buildApprovalsSummary(actor, actorPermissions) : Promise.resolve(null),
-        canReadTickets ? this.buildTicketsSummary(actor, actorPermissions) : Promise.resolve(null),
-        canReadProjects ? this.buildProjectsSummary(actor, actorPermissions, now) : Promise.resolve(null),
+        canReadTickets ? this.buildTicketsSummary(actor, actorRole) : Promise.resolve(null),
+        canReadProjects ? this.buildProjectsSummary(actor, actorRole, now) : Promise.resolve(null),
         actorPermissions.includes('forecast:read') ? this.buildCapacitySummary(actor, weekStartOverride) : Promise.resolve(null),
         actorPermissions.includes('billing:read') ? this.buildSupportSummary(actor, actorRole) : Promise.resolve(null),
         hasOwnHours ? this.buildMyActiveProjects(actor) : Promise.resolve([]),
@@ -200,19 +199,26 @@ export class GetDashboardSummaryUseCase implements UseCase<GetDashboardSummaryCo
     return { todayHours, weekHours, weekTargetHours: WEEK_TARGET_HOURS, rejectedCount: rejectedPage.total };
   }
 
+  /**
+   * Mismo alcance que la cola de `/horas/aprobaciones` (`ListHourEntriesUseCase`):
+   * con `hours:read_team` solo cuenta lo que el actor decidiría registro por
+   * registro (`leaderScopeUserId`), no las horas de todos los miembros de
+   * cualquier equipo que lidere — ese set plano sumaba equipos (RPA, IA, QA...)
+   * cuyas horas en otros proyectos aprueba otro líder.
+   */
   private async buildApprovalsSummary(actor: ActorContext, actorPermissions: readonly Permission[]) {
     let visibleToUserIds: readonly string[] | undefined;
+    let leaderScopeUserId: string | undefined;
     if (actorPermissions.includes('hours:read_all')) {
       visibleToUserIds = undefined;
     } else if (actorPermissions.includes('hours:read_team')) {
-      const teamMemberIds = await this.hourEntryTeams.findTeamMemberUserIds(actor.userId);
-      visibleToUserIds = [actor.userId, ...teamMemberIds];
+      leaderScopeUserId = actor.userId;
     } else {
       visibleToUserIds = [actor.userId];
     }
 
     const page = await this.hourEntries.search(
-      { status: 'pending', visibleToUserIds },
+      { status: 'pending', visibleToUserIds, leaderScopeUserId },
       { page: 1, pageSize: PENDING_APPROVALS_PAGE_SIZE },
       { field: 'date', direction: 'desc' },
     );
@@ -232,8 +238,13 @@ export class GetDashboardSummaryUseCase implements UseCase<GetDashboardSummaryCo
     return { pendingCount: page.total, pendingByTeam };
   }
 
-  private async buildTicketsSummary(actor: ActorContext, actorPermissions: readonly Permission[]) {
-    const hasFullRead = actorPermissions.includes('tickets:read');
+  /**
+   * Solo admin/PMO ven los tickets de toda la organización. El líder también
+   * tiene `tickets:read` (para operar el tablero completo), pero su tarjeta del
+   * Dashboard es personal: los tickets que tiene asignados.
+   */
+  private async buildTicketsSummary(actor: ActorContext, actorRole: RoleCode) {
+    const hasFullRead = isAdminTier(actorRole);
     const assigneeUserId = hasFullRead ? undefined : [actor.userId];
     const pages = await Promise.all(
       OPEN_TICKET_STATUSES.map((status) =>
@@ -270,8 +281,9 @@ export class GetDashboardSummaryUseCase implements UseCase<GetDashboardSummaryCo
     };
   }
 
-  private async buildProjectsSummary(actor: ActorContext, actorPermissions: readonly Permission[], now: Date) {
-    const hasFullRead = actorPermissions.includes('projects:read');
+  /** Mismo criterio que `buildTicketsSummary`: toda la organización solo para admin/PMO; el resto, los proyectos donde participa. */
+  private async buildProjectsSummary(actor: ActorContext, actorRole: RoleCode, now: Date) {
+    const hasFullRead = isAdminTier(actorRole);
     const page = await this.projects.search(
       { type: 'development', assignedToUserId: hasFullRead ? undefined : actor.userId },
       { page: 1, pageSize: PROJECT_PAGE_SIZE },

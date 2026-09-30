@@ -64,7 +64,7 @@ export const dashboardTicketsSummarySchema = z.object({
   byStatus: z.array(dashboardTicketStatusCountSchema),
   /** El ticket abierto más antiguo por fecha de creación — `null` si no hay tickets abiertos. */
   oldestOpenTicket: dashboardOldestOpenTicketSchema.nullable(),
-  /** `'own'` cuando el actor solo tiene `tickets:read_assigned` — el conteo es de sus propios tickets, no de toda la organización. */
+  /** `'own'` para todo actor que no sea admin/PMO (incluido el líder, aunque tenga `tickets:read`) — el conteo es de sus propios tickets, no de toda la organización. */
   scope: dashboardScopeSchema,
 });
 export type DashboardTicketsSummary = z.infer<typeof dashboardTicketsSummarySchema>;
@@ -105,7 +105,7 @@ export const dashboardProjectsSummarySchema = z.object({
   closingThisMonthCount: z.number().int(),
   healthBreakdown: dashboardProjectsHealthBreakdownSchema,
   criticalProjects: z.array(dashboardCriticalProjectSchema),
-  /** `'own'` cuando el actor solo tiene `projects:read_assigned` — todos los conteos están acotados a sus propios proyectos. */
+  /** `'own'` para todo actor que no sea admin/PMO — todos los conteos están acotados a los proyectos donde participa. */
   scope: dashboardScopeSchema,
 });
 export type DashboardProjectsSummary = z.infer<typeof dashboardProjectsSummarySchema>;
