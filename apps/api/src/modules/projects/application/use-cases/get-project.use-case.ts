@@ -66,7 +66,7 @@ export class GetProjectUseCase implements UseCase<GetProjectCommand, ProjectDeta
 
     const [
       client,
-      primaryContact,
+      ownPrimaryContact,
       leader,
       developer,
       commercialManager,
@@ -91,6 +91,13 @@ export class GetProjectUseCase implements UseCase<GetProjectCommand, ProjectDeta
       this.paymentMilestones.listForProject(project.id),
       this.hourEntries.maxApprovedEntryDateForProject(project.id),
     ]);
+
+    /**
+     * Un proyecto creado con "usar el contacto del cliente" no guarda `primaryContactId` propio:
+     * hereda el contacto principal del cliente, así que se resuelve ese en vez de dejarlo vacío.
+     */
+    const primaryContact =
+      ownPrimaryContact ?? (client?.primaryContactId ? await this.contacts.findById(client.primaryContactId) : null);
 
     /**
      * Fase "Prospecto/Cotización": horas aprobadas con fecha anterior al

@@ -9,7 +9,7 @@ export class DrizzleProjectClientReader implements ProjectClientReader {
 
   async findById(clientId: string): Promise<ProjectClientReference | null> {
     const rows = await this.database
-      .select({ id: clients.id, companyName: clients.companyName })
+      .select({ id: clients.id, companyName: clients.companyName, primaryContactId: clients.primaryContactId })
       .from(clients)
       .where(isUuid(clientId) ? eq(clients.id, clientId) : eq(clients.slug, clientId))
       .limit(1);
