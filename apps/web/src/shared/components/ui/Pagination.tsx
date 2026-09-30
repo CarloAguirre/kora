@@ -1,4 +1,5 @@
 import styles from './Pagination.module.css';
+import { Select } from './Select';
 import { ChevronLeftIcon, ChevronRightIcon } from '../icons/Icons';
 
 /**
@@ -8,7 +9,12 @@ import { ChevronLeftIcon, ChevronRightIcon } from '../icons/Icons';
  * actual, con puntos suspensivos entre medias. Pintar los 200 números de una
  * lista larga —que es lo que hacían algunas pantallas de la v1— rompe el diseño
  * y no ayuda a nadie.
+ *
+ * Si se pasa `onPageSizeChange`, muestra además el selector "Ver N filas".
  */
+
+export const DEFAULT_PAGE_SIZE = 10;
+export const PAGE_SIZE_OPTIONS: readonly number[] = [10, 25, 50];
 
 export interface PaginationProps {
   readonly page: number;
@@ -16,9 +22,19 @@ export interface PaginationProps {
   readonly total: number;
   readonly pageSize: number;
   readonly onPageChange: (page: number) => void;
+  readonly onPageSizeChange?: (pageSize: number) => void;
+  readonly pageSizeOptions?: readonly number[];
 }
 
-export function Pagination({ page, pageCount, total, pageSize, onPageChange }: PaginationProps) {
+export function Pagination({
+  page,
+  pageCount,
+  total,
+  pageSize,
+  onPageChange,
+  onPageSizeChange,
+  pageSizeOptions = PAGE_SIZE_OPTIONS,
+}: PaginationProps) {
   if (total === 0) return null;
 
   const from = (page - 1) * pageSize + 1;
@@ -26,9 +42,25 @@ export function Pagination({ page, pageCount, total, pageSize, onPageChange }: P
 
   return (
     <nav className={styles.pagination} aria-label="Paginación de resultados">
-      <p className={styles.summary}>
-        Mostrando {from}–{to} de {total}
-      </p>
+      <div className={styles.info}>
+        {onPageSizeChange && (
+          <div className={styles.pageSize}>
+            <span className={styles.pageSizeLabel} aria-hidden="true">
+              Ver
+            </span>
+            <Select
+              aria-label="Filas por página"
+              value={String(pageSize)}
+              onChange={(event) => onPageSizeChange(Number(event.target.value))}
+              options={pageSizeOptions.map((size) => ({ value: String(size), label: `${size} Filas` }))}
+            />
+          </div>
+        )}
+
+        <p className={styles.summary}>
+          Mostrando {from}–{to} de {total}
+        </p>
+      </div>
 
       <div className={styles.controls}>
         <button

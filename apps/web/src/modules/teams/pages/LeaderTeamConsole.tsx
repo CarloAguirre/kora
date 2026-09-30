@@ -8,7 +8,7 @@ import { Button } from '@/shared/components/ui/Button';
 import { TextField } from '@/shared/components/ui/TextField';
 import { Tabs } from '@/shared/components/ui/Tabs';
 import { DataTable, type Column, type SortState } from '@/shared/components/ui/DataTable';
-import { Pagination } from '@/shared/components/ui/Pagination';
+import { DEFAULT_PAGE_SIZE, Pagination } from '@/shared/components/ui/Pagination';
 import { ClockIcon, SearchIcon, TrendingUpIcon } from '@/shared/components/icons/Icons';
 import { ProjectStatusBadge } from '@/modules/projects/components/ProjectStatusBadge';
 import { getProjectStageLabel } from '@/modules/projects/lib/project-stage-display';
@@ -31,7 +31,6 @@ const TAB_LABELS: Record<ProjectTabKey, string> = {
   quoted: 'Cotización',
 };
 
-const PAGE_SIZE = 10;
 const TEAM_PROJECTS_FETCH_SIZE = 200;
 
 const soldHoursOf = (project: ProjectSummary) => (project.type === 'support' ? project.supportHours : project.soldHours);
@@ -101,6 +100,7 @@ export function LeaderTeamConsole({ teams }: { teams: TeamSummary[] }) {
   // `null` = el orden en que llegan de la API, hasta que se hace clic en un encabezado.
   const [sort, setSort] = useState<SortState<SortField> | null>(null);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
   const {
     data: teamProjects,
@@ -129,8 +129,8 @@ export function LeaderTeamConsole({ teams }: { teams: TeamSummary[] }) {
     return [...bySearch].sort((a, b) => compareSortValues(valueOf(a), valueOf(b), sort.direction));
   }, [allProjects, tab, search, sort]);
 
-  const pageCount = Math.max(1, Math.ceil(filteredProjects.length / PAGE_SIZE));
-  const pageItems = filteredProjects.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const pageCount = Math.max(1, Math.ceil(filteredProjects.length / pageSize));
+  const pageItems = filteredProjects.slice((page - 1) * pageSize, page * pageSize);
 
   const changeTab = (id: string) => {
     setTab(id as ProjectTabKey);
@@ -251,7 +251,17 @@ export function LeaderTeamConsole({ teams }: { teams: TeamSummary[] }) {
             emptyMessage="No hay proyectos para este filtro."
           />
 
-          <Pagination page={page} pageCount={pageCount} total={filteredProjects.length} pageSize={PAGE_SIZE} onPageChange={setPage} />
+          <Pagination
+            page={page}
+            pageCount={pageCount}
+            total={filteredProjects.length}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={(size) => {
+              setPageSize(size);
+              setPage(1);
+            }}
+          />
         </Card>
 
         <Card>

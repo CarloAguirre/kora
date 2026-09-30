@@ -15,7 +15,7 @@ import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Button } from '@/shared/components/ui/Button';
 import { Card } from '@/shared/components/ui/Card';
 import { DataTable, type Column, type SortState } from '@/shared/components/ui/DataTable';
-import { Pagination } from '@/shared/components/ui/Pagination';
+import { DEFAULT_PAGE_SIZE, Pagination } from '@/shared/components/ui/Pagination';
 import { TextField } from '@/shared/components/ui/TextField';
 import { MultiSelect } from '@/shared/components/ui/MultiSelect';
 import { Tabs } from '@/shared/components/ui/Tabs';
@@ -68,6 +68,7 @@ export function ProjectsListPage() {
   const [statuses, setStatuses] = useState<ProjectStatus[]>([]);
   const [phases, setPhases] = useState<ProjectPhase[]>([]);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [sort, setSort] = useState<SortState<ProjectSortField>>({ field: 'createdAt', direction: 'desc' });
   const [deleteTarget, setDeleteTarget] = useState<ProjectSummary | null>(null);
   const [exporting, setExporting] = useState(false);
@@ -91,7 +92,7 @@ export function ProjectsListPage() {
   const { data, isLoading, error } = useProjectsList({
     ...listQuery,
     page,
-    pageSize: 25,
+    pageSize,
     sortField: sort.field,
     sortDirection: sort.direction,
   });
@@ -331,7 +332,17 @@ export function ProjectsListPage() {
           />
 
           {data && (
-            <Pagination page={page} pageCount={data.pageCount} total={data.total} pageSize={data.pageSize} onPageChange={setPage} />
+            <Pagination
+              page={page}
+              pageCount={data.pageCount}
+              total={data.total}
+              pageSize={data.pageSize}
+              onPageChange={setPage}
+              onPageSizeChange={(size) => {
+                setPageSize(size);
+                setPage(1);
+              }}
+            />
           )}
         </Card>
       </div>

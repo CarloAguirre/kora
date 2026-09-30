@@ -35,6 +35,7 @@ export interface SupportTicketBrowserProps {
   loading: boolean;
   page: number;
   onPageChange: (page: number) => void;
+  onPageSizeChange: (pageSize: number) => void;
 }
 
 /**
@@ -43,7 +44,7 @@ export interface SupportTicketBrowserProps {
  * del ticket abre `TicketDetailModal` (editar/cerrar/HH extra) para no
  * duplicar esas acciones acá — este panel es solo lectura.
  */
-export function SupportTicketBrowser({ tickets, loading, page, onPageChange }: SupportTicketBrowserProps) {
+export function SupportTicketBrowser({ tickets, loading, page, onPageChange, onPageSizeChange }: SupportTicketBrowserProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [managingId, setManagingId] = useState<string | null>(null);
 
@@ -94,7 +95,14 @@ export function SupportTicketBrowser({ tickets, loading, page, onPageChange }: S
       </div>
 
       {tickets.total > 0 && (
-        <Pagination page={page} pageCount={tickets.pageCount} total={tickets.total} pageSize={tickets.pageSize} onPageChange={onPageChange} />
+        <Pagination
+          page={page}
+          pageCount={tickets.pageCount}
+          total={tickets.total}
+          pageSize={tickets.pageSize}
+          onPageChange={onPageChange}
+          onPageSizeChange={onPageSizeChange}
+        />
       )}
 
       {managingId && <TicketDetailModal ticketId={managingId} onClose={() => setManagingId(null)} />}

@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ClientSortField, ClientStatus, ListClientsQuery } from '@kora/contracts';
 import type { ClientsFiltersValue } from '../components/ClientsFilters';
+import { DEFAULT_PAGE_SIZE } from '@/shared/components/ui/Pagination';
 
 export type ClientsStatusTab = 'all' | ClientStatus;
 
 const EMPTY_FILTERS: ClientsFiltersValue = { search: '' };
-const PAGE_SIZE = 25;
 const SEARCH_DEBOUNCE_MS = 300;
 
 export interface ClientsListState {
@@ -14,9 +14,11 @@ export interface ClientsListState {
   readonly query: Partial<ListClientsQuery>;
   readonly sort: { field: ClientSortField; direction: 'asc' | 'desc' };
   readonly page: number;
+  readonly pageSize: number;
   setFilters(filters: ClientsFiltersValue): void;
   setTab(tab: ClientsStatusTab): void;
   setPage(page: number): void;
+  setPageSize(pageSize: number): void;
   toggleSort(field: string): void;
 }
 
@@ -25,6 +27,7 @@ export function useClientsListState(): ClientsListState {
   const [tab, setTabState] = useState<ClientsStatusTab>('all');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSizeState] = useState(DEFAULT_PAGE_SIZE);
   const [sort, setSort] = useState<{ field: ClientSortField; direction: 'asc' | 'desc' }>({
     field: 'companyName',
     direction: 'asc',
@@ -45,6 +48,11 @@ export function useClientsListState(): ClientsListState {
     setPage(1);
   }, []);
 
+  const setPageSize = useCallback((next: number) => {
+    setPageSizeState(next);
+    setPage(1);
+  }, []);
+
   const toggleSort = useCallback((field: string) => {
     setSort((current) =>
       current.field === field
@@ -57,14 +65,14 @@ export function useClientsListState(): ClientsListState {
   const query = useMemo<Partial<ListClientsQuery>>(
     () => ({
       page,
-      pageSize: PAGE_SIZE,
+      pageSize,
       search: debouncedSearch || undefined,
       status: tab === 'all' ? undefined : tab,
       sortField: sort.field,
       sortDirection: sort.direction,
     }),
-    [page, debouncedSearch, tab, sort],
+    [page, pageSize, debouncedSearch, tab, sort],
   );
 
-  return { filters, tab, query, sort, page, setFilters, setTab, setPage, toggleSort };
+  return { filters, tab, query, sort, page, pageSize, setFilters, setTab, setPage, setPageSize, toggleSort };
 }

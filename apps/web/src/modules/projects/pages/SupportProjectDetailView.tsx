@@ -7,7 +7,7 @@ import detailStyles from './ProjectDetailPage.module.css';
 import { Card } from '@/shared/components/ui/Card';
 import { Select } from '@/shared/components/ui/Select';
 import { DataTable, type Column } from '@/shared/components/ui/DataTable';
-import { Pagination } from '@/shared/components/ui/Pagination';
+import { DEFAULT_PAGE_SIZE, Pagination } from '@/shared/components/ui/Pagination';
 import { useToast } from '@/shared/components/ui/Toast';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { useClientDetail } from '@/modules/clients/api/clients.queries';
@@ -23,7 +23,6 @@ import { ticketPath } from '@/app/router/paths';
 const STATUS_OPTIONS = PROJECT_STATUSES.map((status) => ({ value: status, label: PROJECT_STATUS_LABELS[status] }));
 const formatDate = (value: string | null) => (value ? new Date(`${value}T00:00:00`).toLocaleDateString('es-CL') : '—');
 const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 2 });
-const TICKETS_PAGE_SIZE = 25;
 
 /**
  * Ficha de proyecto de soporte — réplica de `FichaProyectoSoporte` (v1), que
@@ -40,10 +39,11 @@ export function SupportProjectDetailView({ project, projectId }: { project: Proj
   const { data: client } = useClientDetail(project.client?.id ?? null);
   const { data: supportSummary, isLoading: loadingSummary } = useSupportPlanSummary(projectId);
   const [ticketsPage, setTicketsPage] = useState(1);
+  const [ticketsPageSize, setTicketsPageSize] = useState(DEFAULT_PAGE_SIZE);
   const { data: tickets, isLoading: loadingTickets } = useTicketsList({
     projectId,
     page: ticketsPage,
-    pageSize: TICKETS_PAGE_SIZE,
+    pageSize: ticketsPageSize,
     sortField: 'createdAt',
     sortDirection: 'desc',
   });
@@ -173,8 +173,18 @@ export function SupportProjectDetailView({ project, projectId }: { project: Proj
             error={null}
             emptyMessage="Sin tickets registrados."
           />
-          {tickets && tickets.total > TICKETS_PAGE_SIZE && (
-            <Pagination page={ticketsPage} pageCount={tickets.pageCount} total={tickets.total} pageSize={tickets.pageSize} onPageChange={setTicketsPage} />
+          {tickets && tickets.total > DEFAULT_PAGE_SIZE && (
+            <Pagination
+              page={ticketsPage}
+              pageCount={tickets.pageCount}
+              total={tickets.total}
+              pageSize={tickets.pageSize}
+              onPageChange={setTicketsPage}
+              onPageSizeChange={(size) => {
+                setTicketsPageSize(size);
+                setTicketsPage(1);
+              }}
+            />
           )}
         </div>
       </Card>

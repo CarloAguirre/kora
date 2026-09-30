@@ -122,6 +122,7 @@ export function CapacityReportTable() {
           total={data.total}
           pageSize={data.pageSize}
           onPageChange={state.setPage}
+          onPageSizeChange={state.setPageSize}
         />
       )}
     </div>

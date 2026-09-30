@@ -6,7 +6,7 @@ import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Button } from '@/shared/components/ui/Button';
 import { Card } from '@/shared/components/ui/Card';
 import { DataTable, type Column, type SortState } from '@/shared/components/ui/DataTable';
-import { Pagination } from '@/shared/components/ui/Pagination';
+import { DEFAULT_PAGE_SIZE, Pagination } from '@/shared/components/ui/Pagination';
 import { Tabs } from '@/shared/components/ui/Tabs';
 import { TextField } from '@/shared/components/ui/TextField';
 import { PencilIcon, PlusIcon, ChevronLeftIcon, SearchIcon, EyeIcon } from '@/shared/components/icons/Icons';
@@ -28,7 +28,6 @@ import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { formatMoney } from '@/shared/lib/format-money';
 import { clientPortalPreviewPath, projectPath, supportPlanPath } from '@/app/router/paths';
 
-const PAGE_SIZE = 10;
 
 type ProjectTab = 'all' | 'active' | 'draft' | 'on_hold' | 'support' | 'finished' | 'quoted' | 'prospect';
 
@@ -90,6 +89,7 @@ export function ClientDetailPage() {
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<SortState>({ field: 'name', direction: 'asc' });
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
   const allProjects = projects?.items ?? [];
 
@@ -130,8 +130,8 @@ export function ClientDetailPage() {
     return sorted;
   }, [allProjects, tab, search, sort]);
 
-  const pageCount = Math.max(1, Math.ceil(filteredProjects.length / PAGE_SIZE));
-  const pagedProjects = filteredProjects.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const pageCount = Math.max(1, Math.ceil(filteredProjects.length / pageSize));
+  const pagedProjects = filteredProjects.slice((page - 1) * pageSize, page * pageSize);
 
   if (isLoading || !client || !clientId) {
     return (
@@ -309,7 +309,17 @@ export function ClientDetailPage() {
             emptyMessage="Este cliente todavía no tiene proyectos."
           />
 
-          <Pagination page={page} pageCount={pageCount} total={filteredProjects.length} pageSize={PAGE_SIZE} onPageChange={setPage} />
+          <Pagination
+            page={page}
+            pageCount={pageCount}
+            total={filteredProjects.length}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={(size) => {
+              setPageSize(size);
+              setPage(1);
+            }}
+          />
         </Card>
 
         <Card>

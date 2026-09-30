@@ -4,7 +4,7 @@ import styles from './ForecastPlanning.module.css';
 import { Card } from '@/shared/components/ui/Card';
 import { KpiCard } from '@/shared/components/ui/KpiCard';
 import { TextField } from '@/shared/components/ui/TextField';
-import { Pagination } from '@/shared/components/ui/Pagination';
+import { DEFAULT_PAGE_SIZE, Pagination } from '@/shared/components/ui/Pagination';
 import { DataTable, type Column, type SortState } from '@/shared/components/ui/DataTable';
 import { SearchIcon, TriangleAlertIcon } from '@/shared/components/icons/Icons';
 
@@ -15,7 +15,6 @@ import { SearchIcon, TriangleAlertIcon } from '@/shared/components/icons/Icons';
  * Planificación" con la tabla de carga por colaborador.
  */
 
-const PAGE_SIZE = 20;
 type SortField = 'fullName' | 'teamName' | 'assignedHours' | 'loadPercent';
 
 /** Tiempo que no es de proyecto ni soporte — en el Figma, "Capacitación" va en dorado. */
@@ -137,6 +136,7 @@ export function ForecastPlanningSection({ members, loading = false, error = null
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<SortState<SortField>>({ field: 'fullName', direction: 'asc' });
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
   const totalFreeHours = useMemo(() => members.reduce((sum, member) => sum + freeHours(member), 0), [members]);
 
@@ -169,10 +169,10 @@ export function ForecastPlanningSection({ members, loading = false, error = null
   );
 
   const total = sorted.length;
-  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const pageCount = Math.max(1, Math.ceil(total / pageSize));
   // Al cambiar de período o equipo la lista puede achicarse; no dejamos la página fuera de rango.
   const currentPage = Math.min(page, pageCount);
-  const pageItems = sorted.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const pageItems = sorted.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const handleSortChange = (field: string) => {
     setSort((prev) => ({
@@ -217,7 +217,17 @@ export function ForecastPlanningSection({ members, loading = false, error = null
         onSortChange={handleSortChange}
       />
 
-      <Pagination page={currentPage} pageCount={pageCount} total={total} pageSize={PAGE_SIZE} onPageChange={setPage} />
+      <Pagination
+        page={currentPage}
+        pageCount={pageCount}
+        total={total}
+        pageSize={pageSize}
+        onPageChange={setPage}
+        onPageSizeChange={(size) => {
+          setPageSize(size);
+          setPage(1);
+        }}
+      />
     </Card>
   );
 }

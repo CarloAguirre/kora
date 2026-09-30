@@ -10,7 +10,7 @@ import {
 import styles from './TeamHourHistoryPanel.module.css';
 import { Button } from '@/shared/components/ui/Button';
 import { DataTable, type Column } from '@/shared/components/ui/DataTable';
-import { Pagination } from '@/shared/components/ui/Pagination';
+import { DEFAULT_PAGE_SIZE, Pagination } from '@/shared/components/ui/Pagination';
 import { Select } from '@/shared/components/ui/Select';
 import { TextField } from '@/shared/components/ui/TextField';
 import { Badge } from '@/shared/components/ui/Badge';
@@ -51,6 +51,7 @@ export function TeamHourHistoryPanel({ teamId, userId }: { teamId?: string; user
   const [dateTo, setDateTo] = useState('');
   const [status, setStatus] = useState<HourEntryStatus | ''>('');
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [dialog, setDialog] = useState<DialogState>({ kind: 'none' });
   const { exporting, exportError, exportEntries } = useHourEntriesExport();
   const deleteEntry = useDeleteHourEntry();
@@ -69,7 +70,7 @@ export function TeamHourHistoryPanel({ teamId, userId }: { teamId?: string; user
     dateTo: dateTo || undefined,
     status: status || undefined,
     page,
-    pageSize: 10,
+    pageSize,
     sortField: 'date',
     sortDirection: 'desc',
   });
@@ -260,7 +261,19 @@ export function TeamHourHistoryPanel({ teamId, userId }: { teamId?: string; user
         emptyMessage="No hay registros para los filtros aplicados."
       />
 
-      {data && <Pagination page={page} pageCount={data.pageCount} total={data.total} pageSize={data.pageSize} onPageChange={setPage} />}
+      {data && (
+        <Pagination
+          page={page}
+          pageCount={data.pageCount}
+          total={data.total}
+          pageSize={data.pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setPage(1);
+          }}
+        />
+      )}
 
       <HourEntryFormDialog
         open={dialog.kind !== 'none'}

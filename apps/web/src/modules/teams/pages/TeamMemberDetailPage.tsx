@@ -6,7 +6,7 @@ import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Button } from '@/shared/components/ui/Button';
 import { Card } from '@/shared/components/ui/Card';
 import { DataTable, type Column } from '@/shared/components/ui/DataTable';
-import { Pagination } from '@/shared/components/ui/Pagination';
+import { DEFAULT_PAGE_SIZE, Pagination } from '@/shared/components/ui/Pagination';
 import { Select } from '@/shared/components/ui/Select';
 import { useTeamDetail } from '../api/teams.queries';
 import { useProjectsList } from '@/modules/projects/api/projects.queries';
@@ -40,13 +40,14 @@ export function TeamMemberDetailPage() {
 
   const [historyStatus, setHistoryStatus] = useState<Extract<HourEntryStatus, 'approved' | 'rejected'>>('approved');
   const [historyPage, setHistoryPage] = useState(1);
+  const [historyPageSize, setHistoryPageSize] = useState(DEFAULT_PAGE_SIZE);
 
   const { data: memberProjects, isLoading: loadingProjects } = useProjectsList(
     member ? { assignedToUserId: member.userId, page: 1, pageSize: 50 } : {},
   );
   const { data: history, isLoading: loadingHistory } = useHourEntriesList(
     member
-      ? { userId: member.userId, status: historyStatus, page: historyPage, pageSize: 10, sortField: 'date' }
+      ? { userId: member.userId, status: historyStatus, page: historyPage, pageSize: historyPageSize, sortField: 'date' }
       : {},
   );
 
@@ -175,6 +176,10 @@ export function TeamMemberDetailPage() {
               total={history.total}
               pageSize={history.pageSize}
               onPageChange={setHistoryPage}
+              onPageSizeChange={(size) => {
+                setHistoryPageSize(size);
+                setHistoryPage(1);
+              }}
             />
           )}
         </Card>

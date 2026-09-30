@@ -52,7 +52,7 @@ export function UsersListPage() {
   const { can } = usePermissions();
   const toast = useToast();
   const [activeTab, setActiveTab] = useState<AdminTab>('usuarios');
-  const { filters, query, sort, page, setFilters, setPage, toggleSort } = useUsersListState();
+  const { filters, query, sort, page, setFilters, setPage, setPageSize, toggleSort } = useUsersListState();
   const { data, isLoading, error } = useUsersList(query);
   const { data: teamsData } = useTeamsList({ page: 1, pageSize: 200, sortField: 'name', isActive: true });
 
@@ -191,6 +191,7 @@ export function UsersListPage() {
                   total={data.total}
                   pageSize={data.pageSize}
                   onPageChange={setPage}
+                  onPageSizeChange={setPageSize}
                 />
               )}
             </div>

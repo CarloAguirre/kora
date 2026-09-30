@@ -32,7 +32,8 @@ type DialogState =
 export function ClientsListPage() {
   const { can } = usePermissions();
   const toast = useToast();
-  const { filters, tab, query, sort, page, setFilters, setTab, setPage, toggleSort } = useClientsListState();
+  const { filters, tab, query, sort, page, setFilters, setTab, setPage, setPageSize, toggleSort } =
+    useClientsListState();
   const { data, isLoading, error } = useClientsList(query);
   const { data: stats, isLoading: statsLoading } = useClientsStats();
 
@@ -100,6 +101,7 @@ export function ClientsListPage() {
                 total={data.total}
                 pageSize={data.pageSize}
                 onPageChange={setPage}
+                onPageSizeChange={setPageSize}
               />
             )}
           </div>

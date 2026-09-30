@@ -15,7 +15,7 @@ import { Card } from '@/shared/components/ui/Card';
 import { Select } from '@/shared/components/ui/Select';
 import { MultiSelect } from '@/shared/components/ui/MultiSelect';
 import { TextField } from '@/shared/components/ui/TextField';
-import { Pagination } from '@/shared/components/ui/Pagination';
+import { DEFAULT_PAGE_SIZE, Pagination } from '@/shared/components/ui/Pagination';
 import { DataTable, type Column } from '@/shared/components/ui/DataTable';
 import { DownloadIcon, EyeIcon, SearchIcon, SparklesIcon, AlertIcon } from '@/shared/components/icons/Icons';
 import { TicketStatusBadge } from '../components/TicketStatusBadge';
@@ -29,7 +29,6 @@ import { useUsersList } from '@/modules/users/api/users.queries';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { ApiRequestError } from '@/shared/lib/api-client';
 
-const PAGE_SIZE = 25;
 const formatDate = (value: string) => new Date(value).toLocaleDateString('es-CL');
 
 /**
@@ -46,6 +45,7 @@ export function TicketHistoryPage() {
   const [assigneeUserIds, setAssigneeUserIds] = useState<string[]>([]);
   const [status, setStatus] = useState<TicketStatus | ''>('');
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [sort, setSort] = useState<{ field: TicketSortField; direction: 'asc' | 'desc' }>({
     field: 'createdAt',
     direction: 'desc',
@@ -59,7 +59,7 @@ export function TicketHistoryPage() {
 
   const query: Partial<ListTicketsQuery> = {
     page,
-    pageSize: PAGE_SIZE,
+    pageSize,
     search: search || undefined,
     clientId: clientIds.length > 0 ? clientIds : undefined,
     assigneeUserId: assigneeUserIds.length > 0 ? assigneeUserIds : undefined,
@@ -248,6 +248,10 @@ export function TicketHistoryPage() {
                 total={data.total}
                 pageSize={data.pageSize}
                 onPageChange={setPage}
+                onPageSizeChange={(size) => {
+                  setPageSize(size);
+                  setPage(1);
+                }}
               />
             )}
           </div>

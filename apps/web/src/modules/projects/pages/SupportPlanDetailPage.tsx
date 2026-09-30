@@ -5,6 +5,7 @@ import styles from './SupportPlanDetailPage.module.css';
 import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Button } from '@/shared/components/ui/Button';
 import { Card } from '@/shared/components/ui/Card';
+import { DEFAULT_PAGE_SIZE } from '@/shared/components/ui/Pagination';
 import { Tabs } from '@/shared/components/ui/Tabs';
 import { DataTable, type Column } from '@/shared/components/ui/DataTable';
 import { ChevronLeftIcon, DownloadIcon, LinkIcon } from '@/shared/components/icons/Icons';
@@ -33,7 +34,6 @@ import { clientPath, clientPortalPreviewPath } from '@/app/router/paths';
 
 const formatDate = (value: string | null) => (value ? new Date(`${value}T00:00:00`).toLocaleDateString('es-CL') : '—');
 const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 2 });
-const TICKETS_PAGE_SIZE = 25;
 
 type PayAction = { invoice: SupportInvoice } | null;
 
@@ -64,6 +64,7 @@ export function SupportPlanDetailPage() {
   const [payAction, setPayAction] = useState<PayAction>(null);
   const [closing, setClosing] = useState(false);
   const [ticketsPage, setTicketsPage] = useState(1);
+  const [ticketsPageSize, setTicketsPageSize] = useState(DEFAULT_PAGE_SIZE);
 
   const issueInvoice = useIssueSupportInvoice(planId ?? '', plan?.clientId);
   const markPaid = useMarkSupportInvoicePaid(planId ?? '', plan?.clientId);
@@ -74,7 +75,7 @@ export function SupportPlanDetailPage() {
   const { data: tickets, isLoading: loadingTickets } = useTicketsList({
     projectId: currentProjectId ?? undefined,
     page: ticketsPage,
-    pageSize: TICKETS_PAGE_SIZE,
+    pageSize: ticketsPageSize,
     sortField: 'createdAt',
     sortDirection: 'desc',
   });
@@ -286,7 +287,16 @@ export function SupportPlanDetailPage() {
           Tickets: <strong>{tickets?.total ?? 0}</strong> · HH utilizadas: <strong>{formatHours(plan.usedHours)}h</strong>
         </p>
 
-        <SupportTicketBrowser tickets={tickets} loading={loadingTickets} page={ticketsPage} onPageChange={setTicketsPage} />
+        <SupportTicketBrowser
+          tickets={tickets}
+          loading={loadingTickets}
+          page={ticketsPage}
+          onPageChange={setTicketsPage}
+          onPageSizeChange={(size) => {
+            setTicketsPageSize(size);
+            setTicketsPage(1);
+          }}
+        />
       </Card>
       </div>
 

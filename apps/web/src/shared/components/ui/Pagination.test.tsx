@@ -80,4 +80,31 @@ describe('Pagination', () => {
 
     expect(onPageChange).toHaveBeenCalledWith(3);
   });
+
+  it('no muestra el selector de filas si no se puede cambiar', () => {
+    render(<Pagination page={1} pageCount={3} total={58} pageSize={25} onPageChange={vi.fn()} />);
+
+    expect(screen.queryByRole('combobox', { name: 'Filas por página' })).not.toBeInTheDocument();
+  });
+
+  it('avisa del cambio de filas por página', async () => {
+    const onPageSizeChange = vi.fn();
+    render(
+      <Pagination
+        page={1}
+        pageCount={6}
+        total={58}
+        pageSize={10}
+        onPageChange={vi.fn()}
+        onPageSizeChange={onPageSizeChange}
+      />,
+    );
+
+    const select = screen.getByRole('combobox', { name: 'Filas por página' });
+    expect(select).toHaveValue('10');
+
+    await userEvent.selectOptions(select, '50');
+
+    expect(onPageSizeChange).toHaveBeenCalledWith(50);
+  });
 });

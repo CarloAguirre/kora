@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { CapacityReportSortField, ListCapacityReportQuery } from '@kora/contracts';
+import { DEFAULT_PAGE_SIZE } from '@/shared/components/ui/Pagination';
 
-const PAGE_SIZE = 25;
 const SEARCH_DEBOUNCE_MS = 300;
 const MONTH_LABELS = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -31,10 +31,12 @@ export interface CapacityReportState {
   readonly periodStart: string;
   readonly sort: { field: CapacityReportSortField; direction: 'asc' | 'desc' };
   readonly page: number;
+  readonly pageSize: number;
   readonly query: Partial<ListCapacityReportQuery>;
   setSearch(value: string): void;
   setPeriodStart(value: string): void;
   setPage(page: number): void;
+  setPageSize(pageSize: number): void;
   toggleSort(field: string): void;
 }
 
@@ -45,6 +47,7 @@ export function useCapacityReportState(): CapacityReportState {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [periodStart, setPeriodStartState] = useState(periodOptions[0]?.value ?? '');
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSizeState] = useState(DEFAULT_PAGE_SIZE);
   const [sort, setSort] = useState<{ field: CapacityReportSortField; direction: 'asc' | 'desc' }>({
     field: 'periodDate',
     direction: 'desc',
@@ -65,6 +68,11 @@ export function useCapacityReportState(): CapacityReportState {
     setPage(1);
   }, []);
 
+  const setPageSize = useCallback((next: number) => {
+    setPageSizeState(next);
+    setPage(1);
+  }, []);
+
   const toggleSort = useCallback((field: string) => {
     setSort((current) =>
       current.field === field
@@ -77,14 +85,27 @@ export function useCapacityReportState(): CapacityReportState {
   const query = useMemo<Partial<ListCapacityReportQuery>>(
     () => ({
       page,
-      pageSize: PAGE_SIZE,
+      pageSize,
       search: debouncedSearch || undefined,
       periodStart,
       sortField: sort.field,
       sortDirection: sort.direction,
     }),
-    [page, debouncedSearch, periodStart, sort],
+    [page, pageSize, debouncedSearch, periodStart, sort],
   );
 
-  return { search, periodOptions, periodStart, sort, page, query, setSearch, setPeriodStart, setPage, toggleSort };
+  return {
+    search,
+    periodOptions,
+    periodStart,
+    sort,
+    page,
+    pageSize,
+    query,
+    setSearch,
+    setPeriodStart,
+    setPage,
+    setPageSize,
+    toggleSort,
+  };
 }

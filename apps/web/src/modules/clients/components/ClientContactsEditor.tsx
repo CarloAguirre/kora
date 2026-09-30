@@ -1,4 +1,4 @@
-import { useFieldArray, type Control, type FieldErrors, type UseFormRegister } from 'react-hook-form';
+import { Controller, useFieldArray, type Control, type FieldErrors, type UseFormRegister } from 'react-hook-form';
 import { z } from 'zod';
 import { createClientSchema } from '@kora/contracts';
 
@@ -8,6 +8,7 @@ import { createClientSchema } from '@kora/contracts';
 type ClientFormValues = z.input<typeof createClientSchema>;
 import styles from './ClientContactsEditor.module.css';
 import { TextField } from '@/shared/components/ui/TextField';
+import { PhoneField } from '@/shared/components/ui/PhoneField';
 import { Button } from '@/shared/components/ui/Button';
 import { PlusIcon, TrashIcon } from '@/shared/components/icons/Icons';
 
@@ -45,11 +46,20 @@ export function ClientContactsEditor({ control, errors, register }: ClientContac
             errorText={errors.contacts?.[index]?.email?.message}
             {...register(`contacts.${index}.email`)}
           />
-          <TextField
-            label="Teléfono"
-            type="tel"
-            errorText={errors.contacts?.[index]?.phone?.message}
-            {...register(`contacts.${index}.phone`)}
+          <Controller
+            control={control}
+            name={`contacts.${index}.phone`}
+            render={({ field: { ref, value, onChange, onBlur, name } }) => (
+              <PhoneField
+                ref={ref}
+                name={name}
+                label="Teléfono"
+                value={value ?? ''}
+                onChange={onChange}
+                onBlur={onBlur}
+                errorText={errors.contacts?.[index]?.phone?.message}
+              />
+            )}
           />
           <Button
             type="button"
