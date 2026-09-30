@@ -1,10 +1,7 @@
 import { useMemo, useState } from 'react';
 import {
-  PROJECT_MODULE_TASK_SCOPES,
-  PROJECT_MODULE_TASK_SCOPE_LABELS,
   PROJECT_MODULE_TASK_STATUS_LABELS,
   type ProjectDetail,
-  type ProjectModuleTaskScope,
   type ProjectModuleTaskStatus,
 } from '@kora/contracts';
 import styles from './TeamLeaderProjectView.module.css';
@@ -48,19 +45,14 @@ const TASK_STATUS_BADGE_CLASS: Record<ProjectModuleTaskStatus, string> = {
   done: 'badgeSuccess',
 };
 
-const TASK_SCOPE_OPTIONS = PROJECT_MODULE_TASK_SCOPES.map((scope) => ({
-  value: scope,
-  label: PROJECT_MODULE_TASK_SCOPE_LABELS[scope],
-}));
-
 interface TaskDraft {
   name: string;
   description: string;
   assigneeUserId: string;
   moduleId: string;
   status: ProjectModuleTaskStatus;
-  scope: ProjectModuleTaskScope;
   estimatedHours: string;
+  startDate: string;
   date: string;
 }
 
@@ -70,8 +62,8 @@ const EMPTY_TASK_DRAFT: TaskDraft = {
   assigneeUserId: '',
   moduleId: '',
   status: 'todo',
-  scope: 'desarrollo',
   estimatedHours: '',
+  startDate: '',
   date: '',
 };
 
@@ -136,15 +128,22 @@ export function TeamTasksCard({ project, projectId, teamId }: TeamTasksCardProps
       assigneeUserId: task.assigneeUserId ?? '',
       moduleId,
       status: task.status,
-      scope: task.scope,
       estimatedHours: task.estimatedHours != null ? String(task.estimatedHours) : '',
+      startDate: task.startDate ?? '',
       date: task.date,
     });
     setTaskModalOpen(true);
   };
 
+  // Fechas ISO (yyyy-mm-dd): la comparación de strings respeta el orden cronológico.
+  const startDateError =
+    taskDraft.startDate && taskDraft.date && taskDraft.startDate > taskDraft.date
+      ? 'Debe ser anterior o igual a la fecha límite.'
+      : undefined;
+  const canSaveTask = Boolean(taskDraft.name.trim() && taskDraft.date && taskDraft.moduleId && !startDateError);
+
   const onSaveTask = async () => {
-    if (!taskDraft.name.trim() || !taskDraft.date || !taskDraft.moduleId) return;
+    if (!canSaveTask) return;
     try {
       if (editingTaskId) {
         await updateTask.mutateAsync({
@@ -155,10 +154,10 @@ export function TeamTasksCard({ project, projectId, teamId }: TeamTasksCardProps
             name: taskDraft.name,
             description: taskDraft.description || undefined,
             assigneeUserId: taskDraft.assigneeUserId || undefined,
+            startDate: taskDraft.startDate || null,
             date: taskDraft.date,
             estimatedHours: taskDraft.estimatedHours === '' ? undefined : Number(taskDraft.estimatedHours),
             status: taskDraft.status,
-            scope: taskDraft.scope,
           },
         });
         toast.success('Se actualizó la tarea.');
@@ -171,10 +170,10 @@ export function TeamTasksCard({ project, projectId, teamId }: TeamTasksCardProps
             name: taskDraft.name,
             description: taskDraft.description || undefined,
             assigneeUserId: taskDraft.assigneeUserId || undefined,
+            startDate: taskDraft.startDate || undefined,
             date: taskDraft.date,
             estimatedHours: taskDraft.estimatedHours === '' ? undefined : Number(taskDraft.estimatedHours),
             status: taskDraft.status,
-            scope: taskDraft.scope,
           },
         });
         toast.success('Se creó la tarea.');
@@ -372,7 +371,7 @@ export function TeamTasksCard({ project, projectId, teamId }: TeamTasksCardProps
             <Button
               onClick={() => void onSaveTask()}
               loading={createTask.isPending || updateTask.isPending}
-              disabled={!taskDraft.name.trim() || !taskDraft.date || !taskDraft.moduleId}
+              disabled={!canSaveTask}
             >
               Guardar
             </Button>
@@ -409,12 +408,6 @@ export function TeamTasksCard({ project, projectId, teamId }: TeamTasksCardProps
             disabled={Boolean(editingTaskId)}
             onChange={(event) => setTaskDraft((prev) => ({ ...prev, moduleId: event.target.value }))}
           />
-          <Select
-            label="Ámbito"
-            options={TASK_SCOPE_OPTIONS}
-            value={taskDraft.scope}
-            onChange={(event) => setTaskDraft((prev) => ({ ...prev, scope: event.target.value as ProjectModuleTaskScope }))}
-          />
           <div className={styles.row2}>
             <Select
               label="Estado"
@@ -430,12 +423,23 @@ export function TeamTasksCard({ project, projectId, teamId }: TeamTasksCardProps
               onChange={(event) => setTaskDraft((prev) => ({ ...prev, estimatedHours: event.target.value }))}
             />
           </div>
-          <TextField
-            label="Fecha límite"
-            type="date"
-            value={taskDraft.date}
-            onChange={(event) => setTaskDraft((prev) => ({ ...prev, date: event.target.value }))}
-          />
+          <div className={styles.row2}>
+            <TextField
+              label="Fecha de inicio"
+              type="date"
+              value={taskDraft.startDate}
+              max={taskDraft.date || undefined}
+              errorText={startDateError}
+              onChange={(event) => setTaskDraft((prev) => ({ ...prev, startDate: event.target.value }))}
+            />
+            <TextField
+              label="Fecha límite"
+              type="date"
+              value={taskDraft.date}
+              min={taskDraft.startDate || undefined}
+              onChange={(event) => setTaskDraft((prev) => ({ ...prev, date: event.target.value }))}
+            />
+          </div>
         </div>
       </Modal>
 
