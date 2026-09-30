@@ -332,7 +332,11 @@ export function ClientProjectDetailPage({ projectIdOverride, backTo, backLabel }
                 <span className={styles.statLabel}>Horas desviación</span>
                 <div className={styles.hoursDeviationValueRow}>
                   <span className={styles.statSub}>{formatHours(project.hoursDeviation)}</span>
-                  <StatusPill tone="warning">En riesgo</StatusPill>
+                  {project.hoursDeviation > 0 ? (
+                    <StatusPill tone="warning">En riesgo</StatusPill>
+                  ) : (
+                    <StatusPill tone="success">Sin desviación</StatusPill>
+                  )}
                 </div>
               </div>
             </Card>

@@ -431,7 +431,8 @@ export function toClientProjectDetail(project: ProjectDetail, hourEntries: reado
     clientContactPosition: contactPosition,
     startDate: formatDMY(project.startDate),
     estimatedHours: soldHours,
-    hoursDeviation: Math.round(Math.abs(usedHours - soldHours) * 10) / 10,
+    // Solo cuenta como desviación lo consumido por sobre lo vendido (mismo criterio que el dashboard).
+    hoursDeviation: Math.round(Math.max(0, usedHours - soldHours) * 10) / 10,
     usedHoursToDate: usedHours,
     usedHoursUpdatedAt: project.usedHoursUpdatedAt ? formatDMY(project.usedHoursUpdatedAt) : '--',
     progressActualPercent: project.actualProgress ?? 0,
