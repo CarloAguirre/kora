@@ -165,7 +165,7 @@ export function ProjectsBillingSection() {
     );
   }, [entries, status, clientFilter, sort]);
 
-  // Sumar monedas distintas inventaría un número sin sentido — hoy `proyecto` siempre es CLP, pero se agrupa igual por si eso cambia.
+  // Sumar monedas distintas inventaría un número sin sentido — hoy `proyecto` siempre es UF, pero se agrupa igual por si eso cambia.
   const kpisByCurrency = useMemo(() => {
     const groups = new Map<
       string,
@@ -437,7 +437,7 @@ export function ProjectsBillingSection() {
         ? kpisByCurrency
         : [
             {
-              currency: "CLP" as const,
+              currency: "UF" as const,
               toInvoice: 0,
               invoiced: 0,
               paid: 0,

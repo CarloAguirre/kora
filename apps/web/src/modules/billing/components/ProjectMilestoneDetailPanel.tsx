@@ -116,7 +116,7 @@ export function ProjectMilestoneDetailPanel({ projectId, milestoneId, onClose, o
 
           <div className={[styles.row, styles.rowHighlight].join(' ')}>
             <span className={styles.rowLabel}>Monto del tramo{milestone.percent !== null ? ` (${milestone.percent}%)` : ''}</span>
-            <span className={styles.rowValueHighlight}>{formatMoney(milestone.amount, 'CLP')}</span>
+            <span className={styles.rowValueHighlight}>{formatMoney(milestone.amount, 'UF')}</span>
           </div>
           <p className={styles.note}>El monto se registra manualmente al emitir la factura de este tramo.</p>
         </>

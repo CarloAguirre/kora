@@ -167,8 +167,8 @@ export class ListBillingLedgerEntriesUseCase implements UseCase<void, BillingLed
         clientName: milestone.clientName ?? '',
         detail: `${milestone.projectName} — ${milestone.name}`,
         amount: milestone.amount,
-        // `project_payment_milestones` todavía no tiene moneda propia — mismo criterio ya usado en `ProjectBillingCard.tsx` del portal cliente.
-        currency: 'CLP' as const,
+        // `project_payment_milestones` todavía no tiene moneda propia — los tramos de proyecto se cobran en UF.
+        currency: 'UF' as const,
         folio: milestone.invoiceNumber,
         issuedAt: milestone.issuedAt?.toISOString().slice(0, 10) ?? null,
         status: milestone.status === 'pending' ? 'pendiente' : milestone.status === 'invoiced' ? 'facturado' : 'pagado',
