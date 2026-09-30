@@ -6,7 +6,9 @@
 
 .row {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr auto;
+  /* 2×2 (Nombre/Cargo, Correo/Teléfono) + columna del botón de quitar: con
+     cuatro campos en una sola fila el correo quedaba demasiado angosto. */
+  grid-template-columns: 1fr 1fr auto;
   gap: var(--kora-space-2);
   align-items: start;
   padding: var(--kora-space-3);
@@ -16,6 +18,8 @@
 }
 
 .removeButton {
+  grid-column: 3;
+  grid-row: 1;
   margin-top: 24px;
 }
 
@@ -35,6 +39,8 @@
   }
 
   .removeButton {
+    grid-column: auto;
+    grid-row: auto;
     margin-top: 0;
     justify-self: flex-end;
   }

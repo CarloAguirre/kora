@@ -45,6 +45,12 @@ export function ClientContactsEditor({ control, errors, register }: ClientContac
             errorText={errors.contacts?.[index]?.email?.message}
             {...register(`contacts.${index}.email`)}
           />
+          <TextField
+            label="Teléfono"
+            type="tel"
+            errorText={errors.contacts?.[index]?.phone?.message}
+            {...register(`contacts.${index}.phone`)}
+          />
           <Button
             type="button"
             variant="ghost"
