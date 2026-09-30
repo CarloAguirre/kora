@@ -33,6 +33,9 @@ export function toProjectSummary(item: ProjectListItem): ProjectSummary {
     phase: item.phase as ProjectSummary['phase'],
     priority: item.priority as ProjectSummary['priority'],
     leader: item.leaderUserId ? { id: item.leaderUserId, fullName: item.leaderName ?? '' } : null,
+    commercialManager: item.commercialManagerUserId
+      ? { id: item.commercialManagerUserId, fullName: item.commercialManagerName ?? '' }
+      : null,
     soldHours: item.soldHours,
     usedHours: item.usedHours,
     assignedMemberCount: item.assignedMemberCount,

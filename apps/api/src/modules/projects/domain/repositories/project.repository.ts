@@ -46,6 +46,8 @@ export interface ProjectListItem {
   readonly priority: string | null;
   readonly leaderUserId: string | null;
   readonly leaderName: string | null;
+  readonly commercialManagerUserId: string | null;
+  readonly commercialManagerName: string | null;
   readonly soldHours: number;
   readonly usedHours: number;
   readonly assignedMemberCount: number;

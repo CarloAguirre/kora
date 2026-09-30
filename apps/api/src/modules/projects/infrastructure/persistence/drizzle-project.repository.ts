@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import {
+  alias,
   and,
   asc,
   clients,
@@ -74,6 +75,7 @@ export class DrizzleProjectRepository implements ProjectRepository {
       .from(projectTeamMembers)
       .groupBy(projectTeamMembers.projectId)
       .as('member_stats');
+    const commercialManagers = alias(users, 'commercial_managers');
 
     const [rows, totalRows] = await Promise.all([
       db
@@ -91,6 +93,9 @@ export class DrizzleProjectRepository implements ProjectRepository {
           leaderUserId: projects.leaderUserId,
           leaderFirstName: users.firstName,
           leaderLastName: users.lastName,
+          commercialManagerUserId: projects.commercialManagerUserId,
+          commercialManagerFirstName: commercialManagers.firstName,
+          commercialManagerLastName: commercialManagers.lastName,
           soldHours: projects.soldHours,
           usedHours: projects.usedHours,
           assignedMemberCount: sql<number>`coalesce(${memberStatsSubquery.assignedMemberCount}, 0)`,
@@ -106,6 +111,7 @@ export class DrizzleProjectRepository implements ProjectRepository {
         .from(projects)
         .leftJoin(clients, eq(clients.id, projects.clientId))
         .leftJoin(users, eq(users.id, projects.leaderUserId))
+        .leftJoin(commercialManagers, eq(commercialManagers.id, projects.commercialManagerUserId))
         .leftJoin(memberStatsSubquery, eq(memberStatsSubquery.projectId, projects.id))
         .where(where)
         .orderBy(...this.buildOrderBy(sort))
@@ -128,6 +134,10 @@ export class DrizzleProjectRepository implements ProjectRepository {
       priority: row.priority,
       leaderUserId: row.leaderUserId,
       leaderName: row.leaderFirstName ? `${row.leaderFirstName} ${row.leaderLastName ?? ''}`.trim() : null,
+      commercialManagerUserId: row.commercialManagerUserId,
+      commercialManagerName: row.commercialManagerFirstName
+        ? `${row.commercialManagerFirstName} ${row.commercialManagerLastName ?? ''}`.trim()
+        : null,
       soldHours: Number(row.soldHours),
       usedHours: Number(row.usedHours),
       assignedMemberCount: Number(row.assignedMemberCount),

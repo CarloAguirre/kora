@@ -38,7 +38,7 @@ export function toClientProjectRow(project: ProjectSummary, clientOwnerName: str
     slug: project.slug,
     name: project.name,
     typeLabel: project.type === 'development' ? 'Desarrollo' : 'Soporte',
-    kabeliOwnerName: project.leader?.fullName ?? '—',
+    kabeliOwnerName: project.commercialManager?.fullName ?? '—',
     clientOwnerName,
     startDate: formatDMY(project.startDate),
     endDate: project.endDate ? formatDMY(project.endDate) : null,

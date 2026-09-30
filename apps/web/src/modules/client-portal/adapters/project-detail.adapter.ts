@@ -426,7 +426,7 @@ export function toClientProjectDetail(project: ProjectDetail, hourEntries: reado
       contactName,
       contactPosition,
     },
-    kabeliOwnerName: project.leader?.fullName ?? '—',
+    kabeliOwnerName: project.commercialManager?.fullName ?? '—',
     clientContactName: contactName,
     clientContactPosition: contactPosition,
     startDate: formatDMY(project.startDate),

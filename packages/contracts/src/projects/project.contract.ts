@@ -498,6 +498,8 @@ export const projectSummarySchema = z.object({
   phase: projectPhaseSchema.nullable(),
   priority: projectPrioritySchema.nullable(),
   leader: z.object({ id: uuidSchema, fullName: z.string() }).nullable(),
+  /** Responsable comercial — es quien figura como "Responsable Kabeli" ante el cliente (el líder es otro rol). */
+  commercialManager: z.object({ id: uuidSchema, fullName: z.string() }).nullable(),
   soldHours: z.number(),
   usedHours: z.number(),
   /** Colaboradores con una fila en `project_team_members` (personas asignadas a trabajar en el proyecto). */
@@ -517,7 +519,6 @@ export type ProjectSummary = z.infer<typeof projectSummarySchema>;
 
 export const projectDetailSchema = projectSummarySchema.extend({
   developer: z.object({ id: uuidSchema, fullName: z.string() }).nullable(),
-  commercialManager: z.object({ id: uuidSchema, fullName: z.string() }).nullable(),
   /** Contacto principal DE ESTE PROYECTO (v1: `proyecto.id_contacto`) — puede diferir del contacto general del cliente. */
   primaryContact: clientContactSchema.nullable(),
   estimatedDeliveryDate: z.string().nullable(),
