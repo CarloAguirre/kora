@@ -1,7 +1,9 @@
+import { formatMoney } from '@/shared/lib/format-money';
 import styles from './ProjectBillingCard.module.css';
 import type { ClientProjectBilling } from '../types';
 
-const formatCurrency = (value: number) => `$${value.toLocaleString('es-CL', { maximumFractionDigits: 0 })}`;
+/** Los tramos de pago de un proyecto siempre están en UF (`project_payment_milestones.amount`), igual que en Facturación. */
+const formatCurrency = (value: number) => formatMoney(value, 'UF');
 
 const STATUS_LABEL: Readonly<Record<'paid' | 'pending', string>> = {
   paid: 'Pagada',
