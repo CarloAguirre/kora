@@ -5,9 +5,12 @@ import {
   useProjectBillingSettings,
   useProjectDetail,
   useUpdateProjectBillingSettings,
+  useUpdateProjectPaymentMilestone,
 } from "@/modules/projects/api/projects.queries";
+import { EditProjectMilestoneDialog } from "@/modules/projects/components/EditProjectMilestoneDialog";
 import { IssueProjectMilestoneInvoiceDialog } from "@/modules/projects/components/IssueProjectMilestoneInvoiceDialog";
 import { MarkProjectMilestonePaidDialog } from "@/modules/projects/components/MarkProjectMilestonePaidDialog";
+import { PencilIcon } from "@/shared/components/icons/Icons";
 import { Badge, type BadgeTone } from "@/shared/components/ui/Badge";
 import { Button } from "@/shared/components/ui/Button";
 import {
@@ -30,6 +33,7 @@ import type {
   BillingLedgerEntry,
   IssueProjectPaymentMilestoneInvoiceInput,
   MarkProjectPaymentMilestonePaidInput,
+  UpdateProjectPaymentMilestoneInput,
 } from "@kora/contracts";
 import { useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
@@ -99,7 +103,7 @@ const SORT_VALUE: Record<SortField, (entry: BillingLedgerEntry) => SortValue> =
   };
 
 type DialogState = {
-  kind: "issue-milestone" | "pay-milestone";
+  kind: "issue-milestone" | "pay-milestone" | "edit-milestone";
   entry: BillingLedgerEntry;
 } | null;
 
@@ -132,14 +136,23 @@ export function ProjectsBillingSection() {
 
   const issueMilestoneInvoice = useIssueProjectPaymentMilestoneInvoice();
   const markMilestonePaid = useMarkProjectPaymentMilestonePaid();
+  const updateMilestone = useUpdateProjectPaymentMilestone();
 
   const canManageBilling = can("projects:manage");
   const { data: billingSettings } = useProjectBillingSettings();
   const updateBillingSettings = useUpdateProjectBillingSettings();
 
   const { data: milestoneProject } = useProjectDetail(
-    dialog?.kind === "issue-milestone" ? dialog.entry.projectId : null,
+    dialog?.kind === "issue-milestone" || dialog?.kind === "edit-milestone"
+      ? dialog.entry.projectId
+      : null,
   );
+  const editingMilestone =
+    dialog?.kind === "edit-milestone"
+      ? (milestoneProject?.paymentMilestones.find(
+          (m) => m.id === dialog.entry.referenceId,
+        ) ?? null)
+      : null;
 
   const clientOptions = useMemo(() => {
     const seen = new Map<string, string>();
@@ -216,6 +229,19 @@ export function ProjectsBillingSection() {
     toast.success("Pago registrado correctamente.");
   };
 
+  const onUpdateMilestone = async (
+    input: UpdateProjectPaymentMilestoneInput,
+  ) => {
+    if (dialog?.kind !== "edit-milestone" || !dialog.entry.projectId) return;
+    await updateMilestone.mutateAsync({
+      projectId: dialog.entry.projectId,
+      milestoneId: dialog.entry.referenceId as string,
+      input,
+    });
+    await queryClient.invalidateQueries({ queryKey: billingKeys.ledger() });
+    toast.success("Se guardó el tramo de pago.");
+  };
+
   const invoiceDialogIsFirstMilestone = useMemo(() => {
     if (dialog?.kind !== "issue-milestone" || !milestoneProject) return false;
     if (milestoneProject.salesStage !== "approved") return false;
@@ -251,7 +277,23 @@ export function ProjectsBillingSection() {
     }
   };
 
-  const renderAction = (entry: BillingLedgerEntry) => {
+  const renderAction = (entry: BillingLedgerEntry) => (
+    <div className={styles.actions}>
+      {canManageBilling && (
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setDialog({ kind: "edit-milestone", entry })}
+          aria-label={`Editar ${tramoLabel(entry)}`}
+        >
+          <PencilIcon size={16} />
+        </Button>
+      )}
+      {renderStatusAction(entry)}
+    </div>
+  );
+
+  const renderStatusAction = (entry: BillingLedgerEntry) => {
     if (entry.status === "pendiente") {
       return (
         <Button
@@ -524,6 +566,12 @@ export function ProjectsBillingSection() {
         showReactivationNotice={showReactivationNotice}
         onClose={closeDialog}
         onConfirm={onIssueMilestoneInvoice}
+      />
+
+      <EditProjectMilestoneDialog
+        milestone={editingMilestone}
+        onClose={closeDialog}
+        onConfirm={onUpdateMilestone}
       />
 
       <MarkProjectMilestonePaidDialog

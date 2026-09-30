@@ -132,6 +132,10 @@ export class DrizzleProjectPaymentMilestoneRepository implements ProjectPaymentM
         ...(input.percent !== undefined ? { percent: input.percent != null ? String(input.percent) : null } : {}),
         ...(input.amount !== undefined ? { amount: String(input.amount) } : {}),
         ...(input.sortOrder !== undefined ? { sortOrder: input.sortOrder } : {}),
+        ...(input.status !== undefined ? { status: input.status } : {}),
+        ...(input.invoiceNumber !== undefined ? { invoiceNumber: input.invoiceNumber } : {}),
+        ...(input.issuedAt !== undefined ? { issuedAt: input.issuedAt } : {}),
+        ...(input.paidAt !== undefined ? { paidAt: input.paidAt } : {}),
         updatedAt: new Date(),
       })
       .where(eq(projectPaymentMilestones.id, id));

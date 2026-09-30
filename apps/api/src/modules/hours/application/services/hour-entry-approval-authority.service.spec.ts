@@ -112,11 +112,15 @@ describe('HourEntryApprovalAuthorityService', () => {
     expect(canDecide).toBe(false);
   });
 
-  it('sin proyecto y con aprobador designado, solo ese aprobador puede decidir', async () => {
-    const service = new HourEntryApprovalAuthorityService(new FakeProjectReader(null), new FakeTeamReader());
+  it('sin proyecto y con aprobador designado, decide el designado o quien lidera al dueño', async () => {
+    const service = new HourEntryApprovalAuthorityService(
+      new FakeProjectReader(null),
+      new FakeTeamReader({ 'owner-1': 'team-leader-9' }),
+    );
     const entry = buildNoProjectEntry('designated-1');
 
     expect(await service.canDecide('designated-1', 'leader', entry)).toBe(true);
+    expect(await service.canDecide('team-leader-9', 'leader', entry)).toBe(true);
     expect(await service.canDecide('other-leader', 'leader', entry)).toBe(false);
   });
 

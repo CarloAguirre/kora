@@ -6,6 +6,7 @@ import {
   type ProjectDetail,
   type ProjectPaymentMilestone,
   type ProjectPaymentStatus,
+  type UpdateProjectPaymentMilestoneInput,
 } from '@kora/contracts';
 import styles from './ProjectExtrasTab.module.css';
 import { Card } from '@/shared/components/ui/Card';
@@ -27,6 +28,7 @@ import {
 import { ApiRequestError } from '@/shared/lib/api-client';
 import { IssueProjectMilestoneInvoiceDialog } from './IssueProjectMilestoneInvoiceDialog';
 import { MarkProjectMilestonePaidDialog } from './MarkProjectMilestonePaidDialog';
+import { EditProjectMilestoneDialog } from './EditProjectMilestoneDialog';
 
 interface AccessLinksDraft {
   demoLink: string;
@@ -97,15 +99,6 @@ interface MilestoneDraft {
 
 const EMPTY_MILESTONE_DRAFT: MilestoneDraft = { name: '', percent: '', amount: '', sortOrder: '' };
 
-function toMilestoneDraft(milestone: ProjectPaymentMilestone): MilestoneDraft {
-  return {
-    name: milestone.name,
-    percent: milestone.percent != null ? String(milestone.percent) : '',
-    amount: String(milestone.amount),
-    sortOrder: String(milestone.sortOrder),
-  };
-}
-
 const MILESTONE_STATUS_TONE: Readonly<Record<ProjectPaymentStatus, BadgeTone>> = {
   pending: 'neutral',
   invoiced: 'info',
@@ -142,8 +135,7 @@ export function ProjectExtrasTab({ project, canManage }: { project: ProjectDetai
   const markMilestonePaid = useMarkProjectPaymentMilestonePaid();
 
   const [newMilestone, setNewMilestone] = useState<MilestoneDraft>(EMPTY_MILESTONE_DRAFT);
-  const [editingMilestoneId, setEditingMilestoneId] = useState<string | null>(null);
-  const [milestoneDraft, setMilestoneDraft] = useState<MilestoneDraft>(EMPTY_MILESTONE_DRAFT);
+  const [editingMilestone, setEditingMilestone] = useState<ProjectPaymentMilestone | null>(null);
   const [invoiceDialogMilestone, setInvoiceDialogMilestone] = useState<ProjectPaymentMilestone | null>(null);
   const [paidDialogMilestone, setPaidDialogMilestone] = useState<ProjectPaymentMilestone | null>(null);
 
@@ -173,29 +165,10 @@ export function ProjectExtrasTab({ project, canManage }: { project: ProjectDetai
     }
   };
 
-  const onStartEditMilestone = (milestone: ProjectPaymentMilestone) => {
-    setEditingMilestoneId(milestone.id);
-    setMilestoneDraft(toMilestoneDraft(milestone));
-  };
-
-  const onSaveMilestone = async () => {
-    if (!editingMilestoneId) return;
-    try {
-      await updateMilestone.mutateAsync({
-        projectId: project.id,
-        milestoneId: editingMilestoneId,
-        input: {
-          name: milestoneDraft.name.trim(),
-          percent: milestoneDraft.percent === '' ? null : Number(milestoneDraft.percent),
-          amount: Number(milestoneDraft.amount),
-          sortOrder: milestoneDraft.sortOrder === '' ? undefined : Number(milestoneDraft.sortOrder),
-        },
-      });
-      toast.success('Se guardó el tramo de pago.');
-      setEditingMilestoneId(null);
-    } catch (error) {
-      toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo guardar el tramo.');
-    }
+  const onSaveMilestone = async (input: UpdateProjectPaymentMilestoneInput) => {
+    if (!editingMilestone) return;
+    await updateMilestone.mutateAsync({ projectId: project.id, milestoneId: editingMilestone.id, input });
+    toast.success('Se guardó el tramo de pago.');
   };
 
   const onDeleteMilestone = async (milestone: ProjectPaymentMilestone) => {
@@ -473,90 +446,50 @@ export function ProjectExtrasTab({ project, canManage }: { project: ProjectDetai
             <p className={styles.hint}>Este proyecto todavía no tiene tramos de pago configurados.</p>
           ) : (
             <div className={styles.milestoneList}>
-              {sortedMilestones.map((milestone) =>
-                editingMilestoneId === milestone.id ? (
-                  <div key={milestone.id} className={styles.milestoneEditRow}>
-                    <TextField
-                      label="Nombre"
-                      value={milestoneDraft.name}
-                      onChange={(e) => setMilestoneDraft((prev) => ({ ...prev, name: e.target.value }))}
-                    />
-                    <TextField
-                      label="Porcentaje"
-                      type="number"
-                      min={0}
-                      max={100}
-                      value={milestoneDraft.percent}
-                      onChange={(e) => setMilestoneDraft((prev) => ({ ...prev, percent: e.target.value }))}
-                    />
-                    <TextField
-                      label="Monto"
-                      type="number"
-                      min={0}
-                      value={milestoneDraft.amount}
-                      onChange={(e) => setMilestoneDraft((prev) => ({ ...prev, amount: e.target.value }))}
-                    />
-                    <TextField
-                      label="Orden"
-                      type="number"
-                      min={0}
-                      value={milestoneDraft.sortOrder}
-                      onChange={(e) => setMilestoneDraft((prev) => ({ ...prev, sortOrder: e.target.value }))}
-                    />
-                    <div className={styles.milestoneEditActions}>
-                      <Button variant="outline" size="sm" onClick={() => setEditingMilestoneId(null)} disabled={updateMilestone.isPending}>
-                        Cancelar
-                      </Button>
-                      <Button size="sm" onClick={() => void onSaveMilestone()} loading={updateMilestone.isPending}>
-                        Guardar
-                      </Button>
-                    </div>
+              {sortedMilestones.map((milestone) => (
+                <div key={milestone.id} className={styles.milestoneRow}>
+                  <div className={styles.milestoneInfo}>
+                    <span className={styles.milestoneName}>{milestone.name}</span>
+                    <span className={styles.milestoneMeta}>
+                      {milestone.percent != null ? `${milestone.percent}% · ` : ''}
+                      {milestone.amount.toLocaleString('es-CL', { maximumFractionDigits: 2 })}
+                      {milestone.invoiceNumber ? ` · Folio ${milestone.invoiceNumber}` : ''}
+                      {milestone.issuedAt ? ` · Emitido ${formatDate(milestone.issuedAt)}` : ''}
+                      {milestone.paidAt ? ` · Pagado ${formatDate(milestone.paidAt)}` : ''}
+                    </span>
                   </div>
-                ) : (
-                  <div key={milestone.id} className={styles.milestoneRow}>
-                    <div className={styles.milestoneInfo}>
-                      <span className={styles.milestoneName}>{milestone.name}</span>
-                      <span className={styles.milestoneMeta}>
-                        {milestone.percent != null ? `${milestone.percent}% · ` : ''}
-                        {milestone.amount.toLocaleString('es-CL', { maximumFractionDigits: 2 })}
-                        {milestone.invoiceNumber ? ` · Folio ${milestone.invoiceNumber}` : ''}
-                        {milestone.issuedAt ? ` · Emitido ${formatDate(milestone.issuedAt)}` : ''}
-                        {milestone.paidAt ? ` · Pagado ${formatDate(milestone.paidAt)}` : ''}
-                      </span>
-                    </div>
 
-                    <Badge tone={MILESTONE_STATUS_TONE[milestone.status]}>{PROJECT_PAYMENT_STATUS_LABELS[milestone.status]}</Badge>
+                  <Badge tone={MILESTONE_STATUS_TONE[milestone.status]}>{PROJECT_PAYMENT_STATUS_LABELS[milestone.status]}</Badge>
 
-                    <div className={styles.milestoneActions}>
-                      {canManageMilestones && milestone.status === 'pending' && (
-                        <>
-                          <Button variant="ghost" size="icon" onClick={() => onStartEditMilestone(milestone)} aria-label={`Editar ${milestone.name}`}>
-                            <PencilIcon size={16} />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => void onDeleteMilestone(milestone)}
-                            aria-label={`Quitar ${milestone.name}`}
-                          >
-                            <TrashIcon size={16} />
-                          </Button>
-                        </>
-                      )}
-                      {canManageBillingActions && milestone.status === 'pending' && (
-                        <Button size="sm" onClick={() => setInvoiceDialogMilestone(milestone)}>
-                          Subir factura
-                        </Button>
-                      )}
-                      {canManageBillingActions && milestone.status === 'invoiced' && (
-                        <Button size="sm" onClick={() => setPaidDialogMilestone(milestone)}>
-                          Marcar pagado
-                        </Button>
-                      )}
-                    </div>
+                  <div className={styles.milestoneActions}>
+                    {canManageMilestones && (
+                      <Button variant="ghost" size="icon" onClick={() => setEditingMilestone(milestone)} aria-label={`Editar ${milestone.name}`}>
+                        <PencilIcon size={16} />
+                      </Button>
+                    )}
+                    {canManageMilestones && milestone.status === 'pending' && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => void onDeleteMilestone(milestone)}
+                        aria-label={`Quitar ${milestone.name}`}
+                      >
+                        <TrashIcon size={16} />
+                      </Button>
+                    )}
+                    {canManageBillingActions && milestone.status === 'pending' && (
+                      <Button size="sm" onClick={() => setInvoiceDialogMilestone(milestone)}>
+                        Subir factura
+                      </Button>
+                    )}
+                    {canManageBillingActions && milestone.status === 'invoiced' && (
+                      <Button size="sm" onClick={() => setPaidDialogMilestone(milestone)}>
+                        Marcar pagado
+                      </Button>
+                    )}
                   </div>
-                ),
-              )}
+                </div>
+              ))}
             </div>
           )}
 
@@ -597,6 +530,8 @@ export function ProjectExtrasTab({ project, canManage }: { project: ProjectDetai
           )}
         </Card>
       )}
+
+      <EditProjectMilestoneDialog milestone={editingMilestone} onClose={() => setEditingMilestone(null)} onConfirm={onSaveMilestone} />
 
       <IssueProjectMilestoneInvoiceDialog
         open={invoiceDialogMilestone !== null}

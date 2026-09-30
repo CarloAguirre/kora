@@ -35,6 +35,10 @@ export interface UpdateProjectPaymentMilestoneInput {
   readonly percent?: number | null;
   readonly amount?: number;
   readonly sortOrder?: number;
+  readonly status?: ProjectPaymentStatus;
+  readonly invoiceNumber?: string | null;
+  readonly issuedAt?: Date | null;
+  readonly paidAt?: Date | null;
 }
 
 export interface IssueProjectPaymentMilestoneInvoiceInput {

@@ -63,6 +63,13 @@
   min-width: 200px;
 }
 
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--kora-space-2);
+}
+
 .noAction {
   color: var(--kora-text-muted);
   font-size: var(--kora-text-sm);

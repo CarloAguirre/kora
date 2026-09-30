@@ -435,7 +435,17 @@ export const createProjectPaymentMilestoneSchema = z.object({
 });
 export type CreateProjectPaymentMilestoneInput = z.infer<typeof createProjectPaymentMilestoneSchema>;
 
-export const updateProjectPaymentMilestoneSchema = createProjectPaymentMilestoneSchema.partial();
+/**
+ * Editar un tramo es una corrección manual: además del cronograma, permite
+ * cambiar el estado y los datos de factura/pago en cualquier dirección. No
+ * dispara Hito 0 — eso sigue siendo exclusivo de "Subir factura".
+ */
+export const updateProjectPaymentMilestoneSchema = createProjectPaymentMilestoneSchema.partial().extend({
+  status: projectPaymentStatusSchema.optional(),
+  invoiceNumber: z.string().trim().max(50).nullish(),
+  issuedAt: z.iso.date().nullish(),
+  paidAt: z.iso.date().nullish(),
+});
 export type UpdateProjectPaymentMilestoneInput = z.infer<typeof updateProjectPaymentMilestoneSchema>;
 
 /**

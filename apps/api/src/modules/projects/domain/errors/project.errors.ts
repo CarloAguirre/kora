@@ -254,6 +254,12 @@ export class ProjectPaymentMilestoneNotEditableError extends ConflictError {
   }
 }
 
+export class InvalidProjectPaymentMilestoneStateError extends ValidationError {
+  constructor(message: string) {
+    super(message, 'PROJECT_PAYMENT_MILESTONE_INVALID_STATE');
+  }
+}
+
 export class ProjectPaymentMilestoneAlreadyIssuedError extends ConflictError {
   constructor() {
     super('Este tramo ya fue facturado.', 'PROJECT_PAYMENT_MILESTONE_ALREADY_ISSUED');

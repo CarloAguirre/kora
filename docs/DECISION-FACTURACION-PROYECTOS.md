@@ -22,6 +22,19 @@ manual por proyecto** (nombre + monto + orden, cantidad libre) en vez de un
 esquema fijo — `project_payment_milestones` ya soportaba esto sin cambios de
 forma; solo se hizo `percent` nullable (un tramo "extra" no es un % de nada).
 
+**Actualización:** todo proyecto de desarrollo nace igual con un cronograma
+mínimo **Inicio 50% + Marcha blanca 50%** (monto 0, a completar a mano) —
+lo crea `CreateProjectUseCase`, y la migración `0035` se lo agregó a los
+proyectos existentes que no tenían ningún tramo. Sigue siendo editable/libre:
+se pueden renombrar, quitar o agregar tramos.
+
+**Edición completa:** editar un tramo (`PATCH .../payment-milestones/:id`) ya
+no se limita a los `pending` — es una corrección manual que permite cambiar
+cualquier campo, incluido el estado, folio y fechas (p.ej. devolver a
+"Pendiente" un tramo facturado por error). No dispara Hito 0; eso sigue
+siendo exclusivo de "Subir factura". Se edita desde la pestaña Extras del
+proyecto y desde la tabla de `/facturacion`.
+
 ## Hito 0: reutiliza campos existentes, sin columnas nuevas de estado
 
 "Aprobado" = `projects.salesStage === 'approved'` (ya existía).

@@ -17,6 +17,10 @@ import { Project } from '../../domain/entities/project.entity';
 import { ProjectNameAlreadyInUseError, ReferencedClientNotFoundError } from '../../domain/errors/project.errors';
 import { PROJECT_REPOSITORY, type ProjectRepository } from '../../domain/repositories/project.repository';
 import { PROJECT_TEAM_REPOSITORY, type ProjectTeamRepository } from '../../domain/repositories/project-team.repository';
+import {
+  PROJECT_PAYMENT_MILESTONE_REPOSITORY,
+  type ProjectPaymentMilestoneRepository,
+} from '../../domain/repositories/project-payment-milestone.repository';
 import { PROJECT_CLIENT_READER, type ProjectClientReader } from '../ports/project-client-reader.port';
 import {
   AUDIT_RECORDER,
@@ -30,6 +34,16 @@ export interface CreateProjectCommand {
   readonly actor: ActorContext;
 }
 
+/**
+ * Cronograma de cobro mínimo con el que nace todo proyecto de desarrollo. El
+ * monto parte en 0 (el proyecto no guarda un valor de contrato) y se completa
+ * a mano; los tramos se pueden editar, quitar o complementar después.
+ */
+const DEFAULT_PAYMENT_MILESTONES = [
+  { name: 'Inicio', percent: 50, amount: 0, sortOrder: 0 },
+  { name: 'Marcha blanca', percent: 50, amount: 0, sortOrder: 1 },
+] as const;
+
 @Injectable()
 export class CreateProjectUseCase
   implements UseCase<CreateProjectCommand, { id: string }, ApplicationError>
@@ -37,6 +51,7 @@ export class CreateProjectUseCase
   constructor(
     @Inject(PROJECT_REPOSITORY) private readonly projects: ProjectRepository,
     @Inject(PROJECT_TEAM_REPOSITORY) private readonly projectTeams: ProjectTeamRepository,
+    @Inject(PROJECT_PAYMENT_MILESTONE_REPOSITORY) private readonly paymentMilestones: ProjectPaymentMilestoneRepository,
     @Inject(PROJECT_CLIENT_READER) private readonly clients: ProjectClientReader,
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
     @Inject(UNIT_OF_WORK) private readonly unitOfWork: UnitOfWork,
@@ -98,6 +113,11 @@ export class CreateProjectUseCase
             },
             tx,
           );
+        }
+        if (project.type === 'development') {
+          for (const milestone of DEFAULT_PAYMENT_MILESTONES) {
+            await this.paymentMilestones.create({ projectId: project.id, ...milestone }, tx);
+          }
         }
       });
     } catch (error) {

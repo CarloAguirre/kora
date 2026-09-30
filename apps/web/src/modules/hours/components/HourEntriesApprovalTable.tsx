@@ -9,6 +9,7 @@ import { DataTable, type Column } from '@/shared/components/ui/DataTable';
 import { Modal } from '@/shared/components/ui/Modal';
 import { TextField } from '@/shared/components/ui/TextField';
 import { useToast } from '@/shared/components/ui/Toast';
+import { ApiRequestError } from '@/shared/lib/api-client';
 import { ChevronDownIcon, CheckIcon, CloseIcon, UserIcon } from '@/shared/components/icons/Icons';
 import { useApproveHourEntry, useHourEntriesList, useRejectHourEntry } from '../api/hours.queries';
 import { resolvedApprover } from '../lib/approver';
@@ -127,8 +128,16 @@ export function HourEntriesApprovalTable({
     leaderGroups.sort((a, b) => a.leaderName.localeCompare(b.leaderName, 'es'));
   }
 
+  const showError = (error: unknown, fallback: string) =>
+    toast.error(error instanceof ApiRequestError ? error.message : fallback);
+
   const approveOne = async (entry: HourEntrySummary) => {
-    await approveEntry.mutateAsync(entry.id);
+    try {
+      await approveEntry.mutateAsync(entry.id);
+    } catch (error) {
+      showError(error, 'No se pudo aprobar el registro.');
+      return;
+    }
     toast.success('Registro aprobado.');
     setSelected((prev) => {
       const next = new Set(prev);
@@ -139,14 +148,24 @@ export function HourEntriesApprovalTable({
 
   const approveSelected = async () => {
     const ids = [...selected];
-    for (const id of ids) await approveEntry.mutateAsync(id);
+    try {
+      for (const id of ids) await approveEntry.mutateAsync(id);
+    } catch (error) {
+      showError(error, 'No se pudieron aprobar los registros.');
+      return;
+    }
     toast.success(`${ids.length} ${pluralize(ids.length, 'registro aprobado', 'registros aprobados')}.`);
     setSelected(new Set());
   };
 
   const confirmReject = async () => {
     const ids = [...selected];
-    for (const id of ids) await rejectEntry.mutateAsync({ entryId: id, input: { reason } });
+    try {
+      for (const id of ids) await rejectEntry.mutateAsync({ entryId: id, input: { reason } });
+    } catch (error) {
+      showError(error, 'No se pudieron rechazar los registros.');
+      return;
+    }
     toast.success(`${ids.length} ${pluralize(ids.length, 'registro rechazado', 'registros rechazados')}.`);
     setSelected(new Set());
     setReason('');

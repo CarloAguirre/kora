@@ -27,7 +27,11 @@ export class HourEntryApprovalAuthorityService {
 
     if (entry.projectId) return this.projects.isProjectApprover(entry.projectId, actorId, entry.userId);
 
-    if (entry.designatedApproverUserId) return entry.designatedApproverUserId === actorId;
+    // Sin proyecto: el aprobador designado O quien lidera al dueño — no
+    // excluyente. La cola (`leaderScopeUserId`) ya le muestra estas horas al
+    // líder del dueño aunque haya otro designado; negarle aquí la decisión
+    // producía un 403 al aprobar desde `/horas/aprobaciones`.
+    if (entry.designatedApproverUserId === actorId) return true;
 
     return this.teams.isTeamLeaderOfMember(actorId, entry.userId);
   }
