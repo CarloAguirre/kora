@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { CLOCK, err, ok, type ApplicationError, type Clock, type Result } from '@kora/core';
+import { CLOCK, UNIT_OF_WORK, err, ok, type ApplicationError, type Clock, type Result, type UnitOfWork } from '@kora/core';
 import type { Permission } from '@kora/contracts';
 import {
   CannotManageProjectError,
@@ -37,6 +37,7 @@ export class RemoveProjectModuleDeliveryUseCase
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
     private readonly changeLog: ProjectChangeLogRecorder,
     @Inject(CLOCK) private readonly clock: Clock,
+    @Inject(UNIT_OF_WORK) private readonly unitOfWork: UnitOfWork,
   ) {}
 
   async execute(command: RemoveProjectModuleDeliveryCommand): Promise<Result<void, ApplicationError>> {
@@ -55,21 +56,24 @@ export class RemoveProjectModuleDeliveryUseCase
       return err(new CannotManageProjectError());
     }
 
-    await this.modules.removeDelivery(command.deliveryId);
-
-    // Es un borrado físico: sin este registro no quedaría rastro de que la entrega existió.
-    await this.changeLog.record(
-      [
-        {
-          projectId: project.id,
-          moduleId: command.moduleId,
-          // Sin `deliveryId`: la entrega ya no existe (FK), y sus registros previos quedan sin vínculo (`set null`).
-          message: `Entrega${delivery.name ? ` "${delivery.name}"` : ''} eliminada de la fase "${module.name}".`,
-        },
-      ],
-      command.actor.userId,
-      this.clock.now(),
-    );
+    // Es un borrado físico: sin este registro no quedaría rastro de que la entrega existió — por eso
+    // van en la misma transacción.
+    await this.unitOfWork.run(async (tx) => {
+      await this.modules.removeDelivery(command.deliveryId, tx);
+      await this.changeLog.record(
+        [
+          {
+            projectId: project.id,
+            moduleId: command.moduleId,
+            // Sin `deliveryId`: la entrega ya no existe (FK), y sus registros previos quedan sin vínculo (`set null`).
+            message: `Entrega${delivery.name ? ` "${delivery.name}"` : ''} eliminada de la fase "${module.name}".`,
+          },
+        ],
+        command.actor.userId,
+        this.clock.now(),
+        tx,
+      );
+    });
 
     await this.audit.record({
       actor: { userId: command.actor.userId, email: command.actor.email },

@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { CLOCK, err, ok, type ApplicationError, type Clock, type Result } from '@kora/core';
+import { CLOCK, UNIT_OF_WORK, err, ok, type ApplicationError, type Clock, type Result, type UnitOfWork } from '@kora/core';
 import type { AddProjectModuleDeliveryInput, Permission } from '@kora/contracts';
 import { CannotManageProjectError, ProjectModuleNotFoundError, ProjectNotFoundError } from '../../domain/errors/project.errors';
 import { PROJECT_REPOSITORY, type ProjectRepository } from '../../domain/repositories/project.repository';
@@ -34,6 +34,7 @@ export class AddProjectModuleDeliveryUseCase
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
     private readonly changeLog: ProjectChangeLogRecorder,
     @Inject(CLOCK) private readonly clock: Clock,
+    @Inject(UNIT_OF_WORK) private readonly unitOfWork: UnitOfWork,
   ) {}
 
   async execute(
@@ -52,30 +53,35 @@ export class AddProjectModuleDeliveryUseCase
     }
 
     const now = this.clock.now();
-    const id = await this.modules.addDelivery(
-      {
-        moduleId: command.moduleId,
-        teamId: command.data.teamId ?? null,
-        name: command.data.name,
-        description: command.data.description ?? null,
-        assigneeUserId: command.data.assigneeUserId ?? null,
-        estimatedDate: new Date(command.data.estimatedDate),
-      },
-      now,
-    );
-
-    await this.changeLog.record(
-      [
+    // Alta y registro en la misma transacción: no queda una entrega sin su registro de creación.
+    const id = await this.unitOfWork.run(async (tx) => {
+      const deliveryId = await this.modules.addDelivery(
         {
-          projectId: project.id,
           moduleId: command.moduleId,
-          deliveryId: id,
-          message: `Nueva entrega "${command.data.name}" agregada en fase "${module.name}", estimada para ${formatCommittedDate(new Date(command.data.estimatedDate))}.`,
+          teamId: command.data.teamId ?? null,
+          name: command.data.name,
+          description: command.data.description ?? null,
+          assigneeUserId: command.data.assigneeUserId ?? null,
+          estimatedDate: new Date(command.data.estimatedDate),
         },
-      ],
-      command.actor.userId,
-      now,
-    );
+        now,
+        tx,
+      );
+      await this.changeLog.record(
+        [
+          {
+            projectId: project.id,
+            moduleId: command.moduleId,
+            deliveryId,
+            message: `Nueva entrega "${command.data.name}" agregada en fase "${module.name}", estimada para ${formatCommittedDate(new Date(command.data.estimatedDate))}.`,
+          },
+        ],
+        command.actor.userId,
+        now,
+        tx,
+      );
+      return deliveryId;
+    });
 
     await this.audit.record({
       actor: { userId: command.actor.userId, email: command.actor.email },

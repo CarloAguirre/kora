@@ -1,5 +1,15 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { CLOCK, ForbiddenError, err, ok, type ApplicationError, type Clock, type Result } from '@kora/core';
+import {
+  CLOCK,
+  ForbiddenError,
+  UNIT_OF_WORK,
+  err,
+  ok,
+  type ApplicationError,
+  type Clock,
+  type Result,
+  type UnitOfWork,
+} from '@kora/core';
 import {
   PROJECT_MODULE_TASK_SCOPE_LABELS,
   PROJECT_MODULE_TASK_STATUS_LABELS,
@@ -68,6 +78,7 @@ export class UpdateProjectModuleTaskUseCase
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
     private readonly changeLog: ProjectChangeLogRecorder,
     @Inject(CLOCK) private readonly clock: Clock,
+    @Inject(UNIT_OF_WORK) private readonly unitOfWork: UnitOfWork,
   ) {}
 
   async execute(command: UpdateProjectModuleTaskCommand): Promise<Result<void, ApplicationError>> {
@@ -126,36 +137,41 @@ export class UpdateProjectModuleTaskUseCase
           ? null
           : undefined;
 
-    await this.modules.updateTask(
-      command.taskId,
-      {
-        ...(command.data.teamId !== undefined ? { teamId: command.data.teamId ?? null } : {}),
-        ...(command.data.assigneeUserId !== undefined ? { assigneeUserId: command.data.assigneeUserId ?? null } : {}),
-        ...(command.data.name !== undefined ? { name: command.data.name } : {}),
-        ...(command.data.description !== undefined ? { description: command.data.description ?? null } : {}),
-        ...(command.data.startDate !== undefined
-          ? { startDate: command.data.startDate ? new Date(command.data.startDate) : null }
-          : {}),
-        ...(command.data.date !== undefined ? { date: new Date(command.data.date) } : {}),
-        ...(command.data.estimatedHours !== undefined
-          ? { estimatedHours: command.data.estimatedHours ?? null }
-          : {}),
-        ...(nextStatus !== undefined ? { status: nextStatus } : {}),
-        ...(command.data.scope !== undefined ? { scope: command.data.scope } : {}),
-        ...(completedAt !== undefined ? { completedAt } : {}),
-        ...(rejectionReason !== undefined ? { rejectionReason } : {}),
-      },
-      now,
-    );
-
+    // Se describen contra el estado previo, antes de escribir: cambio y registro van en la misma
+    // transacción — si no se puede escribir la bitácora, la tarea tampoco cambia.
     const messages = await this.describeChanges(project.id, module.name, task, command.data, rejectionReason ?? null, now);
-    if (messages.length > 0) {
-      await this.changeLog.record(
-        messages.map((message) => ({ projectId: project.id, moduleId: command.moduleId, taskId: command.taskId, message })),
-        command.actor.userId,
+    await this.unitOfWork.run(async (tx) => {
+      await this.modules.updateTask(
+        command.taskId,
+        {
+          ...(command.data.teamId !== undefined ? { teamId: command.data.teamId ?? null } : {}),
+          ...(command.data.assigneeUserId !== undefined ? { assigneeUserId: command.data.assigneeUserId ?? null } : {}),
+          ...(command.data.name !== undefined ? { name: command.data.name } : {}),
+          ...(command.data.description !== undefined ? { description: command.data.description ?? null } : {}),
+          ...(command.data.startDate !== undefined
+            ? { startDate: command.data.startDate ? new Date(command.data.startDate) : null }
+            : {}),
+          ...(command.data.date !== undefined ? { date: new Date(command.data.date) } : {}),
+          ...(command.data.estimatedHours !== undefined
+            ? { estimatedHours: command.data.estimatedHours ?? null }
+            : {}),
+          ...(nextStatus !== undefined ? { status: nextStatus } : {}),
+          ...(command.data.scope !== undefined ? { scope: command.data.scope } : {}),
+          ...(completedAt !== undefined ? { completedAt } : {}),
+          ...(rejectionReason !== undefined ? { rejectionReason } : {}),
+        },
         now,
+        tx,
       );
-    }
+      if (messages.length > 0) {
+        await this.changeLog.record(
+          messages.map((message) => ({ projectId: project.id, moduleId: command.moduleId, taskId: command.taskId, message })),
+          command.actor.userId,
+          now,
+          tx,
+        );
+      }
+    });
 
     await this.audit.record({
       actor: { userId: command.actor.userId, email: command.actor.email },

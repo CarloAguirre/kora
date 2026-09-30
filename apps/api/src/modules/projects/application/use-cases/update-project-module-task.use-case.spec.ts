@@ -10,7 +10,7 @@ import type {
 } from '../../domain/repositories/project-team-member.repository';
 import type { AuditRecorder } from '../../../../shared/application/ports/audit-recorder.port';
 import type { ProjectChangeLogRecorder } from '../services/project-change-log.recorder';
-import { FixedClock } from '../../../../test/fakes';
+import { FixedClock, PassthroughUnitOfWork } from '../../../../test/fakes';
 
 const FAKE_PROJECT = {
   id: 'project-1',
@@ -61,6 +61,7 @@ function buildUseCase(module: ProjectModuleRecord) {
     { record: vi.fn().mockResolvedValue(undefined) } as unknown as AuditRecorder,
     { record: changeLogRecord } as unknown as ProjectChangeLogRecorder,
     new FixedClock(),
+    new PassthroughUnitOfWork(),
   );
   return { useCase, changeLogRecord };
 }

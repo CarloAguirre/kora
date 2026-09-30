@@ -1,5 +1,15 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { CLOCK, ForbiddenError, err, ok, type ApplicationError, type Clock, type Result } from '@kora/core';
+import {
+  CLOCK,
+  ForbiddenError,
+  UNIT_OF_WORK,
+  err,
+  ok,
+  type ApplicationError,
+  type Clock,
+  type Result,
+  type UnitOfWork,
+} from '@kora/core';
 import type { Permission } from '@kora/contracts';
 import {
   ProjectModuleNotFoundError,
@@ -38,6 +48,7 @@ export class DeleteProjectModuleTaskUseCase
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
     private readonly changeLog: ProjectChangeLogRecorder,
     @Inject(CLOCK) private readonly clock: Clock,
+    @Inject(UNIT_OF_WORK) private readonly unitOfWork: UnitOfWork,
   ) {}
 
   async execute(command: DeleteProjectModuleTaskCommand): Promise<Result<void, ApplicationError>> {
@@ -61,20 +72,23 @@ export class DeleteProjectModuleTaskUseCase
       }
     }
 
-    await this.modules.removeTask(command.taskId);
-
-    // Borrado físico: sin este registro no quedaría rastro de que la tarea existió.
-    await this.changeLog.record(
-      [
-        {
-          projectId: project.id,
-          moduleId: command.moduleId,
-          message: `Tarea "${task.name}" eliminada de la fase "${module.name}".`,
-        },
-      ],
-      command.actor.userId,
-      this.clock.now(),
-    );
+    // Borrado físico: sin este registro no quedaría rastro de que la tarea existió — por eso van en
+    // la misma transacción.
+    await this.unitOfWork.run(async (tx) => {
+      await this.modules.removeTask(command.taskId, tx);
+      await this.changeLog.record(
+        [
+          {
+            projectId: project.id,
+            moduleId: command.moduleId,
+            message: `Tarea "${task.name}" eliminada de la fase "${module.name}".`,
+          },
+        ],
+        command.actor.userId,
+        this.clock.now(),
+        tx,
+      );
+    });
 
     await this.audit.record({
       actor: { userId: command.actor.userId, email: command.actor.email },

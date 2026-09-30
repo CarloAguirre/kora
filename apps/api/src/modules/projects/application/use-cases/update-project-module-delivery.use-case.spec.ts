@@ -11,7 +11,7 @@ import type {
 } from '../../domain/repositories/project-team-member.repository';
 import type { AuditRecorder } from '../../../../shared/application/ports/audit-recorder.port';
 import type { ProjectChangeLogRecorder } from '../services/project-change-log.recorder';
-import { FixedClock } from '../../../../test/fakes';
+import { FixedClock, PassthroughUnitOfWork } from '../../../../test/fakes';
 
 const FAKE_PROJECT = {
   id: 'project-1',
@@ -88,6 +88,7 @@ function buildUseCase(
     audit,
     changeLog,
     new FixedClock(),
+    new PassthroughUnitOfWork(),
   );
   return { useCase, modules, changeLogRecord };
 }
@@ -131,6 +132,25 @@ describe('UpdateProjectModuleDeliveryUseCase — bitácora automática', () => {
         message: expect.stringContaining('Entrega "Entrega 1" aprobada en fase "Módulo Financiero"'),
       }),
     ]);
+  });
+
+  it('el cambio de estado y su registro van en la misma transacción (sin registro, la entrega no cambia)', async () => {
+    const changeLogRecord = vi.fn().mockResolvedValue(undefined);
+    const { useCase, modules } = buildUseCase(buildModule({ status: 'delivered' }), changeLogRecord);
+
+    await useCase.execute({ ...TARGET, ...LEADER, data: { status: 'approved' } });
+
+    const updateDelivery = modules.updateDelivery as ReturnType<typeof vi.fn>;
+    const deliveryTx = updateDelivery.mock.calls[0]![3];
+    expect(deliveryTx).toBeDefined();
+    expect(changeLogRecord.mock.calls[0]![3]).toBe(deliveryTx);
+  });
+
+  it('si no se puede escribir la bitácora, el error se propaga (la transacción se revierte)', async () => {
+    const changeLogRecord = vi.fn().mockRejectedValue(new Error('db down'));
+    const { useCase } = buildUseCase(buildModule({ status: 'delivered' }), changeLogRecord);
+
+    await expect(useCase.execute({ ...TARGET, ...LEADER, data: { status: 'approved' } })).rejects.toThrow('db down');
   });
 
   it('al rechazar una entrega, el mensaje incluye el motivo', async () => {
@@ -296,6 +316,7 @@ describe('UpdateProjectModuleDeliveryUseCase — asignación', () => {
       'delivery-1',
       expect.objectContaining({ teamId: 'team-2', assigneeUserId: null }),
       expect.any(Date),
+      expect.anything(),
     );
     expect(loggedMessages(changeLogRecord)).toEqual([
       expect.stringContaining('equipo cambiado de "UX-UI" a "Desarrollo"'),

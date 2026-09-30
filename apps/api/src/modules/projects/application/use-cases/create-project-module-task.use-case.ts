@@ -1,5 +1,15 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { CLOCK, ForbiddenError, err, ok, type ApplicationError, type Clock, type Result } from '@kora/core';
+import {
+  CLOCK,
+  ForbiddenError,
+  UNIT_OF_WORK,
+  err,
+  ok,
+  type ApplicationError,
+  type Clock,
+  type Result,
+  type UnitOfWork,
+} from '@kora/core';
 import type { CreateProjectModuleTaskInput, Permission } from '@kora/contracts';
 import { ProjectModuleNotFoundError, ProjectNotFoundError } from '../../domain/errors/project.errors';
 import { PROJECT_REPOSITORY, type ProjectRepository } from '../../domain/repositories/project.repository';
@@ -47,6 +57,7 @@ export class CreateProjectModuleTaskUseCase
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
     private readonly changeLog: ProjectChangeLogRecorder,
     @Inject(CLOCK) private readonly clock: Clock,
+    @Inject(UNIT_OF_WORK) private readonly unitOfWork: UnitOfWork,
   ) {}
 
   async execute(command: CreateProjectModuleTaskCommand): Promise<Result<{ id: string }, ApplicationError>> {
@@ -69,38 +80,44 @@ export class CreateProjectModuleTaskUseCase
     }
 
     const now = this.clock.now();
-    const id = await this.modules.addTask(
-      {
-        moduleId: command.moduleId,
-        teamId: command.data.teamId ?? null,
-        assigneeUserId: command.data.assigneeUserId ?? null,
-        name: command.data.name,
-        description: command.data.description ?? null,
-        startDate: command.data.startDate ? new Date(command.data.startDate) : null,
-        date: new Date(command.data.date),
-        estimatedHours: command.data.estimatedHours ?? null,
-        status: command.data.status ?? 'todo',
-        scope: command.data.scope ?? 'desarrollo',
-      },
-      now,
-    );
-
     const assigneeUserId = command.data.assigneeUserId ?? null;
     const assigneeName = assigneeUserId
       ? (await this.projectTeamMembers.listForProject(project.id)).find((member) => member.userId === assigneeUserId)?.fullName
       : null;
-    await this.changeLog.record(
-      [
+
+    // Alta y registro en la misma transacción: no queda una tarea sin su registro de creación.
+    const id = await this.unitOfWork.run(async (tx) => {
+      const taskId = await this.modules.addTask(
         {
-          projectId: project.id,
           moduleId: command.moduleId,
-          taskId: id,
-          message: `Nueva tarea "${command.data.name}" creada en fase "${module.name}"${assigneeName ? `, asignada a ${assigneeName}` : ''}, con fecha límite ${formatCommittedDate(new Date(command.data.date))}.`,
+          teamId: command.data.teamId ?? null,
+          assigneeUserId,
+          name: command.data.name,
+          description: command.data.description ?? null,
+          startDate: command.data.startDate ? new Date(command.data.startDate) : null,
+          date: new Date(command.data.date),
+          estimatedHours: command.data.estimatedHours ?? null,
+          status: command.data.status ?? 'todo',
+          scope: command.data.scope ?? 'desarrollo',
         },
-      ],
-      command.actor.userId,
-      now,
-    );
+        now,
+        tx,
+      );
+      await this.changeLog.record(
+        [
+          {
+            projectId: project.id,
+            moduleId: command.moduleId,
+            taskId,
+            message: `Nueva tarea "${command.data.name}" creada en fase "${module.name}"${assigneeName ? `, asignada a ${assigneeName}` : ''}, con fecha límite ${formatCommittedDate(new Date(command.data.date))}.`,
+          },
+        ],
+        command.actor.userId,
+        now,
+        tx,
+      );
+      return taskId;
+    });
 
     await this.audit.record({
       actor: { userId: command.actor.userId, email: command.actor.email },

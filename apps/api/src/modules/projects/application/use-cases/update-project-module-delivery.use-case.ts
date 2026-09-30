@@ -1,5 +1,15 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { CLOCK, ForbiddenError, err, ok, type ApplicationError, type Clock, type Result } from '@kora/core';
+import {
+  CLOCK,
+  ForbiddenError,
+  UNIT_OF_WORK,
+  err,
+  ok,
+  type ApplicationError,
+  type Clock,
+  type Result,
+  type UnitOfWork,
+} from '@kora/core';
 import {
   PROJECT_MODULE_DELIVERY_ALLOWED_TRANSITIONS,
   PROJECT_MODULE_DELIVERY_STATUS_LABELS,
@@ -70,6 +80,7 @@ export class UpdateProjectModuleDeliveryUseCase
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
     private readonly changeLog: ProjectChangeLogRecorder,
     @Inject(CLOCK) private readonly clock: Clock,
+    @Inject(UNIT_OF_WORK) private readonly unitOfWork: UnitOfWork,
   ) {}
 
   async execute(command: UpdateProjectModuleDeliveryCommand): Promise<Result<void, ApplicationError>> {
@@ -167,20 +178,6 @@ export class UpdateProjectModuleDeliveryUseCase
           ? null
           : undefined;
 
-    await this.modules.updateDelivery(
-      command.deliveryId,
-      {
-        ...(command.data.teamId !== undefined ? { teamId: nextTeamId } : {}),
-        ...(command.data.name !== undefined ? { name: command.data.name } : {}),
-        ...(command.data.description !== undefined ? { description: command.data.description ?? null } : {}),
-        ...(assigneeChanged ? { assigneeUserId: nextAssigneeUserId } : {}),
-        ...(nextStatus !== undefined ? { status: nextStatus } : {}),
-        ...(command.data.estimatedDate !== undefined ? { estimatedDate: new Date(command.data.estimatedDate) } : {}),
-        ...(rejectionReason !== undefined ? { rejectionReason } : {}),
-      },
-      now,
-    );
-
     /**
      * La fila de "Entrega" en la bitácora muestra el estado ACTUAL de la entrega (y se ordena por su
      * fecha estimada), así que sin estos registros no quedaría rastro de quién la asignó, la terminó,
@@ -240,15 +237,31 @@ export class UpdateProjectModuleDeliveryUseCase
       );
     }
 
-    if (messages.length > 0) {
-      const entries: ProjectChangeLogEntry[] = messages.map((message) => ({
-        projectId: project.id,
-        moduleId: command.moduleId,
-        deliveryId: command.deliveryId,
-        message,
-      }));
-      await this.changeLog.record(entries, command.actor.userId, now);
-    }
+    const entries: ProjectChangeLogEntry[] = messages.map((message) => ({
+      projectId: project.id,
+      moduleId: command.moduleId,
+      deliveryId: command.deliveryId,
+      message,
+    }));
+    // Cambio y registro en la misma transacción: si no se puede escribir la bitácora, la entrega
+    // tampoco cambia — nunca queda una aprobación/rechazo sin quién ni cuándo.
+    await this.unitOfWork.run(async (tx) => {
+      await this.modules.updateDelivery(
+        command.deliveryId,
+        {
+          ...(command.data.teamId !== undefined ? { teamId: nextTeamId } : {}),
+          ...(command.data.name !== undefined ? { name: command.data.name } : {}),
+          ...(command.data.description !== undefined ? { description: command.data.description ?? null } : {}),
+          ...(assigneeChanged ? { assigneeUserId: nextAssigneeUserId } : {}),
+          ...(nextStatus !== undefined ? { status: nextStatus } : {}),
+          ...(command.data.estimatedDate !== undefined ? { estimatedDate: new Date(command.data.estimatedDate) } : {}),
+          ...(rejectionReason !== undefined ? { rejectionReason } : {}),
+        },
+        now,
+        tx,
+      );
+      if (entries.length > 0) await this.changeLog.record(entries, command.actor.userId, now, tx);
+    });
 
     await this.audit.record({
       actor: { userId: command.actor.userId, email: command.actor.email },
