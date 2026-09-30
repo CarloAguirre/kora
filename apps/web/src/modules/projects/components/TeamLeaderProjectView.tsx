@@ -7,6 +7,7 @@ import { Select } from '@/shared/components/ui/Select';
 import { TextField } from '@/shared/components/ui/TextField';
 import { Modal } from '@/shared/components/ui/Modal';
 import { DataTable } from '@/shared/components/ui/DataTable';
+import { Pagination, usePaginatedItems } from '@/shared/components/ui/Pagination';
 import { useToast } from '@/shared/components/ui/Toast';
 import { AlertIcon, PencilIcon, TrashIcon } from '@/shared/components/icons/Icons';
 import { ProjectTimeline } from './ProjectTimeline';
@@ -80,6 +81,7 @@ export function TeamLeaderProjectView({
     const consumedHours = members.reduce((sum, m) => sum + m.consumedHours, 0);
     return { teamId, teamName, leaderId, leaderName, maxMembers, assignedHours, consumedHours, members };
   }, [project, teamId]);
+  const { pageItems: pagedMembers, pagination: membersPagination } = usePaginatedItems(team.members);
 
   const canManageTeam = can('projects:manage') || (user !== null && team.leaderId === user.id);
 
@@ -292,10 +294,11 @@ export function TeamLeaderProjectView({
                       team.assignedHours > 0 ? `${Math.round((member.assignedHours / team.assignedHours) * 100)}%` : '—',
                   },
                 ]}
-                items={team.members}
+                items={pagedMembers}
                 getRowKey={(member) => member.id}
               />
             )}
+            <Pagination {...membersPagination} />
           </div>
         </div>
       </Card>

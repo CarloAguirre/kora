@@ -7,12 +7,14 @@ import {
   type DashboardMyPlanning,
   type DashboardMyTask,
   type DashboardPlanningItem,
+  type DashboardTeamMemberPlanning,
 } from '@kora/contracts';
 import styles from './MyActivityPanel.module.css';
 import { Card } from '@/shared/components/ui/Card';
 import { Button } from '@/shared/components/ui/Button';
 import { Tabs } from '@/shared/components/ui/Tabs';
 import { Modal } from '@/shared/components/ui/Modal';
+import { Pagination, usePaginatedItems } from '@/shared/components/ui/Pagination';
 import { AlertIcon, CheckIcon, CalendarIcon } from '@/shared/components/icons/Icons';
 import { RecentHistoryCard } from './RecentHistoryCard';
 import { useUpdateProjectModuleDelivery, useUpdateProjectModuleTask } from '@/modules/projects/api/projects.queries';
@@ -258,12 +260,12 @@ function MyDeliveriesCard({ deliveries, loading }: { deliveries: readonly Dashbo
         dismissible={!updateDelivery.isPending}
         footer={
           <>
-            <Button variant="outline" onClick={() => setConfirming(null)} disabled={updateDelivery.isPending}>
-              Cancelar
-            </Button>
-            <Button onClick={() => void onComplete()} loading={updateDelivery.isPending} loadingText="Guardando…">
-              Marcar como terminada
-            </Button>
+              <Button variant="outline" onClick={() => setConfirming(null)} disabled={updateDelivery.isPending}>
+                Cancelar
+              </Button>
+              <Button onClick={() => void onComplete()} loading={updateDelivery.isPending} loadingText="Guardando…">
+                Marcar como terminada
+              </Button>
           </>
         }
       >
@@ -303,6 +305,8 @@ interface MyActivityPanelProps {
  * no exigirle a `collaborator` un permiso de forecast propio ni construir un
  * endpoint nuevo que exponga horas registradas de otras personas.
  */
+const NO_TEAM_MEMBERS: readonly DashboardTeamMemberPlanning[] = [];
+
 export function MyActivityPanel({
   hours,
   myActiveProjects,
@@ -319,6 +323,9 @@ export function MyActivityPanel({
   const rejectedCount = hours?.rejectedCount ?? 0;
   const pctDiario = Math.min((todayHours / DAILY_TARGET_HOURS) * 100, 100);
   const pctSemanal = Math.min(Math.round((weekHours / weekTargetHours) * 100), 100);
+  const { pageItems: pagedTeamMembers, pagination: teamMembersPagination } = usePaginatedItems(
+    planning?.teamMembers ?? NO_TEAM_MEMBERS,
+  );
 
   return (
     <div className={styles.panel}>
@@ -445,6 +452,7 @@ export function MyActivityPanel({
         ) : !planning?.teamMembers || planning.teamMembers.length === 0 ? (
           <span className={styles.empty}>No hay miembros del equipo</span>
         ) : (
+          <>
           <div className={styles.tableWrap}>
             <table className={styles.table}>
               <thead>
@@ -455,7 +463,7 @@ export function MyActivityPanel({
                 </tr>
               </thead>
               <tbody>
-                {planning.teamMembers.map((member) => (
+                {pagedTeamMembers.map((member) => (
                   <tr key={member.fullName}>
                     <td>{member.fullName}</td>
                     <td>
@@ -471,6 +479,8 @@ export function MyActivityPanel({
               </tbody>
             </table>
           </div>
+          <Pagination {...teamMembersPagination} />
+          </>
         )}
       </Card>
 

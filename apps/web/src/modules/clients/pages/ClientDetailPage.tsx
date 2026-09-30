@@ -6,7 +6,7 @@ import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Button } from '@/shared/components/ui/Button';
 import { Card } from '@/shared/components/ui/Card';
 import { DataTable, type Column, type SortState } from '@/shared/components/ui/DataTable';
-import { DEFAULT_PAGE_SIZE, Pagination } from '@/shared/components/ui/Pagination';
+import { DEFAULT_PAGE_SIZE, Pagination, usePaginatedItems } from '@/shared/components/ui/Pagination';
 import { Tabs } from '@/shared/components/ui/Tabs';
 import { TextField } from '@/shared/components/ui/TextField';
 import { PencilIcon, PlusIcon, ChevronLeftIcon, SearchIcon, EyeIcon } from '@/shared/components/icons/Icons';
@@ -77,6 +77,8 @@ function formatDuration(start: string | null, end: string | null): string {
  * nunca llegó a construir a pesar de que el backend ya exponía el detalle
  * completo (`useClientDetail`) desde M1.
  */
+const NO_SUPPORT_PLANS: readonly SupportPlanListItem[] = [];
+
 export function ClientDetailPage() {
   const { clientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
@@ -84,6 +86,7 @@ export function ClientDetailPage() {
   const { data: client, isLoading } = useClientDetail(clientId ?? null);
   const { data: projects } = useProjectsList({ clientId: clientId ?? undefined, page: 1, pageSize: 100 });
   const { data: supportPlans, isLoading: loadingSupportPlans } = useSupportPlansForClient(clientId ?? null);
+  const { pageItems: pagedSupportPlans, pagination: supportPlansPagination } = usePaginatedItems(supportPlans ?? NO_SUPPORT_PLANS);
   const [editing, setEditing] = useState(false);
   const [tab, setTab] = useState<ProjectTab>('all');
   const [search, setSearch] = useState('');
@@ -327,12 +330,14 @@ export function ClientDetailPage() {
           <DataTable
             caption="Contratos de soporte del cliente"
             columns={supportPlanColumns}
-            items={supportPlans ?? []}
+            items={pagedSupportPlans}
             getRowKey={(p) => p.id}
             loading={loadingSupportPlans}
             error={null}
             emptyMessage="Este cliente todavía no tiene contratos de soporte."
           />
+
+          <Pagination {...supportPlansPagination} />
         </Card>
       </div>
 

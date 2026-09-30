@@ -17,6 +17,7 @@ import { TextField } from '@/shared/components/ui/TextField';
 import { Combobox } from '@/shared/components/ui/Combobox';
 import { DataTable, type Column } from '@/shared/components/ui/DataTable';
 import { Modal } from '@/shared/components/ui/Modal';
+import { Pagination, usePaginatedItems } from '@/shared/components/ui/Pagination';
 import { DropdownMenu, type DropdownMenuItem } from '@/shared/components/ui/DropdownMenu';
 import { useToast } from '@/shared/components/ui/Toast';
 import { EyeIcon, PencilIcon, PlusIcon, SearchIcon, TrashIcon } from '@/shared/components/icons/Icons';
@@ -130,6 +131,7 @@ export function BitacoraCard({
       return true;
     });
   }, [rows, filter, search, dateFrom, dateTo]);
+  const { pageItems, pagination } = usePaginatedItems(filteredRows);
 
   const resolveRow = async (row: BitacoraRow, nextStatus: ProjectObservationStatus, actionLabel: string) => {
     if (row.kind === 'evento' || row.kind === 'entrega') return;
@@ -297,12 +299,14 @@ export function BitacoraCard({
         <DataTable
           caption="Bitácora del proyecto"
           columns={columns}
-          items={filteredRows}
+          items={pageItems}
           getRowKey={rowId}
           emptyMessage={
             rows.length === 0 ? 'Aún no hay actividad registrada para este proyecto.' : 'No hay registros que coincidan con el filtro.'
           }
         />
+
+        <Pagination {...pagination} />
       </div>
 
       <Modal

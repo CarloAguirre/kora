@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react';
 import styles from './Pagination.module.css';
 import { Select } from './Select';
 import { ChevronLeftIcon, ChevronRightIcon } from '../icons/Icons';
@@ -136,4 +137,40 @@ export function buildPageWindow(
   });
 
   return result;
+}
+
+/**
+ * Pagina en el cliente una lista que ya llegó completa (tablas de detalle,
+ * secciones calculadas en memoria). Devuelve la porción visible y las props
+ * listas para `<Pagination {...pagination} />`.
+ *
+ * Si la lista se achica (un filtro, otro período) la página se ajusta a la
+ * última que exista en vez de dejar la tabla vacía.
+ */
+export function usePaginatedItems<T>(items: readonly T[]) {
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+
+  const total = items.length;
+  const pageCount = Math.max(1, Math.ceil(total / pageSize));
+  const currentPage = Math.min(page, pageCount);
+
+  const pageItems = useMemo(
+    () => items.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+    [items, currentPage, pageSize],
+  );
+
+  const pagination: PaginationProps = {
+    page: currentPage,
+    pageCount,
+    total,
+    pageSize,
+    onPageChange: setPage,
+    onPageSizeChange: (size) => {
+      setPageSize(size);
+      setPage(1);
+    },
+  };
+
+  return { pageItems, pagination };
 }

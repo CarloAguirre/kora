@@ -41,9 +41,11 @@ export function TeamMemberDetailPage() {
   const [historyStatus, setHistoryStatus] = useState<Extract<HourEntryStatus, 'approved' | 'rejected'>>('approved');
   const [historyPage, setHistoryPage] = useState(1);
   const [historyPageSize, setHistoryPageSize] = useState(DEFAULT_PAGE_SIZE);
+  const [projectsPage, setProjectsPage] = useState(1);
+  const [projectsPageSize, setProjectsPageSize] = useState(DEFAULT_PAGE_SIZE);
 
   const { data: memberProjects, isLoading: loadingProjects } = useProjectsList(
-    member ? { assignedToUserId: member.userId, page: 1, pageSize: 50 } : {},
+    member ? { assignedToUserId: member.userId, page: projectsPage, pageSize: projectsPageSize } : {},
   );
   const { data: history, isLoading: loadingHistory } = useHourEntriesList(
     member
@@ -132,6 +134,20 @@ export function TeamMemberDetailPage() {
             error={null}
             emptyMessage="No tiene proyectos asignados."
           />
+
+          {memberProjects && (
+            <Pagination
+              page={projectsPage}
+              pageCount={memberProjects.pageCount}
+              total={memberProjects.total}
+              pageSize={memberProjects.pageSize}
+              onPageChange={setProjectsPage}
+              onPageSizeChange={(size) => {
+                setProjectsPageSize(size);
+                setProjectsPage(1);
+              }}
+            />
+          )}
         </Card>
 
         <Card>

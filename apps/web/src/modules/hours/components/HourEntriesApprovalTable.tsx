@@ -7,6 +7,7 @@ import { Badge } from '@/shared/components/ui/Badge';
 import { Button } from '@/shared/components/ui/Button';
 import { DataTable, type Column } from '@/shared/components/ui/DataTable';
 import { Modal } from '@/shared/components/ui/Modal';
+import { DEFAULT_PAGE_SIZE, Pagination } from '@/shared/components/ui/Pagination';
 import { TextField } from '@/shared/components/ui/TextField';
 import { useToast } from '@/shared/components/ui/Toast';
 import { ApiRequestError } from '@/shared/lib/api-client';
@@ -64,8 +65,23 @@ export function HourEntriesApprovalTable({
   const [collapsedLeaders, setCollapsedLeaders] = useState<Set<string>>(new Set());
   const [rejecting, setRejecting] = useState(false);
   const [reason, setReason] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
-  const { data, isLoading, error } = useHourEntriesList({ status: 'pending', page: 1, pageSize: 100, sortField: 'date', ...query });
+  // Otro equipo o colaborador en el filtro vuelve a la página 1 (ajuste en
+  // render, sin efecto: evita pedir primero la página vieja con el filtro nuevo).
+  const queryKey = JSON.stringify(query);
+  const [previousQueryKey, setPreviousQueryKey] = useState(queryKey);
+  if (queryKey !== previousQueryKey) {
+    setPreviousQueryKey(queryKey);
+    setPage(1);
+  }
+
+  const { data, isLoading, error } = useHourEntriesList({ status: 'pending', sortField: 'date', ...query, page, pageSize });
+
+  // Aprobar o rechazar saca registros de la cola: si la última página queda
+  // vacía, se retrocede a la que ahora es la última.
+  if (data && data.pageCount > 0 && page > data.pageCount) setPage(data.pageCount);
   const approveEntry = useApproveHourEntry();
   const rejectEntry = useRejectHourEntry();
 
@@ -337,6 +353,20 @@ export function HourEntriesApprovalTable({
             );
           })}
         </div>
+      )}
+
+      {data && (
+        <Pagination
+          page={page}
+          pageCount={data.pageCount}
+          total={data.total}
+          pageSize={data.pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setPage(1);
+          }}
+        />
       )}
 
       <div className={styles.bulkBar}>

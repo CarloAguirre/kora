@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { act, render, renderHook, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Pagination, buildPageWindow } from './Pagination';
+import { Pagination, buildPageWindow, usePaginatedItems } from './Pagination';
 
 describe('buildPageWindow', () => {
   it('devuelve todas las páginas cuando son pocas', () => {
@@ -106,5 +106,38 @@ describe('Pagination', () => {
     await userEvent.selectOptions(select, '50');
 
     expect(onPageSizeChange).toHaveBeenCalledWith(50);
+  });
+});
+
+describe('usePaginatedItems', () => {
+  const items = Array.from({ length: 58 }, (_, index) => index + 1);
+
+  it('muestra 10 filas por defecto', () => {
+    const { result } = renderHook(() => usePaginatedItems(items));
+
+    expect(result.current.pageItems).toEqual(items.slice(0, 10));
+    expect(result.current.pagination.pageCount).toBe(6);
+  });
+
+  it('al cambiar las filas por página vuelve a la primera', () => {
+    const { result } = renderHook(() => usePaginatedItems(items));
+
+    act(() => result.current.pagination.onPageChange(3));
+    act(() => result.current.pagination.onPageSizeChange?.(25));
+
+    expect(result.current.pagination.page).toBe(1);
+    expect(result.current.pageItems).toHaveLength(25);
+  });
+
+  it('si la lista se achica no deja la página fuera de rango', () => {
+    const { result, rerender } = renderHook(({ list }) => usePaginatedItems(list), {
+      initialProps: { list: items },
+    });
+
+    act(() => result.current.pagination.onPageChange(6));
+    rerender({ list: items.slice(0, 15) });
+
+    expect(result.current.pagination.page).toBe(2);
+    expect(result.current.pageItems).toEqual([11, 12, 13, 14, 15]);
   });
 });

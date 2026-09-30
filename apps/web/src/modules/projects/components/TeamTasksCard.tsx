@@ -12,6 +12,7 @@ import { TextField } from '@/shared/components/ui/TextField';
 import { Tabs } from '@/shared/components/ui/Tabs';
 import { Modal } from '@/shared/components/ui/Modal';
 import { DataTable } from '@/shared/components/ui/DataTable';
+import { Pagination, usePaginatedItems } from '@/shared/components/ui/Pagination';
 import { DropdownMenu, type DropdownMenuItem } from '@/shared/components/ui/DropdownMenu';
 import { useToast } from '@/shared/components/ui/Toast';
 import { ReviewActionModal, type ReviewAction } from './ReviewActionModal';
@@ -113,6 +114,7 @@ export function TeamTasksCard({ project, projectId, teamId }: TeamTasksCardProps
   }, [project, teamId]);
 
   const filteredTasks = teamTasks.filter((task) => taskFilter === 'all' || task.status === taskFilter);
+  const { pageItems, pagination } = usePaginatedItems(filteredTasks);
 
   const openNewTaskModal = () => {
     setEditingTaskId(null);
@@ -353,10 +355,12 @@ export function TeamTasksCard({ project, projectId, teamId }: TeamTasksCardProps
                 ) : null,
             },
           ]}
-          items={filteredTasks}
+          items={pageItems}
           getRowKey={(task) => task.id}
           emptyMessage="Sin tareas en este filtro."
         />
+
+        <Pagination {...pagination} />
       </Card>
 
       <Modal

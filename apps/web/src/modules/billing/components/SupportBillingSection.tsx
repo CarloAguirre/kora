@@ -10,6 +10,7 @@ import {
 import styles from './SupportBillingSection.module.css';
 import { KpiCard } from '@/shared/components/ui/KpiCard';
 import { MultiSelect } from '@/shared/components/ui/MultiSelect';
+import { Pagination, usePaginatedItems } from '@/shared/components/ui/Pagination';
 import { Tabs } from '@/shared/components/ui/Tabs';
 import { PeriodSelector } from '@/shared/components/ui/PeriodSelector';
 import { DataTable, type Column, type SortState } from '@/shared/components/ui/DataTable';
@@ -106,6 +107,7 @@ export function SupportBillingSection() {
     const valueOf = SORT_VALUE[sort.field];
     return [...list].sort((a, b) => compareSortValues(valueOf(a), valueOf(b), sort.direction));
   }, [overview, filter, clientFilter, sort]);
+  const { pageItems, pagination } = usePaginatedItems(rows);
 
   const columns: Column<SupportBillingRow>[] = [
     { key: 'client', header: 'Cliente', sortable: true, render: (r) => r.clientName },
@@ -198,7 +200,7 @@ export function SupportBillingSection() {
       <DataTable
         caption="Contratos por facturar en el período"
         columns={columns}
-        items={rows}
+        items={pageItems}
         getRowKey={(r) => r.planId}
         sort={sort ?? undefined}
         onSortChange={(field) => setSort((prev) => nextSortState(prev, field as SortField))}
@@ -206,6 +208,8 @@ export function SupportBillingSection() {
         error={null}
         emptyMessage="No hay contratos en este filtro."
       />
+
+      <Pagination {...pagination} />
     </div>
   );
 }

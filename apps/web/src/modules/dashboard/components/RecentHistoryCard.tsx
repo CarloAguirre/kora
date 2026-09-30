@@ -1,8 +1,9 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import type { HourEntrySummary } from '@kora/contracts';
 import styles from './RecentHistoryCard.module.css';
 import { Card } from '@/shared/components/ui/Card';
 import { Select } from '@/shared/components/ui/Select';
+import { DEFAULT_PAGE_SIZE, Pagination } from '@/shared/components/ui/Pagination';
 import { DataTable, type Column } from '@/shared/components/ui/DataTable';
 import { HourEntryStatusBadge } from '@/modules/hours/components/HourEntryStatusBadge';
 import { useHourEntriesList } from '@/modules/hours/api/hours.queries';
@@ -76,13 +77,17 @@ export function RecentHistoryCard({ weekStart, onWeekStartChange }: RecentHistor
     [currentMonday],
   );
 
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+
   const { data, isLoading, error } = useHourEntriesList(
     user
       ? {
           userId: user.id,
           dateFrom: toIsoDate(selectedMonday),
           dateTo: toIsoDate(selectedSunday),
-          pageSize: 50,
+          page,
+          pageSize,
           sortField: 'date',
           sortDirection: 'desc',
         }
@@ -115,7 +120,10 @@ export function RecentHistoryCard({ weekStart, onWeekStartChange }: RecentHistor
           className={styles.weekSelect}
           options={weekOptions}
           value={toIsoDate(selectedMonday)}
-          onChange={(event) => onWeekStartChange(event.target.value)}
+          onChange={(event) => {
+            setPage(1);
+            onWeekStartChange(event.target.value);
+          }}
         />
       </div>
 
@@ -128,6 +136,20 @@ export function RecentHistoryCard({ weekStart, onWeekStartChange }: RecentHistor
         error={error ? 'No se pudo cargar el historial de horas.' : null}
         emptyMessage="No hay registros en esta semana."
       />
+
+      {data && (
+        <Pagination
+          page={page}
+          pageCount={data.pageCount}
+          total={data.total}
+          pageSize={data.pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setPage(1);
+          }}
+        />
+      )}
     </Card>
   );
 }

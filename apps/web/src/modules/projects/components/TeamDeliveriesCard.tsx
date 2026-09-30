@@ -6,6 +6,7 @@ import { Button } from '@/shared/components/ui/Button';
 import { Card } from '@/shared/components/ui/Card';
 import { Tabs } from '@/shared/components/ui/Tabs';
 import { DataTable } from '@/shared/components/ui/DataTable';
+import { Pagination, usePaginatedItems } from '@/shared/components/ui/Pagination';
 import {
   DELIVERY_DISPLAY_STATUS_LABEL,
   DELIVERY_DISPLAY_STATUS_TONE,
@@ -57,6 +58,7 @@ export function TeamDeliveriesCard({ project, projectId, teamId }: TeamDeliverie
   const filteredDeliveries = teamDeliveries.filter(
     ({ delivery }) => deliveryFilter === 'all' || deliveryDisplayStatus(delivery) === deliveryFilter,
   );
+  const { pageItems, pagination } = usePaginatedItems(filteredDeliveries);
 
   return (
     <>
@@ -119,10 +121,12 @@ export function TeamDeliveriesCard({ project, projectId, teamId }: TeamDeliverie
               },
             },
           ]}
-          items={filteredDeliveries}
+          items={pageItems}
           getRowKey={({ delivery }) => delivery.id}
           emptyMessage="Sin entregas en este filtro."
         />
+
+        <Pagination {...pagination} />
       </Card>
 
       <DeliveryActionDialogs

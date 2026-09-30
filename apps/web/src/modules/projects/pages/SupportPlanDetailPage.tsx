@@ -1,11 +1,11 @@
-import { useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { SUPPORT_PLAN_TYPE_LABELS, type SupportInvoice } from '@kora/contracts';
 import styles from './SupportPlanDetailPage.module.css';
 import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Button } from '@/shared/components/ui/Button';
 import { Card } from '@/shared/components/ui/Card';
-import { DEFAULT_PAGE_SIZE } from '@/shared/components/ui/Pagination';
+import { DEFAULT_PAGE_SIZE, Pagination, usePaginatedItems } from '@/shared/components/ui/Pagination';
 import { Tabs } from '@/shared/components/ui/Tabs';
 import { DataTable, type Column } from '@/shared/components/ui/DataTable';
 import { ChevronLeftIcon, DownloadIcon, LinkIcon } from '@/shared/components/icons/Icons';
@@ -79,6 +79,12 @@ export function SupportPlanDetailPage() {
     sortField: 'createdAt',
     sortDirection: 'desc',
   });
+
+  const sortedInvoices = useMemo(
+    () => [...(plan?.invoices ?? [])].sort((a, b) => b.periodKey.localeCompare(a.periodKey)),
+    [plan],
+  );
+  const { pageItems: pagedInvoices, pagination: invoicesPagination } = usePaginatedItems(sortedInvoices);
 
   if (isLoading || !plan || !planId) {
     return (
@@ -253,12 +259,14 @@ export function SupportPlanDetailPage() {
         <DataTable
           caption="Historial de facturaciones del contrato"
           columns={invoiceColumns}
-          items={[...plan.invoices].sort((a, b) => b.periodKey.localeCompare(a.periodKey))}
+          items={pagedInvoices}
           getRowKey={(i) => i.id}
           loading={false}
           error={null}
           emptyMessage="Primer ciclo del contrato — todavía no hay historial."
         />
+
+        <Pagination {...invoicesPagination} />
       </Card>
 
       <SupportPlanBillingAction

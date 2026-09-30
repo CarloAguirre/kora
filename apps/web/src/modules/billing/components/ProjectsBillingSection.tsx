@@ -20,6 +20,7 @@ import {
 } from "@/shared/components/ui/DataTable";
 import { KpiCard } from "@/shared/components/ui/KpiCard";
 import { MultiSelect } from "@/shared/components/ui/MultiSelect";
+import { Pagination, usePaginatedItems } from "@/shared/components/ui/Pagination";
 import { Tabs } from "@/shared/components/ui/Tabs";
 import { useToast } from "@/shared/components/ui/Toast";
 import { ApiRequestError } from "@/shared/lib/api-client";
@@ -177,6 +178,7 @@ export function ProjectsBillingSection() {
       compareSortValues(valueOf(a), valueOf(b), sort.direction),
     );
   }, [entries, status, clientFilter, sort]);
+  const { pageItems, pagination } = usePaginatedItems(rows);
 
   // Sumar monedas distintas inventaría un número sin sentido — hoy `proyecto` siempre es UF, pero se agrupa igual por si eso cambia.
   const kpisByCurrency = useMemo(() => {
@@ -545,7 +547,7 @@ export function ProjectsBillingSection() {
       <DataTable
         caption="Tramos de pago de proyectos"
         columns={columns}
-        items={rows}
+        items={pageItems}
         getRowKey={(e) => e.id}
         sort={sort ?? undefined}
         onSortChange={(field) =>
@@ -555,6 +557,8 @@ export function ProjectsBillingSection() {
         error={null}
         emptyMessage="No hay resultados para estos filtros."
       />
+
+      <Pagination {...pagination} />
 
       <IssueProjectMilestoneInvoiceDialog
         open={dialog?.kind === "issue-milestone"}

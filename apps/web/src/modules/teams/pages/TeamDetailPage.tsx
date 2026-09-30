@@ -11,6 +11,7 @@ import { Card } from '@/shared/components/ui/Card';
 import { TextField } from '@/shared/components/ui/TextField';
 import { Select } from '@/shared/components/ui/Select';
 import { DataTable, type Column } from '@/shared/components/ui/DataTable';
+import { Pagination, usePaginatedItems } from '@/shared/components/ui/Pagination';
 import { useToast } from '@/shared/components/ui/Toast';
 import { ConfirmActionDialog } from '@/shared/components/ui/ConfirmActionDialog';
 import { PencilIcon, TrashIcon } from '@/shared/components/icons/Icons';
@@ -28,6 +29,8 @@ import type { TeamMember } from '@kora/contracts';
  * Ficha de equipo: sus miembros, con horas semanales comprometidas.
  * `weeklyHours` es la base de la disponibilidad que consumirá el forecast (M6).
  */
+const NO_MEMBERS: readonly TeamMember[] = [];
+
 export function TeamDetailPage() {
   const { teamId } = useParams<{ teamId: string }>();
   const navigate = useNavigate();
@@ -83,6 +86,8 @@ export function TeamDetailPage() {
     toast.success(`Se eliminó el equipo ${team.name}.`);
     void navigate('/equipos');
   };
+
+  const { pageItems: pagedMembers, pagination: membersPagination } = usePaginatedItems(team?.members ?? NO_MEMBERS);
 
   const columns: Column<TeamMember>[] = [
     { key: 'fullName', header: 'Nombre', render: (member) => member.fullName },
@@ -173,12 +178,14 @@ export function TeamDetailPage() {
           <DataTable
             caption="Miembros del equipo"
             columns={columns}
-            items={team.members}
+            items={pagedMembers}
             getRowKey={(member) => member.id}
             loading={false}
             error={null}
             emptyMessage="Este equipo aún no tiene miembros."
           />
+
+          <Pagination {...membersPagination} />
 
           {can('teams:manage') && (
             <form className={styles.addForm} onSubmit={onAddMember}>
