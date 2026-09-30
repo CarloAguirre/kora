@@ -184,8 +184,12 @@ export interface EditProjectDialogProps {
   project: ProjectDetail;
   onClose: () => void;
   onSuccess: (message: string) => void;
-  /** Reasignar el proyecto a otro líder es de Gerencia/PMO — el propio líder (sin `projects:manage`) ve el campo bloqueado. El backend exige lo mismo (`CannotReassignProjectLeaderError`). */
-  canReassignLeader: boolean;
+  /**
+   * Gerencia/PMO (`projects:manage`). Sin él, el propio líder no puede reasignar el proyecto a otro
+   * líder (campo bloqueado) ni pasarlo a Activo (la opción no se ofrece). El backend exige lo mismo
+   * (`CannotReassignProjectLeaderError`, `CannotActivateProjectError`).
+   */
+  isManagement: boolean;
 }
 
 /**
@@ -195,7 +199,7 @@ export interface EditProjectDialogProps {
  * v1) — agregar o quitar equipos sigue siendo un flujo aparte en la ficha
  * (`DevelopmentProjectDetailView`).
  */
-export function EditProjectDialog({ open, project, onClose, onSuccess, canReassignLeader }: EditProjectDialogProps) {
+export function EditProjectDialog({ open, project, onClose, onSuccess, isManagement }: EditProjectDialogProps) {
   const isDevelopment = project.type === 'development';
   const updateProject = useUpdateProject();
   const changeStatus = useChangeProjectStatus();
@@ -480,7 +484,10 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, canReassi
     if (next !== module.estimatedEndDate) void onSaveModuleField(module.id, { estimatedEndDate: next });
   };
 
-  const estadoOptions = ESTADO_OPTIONS_BY_TIPO[tipo];
+  /** Pasar a Activo es solo de Gerencia/PMO; si el proyecto ya está activo se mantiene la opción para que el select muestre su valor actual. */
+  const estadoOptions = ESTADO_OPTIONS_BY_TIPO[tipo].filter(
+    (status) => status !== 'active' || isManagement || project.status === 'active',
+  );
   const totalTeamHours = teamsValue.reduce((sum, team) => sum + (Number(team.assignedHours) || 0), 0);
   /** Hito 0 manual: activar a mano (sin factura) un proyecto Aprobado que seguía "No iniciado" — exige motivo (ver `ChangeProjectStatusUseCase`). */
   const isManualHito0 = isDevelopment && tipo === 'aprobado' && project.status === 'draft' && estado === 'active';
@@ -597,8 +604,8 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, canReassi
               label="Líder Kabeli a cargo"
               placeholder="Sin asignar"
               options={(leaders?.items ?? []).map((user) => ({ value: user.id, label: user.fullName }))}
-              disabled={!canReassignLeader}
-              helperText={canReassignLeader ? undefined : 'Solo Gerencia/PMO puede reasignar el proyecto a otro líder.'}
+              disabled={!isManagement}
+              helperText={isManagement ? undefined : 'Solo Gerencia/PMO puede reasignar el proyecto a otro líder.'}
               // Controlado (no `register` directo): si la lista de líderes todavía no cargó cuando el
               // form hace su `reset()` inicial, un `<select>` no controlado se queda pegado en el
               // placeholder aunque el proyecto sí tenga líder — el valor real vive en el form, la opción
@@ -698,9 +705,8 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, canReassi
               />
             </div>
             <p className={styles.hint}>
-              {canReassignLeader
-                ? 'Aún no hay factura del primer tramo. Al activarlo manualmente queda como Hito 0 de origen manual, comienzan a correr las horas y el motivo queda registrado en la bitácora.'
-                : 'Solo Gerencia/PMO puede activar manualmente un proyecto sin factura.'}
+              Aún no hay factura del primer tramo. Al activarlo manualmente queda como Hito 0 de origen manual,
+              comienzan a correr las horas y el motivo queda registrado en la bitácora.
             </p>
           </div>
         )}

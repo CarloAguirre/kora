@@ -127,14 +127,14 @@ describe('EditProjectDialog', () => {
   });
 
   it('precarga el formulario con los datos actuales del proyecto', () => {
-    renderDialog({ open: true, project: buildProject(), onClose: vi.fn(), onSuccess: vi.fn(), canReassignLeader: true });
+    renderDialog({ open: true, project: buildProject(), onClose: vi.fn(), onSuccess: vi.fn(), isManagement: true });
 
     expect(screen.getByLabelText(/Nombre del proyecto/)).toHaveValue('Proyecto de prueba');
     expect(screen.getByLabelText('HH vendidas')).toHaveValue(500);
   });
 
   it('bloquea "Líder Kabeli a cargo" cuando el actor no puede reasignar el proyecto (solo Gerencia/PMO puede)', () => {
-    renderDialog({ open: true, project: buildProject(), onClose: vi.fn(), onSuccess: vi.fn(), canReassignLeader: false });
+    renderDialog({ open: true, project: buildProject(), onClose: vi.fn(), onSuccess: vi.fn(), isManagement: false });
 
     expect(screen.getByLabelText('Líder Kabeli a cargo')).toBeDisabled();
     expect(screen.getByText('Solo Gerencia/PMO puede reasignar el proyecto a otro líder.')).toBeInTheDocument();
@@ -150,7 +150,7 @@ describe('EditProjectDialog', () => {
       project: buildProject({ leader: { id: 'leader-1', fullName: 'José Aponte' } }),
       onClose: vi.fn(),
       onSuccess: vi.fn(),
-      canReassignLeader: true,
+      isManagement: true,
     });
 
     expect(screen.getByLabelText('Líder Kabeli a cargo')).toHaveValue('');
@@ -163,7 +163,7 @@ describe('EditProjectDialog', () => {
           project={buildProject({ leader: { id: 'leader-1', fullName: 'José Aponte' } })}
           onClose={vi.fn()}
           onSuccess={vi.fn()}
-          canReassignLeader
+          isManagement
         />
       </ToastProvider>,
     );
@@ -172,7 +172,7 @@ describe('EditProjectDialog', () => {
   });
 
   it('muestra "Responsable comercial" también para un proyecto ya aprobado', () => {
-    renderDialog({ open: true, project: buildProject(), onClose: vi.fn(), onSuccess: vi.fn(), canReassignLeader: true });
+    renderDialog({ open: true, project: buildProject(), onClose: vi.fn(), onSuccess: vi.fn(), isManagement: true });
 
     expect(screen.getByLabelText(/Responsable comercial/)).toBeInTheDocument();
   });
@@ -183,7 +183,7 @@ describe('EditProjectDialog', () => {
       project: buildProject({ salesStage: 'prospect' }),
       onClose: vi.fn(),
       onSuccess: vi.fn(),
-      canReassignLeader: true,
+      isManagement: true,
     });
 
     expect(screen.getByLabelText(/Responsable comercial/)).toBeInTheDocument();
@@ -195,7 +195,7 @@ describe('EditProjectDialog', () => {
       project: buildProject({ salesStage, status: 'draft', phase: null }),
       onClose: vi.fn(),
       onSuccess: vi.fn(),
-      canReassignLeader: true,
+      isManagement: true,
     });
 
     const estado = screen.getByLabelText('Estado') as HTMLSelectElement;
@@ -204,8 +204,34 @@ describe('EditProjectDialog', () => {
     expect(estado).toHaveValue('draft');
   });
 
+  it('no ofrece "Activo" en el Estado a quien no es Gerencia/PMO (el líder no puede activar el proyecto)', () => {
+    renderDialog({
+      open: true,
+      project: buildProject({ salesStage: 'approved', status: 'draft' }),
+      onClose: vi.fn(),
+      onSuccess: vi.fn(),
+      isManagement: false,
+    });
+
+    const estado = screen.getByLabelText('Estado') as HTMLSelectElement;
+    expect(Array.from(estado.options).map((option) => option.value)).not.toContain('active');
+  });
+
+  it('ofrece la activación manual a Gerencia/PMO', () => {
+    renderDialog({
+      open: true,
+      project: buildProject({ salesStage: 'approved', status: 'draft' }),
+      onClose: vi.fn(),
+      onSuccess: vi.fn(),
+      isManagement: true,
+    });
+
+    const estado = screen.getByLabelText('Estado') as HTMLSelectElement;
+    expect(Array.from(estado.options).map((option) => option.textContent)).toContain('Activo (activación manual)');
+  });
+
   it('muestra los campos de desarrollo (etapa, avance) y no los de soporte', () => {
-    renderDialog({ open: true, project: buildProject({ type: 'development' }), onClose: vi.fn(), onSuccess: vi.fn(), canReassignLeader: true });
+    renderDialog({ open: true, project: buildProject({ type: 'development' }), onClose: vi.fn(), onSuccess: vi.fn(), isManagement: true });
 
     expect(screen.getByLabelText('Tipo de proyecto')).toBeInTheDocument();
     expect(screen.getByLabelText('Avance real (%)')).toBeInTheDocument();
@@ -218,7 +244,7 @@ describe('EditProjectDialog', () => {
       project: buildProject({ type: 'support', salesStage: null, phase: null, actualProgress: null, expectedProgress: null }),
       onClose: vi.fn(),
       onSuccess: vi.fn(),
-      canReassignLeader: true,
+      isManagement: true,
     });
 
     expect(screen.getByLabelText('Horas de soporte')).toBeInTheDocument();
@@ -234,7 +260,7 @@ describe('EditProjectDialog', () => {
       project: buildProject({ commercialManager: { id: '22222222-2222-4222-8222-222222222222', fullName: 'Rodrigo Riveros' } }),
       onClose: vi.fn(),
       onSuccess,
-      canReassignLeader: true,
+      isManagement: true,
     });
 
     const nameField = screen.getByLabelText(/Nombre del proyecto/);

@@ -3,7 +3,7 @@ import { CLOCK, err, ok, type ApplicationError, type Clock, type Result } from '
 import { PROJECT_STATUS_LABELS, type ChangeProjectStatusInput, type Permission } from '@kora/contracts';
 import {
   CannotManageProjectError,
-  CannotManuallyActivateProjectError,
+  CannotActivateProjectError,
   ManualHito0ReasonRequiredError,
   ProjectNotFoundError,
 } from '../../domain/errors/project.errors';
@@ -44,10 +44,15 @@ export class ChangeProjectStatusUseCase
     const previousStatus = project.status;
     if (previousStatus === command.data.status) return ok(undefined);
 
+    /** Pasar a Activo (sea Hito 0 manual o reactivar tras Detenido) es de Gerencia/PMO, no del líder por sí solo. */
+    if (command.data.status === 'active' && !command.actorPermissions.includes('projects:manage')) {
+      return err(new CannotActivateProjectError());
+    }
+
     /**
      * Hito 0 manual (sin factura): activar a mano un proyecto `development`
-     * `aprobado` que seguía "No iniciado" — Gerencia/PMO, no el líder por sí
-     * solo, y con motivo/referencia obligatorio (contrato firmado, OC, etc).
+     * `aprobado` que seguía "No iniciado" — con motivo/referencia obligatorio
+     * (contrato firmado, OC, etc).
      */
     const isManualHito0 =
       previousStatus === 'draft' && command.data.status === 'active' && project.type === 'development' && project.salesStage === 'approved';
@@ -55,7 +60,6 @@ export class ChangeProjectStatusUseCase
     const now = this.clock.now();
     let message = `Estado del proyecto cambiado de "${PROJECT_STATUS_LABELS[previousStatus]}" a "${PROJECT_STATUS_LABELS[command.data.status]}".`;
     if (isManualHito0) {
-      if (!command.actorPermissions.includes('projects:manage')) return err(new CannotManuallyActivateProjectError());
       const reason = command.data.reason?.trim();
       if (!reason) return err(new ManualHito0ReasonRequiredError());
       project.activateFromHito0(now, 'manual', reason);

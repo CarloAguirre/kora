@@ -310,9 +310,12 @@ export class ManualHito0ReasonRequiredError extends ValidationError {
   }
 }
 
-/** Activar manualmente un proyecto (Hito 0 sin factura) es de Gerencia/PMO — el líder del proyecto por sí solo no basta. */
-export class CannotManuallyActivateProjectError extends ForbiddenError {
+/**
+ * Pasar un proyecto a Activo a mano (Hito 0 sin factura, o reactivarlo tras
+ * Detenido) es de Gerencia/PMO — el líder del proyecto por sí solo no basta.
+ */
+export class CannotActivateProjectError extends ForbiddenError {
   constructor() {
-    super('Solo Gerencia/PMO puede activar manualmente este proyecto.', 'PROJECT_CANNOT_MANUALLY_ACTIVATE');
+    super('Solo Gerencia/PMO puede pasar este proyecto a Activo.', 'PROJECT_CANNOT_ACTIVATE');
   }
 }

@@ -141,7 +141,7 @@ export function ProjectDetailPage() {
           project={project}
           onClose={() => setEditing(false)}
           onSuccess={(message) => toast.success(message)}
-          canReassignLeader={can('projects:manage')}
+          isManagement={can('projects:manage')}
         />
       </div>
     </DashboardLayout>

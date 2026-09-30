@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ChangeProjectStatusUseCase } from './change-project-status.use-case';
 import { Project } from '../../domain/entities/project.entity';
-import { CannotManuallyActivateProjectError, ManualHito0ReasonRequiredError } from '../../domain/errors/project.errors';
+import { CannotActivateProjectError, ManualHito0ReasonRequiredError } from '../../domain/errors/project.errors';
 import type { ProjectRepository } from '../../domain/repositories/project.repository';
 import type { AuditRecorder } from '../../../../shared/application/ports/audit-recorder.port';
 import type { ProjectChangeLogRecorder } from '../services/project-change-log.recorder';
@@ -47,7 +47,7 @@ describe('ChangeProjectStatusUseCase — Hito 0 manual', () => {
     });
 
     expect(result.isErr()).toBe(true);
-    expect(result.isErr() && result.error).toBeInstanceOf(CannotManuallyActivateProjectError);
+    expect(result.isErr() && result.error).toBeInstanceOf(CannotActivateProjectError);
     expect(projects.save).not.toHaveBeenCalled();
   });
 
@@ -92,6 +92,30 @@ describe('ChangeProjectStatusUseCase — Hito 0 manual', () => {
       ACTOR.userId,
       NOW,
     );
+  });
+
+  it('rechaza reactivar un proyecto Detenido sin projects:manage, aunque sea el líder del proyecto', async () => {
+    const project = Project.create({
+      id: 'project-1',
+      name: 'Portal',
+      slug: 'portal',
+      type: 'development',
+      salesStage: 'approved',
+      status: 'on_hold',
+      leaderUserId: 'leader-1',
+      now: NOW,
+    }).unwrap();
+    const { useCase, projects } = buildUseCase(project);
+
+    const result = await useCase.execute({
+      projectId: 'project-1',
+      data: { status: 'active' },
+      actor: ACTOR,
+      actorPermissions: ['projects:read_assigned'],
+    });
+
+    expect(result.isErr() && result.error).toBeInstanceOf(CannotActivateProjectError);
+    expect(projects.save).not.toHaveBeenCalled();
   });
 
   it('no exige motivo para otras transiciones (ej. pausar a Detenido)', async () => {
