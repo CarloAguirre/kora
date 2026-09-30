@@ -253,9 +253,11 @@ function toPhaseRoadmapPhase(
       state: taskItemState(task),
       scope: task.scope,
     })),
-    relatedBitacora: (observationsByModule.get(module.id) ?? []).map((observation) =>
-      toBitacoraEntry(observation, moduleBadgeByModuleId),
-    ),
+    /** Más reciente primero: el Roadmap muestra solo el último registro de la
+        tarea/entrega seleccionada (ver `filteredBitacora` en `PhaseRoadmap`). */
+    relatedBitacora: [...(observationsByModule.get(module.id) ?? [])]
+      .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt))
+      .map((observation) => toBitacoraEntry(observation, moduleBadgeByModuleId)),
   };
 }
 

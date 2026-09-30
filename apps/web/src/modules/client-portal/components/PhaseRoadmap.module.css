@@ -13,27 +13,42 @@
     0px 10px 14px 0px rgba(15, 41, 66, 0.16);
 }
 
+/* Bloques del encabezado — `.roadmap-toolbar` / `.roadmap-legend` del prototipo
+   `ficha_proyecto_lider-actualizada.html` (mismo look que el Roadmap interno). */
 .summaryRow {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px 20px;
+  border: 1px solid #e4e9ee;
+  border-radius: 14px;
+}
+
+.summaryChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
 }
 
 .summaryChip {
-  padding: 6px 14px;
-  border-radius: 999px;
-  background: #f1f4f7;
+  padding: 9px 14px;
+  border-radius: 10px;
+  border: 1px solid #e4e9ee;
+  background: #f6f7f9;
   color: #5d6b7a;
   font-size: 12.5px;
-  font-weight: var(--kora-weight-bold);
+}
+
+.summaryChip b {
+  color: #0f2a44;
 }
 
 .filterRow {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-left: auto;
   flex-wrap: wrap;
 }
 
@@ -50,17 +65,10 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 22px;
-  padding: 14px 0;
-  border-top: 1px solid #e4e9ee;
-  border-bottom: 1px solid #e4e9ee;
-}
-
-.legendGroup {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 16px;
+  gap: 18px;
+  padding: 14px 18px;
+  border: 1px solid #e4e9ee;
+  border-radius: 14px;
 }
 
 .legendItem {
@@ -112,7 +120,6 @@
 
 .hint {
   font-size: 12px;
-  font-style: italic;
   color: #93a0ac;
 }
 
@@ -526,10 +533,4 @@
 .relatedBitacoraEmpty {
   font-size: 12.5px;
   color: #93a0ac;
-}
-
-@media (max-width: 900px) {
-  .filterRow {
-    margin-left: 0;
-  }
 }

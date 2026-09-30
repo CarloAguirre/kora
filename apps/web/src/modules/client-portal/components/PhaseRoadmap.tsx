@@ -153,10 +153,21 @@ export function PhaseRoadmap({ phaseRoadmap }: { phaseRoadmap: ProjectPhaseRoadm
 
   return (
     <div className={styles.wrapper}>
+      {/* Encabezado compacto del prototipo `ficha_proyecto_lider-actualizada.html` (`.roadmap-toolbar`
+          + `.roadmap-legend`): chips y rango en un bloque, leyenda en una sola línea con la nota del
+          zoom al final. */}
       <div className={styles.summaryRow}>
-        <span className={styles.summaryChip}>{phaseRoadmap.phaseCount} Fases</span>
-        <span className={styles.summaryChip}>{phaseRoadmap.teamSegmentCount} tramos de equipo</span>
-        <span className={styles.summaryChip}>{phaseRoadmap.plannedDeliveryCount} entregas planificadas</span>
+        <div className={styles.summaryChips}>
+          <span className={styles.summaryChip}>
+            <b>{phaseRoadmap.phaseCount}</b> Fases
+          </span>
+          <span className={styles.summaryChip}>
+            <b>{phaseRoadmap.teamSegmentCount}</b> tramos de equipo
+          </span>
+          <span className={styles.summaryChip}>
+            <b>{phaseRoadmap.plannedDeliveryCount}</b> entregas planificadas
+          </span>
+        </div>
         <div className={styles.filterRow}>
           <span className={styles.filterLabel}>Rango visible:</span>
           <TextField
@@ -172,7 +183,7 @@ export function PhaseRoadmap({ phaseRoadmap }: { phaseRoadmap: ProjectPhaseRoadm
             value={rangeDraft.to}
             onChange={(event) => setRangeDraft((current) => ({ ...current, to: event.target.value }))}
           />
-          <Button size="sm" onClick={() => setAppliedRange(rangeDraft)} disabled={!rangeDraftIsValid}>
+          <Button size="sm" variant="ghost" onClick={() => setAppliedRange(rangeDraft)} disabled={!rangeDraftIsValid}>
             Aplicar
           </Button>
           <Button size="sm" variant="ghost" onClick={onResetRange} disabled={!rangeIsCustom}>
@@ -182,40 +193,33 @@ export function PhaseRoadmap({ phaseRoadmap }: { phaseRoadmap: ProjectPhaseRoadm
       </div>
 
       <div className={styles.legendRow}>
-        <div className={styles.legendGroup}>
-          {(Object.keys(PHASE_ROADMAP_ROLE_LABELS) as Array<keyof typeof PHASE_ROADMAP_ROLE_LABELS>).map((role) => (
-            <span key={role} className={styles.legendItem}>
-              <span className={styles.legendDot} style={{ background: PHASE_ROADMAP_ROLE_COLORS[role] }} />
-              {PHASE_ROADMAP_ROLE_LABELS[role]}
-            </span>
-          ))}
-        </div>
-        <div className={styles.legendGroup}>
-          <span className={styles.legendItem}>
-            <DiamondIcon size={10} className={styles.legendDiamondDone} /> Entrega realizada
+        {(Object.keys(PHASE_ROADMAP_ROLE_LABELS) as Array<keyof typeof PHASE_ROADMAP_ROLE_LABELS>).map((role) => (
+          <span key={role} className={styles.legendItem}>
+            <span className={styles.legendDot} style={{ background: PHASE_ROADMAP_ROLE_COLORS[role] }} />
+            {PHASE_ROADMAP_ROLE_LABELS[role]}
           </span>
-          <span className={styles.legendItem}>
-            <DiamondIcon size={10} className={styles.legendDiamondCommitted} /> Entrega comprometida
-          </span>
-          <span className={styles.legendItem}>
-            <DiamondIcon size={10} className={styles.legendDiamondDelayed} /> Entrega atrasada
-          </span>
-        </div>
-        <div className={styles.legendGroup}>
-          <span className={styles.legendItem}>
-            <span className={[styles.legendDot, styles.taskDotDone].join(' ')} /> Tarea terminada
-          </span>
-          <span className={styles.legendItem}>
-            <span className={[styles.legendDot, styles.taskDotUpcoming].join(' ')} /> Tarea próxima
-          </span>
-          <span className={styles.legendItem}>
-            <span className={[styles.legendDot, styles.taskDotDelayed].join(' ')} /> Tarea atrasada
-          </span>
-          <span className={styles.legendHoy}>— Hoy</span>
-        </div>
+        ))}
+        <span className={styles.legendItem}>
+          <DiamondIcon size={10} className={styles.legendDiamondDone} /> Entrega realizada
+        </span>
+        <span className={styles.legendItem}>
+          <DiamondIcon size={10} className={styles.legendDiamondCommitted} /> Entrega comprometida
+        </span>
+        <span className={styles.legendItem}>
+          <DiamondIcon size={10} className={styles.legendDiamondDelayed} /> Entrega atrasada
+        </span>
+        <span className={styles.legendItem}>
+          <span className={[styles.legendDot, styles.taskDotDone].join(' ')} /> Tarea terminada
+        </span>
+        <span className={styles.legendItem}>
+          <span className={[styles.legendDot, styles.taskDotUpcoming].join(' ')} /> Tarea próxima
+        </span>
+        <span className={styles.legendItem}>
+          <span className={[styles.legendDot, styles.taskDotDelayed].join(' ')} /> Tarea atrasada
+        </span>
+        <span className={styles.legendHoy}>— Hoy</span>
+        <span className={styles.hint}>Usa el zoom de cada fase para ver días y tareas.</span>
       </div>
-
-      <p className={styles.hint}>Usa el zoom de cada fase para ver días y tareas.</p>
 
       <div className={styles.phaseList}>
         {phaseRoadmap.phases.map((phase) => (
@@ -295,12 +299,15 @@ function PhaseCard({
 
   /** Sin selección no se muestra nada — mostrar TODAS las entradas de la fase
    *  por defecto era justo lo que se quería evitar (ver el comentario de
-   *  `RelatedBitacoraSelection`). */
+   *  `RelatedBitacoraSelection`). Para una tarea/entrega se muestra solo el
+   *  registro más reciente (`relatedBitacora` viene ordenado de más nuevo a
+   *  más antiguo), que refleja su estado actual. */
   const filteredBitacora = useMemo(() => {
     if (!selectedRelated) return [];
     if (selectedRelated.kind === 'incident') return phase.relatedBitacora.filter((entry) => entry.kind === 'attention');
     const label = selectedRelated.label.trim().toLowerCase();
-    return phase.relatedBitacora.filter((entry) => entry.title.toLowerCase().includes(label));
+    const latest = phase.relatedBitacora.find((entry) => entry.title.toLowerCase().includes(label));
+    return latest ? [latest] : [];
   }, [phase.relatedBitacora, selectedRelated]);
 
   /** Chips de "Resumen de avance": % completado por ámbito (mismo cálculo que

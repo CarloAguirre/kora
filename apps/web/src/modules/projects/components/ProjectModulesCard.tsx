@@ -82,7 +82,8 @@ function observationDot(observation: ProjectObservation): { className: string | 
  * No existe un vínculo real (FK) entre una `ProjectObservation` y la tarea/entrega puntual que la
  * originó — solo con el módulo/fase completa. Mismo criterio pragmático que ya usa el Roadmap del
  * portal cliente (`project-detail.adapter.ts`/`PhaseRoadmap`): se cruza por texto, buscando la
- * etiqueta de la tarea/entrega dentro del título o mensaje del registro.
+ * etiqueta de la tarea/entrega dentro del título o mensaje del registro. Solo se devuelve el
+ * registro más reciente, que refleja el estado actual del ítem.
  */
 function relatedObservations(
   observations: readonly ProjectObservation[],
@@ -97,7 +98,8 @@ function relatedObservations(
         observation.moduleId === moduleId &&
         ((observation.title ?? '').toLowerCase().includes(needle) || observation.message.toLowerCase().includes(needle)),
     )
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, 1);
 }
 
 function RelatedObservations({ observations, moduleId, label }: { observations: readonly ProjectObservation[]; moduleId: string; label: string }) {
