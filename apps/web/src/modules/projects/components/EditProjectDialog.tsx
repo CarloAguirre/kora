@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { useFieldArray, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -112,6 +112,12 @@ const toModuleEditDraft = (module: ProjectModule): ModuleEditDraft => ({
 const emptyToNull = (value: string) => value || null;
 /** `''` de un input opcional → `undefined`, para que `nullish()` no reciba una cadena vacía. */
 const emptyToUndefined = (value: string) => value || undefined;
+
+const omitKey = (record: Record<string, string>, key: string): Record<string, string> => {
+  const next = { ...record };
+  delete next[key];
+  return next;
+};
 
 /**
  * "Tipo de proyecto" en cascada del mockup — capa de UI sobre `salesStage` +
@@ -354,11 +360,46 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, canReassi
     }
   };
 
-  const onRemoveSegment = async (moduleId: string, segmentId: string) => {
-    try {
+  // Quitar un tiempo de ejecución, una entrega o una fase ya guardados es irreversible: acá solo se
+  // marcan (`id → moduleId`) y recién se borran en "Guardar cambios" — "Cancelar" los descarta.
+  const [pendingSegmentRemovals, setPendingSegmentRemovals] = useState<Record<string, string>>({});
+  const [pendingDeliveryRemovals, setPendingDeliveryRemovals] = useState<Record<string, string>>({});
+  const [pendingModuleRemovals, setPendingModuleRemovals] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!open) return;
+    setPendingSegmentRemovals({});
+    setPendingDeliveryRemovals({});
+    setPendingModuleRemovals({});
+  }, [open]);
+
+  const togglePendingRemoval = (
+    setPending: Dispatch<SetStateAction<Record<string, string>>>,
+    id: string,
+    value: string,
+  ) =>
+    setPending((prev) => {
+      const next = { ...prev };
+      if (id in next) delete next[id];
+      else next[id] = value;
+      return next;
+    });
+
+  /** Aplica las eliminaciones marcadas — cada una que sale bien se saca de la lista, para que un reintento no la repita. */
+  const applyPendingRemovals = async () => {
+    for (const moduleId of Object.keys(pendingModuleRemovals)) {
+      await deleteModule.mutateAsync({ projectId: project.id, moduleId });
+      setPendingModuleRemovals((prev) => omitKey(prev, moduleId));
+    }
+    for (const [segmentId, moduleId] of Object.entries(pendingSegmentRemovals)) {
+      if (moduleId in pendingModuleRemovals) continue;
       await deleteSegment.mutateAsync({ projectId: project.id, moduleId, segmentId });
-    } catch (moduleError) {
-      toast.error(moduleError instanceof ApiRequestError ? moduleError.message : 'No se pudo quitar el tiempo de ejecución.');
+      setPendingSegmentRemovals((prev) => omitKey(prev, segmentId));
+    }
+    for (const [deliveryId, moduleId] of Object.entries(pendingDeliveryRemovals)) {
+      if (moduleId in pendingModuleRemovals) continue;
+      await removeDelivery.mutateAsync({ projectId: project.id, moduleId, deliveryId });
+      setPendingDeliveryRemovals((prev) => omitKey(prev, deliveryId));
     }
   };
 
@@ -406,15 +447,6 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, canReassi
     }
   });
 
-  const onDeleteModule = async (moduleId: string, name: string) => {
-    try {
-      await deleteModule.mutateAsync({ projectId: project.id, moduleId });
-      toast.success(`Se eliminó "${name}".`);
-    } catch (moduleError) {
-      toast.error(moduleError instanceof ApiRequestError ? moduleError.message : 'No se pudo eliminar el módulo.');
-    }
-  };
-
   const moduleDraft = (module: ProjectModule) => moduleDrafts[module.id] ?? toModuleEditDraft(module);
   const setModuleDraftField = (module: ProjectModule, patch: Partial<ModuleEditDraft>) =>
     setModuleDrafts((prev) => ({ ...prev, [module.id]: { ...moduleDraft(module), ...patch } }));
@@ -446,14 +478,6 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, canReassi
   const onBlurModuleEndDate = (module: ProjectModule) => {
     const next = moduleDraft(module).estimatedEndDate || null;
     if (next !== module.estimatedEndDate) void onSaveModuleField(module.id, { estimatedEndDate: next });
-  };
-
-  const onRemoveDelivery = async (moduleId: string, deliveryId: string) => {
-    try {
-      await removeDelivery.mutateAsync({ projectId: project.id, moduleId, deliveryId });
-    } catch (moduleError) {
-      toast.error(moduleError instanceof ApiRequestError ? moduleError.message : 'No se pudo quitar la entrega.');
-    }
   };
 
   const estadoOptions = ESTADO_OPTIONS_BY_TIPO[tipo];
@@ -493,6 +517,7 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, canReassi
     }
     try {
       await updateProject.mutateAsync({ projectId: project.id, input: values });
+      await applyPendingRemovals();
       if (isDevelopment && estado !== project.status) {
         await changeStatus.mutateAsync({
           projectId: project.id,
@@ -802,168 +827,232 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, canReassi
             {project.modules.length === 0 && <p className={styles.hint}>Aún no hay módulos.</p>}
 
             <div className={styles.modulesList}>
-              {project.modules.map((module, index) => (
-                <div key={module.id} className={styles.moduleEditCard}>
-                  <div className={styles.moduleEditHead}>
-                    <span>
-                      Fase {index + 1} — {module.name} ({PROJECT_MODULE_STAGE_LABELS[module.initialStage]})
-                    </span>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => void onDeleteModule(module.id, module.name)}
-                      aria-label={`Eliminar ${module.name}`}
-                    >
-                      <TrashIcon size={16} />
-                    </Button>
-                  </div>
-
-                  <div className={styles.moduleEditSubsection}>
-                    <span className={styles.moduleEditSubsectionLabel}>Datos de la fase</span>
-                    <TextField
-                      label="Nombre del módulo"
-                      value={moduleDraft(module).name}
-                      onChange={(event) => setModuleDraftField(module, { name: event.target.value })}
-                      onBlur={() => onBlurModuleName(module)}
-                    />
-                    <TextField
-                      label="Horas estimadas"
-                      type="number"
-                      min={0}
-                      value={moduleDraft(module).estimatedHours}
-                      onChange={(event) => setModuleDraftField(module, { estimatedHours: event.target.value })}
-                      onBlur={() => onBlurModuleHours(module)}
-                    />
-                    <div className={styles.row}>
-                      <TextField
-                        label="Fecha de inicio estimada"
-                        type="date"
-                        value={moduleDraft(module).estimatedStartDate}
-                        onChange={(event) => setModuleDraftField(module, { estimatedStartDate: event.target.value })}
-                        onBlur={() => onBlurModuleStartDate(module)}
-                      />
-                      <TextField
-                        label="Fecha de término estimada"
-                        type="date"
-                        value={moduleDraft(module).estimatedEndDate}
-                        onChange={(event) => setModuleDraftField(module, { estimatedEndDate: event.target.value })}
-                        onBlur={() => onBlurModuleEndDate(module)}
-                      />
+              {project.modules.map((module, index) => {
+                const moduleRemoved = module.id in pendingModuleRemovals;
+                return (
+                  <div
+                    key={module.id}
+                    className={`${styles.moduleEditCard} ${moduleRemoved ? styles.moduleEditCardPendingRemoval : ''}`}
+                  >
+                    <div className={styles.moduleEditHead}>
+                      <span>
+                        Fase {index + 1} — {module.name} ({PROJECT_MODULE_STAGE_LABELS[module.initialStage]})
+                        {moduleRemoved && <span className={deliveryModalStyles.pendingRemovalNote}> · Se eliminará al guardar</span>}
+                      </span>
+                      {moduleRemoved ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => togglePendingRemoval(setPendingModuleRemovals, module.id, module.name)}
+                        >
+                          Deshacer
+                        </Button>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => togglePendingRemoval(setPendingModuleRemovals, module.id, module.name)}
+                          aria-label={`Eliminar ${module.name}`}
+                        >
+                          <TrashIcon size={16} />
+                        </Button>
+                      )}
                     </div>
-                  </div>
 
-                  <div className={styles.moduleEditSubsection}>
-                    <div className={deliveryModalStyles.subsectionHead}>
-                      <span className={deliveryModalStyles.subsectionLabel}>Tiempos de ejecución por equipo</span>
-                      <p className={styles.hint}>Semanas/días de cada equipo en esta Fase — es lo que dibuja el Roadmap.</p>
-                    </div>
-                    {module.segments.length === 0 && <p className={styles.hint}>Aún no hay tiempos de ejecución para esta fase.</p>}
-                    {module.segments.map((segment) => (
-                      <div key={segment.id} className={deliveryModalStyles.listRow}>
-                        <div className={deliveryModalStyles.listInfo}>
-                          <span className={deliveryModalStyles.listName}>
-                            {segment.teamName}
-                            {segment.name && <span className={deliveryModalStyles.listNameTeam}> — {segment.name}</span>}
-                          </span>
-                          <span className={deliveryModalStyles.listMeta}>
-                            {formatDeliveryDate(segment.startDate)} → {formatDeliveryDate(segment.endDate)}
-                          </span>
+                    {!moduleRemoved && (
+                      <>
+                        <div className={styles.moduleEditSubsection}>
+                          <span className={styles.moduleEditSubsectionLabel}>Datos de la fase</span>
+                          <TextField
+                            label="Nombre del módulo"
+                            value={moduleDraft(module).name}
+                            onChange={(event) => setModuleDraftField(module, { name: event.target.value })}
+                            onBlur={() => onBlurModuleName(module)}
+                          />
+                          <TextField
+                            label="Horas estimadas"
+                            type="number"
+                            min={0}
+                            value={moduleDraft(module).estimatedHours}
+                            onChange={(event) => setModuleDraftField(module, { estimatedHours: event.target.value })}
+                            onBlur={() => onBlurModuleHours(module)}
+                          />
+                          <div className={styles.row}>
+                            <TextField
+                              label="Fecha de inicio estimada"
+                              type="date"
+                              value={moduleDraft(module).estimatedStartDate}
+                              onChange={(event) => setModuleDraftField(module, { estimatedStartDate: event.target.value })}
+                              onBlur={() => onBlurModuleStartDate(module)}
+                            />
+                            <TextField
+                              label="Fecha de término estimada"
+                              type="date"
+                              value={moduleDraft(module).estimatedEndDate}
+                              onChange={(event) => setModuleDraftField(module, { estimatedEndDate: event.target.value })}
+                              onBlur={() => onBlurModuleEndDate(module)}
+                            />
+                          </div>
                         </div>
-                        <div className={deliveryModalStyles.listActions}>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className={deliveryModalStyles.listEditButton}
-                            onClick={() => setSegmentModal({ kind: 'existing', moduleId: module.id, segment })}
-                          >
-                            Editar
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className={deliveryModalStyles.listDeleteButton}
-                            onClick={() => void onRemoveSegment(module.id, segment.id)}
-                            aria-label="Quitar tiempo de ejecución"
-                          >
-                            <CloseIcon size={14} />
-                          </Button>
+
+                        <div className={styles.moduleEditSubsection}>
+                          <div className={deliveryModalStyles.subsectionHead}>
+                            <span className={deliveryModalStyles.subsectionLabel}>Tiempos de ejecución por equipo</span>
+                            <p className={styles.hint}>Semanas/días de cada equipo en esta Fase — es lo que dibuja el Roadmap.</p>
+                          </div>
+                          {module.segments.length === 0 && <p className={styles.hint}>Aún no hay tiempos de ejecución para esta fase.</p>}
+                          {module.segments.map((segment) => {
+                            const segmentRemoved = segment.id in pendingSegmentRemovals;
+                            return (
+                              <div
+                                key={segment.id}
+                                className={`${deliveryModalStyles.listRow} ${segmentRemoved ? deliveryModalStyles.listRowPendingRemoval : ''}`}
+                              >
+                                <div className={deliveryModalStyles.listInfo}>
+                                  <span className={deliveryModalStyles.listName}>
+                                    {segment.teamName}
+                                    {segment.name && <span className={deliveryModalStyles.listNameTeam}> — {segment.name}</span>}
+                                  </span>
+                                  <span className={deliveryModalStyles.listMeta}>
+                                    {formatDeliveryDate(segment.startDate)} → {formatDeliveryDate(segment.endDate)}
+                                  </span>
+                                  {segmentRemoved && <span className={deliveryModalStyles.pendingRemovalNote}>Se quitará al guardar</span>}
+                                </div>
+                                <div className={deliveryModalStyles.listActions}>
+                                  {segmentRemoved ? (
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      className={deliveryModalStyles.listEditButton}
+                                      onClick={() => togglePendingRemoval(setPendingSegmentRemovals, segment.id, module.id)}
+                                    >
+                                      Deshacer
+                                    </Button>
+                                  ) : (
+                                    <>
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className={deliveryModalStyles.listEditButton}
+                                        onClick={() => setSegmentModal({ kind: 'existing', moduleId: module.id, segment })}
+                                      >
+                                        Editar
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className={deliveryModalStyles.listDeleteButton}
+                                        onClick={() => togglePendingRemoval(setPendingSegmentRemovals, segment.id, module.id)}
+                                        aria-label="Quitar tiempo de ejecución"
+                                      >
+                                        <CloseIcon size={14} />
+                                      </Button>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                          {teamFields.length === 0 ? (
+                            <p className={styles.hint}>Primero asigná equipos en "Equipos e involucrados" para poder agregar tiempos de ejecución.</p>
+                          ) : (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className={deliveryModalStyles.addButton}
+                              iconLeft={<PlusIcon size={14} />}
+                              onClick={() => setSegmentModal({ kind: 'existing', moduleId: module.id, segment: null })}
+                            >
+                              Agregar tiempo de ejecución
+                            </Button>
+                          )}
                         </div>
-                      </div>
-                    ))}
-                    {teamFields.length === 0 ? (
-                      <p className={styles.hint}>Primero asigná equipos en "Equipos e involucrados" para poder agregar tiempos de ejecución.</p>
-                    ) : (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className={deliveryModalStyles.addButton}
-                        iconLeft={<PlusIcon size={14} />}
-                        onClick={() => setSegmentModal({ kind: 'existing', moduleId: module.id, segment: null })}
-                      >
-                        Agregar tiempo de ejecución
-                      </Button>
+
+                        <div className={styles.moduleEditSubsection}>
+                          <span className={deliveryModalStyles.subsectionLabel}>Entregas estimadas</span>
+                          {module.deliveries.length === 0 && <p className={styles.hint}>Aún no hay entregas para esta fase.</p>}
+                          {module.deliveries.map((delivery) => {
+                            const deliveryRemoved = delivery.id in pendingDeliveryRemovals;
+                            return (
+                              <div
+                                key={delivery.id}
+                                className={`${deliveryModalStyles.listRow} ${deliveryRemoved ? deliveryModalStyles.listRowPendingRemoval : ''}`}
+                              >
+                                <div className={deliveryModalStyles.listInfo}>
+                                  <span className={deliveryModalStyles.listName}>
+                                    {delivery.name}
+                                    {delivery.teamName && <span className={deliveryModalStyles.listNameTeam}> · {delivery.teamName}</span>}
+                                  </span>
+                                  <span className={deliveryModalStyles.listMeta}>
+                                    {formatDeliveryDate(delivery.estimatedDate)} · {PROJECT_MODULE_DELIVERY_STATUS_LABELS[delivery.status]}
+                                    {delivery.description ? ` · ${delivery.description}` : ''}
+                                  </span>
+                                  {deliveryRemoved && <span className={deliveryModalStyles.pendingRemovalNote}>Se quitará al guardar</span>}
+                                </div>
+                                <div className={deliveryModalStyles.listActions}>
+                                  {deliveryRemoved ? (
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      className={deliveryModalStyles.listEditButton}
+                                      onClick={() => togglePendingRemoval(setPendingDeliveryRemovals, delivery.id, module.id)}
+                                    >
+                                      Deshacer
+                                    </Button>
+                                  ) : (
+                                    <>
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className={deliveryModalStyles.listEditButton}
+                                        onClick={() => setDeliveryModal({ kind: 'existing', moduleId: module.id, delivery })}
+                                      >
+                                        Editar
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className={deliveryModalStyles.listDeleteButton}
+                                        onClick={() => togglePendingRemoval(setPendingDeliveryRemovals, delivery.id, module.id)}
+                                        aria-label="Quitar entrega"
+                                      >
+                                        <CloseIcon size={14} />
+                                      </Button>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                          {teamFields.length === 0 ? (
+                            <p className={styles.hint}>Primero asigná equipos en "Equipos e involucrados" para poder agregar entregas.</p>
+                          ) : (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className={deliveryModalStyles.addButton}
+                              iconLeft={<PlusIcon size={14} />}
+                              onClick={() => setDeliveryModal({ kind: 'existing', moduleId: module.id, delivery: null })}
+                            >
+                              Agregar entrega
+                            </Button>
+                          )}
+                        </div>
+                      </>
                     )}
                   </div>
-
-                  <div className={styles.moduleEditSubsection}>
-                    <span className={deliveryModalStyles.subsectionLabel}>Entregas estimadas</span>
-                    {module.deliveries.length === 0 && <p className={styles.hint}>Aún no hay entregas para esta fase.</p>}
-                    {module.deliveries.map((delivery) => (
-                      <div key={delivery.id} className={deliveryModalStyles.listRow}>
-                        <div className={deliveryModalStyles.listInfo}>
-                          <span className={deliveryModalStyles.listName}>
-                            {delivery.name}
-                            {delivery.teamName && <span className={deliveryModalStyles.listNameTeam}> · {delivery.teamName}</span>}
-                          </span>
-                          <span className={deliveryModalStyles.listMeta}>
-                            {formatDeliveryDate(delivery.estimatedDate)} · {PROJECT_MODULE_DELIVERY_STATUS_LABELS[delivery.status]}
-                            {delivery.description ? ` · ${delivery.description}` : ''}
-                          </span>
-                        </div>
-                        <div className={deliveryModalStyles.listActions}>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className={deliveryModalStyles.listEditButton}
-                            onClick={() => setDeliveryModal({ kind: 'existing', moduleId: module.id, delivery })}
-                          >
-                            Editar
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className={deliveryModalStyles.listDeleteButton}
-                            onClick={() => void onRemoveDelivery(module.id, delivery.id)}
-                            aria-label="Quitar entrega"
-                          >
-                            <CloseIcon size={14} />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                    {teamFields.length === 0 ? (
-                      <p className={styles.hint}>Primero asigná equipos en "Equipos e involucrados" para poder agregar entregas.</p>
-                    ) : (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className={deliveryModalStyles.addButton}
-                        iconLeft={<PlusIcon size={14} />}
-                        onClick={() => setDeliveryModal({ kind: 'existing', moduleId: module.id, delivery: null })}
-                      >
-                        Agregar entrega
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {showNewModuleForm ? (

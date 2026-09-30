@@ -44,6 +44,23 @@
   border: 1px solid var(--kora-border-soft);
 }
 
+.listRowPendingRemoval {
+  background: var(--kora-danger-surface-soft);
+  border-style: dashed;
+}
+
+.listRowPendingRemoval .listName,
+.listRowPendingRemoval .listMeta {
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+.pendingRemovalNote {
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-medium);
+  color: var(--kora-danger);
+}
+
 .listInfo {
   display: flex;
   flex-direction: column;

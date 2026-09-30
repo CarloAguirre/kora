@@ -197,6 +197,13 @@
   box-shadow: var(--kora-shadow-sm);
 }
 
+.moduleEditCardPendingRemoval {
+  border-style: dashed;
+  border-color: var(--kora-danger);
+  background: var(--kora-danger-surface-soft);
+  box-shadow: none;
+}
+
 .moduleEditHead {
   display: flex;
   align-items: center;
