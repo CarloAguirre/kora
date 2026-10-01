@@ -10,6 +10,7 @@ import { DownloadIcon, SearchIcon } from '@/shared/components/icons/Icons';
 import { useCapacityReport } from '../api/hours.queries';
 import { hoursApi } from '../api/hours.api';
 import { useCapacityReportState } from '../hooks/useCapacityReportState';
+import { useHourEntriesExport } from '../hooks/useHourEntriesExport';
 import { exportCapacityReport } from '../lib/hours-export';
 import { ApiRequestError } from '@/shared/lib/api-client';
 
@@ -47,6 +48,10 @@ export function CapacityReportTable() {
   const { data, isLoading, error } = useCapacityReport(state.query);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
+  // Mismo Excel que "Descargar registro de horas" de la consola del líder,
+  // pero sin filtros: con `hours:read_all` el backend devuelve los registros
+  // de toda la organización (comentarios incluidos).
+  const hourEntriesExport = useHourEntriesExport();
 
   const handleExport = async () => {
     setExportError(null);
@@ -74,14 +79,25 @@ export function CapacityReportTable() {
         <div className={styles.headerText}>
           <h2 className={styles.title}>Resumen de horas por colaborador</h2>
         </div>
-        <Button iconLeft={<DownloadIcon size={18} />} loading={exporting} loadingText="Generando…" onClick={() => void handleExport()}>
-          Descargar Excel
-        </Button>
+        <div className={styles.headerActions}>
+          <Button
+            variant="outlineDark"
+            iconLeft={<DownloadIcon size={18} />}
+            loading={hourEntriesExport.exporting}
+            loadingText="Generando…"
+            onClick={() => void hourEntriesExport.exportEntries({ sortField: 'date', sortDirection: 'desc' })}
+          >
+            Descargar registro de horas
+          </Button>
+          <Button iconLeft={<DownloadIcon size={18} />} loading={exporting} loadingText="Generando…" onClick={() => void handleExport()}>
+            Descargar Excel
+          </Button>
+        </div>
       </div>
 
-      {exportError && (
+      {(exportError ?? hourEntriesExport.exportError) && (
         <p className={styles.exportError} role="alert">
-          {exportError}
+          {exportError ?? hourEntriesExport.exportError}
         </p>
       )}
 
