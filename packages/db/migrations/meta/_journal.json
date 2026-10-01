@@ -253,6 +253,13 @@
       "when": 1790794406563,
       "tag": "0035_default_project_payment_milestones",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1790858920655,
+      "tag": "0036_segment_members_forecast",
+      "breakpoints": true
     }
   ]
 }

@@ -20,6 +20,14 @@ export interface ProjectModuleDeliveryRecord {
   readonly rejectionReason: string | null;
 }
 
+export interface ProjectModuleSegmentMemberRecord {
+  readonly teamMemberId: string;
+  readonly fullName: string;
+  /** Capacidad semanal del colaborador en su equipo — base de las HH que el tramo lleva al Forecast. */
+  readonly weeklyHours: number;
+  readonly dailyPercent: number | null;
+}
+
 export interface ProjectModuleSegmentRecord {
   readonly id: string;
   readonly moduleId: string;
@@ -28,6 +36,7 @@ export interface ProjectModuleSegmentRecord {
   readonly name: string;
   readonly startDate: Date;
   readonly endDate: Date;
+  readonly members: readonly ProjectModuleSegmentMemberRecord[];
 }
 
 export interface ProjectModuleTaskRecord {
@@ -94,6 +103,11 @@ export interface UpdateProjectModuleSegmentInput {
   readonly name?: string;
   readonly startDate?: Date;
   readonly endDate?: Date;
+}
+
+export interface ProjectModuleSegmentMemberInput {
+  readonly teamMemberId: string;
+  readonly dailyPercent: number | null;
 }
 
 export interface CreateProjectModuleTaskInput {
@@ -192,6 +206,13 @@ export interface ProjectModuleRepository {
     context?: TransactionContext,
   ): Promise<void>;
   removeSegment(id: string, context?: TransactionContext): Promise<void>;
+  /** Reemplaza todos los colaboradores del tramo por `members`. */
+  replaceSegmentMembers(
+    segmentId: string,
+    members: readonly ProjectModuleSegmentMemberInput[],
+    now: Date,
+    context?: TransactionContext,
+  ): Promise<void>;
   addTask(input: CreateProjectModuleTaskInput, now: Date, context?: TransactionContext): Promise<string>;
   updateTask(id: string, input: UpdateProjectModuleTaskInput, now: Date, context?: TransactionContext): Promise<void>;
   removeTask(id: string, context?: TransactionContext): Promise<void>;

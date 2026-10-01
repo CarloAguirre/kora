@@ -31,35 +31,6 @@
   flex-wrap: wrap;
 }
 
-/* Pestañas "Vista Interna" (deshabilitada, con candado) / "Vista Cliente"
-   (activa) — Figma node 9203:3136. */
-.viewTabs {
-  display: flex;
-  gap: 26px;
-  border-bottom: 1px solid #e4e9ee;
-}
-
-.viewTabDisabled {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 2px 12px;
-  font-size: 14.5px;
-  font-weight: var(--kora-weight-bold);
-  color: #93a0ac;
-  cursor: not-allowed;
-}
-
-.viewTabActive {
-  display: inline-flex;
-  align-items: center;
-  padding: 10px 2px 12px;
-  border-bottom: 3px solid #8bc53f;
-  font-size: 14.5px;
-  font-weight: var(--kora-weight-bold);
-  color: #0f2a44;
-}
-
 /* Fila de 9 botones — medidas exactas del Figma (node 9203:2178): círculos de
    38px, gap 8px, alineados a la derecha, fondo #0F2A44. */
 .sectionToggles {

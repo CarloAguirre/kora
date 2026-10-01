@@ -153,6 +153,11 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
       name: segment.name,
       startDate: segment.startDate.toISOString().slice(0, 10),
       endDate: segment.endDate.toISOString().slice(0, 10),
+      members: segment.members.map((member) => ({
+        teamMemberId: member.teamMemberId,
+        fullName: member.fullName,
+        dailyPercent: member.dailyPercent,
+      })),
     })),
     tasks: module.tasks.map((task) => ({
       id: task.id,

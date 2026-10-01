@@ -196,6 +196,18 @@ export const PROJECT_MODULE_TASK_SCOPE_LABELS: Readonly<Record<ProjectModuleTask
   revision_cliente: 'Rev. Cliente',
 };
 
+/**
+ * Colaborador asignado a un tramo — siempre del equipo del tramo. Con `dailyPercent` el tramo
+ * genera sus filas de Forecast (HH semanales = días hábiles del tramo × jornada diaria × %); sin él,
+ * la asignación es solo informativa.
+ */
+export const projectModuleSegmentMemberSchema = z.object({
+  teamMemberId: uuidSchema,
+  fullName: z.string(),
+  dailyPercent: z.number().nullable(),
+});
+export type ProjectModuleSegmentMember = z.infer<typeof projectModuleSegmentMemberSchema>;
+
 /** Tramo de trabajo de un equipo dentro de una fase/módulo — con su propio rango de fechas (Roadmap). */
 export const projectModuleSegmentSchema = z.object({
   id: uuidSchema,
@@ -204,14 +216,30 @@ export const projectModuleSegmentSchema = z.object({
   name: z.string(),
   startDate: z.string(),
   endDate: z.string(),
+  members: z.array(projectModuleSegmentMemberSchema),
 });
 export type ProjectModuleSegment = z.infer<typeof projectModuleSegmentSchema>;
+
+export const projectModuleSegmentMemberInputSchema = z.object({
+  teamMemberId: uuidSchema,
+  dailyPercent: z.coerce.number().min(1, 'El % diario debe ser al menos 1.').max(100, 'El % diario no puede superar 100.').nullish(),
+});
+export type ProjectModuleSegmentMemberInput = z.infer<typeof projectModuleSegmentMemberInputSchema>;
+
+const segmentMembersInputSchema = z
+  .array(projectModuleSegmentMemberInputSchema)
+  .max(100)
+  .refine((members) => new Set(members.map((m) => m.teamMemberId)).size === members.length, {
+    message: 'Un colaborador no puede repetirse en el mismo tramo.',
+  });
 
 export const createProjectModuleSegmentSchema = z.object({
   teamId: uuidSchema,
   name: nonEmptyTrimmed(300, 'El nombre del tramo'),
   startDate: z.iso.date(),
   endDate: z.iso.date(),
+  /** Opcional — omitirlo en una edición deja los colaboradores como estaban (salvo que cambie el equipo). */
+  members: segmentMembersInputSchema.optional(),
 });
 export type CreateProjectModuleSegmentInput = z.infer<typeof createProjectModuleSegmentSchema>;
 

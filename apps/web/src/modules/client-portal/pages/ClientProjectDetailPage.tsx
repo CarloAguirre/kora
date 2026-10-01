@@ -33,6 +33,7 @@ import { PhaseProgressBar } from '../components/PhaseProgressBar';
 import { PhaseRoadmap } from '../components/PhaseRoadmap';
 import { ProjectBillingCard } from '../components/ProjectBillingCard';
 import { ProjectBitacora } from '../components/ProjectBitacora';
+import { ProjectViewTabs } from '../components/ProjectViewTabs';
 import { StatusPill, type StatusPillTone } from '../components/StatusPill';
 import { toClientProjectDetail } from '../adapters/project-detail.adapter';
 import type { ClientAccessLinks, ClientProjectHealth } from '../types';
@@ -124,9 +125,10 @@ const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFr
  * - Los controles de "Roadmap por Fases" (zoom, filtro de rango, chips de
  *   ámbito, selección de tarea/entrega/incidente) y el "Ver más" de la
  *   Bitácora son reales — ver esos componentes.
- * La única pieza deliberadamente deshabilitada es la pestaña "Vista Interna"
- * del Figma, con un candado (igual que en el propio Figma): esta ruta YA ES
- * la vista cliente, no hay una pantalla interna a la que alternar desde aquí.
+ * La pestaña "Vista Interna" (`ProjectViewTabs`) lleva a la ficha interna
+ * solo desde la vista previa del equipo Kabeli (`internalViewTo`); en el
+ * portal real del cliente queda deshabilitada con candado, igual que en el
+ * Figma.
  *
  * La botonera de íconos bajo el título replica la del Figma en el orden y
  * los conceptos, no en la cantidad exacta: el archivo se quedó con 9 botones
@@ -143,9 +145,13 @@ export interface ClientProjectDetailPageProps {
    *  real del portal de cliente, que un admin/PMO no tiene permiso para ver). */
   readonly backTo?: string;
   readonly backLabel?: string;
+  /** Destino de la pestaña "Vista Interna" — solo lo pasa la vista previa
+   *  interna (`ClientProjectPreviewPage`); en el portal real del cliente queda
+   *  deshabilitada con candado. */
+  readonly internalViewTo?: string;
 }
 
-export function ClientProjectDetailPage({ projectIdOverride, backTo, backLabel }: ClientProjectDetailPageProps = {}) {
+export function ClientProjectDetailPage({ projectIdOverride, backTo, backLabel, internalViewTo }: ClientProjectDetailPageProps = {}) {
   const { projectId: routeProjectId } = useParams<{ projectId: string }>();
   const projectId = projectIdOverride ?? routeProjectId ?? null;
   const navigate = useNavigate();
@@ -211,6 +217,8 @@ export function ClientProjectDetailPage({ projectIdOverride, backTo, backLabel }
   return (
     <DashboardLayout title="Detalle de proyecto">
       <div className={styles.page}>
+        <ProjectViewTabs active="client" internalTo={internalViewTo} />
+
         <Link className={styles.breadcrumb} to={resolvedBackTo}>
           <ChevronLeftIcon size={16} /> {backLabel ?? `Volver a proyectos de ${project.company.name}`}
         </Link>
@@ -225,15 +233,6 @@ export function ClientProjectDetailPage({ projectIdOverride, backTo, backLabel }
           <Button variant="outline" iconLeft={<DownloadIcon size={15} />} onClick={handleDownloadPdf}>
             Descargar PDF
           </Button>
-        </div>
-
-        <div className={styles.viewTabs} role="tablist" aria-label="Vista de la ficha">
-          <span className={styles.viewTabDisabled} role="tab" aria-selected={false} aria-disabled title="Solo el equipo Kabeli puede ver esta pestaña">
-            <LockIcon size={13} /> Vista Interna
-          </span>
-          <span className={styles.viewTabActive} role="tab" aria-selected={true}>
-            Vista Cliente
-          </span>
         </div>
 
         <div className={styles.sectionToggles} role="group" aria-label="Mostrar u ocultar secciones">

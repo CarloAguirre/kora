@@ -63,6 +63,8 @@ import deliveryModalStyles from '../components/DeliveryModal.module.css';
 import {
   ExecutionSegmentModal,
   EMPTY_EXECUTION_SEGMENT_MODAL_VALUES,
+  formatSegmentMembers,
+  toSegmentInput,
   type ExecutionSegmentModalValues,
 } from '../components/ExecutionSegmentModal';
 import { useUsersList } from '@/modules/users/api/users.queries';
@@ -159,12 +161,8 @@ interface DeliveryDraft {
   estimatedDate: string;
   description: string;
 }
-interface SegmentDraft {
+interface SegmentDraft extends ExecutionSegmentModalValues {
   localId: number;
-  teamId: string;
-  name: string;
-  startDate: string;
-  endDate: string;
 }
 /**
  * Un módulo mientras se arma en el wizard: campos como texto plano de
@@ -555,9 +553,7 @@ export function NewProjectPage() {
     if (!segmentModal) return EMPTY_EXECUTION_SEGMENT_MODAL_VALUES;
     const draft = moduleDrafts.find((m) => m.localId === segmentModal.moduleLocalId);
     const segment = draft?.segments.find((s) => s.localId === segmentModal.segmentLocalId);
-    return segment
-      ? { teamId: segment.teamId, name: segment.name, startDate: segment.startDate, endDate: segment.endDate }
-      : EMPTY_EXECUTION_SEGMENT_MODAL_VALUES;
+    return segment ?? EMPTY_EXECUTION_SEGMENT_MODAL_VALUES;
   })();
 
   const onConfirmSegmentModal = (values: ExecutionSegmentModalValues) => {
@@ -737,12 +733,7 @@ export function NewProjectPage() {
                     createSegment.mutateAsync({
                       projectId: result.id,
                       moduleId: module.id,
-                      input: {
-                        teamId: segment.teamId,
-                        name: segment.name.trim(),
-                        startDate: segment.startDate,
-                        endDate: segment.endDate,
-                      },
+                      input: toSegmentInput(segment),
                     }),
                   ),
                 );
@@ -1388,6 +1379,9 @@ export function NewProjectPage() {
                                   <span className={deliveryModalStyles.listMeta}>
                                     {formatDeliveryDate(segment.startDate)} → {formatDeliveryDate(segment.endDate)}
                                   </span>
+                                  {segment.members.length > 0 && (
+                                    <span className={deliveryModalStyles.listMeta}>{formatSegmentMembers(segment.members)}</span>
+                                  )}
                                 </div>
                                 <div className={deliveryModalStyles.listActions}>
                                   <Button

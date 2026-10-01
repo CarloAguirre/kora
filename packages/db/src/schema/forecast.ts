@@ -3,7 +3,7 @@ import { date, index, numeric, pgEnum, pgTable, text, uniqueIndex, uuid, integer
 import { primaryId, timestamps } from './columns';
 import { teamMembers } from './organization';
 import { clients } from './clients';
-import { projects } from './projects';
+import { projectModuleSegments, projects } from './projects';
 
 /** Ver docs/DECISION-M6-FORECAST.md. */
 
@@ -45,10 +45,18 @@ export const forecastAssignments = pgTable(
     comments: text('comments').notNull().default(''),
     assignedHours: numeric('assigned_hours', { precision: 6, scale: 2 }).notNull().default('0'),
 
+    /**
+     * Tramo de ejecución del Roadmap que generó esta fila — `null` en las cargadas a mano. Al guardar
+     * el tramo se borran y regeneran todas sus filas (aunque el líder las haya ajustado); al borrarlo,
+     * se van en cascada. Ver `SegmentForecastSyncService`.
+     */
+    segmentId: uuid('segment_id').references(() => projectModuleSegments.id, { onDelete: 'cascade' }),
+
     ...timestamps,
   },
   (table) => [
     uniqueIndex('forecast_assignments_legacy_id_key').on(table.legacyId).where(sql`${table.legacyId} is not null`),
     index('forecast_assignments_member_period_idx').on(table.teamMemberId, table.periodStart, table.periodEnd),
+    index('forecast_assignments_segment_idx').on(table.segmentId),
   ],
 );

@@ -35,6 +35,9 @@ import { DeliveryModal, EMPTY_DELIVERY_MODAL_VALUES, type DeliveryModalValues } 
 import {
   ExecutionSegmentModal,
   EMPTY_EXECUTION_SEGMENT_MODAL_VALUES,
+  formatSegmentMembers,
+  segmentToModalValues,
+  toSegmentInput,
   type ExecutionSegmentModalValues,
 } from './ExecutionSegmentModal';
 import {
@@ -333,8 +336,7 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
 
   const segmentModalInitialValues: ExecutionSegmentModalValues = (() => {
     if (!segmentModal || !segmentModal.segment) return EMPTY_EXECUTION_SEGMENT_MODAL_VALUES;
-    const { segment } = segmentModal;
-    return { teamId: segment.teamId, name: segment.name, startDate: segment.startDate, endDate: segment.endDate };
+    return segmentModal.kind === 'existing' ? segmentToModalValues(segmentModal.segment) : segmentModal.segment;
   })();
 
   const onConfirmSegmentModal = async (values: ExecutionSegmentModalValues) => {
@@ -351,7 +353,7 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
     }
 
     const { moduleId, segment } = segmentModal;
-    const input = { teamId: values.teamId, name: values.name.trim(), startDate: values.startDate, endDate: values.endDate };
+    const input = toSegmentInput(values);
     try {
       if (segment) {
         await updateSegment.mutateAsync({ projectId: project.id, moduleId, segmentId: segment.id, input });
@@ -436,7 +438,7 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
             createSegment.mutateAsync({
               projectId: project.id,
               moduleId: module.id,
-              input: { teamId: segment.teamId, name: segment.name.trim(), startDate: segment.startDate, endDate: segment.endDate },
+              input: toSegmentInput(segment),
             }),
           ),
         );
@@ -924,6 +926,9 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
                                   <span className={deliveryModalStyles.listMeta}>
                                     {formatDeliveryDate(segment.startDate)} → {formatDeliveryDate(segment.endDate)}
                                   </span>
+                                  {segment.members.length > 0 && (
+                                    <span className={deliveryModalStyles.listMeta}>{formatSegmentMembers(segment.members)}</span>
+                                  )}
                                   {segmentRemoved && <span className={deliveryModalStyles.pendingRemovalNote}>Se quitará al guardar</span>}
                                 </div>
                                 <div className={deliveryModalStyles.listActions}>
@@ -1107,6 +1112,9 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
                         <span className={deliveryModalStyles.listMeta}>
                           {formatDeliveryDate(segment.startDate)} → {formatDeliveryDate(segment.endDate)}
                         </span>
+                        {segment.members.length > 0 && (
+                          <span className={deliveryModalStyles.listMeta}>{formatSegmentMembers(segment.members)}</span>
+                        )}
                       </div>
                       <div className={deliveryModalStyles.listActions}>
                         <Button

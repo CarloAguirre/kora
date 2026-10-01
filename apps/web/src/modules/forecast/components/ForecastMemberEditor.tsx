@@ -7,6 +7,7 @@ import {
   type ForecastAssignmentType,
 } from '@kora/contracts';
 import styles from './ForecastMemberEditor.module.css';
+import { Badge } from '@/shared/components/ui/Badge';
 import { Button } from '@/shared/components/ui/Button';
 import { Select } from '@/shared/components/ui/Select';
 import { TextField } from '@/shared/components/ui/TextField';
@@ -119,69 +120,79 @@ function ForecastAssignmentRow({
   };
 
   return (
-    <div className={styles.row}>
-      <div className={[styles.typeGroup, showProjectSelectors ? styles.typeGroupWithProject : ''].filter(Boolean).join(' ')}>
-        <Select
-          label="Tipo"
-          options={TYPE_OPTIONS}
-          value={assignment.type}
+    <div className={styles.rowGroup}>
+      {assignment.segment && (
+        <div className={styles.roadmapNote}>
+          <Badge tone="info">Roadmap</Badge>
+          <span>
+            {assignment.segment.moduleName} · {assignment.segment.name} — se recalcula si se vuelve a guardar el tramo.
+          </span>
+        </div>
+      )}
+      <div className={styles.row}>
+        <div className={[styles.typeGroup, showProjectSelectors ? styles.typeGroupWithProject : ''].filter(Boolean).join(' ')}>
+          <Select
+            label="Tipo"
+            options={TYPE_OPTIONS}
+            value={assignment.type}
+            disabled={!canEdit}
+            onChange={(event) => commit({ type: event.target.value as ForecastAssignmentType, clientId: null, projectId: null })}
+          />
+          {showProjectSelectors && (
+            <>
+              <Select
+                label="Cliente"
+                placeholder="Sin cliente"
+                options={(clients?.items ?? []).map((client) => ({ value: client.id, label: client.companyName }))}
+                value={assignment.client?.id ?? ''}
+                disabled={!canEdit}
+                onChange={(event) => commit({ clientId: event.target.value || null, projectId: null })}
+              />
+              <Select
+                label="Proyecto"
+                placeholder="Sin proyecto"
+                options={(projects?.items ?? []).map((project) => ({ value: project.id, label: project.name }))}
+                value={assignment.project?.id ?? ''}
+                disabled={!canEdit || !assignment.client}
+                onChange={(event) => commit({ projectId: event.target.value || null })}
+              />
+            </>
+          )}
+        </div>
+
+        <TextField
+          label="Comentarios"
+          value={comments}
           disabled={!canEdit}
-          onChange={(event) => commit({ type: event.target.value as ForecastAssignmentType, clientId: null, projectId: null })}
+          onChange={(event) => setComments(event.target.value)}
+          onBlur={() => commit({ comments })}
         />
-        {showProjectSelectors && (
-          <>
-            <Select
-              label="Cliente"
-              placeholder="Sin cliente"
-              options={(clients?.items ?? []).map((client) => ({ value: client.id, label: client.companyName }))}
-              value={assignment.client?.id ?? ''}
-              disabled={!canEdit}
-              onChange={(event) => commit({ clientId: event.target.value || null, projectId: null })}
-            />
-            <Select
-              label="Proyecto"
-              placeholder="Sin proyecto"
-              options={(projects?.items ?? []).map((project) => ({ value: project.id, label: project.name }))}
-              value={assignment.project?.id ?? ''}
-              disabled={!canEdit || !assignment.client}
-              onChange={(event) => commit({ projectId: event.target.value || null })}
-            />
-          </>
+
+        <TextField
+          label="HH"
+          type="number"
+          min={0}
+          max={maxHours}
+          step="0.5"
+          value={hours}
+          disabled={!canEdit}
+          onChange={(event) => setHours(event.target.value)}
+          onBlur={() => commit({ assignedHours: Number(hours) || 0 })}
+        />
+
+        {canEdit ? (
+          <button
+            type="button"
+            className={styles.deleteButton}
+            aria-label="Eliminar asignación"
+            onClick={() => removeAssignment.mutate(assignment.id)}
+          >
+            <CloseIcon size={16} />
+          </button>
+        ) : (
+          <span />
         )}
       </div>
-
-      <TextField
-        label="Comentarios"
-        value={comments}
-        disabled={!canEdit}
-        onChange={(event) => setComments(event.target.value)}
-        onBlur={() => commit({ comments })}
-      />
-
-      <TextField
-        label="HH"
-        type="number"
-        min={0}
-        max={maxHours}
-        step="0.5"
-        value={hours}
-        disabled={!canEdit}
-        onChange={(event) => setHours(event.target.value)}
-        onBlur={() => commit({ assignedHours: Number(hours) || 0 })}
-      />
-
-      {canEdit ? (
-        <button
-          type="button"
-          className={styles.deleteButton}
-          aria-label="Eliminar asignación"
-          onClick={() => removeAssignment.mutate(assignment.id)}
-        >
-          <CloseIcon size={16} />
-        </button>
-      ) : (
-        <span />
-      )}
     </div>
   );
 }

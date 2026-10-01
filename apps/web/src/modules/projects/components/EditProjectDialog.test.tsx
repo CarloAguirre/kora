@@ -45,6 +45,7 @@ vi.mock('@/modules/users/api/users.queries', () => ({
 
 vi.mock('@/modules/teams/api/teams.queries', () => ({
   useTeamsList: () => ({ data: { items: [] } }),
+  useTeamDetail: () => ({ data: undefined, isLoading: false }),
 }));
 
 function buildProject(overrides: Partial<ProjectDetail> = {}): ProjectDetail {

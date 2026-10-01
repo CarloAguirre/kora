@@ -312,6 +312,30 @@ export const projectModuleSegments = pgTable('project_module_segments', {
   ...timestamps,
 });
 
+/**
+ * Colaborador asignado a un tramo de ejecución — siempre del equipo del tramo. Con `dailyPercent`
+ * el tramo genera sus filas de Forecast (ver `SegmentForecastSyncService`); sin él, queda solo como
+ * asignación informativa.
+ */
+export const projectModuleSegmentMembers = pgTable(
+  'project_module_segment_members',
+  {
+    id: primaryId(),
+    segmentId: uuid('segment_id')
+      .notNull()
+      .references(() => projectModuleSegments.id, { onDelete: 'cascade' }),
+    teamMemberId: uuid('team_member_id')
+      .notNull()
+      .references(() => teamMembers.id, { onDelete: 'cascade' }),
+    /** % de la jornada diaria del colaborador dedicado a este tramo (1–100). */
+    dailyPercent: numeric('daily_percent', { precision: 5, scale: 2 }),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex('project_module_segment_members_segment_member_key').on(table.segmentId, table.teamMemberId),
+  ],
+);
+
 /** Tarea puntual (una fecha) de una fase/módulo, por equipo y opcionalmente asignada a una persona — marcador en el Roadmap y base de "Mis tareas". */
 export const projectModuleTasks = pgTable('project_module_tasks', {
   id: primaryId(),
@@ -424,9 +448,18 @@ export const projectModuleDeliveriesRelations = relations(projectModuleDeliverie
   assignee: one(users, { fields: [projectModuleDeliveries.assigneeUserId], references: [users.id] }),
 }));
 
-export const projectModuleSegmentsRelations = relations(projectModuleSegments, ({ one }) => ({
+export const projectModuleSegmentsRelations = relations(projectModuleSegments, ({ one, many }) => ({
   module: one(projectModules, { fields: [projectModuleSegments.moduleId], references: [projectModules.id] }),
   team: one(teams, { fields: [projectModuleSegments.teamId], references: [teams.id] }),
+  members: many(projectModuleSegmentMembers),
+}));
+
+export const projectModuleSegmentMembersRelations = relations(projectModuleSegmentMembers, ({ one }) => ({
+  segment: one(projectModuleSegments, {
+    fields: [projectModuleSegmentMembers.segmentId],
+    references: [projectModuleSegments.id],
+  }),
+  teamMember: one(teamMembers, { fields: [projectModuleSegmentMembers.teamMemberId], references: [teamMembers.id] }),
 }));
 
 export const projectModuleTasksRelations = relations(projectModuleTasks, ({ one }) => ({

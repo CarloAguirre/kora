@@ -10,6 +10,21 @@
   gap: var(--kora-space-2);
 }
 
+.rowGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-1);
+}
+
+.roadmapNote {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--kora-space-2);
+  font-size: var(--kora-text-xs);
+  color: var(--kora-text-muted);
+}
+
 .row {
   display: grid;
   grid-template-columns: minmax(220px, 1.4fr) minmax(160px, 1fr) 110px 32px;

@@ -53,6 +53,11 @@ export const forecastAssignmentSchema = z.object({
   client: z.object({ id: uuidSchema, companyName: z.string() }).nullable(),
   comments: z.string(),
   assignedHours: z.number(),
+  /**
+   * Tramo de ejecución del Roadmap que generó esta fila — `null` si se cargó a mano. Se puede editar,
+   * pero se regenera (y pisa el ajuste) cada vez que alguien vuelve a guardar el tramo.
+   */
+  segment: z.object({ id: uuidSchema, name: z.string(), moduleName: z.string() }).nullable(),
   createdAt: isoDateTimeSchema,
   updatedAt: isoDateTimeSchema,
 });

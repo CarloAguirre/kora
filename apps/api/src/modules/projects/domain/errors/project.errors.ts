@@ -149,6 +149,12 @@ export class ProjectModuleSegmentNotFoundError extends NotFoundError {
   }
 }
 
+export class InvalidSegmentMemberError extends ValidationError {
+  constructor() {
+    super('Los colaboradores del tramo deben ser miembros activos del equipo del tramo.', 'PROJECT_INVALID_SEGMENT_MEMBER');
+  }
+}
+
 export class ProjectModuleTaskNotFoundError extends NotFoundError {
   constructor(identifier: string) {
     super('Tarea', identifier, 'PROJECT_MODULE_TASK_NOT_FOUND');

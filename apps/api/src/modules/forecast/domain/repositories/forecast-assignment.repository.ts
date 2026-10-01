@@ -17,6 +17,10 @@ export interface ForecastAssignmentRecord {
   readonly clientName: string | null;
   readonly comments: string;
   readonly assignedHours: number;
+  /** Tramo del Roadmap que generó la fila — `null` si se cargó a mano. */
+  readonly segmentId: string | null;
+  readonly segmentName: string | null;
+  readonly segmentModuleName: string | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
 }

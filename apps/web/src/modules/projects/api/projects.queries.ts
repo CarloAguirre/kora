@@ -55,6 +55,16 @@ function useInvalidateProjects() {
   };
 }
 
+/** Los tramos de ejecución generan filas de Forecast (y se borran en cascada con su tramo/fase). */
+function useInvalidateProjectsAndForecast() {
+  const queryClient = useQueryClient();
+  const invalidateProjects = useInvalidateProjects();
+  return () => {
+    invalidateProjects();
+    queryClient.invalidateQueries({ queryKey: ['forecast'] });
+  };
+}
+
 export function useCreateProject() {
   const invalidate = useInvalidateProjects();
   return useMutation({
@@ -217,7 +227,7 @@ export function useUpdateProjectModule() {
 }
 
 export function useDeleteProjectModule() {
-  const invalidate = useInvalidateProjects();
+  const invalidate = useInvalidateProjectsAndForecast();
   return useMutation({
     mutationFn: ({ projectId, moduleId }: { projectId: string; moduleId: string }) =>
       projectsApi.deleteModule(projectId, moduleId),
@@ -276,7 +286,7 @@ export function useUpdateProjectModuleDelivery() {
 }
 
 export function useCreateProjectModuleSegment() {
-  const invalidate = useInvalidateProjects();
+  const invalidate = useInvalidateProjectsAndForecast();
   return useMutation({
     mutationFn: ({
       projectId,
@@ -292,7 +302,7 @@ export function useCreateProjectModuleSegment() {
 }
 
 export function useUpdateProjectModuleSegment() {
-  const invalidate = useInvalidateProjects();
+  const invalidate = useInvalidateProjectsAndForecast();
   return useMutation({
     mutationFn: ({
       projectId,
@@ -310,7 +320,7 @@ export function useUpdateProjectModuleSegment() {
 }
 
 export function useDeleteProjectModuleSegment() {
-  const invalidate = useInvalidateProjects();
+  const invalidate = useInvalidateProjectsAndForecast();
   return useMutation({
     mutationFn: ({
       projectId,

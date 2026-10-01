@@ -18,6 +18,7 @@ import { UpdateProjectObservationUseCase } from './application/use-cases/update-
 import { ResolveProjectObservationUseCase } from './application/use-cases/resolve-project-observation.use-case';
 import { DeleteProjectObservationUseCase } from './application/use-cases/delete-project-observation.use-case';
 import { ProjectChangeLogRecorder } from './application/services/project-change-log.recorder';
+import { SegmentForecastSyncService } from './application/services/segment-forecast-sync.service';
 import { CreateProjectModuleUseCase } from './application/use-cases/create-project-module.use-case';
 import { UpdateProjectModuleUseCase } from './application/use-cases/update-project-module.use-case';
 import { DeleteProjectModuleUseCase } from './application/use-cases/delete-project-module.use-case';
@@ -52,6 +53,7 @@ import { PROJECT_CLIENT_READER } from './application/ports/project-client-reader
 import { PROJECT_CONTACT_READER } from './application/ports/project-contact-reader.port';
 import { PROJECT_HOUR_ENTRY_READER } from './application/ports/project-hour-entry-reader.port';
 import { PROJECT_TEAM_MEMBER_VALIDATOR } from './application/ports/project-team-member-validator.port';
+import { SEGMENT_FORECAST_STORE } from './application/ports/segment-forecast-store.port';
 
 import { DrizzleProjectRepository } from './infrastructure/persistence/drizzle-project.repository';
 import { DrizzleProjectTeamRepository } from './infrastructure/persistence/drizzle-project-team.repository';
@@ -65,6 +67,7 @@ import { DrizzleProjectClientReader } from './infrastructure/services/drizzle-pr
 import { DrizzleProjectContactReader } from './infrastructure/services/drizzle-project-contact-reader';
 import { DrizzleProjectHourEntryReader } from './infrastructure/services/drizzle-project-hour-entry-reader';
 import { DrizzleProjectTeamMemberValidator } from './infrastructure/services/drizzle-project-team-member-validator';
+import { DrizzleSegmentForecastStore } from './infrastructure/services/drizzle-segment-forecast-store';
 
 /**
  * Composición del módulo de proyectos.
@@ -94,6 +97,7 @@ import { DrizzleProjectTeamMemberValidator } from './infrastructure/services/dri
     ResolveProjectObservationUseCase,
     DeleteProjectObservationUseCase,
     ProjectChangeLogRecorder,
+    SegmentForecastSyncService,
     CreateProjectModuleUseCase,
     UpdateProjectModuleUseCase,
     DeleteProjectModuleUseCase,
@@ -128,6 +132,7 @@ import { DrizzleProjectTeamMemberValidator } from './infrastructure/services/dri
     { provide: PROJECT_CONTACT_READER, useClass: DrizzleProjectContactReader },
     { provide: PROJECT_HOUR_ENTRY_READER, useClass: DrizzleProjectHourEntryReader },
     { provide: PROJECT_TEAM_MEMBER_VALIDATOR, useClass: DrizzleProjectTeamMemberValidator },
+    { provide: SEGMENT_FORECAST_STORE, useClass: DrizzleSegmentForecastStore },
   ],
   exports: [PROJECT_REPOSITORY, PROJECT_MODULE_REPOSITORY, PROJECT_PAYMENT_MILESTONE_REPOSITORY],
 })

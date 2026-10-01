@@ -4,6 +4,8 @@ import {
   clients,
   eq,
   forecastAssignments,
+  projectModuleSegments,
+  projectModules,
   projects,
   teamMembers,
   teams,
@@ -61,6 +63,9 @@ export class DrizzleForecastAssignmentRepository implements ForecastAssignmentRe
         clientName: clients.companyName,
         comments: forecastAssignments.comments,
         assignedHours: forecastAssignments.assignedHours,
+        segmentId: forecastAssignments.segmentId,
+        segmentName: projectModuleSegments.name,
+        segmentModuleName: projectModules.name,
         createdAt: forecastAssignments.createdAt,
         updatedAt: forecastAssignments.updatedAt,
       })
@@ -70,6 +75,8 @@ export class DrizzleForecastAssignmentRepository implements ForecastAssignmentRe
       .leftJoin(users, eq(users.id, teamMembers.userId))
       .leftJoin(projects, eq(projects.id, forecastAssignments.projectId))
       .leftJoin(clients, eq(clients.id, forecastAssignments.clientId))
+      .leftJoin(projectModuleSegments, eq(projectModuleSegments.id, forecastAssignments.segmentId))
+      .leftJoin(projectModules, eq(projectModules.id, projectModuleSegments.moduleId))
       .where(
         and(
           eq(teamMembers.teamId, teamId),
@@ -93,6 +100,9 @@ export class DrizzleForecastAssignmentRepository implements ForecastAssignmentRe
       clientName: row.clientName,
       comments: row.comments,
       assignedHours: Number(row.assignedHours),
+      segmentId: row.segmentId,
+      segmentName: row.segmentName,
+      segmentModuleName: row.segmentModuleName,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
     }));

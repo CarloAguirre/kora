@@ -5,11 +5,14 @@ import {
   count,
   eq,
   hourEntries,
+  inArray,
   projectModuleDeliveries,
+  projectModuleSegmentMembers,
   projectModuleSegments,
   projectModuleTasks,
   projectModules,
   projects,
+  teamMembers,
   teams,
   users,
   type Database,
@@ -24,6 +27,8 @@ import type {
   ProjectModuleDeliveryRecord,
   ProjectModuleRecord,
   ProjectModuleRepository,
+  ProjectModuleSegmentMemberInput,
+  ProjectModuleSegmentMemberRecord,
   ProjectModuleTaskRecord,
   TaskAssignedToUserRecord,
   UpdateProjectModuleDeliveryInput,
@@ -114,11 +119,13 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
 
     const mappedTaskRows = taskRows.map(toTaskRow);
     const blockerCountByModule = new Map(blockerRows.map((r) => [r.moduleId, r.value]));
+    const membersBySegment = await loadSegmentMembers(db, segmentRows.map((s) => s.id));
     return moduleRows.map((row) =>
       toRecord(
         row,
         deliveryRows.filter((d) => d.moduleId === row.id),
         segmentRows.filter((s) => s.moduleId === row.id),
+        membersBySegment,
         mappedTaskRows,
         blockerCountByModule.get(row.id) ?? 0,
       ),
@@ -197,7 +204,8 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
         .where(and(eq(hourEntries.moduleId, id), eq(hourEntries.hasBlocker, true))),
     ]);
 
-    return toRecord(row, deliveryRows, segmentRows, taskRows.map(toTaskRow), blockerRows[0]?.value ?? 0);
+    const membersBySegment = await loadSegmentMembers(db, segmentRows.map((s) => s.id));
+    return toRecord(row, deliveryRows, segmentRows, membersBySegment, taskRows.map(toTaskRow), blockerRows[0]?.value ?? 0);
   }
 
   async create(input: CreateProjectModuleInput, now: Date, context?: TransactionContext): Promise<string> {
@@ -353,6 +361,26 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
   async removeSegment(id: string, context?: TransactionContext): Promise<void> {
     const db = resolveDb(this.database, context);
     await db.delete(projectModuleSegments).where(eq(projectModuleSegments.id, id));
+  }
+
+  async replaceSegmentMembers(
+    segmentId: string,
+    members: readonly ProjectModuleSegmentMemberInput[],
+    now: Date,
+    context?: TransactionContext,
+  ): Promise<void> {
+    const db = resolveDb(this.database, context);
+    await db.delete(projectModuleSegmentMembers).where(eq(projectModuleSegmentMembers.segmentId, segmentId));
+    if (members.length === 0) return;
+    await db.insert(projectModuleSegmentMembers).values(
+      members.map((member) => ({
+        segmentId,
+        teamMemberId: member.teamMemberId,
+        dailyPercent: member.dailyPercent != null ? String(member.dailyPercent) : null,
+        createdAt: now,
+        updatedAt: now,
+      })),
+    );
   }
 
   async addTask(input: CreateProjectModuleTaskInput, now: Date, context?: TransactionContext): Promise<string> {
@@ -546,10 +574,46 @@ function toTaskRow(row: RawTaskRow): ProjectModuleTaskRecord {
   };
 }
 
+async function loadSegmentMembers(
+  db: Database,
+  segmentIds: readonly string[],
+): Promise<Map<string, ProjectModuleSegmentMemberRecord[]>> {
+  const bySegment = new Map<string, ProjectModuleSegmentMemberRecord[]>();
+  if (segmentIds.length === 0) return bySegment;
+
+  const rows = await db
+    .select({
+      segmentId: projectModuleSegmentMembers.segmentId,
+      teamMemberId: projectModuleSegmentMembers.teamMemberId,
+      firstName: users.firstName,
+      lastName: users.lastName,
+      weeklyHours: teamMembers.weeklyHours,
+      dailyPercent: projectModuleSegmentMembers.dailyPercent,
+    })
+    .from(projectModuleSegmentMembers)
+    .innerJoin(teamMembers, eq(teamMembers.id, projectModuleSegmentMembers.teamMemberId))
+    .leftJoin(users, eq(users.id, teamMembers.userId))
+    .where(inArray(projectModuleSegmentMembers.segmentId, [...segmentIds]))
+    .orderBy(asc(users.firstName), asc(users.lastName));
+
+  for (const row of rows) {
+    const list = bySegment.get(row.segmentId) ?? [];
+    list.push({
+      teamMemberId: row.teamMemberId,
+      fullName: `${row.firstName ?? ''} ${row.lastName ?? ''}`.trim(),
+      weeklyHours: Number(row.weeklyHours),
+      dailyPercent: row.dailyPercent != null ? Number(row.dailyPercent) : null,
+    });
+    bySegment.set(row.segmentId, list);
+  }
+  return bySegment;
+}
+
 function toRecord(
   row: ModuleRow,
   deliveryRows: DeliveryRow[],
   segmentRows: SegmentRow[],
+  membersBySegment: ReadonlyMap<string, ProjectModuleSegmentMemberRecord[]>,
   taskRows: ProjectModuleTaskRecord[],
   blockerCount: number,
 ): ProjectModuleRecord {
@@ -583,6 +647,7 @@ function toRecord(
       name: s.name,
       startDate: s.startDate,
       endDate: s.endDate,
+      members: membersBySegment.get(s.id) ?? [],
     })),
     tasks: taskRows.filter((t) => t.moduleId === row.id),
     blockerCount,

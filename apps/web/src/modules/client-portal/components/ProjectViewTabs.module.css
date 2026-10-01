@@ -1,0 +1,39 @@
+/* Pestañas "Vista Interna" / "Vista Cliente" — Figma node 9203:3136. */
+.viewTabs {
+  display: flex;
+  gap: 26px;
+  border-bottom: 1px solid #e4e9ee;
+}
+
+.viewTab,
+.viewTabDisabled,
+.viewTabActive {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 2px 12px;
+  border-bottom: 3px solid transparent;
+  font-size: 14.5px;
+  font-weight: var(--kora-weight-bold);
+  text-decoration: none;
+}
+
+.viewTab {
+  color: #5d6b7a;
+  transition: color var(--kora-transition), border-color var(--kora-transition);
+}
+
+.viewTab:hover {
+  color: #0f2a44;
+  border-bottom-color: #d4e8b4;
+}
+
+.viewTabDisabled {
+  color: #93a0ac;
+  cursor: not-allowed;
+}
+
+.viewTabActive {
+  border-bottom-color: #8bc53f;
+  color: #0f2a44;
+}

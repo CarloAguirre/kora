@@ -10,6 +10,8 @@ import { useToast } from '@/shared/components/ui/Toast';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { ApiRequestError } from '@/shared/lib/api-client';
+import { clientProjectPreviewPath } from '@/app/router/paths';
+import { ProjectViewTabs } from '@/modules/client-portal/components/ProjectViewTabs';
 import { useChangeProjectStatus, useProjectDetail, useSetProjectOvertimeAuthorization } from '../api/projects.queries';
 import { EditProjectDialog } from '../components/EditProjectDialog';
 import { TeamLeaderProjectView } from '../components/TeamLeaderProjectView';
@@ -89,10 +91,16 @@ export function ProjectDetailPage() {
   const showTeamOnlyView = !can('projects:manage') && !isProjectLeader && Boolean(leaderTeam);
   /** Sin `projects:manage`, el líder de ESTE proyecto también puede editarlo y cambiar su estado. */
   const canManageProject = can('projects:manage') || isProjectLeader;
+  /** La vista cliente de soporte es otra pantalla (por contrato, no por proyecto) — solo desarrollo tiene la pestaña. */
+  const showViewTabs = !showTeamOnlyView && project.type !== 'support' && project.client !== null && can('clients:read');
 
   return (
     <DashboardLayout title={project.name}>
       <div className={styles.page}>
+        {showViewTabs && project.client && (
+          <ProjectViewTabs active="internal" clientTo={clientProjectPreviewPath(project.client, project)} />
+        )}
+
         <div className={styles.topRow}>
           <Button variant="tertiary" size="sm" className={styles.backButton} onClick={() => void navigate('/proyectos')}>
             <ChevronLeftIcon size={16} /> Volver a proyectos
