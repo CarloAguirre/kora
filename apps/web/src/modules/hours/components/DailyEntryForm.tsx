@@ -84,7 +84,7 @@ export function DailyEntryForm({
 }) {
   const { user } = useAuth();
   const createEntry = useCreateHourEntry();
-  const { data: projects } = useProjectsList({ page: 1, pageSize: 200, sortField: 'name' });
+  const { data: projects } = useProjectsList({ page: 1, pageSize: 200, sortField: 'name', assignedToUserId: user?.id });
   const { data: leaders } = useUsersList({ page: 1, pageSize: 200, sortField: 'firstName', role: 'leader' });
 
   const [date, setDate] = useState(today());

@@ -69,7 +69,7 @@ export function WeeklyEntryForm({
 }) {
   const { user } = useAuth();
   const createEntry = useCreateHourEntry();
-  const { data: projects } = useProjectsList({ page: 1, pageSize: 200, sortField: 'name' });
+  const { data: projects } = useProjectsList({ page: 1, pageSize: 200, sortField: 'name', assignedToUserId: user?.id });
   const { data: leaders } = useUsersList({ page: 1, pageSize: 200, sortField: 'firstName', role: 'leader' });
 
   const [monday, setMonday] = useState(() => mondayOf(new Date().toISOString().slice(0, 10)));
