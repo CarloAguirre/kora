@@ -16,7 +16,7 @@ export function ClientProjectPreviewPage() {
   return (
     <ClientProjectDetailPage
       backTo={`/clientes/${clientId}/vista-cliente`}
-      backLabel="Volver a proyectos"
+      backLabel="Volver a proyectos del cliente"
       internalViewTo={canSeeInternalView && projectId ? projectPath({ id: projectId }) : undefined}
     />
   );
