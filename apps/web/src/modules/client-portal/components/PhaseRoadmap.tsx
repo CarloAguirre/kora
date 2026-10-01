@@ -137,7 +137,16 @@ function buildTimelineAxis(range: DateRange): TimelineAxis {
  * filtra/atenúa en la fila "Tareas" las que no son de ese ámbito.
  */
 export function PhaseRoadmap({ phaseRoadmap, renderPhaseExtras, renderSelectionDetail }: PhaseRoadmapProps) {
-  const [expandedPhaseId, setExpandedPhaseId] = useState<string | null>(phaseRoadmap.phases[0]?.id ?? null);
+  /** Fases abiertas — cada una se abre/cierra por separado (varias a la vez); arranca abierta la primera. */
+  const [expandedPhaseIds, setExpandedPhaseIds] = useState<ReadonlySet<string>>(
+    () => new Set(phaseRoadmap.phases[0] ? [phaseRoadmap.phases[0].id] : []),
+  );
+  const togglePhase = (phaseId: string) =>
+    setExpandedPhaseIds((current) => {
+      const next = new Set(current);
+      if (!next.delete(phaseId)) next.add(phaseId);
+      return next;
+    });
   const [rangeDraft, setRangeDraft] = useState({ from: phaseRoadmap.rangeStartDate, to: phaseRoadmap.rangeEndDate });
   const [appliedRange, setAppliedRange] = useState({ from: phaseRoadmap.rangeStartDate, to: phaseRoadmap.rangeEndDate });
 
@@ -227,8 +236,8 @@ export function PhaseRoadmap({ phaseRoadmap, renderPhaseExtras, renderSelectionD
             key={phase.id}
             phase={phase}
             axis={axis}
-            expanded={expandedPhaseId === phase.id}
-            onToggle={() => setExpandedPhaseId((current) => (current === phase.id ? null : phase.id))}
+            expanded={expandedPhaseIds.has(phase.id)}
+            onToggle={() => togglePhase(phase.id)}
             renderExtras={renderPhaseExtras}
             renderSelectionDetail={renderSelectionDetail}
           />
