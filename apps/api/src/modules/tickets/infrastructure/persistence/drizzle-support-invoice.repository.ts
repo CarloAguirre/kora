@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, isNull, lt, sql, supportInvoices, type Database } from '@kora/db';
+import { and, eq, inArray, isNull, lt, sql, supportInvoices, type Database } from '@kora/db';
 import type { TransactionContext } from '@kora/core';
 import type {
   CreateSupportInvoiceInput,
@@ -66,6 +66,13 @@ export class DrizzleSupportInvoiceRepository implements SupportInvoiceRepository
   async listForPlan(planId: string, context?: TransactionContext): Promise<SupportInvoiceRecord[]> {
     const db = resolveDb(this.database, context);
     const rows = await db.select().from(supportInvoices).where(eq(supportInvoices.planId, planId));
+    return rows.map((row) => toRecord(row as SupportInvoiceRow));
+  }
+
+  async listForPlans(planIds: readonly string[], context?: TransactionContext): Promise<SupportInvoiceRecord[]> {
+    if (planIds.length === 0) return [];
+    const db = resolveDb(this.database, context);
+    const rows = await db.select().from(supportInvoices).where(inArray(supportInvoices.planId, [...planIds]));
     return rows.map((row) => toRecord(row as SupportInvoiceRow));
   }
 

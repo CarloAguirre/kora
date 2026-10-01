@@ -1,16 +1,10 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import {
-  SUPPORT_PLAN_TYPE_LABELS,
-  type SupportBillingKpiGroup,
-  type SupportBillingRow,
-  type SupportInvoiceBillingStatus,
-  type SupportInvoicePaymentStatus,
-} from '@kora/contracts';
+import type { ListSupportBillingRowsQuery, SupportBillingKpiGroup, SupportBillingRow, SupportBillingRowSortField } from '@kora/contracts';
 import styles from './SupportBillingSection.module.css';
 import { KpiCard } from '@/shared/components/ui/KpiCard';
 import { MultiSelect } from '@/shared/components/ui/MultiSelect';
-import { Pagination, usePaginatedItems } from '@/shared/components/ui/Pagination';
+import { DEFAULT_PAGE_SIZE, Pagination } from '@/shared/components/ui/Pagination';
 import { Tabs } from '@/shared/components/ui/Tabs';
 import { PeriodSelector } from '@/shared/components/ui/PeriodSelector';
 import { DataTable, type Column, type SortState } from '@/shared/components/ui/DataTable';
@@ -22,9 +16,9 @@ import {
   SupportPlanTypeBadge,
 } from '@/modules/projects/components/SupportPlanBadges';
 import { formatMoney } from '@/shared/lib/format-money';
-import { useSupportBillingOverview } from '../api/billing.queries';
+import { useSupportBillingOverview, useSupportBillingRows } from '../api/billing.queries';
 import { supportPlanPath } from '@/app/router/paths';
-import { compareSortValues, nextSortState, type SortValue } from '@/shared/lib/sort';
+import { nextSortState } from '@/shared/lib/sort';
 
 /** Fila vacía en UF para cuando aún no hay contratos activos ni carga en curso — mantiene el layout de 5 tarjetas de siempre. */
 const EMPTY_KPI_GROUP: SupportBillingKpiGroup = {
@@ -47,19 +41,8 @@ const FILTERS: Readonly<{ id: TypeFilter; label: string }[]> = [
   { id: 'alerts', label: 'Con alertas' },
 ];
 
-/** Los estados se ordenan por su avance en el flujo de cobro, no alfabéticamente. */
-const BILLING_STATUS_ORDER: Readonly<Record<SupportInvoiceBillingStatus, number>> = { to_invoice: 0, invoiced: 1 };
-const PAYMENT_STATUS_ORDER: Readonly<Record<SupportInvoicePaymentStatus, number>> = { pending: 0, overdue: 1, paid: 2 };
-
-type SortField = 'client' | 'plan' | 'type' | 'amount' | 'billing' | 'payment';
-const SORT_VALUE: Record<SortField, (row: SupportBillingRow) => SortValue> = {
-  client: (r) => r.clientName,
-  plan: (r) => r.planName,
-  type: (r) => SUPPORT_PLAN_TYPE_LABELS[r.planType],
-  amount: (r) => r.amountUf,
-  billing: (r) => BILLING_STATUS_ORDER[r.billingStatus ?? 'to_invoice'],
-  payment: (r) => (r.paymentStatus ? PAYMENT_STATUS_ORDER[r.paymentStatus] : null),
-};
+/** Mismo default que el servidor (`listSupportBillingRowsQuerySchema`) — es también el orden más barato de calcular allá. */
+const DEFAULT_SORT: SortState<SupportBillingRowSortField> = { field: 'client', direction: 'asc' };
 
 function currentPeriod(): { year: number; month: number } {
   const now = new Date();
@@ -84,30 +67,44 @@ function currentPeriod(): { year: number; month: number } {
  */
 export function SupportBillingSection() {
   const [{ year, month }, setPeriod] = useState(currentPeriod());
-  const [filter, setFilter] = useState<TypeFilter>('all');
-  const [clientFilter, setClientFilter] = useState<string[]>([]);
-  // `null` = el orden en que llegan de la API, hasta que se hace clic en un encabezado.
-  const [sort, setSort] = useState<SortState<SortField> | null>(null);
+  const [filter, setFilterState] = useState<TypeFilter>('all');
+  const [clientFilter, setClientFilterState] = useState<string[]>([]);
+  const [sort, setSort] = useState<SortState<SupportBillingRowSortField>>(DEFAULT_SORT);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+
+  // Todo cambio de filtro, orden, período o tamaño vuelve a la página 1 — si no, se puede quedar parado en una página que ya no existe.
+  const setFilter = (next: TypeFilter | ((prev: TypeFilter) => TypeFilter)) => {
+    setFilterState(next);
+    setPage(1);
+  };
+  const setClientFilter = (next: string[]) => {
+    setClientFilterState(next);
+    setPage(1);
+  };
 
   const period = `${year}-${String(month).padStart(2, '0')}`;
   const { data: overview, isLoading } = useSupportBillingOverview(period);
 
-  const clientOptions = useMemo(() => {
-    const seen = new Map<string, string>();
-    for (const row of overview?.rows ?? []) seen.set(row.clientId, row.clientName);
-    return [...seen.entries()].sort((a, b) => a[1].localeCompare(b[1])).map(([value, label]) => ({ value, label }));
-  }, [overview]);
+  const rowsQuery = useMemo<ListSupportBillingRowsQuery>(
+    () => ({
+      period,
+      page,
+      pageSize,
+      planType: filter === 'all' || filter === 'alerts' ? undefined : filter,
+      onlyAlerts: filter === 'alerts' ? true : undefined,
+      clientId: clientFilter.length > 0 ? clientFilter : undefined,
+      sortField: sort.field,
+      sortDirection: sort.direction,
+    }),
+    [period, page, pageSize, filter, clientFilter, sort],
+  );
+  const { data: rowsPage, isLoading: rowsLoading, error: rowsError } = useSupportBillingRows(rowsQuery);
 
-  const rows = useMemo(() => {
-    let list = overview?.rows ?? [];
-    if (filter === 'alerts') list = list.filter((r) => r.hasAlert);
-    else if (filter !== 'all') list = list.filter((r) => r.planType === filter);
-    if (clientFilter.length > 0) list = list.filter((r) => clientFilter.includes(r.clientId));
-    if (!sort) return list;
-    const valueOf = SORT_VALUE[sort.field];
-    return [...list].sort((a, b) => compareSortValues(valueOf(a), valueOf(b), sort.direction));
-  }, [overview, filter, clientFilter, sort]);
-  const { pageItems, pagination } = usePaginatedItems(rows);
+  const clientOptions = useMemo(
+    () => (overview?.clients ?? []).map((client) => ({ value: client.id, label: client.name })),
+    [overview],
+  );
 
   const columns: Column<SupportBillingRow>[] = [
     { key: 'client', header: 'Cliente', sortable: true, render: (r) => r.clientName },
@@ -148,7 +145,14 @@ export function SupportBillingSection() {
           <p className={styles.sectionTitle}>Soporte</p>
           <p className={styles.sectionSubtitle}>Qué corresponde cobrar este período, por cliente y tipo de contrato.</p>
         </div>
-        <PeriodSelector year={year} month={month} onChange={setPeriod} />
+        <PeriodSelector
+          year={year}
+          month={month}
+          onChange={(next) => {
+            setPeriod(next);
+            setPage(1);
+          }}
+        />
       </div>
 
       {/* Sumar montos de monedas distintas inventaría un número sin sentido — un grupo de 4 tarjetas por cada moneda con contratos activos (en la práctica, casi siempre solo UF). Las "Alertas activas" son agnósticas a moneda, así que van una sola vez, junto al primer grupo. */}
@@ -200,16 +204,31 @@ export function SupportBillingSection() {
       <DataTable
         caption="Contratos por facturar en el período"
         columns={columns}
-        items={pageItems}
+        items={rowsPage?.items ?? []}
         getRowKey={(r) => r.planId}
-        sort={sort ?? undefined}
-        onSortChange={(field) => setSort((prev) => nextSortState(prev, field as SortField))}
-        loading={isLoading}
-        error={null}
+        sort={sort}
+        onSortChange={(field) => {
+          setSort((prev) => nextSortState(prev, field as SupportBillingRowSortField));
+          setPage(1);
+        }}
+        loading={rowsLoading}
+        error={rowsError ? 'No se pudieron cargar los contratos del período.' : null}
         emptyMessage="No hay contratos en este filtro."
       />
 
-      <Pagination {...pagination} />
+      {rowsPage && (
+        <Pagination
+          page={page}
+          pageCount={rowsPage.pageCount}
+          total={rowsPage.total}
+          pageSize={rowsPage.pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setPage(1);
+          }}
+        />
+      )}
     </div>
   );
 }

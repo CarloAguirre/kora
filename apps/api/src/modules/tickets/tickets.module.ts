@@ -24,6 +24,8 @@ import { MarkSupportInvoiceIssuedUseCase } from './application/use-cases/mark-su
 import { MarkSupportInvoicePaidUseCase } from './application/use-cases/mark-support-invoice-paid.use-case';
 import { GetSupportBillingOverviewUseCase } from './application/use-cases/get-support-billing-overview.use-case';
 import { ListBillingLedgerEntriesUseCase } from './application/use-cases/list-billing-ledger-entries.use-case';
+import { ListSupportBillingRowsUseCase } from './application/use-cases/list-support-billing-rows.use-case';
+import { SupportBillingRowBuilder } from './application/services/support-billing-row-builder';
 import { CreateSupportProjectUseCase } from './application/use-cases/create-support-project.use-case';
 import { SupportPlanAvailabilityService } from './application/services/support-plan-availability.service';
 import { SupportBillingCalculator } from './application/services/support-billing-calculator';
@@ -92,11 +94,13 @@ import { HoursModule } from '../hours/hours.module';
     MarkSupportInvoicePaidUseCase,
     GetSupportBillingOverviewUseCase,
     ListBillingLedgerEntriesUseCase,
+    ListSupportBillingRowsUseCase,
     CreateSupportProjectUseCase,
     SupportPlanAvailabilityService,
     SupportBillingCalculator,
     SupportPlanCurrentBillingResolver,
     SupportPlanSummaryBuilder,
+    SupportBillingRowBuilder,
     SupportMonthlyPeriodReconciler,
 
     { provide: TICKET_REPOSITORY, useClass: DrizzleTicketRepository },

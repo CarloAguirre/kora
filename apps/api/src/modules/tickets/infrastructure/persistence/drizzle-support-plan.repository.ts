@@ -7,6 +7,7 @@ import type {
   CreateNextSupportMonthlyPeriodInput,
   SupportMonthlyPeriodRecord,
   SupportMonthlyPeriodUsageUpdate,
+  SupportPlanActiveFilters,
   SupportPlanRecord,
   SupportPlanRepository,
 } from '../../domain/repositories/support-plan.repository';
@@ -135,6 +136,22 @@ export class DrizzleSupportPlanRepository implements SupportPlanRepository {
   async listAllActive(context?: TransactionContext): Promise<SupportPlanRecord[]> {
     const db = resolveDb(this.database, context);
     const rows = await db.select().from(supportPlans).where(eq(supportPlans.status, 'active'));
+    return rows.map((row) => toRecord(row as SupportPlanRow));
+  }
+
+  async listActive(filters: SupportPlanActiveFilters, context?: TransactionContext): Promise<SupportPlanRecord[]> {
+    if (filters.clientIds && filters.clientIds.length === 0) return [];
+    const db = resolveDb(this.database, context);
+    const rows = await db
+      .select()
+      .from(supportPlans)
+      .where(
+        and(
+          eq(supportPlans.status, 'active'),
+          filters.planType ? eq(supportPlans.planType, filters.planType) : undefined,
+          filters.clientIds ? inArray(supportPlans.clientId, [...filters.clientIds]) : undefined,
+        ),
+      );
     return rows.map((row) => toRecord(row as SupportPlanRow));
   }
 

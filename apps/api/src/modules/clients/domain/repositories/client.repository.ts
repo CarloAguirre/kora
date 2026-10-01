@@ -43,6 +43,8 @@ export interface ClientStatsResult {
 
 export interface ClientRepository {
   findById(id: string, context?: TransactionContext): Promise<Client | null>;
+  /** Solo por UUID (sin el fallback a slug de `findById`); los ids que no existen simplemente no vienen. */
+  findManyByIds(ids: readonly string[], context?: TransactionContext): Promise<Client[]>;
   findBySlug(slug: string, context?: TransactionContext): Promise<Client | null>;
   findByTaxId(taxId: TaxId, context?: TransactionContext): Promise<Client | null>;
   findByLegacyId(legacyId: number, context?: TransactionContext): Promise<Client | null>;

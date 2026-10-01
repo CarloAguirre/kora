@@ -42,6 +42,8 @@ export interface SupportInvoiceRepository {
   findById(id: string, context?: TransactionContext): Promise<SupportInvoiceRecord | null>;
   findByPlanAndPeriod(planId: string, periodKey: string, context?: TransactionContext): Promise<SupportInvoiceRecord | null>;
   listForPlan(planId: string, context?: TransactionContext): Promise<SupportInvoiceRecord[]>;
+  /** `listForPlan` de varios planes en una sola consulta — evita el N+1 del panel de Facturación. */
+  listForPlans(planIds: readonly string[], context?: TransactionContext): Promise<SupportInvoiceRecord[]>;
   /** Para el panel de Facturación: todas las facturas emitidas EN el período dado, de cualquier plan. */
   listForPeriod(periodKey: string, context?: TransactionContext): Promise<SupportInvoiceRecord[]>;
   /** Todo el historial, de cualquier plan y período — para el libro combinado de Facturación (rol Finanzas). */

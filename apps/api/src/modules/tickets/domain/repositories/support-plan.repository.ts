@@ -50,6 +50,12 @@ export interface SupportMonthlyPeriodRecord {
   readonly consumedHoursEnd: number | null;
 }
 
+/** Filtros de `listActive` — los que el panel de Facturación de Soporte puede resolver en SQL, antes de calcular montos. */
+export interface SupportPlanActiveFilters {
+  readonly planType?: SupportPlanRecord['planType'];
+  readonly clientIds?: readonly string[];
+}
+
 export interface SupportPlanProjectLink {
   readonly planId: string;
   readonly developmentProjectId: string;
@@ -109,6 +115,8 @@ export interface SupportPlanRepository {
   listForClient(clientId: string, context?: TransactionContext): Promise<SupportPlanRecord[]>;
   /** Todos los planes `status='active'` — alimenta el panel de Facturación de Soporte. */
   listAllActive(context?: TransactionContext): Promise<SupportPlanRecord[]>;
+  /** Como `listAllActive`, pero acotado en SQL — la tabla paginada del panel solo calcula los contratos que pasan el filtro. */
+  listActive(filters: SupportPlanActiveFilters, context?: TransactionContext): Promise<SupportPlanRecord[]>;
 
   save(plan: SupportPlan, context?: TransactionContext): Promise<void>;
   /** Reemplaza los proyectos de desarrollo cubiertos por el plan (borra y vuelve a insertar) — usado al crear y al editar. */

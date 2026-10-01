@@ -9,6 +9,7 @@ import {
   desc,
   eq,
   ilike,
+  inArray,
   industries,
   isNull,
   isUuid,
@@ -40,6 +41,14 @@ export class DrizzleClientRepository implements ClientRepository {
     const db = resolveDb(this.database, context);
     const rows = await db.select().from(clients).where(eq(clients.id, id)).limit(1);
     return rows[0] ? toDomain(rows[0]) : null;
+  }
+
+  async findManyByIds(ids: readonly string[], context?: TransactionContext): Promise<Client[]> {
+    const uuids = ids.filter(isUuid);
+    if (uuids.length === 0) return [];
+    const db = resolveDb(this.database, context);
+    const rows = await db.select().from(clients).where(inArray(clients.id, uuids));
+    return rows.map(toDomain);
   }
 
   async findBySlug(slug: string, context?: TransactionContext): Promise<Client | null> {

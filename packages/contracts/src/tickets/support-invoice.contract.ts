@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { nonEmptyTrimmed, uuidSchema } from '../common/primitives';
+import { arrayQueryParam, nonEmptyTrimmed, pageSchema, paginationQuerySchema, sortDirectionSchema, uuidSchema } from '../common/primitives';
 import { supportPlanCurrencySchema, supportPlanDetailSchema, supportPlanScopeSchema, supportPlanTypeSchema } from './support-plan.contract';
 
 /**
@@ -104,21 +104,47 @@ export const supportBillingKpiGroupSchema = z.object({
 });
 export type SupportBillingKpiGroup = z.infer<typeof supportBillingKpiGroupSchema>;
 
+/**
+ * KPIs del panel — cruzan TODOS los contratos activos, así que viven en su
+ * propio endpoint: la tabla (`GET /support-invoices/overview/rows`) se pagina
+ * en el servidor y nunca trae la lista completa.
+ */
 export const supportBillingOverviewSchema = z.object({
   /** 'YYYY-MM' del período consultado. */
   period: z.string(),
   perCurrency: z.array(supportBillingKpiGroupSchema),
   /** Agnóstico a moneda — cuenta contratos, no montos. */
   alertsCount: z.number().int(),
-  rows: z.array(supportBillingRowSchema),
+  /** Clientes con algún contrato activo, ordenados por nombre — opciones del filtro "Cliente" de la tabla. */
+  clients: z.array(z.object({ id: uuidSchema, name: z.string() })),
 });
 export type SupportBillingOverview = z.infer<typeof supportBillingOverviewSchema>;
 
+const periodKeySchema = z.string().regex(/^\d{4}-\d{2}$/, 'Formato de período inválido.');
+
 export const supportBillingOverviewQuerySchema = z.object({
   /** 'YYYY-MM'. */
-  period: z.string().regex(/^\d{4}-\d{2}$/, 'Formato de período inválido.'),
+  period: periodKeySchema,
 });
 export type SupportBillingOverviewQuery = z.infer<typeof supportBillingOverviewQuerySchema>;
+
+export const supportBillingRowSortFieldSchema = z.enum(['client', 'plan', 'type', 'amount', 'billing', 'payment']);
+export type SupportBillingRowSortField = z.infer<typeof supportBillingRowSortFieldSchema>;
+
+export const listSupportBillingRowsQuerySchema = paginationQuerySchema.extend({
+  /** 'YYYY-MM'. */
+  period: periodKeySchema,
+  planType: supportPlanTypeSchema.optional(),
+  /** Tab "Con alertas" — no es un tipo de contrato, por eso es un filtro aparte de `planType`. */
+  onlyAlerts: z.stringbool().optional(),
+  clientId: arrayQueryParam(uuidSchema),
+  sortField: supportBillingRowSortFieldSchema.default('client'),
+  sortDirection: sortDirectionSchema.default('asc'),
+});
+export type ListSupportBillingRowsQuery = z.infer<typeof listSupportBillingRowsQuerySchema>;
+
+export const listSupportBillingRowsResponseSchema = pageSchema(supportBillingRowSchema);
+export type ListSupportBillingRowsResponse = z.infer<typeof listSupportBillingRowsResponseSchema>;
 
 /**
  * Libro combinado de Facturación (rol Finanzas) — une Soporte y Proyectos en

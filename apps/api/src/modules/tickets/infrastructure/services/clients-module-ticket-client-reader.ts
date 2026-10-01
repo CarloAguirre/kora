@@ -21,6 +21,11 @@ export class ClientsModuleTicketClientReader implements TicketClientReader {
     return { id: client.id, companyName: client.companyName, primaryContact };
   }
 
+  async findCompanyNames(clientIds: readonly string[]): Promise<Map<string, string>> {
+    const found = await this.clients.findManyByIds([...new Set(clientIds)]);
+    return new Map(found.map((client) => [client.id, client.companyName]));
+  }
+
   async findContact(clientId: string, contactId: string): Promise<TicketClientContactReference | null> {
     const contact = await this.contacts.findById(contactId);
     if (!contact || contact.clientId !== clientId) return null;
