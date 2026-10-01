@@ -5,7 +5,7 @@ import {
   useProjectPendingApprovals,
 } from "@/modules/hours/api/hours.queries";
 import { useTeamsList } from "@/modules/teams/api/teams.queries";
-import { CalendarIcon, ClockIcon, TrendingUpIcon } from "@/shared/components/icons/Icons";
+import { CalendarIcon, ClockIcon, PencilIcon, TrendingUpIcon } from "@/shared/components/icons/Icons";
 import { Button } from "@/shared/components/ui/Button";
 import { Card } from "@/shared/components/ui/Card";
 import { useToast } from "@/shared/components/ui/Toast";
@@ -44,9 +44,12 @@ type DetailTab = "resumen" | "roadmap" | "bitacora" | "extras";
 export function DevelopmentProjectDetailView({
   project,
   projectId,
+  onEdit,
 }: {
   project: ProjectDetail;
   projectId: string;
+  /** Abre "Editar proyecto" — sin él (quien no puede editar) no se muestra el lápiz. */
+  onEdit?: () => void;
 }) {
   const { can, canAny } = usePermissions();
   const { user } = useAuth();
@@ -227,7 +230,7 @@ export function DevelopmentProjectDetailView({
       )}
 
       {/* Datos del proyecto y Timeline: siempre visibles, fuera de las tabs (igual que en el mockup del líder de proyecto). */}
-      <Card>
+      <Card className={styles.infoCard}>
         <ProjectInfoBar
           clientName={project.client?.companyName ?? "Sin cliente"}
           leaderName={project.leader?.fullName ?? "—"}
@@ -237,6 +240,18 @@ export function DevelopmentProjectDetailView({
           phase={project.phase}
           documents={projectDocuments}
         />
+        {onEdit && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className={styles.editIconButton}
+            onClick={onEdit}
+            aria-label="Editar proyecto"
+            title="Editar proyecto"
+          >
+            <PencilIcon size={14} />
+          </Button>
+        )}
       </Card>
 
       <Card>

@@ -219,7 +219,7 @@ export function ClientDetailPage() {
           <div className={styles.headerRight}>
             <Link to={clientPortalPreviewPath(client)}>
               <Button variant="outline" iconLeft={<EyeIcon size={18} />}>
-                Ver como cliente
+                Vista cliente
               </Button>
             </Link>
             {can('projects:manage') && (

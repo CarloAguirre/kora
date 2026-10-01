@@ -17,15 +17,40 @@
   align-self: flex-start;
 }
 
-.topRowActions {
+/* Tarjeta de datos del proyecto con el lápiz de "Editar proyecto" en la esquina superior derecha. */
+.infoCard {
   display: flex;
-  align-items: flex-end;
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: space-between;
   gap: var(--kora-space-3);
-  flex-wrap: wrap;
 }
 
-.statusControl {
-  min-width: 220px;
+.cardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kora-space-3);
+}
+
+.infoCard > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Lápiz de edición: cuadrado chico con fondo suave, no un botón con texto.
+   `button.` para ganarle a `.ghost`/`.icon` de `Button.module.css` sin
+   depender del orden en que se cargan las hojas. */
+button.editIconButton {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  background: #eef2f6;
+  color: var(--kora-navy);
+}
+
+button.editIconButton:not(:disabled):hover {
+  background: #e1e7ee;
 }
 
 .tabsShell {

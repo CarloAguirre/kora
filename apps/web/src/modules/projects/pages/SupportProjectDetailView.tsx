@@ -6,6 +6,8 @@ import styles from './SupportProjectDetailView.module.css';
 import detailStyles from './ProjectDetailPage.module.css';
 import { Card } from '@/shared/components/ui/Card';
 import { Select } from '@/shared/components/ui/Select';
+import { Button } from '@/shared/components/ui/Button';
+import { PencilIcon } from '@/shared/components/icons/Icons';
 import { DataTable, type Column } from '@/shared/components/ui/DataTable';
 import { DEFAULT_PAGE_SIZE, Pagination } from '@/shared/components/ui/Pagination';
 import { useToast } from '@/shared/components/ui/Toast';
@@ -32,7 +34,16 @@ const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFr
  * del plan de soporte como anillo, el historial mensual de consumo, y la
  * tabla completa de tickets del proyecto.
  */
-export function SupportProjectDetailView({ project, projectId }: { project: ProjectDetail; projectId: string }) {
+export function SupportProjectDetailView({
+  project,
+  projectId,
+  onEdit,
+}: {
+  project: ProjectDetail;
+  projectId: string;
+  /** Abre "Editar proyecto" — sin él (quien no puede editar) no se muestra el lápiz. */
+  onEdit?: () => void;
+}) {
   const { can } = usePermissions();
   const toast = useToast();
   const changeStatus = useChangeProjectStatus();
@@ -103,7 +114,21 @@ export function SupportProjectDetailView({ project, projectId }: { project: Proj
         </Card>
 
         <Card className={styles.dataCard}>
-          <p className={detailStyles.sectionTitle}>Datos Proyecto</p>
+          <div className={detailStyles.cardHeader}>
+            <p className={detailStyles.sectionTitle}>Datos Proyecto</p>
+            {onEdit && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className={detailStyles.editIconButton}
+                onClick={onEdit}
+                aria-label="Editar proyecto"
+                title="Editar proyecto"
+              >
+                <PencilIcon size={14} />
+              </Button>
+            )}
+          </div>
           <div className={styles.dataRows}>
             <DataRow label="Empresa" value={project.client?.companyName} />
             <DataRow label="Cotización" value={project.quotationLink} link />

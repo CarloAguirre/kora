@@ -20,6 +20,7 @@ const changeStatusMutateAsync = vi.fn().mockResolvedValue(undefined);
 vi.mock('../api/projects.queries', () => ({
   useUpdateProject: () => ({ mutateAsync }),
   useChangeProjectStatus: () => ({ mutateAsync: changeStatusMutateAsync }),
+  useSetProjectOvertimeAuthorization: () => ({ mutateAsync: vi.fn() }),
   useCreateProjectModule: () => ({ mutateAsync: vi.fn() }),
   useUpdateProjectModule: () => ({ mutateAsync: vi.fn() }),
   useDeleteProjectModule: () => ({ mutateAsync: vi.fn() }),

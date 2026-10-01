@@ -48,6 +48,7 @@ import {
   useDeleteProjectModule,
   useDeleteProjectModuleSegment,
   useRemoveProjectModuleDelivery,
+  useSetProjectOvertimeAuthorization,
   useUpdateProject,
   useUpdateProjectModule,
   useUpdateProjectModuleDelivery,
@@ -206,6 +207,7 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
   const isDevelopment = project.type === 'development';
   const updateProject = useUpdateProject();
   const changeStatus = useChangeProjectStatus();
+  const setOvertimeAuthorization = useSetProjectOvertimeAuthorization();
   const toast = useToast();
   const createModule = useCreateProjectModule();
   const updateModule = useUpdateProjectModule();
@@ -222,6 +224,7 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
   const [tipo, setTipo] = useState<ProjectTipo>(() => deriveTipo(project.salesStage, project.status));
   const [estado, setEstado] = useState<ProjectStatus>(project.status);
   const [manualActivationReason, setManualActivationReason] = useState('');
+  const [allowsOvertime, setAllowsOvertime] = useState(project.allowsOvertime);
 
   const {
     register,
@@ -244,6 +247,7 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
     reset(toFormValues(project));
     setTipo(deriveTipo(project.salesStage, project.status));
     setEstado(project.status);
+    setAllowsOvertime(project.allowsOvertime);
     setServerError(null);
   }, [open, project, reset]);
 
@@ -533,6 +537,9 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
           input: { status: estado, ...(isManualHito0 ? { reason: manualActivationReason.trim() } : {}) },
         });
       }
+      if (project.canAuthorizeOvertime && allowsOvertime !== project.allowsOvertime) {
+        await setOvertimeAuthorization.mutateAsync({ projectId: project.id, input: { allowsOvertime } });
+      }
       onSuccess(`Se actualizaron los datos de ${values.name ?? project.name}.`);
       onClose();
     } catch (error) {
@@ -757,6 +764,16 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
               placeholder="Ej: Mensual, Bolsa de horas…"
               {...register('supportPlanDescription')}
             />
+          )}
+
+          {project.canAuthorizeOvertime && (
+            <div>
+              <label className={styles.checkboxLabel}>
+                <input type="checkbox" checked={allowsOvertime} onChange={(e) => setAllowsOvertime(e.target.checked)} />
+                Autorizar horas extra
+              </label>
+              <p className={styles.hint}>Permite registrar horas marcadas como horas extra en este proyecto.</p>
+            </div>
           )}
 
           {isDevelopment && (tipo === 'prospecto' || tipo === 'cotizacion') && (

@@ -1,24 +1,20 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { PROJECT_STATUS_LABELS, PROJECT_STATUSES, type ProjectStatus } from '@kora/contracts';
 import styles from './ProjectDetailPage.module.css';
 import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Button } from '@/shared/components/ui/Button';
-import { Select } from '@/shared/components/ui/Select';
-import { ChevronLeftIcon, PencilIcon } from '@/shared/components/icons/Icons';
+import { ChevronLeftIcon } from '@/shared/components/icons/Icons';
 import { useToast } from '@/shared/components/ui/Toast';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { ApiRequestError } from '@/shared/lib/api-client';
 import { clientProjectPreviewPath } from '@/app/router/paths';
 import { ProjectViewTabs } from '@/modules/client-portal/components/ProjectViewTabs';
-import { useChangeProjectStatus, useProjectDetail, useSetProjectOvertimeAuthorization } from '../api/projects.queries';
+import { useProjectDetail, useSetProjectOvertimeAuthorization } from '../api/projects.queries';
 import { EditProjectDialog } from '../components/EditProjectDialog';
 import { TeamLeaderProjectView } from '../components/TeamLeaderProjectView';
 import { DevelopmentProjectDetailView } from './DevelopmentProjectDetailView';
 import { SupportProjectDetailView } from './SupportProjectDetailView';
-
-const STATUS_OPTIONS = PROJECT_STATUSES.map((status) => ({ value: status, label: PROJECT_STATUS_LABELS[status] }));
 
 /**
  * Cascarón de la ficha de proyecto: carga el proyecto y deriva a la vista
@@ -33,16 +29,9 @@ export function ProjectDetailPage() {
   const { can } = usePermissions();
   const { user } = useAuth();
   const toast = useToast();
-  const changeStatus = useChangeProjectStatus();
   const setOvertimeAuthorization = useSetProjectOvertimeAuthorization();
   const { data: project, isLoading, error } = useProjectDetail(projectId ?? null);
   const [editing, setEditing] = useState(false);
-
-  const onStatusChange = async (status: ProjectStatus) => {
-    if (!projectId) return;
-    await changeStatus.mutateAsync({ projectId, input: { status } });
-    toast.success('Se actualizó el estado del proyecto.');
-  };
 
   const onToggleOvertime = async () => {
     if (!projectId || !project) return;
@@ -91,6 +80,7 @@ export function ProjectDetailPage() {
   const showTeamOnlyView = !can('projects:manage') && !isProjectLeader && Boolean(leaderTeam);
   /** Sin `projects:manage`, el líder de ESTE proyecto también puede editarlo y cambiar su estado. */
   const canManageProject = can('projects:manage') || isProjectLeader;
+  const onEdit = canManageProject ? () => setEditing(true) : undefined;
   /** La vista cliente de soporte es otra pantalla (por contrato, no por proyecto) — solo desarrollo tiene la pestaña. */
   const showViewTabs = !showTeamOnlyView && project.type !== 'support' && project.client !== null && can('clients:read');
 
@@ -106,42 +96,26 @@ export function ProjectDetailPage() {
             <ChevronLeftIcon size={16} /> Volver a proyectos
           </Button>
 
-          <div className={styles.topRowActions}>
-            {canManageProject && (
-              <Button variant="outline" size="sm" iconLeft={<PencilIcon size={16} />} onClick={() => setEditing(true)}>
-                Editar proyecto
-              </Button>
-            )}
-
-            {project.canAuthorizeOvertime && (
-              <Button
-                variant="outline"
-                size="sm"
-                loading={setOvertimeAuthorization.isPending}
-                onClick={() => void onToggleOvertime()}
-              >
-                {project.allowsOvertime ? 'Retirar autorización de horas extra' : 'Autorizar horas extra'}
-              </Button>
-            )}
-
-            {project.type !== 'support' && canManageProject && (
-              <Select
-                className={styles.statusControl}
-                label="Cambiar estado"
-                options={STATUS_OPTIONS}
-                value={project.status}
-                onChange={(event) => void onStatusChange(event.target.value as ProjectStatus)}
-              />
-            )}
-          </div>
+          {/* Estado y horas extra viven en "Editar proyecto"; este botón queda solo para quien puede autorizar
+              horas extra sin poder editar el proyecto (líder de un equipo asignado) — sin él perdería esa acción. */}
+          {project.canAuthorizeOvertime && !canManageProject && (
+            <Button
+              variant="outline"
+              size="sm"
+              loading={setOvertimeAuthorization.isPending}
+              onClick={() => void onToggleOvertime()}
+            >
+              {project.allowsOvertime ? 'Retirar autorización de horas extra' : 'Autorizar horas extra'}
+            </Button>
+          )}
         </div>
 
         {showTeamOnlyView && leaderTeam ? (
           <TeamLeaderProjectView project={project} projectId={projectId} teamId={leaderTeam.teamId} />
         ) : project.type === 'support' ? (
-          <SupportProjectDetailView project={project} projectId={projectId} />
+          <SupportProjectDetailView project={project} projectId={projectId} onEdit={onEdit} />
         ) : (
-          <DevelopmentProjectDetailView project={project} projectId={projectId} />
+          <DevelopmentProjectDetailView project={project} projectId={projectId} onEdit={onEdit} />
         )}
 
         <EditProjectDialog
