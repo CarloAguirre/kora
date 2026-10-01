@@ -1,430 +1,21 @@
-.header {
-  margin-bottom: var(--kora-space-4);
-}
-
-.title {
-  font-size: var(--kora-text-base);
-  font-weight: var(--kora-weight-bold);
-  color: var(--kora-navy);
-  margin: 0;
-}
-
-.hint {
-  font-size: var(--kora-text-sm);
-  color: var(--kora-gray-500);
-  margin: var(--kora-space-1) 0 0;
-}
+/* Roadmap interno — el Gantt/encabezado son los de `PhaseRoadmap` (portal de cliente); acá solo
+   viven los extras de la vista interna, con la misma paleta del Roadmap (Figma node 9669:31017). */
 
 .empty {
-  font-size: var(--kora-text-sm);
-  color: var(--kora-gray-500);
-  padding: var(--kora-space-3) 0;
-}
-
-.list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--kora-space-3);
-  margin-bottom: var(--kora-space-4);
-}
-
-.moduleCard {
-  border: 1px solid var(--kora-border-soft);
-  border-radius: 14px;
-  padding: 22px 24px;
-  background: var(--kora-surface);
-  box-shadow: 0 2px 10px rgba(16, 26, 40, 0.06);
-}
-
-.moduleHead {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--kora-space-2);
-  margin-bottom: var(--kora-space-3);
-}
-
-.moduleHeadLeft {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--kora-space-3);
-}
-
-.stageChip {
-  display: inline-flex;
-  align-items: center;
-  padding: 3px var(--kora-space-2);
-  border-radius: var(--kora-radius-pill);
-  font-size: var(--kora-text-xs);
-  font-weight: var(--kora-weight-semibold);
-  white-space: nowrap;
-}
-
-.stageChipMuted {
-  background: var(--kora-surface-disabled);
-  color: var(--kora-text-muted);
-}
-
-.stageChipInfo {
-  background: var(--kora-blue-surface);
-  color: var(--kora-blue-600);
-}
-
-.stageChipLime {
-  background: var(--kora-lime-surface);
-  color: var(--kora-lime-dark);
-}
-
-.stageChipDone {
-  background: #d4edda;
-  color: var(--kora-success-text);
-}
-
-.pipelineSection {
-  margin: 14px 0 16px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--kora-border-soft);
-}
-
-.pipelineHeader {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--kora-space-2);
-  margin-bottom: var(--kora-space-2);
-}
-
-.pipelineLabel {
-  font-size: 11.5px;
-  font-weight: var(--kora-weight-semibold);
-  color: var(--kora-text-muted);
-}
-
-.pipelineTotals {
-  font-size: 11.5px;
-  font-weight: var(--kora-weight-semibold);
-  color: var(--kora-text);
-}
-
-.pipeline {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 4px;
-}
-
-.pipelineColumn {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 0;
-}
-
-.pipelineSegment {
-  height: 7px;
-  border-radius: var(--kora-radius-sm);
-  background: var(--kora-surface-disabled);
-  overflow: hidden;
-}
-
-.pipelineSegmentFill {
-  height: 100%;
-  border-radius: var(--kora-radius-sm);
-  background: var(--kora-navy);
-  transition: width 0.3s ease;
-}
-
-.pipelineScopeLabel {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  font-size: 10.5px;
-  color: var(--kora-text-disabled);
-}
-
-.pipelineScopeValue {
-  font-weight: var(--kora-weight-semibold);
-  color: var(--kora-text);
-}
-
-.pipelineScopeEmpty {
-  font-style: italic;
-}
-
-.pipelineHint {
-  display: block;
-  margin-top: var(--kora-space-2);
-  font-size: 10.5px;
-  color: var(--kora-warning-text);
-}
-
-.toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 22px 24px;
-  margin-bottom: 16px;
-  border: 1px solid var(--kora-border-soft);
-  border-radius: 14px;
-}
-
-.summaryRow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 14px;
-}
-
-.summaryChip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 9px 14px;
-  border-radius: var(--kora-radius-input);
-  border: 1px solid var(--kora-border-soft);
-  background: var(--kora-surface-muted);
   font-size: 12.5px;
-  color: var(--kora-text-muted);
+  color: #93a0ac;
+  padding: 4px 0;
 }
 
-.summaryChip b {
-  color: var(--kora-navy);
-}
-
-.globalLegend {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 18px;
-  padding: 14px 18px;
-  margin-bottom: 18px;
-  border: 1px solid var(--kora-border-soft);
-  border-radius: 14px;
-  font-size: 12px;
-  color: var(--kora-gray-500);
-}
-
-.legendItem {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.legendSquare {
-  display: inline-block;
-  width: 10px;
-  height: 10px;
-  border-radius: 3px;
-  border: 2px solid transparent;
-  box-sizing: border-box;
-}
-
-.legendDiamond {
-  display: inline-block;
-  width: 9px;
-  height: 9px;
-  transform: rotate(45deg);
-  border-radius: 2px;
-  border: 2px solid transparent;
-  box-sizing: border-box;
-}
-
-.legendLine {
-  display: inline-block;
-  width: 2px;
-  height: 11px;
-  background: var(--kora-navy);
-}
-
-.legendHint {
-  color: var(--kora-text-disabled);
-  font-style: italic;
-}
-
-.rangeRow {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--kora-space-2);
-}
-
-.rangeDateField {
-  width: 150px;
-}
-
-.rangeLabel {
-  font-size: var(--kora-text-sm);
-  font-weight: var(--kora-weight-semibold);
-  color: var(--kora-navy);
-}
-
-.moduleFlags {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-left: auto;
-}
-
-/* "⚑ N atrasos" — mismo look que .flag del prototipo, sin cursor (no abre panel). */
-.lateBadge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px var(--kora-space-2);
-  border-radius: var(--kora-radius-sm);
-  font-size: var(--kora-text-xs);
-  font-weight: var(--kora-weight-semibold);
-  background: var(--kora-danger-surface-soft);
-  color: var(--kora-danger);
-  white-space: nowrap;
-}
-
-.taskDetailValueDanger {
-  color: var(--kora-danger);
-  font-weight: var(--kora-weight-semibold);
-}
-
-.blockerBadge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px var(--kora-space-2);
-  border: none;
-  border-radius: var(--kora-radius-sm);
-  font-family: inherit;
-  font-size: var(--kora-text-xs);
-  font-weight: var(--kora-weight-semibold);
-  background: var(--kora-danger-surface-soft);
-  color: var(--kora-danger);
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.incidentsPanel {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 12px 14px;
-  margin-bottom: var(--kora-space-3);
-  border: 1px solid var(--kora-danger-surface-soft);
-  border-radius: var(--kora-radius);
-  background: var(--kora-danger-surface-soft);
-}
-
-.incidentsEmpty {
-  font-size: var(--kora-text-sm);
-  color: var(--kora-text-muted);
-  margin: 0;
-}
-
-.incidentRow {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 6px 0;
-  border-top: 1px solid rgba(0, 0, 0, 0.06);
-}
-
-.incidentRow:first-of-type {
-  border-top: none;
-}
-
-.incidentMeta {
-  font-size: 11px;
-  font-weight: var(--kora-weight-semibold);
-  color: var(--kora-danger);
-}
-
-.incidentDescription {
-  font-size: var(--kora-text-sm);
-  color: var(--kora-navy);
-}
-
-.zoomRow {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 11.5px;
-  color: var(--kora-text-muted);
-  margin: 14px 0 18px;
-}
-
-.zoomRow input[type='range'] {
-  flex: 1;
-  max-width: 220px;
-  accent-color: var(--kora-blue-600);
-}
-
-.ganttHeader {
-  position: relative;
-  height: 20px;
-  margin-bottom: 4px;
-  border-bottom: 1px solid var(--kora-border-soft);
-}
-
-.ganttMonthTick {
-  position: absolute;
-  top: 0;
-  height: 20px;
-  display: flex;
-  align-items: center;
-  font-size: 11px;
-  font-weight: var(--kora-weight-bold);
-  color: var(--kora-navy);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  padding-left: 6px;
-  border-left: 1px solid var(--kora-border-soft);
-  white-space: nowrap;
-}
-
-.ganttDayRow {
-  position: relative;
-  height: 18px;
-  margin-bottom: 4px;
-}
-
-.ganttDayTick {
-  position: absolute;
-  top: 0;
-  height: 18px;
-  display: flex;
-  align-items: center;
-  font-size: 9.5px;
-  font-weight: var(--kora-weight-semibold);
-  color: var(--kora-text-muted);
-  white-space: nowrap;
-  transform: translateX(-50%);
-}
-
-.moduleIndex {
-  display: inline-flex;
-  align-items: center;
-  font-size: 11px;
-  font-weight: 800;
-  color: var(--kora-surface);
-  background: var(--kora-navy);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  padding: 4px 11px;
-  border-radius: 7px;
-  white-space: nowrap;
-}
-
-.moduleName {
-  font-size: 18.5px;
-  font-weight: 800;
-  color: var(--kora-navy);
-  margin: 0;
-}
-
+/* Etapa editable + datos de la fase, bajo "Resumen de avance". */
 .moduleFields {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
-  gap: var(--kora-space-4);
-  margin-bottom: var(--kora-space-4);
+  gap: 14px 24px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #f8fafc;
 }
 
 .moduleStageField {
@@ -435,567 +26,286 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  font-size: var(--kora-text-sm);
-  font-weight: var(--kora-weight-semibold);
-  color: var(--kora-navy);
   padding-bottom: 9px;
+  font-size: 13px;
+  font-weight: var(--kora-weight-semibold);
+  color: #0f2a44;
 }
 
 .moduleMetaLabel {
-  font-size: 12px;
-  font-weight: var(--kora-weight-regular);
-  color: var(--kora-text-muted);
-}
-
-.timeline {
-  margin-bottom: var(--kora-space-3);
-}
-
-.timelineLabel {
-  display: block;
-  font-size: var(--kora-text-xs);
-  font-weight: var(--kora-weight-bold);
-  color: var(--kora-gray-500);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  margin-bottom: var(--kora-space-2);
-}
-
-.ganttGrid {
-  display: flex;
-  gap: var(--kora-space-3);
-}
-
-.ganttLabels {
-  width: 230px;
-  flex: none;
-  display: flex;
-  flex-direction: column;
-}
-
-.ganttRowLabel {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  height: 36px;
-}
-
-.ganttRowDot {
-  width: 8px;
-  height: 8px;
-  border-radius: 2px;
-  flex: none;
-}
-
-.ganttRowLabelText {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  line-height: 1.25;
-}
-
-.ganttRowLabelTeam {
-  font-size: 12.5px;
-  font-weight: var(--kora-weight-semibold);
-  color: var(--kora-navy);
-}
-
-.ganttRowLabelTask {
   font-size: 11px;
-  color: var(--kora-text-muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-weight: var(--kora-weight-regular);
+  color: #93a0ac;
 }
 
-.ganttEntregasLabel {
-  height: 36px;
-  display: flex;
-  align-items: center;
-  font-size: 12.5px;
-  font-weight: var(--kora-weight-semibold);
-  color: var(--kora-navy);
-}
+/* ── Detalle del ítem seleccionado ─────────────────────────────────────── */
 
-.ganttTracksCol {
+.detail {
   position: relative;
+  overflow: hidden;
+  border: 1px solid #e4e9ee;
+  border-radius: 14px;
+  background: var(--kora-surface);
+  box-shadow: 0 1px 2px rgba(15, 41, 66, 0.06);
+}
+
+.detailHead {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px 12px 20px;
+  border-bottom: 1px solid #eef1f4;
+}
+
+/* Franja con el color del equipo en el borde izquierdo de la tarjeta. */
+.detailAccent {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 4px;
+}
+
+.detailHeadText {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
   flex: 1;
   min-width: 0;
-  overflow-x: auto;
 }
 
-/* El zoom Semanas/Días ensancha esto por encima del 100%: aparece el scroll horizontal y el
-   cronograma se ve más en detalle (igual que `.ganttScroll` en `PhaseRoadmap`, vista cliente). */
-.ganttScroll {
-  position: relative;
-  min-width: 100%;
-}
-
-.ganttTrackRow {
-  position: relative;
-  height: 36px;
-}
-
-.ganttTrackBg {
-  position: absolute;
-  top: 9px;
-  left: 0;
-  right: 0;
-  height: 18px;
-  background: var(--kora-surface-alt);
-  border-radius: 5px;
-}
-
-.ganttBar {
-  position: absolute;
-  top: 9px;
-  height: 18px;
-  border-radius: 5px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  padding: 0 8px;
+.detailEyebrow {
   font-size: 10.5px;
-  font-weight: var(--kora-weight-semibold);
-  color: var(--kora-surface);
-  white-space: nowrap;
-  overflow: hidden;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: #93a0ac;
 }
 
-.ganttBarFuture {
-  opacity: 0.45;
+.detailTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  color: #0f2a44;
+  overflow-wrap: anywhere;
 }
 
-.ganttBar,
-.timelineMarkerTask,
-.timelineMarkerDelivery {
-  cursor: pointer;
-}
-
-.ganttBarSelected {
-  outline: 2px solid var(--kora-blue-600);
-  outline-offset: 1px;
-}
-
-/* `.timelineMarker` (más abajo) también define `box-shadow` (el halo blanco) — sin la
-   especificidad extra de encadenar ambas clases, esa regla gana por venir después en el
-   archivo y el aro de selección quedaba tapado. */
-.timelineMarker.timelineMarkerSelected {
-  box-shadow: 0 0 0 3px var(--kora-blue-surface), 0 0 0 5px var(--kora-blue-600);
-}
-
-.timelineGridline {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 1px;
-  background: rgba(0, 0, 0, 0.06);
-  z-index: 0;
-}
-
-/* Cuadrícula por día, solo visible en modo "detalle" (zoom hacia "Días"). */
-.ganttDayLine {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 1px;
-  background: rgba(0, 0, 0, 0.03);
-  z-index: 0;
-}
-
-.timelineToday {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  background: var(--kora-navy);
-  /* Por debajo de barras/marcadores (z-index 1): es una referencia de fondo, no
-     debe tapar una entrega o tarea cuya fecha caiga justo en "hoy" o al lado. */
-  z-index: 0;
-}
-
-.timelineTodayPill {
-  position: absolute;
-  top: 2px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--kora-navy);
-  color: var(--kora-surface);
-  padding: 1px 6px;
-  border-radius: 4px;
-  font-size: 9.5px;
-  font-weight: var(--kora-weight-bold);
-  white-space: nowrap;
-  z-index: 4;
-}
-
-.timelineMarker {
-  position: absolute;
-  top: 12px;
-  width: 11px;
-  height: 11px;
-  transform: translateX(-50%);
-  border: 2px solid var(--kora-gray-500);
-  background: var(--kora-white, #fff);
-  /* Halo blanco: sin esto, una entrega "realizada" (navy) que cae justo sobre
-     la línea de "HOY" (mismo --kora-navy) queda invisible, fundida con la línea. */
-  box-shadow: 0 0 0 2px var(--kora-white, #fff);
-  z-index: 1;
-}
-
-.timelineMarkerDelivery {
-  top: 11px;
-  width: 13px;
-  height: 13px;
-  transform: translateX(-50%) rotate(45deg);
-  border-radius: 2px;
-}
-
-.timelineMarkerTask {
-  border-radius: 50%;
-}
-
-.marker-entregada,
-.marker-done {
-  background: var(--kora-navy);
-  border-color: var(--kora-navy);
-}
-
-.marker-comprometida,
-.marker-upcoming {
-  background: #fff;
-  border-color: var(--kora-gray-500);
-}
-
-.marker-atrasada,
-.marker-late {
-  background: var(--kora-danger);
-  border-color: var(--kora-danger);
-}
-
-.timelineLegend {
+.detailSubtitle {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--kora-space-3);
-  margin-top: var(--kora-space-2);
-  font-size: var(--kora-text-xs);
-  color: var(--kora-gray-500);
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: #5d6b7a;
 }
 
-.timelineLegend span {
+.detailTeam {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
+  font-weight: var(--kora-weight-semibold);
 }
 
-.legendDot {
-  display: inline-block;
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  border: 2px solid var(--kora-gray-500);
+.detailTeamDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 3px;
 }
 
-.subsection {
-  border-top: 1px solid var(--kora-border-soft);
-  padding-top: var(--kora-space-3);
-  margin-bottom: var(--kora-space-3);
-}
-
-.subsectionLabel {
-  display: block;
-  font-size: var(--kora-text-sm);
-  font-weight: var(--kora-weight-bold);
-  color: var(--kora-navy);
-  margin-bottom: var(--kora-space-2);
-}
-
-.taskDetailHead {
+.detailActions {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--kora-space-2);
-}
-
-.taskDetailHead .subsectionLabel,
-.taskDetailHead .deliveriesLabel {
-  margin-bottom: 0;
-}
-
-.segmentRow,
-.taskRow {
-  display: flex;
-  align-items: center;
-  gap: var(--kora-space-2);
-  padding: var(--kora-space-1) 0;
-  font-size: var(--kora-text-sm);
-}
-
-.taskRow {
   flex-wrap: wrap;
-  cursor: pointer;
-  border-radius: var(--kora-radius-sm);
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
-.taskRow:hover {
-  background: var(--kora-surface-muted);
+.detailBody {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px 16px 16px 20px;
 }
 
-.taskRowSelected {
-  background: var(--kora-blue-surface);
-}
-
-.taskDetail {
-  flex-basis: 100%;
-  width: 100%;
+/* Datos clave: celdas con separador vertical, se reacomodan en pantallas angostas. */
+.facts {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: var(--kora-space-2) var(--kora-space-4);
-  padding: var(--kora-space-2) var(--kora-space-3);
-  margin-top: 4px;
-  border-radius: var(--kora-radius-sm);
-  background: var(--kora-surface-alt);
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  margin: 0;
+  border: 1px solid #eef1f4;
+  border-radius: 10px;
+  background: #fafbfc;
 }
 
-.taskDetailField {
+.fact {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 14px;
+  min-width: 0;
+}
+
+.fact + .fact {
+  border-left: 1px solid #eef1f4;
+}
+
+.factLabel {
+  font-size: 10.5px;
+  font-weight: var(--kora-weight-semibold);
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: #93a0ac;
+}
+
+.factValue {
+  margin: 0;
+  font-size: 14px;
+  font-weight: var(--kora-weight-bold);
+  color: #0f2a44;
+  overflow-wrap: anywhere;
+}
+
+.factValueDanger {
+  color: #d5504b;
+}
+
+.factHint {
+  margin: 0;
+  font-size: 11.5px;
+  color: #93a0ac;
+}
+
+.description {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-left: 12px;
+  border-left: 2px solid #e4e9ee;
+}
+
+.descriptionText {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #34465a;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+/* Colaboradores del tramo: avatar, nombre, carga diaria (barra) y %. */
+.members {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-.taskDetailFieldFull {
-  grid-column: 1 / -1;
-}
-
-.taskDetailLabel {
-  font-size: 10.5px;
-  font-weight: var(--kora-weight-semibold);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: var(--kora-text-muted);
-}
-
-.taskDetailValue {
-  font-size: var(--kora-text-sm);
-  color: var(--kora-navy);
-  overflow-wrap: break-word;
-}
-
-/* "Registros de bitácora relacionados" — mismo look que el prototipo (ficha_proyecto_lider-actualizada.html: .reg-panel-head/.reg-mini-item/.dot/.meta). */
-.regPanel {
-  margin-top: var(--kora-space-3);
-  padding-top: var(--kora-space-3);
-  border-top: 1px dashed var(--kora-border-soft);
-}
-
-.regPanelHead {
-  font-size: var(--kora-text-sm);
-  font-weight: var(--kora-weight-bold);
-  color: var(--kora-navy);
-  margin-bottom: var(--kora-space-2);
-}
-
-.regEmpty {
-  font-size: var(--kora-text-xs);
-  color: var(--kora-text-muted);
-}
-
-.regItem {
-  display: flex;
-  gap: var(--kora-space-2);
-  padding: var(--kora-space-2) 0;
-  border-bottom: 1px solid var(--kora-border-soft);
-}
-
-.regItem:last-child {
-  border-bottom: none;
-}
-
-.regItemBody {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-  font-size: var(--kora-text-sm);
-  color: var(--kora-navy);
-}
-
-.regMeta {
-  font-size: 11px;
-  color: var(--kora-text-muted);
-}
-
-.regDot {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  flex: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 10px;
-  line-height: 1;
-  color: var(--kora-white, #fff);
-  margin-top: 1px;
-}
-
-.regDotHito {
-  background: #6c63e8;
-}
-
-.regDotIncidentOpen {
-  background: var(--kora-danger);
-}
-
-.regDotIncidentResolved {
-  background: var(--kora-blue-600);
-}
-
-.regDotCompromiso {
-  background: var(--kora-warning);
-}
-
-.regDotAtencion {
-  background: var(--kora-warning-text);
-}
-
-.regDotCambio {
-  background: var(--kora-blue-600);
-}
-
-.regDotObservacion {
-  background: var(--kora-success);
-}
-
-.eqDot {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 2px;
-  flex: none;
-}
-
-.segmentTeam {
-  color: var(--kora-gray-500);
-  font-size: var(--kora-text-xs);
-  font-weight: var(--kora-weight-bold);
-  text-transform: uppercase;
-  min-width: 50px;
-}
-
-.segmentName,
-.taskName {
-  flex: 1;
-}
-
-.segmentDates {
-  color: var(--kora-gray-500);
-  white-space: nowrap;
-}
-
-.addSegmentRow {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--kora-space-2);
-  margin-top: var(--kora-space-2);
-}
-
-.segmentNameInput {
-  font-family: inherit;
-  font-size: var(--kora-text-sm);
-  border: 1px solid var(--kora-border);
-  border-radius: var(--kora-radius-sm);
-  padding: 8px 10px;
-  flex: 1;
-  min-width: 160px;
-}
-
-.deliveries {
-  border-top: 1px solid var(--kora-border-soft);
-  padding-top: var(--kora-space-3);
-}
-
-.deliveriesLabel {
-  display: block;
-  font-size: var(--kora-text-sm);
-  font-weight: var(--kora-weight-bold);
-  color: var(--kora-navy);
-  margin-bottom: var(--kora-space-2);
-}
-
-.deliveriesHint {
-  font-size: var(--kora-text-xs);
-  color: var(--kora-gray-500);
-  margin: var(--kora-space-2) 0 0;
-}
-
-.deliveryRow {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--kora-space-3);
-  padding: var(--kora-space-1) 0;
-  font-size: var(--kora-text-sm);
-  cursor: pointer;
-  border-radius: var(--kora-radius-sm);
-}
-
-.deliveryRow:hover {
-  background: var(--kora-surface-muted);
-}
-
-.deliveryLabel {
-  min-width: 80px;
-  color: var(--kora-gray-500);
-}
-
-.deliveryStatus {
-  color: var(--kora-blue-600);
-  font-weight: var(--kora-weight-bold);
-}
-
-.deliveryAddRow {
-  display: flex;
-  align-items: center;
-  gap: var(--kora-space-2);
-  margin-top: var(--kora-space-2);
-}
-
-.deliveryDateInput {
-  font-family: inherit;
-  font-size: var(--kora-text-sm);
-  border: 1px solid var(--kora-border);
-  border-radius: var(--kora-radius-sm);
-  padding: 8px 10px;
-}
-
-.newModuleForm {
-  display: flex;
-  flex-direction: column;
-  gap: var(--kora-space-3);
-  border: 1px dashed var(--kora-border);
-  border-radius: var(--kora-radius);
-  padding: var(--kora-space-4);
-}
-
-.newModuleRow {
+.member {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--kora-space-3);
+  grid-template-columns: auto minmax(0, 1fr) 120px 44px;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 4px;
 }
 
-.newModuleActions {
+.member + .member {
+  border-top: 1px dashed #eef1f4;
+}
+
+.memberInfo {
   display: flex;
-  justify-content: flex-end;
-  gap: var(--kora-space-2);
+  flex-direction: column;
+  min-width: 0;
+}
+
+.memberName {
+  font-size: 13px;
+  font-weight: var(--kora-weight-bold);
+  color: #0f2a44;
+}
+
+.memberMeta {
+  font-size: 11.5px;
+  color: #93a0ac;
+}
+
+.memberLoad {
+  height: 6px;
+  border-radius: 999px;
+  background: #eef1f4;
+  overflow: hidden;
+}
+
+.memberLoadFill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #0f2a44;
+}
+
+.memberPercent {
+  grid-column: 4;
+  text-align: right;
+  font-size: 13px;
+  font-weight: 800;
+  color: #0f2a44;
+}
+
+.incidents {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.incident {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: #fdecea;
+}
+
+.incidentMeta {
+  font-size: 11.5px;
+  font-weight: var(--kora-weight-semibold);
+  color: #d5504b;
+}
+
+.incidentDescription {
+  font-size: 13px;
+  color: #0f2a44;
 }
 
 @media (max-width: 640px) {
-  .moduleFields,
-  .newModuleRow {
-    grid-template-columns: 1fr;
+  .detailHead {
+    flex-wrap: wrap;
+  }
+
+  .detailActions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .fact + .fact {
+    border-left: none;
+  }
+
+  .member {
+    grid-template-columns: auto minmax(0, 1fr) 44px;
+  }
+
+  .memberLoad {
+    display: none;
+  }
+
+  .memberPercent {
+    grid-column: 3;
   }
 }

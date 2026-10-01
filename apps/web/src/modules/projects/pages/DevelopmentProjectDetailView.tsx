@@ -129,6 +129,12 @@ export function DevelopmentProjectDetailView({
     return [...summaries.values()];
   }, [project, teamLeaderCatalog]);
 
+  /** Equipos del proyecto — opciones de equipo al editar un tiempo de ejecución desde el Roadmap. */
+  const segmentTeamOptions = useMemo(
+    () => project.teams.map((team) => ({ value: team.teamId, label: team.teamName })),
+    [project.teams],
+  );
+
   const remainingHours = project.soldHours - project.usedHours;
 
   const projectDocuments: ProjectDocument[] = [
@@ -358,10 +364,9 @@ export function DevelopmentProjectDetailView({
             (project.salesStage === "approved" ||
             project.status === "finished" ? (
               <ProjectModulesCard
-                projectId={projectId}
-                modules={project.modules}
+                project={project}
                 hourEntries={projectHourEntries?.items ?? []}
-                observations={project.observations}
+                teamOptions={segmentTeamOptions}
                 canManage={canManageProject}
               />
             ) : (

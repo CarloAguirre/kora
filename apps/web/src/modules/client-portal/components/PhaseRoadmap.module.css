@@ -103,6 +103,22 @@
   background: #0f2a44;
 }
 
+/* "Tarea terminada": ✓ en cuadrado — mismo símbolo en la leyenda y en la fila "Tareas". */
+.legendCheck {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  background: #0f2a44;
+  color: #fff;
+  font-size: 9px;
+  font-weight: var(--kora-weight-bold);
+  line-height: 1;
+}
+
 .taskDotUpcoming {
   background: var(--kora-surface);
   border: 1.5px solid #93a0ac;
@@ -447,6 +463,19 @@
   opacity: 0.45;
 }
 
+/* La barra es un `<button>` (como `.gantt-bar` del prototipo): clic = ver su detalle/registros. */
+button.ganttBar {
+  border: none;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.ganttBarSelected {
+  outline: 2px solid #4c7ef3;
+  outline-offset: 2px;
+  opacity: 1;
+}
+
 .markerRowLabel {
   display: flex;
   align-items: center;
@@ -473,6 +502,8 @@
   color: #0f2a44;
   white-space: nowrap;
   cursor: pointer;
+  /* Sobre la línea de HOY (z-index 5): una tarea/entrega de hoy no debe quedar tapada ni dejar de ser clicable. */
+  z-index: 6;
 }
 
 .markerLabel {

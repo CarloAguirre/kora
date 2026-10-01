@@ -211,6 +211,8 @@ export const PHASE_ROADMAP_TASK_SCOPE_LABELS: Readonly<Record<PhaseRoadmapTaskSc
  * `ProjectModulesCard` del módulo interno, así que no se guarda aparte.
  */
 export interface PhaseRoadmapTask {
+  /** Id del tramo (`ProjectModuleSegment`) — el Roadmap interno lo usa para abrir su detalle/edición. */
+  readonly id?: string;
   readonly role: PhaseRoadmapRole;
   readonly scope: PhaseRoadmapTaskScope;
   /** Descripción corta bajo el código de rol, p.ej. "Diseño y levantamiento". */
@@ -222,6 +224,7 @@ export interface PhaseRoadmapTask {
 export type PhaseRoadmapDeliveryState = 'delivered' | 'committed' | 'delayed';
 
 export interface PhaseRoadmapDelivery {
+  readonly id?: string;
   readonly label: string;
   /** ISO `YYYY-MM-DD`. */
   readonly date: string;
@@ -231,6 +234,7 @@ export interface PhaseRoadmapDelivery {
 export type PhaseRoadmapTaskItemState = 'done' | 'upcoming' | 'delayed';
 
 export interface PhaseRoadmapTaskItem {
+  readonly id?: string;
   readonly label: string;
   /** ISO `YYYY-MM-DD`. */
   readonly date: string;
@@ -251,6 +255,9 @@ export interface PhaseRoadmapPhase {
   readonly tasks: readonly PhaseRoadmapTask[];
   readonly deliveries: readonly PhaseRoadmapDelivery[];
   readonly taskItems: readonly PhaseRoadmapTaskItem[];
+  /** % de avance por ámbito ponderado por HH (`module.progress.scopes`, calculado en el backend) —
+   *  `null` = ámbito sin tareas. Sin este dato, los chips caen al conteo de tareas aprobadas. */
+  readonly scopeProgress?: Readonly<Record<PhaseRoadmapTaskScope, number | null>>;
   readonly relatedBitacora: readonly ClientBitacoraEntry[];
 }
 

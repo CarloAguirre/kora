@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import styles from './PhaseRoadmap.module.css';
 import { Button } from '@/shared/components/ui/Button';
 import { TextField } from '@/shared/components/ui/TextField';
@@ -136,7 +136,7 @@ function buildTimelineAxis(range: DateRange): TimelineAxis {
  * (mismo cálculo que `ProjectModulesCard` del Roadmap interno) y el clic
  * filtra/atenúa en la fila "Tareas" las que no son de ese ámbito.
  */
-export function PhaseRoadmap({ phaseRoadmap }: { phaseRoadmap: ProjectPhaseRoadmap }) {
+export function PhaseRoadmap({ phaseRoadmap, renderPhaseExtras, renderSelectionDetail }: PhaseRoadmapProps) {
   const [expandedPhaseId, setExpandedPhaseId] = useState<string | null>(phaseRoadmap.phases[0]?.id ?? null);
   const [rangeDraft, setRangeDraft] = useState({ from: phaseRoadmap.rangeStartDate, to: phaseRoadmap.rangeEndDate });
   const [appliedRange, setAppliedRange] = useState({ from: phaseRoadmap.rangeStartDate, to: phaseRoadmap.rangeEndDate });
@@ -209,7 +209,7 @@ export function PhaseRoadmap({ phaseRoadmap }: { phaseRoadmap: ProjectPhaseRoadm
           <DiamondIcon size={10} className={styles.legendDiamondDelayed} /> Entrega atrasada
         </span>
         <span className={styles.legendItem}>
-          <span className={[styles.legendDot, styles.taskDotDone].join(' ')} /> Tarea terminada
+          <span className={styles.legendCheck}>✓</span> Tarea terminada
         </span>
         <span className={styles.legendItem}>
           <span className={[styles.legendDot, styles.taskDotUpcoming].join(' ')} /> Tarea próxima
@@ -229,6 +229,8 @@ export function PhaseRoadmap({ phaseRoadmap }: { phaseRoadmap: ProjectPhaseRoadm
             axis={axis}
             expanded={expandedPhaseId === phase.id}
             onToggle={() => setExpandedPhaseId((current) => (current === phase.id ? null : phase.id))}
+            renderExtras={renderPhaseExtras}
+            renderSelectionDetail={renderSelectionDetail}
           />
         ))}
       </div>
@@ -247,33 +249,49 @@ function barGeometry(task: PhaseRoadmapTask, range: DateRange) {
 }
 
 /**
- * Qué entrega/tarea/incidente está seleccionado dentro de una fase — decide
+ * Qué tramo/entrega/tarea/incidente está seleccionado dentro de una fase — decide
  * qué se muestra en "Registros de bitácora relacionados" (antes se mostraban
  * TODAS las entradas de la fase sin importar la tarea abierta). No hay un id
  * real que conecte una `ProjectObservation` con una tarea o entrega puntual
  * (solo con el módulo/fase completa — ver `project-detail.adapter.ts`), así
  * que el cruce se hace por texto: el título de la entrada contiene la
  * etiqueta de la tarea/entrega (p.ej. "Tarea completada: Casos de prueba
- * conciliación" contiene "Casos de prueba conciliación").
+ * conciliación" contiene "Casos de prueba conciliación"). El `id` (cuando
+ * viene) identifica el ítem real — lo usa el Roadmap interno para su detalle.
  */
-type RelatedBitacoraSelection = { kind: 'task' | 'delivery'; label: string } | { kind: 'incident' };
+export type PhaseRoadmapSelection =
+  | { kind: 'segment' | 'task' | 'delivery'; id?: string; label: string }
+  | { kind: 'incident' };
 
-const sameSelection = (a: RelatedBitacoraSelection | null, b: RelatedBitacoraSelection) => {
+const sameSelection = (a: PhaseRoadmapSelection | null, b: PhaseRoadmapSelection) => {
   if (!a) return false;
   if (a.kind === 'incident' || b.kind === 'incident') return a.kind === b.kind;
-  return a.kind === b.kind && a.label === b.label;
+  if (a.kind !== b.kind) return false;
+  return a.id !== undefined && b.id !== undefined ? a.id === b.id : a.label === b.label;
 };
+
+export interface PhaseRoadmapProps {
+  phaseRoadmap: ProjectPhaseRoadmap;
+  /** Contenido extra dentro de cada fase, bajo "Resumen de avance" (p.ej. la etapa editable del Roadmap interno). */
+  renderPhaseExtras?: (phase: PhaseRoadmapPhase) => ReactNode;
+  /** Detalle del ítem seleccionado, sobre "Registros de bitácora relacionados" (Roadmap interno). */
+  renderSelectionDetail?: (phase: PhaseRoadmapPhase, selection: PhaseRoadmapSelection, clearSelection: () => void) => ReactNode;
+}
 
 function PhaseCard({
   phase,
   axis,
   expanded,
   onToggle,
+  renderExtras,
+  renderSelectionDetail,
 }: {
   phase: PhaseRoadmapPhase;
   axis: TimelineAxis;
   expanded: boolean;
   onToggle: () => void;
+  renderExtras?: PhaseRoadmapProps['renderPhaseExtras'];
+  renderSelectionDetail?: PhaseRoadmapProps['renderSelectionDetail'];
 }) {
   /** Igual que `zoomByModule` en `ProjectModulesCard` (Roadmap interno): un slider real, no un
       toggle decorativo. Es estado de vista local, no una acción a conectar. */
@@ -289,12 +307,12 @@ function PhaseCard({
   /** Por defecto se selecciona la tarea marcada como "en foco" (`highlighted`)
    *  — así "Registros de bitácora relacionados" arranca mostrando una sola
    *  entrada, igual que al hacer clic en una tarea/entrega/el incidente. */
-  const [selectedRelated, setSelectedRelated] = useState<RelatedBitacoraSelection | null>(() => {
+  const [selectedRelated, setSelectedRelated] = useState<PhaseRoadmapSelection | null>(() => {
     const focusedTask = phase.taskItems.find((taskItem) => taskItem.highlighted);
-    return focusedTask ? { kind: 'task', label: focusedTask.label } : null;
+    return focusedTask ? { kind: 'task', id: focusedTask.id, label: focusedTask.label } : null;
   });
 
-  const toggleSelection = (selection: RelatedBitacoraSelection) =>
+  const toggleSelection = (selection: PhaseRoadmapSelection) =>
     setSelectedRelated((current) => (sameSelection(current, selection) ? null : selection));
 
   /** Sin selección no se muestra nada — mostrar TODAS las entradas de la fase
@@ -310,9 +328,9 @@ function PhaseCard({
     return latest ? [latest] : [];
   }, [phase.relatedBitacora, selectedRelated]);
 
-  /** Chips de "Resumen de avance": % completado por ámbito (mismo cálculo que
-   *  `ProjectModulesCard` del Roadmap interno) — clic filtra/atenúa en la fila
-   *  "Tareas" las que no son de ese ámbito. */
+  /** Chips de "Resumen de avance": % de avance por ámbito ponderado por HH
+   *  (`phase.scopeProgress`, del backend; sin él, % de tareas aprobadas) — clic
+   *  filtra/atenúa en la fila "Tareas" las que no son de ese ámbito. */
   const [activeScope, setActiveScope] = useState<PhaseRoadmapTaskScope | null>(null);
 
   const scopeStats = useMemo(() => {
@@ -374,10 +392,15 @@ function PhaseCard({
             <div className={styles.stageChips}>
               {PHASE_ROADMAP_TASK_SCOPES.map((scope) => {
                 const stats = scopeStats.get(scope);
-                const percent = stats && stats.total > 0 ? Math.round((stats.done / stats.total) * 100) : null;
+                const percent =
+                  phase.scopeProgress !== undefined
+                    ? phase.scopeProgress[scope]
+                    : stats && stats.total > 0
+                      ? Math.round((stats.done / stats.total) * 100)
+                      : null;
                 const title =
                   percent !== null
-                    ? `${PHASE_ROADMAP_TASK_SCOPE_LABELS[scope]}: ${percent}% (${stats!.done}/${stats!.total} aprobadas)`
+                    ? `${PHASE_ROADMAP_TASK_SCOPE_LABELS[scope]}: ${percent}% (${stats?.done ?? 0}/${stats?.total ?? 0} aprobadas)`
                     : `${PHASE_ROADMAP_TASK_SCOPE_LABELS[scope]}: sin tareas registradas`;
                 return (
                   <button
@@ -406,6 +429,8 @@ function PhaseCard({
               <span>Días</span>
             </div>
           </div>
+
+          {renderExtras?.(phase)}
 
           <div className={styles.ganttGrid}>
             <div className={styles.ganttLabels}>
@@ -460,12 +485,21 @@ function PhaseCard({
                   const end = toDate(task.endDate);
                   const isDone = end < today;
                   const isCurrent = start <= today && today <= end;
+                  const selection: PhaseRoadmapSelection = { kind: 'segment', id: task.id, label: task.label };
+                  const isSelected = sameSelection(selectedRelated, selection);
                   return (
-                    <div key={index} className={styles.trackRow}>
+                    <div key={task.id ?? index} className={styles.trackRow}>
                       <div className={styles.trackRowBg} />
                       {geometry && (
-                        <div
-                          className={[styles.ganttBar, start > today ? styles.ganttBarFuture : ''].join(' ')}
+                        <button
+                          type="button"
+                          aria-pressed={isSelected}
+                          onClick={() => toggleSelection(selection)}
+                          className={[
+                            styles.ganttBar,
+                            start > today ? styles.ganttBarFuture : '',
+                            isSelected ? styles.ganttBarSelected : '',
+                          ].join(' ')}
                           style={{
                             left: `${geometry.leftPercent}%`,
                             width: `${geometry.widthPercent}%`,
@@ -474,7 +508,7 @@ function PhaseCard({
                           title={`${PHASE_ROADMAP_ROLE_LABELS[task.role]} · ${task.label} · ${formatShortDate(task.startDate)} a ${formatShortDate(task.endDate)}`}
                         >
                           {isDone ? `✓ ${PHASE_ROADMAP_ROLE_LABELS[task.role]}` : isCurrent ? 'En curso' : ''}
-                        </div>
+                        </button>
                       )}
                     </div>
                   );
@@ -483,14 +517,16 @@ function PhaseCard({
                 {phase.deliveries.length > 0 && (
                   <div className={styles.trackRow}>
                     {visibleDeliveries.map(({ delivery, leftPercent }, index) => {
-                      const isSelected = sameSelection(selectedRelated, { kind: 'delivery', label: delivery.label });
+                      const selection: PhaseRoadmapSelection = { kind: 'delivery', id: delivery.id, label: delivery.label };
+                      const isSelected = sameSelection(selectedRelated, selection);
                       return (
                         <button
-                          key={index}
+                          key={delivery.id ?? index}
                           type="button"
                           className={[styles.markerItem, isSelected ? styles.markerItemHighlighted : ''].join(' ')}
                           style={{ left: `${leftPercent}%` }}
-                          onClick={() => toggleSelection({ kind: 'delivery', label: delivery.label })}
+                          title={`${delivery.label} · ${formatShortDate(delivery.date)}`}
+                          onClick={() => toggleSelection(selection)}
                         >
                           <DiamondIcon
                             size={10}
@@ -516,11 +552,12 @@ function PhaseCard({
                 {phase.taskItems.length > 0 && (
                   <div className={styles.trackRow}>
                     {visibleTaskItems.map(({ taskItem, leftPercent }, index) => {
-                      const isSelected = sameSelection(selectedRelated, { kind: 'task', label: taskItem.label });
+                      const selection: PhaseRoadmapSelection = { kind: 'task', id: taskItem.id, label: taskItem.label };
+                      const isSelected = sameSelection(selectedRelated, selection);
                       const isDimmed = activeScope !== null && taskItem.scope !== activeScope;
                       return (
                         <button
-                          key={index}
+                          key={taskItem.id ?? index}
                           type="button"
                           className={[
                             styles.markerItem,
@@ -528,18 +565,20 @@ function PhaseCard({
                             isDimmed ? styles.markerItemDimmed : '',
                           ].join(' ')}
                           style={{ left: `${leftPercent}%` }}
-                          onClick={() => toggleSelection({ kind: 'task', label: taskItem.label })}
+                          title={`${taskItem.label} · ${formatShortDate(taskItem.date)}`}
+                          onClick={() => toggleSelection(selection)}
                         >
-                          <span
-                            className={[
-                              styles.legendDot,
-                              taskItem.state === 'done'
-                                ? styles.taskDotDone
-                                : taskItem.state === 'delayed'
-                                  ? styles.taskDotDelayed
-                                  : styles.taskDotUpcoming,
-                            ].join(' ')}
-                          />
+                          {/* Terminada = el mismo ✓ que la leyenda (y que las tareas terminadas del Roadmap interno). */}
+                          {taskItem.state === 'done' ? (
+                            <span className={styles.legendCheck}>✓</span>
+                          ) : (
+                            <span
+                              className={[
+                                styles.legendDot,
+                                taskItem.state === 'delayed' ? styles.taskDotDelayed : styles.taskDotUpcoming,
+                              ].join(' ')}
+                            />
+                          )}
                           {!isFullPeriodView && (
                             <span className={styles.markerLabel}>
                               {taskItem.label} ({formatShortDate(taskItem.date)})
@@ -553,6 +592,8 @@ function PhaseCard({
               </div>
             </div>
           </div>
+
+          {selectedRelated && renderSelectionDetail?.(phase, selectedRelated, () => setSelectedRelated(null))}
 
           {phase.relatedBitacora.length > 0 && (
             <div className={styles.relatedBitacora}>

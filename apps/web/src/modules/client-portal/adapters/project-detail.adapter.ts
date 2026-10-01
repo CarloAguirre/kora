@@ -74,7 +74,7 @@ function formatTimeOfDay(isoDateTime: string): string {
   return date.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hour12: true });
 }
 
-function roleFromTeamName(teamName: string | null): PhaseRoadmapRole {
+export function roleFromTeamName(teamName: string | null): PhaseRoadmapRole {
   const sigla = getTeamStyle(teamName ?? '').sigla.toUpperCase();
   if (sigla === 'QA') return 'qa';
   if (sigla === 'IA') return 'ia';
@@ -235,6 +235,7 @@ function toPhaseRoadmapPhase(
     status: phaseStatus(module),
     alertLabel,
     tasks: module.segments.map((segment) => ({
+      id: segment.id,
       role: roleFromTeamName(segment.teamName),
       scope: 'desarrollo',
       label: segment.name,
@@ -243,17 +244,20 @@ function toPhaseRoadmapPhase(
     })),
     deliveries: module.deliveries.map(
       (delivery): PhaseRoadmapDelivery => ({
+        id: delivery.id,
         label: deliveryLabel(delivery),
         date: delivery.estimatedDate,
         state: deliveryState(delivery),
       }),
     ),
     taskItems: module.tasks.map((task) => ({
+      id: task.id,
       label: task.name,
       date: task.date,
       state: taskItemState(task),
       scope: task.scope,
     })),
+    scopeProgress: module.progress.scopes,
     /** Más reciente primero: el Roadmap muestra solo el último registro de la
         tarea/entrega seleccionada (ver `filteredBitacora` en `PhaseRoadmap`). */
     relatedBitacora: [...(observationsByModule.get(module.id) ?? [])]
@@ -262,7 +266,18 @@ function toPhaseRoadmapPhase(
   };
 }
 
-function toPhaseRoadmap(project: ProjectDetail): ProjectPhaseRoadmap {
+/** ISO `YYYY-MM-DD` corrido `days` días (negativo = hacia atrás). */
+function shiftIsoDate(iso: string, days: number): string {
+  const date = toDate(iso);
+  date.setDate(date.getDate() + days);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+/**
+ * "Roadmap por Fases" del proyecto — lo usan tanto el portal de cliente como el Roadmap interno
+ * (`ProjectModulesCard`), así ambas vistas muestran exactamente lo mismo.
+ */
+export function toPhaseRoadmap(project: ProjectDetail): ProjectPhaseRoadmap {
   const observationsByModule = new Map<string, ProjectObservation[]>();
   for (const observation of project.observations) {
     if (!observation.moduleId) continue;
@@ -274,17 +289,22 @@ function toPhaseRoadmap(project: ProjectDetail): ProjectPhaseRoadmap {
 
   const allDates = project.modules.flatMap((module) => [
     ...module.segments.flatMap((s) => [s.startDate, s.endDate]),
-    ...module.tasks.map((t) => t.date),
+    ...module.tasks.flatMap((t) => (t.startDate ? [t.startDate, t.date] : [t.date])),
     ...module.deliveries.map((d) => d.estimatedDate),
   ]);
   const sorted = allDates.length > 0 ? [...allDates].sort() : [project.startDate, project.endDate].filter((v): v is string => Boolean(v));
+  const first = sorted[0] ?? project.startDate;
+  const last = sorted[sorted.length - 1] ?? project.endDate;
 
   return {
     phaseCount: project.modules.length,
     teamSegmentCount: project.modules.reduce((sum, m) => sum + m.segments.length, 0),
     plannedDeliveryCount: project.modules.reduce((sum, m) => sum + m.deliveries.length, 0),
-    rangeStartDate: sorted[0] ?? project.startDate ?? '',
-    rangeEndDate: sorted[sorted.length - 1] ?? project.endDate ?? '',
+    // Una semana de margen a cada lado, como `computeAutoRange` del prototipo
+    // (`ficha_proyecto_lider-actualizada.html`): sin ella, lo que cae en la primera/última
+    // fecha queda pegado al borde y tapado por la línea de HOY.
+    rangeStartDate: first ? shiftIsoDate(first, -7) : '',
+    rangeEndDate: last ? shiftIsoDate(last, 7) : '',
     phases: project.modules.map((module, index) =>
       toPhaseRoadmapPhase(module, index, observationsByModule, moduleBadgeByModuleId),
     ),
