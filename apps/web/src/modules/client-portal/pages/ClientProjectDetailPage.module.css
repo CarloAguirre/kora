@@ -15,6 +15,25 @@
   width: fit-content;
 }
 
+/* Título + logo Kabeli y, justo debajo, las pestañas Vista Interna/Cliente
+   (Figma node 9663:24207) — más juntos que el gap general de `.page`. */
+.headerBlock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-3);
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kora-space-4);
+}
+
+.brandLogo {
+  flex-shrink: 0;
+}
+
 .title {
   font-size: 26px;
   font-weight: 800;

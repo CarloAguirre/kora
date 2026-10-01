@@ -5,6 +5,7 @@ import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Card } from '@/shared/components/ui/Card';
 import { Button } from '@/shared/components/ui/Button';
 import { useToast } from '@/shared/components/ui/Toast';
+import { KabeliLogo } from '@/shared/components/layout/KabeliLogo';
 import {
   AlignLeftIcon,
   BarChartIcon,
@@ -217,13 +218,17 @@ export function ClientProjectDetailPage({ projectIdOverride, backTo, backLabel, 
   return (
     <DashboardLayout title="Detalle de proyecto">
       <div className={styles.page}>
-        <ProjectViewTabs active="client" internalTo={internalViewTo} />
-
         <Link className={styles.breadcrumb} to={resolvedBackTo}>
           <ChevronLeftIcon size={16} /> {backLabel ?? `Volver a proyectos de ${project.company.name}`}
         </Link>
 
-        <h2 className={styles.title}>{project.name}</h2>
+        <div className={styles.headerBlock}>
+          <div className={styles.titleRow}>
+            <h2 className={styles.title}>{project.name}</h2>
+            <KabeliLogo className={styles.brandLogo} />
+          </div>
+          <ProjectViewTabs active="client" internalTo={internalViewTo} />
+        </div>
 
         <div className={styles.statusActionsRow}>
           <StatusPill tone={HEALTH_TONE[project.health]}>{HEALTH_LABEL[project.health]}</StatusPill>

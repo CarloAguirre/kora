@@ -14,9 +14,9 @@ interface ProjectViewTabsProps {
 
 /**
  * Pestañas "Vista Interna" / "Vista Cliente" (Figma node 9203:3136) — cambian
- * la ficha completa, por eso van como primer elemento de la página tanto en
- * `ProjectDetailPage` como en `ClientProjectDetailPage`: así quedan en la
- * misma posición al alternar entre una y otra.
+ * la ficha completa: en `ProjectDetailPage` van como primer elemento de la
+ * página y en `ClientProjectDetailPage` justo bajo el título (Figma node
+ * 9663:24207).
  */
 export function ProjectViewTabs({ active, internalTo, clientTo }: ProjectViewTabsProps) {
   return (
