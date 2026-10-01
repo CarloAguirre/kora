@@ -18,6 +18,13 @@ export interface GetSupportBillingOverviewQuery {
   readonly period: string;
 }
 
+/** Sin "Sin movimiento": un contrato sin nada pendiente se muestra "Por facturar" con monto 0. */
+interface BillingCell {
+  readonly amountUf: number;
+  readonly billingStatus: 'to_invoice' | 'invoiced';
+  readonly paymentStatus: SupportBillingRow['paymentStatus'];
+}
+
 /**
  * Panel de Facturación de Soporte: una fila por contrato activo, en el
  * período consultado, más los KPIs agregados.
@@ -25,7 +32,7 @@ export interface GetSupportBillingOverviewQuery {
  * Regla obligatoria: SOLO el período en curso (el mes calendario de hoy)
  * calcula un monto en vivo. Cualquier otro período consultado — pasado o
  * futuro — muestra únicamente facturas que existen de verdad; si no hay
- * ninguna, la fila queda sin movimiento. Sin esta regla, abrir un período
+ * ninguna, la fila queda "Por facturar" con monto 0. Sin esta regla, abrir un período
  * viejo inventaría deuda en todos los contratos (mismo criterio que
  * `getCycle()` en el prototipo de referencia: solo el período vigente es
  * editable, el resto es historial de solo lectura).
@@ -85,12 +92,13 @@ export class GetSupportBillingOverviewUseCase implements UseCase<GetSupportBilli
 
       if (billingStatus === 'to_invoice') {
         const group = kpiGroupFor(record.currency);
-        group.toInvoiceAmount += amountUf ?? 0;
-        group.toInvoiceCount++;
+        group.toInvoiceAmount += amountUf;
+        // Una fila "Por facturar" con monto 0 es solo un contrato sin nada pendiente — no suma al conteo de la tarjeta.
+        if (amountUf > 0) group.toInvoiceCount++;
       } else if (billingStatus === 'invoiced') {
         const group = kpiGroupFor(record.currency);
-        group.invoicedAmount += amountUf ?? 0;
-        if (paymentStatus === 'paid') group.paidAmount += amountUf ?? 0;
+        group.invoicedAmount += amountUf;
+        if (paymentStatus === 'paid') group.paidAmount += amountUf;
       }
 
       rows.push({
@@ -138,9 +146,7 @@ export class GetSupportBillingOverviewUseCase implements UseCase<GetSupportBilli
     record: SupportPlanRecord,
     current: CurrentBillingStatus,
     now: Date,
-  ): Promise<{ amountUf: number | null; billingStatus: 'to_invoice' | 'invoiced' | null; paymentStatus: SupportBillingRow['paymentStatus'] }> {
-    if (current.billingStatus === null) return { amountUf: null, billingStatus: null, paymentStatus: null };
-
+  ): Promise<BillingCell> {
     if (current.billingStatus === 'invoiced') {
       const invoice = await this.invoices.findByPlanAndPeriod(record.id, periodKeyOf(now));
       return { amountUf: current.amountUf, billingStatus: 'invoiced', paymentStatus: invoice ? paymentStatusOf(invoice, now) : null };
@@ -152,9 +158,9 @@ export class GetSupportBillingOverviewUseCase implements UseCase<GetSupportBilli
     planInvoices: readonly SupportInvoiceRecord[],
     period: string,
     now: Date,
-  ): { amountUf: number | null; billingStatus: 'to_invoice' | 'invoiced' | null; paymentStatus: SupportBillingRow['paymentStatus'] } {
+  ): BillingCell {
     const invoice = planInvoices.find((item) => item.periodKey === period);
-    if (!invoice) return { amountUf: null, billingStatus: null, paymentStatus: null };
+    if (!invoice) return { amountUf: 0, billingStatus: 'to_invoice', paymentStatus: null };
     return { amountUf: invoice.amountUf, billingStatus: 'invoiced', paymentStatus: paymentStatusOf(invoice, now) };
   }
 

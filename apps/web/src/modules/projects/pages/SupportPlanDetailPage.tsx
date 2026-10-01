@@ -197,7 +197,7 @@ export function SupportPlanDetailPage() {
         <IdentityField
           label="Estado de facturación y pago"
           value={<SupportInvoiceBillingStatusBadge status={plan.currentBillingStatus} />}
-          sub={plan.currentBillingStatus ? formatMoney(plan.currentAmountUf, plan.currency) : undefined}
+          sub={formatMoney(plan.currentAmountUf, plan.currency)}
         />
       </Card>
 

@@ -47,7 +47,7 @@ const FILTERS: Readonly<{ id: TypeFilter; label: string }[]> = [
   { id: 'alerts', label: 'Con alertas' },
 ];
 
-/** Los estados se ordenan por su avance en el flujo de cobro, no alfabéticamente. "Sin movimiento" (`null`) queda al final. */
+/** Los estados se ordenan por su avance en el flujo de cobro, no alfabéticamente. */
 const BILLING_STATUS_ORDER: Readonly<Record<SupportInvoiceBillingStatus, number>> = { to_invoice: 0, invoiced: 1 };
 const PAYMENT_STATUS_ORDER: Readonly<Record<SupportInvoicePaymentStatus, number>> = { pending: 0, overdue: 1, paid: 2 };
 
@@ -57,7 +57,7 @@ const SORT_VALUE: Record<SortField, (row: SupportBillingRow) => SortValue> = {
   plan: (r) => r.planName,
   type: (r) => SUPPORT_PLAN_TYPE_LABELS[r.planType],
   amount: (r) => r.amountUf,
-  billing: (r) => (r.billingStatus ? BILLING_STATUS_ORDER[r.billingStatus] : null),
+  billing: (r) => BILLING_STATUS_ORDER[r.billingStatus ?? 'to_invoice'],
   payment: (r) => (r.paymentStatus ? PAYMENT_STATUS_ORDER[r.paymentStatus] : null),
 };
 
@@ -123,7 +123,7 @@ export function SupportBillingSection() {
       ),
     },
     { key: 'type', header: 'Tipo', sortable: true, render: (r) => <SupportPlanTypeBadge planType={r.planType} /> },
-    { key: 'amount', header: 'Monto', align: 'right', sortable: true, render: (r) => (r.amountUf !== null ? formatMoney(r.amountUf, r.currency) : '—') },
+    { key: 'amount', header: 'Monto', align: 'right', sortable: true, render: (r) => formatMoney(r.amountUf ?? 0, r.currency) },
     { key: 'billing', header: 'Estado facturación', sortable: true, render: (r) => <SupportInvoiceBillingStatusBadge status={r.billingStatus} /> },
     { key: 'payment', header: 'Estado de pago', sortable: true, render: (r) => <SupportInvoicePaymentStatusBadge status={r.paymentStatus} /> },
     {

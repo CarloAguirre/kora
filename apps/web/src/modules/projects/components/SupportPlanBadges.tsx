@@ -42,9 +42,10 @@ const BILLING_TONE: Readonly<Record<SupportInvoiceBillingStatus, BadgeTone>> = {
   invoiced: 'info',
 };
 
+/** `null` (nada pendiente en el período) se muestra igual "Por facturar" — no existe un estado "Sin movimiento"; el monto en 0 ya lo dice. */
 export function SupportInvoiceBillingStatusBadge({ status }: { status: SupportInvoiceBillingStatus | null }) {
-  if (!status) return <Badge tone="neutral">Sin movimiento</Badge>;
-  return <Badge tone={BILLING_TONE[status]}>{SUPPORT_INVOICE_BILLING_STATUS_LABELS[status]}</Badge>;
+  const shown = status ?? 'to_invoice';
+  return <Badge tone={BILLING_TONE[shown]}>{SUPPORT_INVOICE_BILLING_STATUS_LABELS[shown]}</Badge>;
 }
 
 const PAYMENT_TONE: Readonly<Record<SupportInvoicePaymentStatus, BadgeTone>> = {

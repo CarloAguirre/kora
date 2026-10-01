@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { HourEntryRepository } from '../../../hours/domain/repositories/hour-entry.repository';
 import type { SupportMonthlyPeriodRecord, SupportPlanRecord } from '../../domain/repositories/support-plan.repository';
-import type { SupportInvoiceRepository } from '../../domain/repositories/support-invoice.repository';
+import type { SupportInvoiceRecord, SupportInvoiceRepository } from '../../domain/repositories/support-invoice.repository';
 import { SupportBillingCalculator } from './support-billing-calculator';
 import type { SupportMonthlyPeriodReconciler } from './support-monthly-period-reconciler';
 
@@ -20,18 +20,30 @@ class FakePeriodReconciler implements Pick<SupportMonthlyPeriodReconciler, 'list
   }
 }
 
-class FakeSupportInvoiceRepository implements Pick<SupportInvoiceRepository, 'sumHoursBilledForPlan'> {
-  constructor(private readonly alreadyBilled: number) {}
+class FakeSupportInvoiceRepository implements Pick<SupportInvoiceRepository, 'sumHoursBilledForPlan' | 'listForPlan'> {
+  constructor(
+    private readonly alreadyBilled: number,
+    private readonly invoiceCount: number,
+  ) {}
   async sumHoursBilledForPlan(): Promise<number> {
     return this.alreadyBilled;
   }
+  async listForPlan(): Promise<SupportInvoiceRecord[]> {
+    return Array.from({ length: this.invoiceCount }, () => ({}) as SupportInvoiceRecord);
+  }
 }
 
-function buildCalculator(hours: number, periods: SupportMonthlyPeriodRecord[] = [], alreadyBilled = 0): SupportBillingCalculator {
+/** `invoiceCount` = facturas previas del plan; por defecto, 1 si ya hay horas facturadas (en una bolsa, la primera factura ya cobró la bolsa). */
+function buildCalculator(
+  hours: number,
+  periods: SupportMonthlyPeriodRecord[] = [],
+  alreadyBilled = 0,
+  invoiceCount = alreadyBilled > 0 ? 1 : 0,
+): SupportBillingCalculator {
   return new SupportBillingCalculator(
     new FakePeriodReconciler(periods) as unknown as SupportMonthlyPeriodReconciler,
     new FakeHourEntryRepository(hours) as unknown as HourEntryRepository,
-    new FakeSupportInvoiceRepository(alreadyBilled) as unknown as SupportInvoiceRepository,
+    new FakeSupportInvoiceRepository(alreadyBilled, invoiceCount) as unknown as SupportInvoiceRepository,
   );
 }
 
@@ -73,13 +85,25 @@ function basePlan(overrides: Partial<SupportPlanRecord> = {}): SupportPlanRecord
 const TODAY = new Date('2026-09-15T12:00:00Z');
 
 describe('SupportBillingCalculator — on_demand', () => {
-  it('factura las horas aprobadas del mes en curso al valor hora del plan', async () => {
+  it('factura las horas aprobadas aún no facturadas al valor hora del plan', async () => {
     const calculator = buildCalculator(10);
     const result = await calculator.calculate(basePlan({ planType: 'on_demand', planValueUf: 0.35 }), ['p1'], TODAY);
     expect(result).toEqual({ amountUf: 3.5, hoursBilled: 10, periodKey: '2026-09', monthlyPeriodId: null });
   });
 
-  it('no factura nada si no hay horas aprobadas este mes', async () => {
+  it('descuenta las horas que ya entraron en facturas anteriores — las de un mes cerrado sin facturar siguen por cobrar', async () => {
+    const calculator = buildCalculator(26.75, [], 12);
+    const result = await calculator.calculate(basePlan({ planType: 'on_demand', planValueUf: 0.4 }), ['p1'], TODAY);
+    expect(result).toEqual({ amountUf: 5.9, hoursBilled: 14.75, periodKey: '2026-09', monthlyPeriodId: null });
+  });
+
+  it('no factura nada si todas las horas aprobadas ya se facturaron', async () => {
+    const calculator = buildCalculator(10, [], 10);
+    const result = await calculator.calculate(basePlan({ planType: 'on_demand' }), ['p1'], TODAY);
+    expect(result).toBeNull();
+  });
+
+  it('no factura nada si no hay horas aprobadas', async () => {
     const calculator = buildCalculator(0);
     const result = await calculator.calculate(basePlan({ planType: 'on_demand' }), ['p1'], TODAY);
     expect(result).toBeNull();
@@ -87,14 +111,30 @@ describe('SupportBillingCalculator — on_demand', () => {
 });
 
 describe('SupportBillingCalculator — bundle', () => {
-  it('no factura nada si el uso no supera las horas contratadas', async () => {
-    const calculator = buildCalculator(50, [], 0);
+  it('la primera factura cobra la bolsa completa (HH contratadas × valor hora) aunque no se haya usado', async () => {
+    const calculator = buildCalculator(0, [], 0);
+    const result = await calculator.calculate(basePlan({ planType: 'bundle', contractedHours: 300, planValueUf: 0.35 }), ['p1'], TODAY);
+    expect(result).toEqual({ amountUf: 105, hoursBilled: null, periodKey: '2026-09', monthlyPeriodId: null });
+  });
+
+  it('no vuelve a cobrar la bolsa si ya tiene una factura y el uso no supera las horas contratadas', async () => {
+    const calculator = buildCalculator(50, [], 0, 1);
     const result = await calculator.calculate(basePlan({ planType: 'bundle', contractedHours: 300 }), ['p1'], TODAY);
     expect(result).toBeNull();
   });
 
-  it('factura el excedente completo al valor de hora extra cuando nada se ha facturado antes', async () => {
+  it('si la bolsa aún no se factura y ya hay excedente, cobra ambos en la misma factura', async () => {
     const calculator = buildCalculator(340, [], 0);
+    const result = await calculator.calculate(
+      basePlan({ planType: 'bundle', contractedHours: 300, planValueUf: 0.35, extraHourValueUf: 0.45 }),
+      ['p1'],
+      TODAY,
+    );
+    expect(result).toEqual({ amountUf: 123, hoursBilled: 40, periodKey: '2026-09', monthlyPeriodId: null });
+  });
+
+  it('con la bolsa ya facturada, cobra el excedente completo al valor de hora extra', async () => {
+    const calculator = buildCalculator(340, [], 0, 1);
     const result = await calculator.calculate(
       basePlan({ planType: 'bundle', contractedHours: 300, extraHourValueUf: 0.45 }),
       ['p1'],

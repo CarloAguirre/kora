@@ -20,11 +20,13 @@ export interface SupportBillingCalculation {
  * (que solo orquesta: calcula, congela el resultado en una fila de
  * `support_invoices`, y en `on_demand` enlaza los tickets facturados).
  *
- * Nunca mira el pasado más allá de lo necesario para no volver a cobrar lo ya
- * facturado: en `on_demand` factura el mes calendario en curso; en `bundle`,
- * el excedente NUEVO desde la última factura; en `monthly`, reutiliza el
- * mismo árbol de decisión que `GetSupportPlanSummaryUseCase` para la cuota y
- * el excedente del período activo.
+ * Nunca vuelve a cobrar lo ya facturado: en `on_demand` factura toda hora
+ * aprobada que aún no entró en una factura (no solo las del mes calendario —
+ * si no, las horas de un mes que se cerró sin facturar quedaban sin cobrar);
+ * en `bundle`, la bolsa completa de una vez en su primera factura, más el
+ * excedente NUEVO desde la última; en `monthly`, reutiliza el mismo árbol de
+ * decisión que `GetSupportPlanSummaryUseCase` para la cuota y el excedente
+ * del período activo.
  */
 @Injectable()
 export class SupportBillingCalculator {
@@ -51,9 +53,9 @@ export class SupportBillingCalculator {
     today: Date,
   ): Promise<SupportBillingCalculation | null> {
     const day = toUtcDate(today);
-    const monthStart = startOfMonth(day);
-    const from = monthStart.getTime() > plan.startDate.getTime() ? monthStart : plan.startDate;
-    const hours = await this.hourEntries.sumApprovedHoursForProjects(linkedProjectIds, from, day);
+    const totalHours = await this.hourEntries.sumApprovedHoursForProjects(linkedProjectIds, plan.startDate, day);
+    const alreadyBilled = await this.invoices.sumHoursBilledForPlan(plan.id);
+    const hours = round2(Math.max(0, totalHours - alreadyBilled));
     if (hours <= 0) return null;
 
     return { amountUf: round2(hours * plan.planValueUf), hoursBilled: hours, periodKey: periodKeyOf(day), monthlyPeriodId: null };
@@ -68,13 +70,18 @@ export class SupportBillingCalculator {
     const totalUsed = await this.hourEntries.sumApprovedHoursForProjects(linkedProjectIds, plan.startDate, day);
     const totalOverage = Math.max(0, totalUsed - plan.contractedHours);
 
+    // `hours_billed` de una bolsa guarda solo horas de EXCEDENTE — las de la bolsa misma se cobran una sola vez, en la primera factura del contrato.
     const alreadyBilled = await this.invoices.sumHoursBilledForPlan(plan.id);
     const newOverage = Math.max(0, totalOverage - alreadyBilled);
-    if (newOverage <= 0) return null;
+    const bundleAlreadyBilled = (await this.invoices.listForPlan(plan.id)).length > 0;
+    const bundleAmount = bundleAlreadyBilled ? 0 : plan.contractedHours * plan.planValueUf;
+
+    const amountUf = round2(bundleAmount + newOverage * plan.extraHourValueUf);
+    if (amountUf <= 0) return null;
 
     return {
-      amountUf: round2(newOverage * plan.extraHourValueUf),
-      hoursBilled: newOverage,
+      amountUf,
+      hoursBilled: newOverage > 0 ? newOverage : null,
       periodKey: periodKeyOf(day),
       monthlyPeriodId: null,
     };
@@ -107,10 +114,6 @@ export class SupportBillingCalculator {
 
 function toUtcDate(date: Date): Date {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-}
-
-function startOfMonth(date: Date): Date {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
 }
 
 function periodKeyOf(date: Date): string {

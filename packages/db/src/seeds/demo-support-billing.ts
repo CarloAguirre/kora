@@ -8,7 +8,7 @@ import { clients, hourEntries, projects, supportInvoices, supportMonthlyPeriods,
  * panel de Facturación → Soporte (`GetSupportBillingOverviewUseCase`) y la
  * ficha del contrato, para poder revisarlas contra Figma: tipo (a demanda /
  * bolsa / mensual acumulable / mensual con vencimiento) × estado de
- * facturación (por facturar / facturado / sin movimiento) × estado de pago
+ * facturación (por facturar / facturado / por facturar en 0) × estado de pago
  * (pendiente / pagado / atrasado) × alertas (horas desviadas, exceso en el
  * último período, factura atrasada de un período anterior).
  *
@@ -18,7 +18,7 @@ import { clients, hourEntries, projects, supportInvoices, supportMonthlyPeriods,
  *
  * Las fechas son RELATIVAS al mes en curso al momento de correrlo: el panel
  * solo calcula en vivo el mes calendario de hoy, así que con fechas fijas
- * los contratos quedarían "Sin movimiento" apenas cambie el mes. Es
+ * los contratos quedarían en 0 apenas cambie el mes. Es
  * idempotente — horas, períodos y facturas de estos contratos se reemplazan
  * en cada corrida —, así que basta volver a correrlo para "moverlo" al mes
  * nuevo.
@@ -174,18 +174,18 @@ export async function seedDemoSupportBilling(db: Database, today: Date = new Dat
       startDate: monthStart(-3),
       endDate: monthStart(9),
       contractedHours: '40',
-      planValueUf: '32',
+      planValueUf: '0.8',
       extraHourValueUf: '1.2',
     },
     {
       ...basePlan,
       id: IDS.bundleWithinQuota.plan,
-      name: 'Bolsa · Dentro de la bolsa',
+      name: 'Bolsa · Dentro de la bolsa · Bolsa por facturar',
       planType: 'bundle',
       startDate: monthStart(-3),
       endDate: monthStart(9),
       contractedHours: '40',
-      planValueUf: '32',
+      planValueUf: '0.8',
       extraHourValueUf: '1.2',
     },
     {
@@ -196,7 +196,7 @@ export async function seedDemoSupportBilling(db: Database, today: Date = new Dat
       startDate: monthStart(-4),
       endDate: monthStart(8),
       contractedHours: '20',
-      planValueUf: '16',
+      planValueUf: '0.8',
       extraHourValueUf: '1.2',
     },
     {
@@ -278,8 +278,8 @@ export async function seedDemoSupportBilling(db: Database, today: Date = new Dat
   });
 
   await db.insert(hourEntries).values([
-    // A demanda · Por facturar — 6.5 h aprobadas este mes → 6.5 × 0.86 = 5.59 UF. Las del mes pasado no cuentan.
-    entry('onDemandToInvoice', -1, 18, 4, 'Ajuste de reporte mensual (mes anterior, ya fuera del ciclo).'),
+    // A demanda · Por facturar — 10.5 h aprobadas sin facturar → 10.5 × 0.86 = 9.03 UF. Las del mes pasado siguen contando: nunca se facturaron.
+    entry('onDemandToInvoice', -1, 18, 4, 'Ajuste de reporte mensual (mes anterior, aún sin facturar).'),
     entry('onDemandToInvoice', 0, 3, 2.5, 'Corrección de error en formulario de contacto.'),
     entry('onDemandToInvoice', 0, 10, 4, 'Soporte a carga masiva de clientes.', REAL.userSolmaryCastro),
     // Una hora PENDIENTE de aprobación — no debe sumar al monto.
@@ -289,20 +289,20 @@ export async function seedDemoSupportBilling(db: Database, today: Date = new Dat
     entry('onDemandInvoicedPending', 0, 2, 5, 'Incidente en sincronización de pedidos.'),
     entry('onDemandInvoicedPending', 0, 6, 7, 'Mejora de tiempos de carga en catálogo.', REAL.userSolmaryCastro),
 
-    // Bolsa · Horas desviadas · Sin facturar — 40 h contratadas, 52.5 h usadas → 12.5 h × 1.2 = 15 UF. Alerta "horas desviadas".
+    // Bolsa · Horas desviadas · Sin facturar — 40 h contratadas (bolsa ya facturada, paso 6), 52.5 h usadas → 12.5 h × 1.2 = 15 UF. Alerta "horas desviadas".
     entry('bundleDeviatedToInvoice', -3, 12, 14, 'Soporte post salida a producción.'),
     entry('bundleDeviatedToInvoice', -2, 8, 12, 'Ajustes de reglas de reposición.', REAL.userSolmaryCastro),
     entry('bundleDeviatedToInvoice', -1, 15, 16, 'Integración con transportista nuevo.'),
     entry('bundleDeviatedToInvoice', 0, 4, 6, 'Corrección de stock negativo en bodega central.'),
     entry('bundleDeviatedToInvoice', 0, 9, 4.5, 'Soporte a inventario de cierre de mes.', REAL.userSolmaryCastro),
 
-    // Bolsa · Dentro de la bolsa — 22 de 40 h → sin excedente, "Sin movimiento" y sin alerta.
+    // Bolsa · Dentro de la bolsa — 22 de 40 h, sin excedente ni alerta; la bolsa nunca se facturó → 40 h × 0.8 = 32 UF por facturar de una.
     entry('bundleWithinQuota', -2, 10, 8, 'Alta de nuevos perfiles de usuario.'),
     entry('bundleWithinQuota', -1, 14, 9, 'Ajuste de flujo de vacaciones.'),
     entry('bundleWithinQuota', 0, 5, 5, 'Corrección de liquidación en PDF.', REAL.userSolmaryCastro),
 
-    // Bolsa · Facturado · Pagado — 20 h contratadas, 30 h usadas; el excedente completo (10 h) se facturó este mes,
-    // así que el cálculo en vivo da 0 y la fila igual debe verse "Facturado" (no "Sin movimiento").
+    // Bolsa · Facturado · Pagado — 20 h contratadas (bolsa facturada hace 4 meses), 30 h usadas; el excedente completo (10 h)
+    // se facturó este mes, así que el cálculo en vivo da 0 y la fila igual debe verse "Facturado" (no "Por facturar").
     entry('bundleInvoicedPaid', -3, 10, 12, 'Configuración inicial del bot.'),
     entry('bundleInvoicedPaid', -2, 12, 10, 'Ajuste de plantillas de correo de cobranza.'),
     entry('bundleInvoicedPaid', -1, 20, 6, 'Nuevo tramo de mora en reglas del bot.'),
@@ -380,6 +380,27 @@ export async function seedDemoSupportBilling(db: Database, today: Date = new Dat
       folio: 'DEMO-1002',
       invoicedAt: monthDay(0, 7),
       dueAt: addDays(monthDay(0, 7), 30),
+    },
+    // Bolsas — la bolsa completa se cobra una sola vez, en la primera factura (HH contratadas × valor hora; sin `hoursBilled`, que guarda solo excedente).
+    {
+      planId: IDS.bundleDeviatedToInvoice.plan,
+      periodKey: periodKeyOf(monthStart(-3)),
+      amountUf: '32',
+      currency: 'UF',
+      folio: 'DEMO-1003',
+      invoicedAt: monthDay(-3, 2),
+      dueAt: addDays(monthDay(-3, 2), 30),
+      paidAt: monthDay(-3, 20),
+    },
+    {
+      planId: IDS.bundleInvoicedPaid.plan,
+      periodKey: periodKeyOf(monthStart(-4)),
+      amountUf: '16',
+      currency: 'UF',
+      folio: 'DEMO-1004',
+      invoicedAt: monthDay(-4, 2),
+      dueAt: addDays(monthDay(-4, 2), 30),
+      paidAt: monthDay(-4, 18),
     },
     // Bolsa · Facturado · Pagado — 10 h de excedente × 1.2 = 12.00 UF.
     {
