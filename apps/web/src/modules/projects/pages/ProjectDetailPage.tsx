@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import styles from './ProjectDetailPage.module.css';
 import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Button } from '@/shared/components/ui/Button';
+import { Select } from '@/shared/components/ui/Select';
 import { ChevronLeftIcon } from '@/shared/components/icons/Icons';
 import { useToast } from '@/shared/components/ui/Toast';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
@@ -32,6 +33,7 @@ export function ProjectDetailPage() {
   const setOvertimeAuthorization = useSetProjectOvertimeAuthorization();
   const { data: project, isLoading, error } = useProjectDetail(projectId ?? null);
   const [editing, setEditing] = useState(false);
+  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
 
   const onToggleOvertime = async () => {
     if (!projectId || !project) return;
@@ -69,7 +71,9 @@ export function ProjectDetailPage() {
     );
   }
 
-  const leaderTeam = user ? project.teams.find((t) => t.leader?.id === user.id) : undefined;
+  /** Puede liderar más de un equipo del proyecto — en ese caso elige cuál ver con el selector de arriba. */
+  const ledTeams = user ? project.teams.filter((t) => t.leader?.id === user.id) : [];
+  const leaderTeam = ledTeams.find((t) => t.teamId === selectedTeamId) ?? ledTeams[0];
   /**
    * Un líder puede ser a la vez líder de proyecto (o tener `projects:manage`)
    * y líder de uno de los equipos asignados — en ese caso conserva la vista
@@ -95,6 +99,16 @@ export function ProjectDetailPage() {
           <Button variant="tertiary" size="sm" className={styles.backButton} onClick={() => void navigate('/proyectos')}>
             <ChevronLeftIcon size={16} /> Volver a proyectos
           </Button>
+
+          {showTeamOnlyView && leaderTeam && ledTeams.length > 1 && (
+            <Select
+              aria-label="Equipo"
+              className={styles.teamSwitcher}
+              options={ledTeams.map((t) => ({ value: t.teamId, label: t.teamName }))}
+              value={leaderTeam.teamId}
+              onChange={(event) => setSelectedTeamId(event.target.value)}
+            />
+          )}
 
           {/* Estado y horas extra viven en "Editar proyecto"; este botón queda solo para quien puede autorizar
               horas extra sin poder editar el proyecto (líder de un equipo asignado) — sin él perdería esa acción. */}
