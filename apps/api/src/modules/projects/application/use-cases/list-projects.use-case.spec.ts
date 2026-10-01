@@ -6,6 +6,10 @@ import type { ProjectFilters, ProjectListItem, ProjectRepository } from '../../d
 import type { TeamRepository } from '../../../teams/domain/repositories/team.repository';
 import type { Team } from '../../../teams/domain/entities/team.entity';
 import type { ProjectClientReader, ProjectClientReference } from '../ports/project-client-reader.port';
+import type { ProjectModuleRepository } from '../../domain/repositories/project-module.repository';
+import { FixedClock } from '../../../../test/fakes';
+
+const MODULES = { listProgressInputsForProjects: vi.fn().mockResolvedValue(new Map()) } as unknown as ProjectModuleRepository;
 
 const EMPTY_PAGE: Page<ProjectListItem> = buildPage([], 0, { page: 1, pageSize: 25 });
 
@@ -55,6 +59,8 @@ describe('ListProjectsUseCase — resolución de slug en los filtros', () => {
       projects as unknown as ProjectRepository,
       teams as unknown as TeamRepository,
       clients,
+      MODULES,
+      new FixedClock(),
     );
 
     await useCase.execute({ query: { ...baseQuery(), clientId: 'amicar' }, actor: ACTOR, actorPermissions: FULL_READ });
@@ -71,6 +77,8 @@ describe('ListProjectsUseCase — resolución de slug en los filtros', () => {
       projects as unknown as ProjectRepository,
       teams as unknown as TeamRepository,
       clients,
+      MODULES,
+      new FixedClock(),
     );
 
     const result = await useCase.execute({
@@ -91,6 +99,8 @@ describe('ListProjectsUseCase — resolución de slug en los filtros', () => {
       projects as unknown as ProjectRepository,
       teams as unknown as TeamRepository,
       clients,
+      MODULES,
+      new FixedClock(),
     );
 
     await useCase.execute({ query: { ...baseQuery(), teamId: 'desarrollo' }, actor: ACTOR, actorPermissions: FULL_READ });
@@ -108,6 +118,8 @@ describe('ListProjectsUseCase — resolución de slug en los filtros', () => {
       projects as unknown as ProjectRepository,
       teams as unknown as TeamRepository,
       clients,
+      MODULES,
+      new FixedClock(),
     );
 
     await useCase.execute({

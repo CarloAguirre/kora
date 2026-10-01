@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   PROJECT_MODULE_DELIVERY_STATUS_LABELS,
   PROJECT_MODULE_STAGES,
@@ -155,13 +155,15 @@ function groupedGanttItems(module: ProjectModule): GanttRowItem[] {
   return teamOrder.flatMap((teamName) => byTeam.get(teamName)!);
 }
 
-type PhaseVisualStatus = 'proximo' | 'en_proceso' | 'finalizado';
+type PhaseVisualStatus = 'sin_plan' | 'proximo' | 'en_proceso' | 'finalizado';
 const PHASE_STATUS_LABELS: Record<PhaseVisualStatus, string> = {
+  sin_plan: 'Sin plan cargado',
   proximo: 'Próximo',
   en_proceso: 'En Proceso',
   finalizado: 'Finalizado',
 };
 const PHASE_STATUS_CHIP_CLASS: Record<PhaseVisualStatus, 'stageChipMuted' | 'stageChipInfo' | 'stageChipDone'> = {
+  sin_plan: 'stageChipMuted',
   proximo: 'stageChipMuted',
   en_proceso: 'stageChipInfo',
   finalizado: 'stageChipDone',
@@ -170,13 +172,13 @@ const PHASE_STATUS_CHIP_CLASS: Record<PhaseVisualStatus, 'stageChipMuted' | 'sta
  * Estado visual de la fase. "Finalizado" es 100% la decisión manual del líder
  * (`currentStage === 'closed'`, el hito de cierre): si la cerró, quedó
  * cerrada, sin importar tareas pendientes — no se puede "reabrir" calculando
- * desde las tareas. "Próximo"/"En Proceso" sí se derivan de las tareas:
- * "Próximo" es ninguna tarea empezada ni vencida hoy o antes; cualquier otro
- * caso (mientras no esté cerrada a mano) es "En Proceso".
+ * desde las tareas. El resto sí se deriva de las tareas: sin ninguna es
+ * "Sin plan cargado"; "Próximo" es ninguna tarea empezada ni vencida hoy o
+ * antes; cualquier otro caso (mientras no esté cerrada a mano) es "En Proceso".
  */
 function phaseVisualStatus(module: ProjectModule): PhaseVisualStatus {
   if (module.currentStage === 'closed') return 'finalizado';
-  if (module.tasks.length === 0) return 'proximo';
+  if (module.tasks.length === 0) return 'sin_plan';
   const anyStartedOrDue = module.tasks.some((t) => parseDate(t.startDate ?? t.date) <= today());
   return anyStartedOrDue ? 'en_proceso' : 'proximo';
 }
@@ -308,6 +310,18 @@ interface ProjectModulesCardProps {
 export function ProjectModulesCard({ projectId, modules, hourEntries, observations, canManage }: ProjectModulesCardProps) {
   const toast = useToast();
   const updateModule = useUpdateProjectModule();
+
+  /**
+   * La pista del Gantt es más ancha que la vista (zoom inicial = 145%), así que en una fase ya
+   * avanzada HOY y las últimas tareas quedaban fuera de pantalla a la derecha. Al montar cada fase
+   * se desplaza una sola vez para centrar HOY; después el scroll queda en manos de quien la mira.
+   */
+  const centeredOnToday = useRef(new Set<string>());
+  const centerOnToday = (moduleId: string, todayPct: number | null) => (element: HTMLDivElement | null) => {
+    if (!element || todayPct === null || centeredOnToday.current.has(moduleId)) return;
+    centeredOnToday.current.add(moduleId);
+    element.scrollLeft = Math.max(0, (element.scrollWidth * todayPct) / 100 - element.clientWidth / 2);
+  };
 
   const [rangeDraft, setRangeDraft] = useState({ from: '', to: '' });
   const [appliedRange, setAppliedRange] = useState<DateRange | null>(null);
@@ -508,29 +522,48 @@ export function ProjectModulesCard({ projectId, modules, hourEntries, observatio
                 </div>
               )}
 
+              {/* Avance real por ámbito, ponderado por HH (`module.progress`, calculado en el backend). Un
+                  ámbito sin tareas es "Sin plan", nunca 0% ni 100%. */}
               <div className={styles.pipelineSection}>
-                <span className={styles.pipelineLabel}>Resumen de avance</span>
+                <div className={styles.pipelineHeader}>
+                  <span className={styles.pipelineLabel}>Resumen de avance</span>
+                  <span className={styles.pipelineTotals}>
+                    {module.progress.actual != null
+                      ? `Avance ${module.progress.actual}% · Esperado ${module.progress.expected ?? 0}%`
+                      : 'Sin plan cargado'}
+                  </span>
+                </div>
                 <div className={styles.pipeline}>
                   {PROJECT_MODULE_TASK_SCOPES.map((scope) => {
+                    const scopePct = module.progress.scopes[scope];
                     const scopeTasks = module.tasks.filter((t) => t.scope === scope);
-                    const doneCount = scopeTasks.filter((t) => t.status === 'done').length;
-                    const donePct = scopeTasks.length === 0 ? 100 : Math.round((doneCount / scopeTasks.length) * 100);
+                    const approvedCount = scopeTasks.filter((t) => t.status === 'done').length;
                     return (
                       <div
                         key={scope}
-                        className={styles.pipelineSegment}
-                        title={`${PROJECT_MODULE_TASK_SCOPE_LABELS[scope]}: ${donePct}% (${doneCount}/${scopeTasks.length} completadas)`}
+                        className={styles.pipelineColumn}
+                        title={
+                          scopePct != null
+                            ? `${PROJECT_MODULE_TASK_SCOPE_LABELS[scope]}: ${scopePct}% (${approvedCount}/${scopeTasks.length} aprobadas)`
+                            : `${PROJECT_MODULE_TASK_SCOPE_LABELS[scope]}: sin tareas cargadas`
+                        }
                       >
-                        <div className={styles.pipelineSegmentFill} style={{ width: `${donePct}%` }} />
+                        <div className={styles.pipelineSegment}>
+                          <div className={styles.pipelineSegmentFill} style={{ width: `${scopePct ?? 0}%` }} />
+                        </div>
+                        <span className={styles.pipelineScopeLabel}>
+                          {PROJECT_MODULE_TASK_SCOPE_LABELS[scope]}
+                          <span className={scopePct != null ? styles.pipelineScopeValue : styles.pipelineScopeEmpty}>
+                            {scopePct != null ? `${scopePct}%` : 'Sin plan'}
+                          </span>
+                        </span>
                       </div>
                     );
                   })}
                 </div>
-                <div className={styles.pipelineLabels}>
-                  {PROJECT_MODULE_TASK_SCOPES.map((scope) => (
-                    <span key={scope}>{PROJECT_MODULE_TASK_SCOPE_LABELS[scope]}</span>
-                  ))}
-                </div>
+                {module.progress.estimatedByCount && (
+                  <span className={styles.pipelineHint}>Avance calculado por cantidad de tareas: ninguna tiene HH estimadas.</span>
+                )}
               </div>
 
               <div className={styles.moduleFields}>
@@ -593,7 +626,7 @@ export function ProjectModulesCard({ projectId, modules, hourEntries, observatio
                       {module.deliveries.length > 0 && <div className={styles.ganttEntregasLabel}>Entregas</div>}
                     </div>
 
-                    <div className={styles.ganttTracksCol}>
+                    <div className={styles.ganttTracksCol} ref={centerOnToday(module.id, todayPct)}>
                       <div className={styles.ganttScroll} style={{ width: `${scrollWidthPercent(zoom)}%` }}>
                         <div className={styles.ganttHeader}>
                           {monthTicks(range).map((tick, tickIndex) => (

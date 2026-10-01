@@ -44,7 +44,7 @@ export function toClientProjectRow(project: ProjectSummary, clientOwnerName: str
     endDate: project.endDate ? formatDMY(project.endDate) : null,
     health: health(project.status),
     stageLabel: project.phase ? PHASE_LABELS[project.phase] : 'Sin etapa',
-    stageProgressPercent: project.actualProgress ?? 0,
+    stageProgressPercent: project.progress.actual ?? 0,
   };
 }
 

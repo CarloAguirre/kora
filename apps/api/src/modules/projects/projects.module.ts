@@ -19,6 +19,7 @@ import { ResolveProjectObservationUseCase } from './application/use-cases/resolv
 import { DeleteProjectObservationUseCase } from './application/use-cases/delete-project-observation.use-case';
 import { ProjectChangeLogRecorder } from './application/services/project-change-log.recorder';
 import { SegmentForecastSyncService } from './application/services/segment-forecast-sync.service';
+import { ProjectProgressRecalculator } from './application/services/project-progress-recalculator';
 import { CreateProjectModuleUseCase } from './application/use-cases/create-project-module.use-case';
 import { UpdateProjectModuleUseCase } from './application/use-cases/update-project-module.use-case';
 import { DeleteProjectModuleUseCase } from './application/use-cases/delete-project-module.use-case';
@@ -98,6 +99,7 @@ import { DrizzleSegmentForecastStore } from './infrastructure/services/drizzle-s
     DeleteProjectObservationUseCase,
     ProjectChangeLogRecorder,
     SegmentForecastSyncService,
+    ProjectProgressRecalculator,
     CreateProjectModuleUseCase,
     UpdateProjectModuleUseCase,
     DeleteProjectModuleUseCase,

@@ -1,89 +1,129 @@
-import { PROJECT_PHASES, PROJECT_PHASE_LABELS, type ProjectPhase } from '@kora/contracts';
+import { projectDelayLevel, type ProjectDelayLevel, type ProjectProgress } from '@kora/contracts';
+import { Badge, type BadgeTone } from '@/shared/components/ui/Badge';
+import { formatProgressPercent } from '../lib/project-progress-display';
 import styles from './ProjectTimeline.module.css';
 
-const MONTHS_ES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+const DELAY_TONE: Record<ProjectDelayLevel, BadgeTone> = {
+  on_track: 'success',
+  alert: 'warning',
+  critical: 'danger',
+};
 
-/** Réplica de la generación de etiquetas de mes de `LiderProyectoFicha` (v1): un mes por
- * cada mes calendario entre inicio y fin, recortado a 8 etiquetas como máximo. */
-function getMonthLabels(startDate: string | null, endDate: string | null): string[] {
-  const start = startDate ? new Date(`${startDate}T00:00:00`) : null;
-  const end = endDate ? new Date(`${endDate}T00:00:00`) : null;
-
-  let labels: string[] = [];
-  if (start && end && end >= start) {
-    const cursor = new Date(start.getFullYear(), start.getMonth(), 1);
-    const last = new Date(end.getFullYear(), end.getMonth(), 1);
-    while (cursor <= last) {
-      labels.push(`${MONTHS_ES[cursor.getMonth()]} ${String(cursor.getFullYear()).slice(2)}`);
-      cursor.setMonth(cursor.getMonth() + 1);
-    }
-  }
-  if (labels.length === 0) labels = ['—'];
-  if (labels.length > 8) {
-    const step = Math.ceil(labels.length / 8);
-    labels = labels.filter((_, i) => i % step === 0 || i === labels.length - 1);
-  }
-  return labels;
+/** Atraso bajo el umbral de alerta: neutro, no verde — un "Atrasado" en verde se lee como contradicción. */
+function delayTone(delay: number): BadgeTone {
+  const level = projectDelayLevel(delay);
+  return level === 'on_track' && delay > 0 ? 'neutral' : DELAY_TONE[level];
 }
 
+const formatDate = (value: string) => new Date(`${value}T00:00:00`).toLocaleDateString('es-CL');
+const clampPct = (value: number) => Math.min(100, Math.max(0, value));
+const points = (value: number) => `${value} ${value === 1 ? 'pt' : 'pts'}`;
+
+function delayLabel(delay: number): string {
+  if (delay > 0) return `Atrasado ${points(delay)}`;
+  if (delay < 0) return `Adelantado ${points(-delay)}`;
+  return 'Al día';
+}
+
+/** Cerca de los bordes, la etiqueta de una marca se alinea hacia adentro para no salirse de la tarjeta. */
+function markAlign(percent: number): string | undefined {
+  if (percent > 90) return styles.alignEnd;
+  if (percent < 10) return styles.alignStart;
+  return undefined;
+}
+
+/** Con poco avance el texto no cabe dentro del relleno: se muestra a su derecha, sobre la pista vacía. */
+const LABEL_INSIDE_MIN_PCT = 18;
+
 interface ProjectTimelineProps {
-  phase: ProjectPhase | null;
+  progress: ProjectProgress;
   startDate: string | null;
   endDate: string | null;
 }
 
 /**
- * Posición de "HOY" en la barra: porcentaje de días transcurridos entre
- * inicio y fin — no el centro de la fase actual. La fase es una categoría
- * elegida a mano y puede ir adelantada o atrasada respecto al calendario, así
- * que anclar el marcador a ella hacía que "HOY" no coincidiera con la fecha
- * real (p. ej. a mitad de camino en fechas pero recién en la 2ª de 5 fases).
+ * Avance real del proyecto (ver `projectProgressSchema`), con el estilo de la barra gruesa de fases
+ * original: el eje es el % de trabajo, el relleno llega hasta el avance real y la marca "ESPERADO"
+ * (mismo estilo que la píldora HOY de antes) indica dónde debería ir hoy. La marca de HH consumidas
+ * va bajo la barra. La etapa del proyecto ("En desarrollo") se muestra junto a los datos del proyecto.
  */
-function getTodayPercent(startDate: string | null, endDate: string | null): number | null {
-  if (!startDate || !endDate) return null;
-  const start = new Date(`${startDate}T00:00:00`).getTime();
-  const end = new Date(`${endDate}T00:00:00`).getTime();
-  if (end <= start) return null;
-
-  const ratio = (Date.now() - start) / (end - start);
-  return Math.min(100, Math.max(0, ratio * 100));
-}
-
-/** Réplica de la barra de fases + fila de meses de `LiderProyectoFicha` (v1). */
-export function ProjectTimeline({ phase, startDate, endDate }: ProjectTimelineProps) {
-  const currentIndex = phase ? PROJECT_PHASES.indexOf(phase) : -1;
-  const monthLabels = getMonthLabels(startDate, endDate);
-  const todayPercent = getTodayPercent(startDate, endDate);
+export function ProjectTimeline({ progress, startDate, endDate }: ProjectTimelineProps) {
+  const hasPlan = progress.actual != null;
+  const actual = progress.actual ?? 0;
+  const labelInside = actual >= LABEL_INSIDE_MIN_PCT;
 
   return (
     <div className={styles.timeline}>
-      <div className={styles.track}>
-        {PROJECT_PHASES.map((step, index) => {
-          const state = index < currentIndex ? 'past' : index === currentIndex ? 'current' : 'future';
-          const className = [
-            styles.segment,
-            state === 'past' ? styles.segmentPast : state === 'future' ? styles.segmentFuture : styles[`segmentCurrent_${step}`],
-          ].join(' ');
+      <div className={styles.header}>
+        <span className={styles.headerStats}>
+          Esperado hoy <b>{formatProgressPercent(progress.expected)}</b>
+          <span className={styles.headerDot}>·</span>
+          HH consumidas <b>{progress.consumption != null ? `${progress.consumption}%` : '—'}</b>
+        </span>
+        {progress.delay != null && <Badge tone={delayTone(progress.delay)}>{delayLabel(progress.delay)}</Badge>}
+      </div>
 
-          return (
-            <div key={step} className={className}>
-              {PROJECT_PHASE_LABELS[step]}
-            </div>
-          );
-        })}
+      <div className={styles.barArea}>
+        <div
+          className={styles.track}
+          role="img"
+          aria-label={hasPlan ? `Avance real ${progress.actual}%, esperado ${progress.expected}%` : 'Sin plan cargado'}
+        >
+          {hasPlan ? (
+            <>
+              <div className={styles.fill} style={{ width: `${actual}%` }}>
+                {labelInside && <span className={styles.fillLabel}>Avance real {actual}%</span>}
+              </div>
+              {!labelInside && (
+                <span className={styles.outsideLabel} style={{ left: `${actual}%` }}>
+                  Avance real {actual}%
+                </span>
+              )}
+            </>
+          ) : (
+            <span className={styles.emptyLabel}>Sin plan cargado</span>
+          )}
+        </div>
 
-        {todayPercent !== null && (
-          <span className={styles.today} style={{ left: `${todayPercent}%` }}>
-            <span className={styles.todayPill}>HOY</span>
-            <span className={styles.todayLine} />
+        {hasPlan && progress.expected != null && (
+          <span className={styles.expected} style={{ left: `${progress.expected}%` }}>
+            <span className={[styles.expectedPill, markAlign(progress.expected)].filter(Boolean).join(' ')}>
+              ESPERADO {progress.expected}%
+            </span>
+            <span className={styles.expectedLine} />
+          </span>
+        )}
+
+        {progress.consumption != null && (
+          <span className={styles.consumption} style={{ left: `${clampPct(progress.consumption)}%` }}>
+            <span className={[styles.consumptionLabel, markAlign(clampPct(progress.consumption))].filter(Boolean).join(' ')}>
+              HH {progress.consumption}%
+            </span>
           </span>
         )}
       </div>
 
-      <div className={styles.monthLabels}>
-        {monthLabels.map((label, index) => (
-          <span key={index}>{label}</span>
-        ))}
+      <div className={styles.scale}>
+        <span>0%</span>
+        <span>50%</span>
+        <span>100%</span>
+      </div>
+
+      <div className={styles.footer}>
+        <span>{startDate ? `Inicio ${formatDate(startDate)}` : 'Sin fecha de inicio'}</span>
+        <span className={styles.note}>
+          {hasPlan
+            ? [
+                progress.planCoverage != null && progress.planCoverage < 100
+                  ? `Plan cargado: ${progress.planCoverage}% de las HH estimadas de las fases.`
+                  : null,
+                progress.estimatedByCount ? 'Parte del avance se calculó por cantidad de tareas (sin HH estimadas).' : null,
+              ]
+                .filter(Boolean)
+                .join(' ')
+            : 'El avance se mide cuando las fases tienen tareas con HH estimadas (tab Roadmap).'}
+        </span>
+        <span>{endDate ? `Entrega ${formatDate(endDate)}` : 'Sin fecha de entrega'}</span>
       </div>
     </div>
   );

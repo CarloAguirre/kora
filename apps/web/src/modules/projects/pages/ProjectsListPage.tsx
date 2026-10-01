@@ -5,6 +5,7 @@ import {
   PROJECT_PHASE_LABELS,
   PROJECT_STATUSES,
   PROJECT_STATUS_LABELS,
+  projectDelayLevel,
   type ProjectPhase,
   type ProjectSortField,
   type ProjectStatus,
@@ -25,6 +26,7 @@ import { SearchIcon, PlusIcon, DownloadIcon, TrashIcon } from '@/shared/componen
 import { ProjectStatusBadge } from '../components/ProjectStatusBadge';
 import { ProjectsSummaryChart } from '../components/ProjectsSummaryChart';
 import { getProjectStageLabel } from '../lib/project-stage-display';
+import { formatProgressDelay, formatProgressPercent } from '../lib/project-progress-display';
 import { exportDevelopmentProjects, exportSupportProjects } from '../lib/project-export';
 import { useDeleteProject, useProjectsList } from '../api/projects.queries';
 import { useClientsList } from '@/modules/clients/api/clients.queries';
@@ -45,7 +47,9 @@ const SUPPORT_SUB_TABS = [
 const CHART_PAGE_SIZE = 200;
 
 const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 2 });
-const formatDate = (value: string | null) => (value ? new Date(value).toLocaleDateString('es-CL') : '—');
+// Fechas `YYYY-MM-DD` (sin hora): con `T00:00:00` se leen en hora local — `new Date('2026-09-01')` es medianoche
+// UTC y en Chile se mostraba como el día anterior.
+const formatDate = (value: string | null) => (value ? new Date(`${value}T00:00:00`).toLocaleDateString('es-CL') : '—');
 
 /**
  * Listado de proyectos: tabs Desarrollo/Soporte, gráfico resumen y tabla
@@ -178,7 +182,25 @@ export function ProjectsListPage() {
     { key: 'stage', header: 'Etapa de avance', render: (p) => getProjectStageLabel(p) },
     { key: 'startDate', header: 'Inicio', sortable: true, render: (p) => formatDate(p.startDate) },
     { key: 'endDate', header: 'Fin', sortable: true, render: (p) => formatDate(p.endDate) },
-    { key: 'progress', header: '% Avance', sortable: true, render: (p) => (p.actualProgress != null ? `${p.actualProgress}%` : '—') },
+    {
+      key: 'progress',
+      header: '% Avance',
+      sortable: true,
+      render: (p) =>
+        p.progress.actual != null ? formatProgressPercent(p.progress.actual) : <span className={styles.empty}>Sin plan</span>,
+    },
+    {
+      key: 'delay',
+      header: 'Retraso',
+      render: (p) => {
+        const level = projectDelayLevel(p.progress.delay);
+        return (
+          <span className={level === 'critical' ? styles.delayCritical : level === 'alert' ? styles.delayAlert : undefined}>
+            {formatProgressDelay(p.progress)}
+          </span>
+        );
+      },
+    },
     { key: 'soldHours', header: 'HH vendidas', sortable: true, render: (p) => formatHours(p.soldHours) },
     { key: 'usedHours', header: 'HH Consumidas', sortable: true, render: (p) => formatHours(p.usedHours) },
     { key: 'remainingHours', header: 'HH Restantes', sortable: true, render: (p) => formatHours(p.soldHours - p.usedHours) },

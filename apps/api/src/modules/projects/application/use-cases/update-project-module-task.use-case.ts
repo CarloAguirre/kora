@@ -41,6 +41,7 @@ import {
 import type { ActorContext, UseCase } from '../../../../shared/application/use-case';
 import { ProjectChangeLogRecorder } from '../services/project-change-log.recorder';
 import { deadlineNote, formatCommittedDate } from '../services/deadline-note';
+import { ProjectProgressRecalculator } from '../services/project-progress-recalculator';
 
 export interface UpdateProjectModuleTaskCommand {
   readonly projectId: string;
@@ -55,7 +56,7 @@ export interface UpdateProjectModuleTaskCommand {
  * Además del líder (`projects:manage`), de quien lidera el equipo de la tarea
  * y de quien lidera EL PROYECTO (edición completa, igual que si pudiera
  * crearla), la persona asignada puede actualizarla — pero solo su `status`
- * ("Iniciar"/"Marcar como lista para revisión" en "Mis tareas"), no
+ * ("Iniciar"/"Marcar como completada" en "Mis tareas"), no
  * reasignarla ni cambiar sus fechas, y sin poder saltar directo a
  * `done`: solo quien administra el proyecto o lidera el equipo puede
  * aprobar (`done`), rechazar (`in_progress` + `rejectionReason`) o revertir
@@ -77,6 +78,7 @@ export class UpdateProjectModuleTaskUseCase
     @Inject(PROJECT_TEAM_MEMBER_REPOSITORY) private readonly projectTeamMembers: ProjectTeamMemberRepository,
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
     private readonly changeLog: ProjectChangeLogRecorder,
+    private readonly progress: ProjectProgressRecalculator,
     @Inject(CLOCK) private readonly clock: Clock,
     @Inject(UNIT_OF_WORK) private readonly unitOfWork: UnitOfWork,
   ) {}
@@ -153,7 +155,7 @@ export class UpdateProjectModuleTaskUseCase
             : {}),
           ...(command.data.date !== undefined ? { date: new Date(command.data.date) } : {}),
           ...(command.data.estimatedHours !== undefined
-            ? { estimatedHours: command.data.estimatedHours ?? null }
+            ? { estimatedHours: command.data.estimatedHours }
             : {}),
           ...(nextStatus !== undefined ? { status: nextStatus } : {}),
           ...(command.data.scope !== undefined ? { scope: command.data.scope } : {}),
@@ -171,6 +173,7 @@ export class UpdateProjectModuleTaskUseCase
           tx,
         );
       }
+      await this.progress.recalculate(project.id, tx);
     });
 
     await this.audit.record({
@@ -267,12 +270,12 @@ function taskStatusMessage(
   if (to === 'done') {
     return from === 'in_review'
       ? `${label} aprobada ${inPhase}, ${deadline}.`
-      : `${label} marcada como completada ${inPhase}, ${deadline}.`;
+      : `${label} marcada como aprobada ${inPhase}, ${deadline}.`;
   }
   if (to === 'in_review') {
     return from === 'done'
-      ? `Se revirtió la aprobación de la tarea ${label.slice('Tarea '.length)} ${inPhase}; vuelve a revisión.`
-      : `${label} marcada como lista para revisión ${inPhase}, ${deadline}.`;
+      ? `Se revirtió la aprobación de la tarea ${label.slice('Tarea '.length)} ${inPhase}; vuelve a Completada.`
+      : `${label} marcada como completada ${inPhase}, pendiente de aprobación, ${deadline}.`;
   }
   if (to === 'in_progress' && from === 'in_review' && rejectionReason) {
     return `${label} rechazada ${inPhase}: ${rejectionReason}`;

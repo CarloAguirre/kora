@@ -80,8 +80,9 @@ export const dashboardCriticalProjectSchema = z.object({
   usedHours: z.number(),
   soldHours: z.number(),
   planningHours: z.number(),
-  actualProgress: z.number().int(),
-  expectedProgress: z.number().int(),
+  /** Mismo `progress.actual`/`progress.expected` del proyecto — `null` = sin plan cargado. */
+  actualProgress: z.number().int().nullable(),
+  expectedProgress: z.number().int().nullable(),
   status: dashboardCriticalProjectStatusSchema,
   stageLabel: z.string(),
 });

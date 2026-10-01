@@ -184,8 +184,25 @@ export interface DeliveryAssignedToUserRecord {
 }
 
 /** Fases/módulos del proyecto — sin entidad de agregado propia, igual patrón que `ProjectObservationRepository`. */
+/** Lo mínimo de una fase para calcular el avance del proyecto — ver `calculateProjectProgress`. */
+export interface ProjectModuleProgressInputRecord {
+  readonly estimatedHours: number | null;
+  readonly currentStage: ProjectModuleStage;
+  readonly tasks: readonly {
+    readonly estimatedHours: number | null;
+    readonly status: ProjectModuleTaskStatus;
+    readonly date: Date;
+    readonly scope: ProjectModuleTaskScope;
+  }[];
+}
+
 export interface ProjectModuleRepository {
   listForProject(projectId: string, context?: TransactionContext): Promise<ProjectModuleRecord[]>;
+  /** Fases (con sus tareas) de varios proyectos a la vez, por `projectId` — listado y dashboard. */
+  listProgressInputsForProjects(
+    projectIds: readonly string[],
+    context?: TransactionContext,
+  ): Promise<Map<string, ProjectModuleProgressInputRecord[]>>;
   findById(id: string, context?: TransactionContext): Promise<ProjectModuleRecord | null>;
   create(input: CreateProjectModuleInput, now: Date, context?: TransactionContext): Promise<string>;
   update(id: string, input: UpdateProjectModuleInput, now: Date, context?: TransactionContext): Promise<void>;

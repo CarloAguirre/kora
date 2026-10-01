@@ -51,10 +51,20 @@
 }
 
 .track {
+  position: relative;
   height: 8px;
   border-radius: var(--kora-radius-pill);
   background: var(--kora-surface-disabled);
   overflow: hidden;
+}
+
+.expectedMark {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--kora-text);
 }
 
 .fill {

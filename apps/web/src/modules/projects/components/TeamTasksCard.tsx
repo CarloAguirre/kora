@@ -26,10 +26,10 @@ const formatDate = (value: string) => new Date(`${value}T00:00:00`).toLocaleDate
 
 const TASK_TABS = [
   { id: 'all', label: 'Todas' },
-  { id: 'todo', label: 'Por hacer' },
-  { id: 'in_progress', label: 'En progreso' },
-  { id: 'in_review', label: 'En revisión' },
-  { id: 'done', label: 'Completadas' },
+  { id: 'todo', label: 'Pendientes' },
+  { id: 'in_progress', label: 'En curso' },
+  { id: 'in_review', label: 'Completadas' },
+  { id: 'done', label: 'Aprobadas' },
 ] as const;
 type TaskFilter = (typeof TASK_TABS)[number]['id'];
 
@@ -142,7 +142,13 @@ export function TeamTasksCard({ project, projectId, teamId }: TeamTasksCardProps
     taskDraft.startDate && taskDraft.date && taskDraft.startDate > taskDraft.date
       ? 'Debe ser anterior o igual a la fecha límite.'
       : undefined;
-  const canSaveTask = Boolean(taskDraft.name.trim() && taskDraft.date && taskDraft.moduleId && !startDateError);
+  // Las HH estimadas son el peso de la tarea en el avance real del proyecto — obligatorias.
+  const hasEstimatedHours = Number(taskDraft.estimatedHours) > 0;
+  const estimatedHoursError =
+    taskDraft.estimatedHours !== '' && !hasEstimatedHours ? 'Deben ser mayores a 0.' : undefined;
+  const canSaveTask = Boolean(
+    taskDraft.name.trim() && taskDraft.date && taskDraft.moduleId && hasEstimatedHours && !startDateError,
+  );
 
   const onSaveTask = async () => {
     if (!canSaveTask) return;
@@ -158,7 +164,7 @@ export function TeamTasksCard({ project, projectId, teamId }: TeamTasksCardProps
             assigneeUserId: taskDraft.assigneeUserId || undefined,
             startDate: taskDraft.startDate || null,
             date: taskDraft.date,
-            estimatedHours: taskDraft.estimatedHours === '' ? undefined : Number(taskDraft.estimatedHours),
+            estimatedHours: Number(taskDraft.estimatedHours),
             status: taskDraft.status,
           },
         });
@@ -174,7 +180,7 @@ export function TeamTasksCard({ project, projectId, teamId }: TeamTasksCardProps
             assigneeUserId: taskDraft.assigneeUserId || undefined,
             startDate: taskDraft.startDate || undefined,
             date: taskDraft.date,
-            estimatedHours: taskDraft.estimatedHours === '' ? undefined : Number(taskDraft.estimatedHours),
+            estimatedHours: Number(taskDraft.estimatedHours),
             status: taskDraft.status,
           },
         });
@@ -211,7 +217,7 @@ export function TeamTasksCard({ project, projectId, teamId }: TeamTasksCardProps
     try {
       await updateTask.mutateAsync({ projectId, moduleId: reviewTarget.moduleId, taskId: reviewTarget.taskId, input });
       toast.success(
-        reviewTarget.action === 'approve' ? 'Tarea aprobada.' : reviewTarget.action === 'reject' ? 'Tarea rechazada.' : 'Tarea revertida a en revisión.',
+        reviewTarget.action === 'approve' ? 'Tarea aprobada.' : reviewTarget.action === 'reject' ? 'Tarea rechazada.' : 'Tarea devuelta a Completada.',
       );
       setReviewTarget(null);
     } catch (error) {
@@ -423,6 +429,8 @@ export function TeamTasksCard({ project, projectId, teamId }: TeamTasksCardProps
               label="HH estimadas"
               type="number"
               min={0}
+              required
+              errorText={estimatedHoursError}
               value={taskDraft.estimatedHours}
               onChange={(event) => setTaskDraft((prev) => ({ ...prev, estimatedHours: event.target.value }))}
             />

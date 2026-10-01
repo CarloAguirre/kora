@@ -12,6 +12,7 @@ import {
   type AuditRecorder,
 } from '../../../../shared/application/ports/audit-recorder.port';
 import type { ActorContext, UseCase } from '../../../../shared/application/use-case';
+import { ProjectProgressRecalculator } from '../services/project-progress-recalculator';
 
 export interface DeleteProjectModuleCommand {
   readonly projectId: string;
@@ -25,6 +26,7 @@ export class DeleteProjectModuleUseCase implements UseCase<DeleteProjectModuleCo
   constructor(
     @Inject(PROJECT_REPOSITORY) private readonly projects: ProjectRepository,
     @Inject(PROJECT_MODULE_REPOSITORY) private readonly modules: ProjectModuleRepository,
+    private readonly progress: ProjectProgressRecalculator,
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
   ) {}
 
@@ -42,6 +44,7 @@ export class DeleteProjectModuleUseCase implements UseCase<DeleteProjectModuleCo
     }
 
     await this.modules.remove(command.moduleId);
+    await this.progress.recalculate(project.id);
 
     await this.audit.record({
       actor: { userId: command.actor.userId, email: command.actor.email },

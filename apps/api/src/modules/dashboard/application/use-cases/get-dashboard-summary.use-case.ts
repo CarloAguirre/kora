@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { CLOCK, ok, type ApplicationError, type Clock, type Result } from '@kora/core';
 import {
   isAdminTier,
+  projectDelayLevel,
   PROJECT_PHASE_LABELS,
   PROJECT_SALES_STAGE_LABELS,
   type DashboardApprovalsTeam,
@@ -26,6 +27,10 @@ import {
   type ProjectModuleRepository,
 } from '../../../projects/domain/repositories/project-module.repository';
 import { ForecastCapacityService } from '../../../forecast/application/services/forecast-capacity.service';
+import {
+  calculateProjectProgress,
+  progressToday,
+} from '../../../projects/application/services/project-progress';
 import { TEAM_REPOSITORY, type TeamRepository } from '../../../teams/domain/repositories/team.repository';
 import type { ActorContext, UseCase } from '../../../../shared/application/use-case';
 
@@ -304,18 +309,23 @@ export class GetDashboardSummaryUseCase implements UseCase<GetDashboardSummaryCo
       (p) => p.endDate != null && p.endDate <= endOfMonth && p.endDate >= now,
     ).length;
 
+    /**
+     * Mismo avance que la ficha y el listado (`calculateProjectProgress`) — el avance real ya no se
+     * infiere de las HH consumidas. Crítico/alerta por consumo de HH (90%/70%) o por Retraso
+     * (`PROJECT_PROGRESS_DELAY_*`); sin plan cargado solo cuenta el consumo.
+     */
+    const modulesByProject = await this.projectModules.listProgressInputsForProjects(active.map((p) => p.id));
+    const today = progressToday(now);
     const allScored = active.map((p) => {
-      const consumptionPercent = p.soldHours > 0 ? Math.round((p.usedHours / p.soldHours) * 100) : 0;
-      const actualProgress = p.actualProgress != null ? clampPct(p.actualProgress) : Math.max(0, consumptionPercent);
-      const expectedProgress = calculateExpectedProgress(p.startDate, p.endDate, now);
-      const lag = expectedProgress - actualProgress;
-      const hasOperationalData = p.usedHours > 0 || actualProgress > 0;
+      const progress = calculateProjectProgress({ ...p, modules: modulesByProject.get(p.id) ?? [] }, today);
+      const consumptionPercent = progress.consumption ?? 0;
+      const delayLevel = projectDelayLevel(progress.delay);
 
       let status: 'critical' | 'alert' | 'optimal' = 'optimal';
-      if (consumptionPercent >= 90 || (hasOperationalData && lag >= 20)) status = 'critical';
-      else if (consumptionPercent >= 70 || (hasOperationalData && lag >= 10)) status = 'alert';
+      if (consumptionPercent >= 90 || delayLevel === 'critical') status = 'critical';
+      else if (consumptionPercent >= 70 || delayLevel === 'alert') status = 'alert';
 
-      return { p, actualProgress, expectedProgress, status };
+      return { p, actualProgress: progress.actual, expectedProgress: progress.expected, status };
     });
 
     const healthBreakdown = {
@@ -552,18 +562,6 @@ function toIsoDate(date: Date): string {
 
 function parseIsoDate(iso: string): Date {
   return new Date(`${iso}T00:00:00.000Z`);
-}
-
-function clampPct(value: number): number {
-  return Math.max(0, Math.min(100, Math.round(value)));
-}
-
-function calculateExpectedProgress(start: Date | null, end: Date | null, now: Date): number {
-  if (!start || !end) return 0;
-  if (end <= start) return now >= end ? 100 : 0;
-  if (now <= start) return 0;
-  if (now >= end) return 100;
-  return clampPct(((now.getTime() - start.getTime()) / (end.getTime() - start.getTime())) * 100);
 }
 
 function priorityRank(priority: string | null): number {

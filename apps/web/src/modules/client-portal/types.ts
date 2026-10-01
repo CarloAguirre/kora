@@ -346,8 +346,9 @@ export interface ClientProjectDetail {
   readonly hoursDeviation: number;
   readonly usedHoursToDate: number;
   readonly usedHoursUpdatedAt: string;
-  readonly progressActualPercent: number;
-  readonly progressExpectedPercent: number;
+  /** `null` (ambos) = el proyecto todavía no tiene plan de tareas cargado. */
+  readonly progressActualPercent: number | null;
+  readonly progressExpectedPercent: number | null;
   readonly endDate: string;
   readonly daysRemaining: number;
   readonly billing: ClientProjectBilling;

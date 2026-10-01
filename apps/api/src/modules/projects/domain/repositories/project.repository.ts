@@ -54,7 +54,8 @@ export interface ProjectListItem {
   readonly plannedHours: number;
   readonly startDate: Date | null;
   readonly endDate: Date | null;
-  readonly actualProgress: number | null;
+  /** Ver `projectDetailSchema.stopsClock` — el avance (`calculateProjectProgress`) no evalúa Retraso con el reloj pausado. */
+  readonly stopsClock: boolean;
   readonly supportPlanDescription: string | null;
   readonly supportHours: number;
   readonly allowsOvertime: boolean;

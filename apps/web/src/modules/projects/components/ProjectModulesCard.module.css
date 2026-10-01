@@ -87,23 +87,40 @@
   border-bottom: 1px solid var(--kora-border-soft);
 }
 
+.pipelineHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--kora-space-2);
+  margin-bottom: var(--kora-space-2);
+}
+
 .pipelineLabel {
-  display: block;
   font-size: 11.5px;
   font-weight: var(--kora-weight-semibold);
   color: var(--kora-text-muted);
-  margin-bottom: var(--kora-space-2);
+}
+
+.pipelineTotals {
+  font-size: 11.5px;
+  font-weight: var(--kora-weight-semibold);
+  color: var(--kora-text);
 }
 
 .pipeline {
-  display: flex;
-  align-items: center;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 4px;
-  margin-bottom: var(--kora-space-2);
+}
+
+.pipelineColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
 }
 
 .pipelineSegment {
-  flex: 1;
   height: 7px;
   border-radius: var(--kora-radius-sm);
   background: var(--kora-surface-disabled);
@@ -117,11 +134,28 @@
   transition: width 0.3s ease;
 }
 
-.pipelineLabels {
+.pipelineScopeLabel {
   display: flex;
-  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px;
   font-size: 10.5px;
   color: var(--kora-text-disabled);
+}
+
+.pipelineScopeValue {
+  font-weight: var(--kora-weight-semibold);
+  color: var(--kora-text);
+}
+
+.pipelineScopeEmpty {
+  font-style: italic;
+}
+
+.pipelineHint {
+  display: block;
+  margin-top: var(--kora-space-2);
+  font-size: 10.5px;
+  color: var(--kora-warning-text);
 }
 
 .toolbar {

@@ -172,16 +172,19 @@ export type ProjectModuleDelivery = z.infer<typeof projectModuleDeliverySchema>;
  * Flujo real de una tarea ("Mis tareas" del colaborador asignado). "Atrasada"
  * no es un valor guardado — se deriva en el cliente comparando `date` con hoy
  * cuando `status !== 'done'`, igual que ya se hace con las entregas.
+ *
+ * `in_review` es "Completada" (el colaborador la terminó) y `done` es "Aprobada"
+ * (solo el líder llega ahí) — solo `done` suma al avance real del proyecto.
  */
 export const PROJECT_MODULE_TASK_STATUSES = ['todo', 'in_progress', 'in_review', 'done'] as const;
 export const projectModuleTaskStatusSchema = z.enum(PROJECT_MODULE_TASK_STATUSES);
 export type ProjectModuleTaskStatus = z.infer<typeof projectModuleTaskStatusSchema>;
 
 export const PROJECT_MODULE_TASK_STATUS_LABELS: Readonly<Record<ProjectModuleTaskStatus, string>> = {
-  todo: 'Por hacer',
-  in_progress: 'En progreso',
-  in_review: 'En revisión',
-  done: 'Completada',
+  todo: 'Pendiente',
+  in_progress: 'En curso',
+  in_review: 'Completada',
+  done: 'Aprobada',
 };
 
 /** Ámbito de la tarea — base del % por ámbito en "Resumen de avance" del módulo. */
@@ -246,6 +249,11 @@ export type CreateProjectModuleSegmentInput = z.infer<typeof createProjectModule
 export const updateProjectModuleSegmentSchema = createProjectModuleSegmentSchema.partial();
 export type UpdateProjectModuleSegmentInput = z.infer<typeof updateProjectModuleSegmentSchema>;
 
+/** HH estimadas de una tarea o fase — obligatorias y mayores a 0 en altas y ediciones (las antiguas pueden venir nulas). */
+const estimatedHoursSchema = z.coerce
+  .number({ error: 'Ingresa las horas estimadas.' })
+  .gt(0, 'Las horas estimadas deben ser mayores a 0.');
+
 /** Tarea puntual (una fecha) de una fase/módulo, por equipo y opcionalmente asignada a una persona — marcador en el Roadmap y base de "Mis tareas". */
 export const projectModuleTaskSchema = z.object({
   id: uuidSchema,
@@ -273,7 +281,8 @@ export const createProjectModuleTaskSchema = z.object({
   description: z.string().trim().max(2000).nullish(),
   startDate: z.iso.date().nullish(),
   date: z.iso.date(),
-  estimatedHours: z.coerce.number().min(0).nullish(),
+  /** Obligatorio: es el peso de la tarea en el avance real del proyecto (ver `projectProgressSchema`). */
+  estimatedHours: estimatedHoursSchema,
   status: projectModuleTaskStatusSchema.optional(),
   scope: projectModuleTaskScopeSchema.optional(),
 });
@@ -284,6 +293,20 @@ export const updateProjectModuleTaskSchema = createProjectModuleTaskSchema.parti
   rejectionReason: z.string().trim().max(1000).nullish(),
 });
 export type UpdateProjectModuleTaskInput = z.infer<typeof updateProjectModuleTaskSchema>;
+
+/**
+ * Avance de una fase/módulo — mismo cálculo que `projectProgressSchema`, solo con sus tareas.
+ * `null` en `actual`/`expected`/cada ámbito = "Sin plan cargado" (sin tareas), nunca 0%.
+ */
+export const projectModuleProgressSchema = z.object({
+  actual: z.number().int().nullable(),
+  expected: z.number().int().nullable(),
+  /** Ninguna tarea de la fase tiene HH estimadas: el % sale de la cantidad de tareas, no de horas. */
+  estimatedByCount: z.boolean(),
+  /** Avance real por ámbito (Diseño / Desarrollo / QA Funcional / Rev. Cliente) — "Resumen de avance" del Roadmap. */
+  scopes: z.record(projectModuleTaskScopeSchema, z.number().int().nullable()),
+});
+export type ProjectModuleProgress = z.infer<typeof projectModuleProgressSchema>;
 
 /** Fase/módulo del proyecto — unidad de entrega con etapa, horas y fechas propias (ver "Fases · Módulos"). */
 export const projectModuleSchema = z.object({
@@ -299,13 +322,15 @@ export const projectModuleSchema = z.object({
   tasks: z.array(projectModuleTaskSchema),
   /** Cantidad de registros de horas con `hasBlocker` contra este módulo — proxy simple de "incidentes reportados", sin estado abierto/resuelto. */
   blockerCount: z.number().int(),
+  progress: projectModuleProgressSchema,
 });
 export type ProjectModule = z.infer<typeof projectModuleSchema>;
 
 export const createProjectModuleSchema = z.object({
   name: nonEmptyTrimmed(300, 'El nombre del módulo'),
   initialStage: projectModuleStageSchema,
-  estimatedHours: z.coerce.number().min(0).nullish(),
+  /** Obligatorio: forma parte de la base del avance real del proyecto (ver `projectProgressSchema`). */
+  estimatedHours: estimatedHoursSchema,
   estimatedStartDate: z.iso.date().nullish(),
   estimatedEndDate: z.iso.date().nullish(),
 });
@@ -314,7 +339,7 @@ export type CreateProjectModuleInput = z.infer<typeof createProjectModuleSchema>
 export const updateProjectModuleSchema = z.object({
   name: nonEmptyTrimmed(300, 'El nombre del módulo').optional(),
   currentStage: projectModuleStageSchema.optional(),
-  estimatedHours: z.coerce.number().min(0).nullish(),
+  estimatedHours: estimatedHoursSchema.optional(),
   estimatedStartDate: z.iso.date().nullish(),
   estimatedEndDate: z.iso.date().nullish(),
 });
@@ -515,6 +540,45 @@ export type ProjectBillingSettings = z.infer<typeof projectBillingSettingsSchema
 export const updateProjectBillingSettingsSchema = z.object({ autoActivateFirstPayment: z.boolean() });
 export type UpdateProjectBillingSettingsInput = z.infer<typeof updateProjectBillingSettingsSchema>;
 
+/**
+ * Umbrales de Retraso (puntos de avance esperado − real) del semáforo — los mismos en el dashboard, el
+ * listado, la ficha y el portal cliente.
+ */
+export const PROJECT_PROGRESS_DELAY_ALERT = 10;
+export const PROJECT_PROGRESS_DELAY_CRITICAL = 20;
+
+export type ProjectDelayLevel = 'on_track' | 'alert' | 'critical';
+
+export function projectDelayLevel(delay: number | null): ProjectDelayLevel {
+  if (delay == null) return 'on_track';
+  if (delay >= PROJECT_PROGRESS_DELAY_CRITICAL) return 'critical';
+  if (delay >= PROJECT_PROGRESS_DELAY_ALERT) return 'alert';
+  return 'on_track';
+}
+
+/**
+ * Avance del proyecto — tres números que responden preguntas distintas y nunca se infieren uno del
+ * otro: cuánto se hizo (`actual`), cuánto debería estar hecho hoy (`expected`) y cuánto costó
+ * (`consumption`). Se calcula desde las tareas de sus fases, ponderadas por HH estimadas; solo las
+ * tareas Aprobadas (`done`) suman al real. La base es, por fase, el mayor entre la suma de HH de sus
+ * tareas y las HH estimadas de la fase — así un plan cargado a medias no marca 100%.
+ */
+export const projectProgressSchema = z.object({
+  /** % de la base en tareas Aprobadas. `null` = sin plan cargado (ninguna fase con tareas). */
+  actual: z.number().int().nullable(),
+  /** % de la base en tareas cuya fecha límite ya pasó. `null` junto con `actual`. */
+  expected: z.number().int().nullable(),
+  /** HH aprobadas / HH vendidas, en %. Puede superar 100. `null` sin HH vendidas. */
+  consumption: z.number().int().nullable(),
+  /** `expected − actual`, en puntos. `null` sin plan, o con el proyecto detenido y el reloj pausado. */
+  delay: z.number().int().nullable(),
+  /** HH de tareas cargadas / HH estimadas de las fases, en %. `null` si ninguna fase tiene HH estimadas. */
+  planCoverage: z.number().int().nullable(),
+  /** Alguna fase no tiene HH estimadas en ninguna tarea: su parte se calculó por cantidad de tareas. */
+  estimatedByCount: z.boolean(),
+});
+export type ProjectProgress = z.infer<typeof projectProgressSchema>;
+
 export const projectSummarySchema = z.object({
   id: uuidSchema,
   name: z.string(),
@@ -536,7 +600,7 @@ export const projectSummarySchema = z.object({
   plannedHours: z.number(),
   startDate: z.string().nullable(),
   endDate: z.string().nullable(),
-  actualProgress: z.number().int().nullable(),
+  progress: projectProgressSchema,
   supportPlanDescription: z.string().nullable(),
   supportHours: z.number(),
   /** Habilitado por el líder del proyecto/equipo — sin esto, las horas cargadas contra este proyecto no pueden marcarse como horas extra. */
@@ -550,7 +614,6 @@ export const projectDetailSchema = projectSummarySchema.extend({
   /** Contacto principal DE ESTE PROYECTO (v1: `proyecto.id_contacto`) — puede diferir del contacto general del cliente. */
   primaryContact: clientContactSchema.nullable(),
   estimatedDeliveryDate: z.string().nullable(),
-  expectedProgress: z.number().int().nullable(),
   overtimeRateUf: z.number(),
   /** Igual criterio que el resto de los flags "puede gestionar" — no basta con `projects:manage`, ver `GetProjectUseCase`. */
   canAuthorizeOvertime: z.boolean(),
@@ -559,7 +622,7 @@ export const projectDetailSchema = projectSummarySchema.extend({
   additionalLinks: z.string().nullable(),
   /** Motivo declarado mientras `status = 'on_hold'`. */
   onHoldReason: z.string().nullable(),
-  /** Si está activo, el período detenido no debería contar para plazos/desviación — ese cálculo no está implementado todavía. */
+  /** Si está activo, mientras el proyecto esté detenido no se evalúa el Retraso (`progress.delay = null`). */
   stopsClock: z.boolean(),
   scopeNotes: z.string().nullable(),
   deliveryDocumentation: z.string().nullable(),
@@ -718,8 +781,6 @@ export const updateProjectSchema = z.object({
   endDate: z.iso.date().nullish(),
   estimatedDeliveryDate: z.iso.date().nullish(),
   soldHours: z.coerce.number().min(0).optional(),
-  expectedProgress: z.coerce.number().int().min(0).max(100).nullish(),
-  actualProgress: z.coerce.number().int().min(0).max(100).nullish(),
   supportPlanDescription: z.string().trim().max(2000).optional(),
   supportHours: z.coerce.number().min(0).optional(),
   quotationLink: z.string().trim().max(500).optional(),

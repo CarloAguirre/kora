@@ -126,8 +126,6 @@ export class UpdateProjectUseCase implements UseCase<UpdateProjectCommand, void,
           ? { estimatedDeliveryDate: data.estimatedDeliveryDate ? new Date(data.estimatedDeliveryDate) : null }
           : {}),
         ...(data.soldHours !== undefined ? { soldHours: data.soldHours } : {}),
-        ...(data.expectedProgress !== undefined ? { expectedProgress: data.expectedProgress } : {}),
-        ...(data.actualProgress !== undefined ? { actualProgress: data.actualProgress } : {}),
         ...(data.supportPlanDescription !== undefined
           ? { supportPlanDescription: data.supportPlanDescription || null }
           : {}),

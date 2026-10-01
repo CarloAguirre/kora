@@ -299,8 +299,6 @@ export class Project extends AggregateRoot<string> {
         | 'endDate'
         | 'estimatedDeliveryDate'
         | 'soldHours'
-        | 'expectedProgress'
-        | 'actualProgress'
         | 'supportPlanDescription'
         | 'supportHours'
         | 'allowsOvertime'
@@ -396,6 +394,18 @@ export class Project extends AggregateRoot<string> {
   recordUsedHours(hours: number, now: Date): void {
     this.props.usedHours = hours;
     this.touch(now);
+  }
+
+  /**
+   * Caché del avance real calculado (`calculateProjectProgress`) — lo escribe solo
+   * `ProjectProgressRecalculator` al cambiar fases o tareas; existe para poder ordenar el listado
+   * por avance. Devuelve `false` si no cambió, para no tocar `updatedAt` en vano.
+   */
+  recordActualProgress(actualProgress: number | null, now: Date): boolean {
+    if (this.props.actualProgress === actualProgress) return false;
+    this.props.actualProgress = actualProgress;
+    this.touch(now);
+    return true;
   }
 
   setPrimaryContact(contactId: string | null, now: Date): void {

@@ -609,6 +609,11 @@ export function NewProjectPage() {
       setModuleError('Ponle un nombre a todos los módulos agregados antes de continuar.');
       return;
     }
+    // Las HH de cada fase son la base del avance real del proyecto — obligatorias.
+    if (moduleDrafts.some((draft) => !(Number(draft.estimatedHours) > 0))) {
+      setModuleError('Indica las horas estimadas (mayores a 0) de todas las fases antes de continuar.');
+      return;
+    }
     setModuleError(null);
     setStep(resumenStepIndex);
   };
@@ -702,7 +707,7 @@ export function NewProjectPage() {
               const input: CreateProjectModuleInput = {
                 name: draft.name.trim(),
                 initialStage: draft.initialStage,
-                estimatedHours: draft.estimatedHours ? Number(draft.estimatedHours) : undefined,
+                estimatedHours: Number(draft.estimatedHours),
                 estimatedStartDate: draft.estimatedStartDate || undefined,
                 estimatedEndDate: draft.estimatedEndDate || undefined,
               };
@@ -1341,6 +1346,7 @@ export function NewProjectPage() {
                               label="Horas estimadas"
                               type="number"
                               min={0}
+                              required
                               value={draft.estimatedHours}
                               onChange={(event) => updateModuleDraft(draft.localId, 'estimatedHours', event.target.value)}
                             />

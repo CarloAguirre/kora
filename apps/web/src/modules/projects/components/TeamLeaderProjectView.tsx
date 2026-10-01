@@ -234,7 +234,9 @@ export function TeamLeaderProjectView({
         <Card className={styles.kpiCard}>
           <span className={styles.kpiLabel}>Avance real / esperado</span>
           <span className={styles.kpiValue}>
-            {project.actualProgress ?? '—'}% / {project.expectedProgress ?? '—'}%
+            {project.progress.actual != null
+              ? `${project.progress.actual}% / ${project.progress.expected ?? 0}%`
+              : 'Sin plan cargado'}
           </span>
         </Card>
       </div>
@@ -304,10 +306,10 @@ export function TeamLeaderProjectView({
       </Card>
 
       <Card>
-        <p className={styles.sectionTitle}>Timeline del Proyecto</p>
+        <p className={styles.sectionTitle}>Avance del proyecto</p>
         <div style={{ marginTop: 'var(--kora-space-4)' }}>
           <ProjectTimeline
-            phase={project.phase}
+            progress={project.progress}
             startDate={project.startDate}
             endDate={project.estimatedDeliveryDate ?? project.endDate}
           />

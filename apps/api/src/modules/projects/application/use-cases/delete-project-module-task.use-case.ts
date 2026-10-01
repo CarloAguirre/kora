@@ -28,6 +28,7 @@ import {
 } from '../../../../shared/application/ports/audit-recorder.port';
 import type { ActorContext, UseCase } from '../../../../shared/application/use-case';
 import { ProjectChangeLogRecorder } from '../services/project-change-log.recorder';
+import { ProjectProgressRecalculator } from '../services/project-progress-recalculator';
 
 export interface DeleteProjectModuleTaskCommand {
   readonly projectId: string;
@@ -47,6 +48,7 @@ export class DeleteProjectModuleTaskUseCase
     @Inject(PROJECT_TEAM_REPOSITORY) private readonly projectTeams: ProjectTeamRepository,
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
     private readonly changeLog: ProjectChangeLogRecorder,
+    private readonly progress: ProjectProgressRecalculator,
     @Inject(CLOCK) private readonly clock: Clock,
     @Inject(UNIT_OF_WORK) private readonly unitOfWork: UnitOfWork,
   ) {}
@@ -76,6 +78,7 @@ export class DeleteProjectModuleTaskUseCase
     // la misma transacción.
     await this.unitOfWork.run(async (tx) => {
       await this.modules.removeTask(command.taskId, tx);
+      await this.progress.recalculate(project.id, tx);
       await this.changeLog.record(
         [
           {

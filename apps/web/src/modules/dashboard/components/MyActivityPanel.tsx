@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import {
   FORECAST_ASSIGNMENT_TYPE_LABELS,
+  PROJECT_MODULE_TASK_STATUS_LABELS,
   type DashboardHoursSummary,
   type DashboardMyActiveProject,
   type DashboardMyDelivery,
@@ -58,10 +59,7 @@ function DailyProgressDonut({ percent }: { percent: number }) {
 const isPastDate = (isoDate: string) => new Date(`${isoDate}T00:00:00`) < new Date(new Date().toDateString());
 
 const TASK_STATUS_TAG_LABEL: Record<'todo' | 'in_progress' | 'in_review' | 'done' | 'late', string> = {
-  todo: 'Por hacer',
-  in_progress: 'En progreso',
-  in_review: 'En revisión',
-  done: 'Completada',
+  ...PROJECT_MODULE_TASK_STATUS_LABELS,
   late: 'Atrasada',
 };
 const TASK_STATUS_TAG_CLASS = {
@@ -74,7 +72,7 @@ const TASK_STATUS_TAG_CLASS = {
 
 /**
  * "Mis tareas" — tareas de "Fases · Módulos" asignadas directamente al
- * colaborador. "Marcar como lista" solo la manda a revisión (`in_review`):
+ * colaborador. "Marcar como completada" solo la manda a revisión (`in_review`):
  * quien lidera el equipo o el proyecto recién ahí la aprueba (`done`) o la
  * rechaza con motivo — el colaborador nunca la marca `done` directamente.
  */
@@ -106,10 +104,10 @@ function MyTasksCard({ tasks, loading }: { tasks: readonly DashboardMyTask[]; lo
       <Tabs
         tabs={[
           { id: 'all', label: 'Todas' },
-          { id: 'todo', label: 'Por hacer' },
-          { id: 'in_progress', label: 'En progreso' },
-          { id: 'in_review', label: 'En revisión' },
-          { id: 'done', label: 'Completadas' },
+          { id: 'todo', label: 'Pendientes' },
+          { id: 'in_progress', label: 'En curso' },
+          { id: 'in_review', label: 'Completadas' },
+          { id: 'done', label: 'Aprobadas' },
         ]}
         activeId={tab}
         onSelect={(id) => setTab(id as typeof tab)}
@@ -145,7 +143,7 @@ function MyTasksCard({ tasks, loading }: { tasks: readonly DashboardMyTask[]; lo
                 )}
                 {(task.status === 'todo' || task.status === 'in_progress') && (
                   <Button size="sm" onClick={() => void onAdvance(task, 'in_review')}>
-                    Marcar como lista
+                    Marcar como completada
                   </Button>
                 )}
               </div>

@@ -255,10 +255,10 @@ export function DevelopmentProjectDetailView({
       </Card>
 
       <Card>
-        <p className={styles.sectionTitle}>Línea de tiempo</p>
+        <p className={styles.sectionTitle}>Avance del proyecto</p>
         <div style={{ marginTop: "var(--kora-space-4)" }}>
           <ProjectTimeline
-            phase={project.phase}
+            progress={project.progress}
             startDate={project.startDate}
             endDate={project.estimatedDeliveryDate ?? project.endDate}
           />

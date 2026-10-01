@@ -1,5 +1,6 @@
 import type {
   ProjectDetail,
+  ProjectProgress,
   ProjectSummary,
   ProjectTeam as ProjectTeamDto,
   ProjectTeamMember as ProjectTeamMemberDto,
@@ -20,8 +21,10 @@ import type { ProjectPaymentMilestoneRecord } from '../../domain/repositories/pr
 import type { ProjectUserReference } from '../ports/project-user-reader.port';
 import type { ProjectClientReference } from '../ports/project-client-reader.port';
 import type { ProjectContactReference } from '../ports/project-contact-reader.port';
+import { calculateModuleProgress, calculateProjectProgress, progressToday } from '../services/project-progress';
 
-export function toProjectSummary(item: ProjectListItem): ProjectSummary {
+/** `progress` lo calcula quien llama (`calculateProjectProgress`): el listado no trae las tareas. */
+export function toProjectSummary(item: ProjectListItem, progress: ProjectProgress): ProjectSummary {
   return {
     id: item.id,
     name: item.name,
@@ -42,7 +45,7 @@ export function toProjectSummary(item: ProjectListItem): ProjectSummary {
     plannedHours: item.plannedHours,
     startDate: item.startDate?.toISOString().slice(0, 10) ?? null,
     endDate: item.endDate?.toISOString().slice(0, 10) ?? null,
-    actualProgress: item.actualProgress,
+    progress,
     supportPlanDescription: item.supportPlanDescription,
     supportHours: item.supportHours,
     allowsOvertime: item.allowsOvertime,
@@ -125,6 +128,18 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
     canResolve: source.canManagePendings,
   }));
 
+  const today = progressToday(source.now);
+  const progress = calculateProjectProgress(
+    {
+      soldHours: Number(snapshot.soldHours),
+      usedHours: Number(snapshot.usedHours),
+      status: snapshot.status,
+      stopsClock: snapshot.stopsClock,
+      modules: source.modules,
+    },
+    today,
+  );
+
   const modules: ProjectModuleDto[] = source.modules.map((module) => ({
     id: module.id,
     name: module.name,
@@ -176,6 +191,7 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
       rejectionReason: task.rejectionReason,
     })),
     blockerCount: module.blockerCount,
+    progress: calculateModuleProgress(module, today),
   }));
 
   const paymentMilestones: ProjectPaymentMilestoneDto[] = source.paymentMilestones.map((milestone) => ({
@@ -215,8 +231,7 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
     startDate: snapshot.startDate?.toISOString().slice(0, 10) ?? null,
     endDate: snapshot.endDate?.toISOString().slice(0, 10) ?? null,
     estimatedDeliveryDate: snapshot.estimatedDeliveryDate?.toISOString().slice(0, 10) ?? null,
-    expectedProgress: snapshot.expectedProgress,
-    actualProgress: snapshot.actualProgress,
+    progress,
     supportPlanDescription: snapshot.supportPlanDescription,
     supportHours: Number(snapshot.supportHours),
     overtimeRateUf: Number(snapshot.overtimeRateUf),

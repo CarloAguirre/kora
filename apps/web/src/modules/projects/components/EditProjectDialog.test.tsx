@@ -67,7 +67,7 @@ function buildProject(overrides: Partial<ProjectDetail> = {}): ProjectDetail {
     plannedHours: 0,
     startDate: '2026-01-01',
     endDate: null,
-    actualProgress: 40,
+    progress: { actual: 40, expected: 50, consumption: 126, delay: 10, planCoverage: 100, estimatedByCount: false },
     supportPlanDescription: null,
     supportHours: 0,
     allowsOvertime: false,
@@ -76,7 +76,6 @@ function buildProject(overrides: Partial<ProjectDetail> = {}): ProjectDetail {
     commercialManager: null,
     primaryContact: null,
     estimatedDeliveryDate: null,
-    expectedProgress: 50,
     overtimeRateUf: 0,
     canAuthorizeOvertime: false,
     quotationLink: null,
@@ -232,18 +231,19 @@ describe('EditProjectDialog', () => {
     expect(Array.from(estado.options).map((option) => option.textContent)).toContain('Activo (activación manual)');
   });
 
-  it('muestra los campos de desarrollo (etapa, avance) y no los de soporte', () => {
+  it('muestra los campos de desarrollo y no los de soporte; el avance no se edita a mano', () => {
     renderDialog({ open: true, project: buildProject({ type: 'development' }), onClose: vi.fn(), onSuccess: vi.fn(), isManagement: true });
 
     expect(screen.getByLabelText('Tipo de proyecto')).toBeInTheDocument();
-    expect(screen.getByLabelText('Avance real (%)')).toBeInTheDocument();
+    // El avance real se calcula desde las tareas (`projectProgressSchema`), no es un campo del formulario.
+    expect(screen.queryByLabelText('Avance real (%)')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Horas de soporte')).not.toBeInTheDocument();
   });
 
   it('muestra los campos de soporte y no los de desarrollo', () => {
     renderDialog({
       open: true,
-      project: buildProject({ type: 'support', salesStage: null, phase: null, actualProgress: null, expectedProgress: null }),
+      project: buildProject({ type: 'support', salesStage: null, phase: null }),
       onClose: vi.fn(),
       onSuccess: vi.fn(),
       isManagement: true,

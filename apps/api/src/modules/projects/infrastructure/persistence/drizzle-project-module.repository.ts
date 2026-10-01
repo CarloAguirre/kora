@@ -25,6 +25,7 @@ import type {
   CreateProjectModuleTaskInput,
   DeliveryAssignedToUserRecord,
   ProjectModuleDeliveryRecord,
+  ProjectModuleProgressInputRecord,
   ProjectModuleRecord,
   ProjectModuleRepository,
   ProjectModuleSegmentMemberInput,
@@ -130,6 +131,61 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
         blockerCountByModule.get(row.id) ?? 0,
       ),
     );
+  }
+
+  async listProgressInputsForProjects(
+    projectIds: readonly string[],
+    context?: TransactionContext,
+  ): Promise<Map<string, ProjectModuleProgressInputRecord[]>> {
+    const byProject = new Map<string, ProjectModuleProgressInputRecord[]>();
+    if (projectIds.length === 0) return byProject;
+    const db = resolveDb(this.database, context);
+
+    const [moduleRows, taskRows] = await Promise.all([
+      db
+        .select({
+          id: projectModules.id,
+          projectId: projectModules.projectId,
+          estimatedHours: projectModules.estimatedHours,
+          currentStage: projectModules.currentStage,
+        })
+        .from(projectModules)
+        .where(inArray(projectModules.projectId, [...projectIds])),
+      db
+        .select({
+          moduleId: projectModuleTasks.moduleId,
+          estimatedHours: projectModuleTasks.estimatedHours,
+          status: projectModuleTasks.status,
+          date: projectModuleTasks.date,
+          scope: projectModuleTasks.scope,
+        })
+        .from(projectModuleTasks)
+        .innerJoin(projectModules, eq(projectModules.id, projectModuleTasks.moduleId))
+        .where(inArray(projectModules.projectId, [...projectIds])),
+    ]);
+
+    const tasksByModule = new Map<string, ProjectModuleProgressInputRecord['tasks'][number][]>();
+    for (const row of taskRows) {
+      const list = tasksByModule.get(row.moduleId) ?? [];
+      list.push({
+        estimatedHours: row.estimatedHours != null ? Number(row.estimatedHours) : null,
+        status: row.status,
+        date: row.date,
+        scope: row.scope,
+      });
+      tasksByModule.set(row.moduleId, list);
+    }
+
+    for (const row of moduleRows) {
+      const list = byProject.get(row.projectId) ?? [];
+      list.push({
+        estimatedHours: row.estimatedHours != null ? Number(row.estimatedHours) : null,
+        currentStage: row.currentStage,
+        tasks: tasksByModule.get(row.id) ?? [],
+      });
+      byProject.set(row.projectId, list);
+    }
+    return byProject;
   }
 
   async findById(id: string, context?: TransactionContext): Promise<ProjectModuleRecord | null> {

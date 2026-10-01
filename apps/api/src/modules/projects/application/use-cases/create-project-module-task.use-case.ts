@@ -29,6 +29,7 @@ import {
 import type { ActorContext, UseCase } from '../../../../shared/application/use-case';
 import { ProjectChangeLogRecorder } from '../services/project-change-log.recorder';
 import { formatCommittedDate } from '../services/deadline-note';
+import { ProjectProgressRecalculator } from '../services/project-progress-recalculator';
 
 export interface CreateProjectModuleTaskCommand {
   readonly projectId: string;
@@ -56,6 +57,7 @@ export class CreateProjectModuleTaskUseCase
     @Inject(PROJECT_TEAM_MEMBER_REPOSITORY) private readonly projectTeamMembers: ProjectTeamMemberRepository,
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
     private readonly changeLog: ProjectChangeLogRecorder,
+    private readonly progress: ProjectProgressRecalculator,
     @Inject(CLOCK) private readonly clock: Clock,
     @Inject(UNIT_OF_WORK) private readonly unitOfWork: UnitOfWork,
   ) {}
@@ -96,7 +98,7 @@ export class CreateProjectModuleTaskUseCase
           description: command.data.description ?? null,
           startDate: command.data.startDate ? new Date(command.data.startDate) : null,
           date: new Date(command.data.date),
-          estimatedHours: command.data.estimatedHours ?? null,
+          estimatedHours: command.data.estimatedHours,
           status: command.data.status ?? 'todo',
           scope: command.data.scope ?? 'desarrollo',
         },
@@ -116,6 +118,7 @@ export class CreateProjectModuleTaskUseCase
         now,
         tx,
       );
+      await this.progress.recalculate(project.id, tx);
       return taskId;
     });
 

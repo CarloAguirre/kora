@@ -474,9 +474,14 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
     if (name && name !== module.name) void onSaveModuleField(module.id, { name });
   };
 
+  /** Las HH de la fase son obligatorias (base del avance real): vacío o 0 no se guarda y vuelve al valor anterior. */
   const onBlurModuleHours = (module: ProjectModule) => {
-    const raw = moduleDraft(module).estimatedHours;
-    const next = raw === '' ? null : Number(raw);
+    const next = Number(moduleDraft(module).estimatedHours);
+    if (!(next > 0)) {
+      setModuleDraftField(module, { estimatedHours: toModuleEditDraft(module).estimatedHours });
+      toast.error('Las horas estimadas de la fase son obligatorias y deben ser mayores a 0.');
+      return;
+    }
     if (next !== module.estimatedHours) void onSaveModuleField(module.id, { estimatedHours: next });
   };
 
@@ -900,6 +905,7 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
                             label="Horas estimadas"
                             type="number"
                             min={0}
+                            required
                             value={moduleDraft(module).estimatedHours}
                             onChange={(event) => setModuleDraftField(module, { estimatedHours: event.target.value })}
                             onBlur={() => onBlurModuleHours(module)}
@@ -1097,6 +1103,8 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
                     label="Horas estimadas"
                     type="number"
                     min={0}
+                    required
+                    errorText={newModuleForm.formState.errors.estimatedHours?.message}
                     {...newModuleForm.register('estimatedHours', { setValueAs: emptyToUndefined })}
                   />
                 </div>
@@ -1321,8 +1329,6 @@ function toFormValues(project: ProjectDetail): ProjectFormValues {
     endDate: project.endDate,
     estimatedDeliveryDate: project.estimatedDeliveryDate,
     soldHours: project.soldHours,
-    expectedProgress: project.expectedProgress,
-    actualProgress: project.actualProgress,
     supportPlanDescription: project.supportPlanDescription ?? '',
     supportHours: project.supportHours,
     quotationLink: project.quotationLink ?? '',

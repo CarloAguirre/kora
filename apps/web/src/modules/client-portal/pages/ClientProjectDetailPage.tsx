@@ -355,15 +355,21 @@ export function ClientProjectDetailPage({ projectIdOverride, backTo, backLabel, 
             </Card>
             <Card className={styles.statCard}>
               <span className={styles.statLabel}>Avance real vs. esperado</span>
-              <div className={styles.progressValueRow}>
-                <span className={styles.statValue}>{project.progressActualPercent}%</span>
-                <span className={styles.deviationBadge}>{project.progressActualPercent - project.progressExpectedPercent}%</span>
-              </div>
-              <span className={styles.statSub}>vs {project.progressExpectedPercent}% esperado</span>
-              <div className={styles.progressTrack}>
-                <div className={styles.progressFill} style={{ width: `${project.progressActualPercent}%` }} />
-                <div className={styles.progressExpectedMarker} style={{ left: `${project.progressExpectedPercent}%` }} />
-              </div>
+              {project.progressActualPercent != null && project.progressExpectedPercent != null ? (
+                <>
+                  <div className={styles.progressValueRow}>
+                    <span className={styles.statValue}>{project.progressActualPercent}%</span>
+                    <span className={styles.deviationBadge}>{project.progressActualPercent - project.progressExpectedPercent}%</span>
+                  </div>
+                  <span className={styles.statSub}>vs {project.progressExpectedPercent}% esperado</span>
+                  <div className={styles.progressTrack}>
+                    <div className={styles.progressFill} style={{ width: `${project.progressActualPercent}%` }} />
+                    <div className={styles.progressExpectedMarker} style={{ left: `${project.progressExpectedPercent}%` }} />
+                  </div>
+                </>
+              ) : (
+                <span className={styles.statSub}>Sin plan cargado</span>
+              )}
             </Card>
             <Card className={[styles.statCard, styles.statCardDark].join(' ')}>
               <span className={styles.statLabelDark}>Fecha fin del proyecto</span>

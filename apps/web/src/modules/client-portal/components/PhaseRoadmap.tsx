@@ -377,7 +377,7 @@ function PhaseCard({
                 const percent = stats && stats.total > 0 ? Math.round((stats.done / stats.total) * 100) : null;
                 const title =
                   percent !== null
-                    ? `${PHASE_ROADMAP_TASK_SCOPE_LABELS[scope]}: ${percent}% (${stats!.done}/${stats!.total} completadas)`
+                    ? `${PHASE_ROADMAP_TASK_SCOPE_LABELS[scope]}: ${percent}% (${stats!.done}/${stats!.total} aprobadas)`
                     : `${PHASE_ROADMAP_TASK_SCOPE_LABELS[scope]}: sin tareas registradas`;
                 return (
                   <button

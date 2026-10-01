@@ -1,5 +1,6 @@
 import {
   PROJECT_MODULE_DELIVERY_STATUS_LABELS,
+  projectDelayLevel,
   type HourEntryStatus,
   type HourEntrySummary,
   type ProjectDetail,
@@ -365,10 +366,8 @@ function toBilling(project: ProjectDetail): ClientProjectBilling {
 function health(project: ProjectDetail): ClientProjectHealth {
   if (project.status === 'finished') return 'finished';
   if (project.status === 'on_hold') return 'at_risk';
-  const actual = project.actualProgress;
-  const expected = project.expectedProgress;
-  if (actual != null && expected != null && expected - actual >= 15) return 'at_risk';
-  return 'active';
+  // Mismo umbral que el dashboard y el listado interno (`PROJECT_PROGRESS_DELAY_ALERT`).
+  return projectDelayLevel(project.progress.delay) === 'on_track' ? 'active' : 'at_risk';
 }
 
 function tag(project: ProjectDetail): string {
@@ -437,8 +436,8 @@ export function toClientProjectDetail(project: ProjectDetail, hourEntries: reado
     hoursDeviation: Math.round(Math.max(0, usedHours - soldHours) * 10) / 10,
     usedHoursToDate: usedHours,
     usedHoursUpdatedAt: project.usedHoursUpdatedAt ? formatDMY(project.usedHoursUpdatedAt) : '--',
-    progressActualPercent: project.actualProgress ?? 0,
-    progressExpectedPercent: project.expectedProgress ?? 0,
+    progressActualPercent: project.progress.actual,
+    progressExpectedPercent: project.progress.expected,
     endDate: formatDMY(project.endDate),
     daysRemaining,
     billing: toBilling(project),

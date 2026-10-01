@@ -1,11 +1,16 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { buildPage, mapPage, ok, type Page, type Result } from '@kora/core';
+import { CLOCK, buildPage, mapPage, ok, type Clock, type Page, type Result } from '@kora/core';
 import type { ListProjectsQuery, Permission, ProjectSummary } from '@kora/contracts';
 import { PROJECT_REPOSITORY, type ProjectRepository } from '../../domain/repositories/project.repository';
+import {
+  PROJECT_MODULE_REPOSITORY,
+  type ProjectModuleRepository,
+} from '../../domain/repositories/project-module.repository';
 import { TEAM_REPOSITORY, type TeamRepository } from '../../../teams/domain/repositories/team.repository';
 import { PROJECT_CLIENT_READER, type ProjectClientReader } from '../ports/project-client-reader.port';
 import type { ActorContext, UseCase } from '../../../../shared/application/use-case';
 import { toProjectSummary } from '../mappers/project.mapper';
+import { calculateProjectProgress, progressToday } from '../services/project-progress';
 
 export interface ListProjectsQueryCommand {
   readonly query: ListProjectsQuery;
@@ -39,6 +44,8 @@ export class ListProjectsUseCase implements UseCase<ListProjectsQueryCommand, Pa
     @Inject(PROJECT_REPOSITORY) private readonly projects: ProjectRepository,
     @Inject(TEAM_REPOSITORY) private readonly teams: TeamRepository,
     @Inject(PROJECT_CLIENT_READER) private readonly clients: ProjectClientReader,
+    @Inject(PROJECT_MODULE_REPOSITORY) private readonly modules: ProjectModuleRepository,
+    @Inject(CLOCK) private readonly clock: Clock,
   ) {}
 
   async execute(command: ListProjectsQueryCommand): Promise<Result<Page<ProjectSummary>>> {
@@ -85,6 +92,16 @@ export class ListProjectsUseCase implements UseCase<ListProjectsQueryCommand, Pa
       { field: query.sortField, direction: query.sortDirection },
     );
 
-    return ok(mapPage(page, toProjectSummary));
+    // Avance calculado solo para los proyectos de esta página — mismo cálculo que la ficha.
+    const modulesByProject = await this.modules.listProgressInputsForProjects(page.items.map((item) => item.id));
+    const today = progressToday(this.clock.now());
+    return ok(
+      mapPage(page, (item) =>
+        toProjectSummary(
+          item,
+          calculateProjectProgress({ ...item, modules: modulesByProject.get(item.id) ?? [] }, today),
+        ),
+      ),
+    );
   }
 }

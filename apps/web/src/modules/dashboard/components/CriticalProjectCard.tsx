@@ -13,7 +13,7 @@ const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFr
 /** Tarjeta del "Monitor de Salud Proyectos Críticos", igual disposición que `DashboardProyectos` en la v1. */
 export function CriticalProjectCard({ project }: { project: DashboardCriticalProject }) {
   const consumptionPercent = project.soldHours > 0 ? Math.round((project.usedHours / project.soldHours) * 100) : 0;
-  const progressPercent = project.expectedProgress > 0 ? Math.round((project.actualProgress / project.expectedProgress) * 100) : 0;
+  const hasPlan = project.actualProgress != null && project.expectedProgress != null;
 
   return (
     <Card className={styles.card}>
@@ -51,11 +51,17 @@ export function CriticalProjectCard({ project }: { project: DashboardCriticalPro
         <div className={styles.metricRow}>
           <span className={styles.metricLabel}>Avance Real vs Esperado</span>
           <span className={styles.metricValue}>
-            Real: {project.actualProgress}% · Esperado: {project.expectedProgress}%
+            {hasPlan ? `Real: ${project.actualProgress}% · Esperado: ${project.expectedProgress}%` : 'Sin plan cargado'}
           </span>
         </div>
+        {/* Relleno = avance real; la marca = dónde debería ir hoy. */}
         <div className={styles.track}>
-          <div className={styles.fillProgress} style={{ width: `${Math.min(progressPercent, 100)}%` }} />
+          {hasPlan && (
+            <>
+              <div className={styles.fillProgress} style={{ width: `${Math.min(project.actualProgress ?? 0, 100)}%` }} />
+              <span className={styles.expectedMark} style={{ left: `${Math.min(project.expectedProgress ?? 0, 100)}%` }} />
+            </>
+          )}
         </div>
       </div>
 

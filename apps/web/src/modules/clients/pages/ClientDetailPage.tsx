@@ -56,7 +56,8 @@ function matchesTab(project: ProjectSummary, tab: ProjectTab): boolean {
   }
 }
 
-const formatDate = (value: string | null) => (value ? new Date(value).toLocaleDateString('es-CL') : '—');
+// Fechas `YYYY-MM-DD`: `T00:00:00` las lee en hora local (sin él, en Chile salían con un día menos).
+const formatDate = (value: string | null) => (value ? new Date(`${value}T00:00:00`).toLocaleDateString('es-CL') : '—');
 /** A diferencia de `formatDate`: agrega la hora local antes de parsear, para que una fecha 'YYYY-MM-DD' no se lea como medianoche UTC y se corra un día atrás en husos horarios negativos (Chile). */
 const formatPlanDate = (value: string | null) => (value ? new Date(`${value}T00:00:00`).toLocaleDateString('es-CL') : '—');
 const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 2 });

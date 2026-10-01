@@ -1,103 +1,83 @@
-/* Réplica de `fpd-timeline-*` / la barra de fases inline de `LiderProyectoFicha` (v1). */
+/* Avance real del proyecto — mismo estilo que la barra gruesa de fases original (`LiderProyectoFicha`, v1). */
 
 .timeline {
   display: flex;
   flex-direction: column;
 }
 
-.monthLabels {
+.header {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   justify-content: space-between;
-  margin-top: var(--kora-space-2);
+  gap: var(--kora-space-2);
+  font-size: var(--kora-text-sm);
   color: var(--kora-text-muted);
-  font-size: var(--kora-text-xs);
+}
+
+.headerStats b {
+  color: var(--kora-text);
+}
+
+.headerDot {
+  margin: 0 var(--kora-space-2);
+}
+
+/* Espacio arriba para la píldora ESPERADO y abajo para la etiqueta de HH. */
+.barArea {
+  position: relative;
+  padding: 34px 0 22px;
 }
 
 .track {
-  display: flex;
   position: relative;
-  width: 100%;
+  display: flex;
   height: 40px;
-  margin-top: 34px;
   border-radius: var(--kora-radius);
-  overflow: visible;
   background: var(--kora-surface-disabled);
 }
 
-.segment {
+.fill {
   display: flex;
-  flex: 1;
   align-items: center;
   justify-content: center;
-  font-size: var(--kora-text-sm);
-  font-weight: var(--kora-weight-medium);
-  text-align: center;
-  padding: 0 var(--kora-space-2);
+  height: 100%;
+  border-radius: var(--kora-radius);
+  background: var(--kora-lime);
   overflow: hidden;
-  text-overflow: ellipsis;
+  transition: width 0.3s ease;
+}
+
+.fillLabel,
+.outsideLabel {
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-navy);
   white-space: nowrap;
 }
 
-/* `:first-of-type`/`:last-of-type` (no `:first-child`/`:last-child`): el
-   marcador "HOY" se agrega como hermano DESPUÉS de los segmentos cuando hay
-   fechas, así que el último `.segment` deja de ser el último hijo del
-   contenedor — pero sigue siendo el último `<div>` entre los `<span>`. */
-.segment:first-of-type {
-  border-top-left-radius: var(--kora-radius);
-  border-bottom-left-radius: var(--kora-radius);
+.fillLabel {
+  padding: 0 var(--kora-space-2);
 }
 
-.segment:last-of-type {
-  border-top-right-radius: var(--kora-radius);
-  border-bottom-right-radius: var(--kora-radius);
+.outsideLabel {
+  position: absolute;
+  top: 50%;
+  margin-left: var(--kora-space-3);
+  transform: translateY(-50%);
 }
 
-.segmentPast {
-  background: var(--kora-blue-200);
-  color: var(--kora-surface);
-}
-
-.segmentFuture {
-  background: var(--kora-surface-disabled);
+.emptyLabel {
+  margin: auto;
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-medium);
   color: var(--kora-text-muted);
 }
 
-.segmentCurrent_discovery,
-.segmentCurrent_testing,
-.segmentCurrent_pilot,
-.segmentCurrent_closed {
-  color: var(--kora-surface);
-  font-weight: var(--kora-weight-bold);
-}
-
-.segmentCurrent_development {
-  color: var(--kora-navy);
-  font-weight: var(--kora-weight-bold);
-}
-
-.segmentCurrent_discovery {
-  background: var(--kora-blue-600);
-}
-
-.segmentCurrent_development {
-  background: var(--kora-lime);
-}
-
-.segmentCurrent_testing {
-  background: var(--kora-info);
-}
-
-.segmentCurrent_pilot {
-  background: var(--kora-warning);
-}
-
-.segmentCurrent_closed {
-  background: var(--kora-success);
-}
-
-.today {
+/* Marca ESPERADO: píldora + línea, igual que el marcador HOY de la barra original. */
+.expected {
   position: absolute;
-  top: -30px;
+  top: 4px;
   transform: translateX(-50%);
   display: flex;
   flex-direction: column;
@@ -106,7 +86,7 @@
   pointer-events: none;
 }
 
-.todayPill {
+.expectedPill {
   position: relative;
   background: var(--kora-navy);
   color: var(--kora-surface);
@@ -117,7 +97,7 @@
   white-space: nowrap;
 }
 
-.todayPill::after {
+.expectedPill::after {
   content: '';
   position: absolute;
   top: 100%;
@@ -127,8 +107,72 @@
   border-top-color: var(--kora-navy);
 }
 
-.todayLine {
+.expectedLine {
   width: 2px;
   height: 46px;
   background: var(--kora-navy);
+}
+
+/* Marca de HH consumidas: línea punteada sobre la barra y etiqueta debajo. */
+.consumption {
+  position: absolute;
+  top: 34px;
+  height: 40px;
+  border-left: 2px dashed var(--kora-warning);
+  margin-left: -1px;
+  pointer-events: none;
+}
+
+.consumptionLabel {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 3px;
+  transform: translateX(-50%);
+  font-size: 11px;
+  font-weight: var(--kora-weight-semibold);
+  color: var(--kora-warning-text);
+  white-space: nowrap;
+}
+
+.alignStart {
+  left: 0;
+  transform: none;
+}
+
+.alignEnd {
+  left: auto;
+  right: 0;
+  transform: none;
+}
+
+/* La píldora está centrada por su contenedor: en los bordes se corre hacia adentro. */
+.expectedPill.alignStart {
+  transform: translateX(calc(50% - 12px));
+}
+
+.expectedPill.alignEnd {
+  transform: translateX(calc(-50% + 12px));
+}
+
+.scale {
+  display: flex;
+  justify-content: space-between;
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-xs);
+}
+
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--kora-space-2);
+  margin-top: var(--kora-space-3);
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-xs);
+}
+
+.note {
+  flex: 1;
+  text-align: center;
 }

@@ -10,6 +10,7 @@ import type {
 } from '../../domain/repositories/project-team-member.repository';
 import type { AuditRecorder } from '../../../../shared/application/ports/audit-recorder.port';
 import type { ProjectChangeLogRecorder } from '../services/project-change-log.recorder';
+import type { ProjectProgressRecalculator } from '../services/project-progress-recalculator';
 import { FixedClock, PassthroughUnitOfWork } from '../../../../test/fakes';
 
 const FAKE_PROJECT = {
@@ -51,6 +52,7 @@ function buildModule(overrides: Partial<ProjectModuleRecord['tasks'][number]> = 
 
 function buildUseCase(module: ProjectModuleRecord) {
   const changeLogRecord = vi.fn().mockResolvedValue(undefined);
+  const recalculateProgress = vi.fn().mockResolvedValue(undefined);
   const useCase = new UpdateProjectModuleTaskUseCase(
     { findById: vi.fn().mockResolvedValue(FAKE_PROJECT) } as unknown as ProjectRepository,
     { findById: vi.fn().mockResolvedValue(module), updateTask: vi.fn().mockResolvedValue(undefined) } as unknown as ProjectModuleRepository,
@@ -60,10 +62,11 @@ function buildUseCase(module: ProjectModuleRecord) {
     } as unknown as ProjectTeamMemberRepository,
     { record: vi.fn().mockResolvedValue(undefined) } as unknown as AuditRecorder,
     { record: changeLogRecord } as unknown as ProjectChangeLogRecorder,
+    { recalculate: recalculateProgress } as unknown as ProjectProgressRecalculator,
     new FixedClock(),
     new PassthroughUnitOfWork(),
   );
-  return { useCase, changeLogRecord };
+  return { useCase, changeLogRecord, recalculateProgress };
 }
 
 const LEADER = { actor: { userId: 'leader-1', email: 'leader@kabeli.cl' }, actorPermissions: [] as Permission[] };
@@ -86,6 +89,14 @@ describe('UpdateProjectModuleTaskUseCase — bitácora', () => {
         message: 'Tarea "Maqueta" aprobada en fase "Módulo Financiero", con 5 días de atraso (fecha comprometida 20-08-2026).',
       }),
     ]);
+  });
+
+  it('al aprobar, recalcula el avance del proyecto en la misma transacción', async () => {
+    const { useCase, recalculateProgress } = buildUseCase(buildModule({ status: 'in_review' }));
+
+    await useCase.execute({ ...TARGET, ...LEADER, data: { status: 'done' } });
+
+    expect(recalculateProgress).toHaveBeenCalledWith('project-1', expect.anything());
   });
 
   it('al rechazar, el registro incluye el motivo', async () => {
