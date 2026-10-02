@@ -32,12 +32,18 @@ import { portalProjectPath, portalSupportContractPath } from '@/app/router/paths
  */
 
 const HEALTH_LABEL: Readonly<Record<ClientProjectHealth, string>> = {
+  prospect: 'Prospecto',
+  quoted: 'Cotización',
+  not_started: 'No iniciado',
   active: 'Activo',
   at_risk: 'En riesgo',
   finished: 'Finalizado',
 };
 
 const HEALTH_TONE: Readonly<Record<ClientProjectHealth, StatusPillTone>> = {
+  prospect: 'info',
+  quoted: 'info',
+  not_started: 'neutral',
   active: 'success',
   at_risk: 'warning',
   finished: 'neutral',

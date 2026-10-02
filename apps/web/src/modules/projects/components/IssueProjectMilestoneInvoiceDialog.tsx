@@ -7,6 +7,7 @@ import { TextField } from '@/shared/components/ui/TextField';
 import { FileField } from '@/shared/components/ui/FileField';
 import { AlertIcon, InfoIcon } from '@/shared/components/icons/Icons';
 import { ApiRequestError } from '@/shared/lib/api-client';
+import { formatMoney } from '@/shared/lib/format-money';
 
 export interface IssueProjectMilestoneInvoiceDialogProps {
   open: boolean;
@@ -82,7 +83,7 @@ export function IssueProjectMilestoneInvoiceDialog({
     <Modal
       open={open}
       title="Subir factura"
-      description={`${milestoneName} · ${amount.toLocaleString('es-CL', { maximumFractionDigits: 2 })}`}
+      description={`${milestoneName} · ${formatMoney(amount, 'UF')}`}
       onClose={onClose}
       dismissible={!running}
       footer={

@@ -13,6 +13,7 @@ import {
 import { getTeamStyle } from '@/modules/projects/utils/team-style';
 import { toBitacoraRows, type BitacoraRow } from '@/modules/projects/lib/bitacora-row';
 import { entryTitle, EVENT_STATUS_LABEL } from '@/modules/projects/lib/hour-entry-log';
+import { lifecycleHealth } from './portal-list.adapter';
 import type {
   ClientBitacoraEntry,
   ClientBitacoraEntryKind,
@@ -384,8 +385,8 @@ function toBilling(project: ProjectDetail): ClientProjectBilling {
 }
 
 function health(project: ProjectDetail): ClientProjectHealth {
-  if (project.status === 'finished') return 'finished';
-  if (project.status === 'on_hold') return 'at_risk';
+  const lifecycle = lifecycleHealth(project);
+  if (lifecycle) return lifecycle;
   // Mismo umbral que el dashboard y el listado interno (`PROJECT_PROGRESS_DELAY_ALERT`).
   return projectDelayLevel(project.progress.delay) === 'on_track' ? 'active' : 'at_risk';
 }

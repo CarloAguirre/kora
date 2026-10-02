@@ -26,6 +26,7 @@ import {
   useUpdateProjectPaymentMilestone,
 } from '../api/projects.queries';
 import { ApiRequestError } from '@/shared/lib/api-client';
+import { formatMoney } from '@/shared/lib/format-money';
 import { IssueProjectMilestoneInvoiceDialog } from './IssueProjectMilestoneInvoiceDialog';
 import { MarkProjectMilestonePaidDialog } from './MarkProjectMilestonePaidDialog';
 import { EditProjectMilestoneDialog } from './EditProjectMilestoneDialog';
@@ -452,7 +453,7 @@ export function ProjectExtrasTab({ project, canManage }: { project: ProjectDetai
                     <span className={styles.milestoneName}>{milestone.name}</span>
                     <span className={styles.milestoneMeta}>
                       {milestone.percent != null ? `${milestone.percent}% · ` : ''}
-                      {milestone.amount.toLocaleString('es-CL', { maximumFractionDigits: 2 })}
+                      {formatMoney(milestone.amount, 'UF')}
                       {milestone.invoiceNumber ? ` · Folio ${milestone.invoiceNumber}` : ''}
                       {milestone.issuedAt ? ` · Emitido ${formatDate(milestone.issuedAt)}` : ''}
                       {milestone.paidAt ? ` · Pagado ${formatDate(milestone.paidAt)}` : ''}
@@ -510,7 +511,7 @@ export function ProjectExtrasTab({ project, canManage }: { project: ProjectDetai
                 onChange={(e) => setNewMilestone((prev) => ({ ...prev, percent: e.target.value }))}
               />
               <TextField
-                label="Monto"
+                label="Monto (UF)"
                 type="number"
                 min={0}
                 value={newMilestone.amount}

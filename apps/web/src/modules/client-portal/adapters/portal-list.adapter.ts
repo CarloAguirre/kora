@@ -1,4 +1,5 @@
-import type { ClientDetail, ProjectPhase, ProjectSummary, SupportPlanListItem } from '@kora/contracts';
+import type { ClientDetail, ProjectSummary, SupportPlanListItem } from '@kora/contracts';
+import { getProjectStageLabel } from '@/modules/projects/lib/project-stage-display';
 import type { ClientCompanyInfo, ClientProjectHealth, ClientProjectRow, ClientSupportContractRow } from '../types';
 
 /** Traduce las listas reales del cliente (`GET /projects`, `GET /support-plans/client/:id`) a las filas del portal — ver `docs/DECISION-PORTAL-CLIENTE.md`. */
@@ -9,18 +10,18 @@ function formatDMY(iso: string | null | undefined): string {
   return `${String(date.getDate()).padStart(2, '0')}-${String(date.getMonth() + 1).padStart(2, '0')}-${date.getFullYear()}`;
 }
 
-const PHASE_LABELS: Readonly<Record<ProjectPhase, string>> = {
-  discovery: 'Levantamiento',
-  development: 'Desarrollo',
-  testing: 'Pruebas',
-  pilot: 'Marcha blanca',
-  closed: 'Finalizado',
-};
-
-function health(status: ProjectSummary['status']): ClientProjectHealth {
-  if (status === 'finished') return 'finished';
-  if (status === 'on_hold') return 'at_risk';
-  return 'active';
+/**
+ * Estado del ciclo de vida para el cliente, con la misma prioridad que `getProjectStageLabel`
+ * (Finalizado/Detenido antes que la etapa comercial). `null` = proyecto aprobado y en curso:
+ * cada vista decide si es "Activo" o "En riesgo" (el detalle mira el atraso, la lista no lo trae).
+ */
+export function lifecycleHealth(project: Pick<ProjectSummary, 'status' | 'salesStage'>): ClientProjectHealth | null {
+  if (project.status === 'finished') return 'finished';
+  if (project.status === 'on_hold') return 'at_risk';
+  if (project.salesStage === 'prospect') return 'prospect';
+  if (project.salesStage === 'quoted') return 'quoted';
+  if (project.status === 'draft') return 'not_started';
+  return null;
 }
 
 export function toClientCompanyInfo(client: ClientDetail): ClientCompanyInfo {
@@ -42,8 +43,9 @@ export function toClientProjectRow(project: ProjectSummary, clientOwnerName: str
     clientOwnerName,
     startDate: formatDMY(project.startDate),
     endDate: project.endDate ? formatDMY(project.endDate) : null,
-    health: health(project.status),
-    stageLabel: project.phase ? PHASE_LABELS[project.phase] : 'Sin etapa',
+    health: lifecycleHealth(project) ?? 'active',
+    // Misma etiqueta que la columna "Etapa" interna: solo con `phase`, un Prospecto/Cotización (sin fase) salía "Sin etapa".
+    stageLabel: getProjectStageLabel(project),
     stageProgressPercent: project.progress.actual ?? 0,
   };
 }

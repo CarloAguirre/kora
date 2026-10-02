@@ -21,9 +21,11 @@ export interface ClientCompanyInfo {
  * Estado visual del proyecto para el cliente: combina el ciclo de vida real
  * (`ProjectStatus` en `@kora/contracts`) con una señal de riesgo/salud que hoy
  * no existe como campo propio en el proyecto — de ahí que sea un tipo aparte
- * y no un alias de `ProjectStatus`.
+ * y no un alias de `ProjectStatus`. `prospect`/`quoted` vienen de la etapa
+ * comercial (`salesStage`) y `not_started` de `status: 'draft'`: sin ellos,
+ * un proyecto aún no vendido o no iniciado se le mostraba al cliente "Activo".
  */
-export type ClientProjectHealth = 'active' | 'at_risk' | 'finished';
+export type ClientProjectHealth = 'prospect' | 'quoted' | 'not_started' | 'active' | 'at_risk' | 'finished';
 
 export interface ClientProjectRow {
   readonly id: string;

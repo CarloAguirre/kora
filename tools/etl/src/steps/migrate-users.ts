@@ -58,7 +58,13 @@ export async function migrateUsers(context: EtlContext): Promise<void> {
       u.rol,
       u.id_equipo,
       u.auth_user_id,
-      u.es_responsable_comercial,
+      -- El selector de la v1 no lee este flag sino el catálogo
+      -- responsable_comercial (filas visibles); solo 4 de sus 10 personas
+      -- tenían además el flag. Se considera comercial a quien cumpla cualquiera.
+      (u.es_responsable_comercial or exists (
+        select 1 from public.responsable_comercial rc
+        where rc.legacy_usuario_id = u.id_usuario and rc.visible_en_selector
+      )) as es_responsable_comercial,
       p.user_id  as profile_user_id,
       p.estado   as profile_estado,
       a.id       as auth_id,
