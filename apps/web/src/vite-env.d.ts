@@ -1,5 +1,8 @@
 /// <reference types="vite/client" />
 
+/** Identificador del build, inyectado por `vite.config.ts`. */
+declare const __APP_VERSION__: string;
+
 /**
  * Tipado de los CSS Modules.
  *

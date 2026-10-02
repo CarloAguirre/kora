@@ -1,9 +1,31 @@
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react-swc';
 import { resolve } from 'node:path';
 
+// Identificador único de cada build. Se incrusta en el bundle y se publica en
+// `version.json`: la app abierta en una pestaña compara ambos para saber si
+// hubo un despliegue nuevo (ver `src/app/version-check.ts`).
+const BUILD_ID = new Date().toISOString();
+
+function versionFile(): Plugin {
+  return {
+    name: 'kora-version-file',
+    apply: 'build',
+    generateBundle() {
+      this.emitFile({
+        type: 'asset',
+        fileName: 'version.json',
+        source: JSON.stringify({ version: BUILD_ID }),
+      });
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), versionFile()],
+  define: {
+    __APP_VERSION__: JSON.stringify(BUILD_ID),
+  },
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src'),
