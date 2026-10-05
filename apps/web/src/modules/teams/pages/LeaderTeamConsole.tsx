@@ -9,7 +9,7 @@ import { TextField } from '@/shared/components/ui/TextField';
 import { Tabs } from '@/shared/components/ui/Tabs';
 import { DataTable, type Column, type SortState } from '@/shared/components/ui/DataTable';
 import { DEFAULT_PAGE_SIZE, Pagination } from '@/shared/components/ui/Pagination';
-import { ClockIcon, SearchIcon, TrendingUpIcon } from '@/shared/components/icons/Icons';
+import { ClockIcon, SearchIcon } from '@/shared/components/icons/Icons';
 import { ProjectStatusBadge } from '@/modules/projects/components/ProjectStatusBadge';
 import { getProjectStageLabel } from '@/modules/projects/lib/project-stage-display';
 import { useProjectsList } from '@/modules/projects/api/projects.queries';
@@ -87,9 +87,9 @@ function matchesTab(project: ProjectSummary, tab: ProjectTabKey): boolean {
  * "Proyectos del equipo" con tabs por estado, y "Registro de horas Líder":
  * alta de horas propias + historial de TODO el equipo (autor, equipo, filtros
  * de persona/fecha/estado), igual que `LiderDashboardB` en la v1. La
- * capacidad semanal y la aprobación de HH del equipo sí tienen pantallas
- * propias completas en v2 (`/forecast` y `/horas/aprobaciones`) — para esas
- * dos, aquí solo se enlaza en vez de reconstruirlas.
+ * aprobación de HH del equipo tiene pantalla propia en v2
+ * (`/horas/aprobaciones`) — aquí solo se enlaza en vez de reconstruirla. La
+ * capacidad semanal vive en Forecast, ya accesible desde el menú lateral.
  */
 export function LeaderTeamConsole({ teams }: { teams: TeamSummary[] }) {
   const [teamId, setTeamId] = useState(teams[0]?.id ?? '');
@@ -202,18 +202,11 @@ export function LeaderTeamConsole({ teams }: { teams: TeamSummary[] }) {
             setPage(1);
           }}
           actions={
-            <>
-              <Link to="/horas/aprobaciones">
-                <Button variant="outlineDark" size="sm" iconLeft={<ClockIcon size={15} />}>
-                  Registro de HH
-                </Button>
-              </Link>
-              <Link to="/forecast">
-                <Button variant="outlineDark" size="sm" iconLeft={<TrendingUpIcon size={15} />}>
-                  Capacidad
-                </Button>
-              </Link>
-            </>
+            <Link to="/horas/aprobaciones">
+              <Button variant="outlineDark" size="sm" iconLeft={<ClockIcon size={15} />}>
+                Aprobación de HH
+              </Button>
+            </Link>
           }
         />
 
