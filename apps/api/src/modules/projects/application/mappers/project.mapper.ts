@@ -66,6 +66,8 @@ export interface ProjectDetailSource {
   readonly modules: readonly ProjectModuleRecord[];
   readonly paymentMilestones: readonly ProjectPaymentMilestoneRecord[];
   readonly usedHoursUpdatedAt: Date | null;
+  /** Última acción del líder sobre el proyecto — ver `ProjectActivityReader`. */
+  readonly leaderLastActivityAt: Date | null;
   /** Horas aprobadas con fecha anterior al día del Hito 0 — ver `GetProjectUseCase`. */
   readonly prospectPhaseHours: number;
   readonly actorUserId: string;
@@ -265,6 +267,7 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
     periodReportDate: snapshot.periodReportDate?.toISOString().slice(0, 10) ?? null,
     periodReportAchievements: snapshot.periodReportAchievements,
     usedHoursUpdatedAt: source.usedHoursUpdatedAt?.toISOString().slice(0, 10) ?? null,
+    leaderLastActivityAt: source.leaderLastActivityAt?.toISOString() ?? null,
     prospectPhaseHours: source.prospectPhaseHours,
     pendingManagementApproval: source.project.pendingManagementApproval,
     hito0At: snapshot.hito0At?.toISOString() ?? null,

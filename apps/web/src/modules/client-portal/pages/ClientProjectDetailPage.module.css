@@ -50,6 +50,17 @@
   flex-wrap: wrap;
 }
 
+/* Última acción del líder (PM) sobre el proyecto — mismo tono que los captions de sección. */
+.lastUpdated {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: var(--kora-weight-medium);
+  color: #5d6b7a;
+}
+
 /* Fila de 9 botones — medidas exactas del Figma (node 9203:2178): círculos de
    38px, gap 8px, alineados a la derecha, fondo #0F2A44. */
 .sectionToggles {

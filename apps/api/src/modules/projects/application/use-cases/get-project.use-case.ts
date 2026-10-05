@@ -25,6 +25,7 @@ import { PROJECT_USER_READER, type ProjectUserReader } from '../ports/project-us
 import { PROJECT_CLIENT_READER, type ProjectClientReader } from '../ports/project-client-reader.port';
 import { PROJECT_CONTACT_READER, type ProjectContactReader } from '../ports/project-contact-reader.port';
 import { PROJECT_HOUR_ENTRY_READER, type ProjectHourEntryReader } from '../ports/project-hour-entry-reader.port';
+import { PROJECT_ACTIVITY_READER, type ProjectActivityReader } from '../ports/project-activity-reader.port';
 import type { UseCase } from '../../../../shared/application/use-case';
 import { toProjectDetail } from '../mappers/project.mapper';
 
@@ -53,6 +54,7 @@ export class GetProjectUseCase implements UseCase<GetProjectCommand, ProjectDeta
     @Inject(PROJECT_CLIENT_READER) private readonly clients: ProjectClientReader,
     @Inject(PROJECT_CONTACT_READER) private readonly contacts: ProjectContactReader,
     @Inject(PROJECT_HOUR_ENTRY_READER) private readonly hourEntries: ProjectHourEntryReader,
+    @Inject(PROJECT_ACTIVITY_READER) private readonly activity: ProjectActivityReader,
     @Inject(CLOCK) private readonly clock: Clock,
   ) {}
 
@@ -76,6 +78,7 @@ export class GetProjectUseCase implements UseCase<GetProjectCommand, ProjectDeta
       projectModules,
       projectPaymentMilestones,
       usedHoursUpdatedAt,
+      leaderLastActivityAt,
     ] = await Promise.all([
       snapshot.clientId ? this.clients.findById(snapshot.clientId) : Promise.resolve(null),
       snapshot.primaryContactId ? this.contacts.findById(snapshot.primaryContactId) : Promise.resolve(null),
@@ -90,6 +93,9 @@ export class GetProjectUseCase implements UseCase<GetProjectCommand, ProjectDeta
       this.modules.listForProject(project.id),
       this.paymentMilestones.listForProject(project.id),
       this.hourEntries.maxApprovedEntryDateForProject(project.id),
+      snapshot.leaderUserId
+        ? this.activity.lastActivityAtByUser(project.id, snapshot.leaderUserId)
+        : Promise.resolve(null),
     ]);
 
     /**
@@ -169,6 +175,7 @@ export class GetProjectUseCase implements UseCase<GetProjectCommand, ProjectDeta
         modules: projectModules,
         paymentMilestones: projectPaymentMilestones,
         usedHoursUpdatedAt,
+        leaderLastActivityAt,
         prospectPhaseHours,
         actorUserId: command.actorUserId,
         canManagePendings,

@@ -75,6 +75,13 @@ function formatTimeOfDay(isoDateTime: string): string {
   return date.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hour12: true });
 }
 
+/** Instante (no solo fecha) en hora local — "05-10-2026, 02:30 p. m.", mismo formato que las entradas de bitácora. */
+function formatDateTime(isoDateTime: string): string {
+  const date = new Date(isoDateTime);
+  const dmy = `${String(date.getDate()).padStart(2, '0')}-${String(date.getMonth() + 1).padStart(2, '0')}-${date.getFullYear()}`;
+  return `${dmy}, ${formatTimeOfDay(isoDateTime)}`;
+}
+
 export function roleFromTeamName(teamName: string | null): PhaseRoadmapRole {
   const sigla = getTeamStyle(teamName ?? '').sigla.toUpperCase();
   if (sigla === 'QA') return 'qa';
@@ -457,6 +464,7 @@ export function toClientProjectDetail(project: ProjectDetail, hourEntries: reado
     hoursDeviation: Math.round(Math.max(0, usedHours - soldHours) * 10) / 10,
     usedHoursToDate: usedHours,
     usedHoursUpdatedAt: project.usedHoursUpdatedAt ? formatDMY(project.usedHoursUpdatedAt) : '--',
+    lastUpdatedAt: project.leaderLastActivityAt ? formatDateTime(project.leaderLastActivityAt) : null,
     progressActualPercent: project.progress.actual,
     progressExpectedPercent: project.progress.expected,
     endDate: formatDMY(project.endDate),

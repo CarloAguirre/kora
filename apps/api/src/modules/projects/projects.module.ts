@@ -53,6 +53,7 @@ import { PROJECT_USER_READER } from './application/ports/project-user-reader.por
 import { PROJECT_CLIENT_READER } from './application/ports/project-client-reader.port';
 import { PROJECT_CONTACT_READER } from './application/ports/project-contact-reader.port';
 import { PROJECT_HOUR_ENTRY_READER } from './application/ports/project-hour-entry-reader.port';
+import { PROJECT_ACTIVITY_READER } from './application/ports/project-activity-reader.port';
 import { PROJECT_TEAM_MEMBER_VALIDATOR } from './application/ports/project-team-member-validator.port';
 import { SEGMENT_FORECAST_STORE } from './application/ports/segment-forecast-store.port';
 
@@ -67,6 +68,7 @@ import { DrizzleProjectUserReader } from './infrastructure/services/drizzle-proj
 import { DrizzleProjectClientReader } from './infrastructure/services/drizzle-project-client-reader';
 import { DrizzleProjectContactReader } from './infrastructure/services/drizzle-project-contact-reader';
 import { DrizzleProjectHourEntryReader } from './infrastructure/services/drizzle-project-hour-entry-reader';
+import { DrizzleProjectActivityReader } from './infrastructure/services/drizzle-project-activity-reader';
 import { DrizzleProjectTeamMemberValidator } from './infrastructure/services/drizzle-project-team-member-validator';
 import { DrizzleSegmentForecastStore } from './infrastructure/services/drizzle-segment-forecast-store';
 
@@ -133,6 +135,7 @@ import { DrizzleSegmentForecastStore } from './infrastructure/services/drizzle-s
     { provide: PROJECT_CLIENT_READER, useClass: DrizzleProjectClientReader },
     { provide: PROJECT_CONTACT_READER, useClass: DrizzleProjectContactReader },
     { provide: PROJECT_HOUR_ENTRY_READER, useClass: DrizzleProjectHourEntryReader },
+    { provide: PROJECT_ACTIVITY_READER, useClass: DrizzleProjectActivityReader },
     { provide: PROJECT_TEAM_MEMBER_VALIDATOR, useClass: DrizzleProjectTeamMemberValidator },
     { provide: SEGMENT_FORECAST_STORE, useClass: DrizzleSegmentForecastStore },
   ],

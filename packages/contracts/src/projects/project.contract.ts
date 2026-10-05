@@ -653,6 +653,12 @@ export const projectDetailSchema = projectSummarySchema.extend({
   /** Fecha de la hora aprobada más reciente del proyecto — "actualizado al" de la tarjeta de horas. `null` si no tiene ninguna. */
   usedHoursUpdatedAt: z.string().nullable(),
   /**
+   * Última acción del líder (PM) sobre este proyecto — "Última actualización" del portal cliente.
+   * Sale de la auditoría del proyecto y de las entradas de bitácora que escribió. `null` sin líder
+   * o si nunca hizo nada sobre el proyecto.
+   */
+  leaderLastActivityAt: isoDateTimeSchema.nullable(),
+  /**
    * Horas aprobadas registradas antes del día del Hito 0 — fase
    * "Prospecto/Cotización" del documento de Leslie. Ya están incluidas en
    * `usedHours` (suman al consumo total, la cotización ya las considera);

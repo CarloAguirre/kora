@@ -355,6 +355,8 @@ export interface ClientProjectDetail {
   readonly hoursDeviation: number;
   readonly usedHoursToDate: number;
   readonly usedHoursUpdatedAt: string;
+  /** Última acción del líder (PM) sobre el proyecto, ya formateada ("05-10-2026, 02:30 p. m."). `null` si no hay registro. */
+  readonly lastUpdatedAt: string | null;
   /** `null` (ambos) = el proyecto todavía no tiene plan de tareas cargado. */
   readonly progressActualPercent: number | null;
   readonly progressExpectedPercent: number | null;

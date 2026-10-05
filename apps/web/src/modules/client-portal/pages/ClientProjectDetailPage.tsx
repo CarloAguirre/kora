@@ -246,6 +246,13 @@ export function ClientProjectDetailPage({ projectIdOverride, backTo, backLabel, 
           </Button>
         </div>
 
+        {project.lastUpdatedAt && (
+          <p className={styles.lastUpdated}>
+            <ClockIcon size={14} />
+            Última actualización: {project.lastUpdatedAt}
+          </p>
+        )}
+
         <div className={styles.sectionToggles} role="group" aria-label="Mostrar u ocultar secciones">
           {SECTION_TOGGLES.map(({ key, label, icon: Icon }) => (
             <button

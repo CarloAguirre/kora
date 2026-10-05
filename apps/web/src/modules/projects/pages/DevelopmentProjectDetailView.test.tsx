@@ -172,6 +172,7 @@ function buildProject(): ProjectDetail {
     periodReportDate: null,
     periodReportAchievements: null,
     usedHoursUpdatedAt: null,
+    leaderLastActivityAt: null,
     prospectPhaseHours: 0,
     paymentMilestones: [],
     pendingManagementApproval: false,
