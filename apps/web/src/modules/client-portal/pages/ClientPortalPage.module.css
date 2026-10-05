@@ -71,3 +71,9 @@
   font-size: var(--kora-text-xs);
   color: var(--kora-blue-400);
 }
+
+/* El wordmark Kabeli a tamaño natural (149×35) es demasiado para una línea de pie. */
+.footerLogo {
+  width: auto;
+  height: 22px;
+}

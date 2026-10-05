@@ -1,18 +1,16 @@
 import type { ClientCompanyInfo } from '../types';
 import { BuildingIcon } from '@/shared/components/icons/Icons';
-import { KoraLogo } from '@/shared/components/layout/KoraLogo';
+import { KabeliLogo } from '@/shared/components/layout/KabeliLogo';
 import styles from './ClientCompanyHeader.module.css';
 
 /**
  * Franja "empresa" que encabeza el portal — nombre, contacto y logo de marca.
  *
  * El Figma de referencia muestra el logo real del cliente y el wordmark
- * "kabeli" a la derecha. No hay assets de logo por cliente en este proyecto
- * (ni un componente de marca "Kabeli" — el resto de la app ya usa el logo de
- * Kora para esa misma mención, ver el pie de `DashboardSupportTab.tsx`), así
- * que aquí se usa un ícono neutro como marcador de posición del logo del
- * cliente y se reutiliza `KoraLogo` para la marca, en vez de inventar un
- * asset nuevo.
+ * "kabeli" a la derecha. No hay assets de logo por cliente en este proyecto,
+ * así que se usa un ícono neutro como marcador de posición del logo del
+ * cliente; la marca es `KabeliLogo`, igual que en la ficha de proyecto del
+ * portal (`ClientProjectDetailPage`).
  */
 export function ClientCompanyHeader({ company, contractLabel }: { company: ClientCompanyInfo; contractLabel: string }) {
   return (
@@ -30,7 +28,7 @@ export function ClientCompanyHeader({ company, contractLabel }: { company: Clien
       </div>
 
       <div className={styles.brand}>
-        <KoraLogo variant="dark" />
+        <KabeliLogo />
       </div>
     </div>
   );

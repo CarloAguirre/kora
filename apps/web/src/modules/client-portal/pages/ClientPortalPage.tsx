@@ -4,7 +4,7 @@ import type { SupportPlanType } from '@kora/contracts';
 import styles from './ClientPortalPage.module.css';
 import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Tabs } from '@/shared/components/ui/Tabs';
-import { KoraLogo } from '@/shared/components/layout/KoraLogo';
+import { KabeliLogo } from '@/shared/components/layout/KabeliLogo';
 import { useClientDetail } from '@/modules/clients/api/clients.queries';
 import { useProjectsList } from '@/modules/projects/api/projects.queries';
 import { useSupportPlansForClient } from '@/modules/projects/api/support-plan.queries';
@@ -103,7 +103,7 @@ export function ClientPortalPage({
 
         <div className={styles.footer}>
           <span>Diseñado y desarrollado por</span>
-          <KoraLogo variant="dark" />
+          <KabeliLogo className={styles.footerLogo} />
         </div>
       </div>
     </DashboardLayout>
