@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm, type Control } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { createClientSchema, type ClientDetail, type CreateClientInput } from '@kora/contracts';
@@ -7,7 +7,7 @@ import styles from './ClientFormDialog.module.css';
 import { Modal } from '@/shared/components/ui/Modal';
 import { Button } from '@/shared/components/ui/Button';
 import { TextField } from '@/shared/components/ui/TextField';
-import { Select } from '@/shared/components/ui/Select';
+import { Combobox } from '@/shared/components/ui/Combobox';
 import { AlertIcon } from '@/shared/components/icons/Icons';
 import { ClientContactsEditor } from './ClientContactsEditor';
 import {
@@ -162,32 +162,36 @@ export function ClientFormDialog({ open, clientId, onClose, onSuccess, onCreated
         <TextField label="Dirección" {...register('address')} />
 
         <div className={styles.row}>
-          <Select
+          <CatalogCombobox
+            control={control}
+            name="countryId"
             label="País"
-            placeholder="Sin especificar"
-            options={(options?.countries ?? []).map((c) => ({ value: c.id, label: c.name }))}
-            {...register('countryId')}
+            emptyLabel="Sin especificar"
+            options={options?.countries}
           />
-          <Select
+          <CatalogCombobox
+            control={control}
+            name="comunaId"
             label="Comuna"
-            placeholder="Sin especificar"
-            options={(options?.comunas ?? []).map((c) => ({ value: c.id, label: c.name }))}
-            {...register('comunaId')}
+            emptyLabel="Sin especificar"
+            options={options?.comunas}
           />
         </div>
 
         <div className={styles.row}>
-          <Select
+          <CatalogCombobox
+            control={control}
+            name="industryId"
             label="Giro"
-            placeholder="Sin especificar"
-            options={(options?.industries ?? []).map((c) => ({ value: c.id, label: c.name }))}
-            {...register('industryId')}
+            emptyLabel="Sin especificar"
+            options={options?.industries}
           />
-          <Select
+          <CatalogCombobox
+            control={control}
+            name="commercialManagerUserId"
             label="Responsable comercial"
-            placeholder="Sin asignar"
-            options={(options?.commercialManagers ?? []).map((c) => ({ value: c.id, label: c.name }))}
-            {...register('commercialManagerUserId')}
+            emptyLabel="Sin asignar"
+            options={options?.commercialManagers}
           />
         </div>
 
@@ -197,6 +201,36 @@ export function ClientFormDialog({ open, clientId, onClose, onSuccess, onCreated
         </div>
       </form>
     </Modal>
+  );
+}
+
+type CatalogField = 'countryId' | 'comunaId' | 'industryId' | 'commercialManagerUserId';
+
+interface CatalogComboboxProps {
+  control: Control<ClientFormValues, unknown, CreateClientInput>;
+  name: CatalogField;
+  label: string;
+  emptyLabel: string;
+  options: readonly { id: string; name: string }[] | undefined;
+}
+
+/** Catálogo opcional con búsqueda: la opción vacía deja el campo en `null`. */
+function CatalogCombobox({ control, name, label, emptyLabel, options }: CatalogComboboxProps) {
+  return (
+    <Controller
+      control={control}
+      name={name}
+      render={({ field, fieldState }) => (
+        <Combobox
+          label={label}
+          placeholder={emptyLabel}
+          options={[{ value: '', label: emptyLabel }, ...(options ?? []).map((o) => ({ value: o.id, label: o.name }))]}
+          value={field.value ?? ''}
+          onChange={(value) => field.onChange(value || null)}
+          errorText={fieldState.error?.message}
+        />
+      )}
+    />
   );
 }
 
