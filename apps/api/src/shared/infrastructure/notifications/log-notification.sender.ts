@@ -1,5 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
-import { LOGGER, type Logger } from '@kora/core';
+import type { Logger } from '@kora/core';
 import type {
   AccountStatusNotification,
   NotificationSender,
@@ -20,11 +19,15 @@ import type {
  * implemente el mismo puerto y se cambia una línea en el módulo: ningún caso de
  * uso se entera.
  *
- * En producción esta clase NO debe registrarse; el arranque falla si lo hace.
+ * Se usa cuando no hay `RESEND_API_KEY`. En producción la clave es obligatoria
+ * (ver `assertProductionSafety` en env.schema), así que esta clase nunca llega
+ * a registrarse allí.
  */
-@Injectable()
 export class LogNotificationSender implements NotificationSender {
-  constructor(@Inject(LOGGER) private readonly logger: Logger) {}
+  constructor(
+    private readonly logger: Logger,
+    private readonly webAppUrl: string,
+  ) {}
 
   async sendUserInvitation(invitation: UserInvitation): Promise<void> {
     this.logger.info('[notificación] Invitación de usuario', {
@@ -34,7 +37,7 @@ export class LogNotificationSender implements NotificationSender {
       expiresAt: invitation.expiresAt.toISOString(),
       // El token va explícito a propósito: es lo que hace usable este adaptador
       // en desarrollo. Por eso mismo no puede activarse en producción.
-      link: `/auth/definir-contrasena?token=${invitation.setPasswordToken}`,
+      link: `${this.webAppUrl}/definir-contrasena?token=${invitation.setPasswordToken}`,
     });
   }
 
@@ -42,7 +45,7 @@ export class LogNotificationSender implements NotificationSender {
     this.logger.info('[notificación] Recuperación de contraseña', {
       to: notification.email,
       expiresAt: notification.expiresAt.toISOString(),
-      link: `/auth/restablecer?token=${notification.resetToken}`,
+      link: `${this.webAppUrl}/definir-contrasena?token=${notification.resetToken}`,
     });
   }
 

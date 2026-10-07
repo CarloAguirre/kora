@@ -41,6 +41,16 @@ export const envSchema = z.object({
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   GOOGLE_CALLBACK_URL: z.string().optional(),
 
+  // Correo saliente (Resend). Sin RESEND_API_KEY los correos se escriben en el
+  // log en vez de enviarse — solo admisible fuera de producción.
+  RESEND_API_KEY: z.string().optional(),
+  MAIL_FROM: z.string().min(1).default('Kora <avisos@kora-correos.online>'),
+  // Desvía TODOS los correos a este buzón. Solo desarrollo: la base local suele
+  // tener usuarios reales y probar un alta no debe escribirle a un compañero.
+  MAIL_REDIRECT_TO: z.email().optional(),
+  // URL pública del front: los enlaces de los correos tienen que ser absolutos.
+  WEB_APP_URL: z.url().default('http://localhost:5173'),
+
   MAX_FAILED_LOGIN_ATTEMPTS: z.coerce.number().int().min(1).max(50).default(5),
   ACCOUNT_LOCK_MINUTES: z.coerce.number().int().min(1).max(1440).default(15),
 
@@ -81,6 +91,17 @@ function assertProductionSafety(env: Env): void {
   }
   if (env.CORS_ORIGINS.length === 0) {
     problems.push('CORS_ORIGINS no puede estar vacío en producción.');
+  }
+  // Sin clave, el adaptador de log escribiría los tokens de invitación y
+  // recuperación en los logs de producción en vez de enviarlos.
+  if (!env.RESEND_API_KEY) {
+    problems.push('RESEND_API_KEY es obligatoria en producción.');
+  }
+  if (env.MAIL_REDIRECT_TO) {
+    problems.push('MAIL_REDIRECT_TO no puede usarse en producción.');
+  }
+  if (/localhost|127\.0\.0\.1/.test(env.WEB_APP_URL)) {
+    problems.push('WEB_APP_URL apunta a localhost: los enlaces de los correos no funcionarían.');
   }
 
   if (problems.length > 0) {

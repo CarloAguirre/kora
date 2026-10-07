@@ -1,6 +1,7 @@
 import { Global, Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { CLOCK, ID_GENERATOR, LOGGER, UNIT_OF_WORK } from '@kora/core';
+import { CLOCK, ID_GENERATOR, LOGGER, UNIT_OF_WORK, type Logger } from '@kora/core';
+import { Resend } from 'resend';
 
 import { validateEnv } from './config/env.schema';
 import { AppConfigService } from './config/app-config.service';
@@ -17,6 +18,7 @@ import { DrizzleAuditRecorder } from './shared/infrastructure/audit/drizzle-audi
 import { GoogleOAuthClientService } from './shared/infrastructure/auth/google-oauth-client.service';
 import { DrizzleAuditReader } from './shared/infrastructure/audit/drizzle-audit-reader';
 import { LogNotificationSender } from './shared/infrastructure/notifications/log-notification.sender';
+import { ResendNotificationSender } from './shared/infrastructure/notifications/resend-notification.sender';
 import { DatabaseHealthProbe } from './shared/infrastructure/database/database-health.probe';
 
 import { PASSWORD_HASHER } from './shared/application/ports/password-hasher.port';
@@ -66,7 +68,18 @@ import { JwtModule } from '@nestjs/jwt';
     { provide: OPAQUE_TOKEN_GENERATOR, useClass: RandomOpaqueTokenGenerator },
     { provide: AUDIT_RECORDER, useClass: DrizzleAuditRecorder },
     { provide: AUDIT_READER, useClass: DrizzleAuditReader },
-    { provide: NOTIFICATION_SENDER, useClass: LogNotificationSender },
+    {
+      // Con RESEND_API_KEY se envía de verdad; sin ella, al log (solo fuera de
+      // producción: env.schema exige la clave allí).
+      provide: NOTIFICATION_SENDER,
+      inject: [AppConfigService, LOGGER],
+      useFactory: (config: AppConfigService, logger: Logger) => {
+        const mail = config.mail;
+        return mail.enabled
+          ? new ResendNotificationSender(new Resend(mail.resendApiKey).emails, mail, logger)
+          : new LogNotificationSender(logger, mail.webAppUrl);
+      },
+    },
     { provide: GOOGLE_OAUTH_CLIENT, useClass: GoogleOAuthClientService },
 
     // Las sondas de salud se registran como una lista: añadir una dependencia

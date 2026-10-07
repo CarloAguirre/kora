@@ -40,6 +40,17 @@ export interface GoogleOAuthSettings {
   readonly callbackUrl: string;
 }
 
+export interface MailSettings {
+  /** `false` sin `RESEND_API_KEY`: los correos van al log (solo fuera de producción, ver env.schema). */
+  readonly enabled: boolean;
+  readonly resendApiKey: string;
+  readonly from: string;
+  /** Si está definido, todo correo se desvía a este buzón (solo desarrollo). */
+  readonly redirectTo: string | null;
+  /** URL pública del front, sin barra final. */
+  readonly webAppUrl: string;
+}
+
 @Injectable()
 export class AppConfigService {
   constructor(private readonly config: ConfigService<Env, true>) {}
@@ -82,6 +93,18 @@ export class AppConfigService {
       clientId,
       clientSecret,
       callbackUrl,
+    };
+  }
+
+  get mail(): MailSettings {
+    const resendApiKey = this.config.get('RESEND_API_KEY', { infer: true }) ?? '';
+
+    return {
+      enabled: resendApiKey !== '',
+      resendApiKey,
+      from: this.config.get('MAIL_FROM', { infer: true }),
+      redirectTo: this.config.get('MAIL_REDIRECT_TO', { infer: true }) ?? null,
+      webAppUrl: this.config.get('WEB_APP_URL', { infer: true }).replace(/\/+$/, ''),
     };
   }
 
