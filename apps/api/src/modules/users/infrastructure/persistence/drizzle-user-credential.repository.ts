@@ -45,6 +45,7 @@ export class DrizzleUserCredentialRepository implements UserCredentialRepository
 
   async upsert(input: UpsertCredentialInput, context?: TransactionContext): Promise<void> {
     const db = resolveDb(this.database, context);
+    const passwordUpdatedAt = input.passwordHash ? sql`now()` : null;
 
     await db
       .insert(userCredentials)
@@ -52,6 +53,7 @@ export class DrizzleUserCredentialRepository implements UserCredentialRepository
         userId: input.userId,
         passwordHash: input.passwordHash,
         passwordAlgorithm: input.passwordAlgorithm,
+        passwordUpdatedAt,
         mustChangePassword: input.mustChangePassword,
         emailVerifiedAt: input.emailVerifiedAt ?? null,
       })
@@ -60,7 +62,14 @@ export class DrizzleUserCredentialRepository implements UserCredentialRepository
         set: {
           passwordHash: input.passwordHash,
           passwordAlgorithm: input.passwordAlgorithm,
+          passwordUpdatedAt,
           mustChangePassword: input.mustChangePassword,
+          emailVerifiedAt: sql`coalesce(excluded.email_verified_at, ${userCredentials.emailVerifiedAt})`,
+          // Fijar o reiniciar la contraseña (invitación, recuperación) limpia
+          // el bloqueo, igual que `updatePassword`: quien usó el enlace ya
+          // demostró controlar el correo.
+          failedAttempts: 0,
+          lockedUntil: null,
           updatedAt: sql`now()`,
         },
       });
@@ -129,7 +138,10 @@ export class DrizzleUserCredentialRepository implements UserCredentialRepository
 
     await db
       .update(userCredentials)
-      .set({ lockedUntil: until, updatedAt: sql`now()` })
+      // El contador vuelve a cero al bloquear: cuando el bloqueo vence, la
+      // persona recupera todos sus intentos en vez de quedar a un error de
+      // otro bloqueo.
+      .set({ lockedUntil: until, failedAttempts: 0, updatedAt: sql`now()` })
       .where(eq(userCredentials.userId, userId));
   }
 

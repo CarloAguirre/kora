@@ -100,13 +100,7 @@ export class LoginUseCase implements UseCase<LoginCommand, LoginOutcome, Applica
     }
 
     if (credential.lockedUntil && credential.lockedUntil > now) {
-      const minutes = Math.ceil((credential.lockedUntil.getTime() - now.getTime()) / 60_000);
-      return err(
-        new UnauthorizedError(
-          `Demasiados intentos fallidos. Vuelve a intentarlo en ${minutes} minuto(s).`,
-          AUTH_ERROR_CODES.ACCOUNT_LOCKED,
-        ),
-      );
+      return err(accountLocked(credential.lockedUntil, now));
     }
 
     const verification = await this.hasher.verify(
@@ -117,13 +111,14 @@ export class LoginUseCase implements UseCase<LoginCommand, LoginOutcome, Applica
 
     if (!verification.valid) {
       const attempts = await this.credentials.registerFailedAttempt(user.id);
-      if (attempts >= settings.maxFailedAttempts) {
-        await this.credentials.lockUntil(
-          user.id,
-          new Date(now.getTime() + settings.lockMinutes * 60_000),
-        );
-      }
       await this.recordFailure(command, user.id, email.value, 'bad_password', attempts);
+      if (attempts >= settings.maxFailedAttempts) {
+        const lockedUntil = new Date(now.getTime() + settings.lockMinutes * 60_000);
+        await this.credentials.lockUntil(user.id, lockedUntil);
+        // Se avisa en el mismo intento que provoca el bloqueo: si no, la
+        // persona seguiría probando contraseñas sin saber que ya no sirve.
+        return err(accountLocked(lockedUntil, now));
+      }
       return err(invalidCredentials());
     }
 
@@ -204,6 +199,14 @@ export class LoginUseCase implements UseCase<LoginCommand, LoginOutcome, Applica
       metadata: { reason, ...(attempts !== undefined ? { attempts } : {}) },
     });
   }
+}
+
+function accountLocked(lockedUntil: Date, now: Date): UnauthorizedError {
+  const minutes = Math.ceil((lockedUntil.getTime() - now.getTime()) / 60_000);
+  return new UnauthorizedError(
+    `Demasiados intentos fallidos. Vuelve a intentarlo en ${minutes} minuto(s) o recupera tu contraseña.`,
+    AUTH_ERROR_CODES.ACCOUNT_LOCKED,
+  );
 }
 
 /** Un único error para todos los fallos de credenciales, a propósito. */
