@@ -61,6 +61,14 @@ button {
   cursor: pointer;
 }
 
+/* Edge añade su propio botón de "mostrar contraseña" (y uno de borrar) dentro
+   del input. Los campos de contraseña ya traen el ojo del sistema de diseño,
+   así que con el del navegador quedaban dos. */
+input::-ms-reveal,
+input::-ms-clear {
+  display: none;
+}
+
 a {
   color: inherit;
   text-decoration: none;
