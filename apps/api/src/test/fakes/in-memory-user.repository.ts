@@ -35,7 +35,7 @@ export class InMemoryUserRepository implements UserRepository {
   }
 
   async findByEmail(email: Email): Promise<User | null> {
-    return this.all().find((user) => user.email.equals(email)) ?? null;
+    return this.all().find((user) => !user.isDeleted && user.email.equals(email)) ?? null;
   }
 
   async findByLegacyId(legacyId: number): Promise<User | null> {

@@ -53,6 +53,7 @@ export interface UserListItem {
 
 export interface UserRepository {
   findById(id: string, context?: TransactionContext): Promise<User | null>;
+  /** Solo usuarios vigentes: el correo puede repetirse entre eliminados. */
   findByEmail(email: Email, context?: TransactionContext): Promise<User | null>;
   findByLegacyId(legacyId: number, context?: TransactionContext): Promise<User | null>;
 

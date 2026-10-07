@@ -67,7 +67,10 @@ export class DrizzleUserRepository implements UserRepository {
       .select(this.aggregateColumns())
       .from(users)
       .innerJoin(roles, eq(roles.id, users.roleId))
-      .where(sql`lower(btrim(${users.email})) = ${email.value}`)
+      // Un correo puede repetirse entre usuarios eliminados (el índice único
+      // solo abarca los vigentes): sin este filtro, al dar de baja y volver a
+      // crear a alguien, el login podía encontrar la ficha eliminada.
+      .where(and(sql`lower(btrim(${users.email})) = ${email.value}`, isNull(users.deletedAt)))
       .limit(1);
 
     const row = rows[0];
