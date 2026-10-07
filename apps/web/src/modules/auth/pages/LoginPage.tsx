@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { loginSchema, type LoginInput } from '@kora/contracts';
 import styles from './LoginPage.module.css';
+import { AuthLayout } from '../components/AuthLayout';
 import { Button } from '@/shared/components/ui/Button';
 import { TextField } from '@/shared/components/ui/TextField';
 import { AlertIcon, EyeIcon, EyeOffIcon, GoogleIcon } from '@/shared/components/icons/Icons';
@@ -77,81 +78,58 @@ export function LoginPage() {
   });
 
   return (
-    <div className={styles.page}>
-      <div className={styles.left}>
-        <div className={styles.leftContent}>
-          <img src="/images/kora-logo-pdf.png" alt="Kora" className={styles.logo} />
-
-          <div className={styles.welcome}>
-            <div className={styles.welcomeText}>
-              <h1 className={styles.title}>¡Bienvenidos!</h1>
-              <p className={styles.tagline}>Gestión de horas y proyectos</p>
-            </div>
-
-            {serverError && (
-              <div className={styles.alert} role="alert">
-                <AlertIcon size={18} className={styles.alertIcon} />
-                <span>{serverError}</span>
-              </div>
-            )}
-
-            <form className={styles.form} onSubmit={onSubmit} noValidate>
-              <TextField
-                label="Correo electrónico"
-                type="email"
-                autoComplete="username"
-                placeholder="nombre@kabeli.cl"
-                errorText={errors.email?.message}
-                {...register('email')}
-              />
-
-              <TextField
-                label="Contraseña"
-                type={showPassword ? 'text' : 'password'}
-                autoComplete="current-password"
-                placeholder="Tu contraseña"
-                errorText={errors.password?.message}
-                iconRight={
-                  <button
-                    type="button"
-                    className={styles.eyeToggle}
-                    onClick={() => setShowPassword((value) => !value)}
-                    aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                  >
-                    {showPassword ? <EyeOffIcon size={18} /> : <EyeIcon size={18} />}
-                  </button>
-                }
-                {...register('password')}
-              />
-
-              <div className={styles.actions}>
-                <Button type="submit" loading={isSubmitting} loadingText="Entrando…">
-                  Iniciar sesión
-                </Button>
-
-                <a href="/api/auth/google" className={styles.googleButton}>
-                  <GoogleIcon size={18} />
-                  Continuar con Google
-                </a>
-
-                <Link to="/recuperar" className={styles.link}>
-                  Olvidé mi contraseña
-                </Link>
-              </div>
-            </form>
-          </div>
+    <AuthLayout title="¡Bienvenidos!" tagline="Gestión de horas y proyectos">
+      {serverError && (
+        <div className={styles.alert} role="alert">
+          <AlertIcon size={18} className={styles.alertIcon} />
+          <span>{serverError}</span>
         </div>
-      </div>
+      )}
 
-      <div className={styles.right}>
-        <img src="/images/login-side.png" alt="" className={styles.rightImage} />
-        <div className={styles.credit}>
-          <span>Diseñado y desarrollado por</span>
-          <a href="https://kabeli.cl/" className={styles.creditLink}>
-            Kabeli
+      <form className={styles.form} onSubmit={onSubmit} noValidate>
+        <TextField
+          label="Correo electrónico"
+          type="email"
+          autoComplete="username"
+          placeholder="nombre@kabeli.cl"
+          errorText={errors.email?.message}
+          {...register('email')}
+        />
+
+        <TextField
+          label="Contraseña"
+          type={showPassword ? 'text' : 'password'}
+          autoComplete="current-password"
+          placeholder="Tu contraseña"
+          errorText={errors.password?.message}
+          iconRight={
+            <button
+              type="button"
+              className={styles.eyeToggle}
+              onClick={() => setShowPassword((value) => !value)}
+              aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+            >
+              {showPassword ? <EyeOffIcon size={18} /> : <EyeIcon size={18} />}
+            </button>
+          }
+          {...register('password')}
+        />
+
+        <div className={styles.actions}>
+          <Button type="submit" loading={isSubmitting} loadingText="Entrando…">
+            Iniciar sesión
+          </Button>
+
+          <a href="/api/auth/google" className={styles.googleButton}>
+            <GoogleIcon size={18} />
+            Continuar con Google
           </a>
+
+          <Link to="/recuperar" className={styles.link}>
+            Olvidé mi contraseña
+          </Link>
         </div>
-      </div>
-    </div>
+      </form>
+    </AuthLayout>
   );
 }

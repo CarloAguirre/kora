@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Link } from 'react-router-dom';
 import { requestPasswordResetSchema, type RequestPasswordResetInput } from '@kora/contracts';
 import styles from './LoginPage.module.css';
+import { AuthLayout } from '../components/AuthLayout';
 import { Button } from '@/shared/components/ui/Button';
 import { TextField } from '@/shared/components/ui/TextField';
 import { CheckIcon } from '@/shared/components/icons/Icons';
@@ -40,52 +41,44 @@ export function ForgotPasswordPage() {
   });
 
   return (
-    <div className={styles.page}>
-      <div className={styles.card}>
-        <div className={styles.brand}>
-          <span className={styles.logo}>KORA</span>
-          <span className={styles.tagline}>Recuperar acceso</span>
-        </div>
+    <AuthLayout
+      title="Recuperar acceso"
+      tagline="Te enviaremos un enlace para definir una contraseña nueva"
+    >
+      {sent ? (
+        <>
+          <div className={`${styles.alert} ${styles.alertSuccess}`} role="status">
+            <CheckIcon size={18} className={styles.alertIcon} />
+            <span>
+              Si el correo corresponde a una cuenta activa, recibirás un enlace para definir una
+              contraseña nueva. Caduca en 2 horas.
+            </span>
+          </div>
+          <Link to="/login" className={styles.link}>
+            Volver al inicio de sesión
+          </Link>
+        </>
+      ) : (
+        <form className={styles.form} onSubmit={onSubmit} noValidate>
+          <TextField
+            label="Correo electrónico"
+            type="email"
+            autoComplete="username"
+            placeholder="nombre@kabeli.cl"
+            errorText={errors.email?.message}
+            {...register('email')}
+          />
 
-        {sent ? (
-          <>
-            <div
-              className={styles.alert}
-              style={{ background: 'var(--kora-success-surface)', color: 'var(--kora-success-text)' }}
-              role="status"
-            >
-              <CheckIcon size={18} className={styles.alertIcon} />
-              <span>
-                Si el correo corresponde a una cuenta activa, recibirás un enlace para definir una
-                contraseña nueva. Caduca en 2 horas.
-              </span>
-            </div>
+          <div className={styles.actions}>
+            <Button type="submit" loading={isSubmitting} loadingText="Enviando…">
+              Enviar enlace
+            </Button>
             <Link to="/login" className={styles.link}>
               Volver al inicio de sesión
             </Link>
-          </>
-        ) : (
-          <form className={styles.form} onSubmit={onSubmit} noValidate>
-            <TextField
-              label="Correo electrónico"
-              type="email"
-              autoComplete="username"
-              placeholder="nombre@kabeli.cl"
-              errorText={errors.email?.message}
-              {...register('email')}
-            />
-
-            <div className={styles.actions}>
-              <Button type="submit" loading={isSubmitting} loadingText="Enviando…">
-                Enviar enlace
-              </Button>
-              <Link to="/login" className={styles.link}>
-                Volver al inicio de sesión
-              </Link>
-            </div>
-          </form>
-        )}
-      </div>
-    </div>
+          </div>
+        </form>
+      )}
+    </AuthLayout>
   );
 }
