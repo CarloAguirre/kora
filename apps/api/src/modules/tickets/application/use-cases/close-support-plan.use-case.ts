@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CLOCK, err, ok, type ApplicationError, type Clock, type Result } from '@kora/core';
 import type { CloseSupportPlanInput } from '@kora/contracts';
+import { PROJECT_REPOSITORY, type ProjectRepository } from '../../../projects/domain/repositories/project.repository';
 import { SupportPlanNotFoundError } from '../../domain/errors/support-plan.errors';
 import { SUPPORT_PLAN_REPOSITORY, type SupportPlanRepository } from '../../domain/repositories/support-plan.repository';
 import { AUDIT_RECORDER, type AuditRecorder } from '../../../../shared/application/ports/audit-recorder.port';
@@ -16,6 +17,7 @@ export interface CloseSupportPlanCommand {
 export class CloseSupportPlanUseCase implements UseCase<CloseSupportPlanCommand, void, ApplicationError> {
   constructor(
     @Inject(SUPPORT_PLAN_REPOSITORY) private readonly plans: SupportPlanRepository,
+    @Inject(PROJECT_REPOSITORY) private readonly projects: ProjectRepository,
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
     @Inject(CLOCK) private readonly clock: Clock,
   ) {}
@@ -30,6 +32,7 @@ export class CloseSupportPlanUseCase implements UseCase<CloseSupportPlanCommand,
     if (closed.isErr()) return err(closed.error);
 
     await this.plans.save(plan);
+    await this.finishContainerProject(plan.projectId, now);
     await this.audit.record({
       actor: { userId: actor.userId, email: actor.email },
       action: 'status_change',
@@ -39,5 +42,20 @@ export class CloseSupportPlanUseCase implements UseCase<CloseSupportPlanCommand,
     });
 
     return ok(undefined);
+  }
+
+  /**
+   * Cerrar el contrato termina su proyecto "contenedor" de soporte, para que
+   * pase a "Finalizados" en Proyectos → Soporte. Salvo que otro contrato
+   * activo siga usando ese mismo proyecto (legados renovados: un contrato
+   * `ended` y uno `active` sobre el mismo contenedor).
+   */
+  private async finishContainerProject(projectId: string | null, now: Date): Promise<void> {
+    if (!projectId) return;
+    if (await this.plans.findActiveForProjectOrLinked(projectId)) return;
+    const project = await this.projects.findById(projectId);
+    if (!project || project.isDeleted || project.type !== 'support' || project.status === 'finished') return;
+    project.changeStatus('finished', now);
+    await this.projects.save(project);
   }
 }

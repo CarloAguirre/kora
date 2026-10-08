@@ -164,7 +164,10 @@ export class DrizzleTicketRepository implements TicketRepository {
     const conditions = [];
     if (!filters.includeDeleted) conditions.push(isNull(tickets.deletedAt));
     if (filters.clientId?.length) conditions.push(inArray(tickets.clientId, filters.clientId));
-    if (filters.projectId) conditions.push(eq(tickets.projectId, filters.projectId));
+    // También como "Proyecto de desarrollo": la ficha de un contrato filtra por cada proyecto cubierto, y sus tickets se abren contra el proyecto contenedor de soporte con el cubierto en `development_project_id`.
+    if (filters.projectId) {
+      conditions.push(or(eq(tickets.projectId, filters.projectId), eq(tickets.developmentProjectId, filters.projectId)));
+    }
     if (filters.assigneeUserId?.length) conditions.push(inArray(tickets.assigneeUserId, filters.assigneeUserId));
     if (filters.status) conditions.push(eq(tickets.status, filters.status));
     if (filters.priority) conditions.push(eq(tickets.priority, filters.priority));

@@ -5,7 +5,7 @@ export interface SupportPlanRecord {
   readonly id: string;
   readonly clientId: string;
   readonly slug: string;
-  /** `null` en contratos creados desde la v2 — ver el comentario en el schema (`support_plans.project_id`). */
+  /** Proyecto "contenedor" de soporte — `null` solo en contratos v2 anteriores a su backfill; ver el comentario en el schema (`support_plans.project_id`). */
   readonly projectId: string | null;
   readonly planType: 'monthly' | 'bundle' | 'on_demand';
   readonly scope: 'single' | 'consolidated';

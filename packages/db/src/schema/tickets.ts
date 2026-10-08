@@ -135,12 +135,14 @@ export const supportPlanCurrencyEnum = pgEnum('support_plan_currency', ['UF', 'C
 /**
  * Contrato de soporte de un cliente. Ver `soporte_has_active_usable_plan`.
  *
- * `project_id` es el proyecto "contenedor" de soporte de la v1 — sigue
- * NOT NULL en las filas migradas por el ETL, pero ahora es nullable: los
- * contratos creados desde la v2 lo dejan `null` y en su lugar enlazan los
- * proyectos de desarrollo que cubren vía `support_plan_projects` (retoma
+ * `project_id` es el proyecto "contenedor" de soporte (el de la v1 en las
+ * filas migradas por el ETL). Los contratos creados desde la v2 también lo
+ * tienen — `CreateSupportPlanUseCase` lo crea; los anteriores a ese cambio se
+ * rellenan con `backfill:support-plan-container-projects` — y además enlazan
+ * los proyectos de desarrollo que cubren vía `support_plan_projects` (retoma
  * `soporte_proyecto`, deliberadamente diferida en la migración — ver
- * docs/DECISION-M5-TICKETS.md).
+ * docs/DECISION-M5-TICKETS.md). Sigue siendo nullable por esos contratos
+ * previos al backfill.
  */
 export const supportPlans = pgTable(
   'support_plans',

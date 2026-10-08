@@ -7,7 +7,7 @@ import {
   type SupportPlanRecord,
   type SupportPlanRepository,
 } from '../../domain/repositories/support-plan.repository';
-import { resolveSupportPlanProjectIds } from './support-plan-linked-projects';
+import { resolveSupportPlanHourProjectIds } from './support-plan-linked-projects';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -51,7 +51,7 @@ export class SupportMonthlyPeriodReconciler {
   }
 
   private async reconcile(plan: SupportPlanRecord, latest: SupportMonthlyPeriodRecord, today: Date): Promise<boolean> {
-    const projectIds = await resolveSupportPlanProjectIds(this.plans, plan);
+    const projectIds = await resolveSupportPlanHourProjectIds(this.plans, plan);
     const accumulate = plan.surplusPolicy === 'accumulate';
     const inForce = (from: Date) => plan.endDate === null || from.getTime() < plan.endDate.getTime();
 

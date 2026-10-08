@@ -9,7 +9,7 @@ import { computeSupportPlanAlerts } from './support-plan-alerts';
 import { SupportMonthlyPeriodReconciler } from './support-monthly-period-reconciler';
 import { SupportPlanCurrentBillingResolver, type CurrentBillingStatus } from './support-plan-current-billing.resolver';
 import { resolveSupportPlanName } from './support-plan-naming';
-import { resolveSupportPlanProjectIds } from './support-plan-linked-projects';
+import { resolveSupportPlanHourProjectIds } from './support-plan-linked-projects';
 import { paymentStatusOf } from './support-invoice-payment-status';
 
 /**
@@ -90,7 +90,7 @@ export class SupportBillingRowBuilder {
     planInvoices: readonly SupportInvoiceRecord[],
   ): Promise<SupportBillingRow> {
     const isLivePeriod = period === periodKeyOf(now);
-    const linkedIds = await resolveSupportPlanProjectIds(this.plans, record);
+    const linkedIds = await resolveSupportPlanHourProjectIds(this.plans, record);
     // `listPeriods` reconcilia la cadena de un `monthly` — tiene que correr antes que `currentBilling.resolve`, que lee el período vigente.
     const periods = await this.periods.listPeriods(record, now);
     const [current, usedHours] = await Promise.all([

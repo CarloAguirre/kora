@@ -43,13 +43,16 @@ export class GetSupportPlanUseCase implements UseCase<GetSupportPlanQuery, Suppo
     const record = plan.toSnapshot() as SupportPlanRecord;
     const now = this.clock.now();
 
-    const linkedIds = await this.summaryBuilder.resolveLinkedProjectIds(record);
+    const [linkedIds, coveredIds] = await Promise.all([
+      this.summaryBuilder.resolveLinkedProjectIds(record),
+      this.summaryBuilder.resolveCoveredProjectIds(record),
+    ]);
     // Antes del Promise.all: renueva los períodos una sola vez, así el resumen y la facturación ya leen la cadena al día.
     const periods = await this.periods.listPeriods(record, now);
 
     const [client, linkedProjects, leader, invoiceRows, contact, current, summary] = await Promise.all([
       this.clients.findById(record.clientId),
-      this.projects.findManyByIds(linkedIds),
+      this.projects.findManyByIds(coveredIds),
       record.leaderUserId ? this.users.findById(record.leaderUserId) : Promise.resolve(null),
       this.invoices.listForPlan(record.id),
       this.resolveContact(record),

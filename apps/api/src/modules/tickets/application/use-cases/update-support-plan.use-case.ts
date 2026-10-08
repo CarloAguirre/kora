@@ -1,6 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CLOCK, UNIT_OF_WORK, err, ok, type ApplicationError, type Clock, type Result, type UnitOfWork } from '@kora/core';
 import type { UpdateSupportPlanInput } from '@kora/contracts';
+import type { Project } from '../../../projects/domain/entities/project.entity';
+import { ProjectNameAlreadyInUseError } from '../../../projects/domain/errors/project.errors';
+import { PROJECT_REPOSITORY, type ProjectRepository } from '../../../projects/domain/repositories/project.repository';
 import {
   SupportPlanContactNotFoundError,
   SupportPlanNotFoundError,
@@ -25,6 +28,7 @@ export interface UpdateSupportPlanCommand {
 export class UpdateSupportPlanUseCase implements UseCase<UpdateSupportPlanCommand, void, ApplicationError> {
   constructor(
     @Inject(SUPPORT_PLAN_REPOSITORY) private readonly plans: SupportPlanRepository,
+    @Inject(PROJECT_REPOSITORY) private readonly projectRepository: ProjectRepository,
     @Inject(TICKET_CLIENT_READER) private readonly clients: TicketClientReader,
     @Inject(TICKET_PROJECT_READER) private readonly projects: TicketProjectReader,
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
@@ -78,8 +82,12 @@ export class UpdateSupportPlanUseCase implements UseCase<UpdateSupportPlanComman
     );
     if (updated.isErr()) return err(updated.error);
 
+    const container = await this.syncContainerProject(plan.projectId, plan.clientId, data, now);
+    if (container.isErr()) return err(container.error);
+
     await this.unitOfWork.run(async (tx) => {
       await this.plans.save(plan, tx);
+      if (container.value) await this.projectRepository.save(container.value, tx);
       if (data.developmentProjectIds) await this.plans.linkProjects(planId, data.developmentProjectIds, tx);
     });
 
@@ -92,6 +100,42 @@ export class UpdateSupportPlanUseCase implements UseCase<UpdateSupportPlanComman
     });
 
     return ok(undefined);
+  }
+
+  /**
+   * Lleva al proyecto "contenedor" de soporte (`plan.projectId`) los datos del
+   * contrato que también se ven en los listados de proyectos — sin esto,
+   * Proyectos → Soporte y el dashboard mostrarían el nombre, líder, fechas u
+   * horas de cuando se creó el contrato. Solo los campos que vienen en `data`.
+   */
+  private async syncContainerProject(
+    projectId: string | null,
+    clientId: string,
+    data: UpdateSupportPlanInput,
+    now: Date,
+  ): Promise<Result<Project | null, ProjectNameAlreadyInUseError>> {
+    if (!projectId) return ok(null);
+    const project = await this.projectRepository.findById(projectId);
+    if (!project || project.isDeleted || project.type !== 'support') return ok(null);
+
+    const name = data.name?.trim();
+    if (name && name !== project.name && (await this.projectRepository.nameIsTakenByAnother(name, clientId, project.id))) {
+      return err(new ProjectNameAlreadyInUseError(name));
+    }
+
+    project.updateDetails(
+      {
+        ...(name ? { name } : {}),
+        ...(data.leaderUserId !== undefined ? { leaderUserId: data.leaderUserId ?? null } : {}),
+        ...(data.startDate !== undefined ? { startDate: new Date(data.startDate) } : {}),
+        ...(data.endDate !== undefined ? { estimatedDeliveryDate: data.endDate ? new Date(data.endDate) : null } : {}),
+        ...(data.contractedHours !== undefined ? { supportHours: data.contractedHours } : {}),
+        ...(data.quotationLink !== undefined ? { quotationLink: data.quotationLink ?? null } : {}),
+        ...(data.contractLink !== undefined ? { contractLink: data.contractLink ?? null } : {}),
+      },
+      now,
+    );
+    return ok(project);
   }
 
   private async validateProjects(

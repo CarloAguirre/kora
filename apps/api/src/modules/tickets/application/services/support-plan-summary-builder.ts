@@ -8,7 +8,7 @@ import {
   type SupportPlanRepository,
 } from '../../domain/repositories/support-plan.repository';
 import { SupportMonthlyPeriodReconciler } from './support-monthly-period-reconciler';
-import { resolveSupportPlanProjectIds } from './support-plan-linked-projects';
+import { resolveSupportPlanHourProjectIds, resolveSupportPlanProjectIds } from './support-plan-linked-projects';
 
 const MONTH_LABELS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 const HOUR_ENTRY_PAGE_SIZE = 2000;
@@ -48,8 +48,13 @@ export class SupportPlanSummaryBuilder {
     return this.buildUsageSummary(linkedProjectIds, plan.planType, plan.contractedHours, plan.planValueUf, plan.extraHourValueUf, plan.currency);
   }
 
-  /** Ver `resolveSupportPlanProjectIds`. */
+  /** Proyectos cuyas horas consume el contrato — ver `resolveSupportPlanHourProjectIds`. */
   async resolveLinkedProjectIds(plan: SupportPlanRecord): Promise<string[]> {
+    return resolveSupportPlanHourProjectIds(this.plans, plan);
+  }
+
+  /** Proyectos que el contrato cubre, para mostrar — ver `resolveSupportPlanProjectIds`. */
+  async resolveCoveredProjectIds(plan: SupportPlanRecord): Promise<string[]> {
     return resolveSupportPlanProjectIds(this.plans, plan);
   }
 

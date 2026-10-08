@@ -151,13 +151,7 @@ export function NewTicketDialog({ open, onClose, onCreated }: NewTicketDialogPro
               ...(supportProjects ?? []).map((project) => ({ value: project.id, label: project.name })),
             ]}
             value={projectId ?? ''}
-            onChange={(value) => {
-              setValue('projectId', value || undefined, { shouldValidate: true });
-              // Un contrato de soporte v2 no tiene proyecto de soporte propio: la opción ES el proyecto de desarrollo cubierto, así que ya define también ese campo.
-              if (developmentProjects?.some((project) => project.id === value)) {
-                setValue('developmentProjectId', value, { shouldValidate: true });
-              }
-            }}
+            onChange={(value) => setValue('projectId', value || undefined, { shouldValidate: true })}
             emptyMessage="No se encontraron proyectos."
             errorText={errors.projectId?.message}
           />

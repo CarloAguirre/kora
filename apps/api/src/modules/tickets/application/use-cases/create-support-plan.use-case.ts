@@ -13,6 +13,9 @@ import {
 } from '@kora/core';
 import { slugify, withUniqueSuffix } from '@kora/core';
 import type { CreateSupportPlanInput } from '@kora/contracts';
+import { Project } from '../../../projects/domain/entities/project.entity';
+import { ProjectNameAlreadyInUseError } from '../../../projects/domain/errors/project.errors';
+import { PROJECT_REPOSITORY, type ProjectRepository } from '../../../projects/domain/repositories/project.repository';
 import { SupportPlan } from '../../domain/entities/support-plan.entity';
 import {
   SupportPlanContactNotFoundError,
@@ -27,6 +30,7 @@ import { TICKET_CLIENT_READER, type TicketClientReader } from '../ports/ticket-c
 import { TICKET_PROJECT_READER, type TicketProjectReader } from '../ports/ticket-project-reader.port';
 import { resolveSupportPlanName } from '../services/support-plan-naming';
 import { AUDIT_RECORDER, type AuditRecorder } from '../../../../shared/application/ports/audit-recorder.port';
+import { isUniqueViolation } from '../../../../shared/infrastructure/database/postgres-errors';
 import type { ActorContext, UseCase } from '../../../../shared/application/use-case';
 
 export interface CreateSupportPlanCommand {
@@ -35,18 +39,25 @@ export interface CreateSupportPlanCommand {
 }
 
 /**
- * Alta de un contrato de soporte. Corrección clave de diseño: NO crea
- * proyectos — el tipo de proyecto (desarrollo/soporte) se fija al crearlo, en
- * el flujo ya existente (`NewProjectPage`). Este caso de uso vincula
- * proyecto(s) de desarrollo YA TERMINADOS a un contrato nuevo: 1 proyecto =
- * `scope='single'`, 2+ = `'consolidated'` (comparten una sola bolsa de horas
- * y una sola facturación — ver docs/DECISION-M5-TICKETS.md sobre
- * `soporte_proyecto`, que este enlace retoma).
+ * Alta de un contrato de soporte que vincula proyecto(s) de desarrollo YA
+ * TERMINADOS: 1 proyecto = `scope='single'`, 2+ = `'consolidated'` (comparten
+ * una sola bolsa de horas y una sola facturación — ver
+ * docs/DECISION-M5-TICKETS.md sobre `soporte_proyecto`, que este enlace
+ * retoma).
+ *
+ * Además crea el proyecto "contenedor" de soporte del contrato
+ * (`support_plans.project_id`), igual que los contratos legados y
+ * `CreateSupportProjectUseCase`. Antes no lo creaba, y el contrato quedaba
+ * fuera de todo lo que lista proyectos de soporte (Proyectos → Soporte,
+ * dashboard, ficha de cliente, selector de proyecto del ticket). Los tickets
+ * se abren contra el contenedor y el proyecto cubierto va en "Proyecto de
+ * desarrollo"; el consumo suma ambos (ver `resolveSupportPlanHourProjectIds`).
  */
 @Injectable()
 export class CreateSupportPlanUseCase implements UseCase<CreateSupportPlanCommand, { id: string }, ApplicationError> {
   constructor(
     @Inject(SUPPORT_PLAN_REPOSITORY) private readonly plans: SupportPlanRepository,
+    @Inject(PROJECT_REPOSITORY) private readonly projectRepository: ProjectRepository,
     @Inject(TICKET_CLIENT_READER) private readonly clients: TicketClientReader,
     @Inject(TICKET_PROJECT_READER) private readonly projects: TicketProjectReader,
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
@@ -76,6 +87,29 @@ export class CreateSupportPlanUseCase implements UseCase<CreateSupportPlanComman
     const slug = await withUniqueSuffix(slugify(name), async (candidate) => (await this.plans.findBySlug(candidate)) !== null);
     const startDate = new Date(data.startDate);
     const endDate = data.endDate ? new Date(data.endDate) : null;
+
+    if (await this.projectRepository.nameIsTakenByAnother(name, data.clientId, null)) {
+      return err(new ProjectNameAlreadyInUseError(name));
+    }
+    const projectSlug = await withUniqueSuffix(slugify(name), async (candidate) => (await this.projectRepository.findBySlug(candidate)) !== null);
+    const createdProject = Project.create({
+      id: this.ids.generate(),
+      name,
+      slug: projectSlug,
+      clientId: data.clientId,
+      type: 'support',
+      leaderUserId: data.leaderUserId,
+      startDate,
+      estimatedDeliveryDate: endDate,
+      supportHours: data.contractedHours,
+      quotationLink: data.quotationLink,
+      contractLink: data.contractLink,
+      additionalLinks: data.additionalLinks,
+      status: 'active',
+      now,
+    });
+    if (createdProject.isErr()) return err(createdProject.error);
+    const project = createdProject.value;
     const dueDayOfMonth =
       data.dueDayOfMonth ?? (data.planType === 'monthly' && data.surplusPolicy === 'expire' ? startDate.getUTCDate() : null);
 
@@ -83,6 +117,7 @@ export class CreateSupportPlanUseCase implements UseCase<CreateSupportPlanComman
       id: this.ids.generate(),
       clientId: data.clientId,
       slug,
+      projectId: project.id,
       scope,
       planType: data.planType,
       surplusPolicy: data.surplusPolicy,
@@ -108,23 +143,37 @@ export class CreateSupportPlanUseCase implements UseCase<CreateSupportPlanComman
     if (created.isErr()) return err(created.error);
     const plan = created.value;
 
-    await this.unitOfWork.run(async (tx) => {
-      await this.plans.save(plan, tx);
-      await this.plans.linkProjects(plan.id, data.developmentProjectIds, tx);
+    try {
+      await this.unitOfWork.run(async (tx) => {
+        await this.projectRepository.save(project, tx);
+        await this.plans.save(plan, tx);
+        await this.plans.linkProjects(plan.id, data.developmentProjectIds, tx);
 
-      if (data.planType === 'monthly') {
-        await this.plans.createInitialPeriod(
-          {
-            id: this.ids.generate(),
-            planId: plan.id,
-            startDate,
-            endDate: addMonthsUtc(startDate, 1),
-            contractedHours: data.contractedHours,
-            surplusPolicy: data.surplusPolicy ?? 'expire',
-          },
-          tx,
-        );
-      }
+        if (data.planType === 'monthly') {
+          await this.plans.createInitialPeriod(
+            {
+              id: this.ids.generate(),
+              planId: plan.id,
+              startDate,
+              endDate: addMonthsUtc(startDate, 1),
+              contractedHours: data.contractedHours,
+              surplusPolicy: data.surplusPolicy ?? 'expire',
+            },
+            tx,
+          );
+        }
+      });
+    } catch (error) {
+      if (isUniqueViolation(error)) return err(new ProjectNameAlreadyInUseError(name));
+      throw error;
+    }
+
+    await this.audit.record({
+      actor: { userId: actor.userId, email: actor.email },
+      action: 'create',
+      entityType: 'project',
+      entityId: project.id,
+      metadata: { name, type: 'support', supportPlanId: plan.id },
     });
 
     await this.audit.record({
@@ -132,7 +181,7 @@ export class CreateSupportPlanUseCase implements UseCase<CreateSupportPlanComman
       action: 'create',
       entityType: 'support_plan',
       entityId: plan.id,
-      metadata: { clientId: data.clientId, planType: data.planType, scope, projectCount: data.developmentProjectIds.length },
+      metadata: { clientId: data.clientId, planType: data.planType, scope, projectCount: data.developmentProjectIds.length, projectId: project.id },
     });
 
     return ok({ id: plan.id });
