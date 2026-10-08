@@ -4,6 +4,7 @@ import type { ProjectSummary } from '@kora/contracts';
 import styles from './ClientDetailPage.module.css';
 import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Button } from '@/shared/components/ui/Button';
+import { PageLoadError } from '@/shared/components/ui/PageLoadError';
 import { Card } from '@/shared/components/ui/Card';
 import { DataTable, type Column, type SortState } from '@/shared/components/ui/DataTable';
 import { DEFAULT_PAGE_SIZE, Pagination, usePaginatedItems } from '@/shared/components/ui/Pagination';
@@ -84,7 +85,7 @@ export function ClientDetailPage() {
   const { clientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
   const { can } = usePermissions();
-  const { data: client, isLoading } = useClientDetail(clientId ?? null);
+  const { data: client, isLoading, error } = useClientDetail(clientId ?? null);
   const { data: projects } = useProjectsList({ clientId: clientId ?? undefined, page: 1, pageSize: 100 });
   const { data: supportPlans, isLoading: loadingSupportPlans } = useSupportPlansForClient(clientId ?? null);
   const { pageItems: pagedSupportPlans, pagination: supportPlansPagination } = usePaginatedItems(supportPlans ?? NO_SUPPORT_PLANS);
@@ -136,6 +137,14 @@ export function ClientDetailPage() {
 
   const pageCount = Math.max(1, Math.ceil(filteredProjects.length / pageSize));
   const pagedProjects = filteredProjects.slice((page - 1) * pageSize, page * pageSize);
+
+  if (error) {
+    return (
+      <DashboardLayout title="Cliente">
+        <PageLoadError error={error} subject="este cliente" backLabel="Volver a clientes" onBack={() => void navigate('/clientes')} />
+      </DashboardLayout>
+    );
+  }
 
   if (isLoading || !client || !clientId) {
     return (

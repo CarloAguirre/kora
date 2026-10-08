@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import styles from './ProjectDetailPage.module.css';
 import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Button } from '@/shared/components/ui/Button';
+import { PageLoadError } from '@/shared/components/ui/PageLoadError';
 import { Select } from '@/shared/components/ui/Select';
 import { ChevronLeftIcon } from '@/shared/components/icons/Icons';
 import { useToast } from '@/shared/components/ui/Toast';
@@ -50,15 +51,9 @@ export function ProjectDetailPage() {
   };
 
   if (error) {
-    const forbidden = error instanceof ApiRequestError && error.isForbidden;
     return (
       <DashboardLayout title="Proyecto">
-        <div className={styles.page}>
-          <Button variant="tertiary" size="sm" className={styles.backButton} onClick={() => void navigate('/proyectos')}>
-            <ChevronLeftIcon size={16} /> Volver a proyectos
-          </Button>
-          <p>{forbidden ? 'No tienes acceso a este proyecto.' : 'No se pudo cargar el proyecto.'}</p>
-        </div>
+        <PageLoadError error={error} subject="este proyecto" backLabel="Volver a proyectos" onBack={() => void navigate('/proyectos')} />
       </DashboardLayout>
     );
   }

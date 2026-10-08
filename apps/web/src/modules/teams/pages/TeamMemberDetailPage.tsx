@@ -4,6 +4,7 @@ import { HOUR_ENTRY_STATUS_LABELS, type HourEntryStatus, type HourEntrySummary, 
 import styles from './TeamMemberDetailPage.module.css';
 import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Button } from '@/shared/components/ui/Button';
+import { PageLoadError } from '@/shared/components/ui/PageLoadError';
 import { Card } from '@/shared/components/ui/Card';
 import { DataTable, type Column } from '@/shared/components/ui/DataTable';
 import { DEFAULT_PAGE_SIZE, Pagination } from '@/shared/components/ui/Pagination';
@@ -35,7 +36,7 @@ const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFr
 export function TeamMemberDetailPage() {
   const { teamId, memberId } = useParams<{ teamId: string; memberId: string }>();
   const navigate = useNavigate();
-  const { data: team, isLoading } = useTeamDetail(teamId ?? null);
+  const { data: team, isLoading, error } = useTeamDetail(teamId ?? null);
   const member = team?.members.find((candidate) => candidate.id === memberId) ?? null;
 
   const [historyStatus, setHistoryStatus] = useState<Extract<HourEntryStatus, 'approved' | 'rejected'>>('approved');
@@ -89,6 +90,14 @@ export function TeamMemberDetailPage() {
       ),
     },
   ];
+
+  if (error) {
+    return (
+      <DashboardLayout title="Colaborador">
+        <PageLoadError error={error} subject="este equipo" backLabel="Volver a equipos" onBack={() => void navigate('/equipos')} />
+      </DashboardLayout>
+    );
+  }
 
   if (isLoading || !team) {
     return (

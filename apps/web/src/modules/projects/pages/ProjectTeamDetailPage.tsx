@@ -2,6 +2,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import styles from './ProjectDetailPage.module.css';
 import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Button } from '@/shared/components/ui/Button';
+import { PageLoadError } from '@/shared/components/ui/PageLoadError';
 import { Select } from '@/shared/components/ui/Select';
 import { ChevronLeftIcon } from '@/shared/components/icons/Icons';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
@@ -24,7 +25,15 @@ export function ProjectTeamDetailPage() {
   const { projectId, teamId } = useParams<{ projectId: string; teamId: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { data: project, isLoading } = useProjectDetail(projectId ?? null);
+  const { data: project, isLoading, error } = useProjectDetail(projectId ?? null);
+
+  if (error) {
+    return (
+      <DashboardLayout title="Equipo">
+        <PageLoadError error={error} subject="este proyecto" backLabel="Volver a proyectos" onBack={() => void navigate('/proyectos')} />
+      </DashboardLayout>
+    );
+  }
 
   if (isLoading || !project || !projectId || !teamId) {
     return (

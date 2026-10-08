@@ -4,6 +4,7 @@ import { SUPPORT_PLAN_TYPE_LABELS, type SupportInvoice } from '@kora/contracts';
 import styles from './SupportPlanDetailPage.module.css';
 import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Button } from '@/shared/components/ui/Button';
+import { PageLoadError } from '@/shared/components/ui/PageLoadError';
 import { Card } from '@/shared/components/ui/Card';
 import { DEFAULT_PAGE_SIZE, Pagination, usePaginatedItems } from '@/shared/components/ui/Pagination';
 import { Tabs } from '@/shared/components/ui/Tabs';
@@ -59,7 +60,7 @@ export function SupportPlanDetailPage() {
   const toast = useToast();
   const { can } = usePermissions();
 
-  const { data: plan, isLoading } = useSupportPlanDetail(planId ?? null);
+  const { data: plan, isLoading, error } = useSupportPlanDetail(planId ?? null);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [payAction, setPayAction] = useState<PayAction>(null);
   const [closing, setClosing] = useState(false);
@@ -85,6 +86,14 @@ export function SupportPlanDetailPage() {
     [plan],
   );
   const { pageItems: pagedInvoices, pagination: invoicesPagination } = usePaginatedItems(sortedInvoices);
+
+  if (error) {
+    return (
+      <DashboardLayout title="Contrato de soporte">
+        <PageLoadError error={error} subject="este contrato de soporte" backLabel="Volver a proyectos" onBack={() => void navigate('/proyectos')} />
+      </DashboardLayout>
+    );
+  }
 
   if (isLoading || !plan || !planId) {
     return (

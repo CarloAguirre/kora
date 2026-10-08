@@ -7,6 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import styles from './TeamDetailPage.module.css';
 import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Button } from '@/shared/components/ui/Button';
+import { PageLoadError } from '@/shared/components/ui/PageLoadError';
 import { Card } from '@/shared/components/ui/Card';
 import { TextField } from '@/shared/components/ui/TextField';
 import { Select } from '@/shared/components/ui/Select';
@@ -36,7 +37,7 @@ export function TeamDetailPage() {
   const navigate = useNavigate();
   const { can } = usePermissions();
   const toast = useToast();
-  const { data: team, isLoading } = useTeamDetail(teamId ?? null);
+  const { data: team, isLoading, error } = useTeamDetail(teamId ?? null);
   const addMember = useAddTeamMember();
   const removeMember = useRemoveTeamMember();
   const deleteTeam = useDeleteTeam();
@@ -121,6 +122,14 @@ export function TeamDetailPage() {
         ) : null,
     },
   ];
+
+  if (error) {
+    return (
+      <DashboardLayout title="Equipo">
+        <PageLoadError error={error} subject="este equipo" backLabel="Volver a equipos" onBack={() => void navigate('/equipos')} />
+      </DashboardLayout>
+    );
+  }
 
   if (isLoading || !team) {
     return (
