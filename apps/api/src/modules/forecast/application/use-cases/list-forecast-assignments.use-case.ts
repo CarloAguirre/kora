@@ -53,9 +53,14 @@ export function toContract(record: ForecastAssignmentRecord): ForecastAssignment
     client: record.clientId ? { id: record.clientId, companyName: record.clientName ?? '' } : null,
     comments: record.comments,
     assignedHours: record.assignedHours,
+    source: record.source,
     segment: record.segmentId
       ? { id: record.segmentId, name: record.segmentName ?? '', moduleName: record.segmentModuleName ?? '' }
       : null,
+    task: record.taskId ? { id: record.taskId, name: record.taskName ?? '', moduleName: record.taskModuleName ?? '' } : null,
+    calculatedHours: record.calculatedHours,
+    adjusted: record.adjustedAt ? { at: record.adjustedAt.toISOString(), byName: record.adjustedByName } : null,
+    isStale: record.isStale,
     createdAt: record.createdAt.toISOString(),
     updatedAt: record.updatedAt.toISOString(),
   };

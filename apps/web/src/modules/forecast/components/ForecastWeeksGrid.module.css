@@ -1,0 +1,212 @@
+/* "Próximas semanas" — grilla colaborador × semana con la carga como mapa de calor. */
+
+.section {
+  gap: var(--kora-space-5);
+  padding: var(--kora-space-6);
+  border-radius: 12px;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--kora-space-3);
+}
+
+.title {
+  font-size: var(--kora-text-xl);
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-navy);
+}
+
+.nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--kora-space-2);
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--kora-space-2) var(--kora-space-5);
+  font-size: var(--kora-text-sm);
+  color: var(--kora-text-muted);
+}
+
+.legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+}
+
+.legend i {
+  display: inline-block;
+  width: 18px;
+  height: 14px;
+  border-radius: 4px;
+}
+
+.legend i.dotAdjusted,
+.legend i.dotStale {
+  position: static;
+  width: 9px;
+  height: 9px;
+}
+
+.legendDelivery {
+  color: var(--kora-info);
+}
+
+.message {
+  padding: var(--kora-space-6) 0;
+  text-align: center;
+  color: var(--kora-text-muted);
+}
+
+.scroll {
+  overflow-x: auto;
+}
+
+.grid {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: separate;
+  border-spacing: 4px;
+}
+
+.grid thead th {
+  padding: var(--kora-space-1) var(--kora-space-2);
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-text-muted);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.grid thead th.nameHead {
+  text-align: left;
+}
+
+.holiday {
+  display: block;
+  font-weight: var(--kora-weight-medium);
+  color: var(--kora-warning-text);
+}
+
+.name {
+  padding-right: var(--kora-space-3);
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-semibold);
+  color: var(--kora-navy);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.team {
+  display: block;
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-regular, 400);
+  color: var(--kora-text-muted);
+}
+
+.grid td {
+  padding: 0;
+}
+
+.cell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 44px;
+  border: none;
+  border-radius: var(--kora-radius);
+  font: inherit;
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--kora-navy);
+}
+
+button.cell {
+  cursor: pointer;
+}
+
+button.cell:hover {
+  box-shadow: inset 0 0 0 2px var(--kora-navy);
+}
+
+button.cell:focus-visible {
+  outline: 2px solid var(--kora-blue-link);
+  outline-offset: 2px;
+}
+
+/* Misma escala que la barra de carga de la tabla semanal. */
+.empty {
+  background: var(--kora-surface-disabled);
+  color: var(--kora-text-muted);
+}
+
+.low {
+  background: var(--kora-lime-surface);
+  box-shadow: inset 0 0 0 1px var(--kora-lime-mid);
+}
+
+.mid {
+  background: var(--kora-yellow);
+}
+
+.full {
+  background: var(--kora-lime-mid);
+}
+
+.over {
+  background: var(--kora-warning);
+  color: var(--kora-surface);
+}
+
+.absence {
+  background: repeating-linear-gradient(135deg, var(--kora-gold) 0 6px, var(--kora-lime-surface) 6px 9px);
+}
+
+.dotAdjusted,
+.dotStale {
+  position: absolute;
+  top: 5px;
+  right: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1.5px solid var(--kora-surface);
+}
+
+.dotAdjusted {
+  background: var(--kora-orange);
+}
+
+.dotStale {
+  background: var(--kora-danger);
+}
+
+.delivery {
+  position: absolute;
+  bottom: 3px;
+  right: 5px;
+  display: flex;
+  color: var(--kora-info);
+}
+
+.over .delivery {
+  color: var(--kora-surface);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

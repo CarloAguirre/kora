@@ -21,6 +21,10 @@ import { useCreateProjectModuleTask, useDeleteProjectModuleTask, useUpdateProjec
 import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { ApiRequestError } from '@/shared/lib/api-client';
+import { useCheckForecastOverload, useForecastLoadPreview } from '@/modules/forecast/api/forecast.queries';
+import { ForecastOverloadAlert, summarizeOverload } from '@/modules/forecast/components/ForecastOverloadAlert';
+import { ConfirmActionDialog } from '@/shared/components/ui/ConfirmActionDialog';
+import type { ForecastOverloadWarning } from '@kora/contracts';
 
 const formatDate = (value: string) => new Date(`${value}T00:00:00`).toLocaleDateString('es-CL');
 
@@ -131,7 +135,7 @@ export function TeamTasksCard({ project, projectId, teamId }: TeamTasksCardProps
       moduleId,
       status: task.status,
       estimatedHours: task.estimatedHours != null ? String(task.estimatedHours) : '',
-      startDate: task.startDate ?? '',
+      startDate: task.startDate,
       date: task.date,
     });
     setTaskModalOpen(true);
@@ -146,9 +150,39 @@ export function TeamTasksCard({ project, projectId, teamId }: TeamTasksCardProps
   const hasEstimatedHours = Number(taskDraft.estimatedHours) > 0;
   const estimatedHoursError =
     taskDraft.estimatedHours !== '' && !hasEstimatedHours ? 'Deben ser mayores a 0.' : undefined;
+  // El inicio es obligatorio: el Forecast reparte las HH estimadas entre el inicio y la fecha límite.
   const canSaveTask = Boolean(
-    taskDraft.name.trim() && taskDraft.date && taskDraft.moduleId && hasEstimatedHours && !startDateError,
+    taskDraft.name.trim() && taskDraft.startDate && taskDraft.date && taskDraft.moduleId && hasEstimatedHours && !startDateError,
   );
+
+  // ¿La tarea deja a su responsable sobre el 100 % alguna semana? Mismo cálculo que el Forecast.
+  const taskPreviewInput =
+    taskModalOpen && taskDraft.assigneeUserId && taskDraft.moduleId && taskDraft.startDate && taskDraft.date && hasEstimatedHours && !startDateError
+      ? {
+          kind: 'task' as const,
+          taskId: editingTaskId?.taskId ?? null,
+          moduleId: taskDraft.moduleId,
+          teamId,
+          assigneeUserId: taskDraft.assigneeUserId,
+          startDate: taskDraft.startDate,
+          date: taskDraft.date,
+          estimatedHours: Number(taskDraft.estimatedHours),
+        }
+      : null;
+  const { data: taskLoadPreview } = useForecastLoadPreview(taskPreviewInput);
+  const checkOverload = useCheckForecastOverload();
+  const [checkingOverload, setCheckingOverload] = useState(false);
+  const [taskOverloadToConfirm, setTaskOverloadToConfirm] = useState<ForecastOverloadWarning[] | null>(null);
+
+  /** Si el responsable queda sobre el 100 % alguna semana, se pide confirmar antes de guardar. */
+  const onRequestSaveTask = async () => {
+    if (!canSaveTask) return;
+    setCheckingOverload(true);
+    const warnings = await checkOverload(taskPreviewInput);
+    setCheckingOverload(false);
+    if (warnings.length > 0) setTaskOverloadToConfirm(warnings);
+    else await onSaveTask();
+  };
 
   const onSaveTask = async () => {
     if (!canSaveTask) return;
@@ -162,7 +196,7 @@ export function TeamTasksCard({ project, projectId, teamId }: TeamTasksCardProps
             name: taskDraft.name,
             description: taskDraft.description || undefined,
             assigneeUserId: taskDraft.assigneeUserId || undefined,
-            startDate: taskDraft.startDate || null,
+            startDate: taskDraft.startDate,
             date: taskDraft.date,
             estimatedHours: Number(taskDraft.estimatedHours),
             status: taskDraft.status,
@@ -178,7 +212,7 @@ export function TeamTasksCard({ project, projectId, teamId }: TeamTasksCardProps
             name: taskDraft.name,
             description: taskDraft.description || undefined,
             assigneeUserId: taskDraft.assigneeUserId || undefined,
-            startDate: taskDraft.startDate || undefined,
+            startDate: taskDraft.startDate,
             date: taskDraft.date,
             estimatedHours: Number(taskDraft.estimatedHours),
             status: taskDraft.status,
@@ -379,8 +413,8 @@ export function TeamTasksCard({ project, projectId, teamId }: TeamTasksCardProps
               Cancelar
             </Button>
             <Button
-              onClick={() => void onSaveTask()}
-              loading={createTask.isPending || updateTask.isPending}
+              onClick={() => void onRequestSaveTask()}
+              loading={createTask.isPending || updateTask.isPending || checkingOverload}
               disabled={!canSaveTask}
             >
               Guardar
@@ -439,6 +473,7 @@ export function TeamTasksCard({ project, projectId, teamId }: TeamTasksCardProps
             <TextField
               label="Fecha de inicio"
               type="date"
+              required
               value={taskDraft.startDate}
               max={taskDraft.date || undefined}
               errorText={startDateError}
@@ -447,13 +482,24 @@ export function TeamTasksCard({ project, projectId, teamId }: TeamTasksCardProps
             <TextField
               label="Fecha límite"
               type="date"
+              required
               value={taskDraft.date}
               min={taskDraft.startDate || undefined}
               onChange={(event) => setTaskDraft((prev) => ({ ...prev, date: event.target.value }))}
             />
           </div>
+          <ForecastOverloadAlert warnings={taskPreviewInput ? taskLoadPreview?.warnings : undefined} sourceLabel="esta tarea" />
         </div>
       </Modal>
+
+      <ConfirmActionDialog
+        open={taskOverloadToConfirm !== null}
+        title="¿Guardar igual?"
+        description={taskOverloadToConfirm ? summarizeOverload(taskOverloadToConfirm) : ''}
+        confirmLabel="Guardar igual"
+        onConfirm={onSaveTask}
+        onClose={() => setTaskOverloadToConfirm(null)}
+      />
 
       <ReviewActionModal
         open={reviewTarget !== null}

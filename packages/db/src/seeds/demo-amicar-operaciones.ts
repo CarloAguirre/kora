@@ -247,7 +247,8 @@ export async function seedAmicarOperaciones(db: Database): Promise<SeedAmicarOpe
   ]);
 
   // Tareas puntuales (marcador "Tareas" del Roadmap).
-  await db.insert(projectModuleTasks).values([
+  // Toda tarea tiene inicio; estas son de un día (inicio = fecha límite).
+  await db.insert(projectModuleTasks).values(([
     { moduleId: DEMO.moduleFase1, teamId: REAL.teamRpa, assigneeUserId: REAL.userMarcoArraiz, name: 'Mapear proceso de asignación de rutas', date: d('2026-06-08'), status: 'done', scope: 'diseno' },
     { moduleId: DEMO.moduleFase1, teamId: REAL.teamRpa, assigneeUserId: REAL.userJoseAponte, name: 'Definir reglas de negocio de cobranza', date: d('2026-06-16'), status: 'done', scope: 'diseno' },
     { moduleId: DEMO.moduleFase2, teamId: REAL.teamRpa, assigneeUserId: REAL.userMarcoArraiz, name: 'Bot de asignación de rutas', date: d('2026-07-18'), status: 'done', scope: 'desarrollo' },
@@ -258,7 +259,7 @@ export async function seedAmicarOperaciones(db: Database): Promise<SeedAmicarOpe
     { moduleId: DEMO.moduleFase3, teamId: REAL.teamDev, assigneeUserId: REAL.userSolmaryCastro, name: 'Desarrollo de endpoints de reportería', date: d('2026-09-18'), status: 'in_progress', scope: 'desarrollo' },
     { moduleId: DEMO.moduleFase3, teamId: REAL.teamRpa, assigneeUserId: REAL.userCristianCancino, name: 'QA funcional del dashboard', date: d('2026-09-24'), status: 'todo', scope: 'qa' },
     { moduleId: DEMO.moduleFase4, teamId: REAL.teamRpa, assigneeUserId: REAL.userJoseAponte, name: 'Capacitación equipo de operaciones', date: d('2026-10-02'), status: 'todo', scope: 'revision_cliente' },
-  ]);
+  ] satisfies Omit<typeof projectModuleTasks.$inferInsert, 'startDate'>[]).map((task) => ({ startDate: task.date, ...task })));
 
   // Entregas — 1 por fase.
   await db.insert(projectModuleDeliveries).values([

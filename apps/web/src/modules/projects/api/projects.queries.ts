@@ -55,7 +55,10 @@ function useInvalidateProjects() {
   };
 }
 
-/** Los tramos de ejecución generan filas de Forecast (y se borran en cascada con su tramo/fase). */
+/**
+ * Tramos y tareas calculan filas de Forecast (y se borran en cascada con su tramo/tarea/fase); las
+ * entregas aparecen como marca en la semana.
+ */
 function useInvalidateProjectsAndForecast() {
   const queryClient = useQueryClient();
   const invalidateProjects = useInvalidateProjects();
@@ -236,7 +239,7 @@ export function useDeleteProjectModule() {
 }
 
 export function useAddProjectModuleDelivery() {
-  const invalidate = useInvalidateProjects();
+  const invalidate = useInvalidateProjectsAndForecast();
   return useMutation({
     mutationFn: ({
       projectId,
@@ -252,7 +255,7 @@ export function useAddProjectModuleDelivery() {
 }
 
 export function useRemoveProjectModuleDelivery() {
-  const invalidate = useInvalidateProjects();
+  const invalidate = useInvalidateProjectsAndForecast();
   return useMutation({
     mutationFn: ({
       projectId,
@@ -268,7 +271,7 @@ export function useRemoveProjectModuleDelivery() {
 }
 
 export function useUpdateProjectModuleDelivery() {
-  const invalidate = useInvalidateProjects();
+  const invalidate = useInvalidateProjectsAndForecast();
   return useMutation({
     mutationFn: ({
       projectId,
@@ -336,7 +339,7 @@ export function useDeleteProjectModuleSegment() {
 }
 
 export function useCreateProjectModuleTask() {
-  const invalidate = useInvalidateProjects();
+  const invalidate = useInvalidateProjectsAndForecast();
   return useMutation({
     mutationFn: ({
       projectId,
@@ -352,7 +355,7 @@ export function useCreateProjectModuleTask() {
 }
 
 export function useUpdateProjectModuleTask() {
-  const invalidate = useInvalidateProjects();
+  const invalidate = useInvalidateProjectsAndForecast();
   return useMutation({
     mutationFn: ({
       projectId,
@@ -370,7 +373,7 @@ export function useUpdateProjectModuleTask() {
 }
 
 export function useDeleteProjectModuleTask() {
-  const invalidate = useInvalidateProjects();
+  const invalidate = useInvalidateProjectsAndForecast();
   return useMutation({
     mutationFn: ({ projectId, moduleId, taskId }: { projectId: string; moduleId: string; taskId: string }) =>
       projectsApi.deleteModuleTask(projectId, moduleId, taskId),

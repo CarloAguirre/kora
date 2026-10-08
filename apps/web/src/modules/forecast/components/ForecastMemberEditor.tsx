@@ -1,24 +1,31 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   FORECAST_ASSIGNMENT_TYPES,
   FORECAST_ASSIGNMENT_TYPE_LABELS,
   FORECAST_TYPES_WITH_PROJECT,
   type ForecastAssignment,
   type ForecastAssignmentType,
+  type ForecastContainedTask,
+  type ForecastDeliveryMark,
+  type ForecastUnscheduledHours,
 } from '@kora/contracts';
 import styles from './ForecastMemberEditor.module.css';
 import { Badge } from '@/shared/components/ui/Badge';
 import { Button } from '@/shared/components/ui/Button';
 import { Select } from '@/shared/components/ui/Select';
 import { TextField } from '@/shared/components/ui/TextField';
-import { CloseIcon, PlusIcon } from '@/shared/components/icons/Icons';
+import { CloseIcon, DiamondIcon, PlusIcon, TriangleAlertIcon } from '@/shared/components/icons/Icons';
 import { useClientsList } from '@/modules/clients/api/clients.queries';
 import { useProjectsList } from '@/modules/projects/api/projects.queries';
 import {
   useCreateForecastAssignment,
+  useKeepForecastAdjustment,
   useRemoveForecastAssignment,
+  useResetForecastAssignment,
   useUpdateForecastAssignment,
 } from '../api/forecast.queries';
+import { formatWeekday } from '../lib/labor-weeks';
+import { formatHours as formatNumber } from '../lib/hours-format';
 
 const TYPE_OPTIONS = FORECAST_ASSIGNMENT_TYPES.map((type) => ({ value: type, label: FORECAST_ASSIGNMENT_TYPE_LABELS[type] }));
 
@@ -26,12 +33,27 @@ export interface ForecastMemberEditorMember {
   readonly teamMemberId: string;
   readonly capacityHours: number;
   readonly assignedHours: number;
+  readonly deliveries: readonly ForecastDeliveryMark[];
+  readonly containedTasks: readonly ForecastContainedTask[];
+  readonly unscheduled: readonly ForecastUnscheduledHours[];
+}
+
+function formatDay(isoDate: string): string {
+  return new Date(`${isoDate}T00:00:00Z`).toLocaleDateString('es-CL', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+}
+
+function formatHours(hours: number): string {
+  return `${formatNumber(hours)} h`;
 }
 
 /**
- * Editor de las asignaciones de un colaborador en el período — lo que en la
- * v1 (`LiderEquipoForecast`) se abría al expandir su tarjeta. En la v2 vive
- * dentro del modal "Editar" de la tabla de Forecast.
+ * Editor de las asignaciones de un colaborador en el período — lo que en la v1
+ * (`LiderEquipoForecast`) se abría al expandir su tarjeta. En la v2 vive dentro
+ * del modal "Editar" de la tabla de Forecast.
+ *
+ * Arriba lo calculado desde los proyectos (tramos y tareas, más las tareas que ya cubre un tramo y
+ * las entregas de la semana); abajo lo que el líder carga a mano. Ver docs/DECISION-M6-FORECAST.md,
+ * "Forecast calculado".
  */
 export function ForecastMemberEditor({
   member,
@@ -46,53 +68,219 @@ export function ForecastMemberEditor({
 }) {
   const createAssignment = useCreateForecastAssignment();
   const remaining = Math.max(0, member.capacityHours - member.assignedHours);
+  const calculated = assignments.filter((assignment) => assignment.source !== 'manual');
+  const manual = assignments.filter((assignment) => assignment.source === 'manual');
+  const hasProjectData = calculated.length > 0 || member.containedTasks.length > 0 || member.deliveries.length > 0;
+  const overHours = member.assignedHours - member.capacityHours;
 
   return (
     <div className={styles.editor}>
-      <div className={styles.rows}>
-        {assignments.map((assignment) => (
-          <ForecastAssignmentRow key={assignment.id} assignment={assignment} maxHours={member.capacityHours} canEdit />
-        ))}
+      {overHours > 0 && (
+        <div className={styles.overloadBox} role="alert">
+          <TriangleAlertIcon size={16} />
+          <span>
+            Esta semana queda en <strong>{Math.round((member.assignedHours / member.capacityHours) * 100)} %</strong>:{' '}
+            {formatHours(member.assignedHours)} de {formatHours(member.capacityHours)}, {formatHours(overHours)} sobre su capacidad.
+            Revisa las horas de proyecto o las ausencias.
+          </span>
+        </div>
+      )}
+      <section className={styles.group}>
+        <h4 className={styles.groupTitle}>Calculado desde proyectos</h4>
+        {hasProjectData ? (
+          <div className={styles.rows}>
+            {calculated.map((assignment) => (
+              <CalculatedAssignmentRow key={assignment.id} assignment={assignment} maxHours={member.capacityHours} />
+            ))}
+            {member.containedTasks.map((task) => (
+              <div key={task.id} className={styles.infoRow}>
+                <div className={styles.infoTitle}>
+                  Tarea “{task.name}” <Badge tone="info">Incluida en el tramo</Badge>
+                </div>
+                <span className={styles.infoMeta}>
+                  {task.projectName} · {task.moduleName} · {formatDay(task.startDate)} al {formatDay(task.date)} ·{' '}
+                  {formatHours(task.estimatedHours)} estimadas, no suman
+                </span>
+              </div>
+            ))}
+            {member.deliveries.map((delivery) => (
+              <div key={delivery.id} className={styles.infoRow}>
+                <div className={styles.infoTitle}>
+                  <DiamondIcon size={14} /> Entrega “{delivery.name}”
+                </div>
+                <span className={styles.infoMeta}>
+                  {delivery.projectName} · {delivery.moduleName} · {formatWeekday(delivery.date)} · sin horas
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className={styles.empty}>
+            Esta semana no hay tramos ni tareas con horas para esta persona. Se llena solo al asignarla en el Roadmap de un proyecto.
+          </p>
+        )}
+      </section>
 
-        {remaining > 0 && (
-          <div className={styles.unassignedRow}>
-            <span>Sin asignación</span>
-            <span>{remaining}h</span>
+      {member.unscheduled.length > 0 && (
+        <section className={styles.group}>
+          <h4 className={styles.groupTitle}>Horas asignadas sin calendarizar</h4>
+          <p className={styles.empty}>
+            Están asignadas a la persona en el equipo del proyecto, pero ningún tramo ni tarea las reparte todavía en semanas.
+          </p>
+          <div className={styles.rows}>
+            {member.unscheduled.map((row) => (
+              <div key={row.projectId} className={styles.infoRow}>
+                <div className={styles.infoTitle}>
+                  {row.projectName} · {formatHours(row.assignedHours - row.plannedHours)} sin calendarizar
+                </div>
+                <span className={styles.infoMeta}>
+                  {formatHours(row.assignedHours)} asignadas · {formatHours(row.plannedHours)} en el Forecast
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <section className={styles.group}>
+        <h4 className={styles.groupTitle}>Ausencias y otras actividades</h4>
+        {manual.length > 0 && (
+          <div className={styles.rows}>
+            {manual.map((assignment) => (
+              <ManualAssignmentRow key={assignment.id} assignment={assignment} maxHours={member.capacityHours} />
+            ))}
           </div>
         )}
-      </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className={styles.addRow}
+          iconLeft={<PlusIcon size={16} />}
+          loading={createAssignment.isPending}
+          onClick={() =>
+            createAssignment.mutate({
+              teamMemberId: member.teamMemberId,
+              periodStart,
+              periodEnd,
+              type: 'other',
+              assignedHours: 0,
+            })
+          }
+        >
+          Agregar ausencia o actividad
+        </Button>
+      </section>
 
-      <Button
-        variant="outline"
-        size="sm"
-        className={styles.addRow}
-        iconLeft={<PlusIcon size={16} />}
-        loading={createAssignment.isPending}
-        onClick={() =>
-          createAssignment.mutate({
-            teamMemberId: member.teamMemberId,
-            periodStart,
-            periodEnd,
-            type: 'other',
-            assignedHours: 0,
-          })
-        }
-      >
-        Agregar
-      </Button>
+      {remaining > 0 && (
+        <div className={styles.unassignedRow}>
+          <span>Sin asignación</span>
+          <span>{remaining}h</span>
+        </div>
+      )}
     </div>
   );
 }
 
-function ForecastAssignmentRow({
-  assignment,
-  maxHours,
-  canEdit,
-}: {
-  assignment: ForecastAssignment;
-  maxHours: number;
-  canEdit: boolean;
-}) {
+function sourceLabel(assignment: ForecastAssignment): string {
+  if (assignment.segment) return `Roadmap · ${assignment.segment.moduleName} · ${assignment.segment.name}`;
+  if (assignment.task) return `Tarea · ${assignment.task.name}`;
+  return 'Calculado';
+}
+
+/** Fila calculada: solo se editan HH (eso la deja ajustada) y comentarios. */
+function CalculatedAssignmentRow({ assignment, maxHours }: { assignment: ForecastAssignment; maxHours: number }) {
+  const updateAssignment = useUpdateForecastAssignment();
+  const resetAssignment = useResetForecastAssignment();
+  const keepAdjustment = useKeepForecastAdjustment();
+  const [comments, setComments] = useState(assignment.comments);
+  const [hours, setHours] = useState(String(assignment.assignedHours));
+  const calculatedHours = assignment.calculatedHours ?? 0;
+
+  // "Volver al cálculo" o un recálculo cambian las HH en el servidor: el campo las sigue.
+  useEffect(() => setHours(String(assignment.assignedHours)), [assignment.assignedHours]);
+
+  const commit = (patch: { comments?: string; assignedHours?: number }) =>
+    updateAssignment.mutate({
+      assignmentId: assignment.id,
+      input: { comments: patch.comments ?? comments, assignedHours: patch.assignedHours ?? Number(hours) },
+    });
+
+  const rowClass = [styles.calculatedRow, assignment.isStale ? styles.staleRow : assignment.adjusted ? styles.adjustedRow : '']
+    .filter(Boolean)
+    .join(' ');
+
+  return (
+    <div className={rowClass}>
+      <div className={styles.calculatedHead}>
+        <span className={styles.calculatedTitle}>{assignment.project?.name ?? 'Proyecto'}</span>
+        <Badge tone="success">{sourceLabel(assignment)}</Badge>
+        {assignment.adjusted && !assignment.isStale && <Badge tone="warning">Ajustado</Badge>}
+        {assignment.isStale && <Badge tone="danger">Desfasado</Badge>}
+      </div>
+
+      {assignment.isStale && (
+        <div className={styles.staleBox} role="alert">
+          <TriangleAlertIcon size={16} />
+          <span>
+            El proyecto cambió después de tu ajuste: el cálculo ahora da <strong>{formatHours(calculatedHours)}</strong> y tu ajuste
+            es <strong>{formatHours(assignment.assignedHours)}</strong>.
+          </span>
+          <div className={styles.staleActions}>
+            <Button variant="outline" size="sm" loading={keepAdjustment.isPending} onClick={() => keepAdjustment.mutate(assignment.id)}>
+              Mantener {formatHours(assignment.assignedHours)}
+            </Button>
+            <Button size="sm" loading={resetAssignment.isPending} onClick={() => resetAssignment.mutate(assignment.id)}>
+              Usar el cálculo ({formatHours(calculatedHours)})
+            </Button>
+          </div>
+        </div>
+      )}
+
+      <div className={styles.calculatedFields}>
+        <TextField
+          label="Comentarios"
+          placeholder="Por qué se ajusta, si aplica"
+          value={comments}
+          onChange={(event) => setComments(event.target.value)}
+          onBlur={() => {
+            if (comments !== assignment.comments) commit({ comments });
+          }}
+        />
+        <TextField
+          label="HH"
+          type="number"
+          min={0}
+          max={maxHours}
+          step="0.5"
+          value={hours}
+          onChange={(event) => setHours(event.target.value)}
+          onBlur={() => {
+            const next = Number(hours) || 0;
+            if (next !== assignment.assignedHours) commit({ assignedHours: next });
+          }}
+        />
+        <span className={styles.calculatedValue}>
+          Calculado
+          <strong>{formatHours(calculatedHours)}</strong>
+        </span>
+      </div>
+
+      {assignment.adjusted && !assignment.isStale && (
+        <div className={styles.adjustedFoot}>
+          <span>
+            Ajustado{assignment.adjusted.byName ? ` por ${assignment.adjusted.byName}` : ''} el{' '}
+            {formatDay(assignment.adjusted.at.slice(0, 10))}
+          </span>
+          <Button variant="ghost" size="sm" loading={resetAssignment.isPending} onClick={() => resetAssignment.mutate(assignment.id)}>
+            Volver al cálculo ({formatHours(calculatedHours)})
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ManualAssignmentRow({ assignment, maxHours }: { assignment: ForecastAssignment; maxHours: number }) {
   const updateAssignment = useUpdateForecastAssignment();
   const removeAssignment = useRemoveForecastAssignment();
   const [comments, setComments] = useState(assignment.comments);
@@ -105,6 +293,13 @@ function ForecastAssignmentRow({
       ? { page: 1, pageSize: 200, sortField: 'name', clientId: assignment.client.id }
       : { pageSize: 1 },
   );
+
+  // El proyecto actual se muestra aunque la fila no tenga cliente (filas antiguas): sin él la lista
+  // viene vacía y el selector aparecía en blanco.
+  const projectOptions = (projects?.items ?? []).map((project) => ({ value: project.id, label: project.name }));
+  if (assignment.project && !projectOptions.some((option) => option.value === assignment.project?.id)) {
+    projectOptions.unshift({ value: assignment.project.id, label: assignment.project.name });
+  }
 
   const commit = (patch: Partial<{ type: ForecastAssignmentType; clientId: string | null; projectId: string | null; comments: string; assignedHours: number }>) => {
     updateAssignment.mutate({
@@ -120,79 +315,61 @@ function ForecastAssignmentRow({
   };
 
   return (
-    <div className={styles.rowGroup}>
-      {assignment.segment && (
-        <div className={styles.roadmapNote}>
-          <Badge tone="info">Roadmap</Badge>
-          <span>
-            {assignment.segment.moduleName} · {assignment.segment.name} — se recalcula si se vuelve a guardar el tramo.
-          </span>
-        </div>
-      )}
-      <div className={styles.row}>
-        <div className={[styles.typeGroup, showProjectSelectors ? styles.typeGroupWithProject : ''].filter(Boolean).join(' ')}>
-          <Select
-            label="Tipo"
-            options={TYPE_OPTIONS}
-            value={assignment.type}
-            disabled={!canEdit}
-            onChange={(event) => commit({ type: event.target.value as ForecastAssignmentType, clientId: null, projectId: null })}
-          />
-          {showProjectSelectors && (
-            <>
-              <Select
-                label="Cliente"
-                placeholder="Sin cliente"
-                options={(clients?.items ?? []).map((client) => ({ value: client.id, label: client.companyName }))}
-                value={assignment.client?.id ?? ''}
-                disabled={!canEdit}
-                onChange={(event) => commit({ clientId: event.target.value || null, projectId: null })}
-              />
-              <Select
-                label="Proyecto"
-                placeholder="Sin proyecto"
-                options={(projects?.items ?? []).map((project) => ({ value: project.id, label: project.name }))}
-                value={assignment.project?.id ?? ''}
-                disabled={!canEdit || !assignment.client}
-                onChange={(event) => commit({ projectId: event.target.value || null })}
-              />
-            </>
-          )}
-        </div>
-
-        <TextField
-          label="Comentarios"
-          value={comments}
-          disabled={!canEdit}
-          onChange={(event) => setComments(event.target.value)}
-          onBlur={() => commit({ comments })}
+    <div className={styles.row}>
+      <div className={[styles.typeGroup, showProjectSelectors ? styles.typeGroupWithProject : ''].filter(Boolean).join(' ')}>
+        <Select
+          label="Tipo"
+          options={TYPE_OPTIONS}
+          value={assignment.type}
+          onChange={(event) => commit({ type: event.target.value as ForecastAssignmentType, clientId: null, projectId: null })}
         />
-
-        <TextField
-          label="HH"
-          type="number"
-          min={0}
-          max={maxHours}
-          step="0.5"
-          value={hours}
-          disabled={!canEdit}
-          onChange={(event) => setHours(event.target.value)}
-          onBlur={() => commit({ assignedHours: Number(hours) || 0 })}
-        />
-
-        {canEdit ? (
-          <button
-            type="button"
-            className={styles.deleteButton}
-            aria-label="Eliminar asignación"
-            onClick={() => removeAssignment.mutate(assignment.id)}
-          >
-            <CloseIcon size={16} />
-          </button>
-        ) : (
-          <span />
+        {showProjectSelectors && (
+          <>
+            <Select
+              label="Cliente"
+              placeholder="Sin cliente"
+              options={(clients?.items ?? []).map((client) => ({ value: client.id, label: client.companyName }))}
+              value={assignment.client?.id ?? ''}
+              onChange={(event) => commit({ clientId: event.target.value || null, projectId: null })}
+            />
+            <Select
+              label="Proyecto"
+              placeholder="Sin proyecto"
+              options={projectOptions}
+              value={assignment.project?.id ?? ''}
+              disabled={!assignment.client}
+              onChange={(event) => commit({ projectId: event.target.value || null })}
+            />
+          </>
         )}
       </div>
+
+      <TextField
+        label="Comentarios"
+        value={comments}
+        onChange={(event) => setComments(event.target.value)}
+        onBlur={() => commit({ comments })}
+      />
+
+      <TextField
+        label="HH"
+        type="number"
+        min={0}
+        max={maxHours}
+        step="0.5"
+        value={hours}
+        onChange={(event) => setHours(event.target.value)}
+        onBlur={() => commit({ assignedHours: Number(hours) || 0 })}
+      />
+
+      <button
+        type="button"
+        className={styles.deleteButton}
+        aria-label="Eliminar asignación"
+        onClick={() => removeAssignment.mutate(assignment.id)}
+      >
+        <CloseIcon size={16} />
+      </button>
     </div>
   );
 }

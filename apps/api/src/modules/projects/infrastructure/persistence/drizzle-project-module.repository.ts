@@ -601,7 +601,7 @@ interface RawTaskRow {
   assigneeLastName: string | null;
   name: string;
   description: string | null;
-  startDate: Date | null;
+  startDate: Date;
   date: Date;
   estimatedHours: string | null;
   status: ProjectModuleTaskRecord['status'];

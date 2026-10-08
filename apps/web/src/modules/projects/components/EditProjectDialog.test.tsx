@@ -44,6 +44,11 @@ vi.mock('@/modules/users/api/users.queries', () => ({
   useUsersList: (...args: unknown[]) => useUsersListMock(...(args as [])),
 }));
 
+vi.mock('@/modules/forecast/api/forecast.queries', () => ({
+  useForecastLoadPreview: () => ({ data: undefined }),
+  useCheckForecastOverload: () => async () => [],
+}));
+
 vi.mock('@/modules/teams/api/teams.queries', () => ({
   useTeamsList: () => ({ data: { items: [] } }),
   useTeamDetail: () => ({ data: undefined, isLoading: false }),

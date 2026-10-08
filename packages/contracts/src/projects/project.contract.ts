@@ -263,7 +263,7 @@ export const projectModuleTaskSchema = z.object({
   assigneeName: z.string().nullable(),
   name: z.string(),
   description: z.string().nullable(),
-  startDate: z.string().nullable(),
+  startDate: z.string(),
   date: z.string(),
   estimatedHours: z.number().nullable(),
   status: projectModuleTaskStatusSchema,
@@ -279,7 +279,8 @@ export const createProjectModuleTaskSchema = z.object({
   assigneeUserId: uuidSchema.nullish(),
   name: nonEmptyTrimmed(300, 'El nombre de la tarea'),
   description: z.string().trim().max(2000).nullish(),
-  startDate: z.iso.date().nullish(),
+  /** Obligatorio: el Forecast reparte las HH estimadas entre el inicio y la fecha límite. */
+  startDate: z.iso.date({ error: 'Ingresa la fecha de inicio.' }),
   date: z.iso.date(),
   /** Obligatorio: es el peso de la tarea en el avance real del proyecto (ver `projectProgressSchema`). */
   estimatedHours: estimatedHoursSchema,

@@ -21,6 +21,7 @@ import {
   ProjectModuleNotFoundError,
   ProjectModuleTaskNotFoundError,
   ProjectNotFoundError,
+  InvalidTaskDatesError,
   RejectionReasonRequiredError,
 } from '../../domain/errors/project.errors';
 import { PROJECT_REPOSITORY, type ProjectRepository } from '../../domain/repositories/project.repository';
@@ -42,6 +43,7 @@ import type { ActorContext, UseCase } from '../../../../shared/application/use-c
 import { ProjectChangeLogRecorder } from '../services/project-change-log.recorder';
 import { deadlineNote, formatCommittedDate } from '../services/deadline-note';
 import { ProjectProgressRecalculator } from '../services/project-progress-recalculator';
+import { ForecastSourceSyncService } from '../services/forecast-source-sync.service';
 
 export interface UpdateProjectModuleTaskCommand {
   readonly projectId: string;
@@ -79,6 +81,7 @@ export class UpdateProjectModuleTaskUseCase
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
     private readonly changeLog: ProjectChangeLogRecorder,
     private readonly progress: ProjectProgressRecalculator,
+    private readonly forecastSync: ForecastSourceSyncService,
     @Inject(CLOCK) private readonly clock: Clock,
     @Inject(UNIT_OF_WORK) private readonly unitOfWork: UnitOfWork,
   ) {}
@@ -117,6 +120,10 @@ export class UpdateProjectModuleTaskUseCase
       }
     }
 
+    const nextStart = command.data.startDate !== undefined ? new Date(command.data.startDate) : task.startDate;
+    const nextDate = command.data.date !== undefined ? new Date(command.data.date) : task.date;
+    if (nextStart > nextDate) return err(new InvalidTaskDatesError());
+
     const now = this.clock.now();
     const nextStatus = command.data.status;
     if (nextStatus === 'in_progress' && task.status === 'in_review' && !command.data.rejectionReason?.trim()) {
@@ -150,9 +157,7 @@ export class UpdateProjectModuleTaskUseCase
           ...(command.data.assigneeUserId !== undefined ? { assigneeUserId: command.data.assigneeUserId ?? null } : {}),
           ...(command.data.name !== undefined ? { name: command.data.name } : {}),
           ...(command.data.description !== undefined ? { description: command.data.description ?? null } : {}),
-          ...(command.data.startDate !== undefined
-            ? { startDate: command.data.startDate ? new Date(command.data.startDate) : null }
-            : {}),
+          ...(command.data.startDate !== undefined ? { startDate: new Date(command.data.startDate) } : {}),
           ...(command.data.date !== undefined ? { date: new Date(command.data.date) } : {}),
           ...(command.data.estimatedHours !== undefined
             ? { estimatedHours: command.data.estimatedHours }
@@ -174,6 +179,7 @@ export class UpdateProjectModuleTaskUseCase
         );
       }
       await this.progress.recalculate(project.id, tx);
+      await this.forecastSync.syncTask(project, command.moduleId, command.taskId, now, tx);
     });
 
     await this.audit.record({
@@ -226,12 +232,10 @@ export class UpdateProjectModuleTaskUseCase
             : `${label} reasignada de ${task.assigneeName ?? 'otro colaborador'} a ${nextName} ${inPhase}.`,
       );
     }
-    if (data.startDate !== undefined) {
-      const next = data.startDate ? new Date(data.startDate) : null;
-      if (!sameDay(next, task.startDate)) {
-        const show = (value: Date | null) => (value ? formatCommittedDate(value) : 'sin definir');
-        messages.push(`${label} ${inPhase}: fecha de inicio cambiada de ${show(task.startDate)} a ${show(next)}.`);
-      }
+    if (data.startDate !== undefined && !sameDay(new Date(data.startDate), task.startDate)) {
+      messages.push(
+        `${label} ${inPhase}: fecha de inicio cambiada de ${formatCommittedDate(task.startDate)} a ${formatCommittedDate(new Date(data.startDate))}.`,
+      );
     }
     if (data.date !== undefined && !sameDay(new Date(data.date), task.date)) {
       messages.push(

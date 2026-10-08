@@ -12,7 +12,7 @@ import {
   PROJECT_MODULE_REPOSITORY,
   type ProjectModuleRepository,
 } from '../../domain/repositories/project-module.repository';
-import { SegmentForecastSyncService } from '../services/segment-forecast-sync.service';
+import { ForecastSourceSyncService } from '../services/forecast-source-sync.service';
 import {
   AUDIT_RECORDER,
   type AuditRecorder,
@@ -35,7 +35,7 @@ export class CreateProjectModuleSegmentUseCase
   constructor(
     @Inject(PROJECT_REPOSITORY) private readonly projects: ProjectRepository,
     @Inject(PROJECT_MODULE_REPOSITORY) private readonly modules: ProjectModuleRepository,
-    private readonly forecastSync: SegmentForecastSyncService,
+    private readonly forecastSync: ForecastSourceSyncService,
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
     @Inject(CLOCK) private readonly clock: Clock,
     @Inject(UNIT_OF_WORK) private readonly unitOfWork: UnitOfWork,
@@ -79,7 +79,7 @@ export class CreateProjectModuleSegmentUseCase
         tx,
       );
       await this.modules.replaceSegmentMembers(segmentId, members, now, tx);
-      await this.forecastSync.sync(project, command.moduleId, segmentId, now, tx);
+      await this.forecastSync.syncSegment(project, command.moduleId, segmentId, now, tx);
       return segmentId;
     });
 

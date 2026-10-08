@@ -48,7 +48,7 @@ export interface ProjectModuleTaskRecord {
   readonly assigneeName: string | null;
   readonly name: string;
   readonly description: string | null;
-  readonly startDate: Date | null;
+  readonly startDate: Date;
   readonly date: Date;
   readonly estimatedHours: number | null;
   readonly status: ProjectModuleTaskStatus;
@@ -116,7 +116,7 @@ export interface CreateProjectModuleTaskInput {
   readonly assigneeUserId: string | null;
   readonly name: string;
   readonly description: string | null;
-  readonly startDate: Date | null;
+  readonly startDate: Date;
   readonly date: Date;
   readonly estimatedHours: number | null;
   readonly status: ProjectModuleTaskStatus;
@@ -128,7 +128,7 @@ export interface UpdateProjectModuleTaskInput {
   readonly assigneeUserId?: string | null;
   readonly name?: string;
   readonly description?: string | null;
-  readonly startDate?: Date | null;
+  readonly startDate?: Date;
   readonly date?: Date;
   readonly estimatedHours?: number | null;
   readonly status?: ProjectModuleTaskStatus;

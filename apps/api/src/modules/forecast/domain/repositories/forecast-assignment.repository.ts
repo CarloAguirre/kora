@@ -1,4 +1,5 @@
 import type { TransactionContext } from '@kora/core';
+import type { ForecastAssignmentSource } from '@kora/contracts';
 import type { ForecastAssignment } from '../entities/forecast-assignment.entity';
 
 /** Fila resuelta con los nombres ya unidos — evita puertos aparte solo para nombres. */
@@ -17,10 +18,19 @@ export interface ForecastAssignmentRecord {
   readonly clientName: string | null;
   readonly comments: string;
   readonly assignedHours: number;
-  /** Tramo del Roadmap que generó la fila — `null` si se cargó a mano. */
+  readonly source: ForecastAssignmentSource;
+  /** Tramo del Roadmap que generó la fila (`source = 'segment'`). */
   readonly segmentId: string | null;
   readonly segmentName: string | null;
   readonly segmentModuleName: string | null;
+  /** Tarea que generó la fila (`source = 'task'`). */
+  readonly taskId: string | null;
+  readonly taskName: string | null;
+  readonly taskModuleName: string | null;
+  readonly calculatedHours: number | null;
+  readonly adjustedAt: Date | null;
+  readonly adjustedByName: string | null;
+  readonly isStale: boolean;
   readonly createdAt: Date;
   readonly updatedAt: Date;
 }
@@ -28,11 +38,17 @@ export interface ForecastAssignmentRecord {
 /** Fila cruda usada por la vista de capacidad (agregación en el caso de uso, no en SQL). */
 export interface ForecastAssignmentRawRow {
   readonly teamMemberId: string;
+  readonly periodStart: Date;
   readonly type: string;
   readonly projectId: string | null;
   readonly projectName: string | null;
   readonly comments: string;
   readonly assignedHours: number;
+  readonly source: ForecastAssignmentSource;
+  readonly segmentId: string | null;
+  readonly taskId: string | null;
+  readonly isAdjusted: boolean;
+  readonly isStale: boolean;
 }
 
 export interface ForecastAssignmentRepository {
@@ -47,8 +63,11 @@ export interface ForecastAssignmentRepository {
     context?: TransactionContext,
   ): Promise<ForecastAssignmentRecord[]>;
 
-  /** Filas crudas de todos los miembros planificables en un período — para la vista de capacidad. */
-  listRawForPeriod(periodStart: Date, periodEnd: Date, context?: TransactionContext): Promise<ForecastAssignmentRawRow[]>;
+  /**
+   * Filas crudas de las semanas que empiezan entre `firstMonday` y `lastMonday` (inclusive) — para la
+   * vista de capacidad de una semana (`firstMonday = lastMonday`) o de varias.
+   */
+  listRawForWeeks(firstMonday: Date, lastMonday: Date, context?: TransactionContext): Promise<ForecastAssignmentRawRow[]>;
 
   save(assignment: ForecastAssignment, context?: TransactionContext): Promise<void>;
   delete(id: string, context?: TransactionContext): Promise<void>;

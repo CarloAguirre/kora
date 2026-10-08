@@ -11,9 +11,58 @@
 .header {
   display: flex;
   align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--kora-space-3);
+  flex-wrap: wrap;
+}
+
+.headerFields {
+  display: flex;
+  align-items: flex-end;
   justify-content: flex-end;
   gap: var(--kora-space-3);
   flex-wrap: wrap;
+  margin-left: auto;
+}
+
+/* De dónde salen las horas + "Recalcular desde proyectos". */
+.sourceNote {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--kora-space-2) var(--kora-space-4);
+  padding: var(--kora-space-3) var(--kora-space-4);
+  border-radius: var(--kora-radius);
+  background: var(--kora-blue-surface);
+  font-size: var(--kora-text-sm);
+  color: var(--kora-navy);
+}
+
+.sourceNote > span {
+  flex: 1 1 320px;
+}
+
+/* Ajustes del líder que quedaron desfasados porque el proyecto cambió después. */
+.staleBanner {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--kora-space-2) var(--kora-space-3);
+  padding: var(--kora-space-3) var(--kora-space-4);
+  border: 1px solid var(--kora-warning);
+  border-radius: var(--kora-radius);
+  background: var(--kora-warning-surface);
+  color: var(--kora-navy);
+  font-size: var(--kora-text-sm);
+}
+
+.staleBanner > svg {
+  color: var(--kora-warning-text);
+}
+
+.staleBanner > span {
+  flex: 1 1 320px;
 }
 
 .periodField {

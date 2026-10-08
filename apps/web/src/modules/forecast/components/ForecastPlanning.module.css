@@ -54,6 +54,7 @@
 .chip {
   display: inline-flex;
   align-items: center;
+  gap: var(--kora-space-1);
   padding: 2px var(--kora-space-2);
   border-radius: var(--kora-radius);
   font-size: var(--kora-text-base);
@@ -78,6 +79,50 @@
 
 .chipOver {
   background: var(--kora-orange);
+}
+
+/* Origen de las HH — calculado desde el proyecto, ajustado por el líder o desfasado (el cálculo
+   cambió después del ajuste). Lo manual conserva los colores del Figma (azul/dorado). */
+.chipCalculated {
+  background: var(--kora-lime-surface);
+  box-shadow: inset 0 0 0 1px var(--kora-lime-mid);
+  color: var(--kora-lime-dark);
+}
+
+.chipAdjusted {
+  background: var(--kora-warning-surface);
+  color: var(--kora-warning-text);
+}
+
+.chipStale {
+  background: var(--kora-badge-danger-bg);
+  box-shadow: inset 0 0 0 1px var(--kora-badge-danger-text);
+  color: var(--kora-badge-danger-text);
+}
+
+/* Marcas que no suman HH: entregas y HH asignadas sin calendarizar. */
+.chipDelivery {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--kora-info);
+  color: var(--kora-info);
+}
+
+.chipHint {
+  background: var(--kora-blue-surface);
+  color: var(--kora-info);
+  font-size: var(--kora-text-sm);
+}
+
+.loadCell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-1);
+}
+
+.logged {
+  font-size: var(--kora-text-xs);
+  color: var(--kora-text-muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .load {

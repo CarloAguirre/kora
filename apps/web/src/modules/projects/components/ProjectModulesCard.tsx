@@ -202,6 +202,7 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
         mode="edit"
         teamOptions={segmentModalTeamOptions}
         initialValues={segmentModalInitialValues}
+        segmentId={editingSegment?.segment.id ?? null}
         submitting={updateSegment.isPending}
         onCancel={() => setEditingSegment(null)}
         onConfirm={(values) => void onConfirmSegmentEdit(values)}

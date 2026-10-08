@@ -249,7 +249,8 @@ export async function seedDemoClientPortal(db: Database): Promise<SeedDemoClient
 
   // Tareas puntuales (marcador "Tareas" del Roadmap) — el estado real (done/todo)
   // combinado con la fecha es lo que el frontend usa para derivar "terminada/próxima/atrasada".
-  await db.insert(projectModuleTasks).values([
+  // Toda tarea tiene inicio; estas son de un día (inicio = fecha límite).
+  await db.insert(projectModuleTasks).values(([
     { moduleId: DEMO.moduleFase1, teamId: REAL.teamDev, name: 'Definir criterios de conciliación', date: d('2026-06-15'), status: 'done', scope: 'diseno' },
     { moduleId: DEMO.moduleFase1, teamId: REAL.teamQa, name: 'Casos de prueba conciliación', date: d('2026-07-12'), status: 'done', scope: 'qa' },
     { moduleId: DEMO.moduleFase2, teamId: REAL.teamIa, name: 'Definir intents principales', date: d('2026-07-25'), status: 'done', scope: 'diseno' },
@@ -257,7 +258,7 @@ export async function seedDemoClientPortal(db: Database): Promise<SeedDemoClient
     { moduleId: DEMO.moduleFase2, teamId: REAL.teamIa, name: 'Entrenar modelo con casos reales', date: d('2026-08-20'), status: 'todo', scope: 'desarrollo' },
     { moduleId: DEMO.moduleFase3, teamId: REAL.teamUx, name: 'Wireframes de reportes', date: d('2026-07-28'), status: 'done', scope: 'diseno' },
     { moduleId: DEMO.moduleFase3, teamId: REAL.teamDev, name: 'Gráficos de avance por equipo', date: d('2026-08-25'), status: 'in_progress', scope: 'desarrollo' },
-  ]);
+  ] satisfies Omit<typeof projectModuleTasks.$inferInsert, 'startDate'>[]).map((task) => ({ startDate: task.date, ...task })));
 
   // Entregas — 1 por fase, 4 en total.
   await db.insert(projectModuleDeliveries).values([

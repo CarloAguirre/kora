@@ -137,7 +137,20 @@ const SUPPORT_SURPLUS_POLICY_OPTIONS = SUPPORT_SURPLUS_POLICIES.map((policy) => 
   value: policy,
   label: SUPPORT_SURPLUS_POLICY_LABELS[policy],
 }));
-const SUPPORT_SLA_HOUR_OPTIONS = ['2', '4', '8', '24', '48'].map((h) => ({ value: h, label: `${h} horas` }));
+/** SLA fijo de los contratos de soporte: se muestra sin poder editarse y se envía siempre con estos valores. */
+const SUPPORT_SLA_TARGET_HOURS = { critical: 1, high: 2, medium: 12, low: 24 } as const;
+const SUPPORT_SLA_FIELDS = [
+  { label: 'Crítica', hours: SUPPORT_SLA_TARGET_HOURS.critical },
+  { label: 'Alta', hours: SUPPORT_SLA_TARGET_HOURS.high },
+  { label: 'Media', hours: SUPPORT_SLA_TARGET_HOURS.medium },
+  { label: 'Baja', hours: SUPPORT_SLA_TARGET_HOURS.low },
+];
+const SUPPORT_SLA_VALUES = {
+  supportTargetHoursCritical: SUPPORT_SLA_TARGET_HOURS.critical,
+  supportTargetHoursHigh: SUPPORT_SLA_TARGET_HOURS.high,
+  supportTargetHoursMedium: SUPPORT_SLA_TARGET_HOURS.medium,
+  supportTargetHoursLow: SUPPORT_SLA_TARGET_HOURS.low,
+};
 const SUPPORT_DUE_DAY_OPTIONS = Array.from({ length: 31 }, (_, i) => ({ value: String(i + 1), label: String(i + 1) }));
 
 /** Respaldo de un Hito 0 manual (sin factura) — solo copy/UI, se concatena al motivo al enviar (ver `onSubmit`). */
@@ -647,10 +660,10 @@ export function NewProjectPage() {
             quotationLink: values.quotationLink,
             contractLink: values.contractLink,
             additionalLinks: values.additionalLinks,
-            targetHoursCritical: values.supportTargetHoursCritical,
-            targetHoursHigh: values.supportTargetHoursHigh,
-            targetHoursMedium: values.supportTargetHoursMedium,
-            targetHoursLow: values.supportTargetHoursLow,
+            targetHoursCritical: SUPPORT_SLA_TARGET_HOURS.critical,
+            targetHoursHigh: SUPPORT_SLA_TARGET_HOURS.high,
+            targetHoursMedium: SUPPORT_SLA_TARGET_HOURS.medium,
+            targetHoursLow: SUPPORT_SLA_TARGET_HOURS.low,
             startDate: values.startDate,
             endDate: values.estimatedDeliveryDate,
             planType: values.supportPlanType as SupportPlanType,
@@ -667,7 +680,7 @@ export function NewProjectPage() {
           return;
         }
 
-        const result = await createSupportProject.mutateAsync({ ...values, primaryContactId: await resolveProjectContactId() });
+        const result = await createSupportProject.mutateAsync({ ...values, ...SUPPORT_SLA_VALUES, primaryContactId: await resolveProjectContactId() });
         toast.success(`Se creó el proyecto y contrato de soporte de ${values.name}.`);
         // `result.id` es el proyecto (no el contrato) — la ficha de proyecto ya muestra el resumen
         // del plan vía `SupportProjectDetailView` (`useSupportPlanSummary(projectId)`).
@@ -1032,30 +1045,15 @@ export function NewProjectPage() {
               {isSupport && (
                 <Section title="Tiempos de respuesta (SLA)">
                   <div className={styles.row3}>
-                    <Select
-                      label="Crítica"
-                      options={SUPPORT_SLA_HOUR_OPTIONS}
-                      placeholder="—"
-                      {...register('supportTargetHoursCritical', { setValueAs: emptyToUndefined })}
-                    />
-                    <Select
-                      label="Alta"
-                      options={SUPPORT_SLA_HOUR_OPTIONS}
-                      placeholder="—"
-                      {...register('supportTargetHoursHigh', { setValueAs: emptyToUndefined })}
-                    />
-                    <Select
-                      label="Media"
-                      options={SUPPORT_SLA_HOUR_OPTIONS}
-                      placeholder="—"
-                      {...register('supportTargetHoursMedium', { setValueAs: emptyToUndefined })}
-                    />
-                    <Select
-                      label="Baja"
-                      options={SUPPORT_SLA_HOUR_OPTIONS}
-                      placeholder="—"
-                      {...register('supportTargetHoursLow', { setValueAs: emptyToUndefined })}
-                    />
+                    {SUPPORT_SLA_FIELDS.map(({ label, hours }) => (
+                      <Select
+                        key={label}
+                        label={label}
+                        options={[{ value: String(hours), label: `${hours} ${hours === 1 ? 'hora' : 'horas'}` }]}
+                        value={String(hours)}
+                        disabled
+                      />
+                    ))}
                   </div>
                 </Section>
               )}

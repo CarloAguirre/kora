@@ -1,7 +1,153 @@
 .editor {
   display: flex;
   flex-direction: column;
+  gap: var(--kora-space-6);
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
   gap: var(--kora-space-3);
+}
+
+.groupTitle {
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-bold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--kora-text-muted);
+}
+
+.empty {
+  font-size: var(--kora-text-sm);
+  color: var(--kora-text-muted);
+}
+
+/* Fila calculada desde un tramo o una tarea: borde neutro mientras sigue al proyecto, naranjo si el
+   líder la ajustó, rojo si el proyecto cambió después del ajuste. */
+.calculatedRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-2);
+  padding: var(--kora-space-3) var(--kora-space-4);
+  border: 1px solid var(--kora-border-soft);
+  border-radius: var(--kora-radius);
+  background: var(--kora-surface);
+}
+
+.adjustedRow {
+  border-color: var(--kora-warning);
+}
+
+.staleRow {
+  border-color: var(--kora-badge-danger-text);
+}
+
+.calculatedHead {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--kora-space-2);
+}
+
+.calculatedTitle {
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-navy);
+}
+
+.calculatedFields {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) 110px auto;
+  gap: var(--kora-space-2) var(--kora-space-3);
+  align-items: end;
+}
+
+.calculatedValue {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: var(--kora-field-height);
+  font-size: var(--kora-text-xs);
+  color: var(--kora-text-muted);
+}
+
+.calculatedValue strong {
+  font-size: var(--kora-text-base);
+  color: var(--kora-navy);
+  font-variant-numeric: tabular-nums;
+}
+
+.adjustedFoot {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--kora-space-2) var(--kora-space-3);
+  font-size: var(--kora-text-sm);
+  color: var(--kora-warning-text);
+}
+
+.overloadBox {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--kora-space-2);
+  padding: var(--kora-space-3) var(--kora-space-4);
+  border: 1px solid var(--kora-warning);
+  border-radius: var(--kora-radius);
+  background: var(--kora-warning-surface);
+  font-size: var(--kora-text-sm);
+  color: var(--kora-navy);
+}
+
+.overloadBox > svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--kora-warning-text);
+}
+
+.staleBox {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--kora-space-2) var(--kora-space-3);
+  padding: var(--kora-space-3);
+  border-radius: var(--kora-radius);
+  background: var(--kora-badge-danger-bg);
+  color: var(--kora-badge-danger-text);
+  font-size: var(--kora-text-sm);
+}
+
+.staleBox > span {
+  flex: 1 1 260px;
+}
+
+.staleActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--kora-space-2);
+}
+
+/* Datos del proyecto que no suman HH: tareas cubiertas por un tramo y entregas. */
+.infoRow {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--kora-space-2) var(--kora-space-4);
+  border-radius: var(--kora-radius);
+  background: var(--kora-surface-muted);
+}
+
+.infoTitle {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--kora-space-2);
+  font-weight: var(--kora-weight-semibold);
+  color: var(--kora-navy);
+}
+
+.infoMeta {
+  font-size: var(--kora-text-xs);
+  color: var(--kora-text-muted);
 }
 
 .rows {
@@ -10,36 +156,27 @@
   gap: var(--kora-space-2);
 }
 
-.rowGroup {
-  display: flex;
-  flex-direction: column;
-  gap: var(--kora-space-1);
-}
-
-.roadmapNote {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--kora-space-2);
-  font-size: var(--kora-text-xs);
-  color: var(--kora-text-muted);
-}
-
 .row {
   display: grid;
-  grid-template-columns: minmax(220px, 1.4fr) minmax(160px, 1fr) 110px 32px;
-  gap: var(--kora-space-2);
+  /* Primera línea: tipo (y cliente/proyecto si aplica); segunda: comentarios, HH y eliminar. */
+  grid-template-columns: minmax(0, 1fr) 110px 32px;
+  gap: var(--kora-space-3);
   align-items: end;
+  padding: var(--kora-space-3) var(--kora-space-4);
+  border: 1px solid var(--kora-border-soft);
+  border-radius: var(--kora-radius);
+  background: var(--kora-surface);
 }
 
 .typeGroup {
+  grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: 1fr;
-  gap: var(--kora-space-2);
+  grid-template-columns: minmax(0, 240px);
+  gap: var(--kora-space-3);
 }
 
 .typeGroupWithProject {
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .deleteButton {
@@ -48,11 +185,6 @@
   justify-content: center;
   width: var(--kora-field-height);
   height: var(--kora-field-height);
-  /* Los campos de al lado (Select/TextField) siempre reservan una línea de
-     16px debajo para su mensaje de error, así que su caja realmente termina
-     16px por encima del final de la fila (`align-items: end`) — sin este
-     margen el botón queda más abajo que los campos. */
-  margin-bottom: 16px;
   border: none;
   background: none;
   color: var(--kora-danger);
@@ -80,10 +212,14 @@
 }
 
 @media (max-width: 900px) {
-  .row {
+  .calculatedFields {
     grid-template-columns: 1fr;
   }
+  .row {
+    grid-template-columns: minmax(0, 1fr) 90px 32px;
+  }
+  .typeGroup,
   .typeGroupWithProject {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }

@@ -1,7 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { err, ok, type ApplicationError, type Result } from '@kora/core';
 import { isAdminTier, type RoleCode } from '@kora/contracts';
-import { ForbiddenForecastAccessError, ForecastAssignmentNotFoundError } from '../../domain/errors/forecast.errors';
+import {
+  ForbiddenForecastAccessError,
+  ForecastAssignmentNotFoundError,
+  ForecastCalculatedRowNotDeletableError,
+} from '../../domain/errors/forecast.errors';
 import { FORECAST_ASSIGNMENT_REPOSITORY, type ForecastAssignmentRepository } from '../../domain/repositories/forecast-assignment.repository';
 import { FORECAST_CLIENT_READER, type ForecastClientReader } from '../ports/forecast-client-reader.port';
 import { FORECAST_PROJECT_READER, type ForecastProjectReader } from '../ports/forecast-project-reader.port';
@@ -39,6 +43,8 @@ export class DeleteForecastAssignmentUseCase implements UseCase<DeleteForecastAs
     if (!member && !isAdminTier(actorRole)) {
       return err(new ForbiddenForecastAccessError());
     }
+
+    if (assignment.isCalculated) return err(new ForecastCalculatedRowNotDeletableError());
 
     const [project, client] = await Promise.all([
       assignment.projectId ? this.projects.findById(assignment.projectId) : Promise.resolve(null),

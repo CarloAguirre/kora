@@ -184,7 +184,7 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
       assigneeName: task.assigneeName,
       name: task.name,
       description: task.description,
-      startDate: task.startDate ? task.startDate.toISOString().slice(0, 10) : null,
+      startDate: task.startDate.toISOString().slice(0, 10),
       date: task.date.toISOString().slice(0, 10),
       estimatedHours: task.estimatedHours,
       status: task.status,

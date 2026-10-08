@@ -1,6 +1,11 @@
 import { AggregateRoot, assignDefined, createDomainEvent, err, ok, type Result } from '@kora/core';
-import type { ForecastAssignmentType } from '@kora/contracts';
-import { InvalidForecastHoursError, InvalidForecastPeriodError } from '../errors/forecast.errors';
+import type { ForecastAssignmentSource, ForecastAssignmentType } from '@kora/contracts';
+import {
+  ForecastCalculatedRowLockedError,
+  ForecastRowNotCalculatedError,
+  InvalidForecastHoursError,
+  InvalidForecastPeriodError,
+} from '../errors/forecast.errors';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -14,6 +19,13 @@ export interface ForecastAssignmentProps {
   clientId: string | null;
   comments: string;
   assignedHours: number;
+  /** `manual` la cargó el líder; `segment`/`task` la calcula Kora — ver `ForecastSourceSyncService`. */
+  source: ForecastAssignmentSource;
+  /** Lo que dice el cálculo — `null` en las manuales. */
+  calculatedHours: number | null;
+  adjustedAt: Date | null;
+  adjustedByUserId: string | null;
+  isStale: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -71,6 +83,11 @@ export class ForecastAssignment extends AggregateRoot<string> {
       clientId: props.clientId ?? null,
       comments: props.comments?.trim() || '',
       assignedHours: props.assignedHours,
+      source: 'manual',
+      calculatedHours: null,
+      adjustedAt: null,
+      adjustedByUserId: null,
+      isStale: false,
       createdAt: props.now,
       updatedAt: props.now,
     });
@@ -122,23 +139,92 @@ export class ForecastAssignment extends AggregateRoot<string> {
     return this.props.legacyId;
   }
 
+  get source(): ForecastAssignmentSource {
+    return this.props.source;
+  }
+
+  /** La calcula Kora desde un tramo o una tarea (no la cargó el líder a mano). */
+  get isCalculated(): boolean {
+    return this.props.source !== 'manual';
+  }
+
+  get calculatedHours(): number | null {
+    return this.props.calculatedHours;
+  }
+
+  get isAdjusted(): boolean {
+    return this.props.adjustedAt !== null;
+  }
+
+  get isStale(): boolean {
+    return this.props.isStale;
+  }
+
+  /**
+   * En una fila calculada solo cambian HH y comentarios. Cambiar sus HH la deja ajustada (el cálculo
+   * deja de tocarla); volver a poner exactamente lo calculado equivale a "Volver al cálculo".
+   */
   updateDetails(
     data: Partial<Pick<ForecastAssignmentProps, 'type' | 'projectId' | 'clientId' | 'comments' | 'assignedHours'>>,
     now: Date,
-  ): Result<void, InvalidForecastHoursError> {
+    actorUserId: string | null = null,
+  ): Result<void, InvalidForecastHoursError | ForecastCalculatedRowLockedError> {
     if (data.assignedHours !== undefined && data.assignedHours < 0) {
       return err(new InvalidForecastHoursError('Las HH asignadas no pueden ser negativas.'));
     }
     if (data.comments !== undefined) data.comments = data.comments.trim();
 
-    assignDefined(this.props, data);
+    if (this.isCalculated) {
+      const changesReference =
+        (data.type !== undefined && data.type !== this.props.type) ||
+        (data.projectId !== undefined && data.projectId !== this.props.projectId) ||
+        (data.clientId !== undefined && data.clientId !== this.props.clientId);
+      if (changesReference) return err(new ForecastCalculatedRowLockedError());
+
+      if (data.assignedHours !== undefined && data.assignedHours !== this.props.assignedHours) {
+        if (data.assignedHours === this.props.calculatedHours) {
+          this.clearAdjustment();
+        } else {
+          this.props.adjustedAt = now;
+          this.props.adjustedByUserId = actorUserId;
+          this.props.isStale = false;
+        }
+      }
+      this.props.comments = data.comments ?? this.props.comments;
+      this.props.assignedHours = data.assignedHours ?? this.props.assignedHours;
+    } else {
+      assignDefined(this.props, data);
+    }
     this.touch(now);
     this.addDomainEvent(createDomainEvent('forecast_assignment.updated', this.id, {}, now));
     return ok(undefined);
   }
 
+  /** "Volver al cálculo": las HH vuelven a seguir al proyecto. */
+  resetToCalculation(now: Date): Result<void, ForecastRowNotCalculatedError> {
+    if (!this.isCalculated) return err(new ForecastRowNotCalculatedError());
+    this.props.assignedHours = this.props.calculatedHours ?? 0;
+    this.clearAdjustment();
+    this.touch(now);
+    this.addDomainEvent(createDomainEvent('forecast_assignment.updated', this.id, {}, now));
+    return ok(undefined);
+  }
+
+  /** "Mantener mi ajuste": el líder vio que el cálculo cambió y conserva su valor. */
+  keepAdjustment(now: Date): void {
+    if (!this.props.isStale) return;
+    this.props.isStale = false;
+    this.touch(now);
+  }
+
   linkLegacyId(legacyId: number | null): void {
     this.props.legacyId = legacyId;
+  }
+
+  private clearAdjustment(): void {
+    this.props.adjustedAt = null;
+    this.props.adjustedByUserId = null;
+    this.props.isStale = false;
   }
 
   private touch(now: Date): void {

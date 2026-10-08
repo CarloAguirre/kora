@@ -1307,6 +1307,7 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
       mode={segmentModal?.segment ? 'edit' : 'create'}
       teamOptions={deliveryModalTeamOptions}
       initialValues={segmentModalInitialValues}
+      segmentId={segmentModal?.kind === 'existing' ? (segmentModal.segment?.id ?? null) : null}
       submitting={createSegment.isPending || updateSegment.isPending}
       onCancel={() => setSegmentModal(null)}
       onConfirm={(values) => void onConfirmSegmentModal(values)}

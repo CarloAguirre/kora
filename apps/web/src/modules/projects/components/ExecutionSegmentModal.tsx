@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { CreateProjectModuleSegmentInput, ProjectModuleSegment } from '@kora/contracts';
+import type { CreateProjectModuleSegmentInput, ForecastOverloadWarning, ProjectModuleSegment } from '@kora/contracts';
 import styles from './DeliveryModal.module.css';
 import segmentStyles from './ExecutionSegmentModal.module.css';
 import { Modal } from '@/shared/components/ui/Modal';
@@ -7,8 +7,11 @@ import { Button } from '@/shared/components/ui/Button';
 import { TextField } from '@/shared/components/ui/TextField';
 import { Select } from '@/shared/components/ui/Select';
 import { Combobox } from '@/shared/components/ui/Combobox';
+import { ConfirmActionDialog } from '@/shared/components/ui/ConfirmActionDialog';
 import { CloseIcon } from '@/shared/components/icons/Icons';
 import { useTeamDetail } from '@/modules/teams/api/teams.queries';
+import { useCheckForecastOverload, useForecastLoadPreview } from '@/modules/forecast/api/forecast.queries';
+import { ForecastOverloadAlert, summarizeOverload } from '@/modules/forecast/components/ForecastOverloadAlert';
 
 export interface ExecutionSegmentMemberValue {
   teamMemberId: string;
@@ -94,6 +97,8 @@ export interface ExecutionSegmentModalProps {
   /** Equipos ya asignados al proyecto (no el catálogo completo) — mismo criterio que `DeliveryModal`. */
   teamOptions: Array<{ value: string; label: string }>;
   initialValues: ExecutionSegmentModalValues;
+  /** Tramo que se está editando — sus horas actuales no se cuentan como carga existente al avisar sobrecargas. */
+  segmentId?: string | null;
   submitting?: boolean;
   onCancel: () => void;
   onConfirm: (values: ExecutionSegmentModalValues) => void;
@@ -112,6 +117,7 @@ export function ExecutionSegmentModal({
   mode,
   teamOptions,
   initialValues,
+  segmentId = null,
   submitting,
   onCancel,
   onConfirm,
@@ -157,6 +163,28 @@ export function ExecutionSegmentModal({
   const removeMember = (teamMemberId: string) =>
     setValues((prev) => ({ ...prev, members: prev.members.filter((member) => member.teamMemberId !== teamMemberId) }));
 
+  // Solo los colaboradores con % válido cargan HH: con ellos se pregunta si alguien queda sobre el 100 %.
+  const loadedMembers = values.members
+    .filter((member) => member.dailyPercent.trim() && !percentError(member.dailyPercent))
+    .map((member) => ({ teamMemberId: member.teamMemberId, dailyPercent: Number(member.dailyPercent) }));
+  const previewInput =
+    open && values.startDate && values.endDate && values.startDate <= values.endDate && loadedMembers.length > 0
+      ? { kind: 'segment' as const, segmentId, startDate: values.startDate, endDate: values.endDate, members: loadedMembers }
+      : null;
+  const { data: loadPreview } = useForecastLoadPreview(previewInput);
+  const checkOverload = useCheckForecastOverload();
+  const [checking, setChecking] = useState(false);
+  const [overloadToConfirm, setOverloadToConfirm] = useState<ForecastOverloadWarning[] | null>(null);
+
+  /** Si alguien queda sobre el 100 %, se pide confirmar antes de guardar. */
+  const handleSave = async () => {
+    setChecking(true);
+    const warnings = await checkOverload(previewInput);
+    setChecking(false);
+    if (warnings.length > 0) setOverloadToConfirm(warnings);
+    else onConfirm(values);
+  };
+
   const estimatedHours = (member: ExecutionSegmentMemberValue): number | null => {
     const weeklyHours = weeklyHoursByMember.get(member.teamMemberId);
     if (percentError(member.dailyPercent) || !member.dailyPercent.trim() || weeklyHours === undefined || weekdays === 0) {
@@ -166,6 +194,7 @@ export function ExecutionSegmentModal({
   };
 
   return (
+    <>
     <Modal
       open={open}
       title={mode === 'edit' ? 'Editar tiempo de ejecución' : 'Nuevo tiempo de ejecución'}
@@ -177,7 +206,7 @@ export function ExecutionSegmentModal({
           <Button variant="outline" onClick={onCancel} disabled={submitting}>
             Cancelar
           </Button>
-          <Button onClick={() => onConfirm(values)} disabled={!canSubmit} loading={submitting} loadingText="Guardando…">
+          <Button onClick={() => void handleSave()} disabled={!canSubmit} loading={submitting || checking} loadingText="Guardando…">
             Guardar
           </Button>
         </>
@@ -219,7 +248,7 @@ export function ExecutionSegmentModal({
           </div>
           <p className={segmentStyles.hint}>
             Con el % de su jornada diaria, el tramo carga sus HH semanales en el Forecast. Se recalculan cada vez que
-            guardas el tramo (pisando ajustes hechos a mano en esas filas).
+            guardas el tramo; si el líder de equipo las ajustó a mano, su ajuste se mantiene.
           </p>
 
           {values.members.map((member) => {
@@ -274,8 +303,20 @@ export function ExecutionSegmentModal({
             disabled={!values.teamId || loadingTeam}
             emptyMessage={team && team.members.length === values.members.length ? 'Ya agregaste a todo el equipo.' : 'Sin resultados.'}
           />
+
+          <ForecastOverloadAlert warnings={previewInput ? loadPreview?.warnings : undefined} sourceLabel="este tramo" />
         </div>
       </div>
     </Modal>
+
+    <ConfirmActionDialog
+      open={overloadToConfirm !== null}
+      title="¿Guardar igual?"
+      description={overloadToConfirm ? summarizeOverload(overloadToConfirm) : ''}
+      confirmLabel="Guardar igual"
+      onConfirm={async () => onConfirm(values)}
+      onClose={() => setOverloadToConfirm(null)}
+    />
+    </>
   );
 }

@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { err, ok, type ApplicationError, type Result } from '@kora/core';
+import { CLOCK, UNIT_OF_WORK, err, ok, type ApplicationError, type Clock, type Result, type UnitOfWork } from '@kora/core';
 import type { Permission } from '@kora/contracts';
 import {
   CannotManageProjectError,
@@ -17,6 +17,7 @@ import {
   type AuditRecorder,
 } from '../../../../shared/application/ports/audit-recorder.port';
 import type { ActorContext, UseCase } from '../../../../shared/application/use-case';
+import { ForecastSourceSyncService } from '../services/forecast-source-sync.service';
 
 export interface DeleteProjectModuleSegmentCommand {
   readonly projectId: string;
@@ -33,7 +34,10 @@ export class DeleteProjectModuleSegmentUseCase
   constructor(
     @Inject(PROJECT_REPOSITORY) private readonly projects: ProjectRepository,
     @Inject(PROJECT_MODULE_REPOSITORY) private readonly modules: ProjectModuleRepository,
+    private readonly forecastSync: ForecastSourceSyncService,
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
+    @Inject(CLOCK) private readonly clock: Clock,
+    @Inject(UNIT_OF_WORK) private readonly unitOfWork: UnitOfWork,
   ) {}
 
   async execute(command: DeleteProjectModuleSegmentCommand): Promise<Result<void, ApplicationError>> {
@@ -53,7 +57,11 @@ export class DeleteProjectModuleSegmentUseCase
       return err(new CannotManageProjectError());
     }
 
-    await this.modules.removeSegment(command.segmentId);
+    // Las filas del tramo se van en cascada; las tareas que cubría vuelven a sumar en el Forecast.
+    await this.unitOfWork.run(async (tx) => {
+      await this.modules.removeSegment(command.segmentId, tx);
+      await this.forecastSync.syncModuleTasks(project, command.moduleId, this.clock.now(), tx);
+    });
 
     await this.audit.record({
       actor: { userId: command.actor.userId, email: command.actor.email },

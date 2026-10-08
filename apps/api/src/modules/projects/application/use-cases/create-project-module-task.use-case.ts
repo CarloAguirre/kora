@@ -11,7 +11,7 @@ import {
   type UnitOfWork,
 } from '@kora/core';
 import type { CreateProjectModuleTaskInput, Permission } from '@kora/contracts';
-import { ProjectModuleNotFoundError, ProjectNotFoundError } from '../../domain/errors/project.errors';
+import { InvalidTaskDatesError, ProjectModuleNotFoundError, ProjectNotFoundError } from '../../domain/errors/project.errors';
 import { PROJECT_REPOSITORY, type ProjectRepository } from '../../domain/repositories/project.repository';
 import {
   PROJECT_MODULE_REPOSITORY,
@@ -30,6 +30,7 @@ import type { ActorContext, UseCase } from '../../../../shared/application/use-c
 import { ProjectChangeLogRecorder } from '../services/project-change-log.recorder';
 import { formatCommittedDate } from '../services/deadline-note';
 import { ProjectProgressRecalculator } from '../services/project-progress-recalculator';
+import { ForecastSourceSyncService } from '../services/forecast-source-sync.service';
 
 export interface CreateProjectModuleTaskCommand {
   readonly projectId: string;
@@ -58,6 +59,7 @@ export class CreateProjectModuleTaskUseCase
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
     private readonly changeLog: ProjectChangeLogRecorder,
     private readonly progress: ProjectProgressRecalculator,
+    private readonly forecastSync: ForecastSourceSyncService,
     @Inject(CLOCK) private readonly clock: Clock,
     @Inject(UNIT_OF_WORK) private readonly unitOfWork: UnitOfWork,
   ) {}
@@ -81,6 +83,8 @@ export class CreateProjectModuleTaskUseCase
       }
     }
 
+    if (command.data.startDate > command.data.date) return err(new InvalidTaskDatesError());
+
     const now = this.clock.now();
     const assigneeUserId = command.data.assigneeUserId ?? null;
     const assigneeName = assigneeUserId
@@ -96,7 +100,7 @@ export class CreateProjectModuleTaskUseCase
           assigneeUserId,
           name: command.data.name,
           description: command.data.description ?? null,
-          startDate: command.data.startDate ? new Date(command.data.startDate) : null,
+          startDate: new Date(command.data.startDate),
           date: new Date(command.data.date),
           estimatedHours: command.data.estimatedHours,
           status: command.data.status ?? 'todo',
@@ -119,6 +123,7 @@ export class CreateProjectModuleTaskUseCase
         tx,
       );
       await this.progress.recalculate(project.id, tx);
+      await this.forecastSync.syncTask(project, command.moduleId, taskId, now, tx);
       return taskId;
     });
 

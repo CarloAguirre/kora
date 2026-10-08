@@ -346,8 +346,8 @@ export const projectModuleTasks = pgTable('project_module_tasks', {
   assigneeUserId: uuid('assignee_user_id').references(() => users.id, { onDelete: 'set null' }),
   name: varchar('name', { length: 300 }).notNull(),
   description: text('description'),
-  /** Inicio opcional — cuando está presente, el Roadmap dibuja la tarea como barra (`date` sigue siendo el fin/fecha límite). */
-  startDate: date('start_date', { mode: 'date' }),
+  /** Inicio de la tarea — el Roadmap la dibuja como barra hasta `date` (fecha límite) y el Forecast reparte sus HH en ese rango. */
+  startDate: date('start_date', { mode: 'date' }).notNull(),
   date: date('date', { mode: 'date' }).notNull(),
   estimatedHours: numeric('estimated_hours', { precision: 10, scale: 2 }),
   status: projectModuleTaskStatusEnum('status').notNull().default('todo'),

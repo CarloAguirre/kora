@@ -134,3 +134,99 @@ Tipo + Comentarios + HH.
 - **RPC `get_forecast_capacity_view`** — su lógica se reimplementa como caso
   de uso de aplicación (mismo criterio que `SupportPlanAvailabilityService`
   en M5): comprobable con tests, no solo con una fila insertada en Postgres.
+
+## Forecast calculado desde los proyectos (oct 2026)
+
+En la v1 todo el forecast se cargaba a mano. En la v2 los proyectos ya tienen
+tramos de ejecución con % diario, tareas con HH estimadas y responsable, y
+entregas con fecha; el forecast se calcula desde ahí y el líder de equipo lo
+ajusta cuando necesita proyectar algo distinto. Propuesta revisada y aprobada
+con el equipo (decisiones del 8-10-2026).
+
+### Origen de cada fila
+
+`forecast_assignments.source`: `manual` (la carga el líder), `segment` (tramo
+del Roadmap) o `task` (tarea). Las calculadas guardan dos valores:
+`calculated_hours` (lo que dice el cálculo) y `assigned_hours` (lo que vale en
+el forecast y usa la capacidad). Lo calcula `ForecastSourceSyncService`
+(módulo de proyectos) con `planSegmentForecast` y `planTaskForecast`:
+
+- **Tramo**: `días hábiles × (jornada semanal ÷ 5) × % diario`, por semana.
+- **Tarea con responsable y HH**: las HH se reparten en partes iguales entre
+  los días hábiles de inicio a fecha límite. Los días que la persona ya tiene
+  cubiertos por un tramo del mismo módulo (con % diario) no suman — la tarea se
+  muestra como detalle del tramo, sin contarla dos veces. Si se termina antes,
+  las semanas posteriores a la de término quedan libres.
+- **Entregas**: no suman HH; se muestran como marca en la semana.
+- **HH asignadas al proyecto** (`project_team_members`): no tienen fechas, así
+  que no se reparten; se comparan con lo planificado y se avisa lo que falta
+  por calendarizar.
+- **Ausencias, capacitación, soporte**: siguen siendo manuales (soporte no se
+  reserva automáticamente — decisión explícita).
+
+La fecha de inicio de las tareas pasa a ser obligatoria (migración 0040: las
+que no la tenían toman la fecha límite como inicio).
+
+### El ajuste del líder no se pierde
+
+Antes, guardar un tramo borraba y regeneraba sus filas, pisando cualquier
+ajuste. Ahora la sincronización actualiza fila por fila:
+
+- Fila sin ajuste → sus HH siguen al cálculo (se crea, cambia o elimina).
+- Fila ajustada (`adjusted_at`) → solo cambia `calculated_hours`; si el
+  cálculo cambió, queda `is_stale` ("desfasada") y nunca se elimina.
+- El líder resuelve con "Mantener mi ajuste" (`POST
+  /forecast/assignments/:id/keep`) o "Usar el cálculo" (`POST .../reset`; si el
+  cálculo da 0 HH esa semana, la fila se elimina).
+- En una fila calculada solo se editan HH y comentarios; no se elimina (se deja
+  en 0 HH). Volver a poner exactamente lo calculado quita el ajuste.
+
+Todas las semanas se recalculan, pasadas incluidas (decisión explícita: no se
+congelan). Cada cambio automático queda en "Ver historial" firmado como
+"Sistema · Roadmap" o "Sistema · Tarea".
+
+`POST /forecast/recalculate` ("Recalcular desde proyectos") recorre todos los
+tramos y tareas de proyectos en borrador, activos o detenidos — sirve tras
+cambiar la jornada de una persona o los feriados, que no disparan el cálculo
+por sí solos. Respeta los ajustes igual que el cálculo automático.
+
+### Pantalla
+
+- Chips por origen: calculado (verde), ajustado (naranjo), desfasado (rojo),
+  manual (colores del Figma); marcas de entrega y un chip con el total de HH
+  sin calendarizar.
+- Aviso de ajustes desfasados con "Revisar".
+- Editor separado en "Calculado desde proyectos" y "Ausencias y otras
+  actividades".
+- Vista "Próximas semanas" (`GET /forecast/weeks`): carga por persona en 6
+  semanas, con feriados, ajustes y entregas.
+- Plan contra real: en semanas ya iniciadas, horas registradas (pendientes o
+  aprobadas) junto a las planificadas.
+
+### Aviso de sobrecarga al cargar horas
+
+Como el forecast se llena desde distintos lugares, cada uno avisa si deja a una
+persona sobre su capacidad: si esa semana ya estaba al 100 % o lo pasaría con
+lo que se está cargando. No bloquea: al guardar pide confirmar ("¿Guardar
+igual?") y el líder decide. La consulta de confirmación se hace en el momento
+de guardar, sin depender del aviso que se muestra mientras se escribe.
+
+- **Tramo del Roadmap** (`ExecutionSegmentModal`, también en "Nuevo proyecto")
+  y **tarea** (`TeamTasksCard`): mientras se completa el formulario consultan
+  `POST /forecast/load-preview`, que calcula las HH con el mismo cálculo del
+  forecast (`ForecastSourceSyncService.previewSegment`/`previewTask`: feriados,
+  jornada de cada persona, tareas ya cubiertas por un tramo) y las suma a lo que
+  la persona ya tiene. Al editar, no cuenta las filas del mismo tramo o tarea.
+  Solo revisa semanas que no han terminado.
+- **Editor del Forecast**: si la semana queda sobre el 100 %, lo muestra arriba
+  del editor.
+
+### Admin y PMO
+
+Admin y PMO ven y editan el forecast de todos los equipos en la misma vista
+editable del líder, con "Todos los equipos" como opción inicial del selector
+(antes solo veían la tabla de solo lectura si no lideraban un equipo). El
+backend ya les permitía editar (`isAdminTier` en los casos de uso). Con "Todos
+los equipos" las asignaciones se piden del equipo de la persona que se edita, y
+"Ver historial" se muestra al elegir un equipo (el historial es por equipo).
+

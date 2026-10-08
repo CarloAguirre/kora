@@ -82,4 +82,90 @@ describe('ForecastAssignment', () => {
       if (result.isErr()) expect(result.error.code).toBe('FORECAST_INVALID_HOURS');
     });
   });
+
+  describe('filas calculadas', () => {
+    const calculated = (overrides: Partial<Parameters<typeof ForecastAssignment.restore>[0]> = {}) =>
+      ForecastAssignment.restore({
+        id: 'fa2',
+        legacyId: null,
+        teamMemberId: 'member-1',
+        periodStart: MONDAY,
+        periodEnd: FRIDAY,
+        type: 'project',
+        projectId: 'project-1',
+        clientId: null,
+        comments: '',
+        assignedHours: 22,
+        source: 'segment',
+        calculatedHours: 22,
+        adjustedAt: null,
+        adjustedByUserId: null,
+        isStale: false,
+        createdAt: NOW,
+        updatedAt: NOW,
+        ...overrides,
+      });
+
+    it('cambiar sus HH la deja ajustada por quien la editó', () => {
+      const assignment = calculated();
+      const result = assignment.updateDetails({ assignedHours: 30 }, NOW, 'leader-1');
+
+      expect(result.isOk()).toBe(true);
+      expect(assignment.assignedHours).toBe(30);
+      expect(assignment.isAdjusted).toBe(true);
+      expect(assignment.toSnapshot().adjustedByUserId).toBe('leader-1');
+    });
+
+    it('volver a poner lo calculado quita el ajuste y el desfase', () => {
+      const assignment = calculated({ assignedHours: 30, adjustedAt: NOW, adjustedByUserId: 'leader-1', isStale: true });
+      assignment.updateDetails({ assignedHours: 22 }, NOW, 'leader-1');
+
+      expect(assignment.isAdjusted).toBe(false);
+      expect(assignment.isStale).toBe(false);
+    });
+
+    it('editar solo el comentario no la ajusta', () => {
+      const assignment = calculated();
+      assignment.updateDetails({ comments: 'Cierre de sprint', assignedHours: 22 }, NOW, 'leader-1');
+
+      expect(assignment.isAdjusted).toBe(false);
+      expect(assignment.comments).toBe('Cierre de sprint');
+    });
+
+    it('no permite cambiar tipo ni proyecto', () => {
+      const assignment = calculated();
+      const result = assignment.updateDetails({ type: 'support' }, NOW, 'leader-1');
+
+      expect(result.isErr()).toBe(true);
+      if (result.isErr()) expect(result.error.code).toBe('FORECAST_CALCULATED_ROW_LOCKED');
+    });
+
+    it('"Volver al cálculo" usa las HH calculadas', () => {
+      const assignment = calculated({ assignedHours: 30, calculatedHours: 18, adjustedAt: NOW, adjustedByUserId: 'leader-1', isStale: true });
+      const result = assignment.resetToCalculation(NOW);
+
+      expect(result.isOk()).toBe(true);
+      expect(assignment.assignedHours).toBe(18);
+      expect(assignment.isAdjusted).toBe(false);
+      expect(assignment.isStale).toBe(false);
+    });
+
+    it('"Mantener mi ajuste" conserva las HH y quita el desfase', () => {
+      const assignment = calculated({ assignedHours: 30, calculatedHours: 18, adjustedAt: NOW, adjustedByUserId: 'leader-1', isStale: true });
+      assignment.keepAdjustment(NOW);
+
+      expect(assignment.assignedHours).toBe(30);
+      expect(assignment.isAdjusted).toBe(true);
+      expect(assignment.isStale).toBe(false);
+    });
+
+    it('una fila manual no tiene cálculo al que volver', () => {
+      const result = ForecastAssignment.create(validProps);
+      if (result.isErr()) throw new Error('setup failed');
+
+      const reset = result.value.resetToCalculation(NOW);
+      expect(reset.isErr()).toBe(true);
+      if (reset.isErr()) expect(reset.error.code).toBe('FORECAST_ROW_NOT_CALCULATED');
+    });
+  });
 });

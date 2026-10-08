@@ -11,6 +11,7 @@ import type {
 import type { AuditRecorder } from '../../../../shared/application/ports/audit-recorder.port';
 import type { ProjectChangeLogRecorder } from '../services/project-change-log.recorder';
 import type { ProjectProgressRecalculator } from '../services/project-progress-recalculator';
+import type { ForecastSourceSyncService } from '../services/forecast-source-sync.service';
 import { FixedClock, PassthroughUnitOfWork } from '../../../../test/fakes';
 
 const FAKE_PROJECT = {
@@ -36,7 +37,7 @@ function buildModule(overrides: Partial<ProjectModuleRecord['tasks'][number]> = 
         assigneeName: 'Ana Rojas',
         name: 'Maqueta',
         description: null,
-        startDate: null,
+        startDate: new Date('2026-08-18'),
         // FixedClock = 2026-08-25: fecha límite pasada por 5 días.
         date: new Date('2026-08-20'),
         estimatedHours: 8,
@@ -63,6 +64,7 @@ function buildUseCase(module: ProjectModuleRecord) {
     { record: vi.fn().mockResolvedValue(undefined) } as unknown as AuditRecorder,
     { record: changeLogRecord } as unknown as ProjectChangeLogRecorder,
     { recalculate: recalculateProgress } as unknown as ProjectProgressRecalculator,
+    { syncTask: vi.fn().mockResolvedValue(undefined) } as unknown as ForecastSourceSyncService,
     new FixedClock(),
     new PassthroughUnitOfWork(),
   );

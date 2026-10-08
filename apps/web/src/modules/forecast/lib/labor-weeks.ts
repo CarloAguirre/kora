@@ -62,3 +62,34 @@ export function currentLaborWeek(baseDate = new Date()): LaborWeek {
   friday.setUTCDate(friday.getUTCDate() + 4);
   return { periodStart: toIsoDate(monday), periodEnd: toIsoDate(friday), label: formatRange(monday, friday) };
 }
+
+const WEEKDAYS_SHORT = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
+
+/** Día de la semana y del mes, p. ej. "jue 8" — para marcar una entrega dentro de su semana. */
+export function formatWeekday(isoDate: string): string {
+  const date = new Date(`${isoDate}T00:00:00Z`);
+  return `${WEEKDAYS_SHORT[date.getUTCDay()]} ${date.getUTCDate()}`;
+}
+
+/** Encabezado compacto de una semana en "Próximas semanas", p. ej. "5–9 oct" o "28 sep–2 oct". */
+export function formatWeekHeader(periodStart: string, periodEnd: string): string {
+  const start = new Date(`${periodStart}T00:00:00Z`);
+  const end = new Date(`${periodEnd}T00:00:00Z`);
+  const endMonth = MONTHS_SHORT[end.getUTCMonth()];
+  if (start.getUTCMonth() === end.getUTCMonth()) return `${start.getUTCDate()}–${end.getUTCDate()} ${endMonth}`;
+  return `${start.getUTCDate()} ${MONTHS_SHORT[start.getUTCMonth()]}–${end.getUTCDate()} ${endMonth}`;
+}
+
+/** Semana laboral que empieza `weeks` semanas después (o antes, si es negativo) de `periodStart`. */
+export function shiftLaborWeek(periodStart: string, weeks: number): LaborWeek {
+  const monday = new Date(`${periodStart}T00:00:00Z`);
+  monday.setUTCDate(monday.getUTCDate() + weeks * 7);
+  const friday = new Date(monday);
+  friday.setUTCDate(friday.getUTCDate() + 4);
+  return { periodStart: toIsoDate(monday), periodEnd: toIsoDate(friday), label: formatRange(monday, friday) };
+}
+
+/** ¿Ya empezó la semana? — desde entonces tiene sentido comparar lo planificado con lo registrado. */
+export function hasWeekStarted(periodStart: string, today = new Date()): boolean {
+  return periodStart <= toIsoDate(today);
+}

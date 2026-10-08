@@ -65,6 +65,7 @@ export class UpdateForecastAssignmentUseCase implements UseCase<UpdateForecastAs
         assignedHours: data.assignedHours,
       },
       now,
+      actor.userId,
     );
     if (updated.isErr()) return err(updated.error);
 

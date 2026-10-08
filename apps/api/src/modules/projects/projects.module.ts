@@ -18,7 +18,7 @@ import { UpdateProjectObservationUseCase } from './application/use-cases/update-
 import { ResolveProjectObservationUseCase } from './application/use-cases/resolve-project-observation.use-case';
 import { DeleteProjectObservationUseCase } from './application/use-cases/delete-project-observation.use-case';
 import { ProjectChangeLogRecorder } from './application/services/project-change-log.recorder';
-import { SegmentForecastSyncService } from './application/services/segment-forecast-sync.service';
+import { ForecastSourceSyncService } from './application/services/forecast-source-sync.service';
 import { ProjectProgressRecalculator } from './application/services/project-progress-recalculator';
 import { CreateProjectModuleUseCase } from './application/use-cases/create-project-module.use-case';
 import { UpdateProjectModuleUseCase } from './application/use-cases/update-project-module.use-case';
@@ -55,7 +55,7 @@ import { PROJECT_CONTACT_READER } from './application/ports/project-contact-read
 import { PROJECT_HOUR_ENTRY_READER } from './application/ports/project-hour-entry-reader.port';
 import { PROJECT_ACTIVITY_READER } from './application/ports/project-activity-reader.port';
 import { PROJECT_TEAM_MEMBER_VALIDATOR } from './application/ports/project-team-member-validator.port';
-import { SEGMENT_FORECAST_STORE } from './application/ports/segment-forecast-store.port';
+import { FORECAST_SOURCE_STORE } from './application/ports/forecast-source-store.port';
 
 import { DrizzleProjectRepository } from './infrastructure/persistence/drizzle-project.repository';
 import { DrizzleProjectTeamRepository } from './infrastructure/persistence/drizzle-project-team.repository';
@@ -70,7 +70,7 @@ import { DrizzleProjectContactReader } from './infrastructure/services/drizzle-p
 import { DrizzleProjectHourEntryReader } from './infrastructure/services/drizzle-project-hour-entry-reader';
 import { DrizzleProjectActivityReader } from './infrastructure/services/drizzle-project-activity-reader';
 import { DrizzleProjectTeamMemberValidator } from './infrastructure/services/drizzle-project-team-member-validator';
-import { DrizzleSegmentForecastStore } from './infrastructure/services/drizzle-segment-forecast-store';
+import { DrizzleForecastSourceStore } from './infrastructure/services/drizzle-forecast-source-store';
 
 /**
  * Composición del módulo de proyectos.
@@ -100,7 +100,7 @@ import { DrizzleSegmentForecastStore } from './infrastructure/services/drizzle-s
     ResolveProjectObservationUseCase,
     DeleteProjectObservationUseCase,
     ProjectChangeLogRecorder,
-    SegmentForecastSyncService,
+    ForecastSourceSyncService,
     ProjectProgressRecalculator,
     CreateProjectModuleUseCase,
     UpdateProjectModuleUseCase,
@@ -137,8 +137,8 @@ import { DrizzleSegmentForecastStore } from './infrastructure/services/drizzle-s
     { provide: PROJECT_HOUR_ENTRY_READER, useClass: DrizzleProjectHourEntryReader },
     { provide: PROJECT_ACTIVITY_READER, useClass: DrizzleProjectActivityReader },
     { provide: PROJECT_TEAM_MEMBER_VALIDATOR, useClass: DrizzleProjectTeamMemberValidator },
-    { provide: SEGMENT_FORECAST_STORE, useClass: DrizzleSegmentForecastStore },
+    { provide: FORECAST_SOURCE_STORE, useClass: DrizzleForecastSourceStore },
   ],
-  exports: [PROJECT_REPOSITORY, PROJECT_MODULE_REPOSITORY, PROJECT_PAYMENT_MILESTONE_REPOSITORY],
+  exports: [PROJECT_REPOSITORY, PROJECT_MODULE_REPOSITORY, PROJECT_PAYMENT_MILESTONE_REPOSITORY, ForecastSourceSyncService],
 })
 export class ProjectsModule {}

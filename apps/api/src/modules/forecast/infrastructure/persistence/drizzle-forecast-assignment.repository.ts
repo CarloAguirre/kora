@@ -1,10 +1,14 @@
 import { Inject, Injectable } from '@nestjs/common';
 import {
+  alias,
   and,
   clients,
   eq,
   forecastAssignments,
+  gte,
+  lte,
   projectModuleSegments,
+  projectModuleTasks,
   projectModules,
   projects,
   teamMembers,
@@ -46,6 +50,8 @@ export class DrizzleForecastAssignmentRepository implements ForecastAssignmentRe
     context?: TransactionContext,
   ): Promise<ForecastAssignmentRecord[]> {
     const db = resolveDb(this.database, context);
+    const taskModules = alias(projectModules, 'task_modules');
+    const adjusters = alias(users, 'adjusters');
     const rows = await db
       .select({
         id: forecastAssignments.id,
@@ -63,9 +69,18 @@ export class DrizzleForecastAssignmentRepository implements ForecastAssignmentRe
         clientName: clients.companyName,
         comments: forecastAssignments.comments,
         assignedHours: forecastAssignments.assignedHours,
+        source: forecastAssignments.source,
         segmentId: forecastAssignments.segmentId,
         segmentName: projectModuleSegments.name,
         segmentModuleName: projectModules.name,
+        taskId: forecastAssignments.taskId,
+        taskName: projectModuleTasks.name,
+        taskModuleName: taskModules.name,
+        calculatedHours: forecastAssignments.calculatedHours,
+        adjustedAt: forecastAssignments.adjustedAt,
+        adjusterFirstName: adjusters.firstName,
+        adjusterLastName: adjusters.lastName,
+        isStale: forecastAssignments.isStale,
         createdAt: forecastAssignments.createdAt,
         updatedAt: forecastAssignments.updatedAt,
       })
@@ -77,6 +92,9 @@ export class DrizzleForecastAssignmentRepository implements ForecastAssignmentRe
       .leftJoin(clients, eq(clients.id, forecastAssignments.clientId))
       .leftJoin(projectModuleSegments, eq(projectModuleSegments.id, forecastAssignments.segmentId))
       .leftJoin(projectModules, eq(projectModules.id, projectModuleSegments.moduleId))
+      .leftJoin(projectModuleTasks, eq(projectModuleTasks.id, forecastAssignments.taskId))
+      .leftJoin(taskModules, eq(taskModules.id, projectModuleTasks.moduleId))
+      .leftJoin(adjusters, eq(adjusters.id, forecastAssignments.adjustedByUserId))
       .where(
         and(
           eq(teamMembers.teamId, teamId),
@@ -100,41 +118,56 @@ export class DrizzleForecastAssignmentRepository implements ForecastAssignmentRe
       clientName: row.clientName,
       comments: row.comments,
       assignedHours: Number(row.assignedHours),
+      source: row.source,
       segmentId: row.segmentId,
       segmentName: row.segmentName,
       segmentModuleName: row.segmentModuleName,
+      taskId: row.taskId,
+      taskName: row.taskName,
+      taskModuleName: row.taskModuleName,
+      calculatedHours: row.calculatedHours != null ? Number(row.calculatedHours) : null,
+      adjustedAt: row.adjustedAt,
+      adjustedByName: row.adjusterFirstName ? `${row.adjusterFirstName} ${row.adjusterLastName ?? ''}`.trim() : null,
+      isStale: row.isStale,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
     }));
   }
 
-  async listRawForPeriod(periodStart: Date, periodEnd: Date, context?: TransactionContext): Promise<ForecastAssignmentRawRow[]> {
+  async listRawForWeeks(firstMonday: Date, lastMonday: Date, context?: TransactionContext): Promise<ForecastAssignmentRawRow[]> {
     const db = resolveDb(this.database, context);
     const rows = await db
       .select({
         teamMemberId: forecastAssignments.teamMemberId,
+        periodStart: forecastAssignments.periodStart,
         type: forecastAssignments.type,
         projectId: forecastAssignments.projectId,
         projectName: projects.name,
         comments: forecastAssignments.comments,
         assignedHours: forecastAssignments.assignedHours,
+        source: forecastAssignments.source,
+        segmentId: forecastAssignments.segmentId,
+        taskId: forecastAssignments.taskId,
+        adjustedAt: forecastAssignments.adjustedAt,
+        isStale: forecastAssignments.isStale,
       })
       .from(forecastAssignments)
       .leftJoin(projects, eq(projects.id, forecastAssignments.projectId))
-      .where(
-        and(
-          eq(forecastAssignments.periodStart, periodStart),
-          eq(forecastAssignments.periodEnd, periodEnd),
-        ),
-      );
+      .where(and(gte(forecastAssignments.periodStart, firstMonday), lte(forecastAssignments.periodStart, lastMonday)));
 
     return rows.map((row) => ({
       teamMemberId: row.teamMemberId,
+      periodStart: row.periodStart,
       type: row.type,
       projectId: row.projectId,
       projectName: row.projectName,
       comments: row.comments,
       assignedHours: Number(row.assignedHours),
+      source: row.source,
+      segmentId: row.segmentId,
+      taskId: row.taskId,
+      isAdjusted: row.adjustedAt !== null,
+      isStale: row.isStale,
     }));
   }
 

@@ -30,6 +30,22 @@ export const FORECAST_ASSIGNMENT_TYPE_LABELS: Readonly<Record<ForecastAssignment
 /** Solo estos dos tipos muestran selector de cliente y proyecto — `usesClientProjectSelectors` en la v1. */
 export const FORECAST_TYPES_WITH_PROJECT: readonly ForecastAssignmentType[] = ['project', 'support'];
 
+/**
+ * De dónde sale una fila: `manual` la cargó el líder; `segment` y `task` las calcula Kora desde un
+ * tramo del Roadmap o una tarea del proyecto. Ver docs/DECISION-M6-FORECAST.md, "Forecast calculado".
+ */
+export const FORECAST_ASSIGNMENT_SOURCES = ['manual', 'segment', 'task'] as const;
+export const forecastAssignmentSourceSchema = z.enum(FORECAST_ASSIGNMENT_SOURCES);
+export type ForecastAssignmentSource = z.infer<typeof forecastAssignmentSourceSchema>;
+
+/**
+ * Estado de las HH de una fila, tal como lo ve el líder: `calculated` sigue al proyecto, `adjusted`
+ * lo fijó el líder sobre una fila calculada, `manual` la cargó a mano.
+ */
+export const FORECAST_HOURS_ORIGINS = ['calculated', 'adjusted', 'manual'] as const;
+export const forecastHoursOriginSchema = z.enum(FORECAST_HOURS_ORIGINS);
+export type ForecastHoursOrigin = z.infer<typeof forecastHoursOriginSchema>;
+
 function isMonday(dateStr: string): boolean {
   return new Date(`${dateStr}T00:00:00Z`).getUTCDay() === 1;
 }
@@ -53,11 +69,17 @@ export const forecastAssignmentSchema = z.object({
   client: z.object({ id: uuidSchema, companyName: z.string() }).nullable(),
   comments: z.string(),
   assignedHours: z.number(),
-  /**
-   * Tramo de ejecución del Roadmap que generó esta fila — `null` si se cargó a mano. Se puede editar,
-   * pero se regenera (y pisa el ajuste) cada vez que alguien vuelve a guardar el tramo.
-   */
+  source: forecastAssignmentSourceSchema,
+  /** Tramo de ejecución del Roadmap que generó esta fila (`source = 'segment'`). */
   segment: z.object({ id: uuidSchema, name: z.string(), moduleName: z.string() }).nullable(),
+  /** Tarea que generó esta fila (`source = 'task'`). */
+  task: z.object({ id: uuidSchema, name: z.string(), moduleName: z.string() }).nullable(),
+  /** Lo que dice el cálculo — `null` en las filas manuales. */
+  calculatedHours: z.number().nullable(),
+  /** El líder fijó las HH de una fila calculada; desde entonces el cálculo no las cambia. */
+  adjusted: z.object({ at: isoDateTimeSchema, byName: z.string().nullable() }).nullable(),
+  /** El cálculo cambió después del ajuste: el líder decide si mantiene su valor o usa el nuevo. */
+  isStale: z.boolean(),
   createdAt: isoDateTimeSchema,
   updatedAt: isoDateTimeSchema,
 });
@@ -84,6 +106,10 @@ export const createForecastAssignmentSchema = z
   });
 export type CreateForecastAssignmentInput = z.infer<typeof createForecastAssignmentSchema>;
 
+/**
+ * En una fila calculada solo se pueden cambiar las HH (eso la deja ajustada) y los comentarios; tipo,
+ * cliente y proyecto vienen del proyecto.
+ */
 export const updateForecastAssignmentSchema = z.object({
   type: forecastAssignmentTypeSchema.optional(),
   projectId: uuidSchema.nullish(),
@@ -116,8 +142,41 @@ export const forecastCapacityItemSchema = z.object({
   projectName: z.string().nullable(),
   hours: z.number(),
   comments: z.array(z.string()),
+  origin: forecastHoursOriginSchema,
+  /** Alguna de las filas agrupadas quedó desfasada. */
+  isStale: z.boolean(),
 });
 export type ForecastCapacityItem = z.infer<typeof forecastCapacityItemSchema>;
+
+export const forecastDeliveryMarkSchema = z.object({
+  id: uuidSchema,
+  name: z.string(),
+  projectName: z.string(),
+  moduleName: z.string(),
+  date: z.iso.date(),
+});
+export type ForecastDeliveryMark = z.infer<typeof forecastDeliveryMarkSchema>;
+
+export const forecastContainedTaskSchema = z.object({
+  id: uuidSchema,
+  name: z.string(),
+  projectName: z.string(),
+  moduleName: z.string(),
+  startDate: z.iso.date(),
+  date: z.iso.date(),
+  estimatedHours: z.number(),
+});
+export type ForecastContainedTask = z.infer<typeof forecastContainedTaskSchema>;
+
+export const forecastUnscheduledHoursSchema = z.object({
+  projectId: uuidSchema,
+  projectName: z.string(),
+  /** HH asignadas a la persona en el equipo del proyecto. */
+  assignedHours: z.number(),
+  /** HH de ese proyecto que ya tiene en el Forecast, sumando todas las semanas. */
+  plannedHours: z.number(),
+});
+export type ForecastUnscheduledHours = z.infer<typeof forecastUnscheduledHoursSchema>;
 
 export const forecastCapacityMemberSchema = z.object({
   teamMemberId: uuidSchema,
@@ -128,6 +187,14 @@ export const forecastCapacityMemberSchema = z.object({
   assignedHours: z.number(),
   loadPercent: z.number(),
   items: z.array(forecastCapacityItemSchema),
+  /** Entregas a cargo del colaborador con fecha estimada en el período — marca, no suma HH. */
+  deliveries: z.array(forecastDeliveryMarkSchema),
+  /** Tareas del colaborador en el período que no suman porque ya están cubiertas por su tramo. */
+  containedTasks: z.array(forecastContainedTaskSchema),
+  /** Proyectos donde tiene más HH asignadas que las que el Forecast llegó a calendarizar. */
+  unscheduled: z.array(forecastUnscheduledHoursSchema),
+  /** HH registradas (pendientes o aprobadas) en el período — para comparar plan contra real. */
+  loggedHours: z.number(),
 });
 export type ForecastCapacityMember = z.infer<typeof forecastCapacityMemberSchema>;
 
@@ -137,6 +204,95 @@ export const forecastCapacityResponseSchema = z.object({
   members: z.array(forecastCapacityMemberSchema),
 });
 export type ForecastCapacityResponse = z.infer<typeof forecastCapacityResponseSchema>;
+
+/** Vista "Próximas semanas": carga de cada colaborador en varias semanas seguidas. */
+export const forecastWeeksQuerySchema = z
+  .object({
+    from: z.iso.date(),
+    weeks: z.coerce.number().int().min(1).max(12).default(6),
+  })
+  .refine((v) => isMonday(v.from), { message: 'La primera semana debe iniciar un lunes.', path: ['from'] });
+export type ForecastWeeksQuery = z.infer<typeof forecastWeeksQuerySchema>;
+
+export const forecastWeekCellSchema = z.object({
+  periodStart: z.iso.date(),
+  capacityHours: z.number(),
+  assignedHours: z.number(),
+  loadPercent: z.number(),
+  /** HH de vacaciones, licencias, días libres o administrativos. */
+  absenceHours: z.number(),
+  hasAdjusted: z.boolean(),
+  hasStale: z.boolean(),
+  deliveryCount: z.number().int(),
+});
+export type ForecastWeekCell = z.infer<typeof forecastWeekCellSchema>;
+
+export const forecastWeeksResponseSchema = z.object({
+  weeks: z.array(z.object({ periodStart: z.iso.date(), periodEnd: z.iso.date(), businessDays: z.number().int() })),
+  members: z.array(
+    z.object({
+      teamMemberId: uuidSchema,
+      fullName: z.string(),
+      teamId: uuidSchema,
+      teamName: z.string(),
+      cells: z.array(forecastWeekCellSchema),
+    }),
+  ),
+});
+export type ForecastWeeksResponse = z.infer<typeof forecastWeeksResponseSchema>;
+
+/**
+ * "¿Esto sobrecarga a alguien?" — antes de guardar un tramo o una tarea, calcula las HH que agregaría
+ * a cada persona (mismo cálculo que el Forecast) y avisa las semanas en que ya estaba al 100 % o lo
+ * pasaría. No bloquea: el líder decide.
+ */
+export const forecastLoadPreviewInputSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('segment'),
+    /** Al editar un tramo: sus filas actuales no se cuentan como carga existente. */
+    segmentId: uuidSchema.nullish(),
+    startDate: z.iso.date(),
+    endDate: z.iso.date(),
+    members: z.array(z.object({ teamMemberId: uuidSchema, dailyPercent: z.number().min(0).max(100).nullable() })),
+  }),
+  z.object({
+    kind: z.literal('task'),
+    /** Al editar una tarea: sus filas actuales no se cuentan como carga existente. */
+    taskId: uuidSchema.nullish(),
+    moduleId: uuidSchema,
+    teamId: uuidSchema.nullish(),
+    assigneeUserId: uuidSchema,
+    startDate: z.iso.date(),
+    date: z.iso.date(),
+    estimatedHours: z.number().min(0),
+  }),
+]);
+export type ForecastLoadPreviewInput = z.infer<typeof forecastLoadPreviewInputSchema>;
+
+export const forecastOverloadWarningSchema = z.object({
+  teamMemberId: uuidSchema,
+  fullName: z.string(),
+  periodStart: z.iso.date(),
+  periodEnd: z.iso.date(),
+  capacityHours: z.number(),
+  /** HH que ya tenía esa semana, sin contar el tramo o la tarea que se está editando. */
+  currentHours: z.number(),
+  /** HH que agregaría lo que se está guardando. */
+  addedHours: z.number(),
+  totalHours: z.number(),
+  loadPercent: z.number(),
+});
+export type ForecastOverloadWarning = z.infer<typeof forecastOverloadWarningSchema>;
+
+export const forecastLoadPreviewResponseSchema = z.object({ warnings: z.array(forecastOverloadWarningSchema) });
+export type ForecastLoadPreviewResponse = z.infer<typeof forecastLoadPreviewResponseSchema>;
+
+/** Resultado de "Recalcular desde proyectos". */
+export const forecastRecalculateResponseSchema = z.object({
+  segments: z.number().int(),
+  tasks: z.number().int(),
+});
+export type ForecastRecalculateResponse = z.infer<typeof forecastRecalculateResponseSchema>;
 
 /** Historial — proyección de `audit_log` filtrada por equipo y período, ver docs/DECISION-M6-FORECAST.md. */
 export const forecastHistoryActionSchema = z.enum(['created', 'updated', 'deleted']);

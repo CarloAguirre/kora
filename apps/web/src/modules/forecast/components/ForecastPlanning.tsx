@@ -6,7 +6,9 @@ import { KpiCard } from '@/shared/components/ui/KpiCard';
 import { TextField } from '@/shared/components/ui/TextField';
 import { DEFAULT_PAGE_SIZE, Pagination } from '@/shared/components/ui/Pagination';
 import { DataTable, type Column, type SortState } from '@/shared/components/ui/DataTable';
-import { SearchIcon, TriangleAlertIcon } from '@/shared/components/icons/Icons';
+import { DiamondIcon, PencilIcon, RefreshIcon, SearchIcon, TriangleAlertIcon } from '@/shared/components/icons/Icons';
+import { formatWeekday } from '../lib/labor-weeks';
+import { formatHours } from '../lib/hours-format';
 
 /**
  * Piezas comunes de las dos vistas de Forecast (solo lectura y líder), según
@@ -33,50 +35,117 @@ function freeHours(member: ForecastCapacityMember): number {
   return Math.max(0, member.capacityHours - member.assignedHours);
 }
 
+/** Color del chip: calculado (verde), ajustado por el líder (naranjo), desfasado (rojo) o manual (azul/dorado). */
+function chipClass(item: ForecastCapacityItem, over: boolean): string | undefined {
+  if (item.isStale) return styles.chipStale;
+  if (over) return styles.chipOver;
+  if (item.origin === 'calculated') return styles.chipCalculated;
+  if (item.origin === 'adjusted') return styles.chipAdjusted;
+  return NON_PROJECT_TYPES.has(item.type) ? styles.chipNonProject : styles.chipProject;
+}
+
+const ORIGIN_TITLES: Record<ForecastCapacityItem['origin'], string> = {
+  calculated: 'Calculado desde el proyecto',
+  adjusted: 'Ajustado por el líder',
+  manual: 'Cargado a mano',
+};
+
+function OriginIcon({ item }: { item: ForecastCapacityItem }) {
+  if (item.isStale) return <TriangleAlertIcon size={12} />;
+  if (item.origin === 'calculated') return <RefreshIcon size={12} />;
+  if (item.origin === 'adjusted') return <PencilIcon size={12} />;
+  return null;
+}
+
 function ProjectChips({ member }: { member: ForecastCapacityMember }) {
-  const tone = loadTone(member);
+  const over = loadTone(member) === 'over';
   const unassigned = freeHours(member);
 
   return (
     <div className={styles.chips}>
       {member.items.map((item, index) => {
-        const chipClass = tone === 'over' ? styles.chipOver : NON_PROJECT_TYPES.has(item.type) ? styles.chipNonProject : styles.chipProject;
+        const title = [ORIGIN_TITLES[item.origin], item.isStale ? 'el cálculo cambió después del ajuste' : '', ...item.comments]
+          .filter(Boolean)
+          .join(' · ');
         return (
-          <span
-            key={`${item.type}-${item.projectId ?? index}`}
-            className={[styles.chip, chipClass].join(' ')}
-            title={item.comments.join(' · ') || undefined}
-          >
-            {itemLabel(item)}: {item.hours}hh
+          <span key={`${item.type}-${item.projectId ?? index}-${item.origin}`} className={[styles.chip, chipClass(item, over)].join(' ')} title={title}>
+            <OriginIcon item={item} />
+            {itemLabel(item)}: {formatHours(item.hours)}hh
+            {item.isStale && ' · desfasado'}
           </span>
         );
       })}
+      {member.deliveries.map((delivery) => (
+        <span
+          key={delivery.id}
+          className={[styles.chip, styles.chipDelivery].join(' ')}
+          title={`${delivery.name} · ${delivery.projectName} · ${delivery.moduleName}`}
+        >
+          <DiamondIcon size={12} />
+          Entrega {formatWeekday(delivery.date)}
+        </span>
+      ))}
       {unassigned > 0 && <span className={[styles.chip, styles.chipUnassigned].join(' ')}>Sin asignación: {unassigned}hh</span>}
+      <UnscheduledChip member={member} />
     </div>
   );
 }
 
-function LoadBar({ member }: { member: ForecastCapacityMember }) {
+/**
+ * Un solo chip con el total de HH asignadas en proyectos que el Forecast todavía no reparte en
+ * semanas; el detalle por proyecto va en el título y en el editor del colaborador.
+ */
+function UnscheduledChip({ member }: { member: ForecastCapacityMember }) {
+  if (member.unscheduled.length === 0) return null;
+  const total = member.unscheduled.reduce((sum, row) => sum + (row.assignedHours - row.plannedHours), 0);
+  const detail = member.unscheduled
+    .map((row) => `${row.projectName}: ${formatHours(row.assignedHours - row.plannedHours)} h`)
+    .join('\n');
+  const projects = member.unscheduled.length === 1 ? '1 proyecto' : `${member.unscheduled.length} proyectos`;
+
+  return (
+    <span className={[styles.chip, styles.chipHint].join(' ')} title={`HH asignadas que aún no están en ninguna semana:\n${detail}`}>
+      {formatHours(total)} h sin calendarizar en {projects}
+    </span>
+  );
+}
+
+function LoadBar({ member, showLogged }: { member: ForecastCapacityMember; showLogged: boolean }) {
   const tone = loadTone(member);
   const width = Math.min(100, Math.max(0, member.loadPercent));
   const fillClass = tone === 'over' ? styles.fillOver : tone === 'full' ? styles.fillFull : styles.fillPartial;
 
   return (
-    <div className={styles.load}>
-      <div className={styles.track}>
-        <div className={[styles.fill, fillClass].join(' ')} style={{ width: `${width}%` }} />
+    <div className={styles.loadCell}>
+      <div className={styles.load}>
+        <div className={styles.track}>
+          <div className={[styles.fill, fillClass].join(' ')} style={{ width: `${width}%` }} />
+        </div>
+        <span className={styles.loadValue}>{member.loadPercent}%</span>
       </div>
-      <span className={styles.loadValue}>{member.loadPercent}%</span>
+      {showLogged && (member.loggedHours > 0 || member.assignedHours > 0) && (
+        <span className={styles.logged} title="Horas registradas (pendientes o aprobadas) contra las planificadas">
+          Registradas: {formatHours(member.loggedHours)} h de {formatHours(member.assignedHours)} h planificadas
+        </span>
+      )}
     </div>
   );
 }
 
-const BASE_COLUMNS: ReadonlyArray<Column<ForecastCapacityMember>> = [
-  { key: 'fullName', header: 'Colaborador', sortable: true, width: '160px', render: (member) => member.fullName },
-  { key: 'teamName', header: 'Equipo', sortable: true, width: '120px', render: (member) => member.teamName },
-  { key: 'assignedHours', header: 'Proyectos/HH', sortable: true, render: (member) => <ProjectChips member={member} /> },
-  { key: 'loadPercent', header: 'Carga', sortable: true, width: '280px', render: (member) => <LoadBar member={member} /> },
-];
+function baseColumns(showLogged: boolean): ReadonlyArray<Column<ForecastCapacityMember>> {
+  return [
+    { key: 'fullName', header: 'Colaborador', sortable: true, width: '160px', render: (member) => member.fullName },
+    { key: 'teamName', header: 'Equipo', sortable: true, width: '120px', render: (member) => member.teamName },
+    { key: 'assignedHours', header: 'Proyectos/HH', sortable: true, render: (member) => <ProjectChips member={member} /> },
+    {
+      key: 'loadPercent',
+      header: 'Carga',
+      sortable: true,
+      width: '280px',
+      render: (member) => <LoadBar member={member} showLogged={showLogged} />,
+    },
+  ];
+}
 
 function summarize(members: readonly ForecastCapacityMember[]) {
   const totalCapacity = members.reduce((sum, member) => sum + member.capacityHours, 0);
@@ -129,10 +198,18 @@ export interface ForecastPlanningSectionProps {
   error?: string | null;
   /** Acciones por fila (p. ej. "Editar" en la vista del líder); agrega una columna al final. */
   renderActions?: (member: ForecastCapacityMember) => ReactNode;
+  /** El período ya empezó: muestra las horas registradas junto a la carga (plan contra real). */
+  showLogged?: boolean;
 }
 
 /** Tarjeta "Capacidad y Planificación": banner de horas libres, buscador y tabla paginada. */
-export function ForecastPlanningSection({ members, loading = false, error = null, renderActions }: ForecastPlanningSectionProps) {
+export function ForecastPlanningSection({
+  members,
+  loading = false,
+  error = null,
+  renderActions,
+  showLogged = false,
+}: ForecastPlanningSectionProps) {
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<SortState<SortField>>({ field: 'fullName', direction: 'asc' });
   const [page, setPage] = useState(1);
@@ -160,13 +237,10 @@ export function ForecastPlanningSection({ members, loading = false, error = null
     });
   }, [members, search, sort]);
 
-  const columns = useMemo<ReadonlyArray<Column<ForecastCapacityMember>>>(
-    () =>
-      renderActions
-        ? [...BASE_COLUMNS, { key: 'actions', header: '', align: 'right', width: '96px', render: renderActions }]
-        : BASE_COLUMNS,
-    [renderActions],
-  );
+  const columns = useMemo<ReadonlyArray<Column<ForecastCapacityMember>>>(() => {
+    const base = baseColumns(showLogged);
+    return renderActions ? [...base, { key: 'actions', header: '', align: 'right', width: '96px', render: renderActions }] : base;
+  }, [renderActions, showLogged]);
 
   const total = sorted.length;
   const pageCount = Math.max(1, Math.ceil(total / pageSize));

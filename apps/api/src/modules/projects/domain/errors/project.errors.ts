@@ -161,6 +161,12 @@ export class ProjectModuleTaskNotFoundError extends NotFoundError {
   }
 }
 
+export class InvalidTaskDatesError extends ValidationError {
+  constructor() {
+    super('La fecha de inicio no puede ser posterior a la fecha límite.', 'PROJECT_MODULE_TASK_INVALID_DATES');
+  }
+}
+
 /** Rechazar una tarea/entrega en revisión exige explicar qué falta o qué hay que corregir. */
 export class RejectionReasonRequiredError extends ValidationError {
   constructor() {
