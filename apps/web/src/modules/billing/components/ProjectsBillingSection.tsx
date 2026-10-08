@@ -2,9 +2,7 @@ import { usePermissions } from "@/modules/auth/hooks/usePermissions";
 import {
   useIssueProjectPaymentMilestoneInvoice,
   useMarkProjectPaymentMilestonePaid,
-  useProjectBillingSettings,
   useProjectDetail,
-  useUpdateProjectBillingSettings,
   useUpdateProjectPaymentMilestone,
 } from "@/modules/projects/api/projects.queries";
 import { EditProjectMilestoneDialog } from "@/modules/projects/components/EditProjectMilestoneDialog";
@@ -23,7 +21,6 @@ import { MultiSelect } from "@/shared/components/ui/MultiSelect";
 import { Pagination, usePaginatedItems } from "@/shared/components/ui/Pagination";
 import { Tabs } from "@/shared/components/ui/Tabs";
 import { useToast } from "@/shared/components/ui/Toast";
-import { ApiRequestError } from "@/shared/lib/api-client";
 import { formatMoney } from "@/shared/lib/format-money";
 import {
   compareSortValues,
@@ -150,8 +147,6 @@ export function ProjectsBillingSection() {
   const updateMilestone = useUpdateProjectPaymentMilestone();
 
   const canManageBilling = can("projects:manage");
-  const { data: billingSettings } = useProjectBillingSettings();
-  const updateBillingSettings = useUpdateProjectBillingSettings();
 
   const { data: milestoneProject } = useProjectDetail(
     dialog?.kind === "issue-milestone" || dialog?.kind === "edit-milestone"
@@ -282,25 +277,6 @@ export function ProjectsBillingSection() {
     invoiceDialogIsFirstMilestone && milestoneProject?.status === "draft";
   const showReactivationNotice =
     invoiceDialogIsFirstMilestone && milestoneProject?.status === "on_hold";
-
-  const onToggleAutoActivate = async (checked: boolean) => {
-    try {
-      await updateBillingSettings.mutateAsync({
-        autoActivateFirstPayment: checked,
-      });
-      toast.success(
-        checked
-          ? "Se activó la activación automática de Hito 0."
-          : "Se desactivó la activación automática de Hito 0.",
-      );
-    } catch (error) {
-      toast.error(
-        error instanceof ApiRequestError
-          ? error.message
-          : "No se pudo actualizar la configuración.",
-      );
-    }
-  };
 
   const renderAction = (entry: BillingLedgerEntry) => (
     <div className={styles.actions}>
@@ -477,28 +453,6 @@ export function ProjectsBillingSection() {
           </p>
         </div>
       </div>
-      {/* 
-      {canManageBilling ? (
-        <Card className={styles.hito0Settings}>
-          <Switch
-            checked={billingSettings?.autoActivateFirstPayment ?? false}
-            onChange={(checked) => void onToggleAutoActivate(checked)}
-            label="Activación automática de Hito 0"
-            disabled={updateBillingSettings.isPending}
-          />
-          <span className={styles.hito0SettingsLabel}>Activación automática de Hito 0</span>
-        </Card>
-      ) : (
-        can('billing:read') &&
-        billingSettings && (
-          <Card className={styles.hito0Settings}>
-            <span className={styles.hito0SettingsLabel}>
-              Hito 0 automático: <b>{billingSettings.autoActivateFirstPayment ? 'Activado' : 'Desactivado'}</b>
-            </span>
-          </Card>
-        )
-      )} 
-      */}
 
       {(kpisByCurrency.length > 0
         ? kpisByCurrency

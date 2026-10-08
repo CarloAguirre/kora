@@ -26,18 +26,6 @@
   color: var(--kora-text-muted);
 }
 
-.hito0Settings {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: var(--kora-space-3);
-}
-
-.hito0SettingsLabel {
-  font-size: var(--kora-text-sm);
-  color: var(--kora-navy);
-}
-
 .kpis {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
