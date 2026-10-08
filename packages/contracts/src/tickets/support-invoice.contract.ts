@@ -163,12 +163,17 @@ export const BILLING_LEDGER_LINE_LABELS: Readonly<Record<BillingLedgerLine, stri
   proyecto: 'Proyecto',
 };
 
-export const BILLING_LEDGER_STATUSES = ['pendiente', 'facturado', 'atrasado', 'pagado'] as const;
+/**
+ * `pendiente`: Soporte — ciclo vigente sin factura; Proyecto — el hito del tramo aún no se cumple.
+ * `por_facturar`: solo Proyecto — el hito se cumplió y falta emitir la factura.
+ */
+export const BILLING_LEDGER_STATUSES = ['pendiente', 'por_facturar', 'facturado', 'atrasado', 'pagado'] as const;
 export const billingLedgerStatusSchema = z.enum(BILLING_LEDGER_STATUSES);
 export type BillingLedgerStatus = z.infer<typeof billingLedgerStatusSchema>;
 
 export const BILLING_LEDGER_STATUS_LABELS: Readonly<Record<BillingLedgerStatus, string>> = {
   pendiente: 'Pendiente',
+  por_facturar: 'Por facturar',
   facturado: 'Facturado',
   atrasado: 'Atrasado',
   pagado: 'Pagado',
@@ -184,7 +189,7 @@ export const billingLedgerEntrySchema = z.object({
   detail: z.string(),
   /** Soporte: en la moneda del contrato (ver `currency`). Proyecto: el monto declarado en el tramo, tal como se guardó. */
   amount: z.number(),
-  /** Soporte: la moneda real del contrato. Proyecto: `CLP` fijo — `project_payment_milestones` todavía no tiene moneda propia. */
+  /** Soporte: la moneda real del contrato. Proyecto: la moneda del contrato del proyecto (`projects.contract_currency`). */
   currency: supportPlanCurrencySchema,
   folio: z.string().nullable(),
   issuedAt: z.iso.date().nullable(),
@@ -200,6 +205,12 @@ export const billingLedgerEntrySchema = z.object({
   milestoneName: z.string().nullable(),
   /** Solo `line: 'proyecto'` — porcentaje del tramo sobre el total, si se configuró. */
   milestonePercent: z.number().nullable(),
+  /** Vencimiento del pago de la factura — `null` si no hay factura o no se informó. */
+  dueAt: z.iso.date().nullable(),
+  /** Solo `line: 'proyecto'` — qué hito deja el tramo por facturar (ver `PROJECT_PAYMENT_TRIGGERS`). */
+  milestoneTriggerType: z.enum(['approval', 'phase', 'date', 'manual']).nullable(),
+  milestoneTriggerPhase: z.enum(['discovery', 'development', 'testing', 'pilot', 'closed']).nullable(),
+  milestoneTriggerDate: z.iso.date().nullable(),
 });
 export type BillingLedgerEntry = z.infer<typeof billingLedgerEntrySchema>;
 

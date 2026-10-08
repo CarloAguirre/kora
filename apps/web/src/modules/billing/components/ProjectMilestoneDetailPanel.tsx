@@ -7,11 +7,13 @@ import { CheckIcon } from '@/shared/components/icons/Icons';
 import { getProjectStageLabel } from '@/modules/projects/lib/project-stage-display';
 import { useProjectDetail } from '@/modules/projects/api/projects.queries';
 import { formatMoney } from '@/shared/lib/format-money';
+import { paymentTriggerLabel } from '@/modules/projects/lib/payment-milestone-display';
 
 const formatDate = (value: string | null) => (value ? new Date(`${value}T00:00:00`).toLocaleDateString('es-CL') : '—');
 
 const STEPS: ReadonlyArray<{ status: ProjectPaymentStatus; label: string }> = [
-  { status: 'pending', label: 'Por facturar' },
+  { status: 'pending', label: 'Pendiente' },
+  { status: 'to_invoice', label: 'Por facturar' },
   { status: 'invoiced', label: 'Facturado' },
   { status: 'paid', label: 'Pagado' },
 ];
@@ -26,10 +28,9 @@ export interface ProjectMilestoneDetailPanelProps {
 
 /**
  * Detalle de un tramo de pago de proyecto, en panel lateral — igual patrón
- * que el mockup de referencia. A diferencia del prototipo, los tramos son
- * libres (nombre/monto/% a mano, sin etapa "gatillo" fija — ver
- * `docs/DECISION-FACTURACION-PROYECTOS.md`), así que no hay un campo real de
- * "se activa al llegar a X"; se muestra la etapa ACTUAL del proyecto nomás.
+ * que el mockup de referencia: el hito que lo deja por facturar (aprobación,
+ * fase o fecha — ver `docs/DECISION-FACTURACION-PROYECTOS.md`) junto a la
+ * etapa actual del proyecto.
  * Las acciones (`onIssue`/`onMarkPaid`) abren los mismos diálogos que ya
  * usaba la tabla — este panel no duplica esa lógica.
  */
@@ -39,6 +40,8 @@ export function ProjectMilestoneDetailPanel({ projectId, milestoneId, onClose, o
 
   const open = projectId !== null && milestoneId !== null;
   const stepIndex = milestone ? STEPS.findIndex((s) => s.status === milestone.status) : -1;
+  const invoiced = milestone?.status === 'invoiced' || milestone?.status === 'paid';
+  const currency = project?.contractCurrency ?? 'UF';
 
   return (
     <SidePanel
@@ -61,10 +64,19 @@ export function ProjectMilestoneDetailPanel({ projectId, milestoneId, onClose, o
               ))}
             </div>
 
-            {milestone.status !== 'pending' && (
+            {invoiced && (
               <p className={styles.record}>
                 Folio <strong>{milestone.invoiceNumber ?? '—'}</strong> · emitida el <strong>{formatDate(milestone.issuedAt)}</strong>
+                {milestone.dueAt && (
+                  <>
+                    {' '}
+                    · vence el <strong>{formatDate(milestone.dueAt)}</strong>
+                  </>
+                )}
               </p>
+            )}
+            {milestone.isOverdue && (
+              <Badge tone="danger">Pago atrasado</Badge>
             )}
             {milestone.status === 'paid' && (
               <p className={styles.record}>
@@ -72,8 +84,12 @@ export function ProjectMilestoneDetailPanel({ projectId, milestoneId, onClose, o
               </p>
             )}
 
-            {milestone.status === 'pending' && (
-              <Button className={styles.actionButton} onClick={onIssue}>
+            {(milestone.status === 'pending' || milestone.status === 'to_invoice') && (
+              <Button
+                className={styles.actionButton}
+                variant={milestone.status === 'pending' ? 'outline' : 'primary'}
+                onClick={onIssue}
+              >
                 Marcar como facturado
               </Button>
             )}
@@ -107,6 +123,10 @@ export function ProjectMilestoneDetailPanel({ projectId, milestoneId, onClose, o
               <span className={styles.rowValue}>{project.name}</span>
             </div>
             <div className={styles.row}>
+              <span className={styles.rowLabel}>Hito de cobro</span>
+              <span className={styles.rowValue}>{paymentTriggerLabel(milestone)}</span>
+            </div>
+            <div className={styles.row}>
               <span className={styles.rowLabel}>Etapa actual del proyecto</span>
               <span className={styles.rowValue}>{getProjectStageLabel(project)}</span>
             </div>
@@ -116,9 +136,13 @@ export function ProjectMilestoneDetailPanel({ projectId, milestoneId, onClose, o
 
           <div className={[styles.row, styles.rowHighlight].join(' ')}>
             <span className={styles.rowLabel}>Monto del tramo{milestone.percent !== null ? ` (${milestone.percent}%)` : ''}</span>
-            <span className={styles.rowValueHighlight}>{formatMoney(milestone.amount, 'UF')}</span>
+            <span className={styles.rowValueHighlight}>{formatMoney(milestone.amount, currency)}</span>
           </div>
-          <p className={styles.note}>El monto se registra manualmente al emitir la factura de este tramo.</p>
+          <p className={styles.note}>
+            {milestone.status === 'pending'
+              ? 'El tramo queda por facturar cuando se cumpla su hito; se avisa por correo a Finanzas y Gerencia.'
+              : 'Kora no emite la factura: solo registra folio, fechas y pago.'}
+          </p>
         </>
       )}
     </SidePanel>

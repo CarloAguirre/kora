@@ -3,6 +3,7 @@ import type {
   PasswordResetNotification,
   ProjectAutoActivatedNotification,
   ProjectInvoiceBlockedNotification,
+  ProjectPaymentMilestoneReadyNotification,
   ProjectReactivatedFromHoldNotification,
   UserInvitation,
 } from '../../application/ports/notification.port';
@@ -50,15 +51,18 @@ interface LayoutInput {
   readonly webAppUrl: string;
   readonly subject: string;
   readonly firstName: string;
-  /** Párrafos ya escapados. */
+  /** Párrafos ya escapados (o un bloque `<table>` ya armado, que se inserta sin envolver). */
   readonly paragraphs: readonly string[];
   readonly action?: { readonly label: string; readonly url: string };
   readonly footer: string;
 }
 
 function layout(input: LayoutInput): string {
+  // Un bloque `<table>` (p.ej. `detailTable`) va tal cual: una tabla dentro de `<p>` es HTML inválido.
   const paragraphs = input.paragraphs
-    .map((p) => `<p style="margin:0 0 12px; font-size:15px; line-height:22px; color:${MUTED};">${p}</p>`)
+    .map((p) =>
+      p.startsWith('<table') ? p : `<p style="margin:0 0 12px; font-size:15px; line-height:22px; color:${MUTED};">${p}</p>`,
+    )
     .join('\n              ');
 
   const action = input.action
@@ -291,6 +295,74 @@ export function renderProjectAutoActivated(
     (name) =>
       `Se facturó el primer tramo (Hito 0) del proyecto ${name}, por lo que pasó automáticamente a Activo.`,
   );
+}
+
+/** Mismo formato que `formatMoney` del front: UF con 2 decimales, CLP/USD con separador de miles chileno. */
+function formatMoney(value: number, currency: ProjectPaymentMilestoneReadyNotification['currency']): string {
+  if (currency === 'UF') return `${value.toFixed(2)} UF`;
+  return `${value.toLocaleString('es-CL', { maximumFractionDigits: 2 })} ${currency}`;
+}
+
+/** Filas "etiqueta: valor" del detalle del tramo — tabla, no `<dl>`: Outlook no la respeta. */
+function detailTable(rows: ReadonlyArray<readonly [string, string]>): string {
+  const cells = rows
+    .map(
+      ([label, value]) =>
+        `<tr><td style="padding:8px 12px; font-size:13px; color:${MUTED}; border-bottom:1px solid ${BORDER}; width:40%;">${escapeHtml(label)}</td>` +
+        `<td style="padding:8px 12px; font-size:14px; font-weight:600; color:${NAVY}; border-bottom:1px solid ${BORDER};">${escapeHtml(value)}</td></tr>`,
+    )
+    .join('');
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:4px 0 16px; border:1px solid ${BORDER}; border-radius:8px; border-collapse:separate; font-family:${FONT};">${cells}</table>`;
+}
+
+export function renderProjectPaymentMilestoneReady(
+  input: ProjectPaymentMilestoneReadyNotification,
+  webAppUrl: string,
+): RenderedEmail {
+  const subject = `Kora: tramo "${input.milestoneName}" por facturar en ${input.projectName}`;
+  const url = `${webAppUrl}/facturacion`;
+  const amount = formatMoney(input.amount, input.currency);
+  const rows: Array<readonly [string, string]> = [
+    ['Proyecto', input.projectName],
+    ...(input.clientName ? [['Cliente', input.clientName] as const] : []),
+    ['Tramo', input.percent !== null ? `${input.milestoneName} (${input.percent.toLocaleString('es-CL')}%)` : input.milestoneName],
+    ['Monto', amount],
+  ];
+  const intro = (name: string, milestone: string, reason: string, status: string) =>
+    `El proyecto ${name} cumplió el hito del tramo ${milestone}: ${reason}. El tramo quedó en estado ${status}.`;
+
+  return {
+    subject,
+    html: layout({
+      webAppUrl,
+      subject,
+      firstName: input.recipientFirstName,
+      paragraphs: [
+        intro(
+          `<strong style="color:${NAVY};">${escapeHtml(input.projectName)}</strong>`,
+          `<strong style="color:${NAVY};">${escapeHtml(input.milestoneName)}</strong>`,
+          escapeHtml(input.reason),
+          `<strong style="color:${NAVY};">Por facturar</strong>`,
+        ),
+        detailTable(rows),
+        'Emite la factura y regístrala en Kora (folio y fecha de emisión) para dejar el tramo como Facturado.',
+      ],
+      action: { label: 'Ir a Facturación', url },
+      footer: AUTOMATIC_FOOTER,
+    }),
+    text: plainText(
+      input.recipientFirstName,
+      [
+        intro(input.projectName, input.milestoneName, input.reason, 'Por facturar'),
+        '',
+        ...rows.map(([label, value]) => `${label}: ${value}`),
+        '',
+        'Emite la factura y regístrala en Kora (folio y fecha de emisión) para dejar el tramo como Facturado:',
+        url,
+      ],
+      AUTOMATIC_FOOTER,
+    ),
+  };
 }
 
 export function renderProjectReactivatedFromHold(

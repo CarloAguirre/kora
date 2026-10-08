@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, inArray, isNull, roles, users, type Database } from '@kora/db';
+import { and, eq, inArray, isNull, or, roles, users, type Database } from '@kora/db';
 import type {
   ProjectNotificationRecipient,
   ProjectUserReader,
@@ -36,6 +36,21 @@ export class DrizzleProjectUserReader implements ProjectUserReader {
       .from(users)
       .innerJoin(roles, eq(roles.id, users.roleId))
       .where(and(eq(roles.isAdminTier, true), eq(users.status, 'active'), isNull(users.deletedAt)));
+    return rows.map((row) => ({ id: row.id, fullName: `${row.firstName} ${row.lastName}`.trim(), email: row.email }));
+  }
+
+  async findActiveBillingRecipients(): Promise<ProjectNotificationRecipient[]> {
+    const rows = await this.database
+      .select({ id: users.id, firstName: users.firstName, lastName: users.lastName, email: users.email })
+      .from(users)
+      .innerJoin(roles, eq(roles.id, users.roleId))
+      .where(
+        and(
+          or(eq(roles.isAdminTier, true), eq(roles.code, 'finanzas')),
+          eq(users.status, 'active'),
+          isNull(users.deletedAt),
+        ),
+      );
     return rows.map((row) => ({ id: row.id, fullName: `${row.firstName} ${row.lastName}`.trim(), email: row.email }));
   }
 }

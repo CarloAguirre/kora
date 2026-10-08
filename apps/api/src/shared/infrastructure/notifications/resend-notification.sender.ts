@@ -7,6 +7,7 @@ import type {
   PasswordResetNotification,
   ProjectAutoActivatedNotification,
   ProjectInvoiceBlockedNotification,
+  ProjectPaymentMilestoneReadyNotification,
   ProjectReactivatedFromHoldNotification,
   UserInvitation,
 } from '../../application/ports/notification.port';
@@ -15,6 +16,7 @@ import {
   renderPasswordReset,
   renderProjectAutoActivated,
   renderProjectInvoiceBlocked,
+  renderProjectPaymentMilestoneReady,
   renderProjectReactivatedFromHold,
   renderUserInvitation,
   type RenderedEmail,
@@ -84,6 +86,14 @@ export class ResendNotificationSender implements NotificationSender {
       'project_reactivated_from_hold',
       notification.recipientEmail,
       renderProjectReactivatedFromHold(notification, this.settings.webAppUrl),
+    );
+  }
+
+  sendProjectPaymentMilestoneReady(notification: ProjectPaymentMilestoneReadyNotification): Promise<void> {
+    return this.deliver(
+      'project_payment_milestone_ready',
+      notification.recipientEmail,
+      renderProjectPaymentMilestoneReady(notification, this.settings.webAppUrl),
     );
   }
 

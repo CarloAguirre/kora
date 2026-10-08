@@ -8,6 +8,8 @@ import type { ProjectClientReader } from '../ports/project-client-reader.port';
 import type { ProjectUserReader } from '../ports/project-user-reader.port';
 import type { AuditRecorder } from '../../../../shared/application/ports/audit-recorder.port';
 import type { ProjectChangeLogRecorder } from '../services/project-change-log.recorder';
+import type { PaymentMilestoneTriggerService } from '../services/payment-milestone-trigger.service';
+import type { ProjectPaymentMilestoneRepository } from '../../domain/repositories/project-payment-milestone.repository';
 import { FixedClock } from '../../../../test/fakes';
 import type { UnitOfWork } from '@kora/core';
 
@@ -37,6 +39,12 @@ function buildUseCase(leaderUserId: string | null, project: Project = buildProje
   const audit = { record: vi.fn().mockResolvedValue(undefined) } as unknown as AuditRecorder;
   const changeLog = { record: vi.fn().mockResolvedValue(undefined) } as unknown as ProjectChangeLogRecorder;
   const unitOfWork = { run: vi.fn((work: (tx: unknown) => Promise<unknown>) => work({})) } as unknown as UnitOfWork;
+  const paymentMilestones = {} as ProjectPaymentMilestoneRepository;
+  const paymentTriggers = {
+    readinessOf: vi.fn().mockReturnValue(() => false),
+    promote: vi.fn().mockResolvedValue([]),
+    notify: vi.fn().mockResolvedValue(undefined),
+  } as unknown as PaymentMilestoneTriggerService;
 
   const useCase = new UpdateProjectUseCase(
     projects,
@@ -47,6 +55,8 @@ function buildUseCase(leaderUserId: string | null, project: Project = buildProje
     changeLog,
     unitOfWork,
     new FixedClock(NOW),
+    paymentMilestones,
+    paymentTriggers,
   );
   return { useCase, projects };
 }

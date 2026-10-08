@@ -1,5 +1,6 @@
 import { AggregateRoot, assignDefined, createDomainEvent, err, ok, type Result } from '@kora/core';
 import type {
+  ProjectContractCurrency,
   ProjectHito0Source,
   ProjectPhase,
   ProjectPriority,
@@ -64,6 +65,10 @@ export interface ProjectProps {
   /** "Avance del periodo" del portal cliente — narrativa de logros declarada por el líder, igual criterio que impacto/QA. */
   periodReportDate: Date | null;
   periodReportAchievements: string[] | null;
+  /** Monto total del contrato — base del % de cada tramo de pago. */
+  contractAmount: number | null;
+  /** Moneda de todos los tramos de pago del proyecto. */
+  contractCurrency: ProjectContractCurrency;
   /** Hito 0 quedó pausado esperando que Gerencia active el proyecto a mano — ver `IssueProjectPaymentMilestoneInvoiceUseCase`. */
   pendingManagementApproval: boolean;
   /** Fecha del Hito 0 (kickoff) — editable por Gerencia/PMO. `null` si el proyecto nunca se activó. */
@@ -97,6 +102,8 @@ export interface CreateProjectProps {
   readonly quotationLink?: string | null;
   readonly contractLink?: string | null;
   readonly additionalLinks?: string | null;
+  readonly contractAmount?: number | null;
+  readonly contractCurrency?: ProjectContractCurrency;
   readonly phase?: ProjectPhase | null;
   /** Subconjunto de estados con sentido al crear (draft/active/on_hold) — ver `createProjectSchema`. */
   readonly status?: ProjectStatus | null;
@@ -189,6 +196,8 @@ export class Project extends AggregateRoot<string> {
       qaFailedTests: null,
       periodReportDate: null,
       periodReportAchievements: null,
+      contractAmount: props.contractAmount ?? null,
+      contractCurrency: props.contractCurrency ?? 'UF',
       pendingManagementApproval: false,
       hito0At: null,
       hito0Source: null,
@@ -328,6 +337,8 @@ export class Project extends AggregateRoot<string> {
         | 'qaFailedTests'
         | 'periodReportDate'
         | 'periodReportAchievements'
+        | 'contractAmount'
+        | 'contractCurrency'
       >
     >,
     now: Date,

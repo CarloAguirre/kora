@@ -2,8 +2,6 @@ import { formatMoney } from '@/shared/lib/format-money';
 import styles from './ProjectBillingCard.module.css';
 import type { ClientProjectBilling } from '../types';
 
-/** Los tramos de pago de un proyecto siempre están en UF (`project_payment_milestones.amount`), igual que en Facturación. */
-const formatCurrency = (value: number) => formatMoney(value, 'UF');
 
 const STATUS_LABEL: Readonly<Record<'paid' | 'pending', string>> = {
   paid: 'Pagada',
@@ -17,6 +15,8 @@ const STATUS_LABEL: Readonly<Record<'paid' | 'pending', string>> = {
  * PROYECTO por tramos, no de un plan de soporte.
  */
 export function ProjectBillingCard({ billing }: { billing: ClientProjectBilling }) {
+  /** Todos los tramos se cobran en la moneda del contrato del proyecto. */
+  const formatCurrency = (value: number) => formatMoney(value, billing.currency);
   const paidWidth = billing.paid.percent;
   const pendingCollectionWidth = billing.invoicedPendingCollection.percent;
   const pendingToInvoiceWidth = billing.pendingToInvoice.percent;

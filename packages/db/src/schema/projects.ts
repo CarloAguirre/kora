@@ -86,8 +86,20 @@ export const projectObservationStatusEnum = pgEnum('project_observation_status',
   'rechazado',
 ]);
 
-/** Estado de un tramo de pago del proyecto — independiente del estado de facturación de soporte (`support_invoices`). */
-export const projectPaymentStatusEnum = pgEnum('project_payment_status', ['pending', 'invoiced', 'paid']);
+/**
+ * Estado de un tramo de pago del proyecto — independiente del estado de facturación de soporte (`support_invoices`).
+ * `pending` = el hito del tramo aún no se cumple; `to_invoice` = se cumplió y Finanzas debe emitir la factura.
+ * "Atrasado" no es un estado guardado: se calcula (`invoiced` con `due_at` vencido).
+ */
+export const projectPaymentStatusEnum = pgEnum('project_payment_status', ['pending', 'to_invoice', 'invoiced', 'paid']);
+/**
+ * Qué hito pasa un tramo de `pending` a `to_invoice`: la aprobación comercial del proyecto (p.ej. "Inicio"),
+ * la entrada a una fase (`trigger_phase`, p.ej. Marcha blanca), una fecha (`trigger_date` — planes por fecha
+ * y cuotas mensuales) o nada (`manual`: se avanza a mano).
+ */
+export const projectPaymentTriggerEnum = pgEnum('project_payment_trigger', ['approval', 'phase', 'date', 'manual']);
+/** Moneda del contrato del proyecto — mismos valores que `support_plan_currency`, enum propio para no importar `tickets` (ciclo). */
+export const projectContractCurrencyEnum = pgEnum('project_contract_currency', ['UF', 'CLP', 'USD']);
 
 export const projects = pgTable(
   'projects',
@@ -167,6 +179,11 @@ export const projects = pgTable(
     /** "Avance del periodo" del portal cliente — narrativa de logros declarada por el líder, igual criterio que impacto/QA. */
     periodReportDate: date('period_report_date', { mode: 'date' }),
     periodReportAchievements: text('period_report_achievements').array(),
+
+    /** Monto total del contrato — base para calcular el monto de cada tramo a partir de su %. Nulo si no se informó. */
+    contractAmount: numeric('contract_amount', { precision: 14, scale: 2 }),
+    /** Moneda en que se cobran todos los tramos de pago del proyecto. */
+    contractCurrency: projectContractCurrencyEnum('contract_currency').notNull().default('UF'),
 
     /** Hito 0 quedó pausado esperando que Gerencia (admin/pmo) active el proyecto a mano — ver `project_billing_settings`. */
     pendingManagementApproval: boolean('pending_management_approval').notNull().default(false),
@@ -419,9 +436,16 @@ export const projectPaymentMilestones = pgTable('project_payment_milestones', {
   amount: numeric('amount', { precision: 14, scale: 2 }).notNull(),
   invoiceNumber: varchar('invoice_number', { length: 50 }),
   issuedAt: date('issued_at', { mode: 'date' }),
+  /** Vencimiento del pago de la factura — se fija al facturar (emisión + 30 días por defecto). Pasado sin pago = atrasado. */
+  dueAt: date('due_at', { mode: 'date' }),
   status: projectPaymentStatusEnum('status').notNull().default('pending'),
   paidAt: date('paid_at', { mode: 'date' }),
   sortOrder: integer('sort_order').notNull().default(0),
+  triggerType: projectPaymentTriggerEnum('trigger_type').notNull().default('manual'),
+  /** Solo con `trigger_type = 'phase'`: al entrar el proyecto a esta fase (o a una posterior) el tramo queda por facturar. */
+  triggerPhase: projectPhaseEnum('trigger_phase'),
+  /** Solo con `trigger_type = 'date'`: desde esta fecha el tramo queda por facturar. */
+  triggerDate: date('trigger_date', { mode: 'date' }),
   ...timestamps,
 });
 

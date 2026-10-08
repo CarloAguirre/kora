@@ -21,6 +21,10 @@ import {
 } from '../../domain/errors/project.errors';
 import { PROJECT_REPOSITORY, type ProjectRepository } from '../../domain/repositories/project.repository';
 import { PROJECT_TEAM_REPOSITORY, type ProjectTeamRepository } from '../../domain/repositories/project-team.repository';
+import {
+  PROJECT_PAYMENT_MILESTONE_REPOSITORY,
+  type ProjectPaymentMilestoneRepository,
+} from '../../domain/repositories/project-payment-milestone.repository';
 import { PROJECT_CLIENT_READER, type ProjectClientReader } from '../ports/project-client-reader.port';
 import { PROJECT_USER_READER, type ProjectUserReader } from '../ports/project-user-reader.port';
 import {
@@ -30,6 +34,8 @@ import {
 import { isUniqueViolation } from '../../../../shared/infrastructure/database/postgres-errors';
 import type { ActorContext, UseCase } from '../../../../shared/application/use-case';
 import { ProjectChangeLogRecorder, type ProjectChangeLogEntry } from '../services/project-change-log.recorder';
+import { PaymentMilestoneTriggerService, type PromotedPaymentMilestone } from '../services/payment-milestone-trigger.service';
+import { syncPaymentPlan } from '../services/payment-plan-sync';
 
 const formatDate = (value: Date | null): string =>
   value ? value.toLocaleDateString('es-CL') : 'sin definir';
@@ -52,6 +58,8 @@ export class UpdateProjectUseCase implements UseCase<UpdateProjectCommand, void,
     private readonly changeLog: ProjectChangeLogRecorder,
     @Inject(UNIT_OF_WORK) private readonly unitOfWork: UnitOfWork,
     @Inject(CLOCK) private readonly clock: Clock,
+    @Inject(PROJECT_PAYMENT_MILESTONE_REPOSITORY) private readonly paymentMilestones: ProjectPaymentMilestoneRepository,
+    private readonly paymentTriggers: PaymentMilestoneTriggerService,
   ) {}
 
   async execute(command: UpdateProjectCommand): Promise<Result<void, ApplicationError>> {
@@ -164,6 +172,8 @@ export class UpdateProjectUseCase implements UseCase<UpdateProjectCommand, void,
         ...(data.qaPlannedTests !== undefined ? { qaPlannedTests: data.qaPlannedTests } : {}),
         ...(data.qaExecutedTests !== undefined ? { qaExecutedTests: data.qaExecutedTests } : {}),
         ...(data.qaFailedTests !== undefined ? { qaFailedTests: data.qaFailedTests } : {}),
+        ...(data.contractAmount !== undefined ? { contractAmount: data.contractAmount ?? null } : {}),
+        ...(data.contractCurrency !== undefined ? { contractCurrency: data.contractCurrency } : {}),
       },
       now,
     );
@@ -221,9 +231,23 @@ export class UpdateProjectUseCase implements UseCase<UpdateProjectCommand, void,
       });
     }
 
+    let promoted: PromotedPaymentMilestone[] = [];
     try {
       await this.unitOfWork.run(async (tx) => {
         await this.projects.save(project, tx);
+        if (project.type === 'development') {
+          if (data.paymentMilestones) {
+            await syncPaymentPlan(
+              this.paymentMilestones,
+              project.id,
+              data.paymentMilestones,
+              this.paymentTriggers.readinessOf(project),
+              tx,
+            );
+          }
+          // Aprobar el proyecto o avanzar su fase puede cumplir el hito de un tramo.
+          promoted = await this.paymentTriggers.promote(project, tx);
+        }
         if (data.teams) {
           const existingTeams = await this.projectTeams.findByProject(project.id, tx);
           const keptTeamIds = new Set(data.teams.map((team) => team.teamId));
@@ -274,6 +298,8 @@ export class UpdateProjectUseCase implements UseCase<UpdateProjectCommand, void,
       entityType: 'project',
       entityId: project.id,
     });
+
+    await this.paymentTriggers.notify(project, promoted);
 
     return ok(undefined);
   }

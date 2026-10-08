@@ -22,6 +22,8 @@ import {
   type ProjectPaymentMilestoneRepository,
 } from '../../domain/repositories/project-payment-milestone.repository';
 import { PROJECT_CLIENT_READER, type ProjectClientReader } from '../ports/project-client-reader.port';
+import { PaymentMilestoneTriggerService, type PromotedPaymentMilestone } from '../services/payment-milestone-trigger.service';
+import { syncPaymentPlan } from '../services/payment-plan-sync';
 import {
   AUDIT_RECORDER,
   type AuditRecorder,
@@ -35,14 +37,17 @@ export interface CreateProjectCommand {
 }
 
 /**
- * Cronograma de cobro mínimo con el que nace todo proyecto de desarrollo. El
- * monto parte en 0 (el proyecto no guarda un valor de contrato) y se completa
- * a mano; los tramos se pueden editar, quitar o complementar después.
+ * Cronograma de cobro mínimo con el que nace todo proyecto de desarrollo cuando el formulario no manda
+ * plan de pago: Inicio al aprobarse y Marcha blanca al entrar en esa fase. El monto sale del monto del
+ * contrato si se informó; si no, parte en 0 y se completa a mano.
  */
-const DEFAULT_PAYMENT_MILESTONES = [
-  { name: 'Inicio', percent: 50, amount: 0, sortOrder: 0 },
-  { name: 'Marcha blanca', percent: 50, amount: 0, sortOrder: 1 },
-] as const;
+function defaultPaymentPlan(contractAmount: number | null | undefined) {
+  const half = contractAmount ? Math.round(contractAmount * 50) / 100 : 0;
+  return [
+    { name: 'Inicio', percent: 50, amount: half, sortOrder: 0, triggerType: 'approval' as const },
+    { name: 'Marcha blanca', percent: 50, amount: half, sortOrder: 1, triggerType: 'phase' as const, triggerPhase: 'pilot' as const },
+  ];
+}
 
 @Injectable()
 export class CreateProjectUseCase
@@ -57,6 +62,7 @@ export class CreateProjectUseCase
     @Inject(UNIT_OF_WORK) private readonly unitOfWork: UnitOfWork,
     @Inject(CLOCK) private readonly clock: Clock,
     @Inject(ID_GENERATOR) private readonly ids: IdGenerator,
+    private readonly paymentTriggers: PaymentMilestoneTriggerService,
   ) {}
 
   async execute(command: CreateProjectCommand): Promise<Result<{ id: string }, ApplicationError>> {
@@ -92,6 +98,8 @@ export class CreateProjectUseCase
       quotationLink: data.quotationLink,
       contractLink: data.contractLink,
       additionalLinks: data.additionalLinks,
+      contractAmount: data.contractAmount ?? null,
+      ...(data.contractCurrency ? { contractCurrency: data.contractCurrency } : {}),
       phase: data.phase,
       status: data.status,
       now: this.clock.now(),
@@ -99,6 +107,7 @@ export class CreateProjectUseCase
     if (created.isErr()) return err(created.error);
     const project = created.value;
 
+    let promoted: PromotedPaymentMilestone[] = [];
     try {
       await this.unitOfWork.run(async (tx) => {
         await this.projects.save(project, tx);
@@ -115,9 +124,15 @@ export class CreateProjectUseCase
           );
         }
         if (project.type === 'development') {
-          for (const milestone of DEFAULT_PAYMENT_MILESTONES) {
-            await this.paymentMilestones.create({ projectId: project.id, ...milestone }, tx);
-          }
+          await syncPaymentPlan(
+            this.paymentMilestones,
+            project.id,
+            data.paymentMilestones ?? defaultPaymentPlan(data.contractAmount),
+            this.paymentTriggers.readinessOf(project),
+            tx,
+          );
+          // Un proyecto que nace aprobado (o en una fase/fecha ya cumplida) deja sus tramos por facturar de inmediato.
+          promoted = await this.paymentTriggers.promote(project, tx);
         }
       });
     } catch (error) {
@@ -132,6 +147,8 @@ export class CreateProjectUseCase
       entityId: project.id,
       metadata: { name: data.name, type: data.type },
     });
+
+    await this.paymentTriggers.notify(project, promoted);
 
     return ok({ id: project.id });
   }

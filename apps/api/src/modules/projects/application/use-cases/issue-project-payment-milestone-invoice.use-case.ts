@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CLOCK, UNIT_OF_WORK, err, ok, type ApplicationError, type Clock, type Result, type UnitOfWork } from '@kora/core';
-import type { IssueProjectPaymentMilestoneInvoiceInput } from '@kora/contracts';
+import { PROJECT_PAYMENT_DEFAULT_TERM_DAYS, type IssueProjectPaymentMilestoneInvoiceInput } from '@kora/contracts';
 import {
   ProjectNotApprovedForInvoicingError,
   ProjectPaymentMilestoneAlreadyIssuedError,
@@ -17,6 +17,7 @@ import {
 } from '../../domain/repositories/project-billing-settings.repository';
 import { PROJECT_USER_READER, type ProjectUserReader } from '../ports/project-user-reader.port';
 import { ProjectChangeLogRecorder } from '../services/project-change-log.recorder';
+import { addDays } from '../services/payment-milestone-overdue';
 import { AUDIT_RECORDER, type AuditRecorder } from '../../../../shared/application/ports/audit-recorder.port';
 import { NOTIFICATION_SENDER, type NotificationSender } from '../../../../shared/application/ports/notification.port';
 import type { ActorContext, UseCase } from '../../../../shared/application/use-case';
@@ -68,7 +69,10 @@ export class IssueProjectPaymentMilestoneInvoiceUseCase
   async execute(command: IssueProjectPaymentMilestoneInvoiceCommand): Promise<Result<void, ApplicationError>> {
     const milestone = await this.milestones.findById(command.milestoneId);
     if (!milestone) return err(new ProjectPaymentMilestoneNotFoundError(command.milestoneId));
-    if (milestone.status !== 'pending') return err(new ProjectPaymentMilestoneAlreadyIssuedError());
+    // Normalmente se factura un tramo "Por facturar", pero Finanzas puede adelantarse al hito (p.ej. planes manuales).
+    if (milestone.status !== 'pending' && milestone.status !== 'to_invoice') {
+      return err(new ProjectPaymentMilestoneAlreadyIssuedError());
+    }
 
     const project = await this.projects.findById(milestone.projectId);
     if (project && !project.isDeleted && project.type === 'development' && project.salesStage !== 'approved') {
@@ -102,7 +106,11 @@ export class IssueProjectPaymentMilestoneInvoiceUseCase
     await this.unitOfWork.run(async (tx) => {
       await this.milestones.markIssued(
         command.milestoneId,
-        { invoiceNumber: command.data.folio, issuedAt },
+        {
+          invoiceNumber: command.data.folio,
+          issuedAt,
+          dueAt: command.data.dueAt ? new Date(command.data.dueAt) : addDays(issuedAt, PROJECT_PAYMENT_DEFAULT_TERM_DAYS),
+        },
         tx,
       );
 

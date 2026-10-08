@@ -1,4 +1,5 @@
 import type {
+  ProjectContractCurrency,
   ProjectHito0Source,
   ProjectPhase,
   ProjectPriority,
@@ -61,6 +62,8 @@ export interface ProjectRow {
   qaFailedTests: number | null;
   periodReportDate: Date | null;
   periodReportAchievements: string[] | null;
+  contractAmount: string | null;
+  contractCurrency: ProjectContractCurrency;
   pendingManagementApproval: boolean;
   hito0At: Date | null;
   hito0Source: string | null;
@@ -123,6 +126,8 @@ export function toDomain(row: ProjectRow): Project {
     qaFailedTests: row.qaFailedTests,
     periodReportDate: row.periodReportDate,
     periodReportAchievements: row.periodReportAchievements,
+    contractAmount: row.contractAmount === null ? null : Number(row.contractAmount),
+    contractCurrency: row.contractCurrency,
     pendingManagementApproval: row.pendingManagementApproval,
     hito0At: row.hito0At,
     hito0Source: row.hito0Source as ProjectHito0Source | null,
@@ -187,6 +192,8 @@ export function toPersistence(project: Project) {
     qaFailedTests: snapshot.qaFailedTests,
     periodReportDate: snapshot.periodReportDate,
     periodReportAchievements: snapshot.periodReportAchievements,
+    contractAmount: snapshot.contractAmount === null ? null : String(snapshot.contractAmount),
+    contractCurrency: snapshot.contractCurrency,
     pendingManagementApproval: snapshot.pendingManagementApproval,
     hito0At: snapshot.hito0At,
     hito0Source: snapshot.hito0Source,

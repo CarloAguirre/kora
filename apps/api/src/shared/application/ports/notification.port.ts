@@ -45,6 +45,20 @@ export type ProjectAutoActivatedNotification = ProjectBillingAlertBase;
 /** Un proyecto `Detenido` se reactivó a Activo al facturar el primer tramo — "alerta de confirmación" del documento. */
 export type ProjectReactivatedFromHoldNotification = ProjectBillingAlertBase;
 
+/**
+ * Un tramo de pago pasó a "Por facturar" porque el proyecto cumplió su hito
+ * (aprobación, cambio de fase o fecha programada) — a Finanzas y Gerencia/PMO.
+ */
+export interface ProjectPaymentMilestoneReadyNotification extends ProjectBillingAlertBase {
+  readonly clientName: string | null;
+  readonly milestoneName: string;
+  readonly percent: number | null;
+  readonly amount: number;
+  readonly currency: 'UF' | 'CLP' | 'USD';
+  /** Qué hito se cumplió, ya redactado: "el proyecto fue aprobado", "el proyecto entró en Marcha blanca"… */
+  readonly reason: string;
+}
+
 export interface NotificationSender {
   sendUserInvitation(invitation: UserInvitation): Promise<void>;
   sendPasswordReset(notification: PasswordResetNotification): Promise<void>;
@@ -52,6 +66,7 @@ export interface NotificationSender {
   sendProjectInvoiceBlocked(notification: ProjectInvoiceBlockedNotification): Promise<void>;
   sendProjectAutoActivated(notification: ProjectAutoActivatedNotification): Promise<void>;
   sendProjectReactivatedFromHold(notification: ProjectReactivatedFromHoldNotification): Promise<void>;
+  sendProjectPaymentMilestoneReady(notification: ProjectPaymentMilestoneReadyNotification): Promise<void>;
 }
 
 export const NOTIFICATION_SENDER = Symbol('NotificationSender');

@@ -22,6 +22,7 @@ import type { ProjectUserReference } from '../ports/project-user-reader.port';
 import type { ProjectClientReference } from '../ports/project-client-reader.port';
 import type { ProjectContactReference } from '../ports/project-contact-reader.port';
 import { calculateModuleProgress, calculateProjectProgress, progressToday } from '../services/project-progress';
+import { isPaymentMilestoneOverdue } from '../services/payment-milestone-overdue';
 
 /** `progress` lo calcula quien llama (`calculateProjectProgress`): el listado no trae las tareas. */
 export function toProjectSummary(item: ProjectListItem, progress: ProjectProgress): ProjectSummary {
@@ -203,9 +204,14 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
     amount: milestone.amount,
     invoiceNumber: milestone.invoiceNumber,
     issuedAt: milestone.issuedAt?.toISOString().slice(0, 10) ?? null,
+    dueAt: milestone.dueAt?.toISOString().slice(0, 10) ?? null,
     status: milestone.status,
+    isOverdue: isPaymentMilestoneOverdue(milestone, today),
     paidAt: milestone.paidAt?.toISOString().slice(0, 10) ?? null,
     sortOrder: milestone.sortOrder,
+    triggerType: milestone.triggerType,
+    triggerPhase: milestone.triggerPhase,
+    triggerDate: milestone.triggerDate?.toISOString().slice(0, 10) ?? null,
   }));
 
   return {
@@ -269,6 +275,8 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
     usedHoursUpdatedAt: source.usedHoursUpdatedAt?.toISOString().slice(0, 10) ?? null,
     leaderLastActivityAt: source.leaderLastActivityAt?.toISOString() ?? null,
     prospectPhaseHours: source.prospectPhaseHours,
+    contractAmount: snapshot.contractAmount,
+    contractCurrency: snapshot.contractCurrency,
     pendingManagementApproval: source.project.pendingManagementApproval,
     hito0At: snapshot.hito0At?.toISOString() ?? null,
     hito0Source: snapshot.hito0Source,

@@ -319,6 +319,8 @@ export interface ClientBillingScheduleRow {
 }
 
 export interface ClientProjectBilling {
+  /** Moneda del contrato del proyecto — la de todos sus tramos. */
+  readonly currency: 'UF' | 'CLP' | 'USD';
   readonly totalAmount: number;
   readonly paid: { readonly amount: number; readonly percent: number };
   readonly invoicedPendingCollection: { readonly amount: number; readonly percent: number };

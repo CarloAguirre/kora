@@ -74,6 +74,29 @@ sin `projects:*`, `clients:*`, `tickets:*` ni `hours:*`. Su pantalla
 Proyectos en una tabla plana — no reemplaza `/facturacion-soporte` ni
 `/soporte/:planId`, que admin/pmo siguen usando sin cambios.
 
+## Plan de pago por hitos (2026-10-08)
+
+- **Moneda y monto del contrato** viven en el proyecto (`contract_currency`, `contract_amount`); todos sus
+  tramos se cobran en esa moneda. Con monto de contrato, el monto de cada tramo se calcula de su %.
+- **Hito de cada tramo** (`trigger_type`): `approval` (el proyecto pasa a Aprobado — "Inicio"), `phase`
+  (llega a `trigger_phase` o a una fase posterior — "Marcha blanca"), `date` (`trigger_date` — planes por
+  fecha y cuotas mensuales) o `manual`. El plan se carga al crear o editar el proyecto (la lista completa
+  reemplaza a la guardada; los tramos facturados/pagados nunca se borran por esa vía).
+- **Estados:** Pendiente → Por facturar (`to_invoice`, nuevo) → Facturado → Pagado. Un tramo pasa a Por
+  facturar cuando se cumple su hito **y tiene monto > 0** (un tramo en 0 no tiene nada que facturar); si
+  después cambia su monto/hito y deja de cumplirlo, vuelve a Pendiente. Lo hace
+  `PaymentMilestoneTriggerService`: al crear/editar el proyecto o sus tramos y, para los tramos por fecha,
+  de forma perezosa al leer la ficha o el libro de Facturación (no hay cron, igual que
+  `SupportMonthlyPeriodReconciler`). El paso es un UPDATE condicional, así dos lecturas concurrentes no
+  avisan dos veces.
+- **Aviso:** correo "tramo por facturar" a Finanzas + Gerencia/PMO (`findActiveBillingRecipients`),
+  después del commit y best-effort (un correo que falla no deshace el cambio).
+- **Atraso:** al facturar se fija `due_at` (emisión + 30 días por defecto, editable). "Atrasado" no se
+  guarda: es Facturado sin pago con `due_at` vencido (`isPaymentMilestoneOverdue`, día en hora de Chile).
+- La migración `0041` recrea el enum de estado (un `ADD VALUE` no puede usarse en la misma transacción
+  del migrador), asigna hito a los tramos "Inicio"/"Marcha blanca" existentes, deja Por facturar los que
+  ya lo cumplían (sin correo) y pone vencimiento a 30 días a las facturas ya emitidas.
+
 ## Fuera de alcance
 
 - El adjunto de una factura/comprobante de un tramo de proyecto sigue siendo

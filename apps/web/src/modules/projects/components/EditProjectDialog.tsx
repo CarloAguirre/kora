@@ -59,6 +59,13 @@ import { useUsersList } from '@/modules/users/api/users.queries';
 import { useTeamsList } from '@/modules/teams/api/teams.queries';
 import { useToast } from '@/shared/components/ui/Toast';
 import { ApiRequestError } from '@/shared/lib/api-client';
+import {
+  PaymentPlanEditor,
+  paymentPlanFromProject,
+  paymentPlanPayload,
+  validatePaymentPlan,
+  type PaymentPlanDraft,
+} from './PaymentPlanEditor';
 
 type ProjectFormValues = z.input<typeof updateProjectSchema>;
 
@@ -221,6 +228,10 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
   const [showNewModuleForm, setShowNewModuleForm] = useState(false);
   const [moduleDrafts, setModuleDrafts] = useState<Record<string, ModuleEditDraft>>({});
   const [serverError, setServerError] = useState<string | null>(null);
+  const [paymentPlan, setPaymentPlan] = useState<PaymentPlanDraft>(() => paymentPlanFromProject(project));
+  // Solo se manda el plan si se tocó: así guardar otros datos no reescribe los tramos.
+  const [paymentPlanDirty, setPaymentPlanDirty] = useState(false);
+  const [paymentPlanError, setPaymentPlanError] = useState<string | null>(null);
   const [tipo, setTipo] = useState<ProjectTipo>(() => deriveTipo(project.salesStage, project.status));
   const [estado, setEstado] = useState<ProjectStatus>(project.status);
   const [manualActivationReason, setManualActivationReason] = useState('');
@@ -249,6 +260,9 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
     setEstado(project.status);
     setAllowsOvertime(project.allowsOvertime);
     setServerError(null);
+    setPaymentPlan(paymentPlanFromProject(project));
+    setPaymentPlanDirty(false);
+    setPaymentPlanError(null);
   }, [open, project, reset]);
 
   const clientId = watch('clientId') ?? '';
@@ -533,8 +547,16 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
       setServerError('Escribe el motivo o la referencia de la activación (ej. contrato firmado, orden de compra).');
       return;
     }
+    if (isDevelopment && paymentPlanDirty) {
+      const planError = validatePaymentPlan(paymentPlan);
+      setPaymentPlanError(planError);
+      if (planError) return;
+    }
     try {
-      await updateProject.mutateAsync({ projectId: project.id, input: values });
+      await updateProject.mutateAsync({
+        projectId: project.id,
+        input: isDevelopment && paymentPlanDirty ? { ...values, ...paymentPlanPayload(paymentPlan) } : values,
+      });
       await applyPendingRemovals();
       if (isDevelopment && estado !== project.status) {
         await changeStatus.mutateAsync({
@@ -802,6 +824,30 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
             </div>
           )}
         </div>
+
+        {isDevelopment && (
+          <div className={styles.section}>
+            <h3 className={styles.sectionTitle}>Plan de pago</h3>
+            <p className={styles.hint}>
+              Cada tramo queda <b>Por facturar</b> cuando se cumple su hito y se avisa por correo a Finanzas y Gerencia.
+              Los tramos ya facturados no se editan desde acá.
+            </p>
+            <PaymentPlanEditor
+              value={paymentPlan}
+              onChange={(next) => {
+                setPaymentPlan(next);
+                setPaymentPlanDirty(true);
+                setPaymentPlanError(null);
+              }}
+            />
+            {paymentPlanError && (
+              <div className={styles.alert} role="alert">
+                <AlertIcon size={18} className={styles.alertIcon} />
+                <span>{paymentPlanError}</span>
+              </div>
+            )}
+          </div>
+        )}
 
         {isDevelopment && (
           <div className={styles.section}>

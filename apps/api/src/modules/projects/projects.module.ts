@@ -19,6 +19,7 @@ import { ResolveProjectObservationUseCase } from './application/use-cases/resolv
 import { DeleteProjectObservationUseCase } from './application/use-cases/delete-project-observation.use-case';
 import { ProjectChangeLogRecorder } from './application/services/project-change-log.recorder';
 import { ForecastSourceSyncService } from './application/services/forecast-source-sync.service';
+import { PaymentMilestoneTriggerService } from './application/services/payment-milestone-trigger.service';
 import { ProjectProgressRecalculator } from './application/services/project-progress-recalculator';
 import { CreateProjectModuleUseCase } from './application/use-cases/create-project-module.use-case';
 import { UpdateProjectModuleUseCase } from './application/use-cases/update-project-module.use-case';
@@ -101,6 +102,7 @@ import { DrizzleForecastSourceStore } from './infrastructure/services/drizzle-fo
     DeleteProjectObservationUseCase,
     ProjectChangeLogRecorder,
     ForecastSourceSyncService,
+    PaymentMilestoneTriggerService,
     ProjectProgressRecalculator,
     CreateProjectModuleUseCase,
     UpdateProjectModuleUseCase,
@@ -139,6 +141,12 @@ import { DrizzleForecastSourceStore } from './infrastructure/services/drizzle-fo
     { provide: PROJECT_TEAM_MEMBER_VALIDATOR, useClass: DrizzleProjectTeamMemberValidator },
     { provide: FORECAST_SOURCE_STORE, useClass: DrizzleForecastSourceStore },
   ],
-  exports: [PROJECT_REPOSITORY, PROJECT_MODULE_REPOSITORY, PROJECT_PAYMENT_MILESTONE_REPOSITORY, ForecastSourceSyncService],
+  exports: [
+    PROJECT_REPOSITORY,
+    PROJECT_MODULE_REPOSITORY,
+    PROJECT_PAYMENT_MILESTONE_REPOSITORY,
+    ForecastSourceSyncService,
+    PaymentMilestoneTriggerService,
+  ],
 })
 export class ProjectsModule {}

@@ -9,6 +9,7 @@ import type {
   PasswordResetNotification,
   ProjectAutoActivatedNotification,
   ProjectInvoiceBlockedNotification,
+  ProjectPaymentMilestoneReadyNotification,
   ProjectReactivatedFromHoldNotification,
   UserInvitation,
 } from '../../shared/application/ports/notification.port';
@@ -128,6 +129,7 @@ export class RecordingNotificationSender implements NotificationSender {
   readonly projectInvoiceBlocked: ProjectInvoiceBlockedNotification[] = [];
   readonly projectAutoActivated: ProjectAutoActivatedNotification[] = [];
   readonly projectReactivatedFromHold: ProjectReactivatedFromHoldNotification[] = [];
+  readonly projectPaymentMilestoneReady: ProjectPaymentMilestoneReadyNotification[] = [];
 
   async sendProjectInvoiceBlocked(notification: ProjectInvoiceBlockedNotification): Promise<void> {
     if (this.shouldFail) throw new Error('proveedor de correo caído');
@@ -142,6 +144,11 @@ export class RecordingNotificationSender implements NotificationSender {
   async sendProjectReactivatedFromHold(notification: ProjectReactivatedFromHoldNotification): Promise<void> {
     if (this.shouldFail) throw new Error('proveedor de correo caído');
     this.projectReactivatedFromHold.push(notification);
+  }
+
+  async sendProjectPaymentMilestoneReady(notification: ProjectPaymentMilestoneReadyNotification): Promise<void> {
+    if (this.shouldFail) throw new Error('proveedor de correo caído');
+    this.projectPaymentMilestoneReady.push(notification);
   }
 }
 

@@ -27,9 +27,13 @@ function milestone(overrides: Partial<ProjectPaymentMilestoneRecord> = {}): Proj
     amount: 1000,
     invoiceNumber: null,
     issuedAt: null,
+    dueAt: null,
     status: 'pending',
     paidAt: null,
     sortOrder: 0,
+    triggerType: 'approval',
+    triggerPhase: null,
+    triggerDate: null,
     ...overrides,
   };
 }

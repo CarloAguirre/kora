@@ -79,6 +79,8 @@ function buildProject(overrides: Partial<ProjectDetail> = {}): ProjectDetail {
     usedHoursUpdatedAt: null,
     leaderLastActivityAt: null,
     prospectPhaseHours: 0,
+    contractAmount: null,
+    contractCurrency: 'UF',
     paymentMilestones: [],
     pendingManagementApproval: false,
     hito0At: null,

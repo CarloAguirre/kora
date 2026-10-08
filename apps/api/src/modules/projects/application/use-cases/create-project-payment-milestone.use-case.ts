@@ -9,6 +9,8 @@ import {
 } from '../../domain/repositories/project-payment-milestone.repository';
 import { AUDIT_RECORDER, type AuditRecorder } from '../../../../shared/application/ports/audit-recorder.port';
 import type { ActorContext, UseCase } from '../../../../shared/application/use-case';
+import { PaymentMilestoneTriggerService } from '../services/payment-milestone-trigger.service';
+import { toPaymentMilestoneSchedule } from '../services/payment-plan-sync';
 
 export interface CreateProjectPaymentMilestoneCommand {
   readonly projectId: string;
@@ -30,6 +32,7 @@ export class CreateProjectPaymentMilestoneUseCase
     @Inject(PROJECT_REPOSITORY) private readonly projects: ProjectRepository,
     @Inject(PROJECT_PAYMENT_MILESTONE_REPOSITORY) private readonly milestones: ProjectPaymentMilestoneRepository,
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
+    private readonly paymentTriggers: PaymentMilestoneTriggerService,
   ) {}
 
   async execute(
@@ -42,13 +45,7 @@ export class CreateProjectPaymentMilestoneUseCase
       return err(new CannotManageProjectError());
     }
 
-    const id = await this.milestones.create({
-      projectId: project.id,
-      name: command.data.name,
-      percent: command.data.percent ?? null,
-      amount: command.data.amount,
-      sortOrder: command.data.sortOrder ?? 0,
-    });
+    const id = await this.milestones.create({ projectId: project.id, ...toPaymentMilestoneSchedule(command.data, 0) });
 
     await this.audit.record({
       actor: { userId: command.actor.userId, email: command.actor.email },
@@ -57,6 +54,9 @@ export class CreateProjectPaymentMilestoneUseCase
       entityId: project.id,
       metadata: { event: 'payment_milestone_created', milestoneId: id },
     });
+
+    // Un tramo nuevo cuyo hito ya se cumplió (proyecto aprobado, fase alcanzada, fecha pasada) queda por facturar.
+    await this.paymentTriggers.promoteAndNotify(project);
 
     return ok({ id });
   }

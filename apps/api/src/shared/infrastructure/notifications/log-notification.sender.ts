@@ -5,6 +5,7 @@ import type {
   PasswordResetNotification,
   ProjectAutoActivatedNotification,
   ProjectInvoiceBlockedNotification,
+  ProjectPaymentMilestoneReadyNotification,
   ProjectReactivatedFromHoldNotification,
   UserInvitation,
 } from '../../application/ports/notification.port';
@@ -78,6 +79,18 @@ export class LogNotificationSender implements NotificationSender {
       to: notification.recipientEmail,
       projectId: notification.projectId,
       projectName: notification.projectName,
+    });
+  }
+
+  async sendProjectPaymentMilestoneReady(notification: ProjectPaymentMilestoneReadyNotification): Promise<void> {
+    this.logger.info('[notificación] Tramo de pago por facturar', {
+      to: notification.recipientEmail,
+      projectId: notification.projectId,
+      projectName: notification.projectName,
+      milestoneName: notification.milestoneName,
+      amount: notification.amount,
+      currency: notification.currency,
+      reason: notification.reason,
     });
   }
 }

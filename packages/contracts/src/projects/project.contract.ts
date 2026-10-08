@@ -455,15 +455,44 @@ export const projectObservationSchema = z.object({
 export type ProjectObservation = z.infer<typeof projectObservationSchema>;
 
 /** Estado de un tramo de pago del proyecto ("Facturación" del portal cliente) — independiente del estado de facturación de soporte. */
-export const PROJECT_PAYMENT_STATUSES = ['pending', 'invoiced', 'paid'] as const;
+/**
+ * `pending`: el hito del tramo aún no se cumple. `to_invoice`: se cumplió y hay que emitir la factura.
+ * "Atrasado" no es un estado guardado — ver `ProjectPaymentMilestone.isOverdue`.
+ */
+export const PROJECT_PAYMENT_STATUSES = ['pending', 'to_invoice', 'invoiced', 'paid'] as const;
 export const projectPaymentStatusSchema = z.enum(PROJECT_PAYMENT_STATUSES);
 export type ProjectPaymentStatus = z.infer<typeof projectPaymentStatusSchema>;
 
 export const PROJECT_PAYMENT_STATUS_LABELS: Readonly<Record<ProjectPaymentStatus, string>> = {
   pending: 'Pendiente',
+  to_invoice: 'Por facturar',
   invoiced: 'Facturado',
-  paid: 'Pagada',
+  paid: 'Pagado',
 };
+
+/**
+ * Qué hito pasa un tramo de Pendiente a Por facturar: la aprobación comercial del proyecto (p.ej. "Inicio"),
+ * la entrada a una fase (`triggerPhase`, p.ej. Marcha blanca), una fecha (`triggerDate` — planes por fecha y
+ * cuotas mensuales) o nada (`manual`).
+ */
+export const PROJECT_PAYMENT_TRIGGERS = ['approval', 'phase', 'date', 'manual'] as const;
+export const projectPaymentTriggerSchema = z.enum(PROJECT_PAYMENT_TRIGGERS);
+export type ProjectPaymentTrigger = z.infer<typeof projectPaymentTriggerSchema>;
+
+export const PROJECT_PAYMENT_TRIGGER_LABELS: Readonly<Record<ProjectPaymentTrigger, string>> = {
+  approval: 'Aprobación del proyecto',
+  phase: 'Inicio de fase',
+  date: 'Fecha programada',
+  manual: 'Manual',
+};
+
+/** Moneda del contrato del proyecto — mismos valores que `SUPPORT_PLAN_CURRENCIES`, duplicados para no importar `tickets/` (ciclo, ver `createProjectSchema`). */
+export const PROJECT_CONTRACT_CURRENCIES = ['UF', 'CLP', 'USD'] as const;
+export const projectContractCurrencySchema = z.enum(PROJECT_CONTRACT_CURRENCIES);
+export type ProjectContractCurrency = z.infer<typeof projectContractCurrencySchema>;
+
+/** Plazo de pago que se propone al facturar un tramo: vencimiento = emisión + estos días. */
+export const PROJECT_PAYMENT_DEFAULT_TERM_DAYS = 30;
 
 export const projectPaymentMilestoneSchema = z.object({
   id: uuidSchema,
@@ -474,32 +503,78 @@ export const projectPaymentMilestoneSchema = z.object({
   amount: z.number(),
   invoiceNumber: z.string().nullable(),
   issuedAt: z.iso.date().nullable(),
+  /** Vencimiento del pago — se fija al facturar. */
+  dueAt: z.iso.date().nullable(),
   status: projectPaymentStatusSchema,
+  /** Facturado, sin pago y con `dueAt` ya vencido — se calcula al leer, no se guarda. */
+  isOverdue: z.boolean(),
   paidAt: z.iso.date().nullable(),
   sortOrder: z.number().int(),
+  triggerType: projectPaymentTriggerSchema,
+  triggerPhase: projectPhaseSchema.nullable(),
+  triggerDate: z.iso.date().nullable(),
 });
 export type ProjectPaymentMilestone = z.infer<typeof projectPaymentMilestoneSchema>;
 
-/** Configurar el cronograma de cobro (crear/editar/quitar tramos) es del líder/PMO — igual criterio que `createProjectModuleSchema`. */
-export const createProjectPaymentMilestoneSchema = z.object({
+/** Campos del cronograma de un tramo — compartidos por el alta suelta y el plan de pago del formulario del proyecto. */
+const paymentMilestoneScheduleShape = {
   name: nonEmptyTrimmed(120, 'El nombre del tramo'),
   percent: z.coerce.number().min(0).max(100).nullish(),
   amount: z.coerce.number().min(0),
   sortOrder: z.coerce.number().int().min(0).optional(),
-});
+  triggerType: projectPaymentTriggerSchema.default('manual'),
+  triggerPhase: projectPhaseSchema.nullish(),
+  triggerDate: z.iso.date().nullish(),
+};
+
+/** El hito elegido necesita su dato: la fase para `phase`, la fecha para `date`. */
+function refineTrigger(
+  data: {
+    triggerType?: ProjectPaymentTrigger | undefined;
+    triggerPhase?: ProjectPhase | null | undefined;
+    triggerDate?: string | null | undefined;
+  },
+  ctx: z.RefinementCtx,
+): void {
+  if (data.triggerType === 'phase' && !data.triggerPhase) {
+    ctx.addIssue({ code: 'custom', message: 'Selecciona la fase que activa el tramo.', path: ['triggerPhase'] });
+  }
+  if (data.triggerType === 'date' && !data.triggerDate) {
+    ctx.addIssue({ code: 'custom', message: 'Indica la fecha en que se cobra el tramo.', path: ['triggerDate'] });
+  }
+}
+
+/** Configurar el cronograma de cobro (crear/editar/quitar tramos) es del líder/PMO — igual criterio que `createProjectModuleSchema`. */
+export const createProjectPaymentMilestoneSchema = z.object(paymentMilestoneScheduleShape).superRefine(refineTrigger);
 export type CreateProjectPaymentMilestoneInput = z.infer<typeof createProjectPaymentMilestoneSchema>;
+
+/**
+ * Un tramo del plan de pago enviado junto con el proyecto (crear/editar). Con `id` es un tramo existente
+ * (se actualiza su cronograma); sin `id`, uno nuevo. Al editar, los tramos existentes que no vienen se
+ * quitan — salvo los ya facturados/pagados, que nunca se borran por esta vía.
+ */
+export const projectPaymentPlanItemSchema = z
+  .object({ id: uuidSchema.optional(), ...paymentMilestoneScheduleShape })
+  .superRefine(refineTrigger);
+export type ProjectPaymentPlanItemInput = z.infer<typeof projectPaymentPlanItemSchema>;
 
 /**
  * Editar un tramo es una corrección manual: además del cronograma, permite
  * cambiar el estado y los datos de factura/pago en cualquier dirección. No
  * dispara Hito 0 — eso sigue siendo exclusivo de "Subir factura".
  */
-export const updateProjectPaymentMilestoneSchema = createProjectPaymentMilestoneSchema.partial().extend({
-  status: projectPaymentStatusSchema.optional(),
-  invoiceNumber: z.string().trim().max(50).nullish(),
-  issuedAt: z.iso.date().nullish(),
-  paidAt: z.iso.date().nullish(),
-});
+export const updateProjectPaymentMilestoneSchema = z
+  .object(paymentMilestoneScheduleShape)
+  .partial()
+  .extend({
+    triggerType: projectPaymentTriggerSchema.optional(),
+    status: projectPaymentStatusSchema.optional(),
+    invoiceNumber: z.string().trim().max(50).nullish(),
+    issuedAt: z.iso.date().nullish(),
+    dueAt: z.iso.date().nullish(),
+    paidAt: z.iso.date().nullish(),
+  })
+  .superRefine(refineTrigger);
 export type UpdateProjectPaymentMilestoneInput = z.infer<typeof updateProjectPaymentMilestoneSchema>;
 
 /**
@@ -512,6 +587,8 @@ export type UpdateProjectPaymentMilestoneInput = z.infer<typeof updateProjectPay
 export const issueProjectPaymentMilestoneInvoiceSchema = z.object({
   folio: nonEmptyTrimmed(50, 'El folio'),
   issuedAt: z.iso.date(),
+  /** Vencimiento del pago. Sin valor: emisión + `PROJECT_PAYMENT_DEFAULT_TERM_DAYS`. */
+  dueAt: z.iso.date().optional(),
   attachmentName: z.string().trim().max(255).optional(),
   pauseForManagementApproval: z.boolean().optional(),
 });
@@ -667,6 +744,10 @@ export const projectDetailSchema = projectSummarySchema.extend({
    * es igual a `usedHours` completo.
    */
   prospectPhaseHours: z.number(),
+  /** Monto total del contrato — base del % de cada tramo. */
+  contractAmount: z.number().nullable(),
+  /** Moneda de todos los tramos de pago del proyecto. */
+  contractCurrency: projectContractCurrencySchema,
   /** "Facturación" del portal cliente — cronograma de tramos de pago. */
   paymentMilestones: z.array(projectPaymentMilestoneSchema),
   /** true si Hito 0 quedó pausado esperando que Gerencia active el proyecto a mano. */
@@ -721,6 +802,10 @@ export const createProjectSchema = z
     contractLink: z.string().trim().max(500).optional(),
     additionalLinks: z.string().trim().max(500).optional(),
     teams: z.array(createProjectTeamAssignmentSchema).max(20).default([]),
+    contractAmount: z.coerce.number().min(0).nullish(),
+    contractCurrency: projectContractCurrencySchema.optional(),
+    /** Plan de pago — solo `type='development'`. Sin valor: el cronograma mínimo Inicio 50% + Marcha blanca 50%. */
+    paymentMilestones: z.array(projectPaymentPlanItemSchema).max(60).optional(),
     /**
      * Contrato de soporte completo — solo para `type='support'`. Un proyecto
      * de soporte creado desde cero (sin un proyecto de desarrollo terminado
@@ -818,6 +903,10 @@ export const updateProjectSchema = z.object({
   periodReportAchievements: z.array(z.string().trim().max(500)).max(20).nullish(),
   /** Agregar/quitar equipos y editar líder/colaboradores/horas de los ya asignados — la lista reemplaza a la actual. */
   teams: z.array(createProjectTeamAssignmentSchema).max(20).optional(),
+  contractAmount: z.coerce.number().min(0).nullish(),
+  contractCurrency: projectContractCurrencySchema.optional(),
+  /** Plan de pago completo — la lista reemplaza a la actual (ver `projectPaymentPlanItemSchema`). */
+  paymentMilestones: z.array(projectPaymentPlanItemSchema).max(60).optional(),
 });
 export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
 

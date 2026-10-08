@@ -15,6 +15,8 @@ export interface ProjectUserReader {
   findManyByIds(userIds: readonly string[]): Promise<ProjectUserReference[]>;
   /** Gerencia + líder PMO (roles `admin`/`pmo`, activos) — destinatarios de las alertas de facturación/Hito 0. */
   findActiveAdminTierRecipients(): Promise<ProjectNotificationRecipient[]>;
+  /** Gerencia/PMO + rol Finanzas (activos) — destinatarios del aviso "tramo por facturar". */
+  findActiveBillingRecipients(): Promise<ProjectNotificationRecipient[]>;
 }
 
 export const PROJECT_USER_READER = Symbol('ProjectUserReader');

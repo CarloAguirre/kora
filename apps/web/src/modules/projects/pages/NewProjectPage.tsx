@@ -58,6 +58,13 @@ import { useCreateSupportPlan, useCreateSupportProject } from '../api/support-pl
 import { useClientsList, useClientDetail, useUpdateClient } from '@/modules/clients/api/clients.queries';
 import { clientsApi } from '@/modules/clients/api/clients.api';
 import { ClientFormDialog } from '@/modules/clients/components/ClientFormDialog';
+import {
+  PaymentPlanEditor,
+  defaultPaymentPlan,
+  paymentPlanPayload,
+  validatePaymentPlan,
+  type PaymentPlanDraft,
+} from '../components/PaymentPlanEditor';
 import { DeliveryModal, EMPTY_DELIVERY_MODAL_VALUES, type DeliveryModalValues } from '../components/DeliveryModal';
 import deliveryModalStyles from '../components/DeliveryModal.module.css';
 import {
@@ -71,6 +78,7 @@ import { useUsersList } from '@/modules/users/api/users.queries';
 import { useTeamsList } from '@/modules/teams/api/teams.queries';
 import { ApiRequestError } from '@/shared/lib/api-client';
 import { formatMoney } from '@/shared/lib/format-money';
+import { paymentTriggerLabel } from '../lib/payment-milestone-display';
 import { projectPath, supportPlanPath } from '@/app/router/paths';
 
 type ProjectFormValues = z.input<typeof createProjectSchema>;
@@ -264,6 +272,9 @@ export function NewProjectPage() {
   const [step, setStep] = useState(preselectedClientId ? 1 : 0);
   const [serverError, setServerError] = useState<string | null>(null);
   const [dueDayTouched, setDueDayTouched] = useState(false);
+  // Plan de pago (solo desarrollo) — fuera del formulario, igual que `moduleDrafts`: es una lista con su propio editor.
+  const [paymentPlan, setPaymentPlan] = useState<PaymentPlanDraft>(defaultPaymentPlan);
+  const [paymentPlanError, setPaymentPlanError] = useState<string | null>(null);
 
   // Soporte: proyectos de desarrollo terminados a consolidar en el contrato — no viven en el
   // formulario porque el endpoint "desde cero" (`createSupportProject`) no los conoce, mismo
@@ -610,10 +621,23 @@ export function NewProjectPage() {
   };
 
   /** Deja "Estimación" — sin equipos/fases (Prospecto/Cotización, o el usuario eligió omitirlo) va directo a Resumen. */
-  const goToEquiposOrResumen = () => setStep(isApproved ? equiposStepIndex : resumenStepIndex);
+  /** El plan de pago vive en Estimación: se valida al dejar ese paso. */
+  const paymentPlanIsValid = () => {
+    const error = validatePaymentPlan(paymentPlan);
+    setPaymentPlanError(error);
+    return error === null;
+  };
+
+  const goToEquiposOrResumen = () => {
+    if (!paymentPlanIsValid()) return;
+    setStep(isApproved ? equiposStepIndex : resumenStepIndex);
+  };
 
   /** Botón "Crear proyecto" de Estimación (solo Aprobado) — salta Equipos·Fases directo a Resumen, quedan vacíos/pendientes para el líder. */
-  const goToResumenSkippingEquipos = () => setStep(resumenStepIndex);
+  const goToResumenSkippingEquipos = () => {
+    if (!paymentPlanIsValid()) return;
+    setStep(resumenStepIndex);
+  };
 
   /** Deja "Equipos y fases" — mismas validaciones que antes vivían al dejar "Datos del Proyecto" (horas excedidas) más nombres de módulo. */
   const goToResumen = () => {
@@ -689,7 +713,8 @@ export function NewProjectPage() {
       }
 
       const isManualHito0 = values.type === 'development' && values.salesStage === 'approved' && values.status === 'active';
-      const result = await createProject.mutateAsync(isManualHito0 ? { ...values, status: 'draft' } : values);
+      const developmentValues = { ...values, ...paymentPlanPayload(paymentPlan) };
+      const result = await createProject.mutateAsync(isManualHito0 ? { ...developmentValues, status: 'draft' } : developmentValues);
 
       if (values.type === 'development') {
         const primaryContactId = await resolveProjectContactId();
@@ -1128,6 +1153,26 @@ export function NewProjectPage() {
                     {...register('soldHours')}
                   />
                 </div>
+              </Section>
+
+              <Section title="Plan de pago">
+                <p className={styles.hint}>
+                  Tramos en que se cobra el proyecto. Cada tramo queda <b>Por facturar</b> cuando se cumple su hito y se
+                  avisa por correo a Finanzas y Gerencia.
+                </p>
+                <PaymentPlanEditor
+                  value={paymentPlan}
+                  onChange={(next) => {
+                    setPaymentPlan(next);
+                    setPaymentPlanError(null);
+                  }}
+                />
+                {paymentPlanError && (
+                  <div className={styles.alert} role="alert">
+                    <AlertIcon size={18} className={styles.alertIcon} />
+                    <span>{paymentPlanError}</span>
+                  </div>
+                )}
               </Section>
 
               <Section title="Registro de horas">
@@ -1743,6 +1788,25 @@ export function NewProjectPage() {
                   <SummaryItem label="Fecha de fin" value={estimatedDeliveryDate} />
                   <SummaryItem label={isApproved ? 'Horas vendidas' : 'Horas estimadas'} value={soldHours ? `${soldHours} hh` : undefined} />
                   {isApproved && <SummaryItem label="Asignadas a equipos" value={`${totalTeamHours} hh`} />}
+                </div>
+
+                <div className={styles.summaryCard}>
+                  <h3 className={styles.summaryCardTitle}>Plan de pago</h3>
+                  <SummaryItem
+                    label="Monto del contrato"
+                    value={paymentPlan.contractAmount ? formatMoney(Number(paymentPlan.contractAmount), paymentPlan.contractCurrency) : undefined}
+                  />
+                  {paymentPlan.items.map((item) => (
+                    <SummaryItem
+                      key={item.key}
+                      label={item.percent ? `${item.name} (${item.percent}%)` : item.name}
+                      value={`${formatMoney(Number(item.amount || 0), paymentPlan.contractCurrency)} · ${paymentTriggerLabel({
+                        triggerType: item.triggerType,
+                        triggerPhase: item.triggerPhase || null,
+                        triggerDate: item.triggerDate || null,
+                      })}`}
+                    />
+                  ))}
                 </div>
 
                 {clientDetail && (

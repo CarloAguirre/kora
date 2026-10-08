@@ -1,6 +1,12 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CLOCK, ok, type ApplicationError, type Clock, type Result } from '@kora/core';
-import type { BillingLedgerEntry, BillingLedgerResponse, SupportInvoicePaymentStatus, SupportPlanScope } from '@kora/contracts';
+import type {
+  BillingLedgerEntry,
+  BillingLedgerResponse,
+  ProjectPaymentStatus,
+  SupportInvoicePaymentStatus,
+  SupportPlanScope,
+} from '@kora/contracts';
 import { SUPPORT_PLAN_REPOSITORY, type SupportPlanRepository } from '../../domain/repositories/support-plan.repository';
 import { SUPPORT_INVOICE_REPOSITORY, type SupportInvoiceRecord, type SupportInvoiceRepository } from '../../domain/repositories/support-invoice.repository';
 import { TICKET_CLIENT_READER, type TicketClientReader } from '../ports/ticket-client-reader.port';
@@ -8,6 +14,9 @@ import {
   PROJECT_PAYMENT_MILESTONE_REPOSITORY,
   type ProjectPaymentMilestoneRepository,
 } from '../../../projects/domain/repositories/project-payment-milestone.repository';
+import { PaymentMilestoneTriggerService } from '../../../projects/application/services/payment-milestone-trigger.service';
+import { isPaymentMilestoneOverdue } from '../../../projects/application/services/payment-milestone-overdue';
+import { progressToday } from '../../../projects/application/services/project-progress';
 import { resolveSupportPlanName } from '../services/support-plan-naming';
 import { paymentStatusOf } from '../services/support-invoice-payment-status';
 import { SupportPlanCurrentBillingResolver } from '../services/support-plan-current-billing.resolver';
@@ -20,6 +29,13 @@ const PAYMENT_STATUS_TO_LEDGER_STATUS: Readonly<Record<SupportInvoicePaymentStat
   paid: 'pagado',
 };
 
+const PROJECT_STATUS_TO_LEDGER_STATUS: Readonly<Record<ProjectPaymentStatus, BillingLedgerEntry['status']>> = {
+  pending: 'pendiente',
+  to_invoice: 'por_facturar',
+  invoiced: 'facturado',
+  paid: 'pagado',
+};
+
 /**
  * Libro combinado de Facturación (rol Finanzas): une Soporte y Proyectos en
  * una tabla plana. Soporte: el ciclo vigente que todavía no tiene factura
@@ -28,7 +44,9 @@ const PAYMENT_STATUS_TO_LEDGER_STATUS: Readonly<Record<SupportInvoicePaymentStat
  * importa a otro, ver `architecture.spec.ts`) + TODO el historial real de
  * `support_invoices` (cualquier período, cualquier plan — si ya está
  * facturado, existe una fila ahí, sea del período que sea). Proyectos: todos
- * los `project_payment_milestones` de todos los proyectos.
+ * los `project_payment_milestones` de todos los proyectos — antes de leerlos, los
+ * tramos por fecha cuya fecha ya llegó pasan a "Por facturar" (no hay cron, ver
+ * `PaymentMilestoneTriggerService.reconcileDueDates`).
  */
 @Injectable()
 export class ListBillingLedgerEntriesUseCase implements UseCase<void, BillingLedgerResponse, ApplicationError> {
@@ -40,16 +58,19 @@ export class ListBillingLedgerEntriesUseCase implements UseCase<void, BillingLed
     private readonly currentBilling: SupportPlanCurrentBillingResolver,
     private readonly summaryBuilder: SupportPlanSummaryBuilder,
     @Inject(CLOCK) private readonly clock: Clock,
+    private readonly paymentTriggers: PaymentMilestoneTriggerService,
   ) {}
 
   async execute(): Promise<Result<BillingLedgerResponse, ApplicationError>> {
     const now = this.clock.now();
     const currentPeriod = periodKeyOf(now);
 
+    await this.paymentTriggers.reconcileDueDates();
+
     const [pendingEntries, invoiceEntries, projectEntries] = await Promise.all([
       this.buildPendingSupportEntries(now, currentPeriod),
       this.buildSupportInvoiceEntries(now),
-      this.buildProjectEntries(),
+      this.buildProjectEntries(progressToday(now)),
     ]);
 
     const entries = [...pendingEntries, ...invoiceEntries, ...projectEntries].sort((a, b) => {
@@ -93,11 +114,15 @@ export class ListBillingLedgerEntriesUseCase implements UseCase<void, BillingLed
         issuedAt: null,
         status: 'pendiente',
         paidAt: null,
+        dueAt: null,
         referenceId: null,
         projectId: null,
         projectName: null,
         milestoneName: null,
         milestonePercent: null,
+        milestoneTriggerType: null,
+        milestoneTriggerPhase: null,
+        milestoneTriggerDate: null,
       });
     }
     return entries;
@@ -147,15 +172,19 @@ export class ListBillingLedgerEntriesUseCase implements UseCase<void, BillingLed
       issuedAt: invoice.invoicedAt.toISOString().slice(0, 10),
       status: PAYMENT_STATUS_TO_LEDGER_STATUS[paymentStatusOf(invoice, now)],
       paidAt: invoice.paidAt?.toISOString().slice(0, 10) ?? null,
+      dueAt: invoice.dueAt?.toISOString().slice(0, 10) ?? null,
       referenceId: invoice.id,
       projectId: null,
       projectName: null,
       milestoneName: null,
       milestonePercent: null,
+      milestoneTriggerType: null,
+      milestoneTriggerPhase: null,
+      milestoneTriggerDate: null,
     };
   }
 
-  private async buildProjectEntries(): Promise<BillingLedgerEntry[]> {
+  private async buildProjectEntries(today: string): Promise<BillingLedgerEntry[]> {
     const milestones = await this.milestones.listAll();
 
     return milestones
@@ -167,17 +196,20 @@ export class ListBillingLedgerEntriesUseCase implements UseCase<void, BillingLed
         clientName: milestone.clientName ?? '',
         detail: `${milestone.projectName} — ${milestone.name}`,
         amount: milestone.amount,
-        // `project_payment_milestones` todavía no tiene moneda propia — los tramos de proyecto se cobran en UF.
-        currency: 'UF' as const,
+        currency: milestone.currency,
         folio: milestone.invoiceNumber,
         issuedAt: milestone.issuedAt?.toISOString().slice(0, 10) ?? null,
-        status: milestone.status === 'pending' ? 'pendiente' : milestone.status === 'invoiced' ? 'facturado' : 'pagado',
+        status: isPaymentMilestoneOverdue(milestone, today) ? 'atrasado' : PROJECT_STATUS_TO_LEDGER_STATUS[milestone.status],
         paidAt: milestone.paidAt?.toISOString().slice(0, 10) ?? null,
+        dueAt: milestone.dueAt?.toISOString().slice(0, 10) ?? null,
         referenceId: milestone.id,
         projectId: milestone.projectId,
         projectName: milestone.projectName,
         milestoneName: milestone.name,
         milestonePercent: milestone.percent,
+        milestoneTriggerType: milestone.triggerType,
+        milestoneTriggerPhase: milestone.triggerPhase,
+        milestoneTriggerDate: milestone.triggerDate?.toISOString().slice(0, 10) ?? null,
       }));
   }
 }

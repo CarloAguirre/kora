@@ -1,5 +1,9 @@
 import { useEffect, useState } from 'react';
-import type { IssueProjectPaymentMilestoneInvoiceInput } from '@kora/contracts';
+import {
+  PROJECT_PAYMENT_DEFAULT_TERM_DAYS,
+  type IssueProjectPaymentMilestoneInvoiceInput,
+  type ProjectContractCurrency,
+} from '@kora/contracts';
 import styles from './SupportPlanActionDialog.module.css';
 import { Modal } from '@/shared/components/ui/Modal';
 import { Button } from '@/shared/components/ui/Button';
@@ -13,6 +17,8 @@ export interface IssueProjectMilestoneInvoiceDialogProps {
   open: boolean;
   milestoneName: string;
   amount: number;
+  /** Moneda del contrato del proyecto. */
+  currency?: ProjectContractCurrency;
   onClose: () => void;
   onConfirm: (input: IssueProjectPaymentMilestoneInvoiceInput) => Promise<void>;
   /**
@@ -27,6 +33,13 @@ export interface IssueProjectMilestoneInvoiceDialogProps {
   showReactivationNotice?: boolean;
 }
 
+/** `YYYY-MM-DD` + días, sin pasar por la zona horaria local. */
+function addDays(isoDate: string, days: number): string {
+  const date = new Date(`${isoDate}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
 /**
  * Copia del patrón de `IssueSupportInvoiceDialog` para un tramo de proyecto —
  * mismo criterio: Kora no emite la factura, solo registra folio y fecha.
@@ -35,6 +48,7 @@ export function IssueProjectMilestoneInvoiceDialog({
   open,
   milestoneName,
   amount,
+  currency = 'UF',
   onClose,
   onConfirm,
   showHito0Notice = false,
@@ -42,6 +56,9 @@ export function IssueProjectMilestoneInvoiceDialog({
 }: IssueProjectMilestoneInvoiceDialogProps) {
   const [folio, setFolio] = useState('');
   const [issuedAt, setIssuedAt] = useState('');
+  const [dueAt, setDueAt] = useState('');
+  // Mientras no se toque a mano, el vencimiento sigue a la emisión (+30 días).
+  const [dueAtTouched, setDueAtTouched] = useState(false);
   const [attachmentName, setAttachmentName] = useState<string | null>(null);
   const [pauseForManagementApproval, setPauseForManagementApproval] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +67,10 @@ export function IssueProjectMilestoneInvoiceDialog({
   useEffect(() => {
     if (open) {
       setFolio('');
-      setIssuedAt(new Date().toISOString().slice(0, 10));
+      const today = new Date().toISOString().slice(0, 10);
+      setIssuedAt(today);
+      setDueAt(addDays(today, PROJECT_PAYMENT_DEFAULT_TERM_DAYS));
+      setDueAtTouched(false);
       setAttachmentName(null);
       setPauseForManagementApproval(false);
       setError(null);
@@ -62,12 +82,17 @@ export function IssueProjectMilestoneInvoiceDialog({
       setError('Ingresa el folio y la fecha de emisión.');
       return;
     }
+    if (dueAt && dueAt < issuedAt) {
+      setError('El vencimiento no puede ser anterior a la emisión.');
+      return;
+    }
     setError(null);
     setRunning(true);
     try {
       await onConfirm({
         folio: folio.trim(),
         issuedAt,
+        ...(dueAt ? { dueAt } : {}),
         attachmentName: attachmentName ?? undefined,
         ...(showHito0Notice ? { pauseForManagementApproval } : {}),
       });
@@ -83,7 +108,7 @@ export function IssueProjectMilestoneInvoiceDialog({
     <Modal
       open={open}
       title="Subir factura"
-      description={`${milestoneName} · ${formatMoney(amount, 'UF')}`}
+      description={`${milestoneName} · ${formatMoney(amount, currency)}`}
       onClose={onClose}
       dismissible={!running}
       footer={
@@ -101,7 +126,27 @@ export function IssueProjectMilestoneInvoiceDialog({
         <TextField label="N° de documento (folio)" placeholder="Ej: 27846" value={folio} onChange={(e) => setFolio(e.target.value)} autoFocus />
       </div>
       <div className={styles.field}>
-        <TextField label="Fecha de emisión" type="date" value={issuedAt} onChange={(e) => setIssuedAt(e.target.value)} />
+        <TextField
+          label="Fecha de emisión"
+          type="date"
+          value={issuedAt}
+          onChange={(e) => {
+            setIssuedAt(e.target.value);
+            if (!dueAtTouched && e.target.value) setDueAt(addDays(e.target.value, PROJECT_PAYMENT_DEFAULT_TERM_DAYS));
+          }}
+        />
+      </div>
+      <div className={styles.field}>
+        <TextField
+          label="Vencimiento del pago"
+          type="date"
+          helperText={`Pasada esta fecha sin pago, el tramo se marca como atrasado. Por defecto, ${PROJECT_PAYMENT_DEFAULT_TERM_DAYS} días desde la emisión.`}
+          value={dueAt}
+          onChange={(e) => {
+            setDueAt(e.target.value);
+            setDueAtTouched(true);
+          }}
+        />
       </div>
       <div className={styles.field}>
         <FileField

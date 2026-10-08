@@ -1,18 +1,19 @@
 import { useState } from 'react';
-import {
-  PROJECT_PAYMENT_STATUS_LABELS,
-  type IssueProjectPaymentMilestoneInvoiceInput,
-  type MarkProjectPaymentMilestonePaidInput,
-  type ProjectDetail,
-  type ProjectPaymentMilestone,
-  type ProjectPaymentStatus,
-  type UpdateProjectPaymentMilestoneInput,
+import type {
+  IssueProjectPaymentMilestoneInvoiceInput,
+  MarkProjectPaymentMilestonePaidInput,
+  ProjectDetail,
+  ProjectPaymentMilestone,
+  ProjectPaymentStatus,
+  ProjectPaymentTrigger,
+  ProjectPhase,
+  UpdateProjectPaymentMilestoneInput,
 } from '@kora/contracts';
 import styles from './ProjectExtrasTab.module.css';
 import { Card } from '@/shared/components/ui/Card';
 import { Button } from '@/shared/components/ui/Button';
 import { TextField } from '@/shared/components/ui/TextField';
-import { Badge, type BadgeTone } from '@/shared/components/ui/Badge';
+import { Badge } from '@/shared/components/ui/Badge';
 import { useToast } from '@/shared/components/ui/Toast';
 import { PencilIcon, TrashIcon } from '@/shared/components/icons/Icons';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
@@ -30,6 +31,8 @@ import { formatMoney } from '@/shared/lib/format-money';
 import { IssueProjectMilestoneInvoiceDialog } from './IssueProjectMilestoneInvoiceDialog';
 import { MarkProjectMilestonePaidDialog } from './MarkProjectMilestonePaidDialog';
 import { EditProjectMilestoneDialog } from './EditProjectMilestoneDialog';
+import { PaymentTriggerFields } from './PaymentTriggerFields';
+import { paymentStatusLabel, paymentStatusTone, paymentTriggerLabel } from '../lib/payment-milestone-display';
 
 interface AccessLinksDraft {
   demoLink: string;
@@ -96,15 +99,23 @@ interface MilestoneDraft {
   percent: string;
   amount: string;
   sortOrder: string;
+  triggerType: ProjectPaymentTrigger;
+  triggerPhase: ProjectPhase | '';
+  triggerDate: string;
 }
 
-const EMPTY_MILESTONE_DRAFT: MilestoneDraft = { name: '', percent: '', amount: '', sortOrder: '' };
-
-const MILESTONE_STATUS_TONE: Readonly<Record<ProjectPaymentStatus, BadgeTone>> = {
-  pending: 'neutral',
-  invoiced: 'info',
-  paid: 'success',
+const EMPTY_MILESTONE_DRAFT: MilestoneDraft = {
+  name: '',
+  percent: '',
+  amount: '',
+  sortOrder: '',
+  triggerType: 'manual',
+  triggerPhase: '',
+  triggerDate: '',
 };
+
+/** Aún sin factura: se puede quitar o facturar. */
+const isNotInvoiced = (status: ProjectPaymentStatus) => status === 'pending' || status === 'to_invoice';
 
 const formatDate = (value: string | null) => (value ? new Date(`${value}T00:00:00`).toLocaleDateString('es-CL') : '—');
 
@@ -149,6 +160,14 @@ export function ProjectExtrasTab({ project, canManage }: { project: ProjectDetai
       toast.error('Ingresa al menos el nombre y el monto del tramo.');
       return;
     }
+    if (newMilestone.triggerType === 'phase' && !newMilestone.triggerPhase) {
+      toast.error('Selecciona la fase que activa el tramo.');
+      return;
+    }
+    if (newMilestone.triggerType === 'date' && !newMilestone.triggerDate) {
+      toast.error('Indica la fecha de cobro del tramo.');
+      return;
+    }
     try {
       await createMilestone.mutateAsync({
         projectId: project.id,
@@ -157,6 +176,9 @@ export function ProjectExtrasTab({ project, canManage }: { project: ProjectDetai
           percent: newMilestone.percent === '' ? null : Number(newMilestone.percent),
           amount: Number(newMilestone.amount),
           sortOrder: newMilestone.sortOrder === '' ? undefined : Number(newMilestone.sortOrder),
+          triggerType: newMilestone.triggerType,
+          triggerPhase: newMilestone.triggerType === 'phase' ? (newMilestone.triggerPhase as ProjectPhase) : null,
+          triggerDate: newMilestone.triggerType === 'date' ? newMilestone.triggerDate : null,
         },
       });
       toast.success('Se agregó el tramo de pago.');
@@ -441,7 +463,11 @@ export function ProjectExtrasTab({ project, canManage }: { project: ProjectDetai
       {canViewBilling && (
         <Card>
           <p className={styles.title}>Facturación del proyecto</p>
-          <p className={styles.hint}>Cronograma de tramos de pago — pagar el primer tramo puede activar el proyecto (Hito 0).</p>
+          <p className={styles.hint}>
+            Plan de pago del proyecto ({project.contractCurrency}
+            {project.contractAmount != null ? ` · contrato ${formatMoney(project.contractAmount, project.contractCurrency)}` : ''}). Cada
+            tramo queda Por facturar al cumplirse su hito; facturar el primero puede activar el proyecto (Hito 0).
+          </p>
 
           {sortedMilestones.length === 0 ? (
             <p className={styles.hint}>Este proyecto todavía no tiene tramos de pago configurados.</p>
@@ -453,14 +479,18 @@ export function ProjectExtrasTab({ project, canManage }: { project: ProjectDetai
                     <span className={styles.milestoneName}>{milestone.name}</span>
                     <span className={styles.milestoneMeta}>
                       {milestone.percent != null ? `${milestone.percent}% · ` : ''}
-                      {formatMoney(milestone.amount, 'UF')}
+                      {formatMoney(milestone.amount, project.contractCurrency)}
+                      {` · ${paymentTriggerLabel(milestone)}`}
                       {milestone.invoiceNumber ? ` · Folio ${milestone.invoiceNumber}` : ''}
                       {milestone.issuedAt ? ` · Emitido ${formatDate(milestone.issuedAt)}` : ''}
+                      {milestone.dueAt && milestone.status === 'invoiced' ? ` · Vence ${formatDate(milestone.dueAt)}` : ''}
                       {milestone.paidAt ? ` · Pagado ${formatDate(milestone.paidAt)}` : ''}
                     </span>
                   </div>
 
-                  <Badge tone={MILESTONE_STATUS_TONE[milestone.status]}>{PROJECT_PAYMENT_STATUS_LABELS[milestone.status]}</Badge>
+                  <Badge tone={paymentStatusTone(milestone.status, milestone.isOverdue)}>
+                    {paymentStatusLabel(milestone.status, milestone.isOverdue)}
+                  </Badge>
 
                   <div className={styles.milestoneActions}>
                     {canManageMilestones && (
@@ -468,7 +498,7 @@ export function ProjectExtrasTab({ project, canManage }: { project: ProjectDetai
                         <PencilIcon size={16} />
                       </Button>
                     )}
-                    {canManageMilestones && milestone.status === 'pending' && (
+                    {canManageMilestones && isNotInvoiced(milestone.status) && (
                       <Button
                         variant="ghost"
                         size="icon"
@@ -478,8 +508,12 @@ export function ProjectExtrasTab({ project, canManage }: { project: ProjectDetai
                         <TrashIcon size={16} />
                       </Button>
                     )}
-                    {canManageBillingActions && milestone.status === 'pending' && (
-                      <Button size="sm" onClick={() => setInvoiceDialogMilestone(milestone)}>
+                    {canManageBillingActions && isNotInvoiced(milestone.status) && (
+                      <Button
+                        size="sm"
+                        variant={milestone.status === 'pending' ? 'outline' : 'primary'}
+                        onClick={() => setInvoiceDialogMilestone(milestone)}
+                      >
                         Subir factura
                       </Button>
                     )}
@@ -511,11 +545,18 @@ export function ProjectExtrasTab({ project, canManage }: { project: ProjectDetai
                 onChange={(e) => setNewMilestone((prev) => ({ ...prev, percent: e.target.value }))}
               />
               <TextField
-                label="Monto (UF)"
+                label={`Monto (${project.contractCurrency})`}
                 type="number"
                 min={0}
                 value={newMilestone.amount}
                 onChange={(e) => setNewMilestone((prev) => ({ ...prev, amount: e.target.value }))}
+              />
+              <PaymentTriggerFields
+                hideHelper
+                triggerType={newMilestone.triggerType}
+                triggerPhase={newMilestone.triggerPhase}
+                triggerDate={newMilestone.triggerDate}
+                onChange={(patch) => setNewMilestone((prev) => ({ ...prev, ...patch }))}
               />
               <TextField
                 label="Orden (opcional)"
@@ -532,12 +573,18 @@ export function ProjectExtrasTab({ project, canManage }: { project: ProjectDetai
         </Card>
       )}
 
-      <EditProjectMilestoneDialog milestone={editingMilestone} onClose={() => setEditingMilestone(null)} onConfirm={onSaveMilestone} />
+      <EditProjectMilestoneDialog
+        milestone={editingMilestone}
+        currency={project.contractCurrency}
+        onClose={() => setEditingMilestone(null)}
+        onConfirm={onSaveMilestone}
+      />
 
       <IssueProjectMilestoneInvoiceDialog
         open={invoiceDialogMilestone !== null}
         milestoneName={invoiceDialogMilestone?.name ?? ''}
         amount={invoiceDialogMilestone?.amount ?? 0}
+        currency={project.contractCurrency}
         showHito0Notice={showHito0Notice}
         showReactivationNotice={showReactivationNotice}
         onClose={() => setInvoiceDialogMilestone(null)}

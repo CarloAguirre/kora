@@ -41,14 +41,36 @@ import { useMemo, useState } from "react";
 import { billingKeys } from "../api/billing.api";
 import { useBillingLedger } from "../api/billing.queries";
 import { ProjectMilestoneDetailPanel } from "./ProjectMilestoneDetailPanel";
+import {
+  formatIsoDay,
+  paymentTriggerLabel,
+} from "@/modules/projects/lib/payment-milestone-display";
 import styles from "./ProjectsBillingSection.module.css";
 
-type StatusFilter = "todos" | "activos" | "resueltos";
-const STATUS_TABS: ReadonlyArray<{ id: StatusFilter; label: string }> = [
-  { id: "todos", label: "Todos" },
-  { id: "activos", label: "Con alerta activa" },
-  { id: "resueltos", label: "Resueltos" },
+type LedgerStatus = BillingLedgerEntry["status"];
+type StatusFilter = "todos" | LedgerStatus;
+/** Estados de un tramo de proyecto, en el orden del flujo de cobro. */
+const PROJECT_STATUSES: readonly LedgerStatus[] = [
+  "pendiente",
+  "por_facturar",
+  "facturado",
+  "atrasado",
+  "pagado",
 ];
+const STATUS_LABEL: Readonly<Record<LedgerStatus, string>> = {
+  pendiente: "Pendiente",
+  por_facturar: "Por facturar",
+  facturado: "Facturado",
+  atrasado: "Atrasado",
+  pagado: "Pagado",
+};
+const STATUS_TONE: Readonly<Record<LedgerStatus, BadgeTone>> = {
+  pendiente: "neutral",
+  por_facturar: "warning",
+  facturado: "info",
+  atrasado: "danger",
+  pagado: "success",
+};
 
 const formatAmount = (entry: BillingLedgerEntry) =>
   formatMoney(entry.amount, entry.currency);
@@ -64,43 +86,31 @@ function tramoLabel(entry: BillingLedgerEntry) {
     : entry.milestoneName;
 }
 
-/** Antes de tener factura, "pendiente" no distingue estado de pago — no hay nada que mostrar todavía. */
-function facturacionLabel(status: BillingLedgerEntry["status"]) {
-  return status === "pendiente" ? "Por facturar" : "Facturado";
-}
-function facturacionTone(status: BillingLedgerEntry["status"]): BadgeTone {
-  return status === "pendiente" ? "warning" : "info";
-}
-function pagoLabel(status: BillingLedgerEntry["status"]) {
-  return (
-    { facturado: "Pago pendiente", atrasado: "Atrasado", pagado: "Pagado" }[
-      status as "facturado" | "atrasado" | "pagado"
-    ] ?? null
-  );
-}
-const PAGO_TONE: Readonly<
-  Record<"facturado" | "atrasado" | "pagado", BadgeTone>
-> = { facturado: "info", atrasado: "danger", pagado: "success" };
-function pagoTone(status: BillingLedgerEntry["status"]): BadgeTone {
-  return PAGO_TONE[status as "facturado" | "atrasado" | "pagado"] ?? "neutral";
-}
+const hitoLabel = (entry: BillingLedgerEntry) =>
+  paymentTriggerLabel({
+    triggerType: entry.milestoneTriggerType,
+    triggerPhase: entry.milestoneTriggerPhase,
+    triggerDate: entry.milestoneTriggerDate,
+  });
 
-/** Los estados se ordenan por su avance en el flujo de cobro, no alfabéticamente. Sin estado de pago (aún por facturar) queda al final. */
-const PAGO_ORDER: Readonly<
-  Record<"facturado" | "atrasado" | "pagado", number>
-> = { facturado: 0, atrasado: 1, pagado: 2 };
+/** Vencimiento solo mientras falta el pago — en un tramo pagado ya no informa nada. */
+const dueLabel = (entry: BillingLedgerEntry) =>
+  entry.dueAt && (entry.status === "facturado" || entry.status === "atrasado")
+    ? formatIsoDay(entry.dueAt)
+    : "—";
 
 type SortField =
-  "client" | "detail" | "tramo" | "amount" | "billing" | "payment";
+  "client" | "detail" | "tramo" | "amount" | "hito" | "due" | "status";
 const SORT_VALUE: Record<SortField, (entry: BillingLedgerEntry) => SortValue> =
   {
     client: (e) => e.clientName,
     detail: projectLabel,
     tramo: (e) => (e.milestoneName ? tramoLabel(e) : null),
     amount: (e) => e.amount,
-    billing: (e) => (e.status === "pendiente" ? 0 : 1),
-    payment: (e) =>
-      PAGO_ORDER[e.status as "facturado" | "atrasado" | "pagado"] ?? null,
+    hito: hitoLabel,
+    due: (e) => (dueLabel(e) === "—" ? null : e.dueAt),
+    // Los estados se ordenan por su avance en el flujo de cobro, no alfabéticamente.
+    status: (e) => PROJECT_STATUSES.indexOf(e.status),
   };
 
 type DialogState = {
@@ -168,9 +178,7 @@ export function ProjectsBillingSection() {
     const filtered = entries.filter((entry) => {
       if (clientFilter.length > 0 && !clientFilter.includes(entry.clientId))
         return false;
-      if (status === "activos") return entry.status !== "pagado";
-      if (status === "resueltos") return entry.status === "pagado";
-      return true;
+      return status === "todos" || entry.status === status;
     });
     if (!sort) return filtered;
     const valueOf = SORT_VALUE[sort.field];
@@ -180,7 +188,7 @@ export function ProjectsBillingSection() {
   }, [entries, status, clientFilter, sort]);
   const { pageItems, pagination } = usePaginatedItems(rows);
 
-  // Sumar monedas distintas inventaría un número sin sentido — hoy `proyecto` siempre es UF, pero se agrupa igual por si eso cambia.
+  // Sumar monedas distintas inventaría un número sin sentido — cada proyecto cobra en la moneda de su contrato.
   const kpisByCurrency = useMemo(() => {
     const groups = new Map<
       string,
@@ -192,7 +200,8 @@ export function ProjectsBillingSection() {
         group = { toInvoice: 0, invoiced: 0, paid: 0, overdue: 0 };
         groups.set(entry.currency, group);
       }
-      if (entry.status === "pendiente") group.toInvoice += entry.amount;
+      // "Pendiente" (hito aún no cumplido) no suma: todavía no hay nada que facturar.
+      if (entry.status === "por_facturar") group.toInvoice += entry.amount;
       else if (entry.status === "facturado") group.invoiced += entry.amount;
       else if (entry.status === "atrasado") group.overdue += entry.amount;
       else if (entry.status === "pagado") group.paid += entry.amount;
@@ -201,6 +210,20 @@ export function ProjectsBillingSection() {
       currency: currency as BillingLedgerEntry["currency"],
       ...totals,
     }));
+  }, [entries]);
+
+  // Pestañas por estado, con la cantidad de tramos de cada uno (antes de filtrar por cliente).
+  const statusTabs = useMemo(() => {
+    const counts = new Map<LedgerStatus, number>();
+    for (const entry of entries)
+      counts.set(entry.status, (counts.get(entry.status) ?? 0) + 1);
+    return [
+      { id: "todos", label: `Todos (${entries.length})` },
+      ...PROJECT_STATUSES.map((s) => ({
+        id: s,
+        label: `${STATUS_LABEL[s]} (${counts.get(s) ?? 0})`,
+      })),
+    ];
   }, [entries]);
 
   const closeDialog = () => setDialog(null);
@@ -296,17 +319,19 @@ export function ProjectsBillingSection() {
   );
 
   const renderStatusAction = (entry: BillingLedgerEntry) => {
-    if (entry.status === "pendiente") {
+    if (entry.status === "pendiente" || entry.status === "por_facturar") {
+      // Lo normal es facturar al cumplirse el hito; antes se puede, pero como acción secundaria.
       return (
         <Button
           size="sm"
+          variant={entry.status === "pendiente" ? "outline" : "primary"}
           onClick={() => setDialog({ kind: "issue-milestone", entry })}
         >
           Subir factura
         </Button>
       );
     }
-    if (entry.status === "facturado") {
+    if (entry.status === "facturado" || entry.status === "atrasado") {
       return (
         <Button
           size="sm"
@@ -348,26 +373,15 @@ export function ProjectsBillingSection() {
       sortable: true,
       render: formatAmount,
     },
+    { key: "hito", header: "Hito de cobro", sortable: true, render: hitoLabel },
+    { key: "due", header: "Vence", sortable: true, render: dueLabel },
     {
-      key: "billing",
-      header: "Estado facturación",
+      key: "status",
+      header: "Estado",
       sortable: true,
       render: (e) => (
-        <Badge tone={facturacionTone(e.status)}>
-          {facturacionLabel(e.status)}
-        </Badge>
+        <Badge tone={STATUS_TONE[e.status]}>{STATUS_LABEL[e.status]}</Badge>
       ),
-    },
-    {
-      key: "payment",
-      header: "Estado de pago",
-      sortable: true,
-      render: (e) =>
-        pagoLabel(e.status) ? (
-          <Badge tone={pagoTone(e.status)}>{pagoLabel(e.status)}</Badge>
-        ) : (
-          <span className={styles.noAction}>—</span>
-        ),
     },
     { key: "action", header: "", render: renderAction },
   ];
@@ -382,8 +396,12 @@ export function ProjectsBillingSection() {
       "Proyecto",
       "Tramo",
       "Monto",
-      "Estado facturación",
-      "Estado de pago",
+      "Hito de cobro",
+      "Folio",
+      "Emisión",
+      "Vence",
+      "Pago",
+      "Estado",
     ];
     const csv = [header.join(";")]
       .concat(
@@ -393,8 +411,12 @@ export function ProjectsBillingSection() {
             projectLabel(e),
             tramoLabel(e),
             formatAmount(e),
-            facturacionLabel(e.status),
-            pagoLabel(e.status) ?? "",
+            hitoLabel(e),
+            e.folio ?? "",
+            e.issuedAt ? formatIsoDay(e.issuedAt) : "",
+            dueLabel(e) === "—" ? "" : dueLabel(e),
+            e.paidAt ? formatIsoDay(e.paidAt) : "",
+            STATUS_LABEL[e.status],
           ].join(";"),
         ),
       )
@@ -423,7 +445,7 @@ export function ProjectsBillingSection() {
     const tableRows = rows
       .map(
         (e) =>
-          `<tr><td>${e.clientName}</td><td>${projectLabel(e)}</td><td>${tramoLabel(e)}</td><td>${formatAmount(e)}</td><td>${facturacionLabel(e.status)}</td><td>${pagoLabel(e.status) ?? "—"}</td></tr>`,
+          `<tr><td>${e.clientName}</td><td>${projectLabel(e)}</td><td>${tramoLabel(e)}</td><td>${formatAmount(e)}</td><td>${hitoLabel(e)}</td><td>${dueLabel(e)}</td><td>${STATUS_LABEL[e.status]}</td></tr>`,
       )
       .join("");
     win.document
@@ -437,7 +459,7 @@ export function ProjectsBillingSection() {
     </style></head><body>
       <h1>Facturación de Proyectos — Kora</h1>
       <p class="meta">Generado el ${new Date().toLocaleDateString("es-CL")}</p>
-      <table><thead><tr><th>Cliente</th><th>Proyecto</th><th>Tramo</th><th>Monto</th><th>Estado facturación</th><th>Estado de pago</th></tr></thead>
+      <table><thead><tr><th>Cliente</th><th>Proyecto</th><th>Tramo</th><th>Monto</th><th>Hito de cobro</th><th>Vence</th><th>Estado</th></tr></thead>
       <tbody>${tableRows}</tbody></table>
     </body></html>`);
     win.document.close();
@@ -450,7 +472,8 @@ export function ProjectsBillingSection() {
         <div>
           <p className={styles.sectionTitle}>Proyectos</p>
           <p className={styles.sectionSubtitle}>
-            Cobro por tramos de proyecto, activados por el cambio de etapa.
+            Cobro por tramos de proyecto: cada tramo queda por facturar al
+            cumplirse su hito (aprobación, fase o fecha).
           </p>
         </div>
       </div>
@@ -521,7 +544,7 @@ export function ProjectsBillingSection() {
 
       <div className={styles.filtersRow}>
         <Tabs
-          tabs={STATUS_TABS}
+          tabs={statusTabs}
           activeId={status}
           onSelect={(id) => setStatus(id as StatusFilter)}
         />
@@ -566,6 +589,7 @@ export function ProjectsBillingSection() {
           dialog?.kind === "issue-milestone" ? dialog.entry.detail : ""
         }
         amount={dialog?.kind === "issue-milestone" ? dialog.entry.amount : 0}
+        currency={dialog?.kind === "issue-milestone" ? dialog.entry.currency : "UF"}
         showHito0Notice={showHito0Notice}
         showReactivationNotice={showReactivationNotice}
         onClose={closeDialog}
@@ -574,6 +598,7 @@ export function ProjectsBillingSection() {
 
       <EditProjectMilestoneDialog
         milestone={editingMilestone}
+        currency={milestoneProject?.contractCurrency}
         onClose={closeDialog}
         onConfirm={onUpdateMilestone}
       />

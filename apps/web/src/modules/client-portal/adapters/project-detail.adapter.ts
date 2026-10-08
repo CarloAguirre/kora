@@ -369,9 +369,11 @@ function toBilling(project: ProjectDetail): ClientProjectBilling {
 
   const paidAmount = sumWhere((s) => s === 'paid');
   const invoicedAmount = sumWhere((s) => s === 'invoiced');
-  const pendingAmount = sumWhere((s) => s === 'pending');
+  // Para el cliente "pendiente de facturar" incluye los tramos cuyo hito aún no se cumple y los ya por facturar.
+  const pendingAmount = sumWhere((s) => s === 'pending' || s === 'to_invoice');
 
   return {
+    currency: project.contractCurrency,
     totalAmount,
     paid: { amount: paidAmount, percent: percentOf(paidAmount) },
     invoicedPendingCollection: { amount: invoicedAmount, percent: percentOf(invoicedAmount) },

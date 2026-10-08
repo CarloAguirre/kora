@@ -11,6 +11,7 @@ import type { ProjectClientReader } from '../ports/project-client-reader.port';
 import type { ProjectContactReader } from '../ports/project-contact-reader.port';
 import type { ProjectHourEntryReader } from '../ports/project-hour-entry-reader.port';
 import type { ProjectActivityReader } from '../ports/project-activity-reader.port';
+import type { PaymentMilestoneTriggerService } from '../services/payment-milestone-trigger.service';
 import { FixedClock } from '../../../../test/fakes';
 
 class FakeProjectRepository implements Partial<ProjectRepository> {
@@ -34,6 +35,7 @@ function buildUseCase(projects: FakeProjectRepository) {
     NEVER_USED as ProjectHourEntryReader,
     NEVER_USED as ProjectActivityReader,
     new FixedClock(),
+    NEVER_USED as PaymentMilestoneTriggerService,
   );
 }
 

@@ -44,7 +44,9 @@ export class DeleteProjectPaymentMilestoneUseCase
     if (!milestone || milestone.projectId !== project.id) {
       return err(new ProjectPaymentMilestoneNotFoundError(command.milestoneId));
     }
-    if (milestone.status !== 'pending') return err(new ProjectPaymentMilestoneNotEditableError());
+    if (milestone.status !== 'pending' && milestone.status !== 'to_invoice') {
+      return err(new ProjectPaymentMilestoneNotEditableError());
+    }
 
     await this.milestones.remove(command.milestoneId);
 

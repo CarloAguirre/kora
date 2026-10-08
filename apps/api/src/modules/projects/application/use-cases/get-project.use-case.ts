@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { CLOCK, ForbiddenError, err, ok, type ApplicationError, type Clock, type Result } from '@kora/core';
 import { isUuid } from '@kora/core';
 import type { Permission, ProjectDetail } from '@kora/contracts';
+import { PaymentMilestoneTriggerService } from '../services/payment-milestone-trigger.service';
 import { ProjectNotFoundError } from '../../domain/errors/project.errors';
 import { PROJECT_REPOSITORY, type ProjectRepository } from '../../domain/repositories/project.repository';
 import {
@@ -56,6 +57,7 @@ export class GetProjectUseCase implements UseCase<GetProjectCommand, ProjectDeta
     @Inject(PROJECT_HOUR_ENTRY_READER) private readonly hourEntries: ProjectHourEntryReader,
     @Inject(PROJECT_ACTIVITY_READER) private readonly activity: ProjectActivityReader,
     @Inject(CLOCK) private readonly clock: Clock,
+    private readonly paymentTriggers: PaymentMilestoneTriggerService,
   ) {}
 
   async execute(command: GetProjectCommand): Promise<Result<ProjectDetail, ApplicationError>> {
@@ -63,6 +65,9 @@ export class GetProjectUseCase implements UseCase<GetProjectCommand, ProjectDeta
       ? await this.projects.findById(command.projectId)
       : await this.projects.findBySlug(command.projectId);
     if (!project || project.isDeleted) return err(new ProjectNotFoundError(command.projectId));
+
+    // Lectura perezosa de los tramos por fecha (no hay cron): si su fecha ya llegó, quedan por facturar antes de leerlos.
+    await this.paymentTriggers.promoteAndNotify(project);
 
     const snapshot = project.toSnapshot();
 

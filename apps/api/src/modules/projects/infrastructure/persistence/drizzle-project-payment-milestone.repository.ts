@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { asc, clients, eq, projectPaymentMilestones, projects, type Database } from '@kora/db';
+import { and, asc, clients, eq, gt, isNull, lte, projectPaymentMilestones, projects, type Database } from '@kora/db';
 import type { TransactionContext } from '@kora/core';
 import type {
   CreateProjectPaymentMilestoneInput,
@@ -20,9 +20,13 @@ const SELECTION = {
   amount: projectPaymentMilestones.amount,
   invoiceNumber: projectPaymentMilestones.invoiceNumber,
   issuedAt: projectPaymentMilestones.issuedAt,
+  dueAt: projectPaymentMilestones.dueAt,
   status: projectPaymentMilestones.status,
   paidAt: projectPaymentMilestones.paidAt,
   sortOrder: projectPaymentMilestones.sortOrder,
+  triggerType: projectPaymentMilestones.triggerType,
+  triggerPhase: projectPaymentMilestones.triggerPhase,
+  triggerDate: projectPaymentMilestones.triggerDate,
 };
 
 type Row = {
@@ -33,9 +37,13 @@ type Row = {
   amount: string;
   invoiceNumber: string | null;
   issuedAt: Date | null;
+  dueAt: Date | null;
   status: ProjectPaymentMilestoneRecord['status'];
   paidAt: Date | null;
   sortOrder: number;
+  triggerType: ProjectPaymentMilestoneRecord['triggerType'];
+  triggerPhase: ProjectPaymentMilestoneRecord['triggerPhase'];
+  triggerDate: Date | null;
 };
 
 function toRecord(row: Row): ProjectPaymentMilestoneRecord {
@@ -47,9 +55,13 @@ function toRecord(row: Row): ProjectPaymentMilestoneRecord {
     amount: Number(row.amount),
     invoiceNumber: row.invoiceNumber,
     issuedAt: row.issuedAt,
+    dueAt: row.dueAt,
     status: row.status,
     paidAt: row.paidAt,
     sortOrder: row.sortOrder,
+    triggerType: row.triggerType,
+    triggerPhase: row.triggerPhase,
+    triggerDate: row.triggerDate,
   };
 }
 
@@ -81,10 +93,12 @@ export class DrizzleProjectPaymentMilestoneRepository implements ProjectPaymentM
         projectName: projects.name,
         clientId: projects.clientId,
         clientName: clients.companyName,
+        currency: projects.contractCurrency,
       })
       .from(projectPaymentMilestones)
       .innerJoin(projects, eq(projectPaymentMilestones.projectId, projects.id))
       .leftJoin(clients, eq(projects.clientId, clients.id))
+      .where(isNull(projects.deletedAt))
       .orderBy(asc(projectPaymentMilestones.sortOrder));
 
     return rows.map((row) => ({
@@ -92,7 +106,28 @@ export class DrizzleProjectPaymentMilestoneRepository implements ProjectPaymentM
       projectName: row.projectName,
       clientId: row.clientId,
       clientName: row.clientName,
+      currency: row.currency,
     }));
+  }
+
+  async listPendingDateTriggered(today: string, context?: TransactionContext): Promise<ProjectPaymentMilestoneRecord[]> {
+    const db = resolveDb(this.database, context);
+
+    const rows = await db
+      .select(SELECTION)
+      .from(projectPaymentMilestones)
+      .innerJoin(projects, eq(projectPaymentMilestones.projectId, projects.id))
+      .where(
+        and(
+          eq(projectPaymentMilestones.status, 'pending'),
+          eq(projectPaymentMilestones.triggerType, 'date'),
+          lte(projectPaymentMilestones.triggerDate, new Date(today)),
+          gt(projectPaymentMilestones.amount, '0'),
+          isNull(projects.deletedAt),
+        ),
+      );
+
+    return rows.map(toRecord);
   }
 
   async findById(id: string, context?: TransactionContext): Promise<ProjectPaymentMilestoneRecord | null> {
@@ -114,6 +149,9 @@ export class DrizzleProjectPaymentMilestoneRepository implements ProjectPaymentM
         percent: input.percent != null ? String(input.percent) : null,
         amount: String(input.amount),
         sortOrder: input.sortOrder,
+        triggerType: input.triggerType,
+        triggerPhase: input.triggerType === 'phase' ? input.triggerPhase : null,
+        triggerDate: input.triggerType === 'date' ? input.triggerDate : null,
       })
       .returning({ id: projectPaymentMilestones.id });
 
@@ -132,9 +170,13 @@ export class DrizzleProjectPaymentMilestoneRepository implements ProjectPaymentM
         ...(input.percent !== undefined ? { percent: input.percent != null ? String(input.percent) : null } : {}),
         ...(input.amount !== undefined ? { amount: String(input.amount) } : {}),
         ...(input.sortOrder !== undefined ? { sortOrder: input.sortOrder } : {}),
+        ...(input.triggerType !== undefined ? { triggerType: input.triggerType } : {}),
+        ...(input.triggerPhase !== undefined ? { triggerPhase: input.triggerPhase } : {}),
+        ...(input.triggerDate !== undefined ? { triggerDate: input.triggerDate } : {}),
         ...(input.status !== undefined ? { status: input.status } : {}),
         ...(input.invoiceNumber !== undefined ? { invoiceNumber: input.invoiceNumber } : {}),
         ...(input.issuedAt !== undefined ? { issuedAt: input.issuedAt } : {}),
+        ...(input.dueAt !== undefined ? { dueAt: input.dueAt } : {}),
         ...(input.paidAt !== undefined ? { paidAt: input.paidAt } : {}),
         updatedAt: new Date(),
       })
@@ -144,6 +186,18 @@ export class DrizzleProjectPaymentMilestoneRepository implements ProjectPaymentM
   async remove(id: string, context?: TransactionContext): Promise<void> {
     const db = resolveDb(this.database, context);
     await db.delete(projectPaymentMilestones).where(eq(projectPaymentMilestones.id, id));
+  }
+
+  async markToInvoice(id: string, context?: TransactionContext): Promise<boolean> {
+    const db = resolveDb(this.database, context);
+
+    const updated = await db
+      .update(projectPaymentMilestones)
+      .set({ status: 'to_invoice', updatedAt: new Date() })
+      .where(and(eq(projectPaymentMilestones.id, id), eq(projectPaymentMilestones.status, 'pending')))
+      .returning({ id: projectPaymentMilestones.id });
+
+    return updated.length > 0;
   }
 
   async markIssued(
@@ -159,6 +213,7 @@ export class DrizzleProjectPaymentMilestoneRepository implements ProjectPaymentM
         status: 'invoiced',
         invoiceNumber: input.invoiceNumber,
         issuedAt: input.issuedAt,
+        dueAt: input.dueAt,
         updatedAt: new Date(),
       })
       .where(eq(projectPaymentMilestones.id, id));
