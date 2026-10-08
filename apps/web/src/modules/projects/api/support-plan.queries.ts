@@ -33,11 +33,16 @@ export function useSupportPlanDetail(planId: string | null) {
   });
 }
 
-function useInvalidateSupportPlans(clientId?: string, planId?: string) {
+/**
+ * `planId` es el UUID (lo que exigen las rutas de escritura), pero el detalle
+ * se cachea bajo el slug de la URL — por eso se invalidan todos los detalles
+ * en vez de `detail(planId)`, que no calzaría con la clave cacheada.
+ */
+function useInvalidateSupportPlans(clientId?: string) {
   const queryClient = useQueryClient();
   return () => {
     if (clientId) void queryClient.invalidateQueries({ queryKey: supportPlanKeys.forClient(clientId) });
-    if (planId) void queryClient.invalidateQueries({ queryKey: supportPlanKeys.detail(planId) });
+    void queryClient.invalidateQueries({ queryKey: supportPlanKeys.details() });
   };
 }
 
@@ -55,7 +60,7 @@ export function useCreateSupportProject() {
 }
 
 export function useUpdateSupportPlan(planId: string, clientId?: string) {
-  const invalidate = useInvalidateSupportPlans(clientId, planId);
+  const invalidate = useInvalidateSupportPlans(clientId);
   return useMutation({
     mutationFn: (input: UpdateSupportPlanInput) => supportPlanApi.update(planId, input),
     onSuccess: () => invalidate(),
@@ -63,7 +68,7 @@ export function useUpdateSupportPlan(planId: string, clientId?: string) {
 }
 
 export function useCloseSupportPlan(planId: string, clientId?: string) {
-  const invalidate = useInvalidateSupportPlans(clientId, planId);
+  const invalidate = useInvalidateSupportPlans(clientId);
   return useMutation({
     mutationFn: (input: CloseSupportPlanInput) => supportPlanApi.close(planId, input),
     onSuccess: () => invalidate(),
@@ -71,7 +76,7 @@ export function useCloseSupportPlan(planId: string, clientId?: string) {
 }
 
 export function useIssueSupportInvoice(planId: string, clientId?: string) {
-  const invalidate = useInvalidateSupportPlans(clientId, planId);
+  const invalidate = useInvalidateSupportPlans(clientId);
   return useMutation({
     mutationFn: (input: MarkSupportInvoiceIssuedInput) => supportPlanApi.issueInvoice(planId, input),
     onSuccess: () => invalidate(),
@@ -79,7 +84,7 @@ export function useIssueSupportInvoice(planId: string, clientId?: string) {
 }
 
 export function useMarkSupportInvoicePaid(planId: string, clientId?: string) {
-  const invalidate = useInvalidateSupportPlans(clientId, planId);
+  const invalidate = useInvalidateSupportPlans(clientId);
   return useMutation({
     mutationFn: ({ invoiceId, input }: { invoiceId: string; input: MarkSupportInvoicePaidInput }) =>
       supportPlanApi.markInvoicePaid(invoiceId, input),

@@ -66,9 +66,9 @@ export function SupportPlanDetailPage() {
   const [ticketsPage, setTicketsPage] = useState(1);
   const [ticketsPageSize, setTicketsPageSize] = useState(DEFAULT_PAGE_SIZE);
 
-  const issueInvoice = useIssueSupportInvoice(planId ?? '', plan?.clientId);
-  const markPaid = useMarkSupportInvoicePaid(planId ?? '', plan?.clientId);
-  const closePlan = useCloseSupportPlan(planId ?? '', plan?.clientId);
+  const issueInvoice = useIssueSupportInvoice(plan?.id ?? '', plan?.clientId);
+  const markPaid = useMarkSupportInvoicePaid(plan?.id ?? '', plan?.clientId);
+  const closePlan = useCloseSupportPlan(plan?.id ?? '', plan?.clientId);
 
   const currentProjectId = activeProjectId ?? plan?.linkedProjects[0]?.id ?? null;
 

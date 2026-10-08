@@ -45,5 +45,7 @@ export const supportPlanApi = {
 export const supportPlanKeys = {
   summary: (projectId: string) => ['support-plan', 'summary', projectId] as const,
   forClient: (clientId: string) => ['support-plan', 'client', clientId] as const,
+  /** Prefijo de todos los detalles — el detalle se cachea bajo el slug de la URL, no bajo el UUID que usan las mutaciones. */
+  details: () => ['support-plan', 'detail'] as const,
   detail: (planId: string) => ['support-plan', 'detail', planId] as const,
 };
