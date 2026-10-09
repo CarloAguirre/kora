@@ -86,27 +86,7 @@ function ProjectChips({ member }: { member: ForecastCapacityMember }) {
         </span>
       ))}
       {unassigned > 0 && <span className={[styles.chip, styles.chipUnassigned].join(' ')}>Sin asignación: {unassigned}hh</span>}
-      <UnscheduledChip member={member} />
     </div>
-  );
-}
-
-/**
- * Un solo chip con el total de HH asignadas en proyectos que el Forecast todavía no reparte en
- * semanas; el detalle por proyecto va en el título y en el editor del colaborador.
- */
-function UnscheduledChip({ member }: { member: ForecastCapacityMember }) {
-  if (member.unscheduled.length === 0) return null;
-  const total = member.unscheduled.reduce((sum, row) => sum + (row.assignedHours - row.plannedHours), 0);
-  const detail = member.unscheduled
-    .map((row) => `${row.projectName}: ${formatHours(row.assignedHours - row.plannedHours)} h`)
-    .join('\n');
-  const projects = member.unscheduled.length === 1 ? '1 proyecto' : `${member.unscheduled.length} proyectos`;
-
-  return (
-    <span className={[styles.chip, styles.chipHint].join(' ')} title={`HH asignadas que aún no están en ninguna semana:\n${detail}`}>
-      {formatHours(total)} h sin calendarizar en {projects}
-    </span>
   );
 }
 

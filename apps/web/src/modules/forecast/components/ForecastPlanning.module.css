@@ -100,17 +100,11 @@
   color: var(--kora-badge-danger-text);
 }
 
-/* Marcas que no suman HH: entregas y HH asignadas sin calendarizar. */
+/* Marca que no suma HH: entregas. */
 .chipDelivery {
   background: transparent;
   box-shadow: inset 0 0 0 1px var(--kora-info);
   color: var(--kora-info);
-}
-
-.chipHint {
-  background: var(--kora-blue-surface);
-  color: var(--kora-info);
-  font-size: var(--kora-text-sm);
 }
 
 .loadCell {

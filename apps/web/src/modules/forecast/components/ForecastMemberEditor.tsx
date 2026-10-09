@@ -132,15 +132,16 @@ export function ForecastMemberEditor({
 
       {member.unscheduled.length > 0 && (
         <section className={styles.group}>
-          <h4 className={styles.groupTitle}>Horas asignadas sin calendarizar</h4>
+          <h4 className={styles.groupTitle}>Horas sin semana asignada</h4>
           <p className={styles.empty}>
-            Están asignadas a la persona en el equipo del proyecto, pero ningún tramo ni tarea las reparte todavía en semanas.
+            Total del proyecto, no de esta semana: están asignadas a la persona en el equipo del proyecto, pero ningún tramo del
+            roadmap ni tarea las pone todavía en una semana. Para planificarlas, dales fecha en el proyecto.
           </p>
           <div className={styles.rows}>
             {member.unscheduled.map((row) => (
               <div key={row.projectId} className={styles.infoRow}>
                 <div className={styles.infoTitle}>
-                  {row.projectName} · {formatHours(row.assignedHours - row.plannedHours)} sin calendarizar
+                  {row.projectName} · {formatHours(row.assignedHours - row.plannedHours)} h sin semana asignada
                 </div>
                 <span className={styles.infoMeta}>
                   {formatHours(row.assignedHours)} asignadas · {formatHours(row.plannedHours)} en el Forecast
