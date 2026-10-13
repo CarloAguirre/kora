@@ -285,7 +285,9 @@ export function TicketDetailModal({ ticketId, onClose }: { ticketId: string; onC
               <div className={styles.contentSection}>
                 <div className={styles.contentSectionHeader}>
                   <AlertIcon size={16} />
-                  <span className={styles.label}>Descripción del incidente</span>
+                  <span className={styles.label}>
+                    {ticket.serviceType === 'improvement' ? 'Descripción de las mejoras' : 'Descripción del incidente'}
+                  </span>
                   {!ticket.description && <span className={styles.emptyInline}>Sin descripción</span>}
                 </div>
                 {ticket.description && <ExpandableText text={ticket.description} />}
