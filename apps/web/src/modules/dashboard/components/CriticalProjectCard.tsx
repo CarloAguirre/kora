@@ -5,7 +5,6 @@ import { Card } from '@/shared/components/ui/Card';
 import { Badge } from '@/shared/components/ui/Badge';
 import { Button } from '@/shared/components/ui/Button';
 import { UsersIcon } from '@/shared/components/icons/Icons';
-import { PriorityIndicator } from '@/modules/projects/components/PriorityIndicator';
 import { projectPath } from '@/app/router/paths';
 
 const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 1 });
@@ -19,7 +18,6 @@ export function CriticalProjectCard({ project }: { project: DashboardCriticalPro
     <Card className={styles.card}>
       <div className={styles.header}>
         <span className={styles.name}>{project.name}</span>
-        <PriorityIndicator priority={project.priority} />
       </div>
 
       <div className={styles.leader}>

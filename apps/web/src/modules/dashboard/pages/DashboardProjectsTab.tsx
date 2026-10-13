@@ -144,7 +144,7 @@ export function DashboardProjectsTab({ projects, capacity, loading, weekStart, o
           {loading ? (
             <span className={styles.empty}>Cargando proyectos...</span>
           ) : !projects || projects.criticalProjects.length === 0 ? (
-            <span className={styles.empty}>No hay proyectos críticos en este momento</span>
+            <span className={styles.empty}>No hay proyectos con más HH consumidas que vendidas</span>
           ) : (
             projects.criticalProjects.map((project) => <CriticalProjectCard key={project.id} project={project} />)
           )}

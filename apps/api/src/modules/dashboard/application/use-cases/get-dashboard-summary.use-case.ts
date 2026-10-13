@@ -312,7 +312,8 @@ export class GetDashboardSummaryUseCase implements UseCase<GetDashboardSummaryCo
     /**
      * Mismo avance que la ficha y el listado (`calculateProjectProgress`) — el avance real ya no se
      * infiere de las HH consumidas. Crítico/alerta por consumo de HH (90%/70%) o por Retraso
-     * (`PROJECT_PROGRESS_DELAY_*`); sin plan cargado solo cuenta el consumo.
+     * (`PROJECT_PROGRESS_DELAY_*`); sin plan cargado solo cuenta el consumo. Consumir más HH de las
+     * vendidas siempre es crítico, también sin HH vendidas (donde no hay porcentaje de consumo).
      */
     const modulesByProject = await this.projectModules.listProgressInputsForProjects(active.map((p) => p.id));
     const today = progressToday(now);
@@ -322,7 +323,7 @@ export class GetDashboardSummaryUseCase implements UseCase<GetDashboardSummaryCo
       const delayLevel = projectDelayLevel(progress.delay);
 
       let status: 'critical' | 'alert' | 'optimal' = 'optimal';
-      if (consumptionPercent >= 90 || delayLevel === 'critical') status = 'critical';
+      if (p.usedHours > p.soldHours || consumptionPercent >= 90 || delayLevel === 'critical') status = 'critical';
       else if (consumptionPercent >= 70 || delayLevel === 'alert') status = 'alert';
 
       return { p, actualProgress: progress.actual, expectedProgress: progress.expected, status };
@@ -334,12 +335,13 @@ export class GetDashboardSummaryUseCase implements UseCase<GetDashboardSummaryCo
       optimal: allScored.filter((entry) => entry.status === 'optimal').length,
     };
 
+    /** Monitor de Salud: solo proyectos en riesgo por HH (consumidas > vendidas), primero los de mayor exceso. */
     const scored = allScored
-      .filter((entry) => entry.status !== 'optimal')
+      .filter((entry) => entry.p.usedHours > entry.p.soldHours)
       .sort((a, b) => {
-        const priorityDiff = priorityRank(b.p.priority) - priorityRank(a.p.priority);
-        if (priorityDiff !== 0) return priorityDiff;
-        return b.p.soldHours - a.p.soldHours;
+        const overrunDiff = b.p.usedHours - b.p.soldHours - (a.p.usedHours - a.p.soldHours);
+        if (overrunDiff !== 0) return overrunDiff;
+        return priorityRank(b.p.priority) - priorityRank(a.p.priority);
       })
       .slice(0, 4);
 
