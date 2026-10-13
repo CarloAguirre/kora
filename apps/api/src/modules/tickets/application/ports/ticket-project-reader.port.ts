@@ -24,9 +24,9 @@ export interface TicketProjectReader {
    * actor con `tickets:create`/`tickets:manage` debe ver TODOS los proyectos
    * de soporte del cliente, esté o no asignado a ellos — de lo contrario un
    * colaborador no staffeado en el proyecto de soporte de un cliente no podría
-   * nunca abrirle un ticket.
+   * nunca abrirle un ticket. `status` acota además por estado.
    */
-  findLinkableByClient(clientId: string, type: ProjectType): Promise<LinkableProjectReference[]>;
+  findLinkableByClient(clientId: string, type: ProjectType, status?: readonly ProjectStatus[]): Promise<LinkableProjectReference[]>;
   /**
    * ¿Puede `actorUserId` gestionar el ticket de `assigneeUserId` en este
    * proyecto? EXCLUYENTE, mismo criterio que Horas (ver

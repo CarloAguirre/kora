@@ -1,7 +1,13 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CLOCK, err, ok, type ApplicationError, type Clock, type Result } from '@kora/core';
 import type { Permission, RoleCode, UpdateTicketInput } from '@kora/contracts';
-import { CannotAuthorizeTicketOvertimeError, CannotManageTicketError, ReferencedProjectNotFoundError, TicketNotFoundError } from '../../domain/errors/ticket.errors';
+import {
+  CannotAuthorizeTicketOvertimeError,
+  CannotManageTicketError,
+  ReferencedProjectNotFoundError,
+  TicketDevelopmentProjectNotEligibleError,
+  TicketNotFoundError,
+} from '../../domain/errors/ticket.errors';
 import { TICKET_REPOSITORY, type TicketRepository } from '../../domain/repositories/ticket.repository';
 import { TICKET_HISTORY_REPOSITORY, type TicketHistoryRepository } from '../../domain/repositories/ticket-history.repository';
 import { TICKET_PROJECT_READER, type TicketProjectReader } from '../ports/ticket-project-reader.port';
@@ -64,9 +70,14 @@ export class UpdateTicketUseCase implements UseCase<UpdateTicketCommand, void, A
       return err(new CannotAuthorizeTicketOvertimeError());
     }
 
-    if (data.developmentProjectId) {
+    // Solo al cambiarlo: un ticket vinculado antes de exigir proyectos
+    // terminados conserva su vínculo aunque se guarde otro campo.
+    if (data.developmentProjectId && data.developmentProjectId !== ticket.developmentProjectId) {
       const project = await this.projects.findById(data.developmentProjectId);
       if (!project) return err(new ReferencedProjectNotFoundError(data.developmentProjectId));
+      if (project.type !== 'development' || project.status !== 'finished') {
+        return err(new TicketDevelopmentProjectNotEligibleError(project.name));
+      }
     }
 
     if (data.assigneeUserId !== undefined && data.assigneeUserId !== ticket.assigneeUserId) {

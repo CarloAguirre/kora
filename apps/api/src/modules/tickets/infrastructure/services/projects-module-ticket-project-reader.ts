@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { ProjectType } from '@kora/contracts';
+import type { ProjectStatus, ProjectType } from '@kora/contracts';
 import { PROJECT_REPOSITORY, type ProjectRepository } from '../../../projects/domain/repositories/project.repository';
 import type { LinkableProjectReference, TicketProjectReader, TicketProjectReference } from '../../application/ports/ticket-project-reader.port';
 
@@ -18,9 +18,13 @@ export class ProjectsModuleTicketProjectReader implements TicketProjectReader {
     return found.filter((project): project is TicketProjectReference => project !== null);
   }
 
-  async findLinkableByClient(clientId: string, type: ProjectType): Promise<LinkableProjectReference[]> {
+  async findLinkableByClient(
+    clientId: string,
+    type: ProjectType,
+    status?: readonly ProjectStatus[],
+  ): Promise<LinkableProjectReference[]> {
     const page = await this.projects.search(
-      { clientId, type },
+      { clientId, type, status },
       { page: 1, pageSize: 500 },
       { field: 'name', direction: 'asc' },
     );

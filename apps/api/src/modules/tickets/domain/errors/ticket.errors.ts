@@ -30,6 +30,13 @@ export class ReferencedProjectNotFoundError extends NotFoundError {
   }
 }
 
+/** El proyecto de desarrollo de un ticket debe estar terminado: el soporte se da sobre lo ya entregado. */
+export class TicketDevelopmentProjectNotEligibleError extends ConflictError {
+  constructor(projectName: string) {
+    super(`"${projectName}" no puede vincularse al ticket: debe ser un proyecto de desarrollo finalizado.`, 'TICKET_DEVELOPMENT_PROJECT_NOT_ELIGIBLE');
+  }
+}
+
 /** Un colaborador autoservido solo puede abrir tickets contra un proyecto con plan de soporte usable hoy. */
 export class NoUsableSupportPlanError extends ConflictError {
   constructor() {

@@ -57,16 +57,6 @@
   color: var(--kora-text-disabled);
 }
 
-.delayAlert {
-  color: var(--kora-warning-text);
-  font-weight: var(--kora-weight-bold);
-}
-
-.delayCritical {
-  color: var(--kora-danger);
-  font-weight: var(--kora-weight-bold);
-}
-
 .actions {
   display: flex;
   justify-content: flex-end;

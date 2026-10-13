@@ -20,10 +20,11 @@ export interface ListLinkableTicketProjectsQuery {
  * esté asignado a él — esa restricción es para la sección Proyectos, no para
  * elegir a qué proyecto pertenece un ticket.
  *
- * Con `supportProjectId` (el contrato elegido), los de desarrollo se acotan a
- * los que ese contrato cubre. Un contrato legado, sin enlaces en
- * `support_plan_projects`, no tiene cómo acotarlos: cae al listado completo
- * del cliente, como antes.
+ * Los de desarrollo son solo los `finished`: un ticket de soporte se abre
+ * sobre algo ya entregado, nunca sobre un proyecto aún en curso. Con
+ * `supportProjectId` (el contrato elegido), se acotan además a los que ese
+ * contrato cubre. Un contrato legado, sin enlaces en `support_plan_projects`,
+ * no tiene cómo acotarlos: cae a todos los terminados del cliente.
  */
 @Injectable()
 export class ListLinkableTicketProjectsUseCase
@@ -35,8 +36,10 @@ export class ListLinkableTicketProjectsUseCase
   ) {}
 
   async execute(query: ListLinkableTicketProjectsQuery): Promise<Result<TicketLinkableProject[], ApplicationError>> {
-    const items = await this.projects.findLinkableByClient(query.clientId, query.type);
-    if (query.type !== 'development' || !query.supportProjectId) return ok(items);
+    if (query.type !== 'development') return ok(await this.projects.findLinkableByClient(query.clientId, query.type));
+
+    const items = await this.projects.findLinkableByClient(query.clientId, query.type, ['finished']);
+    if (!query.supportProjectId) return ok(items);
 
     const coveredIds = await this.coveredProjectIds(query.supportProjectId);
     if (coveredIds.length === 0) return ok(items);

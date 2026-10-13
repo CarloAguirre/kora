@@ -107,6 +107,10 @@ export class Ticket extends AggregateRoot<string> {
     return this.props.projectId;
   }
 
+  get developmentProjectId(): string | null {
+    return this.props.developmentProjectId;
+  }
+
   get assigneeUserId(): string | null {
     return this.props.assigneeUserId;
   }

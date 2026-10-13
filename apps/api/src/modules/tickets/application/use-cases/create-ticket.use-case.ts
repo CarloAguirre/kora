@@ -2,7 +2,12 @@ import { Inject, Injectable } from '@nestjs/common';
 import { CLOCK, ID_GENERATOR, err, ok, type ApplicationError, type Clock, type IdGenerator, type Result } from '@kora/core';
 import type { CreateTicketInput, RoleCode } from '@kora/contracts';
 import { Ticket } from '../../domain/entities/ticket.entity';
-import { NoUsableSupportPlanError, ReferencedClientNotFoundError, ReferencedProjectNotFoundError } from '../../domain/errors/ticket.errors';
+import {
+  NoUsableSupportPlanError,
+  ReferencedClientNotFoundError,
+  ReferencedProjectNotFoundError,
+  TicketDevelopmentProjectNotEligibleError,
+} from '../../domain/errors/ticket.errors';
 import { TICKET_REPOSITORY, type TicketRepository } from '../../domain/repositories/ticket.repository';
 import { TICKET_HISTORY_REPOSITORY, type TicketHistoryRepository } from '../../domain/repositories/ticket-history.repository';
 import { TICKET_CLIENT_READER, type TicketClientReader } from '../ports/ticket-client-reader.port';
@@ -60,6 +65,14 @@ export class CreateTicketUseCase implements UseCase<CreateTicketCommand, { id: s
       if (actorRole === 'collaborator') {
         const availability = await this.supportPlanAvailability.check(data.projectId, now);
         if (!availability.hasActiveUsablePlan) return err(new NoUsableSupportPlanError());
+      }
+    }
+
+    if (data.developmentProjectId) {
+      const project = await this.projects.findById(data.developmentProjectId);
+      if (!project) return err(new ReferencedProjectNotFoundError(data.developmentProjectId));
+      if (project.type !== 'development' || project.status !== 'finished') {
+        return err(new TicketDevelopmentProjectNotEligibleError(project.name));
       }
     }
 
