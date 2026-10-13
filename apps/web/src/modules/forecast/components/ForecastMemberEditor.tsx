@@ -212,6 +212,7 @@ function CalculatedAssignmentRow({ assignment, maxHours }: { assignment: Forecas
 
   // "Volver al cálculo" o un recálculo cambian las HH en el servidor: el campo las sigue.
   useEffect(() => setHours(String(assignment.assignedHours)), [assignment.assignedHours]);
+  useEffect(() => setComments(assignment.comments), [assignment.comments]);
 
   const commit = (patch: { comments?: string; assignedHours?: number }) =>
     updateAssignment.mutate(
@@ -332,6 +333,11 @@ function ManualAssignmentRow({ assignment, maxHours }: { assignment: ForecastAss
     setClientId(assignment.client?.id ?? null);
     setProjectId(assignment.project?.id ?? null);
   }, [assignment.type, assignment.client?.id, assignment.project?.id]);
+
+  // Comentarios y HH también: al reabrir el modal la fila se monta con la lista en caché, que puede ser
+  // anterior al último guardado (el de HH se dispara con el blur al cerrar) y se refresca después.
+  useEffect(() => setComments(assignment.comments), [assignment.comments]);
+  useEffect(() => setHours(String(assignment.assignedHours)), [assignment.assignedHours]);
 
   const showProjectSelectors = FORECAST_TYPES_WITH_PROJECT.includes(type);
   const { data: clients } = useClientsList(showProjectSelectors ? { page: 1, pageSize: 200, sortField: 'companyName' } : { pageSize: 1 });
