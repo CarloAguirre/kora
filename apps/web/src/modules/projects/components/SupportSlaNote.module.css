@@ -1,0 +1,69 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-2);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--kora-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Tarjeta de solo lectura; el borde izquierdo toma el color de la criticidad (mismos tokens que `TicketPriorityBadge`). */
+.tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--kora-space-1);
+  padding: var(--kora-space-3) var(--kora-space-4);
+  border: 1px solid var(--kora-border-soft);
+  border-left-width: 3px;
+  border-radius: var(--kora-radius);
+  background: var(--kora-surface);
+}
+
+.critical {
+  border-left-color: var(--kora-danger-hover);
+}
+
+.high {
+  border-left-color: var(--kora-danger);
+}
+
+.medium {
+  border-left-color: var(--kora-warning-text);
+}
+
+.low {
+  border-left-color: var(--kora-info);
+}
+
+.value {
+  margin-top: var(--kora-space-1);
+  font-size: var(--kora-text-xl);
+  font-weight: var(--kora-weight-bold);
+  line-height: 1.2;
+  color: var(--kora-navy);
+}
+
+.caption {
+  font-size: var(--kora-text-xs);
+  color: var(--kora-text-muted);
+}
+
+.hint {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-1);
+  margin: 0;
+  font-size: var(--kora-text-xs);
+  color: var(--kora-text-muted);
+}
+
+.hint > svg {
+  flex-shrink: 0;
+}

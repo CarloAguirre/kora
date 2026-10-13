@@ -30,6 +30,7 @@ import { Select } from '@/shared/components/ui/Select';
 import { Combobox } from '@/shared/components/ui/Combobox';
 import { AlertIcon, PlusIcon, TrashIcon, CloseIcon } from '@/shared/components/icons/Icons';
 import { DeliveryModal, EMPTY_DELIVERY_MODAL_VALUES, type DeliveryModalValues } from './DeliveryModal';
+import { SupportSlaNote } from './SupportSlaNote';
 import {
   ExecutionSegmentModal,
   EMPTY_EXECUTION_SEGMENT_MODAL_VALUES,
@@ -825,6 +826,13 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
             </div>
           )}
         </div>
+
+        {!isDevelopment && (
+          <div className={styles.section}>
+            <h3 className={styles.sectionTitle}>Tiempos de respuesta (SLA)</h3>
+            <SupportSlaNote />
+          </div>
+        )}
 
         {!isDevelopment && supportPlan && (
           <div className={styles.section}>

@@ -67,6 +67,7 @@ import {
 } from '../components/PaymentPlanEditor';
 import { DeliveryModal, EMPTY_DELIVERY_MODAL_VALUES, type DeliveryModalValues } from '../components/DeliveryModal';
 import deliveryModalStyles from '../components/DeliveryModal.module.css';
+import { SUPPORT_SLA_TARGET_HOURS, SupportSlaNote } from '../components/SupportSlaNote';
 import {
   ExecutionSegmentModal,
   EMPTY_EXECUTION_SEGMENT_MODAL_VALUES,
@@ -145,14 +146,7 @@ const SUPPORT_SURPLUS_POLICY_OPTIONS = SUPPORT_SURPLUS_POLICIES.map((policy) => 
   value: policy,
   label: SUPPORT_SURPLUS_POLICY_LABELS[policy],
 }));
-/** SLA fijo de los contratos de soporte: se muestra sin poder editarse y se envía siempre con estos valores. */
-const SUPPORT_SLA_TARGET_HOURS = { critical: 1, high: 2, medium: 12, low: 24 } as const;
-const SUPPORT_SLA_FIELDS = [
-  { label: 'Crítica', hours: SUPPORT_SLA_TARGET_HOURS.critical },
-  { label: 'Alta', hours: SUPPORT_SLA_TARGET_HOURS.high },
-  { label: 'Media', hours: SUPPORT_SLA_TARGET_HOURS.medium },
-  { label: 'Baja', hours: SUPPORT_SLA_TARGET_HOURS.low },
-];
+/** SLA fijo de los contratos de soporte: se muestra como nota (`SupportSlaNote`) y se envía siempre con estos valores. */
 const SUPPORT_SLA_VALUES = {
   supportTargetHoursCritical: SUPPORT_SLA_TARGET_HOURS.critical,
   supportTargetHoursHigh: SUPPORT_SLA_TARGET_HOURS.high,
@@ -1069,17 +1063,7 @@ export function NewProjectPage() {
 
               {isSupport && (
                 <Section title="Tiempos de respuesta (SLA)">
-                  <div className={styles.row3}>
-                    {SUPPORT_SLA_FIELDS.map(({ label, hours }) => (
-                      <Select
-                        key={label}
-                        label={label}
-                        options={[{ value: String(hours), label: `${hours} ${hours === 1 ? 'hora' : 'horas'}` }]}
-                        value={String(hours)}
-                        disabled
-                      />
-                    ))}
-                  </div>
+                  <SupportSlaNote />
                 </Section>
               )}
 
