@@ -142,16 +142,16 @@ export function NewTicketDialog({ open, onClose, onCreated }: NewTicketDialogPro
             errorText={errors.clientId?.message}
           />
           <Combobox
-            label="Proyecto"
+            label="Contrato"
             required
-            placeholder="Buscar proyecto…"
+            placeholder="Buscar contrato…"
             options={[
-              { value: '', label: 'Sin proyecto' },
+              { value: '', label: 'Sin contrato' },
               ...(supportProjects ?? []).map((project) => ({ value: project.id, label: project.name })),
             ]}
             value={projectId ?? ''}
             onChange={(value) => setValue('projectId', value || undefined, { shouldValidate: true })}
-            emptyMessage="No se encontraron proyectos."
+            emptyMessage="No se encontraron contratos."
             errorText={errors.projectId?.message}
           />
         </div>

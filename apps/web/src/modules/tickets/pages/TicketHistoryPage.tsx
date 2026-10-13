@@ -118,7 +118,7 @@ export function TicketHistoryPage() {
     { key: 'description', header: 'Incidente', render: (ticket) => ticket.description ?? '—' },
     { key: 'resolution', header: 'Solución', render: (ticket) => ticket.resolution ?? '—' },
     { key: 'client', header: 'Cliente', render: (ticket) => ticket.client?.companyName ?? '—' },
-    { key: 'project', header: 'Proyecto Soporte', render: (ticket) => ticket.project?.name ?? '—' },
+    { key: 'project', header: 'Contrato', render: (ticket) => ticket.project?.name ?? '—' },
     { key: 'supportLeaderInitials', header: 'Líder Soporte', render: (ticket) => ticket.supportLeaderInitials ?? '—' },
     { key: 'developmentProject', header: 'Proyecto Desarrollo', render: (ticket) => ticket.developmentProject?.name ?? '—' },
     { key: 'status', header: 'Estado', sortable: true, render: (ticket) => <TicketStatusBadge status={ticket.status} /> },

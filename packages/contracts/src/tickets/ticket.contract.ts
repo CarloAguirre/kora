@@ -169,7 +169,7 @@ export const createTicketSchema = z
     estimatedHours: z.coerce.number().int().min(0).nullish(),
   })
   .refine((data) => Boolean(data.clientId), { message: 'Selecciona un cliente.', path: ['clientId'] })
-  .refine((data) => Boolean(data.projectId), { message: 'Selecciona un proyecto.', path: ['projectId'] })
+  .refine((data) => Boolean(data.projectId), { message: 'Selecciona un contrato.', path: ['projectId'] })
   .refine((data) => Boolean(data.serviceType), { message: 'Selecciona un tipo de servicio.', path: ['serviceType'] })
   .refine((data) => Boolean(data.assigneeUserId), { message: 'Selecciona un responsable.', path: ['assigneeUserId'] })
   .refine((data) => Boolean(data.developmentProjectId), {

@@ -221,7 +221,7 @@ export function TicketDetailModal({ ticketId, onClose }: { ticketId: string; onC
               </div>
 
               <div className={styles.factCell}>
-                <span className={styles.factLabel}>Proyecto soporte</span>
+                <span className={styles.factLabel}>Contrato</span>
                 <span className={styles.factValue}>{ticket.project?.name ?? '—'}</span>
               </div>
               <div className={styles.factCell}>

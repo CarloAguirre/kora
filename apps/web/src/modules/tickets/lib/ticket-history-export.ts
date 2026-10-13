@@ -14,7 +14,7 @@ const COLUMNS: ReadonlyArray<{ label: string; getValue: (ticket: TicketSummary) 
   { label: 'Incidente', getValue: (t) => t.description ?? '' },
   { label: 'Solución', getValue: (t) => t.resolution ?? '' },
   { label: 'Cliente', getValue: (t) => t.client?.companyName ?? '' },
-  { label: 'Proyecto Soporte', getValue: (t) => t.project?.name ?? '' },
+  { label: 'Contrato', getValue: (t) => t.project?.name ?? '' },
   { label: 'Líder Soporte', getValue: (t) => t.supportLeaderInitials ?? '' },
   { label: 'Proyecto Desarrollo', getValue: (t) => t.developmentProject?.name ?? '' },
   { label: 'Estado', getValue: (t) => TICKET_STATUS_LABELS[t.status] },
