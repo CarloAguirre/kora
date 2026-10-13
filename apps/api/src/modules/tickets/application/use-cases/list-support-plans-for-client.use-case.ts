@@ -58,6 +58,7 @@ export class ListSupportPlansForClientUseCase
     return {
       id: record.id,
       slug: record.slug,
+      projectId: record.projectId,
       name: resolveSupportPlanName(record.name, record.scope, linkedProjects.map((p) => p.name), clientName),
       scope: record.scope,
       planType: record.planType,

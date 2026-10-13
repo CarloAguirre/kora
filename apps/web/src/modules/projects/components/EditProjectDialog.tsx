@@ -53,7 +53,9 @@ import {
   useUpdateProjectModule,
   useUpdateProjectModuleDelivery,
   useUpdateProjectModuleSegment,
+  useProjectsList,
 } from '../api/projects.queries';
+import { useSupportPlanDetail, useSupportPlansForClient, useUpdateSupportPlan } from '../api/support-plan.queries';
 import { useClientsList } from '@/modules/clients/api/clients.queries';
 import { useUsersList } from '@/modules/users/api/users.queries';
 import { useTeamsList } from '@/modules/teams/api/teams.queries';
@@ -263,6 +265,7 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
     setPaymentPlan(paymentPlanFromProject(project));
     setPaymentPlanDirty(false);
     setPaymentPlanError(null);
+    setCoveredProjectIds(null);
   }, [open, project, reset]);
 
   const clientId = watch('clientId') ?? '';
@@ -277,6 +280,36 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
     { enabled: open },
   );
   const { data: teamsCatalog } = useTeamsList({ page: 1, pageSize: 50, sortField: 'name' }, { enabled: open });
+
+  // Soporte: proyectos de desarrollo terminados que cubre el contrato — viven en el contrato
+  // (`support_plan_projects`), no en el proyecto, así que se guardan aparte con `useUpdateSupportPlan`.
+  // Mismo criterio que la sección equivalente de `NewProjectPage`: 1 = "Único", 2+ = "Consolidado".
+  const savedClientId = project.client?.id ?? null;
+  const { data: clientSupportPlans } = useSupportPlansForClient(open && !isDevelopment ? savedClientId : null);
+  const supportPlan = clientSupportPlans?.find((plan) => plan.projectId === project.id) ?? null;
+  const { data: supportPlanDetail } = useSupportPlanDetail(supportPlan?.id ?? null);
+  const updateSupportPlan = useUpdateSupportPlan(supportPlan?.id ?? '', savedClientId ?? undefined);
+  const { data: finishedProjects } = useProjectsList(
+    { clientId: savedClientId ?? undefined, type: 'development', status: ['finished'], page: 1, pageSize: 200 },
+    { enabled: open && !isDevelopment && Boolean(savedClientId) },
+  );
+  // Sin enlaces, el detalle del contrato devuelve el propio contenedor como "cubierto" — no es un proyecto terminado.
+  const savedCoveredProjects = (supportPlanDetail?.linkedProjects ?? []).filter((linked) => linked.id !== project.id);
+  /** `null` = sin tocar: se muestra lo guardado y no se manda nada al contrato. */
+  const [coveredProjectIds, setCoveredProjectIds] = useState<string[] | null>(null);
+  const selectedCoveredIds = coveredProjectIds ?? savedCoveredProjects.map((linked) => linked.id);
+  // Un proyecto cubierto que se reabrió ya no sale entre los terminados, pero sigue enlazado: se muestra igual para poder quitarlo.
+  const coveredCandidates = [
+    ...(finishedProjects?.items ?? []).map((candidate) => ({ id: candidate.id, name: candidate.name, status: candidate.status })),
+    ...savedCoveredProjects.filter((linked) => !finishedProjects?.items.some((candidate) => candidate.id === linked.id)),
+  ];
+
+  const toggleCoveredProject = (projectId: string) =>
+    setCoveredProjectIds(
+      selectedCoveredIds.includes(projectId)
+        ? selectedCoveredIds.filter((id) => id !== projectId)
+        : [...selectedCoveredIds, projectId],
+    );
 
   const newModuleForm = useForm<z.input<typeof createProjectModuleSchema>, unknown, CreateProjectModuleInput>({
     resolver: zodResolver(createProjectModuleSchema),
@@ -558,6 +591,9 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
         input: isDevelopment && paymentPlanDirty ? { ...values, ...paymentPlanPayload(paymentPlan) } : values,
       });
       await applyPendingRemovals();
+      if (supportPlan && coveredProjectIds && !sameIds(coveredProjectIds, savedCoveredProjects.map((linked) => linked.id))) {
+        await updateSupportPlan.mutateAsync({ developmentProjectIds: coveredProjectIds });
+      }
       if (isDevelopment && estado !== project.status) {
         await changeStatus.mutateAsync({
           projectId: project.id,
@@ -824,6 +860,34 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
             </div>
           )}
         </div>
+
+        {!isDevelopment && supportPlan && (
+          <div className={styles.section}>
+            <h3 className={styles.sectionTitle}>Proyectos terminados incluidos en este contrato</h3>
+            <p className={styles.hint}>
+              Un contrato de soporte puede cubrir uno o varios proyectos terminados del mismo cliente. Sin ninguno
+              marcado, el contrato queda solo con este proyecto de soporte. Con uno, el contrato queda "Único". Con
+              dos o más, queda "Consolidado": comparten una sola bolsa de horas y una sola facturación.
+            </p>
+            {coveredCandidates.length === 0 ? (
+              <p className={styles.hint}>Este cliente todavía no tiene proyectos de desarrollo terminados.</p>
+            ) : (
+              <div className={styles.teamsGrid}>
+                {coveredCandidates.map((candidate) => (
+                  <label key={candidate.id} className={styles.teamCheckbox}>
+                    <input
+                      type="checkbox"
+                      checked={selectedCoveredIds.includes(candidate.id)}
+                      onChange={() => toggleCoveredProject(candidate.id)}
+                    />
+                    {candidate.name}{' '}
+                    <span className={styles.coveredProjectStatus}>— {PROJECT_STATUS_LABELS[candidate.status]}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {isDevelopment && (
           <div className={styles.section}>
@@ -1392,4 +1456,8 @@ function toFormValues(project: ProjectDetail): ProjectFormValues {
       assignedHours: team.assignedHours ?? undefined,
     })),
   };
+}
+
+function sameIds(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((id) => b.includes(id));
 }

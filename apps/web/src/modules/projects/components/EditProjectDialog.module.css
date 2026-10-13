@@ -73,6 +73,11 @@
   accent-color: var(--kora-lime);
 }
 
+.coveredProjectStatus {
+  color: var(--kora-text-muted);
+  font-weight: var(--kora-weight-regular);
+}
+
 .field {
   display: flex;
   flex-direction: column;

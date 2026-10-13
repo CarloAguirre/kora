@@ -65,6 +65,7 @@ export class GetSupportPlanUseCase implements UseCase<GetSupportPlanQuery, Suppo
     return ok({
       id: record.id,
       slug: record.slug,
+      projectId: record.projectId,
       name: resolveSupportPlanName(record.name, record.scope, linkedProjects.map((p) => p.name), client?.companyName ?? ''),
       scope: record.scope,
       planType: record.planType,

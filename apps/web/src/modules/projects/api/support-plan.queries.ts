@@ -43,6 +43,9 @@ function useInvalidateSupportPlans(clientId?: string) {
   return () => {
     if (clientId) void queryClient.invalidateQueries({ queryKey: supportPlanKeys.forClient(clientId) });
     void queryClient.invalidateQueries({ queryKey: supportPlanKeys.details() });
+    // El resumen de la ficha de proyecto se cachea por proyecto, no por contrato — cambiar horas o
+    // proyectos cubiertos lo deja desactualizado.
+    void queryClient.invalidateQueries({ queryKey: ['support-plan', 'summary'] });
   };
 }
 

@@ -132,6 +132,8 @@ export type SupportPlanLinkedProject = z.infer<typeof supportPlanLinkedProjectSc
 export const supportPlanListItemSchema = z.object({
   id: uuidSchema,
   slug: z.string(),
+  /** Proyecto "contenedor" de soporte del contrato — `null` en contratos legados sin contenedor. */
+  projectId: uuidSchema.nullable(),
   name: z.string(),
   scope: supportPlanScopeSchema,
   planType: supportPlanTypeSchema,
@@ -214,7 +216,11 @@ export const createSupportPlanSchema = z.object({
 });
 export type CreateSupportPlanInput = z.infer<typeof createSupportPlanSchema>;
 
-export const updateSupportPlanSchema = createSupportPlanSchema.partial().omit({ clientId: true });
+/** A diferencia de crear, editar acepta `developmentProjectIds: []`: el contrato deja de cubrir proyectos terminados y queda solo con su contenedor de soporte. */
+export const updateSupportPlanSchema = createSupportPlanSchema
+  .partial()
+  .omit({ clientId: true })
+  .extend({ developmentProjectIds: z.array(uuidSchema).optional() });
 export type UpdateSupportPlanInput = z.infer<typeof updateSupportPlanSchema>;
 
 export const closeSupportPlanSchema = z.object({

@@ -30,6 +30,13 @@ vi.mock('../api/projects.queries', () => ({
   useCreateProjectModuleSegment: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateProjectModuleSegment: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useDeleteProjectModuleSegment: () => ({ mutateAsync: vi.fn() }),
+  useProjectsList: () => ({ data: { items: [] } }),
+}));
+
+vi.mock('../api/support-plan.queries', () => ({
+  useSupportPlansForClient: () => ({ data: [] }),
+  useSupportPlanDetail: () => ({ data: undefined }),
+  useUpdateSupportPlan: () => ({ mutateAsync: vi.fn() }),
 }));
 
 vi.mock('@/modules/clients/api/clients.queries', () => ({

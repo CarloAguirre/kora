@@ -28,12 +28,13 @@ import type {
 } from '@kora/contracts';
 import { projectKeys, projectsApi } from './projects.api';
 
-export function useProjectsList(query: Partial<ListProjectsQuery>) {
+export function useProjectsList(query: Partial<ListProjectsQuery>, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: projectKeys.list(query),
     queryFn: () => projectsApi.list(query),
     placeholderData: (previous) => previous,
     staleTime: 30_000,
+    enabled: options?.enabled,
   });
 }
 
