@@ -75,7 +75,8 @@ export function NewTicketDialog({ open, onClose, onCreated }: NewTicketDialogPro
   const developmentProjectId = useWatch({ control, name: 'developmentProjectId' });
   const assigneeUserId = useWatch({ control, name: 'assigneeUserId' });
   const { data: supportProjects } = useTicketLinkableProjects(clientId || undefined, 'support');
-  const { data: developmentProjects } = useTicketLinkableProjects(clientId || undefined, 'development');
+  // Y el contrato acota los de desarrollo a los que cubre.
+  const { data: developmentProjects } = useTicketLinkableProjects(clientId || undefined, 'development', projectId || undefined);
 
   const previousClientId = useRef(clientId);
   useEffect(() => {
@@ -84,6 +85,13 @@ export function NewTicketDialog({ open, onClose, onCreated }: NewTicketDialogPro
     setValue('projectId', undefined);
     setValue('developmentProjectId', undefined);
   }, [clientId, setValue]);
+
+  const previousProjectId = useRef(projectId);
+  useEffect(() => {
+    if (previousProjectId.current === projectId) return;
+    previousProjectId.current = projectId;
+    setValue('developmentProjectId', undefined);
+  }, [projectId, setValue]);
 
   useEffect(() => {
     if (!open) return;

@@ -33,6 +33,7 @@ export const ticketsApi = {
     return api.get<TicketLinkableProject[]>('/tickets/linkable-projects', {
       clientId: query.clientId,
       type: query.type,
+      supportProjectId: query.supportProjectId,
     });
   },
   linkableClients(): Promise<TicketLinkableClient[]> {

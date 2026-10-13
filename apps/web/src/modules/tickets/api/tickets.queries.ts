@@ -27,10 +27,11 @@ export function useTicketDetail(ticketId: string | null) {
  * de un cliente nunca vería nada en el combobox. Sin cliente elegido no hay
  * qué listar (los proyectos siempre son de un cliente puntual).
  */
-export function useTicketLinkableProjects(clientId: string | undefined, type: ProjectType) {
+/** `supportProjectId` (el contrato elegido) acota los de desarrollo a los que ese contrato cubre. */
+export function useTicketLinkableProjects(clientId: string | undefined, type: ProjectType, supportProjectId?: string) {
   return useQuery({
-    queryKey: ticketKeys.linkableProjects({ clientId: clientId ?? '', type }),
-    queryFn: () => ticketsApi.linkableProjects({ clientId: clientId as string, type }),
+    queryKey: ticketKeys.linkableProjects({ clientId: clientId ?? '', type, supportProjectId }),
+    queryFn: () => ticketsApi.linkableProjects({ clientId: clientId as string, type, supportProjectId }),
     enabled: Boolean(clientId),
   });
 }

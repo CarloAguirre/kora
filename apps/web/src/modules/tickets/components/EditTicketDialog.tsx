@@ -43,7 +43,15 @@ export function EditTicketDialog({ ticket, open, onClose }: { ticket: TicketDeta
       ? [...SELECTABLE_TICKET_SERVICE_TYPES, ticket.serviceType]
       : SELECTABLE_TICKET_SERVICE_TYPES;
   const serviceTypeSelectOptions = serviceTypeOptions.map((type) => ({ value: type, label: TICKET_SERVICE_TYPE_LABELS[type] }));
-  const { data: projects } = useTicketLinkableProjects(ticket.client?.id, 'development');
+  const { data: projects } = useTicketLinkableProjects(ticket.client?.id, 'development', ticket.project?.id);
+  // El listado se acota a los proyectos que cubre el contrato del ticket; uno
+  // vinculado antes de ese filtro puede no venir. Se mantiene como opción para
+  // que guardar otro cambio no lo desvincule sin que nadie lo note.
+  const currentDevelopmentProject = ticket.developmentProject;
+  const developmentProjectOptions = (projects ?? []).map((project) => ({ value: project.id, label: project.name }));
+  if (currentDevelopmentProject && !developmentProjectOptions.some((option) => option.value === currentDevelopmentProject.id)) {
+    developmentProjectOptions.push({ value: currentDevelopmentProject.id, label: currentDevelopmentProject.name });
+  }
   // Cualquier persona del sistema puede ser responsable de un ticket — es
   // quien puede cargarle horas por tenerlo asignado, no solo colaboradores.
   // Los eliminados ya vienen fuera del listado; los deshabilitados se descartan
@@ -148,7 +156,7 @@ export function EditTicketDialog({ ticket, open, onClose }: { ticket: TicketDeta
         <Combobox
           label="Proyecto de desarrollo"
           placeholder="Buscar proyecto de desarrollo…"
-          options={[{ value: '', label: 'Sin vincular' }, ...(projects ?? []).map((project) => ({ value: project.id, label: project.name }))]}
+          options={[{ value: '', label: 'Sin vincular' }, ...developmentProjectOptions]}
           value={developmentProjectId ?? ''}
           onChange={(value) => setValue('developmentProjectId', value || undefined, { shouldValidate: true })}
           emptyMessage="No se encontraron proyectos de desarrollo."

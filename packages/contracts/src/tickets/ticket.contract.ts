@@ -230,6 +230,13 @@ export type TicketLinkableProject = z.infer<typeof ticketLinkableProjectSchema>;
 export const listTicketLinkableProjectsQuerySchema = z.object({
   clientId: uuidSchema,
   type: projectTypeSchema,
+  /**
+   * Contrato (proyecto de soporte) elegido en el modal. Con `type:
+   * 'development'`, acota el listado a los proyectos que ese contrato cubre
+   * (`support_plan_projects`) — sin esto aparecían todos los de desarrollo del
+   * cliente, incluso los aún en desarrollo que ningún contrato cubre.
+   */
+  supportProjectId: uuidSchema.optional(),
 });
 export type ListTicketLinkableProjectsQuery = z.infer<typeof listTicketLinkableProjectsQuerySchema>;
 
