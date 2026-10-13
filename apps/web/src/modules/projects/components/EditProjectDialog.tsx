@@ -9,7 +9,6 @@ import {
   PROJECT_MODULE_STAGE_LABELS,
   PROJECT_PHASES,
   PROJECT_PHASE_LABELS,
-  PROJECT_PRIORITY_LABELS,
   PROJECT_STATUS_LABELS,
   updateProjectSchema,
   type CreateProjectModuleInput,
@@ -17,7 +16,6 @@ import {
   type ProjectModule,
   type ProjectModuleDelivery,
   type ProjectModuleSegment,
-  type ProjectPriority,
   type ProjectSalesStage,
   type ProjectStatus,
   type UpdateProjectInput,
@@ -61,19 +59,10 @@ import { useUsersList } from '@/modules/users/api/users.queries';
 import { useTeamsList } from '@/modules/teams/api/teams.queries';
 import { useToast } from '@/shared/components/ui/Toast';
 import { ApiRequestError } from '@/shared/lib/api-client';
-import {
-  PaymentPlanEditor,
-  paymentPlanFromProject,
-  paymentPlanPayload,
-  validatePaymentPlan,
-  type PaymentPlanDraft,
-} from './PaymentPlanEditor';
 
 type ProjectFormValues = z.input<typeof updateProjectSchema>;
 
 const PHASE_OPTIONS = PROJECT_PHASES.map((phase) => ({ value: phase, label: PROJECT_PHASE_LABELS[phase] }));
-const PRIORITY_ORDER: readonly ProjectPriority[] = ['high', 'medium', 'low'];
-const PRIORITY_OPTIONS = PRIORITY_ORDER.map((priority) => ({ value: priority, label: PROJECT_PRIORITY_LABELS[priority] }));
 const MODULE_STAGE_OPTIONS = PROJECT_MODULE_STAGES.map((stage) => ({ value: stage, label: PROJECT_MODULE_STAGE_LABELS[stage] }));
 
 /** `2026-05-08` → `08-05-2026` — mismo formato que el resto de la ficha de proyecto. */
@@ -230,10 +219,6 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
   const [showNewModuleForm, setShowNewModuleForm] = useState(false);
   const [moduleDrafts, setModuleDrafts] = useState<Record<string, ModuleEditDraft>>({});
   const [serverError, setServerError] = useState<string | null>(null);
-  const [paymentPlan, setPaymentPlan] = useState<PaymentPlanDraft>(() => paymentPlanFromProject(project));
-  // Solo se manda el plan si se tocó: así guardar otros datos no reescribe los tramos.
-  const [paymentPlanDirty, setPaymentPlanDirty] = useState(false);
-  const [paymentPlanError, setPaymentPlanError] = useState<string | null>(null);
   const [tipo, setTipo] = useState<ProjectTipo>(() => deriveTipo(project.salesStage, project.status));
   const [estado, setEstado] = useState<ProjectStatus>(project.status);
   const [manualActivationReason, setManualActivationReason] = useState('');
@@ -262,9 +247,6 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
     setEstado(project.status);
     setAllowsOvertime(project.allowsOvertime);
     setServerError(null);
-    setPaymentPlan(paymentPlanFromProject(project));
-    setPaymentPlanDirty(false);
-    setPaymentPlanError(null);
     setCoveredProjectIds(null);
   }, [open, project, reset]);
 
@@ -580,15 +562,10 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
       setServerError('Escribe el motivo o la referencia de la activación (ej. contrato firmado, orden de compra).');
       return;
     }
-    if (isDevelopment && paymentPlanDirty) {
-      const planError = validatePaymentPlan(paymentPlan);
-      setPaymentPlanError(planError);
-      if (planError) return;
-    }
     try {
       await updateProject.mutateAsync({
         projectId: project.id,
-        input: isDevelopment && paymentPlanDirty ? { ...values, ...paymentPlanPayload(paymentPlan) } : values,
+        input: values,
       });
       await applyPendingRemovals();
       if (supportPlan && coveredProjectIds && !sameIds(coveredProjectIds, savedCoveredProjects.map((linked) => linked.id))) {
@@ -700,16 +677,14 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
             )}
           </div>
 
-          <div className={styles.row3}>
-            {isDevelopment && (
+          {isDevelopment && (
+            <div className={styles.row3}>
               <Select
                 label="Tipo de proyecto"
                 options={TIPO_OPTIONS}
                 value={tipo}
                 onChange={(event) => handleTipoChange(event.target.value as ProjectTipo)}
               />
-            )}
-            {isDevelopment && (
               <Select
                 label="Estado"
                 options={estadoOptions.map((status) => ({ value: status, label: estadoLabel(tipo, status, project.status) }))}
@@ -717,24 +692,14 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
                 disabled={tipo === 'finalizado'}
                 onChange={(event) => setEstado(event.target.value as ProjectStatus)}
               />
-            )}
-            {isDevelopment && (
               <Select
                 label="Etapa de avance"
                 placeholder="Sin definir"
                 options={PHASE_OPTIONS}
                 {...register('phase', { setValueAs: emptyToNull })}
               />
-            )}
-            {!isDevelopment && (
-              <Select
-                label="Prioridad"
-                placeholder="Sin definir"
-                options={PRIORITY_OPTIONS}
-                {...register('priority', { setValueAs: emptyToNull })}
-              />
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         {isDevelopment && estado === 'on_hold' && (
@@ -884,30 +849,6 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
                     <span className={styles.coveredProjectStatus}>— {PROJECT_STATUS_LABELS[candidate.status]}</span>
                   </label>
                 ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {isDevelopment && (
-          <div className={styles.section}>
-            <h3 className={styles.sectionTitle}>Plan de pago</h3>
-            <p className={styles.hint}>
-              Cada tramo queda <b>Por facturar</b> cuando se cumple su hito y se avisa por correo a Finanzas y Gerencia.
-              Los tramos ya facturados no se editan desde acá.
-            </p>
-            <PaymentPlanEditor
-              value={paymentPlan}
-              onChange={(next) => {
-                setPaymentPlan(next);
-                setPaymentPlanDirty(true);
-                setPaymentPlanError(null);
-              }}
-            />
-            {paymentPlanError && (
-              <div className={styles.alert} role="alert">
-                <AlertIcon size={18} className={styles.alertIcon} />
-                <span>{paymentPlanError}</span>
               </div>
             )}
           </div>

@@ -11,7 +11,7 @@ import { ForecastWeeksGrid } from './ForecastWeeksGrid';
 type ViewMode = 'week' | 'weeks';
 
 const VIEW_OPTIONS = [
-  { value: 'week', label: 'Semana' },
+  { value: 'week', label: 'Semana actual' },
   { value: 'weeks', label: 'Próximas semanas' },
 ] as const;
 
