@@ -21,10 +21,9 @@ import { DownloadIcon, EyeIcon, SearchIcon, SparklesIcon, AlertIcon } from '@/sh
 import { TicketStatusBadge } from '../components/TicketStatusBadge';
 import { TicketPriorityBadge } from '../components/TicketPriorityBadge';
 import { TicketDetailModal } from '../components/TicketDetailModal';
-import { useTicketsList } from '../api/tickets.queries';
+import { useTicketLinkableClients, useTicketsList } from '../api/tickets.queries';
 import { ticketsApi } from '../api/tickets.api';
 import { exportTicketHistory } from '../lib/ticket-history-export';
-import { useClientsList } from '@/modules/clients/api/clients.queries';
 import { useUsersList } from '@/modules/users/api/users.queries';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { ApiRequestError } from '@/shared/lib/api-client';
@@ -54,7 +53,7 @@ export function TicketHistoryPage() {
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
 
-  const { data: clients } = useClientsList({ page: 1, pageSize: 200, sortField: 'companyName' });
+  const { data: clients } = useTicketLinkableClients();
   const { data: users } = useUsersList({ page: 1, pageSize: 200, sortField: 'firstName' });
 
   const query: Partial<ListTicketsQuery> = {
@@ -190,7 +189,7 @@ export function TicketHistoryPage() {
               label="Cliente"
               placeholder="Todos"
               searchPlaceholder="Buscar cliente"
-              options={(clients?.items ?? []).map((client) => ({ value: client.id, label: client.companyName }))}
+              options={(clients ?? []).map((client) => ({ value: client.id, label: client.companyName }))}
               value={clientIds}
               onChange={(next) => {
                 setClientIds(next);

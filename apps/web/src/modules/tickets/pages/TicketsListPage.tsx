@@ -10,8 +10,7 @@ import { AlertIcon, CalendarIcon, ClockIcon, PlusIcon, SearchIcon, SparklesIcon,
 import { TicketPriorityBadge } from '../components/TicketPriorityBadge';
 import { TicketDetailModal } from '../components/TicketDetailModal';
 import { NewTicketDialog } from '../components/NewTicketDialog';
-import { useChangeTicketStatus, useTicketsList } from '../api/tickets.queries';
-import { useClientsList } from '@/modules/clients/api/clients.queries';
+import { useChangeTicketStatus, useTicketLinkableClients, useTicketsList } from '../api/tickets.queries';
 import { useUsersList } from '@/modules/users/api/users.queries';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { useToast } from '@/shared/components/ui/Toast';
@@ -49,7 +48,7 @@ export function TicketsListPage() {
   const [creatingTicket, setCreatingTicket] = useState(false);
 
   const changeStatus = useChangeTicketStatus();
-  const { data: clients } = useClientsList({ page: 1, pageSize: 200, sortField: 'companyName' });
+  const { data: clients } = useTicketLinkableClients();
   const { data: users } = useUsersList({ page: 1, pageSize: 200, sortField: 'firstName' });
 
   const baseFilters = {
@@ -117,7 +116,7 @@ export function TicketsListPage() {
               label="Cliente"
               placeholder="Todos"
               searchPlaceholder="Buscar cliente"
-              options={(clients?.items ?? []).map((client) => ({ value: client.id, label: client.companyName }))}
+              options={(clients ?? []).map((client) => ({ value: client.id, label: client.companyName }))}
               value={clientIds}
               onChange={setClientIds}
             />

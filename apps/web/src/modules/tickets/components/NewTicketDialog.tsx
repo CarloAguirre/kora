@@ -18,8 +18,7 @@ import { Select } from '@/shared/components/ui/Select';
 import { Combobox } from '@/shared/components/ui/Combobox';
 import { AlertIcon } from '@/shared/components/icons/Icons';
 import { useToast } from '@/shared/components/ui/Toast';
-import { useCreateTicket, useTicketLinkableProjects } from '../api/tickets.queries';
-import { useClientsList } from '@/modules/clients/api/clients.queries';
+import { useCreateTicket, useTicketLinkableClients, useTicketLinkableProjects } from '../api/tickets.queries';
 import { useUsersList } from '@/modules/users/api/users.queries';
 import { ApiRequestError } from '@/shared/lib/api-client';
 
@@ -48,7 +47,7 @@ export interface NewTicketDialogProps {
 export function NewTicketDialog({ open, onClose, onCreated }: NewTicketDialogProps) {
   const toast = useToast();
   const createTicket = useCreateTicket();
-  const { data: clients } = useClientsList({ page: 1, pageSize: 200, sortField: 'companyName' });
+  const { data: clients } = useTicketLinkableClients();
   // Cualquier persona del sistema puede ser responsable de un ticket — es
   // quien puede cargarle horas por tenerlo asignado, no solo colaboradores.
   // Los eliminados ya vienen fuera del listado; los deshabilitados se descartan
@@ -136,7 +135,7 @@ export function NewTicketDialog({ open, onClose, onCreated }: NewTicketDialogPro
             label="Cliente"
             required
             placeholder="Buscar cliente…"
-            options={[{ value: '', label: 'Sin cliente' }, ...(clients?.items ?? []).map((client) => ({ value: client.id, label: client.companyName }))]}
+            options={[{ value: '', label: 'Sin cliente' }, ...(clients ?? []).map((client) => ({ value: client.id, label: client.companyName }))]}
             value={clientId ?? ''}
             onChange={(value) => setValue('clientId', value || undefined, { shouldValidate: true })}
             emptyMessage="No se encontraron clientes."

@@ -5,6 +5,7 @@ import type {
   ListTicketsQuery,
   ListTicketsResponse,
   TicketDetail,
+  TicketLinkableClient,
   TicketLinkableProject,
   UpdateTicketInput,
 } from '@kora/contracts';
@@ -34,6 +35,9 @@ export const ticketsApi = {
       type: query.type,
     });
   },
+  linkableClients(): Promise<TicketLinkableClient[]> {
+    return api.get<TicketLinkableClient[]>('/tickets/linkable-clients');
+  },
   create(input: CreateTicketInput): Promise<{ id: string }> {
     return api.post<{ id: string }>('/tickets', input);
   },
@@ -55,4 +59,5 @@ export const ticketKeys = {
   details: () => [...ticketKeys.all, 'detail'] as const,
   detail: (ticketId: string) => [...ticketKeys.details(), ticketId] as const,
   linkableProjects: (query: ListTicketLinkableProjectsQuery) => [...ticketKeys.all, 'linkable-projects', query] as const,
+  linkableClients: () => [...ticketKeys.all, 'linkable-clients'] as const,
 };

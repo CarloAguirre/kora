@@ -233,6 +233,19 @@ export const listTicketLinkableProjectsQuerySchema = z.object({
 });
 export type ListTicketLinkableProjectsQuery = z.infer<typeof listTicketLinkableProjectsQuerySchema>;
 
+/**
+ * Cliente seleccionable en el módulo de tickets (filtro "Cliente" del tablero
+ * y del historial, selector "Cliente" del modal). Mismo criterio que
+ * `TicketLinkableProject`: un colaborador puede crear y ver tickets sin tener
+ * `clients:read`, así que en vez de abrirle `GET /clients` (RUT, contactos,
+ * responsable comercial) se le sirve solo lo mínimo para poblar el combobox.
+ */
+export const ticketLinkableClientSchema = z.object({
+  id: uuidSchema,
+  companyName: z.string(),
+});
+export type TicketLinkableClient = z.infer<typeof ticketLinkableClientSchema>;
+
 export const supportPlanAvailabilitySchema = z.object({
   hasActiveUsablePlan: z.boolean(),
   plan: z

@@ -35,6 +35,20 @@ export function useTicketLinkableProjects(clientId: string | undefined, type: Pr
   });
 }
 
+/**
+ * Clientes para el filtro "Cliente" del tablero/historial y el selector del
+ * modal de ticket. Deliberadamente NO usa `useClientsList`: `GET /clients`
+ * exige `clients:read`, que un colaborador no tiene aunque sí pueda ver y
+ * crear tickets — le respondía 403.
+ */
+export function useTicketLinkableClients() {
+  return useQuery({
+    queryKey: ticketKeys.linkableClients(),
+    queryFn: () => ticketsApi.linkableClients(),
+    staleTime: 60_000,
+  });
+}
+
 function useInvalidateTickets() {
   const queryClient = useQueryClient();
   return () => {

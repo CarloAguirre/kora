@@ -15,6 +15,7 @@ import { ApproveTicketHhRequestUseCase } from './application/use-cases/approve-t
 import { RejectTicketHhRequestUseCase } from './application/use-cases/reject-ticket-hh-request.use-case';
 import { GetSupportPlanSummaryUseCase } from './application/use-cases/get-support-plan-summary.use-case';
 import { ListLinkableTicketProjectsUseCase } from './application/use-cases/list-linkable-ticket-projects.use-case';
+import { ListLinkableTicketClientsUseCase } from './application/use-cases/list-linkable-ticket-clients.use-case';
 import { CreateSupportPlanUseCase } from './application/use-cases/create-support-plan.use-case';
 import { UpdateSupportPlanUseCase } from './application/use-cases/update-support-plan.use-case';
 import { CloseSupportPlanUseCase } from './application/use-cases/close-support-plan.use-case';
@@ -85,6 +86,7 @@ import { HoursModule } from '../hours/hours.module';
     RejectTicketHhRequestUseCase,
     GetSupportPlanSummaryUseCase,
     ListLinkableTicketProjectsUseCase,
+    ListLinkableTicketClientsUseCase,
     CreateSupportPlanUseCase,
     UpdateSupportPlanUseCase,
     CloseSupportPlanUseCase,

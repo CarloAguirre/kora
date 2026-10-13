@@ -4,7 +4,12 @@ import {
   CLIENT_CONTACT_REPOSITORY,
   type ClientContactRepository,
 } from '../../../clients/domain/repositories/client-contact.repository';
-import type { TicketClientContactReference, TicketClientReader, TicketClientReference } from '../../application/ports/ticket-client-reader.port';
+import type {
+  LinkableClientReference,
+  TicketClientContactReference,
+  TicketClientReader,
+  TicketClientReference,
+} from '../../application/ports/ticket-client-reader.port';
 
 @Injectable()
 export class ClientsModuleTicketClientReader implements TicketClientReader {
@@ -19,6 +24,11 @@ export class ClientsModuleTicketClientReader implements TicketClientReader {
 
     const primaryContact = client.primaryContactId ? await this.findContact(clientId, client.primaryContactId) : null;
     return { id: client.id, companyName: client.companyName, primaryContact };
+  }
+
+  async findLinkable(): Promise<LinkableClientReference[]> {
+    const page = await this.clients.search({}, { page: 1, pageSize: 500 }, { field: 'companyName', direction: 'asc' });
+    return page.items.map((item) => ({ id: item.id, companyName: item.companyName }));
   }
 
   async findCompanyNames(clientIds: readonly string[]): Promise<Map<string, string>> {

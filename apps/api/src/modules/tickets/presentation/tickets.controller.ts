@@ -16,6 +16,7 @@ import {
   type RejectTicketHhRequestInput,
   type TicketDetail,
   type TicketHhRequest,
+  type TicketLinkableClient,
   type TicketLinkableProject,
   type UpdateTicketInput,
 } from '@kora/contracts';
@@ -26,6 +27,7 @@ import type { ActorContext } from '../../../shared/application/use-case';
 import { unwrapOrThrow } from '../../../shared/presentation/unwrap-result';
 import { CreateTicketUseCase } from '../application/use-cases/create-ticket.use-case';
 import { ListLinkableTicketProjectsUseCase } from '../application/use-cases/list-linkable-ticket-projects.use-case';
+import { ListLinkableTicketClientsUseCase } from '../application/use-cases/list-linkable-ticket-clients.use-case';
 import { UpdateTicketUseCase } from '../application/use-cases/update-ticket.use-case';
 import { ListTicketsUseCase } from '../application/use-cases/list-tickets.use-case';
 import { GetTicketUseCase } from '../application/use-cases/get-ticket.use-case';
@@ -50,6 +52,7 @@ export class TicketsController {
     private readonly approveHhRequest: ApproveTicketHhRequestUseCase,
     private readonly rejectHhRequest: RejectTicketHhRequestUseCase,
     private readonly listLinkableProjects: ListLinkableTicketProjectsUseCase,
+    private readonly listLinkableClients: ListLinkableTicketClientsUseCase,
   ) {}
 
   @Get()
@@ -77,6 +80,18 @@ export class TicketsController {
     @Query(new ZodValidationPipe(listTicketLinkableProjectsQuerySchema)) query: ListTicketLinkableProjectsQuery,
   ): Promise<TicketLinkableProject[]> {
     return unwrapOrThrow(await this.listLinkableProjects.execute(query));
+  }
+
+  /**
+   * Sirve el filtro "Cliente" del tablero/historial y el selector "Cliente" del
+   * modal de ticket. Debe declararse antes de `:id`. Registrado bajo los
+   * permisos de tickets, no `clients:read`: ver el comentario de
+   * `ListLinkableTicketClientsUseCase`.
+   */
+  @Get('linkable-clients')
+  @RequireAnyPermission('tickets:read', 'tickets:read_assigned', 'tickets:create', 'tickets:manage')
+  async linkableClients(): Promise<TicketLinkableClient[]> {
+    return unwrapOrThrow(await this.listLinkableClients.execute());
   }
 
   @Get(':id')
