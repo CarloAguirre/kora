@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { CreateTicketHhRequestInput, RejectTicketHhRequestInput } from '@kora/contracts';
 import { ticketHhRequestKeys, ticketHhRequestsApi } from './ticket-hh-requests.api';
 import { ticketKeys } from './tickets.api';
+import { hourKeys } from '@/modules/hours/api/hours.api';
 
 export function useTicketHhRequestsList(ticketId: string | null) {
   return useQuery({
@@ -15,7 +16,11 @@ function useInvalidateTicketHhRequests(ticketId: string) {
   const queryClient = useQueryClient();
   return () => {
     void queryClient.invalidateQueries({ queryKey: ticketHhRequestKeys.list(ticketId) });
-    void queryClient.invalidateQueries({ queryKey: ticketKeys.detail(ticketId) });
+    // Detalle y listado: las tarjetas del tablero muestran el chip "Xh por
+    // aprobar" y las HH utilizadas, que quedaban viejos hasta recargar.
+    void queryClient.invalidateQueries({ queryKey: ticketKeys.all });
+    // Aprobar genera un `hour_entries` — refresca Horas y el tope diario del formulario.
+    void queryClient.invalidateQueries({ queryKey: hourKeys.all });
   };
 }
 
