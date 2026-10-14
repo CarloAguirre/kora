@@ -11,6 +11,8 @@ const AVATAR_COLORS = ['#2563EB', '#16A34A', '#EA580C', '#7C3AED', '#DB2777', '#
 export interface AvatarProps {
   name: string;
   size?: number;
+  /** Fondo fijo en vez del color determinístico — p. ej. el navy de la ficha de ticket. */
+  color?: string;
   className?: string;
 }
 
@@ -28,11 +30,11 @@ function colorFor(name: string): string {
   return AVATAR_COLORS[hash % AVATAR_COLORS.length]!;
 }
 
-export function Avatar({ name, size = 28, className }: AvatarProps) {
+export function Avatar({ name, size = 28, color, className }: AvatarProps) {
   return (
     <span
       className={[styles.avatar, className].filter(Boolean).join(' ')}
-      style={{ width: size, height: size, fontSize: Math.round(size * 0.42), background: colorFor(name) }}
+      style={{ width: size, height: size, fontSize: Math.round(size * 0.42), background: color ?? colorFor(name) }}
       title={name}
     >
       {initials(name)}

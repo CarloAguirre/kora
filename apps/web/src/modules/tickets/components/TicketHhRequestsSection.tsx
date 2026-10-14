@@ -1,9 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { TICKET_HH_REQUEST_STATUS_LABELS, type TicketHhRequest } from '@kora/contracts';
 import styles from './TicketHhRequestsSection.module.css';
+import { Avatar } from '@/shared/components/ui/Avatar';
 import { Badge, type BadgeTone } from '@/shared/components/ui/Badge';
 import { Button } from '@/shared/components/ui/Button';
-import { AlertIcon, ClockIcon, PlusIcon } from '@/shared/components/icons/Icons';
+import { Switch } from '@/shared/components/ui/Switch';
+import { CheckIcon, ChevronDownIcon, InfoIcon, PlusIcon, TriangleAlertIcon } from '@/shared/components/icons/Icons';
 import { TextField } from '@/shared/components/ui/TextField';
 import { useToast } from '@/shared/components/ui/Toast';
 import { ApiRequestError } from '@/shared/lib/api-client';
@@ -16,7 +18,6 @@ import {
   useRejectTicketHhRequest,
   useTicketHhRequestsList,
 } from '../api/ticket-hh-requests.queries';
-import { computeApprovedHhBreakdown } from '../lib/ticket-hh-breakdown';
 
 const STATUS_TONE: Record<TicketHhRequest['status'], BadgeTone> = {
   pending: 'warning',
@@ -25,11 +26,19 @@ const STATUS_TONE: Record<TicketHhRequest['status'], BadgeTone> = {
 };
 
 const DAILY_CAP_HOURS = 8;
+const AVATAR_COLOR = 'var(--kora-navy)';
 
 const formatDate = (value: string) => new Date(`${value}T00:00:00`).toLocaleDateString('es-CL');
 const formatDateTime = (value: string) => new Date(value).toLocaleString('es-CL');
 const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 2 });
 const todayIso = () => new Date().toISOString().slice(0, 10);
+
+/** "13-10-2026 · Horas normales · Revisión de logs" — la línea secundaria de cada solicitud. */
+function requestMeta(request: TicketHhRequest): string {
+  return [formatDate(request.date), request.isOvertime ? 'Horas extra' : 'Horas normales', request.note]
+    .filter(Boolean)
+    .join(' · ');
+}
 
 interface TicketHhRequestsSectionProps {
   ticketId: string;
@@ -46,8 +55,10 @@ interface TicketHhRequestsSectionProps {
 
 /**
  * Solicitud de horas desde un ticket — "siguiente paso de M5", ver
- * docs/DECISION-M5-TICKETS.md. Pedir horas, aprobarlas (genera un registro de
- * horas ya aprobado) o rechazarlas, todo dentro de la misma ficha modal.
+ * docs/DECISION-M5-TICKETS.md. Dos tarjetas: "Horas por aprobar" (aprobar —
+ * genera un registro de horas ya aprobado — o rechazar, más el historial de
+ * solicitudes resueltas) y "Registrar horas" (pedir horas), todo dentro de la
+ * misma ficha modal.
  */
 export function TicketHhRequestsSection({
   ticketId,
@@ -71,12 +82,11 @@ export function TicketHhRequestsSection({
   const [isOvertime, setIsOvertime] = useState(false);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
+  const [resolvedOpen, setResolvedOpen] = useState(false);
 
   const canApprove = can('hours:approve');
-
-  /** "HH cargadas por colaborador" de la v1 — vive de las mismas solicitudes ya cargadas, filtradas a aprobadas. */
-  const approvedBreakdown = useMemo(() => computeApprovedHhBreakdown(requests), [requests]);
-  const approvedTotal = approvedBreakdown.reduce((sum, user) => sum + user.hours, 0);
+  const pendingRequests = (requests ?? []).filter((request) => request.status === 'pending');
+  const resolvedRequests = (requests ?? []).filter((request) => request.status !== 'pending');
 
   /**
    * Tope diario de 8h salvo horas extra — mismo criterio que `DailyEntryForm`
@@ -91,8 +101,8 @@ export function TicketHhRequestsSection({
   const otherHoursForDate = (entriesForDate?.items ?? [])
     .filter((entry) => entry.status !== 'rejected')
     .reduce((sum, entry) => sum + entry.hours, 0);
-  const ticketHoursForDate = (requests ?? [])
-    .filter((request) => request.date === date && request.status === 'pending' && request.user.id === user?.id)
+  const ticketHoursForDate = pendingRequests
+    .filter((request) => request.date === date && request.user.id === user?.id)
     .reduce((sum, request) => sum + request.hours, 0);
   const existingHoursForDate = otherHoursForDate + ticketHoursForDate;
   const newHoursValue = Number(hours) || 0;
@@ -122,56 +132,154 @@ export function TicketHhRequestsSection({
     }
   };
 
+  const cancelReject = () => {
+    setRejectingId(null);
+    setRejectionReason('');
+  };
+
   const submitReject = async (requestId: string) => {
     if (!rejectionReason.trim()) return;
     try {
       await rejectRequest.mutateAsync({ requestId, input: { reason: rejectionReason.trim() } });
       toast.success('Solicitud rechazada.');
-      setRejectingId(null);
-      setRejectionReason('');
+      cancelReject();
     } catch (error) {
       toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo rechazar la solicitud.');
     }
   };
 
   return (
-    <div className={styles.section}>
-      <div className={styles.header}>
-        <span className={styles.label}>Solicitudes de HH</span>
-        {pendingHhRequestsCount > 0 && (
-          <span className={styles.pendingChip} title={`${pendingHhRequestsCount} solicitud(es) pendientes de aprobar`}>
-            <ClockIcon size={12} />
-            {formatHours(pendingHhHours)}h por aprobar
-          </span>
+    <>
+      <div className={styles.section}>
+        <div className={styles.header}>
+          <span className={styles.title}>Horas por aprobar</span>
+          {pendingHhRequestsCount > 0 && (
+            <span className={styles.pendingChip} title={`${pendingHhRequestsCount} solicitud(es) pendientes de aprobar`}>
+              {formatHours(pendingHhHours)} h pendientes
+            </span>
+          )}
+        </div>
+
+        {isLoading && <span className={styles.empty}>Cargando…</span>}
+        {!isLoading && pendingRequests.length === 0 && <span className={styles.empty}>Sin horas pendientes de aprobar.</span>}
+
+        {pendingRequests.length > 0 && (
+          <div className={styles.list}>
+            {pendingRequests.map((request) => (
+              <div key={request.id} className={styles.pendingItem}>
+                <div className={styles.itemRow}>
+                  <Avatar name={request.user.fullName} size={32} color={AVATAR_COLOR} />
+                  <div className={styles.itemBody}>
+                    <span className={styles.itemMain}>
+                      {request.user.fullName} · {formatHours(request.hours)} h
+                    </span>
+                    <span className={styles.itemMeta}>{requestMeta(request)}</span>
+                  </div>
+                  {canApprove && rejectingId !== request.id && (
+                    <div className={styles.actions}>
+                      <Button variant="tertiary" size="sm" className={styles.rejectButton} onClick={() => setRejectingId(request.id)}>
+                        Rechazar
+                      </Button>
+                      <Button
+                        variant="outlineDark"
+                        size="sm"
+                        iconLeft={<CheckIcon size={14} />}
+                        loading={approveRequest.isPending && approveRequest.variables === request.id}
+                        disabled={approveRequest.isPending}
+                        onClick={() => void approve(request.id)}
+                      >
+                        Aprobar
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
+                {rejectingId === request.id && (
+                  <div className={styles.rejectRow}>
+                    <TextField
+                      className={styles.rejectionInput}
+                      placeholder="Motivo del rechazo"
+                      value={rejectionReason}
+                      autoFocus
+                      onChange={(event) => setRejectionReason(event.target.value)}
+                    />
+                    <Button variant="tertiary" size="sm" onClick={cancelReject}>
+                      Cancelar
+                    </Button>
+                    <Button
+                      variant="dangerOutline"
+                      size="sm"
+                      disabled={!rejectionReason.trim()}
+                      loading={rejectRequest.isPending}
+                      onClick={() => void submitReject(request.id)}
+                    >
+                      Confirmar rechazo
+                    </Button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {resolvedRequests.length > 0 && (
+          <>
+            <button
+              type="button"
+              className={styles.resolvedToggle}
+              onClick={() => setResolvedOpen((open) => !open)}
+              aria-expanded={resolvedOpen}
+            >
+              {resolvedOpen ? 'Ocultar' : 'Ver'} solicitudes resueltas ({resolvedRequests.length})
+              <ChevronDownIcon size={14} className={resolvedOpen ? styles.chevronOpen : styles.chevron} />
+            </button>
+            {resolvedOpen && (
+              <div className={styles.resolvedList}>
+                {resolvedRequests.map((request) => (
+                  <div key={request.id} className={styles.resolvedItem}>
+                    <div className={styles.itemRow}>
+                      <Avatar name={request.user.fullName} size={24} color={AVATAR_COLOR} />
+                      <div className={styles.itemBody}>
+                        <span className={styles.itemMain}>
+                          {request.user.fullName} · {formatHours(request.hours)} h
+                        </span>
+                        <span className={styles.itemMeta}>{requestMeta(request)}</span>
+                      </div>
+                      <Badge tone={STATUS_TONE[request.status]}>{TICKET_HH_REQUEST_STATUS_LABELS[request.status]}</Badge>
+                    </div>
+                    {request.status === 'rejected' && request.rejectionReason && (
+                      <p className={styles.itemRejection}>Motivo: {request.rejectionReason}</p>
+                    )}
+                    {request.reviewedBy && (
+                      <p className={styles.itemReviewed}>
+                        {TICKET_HH_REQUEST_STATUS_LABELS[request.status]} por {request.reviewedBy.fullName}
+                        {request.reviewedAt ? ` · ${formatDateTime(request.reviewedAt)}` : ''}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
 
-      {approvedBreakdown.length > 0 && (
-        <div className={styles.breakdown}>
-          <span className={styles.breakdownTotal}>HH cargadas por colaborador: {formatHours(approvedTotal)}hrs en total</span>
-          {approvedBreakdown.map((user) => (
-            <div key={user.userId} className={styles.breakdownRow}>
-              <span>{user.fullName}</span>
-              <span>{formatHours(user.hours)}hrs</span>
-            </div>
-          ))}
-        </div>
-      )}
-
       {canRequest && (
-        <div className={styles.form}>
-          <span className={styles.formTitle}>Nueva solicitud de horas</span>
-          <span className={styles.approverNote}>
-            {hhApprovers.length > 0
-              ? `Aprobador${hhApprovers.length > 1 ? 'es' : ''}: ${hhApprovers.map((approver) => approver.fullName).join(', ')}`
-              : 'Este proyecto no tiene un aprobador definido para tu solicitud.'}
-          </span>
+        <div className={styles.section}>
+          <div className={styles.headerStack}>
+            <span className={styles.title}>Registrar horas</span>
+            <span className={styles.subtitle}>
+              {hhApprovers.length > 0
+                ? `Tus horas quedan pendientes hasta que las apruebe ${hhApprovers.map((approver) => approver.fullName).join(' o ')}.`
+                : 'Este proyecto no tiene un aprobador definido para tu solicitud.'}
+            </span>
+          </div>
 
-          {!isOvertime && existingHoursForDate > 0 && existingHoursForDate < DAILY_CAP_HOURS && (
+          {!exceedsDailyCap && existingHoursForDate > 0 && existingHoursForDate < DAILY_CAP_HOURS && (
             <div className={styles.noticeInfo} role="status">
-              <AlertIcon size={16} />
+              <InfoIcon size={16} />
               <span>
-                Ya tienes {formatHours(existingHoursForDate)}h registradas este día. Al superar {DAILY_CAP_HOURS}h, marca
+                Ya tienes {formatHours(existingHoursForDate)} h registradas este día. Sobre {DAILY_CAP_HOURS} h se cuentan como
                 horas extra.
               </span>
             </div>
@@ -179,10 +287,10 @@ export function TicketHhRequestsSection({
 
           {exceedsDailyCap && (
             <div className={styles.noticeWarning} role="alert">
-              <AlertIcon size={16} />
+              <TriangleAlertIcon size={16} />
               <span>
-                Superarías el límite diario de {DAILY_CAP_HOURS}h ({formatHours(totalHoursForDate)}h en total ese día). Marca
-                "Horas extra" para poder enviarla.
+                Superarías el límite diario de {DAILY_CAP_HOURS} h ({formatHours(totalHoursForDate)} h en total ese día).{' '}
+                {allowsOvertime ? 'Marca "Horas extra" para poder enviarla.' : 'Este ticket no tiene horas extra autorizadas.'}
               </span>
             </div>
           )}
@@ -199,90 +307,34 @@ export function TicketHhRequestsSection({
               value={hours}
               onChange={(event) => setHours(event.target.value)}
             />
-            <TextField label="Nota (opcional)" value={note} onChange={(event) => setNote(event.target.value)} />
+            <TextField
+              label="Nota (opcional)"
+              placeholder="¿En qué trabajaste?"
+              value={note}
+              onChange={(event) => setNote(event.target.value)}
+            />
           </div>
+
           <div className={styles.formFooter}>
-            <label
-              className={[styles.overtimeToggleRow, !allowsOvertime ? styles.overtimeToggleRowDisabled : ''].filter(Boolean).join(' ')}
-              title={allowsOvertime ? undefined : 'Este ticket no tiene autorizadas horas extra.'}
-            >
-              <input
-                type="checkbox"
-                className={styles.overtimeCheckbox}
-                disabled={!allowsOvertime}
-                checked={isOvertime}
-                onChange={(event) => setIsOvertime(event.target.checked)}
-              />
-              <span className={styles.overtimeSwitch} />
-              <span>Horas extra</span>
-            </label>
+            {allowsOvertime && (
+              <div className={styles.overtimeRow}>
+                <Switch checked={isOvertime} onChange={setIsOvertime} label="Horas extra" />
+                <span>Horas extra</span>
+              </div>
+            )}
             <Button
-              disabled={exceedsDailyCap}
+              variant="outlineDark"
+              className={styles.submitButton}
+              disabled={exceedsDailyCap || !(Number(hours) > 0)}
               loading={createRequest.isPending}
               iconLeft={<PlusIcon size={16} />}
               onClick={() => void submitRequest()}
             >
-              Enviar solicitud
+              Registrar horas
             </Button>
           </div>
         </div>
       )}
-
-      <div className={styles.list}>
-        {isLoading && <span className={styles.empty}>Cargando…</span>}
-        {!isLoading && (requests?.length ?? 0) === 0 && <span className={styles.empty}>Sin solicitudes todavía.</span>}
-        {requests?.map((request) => (
-          <div key={request.id} className={styles.item}>
-            <div className={styles.itemRow}>
-              <span className={styles.itemMain}>
-                {request.hours}h — {formatDate(request.date)} · {request.user.fullName}
-              </span>
-              {request.isOvertime && <Badge tone="warning">Extra</Badge>}
-              <Badge tone={STATUS_TONE[request.status]}>{TICKET_HH_REQUEST_STATUS_LABELS[request.status]}</Badge>
-            </div>
-            {request.note && <p className={styles.itemNote}>{request.note}</p>}
-            {request.status === 'rejected' && request.rejectionReason && (
-              <p className={styles.itemRejection}>Motivo: {request.rejectionReason}</p>
-            )}
-            {request.status !== 'pending' && request.reviewedBy && (
-              <p className={styles.itemMeta}>
-                {TICKET_HH_REQUEST_STATUS_LABELS[request.status]} por {request.reviewedBy.fullName}
-                {request.reviewedAt ? ` · ${formatDateTime(request.reviewedAt)}` : ''}
-              </p>
-            )}
-
-            {request.status === 'pending' && canApprove && (
-              <div className={styles.actions}>
-                <Button size="sm" loading={approveRequest.isPending} onClick={() => void approve(request.id)}>
-                  Aprobar
-                </Button>
-                {rejectingId === request.id ? (
-                  <>
-                    <TextField
-                      className={styles.rejectionInput}
-                      placeholder="Motivo del rechazo"
-                      value={rejectionReason}
-                      onChange={(event) => setRejectionReason(event.target.value)}
-                    />
-                    <Button
-                      variant="dangerOutline"
-                      size="sm"
-                      loading={rejectRequest.isPending}
-                      onClick={() => void submitReject(request.id)}
-                    >
-                      Confirmar rechazo
-                    </Button>
-                  </>
-                ) : (
-                  <Button variant="dangerOutline" size="sm" onClick={() => setRejectingId(request.id)}>
-                    Rechazar
-                  </Button>
-                )}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
+    </>
   );
 }

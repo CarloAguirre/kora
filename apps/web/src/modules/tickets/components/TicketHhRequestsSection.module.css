@@ -2,7 +2,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--kora-space-3);
-  padding: var(--kora-space-4);
+  padding: var(--kora-space-4) var(--kora-space-5);
   border: 1px solid var(--kora-border-soft);
   border-radius: var(--kora-radius);
   background: var(--kora-surface);
@@ -13,167 +13,38 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--kora-space-2);
+  min-height: 24px;
 }
 
-.label {
-  font-weight: var(--kora-weight-semibold);
+.headerStack {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.title {
+  font-size: var(--kora-text-base);
+  font-weight: var(--kora-weight-bold);
   color: var(--kora-text);
+}
+
+.subtitle {
+  font-size: var(--kora-text-sm);
+  color: var(--kora-text-muted);
 }
 
 .pendingChip {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  height: 22px;
-  padding: 2px var(--kora-space-2);
-  border-radius: var(--kora-radius-sm);
-  border: 1px solid var(--kora-warning);
+  height: 24px;
+  padding: 0 var(--kora-space-3);
+  border-radius: var(--kora-radius-pill);
   background: var(--kora-warning-surface);
   color: var(--kora-warning-text);
   font-size: var(--kora-text-xs);
-  font-weight: var(--kora-weight-medium);
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--kora-space-3);
-  padding: var(--kora-space-4);
-  border: 1px solid var(--kora-border);
-  border-radius: var(--kora-radius);
-  background: var(--kora-surface-alt);
-}
-
-.formTitle {
-  font-size: var(--kora-text-xs);
   font-weight: var(--kora-weight-semibold);
-  color: var(--kora-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-
-.approverNote {
-  font-size: var(--kora-text-xs);
-  color: var(--kora-text-muted);
-}
-
-.noticeInfo,
-.noticeWarning {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--kora-space-2);
-  padding: var(--kora-space-3);
-  border-radius: var(--kora-radius-sm);
-  font-size: var(--kora-text-sm);
-}
-
-.noticeInfo {
-  background: #eef5ff;
-  color: #1d4f91;
-}
-
-.noticeWarning {
-  background: #fff8e1;
-  color: #8b6914;
-}
-
-.formGrid {
-  display: grid;
-  grid-template-columns: minmax(130px, 150px) minmax(90px, 110px) 1fr;
-  gap: var(--kora-space-3);
-}
-
-.formFooter {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--kora-space-3);
-  flex-wrap: wrap;
-}
-
-.overtimeToggleRow {
-  display: flex;
-  align-items: center;
-  gap: var(--kora-space-2);
-  height: 40px;
-  font-size: var(--kora-text-sm);
-  color: var(--kora-navy);
   white-space: nowrap;
-  cursor: pointer;
-}
-
-.overtimeToggleRowDisabled {
-  color: var(--kora-text-disabled);
-  cursor: not-allowed;
-}
-
-.overtimeCheckbox {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  overflow: hidden;
-}
-
-.overtimeSwitch {
-  display: inline-block;
-  width: 34px;
-  height: 18px;
-  border-radius: var(--kora-radius-pill);
-  background: var(--kora-border-soft);
-  position: relative;
   flex-shrink: 0;
-  transition: background 0.15s ease;
-}
-
-.overtimeSwitch::after {
-  content: '';
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--kora-surface);
-  transition: transform 0.15s ease;
-}
-
-.overtimeCheckbox:checked + .overtimeSwitch {
-  background: var(--kora-blue-600);
-}
-
-.overtimeCheckbox:checked + .overtimeSwitch::after {
-  transform: translateX(16px);
-}
-
-.overtimeCheckbox:focus-visible + .overtimeSwitch {
-  box-shadow: 0 0 0 3px var(--kora-blue-surface);
-}
-
-.overtimeCheckbox:disabled + .overtimeSwitch {
-  opacity: 0.5;
-}
-
-@media (max-width: 480px) {
-  .formGrid {
-    grid-template-columns: 1fr;
-  }
-
-  .formFooter {
-    justify-content: stretch;
-  }
-
-  .formFooter > button {
-    width: 100%;
-  }
-}
-
-.list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--kora-space-2);
 }
 
 .empty {
@@ -182,49 +53,72 @@
   font-style: italic;
 }
 
-.item {
+/* ── Solicitudes pendientes ──────────────────────────────────────────── */
+
+.list {
   display: flex;
   flex-direction: column;
   gap: var(--kora-space-2);
-  padding: var(--kora-space-3);
-  border: 1px solid var(--kora-border-soft);
+}
+
+.pendingItem {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-3);
+  padding: var(--kora-space-3) var(--kora-space-4);
+  border: 1px solid var(--kora-border-subtle);
   border-radius: var(--kora-radius);
+  background: var(--kora-surface-alt);
 }
 
 .itemRow {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--kora-space-2);
+  gap: var(--kora-space-3);
+}
+
+.itemBody {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
 }
 
 .itemMain {
-  font-size: var(--kora-text-sm);
+  font-size: var(--kora-text-base);
+  font-weight: var(--kora-weight-bold);
   color: var(--kora-text);
 }
 
-.itemNote {
+.itemMeta {
   font-size: var(--kora-text-sm);
   color: var(--kora-text-muted);
-  white-space: pre-wrap;
-}
-
-.itemRejection {
-  font-size: var(--kora-text-sm);
-  color: var(--kora-danger);
-}
-
-.itemMeta {
-  font-size: var(--kora-text-xs);
-  color: var(--kora-text-disabled);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .actions {
   display: flex;
   align-items: center;
   gap: var(--kora-space-2);
+  flex-shrink: 0;
+}
+
+.actions .rejectButton {
+  color: var(--kora-danger);
+}
+
+.actions .rejectButton:not(:disabled):hover {
+  background: var(--kora-badge-danger-bg);
+}
+
+.rejectRow {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-2);
   flex-wrap: wrap;
-  margin-top: var(--kora-space-1);
 }
 
 .rejectionInput {
@@ -232,30 +126,150 @@
   min-width: 160px;
 }
 
-.breakdown {
-  display: flex;
-  flex-direction: column;
-  gap: var(--kora-space-2);
-  padding: var(--kora-space-3);
-  border-radius: var(--kora-radius);
-  background: var(--kora-blue-surface-alt);
-}
+/* ── Solicitudes resueltas ───────────────────────────────────────────── */
 
-.breakdownTotal {
+.resolvedToggle {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: var(--kora-space-1);
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--kora-blue-600);
+  font: inherit;
   font-size: var(--kora-text-sm);
   font-weight: var(--kora-weight-semibold);
-  color: var(--kora-navy);
+  cursor: pointer;
 }
 
-.breakdownRow {
+.resolvedToggle:hover {
+  text-decoration: underline;
+}
+
+.chevron,
+.chevronOpen {
+  transition: transform 0.2s;
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
+}
+
+.resolvedList {
+  display: flex;
+  flex-direction: column;
+}
+
+.resolvedItem {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-1);
+  padding: var(--kora-space-2) 0;
+  border-top: 1px solid var(--kora-border-subtle);
+}
+
+.resolvedItem .itemMain {
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-semibold);
+}
+
+.resolvedItem .itemMeta {
+  font-size: var(--kora-text-xs);
+}
+
+.itemRejection,
+.itemReviewed {
+  margin: 0;
+  padding-left: calc(24px + var(--kora-space-3));
+  font-size: var(--kora-text-xs);
+}
+
+.itemRejection {
+  color: var(--kora-danger);
+}
+
+.itemReviewed {
+  color: var(--kora-text-disabled);
+}
+
+/* ── Registrar horas ─────────────────────────────────────────────────── */
+
+.noticeInfo,
+.noticeWarning {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: var(--kora-space-2);
+  padding: var(--kora-space-2) var(--kora-space-3);
+  border-radius: var(--kora-radius);
   font-size: var(--kora-text-sm);
-  color: var(--kora-text-muted);
 }
 
-.breakdownRow span:last-child {
-  color: var(--kora-navy);
-  font-weight: var(--kora-weight-medium);
+.noticeInfo > svg,
+.noticeWarning > svg {
+  flex-shrink: 0;
+}
+
+.noticeInfo {
+  background: var(--kora-blue-surface-alt);
+  color: #1d4f91;
+}
+
+.noticeWarning {
+  background: var(--kora-badge-warning-bg);
+  color: var(--kora-badge-warning-text);
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: minmax(140px, 1.3fr) minmax(90px, 0.9fr) 3.2fr;
+  gap: var(--kora-space-3);
+}
+
+.formFooter {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-3);
+  flex-wrap: wrap;
+}
+
+.overtimeRow {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+  font-size: var(--kora-text-sm);
+  color: var(--kora-text);
+}
+
+.formFooter .submitButton {
+  margin-left: auto;
+}
+
+@media (max-width: 640px) {
+  .section {
+    padding: var(--kora-space-3);
+  }
+
+  .formGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .formGrid > :last-child {
+    grid-column: 1 / -1;
+  }
+
+  .pendingItem .itemRow {
+    flex-wrap: wrap;
+  }
+
+  .actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
+@media (max-width: 480px) {
+  .formFooter .submitButton {
+    width: 100%;
+  }
 }

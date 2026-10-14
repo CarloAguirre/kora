@@ -7,11 +7,11 @@ import {
 import styles from './TicketDetailModal.module.css';
 import priorityStyles from './TicketPriorityBadge.module.css';
 import { Button } from '@/shared/components/ui/Button';
+import { Avatar } from '@/shared/components/ui/Avatar';
+import { Switch } from '@/shared/components/ui/Switch';
 import {
   AlertIcon,
   ArrowUpDownIcon,
-  CalendarIcon,
-  CheckIcon,
   ChevronDownIcon,
   ClockIcon,
   CloseIcon,
@@ -19,6 +19,8 @@ import {
   PencilIcon,
   PlusIcon,
   SparklesIcon,
+  TrashIcon,
+  TriangleAlertIcon,
 } from '@/shared/components/icons/Icons';
 import { TicketStatusBadge } from './TicketStatusBadge';
 import { TicketHhRequestsSection } from './TicketHhRequestsSection';
@@ -34,14 +36,7 @@ import { ApiRequestError } from '@/shared/lib/api-client';
 
 const formatDateTime = (value: string) => new Date(value).toLocaleString('es-CL');
 const formatDate = (value: string) => new Date(value).toLocaleDateString('es-CL');
-
-function initials(fullName: string): string {
-  const parts = fullName.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return '?';
-  const first = parts[0]![0]!;
-  const second = parts.length > 1 ? parts[1]![0]! : (parts[0]![1] ?? '');
-  return (first + second).toUpperCase();
-}
+const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 2 });
 
 /** Sólo se enlaza si es http(s) — evita que un `javascript:` guardado como "evidencia" se ejecute al hacer clic. */
 function isSafeHttpUrl(value: string): boolean {
@@ -69,11 +64,6 @@ function historyEventIcon(eventType: string) {
   return <PencilIcon size={14} />;
 }
 
-/**
- * Etiqueta del botón de avance forzado — replica `stageActionLabel` de la v1.
- * El retroceso de estado no vive en el modal: en la v1 se hace arrastrando la
- * tarjeta en el tablero, no hay selector de estado en la ficha.
- */
 /** Umbral a partir del cual un texto largo (descripción/solución) se colapsa por defecto — evita que un incidente muy narrado empuje el resto de la ficha fuera de vista. */
 const LONG_TEXT_THRESHOLD = 280;
 
@@ -94,6 +84,11 @@ function ExpandableText({ text }: { text: string }) {
   );
 }
 
+/**
+ * Etiqueta del botón de avance forzado — replica `stageActionLabel` de la v1.
+ * El retroceso de estado no vive en el modal: en la v1 se hace arrastrando la
+ * tarjeta en el tablero, no hay selector de estado en la ficha.
+ */
 function forwardActionLabel(current: TicketStatus, target: TicketStatus): string {
   switch (target) {
     case 'pending':
@@ -114,6 +109,9 @@ function forwardActionLabel(current: TicketStatus, target: TicketStatus): string
  * (`Soporte/index.tsx`, vista `detail`), en vez de una página de ruta propia.
  * La solicitud de horas (`ticket_hh_request`) también está — es el "siguiente
  * paso de M5" que docs/DECISION-M5-TICKETS.md dejaba anotado.
+ *
+ * Encabezado y pie quedan fijos; solo el cuerpo hace scroll, así las acciones
+ * ("Terminar proceso", "Editar") están siempre a mano en fichas largas.
  */
 export function TicketDetailModal({ ticketId, onClose }: { ticketId: string; onClose: () => void }) {
   const toast = useToast();
@@ -126,6 +124,7 @@ export function TicketDetailModal({ ticketId, onClose }: { ticketId: string; onC
   const isUnassignedPending = ticket ? ticket.status === 'pending' && !ticket.assignee : false;
   const { data: hhRequests } = useTicketHhRequestsList(ticketId);
   const hhBreakdown = computeApprovedHhBreakdown(hhRequests);
+  const approvedHours = hhBreakdown.reduce((sum, person) => sum + person.hours, 0);
 
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -175,228 +174,239 @@ export function TicketDetailModal({ ticketId, onClose }: { ticketId: string; onC
     );
   }
 
+  const hhPercent = ticket?.estimatedHours ? Math.min(100, (ticket.usedHours / ticket.estimatedHours) * 100) : 0;
+
   return (
     <div className={styles.overlay} onClick={onClose}>
       <div className={styles.modal} role="dialog" aria-modal="true" aria-label={ticket?.title ?? 'Ticket'} onClick={(event) => event.stopPropagation()}>
         {error ? (
-          <p className={styles.value}>{forbidden ? 'No tienes acceso a este ticket.' : 'No se pudo cargar el ticket.'}</p>
+          <div className={styles.body}>
+            <p className={styles.value}>{forbidden ? 'No tienes acceso a este ticket.' : 'No se pudo cargar el ticket.'}</p>
+          </div>
         ) : (
           <>
             <div className={styles.header}>
               <div className={styles.headerLeft}>
-                {ticket.serviceType === 'improvement' ? <SparklesIcon size={16} /> : <AlertIcon size={16} />}
+                <span className={styles.typeIcon} title={ticket.serviceType === 'improvement' ? 'Mejora' : 'Incidente'}>
+                  {ticket.serviceType === 'improvement' ? <SparklesIcon size={16} /> : <AlertIcon size={16} />}
+                </span>
                 <span className={styles.code}>{ticket.code ?? '—'}</span>
                 <div className={styles.sep} />
-                <span className={styles.title}>{ticket.title}</span>
+                <span className={styles.title} title={ticket.title}>
+                  {ticket.title}
+                </span>
               </div>
               <div className={styles.headerRight}>
                 <TicketStatusBadge status={ticket.status} />
                 <button type="button" className={styles.closeButton} aria-label="Cerrar" onClick={onClose}>
-                  <CloseIcon size={16} />
+                  <CloseIcon size={18} />
                 </button>
               </div>
             </div>
 
-            {!ticket.assignee && ticket.status === 'pending' && (
-              <div className={styles.warningBanner}>
-                <AlertIcon size={20} />
-                <span>Es necesario asignar un responsable para dar inicio al ticket de soporte.</span>
-              </div>
-            )}
-
-            <div className={styles.factsGrid}>
-              <div className={styles.factCell}>
-                <span className={styles.factLabel}>Cliente</span>
-                <span className={styles.factValue}>{ticket.client?.companyName ?? '—'}</span>
-              </div>
-              <div className={styles.factCell}>
-                <span className={styles.factLabel}>Prioridad</span>
-                {ticket.priority ? (
-                  <span className={[styles.priorityChip, priorityStyles[ticket.priority]].join(' ')}>
-                    {TICKET_PRIORITY_LABELS[ticket.priority]}
-                  </span>
-                ) : (
-                  <span className={styles.factValue}>—</span>
-                )}
-              </div>
-
-              <div className={styles.factCell}>
-                <span className={styles.factLabel}>Contrato</span>
-                <span className={styles.factValue}>{ticket.project?.name ?? '—'}</span>
-              </div>
-              <div className={styles.factCell}>
-                <span className={styles.factLabel}>Fecha de creación</span>
-                <span className={styles.factValue}>
-                  <CalendarIcon size={14} /> {formatDate(ticket.createdAt)}
-                </span>
-              </div>
-
-              <div className={styles.factCell}>
-                <span className={styles.factLabel}>Proyecto desarrollo</span>
-                <span className={styles.factValue}>{ticket.developmentProject?.name ?? '—'}</span>
-              </div>
-              <div className={styles.factCell}>
-                <span className={styles.factLabel}>HH utilizadas / estimadas</span>
-                <HhBreakdownTooltip breakdown={hhBreakdown}>
-                  <div className={styles.hhProgressRow}>
-                    <span className={styles.hhProgressTrack}>
-                      <span
-                        className={styles.hhProgressFill}
-                        style={{ width: `${ticket.estimatedHours ? Math.min(100, (ticket.usedHours / ticket.estimatedHours) * 100) : 0}%` }}
-                      />
-                    </span>
-                    <span className={styles.factValue}>
-                      {ticket.usedHours} / {ticket.estimatedHours ?? '—'}hrs
-                    </span>
-                  </div>
-                </HhBreakdownTooltip>
-              </div>
-
-              <div className={styles.factCell}>
-                <span className={styles.factLabel}>Responsable</span>
-                {ticket.assignee ? (
-                  <div className={styles.assigneeValue}>
-                    <span className={styles.avatar}>{initials(ticket.assignee.fullName)}</span>
-                    <span className={styles.factValue}>{ticket.assignee.fullName}</span>
-                  </div>
-                ) : (
-                  <span className={styles.factValue}>Sin asignar</span>
-                )}
-              </div>
-              <div className={styles.factCell}>
-                <span className={styles.factLabel}>Horas extra</span>
-                <div className={styles.overtimeValueRow}>
-                  <span className={styles.factValue}>{ticket.allowsOvertime ? 'Autorizadas' : 'No autorizadas'}</span>
-                  {ticket.canAuthorizeOvertime && ticket.status !== 'closed' && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      loading={updateTicket.isPending}
-                      onClick={() => void onToggleOvertime()}
-                    >
-                      {ticket.allowsOvertime ? 'Retirar' : 'Autorizar'}
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className={styles.contentCard}>
-              <div className={styles.contentSection}>
-                <div className={styles.contentSectionHeader}>
-                  <AlertIcon size={16} />
-                  <span className={styles.label}>
-                    {ticket.serviceType === 'improvement' ? 'Descripción de las mejoras' : 'Descripción del incidente'}
-                  </span>
-                  {!ticket.description && <span className={styles.emptyInline}>Sin descripción</span>}
-                </div>
-                {ticket.description && <ExpandableText text={ticket.description} />}
-              </div>
-
-              <div className={styles.contentDivider} />
-
-              <div className={styles.contentSection}>
-                <div className={styles.contentSectionHeader}>
-                  <PaperclipIcon size={16} />
-                  <span className={styles.label}>Evidencia</span>
-                  {!ticket.evidenceUrl && <span className={styles.emptyInline}>Sin evidencia adjunta</span>}
-                </div>
-                {ticket.evidenceUrl &&
-                  (isSafeHttpUrl(ticket.evidenceUrl) ? (
-                    <a className={styles.text} href={ticket.evidenceUrl} target="_blank" rel="noreferrer">
-                      {ticket.evidenceUrl}
-                    </a>
-                  ) : (
-                    <p className={styles.text}>{ticket.evidenceUrl}</p>
-                  ))}
-              </div>
-
-              <div className={styles.contentDivider} />
-
-              <div className={styles.contentSection}>
-                <div className={styles.contentSectionHeader}>
-                  <CheckIcon size={16} />
-                  <span className={styles.label}>Solución aplicada</span>
-                  {!ticket.resolution && <span className={styles.emptyInline}>Sin solución registrada</span>}
-                </div>
-                {/* Igual que en la v1: acá siempre es de solo lectura — la solución se
-                    pide al confirmar "Terminar Proceso"/"Marcar Terminado" (ver CompleteTicketDialog). */}
-                {ticket.resolution && <ExpandableText text={ticket.resolution} />}
-              </div>
-            </div>
-
-            <TicketHhRequestsSection
-              ticketId={ticketId}
-              canRequest={ticket.canRequestHh}
-              allowsOvertime={ticket.allowsOvertime}
-              pendingHhRequestsCount={ticket.pendingHhRequestsCount}
-              pendingHhHours={ticket.pendingHhHours}
-              hhApprovers={ticket.hhApprovers}
-            />
-
-            <div className={styles.historyBox}>
-              <button
-                type="button"
-                className={styles.historyToggle}
-                onClick={() => setHistoryOpen((open) => !open)}
-                aria-expanded={historyOpen}
-              >
-                <span className={styles.label}>Historial de ticket:</span>
-                <ChevronDownIcon size={16} className={historyOpen ? styles.historyChevronOpen : styles.historyChevron} />
-              </button>
-              {historyOpen && (
-                <div className={styles.history}>
-                  {ticket.history.length === 0 && <span className={styles.empty}>Sin eventos todavía.</span>}
-                  {ticket.history.map((entry, index) => (
-                    <div key={entry.id} className={styles.historyEntry}>
-                      <div className={styles.historyIconCol}>
-                        <span className={styles.historyIcon}>{historyEventIcon(entry.eventType)}</span>
-                        {index < ticket.history.length - 1 && <span className={styles.historyLine} />}
-                      </div>
-                      <div className={styles.historyBody}>
-                        <p className={styles.historyDescription}>{entry.description}</p>
-                        <p className={styles.historyMeta}>
-                          {entry.actorName ?? 'Sistema'} · {formatDateTime(entry.occurredAt)}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
+            <div className={styles.body}>
+              {!ticket.assignee && ticket.status === 'pending' && (
+                <div className={styles.warningBanner}>
+                  <TriangleAlertIcon size={18} />
+                  <span>Es necesario asignar un responsable para dar inicio al ticket de soporte.</span>
                 </div>
               )}
+
+              <div className={styles.factsGrid}>
+                <div className={styles.factCell}>
+                  <span className={styles.factLabel}>Cliente</span>
+                  <span className={styles.factValue}>{ticket.client?.companyName ?? '—'}</span>
+                </div>
+                <div className={styles.factCell}>
+                  <span className={styles.factLabel}>Prioridad</span>
+                  {ticket.priority ? (
+                    <span className={[styles.priorityChip, priorityStyles[ticket.priority]].join(' ')}>
+                      {TICKET_PRIORITY_LABELS[ticket.priority]}
+                    </span>
+                  ) : (
+                    <span className={styles.factValue}>—</span>
+                  )}
+                </div>
+
+                <div className={styles.factCell}>
+                  <span className={styles.factLabel}>Contrato</span>
+                  <span className={styles.factValue}>{ticket.project?.name ?? '—'}</span>
+                </div>
+                <div className={styles.factCell}>
+                  <span className={styles.factLabel}>Fecha de creación</span>
+                  <span className={styles.factValue}>{formatDate(ticket.createdAt)}</span>
+                </div>
+
+                <div className={styles.factCell}>
+                  <span className={styles.factLabel}>Proyecto desarrollo</span>
+                  <span className={styles.factValue}>{ticket.developmentProject?.name ?? '—'}</span>
+                </div>
+                <div className={styles.factCell}>
+                  <span className={styles.factLabel}>HH utilizadas / estimadas</span>
+                  <HhBreakdownTooltip breakdown={hhBreakdown}>
+                    <div className={styles.hhProgressRow}>
+                      <span
+                        className={styles.hhProgressTrack}
+                        role="progressbar"
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={Math.round(hhPercent)}
+                      >
+                        <span className={styles.hhProgressFill} style={{ width: `${hhPercent}%` }} />
+                      </span>
+                      <span className={styles.hhValue}>
+                        {formatHours(ticket.usedHours)} / {ticket.estimatedHours ?? '—'} h
+                      </span>
+                    </div>
+                  </HhBreakdownTooltip>
+                  {(approvedHours > 0 || ticket.pendingHhHours > 0) && (
+                    <span className={styles.factHint}>
+                      {formatHours(approvedHours)} h aprobadas · {formatHours(ticket.pendingHhHours)} h pendientes
+                    </span>
+                  )}
+                </div>
+
+                <div className={styles.factCell}>
+                  <span className={styles.factLabel}>Responsable</span>
+                  {ticket.assignee ? (
+                    <div className={styles.assigneeValue}>
+                      <Avatar name={ticket.assignee.fullName} size={32} color="var(--kora-navy)" />
+                      <span className={styles.factValue}>{ticket.assignee.fullName}</span>
+                    </div>
+                  ) : (
+                    <span className={styles.factValueMuted}>Sin asignar</span>
+                  )}
+                </div>
+                <div className={styles.factCell}>
+                  <span className={styles.factLabel}>Horas extra</span>
+                  <div className={styles.overtimeValueRow}>
+                    {ticket.canAuthorizeOvertime && ticket.status !== 'closed' && (
+                      <Switch
+                        checked={ticket.allowsOvertime}
+                        disabled={updateTicket.isPending}
+                        label={ticket.allowsOvertime ? 'Retirar horas extra' : 'Permitir horas extra'}
+                        onChange={() => void onToggleOvertime()}
+                      />
+                    )}
+                    <span className={styles.factValue}>{ticket.allowsOvertime ? 'Permitidas' : 'No permitidas'}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className={styles.contentCard}>
+                <div className={styles.contentSection}>
+                  <div className={styles.contentSectionHeader}>
+                    <span className={styles.label}>
+                      {ticket.serviceType === 'improvement' ? 'Descripción de las mejoras' : 'Descripción del incidente'}
+                    </span>
+                    {!ticket.description && <span className={styles.emptyInline}>Sin descripción</span>}
+                  </div>
+                  {ticket.description && <ExpandableText text={ticket.description} />}
+                </div>
+
+                <div className={styles.contentSection}>
+                  <div className={styles.contentSectionHeader}>
+                    <span className={styles.label}>Evidencia</span>
+                    {!ticket.evidenceUrl && <span className={styles.emptyInline}>Sin evidencia adjunta</span>}
+                  </div>
+                  {ticket.evidenceUrl &&
+                    (isSafeHttpUrl(ticket.evidenceUrl) ? (
+                      <a className={styles.link} href={ticket.evidenceUrl} target="_blank" rel="noreferrer">
+                        <PaperclipIcon size={14} />
+                        <span>{ticket.evidenceUrl}</span>
+                      </a>
+                    ) : (
+                      <p className={styles.text}>{ticket.evidenceUrl}</p>
+                    ))}
+                </div>
+
+                <div className={styles.contentSection}>
+                  <div className={styles.contentSectionHeader}>
+                    <span className={styles.label}>Solución aplicada</span>
+                    {!ticket.resolution && <span className={styles.emptyInline}>Sin solución registrada</span>}
+                  </div>
+                  {/* Igual que en la v1: acá siempre es de solo lectura — la solución se
+                      pide al confirmar "Terminar Proceso"/"Marcar Terminado" (ver CompleteTicketDialog). */}
+                  {ticket.resolution && <ExpandableText text={ticket.resolution} />}
+                </div>
+              </div>
+
+              <TicketHhRequestsSection
+                ticketId={ticketId}
+                canRequest={ticket.canRequestHh}
+                allowsOvertime={ticket.allowsOvertime}
+                pendingHhRequestsCount={ticket.pendingHhRequestsCount}
+                pendingHhHours={ticket.pendingHhHours}
+                hhApprovers={ticket.hhApprovers}
+              />
+
+              <div className={styles.historyBox}>
+                <button
+                  type="button"
+                  className={styles.historyToggle}
+                  onClick={() => setHistoryOpen((open) => !open)}
+                  aria-expanded={historyOpen}
+                >
+                  <span className={styles.label}>Historial del ticket</span>
+                  <ChevronDownIcon size={18} className={historyOpen ? styles.historyChevronOpen : styles.historyChevron} />
+                </button>
+                {historyOpen && (
+                  <div className={styles.history}>
+                    {ticket.history.length === 0 && <span className={styles.empty}>Sin eventos todavía.</span>}
+                    {ticket.history.map((entry, index) => (
+                      <div key={entry.id} className={styles.historyEntry}>
+                        <div className={styles.historyIconCol}>
+                          <span className={styles.historyIcon}>{historyEventIcon(entry.eventType)}</span>
+                          {index < ticket.history.length - 1 && <span className={styles.historyLine} />}
+                        </div>
+                        <div className={styles.historyBody}>
+                          <p className={styles.historyDescription}>{entry.description}</p>
+                          <p className={styles.historyMeta}>
+                            {entry.actorName ?? 'Sistema'} · {formatDateTime(entry.occurredAt)}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
             {ticket.canManage && ticket.status !== 'closed' && (
-              <>
-                <div className={styles.divider} />
-                <div className={styles.footer}>
-                  {ticket.status !== 'done' && ticket.canDelete && (
-                    <Button variant="tertiary" onClick={() => setDeleteOpen(true)}>
-                      Eliminar ticket
+              <div className={styles.footer}>
+                {ticket.status !== 'done' && ticket.canDelete && (
+                  <Button
+                    variant="tertiary"
+                    className={styles.deleteButton}
+                    iconLeft={<TrashIcon size={16} />}
+                    onClick={() => setDeleteOpen(true)}
+                  >
+                    Eliminar ticket
+                  </Button>
+                )}
+                <div className={styles.footerRight}>
+                  {ticket.status !== 'done' && ticket.canEditDetails && (
+                    <Button variant="outline" onClick={() => setEditOpen(true)}>
+                      Editar
                     </Button>
                   )}
-                  <div className={styles.footerRight}>
-                    {ticket.status !== 'done' && ticket.canEditDetails && (
-                      <Button variant="outlineDark" iconLeft={<PencilIcon size={16} />} onClick={() => setEditOpen(true)}>
-                        Editar
-                      </Button>
-                    )}
-                    {forwardStatus && (
-                      <Button
-                        variant="primary"
-                        disabled={isUnassignedPending}
-                        loading={changeStatus.isPending}
-                        onClick={() => {
-                          if (forwardStatus === 'closed') return setCloseOpen(true);
-                          if (forwardStatus === 'done' && !ticket.resolution) return setCompleteOpen(true);
-                          void onStatusChange(forwardStatus);
-                        }}
-                      >
-                        {forwardActionLabel(ticket.status, forwardStatus)}
-                      </Button>
-                    )}
-                  </div>
+                  {forwardStatus && (
+                    <Button
+                      variant="primary"
+                      disabled={isUnassignedPending}
+                      title={isUnassignedPending ? 'Asigna un responsable para iniciar el ticket.' : undefined}
+                      loading={changeStatus.isPending}
+                      onClick={() => {
+                        if (forwardStatus === 'closed') return setCloseOpen(true);
+                        if (forwardStatus === 'done' && !ticket.resolution) return setCompleteOpen(true);
+                        void onStatusChange(forwardStatus);
+                      }}
+                    >
+                      {forwardActionLabel(ticket.status, forwardStatus)}
+                    </Button>
+                  )}
                 </div>
-              </>
+              </div>
             )}
 
             <EditTicketDialog ticket={ticket} open={editOpen} onClose={() => setEditOpen(false)} />

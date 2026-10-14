@@ -1,4 +1,5 @@
-/* Réplica de `.soporte-modal*` en dashboard.css (v1) — ver Soporte/index.tsx. */
+/* Ficha de ticket — parte de `.soporte-modal*` en dashboard.css (v1), con
+   encabezado y pie fijos y el cuerpo como única zona con scroll. */
 
 .overlay {
   position: fixed;
@@ -28,39 +29,34 @@
 
 .modal {
   display: flex;
-  width: 640px;
+  flex-direction: column;
+  width: 720px;
   max-width: 100%;
   max-height: 90vh;
-  padding: var(--kora-space-4);
-  flex-direction: column;
-  gap: var(--kora-space-2);
-  border-radius: var(--kora-radius);
-  border: 1px solid var(--kora-blue-400);
+  border-radius: var(--kora-radius-lg);
   background: var(--kora-surface);
   box-shadow: var(--kora-shadow-lg);
-  overflow-y: auto;
+  overflow: hidden;
 }
 
-/* Sin esto las tarjetas (en especial `.contentCard`, que lleva `overflow: hidden`)
-   se encogen para caber en el `max-height` y recortan su texto en vez de que el modal haga scroll. */
-.modal > * {
-  flex-shrink: 0;
-}
+/* ── Encabezado ──────────────────────────────────────────────────────── */
 
 .header {
   display: flex;
   align-items: center;
-  gap: var(--kora-space-4);
   justify-content: space-between;
+  gap: var(--kora-space-4);
+  flex-shrink: 0;
+  padding: var(--kora-space-4) var(--kora-space-5);
+  border-bottom: 1px solid var(--kora-border-subtle);
 }
 
 .headerLeft {
   display: flex;
   align-items: center;
-  gap: var(--kora-space-1);
+  gap: var(--kora-space-2);
   flex: 1;
   min-width: 0;
-  color: var(--kora-text-muted);
 }
 
 .headerRight {
@@ -70,21 +66,28 @@
   flex-shrink: 0;
 }
 
+.typeIcon {
+  display: flex;
+  color: var(--kora-text-muted);
+  flex-shrink: 0;
+}
+
 .code {
-  font-size: var(--kora-text-xs);
+  font-size: var(--kora-text-sm);
   font-weight: var(--kora-weight-medium);
-  color: var(--kora-text);
+  color: var(--kora-text-muted);
+  flex-shrink: 0;
 }
 
 .sep {
   width: 1px;
-  height: 19px;
-  background: var(--kora-border);
+  height: 18px;
+  background: var(--kora-border-soft);
   flex-shrink: 0;
 }
 
 .title {
-  font-size: var(--kora-text-base);
+  font-size: var(--kora-text-lg);
   font-weight: var(--kora-weight-bold);
   color: var(--kora-text);
   overflow: hidden;
@@ -96,19 +99,38 @@
   background: none;
   border: none;
   cursor: pointer;
-  padding: var(--kora-space-1);
+  padding: 6px;
   display: flex;
   color: var(--kora-text-muted);
-  border-radius: var(--kora-radius-sm);
+  border-radius: var(--kora-radius);
 }
 
 .closeButton:hover {
   background: var(--kora-surface-muted);
+  color: var(--kora-text);
+}
+
+/* ── Cuerpo ──────────────────────────────────────────────────────────── */
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-4);
+  flex: 1;
+  min-height: 0;
+  padding: var(--kora-space-5);
+  overflow-y: auto;
+}
+
+/* Sin esto las tarjetas (en especial `.contentCard`, que lleva `overflow: hidden`)
+   se encogen para caber en el alto disponible y recortan su texto en vez de hacer scroll. */
+.body > * {
+  flex-shrink: 0;
 }
 
 .label {
   font-size: var(--kora-text-base);
-  font-weight: var(--kora-weight-medium);
+  font-weight: var(--kora-weight-bold);
   color: var(--kora-text);
 }
 
@@ -120,24 +142,29 @@
 
 .warningBanner {
   display: flex;
-  padding: var(--kora-space-4) var(--kora-space-3);
+  padding: var(--kora-space-3) var(--kora-space-4);
   align-items: center;
   gap: var(--kora-space-2);
-  border-radius: var(--kora-radius-lg);
-  border: 2px solid var(--kora-warning);
-  background: #fff1da;
-  font-size: var(--kora-text-lg);
+  border-radius: var(--kora-radius);
+  border: 1px solid var(--kora-warning);
+  background: var(--kora-badge-warning-bg);
+  font-size: var(--kora-text-base);
   font-weight: var(--kora-weight-semibold);
-  font-style: italic;
-  color: var(--kora-text);
+  color: var(--kora-warning-text);
 }
+
+.warningBanner > svg {
+  flex-shrink: 0;
+}
+
+/* ── Ficha (datos) ───────────────────────────────────────────────────── */
 
 .factsGrid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  row-gap: var(--kora-space-4);
-  column-gap: var(--kora-space-5);
-  padding: var(--kora-space-4);
+  row-gap: var(--kora-space-5);
+  column-gap: var(--kora-space-8);
+  padding: var(--kora-space-5);
   border: 1px solid var(--kora-border-soft);
   border-radius: var(--kora-radius);
 }
@@ -145,7 +172,7 @@
 .factCell {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--kora-space-1);
   min-width: 0;
 }
 
@@ -154,7 +181,7 @@
   font-weight: var(--kora-weight-semibold);
   color: var(--kora-text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
 }
 
 .factValue {
@@ -163,62 +190,77 @@
   gap: 4px;
   font-size: var(--kora-text-base);
   color: var(--kora-text);
+  min-width: 0;
+}
+
+.factValueMuted {
+  font-size: var(--kora-text-base);
+  color: var(--kora-text-disabled);
+  font-style: italic;
+}
+
+.factHint {
+  font-size: var(--kora-text-xs);
+  color: var(--kora-text-muted);
 }
 
 .assigneeValue {
   display: flex;
   align-items: center;
   gap: var(--kora-space-2);
-}
-
-.avatar {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: var(--kora-navy);
-  color: var(--kora-lime);
-  font-size: 10px;
-  font-weight: var(--kora-weight-bold);
-  flex-shrink: 0;
+  min-width: 0;
 }
 
 .hhProgressRow {
   display: flex;
   align-items: center;
-  gap: var(--kora-space-2);
+  gap: var(--kora-space-3);
+  min-height: 24px;
 }
 
 .hhProgressTrack {
-  width: 90px;
+  flex: 1;
+  min-width: 60px;
   height: 6px;
   border-radius: var(--kora-radius-pill);
   background: var(--kora-surface-disabled);
   overflow: hidden;
-  flex-shrink: 0;
 }
 
 .hhProgressFill {
   display: block;
   height: 100%;
+  border-radius: inherit;
   background: var(--kora-lime-dark);
+}
+
+.hhValue {
+  font-size: var(--kora-text-base);
+  font-weight: var(--kora-weight-semibold);
+  color: var(--kora-text);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .overtimeValueRow {
   display: flex;
   align-items: center;
   gap: var(--kora-space-2);
-  flex-wrap: wrap;
+  min-height: 32px;
 }
 
-.divider {
-  width: 100%;
-  height: 1px;
-  background: var(--kora-surface-disabled);
-  margin: var(--kora-space-1) 0;
+.priorityChip {
+  display: inline-flex;
+  align-self: flex-start;
+  height: 24px;
+  padding: 4px var(--kora-space-2);
+  align-items: center;
+  border-radius: var(--kora-radius-sm);
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-semibold);
 }
+
+/* ── Descripción / evidencia / solución ──────────────────────────────── */
 
 .contentCard {
   display: flex;
@@ -232,24 +274,29 @@
   display: flex;
   flex-direction: column;
   gap: var(--kora-space-1);
-  padding: var(--kora-space-3) var(--kora-space-4);
+  padding: var(--kora-space-3) var(--kora-space-5);
+}
+
+.contentSection:first-child {
+  padding-top: var(--kora-space-4);
+  padding-bottom: var(--kora-space-4);
+}
+
+.contentSection + .contentSection {
+  border-top: 1px solid var(--kora-border-subtle);
 }
 
 .contentSectionHeader {
   display: flex;
   align-items: center;
   gap: var(--kora-space-2);
-  color: var(--kora-text);
-}
-
-.contentDivider {
-  height: 1px;
-  background: var(--kora-border-soft);
+  min-height: 24px;
 }
 
 .text {
   font-size: var(--kora-text-base);
   font-weight: var(--kora-weight-regular);
+  line-height: 1.5;
   color: var(--kora-text-muted);
   margin: 0;
   white-space: pre-wrap;
@@ -260,6 +307,25 @@
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 4;
   overflow: hidden;
+}
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kora-space-1);
+  max-width: 100%;
+  font-size: var(--kora-text-sm);
+  color: var(--kora-blue-link);
+}
+
+.link > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.link > svg {
+  flex-shrink: 0;
 }
 
 .seeMoreText {
@@ -276,7 +342,8 @@
 
 .empty {
   color: var(--kora-text-disabled);
-  font-size: var(--kora-text-base);
+  font-size: var(--kora-text-sm);
+  font-style: italic;
 }
 
 .emptyInline {
@@ -284,24 +351,14 @@
   color: var(--kora-text-disabled);
   font-size: var(--kora-text-sm);
   font-style: italic;
+  text-align: right;
 }
 
-.priorityChip {
-  display: inline-flex;
-  align-self: flex-start;
-  height: 24px;
-  padding: 4px var(--kora-space-2);
-  align-items: center;
-  border-radius: var(--kora-radius-sm);
-  font-size: var(--kora-text-xs);
-  font-weight: var(--kora-weight-semibold);
-}
+/* ── Historial ───────────────────────────────────────────────────────── */
 
 .historyBox {
   display: flex;
   flex-direction: column;
-  gap: var(--kora-space-3);
-  padding: var(--kora-space-4);
   border: 1px solid var(--kora-border-soft);
   border-radius: var(--kora-radius);
   background: var(--kora-surface);
@@ -311,34 +368,40 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  padding: var(--kora-space-4) var(--kora-space-5);
   background: none;
   border: none;
-  padding: 0;
+  border-radius: var(--kora-radius);
   cursor: pointer;
   color: inherit;
   font: inherit;
+  text-align: left;
 }
 
-.historyChevron {
+.historyToggle:hover {
+  background: var(--kora-surface-alt);
+}
+
+.historyChevron,
+.historyChevronOpen {
   color: var(--kora-text-muted);
   transition: transform 0.2s;
 }
 
 .historyChevronOpen {
-  color: var(--kora-text-muted);
   transform: rotate(180deg);
-  transition: transform 0.2s;
 }
 
 .history {
   display: flex;
   flex-direction: column;
+  padding: 0 var(--kora-space-5) var(--kora-space-2);
 }
 
 .historyEntry {
   display: flex;
   align-items: stretch;
-  gap: var(--kora-space-2);
+  gap: var(--kora-space-3);
 }
 
 .historyIconCol {
@@ -352,8 +415,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   flex-shrink: 0;
   border-radius: 50%;
   background: var(--kora-blue-surface-alt);
@@ -369,7 +432,7 @@
 
 .historyBody {
   min-width: 0;
-  padding-bottom: var(--kora-space-4);
+  padding: 2px 0 var(--kora-space-4);
 }
 
 .historyDescription {
@@ -384,11 +447,27 @@
   color: var(--kora-text-muted);
 }
 
+/* ── Pie ─────────────────────────────────────────────────────────────── */
+
 .footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: var(--kora-space-4);
+  flex-shrink: 0;
+  padding: var(--kora-space-3) var(--kora-space-5);
+  border-top: 1px solid var(--kora-border-subtle);
+  background: var(--kora-surface);
+}
+
+.footer .deleteButton {
+  color: var(--kora-danger);
+  padding-left: var(--kora-space-2);
+  padding-right: var(--kora-space-2);
+}
+
+.footer .deleteButton:not(:disabled):hover {
+  background: var(--kora-badge-danger-bg);
 }
 
 .footerRight {
@@ -405,7 +484,17 @@
 
   .modal {
     max-height: calc(100dvh - 2 * var(--kora-space-2));
+  }
+
+  .header,
+  .footer {
+    padding-left: var(--kora-space-3);
+    padding-right: var(--kora-space-3);
+  }
+
+  .body {
     padding: var(--kora-space-3);
+    gap: var(--kora-space-3);
   }
 
   .factsGrid {
@@ -414,16 +503,14 @@
     padding: var(--kora-space-3);
   }
 
-  .contentSection {
+  .contentSection,
+  .contentSection:first-child,
+  .historyToggle {
     padding: var(--kora-space-3);
   }
 
-  .historyBox {
-    padding: var(--kora-space-3);
-  }
-
-  .warningBanner {
-    font-size: var(--kora-text-base);
+  .history {
+    padding: 0 var(--kora-space-3) var(--kora-space-2);
   }
 
   .footer {
