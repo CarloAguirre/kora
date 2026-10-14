@@ -5,6 +5,7 @@ import styles from './ClientPortalPage.module.css';
 import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Tabs } from '@/shared/components/ui/Tabs';
 import { KabeliLogo } from '@/shared/components/layout/KabeliLogo';
+import { ChevronLeftIcon } from '@/shared/components/icons/Icons';
 import { useClientDetail } from '@/modules/clients/api/clients.queries';
 import { useProjectsList } from '@/modules/projects/api/projects.queries';
 import { useSupportPlansForClient } from '@/modules/projects/api/support-plan.queries';
@@ -66,6 +67,10 @@ export interface ClientPortalPageProps {
   readonly supportPath?: string;
   readonly getProjectPath?: (project: ClientProjectRow) => string;
   readonly getContractPath?: (contract: ClientSupportContractRow) => string;
+  /** Destino del enlace "Volver". Solo lo pasa la vista previa de admin — en el
+   *  portal real esta es la pantalla de entrada del cliente, sin página anterior. */
+  readonly backTo?: string;
+  readonly backLabel?: string;
 }
 
 export function ClientPortalPage({
@@ -74,6 +79,8 @@ export function ClientPortalPage({
   supportPath = '/portal/soporte',
   getProjectPath = portalProjectPath,
   getContractPath = portalSupportContractPath,
+  backTo,
+  backLabel,
 }: ClientPortalPageProps = {}) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -84,6 +91,12 @@ export function ClientPortalPage({
   return (
     <DashboardLayout title={activeTab === 'proyectos' ? 'Proyectos' : 'Soporte'}>
       <div className={styles.page}>
+        {backTo && (
+          <Link className={styles.breadcrumb} to={backTo}>
+            <ChevronLeftIcon size={16} /> {backLabel ?? 'Volver'}
+          </Link>
+        )}
+
         <ClientCompanyHeader company={company} contractLabel={activeTab === 'proyectos' ? 'Contacto' : 'Responsable'} />
 
         <Tabs

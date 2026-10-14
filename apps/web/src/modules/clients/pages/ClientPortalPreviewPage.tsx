@@ -21,6 +21,8 @@ export function ClientPortalPreviewPage() {
       supportPath={`${base}/soporte`}
       getProjectPath={(project) => `${base}/${project.slug || project.id}`}
       getContractPath={(contract) => `${base}/soporte/${contract.slug || contract.id}`}
+      backTo={`/clientes/${clientId}`}
+      backLabel="Volver al cliente"
     />
   );
 }
