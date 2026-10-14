@@ -295,6 +295,20 @@
       "when": 1791482322591,
       "tag": "0041_project_payment_plan",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1792007043971,
+      "tag": "0042_merge_constructora_into_construccion",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1792007073194,
+      "tag": "0043_comunas_country",
+      "breakpoints": true
     }
   ]
 }

@@ -90,12 +90,12 @@ describe('catálogo de permisos', () => {
     expect(DEFAULT_ROLE_PERMISSIONS.admin).toHaveLength(PERMISSIONS.length - 3);
   });
 
-  it('PMO tiene todo menos importar datos legados, los permisos del portal de cliente y registrar horas', () => {
+  it('PMO tiene todo menos importar datos legados y los permisos del portal de cliente (sí registra horas)', () => {
     expect(DEFAULT_ROLE_PERMISSIONS.pmo).not.toContain('admin:legacy_import');
     expect(DEFAULT_ROLE_PERMISSIONS.pmo).not.toContain('projects:read_own_client');
     expect(DEFAULT_ROLE_PERMISSIONS.pmo).not.toContain('tickets:read_own_client');
-    expect(DEFAULT_ROLE_PERMISSIONS.pmo).not.toContain('hours:register');
-    expect(DEFAULT_ROLE_PERMISSIONS.pmo).toHaveLength(PERMISSIONS.length - 4);
+    expect(DEFAULT_ROLE_PERMISSIONS.pmo).toContain('hours:register');
+    expect(DEFAULT_ROLE_PERMISSIONS.pmo).toHaveLength(PERMISSIONS.length - 3);
   });
 
   it('un colaborador no puede administrar usuarios', () => {

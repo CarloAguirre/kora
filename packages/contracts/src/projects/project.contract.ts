@@ -52,7 +52,7 @@ export const PROJECT_PHASE_LABELS: Readonly<Record<ProjectPhase, string>> = {
   development: 'En desarrollo',
   testing: 'Pruebas',
   pilot: 'Marcha blanca',
-  closed: 'Cerrado',
+  closed: 'Finalizado',
 };
 
 /** Qué disparó el Hito 0 (kickoff) de un proyecto — ver `projectDetailSchema.hito0Source`. */

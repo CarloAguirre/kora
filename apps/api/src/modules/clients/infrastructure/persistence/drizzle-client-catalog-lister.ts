@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { asc, businessSectors, comunas, countries, eq, industries, users, type Database } from '@kora/db';
 import type { CatalogOption } from '@kora/contracts';
-import type { ClientCatalogLister } from '../../application/ports/client-catalog-lister.port';
+import type { ClientCatalogLister, ComunaOption } from '../../application/ports/client-catalog-lister.port';
 import { DATABASE } from '../../../../shared/infrastructure/database/database.module';
 
 @Injectable()
@@ -12,8 +12,11 @@ export class DrizzleClientCatalogLister implements ClientCatalogLister {
     return this.database.select({ id: countries.id, name: countries.name }).from(countries).orderBy(asc(countries.name));
   }
 
-  async listComunas(): Promise<CatalogOption[]> {
-    return this.database.select({ id: comunas.id, name: comunas.name }).from(comunas).orderBy(asc(comunas.name));
+  async listComunas(): Promise<ComunaOption[]> {
+    return this.database
+      .select({ id: comunas.id, name: comunas.name, countryId: comunas.countryId })
+      .from(comunas)
+      .orderBy(asc(comunas.name));
   }
 
   async listIndustries(): Promise<CatalogOption[]> {

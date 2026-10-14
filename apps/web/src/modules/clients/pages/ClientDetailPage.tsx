@@ -9,6 +9,7 @@ import { Card } from '@/shared/components/ui/Card';
 import { DataTable, type Column, type SortState } from '@/shared/components/ui/DataTable';
 import { DEFAULT_PAGE_SIZE, Pagination, usePaginatedItems } from '@/shared/components/ui/Pagination';
 import { Tabs } from '@/shared/components/ui/Tabs';
+import { useToast } from '@/shared/components/ui/Toast';
 import { TextField } from '@/shared/components/ui/TextField';
 import { PencilIcon, PlusIcon, ChevronLeftIcon, SearchIcon, EyeIcon } from '@/shared/components/icons/Icons';
 import { ClientStatusBadge } from '../components/ClientStatusBadge';
@@ -85,6 +86,7 @@ export function ClientDetailPage() {
   const { clientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
   const { can } = usePermissions();
+  const toast = useToast();
   const { data: client, isLoading, error } = useClientDetail(clientId ?? null);
   const { data: projects } = useProjectsList({ clientId: clientId ?? undefined, page: 1, pageSize: 100 });
   const { data: supportPlans, isLoading: loadingSupportPlans } = useSupportPlansForClient(clientId ?? null);
@@ -351,7 +353,16 @@ export function ClientDetailPage() {
         </Card>
       </div>
 
-      <ClientFormDialog open={editing} clientId={client.id} onClose={() => setEditing(false)} onSuccess={() => setEditing(false)} />
+      <ClientFormDialog
+        open={editing}
+        clientId={client.id}
+        onClose={() => setEditing(false)}
+        onSuccess={(message) => {
+          toast.success(message);
+          setEditing(false);
+          void navigate('/clientes');
+        }}
+      />
     </DashboardLayout>
   );
 }

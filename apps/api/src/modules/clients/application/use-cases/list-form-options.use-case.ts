@@ -4,12 +4,13 @@ import type { CatalogOption } from '@kora/contracts';
 import {
   CLIENT_CATALOG_LISTER,
   type ClientCatalogLister,
+  type ComunaOption,
 } from '../ports/client-catalog-lister.port';
 import type { UseCase } from '../../../../shared/application/use-case';
 
 export interface ClientFormOptions {
   readonly countries: readonly CatalogOption[];
-  readonly comunas: readonly CatalogOption[];
+  readonly comunas: readonly ComunaOption[];
   readonly industries: readonly CatalogOption[];
   readonly businessSectors: readonly CatalogOption[];
   readonly commercialManagers: readonly CatalogOption[];

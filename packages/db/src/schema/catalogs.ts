@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { integer, pgTable, uniqueIndex, varchar } from 'drizzle-orm/pg-core';
+import { index, integer, pgTable, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
 import { primaryId, timestamps } from './columns';
 
 /**
@@ -26,15 +26,22 @@ export const countries = pgTable(
   ],
 );
 
+/**
+ * Comuna o ciudad. `countryId` permite que el formulario de cliente muestre solo
+ * las del país elegido; es nullable porque v1 no guardaba esa relación y una
+ * comuna cargada sin país no debe romper nada.
+ */
 export const comunas = pgTable(
   'comunas',
   {
     id: primaryId(),
     legacyId: integer('legacy_id'),
     name: varchar('name', { length: 120 }).notNull(),
+    countryId: uuid('country_id').references(() => countries.id, { onDelete: 'set null' }),
     ...timestamps,
   },
   (table) => [
+    index('comunas_country_id_idx').on(table.countryId),
     uniqueIndex('comunas_name_key').on(sql`lower(btrim(${table.name}))`),
     uniqueIndex('comunas_legacy_id_key').on(table.legacyId).where(sql`${table.legacyId} is not null`),
   ],

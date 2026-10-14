@@ -162,6 +162,7 @@ export function DashboardProjectsTab({ projects, capacity, loading, weekStart, o
         onSuccess={(message) => {
           toast.success(message);
           setCreateClientOpen(false);
+          void navigate('/clientes');
         }}
       />
     </div>

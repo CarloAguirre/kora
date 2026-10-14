@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Controller, useForm, type Control } from 'react-hook-form';
+import { useEffect, useMemo, useState } from 'react';
+import { Controller, useForm, useWatch, type Control } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { createClientSchema, type ClientDetail, type CreateClientInput } from '@kora/contracts';
@@ -52,11 +52,29 @@ export function ClientFormDialog({ open, clientId, onClose, onSuccess, onCreated
     reset,
     control,
     setError,
+    setValue,
+    getValues,
     formState: { errors, isSubmitting },
   } = useForm<ClientFormValues, unknown, CreateClientInput>({
     resolver: zodResolver(createClientSchema),
     defaultValues: emptyValues(),
   });
+
+  // Las comunas dependen del país: sin país no hay comunas que ofrecer.
+  const countryId = useWatch({ control, name: 'countryId' });
+  const comunaOptions = useMemo(
+    () => (countryId ? (options?.comunas ?? []).filter((comuna) => comuna.countryId === countryId) : []),
+    [options?.comunas, countryId],
+  );
+
+  /** Al cambiar de país se descarta la comuna si pertenece a otro. */
+  const handleCountryChange = (nextCountryId: string | null) => {
+    const comunaId = getValues('comunaId');
+    const comuna = options?.comunas.find((option) => option.id === comunaId);
+    if (comuna && comuna.countryId !== nextCountryId) {
+      setValue('comunaId', null, { shouldDirty: true });
+    }
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -168,13 +186,15 @@ export function ClientFormDialog({ open, clientId, onClose, onSuccess, onCreated
             label="País"
             emptyLabel="Sin especificar"
             options={options?.countries}
+            onValueChange={handleCountryChange}
           />
           <CatalogCombobox
             control={control}
             name="comunaId"
             label="Comuna"
-            emptyLabel="Sin especificar"
-            options={options?.comunas}
+            emptyLabel={countryId ? 'Sin especificar' : 'Selecciona un país primero'}
+            options={comunaOptions}
+            disabled={!countryId}
           />
         </div>
 
@@ -212,10 +232,13 @@ interface CatalogComboboxProps {
   label: string;
   emptyLabel: string;
   options: readonly { id: string; name: string }[] | undefined;
+  disabled?: boolean;
+  /** Se dispara tras actualizar el campo, para que el formulario reaccione (p. ej. limpiar campos dependientes). */
+  onValueChange?: (value: string | null) => void;
 }
 
 /** Catálogo opcional con búsqueda: la opción vacía deja el campo en `null`. */
-function CatalogCombobox({ control, name, label, emptyLabel, options }: CatalogComboboxProps) {
+function CatalogCombobox({ control, name, label, emptyLabel, options, disabled, onValueChange }: CatalogComboboxProps) {
   return (
     <Controller
       control={control}
@@ -226,7 +249,11 @@ function CatalogCombobox({ control, name, label, emptyLabel, options }: CatalogC
           placeholder={emptyLabel}
           options={[{ value: '', label: emptyLabel }, ...(options ?? []).map((o) => ({ value: o.id, label: o.name }))]}
           value={field.value ?? ''}
-          onChange={(value) => field.onChange(value || null)}
+          onChange={(value) => {
+            field.onChange(value || null);
+            onValueChange?.(value || null);
+          }}
+          disabled={disabled}
           errorText={fieldState.error?.message}
         />
       )}
