@@ -34,7 +34,6 @@
   color: var(--kora-text-muted);
   font-size: var(--kora-text-2xs);
   font-weight: var(--kora-weight-bold);
-  text-transform: uppercase;
   letter-spacing: 0.02em;
 }
 

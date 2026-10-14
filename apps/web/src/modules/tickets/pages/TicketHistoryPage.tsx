@@ -115,8 +115,6 @@ export function TicketHistoryPage() {
     },
     { key: 'title', header: 'Título', render: (ticket) => ticket.title },
     { key: 'assignee', header: 'Responsable', render: (ticket) => ticket.assignee?.fullName ?? 'Sin asignar' },
-    { key: 'description', header: 'Incidente', render: (ticket) => ticket.description ?? '—' },
-    { key: 'resolution', header: 'Solución', render: (ticket) => ticket.resolution ?? '—' },
     { key: 'client', header: 'Cliente', render: (ticket) => ticket.client?.companyName ?? '—' },
     { key: 'project', header: 'Contrato', render: (ticket) => ticket.project?.name ?? '—' },
     { key: 'supportLeaderInitials', header: 'Líder Soporte', render: (ticket) => ticket.supportLeaderInitials ?? '—' },
