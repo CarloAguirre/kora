@@ -50,6 +50,8 @@ const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFr
 // UTC y en Chile se mostraba como el día anterior.
 const formatDate = (value: string | null) =>
   value ? new Date(`${value}T00:00:00`).toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—';
+// Ancho fijo de las columnas Inicio/Fin: alcanza para "dd-mm-aaaa" + padding sin partir la fecha en dos líneas.
+const DATE_COLUMN_WIDTH = '120px';
 
 /**
  * Listado de proyectos: tabs Desarrollo/Soporte, gráfico resumen y tabla
@@ -179,9 +181,21 @@ export function ProjectsListPage() {
     { key: 'client', header: 'Cliente', sortable: true, render: (p) => p.client?.companyName ?? <span className={styles.empty}>—</span> },
     { key: 'leader', header: 'Líder', sortable: true, render: (p) => p.leader?.fullName ?? <span className={styles.empty}>—</span> },
     { key: 'status', header: 'Estado', sortable: true, render: (p) => <ProjectStatusBadge status={p.status} /> },
-    { key: 'stage', header: 'Etapa de avance', render: (p) => getProjectStageLabel(p) },
-    { key: 'startDate', header: 'Inicio', sortable: true, render: (p) => formatDate(p.startDate) },
-    { key: 'endDate', header: 'Fin', sortable: true, render: (p) => formatDate(p.endDate) },
+    { key: 'stage', header: 'Etapa', render: (p) => getProjectStageLabel(p) },
+    {
+      key: 'startDate',
+      header: 'Inicio',
+      sortable: true,
+      width: DATE_COLUMN_WIDTH,
+      render: (p) => <span className={styles.date}>{formatDate(p.startDate)}</span>,
+    },
+    {
+      key: 'endDate',
+      header: 'Fin',
+      sortable: true,
+      width: DATE_COLUMN_WIDTH,
+      render: (p) => <span className={styles.date}>{formatDate(p.endDate)}</span>,
+    },
     {
       key: 'progress',
       header: '% Avance',
@@ -329,17 +343,19 @@ export function ProjectsListPage() {
             />
           </div>
 
-          <DataTable
-            caption="Listado de proyectos"
-            columns={columns}
-            items={data?.items ?? []}
-            getRowKey={(project) => project.id}
-            loading={isLoading}
-            error={error ? 'No se pudo cargar el listado de proyectos.' : null}
-            emptyMessage="No hay proyectos que coincidan con los filtros aplicados."
-            sort={sort}
-            onSortChange={toggleSort}
-          />
+          <div className={styles.table}>
+            <DataTable
+              caption="Listado de proyectos"
+              columns={columns}
+              items={data?.items ?? []}
+              getRowKey={(project) => project.id}
+              loading={isLoading}
+              error={error ? 'No se pudo cargar el listado de proyectos.' : null}
+              emptyMessage="No hay proyectos que coincidan con los filtros aplicados."
+              sort={sort}
+              onSortChange={toggleSort}
+            />
+          </div>
 
           {data && (
             <Pagination

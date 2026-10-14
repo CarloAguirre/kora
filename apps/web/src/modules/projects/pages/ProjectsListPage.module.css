@@ -57,6 +57,17 @@
   color: var(--kora-text-disabled);
 }
 
+/* Encabezados sin mayúsculas forzadas: los ordenables ya se ven así (el <button> no hereda
+   `text-transform`), y los no ordenables (Etapa, Acciones) salían en MAYÚSCULAS. */
+.table th {
+  text-transform: none;
+}
+
+/* Fechas de Inicio/Fin: siempre en una sola línea, dentro del ancho fijo de la columna. */
+.date {
+  white-space: nowrap;
+}
+
 .actions {
   display: flex;
   justify-content: flex-end;
