@@ -1,12 +1,10 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
 import type { DashboardSupportSummary } from '@kora/contracts';
 import styles from './DashboardSupportTab.module.css';
 import { Card } from '@/shared/components/ui/Card';
 import { Button } from '@/shared/components/ui/Button';
 import { KoraLogo } from '@/shared/components/layout/KoraLogo';
-import { DownloadIcon, PlusIcon } from '@/shared/components/icons/Icons';
-import { usePermissions } from '@/modules/auth/hooks/usePermissions';
+import { DownloadIcon } from '@/shared/components/icons/Icons';
 import { SupportTrendChart } from '../components/SupportTrendChart';
 import { SupportClientBreakdown } from '../components/SupportClientBreakdown';
 import { SupportOvertimeTable } from '../components/SupportOvertimeTable';
@@ -21,7 +19,6 @@ interface DashboardSupportTabProps {
 
 /** Tab "Soporte" del Dashboard — igual disposición que la tab Soporte del `Dashboard` admin en la v1. */
 export function DashboardSupportTab({ support, loading }: DashboardSupportTabProps) {
-  const { can } = usePermissions();
   const [exporting, setExporting] = useState(false);
 
   const handleExport = async () => {
@@ -51,11 +48,6 @@ export function DashboardSupportTab({ support, loading }: DashboardSupportTabPro
           >
             Descargar Reporte
           </Button>
-          {can('projects:manage') && (
-            <Link to="/proyectos/nuevo">
-              <Button iconLeft={<PlusIcon size={16} />}>Crear Soporte</Button>
-            </Link>
-          )}
         </div>
       </div>
 
