@@ -58,6 +58,9 @@ export function DashboardMySummary({ hours, approvals, tickets, loading }: Dashb
             </Button>
           </div>
           <span className={styles.value}>{loading ? '…' : `${formatHours(hours?.weekHours ?? 0)} / ${hours?.weekTargetHours ?? 0} hrs`}</span>
+          {!!hours && hours.weekOvertimeHours > 0 && (
+            <span className={styles.sub}>Incluye {formatHours(hours.weekOvertimeHours)} h extra</span>
+          )}
           {!!hours && hours.rejectedCount > 0 && <span className={styles.sub}>{hours.rejectedCount} registros rechazados</span>}
         </Card>
       )}

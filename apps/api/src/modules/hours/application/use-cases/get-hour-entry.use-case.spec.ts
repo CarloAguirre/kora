@@ -45,7 +45,10 @@ class FakeEntryRepository implements HourEntryRepository {
   sumApprovedHoursForProjects(): Promise<number> {
     throw new Error('not implemented');
   }
-  sumHoursForUserAndDate(): Promise<number> {
+  sumRegularHoursForUserAndDate(): Promise<number> {
+    throw new Error('not implemented');
+  }
+  sumOvertimeHoursByUserForProjects(): Promise<never[]> {
     throw new Error('not implemented');
   }
 }

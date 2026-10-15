@@ -5,6 +5,7 @@ import type {
   HourEntryListItem,
   HourEntryRepository,
   HourEntrySortableField,
+  OvertimeHoursByUser,
 } from '../../modules/hours/domain/repositories/hour-entry.repository';
 
 /**
@@ -86,9 +87,32 @@ export class InMemoryHourEntryRepository implements HourEntryRepository {
       .reduce((sum, item) => sum + item.hours, 0);
   }
 
-  async sumHoursForUserAndDate(userId: string, date: Date): Promise<number> {
+  async sumOvertimeHoursByUserForProjects(
+    projectIds: readonly string[],
+    dateFrom: Date,
+    dateTo: Date,
+  ): Promise<OvertimeHoursByUser[]> {
+    const ids = new Set(projectIds);
+    const byUser = new Map<string, OvertimeHoursByUser>();
+    for (const item of this.items) {
+      if (item.projectId === null || !ids.has(item.projectId) || !item.isOvertime || item.status === 'rejected') continue;
+      if (item.date.getTime() < dateFrom.getTime() || item.date.getTime() > dateTo.getTime()) continue;
+      const existing = byUser.get(item.userId) ?? { userId: item.userId, userFullName: item.userFullName, approvedHours: 0, pendingHours: 0 };
+      byUser.set(item.userId, {
+        ...existing,
+        approvedHours: existing.approvedHours + (item.status === 'approved' ? item.hours : 0),
+        pendingHours: existing.pendingHours + (item.status === 'pending' ? item.hours : 0),
+      });
+    }
+    return [...byUser.values()].sort((a, b) => b.approvedHours + b.pendingHours - (a.approvedHours + a.pendingHours));
+  }
+
+  async sumRegularHoursForUserAndDate(userId: string, date: Date): Promise<number> {
     return this.items
-      .filter((item) => item.userId === userId && item.date.getTime() === date.getTime() && item.status !== 'rejected')
+      .filter(
+        (item) =>
+          item.userId === userId && item.date.getTime() === date.getTime() && !item.isOvertime && item.status !== 'rejected',
+      )
       .reduce((sum, item) => sum + item.hours, 0);
   }
 }

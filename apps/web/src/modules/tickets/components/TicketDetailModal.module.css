@@ -242,13 +242,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-.overtimeValueRow {
-  display: flex;
-  align-items: center;
-  gap: var(--kora-space-2);
-  min-height: 32px;
-}
-
 .priorityChip {
   display: inline-flex;
   align-self: flex-start;

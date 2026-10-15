@@ -8,7 +8,6 @@ import styles from './TicketDetailModal.module.css';
 import priorityStyles from './TicketPriorityBadge.module.css';
 import { Button } from '@/shared/components/ui/Button';
 import { Avatar } from '@/shared/components/ui/Avatar';
-import { Switch } from '@/shared/components/ui/Switch';
 import {
   AlertIcon,
   ArrowUpDownIcon,
@@ -122,9 +121,20 @@ export function TicketDetailModal({ ticketId, onClose }: { ticketId: string; onC
   const forbidden = error instanceof ApiRequestError && error.isForbidden;
   const forwardStatus = ticket ? nextForwardTicketStatus(ticket.status, ticket.serviceType) : null;
   const isUnassignedPending = ticket ? ticket.status === 'pending' && !ticket.assignee : false;
-  const { data: hhRequests } = useTicketHhRequestsList(ticketId);
+  // `ticketId` puede llegar como código (`TK-1072`, al abrir la ficha por enlace): el detalle lo
+  // resuelve, pero las rutas de solicitudes de HH esperan el uuid — se usa el ya resuelto.
+  const hhTicketId = ticket?.id ?? null;
+  const { data: hhRequests } = useTicketHhRequestsList(hhTicketId);
   const hhBreakdown = computeApprovedHhBreakdown(hhRequests);
   const approvedHours = hhBreakdown.reduce((sum, person) => sum + person.hours, 0);
+  // En soporte las horas sobre la jornada de 8h quedan solas como horas extra (ver `CreateTicketHhRequestUseCase`).
+  const overtimeRequests = (hhRequests ?? []).filter((request) => request.isOvertime);
+  const approvedOvertimeHours = overtimeRequests
+    .filter((request) => request.status === 'approved')
+    .reduce((sum, request) => sum + request.hours, 0);
+  const pendingOvertimeHours = overtimeRequests
+    .filter((request) => request.status === 'pending')
+    .reduce((sum, request) => sum + request.hours, 0);
 
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -154,16 +164,6 @@ export function TicketDetailModal({ ticketId, onClose }: { ticketId: string; onC
     await updateTicket.mutateAsync({ ticketId, input: { resolution } });
     await changeStatus.mutateAsync({ ticketId, input: { status: 'done' } });
     toast.success('Se registró la solución y se terminó el ticket.');
-  };
-
-  const onToggleOvertime = async () => {
-    if (!ticket) return;
-    try {
-      await updateTicket.mutateAsync({ ticketId, input: { allowsOvertime: !ticket.allowsOvertime } });
-      toast.success(ticket.allowsOvertime ? 'Se retiró la autorización de horas extra.' : 'Se autorizaron horas extra para este ticket.');
-    } catch (error) {
-      reportError(error, 'No se pudo actualizar la autorización de horas extra.');
-    }
   };
 
   if (!error && (isLoading || !ticket)) {
@@ -279,17 +279,16 @@ export function TicketDetailModal({ ticketId, onClose }: { ticketId: string; onC
                 </div>
                 <div className={styles.factCell}>
                   <span className={styles.factLabel}>Horas extra</span>
-                  <div className={styles.overtimeValueRow}>
-                    {ticket.canAuthorizeOvertime && ticket.status !== 'closed' && (
-                      <Switch
-                        checked={ticket.allowsOvertime}
-                        disabled={updateTicket.isPending}
-                        label={ticket.allowsOvertime ? 'Retirar horas extra' : 'Permitir horas extra'}
-                        onChange={() => void onToggleOvertime()}
-                      />
-                    )}
-                    <span className={styles.factValue}>{ticket.allowsOvertime ? 'Permitidas' : 'No permitidas'}</span>
-                  </div>
+                  {approvedOvertimeHours > 0 || pendingOvertimeHours > 0 ? (
+                    <>
+                      <span className={styles.factValue}>{formatHours(approvedOvertimeHours)} h aprobadas</span>
+                      {pendingOvertimeHours > 0 && (
+                        <span className={styles.factHint}>{formatHours(pendingOvertimeHours)} h pendientes</span>
+                      )}
+                    </>
+                  ) : (
+                    <span className={styles.factValueMuted}>Sin horas extra</span>
+                  )}
                 </div>
               </div>
 
@@ -332,9 +331,8 @@ export function TicketDetailModal({ ticketId, onClose }: { ticketId: string; onC
               </div>
 
               <TicketHhRequestsSection
-                ticketId={ticketId}
+                ticketId={ticket.id}
                 canRequest={ticket.canRequestHh}
-                allowsOvertime={ticket.allowsOvertime}
                 pendingHhRequestsCount={ticket.pendingHhRequestsCount}
                 pendingHhHours={ticket.pendingHhHours}
                 hhApprovers={ticket.hhApprovers}

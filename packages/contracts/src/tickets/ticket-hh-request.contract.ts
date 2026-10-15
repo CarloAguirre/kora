@@ -39,7 +39,6 @@ export const createTicketHhRequestSchema = z.object({
   date: z.iso.date(),
   hours: z.coerce.number().positive('Las horas deben ser mayores a 0.').max(24, 'No puede solicitar más de 24 horas en un día.'),
   note: z.string().trim().max(500).optional(),
-  isOvertime: z.boolean().optional().default(false),
 });
 export type CreateTicketHhRequestInput = z.infer<typeof createTicketHhRequestSchema>;
 

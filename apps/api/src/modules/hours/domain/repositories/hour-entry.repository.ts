@@ -71,6 +71,14 @@ export interface HourEntryListItem {
   readonly projectSalesStage: string | null;
 }
 
+/** Horas extra no rechazadas de un autor, separadas en aprobadas y pendientes. */
+export interface OvertimeHoursByUser {
+  readonly userId: string;
+  readonly userFullName: string;
+  readonly approvedHours: number;
+  readonly pendingHours: number;
+}
+
 export interface HourEntryRepository {
   findById(id: string, context?: TransactionContext): Promise<HourEntry | null>;
   findByLegacyId(legacyId: string, context?: TransactionContext): Promise<HourEntry | null>;
@@ -103,8 +111,20 @@ export interface HourEntryRepository {
     context?: TransactionContext,
   ): Promise<number>;
 
-  /** Horas no rechazadas que `userId` ya tiene registradas para `date` (cualquier asignación/proyecto) — alimenta el tope diario de 8h al crear una solicitud de HH de ticket (ver `CreateTicketHhRequestUseCase`). */
-  sumHoursForUserAndDate(userId: string, date: Date, context?: TransactionContext): Promise<number>;
+  /**
+   * Horas extra (no rechazadas) por autor en varios proyectos y un rango de
+   * fechas — agregación en SQL, alimenta "Horas extra del mes" en la tab
+   * Soporte del Dashboard. Ordenado de mayor a menor total.
+   */
+  sumOvertimeHoursByUserForProjects(
+    projectIds: readonly string[],
+    dateFrom: Date,
+    dateTo: Date,
+    context?: TransactionContext,
+  ): Promise<OvertimeHoursByUser[]>;
+
+  /** Horas normales (no extra) y no rechazadas que `userId` ya tiene registradas para `date` (cualquier asignación/proyecto) — decide qué parte de una solicitud de HH de ticket cabe en la jornada de 8h y cuál queda como horas extra (ver `CreateTicketHhRequestUseCase`). */
+  sumRegularHoursForUserAndDate(userId: string, date: Date, context?: TransactionContext): Promise<number>;
 }
 
 export const HOUR_ENTRY_REPOSITORY = Symbol('HourEntryRepository');

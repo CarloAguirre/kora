@@ -31,6 +31,7 @@ import type {
   HourEntryListItem,
   HourEntryRepository,
   HourEntrySortableField,
+  OvertimeHoursByUser,
 } from '../../domain/repositories/hour-entry.repository';
 import type { HourEntry } from '../../domain/entities/hour-entry.entity';
 import { DATABASE } from '../../../../shared/infrastructure/database/database.module';
@@ -278,12 +279,57 @@ export class DrizzleHourEntryRepository implements HourEntryRepository {
     return Number(rows[0]?.total ?? 0);
   }
 
-  async sumHoursForUserAndDate(userId: string, date: Date, context?: TransactionContext): Promise<number> {
+  async sumOvertimeHoursByUserForProjects(
+    projectIds: readonly string[],
+    dateFrom: Date,
+    dateTo: Date,
+    context?: TransactionContext,
+  ): Promise<OvertimeHoursByUser[]> {
+    if (projectIds.length === 0) return [];
+    const db = resolveDb(this.database, context);
+    const rows = await db
+      .select({
+        userId: hourEntries.userId,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        approved: sql<string>`coalesce(sum(${hourEntries.hours}) filter (where ${hourEntries.status} = 'approved'), 0)`,
+        pending: sql<string>`coalesce(sum(${hourEntries.hours}) filter (where ${hourEntries.status} = 'pending'), 0)`,
+      })
+      .from(hourEntries)
+      .innerJoin(users, eq(users.id, hourEntries.userId))
+      .where(
+        and(
+          inArray(hourEntries.projectId, [...projectIds]),
+          eq(hourEntries.isOvertime, true),
+          ne(hourEntries.status, 'rejected'),
+          gte(hourEntries.date, dateFrom),
+          lte(hourEntries.date, dateTo),
+        ),
+      )
+      .groupBy(hourEntries.userId, users.firstName, users.lastName);
+    return rows
+      .map((row) => ({
+        userId: row.userId,
+        userFullName: `${row.firstName ?? ''} ${row.lastName ?? ''}`.trim(),
+        approvedHours: Number(row.approved),
+        pendingHours: Number(row.pending),
+      }))
+      .sort((a, b) => b.approvedHours + b.pendingHours - (a.approvedHours + a.pendingHours));
+  }
+
+  async sumRegularHoursForUserAndDate(userId: string, date: Date, context?: TransactionContext): Promise<number> {
     const db = resolveDb(this.database, context);
     const rows = await db
       .select({ total: sql<string>`coalesce(sum(${hourEntries.hours}), 0)` })
       .from(hourEntries)
-      .where(and(eq(hourEntries.userId, userId), eq(hourEntries.date, date), ne(hourEntries.status, 'rejected')));
+      .where(
+        and(
+          eq(hourEntries.userId, userId),
+          eq(hourEntries.date, date),
+          eq(hourEntries.isOvertime, false),
+          ne(hourEntries.status, 'rejected'),
+        ),
+      );
     return Number(rows[0]?.total ?? 0);
   }
 

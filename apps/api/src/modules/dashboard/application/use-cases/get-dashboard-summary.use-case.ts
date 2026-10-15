@@ -90,7 +90,10 @@ export class GetDashboardSummaryUseCase implements UseCase<GetDashboardSummaryCo
         canReadTickets ? this.buildTicketsSummary(actor, actorRole) : Promise.resolve(null),
         canReadProjects ? this.buildProjectsSummary(actor, actorRole, now) : Promise.resolve(null),
         actorPermissions.includes('forecast:read') ? this.buildCapacitySummary(actor, weekStartOverride) : Promise.resolve(null),
-        actorPermissions.includes('billing:read') ? this.buildSupportSummary(actor, actorRole) : Promise.resolve(null),
+        // El líder ya no tiene `billing:read`, pero la tab Soporte (métricas, no facturación) sigue siendo suya, acotada a sus proyectos.
+        actorPermissions.includes('billing:read') || actorRole === 'leader'
+          ? this.buildSupportSummary(actor, actorRole, now)
+          : Promise.resolve(null),
         hasOwnHours ? this.buildMyActiveProjects(actor) : Promise.resolve([]),
         hasOwnHours ? this.buildMyPlanning(actor, weekStartOverride) : Promise.resolve(null),
         hasOwnHours ? this.buildMyTasks(actor) : Promise.resolve([]),
@@ -181,12 +184,14 @@ export class GetDashboardSummaryUseCase implements UseCase<GetDashboardSummaryCo
 
   private async buildHoursSummary(actor: ActorContext, now: Date) {
     const monday = mondayOf(now);
+    const monthStart = monthStartOf(now);
     const todayIso = toIsoDate(now);
 
-    const [weekPage, rejectedPage] = await Promise.all([
+    // Desde el lunes o el día 1, lo que sea antes: una sola consulta alimenta semana y mes.
+    const [rangePage, rejectedPage] = await Promise.all([
       this.hourEntries.search(
-        { userId: actor.userId, dateFrom: monday, dateTo: now },
-        { page: 1, pageSize: 200 },
+        { userId: actor.userId, dateFrom: monday < monthStart ? monday : monthStart, dateTo: now },
+        { page: 1, pageSize: 500 },
         { field: 'date', direction: 'asc' },
       ),
       this.hourEntries.search(
@@ -196,12 +201,25 @@ export class GetDashboardSummaryUseCase implements UseCase<GetDashboardSummaryCo
       ),
     ]);
 
-    const weekHours = weekPage.items.reduce((sum, entry) => sum + entry.hours, 0);
-    const todayHours = weekPage.items
+    const weekItems = rangePage.items.filter((entry) => entry.date >= monday);
+    const weekHours = weekItems.reduce((sum, entry) => sum + entry.hours, 0);
+    const todayHours = weekItems
       .filter((entry) => toIsoDate(entry.date) === todayIso)
       .reduce((sum, entry) => sum + entry.hours, 0);
 
-    return { todayHours, weekHours, weekTargetHours: WEEK_TARGET_HOURS, rejectedCount: rejectedPage.total };
+    const overtimeHours = (from: Date) =>
+      rangePage.items
+        .filter((entry) => entry.isOvertime && entry.status !== 'rejected' && entry.date >= from)
+        .reduce((sum, entry) => sum + entry.hours, 0);
+
+    return {
+      todayHours,
+      weekHours,
+      weekTargetHours: WEEK_TARGET_HOURS,
+      rejectedCount: rejectedPage.total,
+      weekOvertimeHours: overtimeHours(monday),
+      monthOvertimeHours: overtimeHours(monthStart),
+    };
   }
 
   /**
@@ -450,7 +468,7 @@ export class GetDashboardSummaryUseCase implements UseCase<GetDashboardSummaryCo
     return { averageLoadPercent, memberCount: scoped.length, scopeLabel, weekStart: toIsoDate(monday), byTeam };
   }
 
-  private async buildSupportSummary(actor: ActorContext, actorRole: RoleCode) {
+  private async buildSupportSummary(actor: ActorContext, actorRole: RoleCode, now: Date) {
     const scopedToLeader = actorRole === 'leader';
     const page = await this.projects.search(
       { type: 'support', leaderUserId: scopedToLeader ? [actor.userId] : undefined },
@@ -470,6 +488,12 @@ export class GetDashboardSummaryUseCase implements UseCase<GetDashboardSummaryCo
         endDate: p.endDate,
       };
     });
+
+    const overtimeByUser = await this.hourEntries.sumOvertimeHoursByUserForProjects(
+      page.items.map((p) => p.id),
+      monthStartOf(now),
+      now,
+    );
 
     const soldHours = rows.reduce((sum, row) => sum + row.contractedHours, 0);
     const usedHours = rows.reduce((sum, row) => sum + row.usedHours, 0);
@@ -502,7 +526,17 @@ export class GetDashboardSummaryUseCase implements UseCase<GetDashboardSummaryCo
       usedPercent: soldHours > 0 ? Math.round((usedHours / soldHours) * 100) : 0,
       deviationPercent: soldHours > 0 ? Math.round((deviationHours / soldHours) * 100) : 0,
       topClients,
-      trend: this.buildSupportTrend(rows, this.clock.now()),
+      trend: this.buildSupportTrend(rows, now),
+      overtime: {
+        approvedHours: overtimeByUser.reduce((sum, user) => sum + user.approvedHours, 0),
+        pendingHours: overtimeByUser.reduce((sum, user) => sum + user.pendingHours, 0),
+        byUser: overtimeByUser.map((user) => ({
+          userId: user.userId,
+          fullName: user.userFullName,
+          approvedHours: user.approvedHours,
+          pendingHours: user.pendingHours,
+        })),
+      },
       scope: scopedToLeader ? ('own' as const) : ('all' as const),
     };
   }
@@ -556,6 +590,10 @@ function mondayOf(date: Date): Date {
   const diff = day === 0 ? -6 : 1 - day;
   result.setUTCDate(result.getUTCDate() + diff);
   return result;
+}
+
+function monthStartOf(date: Date): Date {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
 }
 
 function toIsoDate(date: Date): string {

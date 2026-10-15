@@ -49,20 +49,3 @@ export class CannotReviewTicketHhRequestError extends ForbiddenError {
     super('No puedes revisar esta solicitud.', 'TICKET_HH_REQUEST_CANNOT_REVIEW');
   }
 }
-
-/** El ticket no tiene autorizadas horas extra — el líder del proyecto/equipo debe habilitarlo primero. */
-export class TicketOvertimeNotAllowedError extends ConflictError {
-  constructor() {
-    super('Este ticket no tiene autorizadas horas extra.', 'TICKET_HH_REQUEST_OVERTIME_NOT_ALLOWED');
-  }
-}
-
-/** Tope de 8h/día salvo horas extra — cuenta lo ya solicitado/registrado en CUALQUIER ticket u otro proceso, no solo este ticket (ver `CreateTicketHhRequestUseCase`). */
-export class TicketHhRequestDailyCapExceededError extends ConflictError {
-  constructor(totalHours: number) {
-    super(
-      `Con esta solicitud quedarías con ${totalHours}h ese día, superando el límite diario de 8h. Marca la solicitud como horas extra para poder enviarla.`,
-      'TICKET_HH_REQUEST_DAILY_CAP_EXCEEDED',
-    );
-  }
-}

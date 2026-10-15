@@ -319,6 +319,8 @@ export function MyActivityPanel({
   const weekHours = hours?.weekHours ?? 0;
   const weekTargetHours = hours?.weekTargetHours ?? 40;
   const rejectedCount = hours?.rejectedCount ?? 0;
+  const weekOvertimeHours = hours?.weekOvertimeHours ?? 0;
+  const monthOvertimeHours = hours?.monthOvertimeHours ?? 0;
   const pctDiario = Math.min((todayHours / DAILY_TARGET_HOURS) * 100, 100);
   const pctSemanal = Math.min(Math.round((weekHours / weekTargetHours) * 100), 100);
   const { pageItems: pagedTeamMembers, pagination: teamMembersPagination } = usePaginatedItems(
@@ -360,6 +362,18 @@ export function MyActivityPanel({
                 <div className={styles.progressFill} style={{ width: `${pctSemanal}%` }} />
               </div>
               <span className={styles.kpiSub}>{pctSemanal}% completado</span>
+            </>
+          )}
+        </Card>
+
+        <Card className={styles.kpiCard}>
+          <span className={styles.kpiLabel}>Horas extra este mes</span>
+          {loading ? (
+            <span className={styles.loadingText}>…</span>
+          ) : (
+            <>
+              <span className={styles.kpiValue}>{formatHours(monthOvertimeHours)} horas</span>
+              <span className={styles.kpiSub}>{formatHours(weekOvertimeHours)} h esta semana</span>
             </>
           )}
         </Card>

@@ -21,6 +21,9 @@ export const dashboardHoursSummarySchema = z.object({
   weekHours: z.number(),
   weekTargetHours: z.number(),
   rejectedCount: z.number().int(),
+  /** Horas extra no rechazadas (aprobadas + pendientes) de la semana y del mes en curso. */
+  weekOvertimeHours: z.number(),
+  monthOvertimeHours: z.number(),
 });
 export type DashboardHoursSummary = z.infer<typeof dashboardHoursSummarySchema>;
 
@@ -144,6 +147,23 @@ export const dashboardSupportTrendPointSchema = z.object({
 });
 export type DashboardSupportTrendPoint = z.infer<typeof dashboardSupportTrendPointSchema>;
 
+export const dashboardSupportOvertimeUserSchema = z.object({
+  userId: z.string(),
+  fullName: z.string(),
+  approvedHours: z.number(),
+  pendingHours: z.number(),
+});
+export type DashboardSupportOvertimeUser = z.infer<typeof dashboardSupportOvertimeUserSchema>;
+
+/** Horas extra del mes en curso en los proyectos de soporte del alcance — en soporte las horas sobre la jornada de 8h quedan solas como extra. */
+export const dashboardSupportOvertimeSchema = z.object({
+  approvedHours: z.number(),
+  pendingHours: z.number(),
+  /** Ordenado de mayor a menor total (aprobadas + pendientes). */
+  byUser: z.array(dashboardSupportOvertimeUserSchema),
+});
+export type DashboardSupportOvertime = z.infer<typeof dashboardSupportOvertimeSchema>;
+
 export const dashboardSupportSummarySchema = z.object({
   projectsWithSupportCount: z.number().int(),
   soldHours: z.number(),
@@ -154,6 +174,7 @@ export const dashboardSupportSummarySchema = z.object({
   topClients: z.array(dashboardSupportClientSchema),
   /** Últimos 12 meses (más antiguo primero), horas reales prorrateadas por el rango de fechas de cada proyecto — no sintético. */
   trend: z.array(dashboardSupportTrendPointSchema),
+  overtime: dashboardSupportOvertimeSchema,
   /** `'own'` cuando el actor es líder (no admin/pmo) — acotado a los proyectos de soporte que lidera. */
   scope: dashboardScopeSchema,
 });

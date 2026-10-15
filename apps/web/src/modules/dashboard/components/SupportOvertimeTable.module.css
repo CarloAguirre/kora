@@ -1,0 +1,27 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-4);
+}
+
+.title {
+  font-size: var(--kora-text-base);
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-navy);
+}
+
+.subtitle {
+  font-size: var(--kora-text-sm);
+  color: var(--kora-text-muted);
+  margin-top: 2px;
+}
+
+.user {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+}
+
+.muted {
+  color: var(--kora-text-disabled);
+}

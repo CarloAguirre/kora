@@ -52,7 +52,10 @@ export class UpdateHourEntryUseCase implements UseCase<UpdateHourEntryCommand, v
       if (!project) return err(new ReferencedProjectNotFoundError(data.projectId));
       if (project.status === 'on_hold') return err(new ProjectStoppedError());
       if (isOvertime && !project.allowsOvertime) return err(new ProjectOvertimeNotAllowedError());
-    } else if (isOvertime && projectId) {
+    } else if (data.isOvertime === true && !entry.isOvertime && projectId) {
+      // Solo al MARCAR como extra: un registro que ya nació extra (p. ej. el
+      // excedente de 8h de una solicitud de ticket de soporte, que no exige
+      // autorización) sigue siendo editable aunque el proyecto no las autorice.
       const project = await this.projects.findById(projectId);
       if (project && !project.allowsOvertime) return err(new ProjectOvertimeNotAllowedError());
     }

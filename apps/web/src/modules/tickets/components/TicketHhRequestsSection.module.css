@@ -233,14 +233,6 @@
   flex-wrap: wrap;
 }
 
-.overtimeRow {
-  display: flex;
-  align-items: center;
-  gap: var(--kora-space-2);
-  font-size: var(--kora-text-sm);
-  color: var(--kora-text);
-}
-
 .formFooter .submitButton {
   margin-left: auto;
 }

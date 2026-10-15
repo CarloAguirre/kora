@@ -9,6 +9,7 @@ import { DownloadIcon, PlusIcon } from '@/shared/components/icons/Icons';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { SupportTrendChart } from '../components/SupportTrendChart';
 import { SupportClientBreakdown } from '../components/SupportClientBreakdown';
+import { SupportOvertimeTable } from '../components/SupportOvertimeTable';
 import { exportSupportReport } from '../lib/dashboard-support-export';
 
 const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 1 });
@@ -89,6 +90,18 @@ export function DashboardSupportTab({ support, loading }: DashboardSupportTabPro
           <span className={styles.kpiValue}>{loading ? '…' : `${formatHours(support?.deviationHours ?? 0)} hrs`}</span>
           <span className={styles.kpiSub}>Horas fuera de contrato</span>
         </Card>
+
+        <Card className={styles.kpiCard}>
+          <span className={styles.kpiLabel}>Horas Extra del Mes</span>
+          <span className={styles.kpiValue}>
+            {loading ? '…' : `${formatHours((support?.overtime.approvedHours ?? 0) + (support?.overtime.pendingHours ?? 0))} hrs`}
+          </span>
+          <span className={styles.kpiSub}>
+            {support && support.overtime.pendingHours > 0
+              ? `${formatHours(support.overtime.pendingHours)} h pendientes de aprobar`
+              : `${support?.overtime.byUser.length ?? 0} colaboradores`}
+          </span>
+        </Card>
       </div>
 
       <div className={styles.chartRow}>
@@ -104,6 +117,10 @@ export function DashboardSupportTab({ support, loading }: DashboardSupportTabPro
           <SupportClientBreakdown clients={support?.topClients ?? []} />
         </Card>
       </div>
+
+      <Card>
+        <SupportOvertimeTable users={support?.overtime.byUser ?? []} loading={loading} />
+      </Card>
 
       <div className={styles.footer}>
         <span>Diseñado y desarrollado por</span>

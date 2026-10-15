@@ -20,6 +20,8 @@ export function exportSupportReport(summary: DashboardSupportSummary) {
     ['% Utilizadas', `${summary.usedPercent}%`],
     ['Horas Desviadas', formatDecimal(summary.deviationHours)],
     ['% Desviadas', `${summary.deviationPercent}%`],
+    ['Horas Extra del Mes (aprobadas)', formatDecimal(summary.overtime.approvedHours)],
+    ['Horas Extra del Mes (pendientes)', formatDecimal(summary.overtime.pendingHours)],
   ];
   const summarySheet = XLSX.utils.aoa_to_sheet(summaryRows);
 
@@ -29,8 +31,20 @@ export function exportSupportReport(summary: DashboardSupportSummary) {
   ];
   const clientSheet = XLSX.utils.aoa_to_sheet(clientRows);
 
+  const overtimeRows = [
+    ['Colaborador', 'HH Extra Aprobadas', 'HH Extra Pendientes', 'Total'],
+    ...summary.overtime.byUser.map((u) => [
+      u.fullName,
+      formatDecimal(u.approvedHours),
+      formatDecimal(u.pendingHours),
+      formatDecimal(u.approvedHours + u.pendingHours),
+    ]),
+  ];
+  const overtimeSheet = XLSX.utils.aoa_to_sheet(overtimeRows);
+
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, summarySheet, 'Resumen');
   XLSX.utils.book_append_sheet(workbook, clientSheet, 'Desglose por cliente');
+  XLSX.utils.book_append_sheet(workbook, overtimeSheet, 'Horas extra del mes');
   XLSX.writeFile(workbook, `reporte-soporte-${new Date().toISOString().slice(0, 10)}.xlsx`);
 }

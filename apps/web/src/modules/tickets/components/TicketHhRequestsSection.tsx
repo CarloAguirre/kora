@@ -4,7 +4,6 @@ import styles from './TicketHhRequestsSection.module.css';
 import { Avatar } from '@/shared/components/ui/Avatar';
 import { Badge, type BadgeTone } from '@/shared/components/ui/Badge';
 import { Button } from '@/shared/components/ui/Button';
-import { Switch } from '@/shared/components/ui/Switch';
 import { CheckIcon, ChevronDownIcon, InfoIcon, PlusIcon, TriangleAlertIcon } from '@/shared/components/icons/Icons';
 import { TextField } from '@/shared/components/ui/TextField';
 import { useToast } from '@/shared/components/ui/Toast';
@@ -44,8 +43,6 @@ interface TicketHhRequestsSectionProps {
   ticketId: string;
   /** `ticket.canRequestHh` — responsable o autoridad del proyecto, ticket no cerrado y con proyecto asociado (ver `GetTicketUseCase`). */
   canRequest: boolean;
-  /** `ticket.allowsOvertime` — el líder debe autorizar el ticket antes de poder marcar una solicitud como horas extra. */
-  allowsOvertime: boolean;
   /** `ticket.pendingHhRequestsCount` / `ticket.pendingHhHours` — para avisar en el encabezado sin esperar a que cargue la lista. */
   pendingHhRequestsCount: number;
   pendingHhHours: number;
@@ -63,7 +60,6 @@ interface TicketHhRequestsSectionProps {
 export function TicketHhRequestsSection({
   ticketId,
   canRequest,
-  allowsOvertime,
   pendingHhRequestsCount,
   pendingHhHours,
   hhApprovers,
@@ -79,7 +75,6 @@ export function TicketHhRequestsSection({
   const [date, setDate] = useState(todayIso());
   const [hours, setHours] = useState('');
   const [note, setNote] = useState('');
-  const [isOvertime, setIsOvertime] = useState(false);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
   const [resolvedOpen, setResolvedOpen] = useState(false);
@@ -89,35 +84,27 @@ export function TicketHhRequestsSection({
   const resolvedRequests = (requests ?? []).filter((request) => request.status !== 'pending');
 
   /**
-   * Tope diario de 8h salvo horas extra — mismo criterio que `DailyEntryForm`
-   * (Horas) y que `CreateTicketHhRequestUseCase` en el backend (que es quien
-   * de verdad lo hace cumplir; esto es solo para avisar antes de enviar).
-   * Suma lo pendiente en ESTE ticket para la fecha elegida (`pending`: una
-   * solicitud `approved` ya generó su propio `hour_entries`, contarla de las
-   * dos formas la duplicaría) más los registros de horas del resto de
-   * procesos/tickets del usuario ese día.
+   * Soporte no exige autorizar horas extra: lo que pase de la jornada de 8h se
+   * registra solo como horas extra (lo decide `CreateTicketHhRequestUseCase`
+   * en el backend; esto es solo para avisar antes de enviar). Solo cuentan las
+   * horas normales no rechazadas del usuario ese día — incluye las solicitudes
+   * pendientes de cualquier ticket, que ya viven como `hour_entries` pendientes.
    */
   const { data: entriesForDate } = useHourEntriesList(user ? { userId: user.id, dateFrom: date, dateTo: date, pageSize: 100 } : {});
-  const otherHoursForDate = (entriesForDate?.items ?? [])
-    .filter((entry) => entry.status !== 'rejected')
+  const existingHoursForDate = (entriesForDate?.items ?? [])
+    .filter((entry) => entry.status !== 'rejected' && !entry.isOvertime)
     .reduce((sum, entry) => sum + entry.hours, 0);
-  const ticketHoursForDate = pendingRequests
-    .filter((request) => request.date === date && request.user.id === user?.id)
-    .reduce((sum, request) => sum + request.hours, 0);
-  const existingHoursForDate = otherHoursForDate + ticketHoursForDate;
   const newHoursValue = Number(hours) || 0;
-  const totalHoursForDate = existingHoursForDate + newHoursValue;
-  const exceedsDailyCap = !isOvertime && totalHoursForDate > DAILY_CAP_HOURS;
+  const overtimeHoursPreview = Math.max(0, newHoursValue - Math.max(0, DAILY_CAP_HOURS - existingHoursForDate));
 
   const submitRequest = async () => {
     const hoursValue = Number(hours);
-    if (!(hoursValue > 0) || exceedsDailyCap) return;
+    if (!(hoursValue > 0)) return;
     try {
-      await createRequest.mutateAsync({ date, hours: hoursValue, note: note.trim() || undefined, isOvertime });
+      await createRequest.mutateAsync({ date, hours: hoursValue, note: note.trim() || undefined });
       toast.success('Solicitud de horas enviada.');
       setHours('');
       setNote('');
-      setIsOvertime(false);
     } catch (error) {
       toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo enviar la solicitud.');
     }
@@ -275,7 +262,7 @@ export function TicketHhRequestsSection({
             </span>
           </div>
 
-          {!exceedsDailyCap && existingHoursForDate > 0 && existingHoursForDate < DAILY_CAP_HOURS && (
+          {overtimeHoursPreview === 0 && existingHoursForDate > 0 && (
             <div className={styles.noticeInfo} role="status">
               <InfoIcon size={16} />
               <span>
@@ -285,12 +272,11 @@ export function TicketHhRequestsSection({
             </div>
           )}
 
-          {exceedsDailyCap && (
-            <div className={styles.noticeWarning} role="alert">
+          {overtimeHoursPreview > 0 && (
+            <div className={styles.noticeWarning} role="status">
               <TriangleAlertIcon size={16} />
               <span>
-                Superarías el límite diario de {DAILY_CAP_HOURS} h ({formatHours(totalHoursForDate)} h en total ese día).{' '}
-                {allowsOvertime ? 'Marca "Horas extra" para poder enviarla.' : 'Este ticket no tiene horas extra autorizadas.'}
+                Superas las {DAILY_CAP_HOURS} h del día: {formatHours(overtimeHoursPreview)} h se registrarán como horas extra.
               </span>
             </div>
           )}
@@ -316,16 +302,10 @@ export function TicketHhRequestsSection({
           </div>
 
           <div className={styles.formFooter}>
-            {allowsOvertime && (
-              <div className={styles.overtimeRow}>
-                <Switch checked={isOvertime} onChange={setIsOvertime} label="Horas extra" />
-                <span>Horas extra</span>
-              </div>
-            )}
             <Button
               variant="outlineDark"
               className={styles.submitButton}
-              disabled={exceedsDailyCap || !(Number(hours) > 0)}
+              disabled={!(newHoursValue > 0)}
               loading={createRequest.isPending}
               iconLeft={<PlusIcon size={16} />}
               onClick={() => void submitRequest()}
