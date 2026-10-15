@@ -108,6 +108,22 @@ export function ProjectsListPage() {
   // aparte de `devLeaderFilters`/`devStatusFilters`), no una vista derivada
   // de la tabla.
   const { data: chartSourceData } = useProjectsList({ type: tab, page: 1, pageSize: CHART_PAGE_SIZE });
+  // Totales de las sub-pestañas Activos/Terminados de Soporte: solo interesa
+  // `total`, así que basta con una página de 1. Respetan el Buscar para que
+  // coincidan con lo que muestra la tabla al cambiar de pestaña.
+  const supportCountQuery = { type: 'support' as const, search: search || undefined, page: 1, pageSize: 1 };
+  const { data: supportActiveCount } = useProjectsList(
+    { ...supportCountQuery, status: ['active'] },
+    { enabled: tab === 'support' },
+  );
+  const { data: supportFinishedCount } = useProjectsList(
+    { ...supportCountQuery, status: ['finished'] },
+    { enabled: tab === 'support' },
+  );
+  const supportSubTabs = SUPPORT_SUB_TABS.map((subTab) => {
+    const total = (subTab.id === 'active' ? supportActiveCount : supportFinishedCount)?.total;
+    return { id: subTab.id, label: total === undefined ? subTab.label : `${subTab.label} (${total})` };
+  });
   const { data: clients } = useClientsList({ page: 1, pageSize: 200, sortField: 'companyName' });
   const { data: leaders } = useUsersList({ page: 1, pageSize: 200, sortField: 'firstName', role: 'leader' });
 
@@ -284,7 +300,7 @@ export function ProjectsListPage() {
         <Card>
           {tab === 'support' && (
             <div className={styles.supportSubTabsRow}>
-              <Tabs tabs={SUPPORT_SUB_TABS} activeId={supportSubTab} onSelect={changeSupportSubTab} />
+              <Tabs tabs={supportSubTabs} activeId={supportSubTab} onSelect={changeSupportSubTab} />
             </div>
           )}
 

@@ -306,7 +306,19 @@ export class DrizzleProjectRepository implements ProjectRepository {
     if (filters.clientId) conditions.push(eq(projects.clientId, filters.clientId));
     if (filters.leaderUserId?.length) conditions.push(inArray(projects.leaderUserId, filters.leaderUserId));
     if (filters.search) {
-      conditions.push(ilike(projects.name, `%${filters.search.trim()}%`));
+      // Nombre del proyecto o del cliente. `exists` en vez de un join porque la
+      // consulta de conteo de `search()` no se une a `clients`.
+      const pattern = `%${filters.search.trim()}%`;
+      conditions.push(
+        or(
+          ilike(projects.name, pattern),
+          sql`exists (
+            select 1 from ${clients}
+            where ${clients.id} = ${projects.clientId}
+              and ${clients.companyName} ilike ${pattern}
+          )`,
+        ),
+      );
     }
     if (filters.assignedToUserId) {
       // Lidera el proyecto, desarrolla, es el responsable comercial, lidera alguno de sus
