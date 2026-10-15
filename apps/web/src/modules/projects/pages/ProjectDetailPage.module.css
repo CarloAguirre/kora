@@ -5,6 +5,21 @@
   width: 100%;
 }
 
+/* Nombre del proyecto + pestañas Vista Interna/Cliente — mismo bloque que
+   `ClientProjectDetailPage` para que ambas vistas se vean igual al cambiar. */
+.headerBlock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-3);
+}
+
+.title {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: 0.2158px;
+  color: #0f2a44;
+}
+
 .topRow {
   display: flex;
   align-items: center;

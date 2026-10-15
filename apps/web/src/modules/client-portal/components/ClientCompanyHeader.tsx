@@ -12,7 +12,16 @@ import styles from './ClientCompanyHeader.module.css';
  * cliente; la marca es `KabeliLogo`, igual que en la ficha de proyecto del
  * portal (`ClientProjectDetailPage`).
  */
-export function ClientCompanyHeader({ company, contractLabel }: { company: ClientCompanyInfo; contractLabel: string }) {
+export function ClientCompanyHeader({
+  company,
+  contractLabel,
+  nameSuffix,
+}: {
+  company: ClientCompanyInfo;
+  contractLabel: string;
+  /** Texto tras el nombre ("Vista cliente" en la vista previa de admin). */
+  nameSuffix?: string;
+}) {
   return (
     <div className={styles.row}>
       <div className={styles.identity}>
@@ -20,7 +29,10 @@ export function ClientCompanyHeader({ company, contractLabel }: { company: Clien
           <BuildingIcon size={28} />
         </div>
         <div className={styles.text}>
-          <span className={styles.name}>{company.name}</span>
+          <span className={styles.name}>
+            {company.name}
+            {nameSuffix && ` — ${nameSuffix}`}
+          </span>
           <span className={styles.contact}>
             <strong>{contractLabel}</strong>: {company.contactName} — {company.contactPosition}
           </span>

@@ -617,7 +617,8 @@ export function NewProjectPage() {
   /** Deja "Estimación" — sin equipos/fases (Prospecto/Cotización, o el usuario eligió omitirlo) va directo a Resumen. */
   /** El plan de pago vive en Estimación: se valida al dejar ese paso. */
   const paymentPlanIsValid = () => {
-    const error = validatePaymentPlan(paymentPlan);
+    // En Prospecto el plan no se llena (ver la sección "Plan de pago") — no hay nada que validar.
+    const error = isProspecto ? null : validatePaymentPlan(paymentPlan);
     setPaymentPlanError(error);
     return error === null;
   };
@@ -707,7 +708,9 @@ export function NewProjectPage() {
       }
 
       const isManualHito0 = values.type === 'development' && values.salesStage === 'approved' && values.status === 'active';
-      const developmentValues = { ...values, ...paymentPlanPayload(paymentPlan) };
+      // En Prospecto no se manda plan: el backend crea el plan por defecto (Inicio/Marcha blanca, montos en 0)
+      // y monto y tramos se completan al pasar a Cotización.
+      const developmentValues = isProspecto ? values : { ...values, ...paymentPlanPayload(paymentPlan) };
       const result = await createProject.mutateAsync(isManualHito0 ? { ...developmentValues, status: 'draft' } : developmentValues);
 
       if (values.type === 'development') {
@@ -1140,11 +1143,22 @@ export function NewProjectPage() {
               </Section>
 
               <Section title="Plan de pago">
-                <p className={styles.hint}>
-                  Tramos en que se cobra el proyecto. Cada tramo queda <b>Por facturar</b> cuando se cumple su hito y se
-                  avisa por correo a Finanzas y Gerencia.
-                </p>
+                {isProspecto ? (
+                  <div className={styles.infoBox}>
+                    <InfoIcon size={16} />
+                    <div>
+                      <b>En Prospecto el plan de pago aún no se completa.</b> El monto del contrato y sus tramos se
+                      ingresan cuando el proyecto pasa a Cotización, con fechas y horas estimadas definidas.
+                    </div>
+                  </div>
+                ) : (
+                  <p className={styles.hint}>
+                    Tramos en que se cobra el proyecto. Cada tramo queda <b>Por facturar</b> cuando se cumple su hito y se
+                    avisa por correo a Finanzas y Gerencia.
+                  </p>
+                )}
                 <PaymentPlanEditor
+                  disabled={isProspecto}
                   value={paymentPlan}
                   onChange={(next) => {
                     setPaymentPlan(next);
@@ -1774,24 +1788,26 @@ export function NewProjectPage() {
                   {isApproved && <SummaryItem label="Asignadas a equipos" value={`${totalTeamHours} hh`} />}
                 </div>
 
-                <div className={styles.summaryCard}>
-                  <h3 className={styles.summaryCardTitle}>Plan de pago</h3>
-                  <SummaryItem
-                    label="Monto del contrato"
-                    value={paymentPlan.contractAmount ? formatMoney(Number(paymentPlan.contractAmount), paymentPlan.contractCurrency) : undefined}
-                  />
-                  {paymentPlan.items.map((item) => (
+                {!isProspecto && (
+                  <div className={styles.summaryCard}>
+                    <h3 className={styles.summaryCardTitle}>Plan de pago</h3>
                     <SummaryItem
-                      key={item.key}
-                      label={item.percent ? `${item.name} (${item.percent}%)` : item.name}
-                      value={`${formatMoney(Number(item.amount || 0), paymentPlan.contractCurrency)} · ${paymentTriggerLabel({
-                        triggerType: item.triggerType,
-                        triggerPhase: item.triggerPhase || null,
-                        triggerDate: item.triggerDate || null,
-                      })}`}
+                      label="Monto del contrato"
+                      value={paymentPlan.contractAmount ? formatMoney(Number(paymentPlan.contractAmount), paymentPlan.contractCurrency) : undefined}
                     />
-                  ))}
-                </div>
+                    {paymentPlan.items.map((item) => (
+                      <SummaryItem
+                        key={item.key}
+                        label={item.percent ? `${item.name} (${item.percent}%)` : item.name}
+                        value={`${formatMoney(Number(item.amount || 0), paymentPlan.contractCurrency)} · ${paymentTriggerLabel({
+                          triggerType: item.triggerType,
+                          triggerPhase: item.triggerPhase || null,
+                          triggerDate: item.triggerDate || null,
+                        })}`}
+                      />
+                    ))}
+                  </div>
+                )}
 
                 {clientDetail && (
                   <div className={styles.summaryCard}>

@@ -85,6 +85,9 @@ export interface ClientSupportContractDetailPageProps {
   readonly contractIdOverride?: string;
   readonly backTo?: string;
   readonly backLabel?: string;
+  /** Título del header — siempre el de la sección del menú: "Soporte" en el
+   *  portal real, "Clientes" en la vista previa de admin. */
+  readonly title?: string;
 }
 
 /**
@@ -103,6 +106,7 @@ export function ClientSupportContractDetailPage({
   contractIdOverride,
   backTo,
   backLabel,
+  title = 'Soporte',
 }: ClientSupportContractDetailPageProps = {}) {
   const { contractId: routeContractId } = useParams<{ contractId: string }>();
   const contractId = contractIdOverride ?? routeContractId ?? null;
@@ -163,7 +167,7 @@ export function ClientSupportContractDetailPage({
 
   if (planLoading) {
     return (
-      <DashboardLayout title="Detalle del contrato de soporte">
+      <DashboardLayout title={title}>
         <div className={styles.page}>
           <Card className={styles.notFoundCard}>
             <p>Cargando contrato de soporte…</p>
@@ -175,7 +179,7 @@ export function ClientSupportContractDetailPage({
 
   if (!contract || planError) {
     return (
-      <DashboardLayout title="Detalle del contrato de soporte">
+      <DashboardLayout title={title}>
         <div className={styles.page}>
           <Card className={styles.notFoundCard}>
             <p>No se pudo cargar este contrato.</p>
@@ -190,7 +194,7 @@ export function ClientSupportContractDetailPage({
   }
 
   return (
-    <DashboardLayout title="Detalle del contrato de soporte">
+    <DashboardLayout title={title}>
       <div className={styles.page}>
         <Link className={styles.breadcrumb} to={resolvedBackTo}>
           <ChevronLeftIcon size={16} /> {backLabel ?? `Volver a vista cliente ${contract.company.name}`}

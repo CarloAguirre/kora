@@ -23,6 +23,8 @@ export function ClientPortalPreviewPage() {
       getContractPath={(contract) => `${base}/soporte/${contract.slug || contract.id}`}
       backTo={`/clientes/${clientId}`}
       backLabel="Volver al cliente"
+      title="Clientes"
+      companyNameSuffix="Vista cliente"
     />
   );
 }

@@ -52,7 +52,7 @@ export function ProjectDetailPage() {
 
   if (error) {
     return (
-      <DashboardLayout title="Proyecto">
+      <DashboardLayout title="Proyectos">
         <PageLoadError error={error} subject="este proyecto" backLabel="Volver a proyectos" onBack={() => void navigate('/proyectos')} />
       </DashboardLayout>
     );
@@ -60,7 +60,7 @@ export function ProjectDetailPage() {
 
   if (isLoading || !project || !projectId) {
     return (
-      <DashboardLayout title="Proyecto">
+      <DashboardLayout title="Proyectos">
         <p>Cargando…</p>
       </DashboardLayout>
     );
@@ -84,11 +84,14 @@ export function ProjectDetailPage() {
   const showViewTabs = !showTeamOnlyView && project.type !== 'support' && project.client !== null && can('clients:read');
 
   return (
-    <DashboardLayout title={project.name}>
+    <DashboardLayout title="Proyectos">
       <div className={styles.page}>
-        {showViewTabs && project.client && (
-          <ProjectViewTabs active="internal" clientTo={clientProjectPreviewPath(project.client, project)} />
-        )}
+        <div className={styles.headerBlock}>
+          <h2 className={styles.title}>{project.name}</h2>
+          {showViewTabs && project.client && (
+            <ProjectViewTabs active="internal" clientTo={clientProjectPreviewPath(project.client, project)} />
+          )}
+        </div>
 
         <div className={styles.topRow}>
           <Button variant="tertiary" size="sm" className={styles.backButton} onClick={() => void navigate('/proyectos')}>

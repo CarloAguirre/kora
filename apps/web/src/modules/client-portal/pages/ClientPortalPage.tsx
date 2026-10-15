@@ -71,6 +71,11 @@ export interface ClientPortalPageProps {
    *  portal real esta es la pantalla de entrada del cliente, sin página anterior. */
   readonly backTo?: string;
   readonly backLabel?: string;
+  /** Título del header. Por defecto sigue la pestaña activa ("Proyectos"/"Soporte");
+   *  la vista previa de admin lo fija en "Clientes", la sección del menú en que está. */
+  readonly title?: string;
+  /** Texto junto al nombre del cliente ("Vista cliente" en la vista previa de admin). */
+  readonly companyNameSuffix?: string;
 }
 
 export function ClientPortalPage({
@@ -81,6 +86,8 @@ export function ClientPortalPage({
   getContractPath = portalSupportContractPath,
   backTo,
   backLabel,
+  title,
+  companyNameSuffix,
 }: ClientPortalPageProps = {}) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -89,7 +96,7 @@ export function ClientPortalPage({
   const company = client ? toClientCompanyInfo(client) : { name: '—', contactName: '—', contactPosition: '' };
 
   return (
-    <DashboardLayout title={activeTab === 'proyectos' ? 'Proyectos' : 'Soporte'}>
+    <DashboardLayout title={title ?? (activeTab === 'proyectos' ? 'Proyectos' : 'Soporte')}>
       <div className={styles.page}>
         {backTo && (
           <Link className={styles.breadcrumb} to={backTo}>
@@ -97,7 +104,11 @@ export function ClientPortalPage({
           </Link>
         )}
 
-        <ClientCompanyHeader company={company} contractLabel={activeTab === 'proyectos' ? 'Contacto' : 'Responsable'} />
+        <ClientCompanyHeader
+          company={company}
+          contractLabel={activeTab === 'proyectos' ? 'Contacto' : 'Responsable'}
+          nameSuffix={companyNameSuffix}
+        />
 
         <Tabs
           tabs={[

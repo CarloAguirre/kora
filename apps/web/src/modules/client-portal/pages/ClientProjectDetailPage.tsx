@@ -156,9 +156,18 @@ export interface ClientProjectDetailPageProps {
    *  interna (`ClientProjectPreviewPage`); en el portal real del cliente queda
    *  deshabilitada con candado. */
   readonly internalViewTo?: string;
+  /** Título del header — siempre el de la sección del menú: "Proyectos" en el
+   *  portal real, "Clientes" en la vista previa de admin. */
+  readonly title?: string;
 }
 
-export function ClientProjectDetailPage({ projectIdOverride, backTo, backLabel, internalViewTo }: ClientProjectDetailPageProps = {}) {
+export function ClientProjectDetailPage({
+  projectIdOverride,
+  backTo,
+  backLabel,
+  internalViewTo,
+  title = 'Proyectos',
+}: ClientProjectDetailPageProps = {}) {
   const { projectId: routeProjectId } = useParams<{ projectId: string }>();
   const projectId = projectIdOverride ?? routeProjectId ?? null;
   const navigate = useNavigate();
@@ -191,7 +200,7 @@ export function ClientProjectDetailPage({ projectIdOverride, backTo, backLabel, 
 
   if (isLoading) {
     return (
-      <DashboardLayout title="Detalle de proyecto">
+      <DashboardLayout title={title}>
         <div className={styles.page}>
           <Card className={styles.notFoundCard}>
             <p>Cargando ficha del proyecto…</p>
@@ -203,7 +212,7 @@ export function ClientProjectDetailPage({ projectIdOverride, backTo, backLabel, 
 
   if (!project || isError) {
     return (
-      <DashboardLayout title="Detalle de proyecto">
+      <DashboardLayout title={title}>
         <div className={styles.page}>
           <Card className={styles.notFoundCard}>
             <p>No se pudo cargar este proyecto.</p>
@@ -222,7 +231,7 @@ export function ClientProjectDetailPage({ projectIdOverride, backTo, backLabel, 
   );
 
   return (
-    <DashboardLayout title="Detalle de proyecto">
+    <DashboardLayout title={title}>
       <div className={styles.page}>
         <Link className={styles.breadcrumb} to={resolvedBackTo}>
           <ChevronLeftIcon size={16} /> {backLabel ?? `Volver a proyectos de ${project.company.name}`}

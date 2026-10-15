@@ -12,6 +12,7 @@ export function ClientSupportContractPreviewPage() {
     <ClientSupportContractDetailPage
       backTo={`/clientes/${clientId}/vista-cliente/soporte`}
       backLabel="Volver a soporte"
+      title="Clientes"
     />
   );
 }
