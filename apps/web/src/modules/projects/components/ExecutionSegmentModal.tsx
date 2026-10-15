@@ -133,7 +133,7 @@ export function ExecutionSegmentModal({
   const weeklyHoursByMember = new Map((team?.members ?? []).map((member) => [member.id, member.weeklyHours]));
   const selectedIds = new Set(values.members.map((member) => member.teamMemberId));
   const memberOptions = (team?.members ?? [])
-    .filter((member) => !selectedIds.has(member.id))
+    .filter((member) => !selectedIds.has(member.id) && member.userStatus !== 'disabled')
     .map((member) => ({ value: member.id, label: member.fullName }));
 
   const canSubmit = Boolean(

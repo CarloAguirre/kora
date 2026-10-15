@@ -53,6 +53,7 @@ export class GetTeamUseCase implements UseCase<GetTeamCommand, TeamDetail, Appli
         id: member.id,
         userId: member.userId,
         fullName: member.userFullName,
+        userStatus: member.userStatus,
         position: member.position,
         weeklyHours: Number(member.weeklyHours),
         joinedAt: member.joinedAt.toISOString(),

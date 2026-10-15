@@ -83,6 +83,7 @@ function buildMember(overrides: Partial<ProjectTeamMember>): ProjectTeamMember {
     teamMemberId: 'team-member-id',
     userId: 'user-id',
     fullName: 'Persona',
+    userStatus: 'active',
     activity: null,
     assignedHours: 0,
     consumedHours: 0,

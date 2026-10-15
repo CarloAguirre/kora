@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, isNull, teamMembers, type Database } from '@kora/db';
+import { and, eq, isNull, teamMembers, users, type Database } from '@kora/db';
 import type { ProjectTeamMemberValidator } from '../../application/ports/project-team-member-validator.port';
 import { DATABASE } from '../../../../shared/infrastructure/database/database.module';
 
@@ -23,5 +23,15 @@ export class DrizzleProjectTeamMemberValidator implements ProjectTeamMemberValid
       .where(eq(teamMembers.id, teamMemberId))
       .limit(1);
     return rows[0]?.teamId ?? null;
+  }
+
+  async isUserDisabled(teamMemberId: string): Promise<boolean> {
+    const rows = await this.database
+      .select({ status: users.status })
+      .from(teamMembers)
+      .innerJoin(users, eq(users.id, teamMembers.userId))
+      .where(eq(teamMembers.id, teamMemberId))
+      .limit(1);
+    return rows[0]?.status === 'disabled';
   }
 }

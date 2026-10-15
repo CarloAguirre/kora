@@ -32,8 +32,10 @@ export function AssignCollaboratorModal({
   useEffect(() => {
     // Sin colaborador previo, el `<select>` igual muestra la primera opción por defecto del
     // navegador (no hay placeholder) — si no reflejamos eso acá, el botón queda deshabilitado
-    // (`!userId`) aunque se vea una opción marcada.
-    if (open) setUserId(initialUserId || memberOptions[0]?.value || '');
+    // (`!userId`) aunque se vea una opción marcada. Lo mismo si el colaborador actual ya no se
+    // ofrece (se deshabilitó): reasignar a él mismo no tendría sentido.
+    const isOffered = memberOptions.some((option) => option.value === initialUserId);
+    if (open) setUserId((isOffered ? initialUserId : '') || memberOptions[0]?.value || '');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initialUserId]);
 

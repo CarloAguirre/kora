@@ -1,4 +1,5 @@
 import type { TransactionContext } from '@kora/core';
+import type { UserStatus } from '@kora/contracts';
 
 export interface ProjectTeamMemberRecord {
   readonly id: string;
@@ -8,6 +9,7 @@ export interface ProjectTeamMemberRecord {
   readonly teamMemberId: string;
   readonly userId: string;
   readonly fullName: string;
+  readonly userStatus: UserStatus;
   readonly activity: string | null;
   readonly assignedHours: number;
   readonly consumedHours: number;

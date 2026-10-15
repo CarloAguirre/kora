@@ -47,11 +47,11 @@ export function TeamDetailPage() {
   const [editingMember, setEditingMember] = useState<TeamMember | null>(null);
 
   // Candidatos para agregar: colaboradores y líderes que aún no pertenecen al
-  // equipo. 200 alcanza con margen para una plantilla de este tamaño; si algún
+  // equipo (los deshabilitados ya no trabajan, no se ofrecen). 200 alcanza con margen para una plantilla de este tamaño; si algún
   // día no bastara, el selector pasaría a buscar por texto en vez de listar todo.
   const { data: candidateUsers } = useUsersList({ page: 1, pageSize: 200, sortField: 'firstName' });
   const memberUserIds = new Set((team?.members ?? []).map((member) => member.userId));
-  const availableUsers = (candidateUsers?.items ?? []).filter((user) => !memberUserIds.has(user.id));
+  const availableUsers = (candidateUsers?.items ?? []).filter((user) => user.status !== 'disabled' && !memberUserIds.has(user.id));
 
   const {
     register,

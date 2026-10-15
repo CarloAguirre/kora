@@ -188,6 +188,17 @@ export class DeliveryAssigneeNotInTeamError extends ValidationError {
   }
 }
 
+/**
+ * Una persona deshabilitada ya no entra al sistema ni carga horas: asignarle
+ * una tarea, una entrega o un lugar en el proyecto deja ese trabajo sin dueño.
+ * Lo que ya tenía asignado se conserva; solo se impide asignarle algo nuevo.
+ */
+export class ProjectAssigneeDisabledError extends ConflictError {
+  constructor() {
+    super('No puedes asignar trabajo a un usuario deshabilitado.', 'PROJECT_ASSIGNEE_DISABLED');
+  }
+}
+
 /** Marcar terminada una entrega en nombre del colaborador exige explicar por qué (queda en la bitácora). */
 export class DeliveryOnBehalfCommentRequiredError extends ValidationError {
   constructor() {

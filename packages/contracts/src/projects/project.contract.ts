@@ -9,6 +9,7 @@ import {
   uuidSchema,
 } from '../common/primitives';
 import { clientContactSchema } from '../clients/client.contract';
+import { userStatusSchema } from '../users/user.contract';
 
 /** Ver docs/DECISION-M3-ESTADOS.md: por qué son cuatro campos independientes. */
 
@@ -77,6 +78,8 @@ export const projectTeamMemberSchema = z.object({
   teamMemberId: uuidSchema,
   userId: uuidSchema,
   fullName: z.string(),
+  /** Un deshabilitado sigue figurando por sus horas, pero ya no se le asignan tareas ni entregas. */
+  userStatus: userStatusSchema,
   activity: z.string().nullable(),
   assignedHours: z.number(),
   consumedHours: z.number(),

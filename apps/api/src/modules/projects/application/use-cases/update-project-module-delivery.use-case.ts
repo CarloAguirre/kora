@@ -22,6 +22,7 @@ import {
   DeliveryOnBehalfCommentRequiredError,
   DeliveryTeamNotInProjectError,
   InvalidDeliveryStatusTransitionError,
+  ProjectAssigneeDisabledError,
   ProjectModuleDeliveryNotFoundError,
   ProjectModuleNotFoundError,
   ProjectNotFoundError,
@@ -137,6 +138,10 @@ export class UpdateProjectModuleDeliveryUseCase
     }
     if (command.data.assigneeUserId != null && command.data.assigneeUserId !== delivery.assigneeUserId) {
       if (!isMemberOf(command.data.assigneeUserId, nextTeamId)) return err(new DeliveryAssigneeNotInTeamError());
+      const assigneeUserId = command.data.assigneeUserId;
+      if (members.some((member) => member.userId === assigneeUserId && member.userStatus === 'disabled')) {
+        return err(new ProjectAssigneeDisabledError());
+      }
     } else if (command.data.assigneeUserId === undefined && teamChanged && nextAssigneeUserId !== null) {
       // Cambió el equipo y el colaborador actual no es del nuevo: queda sin asignar (el nuevo líder elige).
       if (!isMemberOf(nextAssigneeUserId, nextTeamId)) nextAssigneeUserId = null;

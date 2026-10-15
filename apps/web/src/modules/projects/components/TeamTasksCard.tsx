@@ -3,6 +3,7 @@ import {
   PROJECT_MODULE_TASK_STATUS_LABELS,
   type ProjectDetail,
   type ProjectModuleTaskStatus,
+  type ProjectTeamMember,
 } from '@kora/contracts';
 import styles from './TeamLeaderProjectView.module.css';
 import { Button } from '@/shared/components/ui/Button';
@@ -25,8 +26,11 @@ import { useCheckForecastOverload, useForecastLoadPreview } from '@/modules/fore
 import { ForecastOverloadAlert, summarizeOverload } from '@/modules/forecast/components/ForecastOverloadAlert';
 import { ConfirmActionDialog } from '@/shared/components/ui/ConfirmActionDialog';
 import type { ForecastOverloadWarning } from '@kora/contracts';
+import { assignableOptions } from '@/modules/users/lib/assignable-options';
 
 const formatDate = (value: string) => new Date(`${value}T00:00:00`).toLocaleDateString('es-CL');
+
+const toMemberCandidate = (member: ProjectTeamMember) => ({ value: member.userId, label: member.fullName, status: member.userStatus });
 
 const TASK_TABS = [
   { id: 'all', label: 'Todas' },
@@ -441,7 +445,7 @@ export function TeamTasksCard({ project, projectId, teamId }: TeamTasksCardProps
           <Select
             label="Asignado a"
             placeholder="Sin asignar"
-            options={team.members.map((m) => ({ value: m.userId, label: m.fullName }))}
+            options={assignableOptions(team.members, toMemberCandidate, taskDraft.assigneeUserId)}
             value={taskDraft.assigneeUserId}
             onChange={(event) => setTaskDraft((prev) => ({ ...prev, assigneeUserId: event.target.value }))}
           />
@@ -539,7 +543,7 @@ export function TeamTasksCard({ project, projectId, teamId }: TeamTasksCardProps
               ]
             : []
         }
-        memberOptions={team.members.map((m) => ({ value: m.userId, label: m.fullName }))}
+        memberOptions={assignableOptions(team.members, toMemberCandidate)}
         initialUserId={reassigningTask?.assigneeUserId ?? ''}
         submitting={updateTask.isPending}
         onCancel={() => setReassignTarget(null)}

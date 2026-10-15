@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { eq, and, hourEntries, projectTeamMembers, sql, teamMembers, teams, users, type Database } from '@kora/db';
 import type { TransactionContext } from '@kora/core';
+import type { UserStatus } from '@kora/contracts';
 import type {
   AssignProjectTeamMemberRecord,
   ProjectTeamMemberRecord,
@@ -95,6 +96,7 @@ export class DrizzleProjectTeamMemberRepository implements ProjectTeamMemberRepo
         userId: teamMembers.userId,
         userFirstName: users.firstName,
         userLastName: users.lastName,
+        userStatus: users.status,
         activity: projectTeamMembers.activity,
         assignedHours: projectTeamMembers.assignedHours,
         // Se calcula en vivo desde las horas aprobadas (igual que `projects.used_hours`)
@@ -124,6 +126,7 @@ export class DrizzleProjectTeamMemberRepository implements ProjectTeamMemberRepo
     userId: string;
     userFirstName: string;
     userLastName: string;
+    userStatus: UserStatus;
     activity: string | null;
     assignedHours: string;
     consumedHours: string;
@@ -136,6 +139,7 @@ export class DrizzleProjectTeamMemberRepository implements ProjectTeamMemberRepo
       teamMemberId: row.teamMemberId,
       userId: row.userId,
       fullName: `${row.userFirstName} ${row.userLastName}`.trim(),
+      userStatus: row.userStatus,
       activity: row.activity,
       assignedHours: Number(row.assignedHours),
       consumedHours: Number(row.consumedHours),

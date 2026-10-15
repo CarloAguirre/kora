@@ -90,6 +90,7 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
     teamMemberId: member.teamMemberId,
     userId: member.userId,
     fullName: member.fullName,
+    userStatus: member.userStatus,
     activity: member.activity,
     assignedHours: member.assignedHours,
     consumedHours: member.consumedHours,

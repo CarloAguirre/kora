@@ -1,4 +1,5 @@
 import type { TransactionContext } from '@kora/core';
+import type { UserStatus } from '@kora/contracts';
 
 export interface TeamMemberRecord {
   readonly id: string;
@@ -7,6 +8,7 @@ export interface TeamMemberRecord {
   /** Resuelto por join en infraestructura: evita un puerto aparte solo para nombres. */
   readonly userFullName: string;
   readonly userEmail: string;
+  readonly userStatus: UserStatus;
   readonly position: string | null;
   readonly weeklyHours: number;
   readonly joinedAt: Date;

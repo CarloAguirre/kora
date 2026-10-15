@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, eq, isNull, teamMembers, teams, users, type Database } from '@kora/db';
 import type { TransactionContext } from '@kora/core';
+import type { UserStatus } from '@kora/contracts';
 import type {
   AddTeamMemberRecord,
   TeamMemberRecord,
@@ -36,6 +37,7 @@ export class DrizzleTeamMemberRepository implements TeamMemberRepository {
         userFirstName: users.firstName,
         userLastName: users.lastName,
         userEmail: users.email,
+        userStatus: users.status,
         position: teamMembers.position,
         weeklyHours: teamMembers.weeklyHours,
         joinedAt: teamMembers.joinedAt,
@@ -115,6 +117,7 @@ export class DrizzleTeamMemberRepository implements TeamMemberRepository {
         userFirstName: users.firstName,
         userLastName: users.lastName,
         userEmail: users.email,
+        userStatus: users.status,
         position: teamMembers.position,
         weeklyHours: teamMembers.weeklyHours,
         joinedAt: teamMembers.joinedAt,
@@ -131,6 +134,7 @@ export class DrizzleTeamMemberRepository implements TeamMemberRepository {
     userFirstName: string;
     userLastName: string;
     userEmail: string;
+    userStatus: UserStatus;
     position: string | null;
     weeklyHours: string;
     joinedAt: Date;
@@ -142,6 +146,7 @@ export class DrizzleTeamMemberRepository implements TeamMemberRepository {
       userId: row.userId,
       userFullName: `${row.userFirstName} ${row.userLastName}`.trim(),
       userEmail: row.userEmail,
+      userStatus: row.userStatus,
       position: row.position,
       weeklyHours: Number(row.weeklyHours),
       joinedAt: row.joinedAt,

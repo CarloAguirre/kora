@@ -5,6 +5,7 @@ import { useUpdateProjectModuleDelivery } from '../api/projects.queries';
 import { deliveryStatusLabel, type DeliveryAction } from '../lib/delivery-status';
 import { ReviewActionModal } from './ReviewActionModal';
 import { AssignCollaboratorModal } from './AssignCollaboratorModal';
+import { assignableOptions } from '@/modules/users/lib/assignable-options';
 
 export interface DeliveryActionTarget {
   readonly action: DeliveryAction;
@@ -121,9 +122,10 @@ export function DeliveryActionDialogs({ projectId, members, target, onClose }: D
         open={target?.action === 'assign'}
         isReassign={Boolean(delivery?.assigneeUserId)}
         summary={summary.filter((row) => row.label !== 'Estado')}
-        memberOptions={members
-          .filter((member) => member.teamId === delivery?.teamId)
-          .map((member) => ({ value: member.userId, label: member.fullName }))}
+        memberOptions={assignableOptions(
+          members.filter((member) => member.teamId === delivery?.teamId),
+          (member) => ({ value: member.userId, label: member.fullName, status: member.userStatus }),
+        )}
         initialUserId={delivery?.assigneeUserId ?? ''}
         submitting={updateDelivery.isPending}
         onCancel={onClose}

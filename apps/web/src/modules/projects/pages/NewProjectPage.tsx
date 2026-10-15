@@ -76,6 +76,7 @@ import {
   type ExecutionSegmentModalValues,
 } from '../components/ExecutionSegmentModal';
 import { useUsersList } from '@/modules/users/api/users.queries';
+import { assignableOptions } from '@/modules/users/lib/assignable-options';
 import { useTeamsList } from '@/modules/teams/api/teams.queries';
 import { ApiRequestError } from '@/shared/lib/api-client';
 import { formatMoney } from '@/shared/lib/format-money';
@@ -959,7 +960,7 @@ export function NewProjectPage() {
                     placeholder="Sin asignar"
                     required={type === 'development'}
                     errorText={errors.leaderUserId?.message}
-                    options={(leaders?.items ?? []).map((user) => ({ value: user.id, label: user.fullName }))}
+                    options={assignableOptions(leaders?.items ?? [], (user) => ({ value: user.id, label: user.fullName, status: user.status }), leaderUserId)}
                     {...register('leaderUserId', { setValueAs: emptyToUndefined })}
                   />
                   {type === 'development' && (isProspecto || salesStage === 'quoted') && (
@@ -968,7 +969,7 @@ export function NewProjectPage() {
                       placeholder="Sin asignar"
                       required
                       errorText={errors.commercialManagerUserId?.message}
-                      options={(commercialUsers?.items ?? []).map((user) => ({ value: user.id, label: user.fullName }))}
+                      options={assignableOptions(commercialUsers?.items ?? [], (user) => ({ value: user.id, label: user.fullName, status: user.status }), commercialManagerUserId)}
                       {...register('commercialManagerUserId', { setValueAs: emptyToUndefined })}
                     />
                   )}
@@ -1279,7 +1280,7 @@ export function NewProjectPage() {
                                   <Select
                                     label="Líder"
                                     placeholder="Sin asignar"
-                                    options={(leaders?.items ?? []).map((user) => ({ value: user.id, label: user.fullName }))}
+                                    options={assignableOptions(leaders?.items ?? [], (user) => ({ value: user.id, label: user.fullName, status: user.status }), teamsValue[index]?.leaderUserId)}
                                     {...register(`teams.${index}.leaderUserId`, { setValueAs: emptyToUndefined })}
                                   />
                                   <TextField label="N° colaboradores" type="number" min={0} {...register(`teams.${index}.memberCount`)} />

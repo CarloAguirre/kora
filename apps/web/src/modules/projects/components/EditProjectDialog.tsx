@@ -57,6 +57,7 @@ import {
 import { useSupportPlanDetail, useSupportPlansForClient, useUpdateSupportPlan } from '../api/support-plan.queries';
 import { useClientsList } from '@/modules/clients/api/clients.queries';
 import { useUsersList } from '@/modules/users/api/users.queries';
+import { assignableOptions } from '@/modules/users/lib/assignable-options';
 import { useTeamsList } from '@/modules/teams/api/teams.queries';
 import { useToast } from '@/shared/components/ui/Toast';
 import { ApiRequestError } from '@/shared/lib/api-client';
@@ -674,7 +675,7 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
             <Select
               label="Líder Kabeli a cargo"
               placeholder="Sin asignar"
-              options={(leaders?.items ?? []).map((user) => ({ value: user.id, label: user.fullName }))}
+              options={assignableOptions(leaders?.items ?? [], (user) => ({ value: user.id, label: user.fullName, status: user.status }), leaderUserId)}
               disabled={!isManagement}
               helperText={isManagement ? undefined : 'Solo Gerencia/PMO puede reasignar el proyecto a otro líder.'}
               // Controlado (no `register` directo): si la lista de líderes todavía no cargó cuando el
@@ -692,7 +693,7 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
                 required
                 helperText="Ejecutivo comercial de Kabeli a cargo de la cuenta."
                 errorText={errors.commercialManagerUserId?.message}
-                options={(commercialUsers?.items ?? []).map((user) => ({ value: user.id, label: user.fullName }))}
+                options={assignableOptions(commercialUsers?.items ?? [], (user) => ({ value: user.id, label: user.fullName, status: user.status }), commercialManagerUserId)}
                 value={commercialManagerUserId}
                 onChange={(event) => setValue('commercialManagerUserId', event.target.value || null, { shouldValidate: true })}
               />
@@ -946,7 +947,7 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
                       <Select
                         label="Líder"
                         placeholder="Sin asignar"
-                        options={(leaders?.items ?? []).map((user) => ({ value: user.id, label: user.fullName }))}
+                        options={assignableOptions(leaders?.items ?? [], (user) => ({ value: user.id, label: user.fullName, status: user.status }), teamsValue[index]?.leaderUserId)}
                         {...register(`teams.${index}.leaderUserId`, { setValueAs: emptyToNull })}
                       />
                       <TextField label="N° colaboradores" type="number" min={0} {...register(`teams.${index}.memberCount`)} />

@@ -10,7 +10,8 @@ import type { UseCase } from '../../../../shared/application/use-case';
 /**
  * Alimenta el buscador de personas al asignar a un proyecto: a diferencia de
  * `GetTeamUseCase`, no está acotado a un equipo — un proyecto reúne gente de
- * distintos equipos (UX, DEV, QA...).
+ * distintos equipos (UX, DEV, QA...). Los deshabilitados quedan fuera: siguen
+ * en su equipo hasta que los saquen, pero ya no se les asigna trabajo.
  */
 @Injectable()
 export class ListTeamMemberOptionsUseCase implements UseCase<void, TeamMemberOption[]> {
@@ -19,7 +20,7 @@ export class ListTeamMemberOptionsUseCase implements UseCase<void, TeamMemberOpt
   async execute(): Promise<Result<TeamMemberOption[]>> {
     const members = await this.members.listAllActive();
     return ok(
-      members.map((member) => ({
+      members.filter((member) => member.userStatus !== 'disabled').map((member) => ({
         id: member.id,
         fullName: member.userFullName,
         teamId: member.teamId,

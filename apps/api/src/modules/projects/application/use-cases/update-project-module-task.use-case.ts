@@ -22,6 +22,7 @@ import {
   ProjectModuleTaskNotFoundError,
   ProjectNotFoundError,
   InvalidTaskDatesError,
+  ProjectAssigneeDisabledError,
   RejectionReasonRequiredError,
 } from '../../domain/errors/project.errors';
 import { PROJECT_REPOSITORY, type ProjectRepository } from '../../domain/repositories/project.repository';
@@ -123,6 +124,15 @@ export class UpdateProjectModuleTaskUseCase
     const nextStart = command.data.startDate !== undefined ? new Date(command.data.startDate) : task.startDate;
     const nextDate = command.data.date !== undefined ? new Date(command.data.date) : task.date;
     if (nextStart > nextDate) return err(new InvalidTaskDatesError());
+
+    // Solo se valida si el colaborador cambia: editar una tarea vieja de alguien ya deshabilitado sigue permitido.
+    const nextAssigneeUserId = command.data.assigneeUserId;
+    if (nextAssigneeUserId && nextAssigneeUserId !== task.assigneeUserId) {
+      const members = await this.projectTeamMembers.listForProject(project.id);
+      if (members.some((member) => member.userId === nextAssigneeUserId && member.userStatus === 'disabled')) {
+        return err(new ProjectAssigneeDisabledError());
+      }
+    }
 
     const now = this.clock.now();
     const nextStatus = command.data.status;

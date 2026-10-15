@@ -3,6 +3,7 @@ import { ForbiddenError, err, ok, type ApplicationError, type Result } from '@ko
 import type { AssignProjectTeamMemberInput, Permission } from '@kora/contracts';
 import {
   InvalidTeamMemberAssignmentError,
+  ProjectAssigneeDisabledError,
   ProjectNotFoundError,
   ProjectTeamMemberAlreadyAssignedError,
   ProjectTeamMemberLimitReachedError,
@@ -56,6 +57,7 @@ export class AssignProjectTeamMemberUseCase
     if (!(await this.validator.isActiveTeamMember(data.teamMemberId))) {
       return err(new InvalidTeamMemberAssignmentError());
     }
+    if (await this.validator.isUserDisabled(data.teamMemberId)) return err(new ProjectAssigneeDisabledError());
 
     const teamId = await this.validator.findTeamId(data.teamMemberId);
 

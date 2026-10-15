@@ -59,7 +59,11 @@ function buildUseCase(module: ProjectModuleRecord) {
     { findById: vi.fn().mockResolvedValue(module), updateTask: vi.fn().mockResolvedValue(undefined) } as unknown as ProjectModuleRepository,
     { isTeamLeaderForProject: vi.fn().mockResolvedValue(false), findByProject: vi.fn().mockResolvedValue([]) } as unknown as ProjectTeamRepository,
     {
-      listForProject: vi.fn().mockResolvedValue([{ userId: 'collab-2', teamId: 'team-1', fullName: 'Luis Soto' }] as ProjectTeamMemberRecord[]),
+      listForProject: vi.fn().mockResolvedValue([
+        { userId: 'collab-1', teamId: 'team-1', fullName: 'Ana Rojas', userStatus: 'disabled' },
+        { userId: 'collab-2', teamId: 'team-1', fullName: 'Luis Soto', userStatus: 'active' },
+        { userId: 'collab-3', teamId: 'team-1', fullName: 'Rosa Díaz', userStatus: 'disabled' },
+      ] as ProjectTeamMemberRecord[]),
     } as unknown as ProjectTeamMemberRepository,
     { record: vi.fn().mockResolvedValue(undefined) } as unknown as AuditRecorder,
     { record: changeLogRecord } as unknown as ProjectChangeLogRecorder,
@@ -124,5 +128,26 @@ describe('UpdateProjectModuleTaskUseCase — bitácora', () => {
       'Tarea "Maqueta" reasignada de Ana Rojas a Luis Soto en fase "Módulo Financiero".',
       'Tarea "Maqueta" en fase "Módulo Financiero": fecha límite cambiada de 20-08-2026 a 01-09-2026.',
     ]);
+  });
+});
+
+/** Un deshabilitado ya no entra al sistema: asignarle una tarea la dejaría sin dueño. */
+describe('UpdateProjectModuleTaskUseCase — colaborador deshabilitado', () => {
+  it('no permite reasignar la tarea a un colaborador deshabilitado', async () => {
+    const { useCase, changeLogRecord } = buildUseCase(buildModule({ status: 'todo' }));
+
+    const result = await useCase.execute({ ...TARGET, ...LEADER, data: { assigneeUserId: 'collab-3' } });
+
+    expect(result.isErr()).toBe(true);
+    if (result.isErr()) expect(result.error.code).toBe('PROJECT_ASSIGNEE_DISABLED');
+    expect(changeLogRecord).not.toHaveBeenCalled();
+  });
+
+  it('editar otra cosa de una tarea cuyo colaborador ya está deshabilitado sigue permitido', async () => {
+    const { useCase } = buildUseCase(buildModule({ status: 'todo' }));
+
+    const result = await useCase.execute({ ...TARGET, ...LEADER, data: { assigneeUserId: 'collab-1', name: 'Maqueta v2' } });
+
+    expect(result.isOk()).toBe(true);
   });
 });

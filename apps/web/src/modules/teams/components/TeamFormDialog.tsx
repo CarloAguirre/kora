@@ -19,6 +19,7 @@ import {
   useUpdateTeam,
 } from '../api/teams.queries';
 import { useUsersList } from '@/modules/users/api/users.queries';
+import { assignableOptions } from '@/modules/users/lib/assignable-options';
 import { ApiRequestError } from '@/shared/lib/api-client';
 import { TEAM_TYPE_COLOR_CHOICES, TEAM_TYPE_ICON_OPTIONS, TeamTypeIcon } from '../team-type-icons';
 import styles from './TeamFormDialog.module.css';
@@ -122,8 +123,9 @@ export function TeamFormDialog({ open, team, onClose, onSuccess }: TeamFormDialo
     setMembers((prev) => prev.filter((member) => member.userId !== userId));
   };
 
+  // Un deshabilitado ya no trabaja: sumarlo al equipo lo dejaría disponible para asignarle proyectos.
   const availableCandidates = (candidateUsers?.items ?? []).filter(
-    (user) => !members.some((member) => member.userId === user.id),
+    (user) => user.status !== 'disabled' && !members.some((member) => member.userId === user.id),
   );
 
   const onSubmit = handleSubmit(async (values) => {
@@ -320,7 +322,7 @@ export function TeamFormDialog({ open, team, onClose, onSuccess }: TeamFormDialo
           <Select
             label="Líder"
             placeholder="Sin asignar"
-            options={(leaders?.items ?? []).map((user) => ({ value: user.id, label: user.fullName }))}
+            options={assignableOptions(leaders?.items ?? [], (user) => ({ value: user.id, label: user.fullName, status: user.status }), team?.leader?.id)}
             {...register('leaderUserId', { setValueAs: emptyToNull })}
           />
           {isEditing && (

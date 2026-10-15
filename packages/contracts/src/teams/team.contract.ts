@@ -7,6 +7,7 @@ import {
   sortDirectionSchema,
   uuidSchema,
 } from '../common/primitives';
+import { userStatusSchema } from '../users/user.contract';
 
 /**
  * Contrato de equipos.
@@ -19,6 +20,8 @@ export const teamMemberSchema = z.object({
   id: uuidSchema,
   userId: uuidSchema,
   fullName: z.string(),
+  /** Un deshabilitado sigue en el equipo hasta que lo saquen, pero no se ofrece para asignar trabajo. */
+  userStatus: userStatusSchema,
   position: z.string().nullable(),
   weeklyHours: z.number(),
   joinedAt: isoDateTimeSchema,
