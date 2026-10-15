@@ -1,5 +1,11 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { TICKET_STATUS_LABELS, type DashboardApprovalsSummary, type DashboardHoursSummary, type DashboardTicketsSummary } from '@kora/contracts';
+import {
+  TICKET_STATUS_LABELS,
+  type DashboardApprovalsSummary,
+  type DashboardHoursSummary,
+  type DashboardSupportOvertime,
+  type DashboardTicketsSummary,
+} from '@kora/contracts';
 import styles from './DashboardMySummary.module.css';
 import { Card } from '@/shared/components/ui/Card';
 import { Button } from '@/shared/components/ui/Button';
@@ -26,10 +32,16 @@ const TICKET_STATUS_COLORS: Record<string, string> = {
   closed: '#5a6470',
 };
 
+const OVERTIME_TOP_USERS = 3;
+
 interface DashboardMySummaryProps {
   hours: DashboardHoursSummary | null;
   approvals: DashboardApprovalsSummary | null;
   tickets: DashboardTicketsSummary | null;
+  /** Horas extra del mes en soporte (`support.overtime`). Sin pasar = la tarjeta no aplica a este rol. */
+  overtime?: DashboardSupportOvertime | null;
+  /** Abre el detalle por colaborador (tab Soporte). */
+  onOpenOvertime?: () => void;
   loading: boolean;
 }
 
@@ -40,9 +52,17 @@ interface DashboardMySummaryProps {
  * (sección `null` desde el caso de uso), así que un colaborador o comercial
  * ve contenido propio en vez de un Dashboard casi vacío.
  */
-export function DashboardMySummary({ hours, approvals, tickets, loading }: DashboardMySummaryProps) {
+export function DashboardMySummary({
+  hours,
+  approvals,
+  tickets,
+  overtime,
+  onOpenOvertime,
+  loading,
+}: DashboardMySummaryProps) {
   const navigate = useNavigate();
-  if (!loading && !hours && !approvals && !tickets) return null;
+  const showsOvertime = overtime !== undefined && (loading || overtime !== null);
+  if (!loading && !hours && !approvals && !tickets && !showsOvertime) return null;
 
   return (
     <div className={styles.row}>
@@ -140,6 +160,38 @@ export function DashboardMySummary({ hours, approvals, tickets, loading }: Dashb
               Más antiguo: {tickets.oldestOpenTicket.title} · {formatDaysAgo(tickets.oldestOpenTicket.createdAt)}
             </Link>
           )}
+        </Card>
+      )}
+
+      {showsOvertime && (
+        <Card className={styles.card}>
+          <div className={styles.labelRow}>
+            <div className={styles.labelGroup}>
+              <ClockIcon size={16} />
+              <span className={styles.label}>Horas Extra del Mes</span>
+            </div>
+            {onOpenOvertime && (
+              <Button variant="ghost" size="icon" aria-label="Ver horas extra por colaborador" onClick={onOpenOvertime}>
+                <ChevronRightIcon size={16} />
+              </Button>
+            )}
+          </div>
+          <span className={styles.value}>
+            {loading ? '…' : `${formatHours((overtime?.approvedHours ?? 0) + (overtime?.pendingHours ?? 0))} hrs`}
+          </span>
+          {!!overtime && overtime.byUser.length > 0 && (
+            <div className={styles.breakdown}>
+              {overtime.byUser.slice(0, OVERTIME_TOP_USERS).map((user) => (
+                <span key={user.userId} className={styles.breakdownItem}>
+                  {user.fullName}: <strong>{formatHours(user.approvedHours + user.pendingHours)} h</strong>
+                </span>
+              ))}
+            </div>
+          )}
+          {!!overtime && overtime.pendingHours > 0 && (
+            <span className={styles.muted}>{formatHours(overtime.pendingHours)} h pendientes de aprobar</span>
+          )}
+          {!!overtime && overtime.byUser.length === 0 && <span className={styles.muted}>Sin horas extra en soporte</span>}
         </Card>
       )}
     </div>

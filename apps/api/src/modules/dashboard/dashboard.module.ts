@@ -7,6 +7,7 @@ import { TeamsModule } from '../teams/teams.module';
 import { UsersModule } from '../users/users.module';
 import { DashboardController } from './presentation/dashboard.controller';
 import { GetDashboardSummaryUseCase } from './application/use-cases/get-dashboard-summary.use-case';
+import { GetOvertimeReportUseCase } from './application/use-cases/get-overtime-report.use-case';
 
 /**
  * M7 — ver docs/DECISION-M7-DASHBOARD.md. Sin dominio ni persistencia
@@ -16,6 +17,6 @@ import { GetDashboardSummaryUseCase } from './application/use-cases/get-dashboar
 @Module({
   imports: [HoursModule, TicketsModule, ProjectsModule, ForecastModule, TeamsModule, UsersModule],
   controllers: [DashboardController],
-  providers: [GetDashboardSummaryUseCase],
+  providers: [GetDashboardSummaryUseCase, GetOvertimeReportUseCase],
 })
 export class DashboardModule {}

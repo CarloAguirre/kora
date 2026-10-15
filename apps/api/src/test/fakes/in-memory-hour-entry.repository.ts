@@ -1,3 +1,4 @@
+import type { ProjectType } from '@kora/contracts';
 import { buildPage, type Page, type PageRequest, type SortRequest } from '@kora/core';
 import type { HourEntry } from '../../modules/hours/domain/entities/hour-entry.entity';
 import type {
@@ -5,6 +6,7 @@ import type {
   HourEntryListItem,
   HourEntryRepository,
   HourEntrySortableField,
+  OvertimeHoursByProjectAndUser,
   OvertimeHoursByUser,
 } from '../../modules/hours/domain/repositories/hour-entry.repository';
 
@@ -105,6 +107,35 @@ export class InMemoryHourEntryRepository implements HourEntryRepository {
       });
     }
     return [...byUser.values()].sort((a, b) => b.approvedHours + b.pendingHours - (a.approvedHours + a.pendingHours));
+  }
+
+  async sumOvertimeHoursByProjectAndUser(
+    projectType: ProjectType,
+    dateFrom: Date,
+    dateTo: Date,
+  ): Promise<OvertimeHoursByProjectAndUser[]> {
+    const rows = new Map<string, OvertimeHoursByProjectAndUser>();
+    for (const item of this.items) {
+      if (item.projectId === null || item.projectType !== projectType || !item.isOvertime || item.status === 'rejected') continue;
+      if (item.date.getTime() < dateFrom.getTime() || item.date.getTime() > dateTo.getTime()) continue;
+      const key = `${item.projectId}:${item.userId}`;
+      const existing = rows.get(key) ?? {
+        projectId: item.projectId,
+        projectName: item.projectName ?? '',
+        leaderUserId: null,
+        leaderFullName: null,
+        userId: item.userId,
+        userFullName: item.userFullName,
+        approvedHours: 0,
+        pendingHours: 0,
+      };
+      rows.set(key, {
+        ...existing,
+        approvedHours: existing.approvedHours + (item.status === 'approved' ? item.hours : 0),
+        pendingHours: existing.pendingHours + (item.status === 'pending' ? item.hours : 0),
+      });
+    }
+    return [...rows.values()];
   }
 
   async sumRegularHoursForUserAndDate(userId: string, date: Date): Promise<number> {

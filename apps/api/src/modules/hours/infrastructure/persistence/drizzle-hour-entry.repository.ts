@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import {
+  alias,
   and,
   asc,
   clients,
@@ -25,12 +26,14 @@ import {
   users,
   type Database,
 } from '@kora/db';
+import type { ProjectType } from '@kora/contracts';
 import { buildPage, toOffset, type Page, type PageRequest, type SortRequest, type TransactionContext } from '@kora/core';
 import type {
   HourEntryFilters,
   HourEntryListItem,
   HourEntryRepository,
   HourEntrySortableField,
+  OvertimeHoursByProjectAndUser,
   OvertimeHoursByUser,
 } from '../../domain/repositories/hour-entry.repository';
 import type { HourEntry } from '../../domain/entities/hour-entry.entity';
@@ -315,6 +318,69 @@ export class DrizzleHourEntryRepository implements HourEntryRepository {
         pendingHours: Number(row.pending),
       }))
       .sort((a, b) => b.approvedHours + b.pendingHours - (a.approvedHours + a.pendingHours));
+  }
+
+  async sumOvertimeHoursByProjectAndUser(
+    projectType: ProjectType,
+    dateFrom: Date,
+    dateTo: Date,
+    context?: TransactionContext,
+  ): Promise<OvertimeHoursByProjectAndUser[]> {
+    const db = resolveDb(this.database, context);
+    const leaders = alias(users, 'project_leaders');
+    const rows = await db
+      .select({
+        projectId: projects.id,
+        projectName: projects.name,
+        leaderUserId: leaders.id,
+        leaderFirstName: leaders.firstName,
+        leaderLastName: leaders.lastName,
+        userId: hourEntries.userId,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        approved: sql<string>`coalesce(sum(${hourEntries.hours}) filter (where ${hourEntries.status} = 'approved'), 0)`,
+        pending: sql<string>`coalesce(sum(${hourEntries.hours}) filter (where ${hourEntries.status} = 'pending'), 0)`,
+      })
+      .from(hourEntries)
+      .innerJoin(projects, eq(projects.id, hourEntries.projectId))
+      .innerJoin(users, eq(users.id, hourEntries.userId))
+      .leftJoin(leaders, eq(leaders.id, projects.leaderUserId))
+      .where(
+        and(
+          eq(projects.type, projectType),
+          eq(hourEntries.isOvertime, true),
+          ne(hourEntries.status, 'rejected'),
+          gte(hourEntries.date, dateFrom),
+          lte(hourEntries.date, dateTo),
+        ),
+      )
+      .groupBy(
+        projects.id,
+        projects.name,
+        leaders.id,
+        leaders.firstName,
+        leaders.lastName,
+        hourEntries.userId,
+        users.firstName,
+        users.lastName,
+      );
+    const fullName = (first: string | null, last: string | null) => `${first ?? ''} ${last ?? ''}`.trim();
+    return rows
+      .map((row) => ({
+        projectId: row.projectId,
+        projectName: row.projectName,
+        leaderUserId: row.leaderUserId,
+        leaderFullName: row.leaderUserId ? fullName(row.leaderFirstName, row.leaderLastName) : null,
+        userId: row.userId,
+        userFullName: fullName(row.firstName, row.lastName),
+        approvedHours: Number(row.approved),
+        pendingHours: Number(row.pending),
+      }))
+      .sort(
+        (a, b) =>
+          a.projectName.localeCompare(b.projectName, 'es') ||
+          b.approvedHours + b.pendingHours - (a.approvedHours + a.pendingHours),
+      );
   }
 
   async sumRegularHoursForUserAndDate(userId: string, date: Date, context?: TransactionContext): Promise<number> {

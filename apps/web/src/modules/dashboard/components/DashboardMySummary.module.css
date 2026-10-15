@@ -40,6 +40,11 @@
   color: var(--kora-danger);
 }
 
+.muted {
+  font-size: var(--kora-text-xs);
+  color: var(--kora-text-muted);
+}
+
 .breakdown {
   display: flex;
   flex-wrap: wrap;

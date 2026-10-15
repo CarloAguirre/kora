@@ -28,6 +28,9 @@ class FakeEntryRepository implements HourEntryRepository {
   async sumOvertimeHoursByUserForProjects(): Promise<never[]> {
     return [];
   }
+  async sumOvertimeHoursByProjectAndUser(): Promise<never[]> {
+    return [];
+  }
 }
 
 class FakeProjectReader implements HourEntryProjectReader {

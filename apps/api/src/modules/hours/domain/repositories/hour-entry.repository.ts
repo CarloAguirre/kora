@@ -79,6 +79,18 @@ export interface OvertimeHoursByUser {
   readonly pendingHours: number;
 }
 
+/** Horas extra no rechazadas de un autor en un proyecto, con el líder del proyecto. */
+export interface OvertimeHoursByProjectAndUser {
+  readonly projectId: string;
+  readonly projectName: string;
+  readonly leaderUserId: string | null;
+  readonly leaderFullName: string | null;
+  readonly userId: string;
+  readonly userFullName: string;
+  readonly approvedHours: number;
+  readonly pendingHours: number;
+}
+
 export interface HourEntryRepository {
   findById(id: string, context?: TransactionContext): Promise<HourEntry | null>;
   findByLegacyId(legacyId: string, context?: TransactionContext): Promise<HourEntry | null>;
@@ -122,6 +134,18 @@ export interface HourEntryRepository {
     dateTo: Date,
     context?: TransactionContext,
   ): Promise<OvertimeHoursByUser[]>;
+
+  /**
+   * Horas extra (no rechazadas) por proyecto × autor, en todos los proyectos
+   * del tipo indicado y un rango de fechas — alimenta "Horas extra por
+   * proyecto" (PMO) en el Dashboard. Agregación en SQL.
+   */
+  sumOvertimeHoursByProjectAndUser(
+    projectType: ProjectType,
+    dateFrom: Date,
+    dateTo: Date,
+    context?: TransactionContext,
+  ): Promise<OvertimeHoursByProjectAndUser[]>;
 
   /** Horas normales (no extra) y no rechazadas que `userId` ya tiene registradas para `date` (cualquier asignación/proyecto) — decide qué parte de una solicitud de HH de ticket cabe en la jornada de 8h y cuál queda como horas extra (ver `CreateTicketHhRequestUseCase`). */
   sumRegularHoursForUserAndDate(userId: string, date: Date, context?: TransactionContext): Promise<number>;

@@ -19,8 +19,9 @@ import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { ApiRequestError } from '@/shared/lib/api-client';
 import { CapacityReportTable } from '@/modules/hours/components/CapacityReportTable';
 import { AvailabilityGrid } from '@/modules/hours/components/AvailabilityGrid';
+import { OvertimeReportSection } from '@/modules/dashboard/components/OvertimeReportSection';
 
-type AdminTab = 'usuarios' | 'capacity' | 'registro-horas';
+type AdminTab = 'usuarios' | 'capacity' | 'registro-horas' | 'horas-extras';
 
 /**
  * Administración de usuarios.
@@ -46,6 +47,7 @@ const BASE_TABS: readonly TabItem[] = [{ id: 'usuarios', label: 'Usuarios' }];
 const HOURS_REPORT_TABS: readonly TabItem[] = [
   { id: 'capacity', label: 'Capacity' },
   { id: 'registro-horas', label: 'Registro de Horas' },
+  { id: 'horas-extras', label: 'Horas Extras' },
 ];
 
 export function UsersListPage() {
@@ -209,6 +211,9 @@ export function UsersListPage() {
             <AvailabilityGrid />
           </Card>
         )}
+
+        {/* La sección ya trae su propia Card (mismo componente que la vista del PMO en el Dashboard). */}
+        {activeTab === 'horas-extras' && <OvertimeReportSection />}
       </div>
 
       <UserFormDialog
