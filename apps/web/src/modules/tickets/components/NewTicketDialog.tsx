@@ -34,9 +34,8 @@ const emptyToUndefined = (value: string) => value || undefined;
 
 export interface NewTicketDialogProps {
   open: boolean;
+  /** También se dispara tras crear el ticket: el modal solo se cierra, sin abrir la ficha creada. */
   onClose: () => void;
-  /** Se dispara tras crear el ticket, para que el tablero abra su ficha — igual que el `TicketNavigationState` de la v1. */
-  onCreated: (ticketId: string) => void;
 }
 
 /**
@@ -44,7 +43,7 @@ export interface NewTicketDialogProps {
  * (`Soporte/index.tsx`), no una ruta propia — igual criterio que
  * `EditTicketDialog` y `TicketDetailModal`.
  */
-export function NewTicketDialog({ open, onClose, onCreated }: NewTicketDialogProps) {
+export function NewTicketDialog({ open, onClose }: NewTicketDialogProps) {
   const toast = useToast();
   const createTicket = useCreateTicket();
   const { data: clients } = useTicketLinkableClients();
@@ -102,9 +101,9 @@ export function NewTicketDialog({ open, onClose, onCreated }: NewTicketDialogPro
   const onSubmit = handleSubmit(async (values) => {
     setServerError(null);
     try {
-      const result = await createTicket.mutateAsync(values);
+      await createTicket.mutateAsync(values);
       toast.success(`Se creó el ticket "${values.title}".`);
-      onCreated(result.id);
+      onClose();
     } catch (error) {
       setServerError(error instanceof ApiRequestError ? error.message : 'No se pudo crear el ticket.');
     }

@@ -182,14 +182,7 @@ export function TicketsListPage() {
 
       {openTicketId && <TicketDetailModal ticketId={openTicketId} onClose={() => setOpenTicketId(null)} />}
 
-      <NewTicketDialog
-        open={creatingTicket}
-        onClose={() => setCreatingTicket(false)}
-        onCreated={(ticketId) => {
-          setCreatingTicket(false);
-          setOpenTicketId(ticketId);
-        }}
-      />
+      <NewTicketDialog open={creatingTicket} onClose={() => setCreatingTicket(false)} />
     </DashboardLayout>
   );
 }
