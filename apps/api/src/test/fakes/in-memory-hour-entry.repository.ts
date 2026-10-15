@@ -1,4 +1,3 @@
-import type { ProjectType } from '@kora/contracts';
 import { buildPage, type Page, type PageRequest, type SortRequest } from '@kora/core';
 import type { HourEntry } from '../../modules/hours/domain/entities/hour-entry.entity';
 import type {
@@ -110,18 +109,18 @@ export class InMemoryHourEntryRepository implements HourEntryRepository {
   }
 
   async sumOvertimeHoursByProjectAndUser(
-    projectType: ProjectType,
     dateFrom: Date,
     dateTo: Date,
   ): Promise<OvertimeHoursByProjectAndUser[]> {
     const rows = new Map<string, OvertimeHoursByProjectAndUser>();
     for (const item of this.items) {
-      if (item.projectId === null || item.projectType !== projectType || !item.isOvertime || item.status === 'rejected') continue;
+      if (item.projectId === null || item.projectType === null || !item.isOvertime || item.status === 'rejected') continue;
       if (item.date.getTime() < dateFrom.getTime() || item.date.getTime() > dateTo.getTime()) continue;
       const key = `${item.projectId}:${item.userId}`;
       const existing = rows.get(key) ?? {
         projectId: item.projectId,
         projectName: item.projectName ?? '',
+        projectType: item.projectType,
         leaderUserId: null,
         leaderFullName: null,
         userId: item.userId,

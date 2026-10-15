@@ -9,11 +9,12 @@ export interface GetOvertimeReportCommand {
 }
 
 /**
- * "Horas extra por proyecto" — vista general del PMO/admin (`hours:read_all`,
- * exigido en el controlador): horas extra no rechazadas de un mes en los
- * proyectos de soporte, por proyecto × colaborador y con el líder de cada
- * proyecto, para filtrar por líder y exportar. En soporte lo que pasa de la
- * jornada de 8h queda solo como horas extra (ver `CreateTicketHhRequestUseCase`).
+ * "Horas Extras" — vista general del PMO/admin (`hours:read_all`, exigido en
+ * el controlador): horas extra no rechazadas de un mes en todos los proyectos
+ * (soporte y desarrollo), por proyecto × colaborador y con el líder de cada
+ * proyecto, para filtrar y exportar. En soporte lo que pasa de la jornada de
+ * 8h queda solo como horas extra (ver `CreateTicketHhRequestUseCase`); en
+ * desarrollo, las que el colaborador marca en un proyecto que las autoriza.
  */
 @Injectable()
 export class GetOvertimeReportUseCase implements UseCase<GetOvertimeReportCommand, DashboardOvertimeReport, ApplicationError> {
@@ -24,7 +25,7 @@ export class GetOvertimeReportUseCase implements UseCase<GetOvertimeReportComman
     const dateFrom = new Date(Date.UTC(year, month - 1, 1));
     const dateTo = new Date(Date.UTC(year, month, 0));
 
-    const rows = await this.hourEntries.sumOvertimeHoursByProjectAndUser('support', dateFrom, dateTo);
+    const rows = await this.hourEntries.sumOvertimeHoursByProjectAndUser(dateFrom, dateTo);
     return ok({ year, month, rows });
   }
 }

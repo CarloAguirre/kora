@@ -12,7 +12,6 @@ import { HourEntryFormDialog } from '@/modules/hours/components/HourEntryFormDia
 import { useDashboardSummary } from '../api/dashboard.queries';
 import { DashboardMySummary } from '../components/DashboardMySummary';
 import { MyActivityPanel } from '../components/MyActivityPanel';
-import { OvertimeReportSection } from '../components/OvertimeReportSection';
 import { DashboardProjectsTab } from './DashboardProjectsTab';
 import { DashboardSupportTab } from './DashboardSupportTab';
 
@@ -100,8 +99,6 @@ export function DashboardPage() {
                 loading={isLoading}
               />
             )}
-            {/* El PMO necesita la vista general (por proyecto y líder, exportable), no la tarjeta resumen del líder. */}
-            {user?.role === 'pmo' && activeTab === 'proyectos' && <OvertimeReportSection />}
 
             {activeTab === 'proyectos' ? (
               <DashboardProjectsTab

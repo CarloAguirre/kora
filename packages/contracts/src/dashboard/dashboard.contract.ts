@@ -3,6 +3,7 @@ import {
   projectModuleDeliveryStatusSchema,
   projectModuleTaskStatusSchema,
   projectPrioritySchema,
+  projectTypeSchema,
 } from '../projects/project.contract';
 import { forecastAssignmentTypeSchema } from '../forecast/forecast.contract';
 import { ticketStatusSchema } from '../tickets/ticket.contract';
@@ -164,7 +165,7 @@ export const dashboardSupportOvertimeSchema = z.object({
 });
 export type DashboardSupportOvertime = z.infer<typeof dashboardSupportOvertimeSchema>;
 
-/** "Horas extra por proyecto" (PMO/admin) — un mes, filas por proyecto de soporte × colaborador. */
+/** "Horas extra por proyecto" (PMO/admin) — un mes, filas por proyecto (soporte y desarrollo) × colaborador. */
 export const dashboardOvertimeReportQuerySchema = z.object({
   year: z.coerce.number().int().min(2000).max(2100),
   month: z.coerce.number().int().min(1).max(12),
@@ -174,6 +175,7 @@ export type DashboardOvertimeReportQuery = z.infer<typeof dashboardOvertimeRepor
 export const dashboardOvertimeReportRowSchema = z.object({
   projectId: z.string(),
   projectName: z.string(),
+  projectType: projectTypeSchema,
   leaderUserId: z.string().nullable(),
   leaderFullName: z.string().nullable(),
   userId: z.string(),

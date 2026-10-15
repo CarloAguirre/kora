@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import type { DashboardOvertimeReportRow } from '@kora/contracts';
+import { PROJECT_TYPE_LABELS, PROJECT_TYPES, type DashboardOvertimeReportRow } from '@kora/contracts';
 import styles from './OvertimeReportSection.module.css';
 import { Card } from '@/shared/components/ui/Card';
 import { Button } from '@/shared/components/ui/Button';
@@ -13,6 +13,11 @@ import { exportOvertimeReport } from '../lib/overtime-report-export';
 
 const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 1 });
 const ALL_LEADERS = 'all';
+const ALL_TYPES = 'all';
+const TYPE_OPTIONS = [
+  { value: ALL_TYPES, label: 'Todos los tipos' },
+  ...PROJECT_TYPES.map((type) => ({ value: type, label: PROJECT_TYPE_LABELS[type] })),
+];
 const NO_LEADER = 'none';
 const NO_ROWS: readonly DashboardOvertimeReportRow[] = [];
 
@@ -20,6 +25,7 @@ const leaderKey = (row: DashboardOvertimeReportRow) => row.leaderUserId ?? NO_LE
 
 const COLUMNS: Column<DashboardOvertimeReportRow>[] = [
   { key: 'project', header: 'Proyecto', render: (row) => row.projectName },
+  { key: 'type', header: 'Tipo', render: (row) => PROJECT_TYPE_LABELS[row.projectType] },
   {
     key: 'leader',
     header: 'Líder',
@@ -43,17 +49,19 @@ const COLUMNS: Column<DashboardOvertimeReportRow>[] = [
 
 /**
  * "Horas extra por proyecto" — vista general del PMO: horas extra de un mes en
- * los proyectos de soporte, por proyecto × colaborador con su líder, filtrable
- * por líder y exportable a Excel. En soporte lo que pasa de la jornada de 8h
- * queda solo como horas extra (ver `CreateTicketHhRequestUseCase`).
+ * todos los proyectos (soporte y desarrollo), por proyecto × colaborador con
+ * su líder, filtrable por tipo y líder, y exportable a Excel. En soporte lo que
+ * pasa de la jornada de 8h queda solo como horas extra (ver `CreateTicketHhRequestUseCase`).
  */
 export function OvertimeReportSection() {
   const today = new Date();
   const [period, setPeriod] = useState({ year: today.getFullYear(), month: today.getMonth() + 1 });
   const [leader, setLeader] = useState(ALL_LEADERS);
+  const [type, setType] = useState(ALL_TYPES);
   const { data, isLoading, error } = useOvertimeReport(period.year, period.month);
 
-  const rows = data?.rows ?? NO_ROWS;
+  const allRows = data?.rows ?? NO_ROWS;
+  const rows = useMemo(() => (type === ALL_TYPES ? allRows : allRows.filter((row) => row.projectType === type)), [allRows, type]);
   const leaderOptions = useMemo(() => {
     const byKey = new Map<string, string>();
     for (const row of rows) byKey.set(leaderKey(row), row.leaderFullName ?? 'Sin líder');
@@ -73,9 +81,16 @@ export function OvertimeReportSection() {
   const projectCount = new Set(filtered.map((row) => row.projectId)).size;
   const userCount = new Set(filtered.map((row) => row.userId)).size;
   const leaderLabel = leaderOptions.find((option) => option.value === leader)?.label ?? 'Todos los líderes';
+  const typeLabel = TYPE_OPTIONS.find((option) => option.value === type)?.label ?? 'Todos los tipos';
+
+  const changeType = (next: string) => {
+    setType(next);
+    setLeader(ALL_LEADERS);
+  };
 
   const changePeriod = (next: { year: number; month: number }) => {
     setPeriod(next);
+    setType(ALL_TYPES);
     setLeader(ALL_LEADERS);
   };
 
@@ -84,10 +99,17 @@ export function OvertimeReportSection() {
       <div className={styles.header}>
         <div>
           <span className={styles.title}>Horas extra por proyecto</span>
-          <p className={styles.subtitle}>Proyectos de soporte, por líder y colaborador</p>
+          <p className={styles.subtitle}>Proyectos de desarrollo y soporte, por líder y colaborador</p>
         </div>
         <div className={styles.controls}>
           <PeriodSelector year={period.year} month={period.month} onChange={changePeriod} />
+          <Select
+            aria-label="Tipo de proyecto"
+            className={styles.typeSelect}
+            options={TYPE_OPTIONS}
+            value={type}
+            onChange={(event) => changeType(event.target.value)}
+          />
           <Select
             aria-label="Líder"
             className={styles.leaderSelect}
@@ -99,7 +121,7 @@ export function OvertimeReportSection() {
             variant="outlineDark"
             iconLeft={<DownloadIcon size={16} />}
             disabled={filtered.length === 0}
-            onClick={() => exportOvertimeReport(filtered, period.year, period.month, leaderLabel)}
+            onClick={() => exportOvertimeReport(filtered, period.year, period.month, { type: typeLabel, leader: leaderLabel })}
           >
             Exportar
           </Button>

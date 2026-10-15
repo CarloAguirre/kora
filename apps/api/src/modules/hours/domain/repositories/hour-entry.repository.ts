@@ -83,6 +83,7 @@ export interface OvertimeHoursByUser {
 export interface OvertimeHoursByProjectAndUser {
   readonly projectId: string;
   readonly projectName: string;
+  readonly projectType: ProjectType;
   readonly leaderUserId: string | null;
   readonly leaderFullName: string | null;
   readonly userId: string;
@@ -137,11 +138,10 @@ export interface HourEntryRepository {
 
   /**
    * Horas extra (no rechazadas) por proyecto × autor, en todos los proyectos
-   * del tipo indicado y un rango de fechas — alimenta "Horas extra por
-   * proyecto" (PMO) en el Dashboard. Agregación en SQL.
+   * (soporte y desarrollo) y un rango de fechas — alimenta "Horas Extras" de
+   * Administración. Agregación en SQL.
    */
   sumOvertimeHoursByProjectAndUser(
-    projectType: ProjectType,
     dateFrom: Date,
     dateTo: Date,
     context?: TransactionContext,

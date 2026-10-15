@@ -1,17 +1,24 @@
 import * as XLSX from 'xlsx';
-import type { DashboardOvertimeReportRow } from '@kora/contracts';
+import { PROJECT_TYPE_LABELS, type DashboardOvertimeReportRow } from '@kora/contracts';
 
 const MONTHS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 
-/** Mismo patrón xlsx que `exportSupportReport` — exporta las filas ya filtradas en pantalla (líder). */
-export function exportOvertimeReport(rows: readonly DashboardOvertimeReportRow[], year: number, month: number, leaderLabel: string) {
+/** Mismo patrón xlsx que `exportSupportReport` — exporta las filas ya filtradas en pantalla (tipo y líder). */
+export function exportOvertimeReport(
+  rows: readonly DashboardOvertimeReportRow[],
+  year: number,
+  month: number,
+  filters: { type: string; leader: string },
+) {
   const sheetRows = [
-    [`Horas extra en proyectos de soporte — ${MONTHS[month - 1]} ${year}`],
-    [`Líder: ${leaderLabel}`],
+    [`Horas extra por proyecto — ${MONTHS[month - 1]} ${year}`],
+    [`Tipo: ${filters.type}`],
+    [`Líder: ${filters.leader}`],
     [],
-    ['Proyecto', 'Líder', 'Colaborador', 'HH Extra Aprobadas', 'HH Extra Pendientes', 'Total'],
+    ['Proyecto', 'Tipo', 'Líder', 'Colaborador', 'HH Extra Aprobadas', 'HH Extra Pendientes', 'Total'],
     ...rows.map((row) => [
       row.projectName,
+      PROJECT_TYPE_LABELS[row.projectType],
       row.leaderFullName ?? 'Sin líder',
       row.userFullName,
       row.approvedHours,
@@ -21,6 +28,7 @@ export function exportOvertimeReport(rows: readonly DashboardOvertimeReportRow[]
     [],
     [
       'Total',
+      '',
       '',
       '',
       rows.reduce((sum, row) => sum + row.approvedHours, 0),

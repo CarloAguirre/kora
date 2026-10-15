@@ -26,7 +26,6 @@ import {
   users,
   type Database,
 } from '@kora/db';
-import type { ProjectType } from '@kora/contracts';
 import { buildPage, toOffset, type Page, type PageRequest, type SortRequest, type TransactionContext } from '@kora/core';
 import type {
   HourEntryFilters,
@@ -321,7 +320,6 @@ export class DrizzleHourEntryRepository implements HourEntryRepository {
   }
 
   async sumOvertimeHoursByProjectAndUser(
-    projectType: ProjectType,
     dateFrom: Date,
     dateTo: Date,
     context?: TransactionContext,
@@ -332,6 +330,7 @@ export class DrizzleHourEntryRepository implements HourEntryRepository {
       .select({
         projectId: projects.id,
         projectName: projects.name,
+        projectType: projects.type,
         leaderUserId: leaders.id,
         leaderFirstName: leaders.firstName,
         leaderLastName: leaders.lastName,
@@ -347,7 +346,6 @@ export class DrizzleHourEntryRepository implements HourEntryRepository {
       .leftJoin(leaders, eq(leaders.id, projects.leaderUserId))
       .where(
         and(
-          eq(projects.type, projectType),
           eq(hourEntries.isOvertime, true),
           ne(hourEntries.status, 'rejected'),
           gte(hourEntries.date, dateFrom),
@@ -357,6 +355,7 @@ export class DrizzleHourEntryRepository implements HourEntryRepository {
       .groupBy(
         projects.id,
         projects.name,
+        projects.type,
         leaders.id,
         leaders.firstName,
         leaders.lastName,
@@ -369,6 +368,7 @@ export class DrizzleHourEntryRepository implements HourEntryRepository {
       .map((row) => ({
         projectId: row.projectId,
         projectName: row.projectName,
+        projectType: row.projectType,
         leaderUserId: row.leaderUserId,
         leaderFullName: row.leaderUserId ? fullName(row.leaderFirstName, row.leaderLastName) : null,
         userId: row.userId,

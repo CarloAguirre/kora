@@ -212,7 +212,7 @@ export function UsersListPage() {
           </Card>
         )}
 
-        {/* La sección ya trae su propia Card (mismo componente que la vista del PMO en el Dashboard). */}
+        {/* La sección ya trae su propia Card. */}
         {activeTab === 'horas-extras' && <OvertimeReportSection />}
       </div>
 

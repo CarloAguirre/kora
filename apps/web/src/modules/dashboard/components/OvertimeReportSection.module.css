@@ -35,6 +35,10 @@
   min-width: 200px;
 }
 
+.typeSelect {
+  min-width: 160px;
+}
+
 .stats {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -67,6 +71,7 @@
 
 @media (max-width: 640px) {
   .controls,
+  .typeSelect,
   .leaderSelect {
     width: 100%;
   }
