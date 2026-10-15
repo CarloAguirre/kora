@@ -47,7 +47,7 @@ function formatEntryDate(value: string): string {
 
 // Mismo orden que la v1: Fecha, Autor, Equipo, Proyecto, Asignación,
 // Actividad, Horas, Estado (etapa del proyecto), Comentario, Aprobado por,
-// Estado de aprobación.
+// Estado de aprobación — más "Horas extra", que la v1 no tenía.
 const HOUR_ENTRY_COLUMNS: ReadonlyArray<{ label: string; getValue: (row: HourEntrySummary) => string | number }> = [
   { label: 'Fecha', getValue: (r) => formatEntryDate(r.date) },
   { label: 'Autor', getValue: (r) => r.user.fullName },
@@ -56,6 +56,7 @@ const HOUR_ENTRY_COLUMNS: ReadonlyArray<{ label: string; getValue: (row: HourEnt
   { label: 'Asignación', getValue: (r) => r.assignment ?? '' },
   { label: 'Actividad', getValue: (r) => r.category },
   { label: 'Horas', getValue: (r) => r.hours },
+  { label: 'Horas extra', getValue: (r) => (r.isOvertime ? 'Sí' : 'No') },
   { label: 'Estado', getValue: (r) => (r.projectStageAtEntry ? PROJECT_STATUS_LABELS[r.projectStageAtEntry as ProjectStatus] : '') },
   { label: 'Comentario', getValue: (r) => r.description ?? '' },
   { label: 'Aprobado por', getValue: (r) => resolvedApprover(r)?.fullName ?? '' },

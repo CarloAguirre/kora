@@ -106,6 +106,22 @@ describe('GetHoursCapacityReportUseCase', () => {
     expect(result.value.items.map((row) => row.id)).toEqual(['in-month']);
   });
 
+  it('no cuenta horas extra: ni como filas ni en el % de dedicación', async () => {
+    // Agosto 2026 sin feriados: 21 días hábiles => 168 horas laborales; 84h normales => 50%.
+    const entries = new InMemoryHourEntryRepository().seed(
+      buildItem({ id: 'regular', hours: 84, date: new Date('2026-08-03T00:00:00.000Z') }),
+      buildItem({ id: 'overtime', hours: 10, isOvertime: true, date: new Date('2026-08-03T00:00:00.000Z') }),
+    );
+    const useCase = new GetHoursCapacityReportUseCase(entries, fakeHolidayReader());
+
+    const result = await useCase.execute({ query: buildQuery() });
+
+    expect(result.isOk()).toBe(true);
+    if (!result.isOk()) return;
+    expect(result.value.items.map((row) => row.id)).toEqual(['regular']);
+    expect(result.value.items[0]?.dedicationPercent).toBe(50);
+  });
+
   it('filtra por búsqueda y pagina en memoria', async () => {
     const entries = new InMemoryHourEntryRepository().seed(
       buildItem({ id: 'a', clientName: 'Acme SpA' }),

@@ -18,6 +18,10 @@ const MONTH_ENTRIES_PAGE_SIZE = 20_000;
  *
  * Solo se llama con `hours:read_all` ya verificado por el controlador — por
  * eso pide todas las horas aprobadas del mes sin `visibleToUserIds`.
+ *
+ * Las horas extra no cuentan para Capacity (ni filas ni % de dedicación): la
+ * capacidad se mide sobre la jornada normal, y las extra tienen su propio
+ * reporte ("Horas Extras" en Administración).
  */
 @Injectable()
 export class GetHoursCapacityReportUseCase implements UseCase<GetHoursCapacityReportCommand, Page<CapacityReportRow>, never> {
@@ -42,13 +46,14 @@ export class GetHoursCapacityReportUseCase implements UseCase<GetHoursCapacityRe
 
     const holidayDates = new Set(holidayRows.map((h) => h.date));
     const laborHours = countBusinessDays(monthStart, monthEnd, holidayDates) * 8;
+    const regularItems = monthPage.items.filter((item) => !item.isOvertime);
 
     const monthlyHoursByUser = new Map<string, number>();
-    for (const item of monthPage.items) {
+    for (const item of regularItems) {
       monthlyHoursByUser.set(item.userId, (monthlyHoursByUser.get(item.userId) ?? 0) + item.hours);
     }
 
-    const rows = monthPage.items.map((item) => toCapacityReportRow(item, laborHours, monthlyHoursByUser.get(item.userId) ?? 0));
+    const rows = regularItems.map((item) => toCapacityReportRow(item, laborHours, monthlyHoursByUser.get(item.userId) ?? 0));
 
     const term = query.search?.trim().toLowerCase();
     const filtered = term
