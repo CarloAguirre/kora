@@ -3,6 +3,7 @@ import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
+  isTicketAssignableRole,
   TICKET_PRIORITIES,
   TICKET_PRIORITY_LABELS,
   SELECTABLE_TICKET_SERVICE_TYPES,
@@ -52,30 +53,25 @@ export function EditTicketDialog({ ticket, open, onClose }: { ticket: TicketDeta
   if (currentDevelopmentProject && !developmentProjectOptions.some((option) => option.value === currentDevelopmentProject.id)) {
     developmentProjectOptions.push({ value: currentDevelopmentProject.id, label: currentDevelopmentProject.name });
   }
-  // Cualquier persona del sistema puede ser responsable de un ticket — es
-  // quien puede cargarle horas por tenerlo asignado, no solo colaboradores.
-  // Los eliminados ya vienen fuera del listado; los deshabilitados se descartan
-  // aquí: no entran al sistema, así que asignarles el ticket lo deja sin dueño.
+  // Solo líderes y colaboradores pueden ser responsables de un ticket: son
+  // quienes lo atienden y le cargan horas. Los eliminados ya vienen fuera del
+  // listado; los deshabilitados se descartan aquí: no entran al sistema, así
+  // que asignarles el ticket lo deja sin dueño.
   const { data: users } = useUsersList({ page: 1, pageSize: 200, sortField: 'firstName' });
   const assignableOptions = (users?.items ?? [])
-    .filter((user) => user.status !== 'disabled')
+    .filter((user) => user.status !== 'disabled' && isTicketAssignableRole(user.role))
     .map((user) => ({ value: user.id, label: user.fullName }));
-  // El responsable actual puede haber quedado fuera (se dio de baja después de
-  // asignarlo). Se mantiene como opción para que el campo no aparezca vacío y
-  // guardar otro cambio no lo borre sin que nadie lo note. Solo se marca como
-  // deshabilitado si consta en el listado: si no vino, no hay cómo saberlo.
+  // El responsable actual puede haber quedado fuera (se dio de baja o cambió de
+  // rol después de asignarlo, o es un ticket histórico). Se mantiene como opción para que el campo
+  // no aparezca vacío y guardar otro cambio no lo borre sin que nadie lo note.
+  // Se marca el motivo solo si consta en el listado: si no vino, no hay cómo saberlo.
   const currentAssignee = ticket.assignee;
+  const currentAssigneeUser = currentAssignee ? (users?.items ?? []).find((user) => user.id === currentAssignee.id) : undefined;
+  const currentAssigneeSuffix =
+    currentAssigneeUser?.status === 'disabled' ? ' (deshabilitado)' : currentAssigneeUser && !isTicketAssignableRole(currentAssigneeUser.role) ? ' (no asignable)' : '';
   const assigneeOptions =
     currentAssignee && !assignableOptions.some((option) => option.value === currentAssignee.id)
-      ? [
-          ...assignableOptions,
-          {
-            value: currentAssignee.id,
-            label: (users?.items ?? []).some((user) => user.id === currentAssignee.id)
-              ? `${currentAssignee.fullName} (deshabilitado)`
-              : currentAssignee.fullName,
-          },
-        ]
+      ? [...assignableOptions, { value: currentAssignee.id, label: `${currentAssignee.fullName}${currentAssigneeSuffix}` }]
       : assignableOptions;
 
   const {

@@ -1,10 +1,12 @@
-import type { UserStatus } from '@kora/contracts';
+import type { RoleCode, UserStatus } from '@kora/contracts';
 
 export interface TicketUserReference {
   readonly id: string;
   readonly fullName: string;
   /** Necesario para decidir si puede recibir el ticket: a un deshabilitado ya no se le asigna. */
   readonly status: UserStatus;
+  /** Solo líderes y colaboradores atienden tickets: al resto no se le asigna. */
+  readonly role: RoleCode;
 }
 
 export interface TicketUserReader {

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { arrayQueryParam, isoDateTimeSchema, nonEmptyTrimmed, pageSchema, paginationQuerySchema, sortDirectionSchema, uuidSchema } from '../common/primitives';
 import { projectTypeSchema } from '../projects/project.contract';
+import type { RoleCode } from '../users/roles';
 
 /** Ver docs/DECISION-M5-TICKETS.md. */
 
@@ -77,6 +78,17 @@ export const TICKET_SERVICE_TYPE_LABELS: Readonly<Record<TicketServiceType, stri
  */
 export const SELECTABLE_TICKET_SERVICE_TYPES = ['incident', 'improvement'] as const satisfies readonly TicketServiceType[];
 export const selectableTicketServiceTypeSchema = z.enum(SELECTABLE_TICKET_SERVICE_TYPES);
+
+/**
+ * Solo líderes y colaboradores atienden tickets, así que solo ellos pueden ser
+ * su responsable. Admin, PMO, comercial, finanzas y cliente quedan fuera
+ * (incluido el usuario de sistema "KORA notificaciones", que es admin).
+ */
+export const TICKET_ASSIGNABLE_ROLES = ['leader', 'collaborator'] as const satisfies readonly RoleCode[];
+
+export function isTicketAssignableRole(role: RoleCode): boolean {
+  return (TICKET_ASSIGNABLE_ROLES as readonly RoleCode[]).includes(role);
+}
 
 export const ticketHistoryEntrySchema = z.object({
   id: uuidSchema,

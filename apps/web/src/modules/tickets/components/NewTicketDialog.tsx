@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
   createTicketSchema,
+  isTicketAssignableRole,
   TICKET_PRIORITIES,
   TICKET_PRIORITY_LABELS,
   SELECTABLE_TICKET_SERVICE_TYPES,
@@ -47,12 +48,12 @@ export function NewTicketDialog({ open, onClose }: NewTicketDialogProps) {
   const toast = useToast();
   const createTicket = useCreateTicket();
   const { data: clients } = useTicketLinkableClients();
-  // Cualquier persona del sistema puede ser responsable de un ticket — es
-  // quien puede cargarle horas por tenerlo asignado, no solo colaboradores.
-  // Los eliminados ya vienen fuera del listado; los deshabilitados se descartan
-  // aquí: no entran al sistema, así que asignarles el ticket lo deja sin dueño.
+  // Solo líderes y colaboradores pueden ser responsables de un ticket: son
+  // quienes lo atienden y le cargan horas. Los eliminados ya vienen fuera del
+  // listado; los deshabilitados se descartan aquí: no entran al sistema, así
+  // que asignarles el ticket lo deja sin dueño.
   const { data: users } = useUsersList({ page: 1, pageSize: 200, sortField: 'firstName' });
-  const assignableUsers = (users?.items ?? []).filter((user) => user.status !== 'disabled');
+  const assignableUsers = (users?.items ?? []).filter((user) => user.status !== 'disabled' && isTicketAssignableRole(user.role));
   const [serverError, setServerError] = useState<string | null>(null);
 
   const {

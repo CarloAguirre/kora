@@ -51,7 +51,7 @@ export class NoUsableSupportPlanError extends ConflictError {
  */
 export class TicketAssigneeNotAssignableError extends ConflictError {
   constructor() {
-    super('No puedes asignar el ticket a una persona eliminada o deshabilitada.', 'TICKET_ASSIGNEE_NOT_ASSIGNABLE');
+    super('Solo puedes asignar el ticket a un líder o colaborador vigente.', 'TICKET_ASSIGNEE_NOT_ASSIGNABLE');
   }
 }
 

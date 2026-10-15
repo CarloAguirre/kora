@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import type { Permission, UserStatus } from '@kora/contracts';
+import type { Permission, RoleCode, UserStatus } from '@kora/contracts';
 import { UpdateTicketUseCase } from './update-ticket.use-case';
 import { Ticket } from '../../domain/entities/ticket.entity';
 import type { TicketRepository } from '../../domain/repositories/ticket.repository';
@@ -56,18 +56,22 @@ class RecordingTicketHistoryRepository implements TicketHistoryRepository {
 
 /** `findById` devuelve `null` para los eliminados, igual que el lector real. */
 class StubTicketUserReader implements TicketUserReader {
-  constructor(private readonly people: Readonly<Record<string, UserStatus>>) {}
+  constructor(private readonly people: Readonly<Record<string, { status: UserStatus; role: RoleCode }>>) {}
 
   async findById(userId: string): Promise<TicketUserReference | null> {
-    const status = this.people[userId];
-    return status ? { id: userId, fullName: `Persona ${userId}`, status } : null;
+    const person = this.people[userId];
+    return person ? { id: userId, fullName: `Persona ${userId}`, ...person } : null;
   }
 }
 
-const PEOPLE: Readonly<Record<string, UserStatus>> = {
-  'user-active': 'active',
-  'user-blocked': 'blocked',
-  'user-disabled': 'disabled',
+const PEOPLE: Readonly<Record<string, { status: UserStatus; role: RoleCode }>> = {
+  'user-active': { status: 'active', role: 'collaborator' },
+  'user-blocked': { status: 'blocked', role: 'collaborator' },
+  'user-disabled': { status: 'disabled', role: 'collaborator' },
+  'user-leader': { status: 'active', role: 'leader' },
+  'user-commercial': { status: 'active', role: 'commercial' },
+  'user-pmo': { status: 'active', role: 'pmo' },
+  'user-admin': { status: 'active', role: 'admin' },
 };
 
 describe('UpdateTicketUseCase — responsable asignable', () => {
@@ -124,6 +128,22 @@ describe('UpdateTicketUseCase — responsable asignable', () => {
     tickets.seed(buildTicket());
 
     const result = await update({ assigneeUserId: 'user-borrado' });
+
+    expect(result.isErr() && result.error.code).toBe('TICKET_ASSIGNEE_NOT_ASSIGNABLE');
+  });
+
+  it('acepta a un líder', async () => {
+    tickets.seed(buildTicket());
+
+    const result = await update({ assigneeUserId: 'user-leader' });
+
+    expect(result.isOk()).toBe(true);
+  });
+
+  it.each(['user-commercial', 'user-pmo', 'user-admin'])('rechaza a %s: solo líderes y colaboradores atienden tickets', async (userId) => {
+    tickets.seed(buildTicket());
+
+    const result = await update({ assigneeUserId: userId });
 
     expect(result.isErr() && result.error.code).toBe('TICKET_ASSIGNEE_NOT_ASSIGNABLE');
   });
