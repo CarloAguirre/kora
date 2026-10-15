@@ -804,7 +804,7 @@ export function NewProjectPage() {
   });
 
   return (
-    <DashboardLayout title={pageTitle}>
+    <DashboardLayout title="Proyectos">
       <div className={styles.header}>
         <Button
           variant="ghost"
