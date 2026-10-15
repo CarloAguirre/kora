@@ -130,6 +130,12 @@ const STEPS_DEVELOPMENT_OTHER = [
   { label: 'Estimación' },
   { label: 'Resumen y confirmación' },
 ];
+/** En Prospecto la estimación y el plan de pago aún no se completan — el paso desaparece y se va directo a Resumen. */
+const STEPS_DEVELOPMENT_PROSPECT = [
+  { label: 'Datos del cliente' },
+  { label: 'Datos del proyecto' },
+  { label: 'Resumen y confirmación' },
+];
 
 const MODULE_STAGE_OPTIONS = PROJECT_MODULE_STAGES.map((stage) => ({ value: stage, label: PROJECT_MODULE_STAGE_LABELS[stage] }));
 
@@ -378,8 +384,14 @@ export function NewProjectPage() {
   const pageTitle = isConsolidating ? 'Nuevo contrato de soporte' : 'Nuevo proyecto';
 
   // Desarrollo: "Equipos y fases" (paso 3) solo existe en la lista cuando el proyecto está
-  // Aprobado — no se deshabilita, desaparece del stepper (ver STEPS_DEVELOPMENT_APPROVED/_OTHER).
-  const developmentSteps = isApproved ? STEPS_DEVELOPMENT_APPROVED : STEPS_DEVELOPMENT_OTHER;
+  // Aprobado y "Estimación" (paso 2) no existe en Prospecto — no se deshabilitan, desaparecen del
+  // stepper (ver STEPS_DEVELOPMENT_APPROVED/_OTHER/_PROSPECT).
+  const developmentSteps = isApproved
+    ? STEPS_DEVELOPMENT_APPROVED
+    : isProspecto
+      ? STEPS_DEVELOPMENT_PROSPECT
+      : STEPS_DEVELOPMENT_OTHER;
+  const hasEstimacionStep = !isSupport && !isProspecto;
   const stepperSteps = isSupport ? STEPS_SUPPORT : developmentSteps;
   const estimacionStepIndex = 2;
   const equiposStepIndex = 3;
@@ -611,14 +623,14 @@ export function NewProjectPage() {
     }
     setEstadoExtraErrors(extraErrors);
     if (!valid || Object.keys(extraErrors).length > 0) return;
+    // En Prospecto no hay paso de Estimación: el índice 2 ya es Resumen.
     setStep(2);
   };
 
-  /** Deja "Estimación" — sin equipos/fases (Prospecto/Cotización, o el usuario eligió omitirlo) va directo a Resumen. */
+  /** Deja "Estimación" (no existe en Prospecto) — sin equipos/fases (Cotización, o el usuario eligió omitirlo) va directo a Resumen. */
   /** El plan de pago vive en Estimación: se valida al dejar ese paso. */
   const paymentPlanIsValid = () => {
-    // En Prospecto el plan no se llena (ver la sección "Plan de pago") — no hay nada que validar.
-    const error = isProspecto ? null : validatePaymentPlan(paymentPlan);
+    const error = validatePaymentPlan(paymentPlan);
     setPaymentPlanError(error);
     return error === null;
   };
@@ -708,9 +720,12 @@ export function NewProjectPage() {
       }
 
       const isManualHito0 = values.type === 'development' && values.salesStage === 'approved' && values.status === 'active';
-      // En Prospecto no se manda plan: el backend crea el plan por defecto (Inicio/Marcha blanca, montos en 0)
-      // y monto y tramos se completan al pasar a Cotización.
-      const developmentValues = isProspecto ? values : { ...values, ...paymentPlanPayload(paymentPlan) };
+      // En Prospecto no se manda plan ni estimación: el backend crea el plan por defecto (Inicio/Marcha
+      // blanca, montos en 0) y fechas, horas, monto y tramos se completan al pasar a Cotización. Se
+      // limpian por si se llenaron con otra etapa comercial antes de volver a Prospecto.
+      const developmentValues = isProspecto
+        ? { ...values, startDate: undefined, estimatedDeliveryDate: undefined, soldHours: 0 }
+        : { ...values, ...paymentPlanPayload(paymentPlan) };
       const result = await createProject.mutateAsync(isManualHito0 ? { ...developmentValues, status: 'draft' } : developmentValues);
 
       if (values.type === 'development') {
@@ -1099,18 +1114,9 @@ export function NewProjectPage() {
             </>
           )}
 
-          {step === estimacionStepIndex && !isSupport && (
+          {step === estimacionStepIndex && hasEstimacionStep && (
             <>
               <Section title="Estimación del Proyecto">
-                {isProspecto && (
-                  <div className={styles.infoBox}>
-                    <InfoIcon size={16} />
-                    <div>
-                      <b>En Prospecto la estimación aún no se completa.</b> Las fechas y horas estimadas se ingresan
-                      cuando el proyecto pasa a Cotización.
-                    </div>
-                  </div>
-                )}
                 {salesStage === 'quoted' && (
                   <div className={styles.infoBox}>
                     <InfoIcon size={16} />
@@ -1121,44 +1127,22 @@ export function NewProjectPage() {
                   </div>
                 )}
                 <div className={styles.row}>
-                  <TextField
-                    label="Fecha de inicio"
-                    type="date"
-                    disabled={isProspecto}
-                    {...register('startDate', { setValueAs: emptyToUndefined })}
-                  />
+                  <TextField label="Fecha de inicio" type="date" {...register('startDate', { setValueAs: emptyToUndefined })} />
                   <TextField
                     label="Fecha de fin"
                     type="date"
-                    disabled={isProspecto}
                     {...register('estimatedDeliveryDate', { setValueAs: emptyToUndefined })}
                   />
-                  <TextField
-                    label={isApproved ? 'Horas vendidas' : 'Horas estimadas'}
-                    type="number"
-                    disabled={isProspecto}
-                    {...register('soldHours')}
-                  />
+                  <TextField label={isApproved ? 'Horas vendidas' : 'Horas estimadas'} type="number" {...register('soldHours')} />
                 </div>
               </Section>
 
               <Section title="Plan de pago">
-                {isProspecto ? (
-                  <div className={styles.infoBox}>
-                    <InfoIcon size={16} />
-                    <div>
-                      <b>En Prospecto el plan de pago aún no se completa.</b> El monto del contrato y sus tramos se
-                      ingresan cuando el proyecto pasa a Cotización, con fechas y horas estimadas definidas.
-                    </div>
-                  </div>
-                ) : (
-                  <p className={styles.hint}>
-                    Tramos en que se cobra el proyecto. Cada tramo queda <b>Por facturar</b> cuando se cumple su hito y se
-                    avisa por correo a Finanzas y Gerencia.
-                  </p>
-                )}
+                <p className={styles.hint}>
+                  Tramos en que se cobra el proyecto. Cada tramo queda <b>Por facturar</b> cuando se cumple su hito y se
+                  avisa por correo a Finanzas y Gerencia.
+                </p>
                 <PaymentPlanEditor
-                  disabled={isProspecto}
                   value={paymentPlan}
                   onChange={(next) => {
                     setPaymentPlan(next);
@@ -1780,13 +1764,15 @@ export function NewProjectPage() {
                   {status === 'on_hold' && isApproved && <SummaryItem label="Stop de reloj" value={stopReloj ? 'Sí' : 'No'} />}
                 </div>
 
-                <div className={styles.summaryCard}>
-                  <h3 className={styles.summaryCardTitle}>Estimación y horas</h3>
-                  <SummaryItem label="Fecha de inicio" value={startDate} />
-                  <SummaryItem label="Fecha de fin" value={estimatedDeliveryDate} />
-                  <SummaryItem label={isApproved ? 'Horas vendidas' : 'Horas estimadas'} value={soldHours ? `${soldHours} hh` : undefined} />
-                  {isApproved && <SummaryItem label="Asignadas a equipos" value={`${totalTeamHours} hh`} />}
-                </div>
+                {!isProspecto && (
+                  <div className={styles.summaryCard}>
+                    <h3 className={styles.summaryCardTitle}>Estimación y horas</h3>
+                    <SummaryItem label="Fecha de inicio" value={startDate} />
+                    <SummaryItem label="Fecha de fin" value={estimatedDeliveryDate} />
+                    <SummaryItem label={isApproved ? 'Horas vendidas' : 'Horas estimadas'} value={soldHours ? `${soldHours} hh` : undefined} />
+                    {isApproved && <SummaryItem label="Asignadas a equipos" value={`${totalTeamHours} hh`} />}
+                  </div>
+                )}
 
                 {!isProspecto && (
                   <div className={styles.summaryCard}>
@@ -1896,7 +1882,7 @@ export function NewProjectPage() {
               </div>
 
               <div className={styles.actions}>
-                <Button variant="outline" type="button" onClick={() => setStep(isApproved ? equiposStepIndex : estimacionStepIndex)}>
+                <Button variant="outline" type="button" onClick={() => setStep(isApproved ? equiposStepIndex : isProspecto ? 1 : estimacionStepIndex)}>
                   Atrás
                 </Button>
                 <Button type="submit" loading={isSubmitting} loadingText="Creando…">

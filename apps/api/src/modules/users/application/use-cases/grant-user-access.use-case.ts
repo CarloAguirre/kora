@@ -53,6 +53,10 @@ const INVITATION_TTL_HOURS = 72;
  *
  * Emitir una invitación nueva invalida las anteriores, para que un enlace viejo
  * reenviado por correo no siga sirviendo.
+ *
+ * Si la persona ya tiene contraseña, se conserva: la invitación solo le ofrece
+ * fijar otra. Borrarla dejaba sin acceso a quien no abría el correo (caso real:
+ * cuentas migradas de la v1 a las que se les "habilitó acceso" de nuevo).
  */
 @Injectable()
 export class GrantUserAccessUseCase
@@ -82,15 +86,17 @@ export class GrantUserAccessUseCase
     const token = this.tokens.generate();
 
     await this.unitOfWork.run(async (tx) => {
-      await this.credentials.upsert(
-        {
-          userId: user.id,
-          passwordHash: null,
-          passwordAlgorithm: null,
-          mustChangePassword: true,
-        },
-        tx,
-      );
+      if (!(await this.credentials.hasUsablePassword(user.id, tx))) {
+        await this.credentials.upsert(
+          {
+            userId: user.id,
+            passwordHash: null,
+            passwordAlgorithm: null,
+            mustChangePassword: true,
+          },
+          tx,
+        );
+      }
 
       await this.invitations.invalidateAllForUser(user.id, now, tx);
       await this.invitations.create(

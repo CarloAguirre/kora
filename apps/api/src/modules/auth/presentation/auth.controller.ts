@@ -100,7 +100,7 @@ export class AuthController {
   @Get('google')
   async googleStart(@Res({ passthrough: false }) reply: FastifyReply): Promise<void> {
     if (!this.config.google.enabled) {
-      void reply.redirect(`/login?google_error=${AUTH_ERROR_CODES.GOOGLE_NOT_CONFIGURED}`);
+      void reply.redirect(`/login?google_error=${AUTH_ERROR_CODES.GOOGLE_NOT_CONFIGURED}`, 302);
       return;
     }
 
@@ -113,7 +113,7 @@ export class AuthController {
       maxAge: 300,
     });
 
-    void reply.redirect(this.googleClient.buildAuthorizationUrl(state));
+    void reply.redirect(this.googleClient.buildAuthorizationUrl(state), 302);
   }
 
   @Public()
@@ -127,7 +127,7 @@ export class AuthController {
     void reply.clearCookie(GOOGLE_STATE_COOKIE, { path: '/' });
 
     if (!stateCookie || !query.state || stateCookie !== query.state || !query.code) {
-      void reply.redirect(`/login?google_error=${AUTH_ERROR_CODES.GOOGLE_STATE_MISMATCH}`);
+      void reply.redirect(`/login?google_error=${AUTH_ERROR_CODES.GOOGLE_STATE_MISMATCH}`, 302);
       return;
     }
 
@@ -139,12 +139,12 @@ export class AuthController {
     });
 
     if (result.isErr()) {
-      void reply.redirect(`/login?google_error=${result.error.code}`);
+      void reply.redirect(`/login?google_error=${result.error.code}`, 302);
       return;
     }
 
     this.setRefreshCookie(reply, result.value.refreshToken, result.value.refreshExpiresAt);
-    void reply.redirect('/');
+    void reply.redirect('/', 302);
   }
 
   @Public()
