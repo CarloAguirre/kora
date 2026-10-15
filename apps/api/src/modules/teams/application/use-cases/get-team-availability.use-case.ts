@@ -46,8 +46,8 @@ export class GetTeamAvailabilityUseCase
 
     const dates = enumerateDates(dateFrom, dateTo);
     const [activeMembers, hoursByMemberAndDate] = await Promise.all([
-      this.members.listActiveForTeam(teamId),
-      this.teams.getApprovedHoursByMemberAndDate(teamId, new Date(`${dateFrom}T00:00:00.000Z`), new Date(`${dateTo}T00:00:00.000Z`)),
+      this.members.listActiveForTeam(team.id),
+      this.teams.getApprovedHoursByMemberAndDate(team.id, new Date(`${dateFrom}T00:00:00.000Z`), new Date(`${dateTo}T00:00:00.000Z`)),
     ]);
 
     const hoursByMemberId = new Map<string, Map<string, number>>();
@@ -58,7 +58,7 @@ export class GetTeamAvailabilityUseCase
     }
 
     return ok({
-      teamId,
+      teamId: team.id,
       members: activeMembers.map((member) => {
         const byDate = hoursByMemberId.get(member.id);
         return {

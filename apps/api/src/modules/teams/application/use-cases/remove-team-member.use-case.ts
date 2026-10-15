@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CLOCK, err, ok, type ApplicationError, type Clock, type Result } from '@kora/core';
-import { TeamMemberNotFoundError } from '../../domain/errors/team.errors';
+import { TeamMemberNotFoundError, TeamNotFoundError } from '../../domain/errors/team.errors';
+import { TEAM_REPOSITORY, type TeamRepository } from '../../domain/repositories/team.repository';
 import {
   TEAM_MEMBER_REPOSITORY,
   type TeamMemberRepository,
@@ -21,6 +22,7 @@ export interface RemoveTeamMemberCommand {
 @Injectable()
 export class RemoveTeamMemberUseCase implements UseCase<RemoveTeamMemberCommand, void, ApplicationError> {
   constructor(
+    @Inject(TEAM_REPOSITORY) private readonly teams: TeamRepository,
     @Inject(TEAM_MEMBER_REPOSITORY) private readonly members: TeamMemberRepository,
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
     @Inject(CLOCK) private readonly clock: Clock,
@@ -29,8 +31,11 @@ export class RemoveTeamMemberUseCase implements UseCase<RemoveTeamMemberCommand,
   async execute(command: RemoveTeamMemberCommand): Promise<Result<void, ApplicationError>> {
     const { teamId, memberId, actor } = command;
 
+    const team = await this.teams.findById(teamId);
+    if (!team || team.isDeleted) return err(new TeamNotFoundError(teamId));
+
     const member = await this.members.findActiveById(memberId);
-    if (!member || member.teamId !== teamId) return err(new TeamMemberNotFoundError(memberId));
+    if (!member || member.teamId !== team.id) return err(new TeamMemberNotFoundError(memberId));
 
     await this.members.remove(memberId, this.clock.now());
 
@@ -38,7 +43,7 @@ export class RemoveTeamMemberUseCase implements UseCase<RemoveTeamMemberCommand,
       actor: { userId: actor.userId, email: actor.email },
       action: 'update',
       entityType: 'team',
-      entityId: teamId,
+      entityId: team.id,
       metadata: { event: 'member_removed', userId: member.userId },
     });
 

@@ -41,12 +41,13 @@ export class AddTeamMemberUseCase
     const team = await this.teams.findById(teamId);
     if (!team || team.isDeleted) return err(new TeamNotFoundError(teamId));
 
-    const existing = await this.members.findActiveByUserAndTeam(data.userId, teamId);
+    // `teamId` puede venir como slug: a partir de aquí se usa siempre el uuid resuelto.
+    const existing = await this.members.findActiveByUserAndTeam(data.userId, team.id);
     if (existing) return err(new TeamMemberAlreadyActiveError());
 
     const now = this.clock.now();
     const id = await this.members.add({
-      teamId,
+      teamId: team.id,
       userId: data.userId,
       position: data.position || null,
       weeklyHours: data.weeklyHours,
@@ -57,7 +58,7 @@ export class AddTeamMemberUseCase
       actor: { userId: actor.userId, email: actor.email },
       action: 'update',
       entityType: 'team',
-      entityId: teamId,
+      entityId: team.id,
       metadata: { event: 'member_added', userId: data.userId },
     });
 
