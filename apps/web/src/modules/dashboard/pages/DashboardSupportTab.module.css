@@ -7,16 +7,10 @@
 
 .header {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
   gap: var(--kora-space-3);
   flex-wrap: wrap;
-}
-
-.title {
-  font-size: var(--kora-text-xl);
-  font-weight: var(--kora-weight-bold);
-  color: var(--kora-navy);
 }
 
 .headerActions {

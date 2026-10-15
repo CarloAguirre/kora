@@ -1,13 +1,9 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import type { DashboardCapacitySummary, DashboardProjectsSummary } from '@kora/contracts';
 import styles from './DashboardProjectsTab.module.css';
 import { Card } from '@/shared/components/ui/Card';
 import { Button } from '@/shared/components/ui/Button';
-import { useToast } from '@/shared/components/ui/Toast';
-import { PlusIcon, AlertIcon, ChevronRightIcon } from '@/shared/components/icons/Icons';
-import { usePermissions } from '@/modules/auth/hooks/usePermissions';
-import { ClientFormDialog } from '@/modules/clients/components/ClientFormDialog';
+import { AlertIcon, ChevronRightIcon } from '@/shared/components/icons/Icons';
 import { SegmentedBar } from '@/shared/components/ui/SegmentedBar';
 import { CriticalProjectCard } from '../components/CriticalProjectCard';
 import { CapacityPlanningSection } from '../components/CapacityPlanningSection';
@@ -27,26 +23,10 @@ interface DashboardProjectsTabProps {
 
 /** Tab "Proyectos" del Dashboard — igual disposición que `DashboardProyectos` en la v1. Sin el enlace "Ver forecast detallado": Forecast ya vive en el menú lateral. */
 export function DashboardProjectsTab({ projects, capacity, loading, weekStart, onWeekStartChange }: DashboardProjectsTabProps) {
-  const { can } = usePermissions();
   const navigate = useNavigate();
-  const toast = useToast();
-  const [createClientOpen, setCreateClientOpen] = useState(false);
 
   return (
     <div className={styles.tab}>
-      <div className={styles.actions}>
-        {can('projects:manage') && (
-          <Link to="/proyectos/nuevo">
-            <Button iconLeft={<PlusIcon size={16} />}>Crear Proyecto</Button>
-          </Link>
-        )}
-        {can('clients:manage') && (
-          <Button variant="secondary" iconLeft={<PlusIcon size={16} />} onClick={() => setCreateClientOpen(true)}>
-            Crear Cliente
-          </Button>
-        )}
-      </div>
-
       <div className={styles.kpis}>
         <Card className={styles.kpiCard}>
           <div className={styles.kpiLabelRow}>
@@ -154,17 +134,6 @@ export function DashboardProjectsTab({ projects, capacity, loading, weekStart, o
       {(loading || capacity) && (
         <CapacityPlanningSection capacity={capacity} loading={loading} weekStart={weekStart} onWeekStartChange={onWeekStartChange} />
       )}
-
-      <ClientFormDialog
-        open={createClientOpen}
-        clientId={null}
-        onClose={() => setCreateClientOpen(false)}
-        onSuccess={(message) => {
-          toast.success(message);
-          setCreateClientOpen(false);
-          void navigate('/clientes');
-        }}
-      />
     </div>
   );
 }

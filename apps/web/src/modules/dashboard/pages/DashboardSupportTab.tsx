@@ -40,7 +40,6 @@ export function DashboardSupportTab({ support, loading }: DashboardSupportTabPro
   return (
     <div className={styles.tab}>
       <div className={styles.header}>
-        <span className={styles.title}>Reporte de Soporte</span>
         <div className={styles.headerActions}>
           <Button
             variant="outlineDark"
