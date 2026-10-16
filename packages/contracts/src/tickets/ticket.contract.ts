@@ -59,7 +59,7 @@ export const TICKET_PRIORITY_LABELS: Readonly<Record<TicketPriority, string>> = 
   low: 'Baja',
 };
 
-export const TICKET_SERVICE_TYPES = ['incident', 'inquiry', 'improvement', 'bug'] as const;
+export const TICKET_SERVICE_TYPES = ['incident', 'inquiry', 'improvement', 'bug', 'operational'] as const;
 export const ticketServiceTypeSchema = z.enum(TICKET_SERVICE_TYPES);
 export type TicketServiceType = z.infer<typeof ticketServiceTypeSchema>;
 
@@ -68,15 +68,16 @@ export const TICKET_SERVICE_TYPE_LABELS: Readonly<Record<TicketServiceType, stri
   inquiry: 'Consulta',
   improvement: 'Mejora',
   bug: 'Error',
+  operational: 'Operativo',
 };
 
 /**
  * "Consulta" e "Error" quedaron deprecados como tipo de servicio (se dejan
  * en `TICKET_SERVICE_TYPES`/`ticketServiceTypeSchema` solo para no romper la
  * lectura ni la edición de tickets históricos que ya los tienen). Los
- * tickets nuevos solo pueden ser Incidente o Mejora.
+ * tickets nuevos solo pueden ser Incidente, Mejora u Operativo.
  */
-export const SELECTABLE_TICKET_SERVICE_TYPES = ['incident', 'improvement'] as const satisfies readonly TicketServiceType[];
+export const SELECTABLE_TICKET_SERVICE_TYPES = ['incident', 'improvement', 'operational'] as const satisfies readonly TicketServiceType[];
 export const selectableTicketServiceTypeSchema = z.enum(SELECTABLE_TICKET_SERVICE_TYPES);
 
 /**

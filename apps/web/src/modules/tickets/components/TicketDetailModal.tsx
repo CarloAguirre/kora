@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import {
   TICKET_PRIORITY_LABELS,
+  TICKET_SERVICE_TYPE_LABELS,
   nextForwardTicketStatus,
   type TicketStatus,
 } from '@kora/contracts';
@@ -17,11 +18,12 @@ import {
   PaperclipIcon,
   PencilIcon,
   PlusIcon,
-  SparklesIcon,
   TrashIcon,
   TriangleAlertIcon,
 } from '@/shared/components/icons/Icons';
 import { TicketStatusBadge } from './TicketStatusBadge';
+import { TicketServiceTypeIcon } from './TicketServiceTypeIcon';
+import { ticketDescriptionLabel } from '../lib/ticket-description-label';
 import { TicketHhRequestsSection } from './TicketHhRequestsSection';
 import { HhBreakdownTooltip } from './HhBreakdownTooltip';
 import { EditTicketDialog } from './EditTicketDialog';
@@ -187,8 +189,8 @@ export function TicketDetailModal({ ticketId, onClose }: { ticketId: string; onC
           <>
             <div className={styles.header}>
               <div className={styles.headerLeft}>
-                <span className={styles.typeIcon} title={ticket.serviceType === 'improvement' ? 'Mejora' : 'Incidente'}>
-                  {ticket.serviceType === 'improvement' ? <SparklesIcon size={16} /> : <AlertIcon size={16} />}
+                <span className={styles.typeIcon} title={TICKET_SERVICE_TYPE_LABELS[ticket.serviceType ?? 'incident']}>
+                  <TicketServiceTypeIcon serviceType={ticket.serviceType} />
                 </span>
                 <span className={styles.code}>{ticket.code ?? '—'}</span>
                 <div className={styles.sep} />
@@ -296,7 +298,7 @@ export function TicketDetailModal({ ticketId, onClose }: { ticketId: string; onC
                 <div className={styles.contentSection}>
                   <div className={styles.contentSectionHeader}>
                     <span className={styles.label}>
-                      {ticket.serviceType === 'improvement' ? 'Descripción de las mejoras' : 'Descripción del incidente'}
+                      {ticketDescriptionLabel(ticket.serviceType)}
                     </span>
                     {!ticket.description && <span className={styles.emptyInline}>Sin descripción</span>}
                   </div>

@@ -19,6 +19,7 @@ import { Select } from '@/shared/components/ui/Select';
 import { Combobox } from '@/shared/components/ui/Combobox';
 import { AlertIcon } from '@/shared/components/icons/Icons';
 import { useToast } from '@/shared/components/ui/Toast';
+import { ticketDescriptionLabel } from '../lib/ticket-description-label';
 import { useCreateTicket, useTicketLinkableClients, useTicketLinkableProjects } from '../api/tickets.queries';
 import { useUsersList } from '@/modules/users/api/users.queries';
 import { ApiRequestError } from '@/shared/lib/api-client';
@@ -74,6 +75,7 @@ export function NewTicketDialog({ open, onClose }: NewTicketDialogProps) {
   const projectId = useWatch({ control, name: 'projectId' });
   const developmentProjectId = useWatch({ control, name: 'developmentProjectId' });
   const assigneeUserId = useWatch({ control, name: 'assigneeUserId' });
+  const serviceType = useWatch({ control, name: 'serviceType' });
   const { data: supportProjects } = useTicketLinkableProjects(clientId || undefined, 'support');
   // Y el contrato acota los de desarrollo a los que cubre.
   const { data: developmentProjects } = useTicketLinkableProjects(clientId || undefined, 'development', projectId || undefined);
@@ -209,7 +211,7 @@ export function NewTicketDialog({ open, onClose }: NewTicketDialogProps) {
           errorText={errors.developmentProjectId?.message}
         />
 
-        <TextField label="Descripción del incidente" placeholder="Detalle lo ocurrido" {...register('description')} />
+        <TextField label={ticketDescriptionLabel(serviceType)} placeholder="Detalle lo ocurrido" {...register('description')} />
 
         <TextField
           label="Evidencia"

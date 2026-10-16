@@ -67,8 +67,8 @@ export interface ClientSupportContractRow {
 export type SupportTicketWorkflowStatus = 'pending' | 'in_progress' | 'closed';
 export type SupportTicketBillingStatus = 'to_invoice' | 'invoiced' | 'pending_invoice';
 export type SupportTicketPriority = 'low' | 'medium' | 'high';
-/** "IN" (Incidente) vs "ME" (Mejora) — el prefijo del código del ticket en el Figma. */
-export type SupportTicketType = 'incident' | 'improvement';
+/** "IN" (Incidente) vs "ME" (Mejora) — el prefijo del código del ticket en el Figma; "OP" (Operativo) se agregó después. */
+export type SupportTicketType = 'incident' | 'improvement' | 'operational';
 
 export interface SupportTicketHistoryEntry {
   readonly date: string;

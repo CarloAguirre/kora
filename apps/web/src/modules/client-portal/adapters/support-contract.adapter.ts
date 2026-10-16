@@ -62,12 +62,16 @@ function sla(estimatedHours: number | null, usedHours: number): string {
   return estimatedHours != null ? `${usedHours}h / ${estimatedHours}h` : `${usedHours}h`;
 }
 
+function supportTicketType(serviceType: TicketSummary['serviceType']): SupportTicket['type'] {
+  return serviceType === 'improvement' || serviceType === 'operational' ? serviceType : 'incident';
+}
+
 /** Fila liviana para la lista y el panel de detalle antes de que cargue el detalle completo. */
 export function toSupportTicketRow(item: TicketSummary): SupportTicket {
   return {
     id: item.id,
     code: item.code ?? item.id.slice(0, 8),
-    type: item.serviceType === 'improvement' ? 'improvement' : 'incident',
+    type: supportTicketType(item.serviceType),
     title: item.title,
     workflowStatus: workflowStatus(item.status),
     billingStatus: billingStatus(item),
@@ -90,7 +94,7 @@ export function toSupportTicketFromDetail(detail: TicketDetail): SupportTicket {
   return {
     id: detail.id,
     code: detail.code ?? detail.id.slice(0, 8),
-    type: detail.serviceType === 'improvement' ? 'improvement' : 'incident',
+    type: supportTicketType(detail.serviceType),
     title: detail.title,
     workflowStatus: workflowStatus(detail.status),
     billingStatus: billingStatus(detail),

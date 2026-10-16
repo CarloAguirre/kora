@@ -8,6 +8,10 @@ describe('nextForwardTicketStatus', () => {
     expect(nextForwardTicketStatus('done', 'incident')).toBe('closed');
   });
 
+  it('un operativo tampoco pasa por "En Pruebas"', () => {
+    expect(nextForwardTicketStatus('in_progress', 'operational')).toBe('done');
+  });
+
   it('sin serviceType sigue el mismo camino que un incidente', () => {
     expect(nextForwardTicketStatus('in_progress', null)).toBe('done');
   });

@@ -8,14 +8,16 @@ import type { TicketProjectReference } from '../ports/ticket-project-reader.port
 /**
  * Código visible — réplica de `getSupportTicketDisplayCode` (v1): la v1 nunca
  * mostraba `id_ticket` tal cual, lo formateaba como `IN0879`/`ME0886` (mejora
- * vs el resto) a partir de sus dígitos + el tipo de servicio. `legacyId` en
+ * vs el resto; `OP` para operativos, tipo que la v1 no tenía) a partir de sus dígitos + el tipo de servicio. `legacyId` en
  * v2 guarda el valor crudo (clave de upsert idempotente en cada reimportación)
  * — este es el único lugar que lo traduce al código que la gente reconoce.
  */
 function formatTicketCode(legacyId: string | null, serviceType: TicketServiceType | null): string | null {
   if (!legacyId) return null;
   const digits = legacyId.replace(/\D/g, '').padStart(4, '0');
-  return serviceType === 'improvement' ? `ME${digits}` : `IN${digits}`;
+  if (serviceType === 'improvement') return `ME${digits}`;
+  if (serviceType === 'operational') return `OP${digits}`;
+  return `IN${digits}`;
 }
 
 export function toTicketSummary(item: TicketListItem): TicketSummary {

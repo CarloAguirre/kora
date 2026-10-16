@@ -1,0 +1,1 @@
+ALTER TYPE "public"."ticket_service_type" ADD VALUE 'operational';

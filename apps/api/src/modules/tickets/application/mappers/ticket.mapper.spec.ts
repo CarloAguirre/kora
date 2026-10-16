@@ -42,6 +42,11 @@ describe('toTicketSummary — código visible', () => {
     expect(summary.code).toBe('ME0886');
   });
 
+  it('antepone "OP" para operativos', () => {
+    const summary = toTicketSummary(buildItem({ legacyId: 'TK-0012', serviceType: 'operational' }));
+    expect(summary.code).toBe('OP0012');
+  });
+
   it('rellena con ceros a la izquierda hasta 4 dígitos', () => {
     const summary = toTicketSummary(buildItem({ legacyId: 'TK-9', serviceType: 'incident' }));
     expect(summary.code).toBe('IN0009');

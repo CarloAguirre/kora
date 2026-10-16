@@ -18,7 +18,7 @@ export const ticketsCodeSeq = pgSequence('tickets_code_seq');
 
 export const ticketStatusEnum = pgEnum('ticket_status', ['pending', 'in_progress', 'in_testing', 'done', 'closed']);
 export const ticketPriorityEnum = pgEnum('ticket_priority', ['critical', 'high', 'medium', 'low']);
-export const ticketServiceTypeEnum = pgEnum('ticket_service_type', ['incident', 'inquiry', 'improvement', 'bug']);
+export const ticketServiceTypeEnum = pgEnum('ticket_service_type', ['incident', 'inquiry', 'improvement', 'bug', 'operational']);
 
 export const tickets = pgTable(
   'tickets',

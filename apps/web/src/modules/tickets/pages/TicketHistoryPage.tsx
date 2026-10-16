@@ -17,9 +17,10 @@ import { MultiSelect } from '@/shared/components/ui/MultiSelect';
 import { TextField } from '@/shared/components/ui/TextField';
 import { DEFAULT_PAGE_SIZE, Pagination } from '@/shared/components/ui/Pagination';
 import { DataTable, type Column } from '@/shared/components/ui/DataTable';
-import { DownloadIcon, EyeIcon, SearchIcon, SparklesIcon, AlertIcon } from '@/shared/components/icons/Icons';
+import { DownloadIcon, EyeIcon, SearchIcon } from '@/shared/components/icons/Icons';
 import { TicketStatusBadge } from '../components/TicketStatusBadge';
 import { TicketPriorityBadge } from '../components/TicketPriorityBadge';
+import { TicketServiceTypeIcon } from '../components/TicketServiceTypeIcon';
 import { TicketDetailModal } from '../components/TicketDetailModal';
 import { useTicketLinkableClients, useTicketsList } from '../api/tickets.queries';
 import { ticketsApi } from '../api/tickets.api';
@@ -108,7 +109,7 @@ export function TicketHistoryPage() {
       header: 'Cod. Ticket',
       render: (ticket) => (
         <span className={styles.codeCell}>
-          {ticket.serviceType === 'improvement' ? <SparklesIcon size={16} /> : <AlertIcon size={16} />}
+          <TicketServiceTypeIcon serviceType={ticket.serviceType} />
           {ticket.code ?? '—'}
         </span>
       ),

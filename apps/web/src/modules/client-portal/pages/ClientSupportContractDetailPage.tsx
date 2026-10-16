@@ -7,7 +7,6 @@ import { Button } from '@/shared/components/ui/Button';
 import { useToast } from '@/shared/components/ui/Toast';
 import { KoraLogo } from '@/shared/components/layout/KoraLogo';
 import {
-  AlertIcon,
   CalendarIcon,
   ChevronDownIcon,
   ChevronLeftIcon,
@@ -15,11 +14,12 @@ import {
   DownloadIcon,
   LinkIcon,
   PaperclipIcon,
-  SparklesIcon,
 } from '@/shared/components/icons/Icons';
 import { useSupportPlanDetail } from '@/modules/projects/api/support-plan.queries';
 import { formatMoney } from '@/shared/lib/format-money';
 import { useTicketDetail, useTicketsList } from '@/modules/tickets/api/tickets.queries';
+import { TicketServiceTypeIcon } from '@/modules/tickets/components/TicketServiceTypeIcon';
+import { ticketDescriptionLabel } from '@/modules/tickets/lib/ticket-description-label';
 import { StatusPill, type StatusPillTone } from '../components/StatusPill';
 import { toSupportContractDetail, toSupportTicketFromDetail } from '../adapters/support-contract.adapter';
 import type {
@@ -324,7 +324,7 @@ export function ClientSupportContractDetailPage({
                 >
                   <div className={styles.ticketListItemMain}>
                     <span className={styles.ticketCode}>
-                      {ticket.type === 'incident' ? <AlertIcon size={13} /> : <SparklesIcon size={13} />}
+                      <TicketServiceTypeIcon serviceType={ticket.type} size={13} />
                       {ticket.code}
                     </span>
                     <span className={styles.ticketListTitle}>{ticket.title}</span>
@@ -356,7 +356,7 @@ export function ClientSupportContractDetailPage({
                 <>
                   <div className={styles.ticketDetailHeadRow}>
                     <span className={styles.ticketDetailHeading}>
-                      {selectedTicket.type === 'incident' ? <AlertIcon size={15} /> : <SparklesIcon size={15} />}
+                      <TicketServiceTypeIcon serviceType={selectedTicket.type} size={15} />
                       <span>{selectedTicket.code}</span> {selectedTicket.title}
                     </span>
                     <StatusPill tone={WORKFLOW_TONE[selectedTicket.workflowStatus]}>
@@ -402,7 +402,7 @@ export function ClientSupportContractDetailPage({
                   </div>
 
                   <div className={styles.ticketDetailBlock}>
-                    <span className={styles.ticketDetailBlockLabel}>Descripción del incidente:</span>
+                    <span className={styles.ticketDetailBlockLabel}>{ticketDescriptionLabel(selectedTicket.type)}:</span>
                     <p className={styles.ticketDetailBlockText}>{selectedTicket.description}</p>
                   </div>
 

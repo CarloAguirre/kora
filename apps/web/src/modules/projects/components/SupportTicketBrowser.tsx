@@ -8,6 +8,7 @@ import { TicketPriorityBadge } from '@/modules/tickets/components/TicketPriority
 import { TicketStatusBadge } from '@/modules/tickets/components/TicketStatusBadge';
 import { TicketDetailModal } from '@/modules/tickets/components/TicketDetailModal';
 import { useTicketDetail } from '@/modules/tickets/api/tickets.queries';
+import { ticketDescriptionLabel } from '@/modules/tickets/lib/ticket-description-label';
 
 const formatDate = (value: string) => new Date(value).toLocaleDateString('es-CL');
 
@@ -138,7 +139,7 @@ function TicketDetailPane({ ticketId, onManage }: { ticketId: string; onManage: 
       </div>
 
       <div className={styles.detailSection}>
-        <p className={styles.detailSectionTitle}>Descripción del incidente</p>
+        <p className={styles.detailSectionTitle}>{ticketDescriptionLabel(ticket.serviceType)}</p>
         <p className={styles.detailText}>{ticket.description ?? 'Sin descripción.'}</p>
       </div>
 

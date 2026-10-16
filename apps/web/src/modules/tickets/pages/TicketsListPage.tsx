@@ -6,8 +6,9 @@ import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Button } from '@/shared/components/ui/Button';
 import { MultiSelect } from '@/shared/components/ui/MultiSelect';
 import { TextField } from '@/shared/components/ui/TextField';
-import { AlertIcon, CalendarIcon, ClockIcon, PlusIcon, SearchIcon, SparklesIcon, UserIcon } from '@/shared/components/icons/Icons';
+import { CalendarIcon, ClockIcon, PlusIcon, SearchIcon, UserIcon } from '@/shared/components/icons/Icons';
 import { TicketPriorityBadge } from '../components/TicketPriorityBadge';
+import { TicketServiceTypeIcon } from '../components/TicketServiceTypeIcon';
 import { TicketDetailModal } from '../components/TicketDetailModal';
 import { NewTicketDialog } from '../components/NewTicketDialog';
 import { useChangeTicketStatus, useTicketLinkableClients, useTicketsList } from '../api/tickets.queries';
@@ -221,7 +222,7 @@ function TicketCard({
       </div>
       <div className={styles.divider} />
       <div className={styles.idRow}>
-        {ticket.serviceType === 'improvement' ? <SparklesIcon size={16} /> : <AlertIcon size={16} />}
+        <TicketServiceTypeIcon serviceType={ticket.serviceType} />
         <span className={styles.code}>{ticket.code ?? '—'}</span>
         <div className={styles.separator} />
         <span className={styles.title}>{ticket.title}</span>

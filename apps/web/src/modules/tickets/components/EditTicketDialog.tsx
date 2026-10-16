@@ -18,6 +18,7 @@ import { Button } from '@/shared/components/ui/Button';
 import { TextField } from '@/shared/components/ui/TextField';
 import { Select } from '@/shared/components/ui/Select';
 import { Combobox } from '@/shared/components/ui/Combobox';
+import { ticketDescriptionLabel } from '../lib/ticket-description-label';
 import { useTicketLinkableProjects, useUpdateTicket } from '../api/tickets.queries';
 import { useUsersList } from '@/modules/users/api/users.queries';
 import { useToast } from '@/shared/components/ui/Toast';
@@ -85,6 +86,7 @@ export function EditTicketDialog({ ticket, open, onClose }: { ticket: TicketDeta
 
   const developmentProjectId = useWatch({ control, name: 'developmentProjectId' });
   const assigneeUserId = useWatch({ control, name: 'assigneeUserId' });
+  const serviceType = useWatch({ control, name: 'serviceType' });
 
   useEffect(() => {
     if (!open) return;
@@ -158,7 +160,7 @@ export function EditTicketDialog({ ticket, open, onClose }: { ticket: TicketDeta
           emptyMessage="No se encontraron proyectos de desarrollo."
         />
 
-        <TextField label="Descripción del incidente" errorText={errors.description?.message} {...register('description')} />
+        <TextField label={ticketDescriptionLabel(serviceType)} errorText={errors.description?.message} {...register('description')} />
 
         <TextField
           label="Evidencia"
