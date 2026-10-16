@@ -13,10 +13,11 @@
   flex-wrap: wrap;
 }
 
-.subtitle {
-  color: var(--kora-text-muted);
-  font-size: var(--kora-text-base);
-  min-height: 20px;
+.title {
+  margin: 0;
+  color: var(--kora-navy);
+  font-size: var(--kora-text-lg);
+  font-weight: var(--kora-weight-bold);
 }
 
 .headerActions {
@@ -30,13 +31,6 @@
   color: var(--kora-danger);
   font-size: var(--kora-text-sm);
   margin: 0;
-}
-
-.sectionTitle {
-  margin: 0;
-  color: var(--kora-navy);
-  font-size: var(--kora-text-base);
-  font-weight: var(--kora-weight-bold);
 }
 
 .filters {

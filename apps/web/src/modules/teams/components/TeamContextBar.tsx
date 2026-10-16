@@ -3,13 +3,7 @@ import type { TeamMember, TeamSummary } from '@kora/contracts';
 import styles from './TeamContextBar.module.css';
 import { useTeamDetail } from '../api/teams.queries';
 import { CheckIcon, ChevronDownIcon, UsersGroupIcon } from '@/shared/components/icons/Icons';
-
-function initials(fullName: string): string {
-  const parts = fullName.trim().split(/\s+/).filter(Boolean);
-  const first = parts[0]?.[0] ?? '';
-  const last = parts.length > 1 ? parts[parts.length - 1]![0] : '';
-  return `${first}${last}`.toUpperCase();
-}
+import { personInitials } from '../lib/team-report';
 
 /**
  * Selector de equipo — panel propio en vez de un `<select>` nativo: la lista
@@ -148,7 +142,7 @@ export function TeamContextBar({
                   aria-pressed={isActive}
                   aria-label={isLeader ? `${member.fullName} — Líder de equipo` : member.fullName}
                 >
-                  <span className={styles.avatarInitials}>{initials(member.fullName)}</span>
+                  <span className={styles.avatarInitials}>{personInitials(member.fullName)}</span>
                   <span className={styles.avatarCard}>
                     <span className={styles.avatarName}>{member.fullName}</span>
                     <span className={styles.avatarRole}>{isLeader ? 'Líder de equipo' : member.position || 'Colaborador'}</span>

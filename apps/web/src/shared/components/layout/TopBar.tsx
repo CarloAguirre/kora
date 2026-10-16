@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useAuth } from "@/modules/auth/hooks/useAuth";
 import { ROLE_LABELS } from "@kora/contracts";
-import { BellIcon, LogoutIcon, MenuIcon } from "../icons/Icons";
+import { LogoutIcon, MenuIcon } from "../icons/Icons";
+import { NotificationBell } from "@/modules/notifications/components/NotificationBell";
 import { ConfirmActionDialog } from "@/shared/components/ui/ConfirmActionDialog";
 import styles from "./TopBar.module.css";
 
@@ -34,13 +35,7 @@ export function TopBar({ title, onMenuToggle }: TopBarProps) {
 
       {user && (
         <div className={styles.userSection}>
-          <button
-            type="button"
-            className={styles.iconButton}
-            aria-label="Notificaciones"
-          >
-            <BellIcon size={20} />
-          </button>
+          <NotificationBell />
           <div className={styles.avatar} aria-hidden="true">
             {initials}
           </div>

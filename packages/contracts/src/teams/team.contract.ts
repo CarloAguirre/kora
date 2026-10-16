@@ -8,6 +8,7 @@ import {
   uuidSchema,
 } from '../common/primitives';
 import { userStatusSchema } from '../users/user.contract';
+import { projectStatusSchema } from '../projects/project.contract';
 
 /**
  * Contrato de equipos.
@@ -141,7 +142,10 @@ export type TeamAvailabilityQuery = z.infer<typeof teamAvailabilityQuerySchema>;
 
 export const teamAvailabilityDaySchema = z.object({
   date: z.string(),
+  /** HH aprobadas. */
   hours: z.number(),
+  /** HH enviadas que todavía esperan aprobación. */
+  pendingHours: z.number(),
 });
 export type TeamAvailabilityDay = z.infer<typeof teamAvailabilityDaySchema>;
 
@@ -158,3 +162,88 @@ export const teamAvailabilityResponseSchema = z.object({
   members: z.array(teamAvailabilityMemberSchema),
 });
 export type TeamAvailabilityResponse = z.infer<typeof teamAvailabilityResponseSchema>;
+
+/**
+ * "Reporte de equipo" del líder (`/equipos`) — una fila por proyecto con el que el equipo
+ * tiene relación (`project_teams`), con las HH de cada persona del equipo en el período y
+ * el acumulado hasta el fin del período. Las HH pendientes viajan aparte para que el
+ * cliente pueda sumarlas o no ("Incluir HH pendientes") sin volver a pedir el reporte.
+ */
+export const teamReportQuerySchema = z
+  .object({
+    dateFrom: z.iso.date(),
+    dateTo: z.iso.date(),
+  })
+  .refine((data) => data.dateFrom <= data.dateTo, {
+    message: 'La fecha "desde" no puede ser posterior a "hasta".',
+    path: ['dateTo'],
+  });
+export type TeamReportQuery = z.infer<typeof teamReportQuerySchema>;
+
+const teamReportPersonSchema = z.object({ id: uuidSchema, fullName: z.string() });
+
+export const teamReportMemberHoursSchema = z.object({
+  userId: uuidSchema,
+  /** HH dentro de [dateFrom, dateTo]. */
+  periodApproved: z.number(),
+  periodPending: z.number(),
+  /** HH desde el inicio del proyecto hasta `dateTo` — base de "Incurridas vs. Asignadas". */
+  accumulatedApproved: z.number(),
+  accumulatedPending: z.number(),
+});
+export type TeamReportMemberHours = z.infer<typeof teamReportMemberHoursSchema>;
+
+export const teamReportProjectSchema = z.object({
+  projectId: uuidSchema,
+  name: z.string(),
+  slug: z.string(),
+  client: z.object({ id: uuidSchema, companyName: z.string() }).nullable(),
+  status: projectStatusSchema,
+  startDate: z.string().nullable(),
+  endDate: z.string().nullable(),
+  /** `project_teams.assigned_hours` — HH asignadas al equipo. Las carga el Líder PM del proyecto. */
+  assignedHours: z.number().nullable(),
+  /** Responsable del equipo en este proyecto (`project_teams.leader_user_id`). */
+  responsible: teamReportPersonSchema.nullable(),
+  /** Líder PM del proyecto — quien carga fechas y HH asignadas. */
+  projectLeader: teamReportPersonSchema.nullable(),
+  hours: z.array(teamReportMemberHoursSchema),
+  /** Tareas de las fases del proyecto asignadas a este equipo, y cuántas ya están aprobadas (`done`). */
+  teamTasks: z.object({ total: z.number().int(), approved: z.number().int() }),
+  /** Alguna entrega a cliente de este equipo quedó aprobada. */
+  teamDeliveryApproved: z.boolean(),
+  comment: z.string().nullable(),
+  /** Cuándo se le pidió al Líder PM completar fechas/HH asignadas desde el reporte. `null` si nunca. */
+  dataRequestedAt: isoDateTimeSchema.nullable(),
+});
+export type TeamReportProject = z.infer<typeof teamReportProjectSchema>;
+
+export const teamReportResponseSchema = z.object({
+  teamId: uuidSchema,
+  teamName: z.string(),
+  dateFrom: z.string(),
+  dateTo: z.string(),
+  /** Columnas de "HH Incurridas": miembros activos del equipo (y su líder, si no figura como miembro). */
+  members: z.array(teamReportPersonSchema),
+  projects: z.array(teamReportProjectSchema),
+});
+export type TeamReportResponse = z.infer<typeof teamReportResponseSchema>;
+
+export const updateTeamReportCommentSchema = z.object({
+  comment: z.string().trim().max(2000),
+});
+export type UpdateTeamReportCommentInput = z.infer<typeof updateTeamReportCommentSchema>;
+
+/** "Pedir datos a los Líderes PM": proyectos del reporte cuyo Líder PM debe completar fechas o HH asignadas. */
+export const requestTeamReportDataSchema = z.object({
+  projectIds: z.array(uuidSchema).min(1).max(500),
+  note: z.string().trim().max(1000).optional(),
+});
+export type RequestTeamReportDataInput = z.infer<typeof requestTeamReportDataSchema>;
+
+export const requestTeamReportDataResponseSchema = z.object({
+  /** Líderes PM notificados (una notificación cada uno). */
+  notifiedLeaders: z.number().int(),
+  requestedProjects: z.number().int(),
+});
+export type RequestTeamReportDataResponse = z.infer<typeof requestTeamReportDataResponseSchema>;

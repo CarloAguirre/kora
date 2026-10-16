@@ -26,18 +26,19 @@
   gap: var(--kora-space-4);
 }
 
+/* Encabezado del grupo sobre el fondo blanco de la tarjeta, fuera de la tabla;
+   la tabla conserva el borde estándar de `DataTable` (Figma node 10306:163491). */
 .leaderGroup {
-  border: 1px solid var(--kora-border-strong);
-  border-radius: var(--kora-radius);
-  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-3);
 }
 
 .leaderHeader {
   display: flex;
   align-items: center;
   gap: var(--kora-space-3);
-  padding: var(--kora-space-3) var(--kora-space-4);
-  background: var(--kora-lime-surface);
+  padding: 0 var(--kora-space-4);
 }
 
 .leaderAvatar {

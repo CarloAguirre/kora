@@ -9,11 +9,6 @@
   align-self: flex-start;
 }
 
-.subtitle {
-  color: var(--kora-text-muted);
-  font-size: var(--kora-text-base);
-}
-
 .sectionTitle {
   margin: 0 0 var(--kora-space-3);
   color: var(--kora-navy);

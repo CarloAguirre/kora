@@ -76,7 +76,14 @@ export function ProjectDetailPage() {
    * equipo.
    */
   const isProjectLeader = user !== null && project.leader?.id === user.id;
-  const showTeamOnlyView = !can('projects:manage') && !isProjectLeader && Boolean(leaderTeam);
+  const isTeamLeaderOnly = !can('projects:manage') && !isProjectLeader && Boolean(leaderTeam);
+  /**
+   * Líder de un equipo asignado (sin liderar el proyecto): en desarrollo ve la
+   * ficha completa en modo consulta y entra a gestionar su equipo desde su
+   * tarjeta de "Equipos asignados" (`ProjectTeamDetailPage`). Soporte no tiene
+   * esa ficha de consulta, así que conserva la vista acotada a su equipo.
+   */
+  const showTeamOnlyView = isTeamLeaderOnly && project.type === 'support';
   /** Sin `projects:manage`, el líder de ESTE proyecto también puede editarlo y cambiar su estado. */
   const canManageProject = can('projects:manage') || isProjectLeader;
   const onEdit = canManageProject ? () => setEditing(true) : undefined;
@@ -127,7 +134,12 @@ export function ProjectDetailPage() {
         ) : project.type === 'support' ? (
           <SupportProjectDetailView project={project} projectId={projectId} onEdit={onEdit} />
         ) : (
-          <DevelopmentProjectDetailView project={project} projectId={projectId} onEdit={onEdit} />
+          <DevelopmentProjectDetailView
+            project={project}
+            projectId={projectId}
+            onEdit={onEdit}
+            readOnlyTeamIds={isTeamLeaderOnly ? new Set(ledTeams.map((t) => t.teamId)) : undefined}
+          />
         )}
 
         <EditProjectDialog

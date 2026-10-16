@@ -87,15 +87,16 @@ export interface TeamRepository {
   ): Promise<{ id: string; name: string } | null>;
 
   /**
-   * Horas aprobadas por miembro activo del equipo y día, dentro de un rango —
-   * alimenta el heatmap de "Disponibilidad". Solo días con horas > 0 aparecen.
+   * Horas aprobadas y pendientes de aprobación por miembro activo del equipo y
+   * día, dentro de un rango — alimenta el heatmap de "Horas pendientes de
+   * aprobación". Solo días con horas > 0 aparecen.
    */
-  getApprovedHoursByMemberAndDate(
+  getHoursByMemberAndDate(
     teamId: string,
     dateFrom: Date,
     dateTo: Date,
     context?: TransactionContext,
-  ): Promise<Array<{ teamMemberId: string; date: string; hours: number }>>;
+  ): Promise<Array<{ teamMemberId: string; date: string; approvedHours: number; pendingHours: number }>>;
 }
 
 export const TEAM_REPOSITORY = Symbol('TeamRepository');

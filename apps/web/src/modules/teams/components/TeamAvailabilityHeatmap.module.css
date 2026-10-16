@@ -12,6 +12,33 @@
   flex-wrap: wrap;
 }
 
+.legend {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-4);
+  flex-wrap: wrap;
+  margin: 0 auto 0 0;
+  padding: 0;
+  /* Al ras del toggle y del selector de período (no del rótulo "Período" de arriba). */
+  min-height: var(--kora-field-height);
+  list-style: none;
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-xs);
+}
+
+.legendSwatch {
+  width: 16px;
+  height: 12px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+}
+
 .toggle {
   display: inline-flex;
   align-items: stretch;
@@ -124,6 +151,13 @@
   background: var(--kora-lime-surface);
   color: var(--kora-lime-dark);
   border-color: var(--kora-lime-hover);
+}
+
+.chipPending {
+  background: rgba(84, 170, 217, 0.25);
+  color: #54aad9;
+  border-color: rgba(84, 170, 217, 0.75);
+  font-weight: var(--kora-weight-bold);
 }
 
 .skeletonBar {

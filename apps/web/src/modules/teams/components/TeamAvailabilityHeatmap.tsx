@@ -15,6 +15,14 @@ interface Column {
   readonly dates: readonly string[];
 }
 
+/** Leyenda de colores de las celdas — mismo orden de prioridad que `chipClass`. */
+const LEGEND = [
+  { className: styles.chipPending, label: 'Pendientes de aprobación' },
+  { className: styles.chipEmpty, label: 'Sin horas' },
+  { className: styles.chipLow, label: 'Menos de 8 h' },
+  { className: styles.chipFull, label: '8 h o más' },
+];
+
 function addDays(iso: string, amount: number): string {
   const date = new Date(`${iso}T00:00:00.000Z`);
   date.setUTCDate(date.getUTCDate() + amount);
@@ -42,7 +50,11 @@ function buildWeeklyColumns(startWeek: LaborWeek, count: number): Column[] {
   });
 }
 
-function chipClass(hours: number) {
+const formatHours = (hours: number) => `${hours.toLocaleString('es-CL', { maximumFractionDigits: 1 })}h`;
+
+/** Con horas enviadas sin aprobar la celda va en azul (Figma node 10306:163467), sin importar cuánto haya aprobado. */
+function chipClass(hours: number, pendingHours: number) {
+  if (pendingHours > 0) return styles.chipPending;
   if (hours <= 0) return styles.chipEmpty;
   if (hours < 8) return styles.chipLow;
   return styles.chipFull;
@@ -50,8 +62,9 @@ function chipClass(hours: number) {
 
 /**
  * Heatmap "Disponibilidad" — réplica de la sección homónima de `LiderEquipos`
- * (v1): horas aprobadas por colaborador y día/semana en un rango, a color
- * según carga. A diferencia del forecast (`/forecast`), que es capacidad
+ * (v1): horas por colaborador y día/semana en un rango, a color según carga.
+ * Las celdas con horas enviadas que esperan aprobación van en azul y suman
+ * aprobadas + pendientes (el desglose, en el tooltip). A diferencia del forecast (`/forecast`), que es capacidad
  * planificada a futuro, esto muestra trabajo ya realizado y aprobado.
  *
  * En la v1 vive en la misma pantalla que la cola de aprobación de HH del
@@ -73,9 +86,9 @@ export function TeamAvailabilityHeatmap({ teamId, teamMemberId }: { teamId: stri
   const { data, isLoading } = useTeamAvailability(teamId, { dateFrom, dateTo });
 
   const hoursByMemberAndDate = useMemo(() => {
-    const map = new Map<string, Map<string, number>>();
+    const map = new Map<string, Map<string, { hours: number; pendingHours: number }>>();
     for (const member of data?.members ?? []) {
-      map.set(member.teamMemberId, new Map(member.days.map((day) => [day.date, day.hours])));
+      map.set(member.teamMemberId, new Map(member.days.map((day) => [day.date, day])));
     }
     return map;
   }, [data]);
@@ -85,6 +98,14 @@ export function TeamAvailabilityHeatmap({ teamId, teamMemberId }: { teamId: stri
   return (
     <div className={styles.wrapper}>
       <div className={styles.controls}>
+        <ul className={styles.legend} aria-label="Colores">
+          {LEGEND.map((item) => (
+            <li key={item.label} className={styles.legendItem}>
+              <span className={[styles.legendSwatch, item.className].join(' ')} aria-hidden="true" />
+              {item.label}
+            </li>
+          ))}
+        </ul>
         <div className={styles.toggle} role="group" aria-label="Vista de disponibilidad">
           {(['daily', 'weekly'] as const).map((mode) => (
             <button
@@ -150,15 +171,21 @@ export function TeamAvailabilityHeatmap({ teamId, teamMemberId }: { teamId: stri
                         <span>{member.fullName}</span>
                       </td>
                       {columns.map((column) => {
-                        const hours = column.dates.reduce((sum, date) => sum + (byDate?.get(date) ?? 0), 0);
+                        const hours = column.dates.reduce((sum, date) => sum + (byDate?.get(date)?.hours ?? 0), 0);
+                        const pendingHours = column.dates.reduce((sum, date) => sum + (byDate?.get(date)?.pendingHours ?? 0), 0);
+                        const detail =
+                          pendingHours > 0
+                            ? `${formatHours(pendingHours)} pendientes de aprobación${hours > 0 ? ` · ${formatHours(hours)} aprobadas` : ''}`
+                            : `${formatHours(hours)} aprobadas`;
                         return (
                           <td key={column.key} className={styles.cell}>
                             <span
-                              className={[styles.chip, chipClass(hours)].join(' ')}
+                              className={[styles.chip, chipClass(hours, pendingHours)].join(' ')}
                               role="status"
-                              aria-label={`${member.fullName} ${column.label}: ${hours} horas`}
+                              title={detail}
+                              aria-label={`${member.fullName} ${column.label}: ${detail}`}
                             >
-                              {hours.toLocaleString('es-CL', { maximumFractionDigits: 1 })}h
+                              {formatHours(hours + pendingHours)}
                             </span>
                           </td>
                         );

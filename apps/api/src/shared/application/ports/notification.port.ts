@@ -96,6 +96,25 @@ export interface PendingHoursDigestNotification {
   readonly items: readonly PendingHoursDigestItem[];
 }
 
+/**
+ * Correo de respaldo de "Pedir datos a los Líderes PM" (Reporte de equipo): sale
+ * cuando el Líder PM no abrió la notificación en Kora dentro de 48 h.
+ */
+export interface TeamReportDataRequestEmail {
+  readonly recipientEmail: string;
+  readonly recipientFirstName: string;
+  readonly requestedByName: string;
+  readonly teamName: string;
+  readonly note: string | null;
+  readonly items: ReadonlyArray<{
+    readonly projectSlug: string;
+    readonly projectName: string;
+    readonly clientName: string | null;
+    /** Ya redactado: "sin fechas", "sin HH asignadas y sin fechas". */
+    readonly missing: string;
+  }>;
+}
+
 export interface NotificationSender {
   sendUserInvitation(invitation: UserInvitation): Promise<void>;
   sendPasswordReset(notification: PasswordResetNotification): Promise<void>;
@@ -106,6 +125,7 @@ export interface NotificationSender {
   sendProjectPaymentMilestoneReady(notification: ProjectPaymentMilestoneReadyNotification): Promise<void>;
   sendMissingHoursReminder(notification: MissingHoursReminderNotification): Promise<void>;
   sendPendingHoursDigest(notification: PendingHoursDigestNotification): Promise<void>;
+  sendTeamReportDataRequest(notification: TeamReportDataRequestEmail): Promise<void>;
 }
 
 export const NOTIFICATION_SENDER = Symbol('NotificationSender');

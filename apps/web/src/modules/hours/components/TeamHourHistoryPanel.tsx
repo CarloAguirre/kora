@@ -15,7 +15,7 @@ import { Select } from '@/shared/components/ui/Select';
 import { TextField } from '@/shared/components/ui/TextField';
 import { Badge } from '@/shared/components/ui/Badge';
 import { useToast } from '@/shared/components/ui/Toast';
-import { PlusIcon, PencilIcon, TrashIcon, EyeIcon, DownloadIcon, SearchIcon } from '@/shared/components/icons/Icons';
+import { PencilIcon, TrashIcon, EyeIcon, DownloadIcon, SearchIcon } from '@/shared/components/icons/Icons';
 import { HourEntryStatusBadge } from './HourEntryStatusBadge';
 import { HourEntryFormDialog } from './HourEntryFormDialog';
 import { useDeleteHourEntry, useHourEntriesList } from '../api/hours.queries';
@@ -31,8 +31,8 @@ type DialogState = { kind: 'none' } | { kind: 'view' | 'edit'; entry: HourEntryS
 
 /**
  * "Registro de horas Líder" — réplica del card homónimo de `LiderDashboardB`
- * (v1): botón para que el líder registre sus propias horas, y debajo el
- * historial de TODO el equipo (no solo el propio) con filtro por persona,
+ * (v1), sin el botón "Registrar horas" que tenía allá (se sacó por diseño):
+ * el historial de TODO el equipo (no solo el propio) con filtro por persona,
  * fecha y estado. La visibilidad viene gratis del alcance `hours:read_team`
  * ya resuelto en el backend (propias + del equipo liderado).
  *
@@ -175,7 +175,7 @@ export function TeamHourHistoryPanel({ teamId, userId }: { teamId?: string; user
   return (
     <div className={styles.wrapper}>
       <div className={styles.header}>
-        <p className={styles.subtitle}>{data ? `${data.total} registro${data.total === 1 ? '' : 's'}` : ' '}</p>
+        <h2 className={styles.title}>Historial Reciente</h2>
         <div className={styles.headerActions}>
           <Button
             variant="outlineDark"
@@ -186,9 +186,6 @@ export function TeamHourHistoryPanel({ teamId, userId }: { teamId?: string; user
           >
             Descargar registro de horas
           </Button>
-          <Button iconLeft={<PlusIcon size={18} />} onClick={() => setDialog({ kind: 'edit', entry: null })}>
-            Registrar horas
-          </Button>
         </div>
       </div>
 
@@ -197,8 +194,6 @@ export function TeamHourHistoryPanel({ teamId, userId }: { teamId?: string; user
           {exportError}
         </p>
       )}
-
-      <h3 className={styles.sectionTitle}>Historial Reciente</h3>
 
       <div className={styles.filters}>
         <TextField

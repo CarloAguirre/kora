@@ -35,6 +35,10 @@
   box-shadow: 0 4px 14px rgb(22 38 77 / 0.1);
 }
 
+.teamCardStatic:hover {
+  box-shadow: none;
+}
+
 .teamCard:focus-visible {
   outline: 2px solid var(--kora-blue-600);
   outline-offset: 2px;

@@ -11,6 +11,7 @@ import type {
   ProjectInvoiceBlockedNotification,
   ProjectPaymentMilestoneReadyNotification,
   ProjectReactivatedFromHoldNotification,
+  TeamReportDataRequestEmail,
   UserInvitation,
 } from '../../application/ports/notification.port';
 import {
@@ -22,6 +23,7 @@ import {
   renderProjectInvoiceBlocked,
   renderProjectPaymentMilestoneReady,
   renderProjectReactivatedFromHold,
+  renderTeamReportDataRequest,
   renderUserInvitation,
   type RenderedEmail,
 } from './email-templates';
@@ -114,6 +116,14 @@ export class ResendNotificationSender implements NotificationSender {
       'pending_hours_digest',
       notification.recipientEmail,
       renderPendingHoursDigest(notification, this.settings.webAppUrl),
+    );
+  }
+
+  sendTeamReportDataRequest(notification: TeamReportDataRequestEmail): Promise<void> {
+    return this.deliver(
+      'team_report_data_request',
+      notification.recipientEmail,
+      renderTeamReportDataRequest(notification, this.settings.webAppUrl),
     );
   }
 

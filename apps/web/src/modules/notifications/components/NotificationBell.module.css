@@ -1,0 +1,169 @@
+.container {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.bellButton {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--kora-navy);
+  cursor: pointer;
+  transition: background var(--kora-transition);
+}
+
+.bellButton:hover,
+.bellButton[aria-expanded='true'] {
+  background: var(--kora-surface-alt);
+}
+
+.badge {
+  position: absolute;
+  top: 4px;
+  right: 3px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border: 2px solid var(--kora-surface);
+  border-radius: var(--kora-radius-pill);
+  background: var(--kora-danger);
+  color: var(--kora-surface);
+  font-size: 10px;
+  font-weight: var(--kora-weight-bold);
+  line-height: 13px;
+  text-align: center;
+}
+
+.panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  /* Por encima de barras `sticky` del contenido (p. ej. `TeamContextBar`, z-sticky) y por debajo de los modales. */
+  z-index: var(--kora-z-overlay);
+  display: flex;
+  flex-direction: column;
+  width: 380px;
+  max-width: calc(100vw - 32px);
+  max-height: min(560px, calc(100vh - 120px));
+  border: 1px solid var(--kora-border-subtle);
+  border-radius: var(--kora-radius-table);
+  background: var(--kora-surface);
+  box-shadow: var(--kora-shadow-lg);
+  overflow: hidden;
+}
+
+.panelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kora-space-3);
+  padding: var(--kora-space-3) var(--kora-space-4);
+  border-bottom: 1px solid var(--kora-border-subtle);
+}
+
+.panelTitle {
+  color: var(--kora-navy);
+  font-size: var(--kora-text-base);
+  font-weight: var(--kora-weight-bold);
+}
+
+.linkButton {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--kora-blue-700);
+  font: inherit;
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-semibold);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.empty {
+  margin: 0;
+  padding: var(--kora-space-8) var(--kora-space-4);
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-sm);
+  text-align: center;
+}
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+}
+
+.item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--kora-space-3) var(--kora-space-4);
+  border-bottom: 1px solid var(--kora-border-subtle);
+  cursor: default;
+}
+
+.item:last-child {
+  border-bottom: none;
+}
+
+.itemUnread {
+  background: var(--kora-blue-surface-alt);
+}
+
+.itemHeader {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--kora-space-2);
+}
+
+.unreadDot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: var(--kora-blue-link);
+}
+
+.itemTitle {
+  color: var(--kora-navy);
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-semibold);
+  line-height: 1.4;
+}
+
+.itemTime {
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-2xs);
+}
+
+.projects {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-xs);
+  line-height: 1.55;
+}
+
+.projectLink {
+  color: var(--kora-navy);
+  text-decoration: underline;
+}
+
+.missing {
+  font-weight: var(--kora-weight-semibold);
+}
+
+.note {
+  margin: 4px 0 0;
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-xs);
+  font-style: italic;
+}

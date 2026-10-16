@@ -35,6 +35,7 @@ import { HEALTH_PROBES } from './shared/application/ports/health-probe.port';
 import { UsersModule } from './modules/users/users.module';
 import { ClientsModule } from './modules/clients/clients.module';
 import { TeamsModule } from './modules/teams/teams.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 import { ProjectsModule } from './modules/projects/projects.module';
 import { HoursModule } from './modules/hours/hours.module';
 import { TicketsModule } from './modules/tickets/tickets.module';
@@ -130,6 +131,7 @@ export class SharedModule {}
     SessionsModule,
     UsersModule,
     AuthModule,
+    NotificationsModule,
     TeamsModule,
     ProjectsModule,
     ClientsModule,

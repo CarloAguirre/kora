@@ -8,6 +8,7 @@ import {
   gte,
   hourEntries,
   ilike,
+  inArray,
   isNull,
   isUuid,
   lte,
@@ -253,25 +254,26 @@ export class DrizzleTeamRepository implements TeamRepository {
     return rows[0] ?? null;
   }
 
-  async getApprovedHoursByMemberAndDate(
+  async getHoursByMemberAndDate(
     teamId: string,
     dateFrom: Date,
     dateTo: Date,
     context?: TransactionContext,
-  ): Promise<Array<{ teamMemberId: string; date: string; hours: number }>> {
+  ): Promise<Array<{ teamMemberId: string; date: string; approvedHours: number; pendingHours: number }>> {
     const db = resolveDb(this.database, context);
     const rows = await db
       .select({
         teamMemberId: teamMembers.id,
         date: hourEntries.date,
-        hours: sql<string>`sum(${hourEntries.hours})`,
+        approvedHours: sql<string>`coalesce(sum(${hourEntries.hours}) filter (where ${hourEntries.status} = 'approved'), 0)`,
+        pendingHours: sql<string>`coalesce(sum(${hourEntries.hours}) filter (where ${hourEntries.status} = 'pending'), 0)`,
       })
       .from(teamMembers)
       .innerJoin(
         hourEntries,
         and(
           eq(hourEntries.userId, teamMembers.userId),
-          eq(hourEntries.status, 'approved'),
+          inArray(hourEntries.status, ['approved', 'pending']),
           gte(hourEntries.date, dateFrom),
           lte(hourEntries.date, dateTo),
         ),
@@ -282,7 +284,8 @@ export class DrizzleTeamRepository implements TeamRepository {
     return rows.map((row) => ({
       teamMemberId: row.teamMemberId,
       date: row.date.toISOString().slice(0, 10),
-      hours: Number(row.hours),
+      approvedHours: Number(row.approvedHours),
+      pendingHours: Number(row.pendingHours),
     }));
   }
 

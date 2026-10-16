@@ -1,11 +1,14 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
 import {
   addTeamMemberSchema,
   createTeamSchema,
   createTeamTypeSchema,
   listTeamsQuerySchema,
   teamAvailabilityQuerySchema,
+  requestTeamReportDataSchema,
+  teamReportQuerySchema,
   updateTeamMemberSchema,
+  updateTeamReportCommentSchema,
   updateTeamSchema,
   type AddTeamMemberInput,
   type CreateTeamInput,
@@ -14,10 +17,15 @@ import {
   type ListTeamsQuery,
   type ListTeamsResponse,
   type ListTeamTypesResponse,
+  type RequestTeamReportDataInput,
+  type RequestTeamReportDataResponse,
   type TeamAvailabilityQuery,
   type TeamAvailabilityResponse,
   type TeamDetail,
+  type TeamReportQuery,
+  type TeamReportResponse,
   type UpdateTeamInput,
+  type UpdateTeamReportCommentInput,
   type UpdateTeamMemberInput,
 } from '@kora/contracts';
 import { ZodValidationPipe } from '../../../shared/presentation/pipes/zod-validation.pipe';
@@ -37,6 +45,9 @@ import { UpdateTeamMemberUseCase } from '../application/use-cases/update-team-me
 import { ListTeamMemberOptionsUseCase } from '../application/use-cases/list-team-member-options.use-case';
 import { ListTeamTypesUseCase } from '../application/use-cases/list-team-types.use-case';
 import { CreateTeamTypeUseCase } from '../application/use-cases/create-team-type.use-case';
+import { GetTeamReportUseCase } from '../application/use-cases/get-team-report.use-case';
+import { UpdateTeamReportCommentUseCase } from '../application/use-cases/update-team-report-comment.use-case';
+import { RequestTeamReportDataUseCase } from '../application/use-cases/request-team-report-data.use-case';
 
 @Controller('teams')
 export class TeamsController {
@@ -53,6 +64,9 @@ export class TeamsController {
     private readonly listMemberOptions: ListTeamMemberOptionsUseCase,
     private readonly listTeamTypes: ListTeamTypesUseCase,
     private readonly createTeamType: CreateTeamTypeUseCase,
+    private readonly getTeamReport: GetTeamReportUseCase,
+    private readonly updateTeamReportComment: UpdateTeamReportCommentUseCase,
+    private readonly requestTeamReportData: RequestTeamReportDataUseCase,
   ) {}
 
   /**
@@ -109,6 +123,64 @@ export class TeamsController {
   ): Promise<TeamAvailabilityResponse> {
     return unwrapOrThrow(
       await this.getTeamAvailability.execute({ teamId: id, dateFrom: query.dateFrom, dateTo: query.dateTo }),
+    );
+  }
+
+  /** "Reporte de equipo" del líder: HH del equipo por proyecto y persona en el período. */
+  @Get(':id/report')
+  @RequirePermissions('teams:read')
+  async report(
+    @Param('id') id: string,
+    @Query(new ZodValidationPipe(teamReportQuerySchema)) query: TeamReportQuery,
+    @CurrentUser() actor: RequestUser,
+  ): Promise<TeamReportResponse> {
+    return unwrapOrThrow(
+      await this.getTeamReport.execute({
+        teamId: id,
+        dateFrom: query.dateFrom,
+        dateTo: query.dateTo,
+        actor: toActorContext(actor),
+        actorPermissions: actor.permissions,
+      }),
+    );
+  }
+
+  /** "Pedir datos a los Líderes PM": una notificación por Líder PM con los proyectos que le faltan datos. */
+  @Post(':id/report/data-requests')
+  @RequirePermissions('teams:read')
+  async reportDataRequest(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(requestTeamReportDataSchema)) body: RequestTeamReportDataInput,
+    @CurrentUser() actor: RequestUser,
+  ): Promise<RequestTeamReportDataResponse> {
+    return unwrapOrThrow(
+      await this.requestTeamReportData.execute({
+        teamId: id,
+        projectIds: body.projectIds,
+        note: body.note,
+        actor: toActorContext(actor),
+        actorPermissions: actor.permissions,
+      }),
+    );
+  }
+
+  @Patch(':id/report/projects/:projectId/comment')
+  @RequirePermissions('teams:read')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async reportComment(
+    @Param('id') id: string,
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Body(new ZodValidationPipe(updateTeamReportCommentSchema)) body: UpdateTeamReportCommentInput,
+    @CurrentUser() actor: RequestUser,
+  ): Promise<void> {
+    unwrapOrThrow(
+      await this.updateTeamReportComment.execute({
+        teamId: id,
+        projectId,
+        comment: body.comment,
+        actor: toActorContext(actor),
+        actorPermissions: actor.permissions,
+      }),
     );
   }
 

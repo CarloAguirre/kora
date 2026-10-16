@@ -227,6 +227,10 @@ export const projectTeams = pgTable(
     assignedHours: numeric('assigned_hours', { precision: 10, scale: 2 }),
     /** Conteo de colaboradores del equipo en este proyecto — no personas nombradas, ver `projectTeamMembers` para eso. */
     memberCount: integer('member_count'),
+    /** Comentario del líder del equipo sobre este proyecto en el "Reporte de equipo" (`/equipos`). */
+    reportComment: text('report_comment'),
+    /** Última vez que el líder del equipo pidió al Líder PM completar fechas/HH asignadas desde el reporte. */
+    dataRequestedAt: timestamp('data_requested_at', { withTimezone: true, mode: 'date' }),
     ...timestamps,
   },
   (table) => [

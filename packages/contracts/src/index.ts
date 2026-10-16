@@ -4,6 +4,7 @@ export * from './users/user.contract';
 export * from './auth/auth.contract';
 export * from './clients/client.contract';
 export * from './teams/team.contract';
+export * from './notifications/notification.contract';
 export * from './projects/project.contract';
 export * from './hours/hour-entry.contract';
 export * from './tickets/ticket.contract';

@@ -4,30 +4,3 @@
   gap: var(--kora-space-4);
   width: 100%;
 }
-
-.title {
-  margin: 0 0 var(--kora-space-3);
-  color: var(--kora-navy);
-  font-size: var(--kora-text-lg);
-  font-weight: var(--kora-weight-bold);
-}
-
-.search {
-  max-width: 360px;
-  margin: var(--kora-space-3) 0;
-}
-
-.link {
-  color: var(--kora-navy);
-  font-weight: var(--kora-weight-semibold);
-  text-decoration: underline;
-}
-
-.empty {
-  color: var(--kora-text-disabled);
-}
-
-.deviated {
-  color: var(--kora-warning-text);
-  font-weight: var(--kora-weight-bold);
-}

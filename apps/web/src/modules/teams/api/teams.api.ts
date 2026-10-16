@@ -6,9 +6,13 @@ import type {
   ListTeamsQuery,
   ListTeamsResponse,
   ListTeamTypesResponse,
+  RequestTeamReportDataInput,
+  RequestTeamReportDataResponse,
   TeamAvailabilityQuery,
   TeamAvailabilityResponse,
   TeamDetail,
+  TeamReportQuery,
+  TeamReportResponse,
   UpdateTeamInput,
   UpdateTeamMemberInput,
 } from '@kora/contracts';
@@ -37,6 +41,15 @@ export const teamsApi = {
       dateFrom: query.dateFrom,
       dateTo: query.dateTo,
     });
+  },
+  report(teamId: string, query: TeamReportQuery): Promise<TeamReportResponse> {
+    return api.get<TeamReportResponse>(`/teams/${teamId}/report`, { dateFrom: query.dateFrom, dateTo: query.dateTo });
+  },
+  updateReportComment(teamId: string, projectId: string, comment: string): Promise<void> {
+    return api.patch<void>(`/teams/${teamId}/report/projects/${projectId}/comment`, { comment });
+  },
+  requestReportData(teamId: string, input: RequestTeamReportDataInput): Promise<RequestTeamReportDataResponse> {
+    return api.post<RequestTeamReportDataResponse>(`/teams/${teamId}/report/data-requests`, input);
   },
   create(input: CreateTeamInput): Promise<{ id: string }> {
     return api.post<{ id: string }>('/teams', input);
@@ -76,5 +89,7 @@ export const teamKeys = {
   memberOptions: () => [...teamKeys.all, 'member-options'] as const,
   availability: (teamId: string, query: TeamAvailabilityQuery) =>
     [...teamKeys.all, 'availability', teamId, query] as const,
+  reports: (teamId: string) => [...teamKeys.all, 'report', teamId] as const,
+  report: (teamId: string, query: TeamReportQuery) => [...teamKeys.reports(teamId), query] as const,
   types: () => [...teamKeys.all, 'types'] as const,
 };

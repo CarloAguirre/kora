@@ -27,7 +27,7 @@ function enumerateDates(dateFrom: string, dateTo: string): string[] {
 }
 
 /**
- * Heatmap "Disponibilidad" — horas aprobadas por miembro y día en un rango.
+ * Heatmap de `/horas/aprobaciones` — horas aprobadas y pendientes de aprobación por miembro y día en un rango.
  * A diferencia del forecast (M6), refleja trabajo ya realizado, no planificado.
  */
 @Injectable()
@@ -47,13 +47,13 @@ export class GetTeamAvailabilityUseCase
     const dates = enumerateDates(dateFrom, dateTo);
     const [activeMembers, hoursByMemberAndDate] = await Promise.all([
       this.members.listActiveForTeam(team.id),
-      this.teams.getApprovedHoursByMemberAndDate(team.id, new Date(`${dateFrom}T00:00:00.000Z`), new Date(`${dateTo}T00:00:00.000Z`)),
+      this.teams.getHoursByMemberAndDate(team.id, new Date(`${dateFrom}T00:00:00.000Z`), new Date(`${dateTo}T00:00:00.000Z`)),
     ]);
 
-    const hoursByMemberId = new Map<string, Map<string, number>>();
+    const hoursByMemberId = new Map<string, Map<string, { approved: number; pending: number }>>();
     for (const row of hoursByMemberAndDate) {
-      const byDate = hoursByMemberId.get(row.teamMemberId) ?? new Map<string, number>();
-      byDate.set(row.date, row.hours);
+      const byDate = hoursByMemberId.get(row.teamMemberId) ?? new Map<string, { approved: number; pending: number }>();
+      byDate.set(row.date, { approved: row.approvedHours, pending: row.pendingHours });
       hoursByMemberId.set(row.teamMemberId, byDate);
     }
 
@@ -65,7 +65,11 @@ export class GetTeamAvailabilityUseCase
           teamMemberId: member.id,
           fullName: member.userFullName,
           weeklyHours: Number(member.weeklyHours),
-          days: dates.map((date) => ({ date, hours: byDate?.get(date) ?? 0 })),
+          days: dates.map((date) => ({
+            date,
+            hours: byDate?.get(date)?.approved ?? 0,
+            pendingHours: byDate?.get(date)?.pending ?? 0,
+          })),
         };
       }),
     });

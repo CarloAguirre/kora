@@ -4,7 +4,10 @@ import type {
   CreateTeamInput,
   CreateTeamTypeInput,
   ListTeamsQuery,
+  RequestTeamReportDataInput,
   TeamAvailabilityQuery,
+  TeamReportQuery,
+  TeamReportResponse,
   UpdateTeamInput,
   UpdateTeamMemberInput,
 } from '@kora/contracts';
@@ -42,6 +45,49 @@ export function useTeamAvailability(teamId: string | null, query: TeamAvailabili
     queryFn: () => teamsApi.availability(teamId as string, query),
     enabled: Boolean(teamId),
     placeholderData: (previous) => previous,
+  });
+}
+
+export function useTeamReport(teamId: string | null, query: TeamReportQuery) {
+  return useQuery({
+    queryKey: teamKeys.report(teamId ?? '', query),
+    queryFn: () => teamsApi.report(teamId as string, query),
+    enabled: Boolean(teamId),
+    placeholderData: (previous) => previous,
+  });
+}
+
+/**
+ * Guarda el comentario de un proyecto en el reporte. Actualiza en el lugar las copias en
+ * caché del reporte de ese equipo (todos los períodos) en vez de volver a pedirlo: el
+ * comentario no afecta ningún cálculo.
+ */
+export function useUpdateTeamReportComment(teamId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ projectId, comment }: { projectId: string; comment: string }) =>
+      teamsApi.updateReportComment(teamId, projectId, comment),
+    onSuccess: (_data, { projectId, comment }) => {
+      queryClient.setQueriesData<TeamReportResponse>({ queryKey: teamKeys.reports(teamId) }, (report) =>
+        report
+          ? {
+              ...report,
+              projects: report.projects.map((project) =>
+                project.projectId === projectId ? { ...project, comment: comment.trim() || null } : project,
+              ),
+            }
+          : report,
+      );
+    },
+  });
+}
+
+/** "Pedir datos a los Líderes PM" — al volver, el reporte se recarga para mostrar las marcas "Solicitada". */
+export function useRequestTeamReportData(teamId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: RequestTeamReportDataInput) => teamsApi.requestReportData(teamId, input),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: teamKeys.reports(teamId) }),
   });
 }
 

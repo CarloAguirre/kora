@@ -1,0 +1,117 @@
+.channel {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid #d6e6fb;
+  border-radius: var(--kora-radius-input);
+  background: #f8fbff;
+  color: var(--kora-blue-700);
+  font-size: var(--kora-text-sm);
+  line-height: 1.5;
+}
+
+.channel p {
+  margin: 0;
+}
+
+.channelIcon {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: #e5a00d;
+}
+
+.lead {
+  margin: 0;
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-sm);
+  line-height: 1.5;
+}
+
+.leaders {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.leader {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--kora-border-subtle);
+  border-radius: var(--kora-radius-table);
+  cursor: pointer;
+}
+
+.leader input {
+  width: 16px;
+  height: 16px;
+  margin: 3px 0 0;
+  accent-color: var(--kora-navy);
+}
+
+.leaderBody {
+  flex: 1;
+  min-width: 0;
+  color: var(--kora-navy);
+  font-size: var(--kora-text-sm);
+}
+
+.count {
+  color: var(--kora-text-disabled);
+  font-weight: var(--kora-weight-regular);
+}
+
+.items {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-sm);
+  line-height: 1.55;
+}
+
+.missing {
+  font-weight: var(--kora-weight-semibold);
+}
+
+.linkButton {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--kora-blue-700);
+  font: inherit;
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-semibold);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.noteField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-2);
+}
+
+.noteLabel {
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-semibold);
+}
+
+.textarea {
+  min-height: 64px;
+  padding: 10px 12px;
+  border: 1px solid var(--kora-border-soft);
+  border-radius: var(--kora-radius-input);
+  font-family: inherit;
+  font-size: var(--kora-text-sm);
+  color: var(--kora-navy);
+  resize: vertical;
+}
+
+.textarea:focus {
+  outline: none;
+  border-color: var(--kora-blue-400);
+  box-shadow: 0 0 0 3px rgba(141, 173, 217, 0.25);
+}

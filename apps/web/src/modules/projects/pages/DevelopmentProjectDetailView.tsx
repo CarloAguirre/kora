@@ -45,12 +45,20 @@ export function DevelopmentProjectDetailView({
   project,
   projectId,
   onEdit,
+  readOnlyTeamIds,
 }: {
   project: ProjectDetail;
   projectId: string;
   /** Abre "Editar proyecto" — sin él (quien no puede editar) no se muestra el lápiz. */
   onEdit?: () => void;
+  /**
+   * Vista de consulta para un líder de equipo que no lidera el proyecto: ve la
+   * ficha completa sin editar nada (sin Extras, Roadmap de solo lectura) y solo
+   * entra a gestionar los equipos que lidera — estos ids.
+   */
+  readOnlyTeamIds?: ReadonlySet<string>;
 }) {
+  const readOnly = readOnlyTeamIds !== undefined;
   const { can, canAny } = usePermissions();
   const { user } = useAuth();
   const toast = useToast();
@@ -185,7 +193,7 @@ export function DevelopmentProjectDetailView({
    * que el backend en `UpdateProjectUseCase` y afines.
    */
   const canManageProject =
-    can("projects:manage") || (user !== null && project.leader?.id === user.id);
+    !readOnly && (can("projects:manage") || (user !== null && project.leader?.id === user.id));
 
   /**
    * Mismo criterio que `GetProjectPendingApprovalsUseCase` en el backend: el
@@ -319,7 +327,7 @@ export function DevelopmentProjectDetailView({
 
       <div className={styles.tabsShell}>
         <div className={styles.tabsShellBar}>
-          {DETAIL_TABS.map((tabDef) => (
+          {DETAIL_TABS.filter((tabDef) => !readOnly || tabDef.id !== "extras").map((tabDef) => (
             <button
               key={tabDef.id}
               type="button"
@@ -344,6 +352,7 @@ export function DevelopmentProjectDetailView({
                   project={project}
                   teams={teamSummaries}
                   onViewHours={() => setTab("bitacora")}
+                  canOpenTeam={readOnlyTeamIds ? (teamId) => readOnlyTeamIds.has(teamId) : undefined}
                 />
               </div>
 
@@ -391,7 +400,7 @@ export function DevelopmentProjectDetailView({
             />
           )}
 
-          {tab === "extras" && (
+          {tab === "extras" && !readOnly && (
             <ProjectExtrasTab project={project} canManage={canManageExtras} />
           )}
         </div>

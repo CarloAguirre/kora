@@ -49,10 +49,13 @@ export function AssignedTeamsCard({
   project,
   teams,
   onViewHours,
+  canOpenTeam = () => true,
 }: {
   project: { id: string; slug?: string | null };
   teams: readonly AssignedTeamSummary[];
   onViewHours: () => void;
+  /** Qué tarjetas llevan a la ficha del equipo — un líder de equipo solo entra a gestionar el suyo; el resto queda informativo. */
+  canOpenTeam?: (teamId: string) => boolean;
 }) {
   return (
     <Card>
@@ -68,13 +71,8 @@ export function AssignedTeamsCard({
           {teams.map((team) => {
             const style = getTeamStyle(team.teamName);
             const health = getTeamHealth(team.assignedHours, team.consumedHours);
-            return (
-              <Link
-                key={team.teamId}
-                to={projectTeamPath(project, { id: team.teamId, slug: team.teamSlug })}
-                className={styles.teamCard}
-                style={{ background: style.bg }}
-              >
+            const content = (
+              <>
                 <span className="srOnly">Equipo {team.teamName}</span>
                 <div className={styles.head}>
                   <span className={styles.avatar} style={{ background: style.color }} title={team.teamName}>
@@ -96,7 +94,21 @@ export function AssignedTeamsCard({
                   </div>
                 </div>
                 <span className={[styles.health, styles[health.tone]].join(' ')}>● {health.label}</span>
+              </>
+            );
+            return canOpenTeam(team.teamId) ? (
+              <Link
+                key={team.teamId}
+                to={projectTeamPath(project, { id: team.teamId, slug: team.teamSlug })}
+                className={styles.teamCard}
+                style={{ background: style.bg }}
+              >
+                {content}
               </Link>
+            ) : (
+              <div key={team.teamId} className={[styles.teamCard, styles.teamCardStatic].join(' ')} style={{ background: style.bg }}>
+                {content}
+              </div>
             );
           })}
         </div>

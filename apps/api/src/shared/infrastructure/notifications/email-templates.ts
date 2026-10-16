@@ -8,6 +8,7 @@ import type {
   ProjectInvoiceBlockedNotification,
   ProjectPaymentMilestoneReadyNotification,
   ProjectReactivatedFromHoldNotification,
+  TeamReportDataRequestEmail,
   UserInvitation,
 } from '../../application/ports/notification.port';
 
@@ -528,6 +529,48 @@ export function renderPendingHoursDigest(input: PendingHoursDigestNotification, 
     text: plainText(
       input.recipientFirstName,
       [intro, '', `Ir a aprobar horas: ${url}`, ...textSections, ...(olderNote ? ['', olderNote] : [])],
+      footer,
+    ),
+  };
+}
+
+// ─────────────────────────── Reporte de equipo ───────────────────────────
+
+export function renderTeamReportDataRequest(input: TeamReportDataRequestEmail, webAppUrl: string): RenderedEmail {
+  const total = input.items.length;
+  const subject = `Kora: ${input.requestedByName} te pide completar datos de ${total} ${plural(total, 'proyecto', 'proyectos')}`;
+  const intro = `${input.requestedByName} (líder del equipo ${input.teamName}) necesita que completes estos datos para su reporte de equipo. Te lo avisamos en Kora hace 48 horas.`;
+  const footer = 'Este es un correo automático de Kora. Cuando completes el dato, la solicitud se cierra sola.';
+  const label = (item: TeamReportDataRequestEmail['items'][number]) =>
+    item.clientName ? `${item.clientName} — ${item.projectName}` : item.projectName;
+
+  return {
+    subject,
+    html: layout({
+      webAppUrl,
+      subject,
+      firstName: input.recipientFirstName,
+      paragraphs: [
+        escapeHtml(intro),
+        listTable(
+          input.items.map((item) => ({
+            main: `<a href="${escapeHtml(projectUrl(webAppUrl, item.projectSlug))}" style="color:${NAVY};">${escapeHtml(label(item))}</a>`,
+            value: escapeHtml(item.missing),
+          })),
+        ),
+        ...(input.note ? [`<strong>Nota:</strong> ${escapeHtml(input.note)}`] : []),
+      ],
+      action: { label: 'Abrir Kora', url: webAppUrl },
+      footer,
+    }),
+    text: plainText(
+      input.recipientFirstName,
+      [
+        intro,
+        '',
+        ...input.items.map((item) => `  - ${label(item)}: ${item.missing} — ${projectUrl(webAppUrl, item.projectSlug)}`),
+        ...(input.note ? ['', `Nota: ${input.note}`] : []),
+      ],
       footer,
     ),
   };

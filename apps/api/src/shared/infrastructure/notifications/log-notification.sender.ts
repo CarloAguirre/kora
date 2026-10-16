@@ -9,6 +9,7 @@ import type {
   ProjectInvoiceBlockedNotification,
   ProjectPaymentMilestoneReadyNotification,
   ProjectReactivatedFromHoldNotification,
+  TeamReportDataRequestEmail,
   UserInvitation,
 } from '../../application/ports/notification.port';
 
@@ -108,6 +109,14 @@ export class LogNotificationSender implements NotificationSender {
       to: notification.recipientEmail,
       items: notification.items.length,
       hours: notification.items.reduce((sum, item) => sum + item.hours, 0),
+    });
+  }
+
+  async sendTeamReportDataRequest(notification: TeamReportDataRequestEmail): Promise<void> {
+    this.logger.info('[notificación] Solicitud de datos del reporte de equipo', {
+      to: notification.recipientEmail,
+      requestedBy: notification.requestedByName,
+      projects: notification.items.length,
     });
   }
 }

@@ -13,13 +13,14 @@ import { projectPath, projectTeamPath } from '@/app/router/paths';
 /**
  * Deep link a un equipo puntual dentro de un proyecto. Dos entradas:
  * `Ver equipo` en el tab Resumen de `DevelopmentProjectDetailView` (para
- * quien tiene `projects:manage`), y la tabla "Proyectos del equipo" de
+ * quien tiene `projects:manage`), y el "Reporte de equipo" de
  * `LeaderTeamConsole` (`/equipos`) — así un líder que también lidera el
  * proyecto completo sigue viendo el panel acotado a su equipo al entrar
  * desde Equipos, en vez de la ficha admin que vería entrando desde
- * Proyectos. Comparte el mismo panel (`TeamLeaderProjectView`) que
- * `ProjectDetailPage` renderiza automáticamente cuando quien entra a
- * `/proyectos/:id` lidera solo ese equipo — no es una vista distinta.
+ * Proyectos. También es adonde lleva la tarjeta de su equipo en "Equipos
+ * asignados" cuando un líder de equipo abre `/proyectos/:id` (que en
+ * desarrollo le muestra la ficha completa en modo consulta). Comparte el panel
+ * (`TeamLeaderProjectView`) con la vista acotada de soporte en `ProjectDetailPage`.
  */
 export function ProjectTeamDetailPage() {
   const { projectId, teamId } = useParams<{ projectId: string; teamId: string }>();

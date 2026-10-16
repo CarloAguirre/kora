@@ -7,7 +7,6 @@ import { Button } from '@/shared/components/ui/Button';
 import { Card } from '@/shared/components/ui/Card';
 import { ChevronLeftIcon } from '@/shared/components/icons/Icons';
 import { HourEntriesApprovalTable } from '../components/HourEntriesApprovalTable';
-import { HoursApprovalsSummary } from '../components/HoursApprovalsSummary';
 import { TeamAvailabilityHeatmap } from '@/modules/teams/components/TeamAvailabilityHeatmap';
 import { TeamContextBar } from '@/modules/teams/components/TeamContextBar';
 import { useTeamsList } from '@/modules/teams/api/teams.queries';
@@ -54,10 +53,6 @@ export function HoursApprovalsPage() {
           <ChevronLeftIcon size={16} /> Volver
         </Button>
 
-        <p className={styles.subtitle}>Horas ingresadas pendientes de aprobación.</p>
-
-        <HoursApprovalsSummary query={{ teamId: activeTeamId || undefined, userId: selectedMember?.userId }} />
-
         {teams.length > 0 && (
           <TeamContextBar
             teams={teams}
@@ -72,15 +67,14 @@ export function HoursApprovalsPage() {
         )}
 
         <Card>
+          <h2 className={styles.sectionTitle}>Horas pendientes de aprobación</h2>
           {teams.length > 0 && (
             <>
-              <h2 className={styles.sectionTitle}>Disponibilidad</h2>
               <TeamAvailabilityHeatmap teamId={activeTeamId} teamMemberId={selectedMember?.id} />
               <div className={styles.divider} />
             </>
           )}
 
-          <h2 className={styles.sectionTitle}>Horas pendientes de aprobación</h2>
           <HourEntriesApprovalTable query={{ teamId: activeTeamId || undefined, userId: selectedMember?.userId }} />
         </Card>
       </div>

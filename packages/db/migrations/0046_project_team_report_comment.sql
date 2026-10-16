@@ -1,0 +1,1 @@
+ALTER TABLE "project_teams" ADD COLUMN "report_comment" text;
