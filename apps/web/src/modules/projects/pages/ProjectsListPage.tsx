@@ -28,6 +28,7 @@ import { getProjectStageLabel } from '../lib/project-stage-display';
 import { formatProgressPercent } from '../lib/project-progress-display';
 import { exportDevelopmentProjects, exportSupportProjects } from '../lib/project-export';
 import { useDeleteProject, useProjectsList } from '../api/projects.queries';
+import { projectsApi } from '../api/projects.api';
 import { useClientsList } from '@/modules/clients/api/clients.queries';
 import { useUsersList } from '@/modules/users/api/users.queries';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
@@ -43,9 +44,16 @@ const SUPPORT_SUB_TABS = [
   { id: 'active', label: 'Activos' },
   { id: 'finished', label: 'Terminados' },
 ] as const;
-const CHART_PAGE_SIZE = 200;
+const EXPORT_PAGE_SIZE = 200;
+
+// Por defecto, primero los proyectos con más horas desviadas.
+const DEFAULT_SORT: SortState<ProjectSortField> = { field: 'deviationHours', direction: 'desc' };
 
 const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 2 });
+// Restantes y desviadas se separan: si el proyecto ya consumió todo lo vendido, restantes queda en 0
+// y el exceso se muestra como desviación (nunca un número negativo).
+const remainingHoursOf = (sold: number, used: number) => Math.max(sold - used, 0);
+const deviationHoursOf = (sold: number, used: number) => Math.max(used - sold, 0);
 // Fechas `YYYY-MM-DD` (sin hora): con `T00:00:00` se leen en hora local — `new Date('2026-09-01')` es medianoche
 // UTC y en Chile se mostraba como el día anterior.
 const formatDate = (value: string | null) =>
@@ -75,7 +83,7 @@ export function ProjectsListPage() {
   const [phases, setPhases] = useState<ProjectPhase[]>([]);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
-  const [sort, setSort] = useState<SortState<ProjectSortField>>({ field: 'createdAt', direction: 'desc' });
+  const [sort, setSort] = useState<SortState<ProjectSortField>>(DEFAULT_SORT);
   const [deleteTarget, setDeleteTarget] = useState<ProjectSummary | null>(null);
   const [exporting, setExporting] = useState(false);
   const deleteProject = useDeleteProject();
@@ -102,12 +110,6 @@ export function ProjectsListPage() {
     sortField: sort.field,
     sortDirection: sort.direction,
   });
-  // El gráfico y la exportación usan su propio universo de datos — todos los
-  // proyectos del tipo activo, sin los filtros de la tabla (Líder/Estado/
-  // Etapa/Buscar): en la v1 son estados independientes (`devChartFilterCliente`
-  // aparte de `devLeaderFilters`/`devStatusFilters`), no una vista derivada
-  // de la tabla.
-  const { data: chartSourceData } = useProjectsList({ type: tab, page: 1, pageSize: CHART_PAGE_SIZE });
   // Totales de las sub-pestañas Activos/Terminados de Soporte: solo interesa
   // `total`, así que basta con una página de 1. Respetan el Buscar para que
   // coincidan con lo que muestra la tabla al cambiar de pestaña.
@@ -138,7 +140,7 @@ export function ProjectsListPage() {
 
   const changeTab = (id: string) => {
     setTab(id as 'development' | 'support');
-    setSort({ field: 'createdAt', direction: 'desc' });
+    setSort(DEFAULT_SORT);
     setPage(1);
   };
 
@@ -168,20 +170,24 @@ export function ProjectsListPage() {
     header: 'Acciones',
     align: 'right',
     width: '70px',
-    render: (project) =>
-      can('projects:manage') ? (
-        <div className={styles.actions}>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setDeleteTarget(project)}
-            aria-label={`Eliminar ${project.name}`}
-          >
-            <TrashIcon size={16} />
-          </Button>
-        </div>
-      ) : null,
+    render: (project) => (
+      <div className={styles.actions}>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setDeleteTarget(project)}
+          aria-label={`Eliminar ${project.name}`}
+        >
+          <TrashIcon size={16} />
+        </Button>
+      </div>
+    ),
   };
+  // Sin `projects:manage` (p. ej. el líder) no hay ninguna acción disponible, así que la columna no se muestra.
+  const managementColumns = can('projects:manage') ? [actionsColumn] : [];
+
+  const renderDeviation = (deviation: number) =>
+    deviation > 0 ? <span className={styles.deviated}>{formatHours(deviation)}</span> : <span className={styles.empty}>{formatHours(deviation)}</span>;
 
   const developmentColumns: Column<ProjectSummary>[] = [
     {
@@ -221,8 +227,14 @@ export function ProjectsListPage() {
     },
     { key: 'soldHours', header: 'HH vendidas', sortable: true, render: (p) => formatHours(p.soldHours) },
     { key: 'usedHours', header: 'HH Consumidas', sortable: true, render: (p) => formatHours(p.usedHours) },
-    { key: 'remainingHours', header: 'HH Restantes', sortable: true, render: (p) => formatHours(p.soldHours - p.usedHours) },
-    actionsColumn,
+    { key: 'remainingHours', header: 'HH Restantes', sortable: true, render: (p) => formatHours(remainingHoursOf(p.soldHours, p.usedHours)) },
+    {
+      key: 'deviationHours',
+      header: 'HH desviadas',
+      sortable: true,
+      render: (p) => renderDeviation(deviationHoursOf(p.soldHours, p.usedHours)),
+    },
+    ...managementColumns,
   ];
 
   const supportColumns: Column<ProjectSummary>[] = [
@@ -247,9 +259,14 @@ export function ProjectsListPage() {
     { key: 'stage', header: 'Etapa', render: (p) => getProjectStageLabel(p) },
     { key: 'supportHours', header: 'HH Vendidas', sortable: true, render: (p) => formatHours(p.supportHours) },
     { key: 'usedHours', header: 'HH Consumidas', sortable: true, render: (p) => formatHours(p.usedHours) },
-    { key: 'remainingHours', header: 'HH Restantes', sortable: true, render: (p) => formatHours(p.supportHours - p.usedHours) },
-    { key: 'deviationHours', header: 'HH Desviación', sortable: true, render: (p) => formatHours(p.usedHours - p.supportHours) },
-    actionsColumn,
+    { key: 'remainingHours', header: 'HH Restantes', sortable: true, render: (p) => formatHours(remainingHoursOf(p.supportHours, p.usedHours)) },
+    {
+      key: 'deviationHours',
+      header: 'HH desviadas',
+      sortable: true,
+      render: (p) => renderDeviation(deviationHoursOf(p.supportHours, p.usedHours)),
+    },
+    ...managementColumns,
   ];
 
   const columns = tab === 'development' ? developmentColumns : supportColumns;
@@ -257,10 +274,14 @@ export function ProjectsListPage() {
   const handleExport = async () => {
     setExporting(true);
     try {
-      // Delay artificial para que se alcance a ver el estado "Generando…"
-      // antes de que el navegador dispare la descarga.
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      const items = chartSourceData?.items ?? [];
+      // La exportación usa su propio universo de datos — todos los proyectos
+      // del tipo activo, sin los filtros de la tabla ni del gráfico — y se pide
+      // recién al descargar. El delay artificial es para que se alcance a ver
+      // el estado "Generando…" antes de que el navegador dispare la descarga.
+      const [{ items }] = await Promise.all([
+        projectsApi.list({ type: tab, page: 1, pageSize: EXPORT_PAGE_SIZE }),
+        new Promise((resolve) => setTimeout(resolve, 1000)),
+      ]);
       if (tab === 'development') exportDevelopmentProjects(items);
       else exportSupportProjects(items);
     } finally {
@@ -292,7 +313,7 @@ export function ProjectsListPage() {
         </div>
 
         <ProjectsSummaryChart
-          projects={chartSourceData?.items ?? []}
+          type={tab}
           clientOptions={clientOptions}
           showFinalizedToggle={tab === 'development'}
         />

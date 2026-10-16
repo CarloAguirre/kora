@@ -304,6 +304,20 @@ export class DrizzleProjectRepository implements ProjectRepository {
     if (filters.status?.length) conditions.push(inArray(projects.status, filters.status));
     if (filters.phase?.length) conditions.push(inArray(projects.phase, filters.phase));
     if (filters.clientId) conditions.push(eq(projects.clientId, filters.clientId));
+    if (filters.clientIds?.length) conditions.push(inArray(projects.clientId, [...filters.clientIds]));
+    if (filters.periods?.length) {
+      // `least`/`greatest` ignoran NULL: con una sola fecha el proyecto ocupa
+      // ese día, y sin ninguna el resultado es NULL y queda fuera.
+      conditions.push(
+        or(
+          ...filters.periods.map(
+            (period) =>
+              sql`(least(${projects.startDate}, ${projects.endDate}) <= ${period.to}
+                and greatest(${projects.startDate}, ${projects.endDate}) >= ${period.from})`,
+          ),
+        ),
+      );
+    }
     if (filters.leaderUserId?.length) conditions.push(inArray(projects.leaderUserId, filters.leaderUserId));
     if (filters.search) {
       // Nombre del proyecto o del cliente. `exists` en vez de un join porque la
@@ -394,18 +408,19 @@ export class DrizzleProjectRepository implements ProjectRepository {
       return [sql`${projects.supportPlanDescription} ${sqlDirection} nulls last`, asc(projects.id)];
     }
 
-    // Restantes = vendidas menos consumidas — desarrollo usa `soldHours`,
+    // Restantes = vendidas menos consumidas (mínimo 0) y desviadas = el exceso
+    // de consumidas sobre vendidas (mínimo 0) — desarrollo usa `soldHours`,
     // soporte usa `supportHours`, así que se elige según el tipo de proyecto
     // de cada fila en vez de asumir que la consulta ya viene filtrada por uno.
+    const soldHoursByType = sql`case when ${projects.type} = 'support' then ${projects.supportHours} else ${projects.soldHours} end`;
+
     if (sort.field === 'remainingHours') {
-      return [
-        sql`(case when ${projects.type} = 'support' then ${projects.supportHours} else ${projects.soldHours} end - ${projects.usedHours}) ${sqlDirection}`,
-        asc(projects.id),
-      ];
+      return [sql`greatest(${soldHoursByType} - ${projects.usedHours}, 0) ${sqlDirection}`, asc(projects.id)];
     }
 
     if (sort.field === 'deviationHours') {
-      return [sql`(${projects.usedHours} - ${projects.supportHours}) ${sqlDirection}`, asc(projects.id)];
+      // Empates (p. ej. todos los sin desviación) quedan del más nuevo al más antiguo.
+      return [sql`greatest(${projects.usedHours} - ${soldHoursByType}, 0) ${sqlDirection}`, desc(projects.createdAt), asc(projects.id)];
     }
 
     const column =

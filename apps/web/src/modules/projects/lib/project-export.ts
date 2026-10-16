@@ -26,7 +26,8 @@ const DEVELOPMENT_COLUMNS: readonly ExportColumn[] = [
   { label: 'Retraso', getValue: (p) => formatProgressDelay(p.progress) },
   { label: 'HH vendidas', getValue: (p) => formatDecimal(p.soldHours) },
   { label: 'HH Consumidas', getValue: (p) => formatDecimal(p.usedHours) },
-  { label: 'HH Restantes', getValue: (p) => formatDecimal(p.soldHours - p.usedHours) },
+  { label: 'HH Restantes', getValue: (p) => formatDecimal(Math.max(p.soldHours - p.usedHours, 0)) },
+  { label: 'HH desviadas', getValue: (p) => formatDecimal(Math.max(p.usedHours - p.soldHours, 0)) },
 ];
 
 const SUPPORT_COLUMNS: readonly ExportColumn[] = [
@@ -37,7 +38,8 @@ const SUPPORT_COLUMNS: readonly ExportColumn[] = [
   { label: 'Etapa', getValue: (p) => getProjectStageLabel(p) },
   { label: 'HH Vendidas', getValue: (p) => formatDecimal(p.supportHours) },
   { label: 'HH Consumidas', getValue: (p) => formatDecimal(p.usedHours) },
-  { label: 'HH Restantes', getValue: (p) => formatDecimal(p.supportHours - p.usedHours) },
+  { label: 'HH Restantes', getValue: (p) => formatDecimal(Math.max(p.supportHours - p.usedHours, 0)) },
+  { label: 'HH desviadas', getValue: (p) => formatDecimal(Math.max(p.usedHours - p.supportHours, 0)) },
 ];
 
 function exportToWorkbook(projects: readonly ProjectSummary[], columns: readonly ExportColumn[], sheetName: string, filePrefix: string) {

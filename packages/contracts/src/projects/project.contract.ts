@@ -1012,6 +1012,16 @@ export const projectSortFieldSchema = z.enum([
 ]);
 export type ProjectSortField = z.infer<typeof projectSortFieldSchema>;
 
+/** Rango de fechas `YYYY-MM-DD..YYYY-MM-DD` (sin comas: `arrayQueryParam` separa por coma). */
+export const projectPeriodSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}\.\.\d{4}-\d{2}-\d{2}$/, 'Período inválido.')
+  .transform((value) => {
+    const [from = '', to = ''] = value.split('..');
+    return { from, to };
+  });
+export type ProjectPeriod = z.infer<typeof projectPeriodSchema>;
+
 export const listProjectsQuerySchema = paginationQuerySchema.extend({
   search: z.string().trim().max(120).optional(),
   type: projectTypeSchema.optional(),
@@ -1019,6 +1029,10 @@ export const listProjectsQuerySchema = paginationQuerySchema.extend({
   phase: arrayQueryParam(projectPhaseSchema),
   /** Acepta id o slug: la ficha de cliente filtra por el `clientId` de la URL, que ahora es el slug del cliente — se resuelve a UUID en `ListProjectsUseCase`. */
   clientId: z.string().optional(),
+  /** Varios clientes por UUID (filtro Cliente del gráfico resumen). */
+  clientIds: arrayQueryParam(uuidSchema),
+  /** Proyectos cuyo rango Inicio–Fin se cruza con alguno de estos períodos (filtro Período/Detalle del gráfico resumen). */
+  period: arrayQueryParam(projectPeriodSchema),
   leaderUserId: arrayQueryParam(uuidSchema),
   /** Filtra a los proyectos donde el usuario indicado participa (líder, desarrollador o miembro). */
   assignedToUserId: uuidSchema.optional(),

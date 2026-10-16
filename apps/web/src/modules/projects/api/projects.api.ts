@@ -40,6 +40,8 @@ export const projectsApi = {
       status: query.status,
       phase: query.phase,
       clientId: query.clientId,
+      clientIds: query.clientIds,
+      period: query.period?.map((period) => `${period.from}..${period.to}`),
       leaderUserId: query.leaderUserId,
       assignedToUserId: query.assignedToUserId,
       teamId: query.teamId,

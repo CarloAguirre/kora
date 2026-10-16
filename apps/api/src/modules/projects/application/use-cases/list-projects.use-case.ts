@@ -84,6 +84,8 @@ export class ListProjectsUseCase implements UseCase<ListProjectsQueryCommand, Pa
         status: query.status,
         phase: query.phase,
         clientId: client?.id,
+        clientIds: query.clientIds,
+        periods: query.period,
         leaderUserId: query.leaderUserId,
         teamId,
         assignedToUserId,

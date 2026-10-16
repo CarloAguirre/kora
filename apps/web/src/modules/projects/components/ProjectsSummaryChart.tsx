@@ -1,12 +1,16 @@
 import { useMemo, useState } from 'react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import type { ProjectSummary } from '@kora/contracts';
+import type { ProjectPeriod, ProjectStatus, ProjectType } from '@kora/contracts';
 import styles from './ProjectsSummaryChart.module.css';
 import { Card } from '@/shared/components/ui/Card';
 import { MultiSelect } from '@/shared/components/ui/MultiSelect';
+import { useProjectsList } from '../api/projects.queries';
+
+/** Tope de la API por página — el gráfico muestra una sola página con los proyectos que pasan los filtros. */
+const CHART_PAGE_SIZE = 200;
 
 interface ProjectsSummaryChartProps {
-  projects: readonly ProjectSummary[];
+  type: ProjectType;
   clientOptions: readonly { value: string; label: string }[];
   /** Solo la tab Desarrollo expone el filtro de estado (Activos/Finalizados/Todos). */
   showFinalizedToggle?: boolean;
@@ -60,23 +64,16 @@ function getPeriodRange(period: PeriodOption, detail: string) {
   return { start: new Date(currentYear, startMonth, 1), end: new Date(currentYear, startMonth + monthsPerPeriod, 0) };
 }
 
-function projectOverlapsPeriod(project: ProjectSummary, details: readonly string[]) {
-  if (details.length === 0) return true;
+// Fecha local `YYYY-MM-DD` — `toISOString()` la pasaría a UTC y en Chile correría el día.
+const toIsoDate = (date: Date) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
-  const startDate = project.startDate ? new Date(project.startDate) : null;
-  const endDate = project.endDate ? new Date(project.endDate) : null;
-  if (!startDate && !endDate) return false;
-
-  const projectStart = startDate ?? endDate!;
-  const projectEnd = endDate ?? startDate!;
-  const start = Math.min(projectStart.getTime(), projectEnd.getTime());
-  const end = Math.max(projectStart.getTime(), projectEnd.getTime());
-
-  return details.some((detail) => {
+/** Rangos de fechas de los Detalle seleccionados, para filtrar en la API. Vacío = sin restricción. */
+function detailsToPeriods(details: readonly string[]): ProjectPeriod[] {
+  return details.flatMap((detail) => {
     const periodType = DETAIL_TO_PERIOD[detail];
     const range = periodType ? getPeriodRange(periodType, detail) : null;
-    if (!range) return true;
-    return start <= range.end.getTime() && end >= range.start.getTime();
+    return range ? [{ from: toIsoDate(range.start), to: toIsoDate(range.end) }] : [];
   });
 }
 
@@ -88,9 +85,11 @@ function projectOverlapsPeriod(project: ProjectSummary, details: readonly string
  * `devChartFilterCliente`/`devFilterPeriodo`/`devFilterSubPeriodo` aparte de
  * `devLeaderFilters`/`devStatusFilters`): Cliente, Período/Detalle (rango de
  * fechas del proyecto) e "Incluir finalizados". Por defecto solo muestra
- * proyectos con status "active", igual que la v1.
+ * proyectos con status "active", igual que la v1. Los filtros viajan a la API
+ * (`clientIds`/`status`/`period`), así que solo se piden los proyectos que
+ * el gráfico va a mostrar.
  */
-export function ProjectsSummaryChart({ projects, clientOptions, showFinalizedToggle }: ProjectsSummaryChartProps) {
+export function ProjectsSummaryChart({ type, clientOptions, showFinalizedToggle }: ProjectsSummaryChartProps) {
   const [clientFilters, setClientFilters] = useState<string[]>([]);
   const [periods, setPeriods] = useState<PeriodOption[]>(['Semestral']);
   const [details, setDetails] = useState<string[]>([SUB_PERIOD_OPTIONS.Semestral[0] ?? '']);
@@ -124,18 +123,21 @@ export function ProjectsSummaryChart({ projects, clientOptions, showFinalizedTog
     setDetails((current) => current.filter((d) => allowed.has(d)));
   };
 
-  const filtered = useMemo(
-    () =>
-      projects.filter((p) => {
-        if (clientFilters.length > 0 && (!p.client || !clientFilters.includes(p.client.id))) return false;
-        const statusOk = showFinalizedToggle
-          ? statusFilters.length === 0 || statusFilters.includes(p.status as StatusFilter)
-          : p.status === 'active';
-        if (!statusOk) return false;
-        return projectOverlapsPeriod(p, details);
-      }),
-    [projects, clientFilters, showFinalizedToggle, statusFilters, details],
-  );
+  const status: ProjectStatus[] | undefined = showFinalizedToggle
+    ? statusFilters.length > 0
+      ? statusFilters
+      : undefined
+    : ['active'];
+  const period = detailsToPeriods(details);
+  const { data } = useProjectsList({
+    type,
+    clientIds: clientFilters.length > 0 ? clientFilters : undefined,
+    status,
+    period: period.length > 0 ? period : undefined,
+    page: 1,
+    pageSize: CHART_PAGE_SIZE,
+  });
+  const filtered = useMemo(() => data?.items ?? [], [data]);
 
   const chartData = useMemo(
     () =>

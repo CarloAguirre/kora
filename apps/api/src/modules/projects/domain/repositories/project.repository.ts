@@ -8,6 +8,9 @@ export interface ProjectFilters {
   readonly status?: readonly ProjectStatus[] | undefined;
   readonly phase?: readonly ProjectPhase[] | undefined;
   readonly clientId?: string | undefined;
+  readonly clientIds?: readonly string[] | undefined;
+  /** Proyectos cuyo rango Inicio–Fin se cruza con alguno de estos períodos (`YYYY-MM-DD`, ambos extremos incluidos). */
+  readonly periods?: readonly { readonly from: string; readonly to: string }[] | undefined;
   readonly leaderUserId?: readonly string[] | undefined;
   /** Filtra a proyectos donde el usuario participa (líder, desarrollador o miembro asignado). */
   readonly assignedToUserId?: string | undefined;

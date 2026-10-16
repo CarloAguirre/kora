@@ -56,6 +56,11 @@
   color: var(--kora-text-disabled);
 }
 
+.deviated {
+  color: var(--kora-warning-text);
+  font-weight: var(--kora-weight-bold);
+}
+
 /* Encabezados sin mayúsculas forzadas: los ordenables ya se ven así (el <button> no hereda
    `text-transform`), y los no ordenables (Etapa, Acciones) salían en MAYÚSCULAS. */
 .table th {
