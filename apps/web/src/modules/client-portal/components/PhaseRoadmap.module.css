@@ -87,8 +87,11 @@
   flex-shrink: 0;
 }
 
+/* Realizada y atrasada van rellenas para destacarse; comprometida queda solo con contorno.
+   `fill` en CSS pisa el `fill="none"` del <svg> de DiamondIcon. */
 .legendDiamondDone {
   color: #0f2a44;
+  fill: currentColor;
 }
 
 .legendDiamondCommitted {
@@ -97,6 +100,7 @@
 
 .legendDiamondDelayed {
   color: #d5504b;
+  fill: currentColor;
 }
 
 .taskDotDone {
@@ -295,7 +299,7 @@
   color: #5d6b7a;
 }
 
-.zoomRow input[type='range'] {
+.zoomRow input[type="range"] {
   width: 90px;
   accent-color: #0f2a44;
 }
@@ -387,7 +391,7 @@
   bottom: 0;
   width: 2px;
   background: #d5504b;
-  z-index: 5;
+  z-index: 10;
 }
 
 .ganttTodayLabel {
