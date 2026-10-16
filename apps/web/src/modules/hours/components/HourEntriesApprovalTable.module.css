@@ -138,10 +138,6 @@
   gap: var(--kora-space-1);
 }
 
-.dangerAction {
-  color: var(--kora-danger);
-}
-
 .bulkBar {
   display: flex;
   align-items: center;

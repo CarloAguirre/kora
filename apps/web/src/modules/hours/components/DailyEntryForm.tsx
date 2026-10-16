@@ -24,16 +24,16 @@ import { ApiRequestError } from '@/shared/lib/api-client';
 const ASSIGNMENT_OPTIONS = [...HOUR_ENTRY_ASSIGNMENTS]
   .sort((a, b) => (a === 'Proyecto' ? -1 : b === 'Proyecto' ? 1 : 0))
   .map((value) => ({ value, label: value }));
-const DAILY_CAP_HOURS = 8;
+export const DAILY_CAP_HOURS = 8;
 const MIN_DESCRIPTION_LENGTH = 5;
 const HOURS_STEP = 0.25;
 const today = () => new Date().toISOString().slice(0, 10);
-const isWeekend = (isoDate: string) => {
+export const isWeekend = (isoDate: string) => {
   const day = new Date(`${isoDate}T00:00:00`).getDay();
   return day === 0 || day === 6;
 };
 
-interface DailyBlock {
+export interface DailyBlock {
   key: string;
   expanded: boolean;
   assignment: HourEntryAssignment | '';
@@ -63,6 +63,47 @@ const createEmptyBlock = (): DailyBlock => ({
   hasBlocker: false,
   blockerDescription: '',
 });
+
+/** Ajusta las horas de un bloque con el stepper (−/+), sin bajar de 0. */
+export const stepBlockHours = (hours: string, delta: number) => {
+  const next = Math.max(0, Math.round(((Number(hours) || 0) + delta) * 100) / 100);
+  return next === 0 ? '' : String(next);
+};
+
+/**
+ * Reglas de un bloque compartidas por el alta (`DailyEntryForm`) y la edición
+ * (`HourEntryFormDialog`). `overtimeAlreadyGranted` cubre registros que ya
+ * nacieron como horas extra en un proyecto que no las autoriza (p. ej. el
+ * excedente de una solicitud de HH de ticket): el backend permite conservarlos.
+ */
+export function validateDailyBlock(
+  block: DailyBlock,
+  {
+    projects,
+    isCollaborator,
+    overtimeAlreadyGranted = false,
+  }: { projects: ProjectSummary[]; isCollaborator: boolean; overtimeAlreadyGranted?: boolean },
+): string | null {
+  if (!block.assignment) return 'Selecciona una asignación.';
+  const hours = Number(block.hours);
+  if (!block.hours || Number.isNaN(hours) || hours <= 0) return 'Ingresa horas mayores a 0.';
+  if (hours > 24) return 'No puede registrar más de 24 horas en un día.';
+  const needsProject = PROJECT_REQUIRING_ASSIGNMENTS.has(block.assignment);
+  if (needsProject && !block.projectId) return 'Selecciona un proyecto para esta asignación.';
+  if (needsProject && block.isOvertime && !overtimeAlreadyGranted) {
+    const project = projects.find((p) => p.id === block.projectId);
+    if (!project?.allowsOvertime) return 'Este proyecto no tiene autorizadas horas extra.';
+  }
+  // Horas de proyecto se aprueban por acceso al proyecto, no por aprobador
+  // designado (docs/DECISION-M4-HORAS.md) — el backend rechaza ambos a la vez.
+  const needsApprover = !needsProject && (isCollaborator || block.isOvertime);
+  if (needsApprover && !block.designatedApproverUserId) return 'Selecciona a quién aprueba estas horas.';
+  if (block.description.trim().length > 0 && block.description.trim().length < MIN_DESCRIPTION_LENGTH) {
+    return `La descripción debe tener al menos ${MIN_DESCRIPTION_LENGTH} caracteres.`;
+  }
+  if (block.hasBlocker && !block.blockerDescription.trim()) return 'Describe el bloqueo reportado.';
+  return null;
+}
 
 /**
  * Registro diario — un mismo día, varios registros en un solo envío.
@@ -132,13 +173,7 @@ export function DailyEntryForm({
     return project ? getProjectOptionLabel(project) : `Registro ${index + 1}`;
   };
   const adjustHours = (key: string, delta: number) => {
-    setBlocks((prev) =>
-      prev.map((block) => {
-        if (block.key !== key) return block;
-        const next = Math.max(0, Math.round(((Number(block.hours) || 0) + delta) * 100) / 100);
-        return { ...block, hours: next === 0 ? '' : String(next) };
-      }),
-    );
+    setBlocks((prev) => prev.map((block) => (block.key === key ? { ...block, hours: stepBlockHours(block.hours, delta) } : block)));
   };
 
   const dailyTotal = blocks.reduce((sum, block) => sum + (Number(block.hours) || 0), 0);
@@ -151,27 +186,8 @@ export function DailyEntryForm({
     onTotalChange?.(totalWithExisting);
   }, [totalWithExisting, onTotalChange]);
 
-  const validateBlock = (block: DailyBlock): string | null => {
-    if (!block.assignment) return 'Selecciona una asignación.';
-    const hours = Number(block.hours);
-    if (!block.hours || Number.isNaN(hours) || hours <= 0) return 'Ingresa horas mayores a 0.';
-    if (hours > 24) return 'No puede registrar más de 24 horas en un día.';
-    const needsProject = PROJECT_REQUIRING_ASSIGNMENTS.has(block.assignment);
-    if (needsProject && !block.projectId) return 'Selecciona un proyecto para esta asignación.';
-    if (needsProject && block.isOvertime) {
-      const project = (projects?.items ?? []).find((p) => p.id === block.projectId);
-      if (!project?.allowsOvertime) return 'Este proyecto no tiene autorizadas horas extra.';
-    }
-    // Horas de proyecto se aprueban por acceso al proyecto, no por aprobador
-    // designado (docs/DECISION-M4-HORAS.md) — el backend rechaza ambos a la vez.
-    const needsApprover = !needsProject && (user?.role === 'collaborator' || block.isOvertime);
-    if (needsApprover && !block.designatedApproverUserId) return 'Selecciona a quién aprueba estas horas.';
-    if (block.description.trim().length > 0 && block.description.trim().length < MIN_DESCRIPTION_LENGTH) {
-      return `La descripción debe tener al menos ${MIN_DESCRIPTION_LENGTH} caracteres.`;
-    }
-    if (block.hasBlocker && !block.blockerDescription.trim()) return 'Describe el bloqueo reportado.';
-    return null;
-  };
+  const validateBlock = (block: DailyBlock) =>
+    validateDailyBlock(block, { projects: projects?.items ?? [], isCollaborator: user?.role === 'collaborator' });
 
   const canSubmit = !blockingMessage && !exceedsDailyCap && blocks.every((block) => validateBlock(block) === null);
 
@@ -306,9 +322,10 @@ export function DailyEntryForm({
 /**
  * Aislado del formulario principal porque necesita `useProjectDetail` (para
  * el selector de Módulo) por bloque — llamarlo dentro de `blocks.map(...)`
- * directamente rompería las reglas de hooks.
+ * directamente rompería las reglas de hooks. También lo reutiliza la edición
+ * de un registro (`HourEntryFormDialog`) para verse igual que el alta.
  */
-function DailyEntryBlockFields({
+export function DailyEntryBlockFields({
   block,
   index,
   removable,

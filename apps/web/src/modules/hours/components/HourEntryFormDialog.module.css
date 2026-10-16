@@ -141,17 +141,6 @@
   font-size: var(--kora-text-xs);
 }
 
-.overtimeToggle {
-  display: flex;
-  align-items: center;
-  gap: var(--kora-space-2);
-  align-self: flex-end;
-  padding-bottom: var(--kora-space-2);
-  font-size: var(--kora-text-sm);
-  color: var(--kora-navy);
-  white-space: nowrap;
-}
-
 .dailyTotal {
   align-self: flex-end;
   font-size: var(--kora-text-sm);

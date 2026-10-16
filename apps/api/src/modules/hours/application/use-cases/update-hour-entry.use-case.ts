@@ -11,6 +11,7 @@ import {
   ReferencedProjectNotFoundError,
 } from '../../domain/errors/hour-entry.errors';
 import { HOUR_ENTRY_REPOSITORY, type HourEntryRepository } from '../../domain/repositories/hour-entry.repository';
+import { HourEntryApprovalAuthorityService } from '../services/hour-entry-approval-authority.service';
 import { HOUR_ENTRY_USER_READER, type HourEntryUserReader } from '../ports/hour-entry-user-reader.port';
 import { HOUR_ENTRY_PROJECT_READER, type HourEntryProjectReader } from '../ports/hour-entry-project-reader.port';
 import { AUDIT_RECORDER, type AuditRecorder } from '../../../../shared/application/ports/audit-recorder.port';
@@ -23,11 +24,12 @@ export interface UpdateHourEntryCommand {
   readonly actorRole: RoleCode;
 }
 
-/** Solo el dueño (mientras esté pendiente/rechazado) o un admin/PMO pueden editar. */
+/** Solo el dueño (mientras esté pendiente/rechazado), un admin/PMO o quien debe aprobarlo (mientras esté pendiente) pueden editar. */
 @Injectable()
 export class UpdateHourEntryUseCase implements UseCase<UpdateHourEntryCommand, void, ApplicationError> {
   constructor(
     @Inject(HOUR_ENTRY_REPOSITORY) private readonly entries: HourEntryRepository,
+    private readonly authority: HourEntryApprovalAuthorityService,
     @Inject(HOUR_ENTRY_USER_READER) private readonly users: HourEntryUserReader,
     @Inject(HOUR_ENTRY_PROJECT_READER) private readonly projects: HourEntryProjectReader,
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
@@ -40,7 +42,11 @@ export class UpdateHourEntryUseCase implements UseCase<UpdateHourEntryCommand, v
     if (!entry) return err(new HourEntryNotFoundError(entryId));
 
     const isOwner = entry.userId === actor.userId;
-    if (!isOwner && actorRole !== 'admin' && actorRole !== 'pmo') {
+    // Quien debe aprobar un registro pendiente puede corregirlo antes de decidir
+    // (desde `/horas/aprobaciones`), en vez de rechazarlo solo para un ajuste.
+    const isPendingApprover =
+      !isOwner && entry.status === 'pending' && (await this.authority.canDecide(actor.userId, actorRole, entry));
+    if (!isOwner && actorRole !== 'admin' && actorRole !== 'pmo' && !isPendingApprover) {
       return err(new ForbiddenError('No puedes editar este registro.', 'HOUR_ENTRY_CANNOT_EDIT'));
     }
 

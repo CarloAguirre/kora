@@ -6,12 +6,13 @@ import { ticketPath } from '@/app/router/paths';
 import { Badge } from '@/shared/components/ui/Badge';
 import { Button } from '@/shared/components/ui/Button';
 import { DataTable, type Column } from '@/shared/components/ui/DataTable';
+import { DropdownMenu } from '@/shared/components/ui/DropdownMenu';
 import { Modal } from '@/shared/components/ui/Modal';
 import { DEFAULT_PAGE_SIZE, Pagination } from '@/shared/components/ui/Pagination';
 import { TextField } from '@/shared/components/ui/TextField';
 import { useToast } from '@/shared/components/ui/Toast';
 import { ApiRequestError } from '@/shared/lib/api-client';
-import { ChevronDownIcon, CheckIcon, CloseIcon, EyeIcon, UserIcon } from '@/shared/components/icons/Icons';
+import { ChevronDownIcon, UserIcon } from '@/shared/components/icons/Icons';
 import { HourEntryFormDialog } from './HourEntryFormDialog';
 import { useApproveHourEntry, useHourEntriesList, useRejectHourEntry } from '../api/hours.queries';
 import { resolvedApprover } from '../lib/approver';
@@ -67,6 +68,7 @@ export function HourEntriesApprovalTable({
   const [rejecting, setRejecting] = useState(false);
   const [reason, setReason] = useState('');
   const [viewing, setViewing] = useState<HourEntrySummary | null>(null);
+  const [editing, setEditing] = useState<HourEntrySummary | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
@@ -264,28 +266,30 @@ export function HourEntriesApprovalTable({
       key: 'actions',
       header: 'Acciones',
       align: 'right',
-      width: '120px',
+      width: '80px',
       render: (entry) => (
         <div className={styles.rowActions}>
-          <Button variant="ghost" size="icon" onClick={() => setViewing(entry)} aria-label="Ver detalle" title="Ver detalle">
-            <EyeIcon size={16} />
-          </Button>
-          <Button variant="ghost" size="icon" onClick={() => void approveOne(entry)} aria-label="Aprobar" title="Aprobar">
-            <CheckIcon size={16} />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => {
-              setSelected(new Set([entry.id]));
-              setRejecting(true);
-            }}
-            aria-label="Rechazar"
-            title="Rechazar"
-            className={styles.dangerAction}
-          >
-            <CloseIcon size={16} />
-          </Button>
+          <DropdownMenu
+            items={[
+              { key: 'ver', label: 'Ver detalle', onSelect: () => setViewing(entry) },
+              { key: 'editar', label: 'Editar', onSelect: () => setEditing(entry) },
+              { key: 'aprobar', label: 'Aprobar', tone: 'success', onSelect: () => void approveOne(entry) },
+              {
+                key: 'rechazar',
+                label: 'Rechazar',
+                tone: 'danger',
+                onSelect: () => {
+                  setSelected(new Set([entry.id]));
+                  setRejecting(true);
+                },
+              },
+            ]}
+            trigger={({ onClick }) => (
+              <Button variant="ghost" size="icon" onClick={onClick} aria-label={`Acciones — ${entry.user.fullName}`} title="Acciones">
+                ⋮
+              </Button>
+            )}
+          />
         </div>
       ),
     },
@@ -392,6 +396,16 @@ export function HourEntriesApprovalTable({
         readOnly
         onClose={() => setViewing(null)}
         onSuccess={() => setViewing(null)}
+      />
+
+      <HourEntryFormDialog
+        open={editing !== null}
+        entry={editing}
+        onClose={() => setEditing(null)}
+        onSuccess={(message) => {
+          setEditing(null);
+          toast.success(message);
+        }}
       />
 
       <Modal open={rejecting} title="Rechazar registros de horas" onClose={() => setRejecting(false)}>
