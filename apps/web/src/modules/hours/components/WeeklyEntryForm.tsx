@@ -69,7 +69,13 @@ export function WeeklyEntryForm({
 }) {
   const { user } = useAuth();
   const createEntry = useCreateHourEntry();
-  const { data: projects } = useProjectsList({ page: 1, pageSize: 200, sortField: 'name', assignedToUserId: user?.id });
+  // El PMO puede registrar horas en cualquier proyecto; el resto solo en los que tiene asignados.
+  const { data: projects } = useProjectsList({
+    page: 1,
+    pageSize: 200,
+    sortField: 'name',
+    assignedToUserId: user?.role === 'pmo' ? undefined : user?.id,
+  });
   const { data: leaders } = useUsersList({ page: 1, pageSize: 200, sortField: 'firstName', role: 'leader' });
 
   const [monday, setMonday] = useState(() => mondayOf(new Date().toISOString().slice(0, 10)));
