@@ -44,12 +44,16 @@ export const envSchema = z.object({
   // Correo saliente (Resend). Sin RESEND_API_KEY los correos se escriben en el
   // log en vez de enviarse — solo admisible fuera de producción.
   RESEND_API_KEY: z.string().optional(),
-  MAIL_FROM: z.string().min(1).default('Kora <avisos@kora-correos.online>'),
+  MAIL_FROM: z.string().min(1).default('Kora <avisos@kora.kabeli.cl>'),
   // Desvía TODOS los correos a este buzón. Solo desarrollo: la base local suele
   // tener usuarios reales y probar un alta no debe escribirle a un compañero.
   MAIL_REDIRECT_TO: z.email().optional(),
   // URL pública del front: los enlaces de los correos tienen que ser absolutos.
   WEB_APP_URL: z.url().default('http://localhost:5173'),
+  // Recordatorios diarios de horas (18:00 horas sin registrar, 08:00 horas por
+  // aprobar — ver modules/reminders). Apagados por defecto: con la base local
+  // de copia de producción, encenderlos en desarrollo le escribiría a gente real.
+  HOUR_REMINDERS_ENABLED: z.stringbool().default(false),
 
   MAX_FAILED_LOGIN_ATTEMPTS: z.coerce.number().int().min(1).max(50).default(5),
   ACCOUNT_LOCK_MINUTES: z.coerce.number().int().min(1).max(1440).default(15),

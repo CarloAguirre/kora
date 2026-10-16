@@ -1,6 +1,9 @@
 import type {
   AccountStatusNotification,
+  MissingHoursReminderNotification,
   PasswordResetNotification,
+  PendingHoursDigestItem,
+  PendingHoursDigestNotification,
   ProjectAutoActivatedNotification,
   ProjectInvoiceBlockedNotification,
   ProjectPaymentMilestoneReadyNotification,
@@ -376,4 +379,156 @@ export function renderProjectReactivatedFromHold(
     (name) =>
       `El proyecto ${name} estaba Detenido y se reactivó a Activo al facturar el primer tramo (Hito 0). Confirma que el cambio es correcto.`,
   );
+}
+
+// ─────────────────────────── Recordatorios de horas ───────────────────────────
+
+/** Cuántos días se listan en el recordatorio: los más recientes; el resto se resume en una línea. */
+const MAX_MISSING_DAYS_SHOWN = 20;
+/** Cuántas solicitudes se listan en el resumen del aprobador; el resto se resume en una línea. */
+const MAX_DIGEST_ITEMS_SHOWN = 60;
+
+const WEEKDAYS_ES = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+
+/** `2026-10-13` → `Lunes 13/10`. La fecha ya es local (Chile): se lee en UTC para no correrla un día. */
+function formatWeekdayDate(isoDate: string): string {
+  const [year, month, day] = isoDate.split('-').map(Number) as [number, number, number];
+  const weekday = WEEKDAYS_ES[new Date(Date.UTC(year, month - 1, day)).getUTCDay()];
+  return `${weekday} ${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}`;
+}
+
+/** `2026-10-13` → `13/10/2026`. */
+function formatShortDate(isoDate: string): string {
+  const [year, month, day] = isoDate.split('-');
+  return `${day}/${month}/${year}`;
+}
+
+function formatHours(hours: number): string {
+  return `${hours.toLocaleString('es-CL', { maximumFractionDigits: 2 })}h`;
+}
+
+function plural(count: number, singular: string, pluralForm: string): string {
+  return count === 1 ? singular : pluralForm;
+}
+
+/** Filas "dato | valor a la derecha" — misma tabla que `detailTable`, con la segunda columna alineada a la derecha. */
+function listTable(rows: ReadonlyArray<{ readonly main: string; readonly sub?: string; readonly value: string }>): string {
+  const cells = rows
+    .map(
+      (row) =>
+        `<tr><td style="padding:10px 12px; border-bottom:1px solid ${BORDER}; vertical-align:top;">` +
+        `<div style="font-size:14px; font-weight:600; color:${NAVY};">${row.main}</div>` +
+        (row.sub ? `<div style="margin-top:2px; font-size:13px; color:${MUTED};">${row.sub}</div>` : '') +
+        `</td><td style="padding:10px 12px; border-bottom:1px solid ${BORDER}; font-size:13px; font-weight:600; color:${NAVY}; text-align:right; white-space:nowrap; vertical-align:top;">${row.value}</td></tr>`,
+    )
+    .join('');
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:4px 0 16px; border:1px solid ${BORDER}; border-radius:8px; border-collapse:separate; font-family:${FONT};">${cells}</table>`;
+}
+
+export function renderMissingHoursReminder(input: MissingHoursReminderNotification, webAppUrl: string): RenderedEmail {
+  const total = input.days.length;
+  const newestFirst = [...input.days].sort((a, b) => b.date.localeCompare(a.date));
+  const shown = newestFirst.slice(0, MAX_MISSING_DAYS_SHOWN).reverse();
+  const hidden = total - shown.length;
+
+  const subject = `Kora: te faltan ${total} ${plural(total, 'día', 'días')} por registrar horas`;
+  const url = `${webAppUrl}/horas`;
+  const footer = 'Este es un correo automático de Kora. Si ya registraste estas horas, puedes ignorar este mensaje.';
+  const intro = `No completaste tus ${input.expectedHoursPerDay} horas registradas para ${plural(total, 'el siguiente día', 'los siguientes días')}:`;
+  const describe = (hours: number) =>
+    hours > 0 ? `${formatHours(hours)} de ${formatHours(input.expectedHoursPerDay)}` : 'sin registrar';
+  const olderNote =
+    hidden > 0
+      ? `Y ${hidden} ${plural(hidden, 'día más antiguo', 'días más antiguos')} también sin completar — revisa tu historial en Kora.`
+      : null;
+
+  return {
+    subject,
+    html: layout({
+      webAppUrl,
+      subject,
+      firstName: input.recipientFirstName,
+      paragraphs: [
+        escapeHtml(intro),
+        listTable(shown.map((day) => ({ main: escapeHtml(formatWeekdayDate(day.date)), value: escapeHtml(describe(day.hoursRegistered)) }))),
+        ...(olderNote ? [escapeHtml(olderNote)] : []),
+      ],
+      action: { label: 'Registrar horas', url },
+      footer,
+    }),
+    text: plainText(
+      input.recipientFirstName,
+      [
+        intro,
+        '',
+        ...shown.map((day) => `  - ${formatWeekdayDate(day.date)} (${describe(day.hoursRegistered)})`),
+        ...(olderNote ? ['', olderNote] : []),
+        '',
+        `Registrar horas: ${url}`,
+      ],
+      footer,
+    ),
+  };
+}
+
+const DIGEST_SECTIONS: ReadonlyArray<{ readonly kind: PendingHoursDigestItem['kind']; readonly title: string }> = [
+  { kind: 'project', title: 'Horas de proyecto' },
+  { kind: 'no_project', title: 'Horas sin proyecto' },
+  { kind: 'ticket', title: 'Horas de soporte (tickets)' },
+];
+
+export function renderPendingHoursDigest(input: PendingHoursDigestNotification, webAppUrl: string): RenderedEmail {
+  const total = input.items.length;
+  const totalHours = input.items.reduce((sum, item) => sum + item.hours, 0);
+  const shown = [...input.items]
+    .sort((a, b) => a.date.localeCompare(b.date) || a.ownerFullName.localeCompare(b.ownerFullName))
+    .slice(0, MAX_DIGEST_ITEMS_SHOWN);
+  const hidden = total - shown.length;
+
+  const subject = `Kora: tienes ${total} ${plural(total, 'solicitud de horas', 'solicitudes de horas')} por aprobar`;
+  const url = `${webAppUrl}/horas/aprobaciones`;
+  const footer = 'Este es un correo automático de Kora. Si ya revisaste estas horas, puedes ignorar este mensaje.';
+  const intro = `Tienes ${total} ${plural(total, 'solicitud pendiente', 'solicitudes pendientes')} de aprobar en Kora (${formatHours(totalHours)} en total).`;
+  const pendingFor = (item: PendingHoursDigestItem) =>
+    `${item.daysPending} ${plural(item.daysPending, 'día', 'días')} pendiente`;
+  const olderNote = hidden > 0 ? `Y ${hidden} ${plural(hidden, 'solicitud más', 'solicitudes más')} — revísalas en Kora.` : null;
+
+  const htmlSections: string[] = [];
+  const textSections: string[] = [];
+  for (const section of DIGEST_SECTIONS) {
+    const items = shown.filter((item) => item.kind === section.kind);
+    if (items.length === 0) continue;
+    htmlSections.push(
+      `<strong style="font-size:12px; letter-spacing:0.04em; text-transform:uppercase; color:${MUTED};">${escapeHtml(section.title)}</strong>`,
+      listTable(
+        items.map((item) => ({
+          main: escapeHtml(item.ownerFullName),
+          sub: escapeHtml(`${item.label} · ${formatShortDate(item.date)} · ${pendingFor(item)}`),
+          value: escapeHtml(formatHours(item.hours)),
+        })),
+      ),
+    );
+    textSections.push(
+      '',
+      `${section.title}:`,
+      ...items.map((item) => `  - ${item.ownerFullName} · ${item.label} · ${formatHours(item.hours)} (${formatShortDate(item.date)}, ${pendingFor(item)})`),
+    );
+  }
+
+  return {
+    subject,
+    html: layout({
+      webAppUrl,
+      subject,
+      firstName: input.recipientFirstName,
+      paragraphs: [escapeHtml(intro), ...htmlSections, ...(olderNote ? [escapeHtml(olderNote)] : [])],
+      action: { label: 'Ir a aprobar horas', url },
+      footer,
+    }),
+    text: plainText(
+      input.recipientFirstName,
+      [intro, '', `Ir a aprobar horas: ${url}`, ...textSections, ...(olderNote ? ['', olderNote] : [])],
+      footer,
+    ),
+  };
 }

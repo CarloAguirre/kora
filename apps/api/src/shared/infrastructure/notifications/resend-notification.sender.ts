@@ -3,8 +3,10 @@ import type { Resend } from 'resend';
 import type { MailSettings } from '../../../config/app-config.service';
 import type {
   AccountStatusNotification,
+  MissingHoursReminderNotification,
   NotificationSender,
   PasswordResetNotification,
+  PendingHoursDigestNotification,
   ProjectAutoActivatedNotification,
   ProjectInvoiceBlockedNotification,
   ProjectPaymentMilestoneReadyNotification,
@@ -13,7 +15,9 @@ import type {
 } from '../../application/ports/notification.port';
 import {
   renderAccountStatusChanged,
+  renderMissingHoursReminder,
   renderPasswordReset,
+  renderPendingHoursDigest,
   renderProjectAutoActivated,
   renderProjectInvoiceBlocked,
   renderProjectPaymentMilestoneReady,
@@ -33,8 +37,8 @@ export class NotificationDeliveryError extends Error {
 }
 
 /**
- * Envía las notificaciones por Resend (dominio `kora-correos.online`, el mismo
- * que usa Kora v1, con una API key propia de v2).
+ * Envía las notificaciones por Resend, desde el dominio propio `kora.kabeli.cl`
+ * (los correos de Kora v1 salían de `kora-correos.online`; v1 ya no envía nada).
  *
  * El SDK no lanza: devuelve `{ data, error }`. Aquí se convierte el error en
  * excepción porque es el contrato que esperan los casos de uso —los que tratan
@@ -94,6 +98,22 @@ export class ResendNotificationSender implements NotificationSender {
       'project_payment_milestone_ready',
       notification.recipientEmail,
       renderProjectPaymentMilestoneReady(notification, this.settings.webAppUrl),
+    );
+  }
+
+  sendMissingHoursReminder(notification: MissingHoursReminderNotification): Promise<void> {
+    return this.deliver(
+      'missing_hours_reminder',
+      notification.recipientEmail,
+      renderMissingHoursReminder(notification, this.settings.webAppUrl),
+    );
+  }
+
+  sendPendingHoursDigest(notification: PendingHoursDigestNotification): Promise<void> {
+    return this.deliver(
+      'pending_hours_digest',
+      notification.recipientEmail,
+      renderPendingHoursDigest(notification, this.settings.webAppUrl),
     );
   }
 

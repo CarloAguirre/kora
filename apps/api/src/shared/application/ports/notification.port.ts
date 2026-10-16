@@ -59,6 +59,43 @@ export interface ProjectPaymentMilestoneReadyNotification extends ProjectBilling
   readonly reason: string;
 }
 
+/** Un día hábil en que el usuario no completó su jornada. */
+export interface MissingHoursDay {
+  /** `YYYY-MM-DD`. */
+  readonly date: string;
+  readonly hoursRegistered: number;
+}
+
+/**
+ * Recordatorio diario (18:00 Chile) a quien registra horas y tiene días hábiles
+ * recientes bajo la jornada — ver `SendMissingHoursRemindersUseCase`.
+ */
+export interface MissingHoursReminderNotification {
+  readonly recipientEmail: string;
+  readonly recipientFirstName: string;
+  readonly expectedHoursPerDay: number;
+  /** Todos los días incompletos, en cualquier orden; la plantilla decide cuántos mostrar. */
+  readonly days: readonly MissingHoursDay[];
+}
+
+export interface PendingHoursDigestItem {
+  readonly kind: 'project' | 'no_project' | 'ticket';
+  readonly ownerFullName: string;
+  /** Proyecto, "Ticket · Proyecto" o la asignación de una hora sin proyecto (Vacaciones, Capacitación...). */
+  readonly label: string;
+  /** `YYYY-MM-DD`. */
+  readonly date: string;
+  readonly hours: number;
+  readonly daysPending: number;
+}
+
+/** Resumen diario (08:00 Chile) a cada aprobador con horas esperando su decisión. */
+export interface PendingHoursDigestNotification {
+  readonly recipientEmail: string;
+  readonly recipientFirstName: string;
+  readonly items: readonly PendingHoursDigestItem[];
+}
+
 export interface NotificationSender {
   sendUserInvitation(invitation: UserInvitation): Promise<void>;
   sendPasswordReset(notification: PasswordResetNotification): Promise<void>;
@@ -67,6 +104,8 @@ export interface NotificationSender {
   sendProjectAutoActivated(notification: ProjectAutoActivatedNotification): Promise<void>;
   sendProjectReactivatedFromHold(notification: ProjectReactivatedFromHoldNotification): Promise<void>;
   sendProjectPaymentMilestoneReady(notification: ProjectPaymentMilestoneReadyNotification): Promise<void>;
+  sendMissingHoursReminder(notification: MissingHoursReminderNotification): Promise<void>;
+  sendPendingHoursDigest(notification: PendingHoursDigestNotification): Promise<void>;
 }
 
 export const NOTIFICATION_SENDER = Symbol('NotificationSender');

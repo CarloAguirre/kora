@@ -309,6 +309,13 @@
       "when": 1792007073194,
       "tag": "0043_comunas_country",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1792111264614,
+      "tag": "0044_scheduled_job_runs",
+      "breakpoints": true
     }
   ]
 }

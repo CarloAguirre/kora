@@ -6,7 +6,13 @@ import {
   ResendNotificationSender,
   type ResendEmailsClient,
 } from './resend-notification.sender';
-import { escapeHtml, renderAccountStatusChanged, renderPasswordReset } from './email-templates';
+import {
+  escapeHtml,
+  renderAccountStatusChanged,
+  renderMissingHoursReminder,
+  renderPasswordReset,
+  renderPendingHoursDigest,
+} from './email-templates';
 
 const silentLogger: Logger = {
   debug: () => undefined,
@@ -124,5 +130,50 @@ describe('plantillas de correo', () => {
       settings.webAppUrl,
     );
     expect(email.text).toContain('https://kora.kabeli.cl/definir-contrasena?token=abc');
+  });
+});
+
+describe('plantillas de recordatorios de horas', () => {
+  it('el recordatorio de horas lista los días con su detalle y enlaza a /horas', () => {
+    const email = renderMissingHoursReminder(
+      {
+        recipientEmail: 'ana@kabeli.cl',
+        recipientFirstName: 'Ana',
+        expectedHoursPerDay: 8,
+        days: [
+          { date: '2026-10-14', hoursRegistered: 4 },
+          { date: '2026-10-13', hoursRegistered: 0 },
+        ],
+      },
+      'https://kora.kabeli.cl',
+    );
+
+    expect(email.subject).toBe('Kora: te faltan 2 días por registrar horas');
+    expect(email.text).toContain('Martes 13/10 (sin registrar)');
+    expect(email.text).toContain('Miércoles 14/10 (4h de 8h)');
+    expect(email.text.indexOf('13/10')).toBeLessThan(email.text.indexOf('14/10'));
+    expect(email.html).toContain('href="https://kora.kabeli.cl/horas"');
+  });
+
+  it('el resumen del aprobador separa por tipo, escapa nombres y enlaza a /horas/aprobaciones', () => {
+    const email = renderPendingHoursDigest(
+      {
+        recipientEmail: 'luis@kabeli.cl',
+        recipientFirstName: 'Luis',
+        items: [
+          { kind: 'project', ownerFullName: 'Ana <b>', label: 'App Walvy', date: '2026-10-14', hours: 4, daysPending: 2 },
+          { kind: 'ticket', ownerFullName: 'Beto', label: 'TK-1200 · Soporte', date: '2026-10-15', hours: 1.5, daysPending: 1 },
+        ],
+      },
+      'https://kora.kabeli.cl',
+    );
+
+    expect(email.subject).toBe('Kora: tienes 2 solicitudes de horas por aprobar');
+    expect(email.text).toContain('(5,5h en total)');
+    expect(email.text).toContain('Horas de proyecto:');
+    expect(email.text).toContain('Horas de soporte (tickets):');
+    expect(email.text).not.toContain('Horas sin proyecto');
+    expect(email.html).toContain('Ana &lt;b&gt;');
+    expect(email.html).toContain('href="https://kora.kabeli.cl/horas/aprobaciones"');
   });
 });

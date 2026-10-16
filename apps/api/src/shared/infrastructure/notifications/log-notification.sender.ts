@@ -1,8 +1,10 @@
 import type { Logger } from '@kora/core';
 import type {
   AccountStatusNotification,
+  MissingHoursReminderNotification,
   NotificationSender,
   PasswordResetNotification,
+  PendingHoursDigestNotification,
   ProjectAutoActivatedNotification,
   ProjectInvoiceBlockedNotification,
   ProjectPaymentMilestoneReadyNotification,
@@ -91,6 +93,21 @@ export class LogNotificationSender implements NotificationSender {
       amount: notification.amount,
       currency: notification.currency,
       reason: notification.reason,
+    });
+  }
+
+  async sendMissingHoursReminder(notification: MissingHoursReminderNotification): Promise<void> {
+    this.logger.info('[notificación] Recordatorio de horas sin registrar', {
+      to: notification.recipientEmail,
+      days: notification.days.map((day) => `${day.date} (${day.hoursRegistered}h)`),
+    });
+  }
+
+  async sendPendingHoursDigest(notification: PendingHoursDigestNotification): Promise<void> {
+    this.logger.info('[notificación] Resumen de horas por aprobar', {
+      to: notification.recipientEmail,
+      items: notification.items.length,
+      hours: notification.items.reduce((sum, item) => sum + item.hours, 0),
     });
   }
 }

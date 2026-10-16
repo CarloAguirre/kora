@@ -10,6 +10,8 @@ import type {
   ProjectAutoActivatedNotification,
   ProjectInvoiceBlockedNotification,
   ProjectPaymentMilestoneReadyNotification,
+  MissingHoursReminderNotification,
+  PendingHoursDigestNotification,
   ProjectReactivatedFromHoldNotification,
   UserInvitation,
 } from '../../shared/application/ports/notification.port';
@@ -149,6 +151,21 @@ export class RecordingNotificationSender implements NotificationSender {
   async sendProjectPaymentMilestoneReady(notification: ProjectPaymentMilestoneReadyNotification): Promise<void> {
     if (this.shouldFail) throw new Error('proveedor de correo caído');
     this.projectPaymentMilestoneReady.push(notification);
+  }
+
+  readonly missingHoursReminders: MissingHoursReminderNotification[] = [];
+  readonly pendingHoursDigests: PendingHoursDigestNotification[] = [];
+  /** Correos cuyo envío falla aunque `shouldFail` sea false — para probar fallos parciales en lote. */
+  readonly failFor = new Set<string>();
+
+  async sendMissingHoursReminder(notification: MissingHoursReminderNotification): Promise<void> {
+    if (this.shouldFail || this.failFor.has(notification.recipientEmail)) throw new Error('proveedor de correo caído');
+    this.missingHoursReminders.push(notification);
+  }
+
+  async sendPendingHoursDigest(notification: PendingHoursDigestNotification): Promise<void> {
+    if (this.shouldFail || this.failFor.has(notification.recipientEmail)) throw new Error('proveedor de correo caído');
+    this.pendingHoursDigests.push(notification);
   }
 }
 

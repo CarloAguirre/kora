@@ -32,6 +32,11 @@ export interface HttpSettings {
   readonly corsOrigins: readonly string[];
 }
 
+export interface HourReminderSettings {
+  /** Si las tareas programadas de recordatorios de horas corren (la ejecución manual desde la API no depende de esto). */
+  readonly enabled: boolean;
+}
+
 export interface GoogleOAuthSettings {
   /** `false` si falta cualquiera de las tres variables — el login con Google se apaga, no rompe el arranque. */
   readonly enabled: boolean;
@@ -106,6 +111,10 @@ export class AppConfigService {
       redirectTo: this.config.get('MAIL_REDIRECT_TO', { infer: true }) ?? null,
       webAppUrl: this.config.get('WEB_APP_URL', { infer: true }).replace(/\/+$/, ''),
     };
+  }
+
+  get hourReminders(): HourReminderSettings {
+    return { enabled: this.config.get('HOUR_REMINDERS_ENABLED', { infer: true }) };
   }
 
   get auth(): AuthSettings {
