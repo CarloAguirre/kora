@@ -61,7 +61,10 @@ import { ProjectsModuleForecastSourceCalculator } from './infrastructure/service
     { provide: FORECAST_PLANNING_SIGNALS_READER, useClass: DrizzleForecastPlanningSignalsReader },
     { provide: FORECAST_SOURCE_CALCULATOR, useClass: ProjectsModuleForecastSourceCalculator },
   ],
-  /** `ForecastCapacityService` se exporta para que el panel (M7) reutilice el cálculo de capacidad sin encadenar casos de uso. */
-  exports: [FORECAST_ASSIGNMENT_REPOSITORY, ForecastCapacityService],
+  /**
+   * `ForecastCapacityService` se exporta para que el panel (M7) reutilice el cálculo de capacidad sin encadenar casos de uso;
+   * `FORECAST_HOLIDAY_READER`, para descontar los feriados de la meta semanal de horas del panel.
+   */
+  exports: [FORECAST_ASSIGNMENT_REPOSITORY, ForecastCapacityService, FORECAST_HOLIDAY_READER],
 })
 export class ForecastModule {}

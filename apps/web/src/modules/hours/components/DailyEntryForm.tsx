@@ -100,6 +100,8 @@ export function DailyEntryForm({
   const [submitting, setSubmitting] = useState(false);
 
   const { data: holidaysForDate } = useHolidays({ dateFrom: date, dateTo: date });
+  /** Catálogo completo (unas decenas de filas) para marcarlos en el calendario, navegue al mes que navegue. */
+  const { data: allHolidays } = useHolidays({});
   const { data: entriesForDate } = useHourEntriesList(user ? { userId: user.id, dateFrom: date, dateTo: date, pageSize: 100 } : {});
   const existingHoursForDate = (entriesForDate?.items ?? [])
     .filter((e) => e.status !== 'rejected')
@@ -226,7 +228,14 @@ export function DailyEntryForm({
         </div>
       )}
 
-      <TextField label="Fecha de registro" type="date" required value={date} onChange={(event) => setDate(event.target.value)} />
+      <TextField
+        label="Fecha de registro"
+        type="date"
+        required
+        holidays={allHolidays}
+        value={date}
+        onChange={(event) => setDate(event.target.value)}
+      />
 
       {!blockingMessage && !exceedsDailyCap && existingNonOvertimeHoursForDate > 0 && existingNonOvertimeHoursForDate < DAILY_CAP_HOURS && (
         <div className={styles.noticeInfo} role="status">

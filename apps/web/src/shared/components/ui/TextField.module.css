@@ -265,6 +265,15 @@
   background: var(--kora-lime-surface);
 }
 
+.dateCellHoliday {
+  background: var(--kora-danger-surface-soft);
+  color: var(--kora-danger);
+}
+
+.dateCellHoliday:hover {
+  background: var(--kora-danger-surface);
+}
+
 .dateCellMuted {
   color: var(--kora-text-disabled);
 }
@@ -278,6 +287,29 @@
 .dateCellSelected:hover {
   background: var(--kora-lime);
   color: var(--kora-navy);
+  font-weight: var(--kora-weight-semibold);
+}
+
+.datePanelHolidays {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: var(--kora-space-2) 0 0;
+  list-style: none;
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-xs);
+}
+
+.datePanelHolidays li {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+}
+
+.datePanelHolidayDay {
+  min-width: 18px;
+  color: var(--kora-danger);
   font-weight: var(--kora-weight-semibold);
 }
 

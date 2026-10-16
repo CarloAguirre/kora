@@ -40,6 +40,12 @@ export interface TextFieldProps extends Omit<
   errorText?: string;
   iconLeft?: ReactNode;
   iconRight?: ReactNode;
+  /**
+   * Solo `type="date"`: días que el calendario destaca como feriados (con su
+   * nombre en el tooltip y en la lista bajo la grilla). Solo los marca —
+   * seguir permitiendo o no elegirlos es responsabilidad del formulario.
+   */
+  holidays?: readonly { date: string; name: string }[];
 }
 
 function applyRef(
@@ -105,6 +111,7 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(
       disabled,
       className,
       onFocus,
+      holidays,
       ...rest
     },
     ref,
@@ -241,6 +248,10 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(
     const monthLabel =
       rawMonthLabel.charAt(0).toLocaleUpperCase("es-CL") +
       rawMonthLabel.slice(1);
+    const holidayNames = new Map((holidays ?? []).map((h) => [h.date, h.name]));
+    const viewMonthHolidays = gridDays
+      .filter((day) => day.getMonth() === viewMonth.getMonth() && holidayNames.has(toISODate(day)))
+      .map((day) => ({ day: day.getDate(), name: holidayNames.get(toISODate(day)) ?? "" }));
 
     return (
       <div className={[styles.wrapper, className].filter(Boolean).join(" ")}>
@@ -340,12 +351,16 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(
                   const inMonth = day.getMonth() === viewMonth.getMonth();
                   const isSelected = iso === selectedISO;
                   const isToday = iso === todayISO;
+                  const holidayName = holidayNames.get(iso);
                   return (
                     <button
                       key={iso}
                       type="button"
+                      title={holidayName ? `Feriado: ${holidayName}` : undefined}
+                      aria-label={holidayName ? `${day.getDate()}, feriado: ${holidayName}` : undefined}
                       className={[
                         styles.dateCell,
+                        holidayName ? styles.dateCellHoliday : "",
                         !inMonth ? styles.dateCellMuted : "",
                         isSelected ? styles.dateCellSelected : "",
                         isToday && !isSelected ? styles.dateCellToday : "",
@@ -359,6 +374,17 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(
                   );
                 })}
               </div>
+
+              {viewMonthHolidays.length > 0 && (
+                <ul className={styles.datePanelHolidays}>
+                  {viewMonthHolidays.map((holiday) => (
+                    <li key={holiday.day}>
+                      <span className={styles.datePanelHolidayDay}>{holiday.day}</span>
+                      {holiday.name}
+                    </li>
+                  ))}
+                </ul>
+              )}
 
               <div className={styles.datePanelFooter}>
                 <button

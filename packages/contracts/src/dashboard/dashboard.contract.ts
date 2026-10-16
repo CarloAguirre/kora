@@ -20,7 +20,10 @@ import { isoDateTimeSchema } from '../common/primitives';
 export const dashboardHoursSummarySchema = z.object({
   todayHours: z.number(),
   weekHours: z.number(),
+  /** 8 h por día hábil de la semana: los feriados que caen de lunes a viernes ya vienen descontados. */
   weekTargetHours: z.number(),
+  /** Feriados de lunes a viernes de la semana en curso (los que se descontaron de `weekTargetHours`). */
+  weekHolidayCount: z.number().int(),
   rejectedCount: z.number().int(),
   /** Horas extra no rechazadas (aprobadas + pendientes) de la semana y del mes en curso. */
   weekOvertimeHours: z.number(),

@@ -16,7 +16,7 @@ import { TextField } from '@/shared/components/ui/TextField';
 import { Select } from '@/shared/components/ui/Select';
 import { Tabs } from '@/shared/components/ui/Tabs';
 import { AlertIcon } from '@/shared/components/icons/Icons';
-import { useHourEntryDetail, useUpdateHourEntry } from '../api/hours.queries';
+import { useHolidays, useHourEntryDetail, useUpdateHourEntry } from '../api/hours.queries';
 import { useProjectsList } from '@/modules/projects/api/projects.queries';
 import { getProjectOptionLabel } from '@/modules/projects/lib/project-option-label';
 import { useUsersList } from '@/modules/users/api/users.queries';
@@ -115,6 +115,8 @@ function EditEntryForm({
 
   const { data: projects } = useProjectsList({ page: 1, pageSize: 200, sortField: 'name' });
   const { data: leaders } = useUsersList({ page: 1, pageSize: 200, sortField: 'firstName', role: 'leader' });
+  /** Catálogo completo (unas decenas de filas): el calendario puede navegar a cualquier mes. */
+  const { data: holidays } = useHolidays({});
 
   const {
     register,
@@ -160,7 +162,7 @@ function EditEntryForm({
 
       <div className={styles.row}>
         <Select label="Asignación" required options={ASSIGNMENT_OPTIONS} {...register('assignment')} />
-        <TextField label="Fecha" type="date" required errorText={errors.date?.message} {...register('date')} />
+        <TextField label="Fecha" type="date" required holidays={holidays} errorText={errors.date?.message} {...register('date')} />
       </div>
 
       {needsProject && (

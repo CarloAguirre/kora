@@ -28,6 +28,10 @@ import {
 } from '../../../projects/domain/repositories/project-module.repository';
 import { ForecastCapacityService } from '../../../forecast/application/services/forecast-capacity.service';
 import {
+  FORECAST_HOLIDAY_READER,
+  type ForecastHolidayReader,
+} from '../../../forecast/application/ports/forecast-holiday-reader.port';
+import {
   calculateProjectProgress,
   progressToday,
 } from '../../../projects/application/services/project-progress';
@@ -42,7 +46,8 @@ export interface GetDashboardSummaryCommand {
   readonly weekStartIso?: string | undefined;
 }
 
-const WEEK_TARGET_HOURS = 40;
+const DAILY_TARGET_HOURS = 8;
+const WORKING_DAYS_PER_WEEK = 5;
 /** "Terminado" ya no cuenta como trabajo abierto: el ticket está resuelto, solo falta el cierre administrativo. */
 const OPEN_TICKET_STATUSES = ['pending', 'in_progress', 'in_testing'] as const;
 const PROJECT_PAGE_SIZE = 2000;
@@ -70,6 +75,7 @@ export class GetDashboardSummaryUseCase implements UseCase<GetDashboardSummaryCo
     @Inject(PROJECT_MODULE_REPOSITORY) private readonly projectModules: ProjectModuleRepository,
     @Inject(TEAM_REPOSITORY) private readonly teams: TeamRepository,
     private readonly forecastCapacity: ForecastCapacityService,
+    @Inject(FORECAST_HOLIDAY_READER) private readonly holidays: ForecastHolidayReader,
     @Inject(CLOCK) private readonly clock: Clock,
   ) {}
 
@@ -186,9 +192,11 @@ export class GetDashboardSummaryUseCase implements UseCase<GetDashboardSummaryCo
     const monday = mondayOf(now);
     const monthStart = monthStartOf(now);
     const todayIso = toIsoDate(now);
+    const friday = new Date(monday);
+    friday.setUTCDate(friday.getUTCDate() + WORKING_DAYS_PER_WEEK - 1);
 
     // Desde el lunes o el día 1, lo que sea antes: una sola consulta alimenta semana y mes.
-    const [rangePage, rejectedPage] = await Promise.all([
+    const [rangePage, rejectedPage, weekHolidays] = await Promise.all([
       this.hourEntries.search(
         { userId: actor.userId, dateFrom: monday < monthStart ? monday : monthStart, dateTo: now },
         { page: 1, pageSize: 500 },
@@ -199,7 +207,10 @@ export class GetDashboardSummaryUseCase implements UseCase<GetDashboardSummaryCo
         { page: 1, pageSize: 1 },
         { field: 'date', direction: 'desc' },
       ),
+      this.holidays.listNonWorkingDates(monday, friday),
     ]);
+    // Un feriado no se puede registrar (ver `DailyEntryForm`/`WeeklyEntryForm`), así que no cuenta como horas faltantes.
+    const weekHolidayCount = new Set(weekHolidays.map(toIsoDate)).size;
 
     const weekItems = rangePage.items.filter((entry) => entry.date >= monday);
     const weekHours = weekItems.reduce((sum, entry) => sum + entry.hours, 0);
@@ -215,7 +226,8 @@ export class GetDashboardSummaryUseCase implements UseCase<GetDashboardSummaryCo
     return {
       todayHours,
       weekHours,
-      weekTargetHours: WEEK_TARGET_HOURS,
+      weekTargetHours: (WORKING_DAYS_PER_WEEK - weekHolidayCount) * DAILY_TARGET_HOURS,
+      weekHolidayCount,
       rejectedCount: rejectedPage.total,
       weekOvertimeHours: overtimeHours(monday),
       monthOvertimeHours: overtimeHours(monthStart),

@@ -318,11 +318,13 @@ export function MyActivityPanel({
   const todayHours = hours?.todayHours ?? 0;
   const weekHours = hours?.weekHours ?? 0;
   const weekTargetHours = hours?.weekTargetHours ?? 40;
+  const weekHolidayCount = hours?.weekHolidayCount ?? 0;
   const rejectedCount = hours?.rejectedCount ?? 0;
   const weekOvertimeHours = hours?.weekOvertimeHours ?? 0;
   const monthOvertimeHours = hours?.monthOvertimeHours ?? 0;
   const pctDiario = Math.min((todayHours / DAILY_TARGET_HOURS) * 100, 100);
-  const pctSemanal = Math.min(Math.round((weekHours / weekTargetHours) * 100), 100);
+  // Semana completa de feriados: la meta es 0, no hay nada pendiente.
+  const pctSemanal = weekTargetHours > 0 ? Math.min(Math.round((weekHours / weekTargetHours) * 100), 100) : 100;
   const { pageItems: pagedTeamMembers, pagination: teamMembersPagination } = usePaginatedItems(
     planning?.teamMembers ?? NO_TEAM_MEMBERS,
   );
@@ -361,7 +363,11 @@ export function MyActivityPanel({
               <div className={styles.progressTrack}>
                 <div className={styles.progressFill} style={{ width: `${pctSemanal}%` }} />
               </div>
-              <span className={styles.kpiSub}>{pctSemanal}% completado</span>
+              <span className={styles.kpiSub}>
+                {pctSemanal}% completado
+                {weekHolidayCount > 0 &&
+                  ` · ${weekHolidayCount} ${weekHolidayCount === 1 ? 'feriado descontado' : 'feriados descontados'}`}
+              </span>
             </>
           )}
         </Card>
