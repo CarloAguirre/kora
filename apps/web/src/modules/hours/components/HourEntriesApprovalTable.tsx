@@ -11,7 +11,8 @@ import { DEFAULT_PAGE_SIZE, Pagination } from '@/shared/components/ui/Pagination
 import { TextField } from '@/shared/components/ui/TextField';
 import { useToast } from '@/shared/components/ui/Toast';
 import { ApiRequestError } from '@/shared/lib/api-client';
-import { ChevronDownIcon, CheckIcon, CloseIcon, UserIcon } from '@/shared/components/icons/Icons';
+import { ChevronDownIcon, CheckIcon, CloseIcon, EyeIcon, UserIcon } from '@/shared/components/icons/Icons';
+import { HourEntryFormDialog } from './HourEntryFormDialog';
 import { useApproveHourEntry, useHourEntriesList, useRejectHourEntry } from '../api/hours.queries';
 import { resolvedApprover } from '../lib/approver';
 
@@ -65,6 +66,7 @@ export function HourEntriesApprovalTable({
   const [collapsedLeaders, setCollapsedLeaders] = useState<Set<string>>(new Set());
   const [rejecting, setRejecting] = useState(false);
   const [reason, setReason] = useState('');
+  const [viewing, setViewing] = useState<HourEntrySummary | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
@@ -262,9 +264,12 @@ export function HourEntriesApprovalTable({
       key: 'actions',
       header: 'Acciones',
       align: 'right',
-      width: '90px',
+      width: '120px',
       render: (entry) => (
         <div className={styles.rowActions}>
+          <Button variant="ghost" size="icon" onClick={() => setViewing(entry)} aria-label="Ver detalle" title="Ver detalle">
+            <EyeIcon size={16} />
+          </Button>
           <Button variant="ghost" size="icon" onClick={() => void approveOne(entry)} aria-label="Aprobar" title="Aprobar">
             <CheckIcon size={16} />
           </Button>
@@ -380,6 +385,14 @@ export function HourEntriesApprovalTable({
           Aprobar las HH seleccionadas
         </Button>
       </div>
+
+      <HourEntryFormDialog
+        open={viewing !== null}
+        entry={viewing}
+        readOnly
+        onClose={() => setViewing(null)}
+        onSuccess={() => setViewing(null)}
+      />
 
       <Modal open={rejecting} title="Rechazar registros de horas" onClose={() => setRejecting(false)}>
         <div className={styles.rejectForm}>
