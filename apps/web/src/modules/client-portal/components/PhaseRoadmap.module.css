@@ -108,13 +108,13 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 13px;
-  height: 13px;
+  width: 14px;
+  height: 14px;
   border-radius: 3px;
   flex-shrink: 0;
   background: #0f2a44;
   color: #fff;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: var(--kora-weight-bold);
   line-height: 1;
 }
@@ -126,6 +126,19 @@
 
 .taskDotDelayed {
   background: #d5504b;
+}
+
+/* Símbolos de tarea (✓ / próxima / atrasada): 14px en la leyenda, 16px en la fila "Tareas".
+   Van después de `.legendDot`/`.legendCheck` para pisar su tamaño. */
+.legendTaskMark {
+  width: 14px;
+  height: 14px;
+}
+
+.markerTaskMark {
+  width: 16px;
+  height: 16px;
+  font-size: 11px;
 }
 
 .legendHoy {
@@ -488,12 +501,14 @@ button.ganttBar {
    es un `<button>` clicable (selecciona qué se ve en "Registros de bitácora
    relacionados", ver PhaseRoadmap.tsx), de ahí el reset de estilos nativos. */
 .markerItem {
+  /* Mitad del ancho del símbolo: así su centro queda justo sobre la fecha. */
+  --marker-half: 9px;
   position: absolute;
-  top: 13px;
+  top: 50%;
   display: flex;
   align-items: center;
   gap: 6px;
-  transform: translateX(-5px);
+  transform: translate(calc(-1 * var(--marker-half)), -50%);
   border: none;
   background: none;
   padding: 0;
@@ -510,16 +525,20 @@ button.ganttBar {
   font-size: 12.5px;
 }
 
+/* Tareas: símbolo de 16px (las entregas usan el diamante de 18px). */
+.markerItemTask {
+  --marker-half: 8px;
+}
+
 /* El padding que infla la píldora empuja su contenido — se compensa con
-   `top`/`transform` para que el punto/diamante quede anclado en el mismo
-   lugar exacto que tenía sin seleccionar, en vez de "moverse" al seleccionar. */
+   `transform` (el vertical ya queda centrado con -50%) para que el punto/diamante
+   quede anclado en el mismo lugar exacto que tenía sin seleccionar. */
 .markerItemHighlighted {
-  top: 9px;
   padding: 4px 10px;
   border: 1px solid #4c7ef3;
   border-radius: 999px;
   background: #eef4ff;
-  transform: translateX(-15px);
+  transform: translate(calc(-1 * var(--marker-half) - 11px), -50%);
 }
 
 /* Tarea fuera del ámbito seleccionado en los chips de "Resumen de avance". */

@@ -209,22 +209,22 @@ export function PhaseRoadmap({ phaseRoadmap, renderPhaseExtras, renderSelectionD
           </span>
         ))}
         <span className={styles.legendItem}>
-          <DiamondIcon size={10} className={styles.legendDiamondDone} /> Entrega realizada
+          <DiamondIcon size={14} className={styles.legendDiamondDone} /> Entrega realizada
         </span>
         <span className={styles.legendItem}>
-          <DiamondIcon size={10} className={styles.legendDiamondCommitted} /> Entrega comprometida
+          <DiamondIcon size={14} className={styles.legendDiamondCommitted} /> Entrega comprometida
         </span>
         <span className={styles.legendItem}>
-          <DiamondIcon size={10} className={styles.legendDiamondDelayed} /> Entrega atrasada
+          <DiamondIcon size={14} className={styles.legendDiamondDelayed} /> Entrega atrasada
         </span>
         <span className={styles.legendItem}>
           <span className={styles.legendCheck}>✓</span> Tarea terminada
         </span>
         <span className={styles.legendItem}>
-          <span className={[styles.legendDot, styles.taskDotUpcoming].join(' ')} /> Tarea próxima
+          <span className={[styles.legendDot, styles.legendTaskMark, styles.taskDotUpcoming].join(' ')} /> Tarea próxima
         </span>
         <span className={styles.legendItem}>
-          <span className={[styles.legendDot, styles.taskDotDelayed].join(' ')} /> Tarea atrasada
+          <span className={[styles.legendDot, styles.legendTaskMark, styles.taskDotDelayed].join(' ')} /> Tarea atrasada
         </span>
         <span className={styles.legendHoy}>— Hoy</span>
         <span className={styles.hint}>Usa el zoom de cada fase para ver días y tareas.</span>
@@ -538,7 +538,7 @@ function PhaseCard({
                           onClick={() => toggleSelection(selection)}
                         >
                           <DiamondIcon
-                            size={10}
+                            size={18}
                             className={
                               delivery.state === 'delivered'
                                 ? styles.legendDiamondDone
@@ -570,6 +570,7 @@ function PhaseCard({
                           type="button"
                           className={[
                             styles.markerItem,
+                            styles.markerItemTask,
                             isSelected ? styles.markerItemHighlighted : '',
                             isDimmed ? styles.markerItemDimmed : '',
                           ].join(' ')}
@@ -579,11 +580,12 @@ function PhaseCard({
                         >
                           {/* Terminada = el mismo ✓ que la leyenda (y que las tareas terminadas del Roadmap interno). */}
                           {taskItem.state === 'done' ? (
-                            <span className={styles.legendCheck}>✓</span>
+                            <span className={[styles.legendCheck, styles.markerTaskMark].join(' ')}>✓</span>
                           ) : (
                             <span
                               className={[
                                 styles.legendDot,
+                                styles.markerTaskMark,
                                 taskItem.state === 'delayed' ? styles.taskDotDelayed : styles.taskDotUpcoming,
                               ].join(' ')}
                             />
