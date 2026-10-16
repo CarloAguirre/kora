@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import styles from './ForecastLayout.module.css';
 import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
-import { SegmentedControl } from '@/shared/components/ui/SegmentedControl';
+import { Tabs } from '@/shared/components/ui/Tabs';
 import { WeekRangePicker } from '@/shared/components/ui/WeekRangePicker';
 import { useForecastCapacity } from '../api/forecast.queries';
 import { currentLaborWeek, hasWeekStarted } from '../lib/labor-weeks';
@@ -10,9 +10,9 @@ import { ForecastWeeksGrid } from './ForecastWeeksGrid';
 
 type ViewMode = 'week' | 'weeks';
 
-const VIEW_OPTIONS = [
-  { value: 'week', label: 'Semana actual' },
-  { value: 'weeks', label: 'Próximas semanas' },
+const VIEW_TABS = [
+  { id: 'week', label: 'Semana actual' },
+  { id: 'weeks', label: 'Próximas semanas' },
 ] as const;
 
 /**
@@ -33,12 +33,7 @@ export function ForecastCapacityView() {
       <div className={styles.page}>
         {/* El título "Forecast" del Figma ya lo pinta la TopBar; aquí solo quedan la vista y el período. */}
         <div className={styles.header}>
-          <SegmentedControl
-            aria-label="Vista"
-            options={VIEW_OPTIONS}
-            value={view}
-            onChange={(value) => setView(value as ViewMode)}
-          />
+          <Tabs tabs={VIEW_TABS} activeId={view} onSelect={(id) => setView(id as ViewMode)} />
           {view === 'week' && (
             <div className={styles.headerFields}>
               <WeekRangePicker

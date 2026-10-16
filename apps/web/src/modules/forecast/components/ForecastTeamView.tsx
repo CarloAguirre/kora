@@ -5,7 +5,7 @@ import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Select } from '@/shared/components/ui/Select';
 import { Button } from '@/shared/components/ui/Button';
 import { Modal } from '@/shared/components/ui/Modal';
-import { SegmentedControl } from '@/shared/components/ui/SegmentedControl';
+import { Tabs } from '@/shared/components/ui/Tabs';
 import { WeekRangePicker } from '@/shared/components/ui/WeekRangePicker';
 import { useToast } from '@/shared/components/ui/Toast';
 import { RefreshIcon, TriangleAlertIcon } from '@/shared/components/icons/Icons';
@@ -23,9 +23,9 @@ type ViewMode = 'week' | 'weeks';
 /** Valor del selector de equipo para "Todos los equipos" (solo admin y PMO). */
 const ALL_TEAMS = 'all';
 
-const VIEW_OPTIONS = [
-  { value: 'week', label: 'Semana actual' },
-  { value: 'weeks', label: 'Próximas semanas' },
+const VIEW_TABS = [
+  { id: 'week', label: 'Semana actual' },
+  { id: 'weeks', label: 'Próximas semanas' },
 ] as const;
 
 /**
@@ -139,12 +139,7 @@ export function ForecastTeamView({ teams, allowAllTeams = false }: { teams: Team
     <DashboardLayout title="Forecast">
       <div className={styles.page}>
         <div className={styles.header}>
-          <SegmentedControl
-            aria-label="Vista"
-            options={VIEW_OPTIONS}
-            value={view}
-            onChange={(value) => setView(value as ViewMode)}
-          />
+          <Tabs tabs={VIEW_TABS} activeId={view} onSelect={(id) => setView(id as ViewMode)} />
           <div className={styles.headerFields}>
             {(teams.length > 1 || allowAllTeams) && (
               <Select
