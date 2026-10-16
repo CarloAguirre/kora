@@ -312,7 +312,7 @@ export function WeeklyEntryForm({
             key={label}
             label={label}
             type="number"
-            step="0.5"
+            step="0.25"
             disabled={holidayDayIndexes.has(index)}
             value={holidayDayIndexes.has(index) ? '' : dayHours[index]}
             onChange={(event) =>

@@ -187,7 +187,7 @@ function EditEntryForm({
 
       <div className={styles.row}>
         <TextField label="Categoría / Actividad" placeholder="p. ej. Desarrollo, Reunión..." {...register('category')} />
-        <TextField label="Horas" type="number" step="0.5" required errorText={errors.hours?.message} {...register('hours')} />
+        <TextField label="Horas" type="number" step="0.25" required errorText={errors.hours?.message} {...register('hours')} />
       </div>
 
       <div className={styles.row}>

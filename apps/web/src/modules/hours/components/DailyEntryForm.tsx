@@ -26,7 +26,7 @@ const ASSIGNMENT_OPTIONS = [...HOUR_ENTRY_ASSIGNMENTS]
   .map((value) => ({ value, label: value }));
 const DAILY_CAP_HOURS = 8;
 const MIN_DESCRIPTION_LENGTH = 5;
-const HOURS_STEP = 0.5;
+const HOURS_STEP = 0.25;
 const today = () => new Date().toISOString().slice(0, 10);
 const isWeekend = (isoDate: string) => {
   const day = new Date(`${isoDate}T00:00:00`).getDay();
