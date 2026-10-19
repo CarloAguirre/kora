@@ -63,6 +63,7 @@ export class GetTeamAvailabilityUseCase
         const byDate = hoursByMemberId.get(member.id);
         return {
           teamMemberId: member.id,
+          userId: member.userId,
           fullName: member.userFullName,
           weeklyHours: Number(member.weeklyHours),
           days: dates.map((date) => ({

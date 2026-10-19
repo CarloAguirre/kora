@@ -151,6 +151,8 @@ export type TeamAvailabilityDay = z.infer<typeof teamAvailabilityDaySchema>;
 
 export const teamAvailabilityMemberSchema = z.object({
   teamMemberId: uuidSchema,
+  /** Para cruzar con la cola de aprobación (`HourEntrySummary.user.id`). */
+  userId: uuidSchema,
   fullName: z.string(),
   weeklyHours: z.number(),
   days: z.array(teamAvailabilityDaySchema),

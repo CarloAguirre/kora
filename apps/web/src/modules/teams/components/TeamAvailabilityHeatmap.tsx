@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import styles from './TeamAvailabilityHeatmap.module.css';
 import { WeekRangePicker } from '@/shared/components/ui/WeekRangePicker';
 import { UserIcon } from '@/shared/components/icons/Icons';
+import { useHourEntriesList } from '@/modules/hours/api/hours.queries';
 import { useTeamAvailability } from '../api/teams.queries';
 import { currentLaborWeek, type LaborWeek } from '@/modules/forecast/lib/labor-weeks';
 
@@ -18,6 +19,7 @@ interface Column {
 /** Leyenda de colores de las celdas — mismo orden de prioridad que `chipClass`. */
 const LEGEND = [
   { className: styles.chipPending, label: 'Pendientes de aprobación' },
+  { className: styles.chipPendingOther, label: 'Pendientes de otro aprobador' },
   { className: styles.chipEmpty, label: 'Sin horas' },
   { className: styles.chipLow, label: 'Menos de 8 h' },
   { className: styles.chipFull, label: '8 h o más' },
@@ -52,9 +54,16 @@ function buildWeeklyColumns(startWeek: LaborWeek, count: number): Column[] {
 
 const formatHours = (hours: number) => `${hours.toLocaleString('es-CL', { maximumFractionDigits: 1 })}h`;
 
-/** Con horas enviadas sin aprobar la celda va en azul (Figma node 10306:163467), sin importar cuánto haya aprobado. */
-function chipClass(hours: number, pendingHours: number) {
-  if (pendingHours > 0) return styles.chipPending;
+/**
+ * Con horas enviadas sin aprobar que le tocan a quien mira, la celda va en azul
+ * (Figma node 10306:163467), sin importar cuánto haya aprobado. Las pendientes
+ * que aprueba otra persona (p.ej. el líder de un proyecto al que el equipo no
+ * está asignado) van aparte: en azul parecían trabajo propio que la cola de
+ * abajo no mostraba.
+ */
+function chipClass(hours: number, myPendingHours: number, otherPendingHours: number) {
+  if (myPendingHours > 0) return styles.chipPending;
+  if (otherPendingHours > 0) return styles.chipPendingOther;
   if (hours <= 0) return styles.chipEmpty;
   if (hours < 8) return styles.chipLow;
   return styles.chipFull;
@@ -84,6 +93,18 @@ export function TeamAvailabilityHeatmap({ teamId, teamMemberId }: { teamId: stri
   const dateTo = columns[columns.length - 1]?.dates.at(-1) ?? selectedWeek.periodEnd;
 
   const { data, isLoading } = useTeamAvailability(teamId, { dateFrom, dateTo });
+  // Misma consulta y alcance que la cola de aprobación de abajo: la API solo
+  // devuelve las pendientes que quien mira puede aprobar, así ambas cuadran.
+  const { data: myPending } = useHourEntriesList({ teamId, status: 'pending', dateFrom, dateTo, pageSize: 200 });
+
+  const myPendingByUserAndDate = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const entry of myPending?.items ?? []) {
+      const key = `${entry.user.id}|${entry.date}`;
+      map.set(key, (map.get(key) ?? 0) + entry.hours);
+    }
+    return map;
+  }, [myPending]);
 
   const hoursByMemberAndDate = useMemo(() => {
     const map = new Map<string, Map<string, { hours: number; pendingHours: number }>>();
@@ -173,14 +194,23 @@ export function TeamAvailabilityHeatmap({ teamId, teamMemberId }: { teamId: stri
                       {columns.map((column) => {
                         const hours = column.dates.reduce((sum, date) => sum + (byDate?.get(date)?.hours ?? 0), 0);
                         const pendingHours = column.dates.reduce((sum, date) => sum + (byDate?.get(date)?.pendingHours ?? 0), 0);
+                        const myPendingHours = Math.min(
+                          pendingHours,
+                          column.dates.reduce((sum, date) => sum + (myPendingByUserAndDate.get(`${member.userId}|${date}`) ?? 0), 0),
+                        );
+                        const otherPendingHours = pendingHours - myPendingHours;
                         const detail =
-                          pendingHours > 0
-                            ? `${formatHours(pendingHours)} pendientes de aprobación${hours > 0 ? ` · ${formatHours(hours)} aprobadas` : ''}`
-                            : `${formatHours(hours)} aprobadas`;
+                          [
+                            myPendingHours > 0 && `${formatHours(myPendingHours)} pendientes de tu aprobación`,
+                            otherPendingHours > 0 && `${formatHours(otherPendingHours)} pendientes de otro aprobador`,
+                            (hours > 0 || pendingHours === 0) && `${formatHours(hours)} aprobadas`,
+                          ]
+                            .filter(Boolean)
+                            .join(' · ');
                         return (
                           <td key={column.key} className={styles.cell}>
                             <span
-                              className={[styles.chip, chipClass(hours, pendingHours)].join(' ')}
+                              className={[styles.chip, chipClass(hours, myPendingHours, otherPendingHours)].join(' ')}
                               role="status"
                               title={detail}
                               aria-label={`${member.fullName} ${column.label}: ${detail}`}

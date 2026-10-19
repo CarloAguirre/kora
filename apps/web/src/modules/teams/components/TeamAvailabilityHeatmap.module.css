@@ -160,6 +160,14 @@
   font-weight: var(--kora-weight-bold);
 }
 
+/* Pendiente, pero la aprueba otra persona: mismo tono azul, apagado y con borde punteado. */
+.chipPendingOther {
+  background: rgba(84, 170, 217, 0.06);
+  color: #3f86ad;
+  border-color: rgba(84, 170, 217, 0.75);
+  border-style: dashed;
+}
+
 .skeletonBar {
   height: 14px;
   width: 100%;
