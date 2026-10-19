@@ -224,6 +224,17 @@ de guardar, sin depender del aviso que se muestra mientras se escribe.
 - **Editor del Forecast**: si la semana queda sobre el 100 %, lo muestra arriba
   del editor.
 
+### Planificación manual y tramos/tareas del mismo proyecto
+
+Las HH de proyecto o soporte que el líder carga a mano para un proyecto son la
+planificación de esa semana; lo que después cargan un tramo o una tarea del
+mismo proyecto sale de ahí, no se suma aparte. Por persona, semana y proyecto,
+la carga es lo mayor entre lo planificado a mano y lo calculado
+(`coverPlannedHours`, usado en `/forecast/capacity` y `/forecast/weeks`). Las
+filas manuales no se modifican — si se borra el tramo, la planificación vuelve
+a contar entera —; el editor indica en cada una cuántas HH ya cubren los tramos
+o tareas.
+
 ### Admin y PMO
 
 Admin y PMO ven y editan el forecast de todos los equipos en la misma vista

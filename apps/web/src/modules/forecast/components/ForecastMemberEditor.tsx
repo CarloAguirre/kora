@@ -46,6 +46,27 @@ export interface ForecastMemberEditorMember {
   readonly unscheduled: readonly ForecastUnscheduledHours[];
 }
 
+/**
+ * HH de cada fila manual de proyecto que ya cubren los tramos/tareas del mismo proyecto esa semana —
+ * no suman aparte (mismo reparto que `coverPlannedHours` en la API).
+ */
+function coveredHoursById(calculated: readonly ForecastAssignment[], manual: readonly ForecastAssignment[]): Map<string, number> {
+  const pending = new Map<string, number>();
+  for (const assignment of calculated) {
+    if (assignment.project) pending.set(assignment.project.id, (pending.get(assignment.project.id) ?? 0) + assignment.assignedHours);
+  }
+  const result = new Map<string, number>();
+  for (const assignment of manual) {
+    const projectId = assignment.project?.id;
+    if (!projectId || (assignment.type !== 'project' && assignment.type !== 'support')) continue;
+    const taken = Math.min(pending.get(projectId) ?? 0, assignment.assignedHours);
+    if (taken <= 0) continue;
+    pending.set(projectId, (pending.get(projectId) ?? 0) - taken);
+    result.set(assignment.id, taken);
+  }
+  return result;
+}
+
 function formatDay(isoDate: string): string {
   return new Date(`${isoDate}T00:00:00Z`).toLocaleDateString('es-CL', { day: 'numeric', month: 'short', timeZone: 'UTC' });
 }
@@ -79,6 +100,7 @@ export function ForecastMemberEditor({
   const remaining = Math.max(0, member.capacityHours - member.assignedHours);
   const calculated = assignments.filter((assignment) => assignment.source !== 'manual');
   const manual = assignments.filter((assignment) => assignment.source === 'manual');
+  const covered = coveredHoursById(calculated, manual);
   const hasProjectData = calculated.length > 0 || member.containedTasks.length > 0 || member.deliveries.length > 0;
   const overHours = member.assignedHours - member.capacityHours;
 
@@ -157,7 +179,12 @@ export function ForecastMemberEditor({
         {manual.length > 0 && (
           <div className={styles.rows}>
             {manual.map((assignment) => (
-              <ManualAssignmentRow key={assignment.id} assignment={assignment} maxHours={member.capacityHours} />
+              <ManualAssignmentRow
+                key={assignment.id}
+                assignment={assignment}
+                maxHours={member.capacityHours}
+                coveredHours={covered.get(assignment.id) ?? 0}
+              />
             ))}
           </div>
         )}
@@ -314,7 +341,16 @@ function CalculatedAssignmentRow({ assignment, maxHours }: { assignment: Forecas
   );
 }
 
-function ManualAssignmentRow({ assignment, maxHours }: { assignment: ForecastAssignment; maxHours: number }) {
+function ManualAssignmentRow({
+  assignment,
+  maxHours,
+  coveredHours,
+}: {
+  assignment: ForecastAssignment;
+  maxHours: number;
+  /** HH de esta fila que ya cubren tramos/tareas del mismo proyecto: no suman aparte. */
+  coveredHours: number;
+}) {
   const toast = useToast();
   const updateAssignment = useUpdateForecastAssignment();
   const removeAssignment = useRemoveForecastAssignment();
@@ -431,6 +467,14 @@ function ManualAssignmentRow({ assignment, maxHours }: { assignment: ForecastAss
       >
         <CloseIcon size={16} />
       </button>
+
+      {coveredHours > 0 && (
+        <p className={styles.coveredNote}>
+          {coveredHours >= assignment.assignedHours
+            ? `Cubiertas por tramos o tareas de este proyecto: estas ${formatHours(assignment.assignedHours)} no suman aparte.`
+            : `${formatHours(coveredHours)} de estas ${formatHours(assignment.assignedHours)} ya las cubren tramos o tareas de este proyecto: solo suman ${formatHours(assignment.assignedHours - coveredHours)}.`}
+        </p>
+      )}
     </div>
   );
 }

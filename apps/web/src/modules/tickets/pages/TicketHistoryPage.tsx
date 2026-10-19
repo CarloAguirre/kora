@@ -43,7 +43,8 @@ export function TicketHistoryPage() {
   const [search, setSearch] = useState('');
   const [clientIds, setClientIds] = useState<string[]>([]);
   const [assigneeUserIds, setAssigneeUserIds] = useState<string[]>([]);
-  const [status, setStatus] = useState<TicketStatus | ''>('');
+  const [leaderUserIds, setLeaderUserIds] = useState<string[]>([]);
+  const [status,setStatus] = useState<TicketStatus | ''>('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [sort, setSort] = useState<{ field: TicketSortField; direction: 'asc' | 'desc' }>({
@@ -63,6 +64,7 @@ export function TicketHistoryPage() {
     search: search || undefined,
     clientId: clientIds.length > 0 ? clientIds : undefined,
     assigneeUserId: assigneeUserIds.length > 0 ? assigneeUserIds : undefined,
+    leaderUserId: leaderUserIds.length > 0 ? leaderUserIds : undefined,
     status: status || undefined,
     sortField: sort.field,
     sortDirection: sort.direction,
@@ -204,6 +206,18 @@ export function TicketHistoryPage() {
               value={assigneeUserIds}
               onChange={(next) => {
                 setAssigneeUserIds(next);
+                setPage(1);
+              }}
+            />
+            <MultiSelect
+              className={styles.filter}
+              label="Líder"
+              placeholder="Todos"
+              searchPlaceholder="Buscar líder"
+              options={(users?.items ?? []).map((user) => ({ value: user.id, label: user.fullName }))}
+              value={leaderUserIds}
+              onChange={(next) => {
+                setLeaderUserIds(next);
                 setPage(1);
               }}
             />

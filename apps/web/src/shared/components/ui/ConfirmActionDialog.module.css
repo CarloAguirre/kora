@@ -15,6 +15,19 @@
   font-size: var(--kora-text-base);
 }
 
+.warning {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--kora-space-2);
+  margin-top: var(--kora-space-3);
+  padding: var(--kora-space-3);
+  border-radius: var(--kora-radius-sm);
+  border: 1px solid var(--kora-warning);
+  background: var(--kora-badge-warning-bg);
+  color: var(--kora-text);
+  font-size: var(--kora-text-base);
+}
+
 .alertIcon {
   flex-shrink: 0;
   margin-top: 1px;

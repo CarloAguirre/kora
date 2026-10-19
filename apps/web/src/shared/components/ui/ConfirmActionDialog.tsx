@@ -2,7 +2,7 @@ import { useState } from 'react';
 import styles from './ConfirmActionDialog.module.css';
 import { Modal } from '@/shared/components/ui/Modal';
 import { Button } from '@/shared/components/ui/Button';
-import { AlertIcon } from '@/shared/components/icons/Icons';
+import { AlertIcon, TriangleAlertIcon } from '@/shared/components/icons/Icons';
 import { ApiRequestError } from '@/shared/lib/api-client';
 
 /**
@@ -23,6 +23,8 @@ export interface ConfirmActionDialogProps {
   open: boolean;
   title: string;
   description: string;
+  /** Aviso destacado bajo la descripción — no bloquea la acción, solo advierte. */
+  warning?: string | null;
   confirmLabel: string;
   /** Presenta la acción como destructiva. */
   destructive?: boolean;
@@ -34,6 +36,7 @@ export function ConfirmActionDialog({
   open,
   title,
   description,
+  warning,
   confirmLabel,
   destructive = false,
   onConfirm,
@@ -88,6 +91,13 @@ export function ConfirmActionDialog({
       }
     >
       <p className={styles.description}>{description}</p>
+
+      {warning && (
+        <div className={styles.warning} role="alert">
+          <TriangleAlertIcon size={18} className={styles.alertIcon} />
+          <span>{warning}</span>
+        </div>
+      )}
 
       {error && (
         <div className={styles.alert} role="alert">

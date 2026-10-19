@@ -38,6 +38,7 @@ export class ListTicketsUseCase implements UseCase<ListTicketsQueryCommand, Page
         clientId: query.clientId,
         projectId: project?.id,
         assigneeUserId: hasFullRead ? query.assigneeUserId : [actor.userId],
+        leaderUserId: query.leaderUserId,
         status: query.status,
         priority: query.priority,
       },

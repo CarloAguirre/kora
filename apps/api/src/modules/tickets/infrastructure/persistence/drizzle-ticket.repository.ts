@@ -169,6 +169,14 @@ export class DrizzleTicketRepository implements TicketRepository {
       conditions.push(or(eq(tickets.projectId, filters.projectId), eq(tickets.developmentProjectId, filters.projectId)));
     }
     if (filters.assigneeUserId?.length) conditions.push(inArray(tickets.assigneeUserId, filters.assigneeUserId));
+    // Subconsulta y no el join de `search`: el conteo total usa este mismo `where` sin joins.
+    if (filters.leaderUserId?.length) {
+      const ledProjects = this.database
+        .select({ id: projects.id })
+        .from(projects)
+        .where(inArray(projects.leaderUserId, filters.leaderUserId));
+      conditions.push(inArray(tickets.projectId, ledProjects));
+    }
     if (filters.status) conditions.push(eq(tickets.status, filters.status));
     if (filters.priority) conditions.push(eq(tickets.priority, filters.priority));
     if (filters.search) {

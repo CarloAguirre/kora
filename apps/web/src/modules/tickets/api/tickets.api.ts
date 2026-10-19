@@ -20,6 +20,7 @@ export const ticketsApi = {
       clientId: query.clientId,
       projectId: query.projectId,
       assigneeUserId: query.assigneeUserId,
+      leaderUserId: query.leaderUserId,
       status: query.status,
       priority: query.priority,
       sortField: query.sortField,

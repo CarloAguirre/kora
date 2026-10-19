@@ -1,22 +1,16 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CLOCK, ok, type ApplicationError, type Clock, type Result } from '@kora/core';
 import type { ForecastLoadPreviewInput, ForecastLoadPreviewResponse, ForecastOverloadWarning } from '@kora/contracts';
-import {
-  FORECAST_ASSIGNMENT_REPOSITORY,
-  type ForecastAssignmentRawRow,
-  type ForecastAssignmentRepository,
-} from '../../domain/repositories/forecast-assignment.repository';
+import { FORECAST_ASSIGNMENT_REPOSITORY, type ForecastAssignmentRepository } from '../../domain/repositories/forecast-assignment.repository';
 import { FORECAST_SOURCE_CALCULATOR, type ForecastSourceCalculator, type PlannedLoadWeek } from '../ports/forecast-source-calculator.port';
 import { FORECAST_TEAM_READER, type ForecastTeamReader } from '../ports/forecast-team-reader.port';
 import { ForecastCapacityService } from '../services/forecast-capacity.service';
+import { isManualPlanning } from '../services/forecast-planned-coverage';
 import type { UseCase } from '../../../../shared/application/use-case';
 
 const toIsoDate = (date: Date) => date.toISOString().slice(0, 10);
 const toDate = (isoDate: string) => new Date(`${isoDate}T00:00:00.000Z`);
 const round2 = (value: number) => Math.round(value * 100) / 100;
-
-/** Horas de proyecto/soporte cargadas a mano en el Forecast: son planificación, no carga comprometida. */
-const isManualPlanning = (row: ForecastAssignmentRawRow) => row.source === 'manual' && (row.type === 'project' || row.type === 'support');
 
 /**
  * Antes de guardar un tramo o una tarea: ¿deja a alguien sobre su capacidad? Calcula las HH que

@@ -19,6 +19,7 @@ import {
   type ForecastAssignmentRawRow,
   type ForecastAssignmentRepository,
 } from '../../domain/repositories/forecast-assignment.repository';
+import { coverPlannedHours } from './forecast-planned-coverage';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -125,7 +126,7 @@ export class ForecastCapacityService {
       this.signals.listLoggedHours(periodStart, periodEnd),
     ]);
 
-    const rowsByMember = groupBy(rawRows, (row) => row.teamMemberId);
+    const rowsByMember = groupBy(coverPlannedHours(rawRows), (row) => row.teamMemberId);
     const deliveriesByMember = this.deliveriesByMember(members, deliveries);
     const containedByMember = groupBy(containedTasks, (task) => task.teamMemberId);
     const plannedByKey = new Map(plannedHours.map((row) => [`${row.teamMemberId}|${row.projectId}`, row.hours]));
@@ -212,7 +213,7 @@ export class ForecastCapacityService {
       return { periodStart, periodEnd, businessDays: countBusinessDays(periodStart, periodEnd, nonWorkingDates) };
     });
 
-    const rowsByMemberWeek = groupBy(rawRows, (row) => `${row.teamMemberId}|${toIsoDate(row.periodStart)}`);
+    const rowsByMemberWeek = groupBy(coverPlannedHours(rawRows), (row) => `${row.teamMemberId}|${toIsoDate(row.periodStart)}`);
     const deliveriesByMember = this.deliveriesByMember(members, deliveries);
 
     return {

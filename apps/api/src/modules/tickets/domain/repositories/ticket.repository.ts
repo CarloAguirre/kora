@@ -7,6 +7,8 @@ export interface TicketFilters {
   readonly clientId?: readonly string[] | undefined;
   readonly projectId?: string | undefined;
   readonly assigneeUserId?: readonly string[] | undefined;
+  /** Líder del proyecto del ticket (`projects.leader_user_id`). */
+  readonly leaderUserId?: readonly string[] | undefined;
   readonly status?: TicketStatus | undefined;
   readonly priority?: TicketPriority | undefined;
   readonly includeDeleted?: boolean | undefined;

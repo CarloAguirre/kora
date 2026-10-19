@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { TICKET_HH_REQUEST_STATUS_LABELS, type TicketHhRequest } from '@kora/contracts';
 import styles from './TicketHhRequestsSection.module.css';
 import { Avatar } from '@/shared/components/ui/Avatar';
@@ -48,6 +48,8 @@ interface TicketHhRequestsSectionProps {
   pendingHhHours: number;
   /** `ticket.hhApprovers` — quién(es) decidirán la solicitud (líder de equipo del responsable, o líder de proyecto a falta de ese líder). */
   hhApprovers: { id: string; fullName: string }[];
+  /** Horas escritas en "Registrar horas" que aún no se enviaron (0 si no hay) — la ficha lo usa para avisar antes de salir. */
+  onUnsentHoursChange?: (hours: number) => void;
 }
 
 /**
@@ -63,6 +65,7 @@ export function TicketHhRequestsSection({
   pendingHhRequestsCount,
   pendingHhHours,
   hhApprovers,
+  onUnsentHoursChange,
 }: TicketHhRequestsSectionProps) {
   const { can } = usePermissions();
   const { user } = useAuth();
@@ -96,6 +99,10 @@ export function TicketHhRequestsSection({
     .reduce((sum, entry) => sum + entry.hours, 0);
   const newHoursValue = Number(hours) || 0;
   const overtimeHoursPreview = Math.max(0, newHoursValue - Math.max(0, DAILY_CAP_HOURS - existingHoursForDate));
+
+  useEffect(() => {
+    onUnsentHoursChange?.(newHoursValue > 0 ? newHoursValue : 0);
+  }, [newHoursValue, onUnsentHoursChange]);
 
   const submitRequest = async () => {
     const hoursValue = Number(hours);

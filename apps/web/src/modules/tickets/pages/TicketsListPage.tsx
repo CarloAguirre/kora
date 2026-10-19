@@ -44,6 +44,7 @@ export function TicketsListPage() {
   const [search, setSearch] = useState('');
   const [clientIds, setClientIds] = useState<string[]>([]);
   const [assigneeUserIds, setAssigneeUserIds] = useState<string[]>([]);
+  const [leaderUserIds, setLeaderUserIds] = useState<string[]>([]);
   const [dragOverStatus, setDragOverStatus] = useState<TicketStatus | null>(null);
   const [openTicketId, setOpenTicketId] = useState<string | null>(null);
   const [creatingTicket, setCreatingTicket] = useState(false);
@@ -56,6 +57,7 @@ export function TicketsListPage() {
     search: search || undefined,
     clientId: clientIds.length > 0 ? clientIds : undefined,
     assigneeUserId: assigneeUserIds.length > 0 ? assigneeUserIds : undefined,
+    leaderUserId: leaderUserIds.length > 0 ? leaderUserIds : undefined,
     pageSize: 200,
   };
 
@@ -129,6 +131,15 @@ export function TicketsListPage() {
               options={(users?.items ?? []).map((user) => ({ value: user.id, label: user.fullName }))}
               value={assigneeUserIds}
               onChange={setAssigneeUserIds}
+            />
+            <MultiSelect
+              className={styles.filter}
+              label="Líder"
+              placeholder="Todos"
+              searchPlaceholder="Buscar líder"
+              options={(users?.items ?? []).map((user) => ({ value: user.id, label: user.fullName }))}
+              value={leaderUserIds}
+              onChange={setLeaderUserIds}
             />
           </div>
           <div className={styles.toolbarActions}>

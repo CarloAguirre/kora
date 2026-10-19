@@ -143,6 +143,14 @@ export function TicketDetailModal({ ticketId, onClose }: { ticketId: string; onC
   const [closeOpen, setCloseOpen] = useState(false);
   const [completeOpen, setCompleteOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [unsentHours, setUnsentHours] = useState(0);
+  const [actionAfterUnsentWarning, setActionAfterUnsentWarning] = useState<(() => void) | null>(null);
+
+  /** Si quedaron horas escritas en "Registrar horas" sin enviar, avisa antes de salir de la ficha o cambiar el estado. */
+  const guardUnsentHours = (action: () => void) => {
+    if (unsentHours > 0) setActionAfterUnsentWarning(() => action);
+    else action();
+  };
 
   const reportError = (error: unknown, fallback: string) => {
     toast.error(error instanceof ApiRequestError ? error.message : fallback);
@@ -179,7 +187,7 @@ export function TicketDetailModal({ ticketId, onClose }: { ticketId: string; onC
   const hhPercent = ticket?.estimatedHours ? Math.min(100, (ticket.usedHours / ticket.estimatedHours) * 100) : 0;
 
   return (
-    <div className={styles.overlay} onClick={onClose}>
+    <div className={styles.overlay} onClick={() => guardUnsentHours(onClose)}>
       <div className={styles.modal} role="dialog" aria-modal="true" aria-label={ticket?.title ?? 'Ticket'} onClick={(event) => event.stopPropagation()}>
         {error ? (
           <div className={styles.body}>
@@ -200,7 +208,7 @@ export function TicketDetailModal({ ticketId, onClose }: { ticketId: string; onC
               </div>
               <div className={styles.headerRight}>
                 <TicketStatusBadge status={ticket.status} />
-                <button type="button" className={styles.closeButton} aria-label="Cerrar" onClick={onClose}>
+                <button type="button" className={styles.closeButton} aria-label="Cerrar" onClick={() => guardUnsentHours(onClose)}>
                   <CloseIcon size={18} />
                 </button>
               </div>
@@ -338,6 +346,7 @@ export function TicketDetailModal({ ticketId, onClose }: { ticketId: string; onC
                 pendingHhRequestsCount={ticket.pendingHhRequestsCount}
                 pendingHhHours={ticket.pendingHhHours}
                 hhApprovers={ticket.hhApprovers}
+                onUnsentHoursChange={setUnsentHours}
               />
 
               <div className={styles.historyBox}>
@@ -396,11 +405,13 @@ export function TicketDetailModal({ ticketId, onClose }: { ticketId: string; onC
                       disabled={isUnassignedPending}
                       title={isUnassignedPending ? 'Asigna un responsable para iniciar el ticket.' : undefined}
                       loading={changeStatus.isPending}
-                      onClick={() => {
-                        if (forwardStatus === 'closed') return setCloseOpen(true);
-                        if (forwardStatus === 'done' && !ticket.resolution) return setCompleteOpen(true);
-                        void onStatusChange(forwardStatus);
-                      }}
+                      onClick={() =>
+                        guardUnsentHours(() => {
+                          if (forwardStatus === 'closed') return setCloseOpen(true);
+                          if (forwardStatus === 'done' && !ticket.resolution) return setCompleteOpen(true);
+                          void onStatusChange(forwardStatus);
+                        })
+                      }
                     >
                       {forwardActionLabel(ticket.status, forwardStatus)}
                     </Button>
@@ -427,12 +438,25 @@ export function TicketDetailModal({ ticketId, onClose }: { ticketId: string; onC
               open={closeOpen}
               title="Cerrar ticket"
               description={`Al cerrar el ticket "${ticket.title}" saldrá del tablero y se trasladará al repositorio de cerrados. ¿Deseas confirmar el cierre?`}
+              warning={
+                ticket.usedHours === 0
+                  ? 'Este ticket tiene 0 horas utilizadas. Si se trabajó en él, registra las HH antes de cerrarlo.'
+                  : null
+              }
               confirmLabel="Cerrar Ticket"
               onClose={() => setCloseOpen(false)}
               onConfirm={async () => {
                 await changeStatus.mutateAsync({ ticketId, input: { status: 'closed' } });
                 toast.success('Se cerró el ticket.');
               }}
+            />
+            <ConfirmActionDialog
+              open={actionAfterUnsentWarning !== null}
+              title="Horas sin registrar"
+              description={`Escribiste ${formatHours(unsentHours)} h en "Registrar horas" pero no las enviaste. Si continúas, no quedarán registradas.`}
+              confirmLabel="Continuar sin registrar"
+              onClose={() => setActionAfterUnsentWarning(null)}
+              onConfirm={async () => actionAfterUnsentWarning?.()}
             />
             {forwardStatus === 'done' && (
               <CompleteTicketDialog
