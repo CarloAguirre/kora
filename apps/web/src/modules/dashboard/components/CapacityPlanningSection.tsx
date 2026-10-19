@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import type { DashboardCapacitySummary } from '@kora/contracts';
 import styles from './CapacityPlanningSection.module.css';
 import { Card } from '@/shared/components/ui/Card';
-import { Select } from '@/shared/components/ui/Select';
+import { WeekRangePicker } from '@/shared/components/ui/WeekRangePicker';
 import { ChevronRightIcon } from '@/shared/components/icons/Icons';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { teamPath } from '@/app/router/paths';
@@ -30,11 +30,6 @@ function toIsoDate(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-function formatRangeDDMMYY(start: Date, end: Date): string {
-  const fmt = (d: Date) => `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getFullYear()).slice(2)}`;
-  return `${fmt(start)} - ${fmt(end)}`;
-}
-
 interface CapacityPlanningSectionProps {
   capacity: DashboardCapacitySummary | null;
   loading: boolean;
@@ -47,17 +42,6 @@ export function CapacityPlanningSection({ capacity, loading, weekStart, onWeekSt
   const { can } = usePermissions();
   const selectedMonday = useMemo(() => mondayOf(weekStart ? new Date(`${weekStart}T00:00:00`) : new Date()), [weekStart]);
 
-  const weekOptions = useMemo(
-    () =>
-      Array.from({ length: 13 }, (_, index) => {
-        const offset = index - 6;
-        const monday = mondayOf(addDays(selectedMonday, offset * 7));
-        const friday = addDays(monday, 4);
-        return { value: toIsoDate(monday), label: formatRangeDDMMYY(monday, friday) };
-      }),
-    [selectedMonday],
-  );
-
   const byTeam = capacity?.byTeam ?? [];
   const totalFreeHours = byTeam.reduce((sum, team) => sum + team.freeHours, 0);
 
@@ -65,12 +49,12 @@ export function CapacityPlanningSection({ capacity, loading, weekStart, onWeekSt
     <Card className={styles.card}>
       <div className={styles.header}>
         <span className={styles.title}>Capacidad y Planificación</span>
-        <Select
-          aria-label="Seleccionar período de capacidad"
+        <WeekRangePicker
+          label=""
           className={styles.weekSelect}
-          options={weekOptions}
-          value={toIsoDate(selectedMonday)}
-          onChange={(event) => onWeekStartChange(event.target.value)}
+          periodStart={toIsoDate(selectedMonday)}
+          periodEnd={toIsoDate(addDays(selectedMonday, 4))}
+          onChange={({ periodStart }) => onWeekStartChange(periodStart)}
         />
       </div>
 
