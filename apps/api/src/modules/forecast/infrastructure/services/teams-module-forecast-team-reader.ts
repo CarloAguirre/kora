@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { isForecastAssignableRole } from '@kora/contracts';
 import { TEAM_REPOSITORY, type TeamRepository } from '../../../teams/domain/repositories/team.repository';
 import {
   TEAM_MEMBER_REPOSITORY,
@@ -44,7 +45,7 @@ export class TeamsModuleForecastTeamReader implements ForecastTeamReader {
     const [team, members] = await Promise.all([this.teams.findById(teamId), this.members.listActiveForTeam(teamId)]);
     const teamName = team?.name ?? '';
 
-    return members.map((member) => ({
+    return members.filter((member) => isForecastAssignableRole(member.userRole)).map((member) => ({
       id: member.id,
       teamId: member.teamId,
       teamName,
@@ -56,7 +57,7 @@ export class TeamsModuleForecastTeamReader implements ForecastTeamReader {
 
   async listAllActiveMembers(): Promise<ForecastTeamMemberReference[]> {
     const members = await this.members.listAllActive();
-    return members.map((member) => ({
+    return members.filter((member) => isForecastAssignableRole(member.userRole)).map((member) => ({
       id: member.id,
       teamId: member.teamId,
       teamName: member.teamName,

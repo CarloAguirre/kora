@@ -1,7 +1,18 @@
 import { z } from 'zod';
 import { isoDateTimeSchema, uuidSchema } from '../common/primitives';
+import type { RoleCode } from '../users/roles';
 
 /** Ver docs/DECISION-M6-FORECAST.md. */
+
+/**
+ * Perfiles que gestionan el trabajo en vez de ejecutarlo: no aparecen en el Forecast ni se les asigna
+ * en un tramo de ejecución, aunque sean miembros de un equipo.
+ */
+export const FORECAST_EXCLUDED_ROLES = ['admin', 'pmo', 'leader'] as const satisfies readonly RoleCode[];
+
+export function isForecastAssignableRole(role: RoleCode): boolean {
+  return !(FORECAST_EXCLUDED_ROLES as readonly RoleCode[]).includes(role);
+}
 
 export const FORECAST_ASSIGNMENT_TYPES = [
   'project',

@@ -17,8 +17,9 @@ export interface ForecastTeamMemberReference {
 export interface ForecastTeamReader {
   findTeamById(teamId: string): Promise<ForecastTeamReference | null>;
   findMemberById(teamMemberId: string): Promise<ForecastTeamMemberReference | null>;
+  /** Miembros activos del equipo, sin líderes, PMO ni admin (`isForecastAssignableRole`). */
   listActiveMembers(teamId: string): Promise<ForecastTeamMemberReference[]>;
-  /** Todos los miembros activos de todos los equipos — para la vista de capacidad org-wide. */
+  /** Todos los miembros activos de todos los equipos (sin líderes, PMO ni admin) — para la vista de capacidad org-wide. */
   listAllActiveMembers(): Promise<ForecastTeamMemberReference[]>;
   /**
    * ¿Lidera `userId` el equipo `teamId`? — mismo criterio ampliado que usa

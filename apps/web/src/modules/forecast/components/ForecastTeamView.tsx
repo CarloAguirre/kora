@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import type { ForecastAssignment, ForecastCapacityMember, TeamSummary } from '@kora/contracts';
+import { isForecastAssignableRole, type ForecastAssignment, type ForecastCapacityMember, type TeamSummary } from '@kora/contracts';
 import styles from './ForecastLayout.module.css';
 import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Select } from '@/shared/components/ui/Select';
@@ -68,7 +68,7 @@ export function ForecastTeamView({ teams, allowAllTeams = false }: { teams: Team
     if (allTeams) return capacity?.members ?? [];
     if (!team) return [];
     const capacityById = new Map((capacity?.members ?? []).filter((m) => m.teamId === teamId).map((m) => [m.teamMemberId, m]));
-    return team.members.map(
+    return team.members.filter((member) => isForecastAssignableRole(member.userRole)).map(
       (member) =>
         capacityById.get(member.id) ?? {
           teamMemberId: member.id,

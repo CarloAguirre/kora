@@ -13,6 +13,7 @@ import {
   type AuditRecorder,
 } from '../../../../shared/application/ports/audit-recorder.port';
 import type { ActorContext, UseCase } from '../../../../shared/application/use-case';
+import { PaymentMilestoneTriggerService } from '../services/payment-milestone-trigger.service';
 import { ProjectChangeLogRecorder } from '../services/project-change-log.recorder';
 
 export interface ChangeProjectStatusCommand {
@@ -31,6 +32,7 @@ export class ChangeProjectStatusUseCase
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
     private readonly changeLog: ProjectChangeLogRecorder,
     @Inject(CLOCK) private readonly clock: Clock,
+    private readonly paymentTriggers: PaymentMilestoneTriggerService,
   ) {}
 
   async execute(command: ChangeProjectStatusCommand): Promise<Result<void, ApplicationError>> {
@@ -78,6 +80,9 @@ export class ChangeProjectStatusUseCase
       entityId: project.id,
       changes: { status: { before: previousStatus, after: command.data.status } },
     });
+
+    // Finalizar cumple los tramos por fase que quedaban pendientes (ej. Marcha blanca).
+    await this.paymentTriggers.promoteAndNotify(project);
 
     return ok(undefined);
   }

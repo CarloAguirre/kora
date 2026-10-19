@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, isNull, teamMembers, teams, users, type Database } from '@kora/db';
+import { and, eq, isNull, roles, teamMembers, teams, users, type Database } from '@kora/db';
 import type { TransactionContext } from '@kora/core';
-import type { UserStatus } from '@kora/contracts';
+import type { RoleCode, UserStatus } from '@kora/contracts';
 import type {
   AddTeamMemberRecord,
   TeamMemberRecord,
@@ -38,6 +38,7 @@ export class DrizzleTeamMemberRepository implements TeamMemberRepository {
         userLastName: users.lastName,
         userEmail: users.email,
         userStatus: users.status,
+        userRole: roles.code,
         position: teamMembers.position,
         weeklyHours: teamMembers.weeklyHours,
         joinedAt: teamMembers.joinedAt,
@@ -45,6 +46,7 @@ export class DrizzleTeamMemberRepository implements TeamMemberRepository {
       })
       .from(teamMembers)
       .innerJoin(users, eq(users.id, teamMembers.userId))
+      .innerJoin(roles, eq(roles.id, users.roleId))
       .innerJoin(teams, eq(teams.id, teamMembers.teamId))
       .where(isNull(teamMembers.leftAt));
 
@@ -118,13 +120,15 @@ export class DrizzleTeamMemberRepository implements TeamMemberRepository {
         userLastName: users.lastName,
         userEmail: users.email,
         userStatus: users.status,
+        userRole: roles.code,
         position: teamMembers.position,
         weeklyHours: teamMembers.weeklyHours,
         joinedAt: teamMembers.joinedAt,
         leftAt: teamMembers.leftAt,
       })
       .from(teamMembers)
-      .innerJoin(users, eq(users.id, teamMembers.userId));
+      .innerJoin(users, eq(users.id, teamMembers.userId))
+      .innerJoin(roles, eq(roles.id, users.roleId));
   }
 
   private toRecord(row: {
@@ -135,6 +139,7 @@ export class DrizzleTeamMemberRepository implements TeamMemberRepository {
     userLastName: string;
     userEmail: string;
     userStatus: UserStatus;
+    userRole: string;
     position: string | null;
     weeklyHours: string;
     joinedAt: Date;
@@ -147,6 +152,7 @@ export class DrizzleTeamMemberRepository implements TeamMemberRepository {
       userFullName: `${row.userFirstName} ${row.userLastName}`.trim(),
       userEmail: row.userEmail,
       userStatus: row.userStatus,
+      userRole: row.userRole as RoleCode,
       position: row.position,
       weeklyHours: Number(row.weeklyHours),
       joinedAt: row.joinedAt,

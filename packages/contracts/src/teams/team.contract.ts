@@ -8,6 +8,7 @@ import {
   uuidSchema,
 } from '../common/primitives';
 import { userStatusSchema } from '../users/user.contract';
+import { roleCodeSchema } from '../users/roles';
 import { projectStatusSchema } from '../projects/project.contract';
 
 /**
@@ -23,6 +24,8 @@ export const teamMemberSchema = z.object({
   fullName: z.string(),
   /** Un deshabilitado sigue en el equipo hasta que lo saquen, pero no se ofrece para asignar trabajo. */
   userStatus: userStatusSchema,
+  /** Perfil del usuario — líderes, PMO y admin no se ofrecen en el Forecast (`isForecastAssignableRole`). */
+  userRole: roleCodeSchema,
   position: z.string().nullable(),
   weeklyHours: z.number(),
   joinedAt: isoDateTimeSchema,

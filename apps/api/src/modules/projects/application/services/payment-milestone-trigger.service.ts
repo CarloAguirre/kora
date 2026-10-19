@@ -31,7 +31,7 @@ const formatDay = (date: Date): string => isoDate(date).split('-').reverse().joi
  */
 export function paymentMilestoneReadyReason(
   milestone: ProjectPaymentMilestoneRecord,
-  project: Pick<Project, 'salesStage' | 'phase' | 'isDeleted'>,
+  project: Pick<Project, 'salesStage' | 'phase' | 'status' | 'isDeleted'>,
   today: string,
 ): string | null {
   if (milestone.status !== 'pending' || milestone.amount <= 0 || project.isDeleted) return null;
@@ -40,9 +40,12 @@ export function paymentMilestoneReadyReason(
     case 'approval':
       return project.salesStage === 'approved' ? 'el proyecto fue aprobado' : null;
     case 'phase':
-      return milestone.triggerPhase && project.phase && phaseRank(project.phase) >= phaseRank(milestone.triggerPhase)
-        ? `el proyecto llegó a la fase ${PROJECT_PHASE_LABELS[milestone.triggerPhase]}`
-        : null;
+      if (!milestone.triggerPhase) return null;
+      if (project.phase && phaseRank(project.phase) >= phaseRank(milestone.triggerPhase)) {
+        return `el proyecto llegó a la fase ${PROJECT_PHASE_LABELS[milestone.triggerPhase]}`;
+      }
+      // Un proyecto finalizado ya pasó por todas sus fases, aunque no se haya actualizado la fase.
+      return project.status === 'finished' ? 'el proyecto finalizó' : null;
     case 'date':
       return milestone.triggerDate && isoDate(milestone.triggerDate) <= today
         ? `llegó su fecha de cobro (${formatDay(milestone.triggerDate)})`
@@ -57,7 +60,7 @@ export function paymentMilestoneReadyReason(
  * fecha) y avisa por correo a Finanzas y Gerencia/PMO.
  *
  * Kora no tiene jobs recurrentes, así que se evalúa cuando cambia algo que puede cumplir un hito (crear o
- * editar el proyecto o sus tramos) y, para los tramos por fecha, de forma perezosa al leer — mismo criterio
+ * editar el proyecto o sus tramos, o cambiarle el estado) y, para los tramos por fecha, de forma perezosa al leer — mismo criterio
  * que `SupportMonthlyPeriodReconciler`: ver `reconcileDueDates`.
  *
  * `promote` corre dentro de la transacción del cambio; `notify` va después del commit, para no avisar de

@@ -1,5 +1,10 @@
 import { useEffect, useState } from 'react';
-import type { CreateProjectModuleSegmentInput, ForecastOverloadWarning, ProjectModuleSegment } from '@kora/contracts';
+import {
+  isForecastAssignableRole,
+  type CreateProjectModuleSegmentInput,
+  type ForecastOverloadWarning,
+  type ProjectModuleSegment,
+} from '@kora/contracts';
 import styles from './DeliveryModal.module.css';
 import segmentStyles from './ExecutionSegmentModal.module.css';
 import { Modal } from '@/shared/components/ui/Modal';
@@ -133,7 +138,7 @@ export function ExecutionSegmentModal({
   const weeklyHoursByMember = new Map((team?.members ?? []).map((member) => [member.id, member.weeklyHours]));
   const selectedIds = new Set(values.members.map((member) => member.teamMemberId));
   const memberOptions = (team?.members ?? [])
-    .filter((member) => !selectedIds.has(member.id) && member.userStatus !== 'disabled')
+    .filter((member) => !selectedIds.has(member.id) && member.userStatus !== 'disabled' && isForecastAssignableRole(member.userRole))
     .map((member) => ({ value: member.id, label: member.fullName }));
 
   const canSubmit = Boolean(

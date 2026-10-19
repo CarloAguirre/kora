@@ -35,7 +35,9 @@ function milestone(overrides: Partial<ProjectPaymentMilestoneRecord> = {}): Proj
   };
 }
 
-function project(overrides: { salesStage?: 'quoted' | 'approved'; phase?: 'development' | 'pilot' | null } = {}) {
+function project(
+  overrides: { salesStage?: 'quoted' | 'approved'; phase?: 'development' | 'pilot' | null; status?: 'active' | 'finished' } = {},
+) {
   return Project.create({
     id: 'project-1',
     name: 'Portal de Proveedores',
@@ -44,6 +46,7 @@ function project(overrides: { salesStage?: 'quoted' | 'approved'; phase?: 'devel
     type: 'development',
     salesStage: overrides.salesStage ?? 'approved',
     phase: overrides.phase ?? null,
+    ...(overrides.status ? { status: overrides.status } : {}),
     contractCurrency: 'CLP',
     now: NOW,
   }).unwrap();
@@ -59,6 +62,13 @@ describe('paymentMilestoneReadyReason', () => {
     const marchaBlanca = milestone({ name: 'Marcha blanca', triggerType: 'phase', triggerPhase: 'testing' });
     expect(paymentMilestoneReadyReason(marchaBlanca, project({ phase: 'development' }), TODAY)).toBeNull();
     expect(paymentMilestoneReadyReason(marchaBlanca, project({ phase: 'pilot' }), TODAY)).toBe('el proyecto llegó a la fase Pruebas');
+  });
+
+  it('por fase: un proyecto finalizado cumple el hito aunque su fase no se haya actualizado', () => {
+    const marchaBlanca = milestone({ name: 'Marcha blanca', triggerType: 'phase', triggerPhase: 'pilot' });
+    expect(paymentMilestoneReadyReason(marchaBlanca, project({ phase: 'development', status: 'finished' }), TODAY)).toBe(
+      'el proyecto finalizó',
+    );
   });
 
   it('por fecha: se cumple desde ese día (hora de Chile)', () => {

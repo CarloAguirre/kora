@@ -244,3 +244,12 @@ backend ya les permitía editar (`isAdminTier` en los casos de uso). Con "Todos
 los equipos" las asignaciones se piden del equipo de la persona que se edita, y
 "Ver historial" se muestra al elegir un equipo (el historial es por equipo).
 
+### Quién aparece en el Forecast
+
+Líderes, PMO y admin gestionan el trabajo, no lo ejecutan: aunque sean miembros
+de un equipo, no aparecen en el Forecast (`/forecast/capacity`,
+`/forecast/weeks` ni la vista por equipo) ni se ofrecen como colaboradores de un
+tramo de ejecución. Se decide por el perfil del usuario
+(`isForecastAssignableRole`, en `@kora/contracts`); el detalle del equipo los
+sigue mostrando, con su perfil en `userRole`.
+

@@ -5,6 +5,7 @@ import { CannotActivateProjectError, ManualHito0ReasonRequiredError } from '../.
 import type { ProjectRepository } from '../../domain/repositories/project.repository';
 import type { AuditRecorder } from '../../../../shared/application/ports/audit-recorder.port';
 import type { ProjectChangeLogRecorder } from '../services/project-change-log.recorder';
+import type { PaymentMilestoneTriggerService } from '../services/payment-milestone-trigger.service';
 import { FixedClock } from '../../../../test/fakes';
 
 const NOW = new Date('2026-09-24T00:00:00.000Z');
@@ -31,8 +32,10 @@ function buildUseCase(project: Project) {
   const audit = { record: vi.fn().mockResolvedValue(undefined) } as unknown as AuditRecorder;
   const changeLog = { record: vi.fn().mockResolvedValue(undefined) } as unknown as ProjectChangeLogRecorder;
 
-  const useCase = new ChangeProjectStatusUseCase(projects, audit, changeLog, new FixedClock(NOW));
-  return { useCase, projects, changeLog };
+  const paymentTriggers = { promoteAndNotify: vi.fn().mockResolvedValue(undefined) } as unknown as PaymentMilestoneTriggerService;
+
+  const useCase = new ChangeProjectStatusUseCase(projects, audit, changeLog, new FixedClock(NOW), paymentTriggers);
+  return { useCase, projects, changeLog, paymentTriggers };
 }
 
 describe('ChangeProjectStatusUseCase — Hito 0 manual', () => {
@@ -130,5 +133,18 @@ describe('ChangeProjectStatusUseCase — Hito 0 manual', () => {
 
     expect(result.isOk()).toBe(true);
     expect(projects.save).toHaveBeenCalledTimes(1);
+  });
+
+  it('al cambiar el estado evalúa los tramos de cobro (finalizar cumple los tramos por fase)', async () => {
+    const { useCase, paymentTriggers } = buildUseCase(buildApprovedDraftProject());
+
+    await useCase.execute({
+      projectId: 'project-1',
+      data: { status: 'finished' },
+      actor: ACTOR,
+      actorPermissions: ['projects:manage'],
+    });
+
+    expect(paymentTriggers.promoteAndNotify).toHaveBeenCalledWith(expect.objectContaining({ status: 'finished' }));
   });
 });
