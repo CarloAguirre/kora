@@ -117,11 +117,11 @@ export function ProjectTimeline({ progress, startDate, endDate }: ProjectTimelin
                 progress.planCoverage != null && progress.planCoverage < 100
                   ? `Plan cargado: ${progress.planCoverage}% de las HH estimadas de las fases.`
                   : null,
-                progress.estimatedByCount ? 'Parte del avance se calculó por cantidad de tareas (sin HH estimadas).' : null,
+                progress.estimatedByCount ? 'Parte del avance se calculó por cantidad de tareas y entregas (sin HH estimadas).' : null,
               ]
                 .filter(Boolean)
                 .join(' ')
-            : 'El avance se mide cuando las fases tienen tareas con HH estimadas (tab Roadmap).'}
+            : 'El avance se mide cuando las fases tienen tareas o entregas (tab Roadmap).'}
         </span>
         <span>{endDate ? `Entrega ${formatDate(endDate)}` : 'Sin fecha de entrega'}</span>
       </div>

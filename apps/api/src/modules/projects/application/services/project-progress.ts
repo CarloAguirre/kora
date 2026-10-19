@@ -1,5 +1,6 @@
 import {
   PROJECT_MODULE_TASK_SCOPES,
+  type ProjectModuleDeliveryStatus,
   type ProjectModuleProgress,
   type ProjectModuleStage,
   type ProjectModuleTaskScope,
@@ -13,14 +14,16 @@ import {
  * ficha, el listado, el dashboard y `ProjectProgressRecalculator`, para que todas las pantallas
  * muestren el mismo número.
  *
- * Por fase:
- * - Peso de una tarea = sus HH estimadas. Las tareas antiguas sin HH pesan el promedio de las que sí
- *   tienen en la misma fase; si ninguna tiene, se reparten por igual las HH de la fase (o pesan 1 si
- *   la fase tampoco tiene) — avance "por cantidad de tareas".
- * - Base = el mayor entre la suma de pesos de sus tareas y las HH estimadas de la fase: las HH de la
- *   fase todavía sin tareas cuentan en la base, pero no en el real ni en el esperado.
- * - Real = peso de las tareas Aprobadas (`done`) / base. Esperado = peso de las tareas con fecha
- *   límite ≤ hoy / base. Una fase cerrada a mano (`closed`) cuenta 100% en ambos.
+ * Por fase, tareas y entregas son ítems del plan:
+ * - Peso de una tarea = sus HH estimadas. Las entregas (no tienen HH) y las tareas antiguas sin HH
+ *   pesan el promedio de las tareas que sí tienen en la misma fase; si ninguna tiene, se reparten por
+ *   igual las HH de la fase entre tareas y entregas (o pesan 1 si la fase tampoco tiene) — avance
+ *   "por cantidad".
+ * - Base = el mayor entre la suma de pesos de sus ítems y las HH estimadas de la fase: las HH de la
+ *   fase todavía sin ítems cuentan en la base, pero no en el real ni en el esperado.
+ * - Real = peso de las tareas Aprobadas (`done`) y entregas Aprobadas (`approved`) / base. Esperado =
+ *   peso de los ítems con fecha límite ≤ hoy / base. Una fase cerrada a mano (`closed`) cuenta 100%
+ *   en ambos.
  *
  * El proyecto suma las fases (no promedia porcentajes), así cada fase pesa según su tamaño.
  */
@@ -33,10 +36,17 @@ export interface ProgressTaskInput {
   readonly scope: ProjectModuleTaskScope;
 }
 
+export interface ProgressDeliveryInput {
+  readonly status: ProjectModuleDeliveryStatus;
+  /** Fecha estimada, día calendario (medianoche UTC). */
+  readonly estimatedDate: Date;
+}
+
 export interface ProgressModuleInput {
   readonly estimatedHours: number | null;
   readonly currentStage: ProjectModuleStage;
   readonly tasks: readonly ProgressTaskInput[];
+  readonly deliveries: readonly ProgressDeliveryInput[];
 }
 
 export interface ProgressProjectInput {
@@ -74,23 +84,29 @@ function moduleTotals(module: ProgressModuleInput, today: string): ModuleTotals 
   });
   const closed = module.currentStage === 'closed';
   const moduleHours = positive(module.estimatedHours) ?? 0;
+  const itemCount = module.tasks.length + module.deliveries.length;
 
-  /** Sin HH en ninguna tarea: las HH de la fase se reparten por igual, así el % es "tareas aprobadas / tareas". */
+  /** Sin HH en ninguna tarea: las HH de la fase se reparten por igual, así el % es "ítems aprobados / ítems". */
   const fallbackWeight =
     known.length > 0
       ? known.reduce((sum, hours) => sum + hours, 0) / known.length
-      : moduleHours > 0 && module.tasks.length > 0
-        ? moduleHours / module.tasks.length
+      : moduleHours > 0 && itemCount > 0
+        ? moduleHours / itemCount
         : 1;
   const weight = (task: ProgressTaskInput) => positive(task.estimatedHours) ?? fallbackWeight;
-  const taskTotal = module.tasks.reduce((sum, task) => sum + weight(task), 0);
+  const isDue = (date: Date) => date.toISOString().slice(0, 10) <= today;
+  const taskTotal = module.tasks.reduce((sum, task) => sum + weight(task), 0) + module.deliveries.length * fallbackWeight;
   const base = Math.max(taskTotal, moduleHours);
-  const approved = closed ? base : module.tasks.filter((task) => task.status === 'done').reduce((sum, task) => sum + weight(task), 0);
+  const approved = closed
+    ? base
+    : module.tasks.filter((task) => task.status === 'done').reduce((sum, task) => sum + weight(task), 0) +
+      module.deliveries.filter((delivery) => delivery.status === 'approved').length * fallbackWeight;
   const due = closed
     ? base
-    : module.tasks.filter((task) => task.date.toISOString().slice(0, 10) <= today).reduce((sum, task) => sum + weight(task), 0);
+    : module.tasks.filter((task) => isDue(task.date)).reduce((sum, task) => sum + weight(task), 0) +
+      module.deliveries.filter((delivery) => isDue(delivery.estimatedDate)).length * fallbackWeight;
 
-  const hasPlan = module.tasks.length > 0 || closed;
+  const hasPlan = itemCount > 0 || closed;
 
   const scopes = Object.fromEntries(
     PROJECT_MODULE_TASK_SCOPES.map((scope) => {
@@ -107,7 +123,7 @@ function moduleTotals(module: ProgressModuleInput, today: string): ModuleTotals 
     progress: {
       actual: hasPlan && base > 0 ? percent(approved, base) : null,
       expected: hasPlan && base > 0 ? percent(due, base) : null,
-      estimatedByCount: module.tasks.length > 0 && known.length === 0,
+      estimatedByCount: itemCount > 0 && known.length === 0,
       scopes,
     },
     hasPlan,

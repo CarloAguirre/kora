@@ -12,6 +12,7 @@ import type {
 import type { AuditRecorder } from '../../../../shared/application/ports/audit-recorder.port';
 import type { ProjectChangeLogRecorder } from '../services/project-change-log.recorder';
 import { FixedClock, PassthroughUnitOfWork } from '../../../../test/fakes';
+import type { ProjectProgressRecalculator } from '../services/project-progress-recalculator';
 
 const FAKE_PROJECT = {
   id: 'project-1',
@@ -45,6 +46,7 @@ function buildModule(overrides: Partial<ProjectModuleRecord['deliveries'][number
         estimatedDate: new Date('2026-09-24'),
         status: 'delivered',
         rejectionReason: null,
+        createdAt: new Date('2026-09-01T12:00:00Z'),
         ...overrides,
       },
     ],
@@ -87,6 +89,7 @@ function buildUseCase(
     projectTeamMembers,
     audit,
     changeLog,
+    { recalculate: vi.fn().mockResolvedValue(undefined) } as unknown as ProjectProgressRecalculator,
     new FixedClock(),
     new PassthroughUnitOfWork(),
   );

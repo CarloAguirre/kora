@@ -468,6 +468,10 @@ function DeliveryDetail({
       <DetailRow label="Equipo" value={row.delivery.teamName ?? 'Sin asignar'} />
       <DetailRow label="Colaborador" value={row.delivery.assigneeName ?? 'Sin asignar'} />
       <DetailRow label="Fecha estimada" value={new Date(`${row.delivery.estimatedDate}T00:00:00`).toLocaleDateString('es-CL')} />
+      <DetailRow
+        label="Agregada"
+        value={new Date(row.delivery.createdAt).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' })}
+      />
       <DetailRow label="Estado" value={deliveryStatusLabel(row.delivery)} />
       {row.delivery.rejectionReason && <DetailRow label="Motivo del rechazo" value={row.delivery.rejectionReason} />}
       <div className={styles.detailRow}>

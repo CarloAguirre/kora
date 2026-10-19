@@ -145,6 +145,19 @@ export function DevelopmentProjectDetailView({
 
   const remainingHours = project.soldHours - project.usedHours;
 
+  /**
+   * HH aprobadas de gente que no está en `project_team_members` (p.ej. el líder
+   * del proyecto o de un equipo que carga horas sin estar asignado como
+   * miembro). `project.usedHours` las cuenta y el desglose por equipo no, así que
+   * "HH Utilizadas" del gráfico no cuadraba con "HH consumidas" de arriba. Cada
+   * persona se cuenta una vez aunque esté en dos equipos — sus horas no guardan equipo.
+   */
+  const unassignedHours = useMemo(() => {
+    const consumedByUser = new Map(project.members.map((member) => [member.userId, member.consumedHours]));
+    const attributed = [...consumedByUser.values()].reduce((sum, hours) => sum + hours, 0);
+    return Math.max(0, project.usedHours - attributed);
+  }, [project]);
+
   const projectDocuments: ProjectDocument[] = [
     project.quotationLink
       ? { label: "Cotización", url: project.quotationLink }
@@ -346,7 +359,7 @@ export function DevelopmentProjectDetailView({
           {tab === "resumen" && (
             <div className={styles.layout}>
               <div className={styles.colLeft}>
-                <TeamHoursSummaryChart teams={teamSummaries} />
+                <TeamHoursSummaryChart teams={teamSummaries} unassignedHours={unassignedHours} />
 
                 <AssignedTeamsCard
                   project={project}

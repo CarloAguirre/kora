@@ -163,6 +163,8 @@ export const projectModuleDeliverySchema = z.object({
   status: projectModuleDeliveryStatusSchema,
   /** Motivo del último rechazo del líder — se limpia al aprobar o al volver a marcarla entregada. */
   rejectionReason: z.string().nullable(),
+  /** Cuándo se agregó la entrega al proyecto (ISO) — fecha de su fila en la bitácora; la agendada es `estimatedDate`. */
+  createdAt: z.string(),
   /**
    * ¿Quien consulta puede gestionarla (asignar, aprobar, rechazar, revertir, editar)? Líder del proyecto,
    * PMO/admin o líder del equipo responsable — mismo criterio que `UpdateProjectModuleDeliveryUseCase`.
@@ -640,22 +642,23 @@ export function projectDelayLevel(delay: number | null): ProjectDelayLevel {
 /**
  * Avance del proyecto — tres números que responden preguntas distintas y nunca se infieren uno del
  * otro: cuánto se hizo (`actual`), cuánto debería estar hecho hoy (`expected`) y cuánto costó
- * (`consumption`). Se calcula desde las tareas de sus fases, ponderadas por HH estimadas; solo las
- * tareas Aprobadas (`done`) suman al real. La base es, por fase, el mayor entre la suma de HH de sus
- * tareas y las HH estimadas de la fase — así un plan cargado a medias no marca 100%.
+ * (`consumption`). Se calcula desde las tareas y entregas de sus fases, ponderadas por HH estimadas
+ * (una entrega pesa como una tarea promedio de su fase); solo las tareas y entregas Aprobadas suman al
+ * real. La base es, por fase, el mayor entre la suma de pesos de sus ítems y las HH estimadas de la
+ * fase — así un plan cargado a medias no marca 100%.
  */
 export const projectProgressSchema = z.object({
-  /** % de la base en tareas Aprobadas. `null` = sin plan cargado (ninguna fase con tareas). */
+  /** % de la base en tareas y entregas Aprobadas. `null` = sin plan cargado (ninguna fase con tareas ni entregas). */
   actual: z.number().int().nullable(),
-  /** % de la base en tareas cuya fecha límite ya pasó. `null` junto con `actual`. */
+  /** % de la base en tareas y entregas cuya fecha ya pasó. `null` junto con `actual`. */
   expected: z.number().int().nullable(),
   /** HH aprobadas / HH vendidas, en %. Puede superar 100. `null` sin HH vendidas. */
   consumption: z.number().int().nullable(),
   /** `expected − actual`, en puntos. `null` sin plan, o con el proyecto detenido y el reloj pausado. */
   delay: z.number().int().nullable(),
-  /** HH de tareas cargadas / HH estimadas de las fases, en %. `null` si ninguna fase tiene HH estimadas. */
+  /** HH de tareas y entregas cargadas / HH estimadas de las fases, en %. `null` si ninguna fase tiene HH estimadas. */
   planCoverage: z.number().int().nullable(),
-  /** Alguna fase no tiene HH estimadas en ninguna tarea: su parte se calculó por cantidad de tareas. */
+  /** Alguna fase con plan no tiene HH estimadas en ninguna tarea: su parte se calculó por cantidad de tareas y entregas. */
   estimatedByCount: z.boolean(),
 });
 export type ProjectProgress = z.infer<typeof projectProgressSchema>;

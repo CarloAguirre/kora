@@ -14,6 +14,7 @@ import {
 import type { ActorContext, UseCase } from '../../../../shared/application/use-case';
 import { formatCommittedDate } from '../services/deadline-note';
 import { ProjectChangeLogRecorder } from '../services/project-change-log.recorder';
+import { ProjectProgressRecalculator } from '../services/project-progress-recalculator';
 
 export interface AddProjectModuleDeliveryCommand {
   readonly projectId: string;
@@ -33,6 +34,7 @@ export class AddProjectModuleDeliveryUseCase
     @Inject(PROJECT_MODULE_REPOSITORY) private readonly modules: ProjectModuleRepository,
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
     private readonly changeLog: ProjectChangeLogRecorder,
+    private readonly progress: ProjectProgressRecalculator,
     @Inject(CLOCK) private readonly clock: Clock,
     @Inject(UNIT_OF_WORK) private readonly unitOfWork: UnitOfWork,
   ) {}
@@ -80,6 +82,7 @@ export class AddProjectModuleDeliveryUseCase
         now,
         tx,
       );
+      await this.progress.recalculate(project.id, tx);
       return deliveryId;
     });
 

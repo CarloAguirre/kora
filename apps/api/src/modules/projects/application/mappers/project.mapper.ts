@@ -163,6 +163,7 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
       estimatedDate: delivery.estimatedDate.toISOString().slice(0, 10),
       status: delivery.status,
       rejectionReason: delivery.rejectionReason,
+      createdAt: delivery.createdAt.toISOString(),
       canManage: source.canManagePendings || (delivery.teamId !== null && source.ledTeamIds.has(delivery.teamId)),
     })),
     segments: module.segments.map((segment) => ({

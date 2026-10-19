@@ -44,6 +44,7 @@ import {
 } from '../../../../shared/application/ports/audit-recorder.port';
 import type { ActorContext, UseCase } from '../../../../shared/application/use-case';
 import { ProjectChangeLogRecorder, type ProjectChangeLogEntry } from '../services/project-change-log.recorder';
+import { ProjectProgressRecalculator } from '../services/project-progress-recalculator';
 import { deadlineNote, formatCommittedDate } from '../services/deadline-note';
 
 export interface UpdateProjectModuleDeliveryCommand {
@@ -80,6 +81,7 @@ export class UpdateProjectModuleDeliveryUseCase
     @Inject(PROJECT_TEAM_MEMBER_REPOSITORY) private readonly projectTeamMembers: ProjectTeamMemberRepository,
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
     private readonly changeLog: ProjectChangeLogRecorder,
+    private readonly progress: ProjectProgressRecalculator,
     @Inject(CLOCK) private readonly clock: Clock,
     @Inject(UNIT_OF_WORK) private readonly unitOfWork: UnitOfWork,
   ) {}
@@ -266,6 +268,7 @@ export class UpdateProjectModuleDeliveryUseCase
         tx,
       );
       if (entries.length > 0) await this.changeLog.record(entries, command.actor.userId, now, tx);
+      await this.progress.recalculate(project.id, tx);
     });
 
     await this.audit.record({

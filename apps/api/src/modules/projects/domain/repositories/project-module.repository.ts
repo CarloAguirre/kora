@@ -18,6 +18,7 @@ export interface ProjectModuleDeliveryRecord {
   readonly estimatedDate: Date;
   readonly status: ProjectModuleDeliveryStatus;
   readonly rejectionReason: string | null;
+  readonly createdAt: Date;
 }
 
 export interface ProjectModuleSegmentMemberRecord {
@@ -194,11 +195,15 @@ export interface ProjectModuleProgressInputRecord {
     readonly date: Date;
     readonly scope: ProjectModuleTaskScope;
   }[];
+  readonly deliveries: readonly {
+    readonly status: ProjectModuleDeliveryStatus;
+    readonly estimatedDate: Date;
+  }[];
 }
 
 export interface ProjectModuleRepository {
   listForProject(projectId: string, context?: TransactionContext): Promise<ProjectModuleRecord[]>;
-  /** Fases (con sus tareas) de varios proyectos a la vez, por `projectId` — listado y dashboard. */
+  /** Fases (con sus tareas y entregas) de varios proyectos a la vez, por `projectId` — listado y dashboard. */
   listProgressInputsForProjects(
     projectIds: readonly string[],
     context?: TransactionContext,

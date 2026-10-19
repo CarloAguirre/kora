@@ -18,6 +18,7 @@ import {
 } from '../../../../shared/application/ports/audit-recorder.port';
 import type { ActorContext, UseCase } from '../../../../shared/application/use-case';
 import { ProjectChangeLogRecorder } from '../services/project-change-log.recorder';
+import { ProjectProgressRecalculator } from '../services/project-progress-recalculator';
 
 export interface RemoveProjectModuleDeliveryCommand {
   readonly projectId: string;
@@ -36,6 +37,7 @@ export class RemoveProjectModuleDeliveryUseCase
     @Inject(PROJECT_MODULE_REPOSITORY) private readonly modules: ProjectModuleRepository,
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
     private readonly changeLog: ProjectChangeLogRecorder,
+    private readonly progress: ProjectProgressRecalculator,
     @Inject(CLOCK) private readonly clock: Clock,
     @Inject(UNIT_OF_WORK) private readonly unitOfWork: UnitOfWork,
   ) {}
@@ -73,6 +75,7 @@ export class RemoveProjectModuleDeliveryUseCase
         this.clock.now(),
         tx,
       );
+      await this.progress.recalculate(project.id, tx);
     });
 
     await this.audit.record({
