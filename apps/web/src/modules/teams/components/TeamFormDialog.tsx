@@ -66,8 +66,13 @@ export function TeamFormDialog({ open, team, onClose, onSuccess }: TeamFormDialo
   const [members, setMembers] = useState<DraftMember[]>([]);
   const [initialMembers, setInitialMembers] = useState<DraftMember[]>([]);
 
-  const { data: leaders } = useUsersList({ page: 1, pageSize: 200, sortField: 'firstName', role: 'leader' });
   const { data: candidateUsers } = useUsersList({ page: 1, pageSize: 200, sortField: 'firstName' });
+
+  // El selector de líder acepta tanto `leader` como `pmo`: un PMO también puede
+  // liderar un equipo. El endpoint solo filtra por un rol a la vez, así que se
+  // filtra en el cliente a partir del listado completo ya cargado para el
+  // selector de colaboradores.
+  const leaders = candidateUsers?.items.filter((user) => user.role === 'leader' || user.role === 'pmo');
 
   const {
     register,
@@ -322,7 +327,7 @@ export function TeamFormDialog({ open, team, onClose, onSuccess }: TeamFormDialo
           <Select
             label="Líder"
             placeholder="Sin asignar"
-            options={assignableOptions(leaders?.items ?? [], (user) => ({ value: user.id, label: user.fullName, status: user.status }), team?.leader?.id)}
+            options={assignableOptions(leaders ?? [], (user) => ({ value: user.id, label: user.fullName, status: user.status }), team?.leader?.id)}
             {...register('leaderUserId', { setValueAs: emptyToNull })}
           />
           {isEditing && (
