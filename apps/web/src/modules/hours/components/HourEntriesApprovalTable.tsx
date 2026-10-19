@@ -91,7 +91,11 @@ export function HourEntriesApprovalTable({
 
   const entries = data?.items ?? [];
   const allSelected = entries.length > 0 && entries.every((entry) => selected.has(entry.id));
-  const selectedHours = entries.filter((entry) => selected.has(entry.id)).reduce((sum, entry) => sum + entry.hours, 0);
+  // `selected` puede arrastrar IDs que ya no están en la cola (aprobados en una
+  // tanda que falló a medias, de otra página, o resueltos por otro aprobador):
+  // las acciones masivas solo actúan sobre lo seleccionado que sigue visible.
+  const selectedEntries = entries.filter((entry) => selected.has(entry.id));
+  const selectedHours = selectedEntries.reduce((sum, entry) => sum + entry.hours, 0);
 
   const toggleAll = () => setSelected(allSelected ? new Set() : new Set(entries.map((entry) => entry.id)));
   const toggleOne = (id: string) =>
@@ -166,28 +170,44 @@ export function HourEntriesApprovalTable({
     });
   };
 
-  const approveSelected = async () => {
-    const ids = [...selected];
-    try {
-      for (const id of ids) await approveEntry.mutateAsync(id);
-    } catch (error) {
-      showError(error, 'No se pudieron aprobar los registros.');
-      return;
+  /**
+   * Procesa cada registro seleccionado sin cortar en el primer error (uno ya
+   * resuelto por otro aprobador no debe bloquear al resto) y deja seleccionados
+   * solo los que fallaron. Devuelve si todos salieron bien.
+   */
+  const runBulk = async (action: (id: string) => Promise<unknown>, done: [string, string], failed: string) => {
+    const ids = selectedEntries.map((entry) => entry.id);
+    const failedIds = new Set<string>();
+    let firstError: unknown = null;
+    for (const id of ids) {
+      try {
+        await action(id);
+      } catch (error) {
+        failedIds.add(id);
+        firstError ??= error;
+      }
     }
-    toast.success(`${ids.length} ${pluralize(ids.length, 'registro aprobado', 'registros aprobados')}.`);
-    setSelected(new Set());
+    const succeeded = ids.length - failedIds.size;
+    setSelected(failedIds);
+    if (failedIds.size === 0) {
+      toast.success(`${succeeded} ${pluralize(succeeded, done[0], done[1])}.`);
+      return true;
+    }
+    const detail = firstError instanceof ApiRequestError ? ` ${firstError.message}` : '';
+    toast.error(`${succeeded} de ${ids.length} ${pluralize(ids.length, done[0], done[1])}; ${failedIds.size} ${failed}.${detail}`);
+    return false;
   };
 
+  const approveSelected = () =>
+    runBulk((id) => approveEntry.mutateAsync(id), ['registro aprobado', 'registros aprobados'], 'no se pudieron aprobar');
+
   const confirmReject = async () => {
-    const ids = [...selected];
-    try {
-      for (const id of ids) await rejectEntry.mutateAsync({ entryId: id, input: { reason } });
-    } catch (error) {
-      showError(error, 'No se pudieron rechazar los registros.');
-      return;
-    }
-    toast.success(`${ids.length} ${pluralize(ids.length, 'registro rechazado', 'registros rechazados')}.`);
-    setSelected(new Set());
+    const ok = await runBulk(
+      (id) => rejectEntry.mutateAsync({ entryId: id, input: { reason } }),
+      ['registro rechazado', 'registros rechazados'],
+      'no se pudieron rechazar',
+    );
+    if (!ok) return;
     setReason('');
     setRejecting(false);
   };
@@ -380,12 +400,12 @@ export function HourEntriesApprovalTable({
 
       <div className={styles.bulkBar}>
         <span className={styles.bulkSummary} aria-live="polite">
-          {selected.size > 0 ? `Seleccionadas: ${selected.size} · ${formatHours(selectedHours)} hrs` : ''}
+          {selectedEntries.length > 0 ? `Seleccionadas: ${selectedEntries.length} · ${formatHours(selectedHours)} hrs` : ''}
         </span>
-        <Button variant="outlineDark" disabled={selected.size === 0} onClick={() => setRejecting(true)}>
+        <Button variant="outlineDark" disabled={selectedEntries.length === 0} onClick={() => setRejecting(true)}>
           Rechazar las HH seleccionadas
         </Button>
-        <Button disabled={selected.size === 0} onClick={() => void approveSelected()}>
+        <Button disabled={selectedEntries.length === 0} onClick={() => void approveSelected()}>
           Aprobar las HH seleccionadas
         </Button>
       </div>
@@ -422,7 +442,7 @@ export function HourEntriesApprovalTable({
               Cancelar
             </Button>
             <Button variant="danger" disabled={!reason.trim()} onClick={() => void confirmReject()}>
-              Rechazar {selected.size} registro{selected.size === 1 ? '' : 's'}
+              Rechazar {selectedEntries.length} registro{selectedEntries.length === 1 ? '' : 's'}
             </Button>
           </div>
         </div>
