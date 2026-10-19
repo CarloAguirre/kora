@@ -98,6 +98,7 @@ export function validateDailyBlock(
   // designado (docs/DECISION-M4-HORAS.md) — el backend rechaza ambos a la vez.
   const needsApprover = !needsProject && (isCollaborator || block.isOvertime);
   if (needsApprover && !block.designatedApproverUserId) return 'Selecciona a quién aprueba estas horas.';
+  if (!block.category.trim()) return 'Indica la actividad realizada.';
   if (block.description.trim().length > 0 && block.description.trim().length < MIN_DESCRIPTION_LENGTH) {
     return `La descripción debe tener al menos ${MIN_DESCRIPTION_LENGTH} caracteres.`;
   }
@@ -212,7 +213,7 @@ export function DailyEntryForm({
           assignment: block.assignment as HourEntryAssignment,
           projectId: needsProject ? block.projectId : undefined,
           moduleId: needsProject && block.moduleId ? block.moduleId : undefined,
-          category: block.category || undefined,
+          category: block.category.trim(),
           description: block.description || undefined,
           hours: Number(block.hours),
           date,
@@ -455,6 +456,7 @@ export function DailyEntryBlockFields({
 
           <TextField
             label="Actividad"
+            required
             placeholder="Ej: Diseño de wireframes de alta fidelidad para módulo dashboard"
             value={block.category}
             onChange={(event) => onUpdate({ category: event.target.value })}

@@ -82,13 +82,16 @@ export const hourEntryDetailSchema = hourEntrySummarySchema.extend({
 });
 export type HourEntryDetail = z.infer<typeof hourEntryDetailSchema>;
 
+/** "Actividad" del registro: obligatoria al crear y, si se envía, al editar. */
+const hourEntryCategorySchema = z.string().trim().min(1, 'Indica la actividad realizada.').max(300);
+
 export const createHourEntrySchema = z
   .object({
     userId: uuidSchema.optional(),
     projectId: uuidSchema.nullish(),
     moduleId: uuidSchema.nullish(),
     assignment: hourEntryAssignmentSchema,
-    category: z.string().trim().max(300).optional(),
+    category: hourEntryCategorySchema,
     description: z.string().trim().max(2000).optional(),
     hours: z.coerce.number().positive('Las horas deben ser mayores a 0.').max(24, 'No puede registrar más de 24 horas en un día.'),
     date: z.iso.date(),
@@ -119,7 +122,7 @@ export const updateHourEntrySchema = z.object({
   assignment: hourEntryAssignmentSchema.optional(),
   projectId: uuidSchema.nullish(),
   moduleId: uuidSchema.nullish(),
-  category: z.string().trim().max(300).optional(),
+  category: hourEntryCategorySchema.optional(),
   description: z.string().trim().max(2000).optional(),
   hours: z.coerce.number().positive().max(24).optional(),
   date: z.iso.date().optional(),

@@ -152,6 +152,7 @@ export function WeeklyEntryForm({
     if (needsProject && !projectId) return 'Selecciona un proyecto para esta asignación.';
     if (needsApprover && !designatedApproverUserId) return 'Selecciona a quién aprueba estas horas.';
     if (needsProject && isOvertime && overtimeDisabled) return 'Este proyecto no tiene autorizadas horas extra.';
+    if (!category.trim()) return 'Indica la actividad realizada.';
     if (description.trim().length > 0 && description.trim().length < MIN_DESCRIPTION_LENGTH) {
       return `La descripción debe tener al menos ${MIN_DESCRIPTION_LENGTH} caracteres.`;
     }
@@ -179,7 +180,7 @@ export function WeeklyEntryForm({
         const input: CreateHourEntryInput = {
           assignment: assignment as HourEntryAssignment,
           projectId: needsProject ? projectId : undefined,
-          category: category || undefined,
+          category: category.trim(),
           description: description || undefined,
           hours: day.hours,
           date: toIsoDate(date),
@@ -273,7 +274,7 @@ export function WeeklyEntryForm({
       </div>
 
       <div className={styles.row}>
-        <TextField label="Actividad" placeholder="Ej: Diseño webapp" value={category} onChange={(event) => setCategory(event.target.value)} />
+        <TextField label="Actividad" required placeholder="Ej: Diseño webapp" value={category} onChange={(event) => setCategory(event.target.value)} />
         <div className={styles.overtimeField}>
           <span className={styles.stepperLabel}>Horas Extra</span>
           <label

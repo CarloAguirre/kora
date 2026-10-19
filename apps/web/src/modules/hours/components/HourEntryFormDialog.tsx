@@ -207,7 +207,7 @@ function EditEntryForm({
           assignment: block.assignment as HourEntryAssignment,
           projectId: needsProject ? block.projectId : null,
           moduleId: needsProject && block.moduleId ? block.moduleId : null,
-          category: block.category,
+          category: block.category.trim(),
           description: block.description,
           hours: Number(block.hours),
           date,
