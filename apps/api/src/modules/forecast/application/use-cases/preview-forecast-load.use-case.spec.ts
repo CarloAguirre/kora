@@ -22,8 +22,8 @@ const row = (monday: string, assignedHours: number, overrides: Partial<ForecastA
   projectName: 'Proyecto',
   comments: '',
   assignedHours,
-  source: 'manual',
-  segmentId: null,
+  source: 'segment',
+  segmentId: 'seg-otro',
   taskId: null,
   isAdjusted: false,
   isStale: false,
@@ -76,6 +76,26 @@ describe('PreviewForecastLoadUseCase', () => {
     const result = await useCase.execute(SEGMENT_INPUT);
 
     expect(result.isOk() && result.value.warnings).toEqual([]);
+  });
+
+  it('no cuenta las HH de proyecto planificadas a mano en el Forecast', async () => {
+    const useCase = build([week('2026-08-24', '2026-08-28', 20)], [
+      row('2026-08-24', 40, { source: 'manual', segmentId: null }),
+      row('2026-08-24', 10, { source: 'manual', segmentId: null, type: 'support' }),
+    ]);
+    const result = await useCase.execute(SEGMENT_INPUT);
+
+    expect(result.isOk() && result.value.warnings).toEqual([]);
+  });
+
+  it('sí cuenta ausencias y otras actividades cargadas a mano', async () => {
+    const useCase = build([week('2026-08-24', '2026-08-28', 20)], [
+      row('2026-08-24', 16, { source: 'manual', segmentId: null, type: 'vacation', projectId: null, projectName: null }),
+      row('2026-08-24', 8, { source: 'manual', segmentId: null, type: 'training', projectId: null, projectName: null }),
+    ]);
+    const result = await useCase.execute(SEGMENT_INPUT);
+
+    expect(result.isOk() && result.value.warnings).toEqual([expect.objectContaining({ currentHours: 24, totalHours: 44, loadPercent: 110 })]);
   });
 
   it('ignora las semanas que ya terminaron', async () => {

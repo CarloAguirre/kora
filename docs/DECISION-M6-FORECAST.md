@@ -216,7 +216,10 @@ de guardar, sin depender del aviso que se muestra mientras se escribe.
   `POST /forecast/load-preview`, que calcula las HH con el mismo cálculo del
   forecast (`ForecastSourceSyncService.previewSegment`/`previewTask`: feriados,
   jornada de cada persona, tareas ya cubiertas por un tramo) y las suma a lo que
-  la persona ya tiene. Al editar, no cuenta las filas del mismo tramo o tarea.
+  la persona ya tiene en tramos, tareas, ausencias y otras actividades. No
+  cuenta las HH de proyecto o soporte cargadas a mano en el Forecast: son
+  planificación y se van ajustando ahí, no carga comprometida. Al editar, no
+  cuenta las filas del mismo tramo o tarea.
   Solo revisa semanas que no han terminado.
 - **Editor del Forecast**: si la semana queda sobre el 100 %, lo muestra arriba
   del editor.

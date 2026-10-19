@@ -1,7 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CLOCK, ok, type ApplicationError, type Clock, type Result } from '@kora/core';
 import type { ForecastLoadPreviewInput, ForecastLoadPreviewResponse, ForecastOverloadWarning } from '@kora/contracts';
-import { FORECAST_ASSIGNMENT_REPOSITORY, type ForecastAssignmentRepository } from '../../domain/repositories/forecast-assignment.repository';
+import {
+  FORECAST_ASSIGNMENT_REPOSITORY,
+  type ForecastAssignmentRawRow,
+  type ForecastAssignmentRepository,
+} from '../../domain/repositories/forecast-assignment.repository';
 import { FORECAST_SOURCE_CALCULATOR, type ForecastSourceCalculator, type PlannedLoadWeek } from '../ports/forecast-source-calculator.port';
 import { FORECAST_TEAM_READER, type ForecastTeamReader } from '../ports/forecast-team-reader.port';
 import { ForecastCapacityService } from '../services/forecast-capacity.service';
@@ -11,11 +15,16 @@ const toIsoDate = (date: Date) => date.toISOString().slice(0, 10);
 const toDate = (isoDate: string) => new Date(`${isoDate}T00:00:00.000Z`);
 const round2 = (value: number) => Math.round(value * 100) / 100;
 
+/** Horas de proyecto/soporte cargadas a mano en el Forecast: son planificación, no carga comprometida. */
+const isManualPlanning = (row: ForecastAssignmentRawRow) => row.source === 'manual' && (row.type === 'project' || row.type === 'support');
+
 /**
  * Antes de guardar un tramo o una tarea: ¿deja a alguien sobre su capacidad? Calcula las HH que
- * agregaría (mismo cálculo que el Forecast) y las suma a lo que la persona ya tiene cada semana, sin
- * contar las filas del mismo tramo/tarea si se está editando. Avisa las semanas en que la persona ya
- * estaba al 100 % o lo pasaría. Solo semanas que no terminaron: el pasado ya no se puede replanificar.
+ * agregaría (mismo cálculo que el Forecast) y las suma a lo que la persona ya tiene cada semana en
+ * tramos, tareas, ausencias y otras actividades — no las HH de proyecto planificadas a mano en el
+ * Forecast, que se van ajustando ahí — sin contar las filas del mismo tramo/tarea si se está editando.
+ * Avisa las semanas en que la persona ya estaba al 100 % o lo pasaría. Solo semanas que no terminaron:
+ * el pasado ya no se puede replanificar.
  */
 @Injectable()
 export class PreviewForecastLoadUseCase implements UseCase<ForecastLoadPreviewInput, ForecastLoadPreviewResponse, ApplicationError> {
@@ -40,6 +49,7 @@ export class PreviewForecastLoadUseCase implements UseCase<ForecastLoadPreviewIn
     const currentByKey = new Map<string, number>();
     for (const row of existing) {
       if ((excludedSegmentId && row.segmentId === excludedSegmentId) || (excludedTaskId && row.taskId === excludedTaskId)) continue;
+      if (isManualPlanning(row)) continue;
       const key = `${row.teamMemberId}|${toIsoDate(row.periodStart)}`;
       currentByKey.set(key, (currentByKey.get(key) ?? 0) + row.assignedHours);
     }
