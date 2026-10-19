@@ -273,6 +273,11 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
 
   const { data: clients } = useClientsList({ page: 1, pageSize: 200, sortField: 'companyName' }, { enabled: open });
   const { data: leaders } = useUsersList({ page: 1, pageSize: 200, sortField: 'firstName', role: 'leader' }, { enabled: open });
+  const { data: pmoUsers } = useUsersList({ page: 1, pageSize: 200, sortField: 'firstName', role: 'pmo' }, { enabled: open });
+  // El líder de un equipo puede ser un líder o un PMO (p. ej. el equipo PMO lo lidera alguien con rol pmo).
+  const teamLeaderCandidates = [...(leaders?.items ?? []), ...(pmoUsers?.items ?? [])].sort((a, b) =>
+    a.fullName.localeCompare(b.fullName, 'es'),
+  );
   const { data: commercialUsers } = useUsersList(
     { page: 1, pageSize: 200, sortField: 'firstName', isCommercialManager: true },
     { enabled: open },
@@ -947,7 +952,7 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
                       <Select
                         label="Líder"
                         placeholder="Sin asignar"
-                        options={assignableOptions(leaders?.items ?? [], (user) => ({ value: user.id, label: user.fullName, status: user.status }), teamsValue[index]?.leaderUserId)}
+                        options={assignableOptions(teamLeaderCandidates, (user) => ({ value: user.id, label: user.fullName, status: user.status }), teamsValue[index]?.leaderUserId)}
                         {...register(`teams.${index}.leaderUserId`, { setValueAs: emptyToNull })}
                       />
                       <TextField label="N° colaboradores" type="number" min={0} {...register(`teams.${index}.memberCount`)} />

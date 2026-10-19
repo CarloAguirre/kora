@@ -350,6 +350,11 @@ export function NewProjectPage() {
   const { data: clients } = useClientsList({ page: 1, pageSize: 200, sortField: 'companyName' });
   const { data: clientDetail } = useClientDetail(clientId || null);
   const { data: leaders } = useUsersList({ page: 1, pageSize: 200, sortField: 'firstName', role: 'leader' });
+  const { data: pmoUsers } = useUsersList({ page: 1, pageSize: 200, sortField: 'firstName', role: 'pmo' });
+  // El líder de un equipo puede ser un líder o un PMO (p. ej. el equipo PMO lo lidera alguien con rol pmo).
+  const teamLeaderCandidates = [...(leaders?.items ?? []), ...(pmoUsers?.items ?? [])].sort((a, b) =>
+    a.fullName.localeCompare(b.fullName, 'es'),
+  );
   const { data: commercialUsers } = useUsersList({ page: 1, pageSize: 200, sortField: 'firstName', isCommercialManager: true });
   const { data: teams } = useTeamsList({ page: 1, pageSize: 50, sortField: 'name' });
   // Candidatos a consolidar en un contrato de soporte — mismo filtro que usaba el asistente "Nuevo
@@ -1280,7 +1285,7 @@ export function NewProjectPage() {
                                   <Select
                                     label="Líder"
                                     placeholder="Sin asignar"
-                                    options={assignableOptions(leaders?.items ?? [], (user) => ({ value: user.id, label: user.fullName, status: user.status }), teamsValue[index]?.leaderUserId)}
+                                    options={assignableOptions(teamLeaderCandidates, (user) => ({ value: user.id, label: user.fullName, status: user.status }), teamsValue[index]?.leaderUserId)}
                                     {...register(`teams.${index}.leaderUserId`, { setValueAs: emptyToUndefined })}
                                   />
                                   <TextField label="N° colaboradores" type="number" min={0} {...register(`teams.${index}.memberCount`)} />
