@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import type { HourEntrySummary } from '@kora/contracts';
 import styles from './RecentHistoryCard.module.css';
 import { Card } from '@/shared/components/ui/Card';
-import { Select } from '@/shared/components/ui/Select';
+import { WeekRangePicker } from '@/shared/components/ui/WeekRangePicker';
 import { DEFAULT_PAGE_SIZE, Pagination } from '@/shared/components/ui/Pagination';
 import { DataTable, type Column } from '@/shared/components/ui/DataTable';
 import { HourEntryStatusBadge } from '@/modules/hours/components/HourEntryStatusBadge';
@@ -31,10 +31,6 @@ function toIsoDate(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-function formatShort(date: Date): string {
-  return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}`;
-}
-
 function formatDate(isoDate: string): string {
   const date = new Date(`${isoDate}T00:00:00`);
   return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
@@ -55,27 +51,11 @@ interface RecentHistoryCardProps {
  */
 export function RecentHistoryCard({ weekStart, onWeekStartChange }: RecentHistoryCardProps) {
   const { user } = useAuth();
-  const currentMonday = useMemo(() => mondayOf(new Date()), []);
   const selectedMonday = useMemo(
     () => mondayOf(weekStart ? new Date(`${weekStart}T00:00:00`) : new Date()),
     [weekStart],
   );
   const selectedSunday = useMemo(() => addDays(selectedMonday, 6), [selectedMonday]);
-
-  const weekOptions = useMemo(
-    () =>
-      Array.from({ length: 13 }, (_, index) => {
-        const offset = index - 6;
-        const monday = mondayOf(addDays(currentMonday, offset * 7));
-        const sunday = addDays(monday, 6);
-        const isCurrent = toIsoDate(monday) === toIsoDate(currentMonday);
-        return {
-          value: toIsoDate(monday),
-          label: isCurrent ? `Semana actual (${formatShort(monday)} - ${formatShort(sunday)})` : `${formatShort(monday)} - ${formatShort(sunday)}`,
-        };
-      }),
-    [currentMonday],
-  );
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
@@ -115,14 +95,15 @@ export function RecentHistoryCard({ weekStart, onWeekStartChange }: RecentHistor
     <Card className={styles.card}>
       <div className={styles.header}>
         <h3 className={styles.title}>Historial Reciente</h3>
-        <Select
-          aria-label="Seleccionar semana"
+        <WeekRangePicker
+          label=""
           className={styles.weekSelect}
-          options={weekOptions}
-          value={toIsoDate(selectedMonday)}
-          onChange={(event) => {
+          periodStart={toIsoDate(selectedMonday)}
+          periodEnd={toIsoDate(addDays(selectedMonday, 4))}
+          displayPeriodEnd={toIsoDate(selectedSunday)}
+          onChange={({ periodStart }) => {
             setPage(1);
-            onWeekStartChange(event.target.value);
+            onWeekStartChange(periodStart);
           }}
         />
       </div>

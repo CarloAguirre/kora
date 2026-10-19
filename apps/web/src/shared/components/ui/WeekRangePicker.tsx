@@ -5,6 +5,7 @@ import { CalendarIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon } from
 import { currentLaborWeek, formatShortRange } from '@/modules/forecast/lib/labor-weeks';
 
 export interface WeekRangePickerProps {
+  /** Etiqueta sobre el botón. Con `""` no se muestra (p. ej. cuando el título del card ya da contexto). */
   label?: string;
   /** Lunes de la semana seleccionada (ISO `yyyy-mm-dd`). */
   periodStart: string;
@@ -141,11 +142,12 @@ export function WeekRangePicker({
 
   return (
     <div className={[styles.wrapper, className].filter(Boolean).join(' ')} ref={containerRef}>
-      <span className={styles.label}>{label}</span>
+      {label && <span className={styles.label}>{label}</span>}
       <button
         type="button"
         className={[styles.trigger, open ? styles.triggerOpen : ''].filter(Boolean).join(' ')}
         onClick={() => (open ? setOpen(false) : openPicker())}
+        aria-label={label ? undefined : 'Seleccionar semana'}
         aria-haspopup="dialog"
         aria-expanded={open}
       >
