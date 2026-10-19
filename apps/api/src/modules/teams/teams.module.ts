@@ -14,6 +14,8 @@ import { UpdateTeamMemberUseCase } from './application/use-cases/update-team-mem
 import { ListTeamMemberOptionsUseCase } from './application/use-cases/list-team-member-options.use-case';
 import { ListTeamTypesUseCase } from './application/use-cases/list-team-types.use-case';
 import { CreateTeamTypeUseCase } from './application/use-cases/create-team-type.use-case';
+import { UpdateTeamTypeUseCase } from './application/use-cases/update-team-type.use-case';
+import { DeleteTeamTypeUseCase } from './application/use-cases/delete-team-type.use-case';
 import { GetTeamReportUseCase } from './application/use-cases/get-team-report.use-case';
 import { UpdateTeamReportCommentUseCase } from './application/use-cases/update-team-report-comment.use-case';
 import { RequestTeamReportDataUseCase } from './application/use-cases/request-team-report-data.use-case';
@@ -53,6 +55,8 @@ import { DrizzleTeamReportReader } from './infrastructure/persistence/drizzle-te
     ListTeamMemberOptionsUseCase,
     ListTeamTypesUseCase,
     CreateTeamTypeUseCase,
+    UpdateTeamTypeUseCase,
+    DeleteTeamTypeUseCase,
     GetTeamReportUseCase,
     UpdateTeamReportCommentUseCase,
     RequestTeamReportDataUseCase,

@@ -10,6 +10,7 @@ import type {
   TeamReportResponse,
   UpdateTeamInput,
   UpdateTeamMemberInput,
+  UpdateTeamTypeInput,
 } from '@kora/contracts';
 import { teamKeys, teamsApi, teamTypesApi } from './teams.api';
 
@@ -174,5 +175,23 @@ export function useCreateTeamType() {
   return useMutation({
     mutationFn: (input: CreateTeamTypeInput) => teamTypesApi.create(input),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: teamKeys.types() }),
+  });
+}
+
+/** Invalida todos los equipos (no solo el catálogo): las tarjetas y el detalle muestran el tipo. */
+export function useUpdateTeamType() {
+  const invalidate = useInvalidateTeams();
+  return useMutation({
+    mutationFn: ({ typeId, input }: { typeId: string; input: UpdateTeamTypeInput }) =>
+      teamTypesApi.update(typeId, input),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useDeleteTeamType() {
+  const invalidate = useInvalidateTeams();
+  return useMutation({
+    mutationFn: (typeId: string) => teamTypesApi.remove(typeId),
+    onSuccess: () => invalidate(),
   });
 }

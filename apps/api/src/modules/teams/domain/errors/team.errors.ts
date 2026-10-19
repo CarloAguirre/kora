@@ -26,6 +26,12 @@ export class TeamTypeNameAlreadyInUseError extends ConflictError {
   }
 }
 
+export class TeamTypeNotFoundError extends NotFoundError {
+  constructor(identifier: string) {
+    super('Tipo de equipo', identifier, 'TEAM_TYPE_NOT_FOUND');
+  }
+}
+
 export class TeamMemberAlreadyActiveError extends ConflictError {
   constructor() {
     super('Esta persona ya pertenece activamente al equipo.', 'TEAM_MEMBER_ALREADY_ACTIVE');

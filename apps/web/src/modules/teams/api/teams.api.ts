@@ -15,6 +15,7 @@ import type {
   TeamReportResponse,
   UpdateTeamInput,
   UpdateTeamMemberInput,
+  UpdateTeamTypeInput,
 } from '@kora/contracts';
 import { api } from '@/shared/lib/api-client';
 
@@ -77,6 +78,12 @@ export const teamTypesApi = {
   },
   create(input: CreateTeamTypeInput): Promise<{ id: string }> {
     return api.post<{ id: string }>('/teams/types', input);
+  },
+  update(typeId: string, input: UpdateTeamTypeInput): Promise<void> {
+    return api.patch<void>(`/teams/types/${typeId}`, input);
+  },
+  remove(typeId: string): Promise<void> {
+    return api.delete<void>(`/teams/types/${typeId}`);
   },
 };
 

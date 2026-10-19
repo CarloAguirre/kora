@@ -45,6 +45,10 @@ export const createTeamTypeSchema = z.object({
 });
 export type CreateTeamTypeInput = z.infer<typeof createTeamTypeSchema>;
 
+/** Editar un tipo reemplaza sus tres campos: el formulario siempre los envía completos. */
+export const updateTeamTypeSchema = createTeamTypeSchema;
+export type UpdateTeamTypeInput = z.infer<typeof updateTeamTypeSchema>;
+
 export const listTeamTypesResponseSchema = z.object({ items: z.array(teamTypeSchema) });
 export type ListTeamTypesResponse = z.infer<typeof listTeamTypesResponseSchema>;
 

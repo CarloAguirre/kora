@@ -10,6 +10,7 @@ import {
   updateTeamMemberSchema,
   updateTeamReportCommentSchema,
   updateTeamSchema,
+  updateTeamTypeSchema,
   type AddTeamMemberInput,
   type CreateTeamInput,
   type CreateTeamTypeInput,
@@ -27,6 +28,7 @@ import {
   type UpdateTeamInput,
   type UpdateTeamReportCommentInput,
   type UpdateTeamMemberInput,
+  type UpdateTeamTypeInput,
 } from '@kora/contracts';
 import { ZodValidationPipe } from '../../../shared/presentation/pipes/zod-validation.pipe';
 import { RequirePermissions } from '../../../shared/presentation/decorators/require-permissions.decorator';
@@ -45,6 +47,8 @@ import { UpdateTeamMemberUseCase } from '../application/use-cases/update-team-me
 import { ListTeamMemberOptionsUseCase } from '../application/use-cases/list-team-member-options.use-case';
 import { ListTeamTypesUseCase } from '../application/use-cases/list-team-types.use-case';
 import { CreateTeamTypeUseCase } from '../application/use-cases/create-team-type.use-case';
+import { UpdateTeamTypeUseCase } from '../application/use-cases/update-team-type.use-case';
+import { DeleteTeamTypeUseCase } from '../application/use-cases/delete-team-type.use-case';
 import { GetTeamReportUseCase } from '../application/use-cases/get-team-report.use-case';
 import { UpdateTeamReportCommentUseCase } from '../application/use-cases/update-team-report-comment.use-case';
 import { RequestTeamReportDataUseCase } from '../application/use-cases/request-team-report-data.use-case';
@@ -64,6 +68,8 @@ export class TeamsController {
     private readonly listMemberOptions: ListTeamMemberOptionsUseCase,
     private readonly listTeamTypes: ListTeamTypesUseCase,
     private readonly createTeamType: CreateTeamTypeUseCase,
+    private readonly updateTeamType: UpdateTeamTypeUseCase,
+    private readonly deleteTeamType: DeleteTeamTypeUseCase,
     private readonly getTeamReport: GetTeamReportUseCase,
     private readonly updateTeamReportComment: UpdateTeamReportCommentUseCase,
     private readonly requestTeamReportData: RequestTeamReportDataUseCase,
@@ -97,6 +103,23 @@ export class TeamsController {
   ): Promise<{ id: string }> {
     const type = unwrapOrThrow(await this.createTeamType.execute(body));
     return { id: type.id };
+  }
+
+  @Patch('types/:typeId')
+  @RequirePermissions('teams:manage')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async updateType(
+    @Param('typeId', ParseUUIDPipe) typeId: string,
+    @Body(new ZodValidationPipe(updateTeamTypeSchema)) body: UpdateTeamTypeInput,
+  ): Promise<void> {
+    unwrapOrThrow(await this.updateTeamType.execute({ typeId, data: body }));
+  }
+
+  @Delete('types/:typeId')
+  @RequirePermissions('teams:manage')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async removeType(@Param('typeId', ParseUUIDPipe) typeId: string): Promise<void> {
+    unwrapOrThrow(await this.deleteTeamType.execute({ typeId }));
   }
 
   @Get()

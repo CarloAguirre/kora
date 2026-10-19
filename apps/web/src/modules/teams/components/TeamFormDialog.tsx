@@ -1,22 +1,25 @@
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { createTeamSchema, type CreateTeamInput, type TeamSummary } from '@kora/contracts';
+import { createTeamSchema, type CreateTeamInput, type TeamSummary, type TeamType } from '@kora/contracts';
 import { SidePanel } from '@/shared/components/ui/SidePanel';
 import { Button } from '@/shared/components/ui/Button';
 import { TextField } from '@/shared/components/ui/TextField';
 import { Select } from '@/shared/components/ui/Select';
 import { Badge } from '@/shared/components/ui/Badge';
 import { Avatar } from '@/shared/components/ui/Avatar';
-import { AlertIcon, PlusIcon, TrashIcon } from '@/shared/components/icons/Icons';
+import { ConfirmActionDialog } from '@/shared/components/ui/ConfirmActionDialog';
+import { AlertIcon, PencilIcon, PlusIcon, TrashIcon } from '@/shared/components/icons/Icons';
 import {
   useAddTeamMember,
   useCreateTeam,
   useCreateTeamType,
+  useDeleteTeamType,
   useRemoveTeamMember,
   useTeamDetail,
   useTeamTypes,
   useUpdateTeam,
+  useUpdateTeamType,
 } from '../api/teams.queries';
 import { useUsersList } from '@/modules/users/api/users.queries';
 import { assignableOptions } from '@/modules/users/lib/assignable-options';
@@ -29,7 +32,12 @@ const STATUS_OPTIONS = [
   { value: 'false', label: 'Inactivo' },
 ];
 
-const EMPTY_NEW_TYPE = { name: '', colorIdx: 0, icon: TEAM_TYPE_ICON_OPTIONS[0]! };
+const EMPTY_TYPE_DRAFT = { name: '', color: TEAM_TYPE_COLOR_CHOICES[0]!.color, icon: TEAM_TYPE_ICON_OPTIONS[0]! as string };
+
+/** Editor de tipo abierto: `typeId` es `null` al crear uno nuevo y el id del tipo al editarlo. */
+interface TypeEditor {
+  typeId: string | null;
+}
 
 /** `''` de un `<select>` sin elegir → `null`, para "sin líder" en vez de una cadena vacía. */
 const emptyToNull = (value: string) => value || null;
@@ -53,6 +61,8 @@ export function TeamFormDialog({ open, team, onClose, onSuccess }: TeamFormDialo
   const createTeam = useCreateTeam();
   const updateTeam = useUpdateTeam();
   const createTeamType = useCreateTeamType();
+  const updateTeamType = useUpdateTeamType();
+  const deleteTeamType = useDeleteTeamType();
   const addTeamMember = useAddTeamMember();
   const removeTeamMember = useRemoveTeamMember();
   const { data: teamTypes } = useTeamTypes();
@@ -60,8 +70,9 @@ export function TeamFormDialog({ open, team, onClose, onSuccess }: TeamFormDialo
   const [serverError, setServerError] = useState<string | null>(null);
   const [isActive, setIsActive] = useState(true);
   const [teamTypeId, setTeamTypeId] = useState<string | null>(null);
-  const [creatingType, setCreatingType] = useState(false);
-  const [newType, setNewType] = useState(EMPTY_NEW_TYPE);
+  const [typeEditor, setTypeEditor] = useState<TypeEditor | null>(null);
+  const [typeDraft, setTypeDraft] = useState(EMPTY_TYPE_DRAFT);
+  const [typeToDelete, setTypeToDelete] = useState<TeamType | null>(null);
   const [typeError, setTypeError] = useState<string | null>(null);
   const [members, setMembers] = useState<DraftMember[]>([]);
   const [initialMembers, setInitialMembers] = useState<DraftMember[]>([]);
@@ -94,8 +105,8 @@ export function TeamFormDialog({ open, team, onClose, onSuccess }: TeamFormDialo
     );
     setIsActive(team?.isActive ?? true);
     setTeamTypeId(team?.teamType?.id ?? null);
-    setCreatingType(false);
-    setNewType(EMPTY_NEW_TYPE);
+    setTypeEditor(null);
+    setTypeDraft(EMPTY_TYPE_DRAFT);
     setTypeError(null);
     setServerError(null);
     if (!team) {
@@ -172,25 +183,55 @@ export function TeamFormDialog({ open, team, onClose, onSuccess }: TeamFormDialo
     }
   });
 
-  const handleCreateType = async () => {
-    const name = newType.name.trim();
+  const editingType = typeEditor?.typeId
+    ? teamTypes?.items.find((type) => type.id === typeEditor.typeId)
+    : undefined;
+  const isEditingType = typeEditor?.typeId != null;
+
+  const openNewType = () => {
+    setTypeDraft(EMPTY_TYPE_DRAFT);
+    setTypeError(null);
+    setTypeEditor({ typeId: null });
+  };
+
+  const openEditType = (type: TeamType) => {
+    setTypeDraft({ name: type.name, color: type.color, icon: type.icon });
+    setTypeError(null);
+    setTypeEditor({ typeId: type.id });
+  };
+
+  const closeTypeEditor = () => {
+    setTypeEditor(null);
+    setTypeDraft(EMPTY_TYPE_DRAFT);
+    setTypeError(null);
+  };
+
+  const handleSaveType = async () => {
+    const name = typeDraft.name.trim();
     if (!name) {
       setTypeError('Ponle un nombre al tipo de equipo.');
       return;
     }
     setTypeError(null);
+    const input = { name, color: typeDraft.color, icon: typeDraft.icon };
     try {
-      const { id } = await createTeamType.mutateAsync({
-        name,
-        color: TEAM_TYPE_COLOR_CHOICES[newType.colorIdx]!.color,
-        icon: newType.icon,
-      });
-      setTeamTypeId(id);
-      setCreatingType(false);
-      setNewType(EMPTY_NEW_TYPE);
+      if (typeEditor?.typeId) {
+        await updateTeamType.mutateAsync({ typeId: typeEditor.typeId, input });
+      } else {
+        const { id } = await createTeamType.mutateAsync(input);
+        setTeamTypeId(id);
+      }
+      closeTypeEditor();
     } catch (error) {
-      setTypeError(error instanceof ApiRequestError ? error.message : 'No se pudo crear el tipo de equipo.');
+      const fallback = isEditingType ? 'No se pudo guardar el tipo de equipo.' : 'No se pudo crear el tipo de equipo.';
+      setTypeError(error instanceof ApiRequestError ? error.message : fallback);
     }
+  };
+
+  const handleDeleteType = async (type: TeamType) => {
+    await deleteTeamType.mutateAsync(type.id);
+    if (teamTypeId === type.id) setTeamTypeId(null);
+    closeTypeEditor();
   };
 
   return (
@@ -231,40 +272,53 @@ export function TeamFormDialog({ open, team, onClose, onSuccess }: TeamFormDialo
           )}
           <div className={styles.typeGrid}>
             {(teamTypes?.items ?? []).map((type) => (
-              <button
-                key={type.id}
-                type="button"
-                className={[styles.typeOption, teamTypeId === type.id ? styles.typeOptionActive : '']
-                  .filter(Boolean)
-                  .join(' ')}
-                style={teamTypeId === type.id ? { borderColor: type.color, background: `${type.color}1a`, color: type.color } : undefined}
-                onClick={() => setTeamTypeId(type.id)}
-              >
-                <TeamTypeIcon icon={type.icon} size={18} />
-                <span>{type.name}</span>
-              </button>
+              <div key={type.id} className={styles.typeOptionWrap}>
+                <button
+                  type="button"
+                  className={[styles.typeOption, teamTypeId === type.id ? styles.typeOptionActive : '']
+                    .filter(Boolean)
+                    .join(' ')}
+                  style={teamTypeId === type.id ? { borderColor: type.color, background: `${type.color}1a`, color: type.color } : undefined}
+                  onClick={() => setTeamTypeId(type.id)}
+                >
+                  <TeamTypeIcon icon={type.icon} size={18} />
+                  <span>{type.name}</span>
+                </button>
+                <button
+                  type="button"
+                  className={styles.typeEditButton}
+                  aria-label={`Editar tipo ${type.name}`}
+                  aria-pressed={typeEditor?.typeId === type.id}
+                  onClick={() => openEditType(type)}
+                >
+                  <PencilIcon size={14} />
+                </button>
+              </div>
             ))}
 
-            {creatingType ? (
+            {typeEditor ? (
               <div className={styles.typeCreate}>
                 <div>
                   <span className={styles.miniLabel}>Nombre del tipo</span>
                   <TextField
                     placeholder="Ej: Innovación, Soporte, Ventas"
-                    value={newType.name}
-                    onChange={(event) => setNewType((prev) => ({ ...prev, name: event.target.value }))}
+                    value={typeDraft.name}
+                    onChange={(event) => setTypeDraft((prev) => ({ ...prev, name: event.target.value }))}
                   />
                 </div>
                 <div>
                   <span className={styles.miniLabel}>Color</span>
                   <div className={styles.swatchRow}>
-                    {TEAM_TYPE_COLOR_CHOICES.map((choice, index) => (
+                    {TEAM_TYPE_COLOR_CHOICES.map((choice) => (
                       <button
                         key={choice.color}
                         type="button"
                         aria-label={choice.color}
-                        className={[styles.swatch, index === newType.colorIdx ? styles.swatchActive : ''].join(' ')}
-                        onClick={() => setNewType((prev) => ({ ...prev, colorIdx: index }))}
+                        className={[
+                          styles.swatch,
+                          choice.color.toLowerCase() === typeDraft.color.toLowerCase() ? styles.swatchActive : '',
+                        ].join(' ')}
+                        onClick={() => setTypeDraft((prev) => ({ ...prev, color: choice.color }))}
                       >
                         <span style={{ background: choice.color }} />
                       </button>
@@ -279,8 +333,8 @@ export function TeamFormDialog({ open, team, onClose, onSuccess }: TeamFormDialo
                         key={icon}
                         type="button"
                         aria-label={icon}
-                        className={[styles.iconOption, icon === newType.icon ? styles.iconOptionActive : ''].join(' ')}
-                        onClick={() => setNewType((prev) => ({ ...prev, icon }))}
+                        className={[styles.iconOption, icon === typeDraft.icon ? styles.iconOptionActive : ''].join(' ')}
+                        onClick={() => setTypeDraft((prev) => ({ ...prev, icon }))}
                       >
                         <TeamTypeIcon icon={icon} size={16} />
                       </button>
@@ -288,25 +342,28 @@ export function TeamFormDialog({ open, team, onClose, onSuccess }: TeamFormDialo
                   </div>
                 </div>
                 <div className={styles.typeCreateActions}>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    type="button"
-                    onClick={() => {
-                      setCreatingType(false);
-                      setTypeError(null);
-                    }}
-                  >
+                  <Button variant="ghost" size="sm" type="button" onClick={closeTypeEditor}>
                     Cancelar
                   </Button>
+                  {editingType && (
+                    <Button
+                      variant="dangerOutline"
+                      size="sm"
+                      type="button"
+                      disabled={updateTeamType.isPending}
+                      onClick={() => setTypeToDelete(editingType)}
+                    >
+                      Eliminar tipo
+                    </Button>
+                  )}
                   <Button
                     size="sm"
                     type="button"
-                    loading={createTeamType.isPending}
-                    loadingText="Creando…"
-                    onClick={() => void handleCreateType()}
+                    loading={createTeamType.isPending || updateTeamType.isPending}
+                    loadingText={isEditingType ? 'Guardando…' : 'Creando…'}
+                    onClick={() => void handleSaveType()}
                   >
-                    Crear tipo
+                    {isEditingType ? 'Guardar cambios' : 'Crear tipo'}
                   </Button>
                 </div>
               </div>
@@ -314,7 +371,7 @@ export function TeamFormDialog({ open, team, onClose, onSuccess }: TeamFormDialo
               <button
                 type="button"
                 className={[styles.typeOption, styles.typeOptionAdd].join(' ')}
-                onClick={() => setCreatingType(true)}
+                onClick={openNewType}
               >
                 <PlusIcon size={18} />
                 <span>Nuevo tipo</span>
@@ -373,6 +430,16 @@ export function TeamFormDialog({ open, team, onClose, onSuccess }: TeamFormDialo
           )}
         </div>
       </form>
+
+      <ConfirmActionDialog
+        open={typeToDelete !== null}
+        title="Eliminar tipo de equipo"
+        description={`Se eliminará el tipo "${typeToDelete?.name ?? ''}". Los equipos que lo usan quedarán sin tipo.`}
+        confirmLabel="Eliminar tipo"
+        destructive
+        onConfirm={() => handleDeleteType(typeToDelete!)}
+        onClose={() => setTypeToDelete(null)}
+      />
     </SidePanel>
   );
 }

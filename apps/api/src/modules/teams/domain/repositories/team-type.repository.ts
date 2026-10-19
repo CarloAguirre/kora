@@ -22,11 +22,22 @@ export interface CreateTeamTypeData {
   readonly now: Date;
 }
 
+export interface UpdateTeamTypeData {
+  readonly name: string;
+  readonly color: string;
+  readonly icon: string;
+  readonly now: Date;
+}
+
 export interface TeamTypeRepository {
   list(context?: TransactionContext): Promise<TeamTypeRecord[]>;
   findById(id: string, context?: TransactionContext): Promise<TeamTypeRecord | null>;
-  nameIsTaken(name: string, context?: TransactionContext): Promise<boolean>;
+  /** `excludeId` deja fuera al propio tipo al renombrarlo. */
+  nameIsTaken(name: string, excludeId?: string, context?: TransactionContext): Promise<boolean>;
   create(data: CreateTeamTypeData, context?: TransactionContext): Promise<TeamTypeRecord>;
+  update(id: string, data: UpdateTeamTypeData, context?: TransactionContext): Promise<void>;
+  /** Borrado físico: los equipos que lo usaban quedan sin tipo (`ON DELETE SET NULL`). */
+  delete(id: string, context?: TransactionContext): Promise<void>;
 }
 
 export const TEAM_TYPE_REPOSITORY = Symbol('TeamTypeRepository');

@@ -68,6 +68,51 @@
   gap: var(--kora-space-1);
 }
 
+.typeOptionWrap {
+  position: relative;
+  display: flex;
+}
+
+.typeOptionWrap > .typeOption {
+  flex: 1;
+}
+
+/* Lápiz para editar el tipo: aparece al pasar por la tarjeta para no competir con la selección. */
+.typeEditButton {
+  position: absolute;
+  top: var(--kora-space-1);
+  right: var(--kora-space-1);
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: var(--kora-radius-sm);
+  background: transparent;
+  color: var(--kora-text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.typeOptionWrap:hover .typeEditButton,
+.typeEditButton:focus-visible,
+.typeEditButton[aria-pressed='true'] {
+  opacity: 1;
+}
+
+.typeEditButton:hover {
+  background: var(--kora-surface-muted);
+  color: var(--kora-navy);
+}
+
+@media (hover: none) {
+  .typeEditButton {
+    opacity: 1;
+  }
+}
+
 .typeOptionActive {
   border-color: var(--kora-blue-link);
   background: var(--kora-blue-surface-alt);
