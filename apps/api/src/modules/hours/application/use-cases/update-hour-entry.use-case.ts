@@ -24,7 +24,11 @@ export interface UpdateHourEntryCommand {
   readonly actorRole: RoleCode;
 }
 
-/** Solo el dueño (mientras esté pendiente/rechazado), un admin/PMO o quien debe aprobarlo (mientras esté pendiente) pueden editar. */
+/**
+ * Editan: el dueño o un admin/PMO (pendiente/rechazado) y quien debe aprobarlo
+ * (pendiente). Un registro aprobado solo lo corrige quien puede aprobarlo
+ * (incluye admin/PMO) — desde el "Historial Reciente" del líder — y sigue aprobado.
+ */
 @Injectable()
 export class UpdateHourEntryUseCase implements UseCase<UpdateHourEntryCommand, void, ApplicationError> {
   constructor(
@@ -42,13 +46,18 @@ export class UpdateHourEntryUseCase implements UseCase<UpdateHourEntryCommand, v
     if (!entry) return err(new HourEntryNotFoundError(entryId));
 
     const isOwner = entry.userId === actor.userId;
-    // Quien debe aprobar un registro pendiente puede corregirlo antes de decidir
-    // (desde `/horas/aprobaciones`), en vez de rechazarlo solo para un ajuste.
-    const isPendingApprover =
-      !isOwner && entry.status === 'pending' && (await this.authority.canDecide(actor.userId, actorRole, entry));
-    if (!isOwner && actorRole !== 'admin' && actorRole !== 'pmo' && !isPendingApprover) {
+    // Quien debe aprobar puede corregir un registro pendiente antes de decidir
+    // (en vez de rechazarlo solo para un ajuste) o uno ya aprobado.
+    const isApprover =
+      (entry.status === 'pending' || entry.status === 'approved') &&
+      (await this.authority.canDecide(actor.userId, actorRole, entry));
+    const isAdminLike = actorRole === 'admin' || actorRole === 'pmo';
+    if (!isOwner && !isAdminLike && !isApprover) {
       return err(new ForbiddenError('No puedes editar este registro.', 'HOUR_ENTRY_CANNOT_EDIT'));
     }
+    const editApproved = entry.status === 'approved' && isApprover;
+    const previousProjectId = entry.projectId;
+    const wasApproved = entry.status === 'approved';
 
     const isOvertime = data.isOvertime !== undefined ? data.isOvertime : entry.isOvertime;
     const projectId = data.projectId !== undefined ? data.projectId : entry.projectId;
@@ -100,6 +109,7 @@ export class UpdateHourEntryUseCase implements UseCase<UpdateHourEntryCommand, v
       },
       ownerRequiresApproval,
       this.clock.now(),
+      { editApproved },
     );
     if (result.isErr()) return err(result.error);
 
@@ -108,6 +118,11 @@ export class UpdateHourEntryUseCase implements UseCase<UpdateHourEntryCommand, v
     if (entry.projectId && entry.status === 'approved') {
       const usedHours = await this.entries.sumApprovedHoursForProject(entry.projectId);
       await this.projects.recalculateUsedHours(entry.projectId, usedHours);
+    }
+    // Un aprobado que cambió de proyecto deja de sumar en el anterior.
+    if (wasApproved && previousProjectId && previousProjectId !== entry.projectId) {
+      const usedHours = await this.entries.sumApprovedHoursForProject(previousProjectId);
+      await this.projects.recalculateUsedHours(previousProjectId, usedHours);
     }
 
     await this.audit.record({

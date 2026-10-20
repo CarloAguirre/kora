@@ -149,6 +149,20 @@ describe('HourEntry', () => {
       if (update.isErr()) expect(update.error.code).toBe('HOUR_ENTRY_NOT_EDITABLE');
     });
 
+    it('quien puede aprobarlo edita un registro aprobado y sigue aprobado', () => {
+      const created = HourEntry.create({ ...base, assignment: 'Proyecto', projectId: 'p1', ownerRequiresApproval: true });
+      if (created.isErr()) throw new Error('setup failed');
+      const entry = created.value;
+      entry.approve('leader1', NOW);
+
+      const update = entry.updateDetails({ hours: 5 }, true, NOW, { editApproved: true });
+
+      expect(update.isOk()).toBe(true);
+      expect(entry.status).toBe('approved');
+      expect(entry.toSnapshot().hours).toBe(5);
+      expect(entry.toSnapshot().decisionUserId).toBe('leader1');
+    });
+
     it('editar un registro rechazado lo vuelve a poner pendiente', () => {
       const created = HourEntry.create({ ...base, assignment: 'Proyecto', projectId: 'p1', ownerRequiresApproval: true });
       if (created.isErr()) throw new Error('setup failed');

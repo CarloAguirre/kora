@@ -192,9 +192,10 @@ export class HourEntry extends AggregateRoot<string> {
   }
 
   /**
-   * Solo el dueño (o un admin, decidido fuera del dominio) puede editar, y
-   * solo mientras esté pendiente o rechazado — un registro aprobado ya
-   * pudo haber afectado el consumo del proyecto.
+   * Quién puede editar se decide fuera del dominio. Un registro aprobado solo
+   * se edita con `editApproved` (quien puede aprobarlo, o admin/PMO): ya
+   * cuenta en el consumo del proyecto, así que sigue aprobado — es una
+   * corrección de quien decide, no un registro nuevo que revisar.
    */
   updateDetails(
     data: Partial<
@@ -215,8 +216,10 @@ export class HourEntry extends AggregateRoot<string> {
     >,
     ownerRequiresApproval: boolean,
     now: Date,
+    { editApproved = false }: { editApproved?: boolean } = {},
   ): Result<void, CreateHourEntryError | HourEntryNotEditableError> {
-    if (this.props.status === 'approved') return err(new HourEntryNotEditableError());
+    const wasApproved = this.props.status === 'approved';
+    if (wasApproved && !editApproved) return err(new HourEntryNotEditableError());
 
     if (data.hours !== undefined && (!(data.hours > 0) || data.hours > 24)) {
       return err(new InvalidHourEntryHoursError('Las horas deben estar entre 0 y 24.'));
@@ -241,7 +244,7 @@ export class HourEntry extends AggregateRoot<string> {
     if (!this.props.hasBlocker) this.props.blockerDescription = null;
 
     const wasRejected = this.props.status === 'rejected';
-    this.props.status = ownerRequiresApproval ? 'pending' : 'approved';
+    if (!wasApproved) this.props.status = ownerRequiresApproval ? 'pending' : 'approved';
     if (wasRejected) {
       this.props.rejectionReason = null;
       this.props.decisionUserId = null;
