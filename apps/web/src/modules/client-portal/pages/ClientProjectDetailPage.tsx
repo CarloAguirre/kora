@@ -17,6 +17,8 @@ import {
   DiamondIcon,
   DollarSignIcon,
   DownloadIcon,
+  EyeIcon,
+  EyeOffIcon,
   HistoryIcon,
   LinkIcon,
   ListIcon,
@@ -180,6 +182,11 @@ export function ClientProjectDetailPage({
   );
   const project = projectDetail ? toClientProjectDetail(projectDetail, projectHourEntries?.items ?? []) : undefined;
   const [visible, setVisible] = useState<Record<SectionKey, boolean>>(ALL_SECTIONS_VISIBLE);
+  /** Oculta solo las horas consumidas dentro de "Horas y avance" — el % de
+   *  avance, las horas estimadas y la fecha fin siguen visibles. También
+   *  esconde el número de desviación (= consumidas − estimadas, lo
+   *  revelaría), pero deja el pill "En riesgo"/"Sin desviación". */
+  const [usedHoursVisible, setUsedHoursVisible] = useState(true);
   const resolvedBackTo = backTo ?? '/portal/proyectos';
 
   const toggleSection = (key: SectionKey) => setVisible((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -349,7 +356,19 @@ export function ClientProjectDetailPage({
 
         {visible.hours && (
         <section className={styles.section}>
-          <h3 className={styles.sectionTitle}>Horas y avance</h3>
+          <div className={styles.sectionHeadingRow}>
+            <h3 className={styles.sectionTitle}>Horas y avance</h3>
+            <Button
+              variant="ghost"
+              size="sm"
+              className={styles.inlineToggle}
+              iconLeft={usedHoursVisible ? <EyeOffIcon size={15} /> : <EyeIcon size={15} />}
+              aria-pressed={!usedHoursVisible}
+              onClick={() => setUsedHoursVisible((prev) => !prev)}
+            >
+              {usedHoursVisible ? 'Ocultar horas consumidas' : 'Mostrar horas consumidas'}
+            </Button>
+          </div>
           <div className={styles.hoursGrid}>
             <Card className={styles.statCard}>
               <span className={styles.statLabel}>Horas estimadas</span>
@@ -357,7 +376,7 @@ export function ClientProjectDetailPage({
               <div className={styles.hoursDeviationRow}>
                 <span className={styles.statLabel}>Horas desviación</span>
                 <div className={styles.hoursDeviationValueRow}>
-                  <span className={styles.statSub}>{formatHours(project.hoursDeviation)}</span>
+                  {usedHoursVisible && <span className={styles.statSub}>{formatHours(project.hoursDeviation)}</span>}
                   {project.hoursDeviation > 0 ? (
                     <StatusPill tone="warning">En riesgo</StatusPill>
                   ) : (
@@ -366,6 +385,7 @@ export function ClientProjectDetailPage({
                 </div>
               </div>
             </Card>
+            {usedHoursVisible && (
             <Card className={styles.statCard}>
               <span className={styles.statLabel}>Horas utilizadas a la fecha</span>
               <span className={styles.statValue}>{formatHours(project.usedHoursToDate)}</span>
@@ -375,6 +395,7 @@ export function ClientProjectDetailPage({
                 {project.usedHoursUpdatedAt}
               </span>
             </Card>
+            )}
             <Card className={styles.statCard}>
               <span className={styles.statLabel}>Avance real vs. esperado</span>
               {project.progressActualPercent != null && project.progressExpectedPercent != null ? (

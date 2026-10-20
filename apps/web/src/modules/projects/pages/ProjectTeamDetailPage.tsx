@@ -9,6 +9,7 @@ import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { TeamLeaderProjectView } from '../components/TeamLeaderProjectView';
 import { useProjectDetail } from '../api/projects.queries';
 import { projectPath, projectTeamPath } from '@/app/router/paths';
+import { projectsListPath } from '../lib/projects-list-search';
 
 /**
  * Deep link a un equipo puntual dentro de un proyecto. Dos entradas:
@@ -31,7 +32,7 @@ export function ProjectTeamDetailPage() {
   if (error) {
     return (
       <DashboardLayout title="Equipo">
-        <PageLoadError error={error} subject="este proyecto" backLabel="Volver a proyectos" onBack={() => void navigate('/proyectos')} />
+        <PageLoadError error={error} subject="este proyecto" backLabel="Volver a proyectos" onBack={() => void navigate(projectsListPath())} />
       </DashboardLayout>
     );
   }

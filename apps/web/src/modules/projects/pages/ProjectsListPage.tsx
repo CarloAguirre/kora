@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import {
   PROJECT_PHASES,
   PROJECT_PHASE_LABELS,
@@ -14,8 +14,8 @@ import styles from './ProjectsListPage.module.css';
 import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Button } from '@/shared/components/ui/Button';
 import { Card } from '@/shared/components/ui/Card';
-import { DataTable, type Column, type SortState } from '@/shared/components/ui/DataTable';
-import { DEFAULT_PAGE_SIZE, Pagination } from '@/shared/components/ui/Pagination';
+import { DataTable, type Column } from '@/shared/components/ui/DataTable';
+import { Pagination } from '@/shared/components/ui/Pagination';
 import { TextField } from '@/shared/components/ui/TextField';
 import { MultiSelect } from '@/shared/components/ui/MultiSelect';
 import { Tabs } from '@/shared/components/ui/Tabs';
@@ -27,6 +27,13 @@ import { ProjectsSummaryChart } from '../components/ProjectsSummaryChart';
 import { getProjectStageLabel } from '../lib/project-stage-display';
 import { formatProgressPercent } from '../lib/project-progress-display';
 import { exportDevelopmentProjects, exportSupportProjects } from '../lib/project-export';
+import {
+  DEFAULT_PROJECTS_SORT,
+  parseProjectsListSearch,
+  rememberProjectsListSearch,
+  serializeProjectsListSearch,
+  type ProjectsListSearch,
+} from '../lib/projects-list-search';
 import { useDeleteProject, useProjectsList } from '../api/projects.queries';
 import { projectsApi } from '../api/projects.api';
 import { useClientsList } from '@/modules/clients/api/clients.queries';
@@ -45,9 +52,6 @@ const SUPPORT_SUB_TABS = [
   { id: 'finished', label: 'Terminados' },
 ] as const;
 const EXPORT_PAGE_SIZE = 200;
-
-// Por defecto, primero los proyectos con más horas desviadas.
-const DEFAULT_SORT: SortState<ProjectSortField> = { field: 'deviationHours', direction: 'desc' };
 
 const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 2 });
 // Restantes y desviadas se separan: si el proyecto ya consumió todo lo vendido, restantes queda en 0
@@ -75,15 +79,19 @@ const DATE_COLUMN_WIDTH = '120px';
 export function ProjectsListPage() {
   const { can } = usePermissions();
   const toast = useToast();
-  const [tab, setTab] = useState<'development' | 'support'>('development');
-  const [supportSubTab, setSupportSubTab] = useState<'active' | 'finished'>('active');
-  const [search, setSearch] = useState('');
-  const [leaderUserIds, setLeaderUserIds] = useState<string[]>([]);
-  const [statuses, setStatuses] = useState<ProjectStatus[]>([]);
-  const [phases, setPhases] = useState<ProjectPhase[]>([]);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
-  const [sort, setSort] = useState<SortState<ProjectSortField>>(DEFAULT_SORT);
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const listSearch = useMemo(() => parseProjectsListSearch(searchParams), [searchParams]);
+  const { tab, supportSubTab, search, leaderUserIds, statuses, phases, page, pageSize, sort } = listSearch;
+  // `replace`: cada tecla del buscador o cambio de filtro no debe sumar una entrada al historial.
+  const updateListSearch = (patch: Partial<ProjectsListSearch>) =>
+    setSearchParams(serializeProjectsListSearch({ ...listSearch, ...patch }), { replace: true });
+  const setPage = (next: number) => updateListSearch({ page: next });
+
+  useEffect(() => {
+    rememberProjectsListSearch(location.search);
+  }, [location.search]);
+
   const [deleteTarget, setDeleteTarget] = useState<ProjectSummary | null>(null);
   const [exporting, setExporting] = useState(false);
   const deleteProject = useDeleteProject();
@@ -138,25 +146,19 @@ export function ProjectsListPage() {
     [leaders],
   );
 
-  const changeTab = (id: string) => {
-    setTab(id as 'development' | 'support');
-    setSort(DEFAULT_SORT);
-    setPage(1);
-  };
+  const changeTab = (id: string) =>
+    updateListSearch({ tab: id as 'development' | 'support', sort: DEFAULT_PROJECTS_SORT, page: 1 });
 
-  const changeSupportSubTab = (id: string) => {
-    setSupportSubTab(id as 'active' | 'finished');
-    setPage(1);
-  };
+  const changeSupportSubTab = (id: string) => updateListSearch({ supportSubTab: id as 'active' | 'finished', page: 1 });
 
-  const toggleSort = (field: string) => {
-    setSort((current) =>
-      current.field === field
-        ? { field: current.field, direction: current.direction === 'asc' ? 'desc' : 'asc' }
-        : { field: field as ProjectSortField, direction: 'asc' },
-    );
-    setPage(1);
-  };
+  const toggleSort = (field: string) =>
+    updateListSearch({
+      sort:
+        sort.field === field
+          ? { field: sort.field, direction: sort.direction === 'asc' ? 'desc' : 'asc' }
+          : { field: field as ProjectSortField, direction: 'asc' },
+      page: 1,
+    });
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
@@ -335,10 +337,7 @@ export function ProjectsListPage() {
                   searchPlaceholder="Buscar líder"
                   options={leaderOptions}
                   value={leaderUserIds}
-                  onChange={(next) => {
-                    setLeaderUserIds(next);
-                    setPage(1);
-                  }}
+                  onChange={(next) => updateListSearch({ leaderUserIds: next, page: 1 })}
                 />
                 <MultiSelect
                   className={styles.filter}
@@ -347,10 +346,7 @@ export function ProjectsListPage() {
                   searchPlaceholder="Buscar estado"
                   options={STATUS_OPTIONS}
                   value={statuses}
-                  onChange={(next) => {
-                    setStatuses(next as ProjectStatus[]);
-                    setPage(1);
-                  }}
+                  onChange={(next) => updateListSearch({ statuses: next as ProjectStatus[], page: 1 })}
                 />
                 <MultiSelect
                   className={styles.filter}
@@ -359,10 +355,7 @@ export function ProjectsListPage() {
                   searchPlaceholder="Buscar etapa"
                   options={PHASE_OPTIONS}
                   value={phases}
-                  onChange={(next) => {
-                    setPhases(next as ProjectPhase[]);
-                    setPage(1);
-                  }}
+                  onChange={(next) => updateListSearch({ phases: next as ProjectPhase[], page: 1 })}
                 />
               </>
             )}
@@ -372,10 +365,7 @@ export function ProjectsListPage() {
               type="search"
               placeholder={tab === 'development' ? 'Buscar Proyecto' : 'Buscar por nombre'}
               value={search}
-              onChange={(event) => {
-                setSearch(event.target.value);
-                setPage(1);
-              }}
+              onChange={(event) => updateListSearch({ search: event.target.value, page: 1 })}
               iconLeft={<SearchIcon size={16} />}
             />
           </div>
@@ -401,10 +391,7 @@ export function ProjectsListPage() {
               total={data.total}
               pageSize={data.pageSize}
               onPageChange={setPage}
-              onPageSizeChange={(size) => {
-                setPageSize(size);
-                setPage(1);
-              }}
+              onPageSizeChange={(size) => updateListSearch({ pageSize: size, page: 1 })}
             />
           )}
         </Card>

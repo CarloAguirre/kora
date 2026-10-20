@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CLOCK, err, ok, type ApplicationError, type Clock, type Result } from '@kora/core';
-import type { RoleCode } from '@kora/contracts';
-import { CannotDeleteTicketError, TicketNotFoundError } from '../../domain/errors/ticket.errors';
+import { isAdminTier, type RoleCode } from '@kora/contracts';
+import { CannotDeleteClosedTicketError, CannotDeleteTicketError, TicketNotFoundError } from '../../domain/errors/ticket.errors';
 import { TICKET_REPOSITORY, type TicketRepository } from '../../domain/repositories/ticket.repository';
 import { TICKET_HISTORY_REPOSITORY, type TicketHistoryRepository } from '../../domain/repositories/ticket-history.repository';
 import { TICKET_PROJECT_READER, type TicketProjectReader } from '../ports/ticket-project-reader.port';
@@ -22,6 +22,9 @@ export interface DeleteTicketCommand {
  * (líder del proyecto o de un equipo asignado a él) — mismo criterio que la
  * v1, donde sólo el responsable o el líder relacionado con el ticket podían
  * eliminarlo, no cualquier líder con permiso general de gestión.
+ *
+ * Un ticket cerrado (el que se ve en "Historial de tickets") solo lo puede
+ * eliminar admin/PMO — ni el responsable ni el líder del proyecto.
  */
 @Injectable()
 export class DeleteTicketUseCase implements UseCase<DeleteTicketCommand, void, ApplicationError> {
@@ -37,8 +40,8 @@ export class DeleteTicketUseCase implements UseCase<DeleteTicketCommand, void, A
     const ticket = await this.tickets.findById(command.ticketId);
     if (!ticket) return err(new TicketNotFoundError(command.ticketId));
 
-    const isAdminTier = command.actorRole === 'admin' || command.actorRole === 'pmo';
-    if (!isAdminTier) {
+    if (!isAdminTier(command.actorRole)) {
+      if (ticket.status === 'closed') return err(new CannotDeleteClosedTicketError());
       const isAssignee = ticket.assigneeUserId === command.actor.userId;
       const isApprover = ticket.projectId
         ? await this.projects.isProjectApprover(ticket.projectId, command.actor.userId, ticket.assigneeUserId)

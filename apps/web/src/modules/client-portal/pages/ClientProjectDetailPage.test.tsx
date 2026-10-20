@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import type { ProjectDetail } from '@kora/contracts';
 import { ClientProjectDetailPage } from './ClientProjectDetailPage';
@@ -124,5 +124,34 @@ describe('ClientProjectDetailPage — última actualización', () => {
     renderPage(buildProject({ leaderLastActivityAt: null }));
 
     expect(screen.queryByText(/Última actualización/)).not.toBeInTheDocument();
+  });
+});
+
+describe('ClientProjectDetailPage — ocultar horas consumidas', () => {
+  it('oculta solo las horas consumidas y deja visible el avance', () => {
+    renderPage(
+      buildProject({
+        soldHours: 100,
+        usedHours: 130,
+        progress: { actual: 40, expected: 50, consumption: 130, delay: null, planCoverage: null, estimatedByCount: false },
+      }),
+    );
+
+    expect(screen.getByText('Horas utilizadas a la fecha')).toBeInTheDocument();
+    expect(screen.getByText('130')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ocultar horas consumidas' }));
+
+    expect(screen.queryByText('Horas utilizadas a la fecha')).not.toBeInTheDocument();
+    expect(screen.queryByText('130')).not.toBeInTheDocument();
+    // La desviación (30 = 130 − 100) revelaría las consumidas: se oculta el número, no el pill.
+    expect(screen.queryByText('30')).not.toBeInTheDocument();
+    expect(screen.getByText('En riesgo')).toBeInTheDocument();
+    expect(screen.getByText('Avance real vs. esperado')).toBeInTheDocument();
+    expect(screen.getByText('40%')).toBeInTheDocument();
+    expect(screen.getByText('Horas estimadas')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Mostrar horas consumidas' }));
+    expect(screen.getByText('Horas utilizadas a la fecha')).toBeInTheDocument();
   });
 });

@@ -172,6 +172,14 @@
   flex-wrap: wrap;
 }
 
+/* "Ocultar horas consumidas" — control de pantalla, no va en el PDF que sale
+   de `window.print()`. */
+@media print {
+  .inlineToggle {
+    display: none;
+  }
+}
+
 .sectionCaption {
   font-size: 12.5px;
   font-weight: var(--kora-weight-medium);

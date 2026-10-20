@@ -86,6 +86,12 @@ export class CannotDeleteTicketError extends ForbiddenError {
   }
 }
 
+export class CannotDeleteClosedTicketError extends ForbiddenError {
+  constructor() {
+    super('Solo un administrador o PMO puede eliminar un ticket cerrado.', 'TICKET_CANNOT_DELETE_CLOSED');
+  }
+}
+
 /** Sin `tickets:manage` y sin relación con el ticket (no es su responsable ni tiene autoridad sobre su proyecto). */
 export class CannotManageTicketError extends ForbiddenError {
   constructor() {

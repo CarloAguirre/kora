@@ -11,6 +11,7 @@ import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { ApiRequestError } from '@/shared/lib/api-client';
 import { clientProjectPreviewPath } from '@/app/router/paths';
+import { projectsListPath } from '../lib/projects-list-search';
 import { ProjectViewTabs } from '@/modules/client-portal/components/ProjectViewTabs';
 import { useProjectDetail, useSetProjectOvertimeAuthorization } from '../api/projects.queries';
 import { EditProjectDialog } from '../components/EditProjectDialog';
@@ -53,7 +54,7 @@ export function ProjectDetailPage() {
   if (error) {
     return (
       <DashboardLayout title="Proyectos">
-        <PageLoadError error={error} subject="este proyecto" backLabel="Volver a proyectos" onBack={() => void navigate('/proyectos')} />
+        <PageLoadError error={error} subject="este proyecto" backLabel="Volver a proyectos" onBack={() => void navigate(projectsListPath())} />
       </DashboardLayout>
     );
   }
@@ -101,7 +102,7 @@ export function ProjectDetailPage() {
         </div>
 
         <div className={styles.topRow}>
-          <Button variant="tertiary" size="sm" className={styles.backButton} onClick={() => void navigate('/proyectos')}>
+          <Button variant="tertiary" size="sm" className={styles.backButton} onClick={() => void navigate(projectsListPath())}>
             <ChevronLeftIcon size={16} /> Volver a proyectos
           </Button>
 
