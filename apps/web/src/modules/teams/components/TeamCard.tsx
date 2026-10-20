@@ -5,18 +5,18 @@ import { Card } from '@/shared/components/ui/Card';
 import { Button } from '@/shared/components/ui/Button';
 import { Badge } from '@/shared/components/ui/Badge';
 import { Avatar } from '@/shared/components/ui/Avatar';
-import { PencilIcon, TrashIcon, UsersIcon } from '@/shared/components/icons/Icons';
+import { UsersIcon } from '@/shared/components/icons/Icons';
 import { TeamTypeIcon, teamTypeBackground } from '../team-type-icons';
-import { teamPath } from '@/app/router/paths';
+import { teamLeaderPreviewPath, teamPath } from '@/app/router/paths';
 
 export interface TeamCardProps {
   team: TeamSummary;
-  canManage: boolean;
-  onEdit: () => void;
-  onDelete: () => void;
+  /** Muestra "Vista líder" (la consola del equipo como la ve su líder). Sin líder asignado no hay vista que mostrar. */
+  canPreviewLeader: boolean;
 }
 
-export function TeamCard({ team, canManage, onEdit, onDelete }: TeamCardProps) {
+/** Editar y eliminar el equipo viven en "Gestionar equipo" (`TeamDetailPage`). */
+export function TeamCard({ team, canPreviewLeader }: TeamCardProps) {
   const type = team.teamType;
 
   return (
@@ -69,20 +69,17 @@ export function TeamCard({ team, canManage, onEdit, onDelete }: TeamCardProps) {
       </div>
 
       <div className={styles.foot}>
-        <Link to={teamPath(team)} className={styles.manageButton}>
+        <Link to={teamPath(team)} className={styles.footButton}>
           <Button variant="outline" size="sm" style={{ width: '100%' }}>
             Gestionar equipo
           </Button>
         </Link>
-        {canManage && (
-          <div className={styles.actions}>
-            <Button variant="ghost" size="icon" onClick={onEdit} aria-label={`Editar ${team.name}`}>
-              <PencilIcon size={16} />
+        {canPreviewLeader && team.leader && (
+          <Link to={teamLeaderPreviewPath(team)} className={styles.footButton}>
+            <Button variant="outline" size="sm" style={{ width: '100%' }}>
+              Vista líder
             </Button>
-            <Button variant="ghost" size="icon" onClick={onDelete} aria-label={`Eliminar ${team.name}`}>
-              <TrashIcon size={16} />
-            </Button>
-          </div>
+          </Link>
         )}
       </div>
     </Card>

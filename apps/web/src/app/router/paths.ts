@@ -39,6 +39,10 @@ export function teamPath(team: WithSlug): string {
   return `/equipos/${segment(team)}`;
 }
 
+export function teamLeaderPreviewPath(team: WithSlug): string {
+  return `${teamPath(team)}/vista-lider`;
+}
+
 export function teamMemberPath(team: WithSlug, memberId: string): string {
   return `${teamPath(team)}/miembros/${memberId}`;
 }

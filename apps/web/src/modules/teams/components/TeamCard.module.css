@@ -89,11 +89,6 @@
   gap: var(--kora-space-2);
 }
 
-.manageButton {
+.footButton {
   flex: 1;
-}
-
-.actions {
-  display: flex;
-  gap: var(--kora-space-1);
 }

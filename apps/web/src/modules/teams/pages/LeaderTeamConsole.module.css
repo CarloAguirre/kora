@@ -4,3 +4,8 @@
   gap: var(--kora-space-4);
   width: 100%;
 }
+
+/* "Volver a equipos" de la Vista líder — mismo botón que "Volver a proyectos" en la ficha de proyecto. */
+.backButton {
+  align-self: flex-start;
+}

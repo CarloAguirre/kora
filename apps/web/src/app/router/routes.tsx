@@ -13,6 +13,7 @@ import { ClientProjectPreviewPage } from '@/modules/clients/pages/ClientProjectP
 import { ClientSupportContractPreviewPage } from '@/modules/clients/pages/ClientSupportContractPreviewPage';
 import { TeamsListPage } from '@/modules/teams/pages/TeamsListPage';
 import { TeamDetailPage } from '@/modules/teams/pages/TeamDetailPage';
+import { TeamLeaderPreviewPage } from '@/modules/teams/pages/TeamLeaderPreviewPage';
 import { TeamMemberDetailPage } from '@/modules/teams/pages/TeamMemberDetailPage';
 import { ProjectsListPage } from '@/modules/projects/pages/ProjectsListPage';
 import { ProjectDetailPage } from '@/modules/projects/pages/ProjectDetailPage';
@@ -99,6 +100,7 @@ export const router = createBrowserRouter([
     children: [
       { path: '/equipos', element: <TeamsListPage /> },
       { path: '/equipos/:teamId', element: <TeamDetailPage /> },
+      { path: '/equipos/:teamId/vista-lider', element: <TeamLeaderPreviewPage /> },
       { path: '/equipos/:teamId/miembros/:memberId', element: <TeamMemberDetailPage /> },
     ],
   },

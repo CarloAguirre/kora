@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useLocation, useSearchParams } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import {
   PROJECT_PHASES,
   PROJECT_PHASE_LABELS,
@@ -29,9 +29,8 @@ import { formatProgressPercent } from '../lib/project-progress-display';
 import { exportDevelopmentProjects, exportSupportProjects } from '../lib/project-export';
 import {
   DEFAULT_PROJECTS_SORT,
-  parseProjectsListSearch,
+  initialProjectsListSearch,
   rememberProjectsListSearch,
-  serializeProjectsListSearch,
   type ProjectsListSearch,
 } from '../lib/projects-list-search';
 import { useDeleteProject, useProjectsList } from '../api/projects.queries';
@@ -80,17 +79,15 @@ export function ProjectsListPage() {
   const { can } = usePermissions();
   const toast = useToast();
   const location = useLocation();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const listSearch = useMemo(() => parseProjectsListSearch(searchParams), [searchParams]);
+  const [listSearch, setListSearch] = useState(() => initialProjectsListSearch(location.state));
   const { tab, supportSubTab, search, leaderUserIds, statuses, phases, page, pageSize, sort } = listSearch;
-  // `replace`: cada tecla del buscador o cambio de filtro no debe sumar una entrada al historial.
-  const updateListSearch = (patch: Partial<ProjectsListSearch>) =>
-    setSearchParams(serializeProjectsListSearch({ ...listSearch, ...patch }), { replace: true });
+  const updateListSearch = (patch: Partial<ProjectsListSearch>) => setListSearch((current) => ({ ...current, ...patch }));
   const setPage = (next: number) => updateListSearch({ page: next });
 
+  // Se guarda en cada cambio para que "Volver a proyectos" desde la ficha restaure lo que había.
   useEffect(() => {
-    rememberProjectsListSearch(location.search);
-  }, [location.search]);
+    rememberProjectsListSearch(listSearch);
+  }, [listSearch]);
 
   const [deleteTarget, setDeleteTarget] = useState<ProjectSummary | null>(null);
   const [exporting, setExporting] = useState(false);

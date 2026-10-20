@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import type { TeamSummary } from '@kora/contracts';
 import styles from './TeamsListPage.module.css';
 import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Button } from '@/shared/components/ui/Button';
@@ -9,11 +8,10 @@ import { useToast } from '@/shared/components/ui/Toast';
 import { PlusIcon, DownloadIcon } from '@/shared/components/icons/Icons';
 import { TextField } from '@/shared/components/ui/TextField';
 import { SearchIcon } from '@/shared/components/icons/Icons';
-import { ConfirmActionDialog } from '@/shared/components/ui/ConfirmActionDialog';
 import { TeamFormDialog } from '../components/TeamFormDialog';
 import { TeamCard } from '../components/TeamCard';
 import { LeaderTeamConsole } from './LeaderTeamConsole';
-import { useDeleteTeam, useTeamsList } from '../api/teams.queries';
+import { useTeamsList } from '../api/teams.queries';
 import { useHourEntriesExport } from '@/modules/hours/hooks/useHourEntriesExport';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
@@ -66,22 +64,9 @@ function TeamsAdminListPage() {
     search: search || undefined,
     isActive: statusFilter === '' ? undefined : statusFilter === 'true',
   });
-  const deleteTeam = useDeleteTeam();
-
-  const [dialog, setDialog] = useState<
-    { kind: 'none' } | { kind: 'form'; team: TeamSummary | null } | { kind: 'delete'; team: TeamSummary }
-  >({
-    kind: 'none',
-  });
-  const closeDialog = () => setDialog({ kind: 'none' });
+  const [creating, setCreating] = useState(false);
 
   const handleExportHours = () => exportEntries({ sortField: 'date', sortDirection: 'desc' });
-
-  const handleDelete = async () => {
-    if (dialog.kind !== 'delete') return;
-    await deleteTeam.mutateAsync(dialog.team.id);
-    toast.success(`Se eliminó el equipo ${dialog.team.name}.`);
-  };
 
   const teams = data?.items ?? [];
   const totalPeople = teams.reduce((sum, team) => sum + team.memberCount, 0);
@@ -104,7 +89,7 @@ function TeamsAdminListPage() {
               </Button>
             )}
             {can('teams:manage') && (
-              <Button onClick={() => setDialog({ kind: 'form', team: null })} iconLeft={<PlusIcon size={18} />}>
+              <Button onClick={() => setCreating(true)} iconLeft={<PlusIcon size={18} />}>
                 Nuevo equipo
               </Button>
             )}
@@ -157,36 +142,16 @@ function TeamsAdminListPage() {
           {!isLoading &&
             !error &&
             teams.map((team) => (
-              <TeamCard
-                key={team.id}
-                team={team}
-                canManage={can('teams:manage')}
-                onEdit={() => setDialog({ kind: 'form', team })}
-                onDelete={() => setDialog({ kind: 'delete', team })}
-              />
+              <TeamCard key={team.id} team={team} canPreviewLeader={can('projects:read')} />
             ))}
         </div>
       </div>
 
       <TeamFormDialog
-        open={dialog.kind === 'form'}
-        team={dialog.kind === 'form' ? dialog.team : null}
-        onClose={closeDialog}
+        open={creating}
+        team={null}
+        onClose={() => setCreating(false)}
         onSuccess={(message) => toast.success(message)}
-      />
-
-      <ConfirmActionDialog
-        open={dialog.kind === 'delete'}
-        title="Eliminar equipo"
-        description={
-          dialog.kind === 'delete'
-            ? `Se eliminará el equipo ${dialog.team.name}. Esta acción no se puede deshacer.`
-            : ''
-        }
-        confirmLabel="Eliminar"
-        destructive
-        onConfirm={handleDelete}
-        onClose={closeDialog}
       />
     </DashboardLayout>
   );
