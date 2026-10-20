@@ -953,7 +953,12 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
                         label="Líder"
                         placeholder="Sin asignar"
                         options={assignableOptions(teamLeaderCandidates, (user) => ({ value: user.id, label: user.fullName, status: user.status }), teamsValue[index]?.leaderUserId)}
-                        {...register(`teams.${index}.leaderUserId`, { setValueAs: emptyToNull })}
+                        // Controlado por la misma razón que "Líder Kabeli a cargo": si los candidatos cargan
+                        // después del `reset()`, un `<select>` no controlado queda en "Sin asignar".
+                        value={teamsValue[index]?.leaderUserId ?? ''}
+                        onChange={(event) =>
+                          setValue(`teams.${index}.leaderUserId`, event.target.value || null, { shouldDirty: true })
+                        }
                       />
                       <TextField label="N° colaboradores" type="number" min={0} {...register(`teams.${index}.memberCount`)} />
                       <TextField label="Horas estimadas" type="number" min={0} {...register(`teams.${index}.assignedHours`)} />

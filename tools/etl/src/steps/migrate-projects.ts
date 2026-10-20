@@ -1,13 +1,17 @@
 import {
+  and,
   clientContacts,
   clients,
   eq,
+  isNull,
+  or,
   projectObservations,
   projectParticipationHistory,
   projectTeamMembers,
   projectTeams,
   projects,
   slugify,
+  sql,
   teamMembers,
   teams,
   users,
@@ -259,14 +263,26 @@ async function migrateProjectTeams(context: EtlContext): Promise<void> {
       assignedHours: row.horas_asignadas !== null ? String(row.horas_asignadas) : null,
     };
 
+    // Por legacy_id, o si no la fila sin legacy_id que creó
+    // `backfillProjectTeamsFromMembers` para el mismo (proyecto, equipo) —
+    // insertar otra chocaría con `project_teams_project_team_key`.
     const existing = await context.target
       .select({ id: projectTeams.id })
       .from(projectTeams)
-      .where(eq(projectTeams.legacyId, row.id))
+      .where(
+        or(
+          eq(projectTeams.legacyId, row.id),
+          and(isNull(projectTeams.legacyId), eq(projectTeams.projectId, projectId), eq(projectTeams.teamId, teamId)),
+        ),
+      )
+      .orderBy(sql`${projectTeams.legacyId} is null`)
       .limit(1);
 
     if (existing[0]) {
-      await context.target.update(projectTeams).set({ ...values, updatedAt: new Date() }).where(eq(projectTeams.id, existing[0].id));
+      await context.target
+        .update(projectTeams)
+        .set({ legacyId: row.id, ...values, updatedAt: new Date() })
+        .where(eq(projectTeams.id, existing[0].id));
       tracker.updated += 1;
     } else {
       await context.target.insert(projectTeams).values({ legacyId: row.id, ...values });

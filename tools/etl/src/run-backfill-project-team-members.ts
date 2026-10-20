@@ -1,5 +1,6 @@
 import { createEtlContext, runMigration } from './lib/context';
 import { backfillProjectTeamMembersFromHours } from './steps/backfill-project-team-members-from-hours';
+import { backfillProjectTeamsFromMembers } from './steps/backfill-project-teams-from-members';
 
 /**
  * Backfill de asignaciones faltantes en `project_team_members`, a partir de
@@ -18,7 +19,10 @@ async function main(): Promise<void> {
   if (context.dryRun) console.log('MODO ENSAYO: no se escribirá nada en la base de destino.\n');
 
   try {
-    await runMigration(context, backfillProjectTeamMembersFromHours);
+    await runMigration(context, async (tx) => {
+      await backfillProjectTeamMembersFromHours(tx);
+      await backfillProjectTeamsFromMembers(tx);
+    });
 
     const summary = context.report.summary();
     console.log('─'.repeat(78));
