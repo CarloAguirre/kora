@@ -25,6 +25,9 @@ class FakeEntryRepository implements HourEntryRepository {
   async sumRegularHoursForUserAndDate(): Promise<number> {
     return 0;
   }
+  async summarize(): Promise<{ entries: number; hours: number }> {
+    return { entries: 0, hours: 0 };
+  }
   async sumOvertimeHoursByUserForProjects(): Promise<never[]> {
     return [];
   }

@@ -79,7 +79,8 @@ export class DrizzleTeamRepository implements TeamRepository {
     const memberCountSubquery = db
       .select({ teamId: teamMembers.teamId, value: count().as('member_count') })
       .from(teamMembers)
-      .where(isNull(teamMembers.leftAt))
+      .innerJoin(users, eq(users.id, teamMembers.userId))
+      .where(this.countsAsMemberCondition())
       .groupBy(teamMembers.teamId)
       .as('member_counts');
 
@@ -178,8 +179,14 @@ export class DrizzleTeamRepository implements TeamRepository {
     const rows = await db
       .select({ value: count() })
       .from(teamMembers)
-      .where(and(eq(teamMembers.teamId, teamId), isNull(teamMembers.leftAt)));
+      .innerJoin(users, eq(users.id, teamMembers.userId))
+      .where(and(eq(teamMembers.teamId, teamId), this.countsAsMemberCondition()));
     return rows[0]?.value ?? 0;
+  }
+
+  /** Sigue en el equipo y no está deshabilitado — lo mismo que muestra el detalle del equipo. */
+  private countsAsMemberCondition() {
+    return and(isNull(teamMembers.leftAt), ne(users.status, 'disabled'));
   }
 
   async isTeamLeaderOfMember(leaderUserId: string, memberUserId: string, context?: TransactionContext): Promise<boolean> {

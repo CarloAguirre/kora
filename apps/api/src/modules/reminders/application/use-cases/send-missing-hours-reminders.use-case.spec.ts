@@ -23,6 +23,7 @@ function registrant(id: string, firstEntryDate: string | null): HoursRegistrant 
 function fakeReader(input: { registrants: HoursRegistrant[]; daily?: DailyHours[]; holidays?: string[] }): HourReminderReader {
   return {
     findHoursRegistrants: async () => input.registrants,
+    findFirstEntryDate: async (userId) => input.registrants.find((user) => user.userId === userId)?.firstEntryDate ?? null,
     sumDailyHours: async (userIds, from, to) =>
       (input.daily ?? []).filter((row) => userIds.includes(row.userId) && row.date >= from && row.date <= to),
     findHolidays: async (from, to) => (input.holidays ?? []).filter((day) => day >= from && day <= to),

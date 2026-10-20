@@ -32,6 +32,7 @@ import type {
   HourEntryListItem,
   HourEntryRepository,
   HourEntrySortableField,
+  HourEntrySummary,
   OvertimeHoursByProjectAndUser,
   OvertimeHoursByUser,
 } from '../../domain/repositories/hour-entry.repository';
@@ -235,6 +236,17 @@ export class DrizzleHourEntryRepository implements HourEntryRepository {
     return buildPage(items, totalRows[0]?.value ?? 0, page);
   }
 
+  async summarize(filters: HourEntryFilters, context?: TransactionContext): Promise<HourEntrySummary> {
+    const db = resolveDb(this.database, context);
+    // Mismo join que el conteo de `search()`: `buildWhere` filtra por nombre del autor cuando hay `search`.
+    const rows = await db
+      .select({ entries: count(), hours: sql<string>`coalesce(sum(${hourEntries.hours}), 0)` })
+      .from(hourEntries)
+      .leftJoin(users, eq(users.id, hourEntries.userId))
+      .where(this.buildWhere(filters));
+    return { entries: rows[0]?.entries ?? 0, hours: Number(rows[0]?.hours ?? 0) };
+  }
+
   async save(entry: HourEntry, context?: TransactionContext): Promise<void> {
     const db = resolveDb(this.database, context);
     const values = toPersistence(entry);
@@ -402,6 +414,7 @@ export class DrizzleHourEntryRepository implements HourEntryRepository {
   private buildWhere(filters: HourEntryFilters) {
     const conditions = [];
     if (filters.userId) conditions.push(eq(hourEntries.userId, filters.userId));
+    if (filters.excludeUserId) conditions.push(ne(hourEntries.userId, filters.excludeUserId));
     if (filters.projectId) conditions.push(eq(hourEntries.projectId, filters.projectId));
     if (filters.search) {
       const term = `%${filters.search.trim()}%`;

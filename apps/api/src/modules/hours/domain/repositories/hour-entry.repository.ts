@@ -28,6 +28,13 @@ export interface HourEntryFilters {
    * `hours:read_team`; no se combinan.
    */
   readonly leaderScopeUserId?: string | undefined;
+  /** Deja fuera los registros de este autor — p.ej. los propios al contar "horas por aprobar", que decide otro. */
+  readonly excludeUserId?: string | undefined;
+}
+
+export interface HourEntrySummary {
+  readonly entries: number;
+  readonly hours: number;
 }
 
 export type HourEntrySortableField = 'date' | 'createdAt' | 'status' | 'hours';
@@ -102,6 +109,9 @@ export interface HourEntryRepository {
     sort: SortRequest<HourEntrySortableField>,
     context?: TransactionContext,
   ): Promise<Page<HourEntryListItem>>;
+
+  /** Cuántos registros calzan con `filters` y cuántas horas suman — agregación en SQL, sin paginar. */
+  summarize(filters: HourEntryFilters, context?: TransactionContext): Promise<HourEntrySummary>;
 
   save(entry: HourEntry, context?: TransactionContext): Promise<void>;
 

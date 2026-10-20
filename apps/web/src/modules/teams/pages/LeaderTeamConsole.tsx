@@ -28,7 +28,11 @@ import { useTeamDetail } from '../api/teams.queries';
  */
 export function LeaderTeamConsole({ teams }: { teams: TeamSummary[] }) {
   const { user } = useAuth();
-  const [teamId, setTeamId] = useState(teams[0]?.id ?? '');
+  // La lista incluye equipos que el usuario lidera solo en algún proyecto, pero
+  // el Reporte de equipo es del líder oficial: se abre primero uno de esos.
+  const [teamId, setTeamId] = useState(
+    () => teams.find((team) => team.leader?.id === user?.id)?.id ?? teams[0]?.id ?? '',
+  );
   const activeTeam = teams.find((t) => t.id === teamId) ?? { id: teamId };
   // Un solo filtro de colaborador para la barra de contexto, el reporte y el historial.
   const [memberUserId, setMemberUserId] = useState('');

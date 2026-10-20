@@ -43,6 +43,9 @@ export interface HourReminderReader {
   /** Usuarios activos cuyo rol tiene `hours:register` (mismo criterio que Disponibilidad). */
   findHoursRegistrants(): Promise<HoursRegistrant[]>;
 
+  /** Fecha (`YYYY-MM-DD`) del primer registro de horas de una persona — mismo cálculo que `firstEntryDate`. */
+  findFirstEntryDate(userId: string): Promise<string | null>;
+
   /**
    * Horas registradas por usuario y día entre `from` y `to` (incluidos), en
    * cualquier estado — una hora rechazada igual es tiempo registrado, como en

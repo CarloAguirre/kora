@@ -43,6 +43,7 @@ function setup(input: {
 }) {
   const reader: HourReminderReader = {
     findHoursRegistrants: async () => [],
+    findFirstEntryDate: async () => null,
     sumDailyHours: async () => [],
     findHolidays: async (from, to) => (input.holidays ?? []).filter((day) => day >= from && day <= to),
     findPendingHourEntries: async () => input.pending,

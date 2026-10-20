@@ -11,6 +11,7 @@ import { useToast } from '@/shared/components/ui/Toast';
 import { SearchIcon, TriangleAlertIcon } from '@/shared/components/icons/Icons';
 import type { SortState } from '@/shared/components/ui/DataTable';
 import { compareSortValues, nextSortState, type SortValue } from '@/shared/lib/sort';
+import { ApiRequestError } from '@/shared/lib/api-client';
 import { projectTeamPath } from '@/app/router/paths';
 import { useTeamReport, useUpdateTeamReportComment } from '../api/teams.queries';
 import { RequestReportDataDialog } from './RequestReportDataDialog';
@@ -293,7 +294,13 @@ export function TeamReport({ team, currentUserId, memberUserId, onMemberChange }
             rows={pageRows}
             allRows={visibleRows}
             loading={isLoading}
-            error={error ? 'No se pudo cargar el reporte del equipo.' : null}
+            error={
+              error instanceof ApiRequestError && error.status === 403
+                ? 'Este reporte solo lo ve el líder oficial del equipo. Elige uno de los equipos que lideras.'
+                : error
+                  ? 'No se pudo cargar el reporte del equipo.'
+                  : null
+            }
             sort={sort}
             onSort={toggleSort}
             onClearFilters={clearFilters}
@@ -591,8 +598,8 @@ function ReportTable({ team, members, rows, allRows, loading, error, sort, onSor
                       </div>
                     </div>
                   </td>
-                  <DateCell iso={project.startDate} project={project} />
-                  <DateCell iso={project.endDate} project={project} />
+                  <DateCell iso={project.startDate} project={project} missing={row.missingDates} />
+                  <DateCell iso={project.endDate} project={project} missing={row.missingDates} />
                   <td className={styles.num}>
                     {row.missingAssigned ? (
                       <MissingData project={project} label="Sin asignar" hint="La asigna el Líder PM" />
@@ -674,8 +681,10 @@ function ReportTable({ team, members, rows, allRows, loading, error, sort, onSor
   );
 }
 
-function DateCell({ iso, project }: { iso: string | null; project: TeamReportProject }) {
-  return <td>{iso ? formatDayMonth(iso) : <MissingData project={project} label="Sin fecha" hint="Lo carga el Líder PM" />}</td>;
+/** Sin fecha se marca como dato faltante solo si aplica pedirlo (`missingDates`); si no —prospecto o sin horas del equipo—, guion. */
+function DateCell({ iso, project, missing }: { iso: string | null; project: TeamReportProject; missing: boolean }) {
+  if (iso) return <td>{formatDayMonth(iso)}</td>;
+  return <td>{missing ? <MissingData project={project} label="Sin fecha" hint="Lo carga el Líder PM" /> : <span className={styles.muted}>–</span>}</td>;
 }
 
 /** Dato que carga el Líder PM y falta — o "Solicitada ✓" si ya se le pidió desde el reporte. */

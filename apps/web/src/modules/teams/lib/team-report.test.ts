@@ -12,6 +12,7 @@ function project(overrides: Partial<TeamReportProject> = {}): TeamReportProject 
     slug: 'aurelia-spr',
     client: null,
     status: 'active',
+    salesStage: 'approved',
     startDate: '2026-06-01',
     endDate: '2026-09-30',
     assignedHours: 130,
@@ -102,6 +103,27 @@ describe('buildReportRows', () => {
     const [row] = buildReportRows(report([project({ hours, assignedHours: null, endDate: null })]), false);
     expect(row!.missingAssigned).toBe(true);
     expect(row!.missingDates).toBe(true);
+  });
+
+  it('cuenta las HH por aprobar aunque no se muestren las pendientes', () => {
+    const pendingOnly = [{ userId: USER_A, periodApproved: 0, periodPending: 2, accumulatedApproved: 0, accumulatedPending: 2 }];
+    const [row] = buildReportRows(report([project({ hours: pendingOnly, assignedHours: null, endDate: null })]), false);
+    expect(row!.missingAssigned).toBe(true);
+    expect(row!.missingDates).toBe(true);
+  });
+
+  it('no marca datos faltantes en prospectos ni en proyectos sin horas del equipo', () => {
+    const rows = buildReportRows(
+      report([
+        project({ hours, assignedHours: null, endDate: null, salesStage: 'prospect' }),
+        project({ hours: [], assignedHours: null, endDate: null }),
+      ]),
+      false,
+    );
+    expect(rows.map((row) => [row.missingAssigned, row.missingDates])).toEqual([
+      [false, false],
+      [false, false],
+    ]);
   });
 
   it('totaliza por persona', () => {

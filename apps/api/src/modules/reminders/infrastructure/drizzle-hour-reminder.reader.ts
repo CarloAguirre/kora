@@ -57,6 +57,17 @@ export class DrizzleHourReminderReader implements HourReminderReader {
     }));
   }
 
+  async findFirstEntryDate(userId: string): Promise<string | null> {
+    const firstEntries = this.db
+      .select({ date: hourEntries.date })
+      .from(hourEntries)
+      .where(eq(hourEntries.userId, userId))
+      .unionAll(this.db.select({ date: ticketHhRequests.date }).from(ticketHhRequests).where(eq(ticketHhRequests.userId, userId)))
+      .as('first_entries');
+    const rows = await this.db.select({ date: min(firstEntries.date) }).from(firstEntries);
+    return rows[0]?.date ? toIsoDate(rows[0].date) : null;
+  }
+
   async sumDailyHours(userIds: readonly string[], from: string, to: string): Promise<DailyHours[]> {
     if (userIds.length === 0) return [];
     const range = { from: new Date(`${from}T00:00:00Z`), to: new Date(`${to}T00:00:00Z`) };

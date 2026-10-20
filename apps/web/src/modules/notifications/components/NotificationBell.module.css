@@ -93,11 +93,19 @@
   text-align: center;
 }
 
+/* Pendientes y notificaciones scrollean juntos bajo la cabecera fija. */
+.body {
+  overflow-y: auto;
+}
+
 .list {
   margin: 0;
   padding: 0;
   list-style: none;
-  overflow-y: auto;
+}
+
+.list + .list {
+  border-top: 1px solid var(--kora-border-subtle);
 }
 
 .item {
@@ -159,6 +167,52 @@
 
 .missing {
   font-weight: var(--kora-weight-semibold);
+}
+
+.item > .linkButton {
+  align-self: flex-start;
+}
+
+/* Pendiente en vivo del líder: no se marca como leído, desaparece al resolverse. */
+.reminder {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: var(--kora-space-2);
+  background: var(--kora-lime-surface);
+}
+
+.reminderIcon {
+  display: flex;
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--kora-lime-dark);
+}
+
+.reminderBody {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.reminderBody > .linkButton,
+.reminderAction {
+  align-self: flex-start;
+}
+
+.reminderAction {
+  color: var(--kora-blue-700);
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-semibold);
+  text-decoration: underline;
+}
+
+.days {
+  margin: 0;
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-xs);
+  line-height: 1.55;
 }
 
 .note {

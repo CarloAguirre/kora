@@ -13,6 +13,7 @@ export interface TeamReportProjectRow {
   readonly slug: string;
   readonly client: { readonly id: string; readonly companyName: string } | null;
   readonly status: 'draft' | 'active' | 'on_hold' | 'finished' | 'cancelled';
+  readonly salesStage: 'prospect' | 'quoted' | 'approved' | null;
   readonly startDate: string | null;
   readonly endDate: string | null;
   readonly assignedHours: number | null;

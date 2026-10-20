@@ -18,6 +18,7 @@ function project(id: string, overrides: Partial<TeamReportProjectRow> = {}): Tea
     slug: `proyecto-${id}`,
     client: { id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', companyName: 'Goldfields' },
     status: 'active',
+    salesStage: 'approved',
     startDate: '2026-06-01',
     endDate: '2026-09-30',
     assignedHours: 100,
@@ -29,7 +30,14 @@ function project(id: string, overrides: Partial<TeamReportProjectRow> = {}): Tea
   };
 }
 
-function setup(projects: TeamReportProjectRow[], { isLeader = true, projectsWithHours = projects.map((p) => p.projectId) } = {}) {
+function setup(
+  projects: TeamReportProjectRow[],
+  {
+    isLeader = true,
+    projectsWithHours = projects.map((p) => p.projectId),
+    projectsWithPendingHoursOnly = [] as string[],
+  } = {},
+) {
   const created: CreateNotificationInput[] = [];
   const teams = {
     findById: vi.fn().mockResolvedValue({ id: TEAM_ID, name: 'UX-UI', isDeleted: false, leaderUserId: ACTOR.userId }),
@@ -38,8 +46,8 @@ function setup(projects: TeamReportProjectRow[], { isLeader = true, projectsWith
   const reports = {
     listProjects: vi.fn().mockResolvedValue(projects),
     listPeople: vi.fn().mockResolvedValue([{ id: ACTOR.userId, fullName: 'Eduardo Aranda' }]),
-    sumHours: vi.fn().mockResolvedValue(
-      projectsWithHours.map((projectId) => ({
+    sumHours: vi.fn().mockResolvedValue([
+      ...projectsWithHours.map((projectId) => ({
         projectId,
         userId: ACTOR.userId,
         periodApproved: 0,
@@ -47,7 +55,15 @@ function setup(projects: TeamReportProjectRow[], { isLeader = true, projectsWith
         accumulatedApproved: 8,
         accumulatedPending: 0,
       })),
-    ),
+      ...projectsWithPendingHoursOnly.map((projectId) => ({
+        projectId,
+        userId: ACTOR.userId,
+        periodApproved: 0,
+        periodPending: 3,
+        accumulatedApproved: 0,
+        accumulatedPending: 3,
+      })),
+    ]),
     markDataRequested: vi.fn().mockResolvedValue(undefined),
   };
   const users = { findById: vi.fn().mockResolvedValue({ id: ACTOR.userId, fullName: 'Eduardo Aranda' }) };
@@ -101,15 +117,31 @@ describe('RequestTeamReportDataUseCase', () => {
     expect(created[0]!.data.items.map((item) => item.projectId)).toEqual(['1']);
   });
 
-  it('no pide HH asignadas si el equipo todavía no incurrió horas en el proyecto', async () => {
-    const { useCase, created } = setup([project('1', { assignedHours: 0, startDate: null }), project('2', { assignedHours: 0 })], {
-      projectsWithHours: [],
+  it('solo pide datos de proyectos —no prospectos— donde el equipo registró horas, aprobadas o por aprobar', async () => {
+    const { useCase, created, reports } = setup(
+      [
+        project('1', { startDate: null }),
+        project('2', { startDate: null, assignedHours: 0, salesStage: 'prospect' }),
+        project('3', { assignedHours: 0, startDate: null }),
+        project('4', { assignedHours: 0 }),
+      ],
+      { projectsWithHours: ['1', '2'], projectsWithPendingHoursOnly: ['4'] },
+    );
+
+    const result = await useCase.execute({
+      teamId: TEAM_ID,
+      projectIds: ['1', '2', '3', '4'],
+      note: undefined,
+      actor: ACTOR,
+      actorPermissions: [],
     });
 
-    const result = await useCase.execute({ teamId: TEAM_ID, projectIds: ['1', '2'], note: undefined, actor: ACTOR, actorPermissions: [] });
-
-    expect(result.unwrap()).toEqual({ notifiedLeaders: 1, requestedProjects: 1 });
-    expect(created[0]!.data.items[0]!.missing).toEqual(['dates']);
+    expect(result.unwrap()).toEqual({ notifiedLeaders: 1, requestedProjects: 2 });
+    expect(created[0]!.data.items.map((item) => [item.projectId, item.missing])).toEqual([
+      ['1', ['dates']],
+      ['4', ['assigned_hours']],
+    ]);
+    expect(reports.markDataRequested).toHaveBeenCalledWith(TEAM_ID, ['1', '4'], new Date('2026-10-16T15:00:00.000Z'));
   });
 
   it('rechaza a quien no lidera el equipo ni gestiona proyectos', async () => {

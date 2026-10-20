@@ -80,6 +80,8 @@ function useInvalidateHourEntries() {
     // El Dashboard resume horas/aprobaciones: sin esto quedaba desactualizado
     // hasta que el usuario recargaba la página a mano.
     queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    // La campanita del líder cuenta horas por aprobar y por registrar.
+    queryClient.invalidateQueries({ queryKey: ['notifications', 'reminders'] });
   };
 }
 

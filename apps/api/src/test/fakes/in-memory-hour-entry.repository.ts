@@ -5,6 +5,7 @@ import type {
   HourEntryListItem,
   HourEntryRepository,
   HourEntrySortableField,
+  HourEntrySummary,
   OvertimeHoursByProjectAndUser,
   OvertimeHoursByUser,
 } from '../../modules/hours/domain/repositories/hour-entry.repository';
@@ -37,8 +38,28 @@ export class InMemoryHourEntryRepository implements HourEntryRepository {
     page: PageRequest,
     sort: SortRequest<HourEntrySortableField>,
   ): Promise<Page<HourEntryListItem>> {
-    const matches = this.items
+    const matches = this.filter(filters).sort((a, b) => {
+      const direction = sort.direction === 'asc' ? 1 : -1;
+      const av = a[sort.field];
+      const bv = b[sort.field];
+      if (av instanceof Date && bv instanceof Date) return (av.getTime() - bv.getTime()) * direction;
+      return String(av).localeCompare(String(bv)) * direction;
+    });
+
+    const start = (page.page - 1) * page.pageSize;
+    return buildPage(matches.slice(start, start + page.pageSize), matches.length, page);
+  }
+
+  /** `leaderScopeUserId` no se simula (es SQL puro): los tests que lo usan siembran solo filas dentro del alcance. */
+  async summarize(filters: HourEntryFilters): Promise<HourEntrySummary> {
+    const matches = this.filter(filters);
+    return { entries: matches.length, hours: matches.reduce((sum, item) => sum + item.hours, 0) };
+  }
+
+  private filter(filters: HourEntryFilters): HourEntryListItem[] {
+    return this.items
       .filter((item) => (filters.projectId ? item.projectId === filters.projectId : true))
+      .filter((item) => (filters.excludeUserId ? item.userId !== filters.excludeUserId : true))
       .filter((item) => (filters.status ? item.status === filters.status : true))
       .filter((item) => (filters.dateFrom ? item.date >= filters.dateFrom : true))
       .filter((item) => (filters.dateTo ? item.date <= filters.dateTo : true))
@@ -47,17 +68,7 @@ export class InMemoryHourEntryRepository implements HourEntryRepository {
         filters.search
           ? item.userFullName.toLowerCase().includes(filters.search.toLowerCase())
           : true,
-      )
-      .sort((a, b) => {
-        const direction = sort.direction === 'asc' ? 1 : -1;
-        const av = a[sort.field];
-        const bv = b[sort.field];
-        if (av instanceof Date && bv instanceof Date) return (av.getTime() - bv.getTime()) * direction;
-        return String(av).localeCompare(String(bv)) * direction;
-      });
-
-    const start = (page.page - 1) * page.pageSize;
-    return buildPage(matches.slice(start, start + page.pageSize), matches.length, page);
+      );
   }
 
   async save(): Promise<void> {

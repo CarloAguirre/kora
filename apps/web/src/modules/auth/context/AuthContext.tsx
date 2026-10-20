@@ -6,6 +6,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import type { AuthenticatedUser, LoginInput, LoginResponse } from '@kora/contracts';
 import { api, tokenStore } from '@/shared/lib/api-client';
 
@@ -37,6 +38,7 @@ export const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
   const [status, setStatus] = useState<AuthContextValue['status']>('loading');
+  const queryClient = useQueryClient();
 
   /**
    * Recuperación de sesión al cargar la página.
@@ -80,22 +82,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * sesión se cierra en la interfaz. Sin esta suscripción, la aplicación
    * seguiría mostrando el menú de un usuario que ya no puede hacer nada.
    */
+  //
+  // También se vacía la caché de consultas: con `staleTime` de 30 s, quien
+  // entrara después en el mismo navegador veía datos del usuario anterior
+  // (su campanita, sus horas) hasta que la consulta se renovara.
   useEffect(() => {
     return tokenStore.subscribe((token) => {
       if (token === null) {
+        queryClient.clear();
         setUser(null);
         setStatus('anonymous');
       }
     });
-  }, []);
+  }, [queryClient]);
 
-  const signIn = useCallback(async (credentials: LoginInput): Promise<AuthenticatedUser> => {
-    const response = await api.post<LoginResponse>('/auth/login', credentials);
-    tokenStore.set(response.tokens.accessToken);
-    setUser(response.user);
-    setStatus('authenticated');
-    return response.user;
-  }, []);
+  const signIn = useCallback(
+    async (credentials: LoginInput): Promise<AuthenticatedUser> => {
+      const response = await api.post<LoginResponse>('/auth/login', credentials);
+      // Por si se entra con otra cuenta sin haber cerrado la sesión anterior.
+      queryClient.clear();
+      tokenStore.set(response.tokens.accessToken);
+      setUser(response.user);
+      setStatus('authenticated');
+      return response.user;
+    },
+    [queryClient],
+  );
 
   const signOut = useCallback(async (): Promise<void> => {
     try {
