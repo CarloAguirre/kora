@@ -151,6 +151,10 @@ export class HourEntry extends AggregateRoot<string> {
     return this.props.designatedApproverUserId;
   }
 
+  get date(): Date {
+    return this.props.date;
+  }
+
   get hours(): number {
     return this.props.hours;
   }

@@ -3,6 +3,7 @@ import { CLOCK, ForbiddenError, err, ok, type ApplicationError, type Clock, type
 import type { RoleCode, UpdateHourEntryInput } from '@kora/contracts';
 import {
   HourEntryNotFoundError,
+  HourEntryOutsideCurrentMonthError,
   InvalidDesignatedApproverError,
   ModuleNotInProjectError,
   ProjectOvertimeNotAllowedError,
@@ -12,6 +13,7 @@ import {
 } from '../../domain/errors/hour-entry.errors';
 import { HOUR_ENTRY_REPOSITORY, type HourEntryRepository } from '../../domain/repositories/hour-entry.repository';
 import { HourEntryApprovalAuthorityService } from '../services/hour-entry-approval-authority.service';
+import { isInCurrentMonth } from '../services/hour-entry-edit-window';
 import { HOUR_ENTRY_USER_READER, type HourEntryUserReader } from '../ports/hour-entry-user-reader.port';
 import { HOUR_ENTRY_PROJECT_READER, type HourEntryProjectReader } from '../ports/hour-entry-project-reader.port';
 import { AUDIT_RECORDER, type AuditRecorder } from '../../../../shared/application/ports/audit-recorder.port';
@@ -28,6 +30,7 @@ export interface UpdateHourEntryCommand {
  * Editan: el dueño o un admin/PMO (pendiente/rechazado) y quien debe aprobarlo
  * (pendiente). Un registro aprobado solo lo corrige quien puede aprobarlo
  * (incluye admin/PMO) — desde el "Historial Reciente" del líder — y sigue aprobado.
+ * Para todos, solo dentro del mes en curso (y sin mover el registro a otro mes).
  */
 @Injectable()
 export class UpdateHourEntryUseCase implements UseCase<UpdateHourEntryCommand, void, ApplicationError> {
@@ -55,6 +58,12 @@ export class UpdateHourEntryUseCase implements UseCase<UpdateHourEntryCommand, v
     if (!isOwner && !isAdminLike && !isApprover) {
       return err(new ForbiddenError('No puedes editar este registro.', 'HOUR_ENTRY_CANNOT_EDIT'));
     }
+
+    const now = this.clock.now();
+    if (!isInCurrentMonth(entry.date, now) || (data.date && !isInCurrentMonth(new Date(data.date), now))) {
+      return err(new HourEntryOutsideCurrentMonthError());
+    }
+
     const editApproved = entry.status === 'approved' && isApprover;
     const previousProjectId = entry.projectId;
     const wasApproved = entry.status === 'approved';
@@ -108,7 +117,7 @@ export class UpdateHourEntryUseCase implements UseCase<UpdateHourEntryCommand, v
         blockerDescription: data.blockerDescription === undefined ? undefined : data.blockerDescription,
       },
       ownerRequiresApproval,
-      this.clock.now(),
+      now,
       { editApproved },
     );
     if (result.isErr()) return err(result.error);

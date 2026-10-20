@@ -25,6 +25,7 @@ import { HourEntryFormDialog } from './HourEntryFormDialog';
 import { useApproveHourEntry, useDeleteHourEntry, useHourEntriesList, useRejectHourEntry } from '../api/hours.queries';
 import { useHourEntriesExport } from '../hooks/useHourEntriesExport';
 import { resolvedApprover } from '../lib/approver';
+import { isInCurrentMonth } from '../lib/edit-window';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 
@@ -46,7 +47,8 @@ type DialogState = { kind: 'none' } | { kind: 'view' | 'edit'; entry: HourEntryS
  * dueño o un admin/PMO (pendiente o rechazado) y quien aprueba (pendiente o
  * aprobado — la corrección de un aprobado lo deja aprobado). Eliminar: el
  * dueño o un admin/PMO si no está aprobado; un aprobado, solo quien lo aprueba
- * (el backend recalcula el consumo del proyecto). Aprobar/Rechazar solo
+ * (el backend recalcula el consumo del proyecto). Editar y eliminar, para
+ * todos, solo dentro del mes en curso. Aprobar/Rechazar solo
  * aplica a pendientes; si el actor no es el aprobador de ese registro, el
  * backend lo rechaza y se muestra su mensaje.
  */
@@ -141,9 +143,10 @@ export function TeamHourHistoryPanel({ teamId, userId }: { teamId?: string; user
     const isOwner = e.user.id === user?.id;
     const isPending = e.status === 'pending';
     const isApproved = e.status === 'approved';
-    const canEdit = ((isOwner || isAdminLike) && !isApproved) || (canApprove && (isPending || isApproved));
+    const inCurrentMonth = isInCurrentMonth(e.date);
+    const canEdit = inCurrentMonth && (((isOwner || isAdminLike) && !isApproved) || (canApprove && (isPending || isApproved)));
     const canDecide = canApprove && isPending;
-    const canDelete = isApproved ? canApprove : isOwner || isAdminLike;
+    const canDelete = inCurrentMonth && (isApproved ? canApprove : isOwner || isAdminLike);
     return [
       { key: 'ver', label: 'Ver detalle', onSelect: () => setDialog({ kind: 'view', entry: e }) },
       ...(canEdit ? [{ key: 'editar', label: 'Editar', onSelect: () => setDialog({ kind: 'edit', entry: e }) }] : []),

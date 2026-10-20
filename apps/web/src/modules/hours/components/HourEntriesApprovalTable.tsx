@@ -16,6 +16,7 @@ import { ChevronDownIcon, UserIcon } from '@/shared/components/icons/Icons';
 import { HourEntryFormDialog } from './HourEntryFormDialog';
 import { useApproveHourEntry, useHourEntriesList, useRejectHourEntry } from '../api/hours.queries';
 import { resolvedApprover } from '../lib/approver';
+import { isInCurrentMonth } from '../lib/edit-window';
 
 const formatDate = (value: string) => new Date(`${value}T00:00:00`).toLocaleDateString('es-CL', { weekday: 'short', day: '2-digit', month: 'short' });
 const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 2 });
@@ -292,7 +293,7 @@ export function HourEntriesApprovalTable({
           <DropdownMenu
             items={[
               { key: 'ver', label: 'Ver detalle', onSelect: () => setViewing(entry) },
-              { key: 'editar', label: 'Editar', onSelect: () => setEditing(entry) },
+              ...(isInCurrentMonth(entry.date) ? [{ key: 'editar', label: 'Editar', onSelect: () => setEditing(entry) }] : []),
               { key: 'aprobar', label: 'Aprobar', tone: 'success', onSelect: () => void approveOne(entry) },
               {
                 key: 'rechazar',

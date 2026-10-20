@@ -66,6 +66,13 @@ export class HourEntryNotEditableError extends ConflictError {
   }
 }
 
+/** Fuera del mes en curso el registro ya se reportó/facturó: no se edita ni se elimina. */
+export class HourEntryOutsideCurrentMonthError extends ConflictError {
+  constructor() {
+    super('Solo se pueden editar o eliminar registros del mes en curso.', 'HOUR_ENTRY_OUTSIDE_CURRENT_MONTH');
+  }
+}
+
 export class RejectionReasonRequiredError extends ValidationError {
   constructor() {
     super('Indica el motivo del rechazo.', 'HOUR_ENTRY_REJECTION_REASON_REQUIRED');

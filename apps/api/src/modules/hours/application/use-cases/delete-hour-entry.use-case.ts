@@ -1,9 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { ForbiddenError, err, ok, type ApplicationError, type Result } from '@kora/core';
+import { CLOCK, ForbiddenError, err, ok, type ApplicationError, type Clock, type Result } from '@kora/core';
 import type { RoleCode } from '@kora/contracts';
-import { HourEntryNotFoundError } from '../../domain/errors/hour-entry.errors';
+import { HourEntryNotFoundError, HourEntryOutsideCurrentMonthError } from '../../domain/errors/hour-entry.errors';
 import { HOUR_ENTRY_REPOSITORY, type HourEntryRepository } from '../../domain/repositories/hour-entry.repository';
 import { HourEntryApprovalAuthorityService } from '../services/hour-entry-approval-authority.service';
+import { isInCurrentMonth } from '../services/hour-entry-edit-window';
 import { HOUR_ENTRY_PROJECT_READER, type HourEntryProjectReader } from '../ports/hour-entry-project-reader.port';
 import { AUDIT_RECORDER, type AuditRecorder } from '../../../../shared/application/ports/audit-recorder.port';
 import type { ActorContext, UseCase } from '../../../../shared/application/use-case';
@@ -17,7 +18,8 @@ export interface DeleteHourEntryCommand {
 /**
  * El dueño o un admin/PMO borran un registro pendiente o rechazado. Uno aprobado
  * ya cuenta en el consumo del proyecto: solo lo borra quien puede aprobarlo
- * (incluye admin/PMO), y el consumo se recalcula sin él.
+ * (incluye admin/PMO), y el consumo se recalcula sin él. Para todos, solo
+ * dentro del mes en curso.
  */
 @Injectable()
 export class DeleteHourEntryUseCase implements UseCase<DeleteHourEntryCommand, void, ApplicationError> {
@@ -26,6 +28,7 @@ export class DeleteHourEntryUseCase implements UseCase<DeleteHourEntryCommand, v
     private readonly authority: HourEntryApprovalAuthorityService,
     @Inject(HOUR_ENTRY_PROJECT_READER) private readonly projects: HourEntryProjectReader,
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
+    @Inject(CLOCK) private readonly clock: Clock,
   ) {}
 
   async execute(command: DeleteHourEntryCommand): Promise<Result<void, ApplicationError>> {
@@ -41,6 +44,7 @@ export class DeleteHourEntryUseCase implements UseCase<DeleteHourEntryCommand, v
     if (!canDelete) {
       return err(new ForbiddenError('No puedes eliminar este registro.', 'HOUR_ENTRY_CANNOT_DELETE'));
     }
+    if (!isInCurrentMonth(entry.date, this.clock.now())) return err(new HourEntryOutsideCurrentMonthError());
 
     await this.entries.delete(entryId);
 

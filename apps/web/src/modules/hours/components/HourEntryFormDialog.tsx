@@ -28,6 +28,7 @@ import {
   type DailyBlock,
 } from './DailyEntryForm';
 import { WeeklyEntryForm } from './WeeklyEntryForm';
+import { isInCurrentMonth, OUTSIDE_CURRENT_MONTH_MESSAGE } from '../lib/edit-window';
 
 const formatDateTime = (value: string) => new Date(value).toLocaleString('es-CL');
 const NEW_ENTRY_TABS = [
@@ -163,11 +164,13 @@ function EditEntryForm({
   }, [projectsData, entry.project]);
 
   const holiday = holidaysForDate?.[0] ?? null;
-  const blockingMessage = isWeekend(date)
-    ? 'No se puede registrar horas en fines de semana.'
-    : holiday
-      ? `No se puede registrar horas el ${holiday.name} (feriado).`
-      : null;
+  const blockingMessage = !isInCurrentMonth(date)
+    ? OUTSIDE_CURRENT_MONTH_MESSAGE
+    : isWeekend(date)
+      ? 'No se puede registrar horas en fines de semana.'
+      : holiday
+        ? `No se puede registrar horas el ${holiday.name} (feriado).`
+        : null;
   /** El propio registro no cuenta contra el tope: se reemplaza por lo que quede en el bloque. */
   const otherNonOvertimeHours = (entriesForDate?.items ?? [])
     .filter((e) => e.id !== entry.id && e.status !== 'rejected' && !e.isOvertime)
