@@ -11,10 +11,12 @@ import { StepTracker, type EtlContext } from '../lib/context';
  * Por cada (proyecto, equipo) con asignaciones en `project_team_members`:
  * - si falta la fila en `project_teams`, se crea con `memberCount` = personas
  *   distintas asignadas (sin horas: no hay dato histórico de eso);
- * - si existe pero sin `memberCount`, se completa con ese mismo conteo.
+ * - si existe pero sin `memberCount`, o con uno menor que ese conteo, se
+ *   lleva a ese mismo conteo: `memberCount` es el tope de colaboradores del
+ *   equipo y la API no deja editar un proyecto con el tope bajo los asignados.
  * Después, todo equipo de proyecto sin líder toma el líder actual del equipo
- * (`teams.leaderUserId`). Un valor ya cargado (p.ej. editado en la app) no se
- * pisa.
+ * (`teams.leaderUserId`). Un valor ya cargado que cubre a los asignados (p.ej.
+ * el `N° colaboradores` de la v1, o uno editado en la app) no se pisa.
  *
  * Solo proyectos migrados (`legacyId`): los creados en la app nueva eligieron
  * sus equipos a mano. Datos ya existentes: ver la migración
@@ -54,7 +56,7 @@ export async function backfillProjectTeamsFromMembers(context: EtlContext): Prom
         memberCount: row.memberCount,
       });
       tracker.created += 1;
-    } else if (existing[0].memberCount === null) {
+    } else if (existing[0].memberCount === null || existing[0].memberCount < row.memberCount) {
       await context.target
         .update(projectTeams)
         .set({ memberCount: row.memberCount, updatedAt: new Date() })

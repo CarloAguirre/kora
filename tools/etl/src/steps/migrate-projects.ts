@@ -235,6 +235,7 @@ interface LegacyProjectTeam {
   id_proyecto: number;
   id_lider_usuario: number | null;
   horas_asignadas: number | null;
+  num_colaboradores: number | null;
 }
 
 async function migrateProjectTeams(context: EtlContext): Promise<void> {
@@ -261,6 +262,11 @@ async function migrateProjectTeams(context: EtlContext): Promise<void> {
       projectId,
       leaderUserId: row.id_lider_usuario ? (userIds.get(row.id_lider_usuario) ?? null) : null,
       assignedHours: row.horas_asignadas !== null ? String(row.horas_asignadas) : null,
+      // `N° colaboradores` del equipo en la v1. 0/nulo es "sin dato", no un
+      // tope de cero: en ese caso no se toca lo que ya haya (lo completa
+      // `backfillProjectTeamsFromMembers`). Si quedó por debajo de las personas
+      // asignadas, ese mismo paso lo sube al final del pipeline.
+      ...(row.num_colaboradores ? { memberCount: row.num_colaboradores } : {}),
     };
 
     // Por legacy_id, o si no la fila sin legacy_id que creó
