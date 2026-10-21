@@ -251,3 +251,53 @@ export const estimationResultSchema = z.object({
   generatedAt: isoDateTimeSchema,
 });
 export type EstimationResult = z.infer<typeof estimationResultSchema>;
+
+
+export const ESTIMATION_POC_ROLE_UNITS = ['week', 'day'] as const;
+export const estimationPocRoleUnitSchema = z.enum(ESTIMATION_POC_ROLE_UNITS);
+export type EstimationPocRoleUnit = z.infer<typeof estimationPocRoleUnitSchema>;
+
+export const generateEstimationPocSchema = z.object({
+  projectId: uuidSchema,
+  projectName: nonEmptyTrimmed(300, 'El nombre del proyecto'),
+  clientName: z.string().trim().max(300).nullish(),
+  driveFolderUrl: z.url({ message: 'La carpeta de Drive no tiene un formato válido.' }),
+  instructions: z.string().trim().max(3000).nullish(),
+});
+export type GenerateEstimationPocInput = z.infer<typeof generateEstimationPocSchema>;
+
+export const estimationPocRoleDraftSchema = z.object({
+  role: nonEmptyTrimmed(120, 'El rol'),
+  unit: estimationPocRoleUnitSchema,
+  duration: z.number().min(0),
+  hoursPerUnit: z.number().min(0),
+  people: z.number().min(0),
+  source: z.string().trim().max(1500).nullish(),
+});
+export type EstimationPocRoleDraft = z.infer<typeof estimationPocRoleDraftSchema>;
+
+export const estimationPocAiDraftSchema = z.object({
+  summary: nonEmptyTrimmed(3000, 'El resumen'),
+  roles: z.array(estimationPocRoleDraftSchema).min(1),
+  assumptions: z.array(z.string().trim().min(1).max(1500)).default([]),
+  clarifyingQuestions: z.array(z.string().trim().min(1).max(1500)).max(5).default([]),
+});
+export type EstimationPocAiDraft = z.infer<typeof estimationPocAiDraftSchema>;
+
+export const estimationPocRoleSchema = estimationPocRoleDraftSchema.extend({
+  totalHours: z.number().min(0),
+});
+export type EstimationPocRole = z.infer<typeof estimationPocRoleSchema>;
+
+export const estimationPocProposalSchema = z.object({
+  projectId: uuidSchema,
+  provider: z.string().trim().min(1).max(120),
+  sourceMode: z.enum(['poc_simulated', 'drive']),
+  documentsAnalyzed: z.number().int().min(0),
+  summary: nonEmptyTrimmed(3000, 'El resumen'),
+  roles: z.array(estimationPocRoleSchema).min(1),
+  totalHours: z.number().min(0),
+  assumptions: z.array(z.string().trim().min(1).max(1500)).default([]),
+  clarifyingQuestions: z.array(z.string().trim().min(1).max(1500)).max(5).default([]),
+});
+export type EstimationPocProposal = z.infer<typeof estimationPocProposalSchema>;
