@@ -27,6 +27,7 @@ import { roleFromTeamName, toPhaseRoadmap } from '@/modules/client-portal/adapte
 import { PHASE_ROADMAP_ROLE_COLORS } from '@/modules/client-portal/types';
 import { useHolidays } from '@/modules/hours/api/hours.queries';
 import { useUpdateProjectModule, useUpdateProjectModuleSegment } from '../api/projects.queries';
+import { countBusinessDays } from '../lib/business-days';
 import {
   EMPTY_EXECUTION_SEGMENT_MODAL_VALUES,
   ExecutionSegmentModal,
@@ -48,17 +49,6 @@ const today = () => {
 };
 const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`;
 
-/** Días hábiles (lunes-viernes, sin feriados) entre dos fechas ISO, inclusive. */
-function businessDays(start: string, end: string, holidays: ReadonlySet<string>): number {
-  if (!start || !end || start > end) return 0;
-  let count = 0;
-  const last = new Date(`${end}T00:00:00Z`);
-  for (const day = new Date(`${start}T00:00:00Z`); day <= last; day.setUTCDate(day.getUTCDate() + 1)) {
-    const weekday = day.getUTCDay();
-    if (weekday !== 0 && weekday !== 6 && !holidays.has(day.toISOString().slice(0, 10))) count += 1;
-  }
-  return count;
-}
 
 /** Color del equipo — el mismo que el Roadmap (`PHASE_ROADMAP_ROLE_COLORS`, Figma), no el de `getTeamStyle`. */
 const teamColor = (teamName: string | null) => PHASE_ROADMAP_ROLE_COLORS[roleFromTeamName(teamName)];
@@ -318,7 +308,7 @@ function Description({ text }: { text: string | null }) {
 function SegmentDetail({ segment, onClose, onEdit }: { segment: ProjectModuleSegment; onClose: () => void; onEdit?: () => void }) {
   const state = segmentState(segment);
   const { data: holidays } = useHolidays({ dateFrom: segment.startDate, dateTo: segment.endDate });
-  const days = businessDays(segment.startDate, segment.endDate, new Set((holidays ?? []).map((holiday) => holiday.date)));
+  const days = countBusinessDays(segment.startDate, segment.endDate, new Set((holidays ?? []).map((holiday) => holiday.date)));
   return (
     <DetailPanel
       eyebrow="Tiempo de ejecución"

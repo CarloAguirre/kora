@@ -56,6 +56,10 @@ vi.mock('@/modules/forecast/api/forecast.queries', () => ({
   useCheckForecastOverload: () => async () => [],
 }));
 
+vi.mock('@/modules/hours/api/hours.queries', () => ({
+  useHolidays: () => ({ data: [] }),
+}));
+
 vi.mock('@/modules/teams/api/teams.queries', () => ({
   useTeamsList: () => ({ data: { items: [] } }),
   useTeamDetail: () => ({ data: undefined, isLoading: false }),

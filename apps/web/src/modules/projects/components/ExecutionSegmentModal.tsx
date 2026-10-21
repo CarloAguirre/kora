@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   isForecastAssignableRole,
   type CreateProjectModuleSegmentInput,
@@ -17,6 +17,8 @@ import { CloseIcon } from '@/shared/components/icons/Icons';
 import { useTeamDetail } from '@/modules/teams/api/teams.queries';
 import { useCheckForecastOverload, useForecastLoadPreview } from '@/modules/forecast/api/forecast.queries';
 import { ForecastOverloadAlert, summarizeOverload } from '@/modules/forecast/components/ForecastOverloadAlert';
+import { useHolidays } from '@/modules/hours/api/hours.queries';
+import { addBusinessDays, countBusinessDays } from '../lib/business-days';
 
 export interface ExecutionSegmentMemberValue {
   teamMemberId: string;
@@ -84,16 +86,10 @@ function percentError(value: string): string | undefined {
   return Number.isFinite(percent) && percent >= 1 && percent <= 100 ? undefined : 'Entre 1 y 100';
 }
 
-/** Días lunes-viernes entre dos fechas ISO, inclusive — sin feriados, por eso la estimación lleva "≈". */
-function countWeekdays(startDate: string, endDate: string): number {
-  if (!startDate || !endDate || startDate > endDate) return 0;
-  let count = 0;
-  const end = new Date(`${endDate}T00:00:00Z`);
-  for (const day = new Date(`${startDate}T00:00:00Z`); day <= end; day.setUTCDate(day.getUTCDate() + 1)) {
-    const weekday = day.getUTCDay();
-    if (weekday !== 0 && weekday !== 6) count += 1;
-  }
-  return count;
+/** Días hábiles válidos para calcular la fecha fin — entero ≥ 1, o `null`. */
+function parseDays(value: string): number | null {
+  const days = Number(value);
+  return value.trim() && Number.isInteger(days) && days >= 1 ? days : null;
 }
 
 export interface ExecutionSegmentModalProps {
@@ -128,13 +124,46 @@ export function ExecutionSegmentModal({
   onConfirm,
 }: ExecutionSegmentModalProps) {
   const [values, setValues] = useState<ExecutionSegmentModalValues>(initialValues);
+  /** Texto del campo "Días hábiles" mientras se escribe — `null` = se deriva de las fechas. */
+  const [daysText, setDaysText] = useState<string | null>(null);
   const { data: team, isLoading: loadingTeam } = useTeamDetail(open && values.teamId ? values.teamId : null);
+  /** Catálogo completo (unas decenas de filas): el rango del tramo cambia mientras se edita. */
+  const { data: holidays } = useHolidays({});
+  const holidayDates = useMemo(() => new Set((holidays ?? []).map((holiday) => holiday.date)), [holidays]);
 
   useEffect(() => {
-    if (open) setValues(initialValues);
+    if (open) {
+      setValues(initialValues);
+      setDaysText(null);
+    }
   }, [open, initialValues]);
 
-  const weekdays = countWeekdays(values.startDate, values.endDate);
+  const weekdays = countBusinessDays(values.startDate, values.endDate, holidayDates);
+  const daysValue = daysText ?? (weekdays > 0 ? String(weekdays) : '');
+
+  /** Con inicio y días hábiles, la fecha fin se calcula saltando fines de semana y feriados. */
+  const changeDays = (text: string) => {
+    setDaysText(text);
+    const days = parseDays(text);
+    if (days !== null && values.startDate) {
+      setValues((prev) => ({ ...prev, endDate: addBusinessDays(prev.startDate, days, holidayDates) }));
+    }
+  };
+
+  /** Al mover el inicio se conserva la duración en días hábiles y se corre la fecha fin. */
+  const changeStartDate = (startDate: string) => {
+    const days = parseDays(daysValue);
+    setValues((prev) => ({
+      ...prev,
+      startDate,
+      endDate: startDate && days !== null ? addBusinessDays(startDate, days, holidayDates) : prev.endDate,
+    }));
+  };
+
+  const changeEndDate = (endDate: string) => {
+    setDaysText(null);
+    setValues((prev) => ({ ...prev, endDate }));
+  };
   const weeklyHoursByMember = new Map((team?.members ?? []).map((member) => [member.id, member.weeklyHours]));
   const selectedIds = new Set(values.members.map((member) => member.teamMemberId));
   const memberOptions = (team?.members ?? [])
@@ -237,13 +266,23 @@ export function ExecutionSegmentModal({
             label="Fecha inicio"
             type="date"
             value={values.startDate}
-            onChange={(event) => setValues((prev) => ({ ...prev, startDate: event.target.value }))}
+            onChange={(event) => changeStartDate(event.target.value)}
+          />
+          <TextField
+            label="Días hábiles"
+            type="number"
+            min={1}
+            step={1}
+            placeholder="Ej. 10"
+            value={daysValue}
+            errorText={daysValue.trim() && parseDays(daysValue) === null ? 'Entero ≥ 1' : undefined}
+            onChange={(event) => changeDays(event.target.value)}
           />
           <TextField
             label="Fecha fin"
             type="date"
             value={values.endDate}
-            onChange={(event) => setValues((prev) => ({ ...prev, endDate: event.target.value }))}
+            onChange={(event) => changeEndDate(event.target.value)}
           />
         </div>
 
