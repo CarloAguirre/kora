@@ -1,5 +1,8 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
-import type { GenerateEstimationPocInput } from '@kora/contracts';
+import type {
+  AnalyzeEstimationPocInput,
+  GenerateEstimationPocInput,
+} from '@kora/contracts';
 import { estimationApi, estimationKeys } from './estimation.api';
 
 export function useEstimationQuestionnaireDefinition() {
@@ -7,6 +10,12 @@ export function useEstimationQuestionnaireDefinition() {
     queryKey: estimationKeys.questionnaireDefinition(),
     queryFn: () => estimationApi.questionnaireDefinition(),
     staleTime: 5 * 60_000,
+  });
+}
+
+export function useAnalyzeEstimationPoc() {
+  return useMutation({
+    mutationFn: (input: AnalyzeEstimationPocInput) => estimationApi.analyzePoc(input),
   });
 }
 
