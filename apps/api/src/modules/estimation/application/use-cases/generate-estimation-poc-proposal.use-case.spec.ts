@@ -36,6 +36,9 @@ describe('GenerateEstimationPocProposalUseCase', () => {
       clientName: 'Cliente',
       driveFolderUrl: 'https://drive.google.com/drive/folders/demo',
       instructions: null,
+      answers: [
+        { questionId: 'F01', value: 'mvp', usedAssumption: false },
+      ],
     });
 
     expect(result.roles[0]?.totalHours).toBe(160);
