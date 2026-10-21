@@ -2,9 +2,19 @@ import { describe, expect, it } from 'vitest';
 import type { DriveFolderClient } from '../ports/drive-folder-client.port';
 import { ListEstimationDriveFilesUseCase } from './list-estimation-drive-files.use-case';
 
+const emptyDiscovery = {
+  listChildren: async () => [],
+  searchFolders: async () => [],
+  getMetadata: async () => null,
+} satisfies Pick<
+  DriveFolderClient,
+  'listChildren' | 'searchFolders' | 'getMetadata'
+>;
+
 describe('ListEstimationDriveFilesUseCase', () => {
   it('lista y clasifica archivos visibles en la carpeta', async () => {
     const drive: DriveFolderClient = {
+      ...emptyDiscovery,
       isConfigured: () => true,
       listFiles: async (folderId) => {
         expect(folderId).toBe('abc_123');
@@ -17,6 +27,8 @@ describe('ListEstimationDriveFilesUseCase', () => {
             modifiedAt: '2026-10-20T12:00:00.000Z',
             webViewLink: 'https://drive.google.com/file/d/doc-1/view',
             sizeBytes: 1200,
+            itemType: 'file',
+            parentIds: ['abc_123'],
           },
           {
             id: 'pdf-1',
@@ -25,6 +37,8 @@ describe('ListEstimationDriveFilesUseCase', () => {
             modifiedAt: '2026-10-19T12:00:00.000Z',
             webViewLink: 'https://drive.google.com/file/d/pdf-1/view',
             sizeBytes: 2200,
+            itemType: 'file',
+            parentIds: ['abc_123'],
           },
         ];
       },
@@ -42,6 +56,7 @@ describe('ListEstimationDriveFilesUseCase', () => {
 
   it('explica cuando Drive no está configurado', async () => {
     const drive: DriveFolderClient = {
+      ...emptyDiscovery,
       isConfigured: () => false,
       listFiles: async () => [],
     };
