@@ -10,7 +10,6 @@ import { useProjectsList } from '@/modules/projects/api/projects.queries';
 import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Card } from '@/shared/components/ui/Card';
 import { TextField } from '@/shared/components/ui/TextField';
-import { Button } from '@/shared/components/ui/Button';
 import { SearchIcon } from '@/shared/components/icons/Icons';
 import styles from './CalculatorPage.module.css';
 
@@ -117,17 +116,6 @@ export function CalculatorPage() {
                       <td className={styles.numeric}>{formatHours(project.soldHours)}</td>
                       <td>{project.leader?.fullName ?? 'Sin asignar'}</td>
                       <td className={styles.actionCell}>
-                        <Button
-                          as={undefined as never}
-                          variant="outline"
-                          size="sm"
-                          onClick={() => undefined}
-                          className={styles.hiddenButton}
-                          aria-hidden="true"
-                          tabIndex={-1}
-                        >
-                          Estimar
-                        </Button>
                         <Link className={styles.actionLink} to={projectEstimationPath(project)}>
                           Estimar
                         </Link>
