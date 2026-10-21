@@ -1,17 +1,31 @@
 import type {
   AnalyzeEstimationPocInput,
   EstimationDriveFolderListing,
+  EstimationDriveFolderResolution,
+  EstimationDriveInventory,
   EstimationPocAnalysis,
   EstimationPocProposal,
   EstimationQuestionnaireDefinition,
   GenerateEstimationPocInput,
+  InventoryEstimationDriveInput,
   ListEstimationDriveFilesInput,
+  ResolveEstimationDriveFolderInput,
 } from '@kora/contracts';
 import { api } from '@/shared/lib/api-client';
 
 export const estimationApi = {
   questionnaireDefinition(): Promise<EstimationQuestionnaireDefinition> {
     return api.get<EstimationQuestionnaireDefinition>('/estimations/questionnaire-definition');
+  },
+  resolveDriveFolder(
+    input: ResolveEstimationDriveFolderInput,
+  ): Promise<EstimationDriveFolderResolution> {
+    return api.post<EstimationDriveFolderResolution>('/estimations/drive/resolve', input);
+  },
+  inventoryDrive(
+    input: InventoryEstimationDriveInput,
+  ): Promise<EstimationDriveInventory> {
+    return api.post<EstimationDriveInventory>('/estimations/drive/inventory', input);
   },
   driveFiles(input: ListEstimationDriveFilesInput): Promise<EstimationDriveFolderListing> {
     return api.post<EstimationDriveFolderListing>('/estimations/drive/files', input);
@@ -27,6 +41,10 @@ export const estimationApi = {
 export const estimationKeys = {
   all: ['estimations'] as const,
   questionnaireDefinition: () => [...estimationKeys.all, 'questionnaire-definition'] as const,
+  driveResolution: (projectId: string) =>
+    [...estimationKeys.all, 'drive-resolution', projectId] as const,
+  driveInventory: (driveFolderUrl: string) =>
+    [...estimationKeys.all, 'drive-inventory', driveFolderUrl] as const,
   driveFiles: (driveFolderUrl: string) =>
     [...estimationKeys.all, 'drive-files', driveFolderUrl] as const,
 };
