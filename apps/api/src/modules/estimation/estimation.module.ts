@@ -3,6 +3,9 @@ import { AiModule } from '../ai/ai.module';
 import { AnalyzeEstimationPocUseCase } from './application/use-cases/analyze-estimation-poc.use-case';
 import { GenerateEstimationPocProposalUseCase } from './application/use-cases/generate-estimation-poc-proposal.use-case';
 import { GetEstimationQuestionnaireDefinitionUseCase } from './application/use-cases/get-estimation-questionnaire-definition.use-case';
+import { ListEstimationDriveFilesUseCase } from './application/use-cases/list-estimation-drive-files.use-case';
+import { DRIVE_FOLDER_CLIENT } from './application/ports/drive-folder-client.port';
+import { GoogleDriveFolderClient } from './infrastructure/drive/google-drive-folder.client';
 import { EstimationController } from './presentation/estimation.controller';
 
 /**
@@ -18,6 +21,9 @@ import { EstimationController } from './presentation/estimation.controller';
     GetEstimationQuestionnaireDefinitionUseCase,
     AnalyzeEstimationPocUseCase,
     GenerateEstimationPocProposalUseCase,
+    ListEstimationDriveFilesUseCase,
+    GoogleDriveFolderClient,
+    { provide: DRIVE_FOLDER_CLIENT, useExisting: GoogleDriveFolderClient },
   ],
 })
 export class EstimationModule {}
