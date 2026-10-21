@@ -1,27 +1,46 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import type { EstimationPocProposal } from '@kora/contracts';
+import { useEffect, useMemo, useRef } from 'react';
+import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
+import type {
+  EstimationCreationMode,
+  EstimationPocRole,
+  SubmitEstimationAnswerInput,
+} from '@kora/contracts';
 import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
-import { Button } from '@/shared/components/ui/Button';
 import { Card } from '@/shared/components/ui/Card';
-import { TextField } from '@/shared/components/ui/TextField';
-import { useGenerateEstimationPocProposal } from '../api/estimation.queries';
+import {
+  useAnalyzeEstimationPoc,
+  useGenerateEstimationPocProposal,
+} from '../api/estimation.queries';
+import { EstimationQuestionnaireForm } from '../components/EstimationQuestionnaireForm';
 import { useEstimationWorkspace } from '../hooks/useEstimationWorkspace';
-import { QuestionnaireBlueprintCard } from '../components/QuestionnaireBlueprintCard';
+import { getManualEstimationTemplate } from '../lib/estimation-templates';
 import styles from './EstimationWorkspacePage.module.css';
+
+interface EstimationNavigationState {
+  creationMode?: EstimationCreationMode;
+  driveFolderUrl?: string;
+  instructions?: string;
+}
 
 const PIPELINE = [
   'Antecedentes de Drive',
-  'Contexto normalizado',
   'Aclaraciones mínimas',
+  'Documentación base',
   'EDT',
-  'Resumen y escenarios',
+  'Estimación final',
+] as const;
+
+const ANALYSIS_STEPS = [
+  'Leyendo antecedentes del levantamiento',
+  'Identificando requerimientos, procesos e integraciones',
+  'Detectando vacíos que sí cambian la estimación',
+  'Preparando preguntas de aclaración',
 ] as const;
 
 const formatHours = (value: number) =>
   value.toLocaleString('es-CL', { maximumFractionDigits: 1 });
 
-function RoleTable({ proposal }: { proposal: EstimationPocProposal }) {
+function RolesTable({ roles }: { roles: readonly EstimationPocRole[] }) {
   return (
     <div className={styles.tableScroll}>
       <table className={styles.rolesTable}>
@@ -36,11 +55,11 @@ function RoleTable({ proposal }: { proposal: EstimationPocProposal }) {
           </tr>
         </thead>
         <tbody>
-          {proposal.roles.map((role) => (
+          {roles.map((role) => (
             <tr key={role.role}>
               <td>
                 <strong>{role.role}</strong>
-                {role.source && <span className={styles.source}>{role.source}</span>}
+                {role.source && <span className={styles.source}>✦ {role.source}</span>}
               </td>
               <td>{role.unit === 'week' ? 'Semana' : 'Día'}</td>
               <td className={styles.numeric}>{role.duration}</td>
@@ -55,49 +74,71 @@ function RoleTable({ proposal }: { proposal: EstimationPocProposal }) {
   );
 }
 
+function isCreationMode(value: string | null): value is EstimationCreationMode {
+  return value === 'ai' || value === 'standard' || value === 'rpa';
+}
+
 export function EstimationWorkspacePage() {
   const { projectId } = useParams();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const navigationState = (location.state ?? {}) as EstimationNavigationState;
+  const modeParam = searchParams.get('mode');
+  const mode: EstimationCreationMode = isCreationMode(modeParam)
+    ? modeParam
+    : navigationState.creationMode ?? 'standard';
+
   const { project, questionnaire, isLoading } = useEstimationWorkspace(projectId ?? null);
+  const analyze = useAnalyzeEstimationPoc();
   const generateProposal = useGenerateEstimationPocProposal();
-  const [driveFolderUrl, setDriveFolderUrl] = useState('');
-  const [instructions, setInstructions] = useState('');
-  const [driveTouched, setDriveTouched] = useState(false);
-  const [localError, setLocalError] = useState<string | null>(null);
+  const analysisStarted = useRef(false);
+
+  const driveFolderUrl =
+    navigationState.driveFolderUrl?.trim() ||
+    (project.data?.documentationLink?.includes('drive.google.com')
+      ? project.data.documentationLink
+      : '');
+  const instructions = navigationState.instructions?.trim() || '';
+
+  const manualRoles = useMemo(
+    () => (mode === 'ai' ? [] : getManualEstimationTemplate(mode)),
+    [mode],
+  );
 
   useEffect(() => {
-    if (driveTouched || !project.data?.documentationLink) return;
-    if (!project.data.documentationLink.includes('drive.google.com')) return;
-    setDriveFolderUrl(project.data.documentationLink);
-  }, [driveTouched, project.data?.documentationLink]);
-
-  const proposal = generateProposal.data;
-  const projectLabel = useMemo(() => {
-    if (!project.data) return 'Proyecto';
-    const client = project.data.client?.companyName;
-    return client ? `${client} · ${project.data.name}` : project.data.name;
-  }, [project.data]);
+    if (mode !== 'ai' || !project.data || !driveFolderUrl || analysisStarted.current) return;
+    analysisStarted.current = true;
+    analyze.mutate({
+      projectId: project.data.id,
+      projectName: project.data.name,
+      clientName: project.data.client?.companyName ?? null,
+      driveFolderUrl,
+      instructions: instructions || null,
+    });
+  }, [analyze, driveFolderUrl, instructions, mode, project.data]);
 
   if (!projectId) {
     return (
       <DashboardLayout title="Calculadora">
-        <Card>No se indicó un proyecto para estimar.</Card>
+        <Card>No se indicó un prospecto para estimar.</Card>
       </DashboardLayout>
     );
   }
 
-  const onGenerate = async () => {
-    if (!project.data) return;
-    if (!driveFolderUrl.trim()) {
-      setLocalError('Vincula la carpeta de Drive del levantamiento para continuar.');
-      return;
-    }
-    setLocalError(null);
-    await generateProposal.mutateAsync({
+  const proposal = generateProposal.data;
+  const analysis = analyze.data;
+  const roles = proposal?.roles ?? manualRoles;
+  const totalHours = proposal?.totalHours ?? manualRoles.reduce((sum, role) => sum + role.totalHours, 0);
+
+  const submitQuestionnaire = (answers: SubmitEstimationAnswerInput[]) => {
+    if (!project.data || !driveFolderUrl) return;
+    generateProposal.mutate({
       projectId: project.data.id,
       projectName: project.data.name,
       clientName: project.data.client?.companyName ?? null,
-      driveFolderUrl: driveFolderUrl.trim(),
-      instructions: instructions.trim() || null,
+      driveFolderUrl,
+      instructions: instructions || null,
+      answers,
     });
   };
 
@@ -109,23 +150,26 @@ export function EstimationWorkspacePage() {
           <span>/</span>
           <span>{project.data?.client?.companyName ?? 'Cliente'}</span>
           <span>/</span>
-          <strong>{project.data?.name ?? 'Proyecto'}</strong>
+          <strong>{project.data?.name ?? 'Prospecto'}</strong>
         </div>
 
         <div className={styles.heading}>
           <div>
-            <span className={styles.eyebrow}>Estimación asistida por IA</span>
-            <h1>{project.data?.name ?? 'Proyecto'}</h1>
+            <span className={styles.eyebrow}>
+              {mode === 'ai' ? 'Estimación con agente IA' : mode === 'rpa' ? 'Plantilla RPA' : 'Plantilla estándar'}
+            </span>
+            <h1>{project.data?.name ?? 'Prospecto'}</h1>
             <p>
-              Las HH se calculan de forma determinística a partir de la propuesta estructurada del
-              módulo IA. La lectura real de Drive se incorporará en el siguiente vertical slice.
+              {mode === 'ai'
+                ? 'Primero se analizan los antecedentes, luego se responden únicamente las aclaraciones necesarias y recién después se genera la estimación.'
+                : 'La estimación parte desde una plantilla de roles y dedicaciones, tal como en el flujo original de Calculadora.'}
             </p>
           </div>
           <span className={styles.status}>PoC</span>
         </div>
 
         <Card className={styles.pipelineCard}>
-          <h2>Flujo objetivo</h2>
+          <h2>Flujo de estimación</h2>
           <div className={styles.pipeline}>
             {PIPELINE.map((step, index) => (
               <div key={step} className={styles.pipelineStep}>
@@ -136,11 +180,8 @@ export function EstimationWorkspacePage() {
           </div>
         </Card>
 
-        {isLoading && <Card>Cargando proyecto y configuración…</Card>}
-
-        {!isLoading && project.error && (
-          <Card>No se pudo cargar el proyecto seleccionado.</Card>
-        )}
+        {isLoading && <Card>Cargando prospecto…</Card>}
+        {!isLoading && project.error && <Card>No se pudo cargar el prospecto seleccionado.</Card>}
 
         {!isLoading && project.data && (
           <div className={styles.editorGrid}>
@@ -152,91 +193,125 @@ export function EstimationWorkspacePage() {
                     <strong>{project.data.client?.companyName ?? 'Cliente por confirmar'}</strong>
                   </div>
                   <div>
-                    <span>Proyecto</span>
+                    <span>Prospecto</span>
                     <strong>{project.data.name}</strong>
                   </div>
                   <div>
-                    <span>HH actuales</span>
-                    <strong>{formatHours(project.data.soldHours)} HH</strong>
+                    <span>Origen</span>
+                    <strong>{mode === 'ai' ? 'Agente IA' : mode === 'rpa' ? 'Plantilla RPA' : 'Plantilla estándar'}</strong>
                   </div>
                 </div>
                 <p className={styles.metaNote}>
-                  Cliente, nombre, etapa y responsables siguen viniendo del módulo Proyectos.
+                  Cliente, nombre y estado comercial siguen siendo responsabilidad del módulo Proyectos.
                 </p>
-              </Card>
-
-              <Card className={styles.agentCard}>
-                <div className={styles.sectionHead}>
-                  <div>
-                    <span className={styles.agentEyebrow}>✦ Agente IA</span>
-                    <h2>Generar propuesta</h2>
-                  </div>
-                  <span className={styles.simBadge}>Proveedor simulado</span>
-                </div>
-
-                <TextField
-                  label="Carpeta de Drive del levantamiento"
-                  type="url"
-                  value={driveFolderUrl}
-                  onChange={(event) => {
-                    setDriveTouched(true);
-                    setDriveFolderUrl(event.target.value);
-                    setLocalError(null);
-                  }}
-                  placeholder="https://drive.google.com/drive/folders/…"
-                  helperText="En la PoC validamos el flujo y el contrato. Todavía no se descargan documentos."
-                  errorText={localError ?? undefined}
-                />
-
-                <label className={styles.textareaField}>
-                  <span>Indicaciones para el agente (opcional)</span>
-                  <textarea
-                    value={instructions}
-                    onChange={(event) => setInstructions(event.target.value)}
-                    placeholder="Ej. Considerar solo el módulo de despacho; el cliente ya tiene las licencias."
-                  />
-                </label>
-
-                <div className={styles.agentActions}>
-                  <Button
-                    onClick={() => void onGenerate()}
-                    loading={generateProposal.isPending}
-                    loadingText="Generando propuesta…"
-                  >
-                    ✦ Generar propuesta IA
-                  </Button>
-                  <span>
-                    Esta ejecución no modifica el proyecto ni persiste una estimación todavía.
-                  </span>
-                </div>
-
-                {generateProposal.error && (
-                  <div className={styles.errorBox}>
-                    No se pudo generar la propuesta PoC. Revisa la API y vuelve a intentar.
-                  </div>
+                {mode === 'ai' && (
+                  <p className={styles.driveNote}>
+                    📁 {driveFolderUrl ? 'Carpeta de Drive vinculada para el análisis.' : 'No hay carpeta de Drive vinculada.'}
+                  </p>
                 )}
               </Card>
 
-              {proposal && (
-                <Card className={styles.rolesCard}>
-                  <div className={styles.sectionHead}>
-                    <div>
-                      <span className={styles.agentEyebrow}>Propuesta IA</span>
-                      <h2>Equipo y esfuerzo</h2>
-                    </div>
-                    <span className={styles.reviewBadge}>Por revisar</span>
-                  </div>
-                  <p className={styles.summaryText}>{proposal.summary}</p>
-                  <RoleTable proposal={proposal} />
+              {mode === 'ai' && !driveFolderUrl && (
+                <Card className={styles.errorCard}>
+                  <h2>Falta la carpeta de Drive</h2>
+                  <p>
+                    Vuelve a <Link to="/calculadora">Calculadora</Link> y crea la estimación desde
+                    <strong> + Nueva estimación</strong> indicando la carpeta del levantamiento.
+                  </p>
                 </Card>
               )}
 
-              {questionnaire.error && (
+              {mode === 'ai' && driveFolderUrl && analyze.isPending && (
+                <Card className={styles.analysisCard}>
+                  <span className={styles.agentEyebrow}>✦ Agente IA</span>
+                  <h2>Analizando antecedentes</h2>
+                  <p className={styles.summaryText}>
+                    Esta PoC simula el análisis. La integración real con Drive reemplazará este adaptador
+                    sin cambiar el flujo de la pantalla.
+                  </p>
+                  <ol className={styles.analysisSteps}>
+                    {ANALYSIS_STEPS.map((step, index) => (
+                      <li key={step}>
+                        <span>{index + 1}</span>
+                        {step}
+                      </li>
+                    ))}
+                  </ol>
+                </Card>
+              )}
+
+              {mode === 'ai' && analyze.error && (
+                <Card className={styles.errorCard}>
+                  <h2>No se pudo analizar el levantamiento</h2>
+                  <p>Revisa la API de Kora y vuelve a iniciar la estimación.</p>
+                </Card>
+              )}
+
+              {mode === 'ai' && analysis && !proposal && questionnaire.data && (
+                <>
+                  <Card className={styles.analysisSummary}>
+                    <span className={styles.agentEyebrow}>Entendimiento preliminar</span>
+                    <h2>El análisis terminó antes de estimar</h2>
+                    <p>{analysis.summary}</p>
+                    <div className={styles.analysisMeta}>
+                      <span>{analysis.documentsAnalyzed} documentos analizados</span>
+                      <span>{analysis.dynamicQuestions.length} aclaraciones dinámicas</span>
+                    </div>
+                  </Card>
+
+                  <Card>
+                    <EstimationQuestionnaireForm
+                      fixedQuestions={questionnaire.data.fixedQuestions}
+                      dynamicQuestions={analysis.dynamicQuestions}
+                      submitting={generateProposal.isPending}
+                      onSubmit={submitQuestionnaire}
+                    />
+                  </Card>
+                </>
+              )}
+
+              {mode === 'ai' && questionnaire.error && (
                 <Card>No se pudo cargar la definición del cuestionario.</Card>
               )}
 
-              {questionnaire.data && (
-                <QuestionnaireBlueprintCard definition={questionnaire.data} />
+              {generateProposal.error && (
+                <Card className={styles.errorCard}>
+                  <h2>No se pudo generar la estimación final</h2>
+                  <p>Las respuestas se conservarán en la futura versión persistida del flujo.</p>
+                </Card>
+              )}
+
+              {(mode !== 'ai' || proposal) && (
+                <Card className={styles.rolesCard}>
+                  <div className={styles.sectionHead}>
+                    <div>
+                      <span className={mode === 'ai' ? styles.agentEyebrow : styles.eyebrow}>
+                        {mode === 'ai' ? '✦ Propuesta IA' : 'Base editable'}
+                      </span>
+                      <h2>Roles y dedicación</h2>
+                    </div>
+                    {mode === 'ai' && <span className={styles.reviewBadge}>Por revisar</span>}
+                  </div>
+                  {proposal && <p className={styles.summaryText}>{proposal.summary}</p>}
+                  <RolesTable roles={roles} />
+                  {mode !== 'ai' && (
+                    <p className={styles.metaNote}>
+                      En la siguiente iteración estas celdas serán editables, igual que en el prototipo HTML.
+                    </p>
+                  )}
+                </Card>
+              )}
+
+              {proposal && (
+                <Card className={styles.documentsCard}>
+                  <span className={styles.eyebrow}>Siguiente salida</span>
+                  <h2>Documentación base + EDT</h2>
+                  <p>
+                    El flujo ya termina la estimación después del cuestionario. El próximo vertical slice
+                    generará los documentos normalizados y los escribirá en la misma carpeta de Drive antes
+                    de producir la EDT definitiva.
+                  </p>
+                </Card>
               )}
             </div>
 
@@ -244,21 +319,25 @@ export function EstimationWorkspacePage() {
               <Card className={styles.summaryCard}>
                 <span className={styles.summaryLabel}>Total estimado</span>
                 <div className={styles.totalHours}>
-                  {proposal ? formatHours(proposal.totalHours) : '—'}
+                  {roles.length ? formatHours(totalHours) : '—'}
                   <small> HH</small>
                 </div>
 
                 <div className={styles.summaryBlock}>
-                  <span>Proyecto</span>
-                  <strong>{projectLabel}</strong>
+                  <span>Origen</span>
+                  <strong>{mode === 'ai' ? 'Agente IA' : mode === 'rpa' ? 'Plantilla RPA' : 'Plantilla estándar'}</strong>
                 </div>
                 <div className={styles.summaryBlock}>
-                  <span>Modo de fuente</span>
-                  <strong>{proposal?.sourceMode === 'poc_simulated' ? 'PoC simulada' : 'Drive'}</strong>
-                </div>
-                <div className={styles.summaryBlock}>
-                  <span>Documentos analizados</span>
-                  <strong>{proposal?.documentsAnalyzed ?? 0}</strong>
+                  <span>Estado</span>
+                  <strong>
+                    {proposal
+                      ? 'Estimación generada'
+                      : mode === 'ai'
+                        ? analysis
+                          ? 'Esperando respuestas'
+                          : 'Analizando'
+                        : 'Borrador manual'}
+                  </strong>
                 </div>
 
                 {proposal && (
@@ -270,13 +349,6 @@ export function EstimationWorkspacePage() {
                         <li key={assumption}>{assumption}</li>
                       ))}
                     </ul>
-
-                    <h3>Aclaraciones detectadas</h3>
-                    <ol>
-                      {proposal.clarifyingQuestions.map((question) => (
-                        <li key={question}>{question}</li>
-                      ))}
-                    </ol>
                   </>
                 )}
               </Card>
