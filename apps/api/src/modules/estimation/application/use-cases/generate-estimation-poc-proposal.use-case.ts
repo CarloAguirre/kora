@@ -20,6 +20,7 @@ export class GenerateEstimationPocProposalUseCase {
           projectName: input.projectName,
           clientName: input.clientName,
           driveFolderUrl: input.driveFolderUrl,
+          answers: input.answers,
         },
         instructions: input.instructions,
       }),
