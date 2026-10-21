@@ -367,3 +367,87 @@ export const estimationDriveFolderListingSchema = z.object({
   message: z.string().trim().max(1000).nullish(),
 });
 export type EstimationDriveFolderListing = z.infer<typeof estimationDriveFolderListingSchema>;
+
+
+export const resolveEstimationDriveFolderSchema = z.object({
+  projectId: uuidSchema,
+  projectName: nonEmptyTrimmed(300, 'El nombre del proyecto'),
+  clientName: z.string().trim().max(300).nullish(),
+  documentationLink: z.url().nullish(),
+  quotationLink: z.url().nullish(),
+});
+export type ResolveEstimationDriveFolderInput = z.infer<typeof resolveEstimationDriveFolderSchema>;
+
+export const estimationDriveFolderCandidateSchema = z.object({
+  folderId: z.string().trim().min(1),
+  name: nonEmptyTrimmed(500, 'El nombre de la carpeta'),
+  url: z.url(),
+  score: z.number().min(0).max(100),
+  confidence: estimationConfidenceLevelSchema,
+  reasons: z.array(z.string().trim().min(1).max(500)).default([]),
+  ancestorNames: z.array(z.string().trim().min(1).max(500)).default([]),
+});
+export type EstimationDriveFolderCandidate = z.infer<typeof estimationDriveFolderCandidateSchema>;
+
+export const estimationDriveFolderResolutionSchema = z.object({
+  connection: z.enum(['connected', 'not_configured', 'unavailable']),
+  status: z.enum(['resolved', 'needs_confirmation', 'not_found']),
+  selectedFolder: estimationDriveFolderCandidateSchema.nullish(),
+  candidates: z.array(estimationDriveFolderCandidateSchema).max(8).default([]),
+  message: z.string().trim().max(1500).nullish(),
+});
+export type EstimationDriveFolderResolution = z.infer<typeof estimationDriveFolderResolutionSchema>;
+
+export const inventoryEstimationDriveSchema = z.object({
+  driveFolderUrl: z
+    .url({ message: 'La carpeta de Drive no tiene un formato válido.' })
+    .refine((value) => {
+      try {
+        return new URL(value).hostname === 'drive.google.com';
+      } catch {
+        return false;
+      }
+    }, 'La URL debe pertenecer a drive.google.com.'),
+  maxDepth: z.number().int().min(1).max(5).default(3),
+});
+export type InventoryEstimationDriveInput = z.infer<typeof inventoryEstimationDriveSchema>;
+
+export const ESTIMATION_DRIVE_SOURCE_PRIORITIES = [
+  'recommended',
+  'secondary',
+  'excluded',
+] as const;
+export const estimationDriveSourcePrioritySchema = z.enum(ESTIMATION_DRIVE_SOURCE_PRIORITIES);
+export type EstimationDriveSourcePriority = z.infer<typeof estimationDriveSourcePrioritySchema>;
+
+export const estimationDriveInventoryItemSchema = z.object({
+  id: z.string().trim().min(1),
+  name: nonEmptyTrimmed(500, 'El nombre del elemento'),
+  url: z.url().nullish(),
+  mimeType: z.string().trim().min(1),
+  itemType: z.enum(['file', 'folder']),
+  kind: estimationDriveFileKindSchema.nullish(),
+  modifiedAt: isoDateTimeSchema,
+  path: nonEmptyTrimmed(2000, 'La ruta'),
+  depth: z.number().int().min(1).max(5),
+  priority: estimationDriveSourcePrioritySchema,
+  reason: z.string().trim().max(1000).nullish(),
+});
+export type EstimationDriveInventoryItem = z.infer<typeof estimationDriveInventoryItemSchema>;
+
+export const estimationDriveInventorySchema = z.object({
+  connection: z.enum(['connected', 'not_configured', 'unavailable']),
+  rootFolderId: z.string().trim().min(1),
+  rootFolderUrl: z.url(),
+  summary: z.object({
+    files: z.number().int().min(0),
+    folders: z.number().int().min(0),
+    recommended: z.number().int().min(0),
+    secondary: z.number().int().min(0),
+    excluded: z.number().int().min(0),
+    truncated: z.boolean(),
+  }),
+  items: z.array(estimationDriveInventoryItemSchema).default([]),
+  message: z.string().trim().max(1500).nullish(),
+});
+export type EstimationDriveInventory = z.infer<typeof estimationDriveInventorySchema>;
