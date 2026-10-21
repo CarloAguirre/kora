@@ -32,6 +32,7 @@ import { ClientProjectDetailPage } from '@/modules/client-portal/pages/ClientPro
 import { ClientSupportContractDetailPage } from '@/modules/client-portal/pages/ClientSupportContractDetailPage';
 import { ForbiddenPage } from '@/app/pages/ForbiddenPage';
 import { NotFoundPage } from '@/app/pages/NotFoundPage';
+import { CalculatorPage } from '@/modules/estimation/pages/CalculatorPage';
 import { EstimationWorkspacePage } from '@/modules/estimation/pages/EstimationWorkspacePage';
 
 /**
@@ -113,6 +114,7 @@ export const router = createBrowserRouter([
     element: <ProtectedRoute permission="projects:manage" />,
     children: [
       { path: '/proyectos/nuevo', element: <NewProjectPage /> },
+      { path: '/calculadora', element: <CalculatorPage /> },
       { path: '/proyectos/:projectId/estimacion', element: <EstimationWorkspacePage /> },
     ],
   },
