@@ -50,7 +50,7 @@ export function CapacityReportTable() {
   const { data, isLoading, error } = useCapacityReport(state.query);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
-  // Mismo Excel que "Descargar registro de horas" de la consola del líder,
+  // "Descargar todo": mismo Excel que "Descargar registro de horas" de la consola del líder,
   // pero sin filtros: con `hours:read_all` el backend devuelve los registros
   // de toda la organización (comentarios incluidos).
   const hourEntriesExport = useHourEntriesExport();
@@ -94,10 +94,16 @@ export function CapacityReportTable() {
             loadingText="Generando…"
             onClick={() => void hourEntriesExport.exportEntries({ sortField: 'date', sortDirection: 'desc' })}
           >
-            Descargar registro de horas
+            Descargar todo
           </Button>
-          <Button iconLeft={<DownloadIcon size={18} />} loading={exporting} loadingText="Generando…" onClick={() => void handleExport()}>
-            Descargar Excel
+          <Button
+            variant="outlineDark"
+            iconLeft={<DownloadIcon size={18} />}
+            loading={exporting}
+            loadingText="Generando…"
+            onClick={() => void handleExport()}
+          >
+            Descargar datos filtrados
           </Button>
         </div>
       </div>
