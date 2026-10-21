@@ -1,5 +1,7 @@
 .page {
   display: grid;
+  width: 100%;
+  min-width: 0;
   gap: 20px;
 }
 
@@ -36,7 +38,10 @@
 .heading p,
 .summaryText,
 .metaNote,
-.agentActions span {
+.driveNote,
+.documentsCard p,
+.analysisSummary p,
+.errorCard p {
   margin: 0;
   color: var(--kora-text-muted, #667085);
   line-height: 1.55;
@@ -60,7 +65,6 @@
 }
 
 .status,
-.simBadge,
 .reviewBadge {
   border-radius: 999px;
   padding: 7px 11px;
@@ -69,8 +73,7 @@
   white-space: nowrap;
 }
 
-.status,
-.simBadge {
+.status {
   background: #f3efff;
   color: #6d28d9;
 }
@@ -82,23 +85,32 @@
 
 .pipelineCard,
 .projectCard,
-.agentCard,
+.analysisCard,
+.analysisSummary,
+.errorCard,
 .rolesCard,
+.documentsCard,
 .summaryCard {
   display: grid;
   gap: 16px;
 }
 
 .pipelineCard h2,
-.agentCard h2,
+.analysisCard h2,
+.analysisSummary h2,
+.errorCard h2,
 .rolesCard h2,
+.documentsCard h2,
 .summaryCard h3 {
   margin: 0;
 }
 
 .pipelineCard h2,
-.agentCard h2,
-.rolesCard h2 {
+.analysisCard h2,
+.analysisSummary h2,
+.errorCard h2,
+.rolesCard h2,
+.documentsCard h2 {
   font-size: 18px;
 }
 
@@ -152,6 +164,8 @@
 .summaryCard {
   position: sticky;
   top: 20px;
+  background: var(--kora-navy, #122235);
+  color: #fff;
 }
 
 .projectMetaGrid {
@@ -176,14 +190,29 @@
   letter-spacing: .03em;
 }
 
+.summaryCard .summaryBlock span,
+.summaryCard .summaryLabel {
+  color: #9fb0d3;
+}
+
 .projectMetaGrid strong,
 .summaryBlock strong {
   font-size: 13px;
 }
 
-.metaNote {
+.summaryCard .summaryBlock strong {
+  color: #fff;
+}
+
+.metaNote,
+.driveNote {
   padding-top: 4px;
   font-size: 12px;
+}
+
+.driveNote {
+  color: #6d28d9;
+  font-weight: 600;
 }
 
 .sectionHead {
@@ -198,53 +227,62 @@
   gap: 4px;
 }
 
-.textareaField {
+.errorCard {
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+
+.errorCard h2 {
+  color: #b42318;
+}
+
+.analysisCard {
+  border-color: #ddd6fe;
+  background: #faf8ff;
+}
+
+.analysisSteps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   display: grid;
-  gap: 7px;
+  gap: 9px;
 }
 
-.textareaField > span {
-  color: var(--kora-text, #111827);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.textareaField textarea {
-  min-height: 88px;
-  resize: vertical;
-  border: 1px solid var(--kora-border, #d0d5dd);
-  border-radius: 8px;
-  padding: 10px 12px;
-  background: var(--kora-surface, #fff);
-  color: var(--kora-text, #111827);
-  font: inherit;
-  line-height: 1.45;
-}
-
-.textareaField textarea:focus {
-  outline: 2px solid color-mix(in srgb, #2563eb 24%, transparent);
-  border-color: #2563eb;
-}
-
-.agentActions {
+.analysisSteps li {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 10px;
+  color: var(--kora-text-muted, #667085);
+  font-size: 13px;
+}
+
+.analysisSteps li span {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  flex: none;
+  border: 2px solid #6d28d9;
+  border-top-color: transparent;
+  border-radius: 50%;
+  color: #6d28d9;
+  font-size: 10px;
+}
+
+.analysisMeta {
+  display: flex;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
-.agentActions span {
-  max-width: 560px;
-  font-size: 12px;
-}
-
-.errorBox {
-  border: 1px solid #fecaca;
-  border-radius: 10px;
-  padding: 11px 12px;
-  background: #fef2f2;
-  color: #b91c1c;
-  font-size: 13px;
+.analysisMeta span {
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: var(--kora-surface-muted, #f8fafc);
+  color: var(--kora-text-muted, #667085);
+  font-size: 11px;
+  font-weight: 700;
 }
 
 .tableScroll {
@@ -280,7 +318,7 @@
 .source {
   display: block;
   margin-top: 4px;
-  color: var(--kora-text-muted, #667085);
+  color: #6d28d9;
   font-size: 11px;
   line-height: 1.35;
 }
@@ -295,35 +333,40 @@
 }
 
 .totalHours {
-  font-size: 34px;
+  color: #fff;
+  font-size: 38px;
   font-weight: 800;
   letter-spacing: -.03em;
 }
 
 .totalHours small {
+  color: #9fb0d3;
   font-size: 14px;
   font-weight: 700;
-  color: var(--kora-text-muted, #667085);
 }
 
 .divider {
   height: 1px;
-  background: var(--kora-border, #e5e7eb);
+  background: #2b3d5b;
 }
 
 .summaryCard h3 {
+  color: #fff;
   font-size: 13px;
 }
 
-.summaryCard ul,
-.summaryCard ol {
+.summaryCard ul {
   margin: -6px 0 0;
   padding-left: 18px;
   display: grid;
   gap: 7px;
-  color: var(--kora-text-muted, #667085);
+  color: #dbe4f6;
   font-size: 12px;
   line-height: 1.45;
+}
+
+.documentsCard {
+  border-style: dashed;
 }
 
 @media (max-width: 1100px) {
