@@ -1,0 +1,111 @@
+import { Injectable } from '@nestjs/common';
+import type { EstimationQuestionnaireDefinition } from '@kora/contracts';
+
+const DEFINITION: EstimationQuestionnaireDefinition = {
+  maxDynamicFirstRound: 5,
+  maxDynamicFollowUp: 2,
+  targetMinutesMin: 3,
+  targetMinutesMax: 5,
+  fixedQuestions: [
+    {
+      id: 'F01',
+      kind: 'fixed',
+      category: 'Alcance',
+      question: '¿Qué nivel de entrega quieres estimar?',
+      reason: 'Fija la profundidad del alcance antes de calcular.',
+      impact: 'high',
+      answerType: 'single_choice',
+      options: [
+        { value: 'poc', label: 'PoC' },
+        { value: 'mvp', label: 'MVP' },
+        { value: 'phase', label: 'Fase específica' },
+        { value: 'complete', label: 'Solución completa' },
+        { value: 'evolution', label: 'Evolutivo' },
+      ],
+      required: true,
+      canPrefill: true,
+      priorityScore: 3,
+      sourceRefs: [],
+      dependsOn: [],
+    },
+    {
+      id: 'F02',
+      kind: 'fixed',
+      category: 'Plazo',
+      question: '¿Existe una fecha o duración objetivo que debamos respetar?',
+      reason: 'Permite separar esfuerzo de calendario y detectar necesidad de paralelización.',
+      impact: 'high',
+      answerType: 'text',
+      options: [],
+      required: true,
+      canPrefill: true,
+      priorityScore: 3,
+      sourceRefs: [],
+      dependsOn: [],
+    },
+    {
+      id: 'F03',
+      kind: 'fixed',
+      category: 'Equipo',
+      question: '¿Cómo quieres que propongamos el equipo?',
+      reason: 'Define si se estima con un equipo ideal o con la disponibilidad real de Kora.',
+      impact: 'high',
+      answerType: 'single_choice',
+      options: [
+        { value: 'ideal', label: 'Equipo ideal' },
+        { value: 'kora_availability', label: 'Disponibilidad real de Kora' },
+        { value: 'compare', label: 'Comparar ambos escenarios' },
+        { value: 'specific_profiles', label: 'Perfiles específicos' },
+      ],
+      required: true,
+      canPrefill: false,
+      priorityScore: 3,
+      sourceRefs: [],
+      dependsOn: [],
+    },
+    {
+      id: 'F04',
+      kind: 'fixed',
+      category: 'Postproducción',
+      question: '¿Qué actividades posteriores a desarrollo deben quedar dentro de la estimación?',
+      reason: 'Evita dejar fuera UAT, estabilización, marcha blanca o soporte inicial.',
+      impact: 'medium',
+      answerType: 'multi_choice',
+      options: [
+        { value: 'uat', label: 'UAT' },
+        { value: 'stabilization', label: 'Estabilización' },
+        { value: 'pilot', label: 'Marcha blanca' },
+        { value: 'support', label: 'Soporte inicial' },
+        { value: 'none', label: 'Ninguna' },
+      ],
+      required: true,
+      canPrefill: true,
+      priorityScore: 2,
+      sourceRefs: [],
+      dependsOn: [],
+    },
+    {
+      id: 'F05',
+      kind: 'fixed',
+      category: 'Contexto adicional',
+      question: '¿Hay alguna condición, exclusión o decisión importante que no aparezca en los documentos?',
+      reason: 'Captura conocimiento tácito sin convertirlo en más preguntas obligatorias.',
+      impact: 'low',
+      answerType: 'text',
+      options: [],
+      required: false,
+      canPrefill: false,
+      assumptionIfSkipped: 'No se informaron condiciones adicionales fuera de los antecedentes analizados.',
+      priorityScore: 1,
+      sourceRefs: [],
+      dependsOn: [],
+    },
+  ],
+};
+
+@Injectable()
+export class GetEstimationQuestionnaireDefinitionUseCase {
+  execute(): EstimationQuestionnaireDefinition {
+    return DEFINITION;
+  }
+}
