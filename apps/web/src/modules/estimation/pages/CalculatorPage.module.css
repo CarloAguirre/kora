@@ -1,0 +1,168 @@
+.page {
+  display: grid;
+  gap: 20px;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.header h1 {
+  margin: 4px 0 6px;
+  font-size: 28px;
+}
+
+.header p {
+  margin: 0;
+  max-width: 780px;
+  color: var(--kora-text-muted, #667085);
+  line-height: 1.55;
+}
+
+.eyebrow {
+  color: var(--kora-text-muted, #667085);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.pocBadge {
+  padding: 7px 11px;
+  border-radius: 999px;
+  background: #f3efff;
+  color: #6d28d9;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.toolbar {
+  display: grid;
+  grid-template-columns: minmax(280px, 440px) 1fr;
+  align-items: end;
+  gap: 20px;
+}
+
+.toolbarNote {
+  padding-bottom: 9px;
+  color: var(--kora-text-muted, #667085);
+  font-size: 13px;
+}
+
+.tableCard {
+  padding: 0;
+  overflow: hidden;
+}
+
+.tableScroll {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  min-width: 930px;
+  border-collapse: collapse;
+}
+
+.table th,
+.table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--kora-border, #e5e7eb);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.table th {
+  background: var(--kora-surface-soft, #f8fafc);
+  color: var(--kora-text-muted, #667085);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.table td {
+  font-size: 13px;
+}
+
+.table tbody tr:hover {
+  background: var(--kora-surface-soft, #f8fafc);
+}
+
+.projectName,
+.projectMeta {
+  display: block;
+}
+
+.projectName {
+  color: var(--kora-text, #111827);
+  font-size: 13px;
+}
+
+.projectMeta {
+  margin-top: 3px;
+  color: var(--kora-text-muted, #667085);
+  font-size: 12px;
+}
+
+.stageBadge {
+  display: inline-flex;
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #2563eb;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.numeric {
+  text-align: right !important;
+  font-variant-numeric: tabular-nums;
+}
+
+.actionCell {
+  width: 96px;
+  text-align: right !important;
+}
+
+.actionLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--kora-border, #d0d5dd);
+  border-radius: 8px;
+  color: var(--kora-text, #111827);
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.actionLink:hover {
+  border-color: #0b1736;
+}
+
+.hiddenButton {
+  display: none;
+}
+
+.state {
+  padding: 38px 24px;
+  color: var(--kora-text-muted, #667085);
+  text-align: center;
+}
+
+@media (max-width: 760px) {
+  .header,
+  .toolbar {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .toolbarNote {
+    padding-bottom: 0;
+  }
+}
