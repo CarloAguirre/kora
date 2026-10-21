@@ -229,7 +229,7 @@ function scoreFolderName(
 
   if (folder === project) {
     reasons.push('El nombre de la carpeta coincide con el proyecto.');
-    return 75;
+    return 85;
   }
 
   let score = 0;
