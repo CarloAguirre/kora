@@ -1,16 +1,21 @@
 import { Module } from '@nestjs/common';
+import { AiModule } from '../ai/ai.module';
+import { GenerateEstimationPocProposalUseCase } from './application/use-cases/generate-estimation-poc-proposal.use-case';
 import { GetEstimationQuestionnaireDefinitionUseCase } from './application/use-cases/get-estimation-questionnaire-definition.use-case';
 import { EstimationController } from './presentation/estimation.controller';
 
 /**
- * Módulo de Estimación Inteligente.
+ * Dominio backend de la Calculadora / Estimación Inteligente.
  *
- * Esta primera iteración registra únicamente el contrato del cuestionario.
- * Drive, proveedor IA y persistencia entrarán como adaptadores de los puertos
- * ya definidos, sin cambiar los consumidores.
+ * Consume AiModule como capacidad técnica separada. La Calculadora conoce el
+ * caso de uso de negocio; no conoce SDKs ni proveedores LLM concretos.
  */
 @Module({
+  imports: [AiModule],
   controllers: [EstimationController],
-  providers: [GetEstimationQuestionnaireDefinitionUseCase],
+  providers: [
+    GetEstimationQuestionnaireDefinitionUseCase,
+    GenerateEstimationPocProposalUseCase,
+  ],
 })
 export class EstimationModule {}
