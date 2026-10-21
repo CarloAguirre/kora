@@ -965,3 +965,73 @@ boundaries ya creados:
 
 La UI y los contratos consumidores no deberían requerir una reescritura para
 cambiar `PocAiProvider` por el proveedor real.
+
+
+## Corrección de flujo PoC · Calculadora como punto de entrada
+
+A partir de la validación visual contra el prototipo HTML, el flujo de
+Calculadora queda definido así:
+
+```text
+/calculadora
+   │
+   ├── muestra proyectos vigentes como referencia
+   │   └── NO expone un botón "Estimar" por fila
+   │
+   └── + Nueva estimación
+         │
+         ├── solo permite seleccionar prospectos en Cotización
+         │
+         ├── Plantilla estándar
+         │      └── abre la estimación con roles base
+         │
+         ├── Plantilla RPA
+         │      └── abre la estimación con roles base RPA
+         │
+         └── Propuesta del agente IA
+                │
+                ├── requiere carpeta Drive
+                ├── analiza antecedentes
+                ├── consolida entendimiento
+                ├── genera preguntas fijas + dinámicas
+                ├── usuario responde
+                ├── genera propuesta final
+                └── futuro: escribe documentos normalizados + EDT en Drive
+```
+
+La selección de un proyecto ya aprobado o en ejecución no inicia una nueva
+estimación. Los proyectos existentes pueden seguir visibles en la vista
+principal, pero el alta de una estimación siempre parte desde
+`+ Nueva estimación`.
+
+### Secuencia IA
+
+La PoC separa explícitamente dos operaciones:
+
+1. `POST /api/estimations/poc/analyze`
+   - antecede a cualquier cálculo de HH;
+   - devuelve resumen preliminar y preguntas dinámicas;
+   - no devuelve roles ni HH.
+2. `POST /api/estimations/poc/proposal`
+   - se ejecuta después de responder el cuestionario;
+   - recibe las respuestas;
+   - genera la propuesta estructurada;
+   - el caso de uso calcula las HH de forma determinística.
+
+Esto corrige el flujo anterior, donde la propuesta de roles se generaba antes
+del cuestionario.
+
+### Fidelidad al prototipo
+
+Se mantiene del HTML de referencia:
+
+- botón superior `+ Nueva estimación`;
+- modal de selección de prospecto;
+- alternativas Agente IA / Plantilla estándar / Plantilla RPA;
+- Drive visible únicamente para el flujo IA;
+- navegación posterior al editor/workspace de la estimación;
+- proyectos aprobados o ya en curso fuera del selector de nueva estimación.
+
+La opción "Copiar una estimación existente" permanece visible como futura
+capacidad, pero está deshabilitada en la PoC mientras no exista persistencia
+del historial/versionado de estimaciones.
