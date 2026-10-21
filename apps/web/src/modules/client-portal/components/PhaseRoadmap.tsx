@@ -134,7 +134,8 @@ function buildTimelineAxis(range: DateRange): TimelineAxis {
  * Figma, pero están conectados a las tareas reales de la fase (`taskItems`,
  * cada una con su `scope`): el tooltip muestra el % completado por ámbito
  * (mismo cálculo que `ProjectModulesCard` del Roadmap interno) y el clic
- * filtra/atenúa en la fila "Tareas" las que no son de ese ámbito.
+ * atenúa los tramos y las tareas que no son de ese ámbito (el de cada tramo se
+ * deriva de su rol en el adapter).
  */
 export function PhaseRoadmap({ phaseRoadmap, renderPhaseExtras, renderSelectionDetail }: PhaseRoadmapProps) {
   /** Fases abiertas — cada una se abre/cierra por separado (varias a la vez); arranca abierta la primera. */
@@ -247,6 +248,35 @@ export function PhaseRoadmap({ phaseRoadmap, renderPhaseExtras, renderSelectionD
   );
 }
 
+/** Aviso bajo los chips de "Resumen de avance" con el ámbito activo — sin él, elegir un ámbito sin
+ *  tramos ni tareas parecía no hacer nada. */
+function ScopeFilterNotice({
+  scope,
+  segmentCount,
+  taskCount,
+  onClear,
+}: {
+  scope: PhaseRoadmapTaskScope;
+  segmentCount: number;
+  taskCount: number;
+  onClear: () => void;
+}) {
+  const plural = (count: number, singular: string, pluralForm: string) => `${count} ${count === 1 ? singular : pluralForm}`;
+  return (
+    <div className={styles.scopeFilterNotice}>
+      <span>
+        Filtrando por <b>{PHASE_ROADMAP_TASK_SCOPE_LABELS[scope]}</b>:{' '}
+        {segmentCount === 0 && taskCount === 0
+          ? 'sin tramos ni tareas en este ámbito.'
+          : `${plural(segmentCount, 'tramo', 'tramos')} y ${plural(taskCount, 'tarea', 'tareas')}.`}
+      </span>
+      <button type="button" className={styles.relatedBitacoraReset} onClick={onClear}>
+        Quitar filtro
+      </button>
+    </div>
+  );
+}
+
 /** Geometría de la barra dentro del rango visible; `null` si el tramo queda completamente fuera. */
 function barGeometry(task: PhaseRoadmapTask, range: DateRange) {
   const start = toDate(task.startDate);
@@ -339,8 +369,9 @@ function PhaseCard({
 
   /** Chips de "Resumen de avance": % de avance por ámbito ponderado por HH
    *  (`phase.scopeProgress`, del backend; sin él, % de tareas aprobadas) — clic
-   *  filtra/atenúa en la fila "Tareas" las que no son de ese ámbito. */
+   *  atenúa los tramos (barras) y las tareas que no son de ese ámbito. */
   const [activeScope, setActiveScope] = useState<PhaseRoadmapTaskScope | null>(null);
+  const isOutOfScope = (scope: PhaseRoadmapTaskScope) => activeScope !== null && scope !== activeScope;
 
   const scopeStats = useMemo(() => {
     const stats = new Map<PhaseRoadmapTaskScope, { total: number; done: number }>();
@@ -439,13 +470,22 @@ function PhaseCard({
             </div>
           </div>
 
+          {activeScope !== null && (
+            <ScopeFilterNotice
+              scope={activeScope}
+              segmentCount={phase.tasks.filter((task) => task.scope === activeScope).length}
+              taskCount={phase.taskItems.filter((taskItem) => taskItem.scope === activeScope).length}
+              onClear={() => setActiveScope(null)}
+            />
+          )}
+
           {renderExtras?.(phase)}
 
           <div className={styles.ganttGrid}>
             <div className={styles.ganttLabels}>
               <div className={styles.ganttLabelsHeader} />
               {phase.tasks.map((task, index) => (
-                <div key={index} className={styles.taskRowLabel}>
+                <div key={index} className={[styles.taskRowLabel, isOutOfScope(task.scope) ? styles.scopeDimmed : ''].join(' ')}>
                   <span className={styles.legendDot} style={{ background: PHASE_ROADMAP_ROLE_COLORS[task.role] }} />
                   <span className={styles.taskRowLabelText}>
                     <span className={styles.taskRoleName}>{PHASE_ROADMAP_ROLE_LABELS[task.role]}</span>
@@ -508,6 +548,7 @@ function PhaseCard({
                             styles.ganttBar,
                             start > today ? styles.ganttBarFuture : '',
                             isSelected ? styles.ganttBarSelected : '',
+                            isOutOfScope(task.scope) ? styles.scopeDimmed : '',
                           ].join(' ')}
                           style={{
                             left: `${geometry.leftPercent}%`,
@@ -563,7 +604,6 @@ function PhaseCard({
                     {visibleTaskItems.map(({ taskItem, leftPercent }, index) => {
                       const selection: PhaseRoadmapSelection = { kind: 'task', id: taskItem.id, label: taskItem.label };
                       const isSelected = sameSelection(selectedRelated, selection);
-                      const isDimmed = activeScope !== null && taskItem.scope !== activeScope;
                       return (
                         <button
                           key={taskItem.id ?? index}
@@ -572,7 +612,7 @@ function PhaseCard({
                             styles.markerItem,
                             styles.markerItemTask,
                             isSelected ? styles.markerItemHighlighted : '',
-                            isDimmed ? styles.markerItemDimmed : '',
+                            isOutOfScope(taskItem.scope) ? styles.scopeDimmed : '',
                           ].join(' ')}
                           style={{ left: `${leftPercent}%` }}
                           title={`${taskItem.label} · ${formatShortDate(taskItem.date)}`}

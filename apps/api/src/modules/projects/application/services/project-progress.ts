@@ -18,7 +18,7 @@ import {
  * - Peso de una tarea = sus HH estimadas. Las entregas (no tienen HH) y las tareas antiguas sin HH
  *   pesan el promedio de las tareas que sí tienen en la misma fase; si ninguna tiene, se reparten por
  *   igual las HH de la fase entre tareas y entregas (o pesan 1 si la fase tampoco tiene) — avance
- *   "por cantidad".
+ *   "por cantidad". Una fase con HH pero sin tareas (solo entregas) no reparte: cada entrega pesa 1.
  * - Base = el mayor entre la suma de pesos de sus ítems y las HH estimadas de la fase: las HH de la
  *   fase todavía sin ítems cuentan en la base, pero no en el real ni en el esperado.
  * - Real = peso de las tareas Aprobadas (`done`) y entregas Aprobadas (`approved`) / base. Esperado =
@@ -85,12 +85,15 @@ function moduleTotals(module: ProgressModuleInput, today: string): ModuleTotals 
   const closed = module.currentStage === 'closed';
   const moduleHours = positive(module.estimatedHours) ?? 0;
   const itemCount = module.tasks.length + module.deliveries.length;
+  /** Fase con HH pero solo entregas: no hay plan de tareas que repartir, así que las entregas pesan 1
+   *  y las HH de la fase quedan en la base — si no, aprobar la única entrega marcaba la fase al 100%. */
+  const deliveriesOnly = module.tasks.length === 0 && moduleHours > 0;
 
   /** Sin HH en ninguna tarea: las HH de la fase se reparten por igual, así el % es "ítems aprobados / ítems". */
   const fallbackWeight =
     known.length > 0
       ? known.reduce((sum, hours) => sum + hours, 0) / known.length
-      : moduleHours > 0 && itemCount > 0
+      : moduleHours > 0 && itemCount > 0 && !deliveriesOnly
         ? moduleHours / itemCount
         : 1;
   const weight = (task: ProgressTaskInput) => positive(task.estimatedHours) ?? fallbackWeight;
@@ -123,7 +126,7 @@ function moduleTotals(module: ProgressModuleInput, today: string): ModuleTotals 
     progress: {
       actual: hasPlan && base > 0 ? percent(approved, base) : null,
       expected: hasPlan && base > 0 ? percent(due, base) : null,
-      estimatedByCount: itemCount > 0 && known.length === 0,
+      estimatedByCount: itemCount > 0 && known.length === 0 && !deliveriesOnly,
       scopes,
     },
     hasPlan,

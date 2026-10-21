@@ -181,12 +181,26 @@ describe('calculateProjectProgress', () => {
     expect(progress.planCoverage).toBe(100);
   });
 
-  it('una fase solo con entregas tiene plan: reparte sus HH entre ellas y suman las Aprobadas', () => {
+  it('una fase con HH y solo entregas no reparte sus HH: aprobar la única entrega no la marca al 100%', () => {
+    const progress = calculateProjectProgress(
+      project({
+        modules: [module({ estimatedHours: 1260, deliveries: [delivery({ status: 'approved' })] })],
+      }),
+      TODAY,
+    );
+
+    // La entrega pesa 1 sobre una base de 1260 HH: la fase todavía no tiene plan de tareas.
+    expect(progress.actual).toBe(0);
+    expect(progress.expected).toBe(0);
+    expect(progress.planCoverage).toBe(0);
+    expect(progress.estimatedByCount).toBe(false);
+  });
+
+  it('una fase sin HH y solo con entregas se calcula por cantidad de entregas', () => {
     const progress = calculateProjectProgress(
       project({
         modules: [
           module({
-            estimatedHours: 400,
             deliveries: [
               delivery({ status: 'approved', estimatedDate: d('2026-09-20') }),
               delivery({ status: 'delivered', estimatedDate: d('2026-09-25') }),
@@ -199,10 +213,9 @@ describe('calculateProjectProgress', () => {
       TODAY,
     );
 
-    // 4 entregas de 100 HH: una aprobada (la terminada sin aprobar no suma), dos con fecha ya pasada.
+    // Una aprobada (la terminada sin aprobar no suma), dos con fecha ya pasada.
     expect(progress.actual).toBe(25);
     expect(progress.expected).toBe(50);
-    expect(progress.planCoverage).toBe(100);
     expect(progress.estimatedByCount).toBe(true);
   });
 

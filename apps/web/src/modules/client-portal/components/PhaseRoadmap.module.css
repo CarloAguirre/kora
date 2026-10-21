@@ -280,6 +280,15 @@
   background: #4c7ef3;
 }
 
+.scopeFilterNotice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: -6px;
+  font-size: 12.5px;
+  color: #5d6b7a;
+}
+
 .stageChipPercent {
   padding: 1px 6px;
   border-radius: 999px;
@@ -545,9 +554,11 @@ button.ganttBar {
   transform: translate(calc(-1 * var(--marker-half) - 11px), -50%);
 }
 
-/* Tarea fuera del ámbito seleccionado en los chips de "Resumen de avance". */
-.markerItemDimmed {
-  opacity: 0.35;
+/* Tramo (barra + etiqueta) o tarea fuera del ámbito seleccionado en los chips de "Resumen de
+   avance". Gris además de tenue para no confundirse con `.ganttBarFuture`. */
+.scopeDimmed {
+  opacity: 0.2;
+  filter: grayscale(1);
 }
 
 .relatedBitacora {

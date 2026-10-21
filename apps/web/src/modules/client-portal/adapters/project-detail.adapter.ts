@@ -27,6 +27,7 @@ import type {
   PhaseRoadmapPhase,
   PhaseRoadmapRole,
   PhaseRoadmapTaskItem,
+  PhaseRoadmapTaskScope,
   ProjectPhaseRoadmap,
   RoadmapStep,
 } from '../types';
@@ -90,6 +91,17 @@ export function roleFromTeamName(teamName: string | null): PhaseRoadmapRole {
   if (sigla === 'RPA') return 'rpa';
   return 'dev';
 }
+
+/** Los tramos no guardan ámbito propio (solo el equipo), así que se deriva del rol: UX → Diseño,
+ *  QA → QA Funcional y el resto → Desarrollo. Ningún tramo cae en "Rev. Cliente". Es lo que
+ *  permite que los chips de "Resumen de avance" también filtren las barras del Gantt. */
+const SCOPE_BY_ROLE: Readonly<Record<PhaseRoadmapRole, PhaseRoadmapTaskScope>> = {
+  ux: 'diseno',
+  qa: 'qa',
+  dev: 'desarrollo',
+  ia: 'desarrollo',
+  rpa: 'desarrollo',
+};
 
 /**
  * Mismo criterio que `phaseVisualStatus` de `ProjectModulesCard`: "finished" es 100% la decisión
@@ -242,14 +254,17 @@ function toPhaseRoadmapPhase(
     name: module.name,
     status: phaseStatus(module),
     alertLabel,
-    tasks: module.segments.map((segment) => ({
-      id: segment.id,
-      role: roleFromTeamName(segment.teamName),
-      scope: 'desarrollo',
-      label: segment.name,
-      startDate: segment.startDate,
-      endDate: segment.endDate,
-    })),
+    tasks: module.segments.map((segment) => {
+      const role = roleFromTeamName(segment.teamName);
+      return {
+        id: segment.id,
+        role,
+        scope: SCOPE_BY_ROLE[role],
+        label: segment.name,
+        startDate: segment.startDate,
+        endDate: segment.endDate,
+      };
+    }),
     deliveries: module.deliveries.map(
       (delivery): PhaseRoadmapDelivery => ({
         id: delivery.id,
