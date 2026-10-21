@@ -176,14 +176,13 @@ function ClientProjectsSection({
     {
       key: 'stage',
       header: 'Etapa',
-      render: (p) => (
-        <div className={styles.stageCell}>
-          <span className={styles.stageLabel}>{p.stageLabel}</span>
-          <div className={styles.stageBarTrack}>
-            <div className={styles.stageBarFill} style={{ width: `${p.stageProgressPercent}%` }} />
-          </div>
-        </div>
-      ),
+      render: (p) => <span className={styles.stageLabel}>{p.stageLabel}</span>,
+    },
+    {
+      key: 'progress',
+      header: 'Avance',
+      // `null` = sin plan cargado: "--", no un 0% que parezca medido.
+      render: (p) => (p.progressPercent != null ? `${p.progressPercent}%` : '--'),
     },
   ];
 

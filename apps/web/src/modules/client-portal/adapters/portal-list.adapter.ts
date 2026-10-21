@@ -46,7 +46,7 @@ export function toClientProjectRow(project: ProjectSummary): ClientProjectRow {
     health: projectHealth(project),
     // Misma etiqueta que la columna "Etapa" interna: solo con `phase`, un Prospecto/Cotización (sin fase) salía "Sin etapa".
     stageLabel: getProjectStageLabel(project),
-    stageProgressPercent: project.progress.actual ?? 0,
+    progressPercent: project.progress.actual,
   };
 }
 

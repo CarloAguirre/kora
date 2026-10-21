@@ -36,7 +36,8 @@ export interface ClientProjectRow {
   readonly endDate: string | null;
   readonly health: ClientProjectHealth;
   readonly stageLabel: string;
-  readonly stageProgressPercent: number;
+  /** Avance real (`progress.actual`); `null` = sin plan cargado. */
+  readonly progressPercent: number | null;
 }
 
 export interface ClientSupportContractRow {

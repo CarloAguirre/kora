@@ -41,30 +41,10 @@
   text-decoration: underline;
 }
 
-.stageCell {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  min-width: 130px;
-}
-
 .stageLabel {
   font-size: 12px;
   font-weight: var(--kora-weight-bold);
   color: #5d6b7a;
-}
-
-.stageBarTrack {
-  height: 6px;
-  border-radius: 4px;
-  background: #f1f4f7;
-  overflow: hidden;
-}
-
-.stageBarFill {
-  height: 100%;
-  border-radius: 4px;
-  background: #8bc53f;
 }
 
 .footer {
