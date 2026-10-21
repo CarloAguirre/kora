@@ -416,6 +416,7 @@ export class DrizzleHourEntryRepository implements HourEntryRepository {
     if (filters.userId) conditions.push(eq(hourEntries.userId, filters.userId));
     if (filters.excludeUserId) conditions.push(ne(hourEntries.userId, filters.excludeUserId));
     if (filters.projectId) conditions.push(eq(hourEntries.projectId, filters.projectId));
+    if (filters.projectIds?.length) conditions.push(inArray(hourEntries.projectId, [...filters.projectIds]));
     if (filters.search) {
       const term = `%${filters.search.trim()}%`;
       conditions.push(or(ilike(users.firstName, term), ilike(users.lastName, term)));

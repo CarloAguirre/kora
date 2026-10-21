@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { isoDateTimeSchema, nonEmptyTrimmed, pageSchema, paginationQuerySchema, sortDirectionSchema, uuidSchema } from '../common/primitives';
+import { arrayQueryParam, isoDateTimeSchema, nonEmptyTrimmed, pageSchema, paginationQuerySchema, sortDirectionSchema, uuidSchema } from '../common/primitives';
 import { roleCodeSchema } from '../users/roles';
 
 /** Ver docs/DECISION-M4-HORAS.md. */
@@ -147,6 +147,8 @@ export const listHourEntriesQuerySchema = paginationQuerySchema.extend({
   teamId: uuidSchema.optional(),
   /** Acepta id o slug: la ficha de proyecto filtra por el `projectId` de la URL, que ahora es el slug del proyecto — se resuelve a UUID en `ListHourEntriesUseCase`. */
   projectId: z.string().optional(),
+  /** Varios proyectos por UUID (filtro Proyecto del historial de equipo). */
+  projectIds: arrayQueryParam(uuidSchema),
   status: hourEntryStatusSchema.optional(),
   dateFrom: z.iso.date().optional(),
   dateTo: z.iso.date().optional(),

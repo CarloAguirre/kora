@@ -58,6 +58,7 @@ export class ListHourEntriesUseCase implements UseCase<ListHourEntriesCommand, P
       {
         userId,
         projectId: project?.id,
+        projectIds: query.projectIds,
         search: query.search,
         teamId: query.teamId,
         status: query.status,

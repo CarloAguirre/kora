@@ -9,6 +9,7 @@ export interface HourEntryFilters {
   /** Acota a autores con membresía activa en este equipo. */
   readonly teamId?: string | undefined;
   readonly projectId?: string | undefined;
+  readonly projectIds?: readonly string[] | undefined;
   readonly status?: HourEntryStatus | undefined;
   readonly dateFrom?: Date | undefined;
   readonly dateTo?: Date | undefined;

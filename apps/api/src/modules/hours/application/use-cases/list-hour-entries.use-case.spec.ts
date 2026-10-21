@@ -180,4 +180,19 @@ describe('ListHourEntriesUseCase — resolución de slug en projectId', () => {
     expect(result.isOk() && result.value.items).toEqual([]);
     expect(repo.search).not.toHaveBeenCalled();
   });
+
+  it('projectIds (filtro Proyecto del historial de equipo): pasa los UUID tal cual al repositorio', async () => {
+    const repo = new FakeEntryRepository();
+    const useCase = new ListHourEntriesUseCase(repo, new FakeProjectReader());
+
+    await useCase.execute({
+      query: { ...baseQuery(), projectIds: ['project-uuid-1', 'project-uuid-2'] },
+      actor: { userId: 'leader-1', email: 'l@kabeli.cl' },
+      actorPermissions: ['hours:read_team'],
+    });
+
+    const filters: HourEntryFilters = repo.search.mock.calls[0]![0];
+    expect(filters.projectIds).toEqual(['project-uuid-1', 'project-uuid-2']);
+    expect(filters.leaderScopeUserId).toBe('leader-1');
+  });
 });

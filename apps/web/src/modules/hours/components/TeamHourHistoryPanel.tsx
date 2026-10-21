@@ -12,6 +12,7 @@ import { Button } from '@/shared/components/ui/Button';
 import { DataTable, type Column } from '@/shared/components/ui/DataTable';
 import { DropdownMenu, type DropdownMenuItem } from '@/shared/components/ui/DropdownMenu';
 import { Modal } from '@/shared/components/ui/Modal';
+import { MultiSelect } from '@/shared/components/ui/MultiSelect';
 import { ConfirmActionDialog } from '@/shared/components/ui/ConfirmActionDialog';
 import { DEFAULT_PAGE_SIZE, Pagination } from '@/shared/components/ui/Pagination';
 import { Select } from '@/shared/components/ui/Select';
@@ -26,6 +27,8 @@ import { useApproveHourEntry, useDeleteHourEntry, useHourEntriesList, useRejectH
 import { useHourEntriesExport } from '../hooks/useHourEntriesExport';
 import { resolvedApprover } from '../lib/approver';
 import { isInCurrentMonth } from '../lib/edit-window';
+import { useProjectsList } from '@/modules/projects/api/projects.queries';
+import { getProjectOptionLabel } from '@/modules/projects/lib/project-option-label';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 
@@ -39,7 +42,7 @@ type DialogState = { kind: 'none' } | { kind: 'view' | 'edit'; entry: HourEntryS
  * "Registro de horas Líder" — réplica del card homónimo de `LiderDashboardB`
  * (v1), sin el botón "Registrar horas" que tenía allá (se sacó por diseño):
  * el historial de TODO el equipo (no solo el propio) con filtro por persona,
- * fecha y estado. La visibilidad viene gratis del alcance `hours:read_team`
+ * proyecto, fecha y estado. La visibilidad viene gratis del alcance `hours:read_team`
  * ya resuelto en el backend (propias + del equipo liderado).
  *
  * Las acciones de cada fila van en un menú ⋮ (mismo patrón que la cola de
@@ -57,6 +60,7 @@ export function TeamHourHistoryPanel({ teamId, userId }: { teamId?: string; user
   const { can } = usePermissions();
   const toast = useToast();
   const [personSearch, setPersonSearch] = useState('');
+  const [projectIds, setProjectIds] = useState<string[]>([]);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [status, setStatus] = useState<HourEntryStatus | ''>('');
@@ -73,16 +77,29 @@ export function TeamHourHistoryPanel({ teamId, userId }: { teamId?: string; user
   const canApprove = can('hours:approve');
   const isAdminLike = user?.role === 'admin' || user?.role === 'pmo';
 
-  const hasFilters = Boolean(personSearch || dateFrom || dateTo || status);
+  const hasFilters = Boolean(personSearch || projectIds.length || dateFrom || dateTo || status);
 
+  // Las opciones de proyecto dependen del equipo/colaborador: al cambiarlos se sueltan los proyectos elegidos.
   useEffect(() => {
+    setProjectIds([]);
     setPage(1);
   }, [teamId, userId]);
+
+  const { data: projects } = useProjectsList({
+    page: 1,
+    pageSize: 200,
+    sortField: 'name',
+    sortDirection: 'asc',
+    teamId,
+    assignedToUserId: userId,
+  });
+  const projectOptions = (projects?.items ?? []).map((project) => ({ value: project.id, label: getProjectOptionLabel(project) }));
 
   const { data, isLoading, error } = useHourEntriesList({
     search: personSearch.trim() || undefined,
     teamId,
     userId,
+    projectIds: projectIds.length ? projectIds : undefined,
     dateFrom: dateFrom || undefined,
     dateTo: dateTo || undefined,
     status: status || undefined,
@@ -94,6 +111,7 @@ export function TeamHourHistoryPanel({ teamId, userId }: { teamId?: string; user
 
   const clearFilters = () => {
     setPersonSearch('');
+    setProjectIds([]);
     setDateFrom('');
     setDateTo('');
     setStatus('');
@@ -167,6 +185,7 @@ export function TeamHourHistoryPanel({ teamId, userId }: { teamId?: string; user
       search: personSearch.trim() || undefined,
       teamId,
       userId,
+      projectIds: projectIds.length ? projectIds : undefined,
       dateFrom: dateFrom || undefined,
       dateTo: dateTo || undefined,
       status: status || undefined,
@@ -264,6 +283,18 @@ export function TeamHourHistoryPanel({ teamId, userId }: { teamId?: string; user
             setPage(1);
           }}
           iconLeft={<SearchIcon size={16} />}
+        />
+        <MultiSelect
+          className={styles.filter}
+          label="Proyecto"
+          placeholder="Todos"
+          searchPlaceholder="Buscar proyecto"
+          options={projectOptions}
+          value={projectIds}
+          onChange={(nextProjectIds) => {
+            setProjectIds(nextProjectIds);
+            setPage(1);
+          }}
         />
         <TextField
           className={styles.filter}
