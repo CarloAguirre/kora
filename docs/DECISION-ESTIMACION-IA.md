@@ -712,3 +712,131 @@ Este documento debe mantenerse como fuente de las decisiones del módulo mientra
 se completa el levantamiento. Los detalles que se acuerden en nuevas sesiones
 de diseño deben incorporarse aquí o separarse en decisiones más específicas si
 el documento crece demasiado.
+
+
+## Estado de implementación · Iteración 1
+
+Se creó el primer scaffold funcional en `feature/calculadora/carlo`.
+
+### Contratos compartidos
+
+Existe ahora:
+
+```text
+packages/contracts/src/estimation/
+  estimation.contract.ts
+```
+
+El contrato ya modela:
+
+- estados del flujo de estimación;
+- requerimientos RF/RNF/RN;
+- referencias a fuentes;
+- historias de usuario;
+- contexto técnico e integraciones;
+- gaps/decisiones;
+- preguntas fijas y dinámicas;
+- respuestas;
+- ítems EDT;
+- esfuerzo por rol;
+- resumen por módulo;
+- escenarios;
+- resultado de estimación.
+
+Se exporta desde `@kora/contracts` y sigue el patrón Zod nativo del proyecto.
+
+### API
+
+Se creó:
+
+```text
+apps/api/src/modules/estimation/
+  application/
+    ports/
+      ai-project-analyzer.port.ts
+      document-source-reader.port.ts
+    use-cases/
+      get-estimation-questionnaire-definition.use-case.ts
+  domain/
+    repositories/
+      estimation.repository.ts
+  presentation/
+    estimation.controller.ts
+  estimation.module.ts
+```
+
+El módulo ya está registrado en `AppModule`.
+
+El primer endpoint real es:
+
+```http
+GET /api/estimations/questionnaire-definition
+```
+
+Requiere `projects:manage` y devuelve la definición del cuestionario mínimo
+(5 preguntas base, máximo 5 dinámicas iniciales, máximo 2 de seguimiento,
+objetivo de 3–5 minutos).
+
+Los puertos de Drive, IA y persistencia están definidos pero todavía no tienen
+adaptadores concretos. Esto es deliberado: permite cerrar primero autenticación
+Drive, modelo LLM y versionado sin acoplar la aplicación a proveedores.
+
+### Frontend
+
+Se creó:
+
+```text
+apps/web/src/modules/estimation/
+  api/
+  components/
+  hooks/
+  lib/
+  pages/
+```
+
+Existe un workspace inicial accesible en:
+
+```text
+/proyectos/:projectId/estimacion
+```
+
+bajo el mismo permiso `projects:manage`.
+
+La pantalla consume el contrato real de la API y visualiza:
+
+- pipeline previsto;
+- cuestionario mínimo;
+- límites de preguntas dinámicas;
+- siguiente vertical slice.
+
+No se agregó aún al menú lateral ni se alteró el wizard `Nuevo proyecto`.
+La integración al paso "Estimación" se hará cuando el flujo pueda continuar
+realmente hacia Drive/análisis, evitando exponer un CTA que todavía no complete
+la operación.
+
+### Decisión de persistencia
+
+No se agregaron tablas Drizzle ni migraciones en esta iteración.
+
+Antes deben cerrarse:
+
+- si una estimación se crea antes o después de persistir el proyecto;
+- política de versionado;
+- refresh cuando cambian fuentes Drive;
+- snapshot exacto de documentos/contexto;
+- qué parte del contexto canónico queda normalizada en columnas y qué parte en
+  JSONB.
+
+Esta decisión evita fijar un modelo físico prematuramente.
+
+### Próximo vertical slice recomendado
+
+1. Resolver acceso de Kora a la carpeta Drive del proyecto.
+2. Implementar `DocumentSourceReader`.
+3. Implementar un primer `AiProjectAnalyzer`.
+4. Generar `ProjectEstimationContext` con requisitos, HU, contexto técnico y
+   gaps.
+5. Persistir un snapshot mínimo.
+6. Renderizar resumen de entendimiento + preguntas dinámicas.
+7. Recién entonces conectar el CTA "Estimar con IA" del paso Estimación de
+   `NewProjectPage`.
