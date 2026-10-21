@@ -109,3 +109,68 @@
   font-size: 12px;
   font-weight: 600;
 }
+
+
+.driveFiles {
+  display: grid;
+  gap: 7px;
+  padding: 2px 2px 0;
+}
+
+.driveFile {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  font-size: 12px;
+}
+
+.driveFileIcon {
+  font-size: 12px;
+  line-height: 1;
+}
+
+.driveFile a,
+.driveFileName {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--kora-text, #111827);
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.driveFile a:hover {
+  text-decoration: underline;
+}
+
+.driveFile time {
+  color: var(--kora-text-muted, #667085);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.driveStatus,
+.driveWarning,
+.driveError {
+  border-radius: 8px;
+  padding: 9px 10px;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.driveStatus {
+  background: var(--kora-surface, #fff);
+  color: var(--kora-text-muted, #667085);
+}
+
+.driveWarning {
+  background: #fff7e6;
+  color: #92400e;
+}
+
+.driveError {
+  background: #fef2f2;
+  color: #b42318;
+}
