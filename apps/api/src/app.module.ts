@@ -45,6 +45,7 @@ import { AdminModule } from './modules/admin/admin.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { SessionsModule } from './modules/sessions/sessions.module';
 import { RemindersModule } from './modules/reminders/reminders.module';
+import { EstimationModule } from './modules/estimation/estimation.module';
 import { HealthController } from './shared/presentation/health.controller';
 import { JwtModule } from '@nestjs/jwt';
 
@@ -141,6 +142,7 @@ export class SharedModule {}
     DashboardModule,
     AdminModule,
     RemindersModule,
+    EstimationModule,
   ],
   controllers: [HealthController],
 })
