@@ -5,6 +5,7 @@ import { HourEntry } from '../../domain/entities/hour-entry.entity';
 import {
   InvalidDesignatedApproverError,
   ModuleNotInProjectError,
+  ProjectClosedError,
   ProjectOvertimeNotAllowedError,
   ProjectStoppedError,
   ReferencedModuleNotFoundError,
@@ -62,6 +63,7 @@ export class CreateHourEntryUseCase implements UseCase<CreateHourEntryCommand, {
       const project = await this.projects.findById(data.projectId);
       if (!project) return err(new ReferencedProjectNotFoundError(data.projectId));
       if (project.status === 'on_hold') return err(new ProjectStoppedError());
+      if (project.status === 'finished' || project.status === 'cancelled') return err(new ProjectClosedError());
       if (data.isOvertime && !project.allowsOvertime) return err(new ProjectOvertimeNotAllowedError());
       projectStageAtEntry = project.status;
     }

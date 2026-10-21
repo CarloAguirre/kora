@@ -30,10 +30,11 @@ export function useHolidays(query: Partial<ListHolidaysQuery>) {
 }
 
 /** Pestaña "Capacity" de Administración. */
-export function useCapacityReport(query: Partial<ListCapacityReportQuery>) {
+export function useCapacityReport(query: Partial<ListCapacityReportQuery>, options: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: hourKeys.capacityReport(query),
     queryFn: () => hoursApi.capacityReport(query),
+    enabled: options.enabled ?? true,
     placeholderData: (previous) => previous,
     staleTime: 30_000,
   });

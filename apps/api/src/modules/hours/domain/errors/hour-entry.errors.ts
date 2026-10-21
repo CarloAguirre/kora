@@ -104,6 +104,13 @@ export class ProjectStoppedError extends ConflictError {
   }
 }
 
+/** Proyecto finalizado o cancelado: ya no admite horas nuevas. */
+export class ProjectClosedError extends ConflictError {
+  constructor() {
+    super('No se pueden registrar horas en un proyecto finalizado.', 'HOUR_ENTRY_PROJECT_CLOSED');
+  }
+}
+
 /** El proyecto no tiene autorizadas horas extra — el líder del proyecto/equipo debe habilitarlo primero. */
 export class ProjectOvertimeNotAllowedError extends ConflictError {
   constructor() {

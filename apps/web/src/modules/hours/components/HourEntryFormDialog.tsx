@@ -28,7 +28,7 @@ import {
   type DailyBlock,
 } from './DailyEntryForm';
 import { WeeklyEntryForm } from './WeeklyEntryForm';
-import { isInCurrentMonth, OUTSIDE_CURRENT_MONTH_MESSAGE } from '../lib/edit-window';
+import { canEditAnyMonth, isInCurrentMonth, OUTSIDE_CURRENT_MONTH_MESSAGE } from '../lib/edit-window';
 
 const formatDateTime = (value: string) => new Date(value).toLocaleString('es-CL');
 const NEW_ENTRY_TABS = [
@@ -148,6 +148,7 @@ function EditEntryForm({
     pageSize: 200,
     sortField: 'name',
     assignedToUserId: restrictToAssigned ? user?.id : undefined,
+    status: ['active'],
   });
   const { data: leaders } = useUsersList({ page: 1, pageSize: 200, sortField: 'firstName', role: 'leader' });
   /** Catálogo completo (unas decenas de filas): el calendario puede navegar a cualquier mes. */
@@ -156,7 +157,7 @@ function EditEntryForm({
   const { data: entriesForDate } = useHourEntriesList({ userId: entry.user.id, dateFrom: date, dateTo: date, pageSize: 100 });
 
   // El proyecto guardado puede no venir en la lista (p. ej. ya no está asignado
-  // al autor): se agrega para que el combobox lo siga mostrando.
+  // al autor, o ya se finalizó): se agrega para que el combobox lo siga mostrando.
   const projects = useMemo(() => {
     const items = projectsData?.items ?? [];
     if (!entry.project || items.some((p) => p.id === entry.project?.id)) return items;
@@ -164,7 +165,7 @@ function EditEntryForm({
   }, [projectsData, entry.project]);
 
   const holiday = holidaysForDate?.[0] ?? null;
-  const blockingMessage = !isInCurrentMonth(date)
+  const blockingMessage = !canEditAnyMonth(user?.role) && !isInCurrentMonth(date)
     ? OUTSIDE_CURRENT_MONTH_MESSAGE
     : isWeekend(date)
       ? 'No se puede registrar horas en fines de semana.'

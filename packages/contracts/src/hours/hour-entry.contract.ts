@@ -213,13 +213,26 @@ export const capacityReportSortFieldSchema = z.enum([
 ]);
 export type CapacityReportSortField = z.infer<typeof capacityReportSortFieldSchema>;
 
-export const listCapacityReportQuerySchema = paginationQuerySchema.extend({
-  search: z.string().trim().max(120).optional(),
-  /** Cualquier día del mes a reportar; se normaliza al primer día del mes. */
-  periodStart: z.iso.date(),
-  sortField: capacityReportSortFieldSchema.default('periodDate'),
-  sortDirection: sortDirectionSchema.default('desc'),
-});
+/** Tope del rango de Capacity: un año alcanza para cualquier revisión y acota cuántas horas se cargan en memoria. */
+export const CAPACITY_REPORT_MAX_RANGE_DAYS = 366;
+
+export const listCapacityReportQuerySchema = paginationQuerySchema
+  .extend({
+    search: z.string().trim().max(120).optional(),
+    /** Rango de fechas del registro (inclusive), `yyyy-mm-dd`. Puede abarcar varios meses. */
+    dateFrom: z.iso.date(),
+    dateTo: z.iso.date(),
+    sortField: capacityReportSortFieldSchema.default('periodDate'),
+    sortDirection: sortDirectionSchema.default('desc'),
+  })
+  .refine((data) => data.dateFrom <= data.dateTo, {
+    message: 'La fecha de inicio no puede ser posterior a la fecha de fin.',
+    path: ['dateTo'],
+  })
+  .refine(
+    (data) => (Date.parse(data.dateTo) - Date.parse(data.dateFrom)) / 86_400_000 < CAPACITY_REPORT_MAX_RANGE_DAYS,
+    { message: `El rango no puede superar ${CAPACITY_REPORT_MAX_RANGE_DAYS} días.`, path: ['dateTo'] },
+  );
 export type ListCapacityReportQuery = z.infer<typeof listCapacityReportQuerySchema>;
 
 export const listCapacityReportResponseSchema = pageSchema(capacityReportRowSchema);

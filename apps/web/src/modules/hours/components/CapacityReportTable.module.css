@@ -53,6 +53,10 @@
   width: 220px;
 }
 
+.date {
+  width: 180px;
+}
+
 @media (max-width: 640px) {
   .header {
     flex-direction: column;
@@ -70,8 +74,15 @@
   }
 
   .search,
-  .period {
+  .period,
+  .date {
     max-width: none;
     width: 100%;
   }
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--kora-space-1);
 }

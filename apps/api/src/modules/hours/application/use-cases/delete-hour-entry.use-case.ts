@@ -18,8 +18,8 @@ export interface DeleteHourEntryCommand {
 /**
  * El dueño o un admin/PMO borran un registro pendiente o rechazado. Uno aprobado
  * ya cuenta en el consumo del proyecto: solo lo borra quien puede aprobarlo
- * (incluye admin/PMO), y el consumo se recalcula sin él. Para todos, solo
- * dentro del mes en curso.
+ * (incluye admin/PMO), y el consumo se recalcula sin él. Salvo admin/PMO (que
+ * eliminan cualquier registro), solo dentro del mes en curso.
  */
 @Injectable()
 export class DeleteHourEntryUseCase implements UseCase<DeleteHourEntryCommand, void, ApplicationError> {
@@ -37,14 +37,15 @@ export class DeleteHourEntryUseCase implements UseCase<DeleteHourEntryCommand, v
     if (!entry) return err(new HourEntryNotFoundError(entryId));
 
     const isOwner = entry.userId === actor.userId;
+    const isAdminLike = actorRole === 'admin' || actorRole === 'pmo';
     const wasApproved = entry.status === 'approved';
     const canDelete = wasApproved
       ? await this.authority.canDecide(actor.userId, actorRole, entry)
-      : isOwner || actorRole === 'admin' || actorRole === 'pmo';
+      : isOwner || isAdminLike;
     if (!canDelete) {
       return err(new ForbiddenError('No puedes eliminar este registro.', 'HOUR_ENTRY_CANNOT_DELETE'));
     }
-    if (!isInCurrentMonth(entry.date, this.clock.now())) return err(new HourEntryOutsideCurrentMonthError());
+    if (!isAdminLike && !isInCurrentMonth(entry.date, this.clock.now())) return err(new HourEntryOutsideCurrentMonthError());
 
     await this.entries.delete(entryId);
 

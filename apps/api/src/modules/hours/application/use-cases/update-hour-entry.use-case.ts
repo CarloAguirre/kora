@@ -6,6 +6,7 @@ import {
   HourEntryOutsideCurrentMonthError,
   InvalidDesignatedApproverError,
   ModuleNotInProjectError,
+  ProjectClosedError,
   ProjectOvertimeNotAllowedError,
   ProjectStoppedError,
   ReferencedModuleNotFoundError,
@@ -30,7 +31,8 @@ export interface UpdateHourEntryCommand {
  * Editan: el dueño o un admin/PMO (pendiente/rechazado) y quien debe aprobarlo
  * (pendiente). Un registro aprobado solo lo corrige quien puede aprobarlo
  * (incluye admin/PMO) — desde el "Historial Reciente" del líder — y sigue aprobado.
- * Para todos, solo dentro del mes en curso (y sin mover el registro a otro mes).
+ * Salvo admin/PMO (que editan cualquier registro), solo dentro del mes en curso
+ * (y sin mover el registro a otro mes).
  */
 @Injectable()
 export class UpdateHourEntryUseCase implements UseCase<UpdateHourEntryCommand, void, ApplicationError> {
@@ -60,7 +62,7 @@ export class UpdateHourEntryUseCase implements UseCase<UpdateHourEntryCommand, v
     }
 
     const now = this.clock.now();
-    if (!isInCurrentMonth(entry.date, now) || (data.date && !isInCurrentMonth(new Date(data.date), now))) {
+    if (!isAdminLike && (!isInCurrentMonth(entry.date, now) || (data.date && !isInCurrentMonth(new Date(data.date), now)))) {
       return err(new HourEntryOutsideCurrentMonthError());
     }
 
@@ -74,7 +76,12 @@ export class UpdateHourEntryUseCase implements UseCase<UpdateHourEntryCommand, v
     if (data.projectId) {
       const project = await this.projects.findById(data.projectId);
       if (!project) return err(new ReferencedProjectNotFoundError(data.projectId));
-      if (project.status === 'on_hold') return err(new ProjectStoppedError());
+      // Detenido/finalizado solo impide MOVER horas a ese proyecto: las que ya
+      // tenía se siguen pudiendo corregir.
+      if (data.projectId !== previousProjectId) {
+        if (project.status === 'on_hold') return err(new ProjectStoppedError());
+        if (project.status === 'finished' || project.status === 'cancelled') return err(new ProjectClosedError());
+      }
       if (isOvertime && !project.allowsOvertime) return err(new ProjectOvertimeNotAllowedError());
     } else if (data.isOvertime === true && !entry.isOvertime && projectId) {
       // Solo al MARCAR como extra: un registro que ya nació extra (p. ej. el

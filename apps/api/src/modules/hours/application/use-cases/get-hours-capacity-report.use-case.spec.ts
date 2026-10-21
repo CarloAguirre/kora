@@ -47,7 +47,7 @@ function buildItem(overrides: Partial<HourEntryListItem>): HourEntryListItem {
 }
 
 function buildQuery(overrides: Partial<ListCapacityReportQuery> = {}): ListCapacityReportQuery {
-  return { page: 1, pageSize: 25, periodStart: '2026-08-01', sortField: 'periodDate', sortDirection: 'desc', ...overrides };
+  return { page: 1, pageSize: 25, dateFrom: '2026-08-01', dateTo: '2026-08-31', sortField: 'periodDate', sortDirection: 'desc', ...overrides };
 }
 
 describe('GetHoursCapacityReportUseCase', () => {
@@ -91,7 +91,7 @@ describe('GetHoursCapacityReportUseCase', () => {
     expect(typeById.get('no-project')).toBe('Vacaciones');
   });
 
-  it('solo trae horas aprobadas del mes pedido', async () => {
+  it('solo trae horas aprobadas del rango pedido', async () => {
     const entries = new InMemoryHourEntryRepository().seed(
       buildItem({ id: 'in-month', date: new Date('2026-08-15T00:00:00.000Z'), status: 'approved' }),
       buildItem({ id: 'pending', date: new Date('2026-08-15T00:00:00.000Z'), status: 'pending' }),
@@ -99,11 +99,44 @@ describe('GetHoursCapacityReportUseCase', () => {
     );
     const useCase = new GetHoursCapacityReportUseCase(entries, fakeHolidayReader());
 
-    const result = await useCase.execute({ query: buildQuery({ periodStart: '2026-08-05' }) });
+    const result = await useCase.execute({ query: buildQuery() });
 
     expect(result.isOk()).toBe(true);
     if (!result.isOk()) return;
     expect(result.value.items.map((row) => row.id)).toEqual(['in-month']);
+  });
+
+  it('con un rango parcial, el % de dedicación usa solo los días hábiles del rango', async () => {
+    // 3 al 7 de agosto 2026: 5 días hábiles => 40 horas laborales; 20h => 50%.
+    const entries = new InMemoryHourEntryRepository().seed(
+      buildItem({ id: 'in-range', hours: 20, date: new Date('2026-08-04T00:00:00.000Z') }),
+      buildItem({ id: 'out-of-range', hours: 8, date: new Date('2026-08-10T00:00:00.000Z') }),
+    );
+    const useCase = new GetHoursCapacityReportUseCase(entries, fakeHolidayReader());
+
+    const result = await useCase.execute({ query: buildQuery({ dateFrom: '2026-08-03', dateTo: '2026-08-07' }) });
+
+    expect(result.isOk()).toBe(true);
+    if (!result.isOk()) return;
+    expect(result.value.items.map((row) => row.id)).toEqual(['in-range']);
+    expect(result.value.items[0]?.dedicationPercent).toBe(50);
+  });
+
+  it('un rango de varios meses calcula el % de dedicación por mes', async () => {
+    // Agosto 2026: 21 días hábiles => 168h; 84h => 50%. Septiembre 2026: 22 días hábiles => 176h; 44h => 25%.
+    const entries = new InMemoryHourEntryRepository().seed(
+      buildItem({ id: 'aug', hours: 84, date: new Date('2026-08-03T00:00:00.000Z') }),
+      buildItem({ id: 'sep', hours: 44, date: new Date('2026-09-07T00:00:00.000Z') }),
+    );
+    const useCase = new GetHoursCapacityReportUseCase(entries, fakeHolidayReader());
+
+    const result = await useCase.execute({ query: buildQuery({ dateFrom: '2026-08-01', dateTo: '2026-09-30' }) });
+
+    expect(result.isOk()).toBe(true);
+    if (!result.isOk()) return;
+    const percentById = new Map(result.value.items.map((row) => [row.id, row.dedicationPercent]));
+    expect(percentById.get('aug')).toBe(50);
+    expect(percentById.get('sep')).toBe(25);
   });
 
   it('no cuenta horas extra: ni como filas ni en el % de dedicación', async () => {

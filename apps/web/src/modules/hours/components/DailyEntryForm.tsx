@@ -127,11 +127,13 @@ export function DailyEntryForm({
   const { user } = useAuth();
   const createEntry = useCreateHourEntry();
   // El PMO puede registrar horas en cualquier proyecto; el resto solo en los que tiene asignados.
+  // Solo proyectos activos: en uno finalizado ya no se cargan horas.
   const { data: projects } = useProjectsList({
     page: 1,
     pageSize: 200,
     sortField: 'name',
     assignedToUserId: user?.role === 'pmo' ? undefined : user?.id,
+    status: ['active'],
   });
   const { data: leaders } = useUsersList({ page: 1, pageSize: 200, sortField: 'firstName', role: 'leader' });
 

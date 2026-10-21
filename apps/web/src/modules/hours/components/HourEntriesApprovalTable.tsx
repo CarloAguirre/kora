@@ -22,7 +22,8 @@ import {
   type BulkDecisionResult,
 } from '../api/hours.queries';
 import { resolvedApprover } from '../lib/approver';
-import { isInCurrentMonth } from '../lib/edit-window';
+import { canEditAnyMonth, isInCurrentMonth } from '../lib/edit-window';
+import { useAuth } from '@/modules/auth/hooks/useAuth';
 
 const formatDate = (value: string) => new Date(`${value}T00:00:00`).toLocaleDateString('es-CL', { weekday: 'short', day: '2-digit', month: 'short' });
 const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 2 });
@@ -69,6 +70,7 @@ export function HourEntriesApprovalTable({
   showTeamColumn?: boolean;
   groupByUser?: boolean;
 }) {
+  const { user } = useAuth();
   const toast = useToast();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [collapsedLeaders, setCollapsedLeaders] = useState<Set<string>>(new Set());
@@ -298,7 +300,7 @@ export function HourEntriesApprovalTable({
           <DropdownMenu
             items={[
               { key: 'ver', label: 'Ver detalle', onSelect: () => setViewing(entry) },
-              ...(isInCurrentMonth(entry.date) ? [{ key: 'editar', label: 'Editar', onSelect: () => setEditing(entry) }] : []),
+              ...(canEditAnyMonth(user?.role) || isInCurrentMonth(entry.date) ? [{ key: 'editar', label: 'Editar', onSelect: () => setEditing(entry) }] : []),
               { key: 'aprobar', label: 'Aprobar', tone: 'success', onSelect: () => void approveOne(entry) },
               {
                 key: 'rechazar',

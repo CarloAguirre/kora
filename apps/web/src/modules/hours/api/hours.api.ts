@@ -60,7 +60,8 @@ export const hoursApi = {
       page: query.page,
       pageSize: query.pageSize,
       search: query.search || undefined,
-      periodStart: query.periodStart,
+      dateFrom: query.dateFrom,
+      dateTo: query.dateTo,
       sortField: query.sortField,
       sortDirection: query.sortDirection,
     });

@@ -12,7 +12,7 @@ import { HourEntryStatusBadge } from './HourEntryStatusBadge';
 import { HourEntryFormDialog } from './HourEntryFormDialog';
 import { useDeleteHourEntry, useHourEntriesList } from '../api/hours.queries';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
-import { isInCurrentMonth } from '../lib/edit-window';
+import { canEditAnyMonth, isInCurrentMonth } from '../lib/edit-window';
 
 const STATUS_OPTIONS = HOUR_ENTRY_STATUSES.map((status) => ({ value: status, label: HOUR_ENTRY_STATUS_LABELS[status] }));
 const formatDate = (value: string) => new Date(`${value}T00:00:00`).toLocaleDateString('es-CL');
@@ -76,7 +76,7 @@ export function MyHourEntriesPanel() {
       align: 'right',
       width: '90px',
       render: (e) =>
-        e.status !== 'approved' && isInCurrentMonth(e.date) ? (
+        canEditAnyMonth(user?.role) || (e.status !== 'approved' && isInCurrentMonth(e.date)) ? (
           <div className={styles.actions}>
             <Button variant="ghost" size="icon" onClick={() => setDialog({ kind: 'form', entry: e })} aria-label="Editar" title="Editar">
               <PencilIcon size={16} />
