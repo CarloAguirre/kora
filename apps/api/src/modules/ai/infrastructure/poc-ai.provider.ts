@@ -4,6 +4,7 @@ import type { AiProvider, AiStructuredRequest } from '../application/ports/ai-pr
 interface EstimationPocContext {
   projectName?: string;
   clientName?: string | null;
+  answers?: readonly unknown[];
 }
 
 /**
@@ -16,11 +17,63 @@ interface EstimationPocContext {
 @Injectable()
 export class PocAiProvider implements AiProvider {
   async generateStructured(input: AiStructuredRequest): Promise<unknown> {
+    const context = (input.context ?? {}) as EstimationPocContext;
+
+    if (input.task === 'estimation.poc.analysis') {
+      return {
+        summary:
+          `Análisis preliminar PoC de ${context.projectName ?? 'el proyecto'}. ` +
+          'En el flujo real esta etapa leerá los antecedentes de Drive, consolidará el contexto y formulará solo las aclaraciones que cambien materialmente la estimación.',
+        detectedDocuments: [],
+        dynamicQuestions: [
+          {
+            id: 'D01',
+            kind: 'dynamic',
+            category: 'Integraciones',
+            question: '¿Las integraciones principales ya cuentan con API documentada y ambiente de prueba?',
+            reason: 'La ausencia de una API disponible puede agregar una capa de integración y aumentar el esfuerzo.',
+            impact: 'high',
+            answerType: 'single_choice',
+            options: [
+              { value: 'yes', label: 'Sí, están disponibles' },
+              { value: 'partial', label: 'Solo algunas' },
+              { value: 'no', label: 'No / aún no se confirma' },
+            ],
+            required: true,
+            canPrefill: false,
+            confidence: 'low',
+            priorityScore: 3,
+            sourceRefs: [],
+            dependsOn: [],
+          },
+          {
+            id: 'D02',
+            kind: 'dynamic',
+            category: 'Datos',
+            question: '¿Se requiere migrar o normalizar información histórica?',
+            reason: 'Una carga histórica puede agregar ETL, homologación y pruebas de conciliación.',
+            impact: 'medium',
+            answerType: 'single_choice',
+            options: [
+              { value: 'no', label: 'No' },
+              { value: 'yes_clean', label: 'Sí, datos ya preparados' },
+              { value: 'yes_dirty', label: 'Sí, requieren limpieza/homologación' },
+            ],
+            required: true,
+            canPrefill: false,
+            confidence: 'low',
+            priorityScore: 2,
+            sourceRefs: [],
+            dependsOn: [],
+          },
+        ],
+      };
+    }
+
     if (input.task !== 'estimation.poc.proposal') {
       throw new Error(`PoC AI provider does not support task: ${input.task}`);
     }
 
-    const context = (input.context ?? {}) as EstimationPocContext;
     const hayIa = /\b(ia|ai|inteligencia|llm|agente)\b/i.test(
       `${context.projectName ?? ''} ${input.instructions ?? ''}`,
     );
@@ -73,18 +126,16 @@ export class PocAiProvider implements AiProvider {
     ];
 
     return {
-      summary: `Propuesta PoC para ${context.projectName ?? 'el proyecto'}${context.clientName ? ` de ${context.clientName}` : ''}. La estructura demuestra el flujo de Calculadora consumiendo un módulo IA desacoplado.`,
+      summary:
+        `Propuesta PoC para ${context.projectName ?? 'el proyecto'}${context.clientName ? ` de ${context.clientName}` : ''}. ` +
+        `Se recibieron ${context.answers?.length ?? 0} respuestas de aclaración antes de estimar.`,
       roles,
       assumptions: [
         'Se reutilizan autenticación, proyectos, permisos, layout y componentes existentes de Kora.',
         'La PoC no descarga ni interpreta todavía los archivos de Drive.',
         'Los cálculos de HH se realizan fuera del proveedor IA.',
       ],
-      clarifyingQuestions: [
-        '¿El alcance corresponde a un MVP, una fase específica o la solución completa?',
-        '¿Existe una fecha objetivo que condicione la cantidad de personas en paralelo?',
-        '¿Las integraciones mencionadas disponen de APIs y ambientes de prueba?',
-      ],
+      clarifyingQuestions: [],
     };
   }
 }
