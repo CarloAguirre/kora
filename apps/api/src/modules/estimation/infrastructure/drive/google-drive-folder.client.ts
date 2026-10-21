@@ -4,11 +4,16 @@ import { AppConfigService } from '../../../../config/app-config.service';
 import type {
   DriveFolderClient,
   DriveFolderFile,
+  DriveFolderItem,
+  DriveFolderMetadata,
 } from '../../application/ports/drive-folder-client.port';
 
 const TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token';
 const DRIVE_FILES_ENDPOINT = 'https://www.googleapis.com/drive/v3/files';
+const DRIVE_FOLDER_MIME = 'application/vnd.google-apps.folder';
 const DRIVE_READONLY_SCOPE = 'https://www.googleapis.com/auth/drive.readonly';
+const FILE_FIELDS =
+  'id,name,mimeType,modifiedTime,webViewLink,size,parents';
 
 interface GoogleTokenResponse {
   access_token?: string;
@@ -22,6 +27,7 @@ interface GoogleDriveFileResponse {
   modifiedTime?: string;
   webViewLink?: string;
   size?: string;
+  parents?: string[];
 }
 
 interface GoogleDriveListResponse {
@@ -46,55 +52,103 @@ export class GoogleDriveFolderClient implements DriveFolderClient {
   }
 
   async listFiles(folderId: string): Promise<readonly DriveFolderFile[]> {
-    if (!this.isConfigured()) {
-      throw new Error('La integración de Google Drive no está configurada.');
+    const children = await this.listChildren(folderId);
+    return children.filter(
+      (item): item is DriveFolderFile => item.itemType === 'file',
+    );
+  }
+
+  async listChildren(folderId: string): Promise<readonly DriveFolderItem[]> {
+    return this.listByQuery(
+      `'${escapeDriveQueryValue(folderId)}' in parents and trashed = false`,
+      100,
+      'modifiedTime desc',
+    );
+  }
+
+  async searchFolders(
+    terms: readonly string[],
+  ): Promise<readonly DriveFolderItem[]> {
+    const cleanedTerms = [...new Set(terms.map((term) => term.trim()).filter(Boolean))]
+      .slice(0, 4);
+
+    if (cleanedTerms.length === 0) return [];
+
+    const nameFilter = cleanedTerms
+      .map((term) => `name contains '${escapeDriveQueryValue(term)}'`)
+      .join(' or ');
+
+    return this.listByQuery(
+      `mimeType = '${DRIVE_FOLDER_MIME}' and trashed = false and (${nameFilter})`,
+      100,
+      'modifiedTime desc',
+    );
+  }
+
+  async getMetadata(fileId: string): Promise<DriveFolderMetadata | null> {
+    this.assertConfigured();
+    const accessToken = await this.getAccessToken();
+    const url = new URL(
+      `${DRIVE_FILES_ENDPOINT}/${encodeURIComponent(fileId)}`,
+    );
+    url.searchParams.set('fields', FILE_FIELDS);
+    url.searchParams.set('supportsAllDrives', 'true');
+
+    const response = await fetch(url, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    if (response.status === 404) return null;
+    if (!response.ok) {
+      throw driveError(response.status);
     }
 
+    const file = (await response.json()) as GoogleDriveFileResponse;
+    if (!isUsableDriveFile(file)) return null;
+
+    return {
+      id: file.id,
+      name: file.name,
+      mimeType: file.mimeType,
+      modifiedAt: file.modifiedTime,
+      webViewLink: file.webViewLink ?? null,
+      parentIds: file.parents ?? [],
+    };
+  }
+
+  private async listByQuery(
+    query: string,
+    pageSize: number,
+    orderBy?: string,
+  ): Promise<readonly DriveFolderItem[]> {
+    this.assertConfigured();
     const accessToken = await this.getAccessToken();
     const url = new URL(DRIVE_FILES_ENDPOINT);
-    url.searchParams.set(
-      'q',
-      `'${folderId}' in parents and trashed = false and mimeType != 'application/vnd.google-apps.folder'`,
-    );
-    url.searchParams.set(
-      'fields',
-      'files(id,name,mimeType,modifiedTime,webViewLink,size)',
-    );
-    url.searchParams.set('orderBy', 'modifiedTime desc');
-    url.searchParams.set('pageSize', '100');
+    url.searchParams.set('q', query);
+    url.searchParams.set('fields', `files(${FILE_FIELDS})`);
+    url.searchParams.set('pageSize', String(pageSize));
     url.searchParams.set('supportsAllDrives', 'true');
     url.searchParams.set('includeItemsFromAllDrives', 'true');
+    if (orderBy) url.searchParams.set('orderBy', orderBy);
 
     const response = await fetch(url, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
 
     if (!response.ok) {
-      throw new Error(
-        response.status === 403
-          ? 'Kora no tiene permiso para leer esta carpeta de Drive.'
-          : `Google Drive rechazó la consulta (HTTP ${response.status}).`,
-      );
+      throw driveError(response.status);
     }
 
     const body = (await response.json()) as GoogleDriveListResponse;
-
     return (body.files ?? [])
-      .filter(
-        (file): file is Required<
-          Pick<GoogleDriveFileResponse, 'id' | 'name' | 'mimeType' | 'modifiedTime'>
-        > &
-          GoogleDriveFileResponse =>
-          Boolean(file.id && file.name && file.mimeType && file.modifiedTime),
-      )
-      .map((file) => ({
-        id: file.id,
-        name: file.name,
-        mimeType: file.mimeType,
-        modifiedAt: file.modifiedTime,
-        webViewLink: file.webViewLink ?? null,
-        sizeBytes: file.size ? Number(file.size) : null,
-      }));
+      .filter(isUsableDriveFile)
+      .map(toDriveFolderItem);
+  }
+
+  private assertConfigured(): void {
+    if (!this.isConfigured()) {
+      throw new Error('La integración de Google Drive no está configurada.');
+    }
   }
 
   private async getAccessToken(): Promise<string> {
@@ -152,6 +206,45 @@ export class GoogleDriveFolderClient implements DriveFolderClient {
     };
     return body.access_token;
   }
+}
+
+function isUsableDriveFile(
+  file: GoogleDriveFileResponse,
+): file is Required<
+  Pick<GoogleDriveFileResponse, 'id' | 'name' | 'mimeType' | 'modifiedTime'>
+> &
+  GoogleDriveFileResponse {
+  return Boolean(file.id && file.name && file.mimeType && file.modifiedTime);
+}
+
+function toDriveFolderItem(
+  file: Required<
+    Pick<GoogleDriveFileResponse, 'id' | 'name' | 'mimeType' | 'modifiedTime'>
+  > &
+    GoogleDriveFileResponse,
+): DriveFolderItem {
+  return {
+    id: file.id,
+    name: file.name,
+    mimeType: file.mimeType,
+    modifiedAt: file.modifiedTime,
+    webViewLink: file.webViewLink ?? null,
+    sizeBytes: file.size ? Number(file.size) : null,
+    itemType: file.mimeType === DRIVE_FOLDER_MIME ? 'folder' : 'file',
+    parentIds: file.parents ?? [],
+  };
+}
+
+function escapeDriveQueryValue(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
+function driveError(status: number): Error {
+  return new Error(
+    status === 403
+      ? 'Kora no tiene permiso para consultar este recurso de Drive.'
+      : `Google Drive rechazó la consulta (HTTP ${status}).`,
+  );
 }
 
 function encodeBase64Url(value: string): string {
