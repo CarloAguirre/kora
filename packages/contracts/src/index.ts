@@ -14,3 +14,5 @@ export * from './tickets/support-invoice.contract';
 export * from './forecast/forecast.contract';
 export * from './dashboard/dashboard.contract';
 export * from './admin/legacy-import.contract';
+
+export * from './estimation/estimation.contract';
