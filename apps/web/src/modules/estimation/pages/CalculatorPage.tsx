@@ -1,28 +1,34 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
 import {
   PROJECT_SALES_STAGE_LABELS,
   PROJECT_STATUS_LABELS,
   type ProjectSummary,
 } from '@kora/contracts';
-import { projectEstimationPath } from '@/app/router/paths';
 import { useProjectsList } from '@/modules/projects/api/projects.queries';
 import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
+import { Button } from '@/shared/components/ui/Button';
 import { Card } from '@/shared/components/ui/Card';
 import { TextField } from '@/shared/components/ui/TextField';
 import { SearchIcon } from '@/shared/components/icons/Icons';
+import { NewEstimationModal } from '../components/NewEstimationModal';
 import styles from './CalculatorPage.module.css';
 
 const formatHours = (value: number) =>
   value.toLocaleString('es-CL', { maximumFractionDigits: 1 });
 
-const isEstimable = (project: ProjectSummary) =>
+const isVisibleProject = (project: ProjectSummary) =>
   project.type === 'development' &&
   (project.salesStage === 'quoted' || project.salesStage === 'approved') &&
   project.status !== 'cancelled';
 
+const isQuotationProspect = (project: ProjectSummary) =>
+  project.type === 'development' &&
+  project.salesStage === 'quoted' &&
+  project.status !== 'cancelled';
+
 export function CalculatorPage() {
   const [search, setSearch] = useState('');
+  const [newEstimationOpen, setNewEstimationOpen] = useState(false);
   const { data, isLoading, error } = useProjectsList({
     type: 'development',
     page: 1,
@@ -31,17 +37,24 @@ export function CalculatorPage() {
     sortDirection: 'desc',
   });
 
+  const sourceProjects = data?.items ?? [];
+
   const projects = useMemo(() => {
     const term = search.trim().toLocaleLowerCase('es-CL');
-    return (data?.items ?? [])
-      .filter(isEstimable)
+    return sourceProjects
+      .filter(isVisibleProject)
       .filter((project) => {
         if (!term) return true;
         return `${project.name} ${project.client?.companyName ?? ''}`
           .toLocaleLowerCase('es-CL')
           .includes(term);
       });
-  }, [data?.items, search]);
+  }, [search, sourceProjects]);
+
+  const prospects = useMemo(
+    () => sourceProjects.filter(isQuotationProspect),
+    [sourceProjects],
+  );
 
   return (
     <DashboardLayout title="Calculadora">
@@ -51,11 +64,14 @@ export function CalculatorPage() {
             <span className={styles.eyebrow}>Estimación de proyectos</span>
             <h1>Calculadora</h1>
             <p>
-              Estima HH, equipo y supuestos para proyectos de desarrollo. La PoC reutiliza los
-              proyectos reales de Kora y replica el flujo principal del prototipo HTML.
+              Estima las HH de cada rol para prospectos en cotización y mantén visibles los
+              proyectos vigentes como referencia.
             </p>
           </div>
-          <span className={styles.pocBadge}>PoC</span>
+          <div className={styles.headerActions}>
+            <span className={styles.pocBadge}>PoC</span>
+            <Button onClick={() => setNewEstimationOpen(true)}>+ Nueva estimación</Button>
+          </div>
         </header>
 
         <Card className={styles.toolbar}>
@@ -65,10 +81,10 @@ export function CalculatorPage() {
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Buscar por cliente o proyecto"
             iconLeft={<SearchIcon size={16} />}
-            aria-label="Buscar proyectos para estimar"
+            aria-label="Buscar proyectos"
           />
           <div className={styles.toolbarNote}>
-            Se muestran proyectos en <strong>Cotización</strong> o <strong>Aprobado</strong>.
+            La creación de una estimación parte siempre desde <strong>+ Nueva estimación</strong>.
           </div>
         </Card>
 
@@ -90,7 +106,6 @@ export function CalculatorPage() {
                     <th>Estado</th>
                     <th className={styles.numeric}>HH actuales</th>
                     <th>Líder</th>
-                    <th aria-label="Acciones" />
                   </tr>
                 </thead>
                 <tbody>
@@ -115,11 +130,6 @@ export function CalculatorPage() {
                       <td>{PROJECT_STATUS_LABELS[project.status]}</td>
                       <td className={styles.numeric}>{formatHours(project.soldHours)}</td>
                       <td>{project.leader?.fullName ?? 'Sin asignar'}</td>
-                      <td className={styles.actionCell}>
-                        <Link className={styles.actionLink} to={projectEstimationPath(project)}>
-                          Estimar
-                        </Link>
-                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -128,6 +138,12 @@ export function CalculatorPage() {
           )}
         </Card>
       </div>
+
+      <NewEstimationModal
+        open={newEstimationOpen}
+        prospects={prospects}
+        onClose={() => setNewEstimationOpen(false)}
+      />
     </DashboardLayout>
   );
 }
