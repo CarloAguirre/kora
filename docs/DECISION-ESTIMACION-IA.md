@@ -1035,3 +1035,123 @@ Se mantiene del HTML de referencia:
 La opción "Copiar una estimación existente" permanece visible como futura
 capacidad, pero está deshabilitada en la PoC mientras no exista persistencia
 del historial/versionado de estimaciones.
+
+
+## Integración Drive · listado de antecedentes en Nueva estimación
+
+Se implementó el primer acceso real a Google Drive para que el modal
+`+ Nueva estimación` pueda mostrar los archivos del levantamiento antes de
+incorporar IA.
+
+### Fuente del enlace
+
+Kora ya almacena `project.documentationLink`. El modal reutiliza ese campo y,
+cuando contiene una carpeta de Google Drive, intenta listar sus archivos.
+
+No se creó un segundo campo permanente para la Calculadora.
+
+### Flujo actual
+
+```text
+Prospecto en Kora
+   │
+   └── documentationLink
+          │
+          ▼
++ Nueva estimación
+          │
+          ▼
+POST /api/estimations/drive/files
+          │
+          ▼
+GoogleDriveFolderClient
+          │
+          ▼
+Google Drive API v3
+          │
+          ▼
+nombre + tipo + fecha modificación + link
+```
+
+La vista muestra los archivos directamente debajo del enlace de Drive, siguiendo
+el prototipo de Calculadora. La lectura de contenido todavía no forma parte de
+este bloque.
+
+### Autenticación elegida
+
+El acceso a Drive es server-to-server mediante una **cuenta de servicio de
+Google** y scope de solo lectura:
+
+```text
+https://www.googleapis.com/auth/drive.readonly
+```
+
+Variables opcionales:
+
+```text
+GOOGLE_DRIVE_CLIENT_EMAIL
+GOOGLE_DRIVE_PRIVATE_KEY
+```
+
+La carpeta del proyecto debe compartirse con `GOOGLE_DRIVE_CLIENT_EMAIL`.
+
+Se eligió una cuenta de servicio en lugar de reutilizar el login Google actual
+porque el OAuth de autenticación de Kora solo solicita:
+
+```text
+openid email profile
+```
+
+y no persiste refresh/access tokens de Drive.
+
+### Comportamiento sin configuración
+
+Las variables son opcionales para no romper ambientes existentes.
+
+Si no están configuradas:
+
+- la API sigue iniciando normalmente;
+- el modal conserva el enlace del proyecto;
+- muestra el estado "Drive no configurado";
+- no simula archivos.
+
+Si las credenciales existen pero la carpeta no fue compartida con la cuenta de
+servicio, el modal informa que Kora no tiene permisos.
+
+### Alcance de esta primera iteración
+
+Incluido:
+
+- detectar el ID de carpeta desde una URL de Drive;
+- obtener token OAuth server-to-server con JWT firmado;
+- cachear temporalmente el access token;
+- listar hasta 100 archivos directos;
+- soportar carpetas accesibles en My Drive o Shared Drives;
+- excluir subcarpetas;
+- clasificar visualmente documentos, hojas, presentaciones, PDF, imágenes y
+  otros;
+- mostrar fecha relativa y enlace de apertura del archivo.
+
+Pendiente para el bloque IA:
+
+- recorrer subcarpetas;
+- descargar archivos binarios;
+- exportar Google Docs/Sheets/Slides;
+- extracción de texto;
+- generar requisitos/HU/contexto técnico/gaps;
+- escribir predocumentos y EDT en la carpeta;
+- snapshots/versionado de las fuentes.
+
+### Boundary técnico
+
+El acceso se mantiene detrás de:
+
+```text
+DRIVE_FOLDER_CLIENT
+        │
+        └── GoogleDriveFolderClient
+```
+
+La futura lectura de contenido seguirá utilizando `DocumentSourceReader`, por
+lo que listar metadatos en el modal no obliga a mezclar Drive con la lógica de
+análisis IA.
