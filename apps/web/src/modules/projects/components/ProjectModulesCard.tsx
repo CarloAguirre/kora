@@ -25,6 +25,7 @@ import { ApiRequestError } from '@/shared/lib/api-client';
 import { PhaseRoadmap, type PhaseRoadmapSelection } from '@/modules/client-portal/components/PhaseRoadmap';
 import { roleFromTeamName, toPhaseRoadmap } from '@/modules/client-portal/adapters/project-detail.adapter';
 import { PHASE_ROADMAP_ROLE_COLORS } from '@/modules/client-portal/types';
+import { useHolidays } from '@/modules/hours/api/hours.queries';
 import { useUpdateProjectModule, useUpdateProjectModuleSegment } from '../api/projects.queries';
 import {
   EMPTY_EXECUTION_SEGMENT_MODAL_VALUES,
@@ -47,9 +48,17 @@ const today = () => {
 };
 const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`;
 
-/** Días corridos entre dos fechas ISO, inclusive. */
-const calendarDays = (start: string, end: string) =>
-  Math.round((parseDate(end).getTime() - parseDate(start).getTime()) / DAY_MS) + 1;
+/** Días hábiles (lunes-viernes, sin feriados) entre dos fechas ISO, inclusive. */
+function businessDays(start: string, end: string, holidays: ReadonlySet<string>): number {
+  if (!start || !end || start > end) return 0;
+  let count = 0;
+  const last = new Date(`${end}T00:00:00Z`);
+  for (const day = new Date(`${start}T00:00:00Z`); day <= last; day.setUTCDate(day.getUTCDate() + 1)) {
+    const weekday = day.getUTCDay();
+    if (weekday !== 0 && weekday !== 6 && !holidays.has(day.toISOString().slice(0, 10))) count += 1;
+  }
+  return count;
+}
 
 /** Color del equipo — el mismo que el Roadmap (`PHASE_ROADMAP_ROLE_COLORS`, Figma), no el de `getTeamStyle`. */
 const teamColor = (teamName: string | null) => PHASE_ROADMAP_ROLE_COLORS[roleFromTeamName(teamName)];
@@ -308,7 +317,8 @@ function Description({ text }: { text: string | null }) {
 
 function SegmentDetail({ segment, onClose, onEdit }: { segment: ProjectModuleSegment; onClose: () => void; onEdit?: () => void }) {
   const state = segmentState(segment);
-  const days = calendarDays(segment.startDate, segment.endDate);
+  const { data: holidays } = useHolidays({ dateFrom: segment.startDate, dateTo: segment.endDate });
+  const days = businessDays(segment.startDate, segment.endDate, new Set((holidays ?? []).map((holiday) => holiday.date)));
   return (
     <DetailPanel
       eyebrow="Tiempo de ejecución"
@@ -322,7 +332,7 @@ function SegmentDetail({ segment, onClose, onEdit }: { segment: ProjectModuleSeg
       <Facts>
         <Fact label="Inicio" value={formatDate(segment.startDate)} />
         <Fact label="Término" value={formatDate(segment.endDate)} />
-        <Fact label="Duración" value={plural(days, 'día')} />
+        <Fact label="Duración" value={`${plural(days, 'día')} ${days === 1 ? 'hábil' : 'hábiles'}`} />
         <Fact label="Colaboradores" value={segment.members.length > 0 ? String(segment.members.length) : 'Sin asignar'} />
       </Facts>
       {segment.members.length > 0 && (
