@@ -322,3 +322,48 @@ export const estimationPocAnalysisSchema = z.object({
   dynamicQuestions: z.array(estimationQuestionSchema).max(5).default([]),
 });
 export type EstimationPocAnalysis = z.infer<typeof estimationPocAnalysisSchema>;
+
+
+export const listEstimationDriveFilesSchema = z.object({
+  driveFolderUrl: z
+    .url({ message: 'La carpeta de Drive no tiene un formato válido.' })
+    .refine((value) => {
+      try {
+        return new URL(value).hostname === 'drive.google.com';
+      } catch {
+        return false;
+      }
+    }, 'La URL debe pertenecer a drive.google.com.'),
+});
+export type ListEstimationDriveFilesInput = z.infer<typeof listEstimationDriveFilesSchema>;
+
+export const ESTIMATION_DRIVE_FILE_KINDS = [
+  'document',
+  'spreadsheet',
+  'presentation',
+  'pdf',
+  'image',
+  'other',
+] as const;
+export const estimationDriveFileKindSchema = z.enum(ESTIMATION_DRIVE_FILE_KINDS);
+export type EstimationDriveFileKind = z.infer<typeof estimationDriveFileKindSchema>;
+
+export const estimationDriveFileSchema = z.object({
+  id: z.string().trim().min(1),
+  name: nonEmptyTrimmed(500, 'El nombre del archivo'),
+  mimeType: z.string().trim().min(1),
+  kind: estimationDriveFileKindSchema,
+  modifiedAt: isoDateTimeSchema,
+  webViewLink: z.url().nullish(),
+  sizeBytes: z.number().int().min(0).nullish(),
+});
+export type EstimationDriveFile = z.infer<typeof estimationDriveFileSchema>;
+
+export const estimationDriveFolderListingSchema = z.object({
+  folderId: z.string().trim().min(1),
+  folderUrl: z.url(),
+  connection: z.enum(['connected', 'not_configured', 'unavailable']),
+  files: z.array(estimationDriveFileSchema).default([]),
+  message: z.string().trim().max(1000).nullish(),
+});
+export type EstimationDriveFolderListing = z.infer<typeof estimationDriveFolderListingSchema>;
