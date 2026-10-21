@@ -840,3 +840,128 @@ Esta decisión evita fijar un modelo físico prematuramente.
 6. Renderizar resumen de entendimiento + preguntas dinámicas.
 7. Recién entonces conectar el CTA "Estimar con IA" del paso Estimación de
    `NewProjectPage`.
+
+
+## PoC de Calculadora · Separación Calculadora / IA
+
+Se implementó una PoC navegable basada en el prototipo HTML de Calculadora.
+
+### Boundary acordado
+
+La Calculadora es un dominio de negocio y **no debe contener directamente el
+SDK ni la implementación de un proveedor LLM**.
+
+La composición actual queda:
+
+```text
+apps/web
+  Calculadora / estimation
+        │
+        ▼
+apps/api
+  EstimationModule
+        │
+        ▼
+      AiModule
+        │
+        ▼
+    AI_PROVIDER
+        │
+        ├── PocAiProvider           (PoC actual)
+        └── proveedor real futuro   (OpenAI/Azure OpenAI/etc.)
+```
+
+`AiModule` es una capacidad técnica reutilizable por otros dominios de Kora.
+`EstimationModule` conserva la lógica propia de estimación: contratos,
+preguntas, EDT y cálculos.
+
+### Regla de cálculo
+
+El proveedor IA propone una estructura de roles:
+
+```text
+rol
+unidad
+duración
+HH por unidad
+cantidad de personas
+fuente / explicación
+```
+
+La IA **no entrega el total autoritativo**.
+
+El caso de uso de Calculadora calcula:
+
+```text
+HH rol = duración × HH/unidad × personas
+HH total = suma(HH rol)
+```
+
+Esto prueba desde la PoC la separación "IA propone / motor determinístico
+calcula".
+
+### Alcance funcional de la PoC
+
+Ruta principal:
+
+```text
+/calculadora
+```
+
+La pantalla:
+
+- reutiliza proyectos reales de Kora;
+- muestra proyectos de desarrollo en Cotización/Aprobado;
+- permite buscar por cliente/proyecto;
+- navega al workspace de estimación de un proyecto.
+
+Workspace:
+
+```text
+/proyectos/:projectId/estimacion
+```
+
+Replica elementos centrales del HTML de referencia:
+
+- cliente/proyecto como datos de solo lectura provenientes de Proyectos;
+- carpeta Drive del levantamiento;
+- indicaciones opcionales al agente;
+- acción "Generar propuesta IA";
+- roles, duración, HH/unidad, personas y HH resultantes;
+- trazabilidad/explicación por rol;
+- resumen lateral;
+- supuestos;
+- aclaraciones detectadas;
+- cuestionario mínimo.
+
+### Limitación intencional
+
+`PocAiProvider` es **simulado y determinístico**.
+
+En esta iteración:
+
+- no descarga archivos de Drive;
+- no llama a un LLM externo;
+- no persiste versiones de estimación;
+- no modifica el proyecto;
+- devuelve `documentsAnalyzed = 0`;
+- el frontend lo identifica explícitamente como proveedor simulado.
+
+No se debe presentar esta PoC como análisis real de antecedentes.
+
+### Siguiente vertical slice
+
+El siguiente bloque debe reemplazar solo la parte necesaria detrás de los
+boundaries ya creados:
+
+1. resolver identidad/acceso a Drive;
+2. implementar `DocumentSourceReader`;
+3. descargar/exportar formatos soportados;
+4. implementar proveedor IA real en `AiModule`;
+5. producir contexto normalizado;
+6. generar las preguntas dinámicas desde gaps reales;
+7. persistir versión/snapshot;
+8. conectar el flujo de creación de proyecto con la opción "Estimar con IA".
+
+La UI y los contratos consumidores no deberían requerir una reescritura para
+cambiar `PocAiProvider` por el proveedor real.
