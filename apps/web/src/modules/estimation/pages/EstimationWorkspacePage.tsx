@@ -91,7 +91,7 @@ export function EstimationWorkspacePage() {
   const { project, questionnaire, isLoading } = useEstimationWorkspace(projectId ?? null);
   const analyze = useAnalyzeEstimationPoc();
   const generateProposal = useGenerateEstimationPocProposal();
-  const analysisStarted = useRef(false);
+  const analysisStarted = useRef<string | null>(null);
 
   const driveFolderUrl =
     navigationState.driveFolderUrl?.trim() ||
@@ -106,8 +106,10 @@ export function EstimationWorkspacePage() {
   );
 
   useEffect(() => {
-    if (mode !== 'ai' || !project.data || !driveFolderUrl || analysisStarted.current) return;
-    analysisStarted.current = true;
+    if (mode !== 'ai' || !project.data || !driveFolderUrl) return;
+    const analysisKey = `${project.data.id}::${driveFolderUrl}::${instructions}`;
+    if (analysisStarted.current === analysisKey) return;
+    analysisStarted.current = analysisKey;
     analyze.mutate({
       projectId: project.data.id,
       projectName: project.data.name,
