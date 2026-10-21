@@ -14,6 +14,8 @@ import { useHourEntriesExport } from '../hooks/useHourEntriesExport';
 import { exportCapacityReport } from '../lib/hours-export';
 import { ApiRequestError } from '@/shared/lib/api-client';
 
+const EXPORT_PAGE_SIZE = 200;
+
 const MONTH_LABELS = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
@@ -57,15 +59,20 @@ export function CapacityReportTable() {
     setExportError(null);
     setExporting(true);
     try {
-      const all = await hoursApi.capacityReport({
+      // El contrato limita `pageSize` a 200: se pagina hasta traer el reporte completo.
+      const baseQuery = {
         search: state.query.search,
         periodStart: state.periodStart,
         sortField: state.sort.field,
         sortDirection: state.sort.direction,
-        page: 1,
-        pageSize: 10_000,
-      });
-      exportCapacityReport(all.items, state.periodStart);
+      };
+      const first = await hoursApi.capacityReport({ ...baseQuery, page: 1, pageSize: EXPORT_PAGE_SIZE });
+      const rest = await Promise.all(
+        Array.from({ length: first.pageCount - 1 }, (_, index) =>
+          hoursApi.capacityReport({ ...baseQuery, page: index + 2, pageSize: EXPORT_PAGE_SIZE }),
+        ),
+      );
+      exportCapacityReport([...first.items, ...rest.flatMap((page) => page.items)], state.periodStart);
     } catch (exportErr) {
       setExportError(exportErr instanceof ApiRequestError ? exportErr.message : 'No se pudo generar el Excel.');
     } finally {
