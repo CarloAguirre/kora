@@ -2,7 +2,7 @@
 
 **Estado:** diseño funcional/técnico en curso  
 **Fecha:** 2026-10-21  
-**Rama de documentación:** `docs/estimacion-inteligente`
+**Rama de trabajo:** `feature/calculadora/carlo`
 
 ## Objetivo
 
