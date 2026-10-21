@@ -1,0 +1,93 @@
+.page {
+  display: grid;
+  gap: 20px;
+}
+
+.heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.heading h1 {
+  margin: 4px 0 6px;
+  font-size: 28px;
+}
+
+.heading p,
+.nextCard p {
+  margin: 0;
+  color: var(--kora-text-muted, #667085);
+  line-height: 1.55;
+  max-width: 760px;
+}
+
+.eyebrow {
+  color: var(--kora-text-muted, #667085);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.status {
+  border: 1px solid var(--kora-border, #e5e7eb);
+  border-radius: 999px;
+  padding: 7px 11px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.pipelineCard,
+.nextCard {
+  display: grid;
+  gap: 14px;
+}
+
+.pipelineCard h2,
+.nextCard h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.pipeline {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.pipelineStep {
+  border: 1px solid var(--kora-border, #e5e7eb);
+  border-radius: 12px;
+  padding: 12px;
+  display: grid;
+  gap: 7px;
+}
+
+.pipelineStep span {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--kora-navy, #122235);
+  color: white;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.pipelineStep strong {
+  font-size: 13px;
+}
+
+@media (max-width: 900px) {
+  .pipeline {
+    grid-template-columns: 1fr;
+  }
+
+  .heading {
+    display: grid;
+  }
+}
