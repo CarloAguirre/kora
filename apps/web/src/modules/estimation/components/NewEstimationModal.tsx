@@ -1,13 +1,22 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { EstimationCreationMode, ProjectSummary } from '@kora/contracts';
+import type {
+  EstimationCreationMode,
+  EstimationDriveFolderResolution,
+  EstimationDriveInventory,
+  EstimationDriveInventoryItem,
+  ProjectSummary,
+} from '@kora/contracts';
 import { projectEstimationPath } from '@/app/router/paths';
 import { useProjectDetail } from '@/modules/projects/api/projects.queries';
 import { Button } from '@/shared/components/ui/Button';
 import { Modal } from '@/shared/components/ui/Modal';
 import { Select } from '@/shared/components/ui/Select';
 import { TextField } from '@/shared/components/ui/TextField';
-import { useEstimationDriveFiles } from '../api/estimation.queries';
+import {
+  useEstimationDriveInventory,
+  useResolveEstimationDriveFolder,
+} from '../api/estimation.queries';
 import styles from './NewEstimationModal.module.css';
 
 interface NewEstimationModalProps {
@@ -55,8 +64,25 @@ export function NewEstimationModal({ open, prospects, onClose }: NewEstimationMo
     [projectRef, prospects],
   );
   const detail = useProjectDetail(selected?.slug ?? null);
+
+  const resolutionInput = useMemo(() => {
+    if (!detail.data) return null;
+    return {
+      projectId: detail.data.id,
+      projectName: detail.data.name,
+      clientName: detail.data.client?.companyName ?? null,
+      documentationLink: detail.data.documentationLink,
+      quotationLink: detail.data.quotationLink,
+    };
+  }, [detail.data]);
+
+  const driveResolution = useResolveEstimationDriveFolder(
+    resolutionInput,
+    open && mode === 'ai' && Boolean(selected),
+  );
+
   const driveUrlIsValid = isGoogleDriveFolderUrl(driveFolderUrl);
-  const driveFiles = useEstimationDriveFiles(
+  const driveInventory = useEstimationDriveInventory(
     driveFolderUrl.trim(),
     open && mode === 'ai' && driveUrlIsValid,
   );
@@ -78,9 +104,21 @@ export function NewEstimationModal({ open, prospects, onClose }: NewEstimationMo
       return;
     }
     if (driveTouched) return;
-    const candidate = detail.data?.documentationLink ?? '';
-    setDriveFolderUrl(candidate.includes('drive.google.com') ? candidate : '');
-  }, [detail.data?.documentationLink, driveTouched, selected]);
+
+    const explicit = detail.data?.documentationLink ?? '';
+    if (isGoogleDriveFolderUrl(explicit)) {
+      setDriveFolderUrl(explicit);
+      return;
+    }
+
+    const resolved = driveResolution.data?.selectedFolder?.url ?? '';
+    setDriveFolderUrl(isGoogleDriveFolderUrl(resolved) ? resolved : '');
+  }, [
+    detail.data?.documentationLink,
+    driveResolution.data?.selectedFolder?.url,
+    driveTouched,
+    selected,
+  ]);
 
   const projectOptions = prospects.map((project) => ({
     value: project.slug,
@@ -93,7 +131,7 @@ export function NewEstimationModal({ open, prospects, onClose }: NewEstimationMo
       return;
     }
     if (mode === 'ai' && !driveFolderUrl.trim()) {
-      setError('Vincula la carpeta de Drive del levantamiento para usar el agente IA.');
+      setError('Confirma o vincula la carpeta de Drive del levantamiento para usar el agente IA.');
       return;
     }
 
@@ -105,6 +143,12 @@ export function NewEstimationModal({ open, prospects, onClose }: NewEstimationMo
       },
     });
     onClose();
+  };
+
+  const selectCandidate = (url: string) => {
+    setDriveTouched(true);
+    setDriveFolderUrl(url);
+    setError(null);
   };
 
   return (
@@ -126,6 +170,7 @@ export function NewEstimationModal({ open, prospects, onClose }: NewEstimationMo
         onChange={(event) => {
           setProjectRef(event.target.value);
           setDriveTouched(false);
+          setDriveFolderUrl('');
           setError(null);
         }}
         options={projectOptions}
@@ -183,13 +228,23 @@ export function NewEstimationModal({ open, prospects, onClose }: NewEstimationMo
             placeholder="https://drive.google.com/drive/folders/…"
             helperText={
               detail.isLoading
-                ? 'Buscando carpeta vinculada al proyecto…'
-                : 'Si Kora ya tiene el enlace documental del prospecto, se completa automáticamente.'
+                ? 'Buscando antecedentes del prospecto…'
+                : driveFolderUrl
+                  ? 'Kora usará esta carpeta como fuente documental de la estimación.'
+                  : 'Kora intenta descubrir una carpeta por proyecto/cliente; también puedes pegarla manualmente.'
             }
           />
-          <DriveFilesPreview
-            loading={driveFiles.isLoading || driveFiles.isFetching}
-            listing={driveFiles.data}
+
+          <DriveResolutionPreview
+            loading={driveResolution.isLoading || driveResolution.isFetching}
+            resolution={driveResolution.data}
+            hasSelectedFolder={driveUrlIsValid}
+            onSelect={selectCandidate}
+          />
+
+          <DriveInventoryPreview
+            loading={driveInventory.isLoading || driveInventory.isFetching}
+            inventory={driveInventory.data}
           />
 
           <label className={styles.instructions}>
@@ -208,6 +263,150 @@ export function NewEstimationModal({ open, prospects, onClose }: NewEstimationMo
   );
 }
 
+function DriveResolutionPreview({
+  loading,
+  resolution,
+  hasSelectedFolder,
+  onSelect,
+}: {
+  loading: boolean;
+  resolution: EstimationDriveFolderResolution | undefined;
+  hasSelectedFolder: boolean;
+  onSelect: (url: string) => void;
+}) {
+  if (loading && !hasSelectedFolder) {
+    return <div className={styles.driveStatus}>Buscando carpeta del proyecto en Drive…</div>;
+  }
+
+  if (!resolution || hasSelectedFolder) return null;
+
+  if (resolution.connection !== 'connected') {
+    return <div className={styles.driveWarning}>{resolution.message}</div>;
+  }
+
+  if (resolution.status === 'not_found') {
+    return (
+      <div className={styles.driveWarning}>
+        {resolution.message} Puedes pegar la carpeta manualmente.
+      </div>
+    );
+  }
+
+  if (resolution.candidates.length === 0) return null;
+
+  return (
+    <div className={styles.candidates}>
+      <div className={styles.candidateTitle}>
+        <strong>Carpetas candidatas</strong>
+        <span>Confirma la fuente correcta antes de analizar.</span>
+      </div>
+      {resolution.candidates.slice(0, 4).map((candidate) => (
+        <button
+          key={candidate.folderId}
+          type="button"
+          className={styles.candidate}
+          onClick={() => onSelect(candidate.url)}
+        >
+          <span>
+            <strong>{candidate.name}</strong>
+            {candidate.ancestorNames.length > 0 && (
+              <small>{candidate.ancestorNames.join(' / ')}</small>
+            )}
+          </span>
+          <b>{candidate.score}%</b>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function DriveInventoryPreview({
+  loading,
+  inventory,
+}: {
+  loading: boolean;
+  inventory: EstimationDriveInventory | undefined;
+}) {
+  if (loading) {
+    return <div className={styles.driveStatus}>Inventariando antecedentes…</div>;
+  }
+
+  if (!inventory) return null;
+
+  if (inventory.connection !== 'connected') {
+    return (
+      <div
+        className={
+          inventory.connection === 'not_configured'
+            ? styles.driveWarning
+            : styles.driveError
+        }
+      >
+        {inventory.message}
+      </div>
+    );
+  }
+
+  const visibleItems = inventory.items
+    .filter(
+      (item) =>
+        item.itemType === 'file' &&
+        item.priority !== 'excluded',
+    )
+    .sort((left, right) => priorityRank(left) - priorityRank(right))
+    .slice(0, 8);
+
+  return (
+    <div className={styles.inventory}>
+      <div className={styles.inventorySummary}>
+        <strong>Antecedentes detectados</strong>
+        <span>
+          {inventory.summary.files} archivos · {inventory.summary.recommended} prioritarios
+          {inventory.summary.excluded > 0
+            ? ` · ${inventory.summary.excluded} excluidos`
+            : ''}
+        </span>
+      </div>
+
+      {visibleItems.length === 0 ? (
+        <div className={styles.driveStatus}>
+          No se encontraron archivos utilizables dentro de los primeros niveles de la carpeta.
+        </div>
+      ) : (
+        <div className={styles.driveFiles}>
+          {visibleItems.map((file) => (
+            <div key={file.id} className={styles.driveFile}>
+              <span className={styles.driveFileIcon} aria-hidden="true">
+                {driveFileIcon(file.kind)}
+              </span>
+              <span className={styles.driveFileInfo}>
+                {file.url ? (
+                  <a href={file.url} target="_blank" rel="noreferrer">
+                    {file.name}
+                  </a>
+                ) : (
+                  <span className={styles.driveFileName}>{file.name}</span>
+                )}
+                <small>{file.path}</small>
+              </span>
+              <time dateTime={file.modifiedAt}>{formatRelativeTime(file.modifiedAt)}</time>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {inventory.summary.files > visibleItems.length && (
+        <span className={styles.moreFiles}>
+          + {inventory.summary.files - visibleItems.length} archivos adicionales en el inventario
+        </span>
+      )}
+    </div>
+  );
+}
+
+function priorityRank(item: EstimationDriveInventoryItem): number {
+  return item.priority === 'recommended' ? 0 : 1;
+}
 
 function isGoogleDriveFolderUrl(value: string): boolean {
   if (!value.trim()) return false;
@@ -223,61 +422,9 @@ function isGoogleDriveFolderUrl(value: string): boolean {
   }
 }
 
-function DriveFilesPreview({
-  loading,
-  listing,
-}: {
-  loading: boolean;
-  listing:
-    | import('@kora/contracts').EstimationDriveFolderListing
-    | undefined;
-}) {
-  if (loading) {
-    return <div className={styles.driveStatus}>Leyendo archivos de Drive…</div>;
-  }
-
-  if (!listing) return null;
-
-  if (listing.connection !== 'connected') {
-    return (
-      <div
-        className={
-          listing.connection === 'not_configured'
-            ? styles.driveWarning
-            : styles.driveError
-        }
-      >
-        {listing.message}
-      </div>
-    );
-  }
-
-  if (listing.files.length === 0) {
-    return <div className={styles.driveStatus}>La carpeta no contiene archivos visibles para Kora.</div>;
-  }
-
-  return (
-    <div className={styles.driveFiles} aria-label="Archivos del levantamiento">
-      {listing.files.map((file) => (
-        <div key={file.id} className={styles.driveFile}>
-          <span className={styles.driveFileIcon} aria-hidden="true">
-            {driveFileIcon(file.kind)}
-          </span>
-          {file.webViewLink ? (
-            <a href={file.webViewLink} target="_blank" rel="noreferrer">
-              {file.name}
-            </a>
-          ) : (
-            <span className={styles.driveFileName}>{file.name}</span>
-          )}
-          <time dateTime={file.modifiedAt}>{formatRelativeTime(file.modifiedAt)}</time>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function driveFileIcon(kind: import('@kora/contracts').EstimationDriveFileKind): string {
+function driveFileIcon(
+  kind: EstimationDriveInventoryItem['kind'],
+): string {
   switch (kind) {
     case 'spreadsheet':
       return '📊';
