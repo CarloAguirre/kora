@@ -41,6 +41,12 @@ export const envSchema = z.object({
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   GOOGLE_CALLBACK_URL: z.string().optional(),
 
+  // Integración servidor-a-servidor con Google Drive para los antecedentes de
+  // proyectos. Ambas son opcionales: sin ellas, Calculadora informa que Drive
+  // no está configurado y no intenta acceder a carpetas privadas.
+  GOOGLE_DRIVE_CLIENT_EMAIL: z.email().optional(),
+  GOOGLE_DRIVE_PRIVATE_KEY: z.string().optional(),
+
   // Correo saliente (Resend). Sin RESEND_API_KEY los correos se escriben en el
   // log en vez de enviarse — solo admisible fuera de producción.
   RESEND_API_KEY: z.string().optional(),
