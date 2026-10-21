@@ -99,8 +99,9 @@ const HEALTH_LABEL: Readonly<Record<ClientProjectHealth, string>> = {
   quoted: 'Cotización',
   not_started: 'No iniciado',
   active: 'Activo',
-  at_risk: 'En riesgo',
+  on_hold: 'Detenido',
   finished: 'Finalizado',
+  cancelled: 'Cancelado',
 };
 
 const HEALTH_TONE: Readonly<Record<ClientProjectHealth, StatusPillTone>> = {
@@ -108,8 +109,9 @@ const HEALTH_TONE: Readonly<Record<ClientProjectHealth, StatusPillTone>> = {
   quoted: 'info',
   not_started: 'neutral',
   active: 'success',
-  at_risk: 'warning',
+  on_hold: 'warning',
   finished: 'neutral',
+  cancelled: 'neutral',
 };
 
 const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 1 });

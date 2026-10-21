@@ -18,23 +18,20 @@ export interface ClientCompanyInfo {
 }
 
 /**
- * Estado visual del proyecto para el cliente: combina el ciclo de vida real
- * (`ProjectStatus` en `@kora/contracts`) con una señal de riesgo/salud que hoy
- * no existe como campo propio en el proyecto — de ahí que sea un tipo aparte
+ * Estado del proyecto para el cliente: el ciclo de vida real (`ProjectStatus`
+ * en `@kora/contracts`) más la etapa comercial — de ahí que sea un tipo aparte
  * y no un alias de `ProjectStatus`. `prospect`/`quoted` vienen de la etapa
  * comercial (`salesStage`) y `not_started` de `status: 'draft'`: sin ellos,
  * un proyecto aún no vendido o no iniciado se le mostraba al cliente "Activo".
  */
-export type ClientProjectHealth = 'prospect' | 'quoted' | 'not_started' | 'active' | 'at_risk' | 'finished';
+export type ClientProjectHealth = 'prospect' | 'quoted' | 'not_started' | 'active' | 'on_hold' | 'finished' | 'cancelled';
 
 export interface ClientProjectRow {
   readonly id: string;
   readonly slug?: string | null;
   readonly name: string;
-  /** "Desarrollo" / "Soporte" — `ProjectSummary` no trae equipos ni cantidad de fases para esta fila de lista, a diferencia de `ClientProjectDetail`. */
-  readonly typeLabel: string;
-  readonly kabeliOwnerName: string;
-  readonly clientOwnerName: string;
+  /** Líder del proyecto (`ProjectSummary.leader`) — columna "Líder Kabeli". */
+  readonly leaderName: string;
   readonly startDate: string;
   readonly endDate: string | null;
   readonly health: ClientProjectHealth;

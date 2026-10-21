@@ -21,10 +21,10 @@
   gap: var(--kora-space-3);
 }
 
-.projectCell {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+.search {
+  flex: 0 1 280px;
+  min-width: 200px;
+  margin-left: auto;
 }
 
 .projectLink {
@@ -32,12 +32,6 @@
   font-size: 14.5px;
   font-weight: var(--kora-weight-bold);
   text-decoration: underline;
-}
-
-.projectMeta {
-  font-size: 12px;
-  font-weight: var(--kora-weight-medium);
-  color: #93a0ac;
 }
 
 .contractName {

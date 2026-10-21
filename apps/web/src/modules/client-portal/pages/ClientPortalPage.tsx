@@ -4,8 +4,9 @@ import type { SupportPlanType } from '@kora/contracts';
 import styles from './ClientPortalPage.module.css';
 import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Tabs } from '@/shared/components/ui/Tabs';
+import { TextField } from '@/shared/components/ui/TextField';
 import { KabeliLogo } from '@/shared/components/layout/KabeliLogo';
-import { ChevronLeftIcon } from '@/shared/components/icons/Icons';
+import { ChevronLeftIcon, SearchIcon } from '@/shared/components/icons/Icons';
 import { useClientDetail } from '@/modules/clients/api/clients.queries';
 import { useProjectsList } from '@/modules/projects/api/projects.queries';
 import { useSupportPlansForClient } from '@/modules/projects/api/support-plan.queries';
@@ -37,8 +38,9 @@ const HEALTH_LABEL: Readonly<Record<ClientProjectHealth, string>> = {
   quoted: 'Cotización',
   not_started: 'No iniciado',
   active: 'Activo',
-  at_risk: 'En riesgo',
+  on_hold: 'Detenido',
   finished: 'Finalizado',
+  cancelled: 'Cancelado',
 };
 
 const HEALTH_TONE: Readonly<Record<ClientProjectHealth, StatusPillTone>> = {
@@ -46,8 +48,9 @@ const HEALTH_TONE: Readonly<Record<ClientProjectHealth, StatusPillTone>> = {
   quoted: 'info',
   not_started: 'neutral',
   active: 'success',
-  at_risk: 'warning',
+  on_hold: 'warning',
   finished: 'neutral',
+  cancelled: 'neutral',
 };
 
 const PLAN_TYPE_LABEL: Readonly<Record<SupportPlanType, string>> = {
@@ -120,7 +123,7 @@ export function ClientPortalPage({
         />
 
         {activeTab === 'proyectos' ? (
-          <ClientProjectsSection clientId={clientId} clientOwnerName={company.contactName} getProjectPath={getProjectPath} />
+          <ClientProjectsSection clientId={clientId} getProjectPath={getProjectPath} />
         ) : (
           <ClientSupportSection clientId={clientId} getContractPath={getContractPath} />
         )}
@@ -136,41 +139,35 @@ export function ClientPortalPage({
 
 function ClientProjectsSection({
   clientId,
-  clientOwnerName,
   getProjectPath,
 }: {
   clientId: string | undefined;
-  clientOwnerName: string;
   getProjectPath: (project: ClientProjectRow) => string;
 }) {
   const { data } = useProjectsList({ clientId: clientId ?? undefined, pageSize: 100 });
-  const projects = useMemo(
-    () => (data?.items ?? []).map((project) => toClientProjectRow(project, clientOwnerName)),
-    [data, clientOwnerName],
-  );
+  const projects = useMemo(() => (data?.items ?? []).map(toClientProjectRow), [data]);
+  const [search, setSearch] = useState('');
   const activeCount = projects.filter((p) => p.health === 'active').length;
-  const attentionCount = projects.filter((p) => p.health === 'at_risk').length;
+  const attentionCount = projects.filter((p) => p.health === 'on_hold').length;
+
+  const query = search.trim().toLowerCase();
+  const filtered = query
+    ? projects.filter((p) => p.name.toLowerCase().includes(query) || p.leaderName.toLowerCase().includes(query))
+    : projects;
 
   const columns: PortalTableColumn<ClientProjectRow>[] = [
     {
       key: 'name',
       header: 'Proyecto',
       render: (project) => (
-        <div className={styles.projectCell}>
-          <Link className={styles.projectLink} to={getProjectPath(project)}>
-            {project.name}
-          </Link>
-          <span className={styles.projectMeta}>{project.typeLabel}</span>
-        </div>
+        <Link className={styles.projectLink} to={getProjectPath(project)}>
+          {project.name}
+        </Link>
       ),
     },
-    { key: 'kabeliOwner', header: 'Responsable Kabeli', render: (p) => p.kabeliOwnerName },
-    { key: 'clientOwner', header: 'Responsable cliente', render: (p) => p.clientOwnerName },
-    {
-      key: 'dates',
-      header: 'Inicio – Fin',
-      render: (p) => `${p.startDate} / ${p.endDate ?? '--'}`,
-    },
+    { key: 'leader', header: 'Líder Kabeli', render: (p) => p.leaderName },
+    { key: 'startDate', header: 'Inicio', render: (p) => p.startDate },
+    { key: 'endDate', header: 'Fin', render: (p) => p.endDate ?? '--' },
     {
       key: 'health',
       header: 'Estado',
@@ -196,9 +193,18 @@ function ClientProjectsSection({
         <StatPill value={projects.length} label="proyectos totales" />
         <StatPill value={activeCount} label="activos" />
         <StatPill value={attentionCount} label="con puntos de atención" />
+        <TextField
+          className={styles.search}
+          type="search"
+          placeholder="Buscar proyecto o líder"
+          aria-label="Buscar proyecto"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          iconLeft={<SearchIcon size={16} />}
+        />
       </div>
 
-      <PortalTable columns={columns} items={projects} getRowKey={(p) => p.id} />
+      <PortalTable columns={columns} items={filtered} getRowKey={(p) => p.id} />
     </>
   );
 }

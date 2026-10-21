@@ -1,6 +1,5 @@
 import {
   PROJECT_MODULE_DELIVERY_STATUS_LABELS,
-  projectDelayLevel,
   type HourEntryStatus,
   type HourEntrySummary,
   type ProjectDetail,
@@ -13,14 +12,13 @@ import {
 import { getTeamStyle } from '@/modules/projects/utils/team-style';
 import { toBitacoraRows, type BitacoraRow } from '@/modules/projects/lib/bitacora-row';
 import { entryTitle, EVENT_STATUS_LABEL } from '@/modules/projects/lib/hour-entry-log';
-import { lifecycleHealth } from './portal-list.adapter';
+import { projectHealth } from './portal-list.adapter';
 import type {
   ClientBitacoraEntry,
   ClientBitacoraEntryKind,
   ClientBitacoraStatusTone,
   ClientProjectBilling,
   ClientProjectDetail,
-  ClientProjectHealth,
   ClientRoadmapPhase,
   PhaseRoadmapDelivery,
   PhaseRoadmapDeliveryState,
@@ -408,13 +406,6 @@ function toBilling(project: ProjectDetail): ClientProjectBilling {
   };
 }
 
-function health(project: ProjectDetail): ClientProjectHealth {
-  const lifecycle = lifecycleHealth(project);
-  if (lifecycle) return lifecycle;
-  // Mismo umbral que el dashboard y el listado interno (`PROJECT_PROGRESS_DELAY_ALERT`).
-  return projectDelayLevel(project.progress.delay) === 'on_track' ? 'active' : 'at_risk';
-}
-
 function tag(project: ProjectDetail): string {
   const teamNames = new Set<string>();
   for (const module of project.modules) {
@@ -465,7 +456,7 @@ export function toClientProjectDetail(project: ProjectDetail, hourEntries: reado
     id: project.id,
     slug: project.slug,
     name: project.name,
-    health: health(project),
+    health: projectHealth(project),
     tag: tag(project),
     company: {
       name: project.client?.companyName ?? '—',
