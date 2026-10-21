@@ -1,12 +1,16 @@
 import { Body, Controller, Get, Post } from '@nestjs/common';
 import {
+  analyzeEstimationPocSchema,
   generateEstimationPocSchema,
+  type AnalyzeEstimationPocInput,
+  type EstimationPocAnalysis,
   type EstimationPocProposal,
   type EstimationQuestionnaireDefinition,
   type GenerateEstimationPocInput,
 } from '@kora/contracts';
 import { RequirePermissions } from '../../../shared/presentation/decorators/require-permissions.decorator';
 import { ZodValidationPipe } from '../../../shared/presentation/pipes/zod-validation.pipe';
+import { AnalyzeEstimationPocUseCase } from '../application/use-cases/analyze-estimation-poc.use-case';
 import { GenerateEstimationPocProposalUseCase } from '../application/use-cases/generate-estimation-poc-proposal.use-case';
 import { GetEstimationQuestionnaireDefinitionUseCase } from '../application/use-cases/get-estimation-questionnaire-definition.use-case';
 
@@ -14,6 +18,7 @@ import { GetEstimationQuestionnaireDefinitionUseCase } from '../application/use-
 export class EstimationController {
   constructor(
     private readonly getQuestionnaireDefinition: GetEstimationQuestionnaireDefinitionUseCase,
+    private readonly analyzePoc: AnalyzeEstimationPocUseCase,
     private readonly generatePocProposal: GenerateEstimationPocProposalUseCase,
   ) {}
 
@@ -23,12 +28,17 @@ export class EstimationController {
     return this.getQuestionnaireDefinition.execute();
   }
 
+  @Post('poc/analyze')
+  @RequirePermissions('projects:manage')
+  analyze(
+    @Body(new ZodValidationPipe(analyzeEstimationPocSchema)) input: AnalyzeEstimationPocInput,
+  ): Promise<EstimationPocAnalysis> {
+    return this.analyzePoc.execute(input);
+  }
+
   /**
-   * PoC del boundary Calculadora -> módulo IA.
-   *
-   * El proveedor actual es simulado y NO lee Drive; la URL se conserva en el
-   * contrato porque es la entrada que utilizará el lector real en la siguiente
-   * iteración. Las HH se calculan determinísticamente en el caso de uso.
+   * Segunda etapa de la PoC: genera la propuesta solo después de recibir las
+   * respuestas del cuestionario. Las HH se calculan determinísticamente.
    */
   @Post('poc/proposal')
   @RequirePermissions('projects:manage')
