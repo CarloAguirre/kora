@@ -1,10 +1,12 @@
-import { useState, type ComponentType, type ReactNode } from 'react';
+import { type ComponentType, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import styles from './ClientProjectDetailPage.module.css';
 import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Card } from '@/shared/components/ui/Card';
 import { Button } from '@/shared/components/ui/Button';
 import { useToast } from '@/shared/components/ui/Toast';
+import { useStoredState } from '@/shared/hooks/useStoredState';
+import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { KabeliLogo } from '@/shared/components/layout/KabeliLogo';
 import {
   AlignLeftIcon,
@@ -94,6 +96,15 @@ const ALL_SECTIONS_VISIBLE: Record<SectionKey, boolean> = {
   bitacora: true,
 };
 
+/** Lo que recuerda la botonera entre visitas. `sections` es parcial: una sección
+ *  agregada después de guardar arranca visible en vez de quedar oculta. */
+interface ViewPrefs {
+  readonly sections: Partial<Record<SectionKey, boolean>>;
+  readonly usedHoursVisible: boolean;
+}
+
+const DEFAULT_VIEW_PREFS: ViewPrefs = { sections: ALL_SECTIONS_VISIBLE, usedHoursVisible: true };
+
 const HEALTH_LABEL: Readonly<Record<ClientProjectHealth, string>> = {
   prospect: 'Prospecto',
   quoted: 'Cotización',
@@ -144,7 +155,8 @@ const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFr
  * La botonera de íconos bajo el título replica la del Figma en el orden y
  * los conceptos, no en la cantidad exacta: el archivo se quedó con 9 botones
  * sin sincronizar con la fusión de "Hitos y aprobaciones" + "Puntos de
- * atención e incidentes" en una sola "Bitácora" — acá son 9, uno por sección.
+ * atención e incidentes" en una sola "Bitácora" — acá son 9, uno por sección,
+ * más uno final para ocultar las horas consumidas (`usedHoursVisible`).
  * `SECTION_TOGGLES` es la única lista — el botón y la sección que controla
  * nunca pueden desincronizarse porque ambos leen de ahí.
  */
@@ -183,15 +195,23 @@ export function ClientProjectDetailPage({
     { enabled: Boolean(projectDetail?.id) },
   );
   const project = projectDetail ? toClientProjectDetail(projectDetail, projectHourEntries?.items ?? []) : undefined;
-  const [visible, setVisible] = useState<Record<SectionKey, boolean>>(ALL_SECTIONS_VISIBLE);
+  /** La botonera se recuerda por usuario y cliente: al recargar o volver a la
+   *  ficha (de este o de otro proyecto del mismo cliente) sigue lo que dejó. */
+  const { user } = useAuth();
+  const clientId = projectDetail?.client?.id;
+  const prefsKey = user && clientId ? `kora:portal-ficha:${user.id}:${clientId}` : null;
+  const [prefs, setPrefs] = useStoredState<ViewPrefs>(prefsKey, DEFAULT_VIEW_PREFS);
+  const visible: Record<SectionKey, boolean> = { ...ALL_SECTIONS_VISIBLE, ...prefs.sections };
   /** Oculta solo las horas consumidas dentro de "Horas y avance" — el % de
    *  avance, las horas estimadas y la fecha fin siguen visibles. También
    *  esconde el número de desviación (= consumidas − estimadas, lo
    *  revelaría), pero deja el pill "En riesgo"/"Sin desviación". */
-  const [usedHoursVisible, setUsedHoursVisible] = useState(true);
+  const usedHoursVisible = prefs.usedHoursVisible !== false;
   const resolvedBackTo = backTo ?? '/portal/proyectos';
 
-  const toggleSection = (key: SectionKey) => setVisible((prev) => ({ ...prev, [key]: !prev[key] }));
+  const toggleSection = (key: SectionKey) =>
+    setPrefs((prev) => ({ ...prev, sections: { ...prev.sections, [key]: !(prev.sections?.[key] ?? true) } }));
+  const toggleUsedHours = () => setPrefs((prev) => ({ ...prev, usedHoursVisible: prev.usedHoursVisible === false }));
 
   /** No hay generación de PDF en el backend — "Compartir" copia el enlace de
    *  esta misma ficha (quien lo reciba necesita acceso al portal cliente) y
@@ -285,6 +305,16 @@ export function ClientProjectDetailPage({
               <Icon size={16} />
             </button>
           ))}
+          <button
+            type="button"
+            className={[styles.sectionToggle, usedHoursVisible ? styles.sectionToggleOn : ''].filter(Boolean).join(' ')}
+            aria-pressed={usedHoursVisible}
+            aria-label={`${usedHoursVisible ? 'Ocultar' : 'Mostrar'} horas consumidas`}
+            title={usedHoursVisible ? 'Ocultar horas consumidas' : 'Mostrar horas consumidas'}
+            onClick={toggleUsedHours}
+          >
+            {usedHoursVisible ? <EyeOffIcon size={16} /> : <EyeIcon size={16} />}
+          </button>
         </div>
 
         {visible.info && (
@@ -358,19 +388,7 @@ export function ClientProjectDetailPage({
 
         {visible.hours && (
         <section className={styles.section}>
-          <div className={styles.sectionHeadingRow}>
-            <h3 className={styles.sectionTitle}>Horas y avance</h3>
-            <Button
-              variant="ghost"
-              size="sm"
-              className={styles.inlineToggle}
-              iconLeft={usedHoursVisible ? <EyeOffIcon size={15} /> : <EyeIcon size={15} />}
-              aria-pressed={!usedHoursVisible}
-              onClick={() => setUsedHoursVisible((prev) => !prev)}
-            >
-              {usedHoursVisible ? 'Ocultar horas consumidas' : 'Mostrar horas consumidas'}
-            </Button>
-          </div>
+          <h3 className={styles.sectionTitle}>Horas y avance</h3>
           <div className={styles.hoursGrid}>
             <Card className={styles.statCard}>
               <span className={styles.statLabel}>Horas estimadas</span>

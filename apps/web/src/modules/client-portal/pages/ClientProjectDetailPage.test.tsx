@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
-import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import type { ProjectDetail } from '@kora/contracts';
 import { ClientProjectDetailPage } from './ClientProjectDetailPage';
@@ -15,6 +15,12 @@ vi.mock('@/modules/projects/api/projects.queries', () => ({
 vi.mock('@/modules/hours/api/hours.queries', () => ({
   useHourEntriesList: () => ({ data: { items: [] } }),
 }));
+
+vi.mock('@/modules/auth/hooks/useAuth', () => ({
+  useAuth: () => ({ user: { id: 'user-1' } }),
+}));
+
+beforeEach(() => localStorage.clear());
 
 vi.mock('@/shared/components/layout/DashboardLayout', () => ({
   DashboardLayout: ({ children }: { children: ReactNode }) => <>{children}</>,
@@ -153,5 +159,23 @@ describe('ClientProjectDetailPage — ocultar horas consumidas', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Mostrar horas consumidas' }));
     expect(screen.getByText('Horas utilizadas a la fecha')).toBeInTheDocument();
+  });
+});
+
+describe('ClientProjectDetailPage — botonera recordada', () => {
+  it('recuerda por usuario y cliente las secciones y las horas ocultas al volver a la ficha', () => {
+    renderPage(buildProject());
+    fireEvent.click(screen.getByRole('button', { name: 'Ocultar Horas y avance' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ocultar horas consumidas' }));
+    cleanup();
+
+    renderPage(buildProject());
+    expect(screen.getByRole('button', { name: 'Mostrar Horas y avance' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Mostrar horas consumidas' })).toBeInTheDocument();
+    cleanup();
+
+    // Otro cliente arranca con todo visible.
+    renderPage(buildProject({ client: { id: 'client-2', companyName: 'Otra' } }));
+    expect(screen.getByRole('button', { name: 'Ocultar Horas y avance' })).toBeInTheDocument();
   });
 });
