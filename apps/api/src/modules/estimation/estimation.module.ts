@@ -1,10 +1,12 @@
 import { Module } from '@nestjs/common';
 import { AiModule } from '../ai/ai.module';
+import { DRIVE_FOLDER_CLIENT } from './application/ports/drive-folder-client.port';
 import { AnalyzeEstimationPocUseCase } from './application/use-cases/analyze-estimation-poc.use-case';
 import { GenerateEstimationPocProposalUseCase } from './application/use-cases/generate-estimation-poc-proposal.use-case';
 import { GetEstimationQuestionnaireDefinitionUseCase } from './application/use-cases/get-estimation-questionnaire-definition.use-case';
+import { InventoryEstimationDriveUseCase } from './application/use-cases/inventory-estimation-drive.use-case';
 import { ListEstimationDriveFilesUseCase } from './application/use-cases/list-estimation-drive-files.use-case';
-import { DRIVE_FOLDER_CLIENT } from './application/ports/drive-folder-client.port';
+import { ResolveEstimationDriveFolderUseCase } from './application/use-cases/resolve-estimation-drive-folder.use-case';
 import { GoogleDriveFolderClient } from './infrastructure/drive/google-drive-folder.client';
 import { EstimationController } from './presentation/estimation.controller';
 
@@ -22,6 +24,8 @@ import { EstimationController } from './presentation/estimation.controller';
     AnalyzeEstimationPocUseCase,
     GenerateEstimationPocProposalUseCase,
     ListEstimationDriveFilesUseCase,
+    ResolveEstimationDriveFolderUseCase,
+    InventoryEstimationDriveUseCase,
     GoogleDriveFolderClient,
     { provide: DRIVE_FOLDER_CLIENT, useExisting: GoogleDriveFolderClient },
   ],
