@@ -1,0 +1,111 @@
+.fieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.fieldset legend {
+  margin-bottom: 8px;
+  color: var(--kora-text, #111827);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.options {
+  display: grid;
+  gap: 8px;
+}
+
+.option,
+.optionDisabled {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  border: 1px solid var(--kora-border, #d0d5dd);
+  border-radius: 10px;
+  padding: 11px 12px;
+  background: var(--kora-surface, #fff);
+}
+
+.option {
+  cursor: pointer;
+}
+
+.optionSelected {
+  border-color: var(--kora-navy, #122235);
+  box-shadow: inset 0 0 0 1px var(--kora-navy, #122235);
+}
+
+.option input {
+  flex: none;
+  margin-top: 3px;
+}
+
+.option span,
+.optionDisabled span:last-child {
+  display: grid;
+  gap: 3px;
+}
+
+.option strong,
+.optionDisabled strong {
+  font-size: 13px;
+}
+
+.option small,
+.optionDisabled small {
+  color: var(--kora-text-muted, #667085);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.optionDisabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+
+.fakeRadio {
+  width: 13px;
+  height: 13px;
+  flex: none;
+  margin-top: 3px;
+  border: 1px solid var(--kora-border, #98a2b3);
+  border-radius: 50%;
+}
+
+.driveBox {
+  display: grid;
+  gap: 14px;
+  border: 1px solid var(--kora-border, #e5e7eb);
+  border-radius: 10px;
+  padding: 14px;
+  background: var(--kora-surface-muted, #f8fafc);
+}
+
+.instructions {
+  display: grid;
+  gap: 6px;
+}
+
+.instructions > span {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.instructions textarea {
+  min-height: 72px;
+  resize: vertical;
+  border: 1px solid var(--kora-border, #d0d5dd);
+  border-radius: 8px;
+  padding: 9px 10px;
+  background: var(--kora-surface, #fff);
+  color: var(--kora-text, #111827);
+  font: inherit;
+}
+
+.error {
+  margin: 0;
+  color: var(--kora-danger, #b42318);
+  font-size: 12px;
+  font-weight: 600;
+}
