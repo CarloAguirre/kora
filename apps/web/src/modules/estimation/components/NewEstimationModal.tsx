@@ -7,6 +7,7 @@ import { Button } from '@/shared/components/ui/Button';
 import { Modal } from '@/shared/components/ui/Modal';
 import { Select } from '@/shared/components/ui/Select';
 import { TextField } from '@/shared/components/ui/TextField';
+import { useEstimationDriveFiles } from '../api/estimation.queries';
 import styles from './NewEstimationModal.module.css';
 
 interface NewEstimationModalProps {
@@ -54,6 +55,11 @@ export function NewEstimationModal({ open, prospects, onClose }: NewEstimationMo
     [projectRef, prospects],
   );
   const detail = useProjectDetail(selected?.slug ?? null);
+  const driveUrlIsValid = isGoogleDriveFolderUrl(driveFolderUrl);
+  const driveFiles = useEstimationDriveFiles(
+    driveFolderUrl.trim(),
+    open && mode === 'ai' && driveUrlIsValid,
+  );
 
   useEffect(() => {
     if (!open) {
@@ -181,6 +187,11 @@ export function NewEstimationModal({ open, prospects, onClose }: NewEstimationMo
                 : 'Si Kora ya tiene el enlace documental del prospecto, se completa automáticamente.'
             }
           />
+          <DriveFilesPreview
+            loading={driveFiles.isLoading || driveFiles.isFetching}
+            listing={driveFiles.data}
+          />
+
           <label className={styles.instructions}>
             <span>Indicaciones para el agente (opcional)</span>
             <textarea
@@ -195,4 +206,104 @@ export function NewEstimationModal({ open, prospects, onClose }: NewEstimationMo
       {error && <p className={styles.error}>{error}</p>}
     </Modal>
   );
+}
+
+
+function isGoogleDriveFolderUrl(value: string): boolean {
+  if (!value.trim()) return false;
+  try {
+    const url = new URL(value);
+    return (
+      url.hostname === 'drive.google.com' &&
+      (/\/folders\/[a-zA-Z0-9_-]+/.test(url.pathname) ||
+        /^[a-zA-Z0-9_-]+$/.test(url.searchParams.get('id') ?? ''))
+    );
+  } catch {
+    return false;
+  }
+}
+
+function DriveFilesPreview({
+  loading,
+  listing,
+}: {
+  loading: boolean;
+  listing:
+    | import('@kora/contracts').EstimationDriveFolderListing
+    | undefined;
+}) {
+  if (loading) {
+    return <div className={styles.driveStatus}>Leyendo archivos de Drive…</div>;
+  }
+
+  if (!listing) return null;
+
+  if (listing.connection !== 'connected') {
+    return (
+      <div
+        className={
+          listing.connection === 'not_configured'
+            ? styles.driveWarning
+            : styles.driveError
+        }
+      >
+        {listing.message}
+      </div>
+    );
+  }
+
+  if (listing.files.length === 0) {
+    return <div className={styles.driveStatus}>La carpeta no contiene archivos visibles para Kora.</div>;
+  }
+
+  return (
+    <div className={styles.driveFiles} aria-label="Archivos del levantamiento">
+      {listing.files.map((file) => (
+        <div key={file.id} className={styles.driveFile}>
+          <span className={styles.driveFileIcon} aria-hidden="true">
+            {driveFileIcon(file.kind)}
+          </span>
+          {file.webViewLink ? (
+            <a href={file.webViewLink} target="_blank" rel="noreferrer">
+              {file.name}
+            </a>
+          ) : (
+            <span className={styles.driveFileName}>{file.name}</span>
+          )}
+          <time dateTime={file.modifiedAt}>{formatRelativeTime(file.modifiedAt)}</time>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function driveFileIcon(kind: import('@kora/contracts').EstimationDriveFileKind): string {
+  switch (kind) {
+    case 'spreadsheet':
+      return '📊';
+    case 'presentation':
+      return '📑';
+    case 'image':
+      return '🖼️';
+    case 'pdf':
+    case 'document':
+      return '📄';
+    default:
+      return '📎';
+  }
+}
+
+function formatRelativeTime(value: string): string {
+  const date = new Date(value);
+  const diffMs = date.getTime() - Date.now();
+  const absMs = Math.abs(diffMs);
+  const formatter = new Intl.RelativeTimeFormat('es-CL', { numeric: 'auto' });
+
+  const minute = 60_000;
+  const hour = 60 * minute;
+  const day = 24 * hour;
+
+  if (absMs < hour) return formatter.format(Math.round(diffMs / minute), 'minute');
+  if (absMs < day) return formatter.format(Math.round(diffMs / hour), 'hour');
+  return formatter.format(Math.round(diffMs / day), 'day');
 }
