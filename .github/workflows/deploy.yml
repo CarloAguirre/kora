@@ -3,6 +3,8 @@ name: Deploy to EC2 (kora-v2)
 on:
   push:
     branches: [master]
+  # Relanzar a mano ("Run workflow" / `gh workflow run deploy.yml`) si GitHub pierde el evento de un push.
+  workflow_dispatch:
 
 jobs:
   deploy:
