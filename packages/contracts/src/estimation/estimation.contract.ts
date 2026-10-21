@@ -257,12 +257,21 @@ export const ESTIMATION_POC_ROLE_UNITS = ['week', 'day'] as const;
 export const estimationPocRoleUnitSchema = z.enum(ESTIMATION_POC_ROLE_UNITS);
 export type EstimationPocRoleUnit = z.infer<typeof estimationPocRoleUnitSchema>;
 
-export const generateEstimationPocSchema = z.object({
+export const ESTIMATION_CREATION_MODES = ['ai', 'standard', 'rpa'] as const;
+export const estimationCreationModeSchema = z.enum(ESTIMATION_CREATION_MODES);
+export type EstimationCreationMode = z.infer<typeof estimationCreationModeSchema>;
+
+export const analyzeEstimationPocSchema = z.object({
   projectId: uuidSchema,
   projectName: nonEmptyTrimmed(300, 'El nombre del proyecto'),
   clientName: z.string().trim().max(300).nullish(),
   driveFolderUrl: z.url({ message: 'La carpeta de Drive no tiene un formato válido.' }),
   instructions: z.string().trim().max(3000).nullish(),
+});
+export type AnalyzeEstimationPocInput = z.infer<typeof analyzeEstimationPocSchema>;
+
+export const generateEstimationPocSchema = analyzeEstimationPocSchema.extend({
+  answers: z.array(submitEstimationAnswerSchema).default([]),
 });
 export type GenerateEstimationPocInput = z.infer<typeof generateEstimationPocSchema>;
 
@@ -301,3 +310,15 @@ export const estimationPocProposalSchema = z.object({
   clarifyingQuestions: z.array(z.string().trim().min(1).max(1500)).max(5).default([]),
 });
 export type EstimationPocProposal = z.infer<typeof estimationPocProposalSchema>;
+
+
+export const estimationPocAnalysisSchema = z.object({
+  projectId: uuidSchema,
+  provider: z.string().trim().min(1).max(120),
+  sourceMode: z.enum(['poc_simulated', 'drive']),
+  documentsAnalyzed: z.number().int().min(0),
+  summary: nonEmptyTrimmed(3000, 'El resumen'),
+  detectedDocuments: z.array(z.string().trim().min(1).max(500)).default([]),
+  dynamicQuestions: z.array(estimationQuestionSchema).max(5).default([]),
+});
+export type EstimationPocAnalysis = z.infer<typeof estimationPocAnalysisSchema>;
