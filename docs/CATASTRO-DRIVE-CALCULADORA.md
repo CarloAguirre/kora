@@ -454,3 +454,61 @@ Proyecto Kora
   -> EDT
   -> estimación
 ```
+
+
+## Estado de implementación · Resolver + inventario
+
+La estrategia anterior ya cuenta con un primer vertical slice implementado.
+
+### Resolución
+
+Endpoint:
+
+```http
+POST /api/estimations/drive/resolve
+```
+
+El resolver usa, en orden:
+
+1. `documentationLink` explícito si existe;
+2. búsqueda de carpetas por términos significativos del nombre del proyecto;
+3. búsqueda de carpetas cliente y revisión de hijos directos;
+4. `quotationLink` únicamente cuando realmente apunta a `/folders/`;
+5. scoring por nombre, términos coincidentes y jerarquía cliente.
+
+Una coincidencia de alta confianza puede seleccionarse automáticamente. Las
+coincidencias medias/bajas se devuelven como candidatos que el usuario debe
+confirmar en el modal.
+
+### Inventario
+
+Endpoint:
+
+```http
+POST /api/estimations/drive/inventory
+```
+
+El inventario:
+
+- recorre hasta 3 niveles por defecto;
+- limita el resultado a 150 elementos;
+- conserva path relativo;
+- diferencia archivos y carpetas;
+- clasifica documentos como recommended / secondary / excluded;
+- evita recorrer carpetas marcadas como excluidas;
+- identifica tipo documental para representación visual.
+
+El modal `+ Nueva estimación` ya consume ambos endpoints:
+
+```text
+seleccionar prospecto
+  -> resolver carpeta
+  -> autoasignar si confianza alta
+  -> mostrar candidatos si requiere confirmación
+  -> inventariar carpeta elegida
+  -> mostrar antecedentes prioritarios antes de crear la estimación
+```
+
+La asociación descubierta todavía no se persiste. Ese paso debe realizarse
+cuando se defina si se reutiliza `projects.documentation_link` o se crea una
+entidad versionable de fuentes documentales de estimación.
