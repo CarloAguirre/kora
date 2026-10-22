@@ -18,25 +18,36 @@ import {
 } from '../schema';
 
 /**
- * Carga de la ficha de Leslie (`AurelIA-SPR-proyecto-kora.xlsx`, corte 21/10/2026) en el proyecto
- * REAL "AurelIA - SPR" (`legacy_id = 44`, viene del sync de la v1 — mismo criterio que
+ * Carga de la ficha de Leslie v2 (`AurelIA-SPR-proyecto-kora_v2.xlsx`, corte 21/10/2026) en el
+ * proyecto REAL "AurelIA - SPR" (`legacy_id = 44`, viene del sync de la v1 — mismo criterio que
  * `demo-amicar-operaciones.ts`: se resuelve por `legacyId`, nunca por un uuid fijo).
  *
  * Dos destinos:
  * - `preview`: crea (o recrea) "AurelIA - SPR carga", un clon del proyecto real con todo cargado,
  *   para revisarlo antes de tocar el real. Lleva una COPIA de las horas del real (para ver el
- *   consumo por fase) — se borran junto con el clon en cada corrida y con `cleanup`.
- * - `real`: aplica lo mismo sobre "AurelIA - SPR": fases, tramos, tareas, entregas, bitácora,
- *   Hito 0, retira el equipo IA (sin horas en SPR) e imputa a su fase las horas ya registradas.
- *   No crea ni borra horas.
+ *   consumo de la fase) — se borran junto con el clon en cada corrida y con `cleanup`.
+ * - `real`: aplica lo mismo sobre "AurelIA - SPR": fase, tramos, tareas, entrega, bitácora,
+ *   Hito 0, retira el equipo IA (sin horas en SPR) e imputa a la fase las horas ya registradas.
+ *   No crea ni borra horas. Reemplaza lo que haya sembrado una corrida anterior (v1: 4 fases).
  *
- * Decisiones (Leslie, 21/10): avance calculado por Kora con las HH estimadas de la ficha (no los
- * pesos del Panel); equipos como están en Kora salvo IA; no se excluye ninguna hora.
- *
- * Fuera de lo que Kora modela, la ficha se traspone así: hito rechazado → historial de la entrega
- * en la bitácora; "OK QA"/"OK cliente" → tareas de ámbito QA/Rev. Cliente; incidentes y pendientes
- * sin fecha → bitácora (incidente/compromiso). F3 queda en 60% con 3 de 5 ítems aprobados (tareas
- * sin HH: avance por cantidad — HH estimadas en tareas pasadas ensuciarían el Forecast).
+ * La v2 modela SPR como UNA fase ("SPR", 1.235 HH) que recorre las etapas del Panel de Control
+ * (Levantamiento detallado 30 · Desarrollo 40 · Pruebas Gold Fields 25 · Marcha blanca 5). Kora no
+ * tiene etapas con nombre, peso ni fechas dentro de una fase, así que se traspone así (decisión
+ * del 22/10: una sola fase, como el Excel):
+ * - Etapa actual de la fase: Desarrollo (el catálogo de fases no tiene "Pruebas"); la "Etapa de
+ *   avance" del proyecto sí: `testing` (Pruebas).
+ * - Cada tramo lleva su etapa al inicio del nombre; cada etapa (peso, fechas, HH, avance) y el
+ *   historial semanal del Panel quedan como registros de bitácora.
+ * - Las 3 entregas a Tania son UNA entrega con su historial (dos rechazos; la 3ra validada por la
+ *   líder y pendiente de confirmación de GF, que es la tarea "Aprobación Gold Fields").
+ * - Avance: para que Kora reproduzca el 85% real / 95% esperado del Panel, las tareas llevan HH
+ *   estimadas como PESO (no como planificación): los 5 hitos de Pruebas, 61,75 HH c/u (5% del
+ *   proyecto cada uno = el 25% de la etapa; 3 aprobados → 60%), y dos tareas "de etapa" para
+ *   Levantamiento y Desarrollo con el peso que cuadra el total (la entrega pesa el promedio de las
+ *   tareas — ver `project-progress.ts`). Marcha blanca (5%) queda sin ítems: no cuenta como
+ *   esperado. Las tareas van SIN colaborador asignado (la ficha solo da el equipo): una tarea con
+ *   asignado y HH genera filas de Forecast, aquí en semanas pasadas.
+ * Equipos como están en Kora salvo IA; no se excluye ninguna hora.
  *
  * Se corre a mano con `pnpm --filter @kora/db seed:aurelia-spr <preview|real|cleanup>`.
  */
@@ -65,8 +76,9 @@ const REAL = {
   userClaudio: 'b3b252f8-5640-497b-89d8-5bcc23e536f8', // quien registra la carga
 } as const;
 
-/** Contacto del cliente — compartido por ambos destinos (es un dato real de Gold Fields). */
+/** Contactos del cliente — compartidos por ambos destinos (son datos reales de Gold Fields). */
 const CONTACT_TANIA = 'a5b00000-0000-4000-8000-000000000001';
+const CONTACT_ELISA = 'a5b00000-0000-4000-8000-000000000002';
 
 /** IDs nuevos, fijos por destino — el clon y el real pueden convivir sin chocar. */
 const ids = (target: AureliaSprTarget) => {
@@ -74,17 +86,17 @@ const ids = (target: AureliaSprTarget) => {
   const id = (n: number) => `${prefix}-0000-4000-8000-${String(n).padStart(12, '0')}`;
   return {
     previewProject: id(10),
-    moduleF1: id(11),
-    moduleF2: id(12),
-    moduleF3: id(13),
-    moduleF4: id(14),
-    deliveryDiseno: id(21),
-    deliveryPruebasGf: id(22),
-    taskTestPlan: id(31),
-    taskManual: id(32),
-    taskCorrecciones: id(33),
-    taskRevisionQa: id(34),
-    taskOkCliente: id(35),
+    moduleSpr: id(11),
+    /** Fases de la carga v1 (4 etapas como fases) — se borran al re-sembrar el real. */
+    legacyModules: [id(11), id(12), id(13), id(14)],
+    deliveryTania: id(21),
+    taskRediseno: id(31),
+    taskCorreccionesTania: id(32),
+    taskElisa: id(33),
+    taskPruebasQa: id(34),
+    taskAprobacionGf: id(35),
+    taskEtapaLevantamiento: id(36),
+    taskEtapaDesarrollo: id(37),
     /** Rango 100–199: bitácora. */
     observation: (n: number) => id(100 + n),
   };
@@ -100,33 +112,22 @@ const deadline = (committed: string, done: string) => {
   const note = `fecha comprometida ${fmt(committed)}`;
   return late === 0 ? `a tiempo (${note})` : `con ${late} ${late === 1 ? 'día' : 'días'} de atraso (${note})`;
 };
+/** "Hoy" en Chile como `YYYY-MM-DD` — fecha del registro "Equipo IA retirado". */
+const todayInChile = () =>
+  new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Santiago', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 
 const HITO0_REASON =
   'Módulo de AurelIA. El proyecto madre tuvo prospecto, cotización y aprobación; al aprobarse y activarse, cada módulo toma su fecha de inicio como Hito 0.';
 const OBJETIVO =
   'Automatizar el ciclo mensual de consolidación de datos ambientales que hoy se arma manualmente para el reporte oficial que se firma y envía al SAC, con un flujo de firmas y validaciones auditable.';
 
-/**
- * Fase de cada hora ya registrada — criterio de la hoja "Horas reales" de la ficha (fecha y
- * actividad del registro diario): octubre completo y el manual de usuario (desde 17/09) son
- * Pruebas GF; UX y la revisión de documentación de jun–jul son Levantamiento, igual que las horas
- * de Solmary hasta la propuesta definitiva (14/07); el resto es Desarrollo.
- */
-function moduleKeyFor(userId: string, isoDate: string): 'moduleF1' | 'moduleF2' | 'moduleF3' {
-  if (isoDate >= '2026-10-01') return 'moduleF3';
-  if (userId === REAL.userAlexis) {
-    if (isoDate <= '2026-07-31') return 'moduleF1';
-    return isoDate >= '2026-09-17' ? 'moduleF3' : 'moduleF2';
-  }
-  if (userId === REAL.userAnaSoto || userId === REAL.userEduardo) return 'moduleF1';
-  if (userId === REAL.userSolmary && isoDate <= '2026-07-14') return 'moduleF1';
-  return 'moduleF2';
-}
+/** Fase única de la v2. */
+const PHASE = 'SPR';
 
 export interface SeedAureliaSprResult {
   projectId: string;
   projectName: string;
-  hoursByPhase: Record<string, number>;
+  hoursInPhase: number;
 }
 
 export async function seedAureliaSpr(db: Database, target: AureliaSprTarget): Promise<SeedAureliaSprResult> {
@@ -154,10 +155,13 @@ export async function seedAureliaSpr(db: Database, target: AureliaSprTarget): Pr
       return row.id;
     };
 
-    // 0. Contacto del cliente — solo nombre: la ficha no trae apellido, cargo, correo ni teléfono.
+    // 0. Contactos del cliente — solo lo que trae la ficha (sin apellido, correo ni teléfono).
     await tx
       .insert(clientContacts)
-      .values({ id: CONTACT_TANIA, clientId, name: 'Tania' })
+      .values([
+        { id: CONTACT_TANIA, clientId, name: 'Tania' },
+        { id: CONTACT_ELISA, clientId, name: 'Elisa', position: 'Aprobadora de diseño (SPR)' },
+      ])
       .onConflictDoNothing({ target: clientContacts.id });
 
     // 1. Proyecto destino — el real, o un clon recién creado.
@@ -195,104 +199,101 @@ export async function seedAureliaSpr(db: Database, target: AureliaSprTarget): Pr
       await tx.delete(projectObservations).where(
         and(eq(projectObservations.projectId, projectId), sql`${projectObservations.id}::text like 'a5b00000-%'`),
       );
-      await tx
-        .delete(projectModules)
-        .where(inArray(projectModules.id, [ID.moduleF1, ID.moduleF2, ID.moduleF3, ID.moduleF4]));
+      await tx.delete(projectModules).where(inArray(projectModules.id, ID.legacyModules));
     }
 
     // 2. Datos generales + Hito 0 (manual: el módulo hereda la aprobación del proyecto madre).
-    //    `actualProgress` es el caché de `ProjectProgressRecalculator` — 81% con este plan
-    //    (F1 y F2 finalizadas, F3 en 60%, F4 sin iniciar; las fases pesan por sus HH estimadas).
+    //    `actualProgress` es el caché de `ProjectProgressRecalculator` — 85% con este plan (ver cabecera).
     await tx
       .update(projects)
       .set({
         primaryContactId: CONTACT_TANIA,
+        phase: 'testing',
         scopeNotes: OBJETIVO,
         hito0At: d('2026-06-02'),
         hito0Source: 'manual',
         hito0Reason: HITO0_REASON,
         pendingManagementApproval: false,
-        actualProgress: 81,
+        actualProgress: 85,
       })
       .where(eq(projects.id, projectId));
 
-    // 3. Fases. HH estimadas de la ficha: F1 cerrada con su real; el saldo se reparte F2–F4 según
-    //    los pesos del Panel (40/25/5). F4 sin fechas: se definen con el feedback de GF.
-    await tx.insert(projectModules).values([
-      { id: ID.moduleF1, projectId, name: 'Levantamiento detallado', initialStage: 'discovery', currentStage: 'closed', estimatedHours: '114.50', estimatedStartDate: d('2026-06-02'), estimatedEndDate: d('2026-07-14') },
-      { id: ID.moduleF2, projectId, name: 'Desarrollo', initialStage: 'development', currentStage: 'closed', estimatedHours: '640.29', estimatedStartDate: d('2026-07-07'), estimatedEndDate: d('2026-09-17') },
-      { id: ID.moduleF3, projectId, name: 'Pruebas Gold Fields', initialStage: 'development', currentStage: 'development', estimatedHours: '400.18', estimatedStartDate: d('2026-09-17'), estimatedEndDate: d('2026-09-30') },
-      { id: ID.moduleF4, projectId, name: 'Marcha blanca', initialStage: 'pilot', currentStage: 'pilot', estimatedHours: '80.03' },
-    ]);
+    // 3. Fase única. Fechas de la ficha: fin 30/09 vencido por espera de feedback de GF.
+    await tx.insert(projectModules).values({
+      id: ID.moduleSpr,
+      projectId,
+      name: PHASE,
+      initialStage: 'discovery',
+      currentStage: 'development',
+      estimatedHours: '1235.00',
+      estimatedStartDate: d('2026-06-02'),
+      estimatedEndDate: d('2026-09-30'),
+    });
 
-    // 4. Tramos de ejecución T01–T10 (fechas reales del registro diario). Sin `dailyPercent`:
-    //    son pasados, no deben generar Forecast. Los 3 tramos pendientes sin fecha van a la bitácora.
+    // 4. Tramos de ejecución T01–T12 (fechas reales del registro diario, ajustadas a los hitos), con
+    //    su etapa al inicio del nombre. Sin `dailyPercent`: son pasados, no deben generar Forecast.
     const segments = [
-      { module: ID.moduleF1, team: REAL.teamUx, name: 'Ideación de flujos, mockups y correcciones de diseño', start: '2026-06-22', end: '2026-07-14', users: [REAL.userAlexis, REAL.userEduardo] },
-      { module: ID.moduleF1, team: REAL.teamDev, name: 'Kickoff, revisión de documentación y flujos, reunión de diseño con GF', start: '2026-06-02', end: '2026-07-14', users: [REAL.userAnaSoto, REAL.userSolmary] },
-      { module: ID.moduleF2, team: REAL.teamDev, name: 'Construcción del módulo SPR', start: '2026-07-07', end: '2026-09-17', users: [REAL.userNicolas, REAL.userSolmary] },
-      { module: ID.moduleF2, team: REAL.teamQa, name: 'Test plan, test de correos y pruebas de carga y estrés (JMeter)', start: '2026-07-27', end: '2026-09-21', users: [REAL.userConstanza] },
-      { module: ID.moduleF2, team: REAL.teamRpa, name: 'Seguimiento y pruebas funcionales con perfiles', start: '2026-07-27', end: '2026-09-28', users: [REAL.userJoseAponte] },
-      { module: ID.moduleF2, team: REAL.teamUx, name: 'Correcciones de UI del módulo', start: '2026-09-04', end: '2026-09-04', users: [REAL.userAlexis] },
-      { module: ID.moduleF3, team: REAL.teamUx, name: 'Manual de usuario y video de explicación del flujo', start: '2026-09-17', end: '2026-10-20', users: [REAL.userAlexis] },
-      { module: ID.moduleF3, team: REAL.teamDev, name: "Correcciones del correo 'Revisión módulo SPR' y restauración histórica (01/26–08/26)", start: '2026-10-02', end: '2026-10-08', users: [REAL.userCarlo, REAL.userSolmary] },
-      { module: ID.moduleF3, team: REAL.teamQa, name: 'Revisión de correcciones según correo de GF', start: '2026-10-08', end: '2026-10-09', users: [REAL.userConstanza] },
-      { module: ID.moduleF3, team: REAL.teamRpa, name: 'Seguimiento de pruebas GF', start: '2026-10-02', end: '2026-10-05', users: [REAL.userJoseAponte] },
+      { team: REAL.teamUx, name: 'Levantamiento · Ideación de flujos, mockups y correcciones de diseño', start: '2026-06-22', end: '2026-07-14', users: [REAL.userAlexis, REAL.userEduardo] },
+      { team: REAL.teamDev, name: 'Levantamiento · Kickoff, revisión de documentación y flujos, reunión de diseño con GF', start: '2026-06-02', end: '2026-07-14', users: [REAL.userAnaSoto, REAL.userSolmary] },
+      { team: REAL.teamDev, name: 'Desarrollo · Construcción del módulo SPR', start: '2026-07-07', end: '2026-08-17', users: [REAL.userNicolas, REAL.userSolmary] },
+      { team: REAL.teamQa, name: 'Desarrollo · Test plan y pruebas internas', start: '2026-07-28', end: '2026-08-17', users: [REAL.userConstanza] },
+      { team: REAL.teamRpa, name: 'Desarrollo · Seguimiento y pruebas internas con perfiles', start: '2026-07-27', end: '2026-08-17', users: [REAL.userJoseAponte] },
+      { team: REAL.teamDev, name: 'Pruebas · Rediseño por proceso manual y correcciones del feedback de GF (01/09)', start: '2026-08-18', end: '2026-09-22', users: [REAL.userNicolas, REAL.userSolmary] },
+      { team: REAL.teamQa, name: 'Pruebas · Test de correos, pruebas de carga y estrés (JMeter) y test plan de cambios', start: '2026-08-18', end: '2026-09-21', users: [REAL.userConstanza] },
+      { team: REAL.teamRpa, name: 'Pruebas · Seguimiento y pruebas con usuarios', start: '2026-08-18', end: '2026-09-28', users: [REAL.userJoseAponte] },
+      { team: REAL.teamUx, name: 'Pruebas · Correcciones de UI, manual de usuario y video de flujo', start: '2026-09-04', end: '2026-10-20', users: [REAL.userAlexis] },
+      { team: REAL.teamDev, name: "Pruebas · Correcciones del correo 'Revisión módulo SPR' y restauración histórica (01/26–08/26)", start: '2026-10-02', end: '2026-10-08', users: [REAL.userCarlo, REAL.userSolmary] },
+      { team: REAL.teamQa, name: 'Pruebas · Revisión de correcciones según correo de GF', start: '2026-10-08', end: '2026-10-09', users: [REAL.userConstanza] },
+      { team: REAL.teamRpa, name: 'Pruebas · Seguimiento de la 3ra entrega', start: '2026-10-02', end: '2026-10-05', users: [REAL.userJoseAponte] },
     ];
     for (const segment of segments) {
       const [row] = await tx
         .insert(projectModuleSegments)
-        .values({ moduleId: segment.module, teamId: segment.team, name: segment.name, startDate: d(segment.start), endDate: d(segment.end) })
+        .values({ moduleId: ID.moduleSpr, teamId: segment.team, name: segment.name, startDate: d(segment.start), endDate: d(segment.end) })
         .returning({ id: projectModuleSegments.id });
       const memberIds = await Promise.all(segment.users.map((userId) => resolveTeamMembership(segment.team, userId)));
       await tx.insert(projectModuleSegmentMembers).values(memberIds.map((teamMemberId) => ({ segmentId: row!.id, teamMemberId })));
     }
 
-    // 5. Entregas — los hitos rechazados quedan como historial de una misma entrega (abajo, en la bitácora).
-    const DISENO = 'Propuesta de diseño (mockups)';
-    const PRUEBAS_GF = 'Módulo SPR para pruebas GF + manual de usuario';
-    await tx.insert(projectModuleDeliveries).values([
-      {
-        id: ID.deliveryDiseno,
-        moduleId: ID.moduleF1,
-        teamId: REAL.teamUx,
-        name: DISENO,
-        description: '1ra propuesta revisada con GF el 01/07 (con correcciones de flujos); propuesta definitiva el 14/07.',
-        assigneeUserId: REAL.userAlexis,
-        estimatedDate: d('2026-07-14'),
-        status: 'approved',
-        createdAt: at('2026-06-22'),
-        updatedAt: at('2026-07-14', 5),
-      },
-      {
-        id: ID.deliveryPruebasGf,
-        moduleId: ID.moduleF3,
-        teamId: REAL.teamDev,
-        name: PRUEBAS_GF,
-        description: "1ra entrega 22/09; GF respondió el 02/10 con el correo 'Revisión módulo SPR'. 2da entrega (correcciones + video de flujo) el 09/10, en espera de nuevo feedback de GF.",
-        assigneeUserId: REAL.userSolmary,
-        estimatedDate: d('2026-10-09'),
-        status: 'delivered',
-        createdAt: at('2026-09-17'),
-        updatedAt: at('2026-10-09'),
-      },
-    ]);
+    // 5. Entrega a Tania — las 3 entregas de la ficha (18/08 y 29/09 rechazadas, 09/10 validada por la
+    //    líder y pendiente de confirmación de GF) son una misma entrega con su historial (abajo, en la bitácora).
+    const TANIA = 'Desarrollo web a Tania para pruebas con usuarios';
+    await tx.insert(projectModuleDeliveries).values({
+      id: ID.deliveryTania,
+      moduleId: ID.moduleSpr,
+      teamId: REAL.teamDev,
+      name: TANIA,
+      description:
+        "1ra entrega 18/08 (cierra la etapa Desarrollo; GF pidió correcciones el 01/09). 2da entrega 29/09 (GF respondió el 02/10 con el correo 'Revisión módulo SPR'). 3ra entrega 09/10 con nuevas correcciones: validada por la líder, pendiente de confirmación de GF (tarea 'Aprobación Gold Fields').",
+      assigneeUserId: REAL.userSolmary,
+      estimatedDate: d('2026-10-09'),
+      status: 'approved',
+      createdAt: at('2026-07-07'),
+      updatedAt: at('2026-10-09'),
+    });
 
-    // 6. Tareas — los hitos OK QA / OK cliente y el trabajo de F3. Sin HH estimadas (ver cabecera).
+    // 6. Tareas — los hitos de la ficha que no son entregas, más una por etapa ya cerrada. Las HH son
+    //    el PESO de cada una en el avance (ver cabecera), sin colaborador asignado: así no generan Forecast.
+    //    Levantamiento + Desarrollo = 717,84 HH (repartidas 30:40) es lo que cuadra 85% real / 95% esperado
+    //    junto con los 5 hitos de 61,75 HH y la entrega aprobada (que pesa el promedio de las 7 tareas).
+    const WEIGHT_NOTE = 'HH estimadas = peso en el avance de la fase (Panel de Control AurelIA), no planificación de horas.';
     const tasks = [
-      { id: ID.taskTestPlan, module: ID.moduleF2, phase: 'Desarrollo', team: REAL.teamQa, user: REAL.userConstanza, userName: 'Constanza Mardones', name: 'Test plan SPR ejecutado (OK QA)', scope: 'qa', start: '2026-07-27', date: '2026-09-21', doneOn: '2026-09-21' },
-      { id: ID.taskManual, module: ID.moduleF3, phase: 'Pruebas Gold Fields', team: REAL.teamUx, user: REAL.userAlexis, userName: 'Alexis Camilo Torres Fernández', name: 'Manual de usuario y video de explicación del flujo', scope: 'diseno', start: '2026-09-17', date: '2026-10-20', doneOn: '2026-10-20' },
-      { id: ID.taskCorrecciones, module: ID.moduleF3, phase: 'Pruebas Gold Fields', team: REAL.teamDev, user: REAL.userCarlo, userName: 'Carlo Aguirre', name: 'Correcciones de observaciones GF y restauración histórica', scope: 'desarrollo', start: '2026-10-02', date: '2026-10-08', doneOn: '2026-10-08' },
-      { id: ID.taskRevisionQa, module: ID.moduleF3, phase: 'Pruebas Gold Fields', team: REAL.teamQa, user: REAL.userConstanza, userName: 'Constanza Mardones', name: 'Revisión QA de las correcciones', scope: 'qa', start: '2026-10-08', date: '2026-10-09', doneOn: '2026-10-09' },
-      { id: ID.taskOkCliente, module: ID.moduleF3, phase: 'Pruebas Gold Fields', team: REAL.teamDev, user: REAL.userSolmary, userName: 'Solmary Castro', name: 'Aprobación de Gold Fields (OK cliente)', scope: 'revision_cliente', start: '2026-09-22', date: '2026-09-30', doneOn: null },
+      { id: ID.taskEtapaLevantamiento, team: null, name: 'Etapa Levantamiento detallado (peso 30%)', scope: 'diseno', hours: '307.65', start: '2026-06-02', date: '2026-07-14', doneOn: '2026-07-14' },
+      { id: ID.taskEtapaDesarrollo, team: null, name: 'Etapa Desarrollo (peso 40%)', scope: 'desarrollo', hours: '410.19', start: '2026-07-07', date: '2026-08-17', doneOn: '2026-08-17' },
+      { id: ID.taskRediseno, team: REAL.teamDev, name: 'Rediseño por proceso manual (descarte de automatizaciones SAC y SAP)', scope: 'desarrollo', hours: '61.75', start: '2026-08-27', date: '2026-08-28', doneOn: '2026-08-28' },
+      { id: ID.taskCorreccionesTania, team: REAL.teamDev, name: 'Correcciones solicitadas por Tania', scope: 'desarrollo', hours: '61.75', start: '2026-09-01', date: '2026-09-11', doneOn: '2026-09-11' },
+      { id: ID.taskElisa, team: REAL.teamUx, name: 'Aprobación del diseño por Elisa (OK cliente)', scope: 'revision_cliente', hours: '61.75', start: '2026-08-21', date: '2026-09-15', doneOn: '2026-09-15' },
+      { id: ID.taskPruebasQa, team: REAL.teamQa, name: 'Pruebas de usuario QA (OK QA)', scope: 'qa', hours: '61.75', start: '2026-09-22', date: '2026-09-30', doneOn: null },
+      { id: ID.taskAprobacionGf, team: REAL.teamDev, name: 'Aprobación Gold Fields (OK cliente)', scope: 'revision_cliente', hours: '61.75', start: '2026-09-22', date: '2026-09-30', doneOn: null },
     ] as const;
     await tx.insert(projectModuleTasks).values(
       tasks.map((task) => ({
         id: task.id,
-        moduleId: task.module,
+        moduleId: ID.moduleSpr,
         teamId: task.team,
-        assigneeUserId: task.user,
         name: task.name,
+        description: WEIGHT_NOTE,
+        estimatedHours: task.hours,
         startDate: d(task.start),
         date: d(task.date),
         status: task.doneOn ? ('done' as const) : ('todo' as const),
@@ -303,8 +304,8 @@ export async function seedAureliaSpr(db: Database, target: AureliaSprTarget): Pr
       })),
     );
 
-    // 7. Bitácora: Hito 0, historial de entregas y tareas (mismos textos que la API), hitos,
-    //    incidentes y compromisos pendientes.
+    // 7. Bitácora: Hito 0, etapas del Panel, historial de la entrega y las tareas (mismos textos que
+    //    la API), incidentes e historial semanal de avance.
     type Observation = typeof projectObservations.$inferInsert;
     const log = (
       on: string,
@@ -322,79 +323,96 @@ export async function seedAureliaSpr(db: Database, target: AureliaSprTarget): Pr
       updatedAt: at(on, minute),
       ...extra,
     });
-    const inF1 = 'en fase "Levantamiento detallado"';
-    const inF3 = 'en fase "Pruebas Gold Fields"';
+    const inPhase = `en fase "${PHASE}"`;
+    const inSpr = { moduleId: ID.moduleSpr };
+    const onTania = { moduleId: ID.moduleSpr, deliveryId: ID.deliveryTania };
+
+    // Historial semanal del Panel de Control AurelIA (hoja "Historial de avance").
+    const panels: [string, number, number, string][] = [
+      ['2026-07-27', 40, 40, ''],
+      ['2026-07-31', 40, 40, ''],
+      ['2026-08-07', 50, 50, 'Kabeli comenzó la fase de pruebas con lo desarrollado en la web.'],
+      ['2026-08-14', 73, 73, 'Se solicita a Tania una reunión de levantamiento de robots.'],
+      ['2026-08-21', 73, 73, '18/08: entregado a Tania para iniciar pruebas con usuarios. Agendar reunión con Elisa para revisar diseño.'],
+      ['2026-08-28', 73, 73, 'Rediseño de procesos manuales por descarte de automatizaciones.'],
+      ['2026-09-04', 80, 75, 'Pendiente finalización de pruebas y feedback de Tania.'],
+      ['2026-09-11', 80, 85, 'Correcciones solicitadas por Tania realizadas; finalizando pruebas para reentregar.'],
+      ['2026-09-25', 95, 80, '15/09: Elisa aprobó el diseño.'],
+      ['2026-10-02', 95, 85, '29/09: reentregado a Tania con correcciones para pruebas con usuarios.'],
+      ['2026-10-09', 95, 85, '09/10: se entregan las nuevas correcciones a Tania.'],
+      ['2026-10-16', 95, 85, 'En espera de nuevo feedback.'],
+      ['2026-10-23', 95, 85, 'En espera de nuevo feedback (lámina SPR sin cambios desde el 16-10).'],
+    ];
 
     const entries: Omit<Observation, 'id'>[] = [
       log('2026-06-02', 0, REAL.userClaudio, `Proyecto activado manualmente (Hito 0) — comienzan a correr las horas. Motivo: ${HITO0_REASON}`, { isHito0: true }),
-      log('2026-06-02', 1, REAL.userSolmary, 'Reunión de inicio del módulo SPR (módulo N° 3 de 8 de AurelIA) con Gold Fields.', { type: 'hito', title: 'Kickoff del módulo SPR', status: 'cumplido', moduleId: ID.moduleF1 }),
+      log('2026-06-02', 1, REAL.userSolmary, 'Reunión de inicio del módulo SPR (módulo N° 3 de 8 de AurelIA) con Gold Fields.', { type: 'hito', title: 'Kickoff del módulo SPR', status: 'cumplido', ...inSpr }),
 
-      // Entrega "Propuesta de diseño": 1ra versión rechazada en la revisión con GF, definitiva aprobada.
-      log('2026-06-22', 0, REAL.userSolmary, `Nueva entrega "${DISENO}" agregada ${inF1}, estimada para ${fmt('2026-07-01')}.`, { moduleId: ID.moduleF1, deliveryId: ID.deliveryDiseno }),
-      log('2026-07-01', 0, REAL.userAlexis, `Entrega "${DISENO}" marcada como terminada ${inF1}, ${deadline('2026-07-01', '2026-07-01')}; queda pendiente de aprobación.`, { moduleId: ID.moduleF1, deliveryId: ID.deliveryDiseno }),
-      log('2026-07-01', 1, REAL.userSolmary, `Entrega "${DISENO}" rechazada ${inF1}: En la revisión de diseño con GF se pidieron correcciones de flujos (06–08/07).`, { moduleId: ID.moduleF1, deliveryId: ID.deliveryDiseno }),
-      log('2026-07-01', 2, REAL.userSolmary, `Entrega "${DISENO}" ${inF1}: fecha estimada cambiada de ${fmt('2026-07-01')} a ${fmt('2026-07-14')}.`, { moduleId: ID.moduleF1, deliveryId: ID.deliveryDiseno }),
-      log('2026-07-14', 0, REAL.userAlexis, `Entrega "${DISENO}" marcada como terminada ${inF1}, ${deadline('2026-07-14', '2026-07-14')}; queda pendiente de aprobación.`, { moduleId: ID.moduleF1, deliveryId: ID.deliveryDiseno }),
-      log('2026-07-14', 5, REAL.userSolmary, `Entrega "${DISENO}" aprobada ${inF1}, ${deadline('2026-07-14', '2026-07-14')}.`, { moduleId: ID.moduleF1, deliveryId: ID.deliveryDiseno }),
+      // Etapas de la fase según el Panel de Control (Kora no las modela dentro de una fase).
+      log('2026-07-14', 30, REAL.userSolmary, 'Etapa Levantamiento · peso 30% · 02/06–14/07 · 114,5 HH reales · avance 100%. Kickoff 02/06, ideación y mockups UX (22/06–14/07), revisión de diseño con GF 01/07.', { type: 'hito', title: 'Etapa "Levantamiento detallado" finalizada', status: 'cumplido', ...inSpr }),
+      log('2026-08-17', 30, REAL.userSolmary, 'Etapa Desarrollo · peso 40% · 07/07–17/08 · 350,15 HH reales · avance 100%. Construcción del módulo, test plan QA y pruebas internas de Kabeli sobre lo desarrollado en la web (desde 07/08). Termina con la 1ra entrega a Tania (18/08).', { type: 'hito', title: 'Etapa "Desarrollo" finalizada', status: 'cumplido', ...inSpr }),
+      log('2026-08-18', 30, REAL.userSolmary, 'Etapa Pruebas · peso 25% · 18/08–30/09 · 200,75 HH reales · avance real 60% (esperado 100%). Entregas a Tania 18/08, 29/09 y 09/10; feedback GF 01/09 y 02/10; Elisa aprobó el diseño 15/09. Detenida en 60% a la espera de feedback de GF.', { type: 'hito', title: 'Etapa "Pruebas Gold Fields" en curso', status: 'activo', ...inSpr }),
+      log('2026-08-18', 31, REAL.userSolmary, "Etapa Marcha blanca · peso 5% (columna 'Aprobado' del Panel) · sin iniciar. Empieza con el OK cliente de GF; fechas por definir. Después viene Finalizado, con el OK cliente final.", { type: 'compromiso', title: 'Etapa "Marcha blanca" por iniciar', status: 'pendiente', ...inSpr }),
 
-      // Entrega "Módulo SPR para pruebas GF": rechazada por el correo de revisión, reenviada con correcciones.
-      log('2026-09-17', 0, REAL.userSolmary, `Nueva entrega "${PRUEBAS_GF}" agregada ${inF3}, estimada para ${fmt('2026-09-22')}.`, { moduleId: ID.moduleF3, deliveryId: ID.deliveryPruebasGf }),
-      log('2026-09-22', 0, REAL.userSolmary, `Entrega "${PRUEBAS_GF}" marcada como terminada ${inF3}, ${deadline('2026-09-22', '2026-09-22')}; queda pendiente de aprobación.`, { moduleId: ID.moduleF3, deliveryId: ID.deliveryPruebasGf }),
-      log('2026-10-02', 0, REAL.userSolmary, `Entrega "${PRUEBAS_GF}" rechazada ${inF3}: GF respondió con el correo 'Revisión módulo SPR' con casos a corregir.`, { moduleId: ID.moduleF3, deliveryId: ID.deliveryPruebasGf }),
-      log('2026-10-02', 1, REAL.userSolmary, `Entrega "${PRUEBAS_GF}" ${inF3}: fecha estimada cambiada de ${fmt('2026-09-22')} a ${fmt('2026-10-09')}.`, { moduleId: ID.moduleF3, deliveryId: ID.deliveryPruebasGf }),
-      log('2026-10-09', 0, REAL.userSolmary, `Entrega "${PRUEBAS_GF}" marcada como terminada ${inF3}, ${deadline('2026-10-09', '2026-10-09')}; queda pendiente de aprobación.`, { moduleId: ID.moduleF3, deliveryId: ID.deliveryPruebasGf }),
+      // Entrega a Tania: dos rechazos de GF y la 3ra entrega pendiente.
+      log('2026-07-07', 0, REAL.userSolmary, `Nueva entrega "${TANIA}" agregada ${inPhase}, estimada para ${fmt('2026-08-18')}.`, onTania),
+      log('2026-08-18', 0, REAL.userSolmary, `Entrega "${TANIA}" marcada como terminada ${inPhase}, ${deadline('2026-08-18', '2026-08-18')}; queda pendiente de aprobación.`, onTania),
+      log('2026-09-01', 0, REAL.userSolmary, `Entrega "${TANIA}" rechazada ${inPhase}: Feedback de GF sobre la 1ra entrega: pidió correcciones.`, onTania),
+      log('2026-09-01', 1, REAL.userSolmary, `Entrega "${TANIA}" ${inPhase}: fecha estimada cambiada de ${fmt('2026-08-18')} a ${fmt('2026-09-29')}.`, onTania),
+      log('2026-09-01', 2, REAL.userSolmary, 'Gold Fields envió su feedback sobre la 1ra entrega (desarrollo web para pruebas con usuarios) con correcciones a realizar.', { type: 'hito', title: 'Feedback de GF sobre la 1ra entrega', status: 'cumplido', ...inSpr }),
+      log('2026-09-29', 0, REAL.userSolmary, `Entrega "${TANIA}" marcada como terminada ${inPhase}, ${deadline('2026-09-29', '2026-09-29')}; queda pendiente de aprobación.`, onTania),
+      log('2026-10-02', 0, REAL.userSolmary, `Entrega "${TANIA}" rechazada ${inPhase}: GF respondió con el correo 'Revisión módulo SPR' con casos a corregir.`, onTania),
+      log('2026-10-02', 1, REAL.userSolmary, `Entrega "${TANIA}" ${inPhase}: fecha estimada cambiada de ${fmt('2026-09-29')} a ${fmt('2026-10-09')}.`, onTania),
+      log('2026-10-09', 0, REAL.userSolmary, `Entrega "${TANIA}" marcada como terminada ${inPhase}, ${deadline('2026-10-09', '2026-10-09')}; queda pendiente de aprobación.`, onTania),
+      log('2026-10-09', 5, REAL.userSolmary, `Entrega "${TANIA}" aprobada ${inPhase}, ${deadline('2026-10-09', '2026-10-09')}.`, onTania),
 
-      // Tareas: creación, completada y aprobada.
+      // Tareas: creación y, si se cumplió, aprobación directa de la líder (no tienen colaborador asignado).
       ...tasks.flatMap((task) => {
-        const inPhase = `en fase "${task.phase}"`;
-        const label = `Tarea "${task.name}"`;
-        const created = log(task.start, 0, REAL.userSolmary, `Nueva tarea "${task.name}" creada ${inPhase}, asignada a ${task.userName}, con fecha límite ${fmt(task.date)}.`, { moduleId: task.module, taskId: task.id });
+        const onTask = { moduleId: ID.moduleSpr, taskId: task.id };
+        const created = log(task.start, 0, REAL.userSolmary, `Nueva tarea "${task.name}" creada ${inPhase}, con fecha límite ${fmt(task.date)}.`, onTask);
         if (!task.doneOn) return [created];
-        return [
-          created,
-          log(task.doneOn, 3, task.user, `${label} marcada como completada ${inPhase}, pendiente de aprobación, ${deadline(task.date, task.doneOn)}.`, { moduleId: task.module, taskId: task.id }),
-          log(task.doneOn, 5, REAL.userSolmary, `${label} aprobada ${inPhase}, ${deadline(task.date, task.doneOn)}.`, { moduleId: task.module, taskId: task.id }),
-        ];
+        return [created, log(task.doneOn, 5, REAL.userSolmary, `Tarea "${task.name}" marcada como aprobada ${inPhase}, ${deadline(task.date, task.doneOn)}.`, onTask)];
       }),
 
       // Incidentes de la ficha — Kora no tiene severidad/origen/responsable: van en el texto.
-      log('2026-10-09', 10, REAL.userSolmary, "Se entregaron las correcciones del correo 'Revisión módulo SPR' (05–09/10). GF aún no envía nuevo feedback.\nTipo: Espera de feedback cliente · Origen: Externo · Severidad: Media · Responsable: Solmary Castro.", { type: 'incidente', title: 'INC-01 · Espera de feedback de Gold Fields', status: 'abierto', moduleId: ID.moduleF3 }),
-      log('2026-10-16', 10, REAL.userSolmary, 'Automatizaciones pendientes: BoT SAC y Bot SAP. Se solicitó a Tania una reunión de levantamiento de robots. Desde el 27/08 se trabaja una solución de flujos sin integración con sistemas externos.\nTipo: Cambio de alcance · Origen: Externo · Severidad: Alta · Responsable: Solmary Castro.', { type: 'incidente', title: 'INC-02 · Bots SAC y SAP pendientes', status: 'abierto', moduleId: ID.moduleF3 }),
-      log('2026-10-01', 10, REAL.userSolmary, 'La aprobación de Gold Fields (OK cliente, objetivo 30/09) venció sin confirmarse. Atraso atribuible a la espera de feedback de GF (INC-01): el plazo corre, pero las horas y el avance están detenidos.\nTipo: Atraso en entrega · Origen: Externo · Severidad: Media · Responsable: Solmary Castro · Relacionado: INC-01.', { type: 'incidente', title: 'INC-03 · Atraso en la aprobación de GF', status: 'abierto', moduleId: ID.moduleF3 }),
+      log('2026-08-27', 10, REAL.userSolmary, "Se descartan las automatizaciones (BoT SAC y Bot SAP) y se rediseñan los procesos como manuales. Resolución: hito 'Rediseño por proceso manual' (28/08).\nTipo: Cambio de alcance · Origen: Externo · Severidad: Alta · Responsable: Solmary Castro.", { type: 'incidente', title: 'INC-02 · Descarte de bots SAC y SAP', status: 'resuelto', ...inSpr }),
+      log('2026-10-01', 10, REAL.userSolmary, "La tarea 'Aprobación Gold Fields' (OK cliente, objetivo 30/09) venció sin confirmarse. Atraso atribuible a la espera de feedback de GF (INC-01): el plazo corre, pero las horas y el avance están detenidos.\nTipo: Atraso en entrega · Origen: Externo · Severidad: Media · Responsable: Solmary Castro · Relacionado: INC-01.", { type: 'incidente', title: 'INC-03 · Atraso en la aprobación de GF', status: 'abierto', ...inSpr }),
+      log('2026-10-09', 10, REAL.userSolmary, 'Se entregaron las nuevas correcciones a Tania (3ra entrega, 09/10). GF aún no envía nuevo feedback.\nTipo: Espera de feedback cliente · Origen: Externo · Severidad: Media · Responsable: Solmary Castro.', { type: 'incidente', title: 'INC-01 · Espera de feedback de Gold Fields', status: 'abierto', ...inSpr }),
 
-      // Pendientes sin fecha — pasan a tramos/tareas cuando se definan.
-      log('2026-10-09', 11, REAL.userSolmary, 'Ajustes del nuevo feedback de GF (equipo Desarrollo). Fechas por definir: dependen de que GF envíe su feedback.', { type: 'compromiso', title: 'Ajustes del nuevo feedback de GF', status: 'pendiente', moduleId: ID.moduleF3 }),
-      log('2026-10-16', 11, REAL.userSolmary, 'Bots SAC y SAP (equipo RPA): requiere reunión de levantamiento de robots con Tania. Fase y fechas por definir.', { type: 'compromiso', title: 'Reunión de levantamiento de bots SAC y SAP con Tania', status: 'pendiente' }),
+      // Historial semanal de avance.
+      ...panels.map(([on, expected, actual, note]) => {
+        const deviation = actual - expected;
+        const deviationText = deviation === 0 ? 'sin desvío' : `desvío ${deviation > 0 ? '+' : ''}${deviation} pts`;
+        return log(on, 20, REAL.userSolmary, `Panel de Control AurelIA: esperado ${expected}% · real ${actual}% (${deviationText}).${note ? ` ${note}` : ''}`, {
+          type: 'observacion',
+          title: `Avance SPR · Panel ${fmt(on)}`,
+          status: null,
+          ...inSpr,
+        });
+      }),
     ];
     if (target === 'real' && (await tx.select({ id: projectTeams.id }).from(projectTeams).where(and(eq(projectTeams.projectId, projectId), eq(projectTeams.teamId, REAL.teamIa)))).length > 0) {
       await tx.delete(projectTeams).where(and(eq(projectTeams.projectId, projectId), eq(projectTeams.teamId, REAL.teamIa)));
-      const today = new Date().toISOString().slice(0, 10);
-      entries.push(log(today, 0, REAL.userClaudio, 'Equipo "IA" retirado del proyecto.'));
+      const now = new Date();
+      entries.push({ ...log(todayInChile(), 0, REAL.userClaudio, 'Equipo "IA" retirado del proyecto.'), createdAt: now, updatedAt: now });
     }
     await tx.insert(projectObservations).values(entries.map((entry, index) => ({ ...entry, id: ID.observation(index) })));
 
-    // 8. Horas por fase — el real imputa las que ya tiene; el clon lleva una copia imputada.
+    // 8. Horas — todas a la fase única: el real imputa las que ya tiene; el clon lleva una copia.
     const realHours = await tx.select().from(hourEntries).where(eq(hourEntries.projectId, realProject.id));
-    const moduleOf = (entry: { userId: string; date: Date }) => ID[moduleKeyFor(entry.userId, entry.date.toISOString().slice(0, 10))];
     if (target === 'real') {
-      for (const moduleKey of ['moduleF1', 'moduleF2', 'moduleF3'] as const) {
-        const entryIds = realHours.filter((entry) => moduleOf(entry) === ID[moduleKey]).map((entry) => entry.id);
-        if (entryIds.length > 0) await tx.update(hourEntries).set({ moduleId: ID[moduleKey] }).where(inArray(hourEntries.id, entryIds));
-      }
+      await tx.update(hourEntries).set({ moduleId: ID.moduleSpr }).where(eq(hourEntries.projectId, projectId));
     } else if (realHours.length > 0) {
       await tx.insert(hourEntries).values(
-        realHours.map(({ id: _id, legacyId: _legacyId, ...entry }) => ({ ...entry, projectId, moduleId: moduleOf(entry) })),
+        realHours.map(({ id: _id, legacyId: _legacyId, ...entry }) => ({ ...entry, projectId, moduleId: ID.moduleSpr })),
       );
     }
 
-    const names: Record<string, string> = { [ID.moduleF1]: 'F1', [ID.moduleF2]: 'F2', [ID.moduleF3]: 'F3' };
-    const hoursByPhase: Record<string, number> = {};
-    for (const entry of realHours) {
-      const phase = names[moduleOf(entry)]!;
-      hoursByPhase[phase] = (hoursByPhase[phase] ?? 0) + Number(entry.hours);
-    }
-
-    return { projectId, projectName: target === 'preview' ? PREVIEW_NAME : realProject.name, hoursByPhase };
+    return {
+      projectId,
+      projectName: target === 'preview' ? PREVIEW_NAME : realProject.name,
+      hoursInPhase: realHours.reduce((sum, entry) => sum + Number(entry.hours), 0),
+    };
   });
 }
 

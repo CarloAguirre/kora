@@ -134,7 +134,7 @@ export interface SupportContractDetail {
  * Figma) — NO es el mismo concepto que `ProjectPhase` de `@kora/contracts`:
  * ese describe la etapa vigente de TODO el proyecto, mientras que esto es el
  * mini-pipeline que recorre cada fase individual (p.ej. "Fase 2" pasa por
- * Levantamiento → Desarrollo → Producción → Marcha blanca → Finalizado).
+ * Levantamiento → Desarrollo → Pruebas → Marcha blanca → Finalizado).
  * Se mantiene como tipo propio para no forzar un calce que no existe.
  */
 export const ROADMAP_STEPS = ['discovery', 'development', 'production', 'pilot', 'finished'] as const;
@@ -143,7 +143,7 @@ export type RoadmapStep = (typeof ROADMAP_STEPS)[number];
 export const ROADMAP_STEP_LABELS: Readonly<Record<RoadmapStep, string>> = {
   discovery: 'Levantamiento',
   development: 'Desarrollo',
-  production: 'Producción',
+  production: 'Pruebas',
   pilot: 'Marcha blanca',
   finished: 'Finalizado',
 };

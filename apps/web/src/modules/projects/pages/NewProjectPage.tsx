@@ -1312,7 +1312,7 @@ export function NewProjectPage() {
                   <Section title="Fases · Módulos">
                     <p className={styles.hint} style={{ marginTop: 0 }}>
                       Unidades de entrega del proyecto — cada una recorre las etapas del sistema (Levantamiento →
-                      Desarrollo → Producción → Marcha blanca → Finalizado) de forma independiente.
+                      Desarrollo → Pruebas → Marcha blanca → Finalizado) de forma independiente.
                     </p>
 
                     <div className={styles.phaseCardLocked}>

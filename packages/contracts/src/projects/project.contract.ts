@@ -115,7 +115,7 @@ export type ProjectModuleStage = z.infer<typeof projectModuleStageSchema>;
 export const PROJECT_MODULE_STAGE_LABELS: Readonly<Record<ProjectModuleStage, string>> = {
   discovery: 'Levantamiento',
   development: 'Desarrollo',
-  production: 'Producción',
+  production: 'Pruebas',
   pilot: 'Marcha blanca',
   closed: 'Finalizado',
 };
