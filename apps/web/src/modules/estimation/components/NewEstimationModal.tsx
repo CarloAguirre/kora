@@ -493,7 +493,8 @@ function DriveInventoryPreview({
     return (
       <div
         className={
-          inventory.connection === 'not_configured'
+          inventory.connection === 'not_configured' ||
+          inventory.connection === 'not_connected'
             ? styles.driveWarning
             : styles.driveError
         }
