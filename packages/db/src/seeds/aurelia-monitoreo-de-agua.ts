@@ -28,9 +28,9 @@ import {
 
 /**
  * Carga de la ficha de Leslie `AurelIA-Monitoreo-de-agua-proyecto-kora.xlsx` (corte 23/10/2026) en el
- * proyecto REAL "AurelIA - monitoreo de agua" (`legacy_id = 205`, del sync de la v1 — se resuelve por
+ * proyecto REAL "AurelIA - Monitoreo de agua" (`legacy_id = 205`, del sync de la v1 — se resuelve por
  * `legacyId`). Mismos destinos que `aurelia-inspecciones.ts`: `preview` crea/recrea el clon
- * "AurelIA - monitoreo de agua carga" con una COPIA de las horas; `real` aplica sobre el proyecto real
+ * "AurelIA - Monitoreo de agua carga" con una COPIA de las horas; `real` aplica sobre el proyecto real
  * (sin crear ni borrar horas, solo las imputa a la fase).
  *
  * UNA fase ("Monitoreo de agua", 452 HH, 29/07–06/11) que recorre las etapas del Panel de Control
@@ -55,7 +55,7 @@ import {
  */
 
 const LEGACY_ID = 205;
-const PREVIEW_NAME = 'AurelIA - monitoreo de agua carga';
+const PREVIEW_NAME = 'AurelIA - Monitoreo de agua carga';
 const PHASE = 'Monitoreo de agua';
 
 // IDs reales, ya existentes en la base — NO se crean acá.
@@ -115,9 +115,9 @@ export async function seedAureliaMonitoreoDeAgua(db: Database, target: FichaTarg
 
   const [realProject] = await db.select().from(projects).where(eq(projects.legacyId, LEGACY_ID)).limit(1);
   if (!realProject) {
-    throw new Error(`No se encontró "AurelIA - monitoreo de agua" (legacy_id=${LEGACY_ID}) en esta base — ¿corrió el ETL/sync desde la v1 en este ambiente?`);
+    throw new Error(`No se encontró "AurelIA - Monitoreo de agua" (legacy_id=${LEGACY_ID}) en esta base — ¿corrió el ETL/sync desde la v1 en este ambiente?`);
   }
-  if (!realProject.clientId) throw new Error('"AurelIA - monitoreo de agua" no tiene cliente asignado.');
+  if (!realProject.clientId) throw new Error('"AurelIA - Monitoreo de agua" no tiene cliente asignado.');
   const clientId = realProject.clientId;
 
   return db.transaction(async (tx) => {
@@ -330,7 +330,7 @@ export async function seedAureliaMonitoreoDeAgua(db: Database, target: FichaTarg
   });
 }
 
-/** Borra el clon "AurelIA - monitoreo de agua carga" con sus horas copiadas. */
+/** Borra el clon "AurelIA - Monitoreo de agua carga" con sus horas copiadas. */
 export async function deleteMonitoreoDeAguaPreview(db: Pick<Database, 'delete'>): Promise<void> {
   await deletePreviewProject(db, ids('preview').previewProject);
 }

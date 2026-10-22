@@ -17,7 +17,7 @@ async function main(): Promise<void> {
   try {
     if (mode === 'cleanup') {
       await connection.db.transaction((tx) => deleteMonitoreoDeAguaPreview(tx));
-      console.log('Proyecto "AurelIA - monitoreo de agua carga" y sus horas copiadas, borrados.');
+      console.log('Proyecto "AurelIA - Monitoreo de agua carga" y sus horas copiadas, borrados.');
       return;
     }
     const result = await seedAureliaMonitoreoDeAgua(connection.db, mode);
@@ -28,6 +28,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((error: unknown) => {
-  console.error('Falló la carga de AurelIA - monitoreo de agua:', error);
+  console.error('Falló la carga de AurelIA - Monitoreo de agua:', error);
   process.exit(1);
 });
