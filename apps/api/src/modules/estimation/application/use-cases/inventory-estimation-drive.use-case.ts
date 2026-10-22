@@ -1,17 +1,19 @@
 import { Inject, Injectable } from '@nestjs/common';
 import {
   estimationDriveInventorySchema,
-  type EstimationDriveFileKind,
   type EstimationDriveInventory,
   type EstimationDriveInventoryItem,
-  type EstimationDriveSourcePriority,
   type InventoryEstimationDriveInput,
 } from '@kora/contracts';
 import {
   DRIVE_FOLDER_CLIENT,
   type DriveFolderClient,
-  type DriveFolderItem,
 } from '../ports/drive-folder-client.port';
+import {
+  classifyDriveKind,
+  classifyDriveSource,
+  extractDriveFolderId,
+} from '../drive-source-selection';
 
 const MAX_INVENTORY_ITEMS = 150;
 
@@ -66,7 +68,7 @@ export class InventoryEstimationDriveUseCase {
           const path = current.path
             ? `${current.path}/${child.name}`
             : child.name;
-          const classification = classifySource(child, path);
+          const classification = classifyDriveSource(child, path);
 
           items.push({
             id: child.id,
@@ -134,81 +136,6 @@ export class InventoryEstimationDriveUseCase {
   }
 }
 
-function classifySource(
-  item: DriveFolderItem,
-  path: string,
-): { priority: EstimationDriveSourcePriority; reason: string | null } {
-  const value = normalize(`${path} ${item.name}`);
-
-  if (
-    /(password|contrasena|secret|credencial|credential|private key|api key)/.test(value) ||
-    /(^|\s)acceso(s)?(\s|$)/.test(value) ||
-    item.mimeType === 'application/vnd.android.package-archive'
-  ) {
-    return {
-      priority: 'excluded',
-      reason: 'Se excluye por seguridad o por no aportar contenido documental al análisis.',
-    };
-  }
-
-  if (
-    /(antiguo|backup|respaldo|deprecated|historico obsoleto)/.test(value)
-  ) {
-    return {
-      priority: 'excluded',
-      reason: 'Se excluye por defecto por corresponder a respaldo o material antiguo.',
-    };
-  }
-
-  if (
-    /(levantamiento|requerimiento|especificacion|arquitectura|as is|to be|flujo|proceso|caso de uso|historia de usuario|kick ?off|matriz funcional|documentacion por modulos)/.test(
-      value,
-    )
-  ) {
-    return {
-      priority: 'recommended',
-      reason: 'El nombre/ruta indica un antecedente de alto valor para estimación.',
-    };
-  }
-
-  return {
-    priority: 'secondary',
-    reason: null,
-  };
-}
-
-function classifyDriveKind(mimeType: string): EstimationDriveFileKind {
-  if (
-    mimeType === 'application/vnd.google-apps.document' ||
-    mimeType.includes('wordprocessingml') ||
-    mimeType === 'application/msword' ||
-    mimeType === 'text/plain' ||
-    mimeType === 'text/markdown'
-  ) {
-    return 'document';
-  }
-
-  if (
-    mimeType === 'application/vnd.google-apps.spreadsheet' ||
-    mimeType.includes('spreadsheetml') ||
-    mimeType === 'application/vnd.ms-excel'
-  ) {
-    return 'spreadsheet';
-  }
-
-  if (
-    mimeType === 'application/vnd.google-apps.presentation' ||
-    mimeType.includes('presentationml') ||
-    mimeType === 'application/vnd.ms-powerpoint'
-  ) {
-    return 'presentation';
-  }
-
-  if (mimeType === 'application/pdf') return 'pdf';
-  if (mimeType.startsWith('image/')) return 'image';
-  return 'other';
-}
-
 function emptyInventory(
   connection: 'not_configured' | 'unavailable',
   rootFolderId: string,
@@ -232,25 +159,3 @@ function emptyInventory(
   });
 }
 
-function extractDriveFolderId(value: string): string | null {
-  try {
-    const url = new URL(value);
-    if (url.hostname !== 'drive.google.com') return null;
-    const match = url.pathname.match(/\/folders\/([a-zA-Z0-9_-]+)/);
-    if (match?.[1]) return match[1];
-    const id = url.searchParams.get('id');
-    return id && /^[a-zA-Z0-9_-]+$/.test(id) ? id : null;
-  } catch {
-    return null;
-  }
-}
-
-function normalize(value: string): string {
-  return value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim()
-    .replace(/\s+/g, ' ');
-}
