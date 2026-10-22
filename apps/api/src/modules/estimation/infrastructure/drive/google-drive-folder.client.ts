@@ -6,6 +6,7 @@ import type {
   DriveFolderFile,
   DriveFolderItem,
   DriveFolderMetadata,
+  DriveAnalysisContent,
 } from '../../application/ports/drive-folder-client.port';
 
 const TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token';
@@ -85,6 +86,53 @@ export class GoogleDriveFolderClient implements DriveFolderClient {
     );
   }
 
+  async readAnalysisContent(
+    fileId: string,
+    mimeType: string,
+  ): Promise<DriveAnalysisContent | null> {
+    this.assertConfigured();
+
+    const exportMimeType = googleExportMimeType(mimeType);
+    if (exportMimeType) {
+      const response = await this.authorizedFetch(
+        `${DRIVE_FILES_ENDPOINT}/${encodeURIComponent(fileId)}/export?mimeType=${encodeURIComponent(exportMimeType)}`,
+      );
+      if (!response.ok) throw driveError(response.status);
+
+      return {
+        mimeType: exportMimeType,
+        text: await response.text(),
+      };
+    }
+
+    if (mimeType === 'application/pdf') {
+      const response = await this.authorizedFetch(
+        `${DRIVE_FILES_ENDPOINT}/${encodeURIComponent(fileId)}?alt=media&supportsAllDrives=true`,
+      );
+      if (!response.ok) throw driveError(response.status);
+
+      const bytes = Buffer.from(await response.arrayBuffer());
+      return {
+        mimeType,
+        dataBase64: bytes.toString('base64'),
+      };
+    }
+
+    if (isPlainTextMime(mimeType)) {
+      const response = await this.authorizedFetch(
+        `${DRIVE_FILES_ENDPOINT}/${encodeURIComponent(fileId)}?alt=media&supportsAllDrives=true`,
+      );
+      if (!response.ok) throw driveError(response.status);
+
+      return {
+        mimeType,
+        text: await response.text(),
+      };
+    }
+
+    return null;
+  }
+
   async getMetadata(fileId: string): Promise<DriveFolderMetadata | null> {
     this.assertConfigured();
     const accessToken = await this.getAccessToken();
@@ -143,6 +191,13 @@ export class GoogleDriveFolderClient implements DriveFolderClient {
     return (body.files ?? [])
       .filter(isUsableDriveFile)
       .map(toDriveFolderItem);
+  }
+
+  private async authorizedFetch(url: string): Promise<Response> {
+    const accessToken = await this.getAccessToken();
+    return fetch(url, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
   }
 
   private assertConfigured(): void {
@@ -249,4 +304,31 @@ function driveError(status: number): Error {
 
 function encodeBase64Url(value: string): string {
   return Buffer.from(value, 'utf8').toString('base64url');
+}
+
+
+function googleExportMimeType(mimeType: string): string | null {
+  switch (mimeType) {
+    case 'application/vnd.google-apps.document':
+      return 'text/plain';
+    case 'application/vnd.google-apps.spreadsheet':
+      return 'text/csv';
+    case 'application/vnd.google-apps.presentation':
+      return 'text/plain';
+    default:
+      return null;
+  }
+}
+
+function isPlainTextMime(mimeType: string): boolean {
+  return new Set([
+    'text/plain',
+    'text/markdown',
+    'text/csv',
+    'text/tab-separated-values',
+    'text/html',
+    'text/xml',
+    'text/rtf',
+    'application/json',
+  ]).has(mimeType);
 }
