@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { projectDelayLevel } from '@kora/contracts';
 import { StatusPill, type StatusPillTone } from './StatusPill';
 import styles from './ProjectProgressOverview.module.css';
@@ -6,13 +7,17 @@ interface ProjectProgressOverviewProps {
   /** `null` = el proyecto todavía no tiene plan cargado. */
   readonly actualPercent: number | null;
   readonly expectedPercent: number | null;
-  /** Ya formateadas (dd-mm-aaaa). */
-  readonly startDate: string;
-  readonly endDate: string;
-  readonly daysRemaining: number;
+  /** Ya formateadas (dd-mm-aaaa). Sin ellas no hay pie de fechas (la ficha interna ya las muestra aparte). */
+  readonly startDate?: string;
+  readonly endDate?: string;
+  readonly daysRemaining?: number;
+  /** Sin tarjeta propia — cuando el contenedor ya es una (ficha interna). */
+  readonly bare?: boolean;
+  /** Leyenda arriba a la derecha, junto al estado, en vez de una fila propia bajo la barra (ficha interna). */
+  readonly legendInHeader?: boolean;
+  /** Dato extra bajo la barra (la ficha interna agrega HH consumidas y cobertura del plan). */
+  readonly note?: ReactNode;
 }
-
-const points = (value: number) => `${value} ${value === 1 ? 'punto' : 'puntos'}`;
 
 /** Cerca de los bordes, la etiqueta del plan se alinea hacia adentro para no salirse de la tarjeta. */
 function edgeAlign(percent: number): string | undefined {
@@ -21,23 +26,16 @@ function edgeAlign(percent: number): string | undefined {
   return undefined;
 }
 
-/** Estado en palabras: el cliente lee "vamos X puntos bajo lo planificado", no "Atrasado 10 pts". */
+/** Estado en palabras, sin cálculo de diferencia: la barra ya la muestra (tramo rayado). */
 function describeStatus(actual: number, expected: number): { label: string; tone: StatusPillTone; sentence: string } {
   const delay = expected - actual;
-  if (delay < 0) {
-    return {
-      label: 'Adelantado',
-      tone: 'success',
-      sentence: `Vamos ${points(-delay)} por sobre lo planificado a la fecha (${expected}%).`,
-    };
-  }
-  if (delay === 0) {
-    return { label: 'Al día', tone: 'success', sentence: `Vamos justo en lo planificado a la fecha (${expected}%).` };
-  }
+  const sentence = `A la fecha el plan contemplaba un ${expected}% de avance.`;
+  if (delay < 0) return { label: 'Adelantado', tone: 'success', sentence };
+  if (delay === 0) return { label: 'Al día', tone: 'success', sentence };
   return {
     label: projectDelayLevel(delay) === 'on_track' ? 'Levemente atrasado' : 'Atrasado',
     tone: projectDelayLevel(delay) === 'on_track' ? 'neutral' : 'warning',
-    sentence: `A la fecha el plan contemplaba un ${expected}% de avance: vamos ${points(delay)} por debajo.`,
+    sentence,
   };
 }
 
@@ -52,21 +50,42 @@ export function ProjectProgressOverview({
   expectedPercent,
   startDate,
   endDate,
-  daysRemaining,
+  daysRemaining = 0,
+  bare = false,
+  legendInHeader = false,
+  note,
 }: ProjectProgressOverviewProps) {
+  const containerClass = bare ? styles.bare : styles.card;
+
   if (actualPercent == null || expectedPercent == null) {
     return (
-      <div className={styles.card}>
+      <div className={containerClass}>
         <p className={styles.empty}>El avance se mostrará apenas el plan de trabajo del proyecto esté cargado.</p>
+        {note && <p className={styles.note}>{note}</p>}
       </div>
     );
   }
 
   const status = describeStatus(actualPercent, expectedPercent);
   const behind = expectedPercent > actualPercent;
+  const legend = (
+    <div className={styles.legend}>
+      <span className={styles.legendItem}>
+        <span className={[styles.swatch, styles.swatchFill].join(' ')} /> Avance real
+      </span>
+      <span className={styles.legendItem}>
+        <span className={styles.swatchLine} /> Lo planificado a hoy
+      </span>
+      {behind && (
+        <span className={styles.legendItem}>
+          <span className={[styles.swatch, styles.swatchGap].join(' ')} /> Diferencia por recuperar
+        </span>
+      )}
+    </div>
+  );
 
   return (
-    <div className={styles.card}>
+    <div className={containerClass}>
       <div className={styles.header}>
         <div className={styles.headline}>
           <span className={styles.bigNumber}>{actualPercent}%</span>
@@ -75,7 +94,10 @@ export function ProjectProgressOverview({
             <span className={styles.headlineSentence}>{status.sentence}</span>
           </span>
         </div>
-        <StatusPill tone={status.tone}>{status.label}</StatusPill>
+        <div className={styles.headerSide}>
+          {legendInHeader && legend}
+          <StatusPill tone={status.tone}>{status.label}</StatusPill>
+        </div>
       </div>
 
       <div className={styles.barArea}>
@@ -101,20 +123,11 @@ export function ProjectProgressOverview({
         </span>
       </div>
 
-      <div className={styles.legend}>
-        <span className={styles.legendItem}>
-          <span className={[styles.swatch, styles.swatchFill].join(' ')} /> Avance real
-        </span>
-        <span className={styles.legendItem}>
-          <span className={styles.swatchLine} /> Lo planificado a hoy
-        </span>
-        {behind && (
-          <span className={styles.legendItem}>
-            <span className={[styles.swatch, styles.swatchGap].join(' ')} /> Diferencia por recuperar
-          </span>
-        )}
-      </div>
+      {!legendInHeader && legend}
 
+      {note && <p className={styles.note}>{note}</p>}
+
+      {startDate && endDate && (
       <div className={styles.footer}>
         <span className={styles.footerDate}>
           <span className={styles.footerLabel}>Inicio</span>
@@ -130,6 +143,7 @@ export function ProjectProgressOverview({
           {endDate}
         </span>
       </div>
+      )}
     </div>
   );
 }

@@ -172,7 +172,7 @@ describe('ClientProjectDetailPage — avance del proyecto', () => {
     );
 
     expect(screen.getByText('del proyecto completado')).toBeInTheDocument();
-    expect(screen.getByText('A la fecha el plan contemplaba un 95% de avance: vamos 10 puntos por debajo.')).toBeInTheDocument();
+    expect(screen.getByText('A la fecha el plan contemplaba un 95% de avance.')).toBeInTheDocument();
     expect(screen.getByText('Diferencia por recuperar')).toBeInTheDocument();
     // Lo interno de `ProjectTimeline` (HH, cobertura del plan) no llega al cliente.
     expect(screen.queryByText(/Plan cargado/)).not.toBeInTheDocument();

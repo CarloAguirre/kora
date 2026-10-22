@@ -21,9 +21,6 @@
   align-items: center;
   justify-content: space-between;
   gap: 14px;
-  padding: 16px 20px;
-  border: 1px solid #e4e9ee;
-  border-radius: 14px;
 }
 
 .summaryChips {
@@ -66,9 +63,6 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 18px;
-  padding: 14px 18px;
-  border: 1px solid #e4e9ee;
-  border-radius: 14px;
 }
 
 .legendItem {

@@ -25,7 +25,6 @@ import {
   ListIcon,
   LockIcon,
   PlayIcon,
-  RefreshIcon,
   TrendingUpIcon,
   UnlockIcon,
   UsersIcon,
@@ -61,7 +60,7 @@ const ACCESS_LINKS: readonly AccessLink[] = [
   { key: 'documentation', label: 'Documentación', subtitle: 'Especificaciones', icon: AlignLeftIcon },
 ];
 
-type SectionKey = 'info' | 'billing' | 'links' | 'progress' | 'roadmap' | 'hours' | 'gantt' | 'impact' | 'qa' | 'bitacora';
+type SectionKey = 'info' | 'billing' | 'links' | 'progress' | 'hours' | 'gantt' | 'impact' | 'qa' | 'bitacora';
 
 /**
  * Un botón por sección — "esta botonera muestra o esconde las secciones de
@@ -69,13 +68,12 @@ type SectionKey = 'info' | 'billing' | 'links' | 'progress' | 'roadmap' | 'hours
  * sincronizó con las 2 secciones nuevas de la variante "Kora · Proyectos y
  * Soporte 2" del node 9663:24207). Se prioriza el invariante que esta misma
  * lista ya documentaba (un ícono = una sección, nunca desincronizados) sobre
- * copiar un conteo de Figma que quedó desactualizado: son 10 ahora ("Avance
+ * copiar un conteo de Figma que quedó desactualizado: son 9 ahora ("Avance
  * del periodo" se quitó — su contenido ya vive en "Bitácora").
  */
 const SECTION_TOGGLES: ReadonlyArray<{ key: SectionKey; label: string; icon: typeof LinkIcon }> = [
   { key: 'links', label: 'Accesos y enlaces', icon: LinkIcon },
   { key: 'progress', label: 'Avance del proyecto', icon: CircleCheckIcon },
-  { key: 'roadmap', label: 'Hoja de ruta', icon: RefreshIcon },
   { key: 'billing', label: 'Facturación', icon: DollarSignIcon },
   { key: 'info', label: 'Datos del proyecto', icon: ListIcon },
   { key: 'hours', label: 'Horas y avance', icon: ClockIcon },
@@ -90,7 +88,6 @@ const ALL_SECTIONS_VISIBLE: Record<SectionKey, boolean> = {
   billing: true,
   links: true,
   progress: true,
-  roadmap: true,
   hours: true,
   gantt: true,
   impact: true,
@@ -157,7 +154,7 @@ const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFr
  * La botonera de íconos bajo el título replica la del Figma en el orden y
  * los conceptos, no en la cantidad exacta: el archivo se quedó con 9 botones
  * sin sincronizar con la fusión de "Hitos y aprobaciones" + "Puntos de
- * atención e incidentes" en una sola "Bitácora" — acá son 10, uno por sección,
+ * atención e incidentes" en una sola "Bitácora" — acá son 9, uno por sección,
  * más uno final para ocultar las horas consumidas (`usedHoursVisible`).
  * `SECTION_TOGGLES` es la única lista — el botón y la sección que controla
  * nunca pueden desincronizarse porque ambos leen de ahí.
@@ -387,20 +384,6 @@ export function ClientProjectDetailPage({
         </section>
         )}
 
-        {visible.roadmap && (
-        <section className={styles.section}>
-          <div className={styles.sectionHeadingRow}>
-            <h3 className={styles.sectionTitle}>Hoja de ruta</h3>
-            <span className={styles.sectionCaption}>Cada fase tiene su propio cronograma independiente · la línea roja marca el avance esperado a hoy</span>
-          </div>
-          <div className={styles.roadmapList}>
-            {project.roadmap.map((phase) => (
-              <PhaseProgressBar key={phase.name} phase={phase} />
-            ))}
-          </div>
-        </section>
-        )}
-
         {visible.hours && (
         <section className={styles.section}>
           <h3 className={styles.sectionTitle}>Horas y avance</h3>
@@ -464,7 +447,15 @@ export function ClientProjectDetailPage({
             <h3 className={styles.sectionTitle}>Roadmap por Fases</h3>
             <span className={styles.sectionCaption}>Vista por semana de diseño, desarrollo, QA y aprobación por fase</span>
           </div>
-          <PhaseRoadmap phaseRoadmap={project.phaseRoadmap} />
+          {/* La "Hoja de ruta" de cada fase va dentro de su tarjeta, igual que en el Roadmap interno.
+              `roadmap` y `phaseRoadmap.phases` salen de `project.modules` en el mismo orden. */}
+          <PhaseRoadmap
+            phaseRoadmap={project.phaseRoadmap}
+            renderPhaseExtras={(phase) => {
+              const roadmapPhase = project.roadmap[project.phaseRoadmap.phases.indexOf(phase)];
+              return roadmapPhase ? <PhaseProgressBar phase={roadmapPhase} embedded /> : null;
+            }}
+          />
         </section>
         )}
 

@@ -23,6 +23,8 @@ import { getTeamStyle } from '../utils/team-style';
 
 const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 2 });
 const formatDate = (value: string) => new Date(`${value}T00:00:00`).toLocaleDateString('es-CL');
+/** Entrega estimada: proyectos antiguos/seed no la tienen propia y caen a la fecha de fin. */
+const formatOptionalDate = (value: string | null) => (value ? formatDate(value) : '—');
 
 interface TeamMemberDraftRow {
   key: string;
@@ -229,7 +231,7 @@ export function TeamLeaderProjectView({
         </Card>
         <Card className={styles.kpiCard}>
           <span className={styles.kpiLabel}>Fecha de entrega estimada</span>
-          <span className={styles.kpiValue}>{project.estimatedDeliveryDate ? formatDate(project.estimatedDeliveryDate) : '—'}</span>
+          <span className={styles.kpiValue}>{formatOptionalDate(project.estimatedDeliveryDate ?? project.endDate)}</span>
         </Card>
         <Card className={styles.kpiCard}>
           <span className={styles.kpiLabel}>Avance real / esperado</span>
@@ -308,11 +310,7 @@ export function TeamLeaderProjectView({
       <Card>
         <p className={styles.sectionTitle}>Avance del proyecto</p>
         <div style={{ marginTop: 'var(--kora-space-4)' }}>
-          <ProjectTimeline
-            progress={project.progress}
-            startDate={project.startDate}
-            endDate={project.estimatedDeliveryDate ?? project.endDate}
-          />
+          <ProjectTimeline progress={project.progress} />
         </div>
       </Card>
 

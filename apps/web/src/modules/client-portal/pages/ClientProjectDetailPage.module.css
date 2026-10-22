@@ -230,12 +230,6 @@
   color: #93a0ac;
 }
 
-.roadmapList {
-  display: flex;
-  flex-direction: column;
-  gap: var(--kora-space-3);
-}
-
 .hoursGrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));

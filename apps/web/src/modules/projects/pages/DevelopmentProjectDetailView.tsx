@@ -284,11 +284,7 @@ export function DevelopmentProjectDetailView({
       <Card>
         <p className={styles.sectionTitle}>Avance del proyecto</p>
         <div style={{ marginTop: "var(--kora-space-4)" }}>
-          <ProjectTimeline
-            progress={project.progress}
-            startDate={project.startDate}
-            endDate={project.estimatedDeliveryDate ?? project.endDate}
-          />
+          <ProjectTimeline progress={project.progress} />
         </div>
 
         <div className={styles.metricsDivider} />
@@ -306,7 +302,8 @@ export function DevelopmentProjectDetailView({
               <CalendarIcon size={12} className={styles.iconBlue} /> Entrega estimada
             </span>
             <span className={styles.kpiValue} style={{ fontSize: "var(--kora-text-lg)" }}>
-              {formatDate(project.estimatedDeliveryDate)}
+              {/* Proyectos antiguos/seed no tienen entrega estimada propia: cae a la fecha de fin, como el avance antes. */}
+              {formatDate(project.estimatedDeliveryDate ?? project.endDate)}
             </span>
           </div>
           <div className={styles.metricItem}>

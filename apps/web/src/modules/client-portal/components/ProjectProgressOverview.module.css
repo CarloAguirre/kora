@@ -12,6 +12,18 @@
     0px 10px 14px 0px rgba(15, 41, 66, 0.16);
 }
 
+.bare {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.note {
+  margin: -8px 0 0;
+  font-size: var(--kora-text-xs);
+  color: #93a0ac;
+}
+
 .empty {
   margin: 0;
   font-size: var(--kora-text-sm);
@@ -123,10 +135,19 @@
   transform: translateX(calc(-50% + 8px));
 }
 
+/* Leyenda + estado arriba a la derecha: la leyenda no ocupa una fila propia. */
+.headerSide {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px 18px;
+}
+
 .legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px 18px;
+  gap: 6px 14px;
   font-size: var(--kora-text-xs);
   color: #5d6b7a;
 }
