@@ -15,9 +15,11 @@ import {
 } from '../../application/drive-source-selection';
 
 const MAX_DEPTH = 3;
-const MAX_SOURCE_DOCUMENTS = 6;
-const MAX_BINARY_BYTES = 8 * 1024 * 1024;
-const MAX_TEXT_CHARS_PER_DOCUMENT = 40_000;
+const MAX_SOURCE_DOCUMENTS = 4;
+const MAX_BINARY_BYTES = 5 * 1024 * 1024;
+const MAX_TEXT_CHARS_PER_DOCUMENT = 30_000;
+const MAX_SCANNED_ITEMS = 150;
+const MAX_BASE64_CHARS = Math.ceil((MAX_BINARY_BYTES * 4) / 3) + 4;
 
 interface Candidate {
   readonly item: DriveFolderItem;
@@ -67,6 +69,12 @@ export class GoogleDriveDocumentSourceReader
           : undefined;
 
         if (!text && !content.dataBase64) continue;
+        if (
+          content.dataBase64 &&
+          content.dataBase64.length > MAX_BASE64_CHARS
+        ) {
+          continue;
+        }
 
         documents.push({
           sourceId: candidate.item.id,
@@ -95,13 +103,20 @@ export class GoogleDriveDocumentSourceReader
       { folderId: rootFolderId, path: '', depth: 1 },
     ];
     const candidates: Candidate[] = [];
+    let scannedItems = 0;
 
-    while (queue.length > 0 && candidates.length < 30) {
+    while (
+      queue.length > 0 &&
+      candidates.length < 30 &&
+      scannedItems < MAX_SCANNED_ITEMS
+    ) {
       const current = queue.shift();
       if (!current) break;
 
       const children = await this.drive.listChildren(current.folderId);
       for (const child of children) {
+        scannedItems += 1;
+        if (scannedItems > MAX_SCANNED_ITEMS) break;
         const path = current.path
           ? `${current.path}/${child.name}`
           : child.name;
