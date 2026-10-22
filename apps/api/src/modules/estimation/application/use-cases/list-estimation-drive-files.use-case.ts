@@ -9,6 +9,12 @@ import {
   DRIVE_FOLDER_CLIENT,
   type DriveFolderClient,
 } from '../ports/drive-folder-client.port';
+import {
+  FALLBACK_DOCUMENT_ID,
+  FALLBACK_DOCUMENT_MIME_TYPE,
+  FALLBACK_DOCUMENT_MODIFIED_AT,
+  FALLBACK_DOCUMENT_NAME,
+} from '../fallback-estimation-document';
 
 @Injectable()
 export class ListEstimationDriveFilesUseCase {
@@ -36,10 +42,20 @@ export class ListEstimationDriveFilesUseCase {
       return estimationDriveFolderListingSchema.parse({
         folderId,
         folderUrl: input.driveFolderUrl,
-        connection: 'not_configured',
-        files: [],
+        connection: 'connected',
+        files: [
+          {
+            id: FALLBACK_DOCUMENT_ID,
+            name: FALLBACK_DOCUMENT_NAME,
+            mimeType: FALLBACK_DOCUMENT_MIME_TYPE,
+            kind: 'pdf',
+            modifiedAt: FALLBACK_DOCUMENT_MODIFIED_AT,
+            webViewLink: null,
+            sizeBytes: null,
+          },
+        ],
         message:
-          'Google Drive aún no está configurado en la API de Kora. Define las credenciales de la cuenta de servicio para listar archivos.',
+          'Modo fallback PoC: Requerimiento_KDM.pdf simula un antecedente disponible en Drive.',
       });
     }
 
