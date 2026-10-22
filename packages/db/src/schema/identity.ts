@@ -180,6 +180,23 @@ export const userIdentities = pgTable(
   ],
 );
 
+export const googleDriveConnections = pgTable(
+  'google_drive_connections',
+  {
+    userId: uuid('user_id')
+      .primaryKey()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    googleEmail: varchar('google_email', { length: 255 }).notNull(),
+    refreshTokenEncrypted: text('refresh_token_encrypted').notNull(),
+    scopes: text('scopes').notNull(),
+    connectedAt: timestamp('connected_at', { withTimezone: true, mode: 'date' })
+      .notNull()
+      .default(sql`now()`),
+    ...timestamps,
+  },
+  (table) => [index('google_drive_connections_email_idx').on(table.googleEmail)],
+);
+
 /**
  * Excepciones puntuales al permiso que otorga el rol.
  *
@@ -285,6 +302,10 @@ export const usersRelations = relations(users, ({ one, many }) => ({
     references: [userCredentials.userId],
   }),
   identities: many(userIdentities),
+  googleDriveConnection: one(googleDriveConnections, {
+    fields: [users.id],
+    references: [googleDriveConnections.userId],
+  }),
   permissionOverrides: many(userPermissionOverrides),
   sessions: many(sessions),
 }));
@@ -296,6 +317,16 @@ export const userCredentialsRelations = relations(userCredentials, ({ one }) => 
 export const userIdentitiesRelations = relations(userIdentities, ({ one }) => ({
   user: one(users, { fields: [userIdentities.userId], references: [users.id] }),
 }));
+
+export const googleDriveConnectionsRelations = relations(
+  googleDriveConnections,
+  ({ one }) => ({
+    user: one(users, {
+      fields: [googleDriveConnections.userId],
+      references: [users.id],
+    }),
+  }),
+);
 
 export const userPermissionOverridesRelations = relations(userPermissionOverrides, ({ one }) => ({
   user: one(users, { fields: [userPermissionOverrides.userId], references: [users.id] }),
