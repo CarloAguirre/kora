@@ -41,12 +41,6 @@ export const envSchema = z.object({
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   GOOGLE_CALLBACK_URL: z.string().optional(),
 
-  // Integración servidor-a-servidor con Google Drive para los antecedentes de
-  // proyectos. Ambas son opcionales: sin ellas, Calculadora informa que Drive
-  // no está configurado y no intenta acceder a carpetas privadas.
-  GOOGLE_DRIVE_CLIENT_EMAIL: z.email().optional(),
-  GOOGLE_DRIVE_PRIVATE_KEY: z.string().optional(),
-
   // Proveedor IA de la PoC de Calculadora. La API key es opcional: sin ella
   // AiModule cae al proveedor simulado y la aplicación sigue arrancando.
   GEMINI_API_KEY: z.string().trim().min(1).optional(),
