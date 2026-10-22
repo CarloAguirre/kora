@@ -8,11 +8,8 @@ import { BitacoraEntryRow } from './ProjectBitacora';
 import {
   PHASE_ROADMAP_ROLE_COLORS,
   PHASE_ROADMAP_ROLE_LABELS,
-  PHASE_ROADMAP_TASK_SCOPES,
-  PHASE_ROADMAP_TASK_SCOPE_LABELS,
   type PhaseRoadmapPhase,
   type PhaseRoadmapTask,
-  type PhaseRoadmapTaskScope,
   type ProjectPhaseRoadmap,
 } from '../types';
 
@@ -153,13 +150,6 @@ function phaseRange(phase: PhaseRoadmapPhase): DateRange | null {
  * 35 revela la cuadrícula y las etiquetas por día). Solo la
  * columna de pistas hace scroll horizontal: los nombres de cada fila quedan
  * siempre visibles a la izquierda.
- *
- * Los chips de "Resumen de avance" mantienen la píldora navy sólida del
- * Figma, pero están conectados a las tareas reales de la fase (`taskItems`,
- * cada una con su `scope`): el tooltip muestra el % completado por ámbito
- * (mismo cálculo que `ProjectModulesCard` del Roadmap interno) y el clic
- * atenúa los tramos y las tareas que no son de ese ámbito (el de cada tramo se
- * deriva de su rol en el adapter).
  */
 export function PhaseRoadmap({ phaseRoadmap, renderPhaseExtras, renderSelectionDetail }: PhaseRoadmapProps) {
   /** Fases abiertas — cada una se abre/cierra por separado (varias a la vez); arranca abierta la primera. */
@@ -284,35 +274,6 @@ export function PhaseRoadmap({ phaseRoadmap, renderPhaseExtras, renderSelectionD
   );
 }
 
-/** Aviso bajo los chips de "Resumen de avance" con el ámbito activo — sin él, elegir un ámbito sin
- *  tramos ni tareas parecía no hacer nada. */
-function ScopeFilterNotice({
-  scope,
-  segmentCount,
-  taskCount,
-  onClear,
-}: {
-  scope: PhaseRoadmapTaskScope;
-  segmentCount: number;
-  taskCount: number;
-  onClear: () => void;
-}) {
-  const plural = (count: number, singular: string, pluralForm: string) => `${count} ${count === 1 ? singular : pluralForm}`;
-  return (
-    <div className={styles.scopeFilterNotice}>
-      <span>
-        Filtrando por <b>{PHASE_ROADMAP_TASK_SCOPE_LABELS[scope]}</b>:{' '}
-        {segmentCount === 0 && taskCount === 0
-          ? 'sin tramos ni tareas en este ámbito.'
-          : `${plural(segmentCount, 'tramo', 'tramos')} y ${plural(taskCount, 'tarea', 'tareas')}.`}
-      </span>
-      <button type="button" className={styles.relatedBitacoraReset} onClick={onClear}>
-        Quitar filtro
-      </button>
-    </div>
-  );
-}
-
 /** Geometría de la barra dentro del rango visible; `null` si el tramo queda completamente fuera. */
 function barGeometry(task: PhaseRoadmapTask, range: DateRange) {
   const start = toDate(task.startDate);
@@ -347,7 +308,7 @@ const sameSelection = (a: PhaseRoadmapSelection | null, b: PhaseRoadmapSelection
 
 export interface PhaseRoadmapProps {
   phaseRoadmap: ProjectPhaseRoadmap;
-  /** Contenido extra dentro de cada fase, bajo "Resumen de avance" (p.ej. los datos de la fase del Roadmap interno). */
+  /** Contenido extra dentro de cada fase, bajo el zoom (p.ej. los datos de la fase del Roadmap interno). */
   renderPhaseExtras?: (phase: PhaseRoadmapPhase) => ReactNode;
   /** Detalle del ítem seleccionado, sobre "Registros de bitácora relacionados" (Roadmap interno). */
   renderSelectionDetail?: (phase: PhaseRoadmapPhase, selection: PhaseRoadmapSelection, clearSelection: () => void) => ReactNode;
@@ -404,23 +365,6 @@ function PhaseCard({
     return latest ? [latest] : [];
   }, [phase.relatedBitacora, selectedRelated]);
 
-  /** Chips de "Resumen de avance": % de avance por ámbito ponderado por HH
-   *  (`phase.scopeProgress`, del backend; sin él, % de tareas aprobadas) — clic
-   *  atenúa los tramos (barras) y las tareas que no son de ese ámbito. */
-  const [activeScope, setActiveScope] = useState<PhaseRoadmapTaskScope | null>(null);
-  const isOutOfScope = (scope: PhaseRoadmapTaskScope) => activeScope !== null && scope !== activeScope;
-
-  const scopeStats = useMemo(() => {
-    const stats = new Map<PhaseRoadmapTaskScope, { total: number; done: number }>();
-    for (const item of phase.taskItems) {
-      const entry = stats.get(item.scope) ?? { total: 0, done: 0 };
-      entry.total += 1;
-      if (item.state === 'done') entry.done += 1;
-      stats.set(item.scope, entry);
-    }
-    return stats;
-  }, [phase.taskItems]);
-
   const visibleDeliveries = phase.deliveries
     .map((delivery) => ({ delivery, leftPercent: percentOf(toDate(delivery.date), axis.range) }))
     .filter(({ leftPercent }) => leftPercent >= 0 && leftPercent <= 100);
@@ -465,34 +409,6 @@ function PhaseCard({
       {expanded && (
         <div className={styles.phaseBody}>
           <div className={styles.summaryOfProgressRow}>
-            <span className={styles.summaryOfProgressLabel}>Resumen de avance</span>
-            <div className={styles.stageChips}>
-              {PHASE_ROADMAP_TASK_SCOPES.map((scope) => {
-                const stats = scopeStats.get(scope);
-                const percent =
-                  phase.scopeProgress !== undefined
-                    ? phase.scopeProgress[scope]
-                    : stats && stats.total > 0
-                      ? Math.round((stats.done / stats.total) * 100)
-                      : null;
-                const title =
-                  percent !== null
-                    ? `${PHASE_ROADMAP_TASK_SCOPE_LABELS[scope]}: ${percent}% (${stats?.done ?? 0}/${stats?.total ?? 0} aprobadas)`
-                    : `${PHASE_ROADMAP_TASK_SCOPE_LABELS[scope]}: sin tareas registradas`;
-                return (
-                  <button
-                    key={scope}
-                    type="button"
-                    className={[styles.stageChip, activeScope === scope ? styles.stageChipActive : ''].join(' ')}
-                    title={title}
-                    onClick={() => setActiveScope((current) => (current === scope ? null : scope))}
-                  >
-                    {PHASE_ROADMAP_TASK_SCOPE_LABELS[scope]}
-                    {percent !== null && <span className={styles.stageChipPercent}>{percent}%</span>}
-                  </button>
-                );
-              })}
-            </div>
             <div className={styles.zoomRow}>
               <span>Semanas</span>
               <input
@@ -507,22 +423,13 @@ function PhaseCard({
             </div>
           </div>
 
-          {activeScope !== null && (
-            <ScopeFilterNotice
-              scope={activeScope}
-              segmentCount={phase.tasks.filter((task) => task.scope === activeScope).length}
-              taskCount={phase.taskItems.filter((taskItem) => taskItem.scope === activeScope).length}
-              onClear={() => setActiveScope(null)}
-            />
-          )}
-
           {renderExtras?.(phase)}
 
           <div className={styles.ganttGrid}>
             <div className={styles.ganttLabels}>
               <div className={styles.ganttLabelsHeader} />
               {phase.tasks.map((task, index) => (
-                <div key={index} className={[styles.taskRowLabel, isOutOfScope(task.scope) ? styles.scopeDimmed : ''].join(' ')}>
+                <div key={index} className={styles.taskRowLabel}>
                   <span className={styles.legendDot} style={{ background: PHASE_ROADMAP_ROLE_COLORS[task.role] }} />
                   <span className={styles.taskRowLabelText}>
                     <span className={styles.taskRoleName}>{PHASE_ROADMAP_ROLE_LABELS[task.role]}</span>
@@ -586,7 +493,6 @@ function PhaseCard({
                             styles.ganttBar,
                             start > today ? styles.ganttBarFuture : '',
                             isSelected ? styles.ganttBarSelected : '',
-                            isOutOfScope(task.scope) ? styles.scopeDimmed : '',
                           ].join(' ')}
                           style={{
                             left: `${geometry.leftPercent}%`,
@@ -650,7 +556,6 @@ function PhaseCard({
                             styles.markerItem,
                             styles.markerItemTask,
                             isSelected ? styles.markerItemHighlighted : '',
-                            isOutOfScope(taskItem.scope) ? styles.scopeDimmed : '',
                           ].join(' ')}
                           style={{ left: `${leftPercent}%` }}
                           title={`${taskItem.label} · ${formatShortDate(taskItem.date)}`}
