@@ -154,11 +154,34 @@ describe('ClientProjectDetailPage — ocultar horas consumidas', () => {
     expect(screen.queryByText('30')).not.toBeInTheDocument();
     expect(screen.getByText('En riesgo')).toBeInTheDocument();
     expect(screen.getByText('Avance real vs. esperado')).toBeInTheDocument();
-    expect(screen.getByText('40%')).toBeInTheDocument();
+    // Uno en "Avance del proyecto" y otro en "Horas y avance".
+    expect(screen.getAllByText('40%')).toHaveLength(2);
     expect(screen.getByText('Horas estimadas')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Mostrar horas consumidas' }));
     expect(screen.getByText('Horas utilizadas a la fecha')).toBeInTheDocument();
+  });
+});
+
+describe('ClientProjectDetailPage — avance del proyecto', () => {
+  it('explica en palabras la diferencia entre el avance real y lo planificado a la fecha', () => {
+    renderPage(
+      buildProject({
+        progress: { actual: 85, expected: 95, consumption: 55, delay: 10, planCoverage: 95, estimatedByCount: false },
+      }),
+    );
+
+    expect(screen.getByText('del proyecto completado')).toBeInTheDocument();
+    expect(screen.getByText('A la fecha el plan contemplaba un 95% de avance: vamos 10 puntos por debajo.')).toBeInTheDocument();
+    expect(screen.getByText('Diferencia por recuperar')).toBeInTheDocument();
+    // Lo interno de `ProjectTimeline` (HH, cobertura del plan) no llega al cliente.
+    expect(screen.queryByText(/Plan cargado/)).not.toBeInTheDocument();
+  });
+
+  it('sin plan cargado avisa que el avance se mostrará después', () => {
+    renderPage(buildProject());
+
+    expect(screen.getByText(/El avance se mostrará apenas el plan de trabajo/)).toBeInTheDocument();
   });
 });
 

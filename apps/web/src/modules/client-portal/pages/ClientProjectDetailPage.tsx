@@ -38,6 +38,7 @@ import { PhaseProgressBar } from '../components/PhaseProgressBar';
 import { PhaseRoadmap } from '../components/PhaseRoadmap';
 import { ProjectBillingCard } from '../components/ProjectBillingCard';
 import { ProjectBitacora } from '../components/ProjectBitacora';
+import { ProjectProgressOverview } from '../components/ProjectProgressOverview';
 import { ProjectViewTabs } from '../components/ProjectViewTabs';
 import { StatusPill, type StatusPillTone } from '../components/StatusPill';
 import { toClientProjectDetail } from '../adapters/project-detail.adapter';
@@ -61,7 +62,7 @@ const ACCESS_LINKS: readonly AccessLink[] = [
   { key: 'documentation', label: 'Documentación', subtitle: 'Especificaciones', icon: AlignLeftIcon },
 ];
 
-type SectionKey = 'info' | 'billing' | 'links' | 'roadmap' | 'hours' | 'gantt' | 'impact' | 'qa' | 'bitacora';
+type SectionKey = 'info' | 'billing' | 'links' | 'progress' | 'roadmap' | 'hours' | 'gantt' | 'impact' | 'qa' | 'bitacora';
 
 /**
  * Un botón por sección — "esta botonera muestra o esconde las secciones de
@@ -69,11 +70,12 @@ type SectionKey = 'info' | 'billing' | 'links' | 'roadmap' | 'hours' | 'gantt' |
  * sincronizó con las 2 secciones nuevas de la variante "Kora · Proyectos y
  * Soporte 2" del node 9663:24207). Se prioriza el invariante que esta misma
  * lista ya documentaba (un ícono = una sección, nunca desincronizados) sobre
- * copiar un conteo de Figma que quedó desactualizado: son 9 ahora ("Avance
+ * copiar un conteo de Figma que quedó desactualizado: son 10 ahora ("Avance
  * del periodo" se quitó — su contenido ya vive en "Bitácora").
  */
 const SECTION_TOGGLES: ReadonlyArray<{ key: SectionKey; label: string; icon: typeof LinkIcon }> = [
   { key: 'links', label: 'Accesos y enlaces', icon: LinkIcon },
+  { key: 'progress', label: 'Avance del proyecto', icon: CircleCheckIcon },
   { key: 'roadmap', label: 'Hoja de ruta', icon: RefreshIcon },
   { key: 'billing', label: 'Facturación', icon: DollarSignIcon },
   { key: 'info', label: 'Datos del proyecto', icon: ListIcon },
@@ -88,6 +90,7 @@ const ALL_SECTIONS_VISIBLE: Record<SectionKey, boolean> = {
   info: true,
   billing: true,
   links: true,
+  progress: true,
   roadmap: true,
   hours: true,
   gantt: true,
@@ -155,7 +158,7 @@ const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFr
  * La botonera de íconos bajo el título replica la del Figma en el orden y
  * los conceptos, no en la cantidad exacta: el archivo se quedó con 9 botones
  * sin sincronizar con la fusión de "Hitos y aprobaciones" + "Puntos de
- * atención e incidentes" en una sola "Bitácora" — acá son 9, uno por sección,
+ * atención e incidentes" en una sola "Bitácora" — acá son 10, uno por sección,
  * más uno final para ocultar las horas consumidas (`usedHoursVisible`).
  * `SECTION_TOGGLES` es la única lista — el botón y la sección que controla
  * nunca pueden desincronizarse porque ambos leen de ahí.
@@ -369,6 +372,19 @@ export function ClientProjectDetailPage({
               </a>
             ))}
           </div>
+        </section>
+        )}
+
+        {visible.progress && (
+        <section className={styles.section}>
+          <h3 className={styles.sectionTitle}>Avance del proyecto</h3>
+          <ProjectProgressOverview
+            actualPercent={project.progressActualPercent}
+            expectedPercent={project.progressExpectedPercent}
+            startDate={project.startDate}
+            endDate={project.endDate}
+            daysRemaining={project.daysRemaining}
+          />
         </section>
         )}
 
