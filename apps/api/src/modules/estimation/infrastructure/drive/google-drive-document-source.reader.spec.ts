@@ -23,6 +23,29 @@ function file(
 }
 
 describe('GoogleDriveDocumentSourceReader', () => {
+
+  it('entrega el contenido KDM a Gemini si Drive no está configurado', async () => {
+    const drive: DriveFolderClient = {
+      isConfigured: () => false,
+      listFiles: async () => [],
+      listChildren: async () => [],
+      searchFolders: async () => [],
+      getMetadata: async () => null,
+      readAnalysisContent: async () => null,
+    };
+
+    const reader = new GoogleDriveDocumentSourceReader(drive);
+    const result = await reader.readDriveSources(
+      'https://drive.google.com/drive/folders/kora-poc-fallback',
+    );
+
+    expect(result).toHaveLength(1);
+    expect(result[0]?.name).toBe('Requerimiento_KDM.pdf');
+    expect(result[0]?.text).toContain('Integración con Facele');
+    expect(result[0]?.text).toContain('Match Engine');
+    expect(result[0]?.text).toContain('Microsoft Entra ID');
+  });
+
   it('prioriza antecedentes relevantes y omite credenciales y Office no convertido', async () => {
     const drive: DriveFolderClient = {
       isConfigured: () => true,
