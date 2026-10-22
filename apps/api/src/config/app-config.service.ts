@@ -51,6 +51,12 @@ export interface GoogleDriveSettings {
   readonly privateKey: string;
 }
 
+export interface AiSettings {
+  readonly enabled: boolean;
+  readonly geminiApiKey: string;
+  readonly geminiModel: string;
+}
+
 export interface MailSettings {
   /** `false` sin `RESEND_API_KEY`: los correos van al log (solo fuera de producción, ver env.schema). */
   readonly enabled: boolean;
@@ -115,6 +121,16 @@ export class AppConfigService {
       enabled: clientEmail !== '' && privateKeyRaw !== '',
       clientEmail,
       privateKey: privateKeyRaw.replace(/\\n/g, '\n'),
+    };
+  }
+
+  get ai(): AiSettings {
+    const geminiApiKey = this.config.get('GEMINI_API_KEY', { infer: true }) ?? '';
+
+    return {
+      enabled: geminiApiKey !== '',
+      geminiApiKey,
+      geminiModel: this.config.get('GEMINI_MODEL', { infer: true }),
     };
   }
 
