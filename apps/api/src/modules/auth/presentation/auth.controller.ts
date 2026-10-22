@@ -1,5 +1,20 @@
-import { randomBytes } from 'node:crypto';
-import { Body, Controller, Get, HttpCode, HttpStatus, Inject, Post, Req, Res } from '@nestjs/common';
+import {
+  createHmac,
+  randomBytes,
+  timingSafeEqual,
+} from 'node:crypto';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Inject,
+  Post,
+  Req,
+  Res,
+} from '@nestjs/common';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import {
   AUTH_ERROR_CODES,
@@ -36,9 +51,14 @@ import {
   GOOGLE_OAUTH_CLIENT,
   type GoogleOAuthClient,
 } from '../../../shared/application/ports/google-oauth-client.port';
+import {
+  GoogleDriveAuthorizationService,
+  type GoogleDriveConnectionStatus,
+} from '../../../shared/infrastructure/auth/google-drive-authorization.service';
 
 const REFRESH_COOKIE = 'kora_refresh';
 const GOOGLE_STATE_COOKIE = 'kora_google_state';
+const GOOGLE_DRIVE_STATE_COOKIE = 'kora_google_drive_state';
 
 /**
  * Endpoints de autenticación.
@@ -62,6 +82,7 @@ export class AuthController {
     private readonly requestReset: RequestPasswordResetUseCase,
     private readonly currentUser: GetCurrentUserUseCase,
     private readonly config: AppConfigService,
+    private readonly googleDriveAuthorization: GoogleDriveAuthorizationService,
     @Inject(GOOGLE_OAUTH_CLIENT) private readonly googleClient: GoogleOAuthClient,
   ) {}
 
@@ -116,6 +137,63 @@ export class AuthController {
     void reply.redirect(this.googleClient.buildAuthorizationUrl(state), 302);
   }
 
+  @Post('google/drive/connect')
+  async googleDriveConnect(
+    @CurrentUser() user: RequestUser,
+    @Body() body: { returnTo?: string } | undefined,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ): Promise<{ authorizationUrl: string }> {
+    if (!this.config.google.enabled) {
+      throw new UnauthorizedError(
+        'Google OAuth no está configurado en Kora.',
+        AUTH_ERROR_CODES.GOOGLE_NOT_CONFIGURED,
+      );
+    }
+
+    const state = randomBytes(16).toString('hex');
+    const payload: GoogleDriveStatePayload = {
+      state,
+      userId: user.id,
+      email: user.email,
+      returnTo: sanitizeReturnTo(body?.returnTo),
+    };
+
+    void reply.setCookie(
+      GOOGLE_DRIVE_STATE_COOKIE,
+      sealDriveState(payload, this.config.auth.accessSecret),
+      {
+        httpOnly: true,
+        secure: this.config.isProduction,
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 600,
+      },
+    );
+
+    return {
+      authorizationUrl:
+        this.googleDriveAuthorization.buildAuthorizationUrl(
+          state,
+          user.email,
+        ),
+    };
+  }
+
+  @Get('google/drive/status')
+  async googleDriveStatus(
+    @CurrentUser() user: RequestUser,
+  ): Promise<GoogleDriveConnectionStatus> {
+    return this.googleDriveAuthorization.status(user.id);
+  }
+
+  @Delete('google/drive')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async googleDriveDisconnect(
+    @CurrentUser() user: RequestUser,
+  ): Promise<void> {
+    await this.googleDriveAuthorization.disconnect(user.id);
+  }
+
   @Public()
   @Get('google/callback')
   async googleCallback(
@@ -123,6 +201,56 @@ export class AuthController {
     @Res({ passthrough: false }) reply: FastifyReply,
   ): Promise<void> {
     const query = request.query as Record<string, string | undefined>;
+    const driveStateCookie = readCookie(
+      request,
+      GOOGLE_DRIVE_STATE_COOKIE,
+    );
+
+    if (driveStateCookie) {
+      void reply.clearCookie(GOOGLE_DRIVE_STATE_COOKIE, { path: '/' });
+
+      const payload = openDriveState(
+        driveStateCookie,
+        this.config.auth.accessSecret,
+      );
+
+      if (
+        !payload ||
+        !query.state ||
+        payload.state !== query.state ||
+        !query.code
+      ) {
+        void reply.redirect(
+          appendQuery(payload?.returnTo ?? '/calculadora', {
+            drive_error: 'state_mismatch',
+          }),
+          302,
+        );
+        return;
+      }
+
+      try {
+        await this.googleDriveAuthorization.completeAuthorization({
+          userId: payload.userId,
+          expectedEmail: payload.email,
+          code: query.code,
+        });
+
+        void reply.redirect(
+          appendQuery(payload.returnTo, { drive_connected: '1' }),
+          302,
+        );
+      } catch {
+        void reply.redirect(
+          appendQuery(payload.returnTo, {
+            drive_error: 'authorization_failed',
+          }),
+          302,
+        );
+      }
+      return;
+    }
+
     const stateCookie = readCookie(request, GOOGLE_STATE_COOKIE);
     void reply.clearCookie(GOOGLE_STATE_COOKIE, { path: '/' });
 
@@ -270,4 +398,91 @@ function clientIp(request: FastifyRequest): string | null {
     return forwarded.split(',')[0]?.trim() ?? null;
   }
   return request.ip ?? null;
+}
+
+
+interface GoogleDriveStatePayload {
+  readonly state: string;
+  readonly userId: string;
+  readonly email: string;
+  readonly returnTo: string;
+}
+
+function sealDriveState(
+  payload: GoogleDriveStatePayload,
+  secret: string,
+): string {
+  const body = Buffer.from(
+    JSON.stringify(payload),
+    'utf8',
+  ).toString('base64url');
+  const signature = createHmac('sha256', secret)
+    .update(body)
+    .digest('base64url');
+
+  return `${body}.${signature}`;
+}
+
+function openDriveState(
+  value: string,
+  secret: string,
+): GoogleDriveStatePayload | null {
+  const [body, signature] = value.split('.');
+  if (!body || !signature) return null;
+
+  const expected = createHmac('sha256', secret)
+    .update(body)
+    .digest();
+  const received = Buffer.from(signature, 'base64url');
+
+  if (
+    expected.length !== received.length ||
+    !timingSafeEqual(expected, received)
+  ) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(
+      Buffer.from(body, 'base64url').toString('utf8'),
+    ) as Partial<GoogleDriveStatePayload>;
+
+    if (
+      !parsed.state ||
+      !parsed.userId ||
+      !parsed.email ||
+      !parsed.returnTo
+    ) {
+      return null;
+    }
+
+    return {
+      state: parsed.state,
+      userId: parsed.userId,
+      email: parsed.email,
+      returnTo: sanitizeReturnTo(parsed.returnTo),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function sanitizeReturnTo(value: string | undefined): string {
+  if (
+    !value ||
+    !value.startsWith('/') ||
+    value.startsWith('//')
+  ) {
+    return '/calculadora';
+  }
+
+  return value;
+}
+
+function appendQuery(
+  path: string,
+  params: Record<string, string>,
+): string {
+  const separator = path.includes('?') ? '&' : '?';
+  return `${path}${separator}${new URLSearchParams(params).toString()}`;
 }
