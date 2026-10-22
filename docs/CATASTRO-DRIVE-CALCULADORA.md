@@ -512,3 +512,30 @@ seleccionar prospecto
 La asociación descubierta todavía no se persiste. Ese paso debe realizarse
 cuando se defina si se reutiliza `projects.documentation_link` o se crea una
 entidad versionable de fuentes documentales de estimación.
+
+
+## Actualización · carpeta confirmada y análisis real
+
+La Calculadora ya persiste una carpeta confirmada reutilizando
+`projects.documentation_link`.
+
+Además, el inventario diferencia entre:
+
+- archivo visible en Drive;
+- archivo excluido;
+- archivo **analizable** por la PoC.
+
+Los archivos analizables pueden alimentar el lector documental real. El flujo
+actual selecciona hasta seis antecedentes priorizados y los entrega al proveedor
+IA para una estimación ejecutiva por equipos/roles.
+
+La asociación ya no queda únicamente en memoria del modal:
+
+```text
+carpeta elegida
+  -> PATCH /projects/:id/extras
+  -> documentation_link
+  -> próxima estimación reutiliza el vínculo
+```
+
+El análisis detallado RF/HU/EDT permanece fuera del alcance de esta prueba.
