@@ -26,6 +26,7 @@ export class InventoryEstimationDriveUseCase {
   ) {}
 
   async execute(
+    userId: string,
     input: InventoryEstimationDriveInput,
   ): Promise<EstimationDriveInventory> {
     const rootFolderId = extractDriveFolderId(input.driveFolderUrl);
@@ -39,12 +40,12 @@ export class InventoryEstimationDriveUseCase {
       );
     }
 
-    if (!this.drive.isConfigured()) {
+    if (!(await this.drive.isConnected(userId))) {
       return emptyInventory(
-        'not_configured',
+        'not_connected',
         rootFolderId,
         input.driveFolderUrl,
-        'Google Drive aún no está configurado en la API de Kora.',
+        'Conecta Google Drive con tu cuenta para consultar esta carpeta con tus permisos.',
       );
     }
 
@@ -59,7 +60,7 @@ export class InventoryEstimationDriveUseCase {
         const current = queue.shift();
         if (!current) break;
 
-        const children = await this.drive.listChildren(current.folderId);
+        const children = await this.drive.listChildren(userId, current.folderId);
         for (const child of children) {
           if (items.length >= MAX_INVENTORY_ITEMS) {
             truncated = true;
@@ -142,7 +143,7 @@ export class InventoryEstimationDriveUseCase {
 }
 
 function emptyInventory(
-  connection: 'not_configured' | 'unavailable',
+  connection: 'not_connected' | 'not_configured' | 'unavailable',
   rootFolderId: string,
   rootFolderUrl: string,
   message: string,
