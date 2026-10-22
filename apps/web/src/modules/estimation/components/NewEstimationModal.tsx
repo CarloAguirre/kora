@@ -136,6 +136,9 @@ export function NewEstimationModal({ open, prospects, onClose }: NewEstimationMo
     }
 
     const normalizedDriveUrl = driveFolderUrl.trim();
+    const usingFallbackDrive =
+      normalizedDriveUrl.includes('/folders/kora-poc-fallback');
+
     if (mode === 'ai') {
       if (!normalizedDriveUrl) {
         setError('Confirma o vincula la carpeta de Drive del levantamiento para usar el agente IA.');
@@ -167,7 +170,10 @@ export function NewEstimationModal({ open, prospects, onClose }: NewEstimationMo
         return;
       }
 
-      if (detail.data?.documentationLink !== normalizedDriveUrl) {
+      if (
+        !usingFallbackDrive &&
+        detail.data?.documentationLink !== normalizedDriveUrl
+      ) {
         try {
           await updateProjectExtras.mutateAsync({
             projectId: selected.id,
@@ -423,6 +429,10 @@ function DriveInventoryPreview({
             : ''}
         </span>
       </div>
+
+      {inventory.message && (
+        <div className={styles.driveStatus}>{inventory.message}</div>
+      )}
 
       {visibleItems.length === 0 ? (
         <div className={styles.driveStatus}>
