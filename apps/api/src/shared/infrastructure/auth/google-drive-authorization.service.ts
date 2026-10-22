@@ -17,6 +17,11 @@ export interface GoogleDriveConnectionStatus {
 
 @Injectable()
 export class GoogleDriveAuthorizationService {
+  private readonly accessTokens = new Map<
+    string,
+    { readonly value: string; readonly expiresAtMs: number }
+  >();
+
   constructor(
     @Inject(GOOGLE_OAUTH_CLIENT)
     private readonly google: GoogleOAuthClient,
@@ -62,6 +67,7 @@ export class GoogleDriveAuthorizationService {
       refreshTokenEncrypted: this.cipher.encrypt(grant.refreshToken),
       scopes: grant.scopes.join(' '),
     });
+    this.accessTokens.delete(input.userId);
   }
 
   async status(
@@ -81,6 +87,11 @@ export class GoogleDriveAuthorizationService {
   }
 
   async getAccessToken(userId: string): Promise<string> {
+    const cached = this.accessTokens.get(userId);
+    if (cached && cached.expiresAtMs > Date.now() + 60_000) {
+      return cached.value;
+    }
+
     const connection = await this.connections.findByUserId(userId);
     if (!connection) {
       throw new Error(
@@ -92,10 +103,19 @@ export class GoogleDriveAuthorizationService {
       connection.refreshTokenEncrypted,
     );
 
-    return this.google.refreshAccessToken(refreshToken);
+    const accessToken =
+      await this.google.refreshAccessToken(refreshToken);
+
+    this.accessTokens.set(userId, {
+      value: accessToken,
+      expiresAtMs: Date.now() + 50 * 60_000,
+    });
+
+    return accessToken;
   }
 
   async disconnect(userId: string): Promise<void> {
+    this.accessTokens.delete(userId);
     await this.connections.deleteByUserId(userId);
   }
 }
