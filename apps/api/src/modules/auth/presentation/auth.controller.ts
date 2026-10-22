@@ -19,12 +19,16 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import {
   AUTH_ERROR_CODES,
   changePasswordSchema,
+  googleDriveConnectSchema,
   confirmPasswordResetSchema,
   loginSchema,
   requestPasswordResetSchema,
   type AuthenticatedUser,
   type ChangePasswordInput,
   type ConfirmPasswordResetInput,
+  type GoogleDriveConnectionStatus,
+  type GoogleDriveConnectInput,
+  type GoogleDriveConnectResponse,
   type LoginInput,
   type LoginResponse,
   type RefreshResponse,
@@ -51,10 +55,7 @@ import {
   GOOGLE_OAUTH_CLIENT,
   type GoogleOAuthClient,
 } from '../../../shared/application/ports/google-oauth-client.port';
-import {
-  GoogleDriveAuthorizationService,
-  type GoogleDriveConnectionStatus,
-} from '../../../shared/infrastructure/auth/google-drive-authorization.service';
+import { GoogleDriveAuthorizationService } from '../../../shared/infrastructure/auth/google-drive-authorization.service';
 
 const REFRESH_COOKIE = 'kora_refresh';
 const GOOGLE_STATE_COOKIE = 'kora_google_state';
@@ -142,9 +143,10 @@ export class AuthController {
   @Post('google/drive/connect')
   async googleDriveConnect(
     @CurrentUser() user: RequestUser,
-    @Body() body: { returnTo?: string } | undefined,
+    @Body(new ZodValidationPipe(googleDriveConnectSchema))
+    body: GoogleDriveConnectInput,
     @Res({ passthrough: true }) reply: FastifyReply,
-  ): Promise<{ authorizationUrl: string }> {
+  ): Promise<GoogleDriveConnectResponse> {
     if (!this.config.google.enabled) {
       throw new UnauthorizedError(
         'Google OAuth no está configurado en Kora.',
@@ -159,7 +161,7 @@ export class AuthController {
       state,
       userId: user.id,
       email: user.email,
-      returnTo: sanitizeReturnTo(body?.returnTo),
+      returnTo: sanitizeReturnTo(body.returnTo),
     };
 
     void reply.setCookie(
