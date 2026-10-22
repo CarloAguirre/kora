@@ -9,6 +9,9 @@ import {
 } from '../../application/ports/google-oauth-client.port';
 import { GoogleOAuthTokenCipher } from './google-oauth-token-cipher';
 
+const DRIVE_READONLY_SCOPE =
+  'https://www.googleapis.com/auth/drive.readonly';
+
 export interface GoogleDriveConnectionStatus {
   readonly connected: boolean;
   readonly email: string | null;
@@ -58,6 +61,12 @@ export class GoogleDriveAuthorizationService {
     ) {
       throw new Error(
         'Debes autorizar Drive con el mismo correo asociado a tu usuario de Kora.',
+      );
+    }
+
+    if (!grant.scopes.includes(DRIVE_READONLY_SCOPE)) {
+      throw new Error(
+        'No se concedió el permiso de lectura de Google Drive.',
       );
     }
 
