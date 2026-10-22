@@ -10,6 +10,7 @@ import {
   type DriveFolderClient,
 } from '../ports/drive-folder-client.port';
 import {
+  canReadDriveSource,
   classifyDriveKind,
   classifyDriveSource,
   extractDriveFolderId,
@@ -84,6 +85,10 @@ export class InventoryEstimationDriveUseCase {
             path,
             depth: current.depth,
             priority: classification.priority,
+            analyzable:
+              child.itemType === 'file' &&
+              classification.priority !== 'excluded' &&
+              canReadDriveSource(child.mimeType),
             reason: classification.reason,
           });
 
