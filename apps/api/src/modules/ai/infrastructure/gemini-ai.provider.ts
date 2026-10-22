@@ -49,7 +49,6 @@ export class GeminiAiProvider implements AiProvider {
           },
         ],
         generationConfig: {
-          temperature: 0.2,
           responseMimeType: 'application/json',
           ...(input.responseJsonSchema
             ? { responseSchema: input.responseJsonSchema }
