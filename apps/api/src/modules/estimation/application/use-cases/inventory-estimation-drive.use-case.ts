@@ -15,6 +15,13 @@ import {
   classifyDriveSource,
   extractDriveFolderId,
 } from '../drive-source-selection';
+import {
+  FALLBACK_DOCUMENT_ID,
+  FALLBACK_DOCUMENT_MIME_TYPE,
+  FALLBACK_DOCUMENT_MODIFIED_AT,
+  FALLBACK_DOCUMENT_NAME,
+  FALLBACK_DOCUMENT_PATH,
+} from '../fallback-estimation-document';
 
 const MAX_INVENTORY_ITEMS = 150;
 
@@ -40,12 +47,7 @@ export class InventoryEstimationDriveUseCase {
     }
 
     if (!this.drive.isConfigured()) {
-      return emptyInventory(
-        'not_configured',
-        rootFolderId,
-        input.driveFolderUrl,
-        'Google Drive aún no está configurado en la API de Kora.',
-      );
+      return fallbackInventory(rootFolderId, input.driveFolderUrl);
     }
 
     try {
@@ -164,3 +166,42 @@ function emptyInventory(
   });
 }
 
+
+
+function fallbackInventory(
+  rootFolderId: string,
+  rootFolderUrl: string,
+): EstimationDriveInventory {
+  return estimationDriveInventorySchema.parse({
+    connection: 'connected',
+    rootFolderId,
+    rootFolderUrl,
+    summary: {
+      files: 1,
+      folders: 0,
+      recommended: 1,
+      secondary: 0,
+      excluded: 0,
+      truncated: false,
+    },
+    items: [
+      {
+        id: FALLBACK_DOCUMENT_ID,
+        name: FALLBACK_DOCUMENT_NAME,
+        url: null,
+        mimeType: FALLBACK_DOCUMENT_MIME_TYPE,
+        itemType: 'file',
+        kind: 'pdf',
+        modifiedAt: FALLBACK_DOCUMENT_MODIFIED_AT,
+        path: FALLBACK_DOCUMENT_PATH,
+        depth: 1,
+        priority: 'recommended',
+        analyzable: true,
+        reason:
+          'Antecedente temporal de la PoC utilizado mientras Google Drive no está configurado.',
+      },
+    ],
+    message:
+      'Modo fallback PoC: este antecedente simula un archivo disponible en la carpeta Drive del prospecto.',
+  });
+}
