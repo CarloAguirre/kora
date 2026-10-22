@@ -24,6 +24,8 @@
     "seed:aurelia-sustancias-peligrosas": "tsx src/seeds/run-aurelia-sustancias-peligrosas.ts",
     "seed:aurelia-gestion-documental": "tsx src/seeds/run-aurelia-gestion-documental.ts",
     "seed:aurelia-capacitaciones-ambientales": "tsx src/seeds/run-aurelia-capacitaciones-ambientales.ts",
+    "seed:aurelia-monitoreo-de-aire": "tsx src/seeds/run-aurelia-monitoreo-de-aire.ts",
+    "seed:aurelia-monitoreo-de-agua": "tsx src/seeds/run-aurelia-monitoreo-de-agua.ts",
     "backfill:slugs": "tsx src/backfill-slugs.ts",
     "backfill:ticket-hh-request-hour-entries": "tsx src/backfill-ticket-hh-request-hour-entries.ts",
     "backfill:support-plan-container-projects": "tsx src/backfill-support-plan-container-projects.ts",
