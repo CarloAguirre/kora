@@ -16,6 +16,8 @@ interface EstimationPocContext {
  */
 @Injectable()
 export class PocAiProvider implements AiProvider {
+  readonly name = 'poc-ai';
+
   async generateStructured(input: AiStructuredRequest): Promise<unknown> {
     const context = (input.context ?? {}) as EstimationPocContext;
 
@@ -132,7 +134,7 @@ export class PocAiProvider implements AiProvider {
       roles,
       assumptions: [
         'Se reutilizan autenticación, proyectos, permisos, layout y componentes existentes de Kora.',
-        'La PoC no descarga ni interpreta todavía los archivos de Drive.',
+        'El proveedor simulado no interpreta documentos; configura GEMINI_API_KEY para la prueba real.',
         'Los cálculos de HH se realizan fuera del proveedor IA.',
       ],
       clarifyingQuestions: [],
