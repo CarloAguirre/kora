@@ -1155,3 +1155,108 @@ DRIVE_FOLDER_CLIENT
 La futura lectura de contenido seguirá utilizando `DocumentSourceReader`, por
 lo que listar metadatos en el modal no obliga a mezclar Drive con la lógica de
 análisis IA.
+
+
+## PoC real · Drive + Gemini + estimación por equipos
+
+Se implementó el siguiente vertical slice para validar el valor de la Calculadora
+sin incorporar todavía la EDT detallada.
+
+### Alcance
+
+El flujo activo para `Propuesta del agente IA` queda:
+
+```text
++ Nueva estimación
+  -> seleccionar prospecto
+  -> vincular/confirmar carpeta raíz Drive
+  -> inventariar antecedentes
+  -> mostrar archivos realmente analizables
+  -> guardar la carpeta en projects.documentation_link
+  -> seleccionar hasta 6 fuentes relevantes
+  -> exportar/descargar contenido
+  -> Gemini
+  -> roles/equipos + duración + dedicación + supuestos
+  -> cálculo determinístico de HH
+  -> revisión humana
+```
+
+Esta PoC **no genera todavía** requerimientos, HU, casos de uso, tareas ni EDT.
+La reducción de alcance es deliberada para validar primero:
+
+1. acceso real a documentación;
+2. selección de antecedentes relevantes;
+3. interpretación real mediante LLM;
+4. dimensionamiento inicial por perfiles;
+5. trazabilidad mínima por nombre de documento.
+
+### Proveedor IA
+
+`AiModule` conserva el boundary `AI_PROVIDER`.
+
+Con `GEMINI_API_KEY` configurado utiliza Gemini. El modelo queda configurable
+con `GEMINI_MODEL`; el valor por defecto de la PoC es:
+
+```text
+gemini-3.5-flash-lite
+```
+
+Sin API key Kora puede seguir arrancando y mantiene `PocAiProvider` como
+fallback explícitamente identificado como simulado.
+
+Para esta PoC se usa REST con `fetch` nativo de Node, evitando incorporar un
+SDK adicional.
+
+### Formatos analizados
+
+Soportados en esta iteración:
+
+- PDF;
+- Google Docs (exportado a texto);
+- Google Sheets (exportado a CSV);
+- Google Slides (exportado a PDF);
+- TXT;
+- Markdown;
+- CSV/TSV;
+- HTML/XML/RTF;
+- JSON.
+
+Los DOCX/XLSX/PPTX almacenados como binarios Office pueden aparecer en el
+inventario, pero no se envían todavía al modelo.
+
+### Selección y límites
+
+El lector documental:
+
+- recorre como máximo 3 niveles;
+- excluye credenciales, secretos, APK, backups y carpetas antiguas;
+- prioriza levantamientos, requerimientos, arquitectura, procesos, alcance y
+  documentación por módulos;
+- toma como máximo 6 documentos;
+- limita PDF/binarios a 8 MB;
+- limita texto a 40.000 caracteres por documento;
+- si un archivo falla, continúa con los demás.
+
+### Privacidad
+
+El tier gratuito de Gemini puede usar los datos enviados para mejorar productos
+de Google. Por ello esta configuración gratuita debe considerarse **PoC** y
+usarse solo con documentación cuya salida hacia ese proveedor esté autorizada.
+
+Para documentos reales de clientes sensibles, el paso a producción deberá usar
+un tier/proveedor aprobado contractualmente y con las garantías de tratamiento
+de datos requeridas por Kabeli/cliente.
+
+### Persistencia del vínculo Drive
+
+Cuando el usuario confirma o pega una carpeta válida en el modal, Kora reutiliza
+el endpoint existente de Proyectos:
+
+```http
+PATCH /api/projects/:id/extras
+```
+
+y guarda la URL como `documentationLink` / `projects.documentation_link`.
+
+Así la Calculadora no mantiene una relación paralela proyecto-Drive y futuras
+estimaciones pueden reutilizar la carpeta ya confirmada.
