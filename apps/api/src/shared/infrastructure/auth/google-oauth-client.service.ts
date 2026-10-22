@@ -86,7 +86,7 @@ export class GoogleOAuthClientService implements GoogleOAuthClient {
     return {
       profile,
       refreshToken: token.refresh_token,
-      scopes: (token.scope ?? DRIVE_READONLY_SCOPE)
+      scopes: (token.scope ?? '')
         .split(/\s+/)
         .filter(Boolean),
     };
