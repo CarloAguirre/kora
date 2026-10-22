@@ -139,7 +139,7 @@ export function NewEstimationModal({ open, prospects, onClose }: NewEstimationMo
 
   useEffect(() => {
     if (!selected) {
-      setDriveFolderUrl('');
+      if (!projectRef) setDriveFolderUrl('');
       return;
     }
     if (driveTouched) return;
@@ -156,6 +156,7 @@ export function NewEstimationModal({ open, prospects, onClose }: NewEstimationMo
     detail.data?.documentationLink,
     driveResolution.data?.selectedFolder?.url,
     driveTouched,
+    projectRef,
     selected,
   ]);
 
