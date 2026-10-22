@@ -6,6 +6,22 @@ import type {
 } from '@kora/contracts';
 import { estimationApi, estimationKeys } from './estimation.api';
 
+export function useGoogleDriveConnectionStatus(enabled = true) {
+  return useQuery({
+    queryKey: estimationKeys.driveConnection(),
+    queryFn: () => estimationApi.driveConnectionStatus(),
+    enabled,
+    staleTime: 60_000,
+  });
+}
+
+export function useConnectGoogleDrive() {
+  return useMutation({
+    mutationFn: (returnTo: string) =>
+      estimationApi.startDriveConnection(returnTo),
+  });
+}
+
 export function useEstimationQuestionnaireDefinition() {
   return useQuery({
     queryKey: estimationKeys.questionnaireDefinition(),
