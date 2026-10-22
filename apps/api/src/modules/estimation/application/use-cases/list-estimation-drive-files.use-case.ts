@@ -18,6 +18,7 @@ export class ListEstimationDriveFilesUseCase {
   ) {}
 
   async execute(
+    userId: string,
     input: ListEstimationDriveFilesInput,
   ): Promise<EstimationDriveFolderListing> {
     const folderId = extractDriveFolderId(input.driveFolderUrl);
@@ -32,19 +33,19 @@ export class ListEstimationDriveFilesUseCase {
       });
     }
 
-    if (!this.drive.isConfigured()) {
+    if (!(await this.drive.isConnected(userId))) {
       return estimationDriveFolderListingSchema.parse({
         folderId,
         folderUrl: input.driveFolderUrl,
-        connection: 'not_configured',
+        connection: 'not_connected',
         files: [],
         message:
-          'Google Drive aún no está configurado en la API de Kora. Define las credenciales de la cuenta de servicio para listar archivos.',
+          'Conecta Google Drive con tu cuenta para consultar esta carpeta con tus permisos.',
       });
     }
 
     try {
-      const files = await this.drive.listFiles(folderId);
+      const files = await this.drive.listFiles(userId, folderId);
 
       return estimationDriveFolderListingSchema.parse({
         folderId,
