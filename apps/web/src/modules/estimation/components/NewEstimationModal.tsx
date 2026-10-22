@@ -34,7 +34,7 @@ const MODE_OPTIONS: readonly {
     value: 'ai',
     title: '✦ Propuesta del agente IA',
     description:
-      'Analiza los antecedentes de Drive, formula las aclaraciones necesarias y luego genera la estimación.',
+      'Lee los antecedentes relevantes de Drive y propone roles, horas y supuestos para una estimación inicial.',
   },
   {
     value: 'standard',
@@ -347,12 +347,13 @@ function DriveInventoryPreview({
     );
   }
 
-  const visibleItems = inventory.items
-    .filter(
-      (item) =>
-        item.itemType === 'file' &&
-        item.priority !== 'excluded',
-    )
+  const analyzableFiles = inventory.items.filter(
+    (item) =>
+      item.itemType === 'file' &&
+      item.priority !== 'excluded' &&
+      item.analyzable,
+  );
+  const visibleItems = analyzableFiles
     .sort((left, right) => priorityRank(left) - priorityRank(right))
     .slice(0, 8);
 
@@ -361,7 +362,10 @@ function DriveInventoryPreview({
       <div className={styles.inventorySummary}>
         <strong>Antecedentes detectados</strong>
         <span>
-          {inventory.summary.files} archivos · {inventory.summary.recommended} prioritarios
+          {inventory.summary.files} archivos · {analyzableFiles.length} analizables
+          {inventory.summary.recommended > 0
+            ? ` · ${inventory.summary.recommended} prioritarios`
+            : ''}
           {inventory.summary.excluded > 0
             ? ` · ${inventory.summary.excluded} excluidos`
             : ''}
@@ -395,9 +399,14 @@ function DriveInventoryPreview({
         </div>
       )}
 
-      {inventory.summary.files > visibleItems.length && (
+      {analyzableFiles.length > visibleItems.length && (
         <span className={styles.moreFiles}>
-          + {inventory.summary.files - visibleItems.length} archivos adicionales en el inventario
+          + {analyzableFiles.length - visibleItems.length} archivos analizables adicionales
+        </span>
+      )}
+      {inventory.summary.files > analyzableFiles.length && (
+        <span className={styles.moreFiles}>
+          Los archivos Office no convertidos y otros formatos incompatibles se muestran en Drive, pero no se envían a la IA en esta PoC.
         </span>
       )}
     </div>
