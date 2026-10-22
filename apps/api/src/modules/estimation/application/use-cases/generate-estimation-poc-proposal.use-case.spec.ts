@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { AiProvider } from '../../../ai/application/ports/ai-provider.port';
 import type { DocumentSourceReader } from '../ports/document-source-reader.port';
+import type { DriveFolderClient } from '../ports/drive-folder-client.port';
+import { GoogleDriveDocumentSourceReader } from '../../infrastructure/drive/google-drive-document-source.reader';
 import { GenerateEstimationPocProposalUseCase } from './generate-estimation-poc-proposal.use-case';
 
 describe('GenerateEstimationPocProposalUseCase', () => {
@@ -52,6 +54,66 @@ describe('GenerateEstimationPocProposalUseCase', () => {
     expect(result.totalHours).toBe(184);
     expect(result.sourceMode).toBe('poc_simulated');
     expect(result.documentsAnalyzed).toBe(0);
+  });
+
+
+  it('usa Requerimiento_KDM.pdf con Gemini mientras Drive no está configurado', async () => {
+    let receivedDocumentName: string | null = null;
+    let receivedDocumentText = '';
+
+    const ai: AiProvider = {
+      name: 'gemini',
+      generateStructured: async (request) => {
+        receivedDocumentName = request.documents?.[0]?.name ?? null;
+        receivedDocumentText = request.documents?.[0]?.text ?? '';
+
+        return {
+          summary: 'Estimación generada desde KDM',
+          roles: [
+            {
+              role: 'Desarrollador Fullstack',
+              unit: 'week',
+              duration: 4,
+              hoursPerUnit: 40,
+              people: 1,
+              source: 'Requerimiento_KDM.pdf',
+            },
+          ],
+          assumptions: [],
+          clarifyingQuestions: [],
+        };
+      },
+    };
+
+    const drive: DriveFolderClient = {
+      isConfigured: () => false,
+      listFiles: async () => [],
+      listChildren: async () => [],
+      searchFolders: async () => [],
+      getMetadata: async () => null,
+      readAnalysisContent: async () => null,
+    };
+
+    const sources = new GoogleDriveDocumentSourceReader(drive);
+
+    const result = await new GenerateEstimationPocProposalUseCase(
+      ai,
+      sources,
+    ).execute({
+      projectId: '550e8400-e29b-41d4-a716-446655440000',
+      projectName: 'Prospecto cualquiera',
+      clientName: 'Cliente',
+      driveFolderUrl:
+        'https://drive.google.com/drive/folders/kora-poc-fallback',
+      instructions: null,
+      answers: [],
+    });
+
+    expect(receivedDocumentName).toBe('Requerimiento_KDM.pdf');
+    expect(receivedDocumentText).toContain('Facele');
+    expect(receivedDocumentText).toContain('SAP');
+    expect(result.documentsAnalyzed).toBe(1);
+    expect(result.totalHours).toBe(160);
   });
 
   it('entrega los documentos de Drive al proveedor real', async () => {
