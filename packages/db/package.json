@@ -19,6 +19,7 @@
     "seed:demo-support-billing": "tsx src/seeds/run-demo-support-billing.ts",
     "seed:aurelia-spr": "tsx src/seeds/run-aurelia-spr.ts",
     "seed:aurelia-inspecciones": "tsx src/seeds/run-aurelia-inspecciones.ts",
+    "seed:aurelia-incidentes": "tsx src/seeds/run-aurelia-incidentes.ts",
     "backfill:slugs": "tsx src/backfill-slugs.ts",
     "backfill:ticket-hh-request-hour-entries": "tsx src/backfill-ticket-hh-request-hour-entries.ts",
     "backfill:support-plan-container-projects": "tsx src/backfill-support-plan-container-projects.ts",
