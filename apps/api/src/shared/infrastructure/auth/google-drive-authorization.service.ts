@@ -1,3 +1,4 @@
+import type { GoogleDriveConnectionStatus } from '@kora/contracts';
 import { Inject, Injectable } from '@nestjs/common';
 import {
   GOOGLE_DRIVE_CONNECTION_REPOSITORY,
@@ -11,12 +12,6 @@ import { GoogleOAuthTokenCipher } from './google-oauth-token-cipher';
 
 const DRIVE_READONLY_SCOPE =
   'https://www.googleapis.com/auth/drive.readonly';
-
-export interface GoogleDriveConnectionStatus {
-  readonly connected: boolean;
-  readonly email: string | null;
-  readonly scopes: readonly string[];
-}
 
 @Injectable()
 export class GoogleDriveAuthorizationService {
