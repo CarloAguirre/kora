@@ -1,7 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import {
   PROJECT_MODULE_DELIVERY_STATUS_LABELS,
-  PROJECT_MODULE_STAGES,
   PROJECT_MODULE_STAGE_LABELS,
   PROJECT_MODULE_TASK_SCOPE_LABELS,
   PROJECT_MODULE_TASK_STATUS_LABELS,
@@ -10,13 +9,11 @@ import {
   type ProjectModule,
   type ProjectModuleDelivery,
   type ProjectModuleSegment,
-  type ProjectModuleStage,
   type ProjectModuleTask,
 } from '@kora/contracts';
 import styles from './ProjectModulesCard.module.css';
 import { Card } from '@/shared/components/ui/Card';
 import { Button } from '@/shared/components/ui/Button';
-import { Select } from '@/shared/components/ui/Select';
 import { Avatar } from '@/shared/components/ui/Avatar';
 import { Badge, type BadgeTone } from '@/shared/components/ui/Badge';
 import { CloseIcon, PencilIcon } from '@/shared/components/icons/Icons';
@@ -26,7 +23,7 @@ import { PhaseRoadmap, type PhaseRoadmapSelection } from '@/modules/client-porta
 import { roleFromTeamName, toPhaseRoadmap } from '@/modules/client-portal/adapters/project-detail.adapter';
 import { PHASE_ROADMAP_ROLE_COLORS } from '@/modules/client-portal/types';
 import { useHolidays } from '@/modules/hours/api/hours.queries';
-import { useUpdateProjectModule, useUpdateProjectModuleSegment } from '../api/projects.queries';
+import { useUpdateProjectModuleSegment } from '../api/projects.queries';
 import { countBusinessDays } from '../lib/business-days';
 import {
   EMPTY_EXECUTION_SEGMENT_MODAL_VALUES,
@@ -36,7 +33,6 @@ import {
   type ExecutionSegmentModalValues,
 } from './ExecutionSegmentModal';
 
-const STAGE_OPTIONS = PROJECT_MODULE_STAGES.map((stage) => ({ value: stage, label: PROJECT_MODULE_STAGE_LABELS[stage] }));
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 const formatDate = (value: string | null) =>
@@ -90,14 +86,14 @@ interface ProjectModulesCardProps {
 /**
  * Roadmap interno del proyecto — el MISMO "Roadmap por Fases" del portal de cliente
  * (`PhaseRoadmap` + `toPhaseRoadmap`), para que ambas vistas se vean idénticas (el del cliente es
- * el fiel al Figma). Lo propio de la vista interna entra por sus slots: la etapa editable de cada
- * fase y el detalle del ítem seleccionado (tramo con lápiz para editarlo sin pasar por "Editar
- * proyecto", tarea, entrega o incidentes). Crear/quitar fases y entregas sigue en "Editar
- * proyecto"; aprobar/rechazar tareas, en la vista de líder de equipo.
+ * el fiel al Figma). Lo propio de la vista interna entra por sus slots: los datos de cada fase y el
+ * detalle del ítem seleccionado (tramo con lápiz para editarlo sin pasar por "Editar proyecto",
+ * tarea, entrega o incidentes). La etapa actual se muestra pero no se cambia acá — un select que
+ * guardaba al elegir hacía fácil cambiarla sin querer —; se cambia en "Editar proyecto", igual que
+ * crear/quitar fases y entregas. Aprobar/rechazar tareas, en la vista de líder de equipo.
  */
 export function ProjectModulesCard({ project, hourEntries, teamOptions, canManage }: ProjectModulesCardProps) {
   const toast = useToast();
-  const updateModule = useUpdateProjectModule();
   const updateSegment = useUpdateProjectModuleSegment();
   const phaseRoadmap = useMemo(() => toPhaseRoadmap(project), [project]);
   const modulesById = useMemo(() => new Map(project.modules.map((module) => [module.id, module])), [project.modules]);
@@ -132,14 +128,6 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
     }
   };
 
-  const onChangeStage = async (moduleId: string, currentStage: ProjectModuleStage) => {
-    try {
-      await updateModule.mutateAsync({ projectId: project.id, moduleId, input: { currentStage } });
-    } catch (error) {
-      toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo actualizar la etapa.');
-    }
-  };
-
   if (project.modules.length === 0) {
     return (
       <Card>
@@ -153,14 +141,7 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
     if (!module) return null;
     return (
       <div className={styles.moduleFields}>
-        <Select
-          className={styles.moduleStageField}
-          label="Etapa actual"
-          options={STAGE_OPTIONS}
-          value={module.currentStage}
-          disabled={!canManage}
-          onChange={(event) => void onChangeStage(module.id, event.target.value as ProjectModuleStage)}
-        />
+        <Meta label="Etapa actual" value={PROJECT_MODULE_STAGE_LABELS[module.currentStage]} />
         <Meta label="Etapa inicial" value={PROJECT_MODULE_STAGE_LABELS[module.initialStage]} />
         <Meta label="Horas estimadas" value={module.estimatedHours != null ? `${module.estimatedHours} hh` : 'Sin definir'} />
         <Meta label="Fechas estimadas" value={`${formatDate(module.estimatedStartDate)} — ${formatDate(module.estimatedEndDate)}`} />

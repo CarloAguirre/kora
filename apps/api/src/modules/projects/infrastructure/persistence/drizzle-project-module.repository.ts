@@ -48,7 +48,13 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
     const db = resolveDb(this.database, context);
 
     const [moduleRows, deliveryRows, segmentRows, taskRows, blockerRows] = await Promise.all([
-      db.select().from(projectModules).where(eq(projectModules.projectId, projectId)).orderBy(asc(projectModules.createdAt)),
+      // Fases en orden cronológico ("Fase 1, 2…" del Roadmap): por fecha de inicio estimada — las sin
+      // fecha al final (ASC deja los null últimos en Postgres) — y, en empate, por orden de creación.
+      db
+        .select()
+        .from(projectModules)
+        .where(eq(projectModules.projectId, projectId))
+        .orderBy(asc(projectModules.estimatedStartDate), asc(projectModules.createdAt)),
       db
         .select({
           id: projectModuleDeliveries.id,

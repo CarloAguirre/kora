@@ -34,6 +34,8 @@ const MONTH_LABELS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'S
 const scrollWidthPercent = (zoom: number) => 100 + zoom * 3;
 /** Sobre este valor del zoom aparecen la cuadrícula y las etiquetas por día. */
 const DETAIL_ZOOM_THRESHOLD = 35;
+/** Ancho mínimo (% de la pista) de un bloque de mes para mostrar su nombre. */
+const MIN_MONTH_LABEL_PERCENT = 6;
 
 const toDate = (isoDate: string) => new Date(`${isoDate}T00:00:00`);
 
@@ -115,6 +117,27 @@ function buildTimelineAxis(range: DateRange): TimelineAxis {
   return { range, months, weekLines, dayLines, dayTicks, todayPercent };
 }
 
+const shiftDays = (date: Date, days: number) => new Date(date.getFullYear(), date.getMonth(), date.getDate() + days);
+
+/**
+ * Rango propio de una fase: de su primer a su último tramo/entrega/tarea, con una semana de margen y
+ * al menos 4 semanas de ancho. Con la escala del proyecto completo una fase corta (p.ej. dos semanas
+ * de pruebas al final) quedaba comprimida en una esquina y había que desplazarse para encontrarla.
+ * `null` si la fase no tiene nada con fecha.
+ */
+function phaseRange(phase: PhaseRoadmapPhase): DateRange | null {
+  const dates = [
+    ...phase.tasks.flatMap((task) => [task.startDate, task.endDate]),
+    ...phase.deliveries.map((delivery) => delivery.date),
+    ...phase.taskItems.map((taskItem) => taskItem.date),
+  ].sort();
+  if (dates.length === 0) return null;
+  const min = shiftDays(toDate(dates[0]!), -7);
+  const max = shiftDays(toDate(dates[dates.length - 1]!), 7);
+  const minimumMax = shiftDays(min, 28);
+  return { min, max: max < minimumMax ? minimumMax : max };
+}
+
 /**
  * "Roadmap por Fases" — reemplaza el Gantt fijo de 3 módulos × 4 tareas
  * (`ProjectGanttChart`, ya borrado) por un acordeón de fases del proyecto
@@ -124,9 +147,10 @@ function buildTimelineAxis(range: DateRange): TimelineAxis {
  *
  * El calendario es de fechas reales, no de posiciones fijas: barras,
  * marcadores, meses, cuadrícula y línea de HOY se calculan como % del rango
- * visible, igual que el prototipo `ficha_proyecto_lider`. Por eso el filtro
- * "Rango visible" y el zoom Semanas/Días sí cambian la vista (el zoom ensancha
- * la pista y sobre 35 revela la cuadrícula y las etiquetas por día). Solo la
+ * visible, igual que el prototipo `ficha_proyecto_lider`. Cada fase abre en su
+ * propio rango de fechas (`phaseRange`); el filtro "Rango visible" aplicado a
+ * mano lo reemplaza para todas, y el zoom Semanas/Días ensancha la pista (sobre
+ * 35 revela la cuadrícula y las etiquetas por día). Solo la
  * columna de pistas hace scroll horizontal: los nombres de cada fila quedan
  * siempre visibles a la izquierda.
  *
@@ -155,6 +179,18 @@ export function PhaseRoadmap({ phaseRoadmap, renderPhaseExtras, renderSelectionD
 
   const rangeDraftIsValid = toDate(rangeDraft.from) < toDate(rangeDraft.to);
   const rangeIsCustom = appliedRange.from !== phaseRoadmap.rangeStartDate || appliedRange.to !== phaseRoadmap.rangeEndDate;
+
+  /** Sin un "Rango visible" aplicado a mano, cada fase abre en su propio rango (`phaseRange`); con uno, todas usan ese. */
+  const axisByPhase = useMemo(
+    () =>
+      new Map(
+        phaseRoadmap.phases.map((phase) => {
+          const range = rangeIsCustom ? null : phaseRange(phase);
+          return [phase.id, range ? buildTimelineAxis(range) : axis];
+        }),
+      ),
+    [phaseRoadmap.phases, rangeIsCustom, axis],
+  );
 
   const onResetRange = () => {
     setRangeDraft({ from: phaseRoadmap.rangeStartDate, to: phaseRoadmap.rangeEndDate });
@@ -236,7 +272,7 @@ export function PhaseRoadmap({ phaseRoadmap, renderPhaseExtras, renderSelectionD
           <PhaseCard
             key={phase.id}
             phase={phase}
-            axis={axis}
+            axis={axisByPhase.get(phase.id) ?? axis}
             expanded={expandedPhaseIds.has(phase.id)}
             onToggle={() => togglePhase(phase.id)}
             renderExtras={renderPhaseExtras}
@@ -311,7 +347,7 @@ const sameSelection = (a: PhaseRoadmapSelection | null, b: PhaseRoadmapSelection
 
 export interface PhaseRoadmapProps {
   phaseRoadmap: ProjectPhaseRoadmap;
-  /** Contenido extra dentro de cada fase, bajo "Resumen de avance" (p.ej. la etapa editable del Roadmap interno). */
+  /** Contenido extra dentro de cada fase, bajo "Resumen de avance" (p.ej. los datos de la fase del Roadmap interno). */
   renderPhaseExtras?: (phase: PhaseRoadmapPhase) => ReactNode;
   /** Detalle del ítem seleccionado, sobre "Registros de bitácora relacionados" (Roadmap interno). */
   renderSelectionDetail?: (phase: PhaseRoadmapPhase, selection: PhaseRoadmapSelection, clearSelection: () => void) => ReactNode;
@@ -333,8 +369,9 @@ function PhaseCard({
   renderSelectionDetail?: PhaseRoadmapProps['renderSelectionDetail'];
 }) {
   /** Igual que `zoomByModule` en `ProjectModulesCard` (Roadmap interno): un slider real, no un
-      toggle decorativo. Es estado de vista local, no una acción a conectar. */
-  const [zoom, setZoom] = useState(15);
+      toggle decorativo. Es estado de vista local, no una acción a conectar. Arranca en 0: con el
+      rango propio de la fase (`phaseRange`) la fase entera cabe sin desplazarse. */
+  const [zoom, setZoom] = useState(0);
   const today = startOfToday();
   /** Por debajo de este zoom la pista no ensancha lo suficiente (`scrollWidthPercent`)
    *  para separar tareas cercanas entre sí: sus etiquetas se solapan y quedan
@@ -506,7 +543,8 @@ function PhaseCard({
                       className={styles.ganttMonth}
                       style={{ left: `${month.leftPercent}%`, width: `${month.widthPercent}%` }}
                     >
-                      {MONTH_LABELS[month.monthIndex]}
+                      {/* Un mes que apenas asoma en el borde (p.ej. el rango parte el 30) no lleva nombre: se encimaba con el siguiente. */}
+                      {month.widthPercent >= MIN_MONTH_LABEL_PERCENT && MONTH_LABELS[month.monthIndex]}
                     </span>
                   ))}
                   {axis.dayTicks.map((tick, index) => (

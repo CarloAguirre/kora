@@ -14,6 +14,7 @@ import {
   type CreateProjectModuleInput,
   type ProjectDetail,
   type ProjectModule,
+  type ProjectModuleStage,
   type ProjectModuleDelivery,
   type ProjectModuleSegment,
   type ProjectSalesStage,
@@ -1025,6 +1026,15 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
                             value={moduleDraft(module).name}
                             onChange={(event) => setModuleDraftField(module, { name: event.target.value })}
                             onBlur={() => onBlurModuleName(module)}
+                          />
+                          {/* Único lugar donde se cambia — en el Roadmap la etapa solo se muestra (ver `ProjectModulesCard`). */}
+                          <Select
+                            label="Etapa actual"
+                            options={MODULE_STAGE_OPTIONS}
+                            value={module.currentStage}
+                            onChange={(event) =>
+                              void onSaveModuleField(module.id, { currentStage: event.target.value as ProjectModuleStage })
+                            }
                           />
                           <TextField
                             label="Horas estimadas"
