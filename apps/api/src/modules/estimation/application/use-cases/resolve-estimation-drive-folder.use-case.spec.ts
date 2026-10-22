@@ -29,6 +29,30 @@ describe('ResolveEstimationDriveFolderUseCase', () => {
     expect(result.selectedFolder?.score).toBe(100);
   });
 
+
+  it('usa carpeta virtual de la PoC si Drive no está configurado', async () => {
+    const drive: DriveFolderClient = {
+      isConfigured: () => false,
+      listFiles: async () => [],
+      listChildren: async () => [],
+      searchFolders: async () => [],
+      getMetadata: async () => null,
+      readAnalysisContent: async () => null,
+    };
+
+    const result = await new ResolveEstimationDriveFolderUseCase(drive).execute({
+      projectId: '550e8400-e29b-41d4-a716-446655440000',
+      projectName: 'Prospecto cualquiera',
+      clientName: 'Cliente',
+      documentationLink: null,
+      quotationLink: null,
+    });
+
+    expect(result.status).toBe('resolved');
+    expect(result.connection).toBe('not_configured');
+    expect(result.selectedFolder?.folderId).toBe('kora-poc-fallback');
+  });
+
   it('resuelve automáticamente una carpeta con nombre exacto', async () => {
     const drive: DriveFolderClient = {
       isConfigured: () => true,
