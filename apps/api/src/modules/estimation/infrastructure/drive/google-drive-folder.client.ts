@@ -99,6 +99,14 @@ export class GoogleDriveFolderClient implements DriveFolderClient {
       );
       if (!response.ok) throw driveError(response.status);
 
+      if (exportMimeType === 'application/pdf') {
+        const bytes = Buffer.from(await response.arrayBuffer());
+        return {
+          mimeType: exportMimeType,
+          dataBase64: bytes.toString('base64'),
+        };
+      }
+
       return {
         mimeType: exportMimeType,
         text: await response.text(),
@@ -314,7 +322,7 @@ function googleExportMimeType(mimeType: string): string | null {
     case 'application/vnd.google-apps.spreadsheet':
       return 'text/csv';
     case 'application/vnd.google-apps.presentation':
-      return 'text/plain';
+      return 'application/pdf';
     default:
       return null;
   }
