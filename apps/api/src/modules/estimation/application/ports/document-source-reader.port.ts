@@ -19,6 +19,7 @@ export interface ProjectSourceDocument {
  */
 export interface DocumentSourceReader {
   readDriveSources(
+    userId: string,
     driveFolderUrl: string,
   ): Promise<readonly ProjectSourceDocument[]>;
 }
