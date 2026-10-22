@@ -13,6 +13,14 @@ import {
   classifyDriveSource,
   extractDriveFolderId,
 } from '../../application/drive-source-selection';
+import {
+  FALLBACK_DOCUMENT_ID,
+  FALLBACK_DOCUMENT_MIME_TYPE,
+  FALLBACK_DOCUMENT_MODIFIED_AT,
+  FALLBACK_DOCUMENT_NAME,
+  FALLBACK_DOCUMENT_PATH,
+  FALLBACK_DOCUMENT_TEXT,
+} from '../../application/fallback-estimation-document';
 
 const MAX_DEPTH = 3;
 const MAX_SOURCE_DOCUMENTS = 4;
@@ -44,9 +52,16 @@ export class GoogleDriveDocumentSourceReader
       throw new Error('No se pudo identificar la carpeta raíz de Google Drive.');
     }
     if (!this.drive.isConfigured()) {
-      throw new Error(
-        'Google Drive no está configurado en la API de Kora.',
-      );
+      return [
+        {
+          sourceId: FALLBACK_DOCUMENT_ID,
+          name: FALLBACK_DOCUMENT_NAME,
+          mimeType: FALLBACK_DOCUMENT_MIME_TYPE,
+          path: FALLBACK_DOCUMENT_PATH,
+          modifiedAt: new Date(FALLBACK_DOCUMENT_MODIFIED_AT),
+          text: FALLBACK_DOCUMENT_TEXT,
+        },
+      ];
     }
 
     const candidates = await this.collectCandidates(rootFolderId);
