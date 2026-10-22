@@ -105,12 +105,16 @@ export class GenerateEstimationPocProposalUseCase {
   ) {}
 
   async execute(
+    userId: string,
     input: GenerateEstimationPocInput,
   ): Promise<EstimationPocProposal> {
     const documents =
       this.ai.name === 'poc-ai'
         ? []
-        : await this.sources.readDriveSources(input.driveFolderUrl);
+        : await this.sources.readDriveSources(
+            userId,
+            input.driveFolderUrl,
+          );
 
     if (this.ai.name !== 'poc-ai' && documents.length === 0) {
       throw new Error(
