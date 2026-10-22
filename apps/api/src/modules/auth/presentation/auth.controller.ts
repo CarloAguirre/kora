@@ -120,6 +120,8 @@ export class AuthController {
   @Public()
   @Get('google')
   async googleStart(@Res({ passthrough: false }) reply: FastifyReply): Promise<void> {
+    void reply.clearCookie(GOOGLE_DRIVE_STATE_COOKIE, { path: '/' });
+
     if (!this.config.google.enabled) {
       void reply.redirect(`/login?google_error=${AUTH_ERROR_CODES.GOOGLE_NOT_CONFIGURED}`, 302);
       return;
@@ -149,6 +151,8 @@ export class AuthController {
         AUTH_ERROR_CODES.GOOGLE_NOT_CONFIGURED,
       );
     }
+
+    void reply.clearCookie(GOOGLE_STATE_COOKIE, { path: '/' });
 
     const state = randomBytes(16).toString('hex');
     const payload: GoogleDriveStatePayload = {
