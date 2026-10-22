@@ -5,6 +5,7 @@ import { AnalyzeEstimationPocUseCase } from './analyze-estimation-poc.use-case';
 describe('AnalyzeEstimationPocUseCase', () => {
   it('normaliza el análisis previo sin generar todavía HH', async () => {
     const ai: AiProvider = {
+      name: 'poc-ai',
       generateStructured: async () => ({
         summary: 'Análisis preliminar',
         detectedDocuments: [],
