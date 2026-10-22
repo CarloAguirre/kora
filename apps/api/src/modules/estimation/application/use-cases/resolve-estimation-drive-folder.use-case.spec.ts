@@ -10,6 +10,7 @@ describe('ResolveEstimationDriveFolderUseCase', () => {
       listChildren: async () => [],
       searchFolders: async () => [],
       getMetadata: async () => null,
+      readAnalysisContent: async () => null,
     };
 
     const result = await new ResolveEstimationDriveFolderUseCase(drive).execute({
@@ -50,6 +51,7 @@ describe('ResolveEstimationDriveFolderUseCase', () => {
             ]
           : [],
       getMetadata: async () => null,
+      readAnalysisContent: async () => null,
     };
 
     const result = await new ResolveEstimationDriveFolderUseCase(drive).execute({
