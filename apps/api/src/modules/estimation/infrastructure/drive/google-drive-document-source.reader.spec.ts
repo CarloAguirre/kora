@@ -25,11 +25,11 @@ function file(
 describe('GoogleDriveDocumentSourceReader', () => {
   it('prioriza antecedentes relevantes y omite credenciales y Office no convertido', async () => {
     const drive: DriveFolderClient = {
-      isConnected: async () => true,
+      isConfigured: () => true,
       listFiles: async () => [],
       searchFolders: async () => [],
       getMetadata: async () => null,
-      readAnalysisContent: async (_userId, fileId, mimeType) => {
+      readAnalysisContent: async (fileId, mimeType) => {
         if (fileId === 'requirements') {
           return { mimeType, dataBase64: 'cGRm' };
         }
@@ -38,7 +38,7 @@ describe('GoogleDriveDocumentSourceReader', () => {
         }
         return null;
       },
-      listChildren: async (_userId, folderId) => {
+      listChildren: async (folderId) => {
         if (folderId !== 'root123') return [];
         return [
           file(
@@ -63,7 +63,6 @@ describe('GoogleDriveDocumentSourceReader', () => {
 
     const reader = new GoogleDriveDocumentSourceReader(drive);
     const result = await reader.readDriveSources(
-      'user-1',
       'https://drive.google.com/drive/folders/root123',
     );
 

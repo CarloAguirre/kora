@@ -16,9 +16,8 @@ describe('ListEstimationDriveFilesUseCase', () => {
   it('lista y clasifica archivos visibles en la carpeta', async () => {
     const drive: DriveFolderClient = {
       ...emptyDiscovery,
-      isConnected: async () => true,
-      listFiles: async (userId, folderId) => {
-        expect(userId).toBe('user-1');
+      isConfigured: () => true,
+      listFiles: async (folderId) => {
         expect(folderId).toBe('abc_123');
         return [
           {
@@ -46,7 +45,7 @@ describe('ListEstimationDriveFilesUseCase', () => {
       },
     };
 
-    const result = await new ListEstimationDriveFilesUseCase(drive).execute('user-1', {
+    const result = await new ListEstimationDriveFilesUseCase(drive).execute({
       driveFolderUrl: 'https://drive.google.com/drive/folders/abc_123',
     });
 
@@ -56,18 +55,18 @@ describe('ListEstimationDriveFilesUseCase', () => {
     expect(result.files[1]?.kind).toBe('pdf');
   });
 
-  it('explica cuando el usuario no conectó Drive', async () => {
+  it('explica cuando Drive no está configurado', async () => {
     const drive: DriveFolderClient = {
       ...emptyDiscovery,
-      isConnected: async () => false,
+      isConfigured: () => false,
       listFiles: async () => [],
     };
 
-    const result = await new ListEstimationDriveFilesUseCase(drive).execute('user-1', {
+    const result = await new ListEstimationDriveFilesUseCase(drive).execute({
       driveFolderUrl: 'https://drive.google.com/drive/folders/abc_123',
     });
 
-    expect(result.connection).toBe('not_connected');
+    expect(result.connection).toBe('not_configured');
     expect(result.files).toEqual([]);
   });
 });

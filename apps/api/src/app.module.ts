@@ -16,9 +16,6 @@ import { JwtAccessTokenService } from './shared/infrastructure/crypto/jwt-access
 import { RandomOpaqueTokenGenerator } from './shared/infrastructure/crypto/random-opaque-token.generator';
 import { DrizzleAuditRecorder } from './shared/infrastructure/audit/drizzle-audit-recorder';
 import { GoogleOAuthClientService } from './shared/infrastructure/auth/google-oauth-client.service';
-import { GoogleOAuthTokenCipher } from './shared/infrastructure/auth/google-oauth-token-cipher';
-import { GoogleDriveAuthorizationService } from './shared/infrastructure/auth/google-drive-authorization.service';
-import { DrizzleGoogleDriveConnectionRepository } from './shared/infrastructure/auth/drizzle-google-drive-connection.repository';
 import { DrizzleAuditReader } from './shared/infrastructure/audit/drizzle-audit-reader';
 import { LogNotificationSender } from './shared/infrastructure/notifications/log-notification.sender';
 import { ResendNotificationSender } from './shared/infrastructure/notifications/resend-notification.sender';
@@ -31,7 +28,6 @@ import {
 } from './shared/application/ports/token.port';
 import { AUDIT_RECORDER } from './shared/application/ports/audit-recorder.port';
 import { GOOGLE_OAUTH_CLIENT } from './shared/application/ports/google-oauth-client.port';
-import { GOOGLE_DRIVE_CONNECTION_REPOSITORY } from './shared/application/ports/google-drive-connection.repository';
 import { AUDIT_READER } from './shared/application/ports/audit-reader.port';
 import { NOTIFICATION_SENDER } from './shared/application/ports/notification.port';
 import { HEALTH_PROBES } from './shared/application/ports/health-probe.port';
@@ -88,13 +84,6 @@ import { JwtModule } from '@nestjs/jwt';
       },
     },
     { provide: GOOGLE_OAUTH_CLIENT, useClass: GoogleOAuthClientService },
-    GoogleOAuthTokenCipher,
-    GoogleDriveAuthorizationService,
-    DrizzleGoogleDriveConnectionRepository,
-    {
-      provide: GOOGLE_DRIVE_CONNECTION_REPOSITORY,
-      useExisting: DrizzleGoogleDriveConnectionRepository,
-    },
 
     // Las sondas de salud se registran como una lista: añadir una dependencia
     // que vigilar es añadir una clase aquí, sin tocar el controlador.
@@ -118,7 +107,6 @@ import { JwtModule } from '@nestjs/jwt';
     AUDIT_READER,
     NOTIFICATION_SENDER,
     GOOGLE_OAUTH_CLIENT,
-    GoogleDriveAuthorizationService,
     HEALTH_PROBES,
   ],
 })

@@ -17,14 +17,10 @@ import { Modal } from '@/shared/components/ui/Modal';
 import { Select } from '@/shared/components/ui/Select';
 import { TextField } from '@/shared/components/ui/TextField';
 import {
-  useConnectGoogleDrive,
   useEstimationDriveInventory,
-  useGoogleDriveConnectionStatus,
   useResolveEstimationDriveFolder,
 } from '../api/estimation.queries';
 import styles from './NewEstimationModal.module.css';
-
-const DRIVE_DRAFT_KEY = 'kora:calculadora:drive-draft';
 
 interface NewEstimationModalProps {
   open: boolean;
@@ -72,10 +68,6 @@ export function NewEstimationModal({ open, prospects, onClose }: NewEstimationMo
   );
   const detail = useProjectDetail(selected?.slug ?? null);
   const updateProjectExtras = useUpdateProjectExtras();
-  const driveConnection = useGoogleDriveConnectionStatus(
-    open && mode === 'ai',
-  );
-  const connectDrive = useConnectGoogleDrive();
 
   const resolutionInput = useMemo(() => {
     if (!detail.data) return null;
@@ -90,19 +82,13 @@ export function NewEstimationModal({ open, prospects, onClose }: NewEstimationMo
 
   const driveResolution = useResolveEstimationDriveFolder(
     resolutionInput,
-    open &&
-      mode === 'ai' &&
-      Boolean(selected) &&
-      driveConnection.data?.connected === true,
+    open && mode === 'ai' && Boolean(selected),
   );
 
   const driveUrlIsValid = isGoogleDriveFolderUrl(driveFolderUrl);
   const driveInventory = useEstimationDriveInventory(
     driveFolderUrl.trim(),
-    open &&
-      mode === 'ai' &&
-      driveUrlIsValid &&
-      driveConnection.data?.connected === true,
+    open && mode === 'ai' && driveUrlIsValid,
   );
 
   useEffect(() => {
@@ -113,33 +99,12 @@ export function NewEstimationModal({ open, prospects, onClose }: NewEstimationMo
       setInstructions('');
       setDriveTouched(false);
       setError(null);
-      return;
-    }
-
-    const rawDraft = sessionStorage.getItem(DRIVE_DRAFT_KEY);
-    if (!rawDraft) return;
-
-    try {
-      const draft = JSON.parse(rawDraft) as {
-        projectRef?: string;
-        mode?: EstimationCreationMode;
-        driveFolderUrl?: string;
-        instructions?: string;
-      };
-
-      setProjectRef(draft.projectRef ?? '');
-      setMode(draft.mode ?? 'ai');
-      setDriveFolderUrl(draft.driveFolderUrl ?? '');
-      setInstructions(draft.instructions ?? '');
-      setDriveTouched(Boolean(draft.driveFolderUrl));
-    } catch {
-      sessionStorage.removeItem(DRIVE_DRAFT_KEY);
     }
   }, [open]);
 
   useEffect(() => {
     if (!selected) {
-      if (!projectRef) setDriveFolderUrl('');
+      setDriveFolderUrl('');
       return;
     }
     if (driveTouched) return;
@@ -156,7 +121,6 @@ export function NewEstimationModal({ open, prospects, onClose }: NewEstimationMo
     detail.data?.documentationLink,
     driveResolution.data?.selectedFolder?.url,
     driveTouched,
-    projectRef,
     selected,
   ]);
 
@@ -173,12 +137,6 @@ export function NewEstimationModal({ open, prospects, onClose }: NewEstimationMo
 
     const normalizedDriveUrl = driveFolderUrl.trim();
     if (mode === 'ai') {
-      if (driveConnection.data?.connected !== true) {
-        setError(
-          'Conecta Google Drive con tu cuenta antes de crear la estimación.',
-        );
-        return;
-      }
       if (!normalizedDriveUrl) {
         setError('Confirma o vincula la carpeta de Drive del levantamiento para usar el agente IA.');
         return;
@@ -224,8 +182,6 @@ export function NewEstimationModal({ open, prospects, onClose }: NewEstimationMo
       }
     }
 
-    sessionStorage.removeItem(DRIVE_DRAFT_KEY);
-
     navigate(`${projectEstimationPath(selected)}?mode=${mode}`, {
       state: {
         creationMode: mode,
@@ -233,34 +189,6 @@ export function NewEstimationModal({ open, prospects, onClose }: NewEstimationMo
         instructions: instructions.trim(),
       },
     });
-    onClose();
-  };
-
-  const startDriveConnection = async () => {
-    sessionStorage.setItem(
-      DRIVE_DRAFT_KEY,
-      JSON.stringify({
-        projectRef,
-        mode,
-        driveFolderUrl,
-        instructions,
-      }),
-    );
-
-    try {
-      const result = await connectDrive.mutateAsync(
-        '/calculadora?resume_drive=1',
-      );
-      window.location.assign(result.authorizationUrl);
-    } catch {
-      setError(
-        'No se pudo iniciar la autorización de Google Drive.',
-      );
-    }
-  };
-
-  const close = () => {
-    sessionStorage.removeItem(DRIVE_DRAFT_KEY);
     onClose();
   };
 
@@ -274,10 +202,10 @@ export function NewEstimationModal({ open, prospects, onClose }: NewEstimationMo
     <Modal
       open={open}
       title="Nueva estimación"
-      onClose={close}
+      onClose={onClose}
       footer={
         <>
-          <Button variant="outline" onClick={close}>Cancelar</Button>
+          <Button variant="outline" onClick={onClose}>Cancelar</Button>
           <Button
             loading={updateProjectExtras.isPending}
             onClick={() => void submit()}
@@ -340,39 +268,6 @@ export function NewEstimationModal({ open, prospects, onClose }: NewEstimationMo
 
       {mode === 'ai' && (
         <div className={styles.driveBox}>
-          <div className={styles.driveConnection}>
-            {driveConnection.isLoading ? (
-              <div className={styles.driveStatus}>
-                Comprobando conexión con Google Drive…
-              </div>
-            ) : driveConnection.data?.connected ? (
-              <div className={styles.driveConnected}>
-                <span>✓ Google Drive conectado</span>
-                <small>
-                  Kora consulta Drive como {driveConnection.data.email}.
-                  Solo podrá leer archivos que esa cuenta pueda abrir.
-                </small>
-              </div>
-            ) : (
-              <div className={styles.driveConnectPrompt}>
-                <div>
-                  <strong>Conecta Google Drive</strong>
-                  <small>
-                    Kora solicitará acceso de solo lectura y respetará los
-                    permisos de tu cuenta Google.
-                  </small>
-                </div>
-                <Button
-                  variant="outline"
-                  loading={connectDrive.isPending}
-                  onClick={() => void startDriveConnection()}
-                >
-                  Conectar Google Drive
-                </Button>
-              </div>
-            )}
-          </div>
-
           <TextField
             label="Carpeta de Drive del levantamiento"
             type="url"
@@ -494,8 +389,7 @@ function DriveInventoryPreview({
     return (
       <div
         className={
-          inventory.connection === 'not_configured' ||
-          inventory.connection === 'not_connected'
+          inventory.connection === 'not_configured'
             ? styles.driveWarning
             : styles.driveError
         }

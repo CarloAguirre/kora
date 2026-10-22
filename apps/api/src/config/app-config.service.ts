@@ -45,6 +45,12 @@ export interface GoogleOAuthSettings {
   readonly callbackUrl: string;
 }
 
+export interface GoogleDriveSettings {
+  readonly enabled: boolean;
+  readonly clientEmail: string;
+  readonly privateKey: string;
+}
+
 export interface AiSettings {
   readonly enabled: boolean;
   readonly geminiApiKey: string;
@@ -104,6 +110,17 @@ export class AppConfigService {
       clientId,
       clientSecret,
       callbackUrl,
+    };
+  }
+
+  get googleDrive(): GoogleDriveSettings {
+    const clientEmail = this.config.get('GOOGLE_DRIVE_CLIENT_EMAIL', { infer: true }) ?? '';
+    const privateKeyRaw = this.config.get('GOOGLE_DRIVE_PRIVATE_KEY', { infer: true }) ?? '';
+
+    return {
+      enabled: clientEmail !== '' && privateKeyRaw !== '',
+      clientEmail,
+      privateKey: privateKeyRaw.replace(/\\n/g, '\n'),
     };
   }
 

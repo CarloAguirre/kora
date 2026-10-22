@@ -37,23 +37,19 @@ export class GoogleDriveDocumentSourceReader
   ) {}
 
   async readDriveSources(
-    userId: string,
     driveFolderUrl: string,
   ): Promise<readonly ProjectSourceDocument[]> {
     const rootFolderId = extractDriveFolderId(driveFolderUrl);
     if (!rootFolderId) {
       throw new Error('No se pudo identificar la carpeta raíz de Google Drive.');
     }
-    if (!(await this.drive.isConnected(userId))) {
+    if (!this.drive.isConfigured()) {
       throw new Error(
-        'Conecta Google Drive con tu cuenta antes de analizar antecedentes.',
+        'Google Drive no está configurado en la API de Kora.',
       );
     }
 
-    const candidates = await this.collectCandidates(
-      userId,
-      rootFolderId,
-    );
+    const candidates = await this.collectCandidates(rootFolderId);
     const selected = candidates
       .sort((left, right) => left.rank - right.rank)
       .slice(0, MAX_SOURCE_DOCUMENTS);
@@ -63,7 +59,6 @@ export class GoogleDriveDocumentSourceReader
     for (const candidate of selected) {
       try {
         const content = await this.drive.readAnalysisContent(
-          userId,
           candidate.item.id,
           candidate.item.mimeType,
         );
@@ -102,7 +97,6 @@ export class GoogleDriveDocumentSourceReader
   }
 
   private async collectCandidates(
-    userId: string,
     rootFolderId: string,
   ): Promise<Candidate[]> {
     const queue: Array<{ folderId: string; path: string; depth: number }> = [
@@ -119,7 +113,7 @@ export class GoogleDriveDocumentSourceReader
       const current = queue.shift();
       if (!current) break;
 
-      const children = await this.drive.listChildren(userId, current.folderId);
+      const children = await this.drive.listChildren(current.folderId);
       for (const child of children) {
         scannedItems += 1;
         if (scannedItems > MAX_SCANNED_ITEMS) break;

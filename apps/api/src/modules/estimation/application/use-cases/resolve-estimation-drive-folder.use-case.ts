@@ -38,14 +38,12 @@ export class ResolveEstimationDriveFolderUseCase {
   ) {}
 
   async execute(
-    userId: string,
     input: ResolveEstimationDriveFolderInput,
   ): Promise<EstimationDriveFolderResolution> {
-    const connected = await this.drive.isConnected(userId);
     const explicitFolderId = extractDriveFolderId(input.documentationLink);
     if (explicitFolderId) {
       return estimationDriveFolderResolutionSchema.parse({
-        connection: connected ? 'connected' : 'not_connected',
+        connection: this.drive.isConfigured() ? 'connected' : 'not_configured',
         status: 'resolved',
         selectedFolder: {
           folderId: explicitFolderId,
@@ -57,20 +55,20 @@ export class ResolveEstimationDriveFolderUseCase {
           ancestorNames: [],
         },
         candidates: [],
-        message: connected
+        message: this.drive.isConfigured()
           ? null
-          : 'La carpeta está vinculada, pero debes conectar Google Drive para inspeccionarla con tus permisos.',
+          : 'La carpeta está vinculada, pero la API de Kora aún no tiene credenciales para inspeccionarla.',
       });
     }
 
-    if (!connected) {
+    if (!this.drive.isConfigured()) {
       return estimationDriveFolderResolutionSchema.parse({
-        connection: 'not_connected',
+        connection: 'not_configured',
         status: 'not_found',
         selectedFolder: null,
         candidates: [],
         message:
-          'Conecta Google Drive con tu cuenta para descubrir carpetas usando tus permisos.',
+          'Google Drive no está configurado en la API de Kora; no es posible descubrir carpetas automáticamente.',
       });
     }
 
@@ -79,12 +77,12 @@ export class ResolveEstimationDriveFolderUseCase {
       const projectTerms = significantTerms(input.projectName);
       const clientTerms = significantTerms(input.clientName ?? '');
 
-      for (const folder of await this.drive.searchFolders(userId, projectTerms)) {
+      for (const folder of await this.drive.searchFolders(projectTerms)) {
         if (folder.itemType === 'folder') discovered.set(folder.id, folder);
       }
 
       if (clientTerms.length > 0) {
-        const clientRoots = (await this.drive.searchFolders(userId, clientTerms))
+        const clientRoots = (await this.drive.searchFolders(clientTerms))
           .filter((item) => item.itemType === 'folder')
           .sort(
             (a, b) =>
@@ -94,7 +92,7 @@ export class ResolveEstimationDriveFolderUseCase {
           .slice(0, 3);
 
         for (const root of clientRoots) {
-          for (const child of await this.drive.listChildren(userId, root.id)) {
+          for (const child of await this.drive.listChildren(root.id)) {
             if (child.itemType === 'folder') discovered.set(child.id, child);
           }
         }
@@ -102,7 +100,7 @@ export class ResolveEstimationDriveFolderUseCase {
 
       const quotationFolderId = extractDriveFolderId(input.quotationLink);
       if (quotationFolderId && !discovered.has(quotationFolderId)) {
-        const metadata = await this.drive.getMetadata(userId, quotationFolderId);
+        const metadata = await this.drive.getMetadata(quotationFolderId);
         if (metadata?.mimeType === 'application/vnd.google-apps.folder') {
           discovered.set(quotationFolderId, {
             ...metadata,
@@ -114,11 +112,7 @@ export class ResolveEstimationDriveFolderUseCase {
 
       const scored: EstimationDriveFolderCandidate[] = [];
       for (const folder of discovered.values()) {
-        const ancestorNames = await this.getAncestorNames(
-          userId,
-          folder.parentIds,
-          3,
-        );
+        const ancestorNames = await this.getAncestorNames(folder.parentIds, 3);
         const reasons: string[] = [];
         let score = scoreFolderName(folder.name, input.projectName, reasons);
 
@@ -190,7 +184,6 @@ export class ResolveEstimationDriveFolderUseCase {
   }
 
   private async getAncestorNames(
-    userId: string,
     parentIds: readonly string[],
     maxDepth: number,
   ): Promise<string[]> {
@@ -198,7 +191,7 @@ export class ResolveEstimationDriveFolderUseCase {
     let currentId = parentIds[0] ?? null;
 
     for (let depth = 0; currentId && depth < maxDepth; depth += 1) {
-      const metadata = await this.drive.getMetadata(userId, currentId);
+      const metadata = await this.drive.getMetadata(currentId);
       if (!metadata) break;
       result.push(metadata.name);
       currentId = metadata.parentIds[0] ?? null;

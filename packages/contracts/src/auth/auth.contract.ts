@@ -63,37 +63,6 @@ export const refreshResponseSchema = z.object({
 
 export type RefreshResponse = z.infer<typeof refreshResponseSchema>;
 
-
-
-export const googleDriveConnectSchema = z.object({
-  returnTo: z
-    .string()
-    .trim()
-    .max(1000)
-    .refine(
-      (value) => value.startsWith('/') && !value.startsWith('//'),
-      'La ruta de retorno debe ser interna.',
-    )
-    .default('/calculadora'),
-});
-export type GoogleDriveConnectInput = z.infer<typeof googleDriveConnectSchema>;
-
-export const googleDriveConnectionStatusSchema = z.object({
-  connected: z.boolean(),
-  email: emailSchema.nullable(),
-  scopes: z.array(z.string().trim().min(1)),
-});
-export type GoogleDriveConnectionStatus = z.infer<
-  typeof googleDriveConnectionStatusSchema
->;
-
-export const googleDriveConnectResponseSchema = z.object({
-  authorizationUrl: z.url(),
-});
-export type GoogleDriveConnectResponse = z.infer<
-  typeof googleDriveConnectResponseSchema
->;
-
 export const changePasswordSchema = z
   .object({
     currentPassword: z.string().min(1, 'La contraseña actual es obligatoria.'),

@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useMemo, useState } from 'react';
 import {
   PROJECT_SALES_STAGE_LABELS,
   PROJECT_STATUS_LABELS,
@@ -28,7 +27,6 @@ const isQuotationProspect = (project: ProjectSummary) =>
   project.status !== 'cancelled';
 
 export function CalculatorPage() {
-  const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState('');
   const [newEstimationOpen, setNewEstimationOpen] = useState(false);
   const { data, isLoading, error } = useProjectsList({
@@ -57,22 +55,6 @@ export function CalculatorPage() {
     () => sourceProjects.filter(isQuotationProspect),
     [sourceProjects],
   );
-
-  useEffect(() => {
-    const shouldResume =
-      searchParams.get('resume_drive') === '1' ||
-      searchParams.get('drive_connected') === '1' ||
-      searchParams.has('drive_error');
-
-    if (!shouldResume) return;
-
-    setNewEstimationOpen(true);
-    const next = new URLSearchParams(searchParams);
-    next.delete('resume_drive');
-    next.delete('drive_connected');
-    next.delete('drive_error');
-    setSearchParams(next, { replace: true });
-  }, [searchParams, setSearchParams]);
 
   return (
     <DashboardLayout title="Calculadora">

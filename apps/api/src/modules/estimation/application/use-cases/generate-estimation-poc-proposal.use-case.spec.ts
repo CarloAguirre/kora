@@ -38,7 +38,7 @@ describe('GenerateEstimationPocProposalUseCase', () => {
     const result = await new GenerateEstimationPocProposalUseCase(
       ai,
       sources,
-    ).execute('user-1', {
+    ).execute({
       projectId: '550e8400-e29b-41d4-a716-446655440000',
       projectName: 'Proyecto',
       clientName: 'Cliente',
@@ -92,7 +92,7 @@ describe('GenerateEstimationPocProposalUseCase', () => {
     const result = await new GenerateEstimationPocProposalUseCase(
       ai,
       sources,
-    ).execute('user-1', {
+    ).execute({
       projectId: '550e8400-e29b-41d4-a716-446655440000',
       projectName: 'Proyecto',
       clientName: 'Cliente',

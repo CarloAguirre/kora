@@ -1079,65 +1079,51 @@ este bloque.
 
 ### Autenticación elegida
 
-La decisión final es **OAuth delegado por usuario**, no una cuenta de servicio
-global.
-
-Kora mantiene el login Google básico con:
-
-```text
-openid email profile
-```
-
-y solicita de forma incremental, únicamente cuando el usuario usa Calculadora:
+El acceso a Drive es server-to-server mediante una **cuenta de servicio de
+Google** y scope de solo lectura:
 
 ```text
 https://www.googleapis.com/auth/drive.readonly
 ```
 
-El flujo usa `access_type=offline` para obtener un refresh token. Kora guarda
-ese refresh token cifrado y asociado al `user_id`, y genera access tokens
-temporales cuando necesita consultar Drive.
-
-Regla de autorización:
+Variables opcionales:
 
 ```text
-Usuario Kora
-  -> autoriza su misma cuenta Google
-  -> Kora consulta Drive en su nombre
-  -> Google decide acceso según los permisos reales de esa cuenta
+GOOGLE_DRIVE_CLIENT_EMAIL
+GOOGLE_DRIVE_PRIVATE_KEY
 ```
 
-Por lo tanto, conocer o guardar un `documentation_link` **no otorga acceso**.
-Si el correo del usuario no puede abrir la carpeta en Google Drive, Calculadora
-tampoco puede consumirla.
+La carpeta del proyecto debe compartirse con `GOOGLE_DRIVE_CLIENT_EMAIL`.
 
-La conexión se persiste en:
+Se eligió una cuenta de servicio en lugar de reutilizar el login Google actual
+porque el OAuth de autenticación de Kora solo solicita:
 
 ```text
-google_drive_connections
+openid email profile
 ```
 
-con el refresh token cifrado. La cuenta Google utilizada debe coincidir con el
-correo del usuario Kora.
+y no persiste refresh/access tokens de Drive.
 
-### Comportamiento sin autorización
+### Comportamiento sin configuración
 
-Si el usuario todavía no concedió Drive:
+Las variables son opcionales para no romper ambientes existentes.
 
-- la aplicación sigue funcionando normalmente;
-- Calculadora muestra **Conectar Google Drive**;
-- no lista ni descarga archivos;
-- no utiliza una identidad global como fallback.
+Si no están configuradas:
 
-Al conectar, Kora reutiliza el mismo callback OAuth ya configurado para login y
-retorna a Calculadora, restaurando el borrador del modal.
+- la API sigue iniciando normalmente;
+- el modal conserva el enlace del proyecto;
+- muestra el estado "Drive no configurado";
+- no simula archivos.
+
+Si las credenciales existen pero la carpeta no fue compartida con la cuenta de
+servicio, el modal informa que Kora no tiene permisos.
 
 ### Alcance de esta primera iteración
 
 Incluido:
 
 - detectar el ID de carpeta desde una URL de Drive;
-- obtener y renovar access tokens OAuth delegados por usuario;
+- obtener token OAuth server-to-server con JWT firmado;
 - cachear temporalmente el access token;
 - listar hasta 100 archivos directos;
 - soportar carpetas accesibles en My Drive o Shared Drives;
@@ -1275,16 +1261,3 @@ y guarda la URL como `documentationLink` / `projects.documentation_link`.
 
 Así la Calculadora no mantiene una relación paralela proyecto-Drive y futuras
 estimaciones pueden reutilizar la carpeta ya confirmada.
-
-
-### Consideración OAuth de Google
-
-El scope `drive.readonly` está clasificado por Google como **restricted**. Para
-desarrollo puede probarse con una app OAuth en estado Testing y usuarios de
-prueba autorizados. Si Kora se publica para usuarios externos, Google puede
-exigir verificación y evaluación adicional; si el cliente OAuth se configura
-como aplicación interna de Google Workspace, aplican las reglas de aplicaciones
-internas de la organización.
-
-La PoC debe probar primero con una cuenta añadida como test user o con un OAuth
-Client interno de Kabeli, según la configuración real del Workspace.

@@ -10,10 +10,10 @@ y definir cómo Kora puede resolver una carpeta/proyecto para representarla en
 Calculadora.
 
 Este catastro se realizó consultando Drive directamente mediante el conector
-disponible en el entorno de análisis. Ese acceso sirvió para inspeccionar la
-estructura real y diseñar la lógica. La ejecución de Kora usa OAuth delegado:
-cada usuario conecta su propia cuenta Google y Google aplica los permisos reales
-de esa cuenta sobre las carpetas y archivos.
+disponible en el entorno de análisis. Ese acceso sirve para inspeccionar la
+estructura real y diseñar la lógica; no implica que la API de Kora use las mismas
+credenciales. La ejecución productiva seguirá utilizando el adaptador de Drive de
+Kora.
 
 ## Hallazgo principal
 
@@ -526,7 +526,7 @@ Además, el inventario diferencia entre:
 - archivo **analizable** por la PoC.
 
 Los archivos analizables pueden alimentar el lector documental real. El flujo
-actual selecciona hasta cuatro antecedentes priorizados y los entrega al proveedor
+actual selecciona hasta seis antecedentes priorizados y los entrega al proveedor
 IA para una estimación ejecutiva por equipos/roles.
 
 La asociación ya no queda únicamente en memoria del modal:
@@ -539,33 +539,3 @@ carpeta elegida
 ```
 
 El análisis detallado RF/HU/EDT permanece fuera del alcance de esta prueba.
-
-
-## Actualización · autorización Drive por usuario
-
-La autenticación mediante cuenta de servicio fue descartada para el flujo final
-de Calculadora.
-
-La regla vigente es:
-
-```text
-usuario autenticado en Kora
-  -> Conectar Google Drive
-  -> consentimiento incremental drive.readonly
-  -> refresh token cifrado por user_id
-  -> llamadas Drive en nombre de ese usuario
-  -> Google aplica sus permisos reales
-```
-
-Esto significa que `documentation_link` identifica la carpeta, pero no concede
-acceso.
-
-Dos usuarios pueden consultar el mismo proyecto y obtener resultados distintos:
-
-```text
-Usuario A tiene permiso en Drive -> Kora puede inventariar/leer
-Usuario B no tiene permiso       -> Google responde sin acceso
-```
-
-La conexión se almacena en `google_drive_connections` y se elimina el uso de
-`GOOGLE_DRIVE_CLIENT_EMAIL` / `GOOGLE_DRIVE_PRIVATE_KEY`.

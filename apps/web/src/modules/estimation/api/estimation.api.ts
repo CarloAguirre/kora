@@ -1,7 +1,5 @@
 import type {
   AnalyzeEstimationPocInput,
-  GoogleDriveConnectionStatus,
-  GoogleDriveConnectResponse,
   EstimationDriveFolderListing,
   EstimationDriveFolderResolution,
   EstimationDriveInventory,
@@ -16,17 +14,6 @@ import type {
 import { api } from '@/shared/lib/api-client';
 
 export const estimationApi = {
-  driveConnectionStatus(): Promise<GoogleDriveConnectionStatus> {
-    return api.get<GoogleDriveConnectionStatus>('/auth/google/drive/status');
-  },
-  startDriveConnection(
-    returnTo: string,
-  ): Promise<GoogleDriveConnectResponse> {
-    return api.post<GoogleDriveConnectResponse>(
-      '/auth/google/drive/connect',
-      { returnTo },
-    );
-  },
   questionnaireDefinition(): Promise<EstimationQuestionnaireDefinition> {
     return api.get<EstimationQuestionnaireDefinition>('/estimations/questionnaire-definition');
   },
@@ -53,8 +40,6 @@ export const estimationApi = {
 
 export const estimationKeys = {
   all: ['estimations'] as const,
-  driveConnection: () =>
-    [...estimationKeys.all, 'drive-connection'] as const,
   questionnaireDefinition: () => [...estimationKeys.all, 'questionnaire-definition'] as const,
   driveResolution: (projectId: string) =>
     [...estimationKeys.all, 'drive-resolution', projectId] as const,

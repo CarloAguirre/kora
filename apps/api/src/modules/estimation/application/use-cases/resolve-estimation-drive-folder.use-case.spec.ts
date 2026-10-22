@@ -5,7 +5,7 @@ import { ResolveEstimationDriveFolderUseCase } from './resolve-estimation-drive-
 describe('ResolveEstimationDriveFolderUseCase', () => {
   it('usa documentationLink como vínculo explícito cuando existe', async () => {
     const drive: DriveFolderClient = {
-      isConnected: async () => false,
+      isConfigured: () => false,
       listFiles: async () => [],
       listChildren: async () => [],
       searchFolders: async () => [],
@@ -13,7 +13,7 @@ describe('ResolveEstimationDriveFolderUseCase', () => {
       readAnalysisContent: async () => null,
     };
 
-    const result = await new ResolveEstimationDriveFolderUseCase(drive).execute('user-1', {
+    const result = await new ResolveEstimationDriveFolderUseCase(drive).execute({
       projectId: '550e8400-e29b-41d4-a716-446655440000',
       projectName: 'AurelIA',
       clientName: 'Goldfields',
@@ -31,10 +31,10 @@ describe('ResolveEstimationDriveFolderUseCase', () => {
 
   it('resuelve automáticamente una carpeta con nombre exacto', async () => {
     const drive: DriveFolderClient = {
-      isConnected: async () => true,
+      isConfigured: () => true,
       listFiles: async () => [],
       listChildren: async () => [],
-      searchFolders: async (_userId, terms) =>
+      searchFolders: async (terms) =>
         terms.some((term) => term.toLowerCase().includes('aurelia'))
           ? [
               {
@@ -54,7 +54,7 @@ describe('ResolveEstimationDriveFolderUseCase', () => {
       readAnalysisContent: async () => null,
     };
 
-    const result = await new ResolveEstimationDriveFolderUseCase(drive).execute('user-1', {
+    const result = await new ResolveEstimationDriveFolderUseCase(drive).execute({
       projectId: '550e8400-e29b-41d4-a716-446655440000',
       projectName: 'AurelIA',
       clientName: 'Goldfields',
