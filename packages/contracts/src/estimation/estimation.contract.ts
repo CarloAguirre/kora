@@ -431,6 +431,7 @@ export const estimationDriveInventoryItemSchema = z.object({
   path: nonEmptyTrimmed(2000, 'La ruta'),
   depth: z.number().int().min(1).max(5),
   priority: estimationDriveSourcePrioritySchema,
+  analyzable: z.boolean(),
   reason: z.string().trim().max(1000).nullish(),
 });
 export type EstimationDriveInventoryItem = z.infer<typeof estimationDriveInventoryItemSchema>;
