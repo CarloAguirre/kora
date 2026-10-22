@@ -5,12 +5,13 @@ import { InventoryEstimationDriveUseCase } from './inventory-estimation-drive.us
 describe('InventoryEstimationDriveUseCase', () => {
   it('prioriza levantamientos y excluye credenciales', async () => {
     const drive: DriveFolderClient = {
-      isConfigured: () => true,
+      isConnected: async () => true,
       listFiles: async () => [],
       searchFolders: async () => [],
       getMetadata: async () => null,
       readAnalysisContent: async () => null,
-      listChildren: async (folderId) => {
+      listChildren: async (userId, folderId) => {
+        expect(userId).toBe('user-1');
         if (folderId !== 'root123') return [];
         return [
           {
@@ -38,7 +39,7 @@ describe('InventoryEstimationDriveUseCase', () => {
       },
     };
 
-    const result = await new InventoryEstimationDriveUseCase(drive).execute({
+    const result = await new InventoryEstimationDriveUseCase(drive).execute('user-1', {
       driveFolderUrl: 'https://drive.google.com/drive/folders/root123',
       maxDepth: 3,
     });
