@@ -1232,9 +1232,10 @@ El lector documental:
 - excluye credenciales, secretos, APK, backups y carpetas antiguas;
 - prioriza levantamientos, requerimientos, arquitectura, procesos, alcance y
   documentación por módulos;
-- toma como máximo 6 documentos;
-- limita PDF/binarios a 8 MB;
-- limita texto a 40.000 caracteres por documento;
+- toma como máximo 4 documentos;
+- limita PDF/binarios a 5 MB;
+- limita texto a 30.000 caracteres por documento;
+- inspecciona como máximo 150 elementos del árbol;
 - si un archivo falla, continúa con los demás.
 
 ### Privacidad
