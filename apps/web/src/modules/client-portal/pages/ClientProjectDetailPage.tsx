@@ -20,7 +20,6 @@ import {
   DollarSignIcon,
   DownloadIcon,
   EyeIcon,
-  EyeOffIcon,
   HistoryIcon,
   LinkIcon,
   ListIcon,
@@ -316,7 +315,7 @@ export function ClientProjectDetailPage({
             title={usedHoursVisible ? 'Ocultar horas consumidas' : 'Mostrar horas consumidas'}
             onClick={toggleUsedHours}
           >
-            {usedHoursVisible ? <EyeOffIcon size={16} /> : <EyeIcon size={16} />}
+            <EyeIcon size={16} />
           </button>
         </div>
 
