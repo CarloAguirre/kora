@@ -24,15 +24,18 @@ export interface DriveFolderMetadata {
   readonly parentIds: readonly string[];
 }
 
+export interface DriveAnalysisContent {
+  readonly mimeType: string;
+  readonly text?: string;
+  readonly dataBase64?: string;
+}
+
 /**
- * Boundary de metadata de Google Drive usado por Calculadora.
+ * Boundary de Google Drive usado por Calculadora.
  *
- * - resuelve carpetas candidatas por metadata;
- * - recorre jerarquía;
- * - lista archivos para la UI.
- *
- * La descarga/exportación de contenido para IA permanece en
- * DocumentSourceReader.
+ * El adaptador resuelve metadata, jerarquía y lectura de formatos soportados.
+ * La selección semántica de qué documentos analizar permanece en la capa de
+ * aplicación.
  */
 export interface DriveFolderClient {
   isConfigured(): boolean;
@@ -40,4 +43,8 @@ export interface DriveFolderClient {
   listChildren(folderId: string): Promise<readonly DriveFolderItem[]>;
   searchFolders(terms: readonly string[]): Promise<readonly DriveFolderItem[]>;
   getMetadata(fileId: string): Promise<DriveFolderMetadata | null>;
+  readAnalysisContent(
+    fileId: string,
+    mimeType: string,
+  ): Promise<DriveAnalysisContent | null>;
 }
