@@ -1275,3 +1275,16 @@ y guarda la URL como `documentationLink` / `projects.documentation_link`.
 
 Así la Calculadora no mantiene una relación paralela proyecto-Drive y futuras
 estimaciones pueden reutilizar la carpeta ya confirmada.
+
+
+### Consideración OAuth de Google
+
+El scope `drive.readonly` está clasificado por Google como **restricted**. Para
+desarrollo puede probarse con una app OAuth en estado Testing y usuarios de
+prueba autorizados. Si Kora se publica para usuarios externos, Google puede
+exigir verificación y evaluación adicional; si el cliente OAuth se configura
+como aplicación interna de Google Workspace, aplican las reglas de aplicaciones
+internas de la organización.
+
+La PoC debe probar primero con una cuenta añadida como test user o con un OAuth
+Client interno de Kabeli, según la configuración real del Workspace.
