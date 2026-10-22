@@ -9,6 +9,7 @@ describe('InventoryEstimationDriveUseCase', () => {
       listFiles: async () => [],
       searchFolders: async () => [],
       getMetadata: async () => null,
+      readAnalysisContent: async () => null,
       listChildren: async (folderId) => {
         if (folderId !== 'root123') return [];
         return [
