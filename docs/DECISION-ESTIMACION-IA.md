@@ -1261,3 +1261,43 @@ y guarda la URL como `documentationLink` / `projects.documentation_link`.
 
 Así la Calculadora no mantiene una relación paralela proyecto-Drive y futuras
 estimaciones pueden reutilizar la carpeta ya confirmada.
+
+
+## Fallback temporal de antecedentes para la PoC
+
+Mientras `GOOGLE_DRIVE_CLIENT_EMAIL` y `GOOGLE_DRIVE_PRIVATE_KEY` no estén
+configurados, Calculadora no bloquea el flujo de validación de Gemini.
+
+Para cualquier prospecto en cotización, Kora expone una carpeta virtual:
+
+```text
+https://drive.google.com/drive/folders/kora-poc-fallback
+```
+
+con un antecedente prioritario:
+
+```text
+Levantamiento/Requerimiento_KDM.pdf
+```
+
+El nombre y tipo se presentan como si fueran un archivo del inventario Drive,
+pero el contenido entregado a Gemini corresponde al texto extraído del PDF KDM
+usado como fixture de la PoC.
+
+El fallback contiene el alcance de la Plataforma de Recepción de Servicios KDM,
+incluyendo PWA, backoffice, CECO/permisos, Facele SOAP, SAP API Gateway, Match
+Engine, aprobación/rechazo, rechazo automático de 7 días, seguridad y SSO Entra
+ID opcional.
+
+Reglas:
+
+- se activa solo cuando Drive no está configurado;
+- no reemplaza Drive cuando la Service Account está disponible;
+- la carpeta virtual nunca se persiste en `projects.documentation_link`;
+- una URL Drive real ingresada por el usuario sí puede persistirse;
+- Gemini recibe el contenido KDM como un único antecedente llamado
+  `Requerimiento_KDM.pdf`;
+- las HH continúan calculándose determinísticamente fuera del modelo.
+
+Este mecanismo debe eliminarse o desactivarse cuando la integración real de
+Drive quede disponible en el ambiente objetivo.
