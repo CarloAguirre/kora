@@ -34,7 +34,7 @@ describe('GoogleDriveAuthorizationService', () => {
     const cipher = {
       encrypt: (value: string) => `encrypted:${value}`,
       decrypt: (value: string) => value.replace('encrypted:', ''),
-    } as GoogleOAuthTokenCipher;
+    } as unknown as GoogleOAuthTokenCipher;
 
     const service = new GoogleDriveAuthorizationService(
       google,
@@ -78,7 +78,7 @@ describe('GoogleDriveAuthorizationService', () => {
     const cipher = {
       encrypt: (value: string) => value,
       decrypt: (value: string) => value,
-    } as GoogleOAuthTokenCipher;
+    } as unknown as GoogleOAuthTokenCipher;
 
     const service = new GoogleDriveAuthorizationService(
       google,
@@ -126,7 +126,7 @@ describe('GoogleDriveAuthorizationService', () => {
     const cipher = {
       encrypt: (value: string) => `encrypted:${value}`,
       decrypt: (value: string) => value.replace('encrypted:', ''),
-    } as GoogleOAuthTokenCipher;
+    } as unknown as GoogleOAuthTokenCipher;
 
     const service = new GoogleDriveAuthorizationService(
       google,
