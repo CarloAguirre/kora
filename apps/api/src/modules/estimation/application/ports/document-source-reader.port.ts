@@ -4,15 +4,21 @@ export interface ProjectSourceDocument {
   readonly sourceId: string;
   readonly name: string;
   readonly mimeType: string;
+  readonly path: string;
   readonly modifiedAt?: Date;
-  /**
-   * Contenido ya normalizado para análisis. El adaptador concreto de Drive es
-   * responsable de descargar/exportar cada formato; la capa de aplicación no
-   * conoce APIs de Google.
-   */
-  readonly content: string;
+  readonly text?: string;
+  readonly dataBase64?: string;
 }
 
+/**
+ * Puerto de fuentes documentales ya seleccionadas para análisis.
+ *
+ * La capa de aplicación entrega una carpeta raíz; el adaptador concreto
+ * recorre Drive, selecciona antecedentes relevantes y normaliza el contenido
+ * soportado sin exponer detalles de la API de Google al caso de uso.
+ */
 export interface DocumentSourceReader {
-  readProjectSources(projectId: string): Promise<readonly ProjectSourceDocument[]>;
+  readDriveSources(
+    driveFolderUrl: string,
+  ): Promise<readonly ProjectSourceDocument[]>;
 }
