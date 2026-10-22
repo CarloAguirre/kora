@@ -1,18 +1,29 @@
 import { Module } from '@nestjs/common';
-import { AI_PROVIDER } from './application/ports/ai-provider.port';
+import { AppConfigService } from '../../config/app-config.service';
+import { AI_PROVIDER, type AiProvider } from './application/ports/ai-provider.port';
+import { GeminiAiProvider } from './infrastructure/gemini-ai.provider';
 import { PocAiProvider } from './infrastructure/poc-ai.provider';
 
 /**
  * Módulo técnico de IA.
  *
- * Expone una abstracción a los módulos de negocio. Durante la PoC usa un
- * proveedor determinístico; posteriormente podrá registrar OpenAI, Azure
- * OpenAI u otro adaptador sin acoplar Calculadora a ese SDK.
+ * Con GEMINI_API_KEY utiliza Gemini. Sin key conserva el proveedor determinístico
+ * para que la API pueda arrancar y el resto de Kora no dependa de una credencial
+ * externa durante desarrollo.
  */
 @Module({
   providers: [
     PocAiProvider,
-    { provide: AI_PROVIDER, useExisting: PocAiProvider },
+    GeminiAiProvider,
+    {
+      provide: AI_PROVIDER,
+      inject: [AppConfigService, GeminiAiProvider, PocAiProvider],
+      useFactory: (
+        config: AppConfigService,
+        gemini: GeminiAiProvider,
+        poc: PocAiProvider,
+      ): AiProvider => (config.ai.enabled ? gemini : poc),
+    },
   ],
   exports: [AI_PROVIDER],
 })
