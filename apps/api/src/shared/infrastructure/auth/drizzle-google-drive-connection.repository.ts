@@ -5,7 +5,6 @@ import {
   type Database,
 } from '@kora/db';
 import {
-  GOOGLE_DRIVE_CONNECTION_REPOSITORY,
   type GoogleDriveConnectionRecord,
   type GoogleDriveConnectionRepository,
   type SaveGoogleDriveConnectionInput,
@@ -68,5 +67,3 @@ export class DrizzleGoogleDriveConnectionRepository
       .where(eq(googleDriveConnections.userId, userId));
   }
 }
-
-void GOOGLE_DRIVE_CONNECTION_REPOSITORY;
