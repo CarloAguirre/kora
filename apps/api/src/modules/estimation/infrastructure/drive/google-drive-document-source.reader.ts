@@ -1,8 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
-import {
-  DOCUMENT_SOURCE_READER,
-  type DocumentSourceReader,
-  type ProjectSourceDocument,
+import type {
+  DocumentSourceReader,
+  ProjectSourceDocument,
 } from '../../application/ports/document-source-reader.port';
 import {
   DRIVE_FOLDER_CLIENT,
@@ -142,7 +141,3 @@ export class GoogleDriveDocumentSourceReader
     return candidates;
   }
 }
-
-// Mantiene el token de DI referenciado por el archivo para que una futura
-// sustitución del reader sea explícita al registrar el provider.
-void DOCUMENT_SOURCE_READER;
