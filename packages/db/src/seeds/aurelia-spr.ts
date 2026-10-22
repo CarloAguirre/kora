@@ -34,8 +34,8 @@ import {
  * (Levantamiento detallado 30 · Desarrollo 40 · Pruebas Gold Fields 25 · Marcha blanca 5). Kora no
  * tiene etapas con nombre, peso ni fechas dentro de una fase, así que se traspone así (decisión
  * del 22/10: una sola fase, como el Excel):
- * - Etapa actual de la fase: Desarrollo (el catálogo de fases no tiene "Pruebas"); la "Etapa de
- *   avance" del proyecto sí: `testing` (Pruebas).
+ * - Etapa actual de la fase: Pruebas (`production`, cuya etiqueta en Kora es "Pruebas"); la "Etapa
+ *   de avance" del proyecto: `testing` (Pruebas).
  * - Cada tramo lleva su etapa al inicio del nombre; cada etapa (peso, fechas, HH, avance) y el
  *   historial semanal del Panel quedan como registros de bitácora.
  * - Las 3 entregas a Tania son UNA entrega con su historial (dos rechazos; la 3ra validada por la
@@ -166,6 +166,8 @@ export async function seedAureliaSpr(db: Database, target: AureliaSprTarget): Pr
 
     // 1. Proyecto destino — el real, o un clon recién creado.
     let projectId = realProject.id;
+    /** "Equipo IA retirado" de una corrida anterior sobre el real — se conserva (IA ya no está, no se volvería a crear). */
+    let previousIaRemovalLog: typeof projectObservations.$inferSelect | undefined;
     if (target === 'preview') {
       projectId = ID.previewProject;
       await deletePreview(tx);
@@ -196,6 +198,17 @@ export async function seedAureliaSpr(db: Database, target: AureliaSprTarget): Pr
       }
     } else {
       // Re-corrida: se reemplaza solo lo que siembra este archivo (ids fijos), nunca lo cargado a mano.
+      [previousIaRemovalLog] = await tx
+        .select()
+        .from(projectObservations)
+        .where(
+          and(
+            eq(projectObservations.projectId, projectId),
+            eq(projectObservations.message, 'Equipo "IA" retirado del proyecto.'),
+            sql`${projectObservations.id}::text like 'a5b00000-%'`,
+          ),
+        )
+        .limit(1);
       await tx.delete(projectObservations).where(
         and(eq(projectObservations.projectId, projectId), sql`${projectObservations.id}::text like 'a5b00000-%'`),
       );
@@ -224,7 +237,7 @@ export async function seedAureliaSpr(db: Database, target: AureliaSprTarget): Pr
       projectId,
       name: PHASE,
       initialStage: 'discovery',
-      currentStage: 'development',
+      currentStage: 'production',
       estimatedHours: '1235.00',
       estimatedStartDate: d('2026-06-02'),
       estimatedEndDate: d('2026-09-30'),
@@ -395,6 +408,9 @@ export async function seedAureliaSpr(db: Database, target: AureliaSprTarget): Pr
       await tx.delete(projectTeams).where(and(eq(projectTeams.projectId, projectId), eq(projectTeams.teamId, REAL.teamIa)));
       const now = new Date();
       entries.push({ ...log(todayInChile(), 0, REAL.userClaudio, 'Equipo "IA" retirado del proyecto.'), createdAt: now, updatedAt: now });
+    } else if (previousIaRemovalLog) {
+      const { id: _id, ...kept } = previousIaRemovalLog;
+      entries.push(kept);
     }
     await tx.insert(projectObservations).values(entries.map((entry, index) => ({ ...entry, id: ID.observation(index) })));
 
