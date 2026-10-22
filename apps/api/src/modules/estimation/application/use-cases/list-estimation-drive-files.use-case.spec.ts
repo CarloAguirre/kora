@@ -16,8 +16,9 @@ describe('ListEstimationDriveFilesUseCase', () => {
   it('lista y clasifica archivos visibles en la carpeta', async () => {
     const drive: DriveFolderClient = {
       ...emptyDiscovery,
-      isConfigured: () => true,
-      listFiles: async (folderId) => {
+      isConnected: async () => true,
+      listFiles: async (userId, folderId) => {
+        expect(userId).toBe('user-1');
         expect(folderId).toBe('abc_123');
         return [
           {
@@ -45,7 +46,7 @@ describe('ListEstimationDriveFilesUseCase', () => {
       },
     };
 
-    const result = await new ListEstimationDriveFilesUseCase(drive).execute({
+    const result = await new ListEstimationDriveFilesUseCase(drive).execute('user-1', {
       driveFolderUrl: 'https://drive.google.com/drive/folders/abc_123',
     });
 
@@ -58,11 +59,11 @@ describe('ListEstimationDriveFilesUseCase', () => {
   it('explica cuando Drive no está configurado', async () => {
     const drive: DriveFolderClient = {
       ...emptyDiscovery,
-      isConfigured: () => false,
+      isConnected: async () => false,
       listFiles: async () => [],
     };
 
-    const result = await new ListEstimationDriveFilesUseCase(drive).execute({
+    const result = await new ListEstimationDriveFilesUseCase(drive).execute('user-1', {
       driveFolderUrl: 'https://drive.google.com/drive/folders/abc_123',
     });
 
