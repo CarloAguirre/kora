@@ -56,7 +56,7 @@ describe('ListEstimationDriveFilesUseCase', () => {
     expect(result.files[1]?.kind).toBe('pdf');
   });
 
-  it('explica cuando Drive no está configurado', async () => {
+  it('explica cuando el usuario no conectó Drive', async () => {
     const drive: DriveFolderClient = {
       ...emptyDiscovery,
       isConnected: async () => false,
@@ -67,7 +67,7 @@ describe('ListEstimationDriveFilesUseCase', () => {
       driveFolderUrl: 'https://drive.google.com/drive/folders/abc_123',
     });
 
-    expect(result.connection).toBe('not_configured');
+    expect(result.connection).toBe('not_connected');
     expect(result.files).toEqual([]);
   });
 });
