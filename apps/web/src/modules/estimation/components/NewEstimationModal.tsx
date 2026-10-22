@@ -8,7 +8,10 @@ import type {
   ProjectSummary,
 } from '@kora/contracts';
 import { projectEstimationPath } from '@/app/router/paths';
-import { useProjectDetail } from '@/modules/projects/api/projects.queries';
+import {
+  useProjectDetail,
+  useUpdateProjectExtras,
+} from '@/modules/projects/api/projects.queries';
 import { Button } from '@/shared/components/ui/Button';
 import { Modal } from '@/shared/components/ui/Modal';
 import { Select } from '@/shared/components/ui/Select';
@@ -64,6 +67,7 @@ export function NewEstimationModal({ open, prospects, onClose }: NewEstimationMo
     [projectRef, prospects],
   );
   const detail = useProjectDetail(selected?.slug ?? null);
+  const updateProjectExtras = useUpdateProjectExtras();
 
   const resolutionInput = useMemo(() => {
     if (!detail.data) return null;
@@ -125,20 +129,63 @@ export function NewEstimationModal({ open, prospects, onClose }: NewEstimationMo
     label: `${project.client?.companyName ?? 'Cliente por confirmar'} — ${project.name}`,
   }));
 
-  const submit = () => {
+  const submit = async () => {
     if (!selected) {
       setError('Elige un prospecto en cotización.');
       return;
     }
-    if (mode === 'ai' && !driveFolderUrl.trim()) {
-      setError('Confirma o vincula la carpeta de Drive del levantamiento para usar el agente IA.');
-      return;
+
+    const normalizedDriveUrl = driveFolderUrl.trim();
+    if (mode === 'ai') {
+      if (!normalizedDriveUrl) {
+        setError('Confirma o vincula la carpeta de Drive del levantamiento para usar el agente IA.');
+        return;
+      }
+      if (driveInventory.isLoading || driveInventory.isFetching) {
+        setError('Espera a que Kora termine de revisar la carpeta de Drive.');
+        return;
+      }
+      if (driveInventory.data?.connection !== 'connected') {
+        setError(
+          driveInventory.data?.message ??
+            'Kora todavía no puede leer esta carpeta de Drive.',
+        );
+        return;
+      }
+
+      const analyzableCount = driveInventory.data.items.filter(
+        (item) =>
+          item.itemType === 'file' &&
+          item.priority !== 'excluded' &&
+          item.analyzable,
+      ).length;
+
+      if (analyzableCount === 0) {
+        setError(
+          'La carpeta no contiene antecedentes compatibles para esta PoC.',
+        );
+        return;
+      }
+
+      if (detail.data?.documentationLink !== normalizedDriveUrl) {
+        try {
+          await updateProjectExtras.mutateAsync({
+            projectId: selected.id,
+            input: { documentationLink: normalizedDriveUrl },
+          });
+        } catch {
+          setError(
+            'La carpeta es válida, pero no se pudo guardar el vínculo en el proyecto.',
+          );
+          return;
+        }
+      }
     }
 
     navigate(`${projectEstimationPath(selected)}?mode=${mode}`, {
       state: {
         creationMode: mode,
-        driveFolderUrl: driveFolderUrl.trim(),
+        driveFolderUrl: normalizedDriveUrl,
         instructions: instructions.trim(),
       },
     });
@@ -159,7 +206,12 @@ export function NewEstimationModal({ open, prospects, onClose }: NewEstimationMo
       footer={
         <>
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
-          <Button onClick={submit}>Crear estimación</Button>
+          <Button
+            loading={updateProjectExtras.isPending}
+            onClick={() => void submit()}
+          >
+            Crear estimación
+          </Button>
         </>
       }
     >
