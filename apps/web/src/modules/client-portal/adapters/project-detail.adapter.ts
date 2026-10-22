@@ -337,7 +337,7 @@ function toRoadmapStep(stage: ProjectModule['currentStage']): RoadmapStep {
   return stage === 'closed' ? 'finished' : stage;
 }
 
-function toRoadmapPhase(module: ProjectModule, index: number): ClientRoadmapPhase {
+export function toRoadmapPhase(module: ProjectModule, index: number): ClientRoadmapPhase {
   const status = phaseStatus(module);
   const start = module.estimatedStartDate;
   const end = module.estimatedEndDate;

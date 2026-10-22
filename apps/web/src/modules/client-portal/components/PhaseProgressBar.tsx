@@ -30,18 +30,33 @@ const STATUS_TONE: Readonly<Record<ClientRoadmapPhase['status'], StatusPillTone>
  *   visible (`overflow: hidden` del contenedor), y el texto de apoyo la
  *   describe como el avance ESPERADO a hoy, no como "hoy" en sí.
  */
-export function PhaseProgressBar({ phase }: { phase: ClientRoadmapPhase }) {
+export function PhaseProgressBar({
+  phase,
+  embedded = false,
+}: {
+  phase: ClientRoadmapPhase;
+  /** Dentro de una fase del Roadmap, que ya muestra nombre y estado: sin tarjeta propia, con un título "Hoja de ruta". */
+  embedded?: boolean;
+}) {
   const currentIndex = phase.currentStep ? ROADMAP_STEPS.indexOf(phase.currentStep) : -1;
 
   return (
-    <div className={[styles.phase, phase.status === 'upcoming' ? styles.phaseUpcoming : ''].join(' ')}>
-      <div className={styles.phaseHeader}>
-        <StatusPill tone={STATUS_TONE[phase.status]}>{STATUS_LABEL[phase.status]}</StatusPill>
-        <span className={styles.phaseName}>{phase.name}</span>
-        <span className={styles.phaseDates}>
-          Inicio: {phase.startDate} - Fin: {phase.endDate}
-        </span>
-      </div>
+    <div
+      className={
+        embedded ? styles.embedded : [styles.phase, phase.status === 'upcoming' ? styles.phaseUpcoming : ''].join(' ')
+      }
+    >
+      {embedded ? (
+        <span className={styles.embeddedLabel}>Hoja de ruta</span>
+      ) : (
+        <div className={styles.phaseHeader}>
+          <StatusPill tone={STATUS_TONE[phase.status]}>{STATUS_LABEL[phase.status]}</StatusPill>
+          <span className={styles.phaseName}>{phase.name}</span>
+          <span className={styles.phaseDates}>
+            Inicio: {phase.startDate} - Fin: {phase.endDate}
+          </span>
+        </div>
+      )}
 
       <div className={styles.months}>
         {phase.months.map((month, index) => (

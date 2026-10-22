@@ -25,6 +25,38 @@
   flex-wrap: wrap;
 }
 
+/* Variante dentro de una fase del Roadmap: sin tarjeta, el contenedor ya la da. */
+.embedded {
+  display: flex;
+  flex-direction: column;
+}
+
+.embeddedLabel {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: #93a0ac;
+}
+
+.embedded .months {
+  padding-top: 6px;
+}
+
+.embedded .months span {
+  font-size: 11px;
+}
+
+.embedded .steps {
+  height: 26px;
+  margin-top: 4px;
+  border-radius: 13px;
+}
+
+.embedded .step {
+  font-size: 11px;
+}
+
 .phaseName {
   font-size: 14.5px;
   font-weight: 800;

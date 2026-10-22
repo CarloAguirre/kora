@@ -20,7 +20,8 @@ import { CloseIcon, PencilIcon } from '@/shared/components/icons/Icons';
 import { useToast } from '@/shared/components/ui/Toast';
 import { ApiRequestError } from '@/shared/lib/api-client';
 import { PhaseRoadmap, type PhaseRoadmapSelection } from '@/modules/client-portal/components/PhaseRoadmap';
-import { roleFromTeamName, toPhaseRoadmap } from '@/modules/client-portal/adapters/project-detail.adapter';
+import { PhaseProgressBar } from '@/modules/client-portal/components/PhaseProgressBar';
+import { roleFromTeamName, toPhaseRoadmap, toRoadmapPhase } from '@/modules/client-portal/adapters/project-detail.adapter';
 import { PHASE_ROADMAP_ROLE_COLORS } from '@/modules/client-portal/types';
 import { useHolidays } from '@/modules/hours/api/hours.queries';
 import { useUpdateProjectModuleSegment } from '../api/projects.queries';
@@ -140,15 +141,18 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
     const module = modulesById.get(phase.id);
     if (!module) return null;
     return (
-      <div className={styles.moduleFields}>
-        <Meta label="Etapa actual" value={PROJECT_MODULE_STAGE_LABELS[module.currentStage]} />
-        <Meta label="Etapa inicial" value={PROJECT_MODULE_STAGE_LABELS[module.initialStage]} />
-        <Meta label="Horas estimadas" value={module.estimatedHours != null ? `${module.estimatedHours} hh` : 'Sin definir'} />
-        <Meta label="Fechas estimadas" value={`${formatDate(module.estimatedStartDate)} — ${formatDate(module.estimatedEndDate)}`} />
-        {module.progress.actual != null && (
-          <Meta label="Avance real · esperado" value={`${module.progress.actual}% · ${module.progress.expected ?? 0}%`} />
-        )}
-      </div>
+      <>
+        <PhaseProgressBar phase={toRoadmapPhase(module, project.modules.indexOf(module))} embedded />
+        <div className={styles.moduleFields}>
+          <Meta label="Etapa actual" value={PROJECT_MODULE_STAGE_LABELS[module.currentStage]} />
+          <Meta label="Etapa inicial" value={PROJECT_MODULE_STAGE_LABELS[module.initialStage]} />
+          <Meta label="Horas estimadas" value={module.estimatedHours != null ? `${module.estimatedHours} hh` : 'Sin definir'} />
+          <Meta label="Fechas estimadas" value={`${formatDate(module.estimatedStartDate)} — ${formatDate(module.estimatedEndDate)}`} />
+          {module.progress.actual != null && (
+            <Meta label="Avance real · esperado" value={`${module.progress.actual}% · ${module.progress.expected ?? 0}%`} />
+          )}
+        </div>
+      </>
     );
   };
 
