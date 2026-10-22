@@ -43,6 +43,8 @@ export function toClientProjectRow(project: ProjectSummary): ClientProjectRow {
     leaderName: project.leader?.fullName ?? '—',
     startDate: formatDMY(project.startDate),
     endDate: project.endDate ? formatDMY(project.endDate) : null,
+    startDateIso: project.startDate ?? null,
+    endDateIso: project.endDate ?? null,
     health: projectHealth(project),
     // Misma etiqueta que la columna "Etapa" interna: solo con `phase`, un Prospecto/Cotización (sin fase) salía "Sin etapa".
     stageLabel: getProjectStageLabel(project),
@@ -61,6 +63,8 @@ export function toClientSupportContractRow(plan: SupportPlanListItem): ClientSup
     kabeliOwnerName: plan.leaderName ?? '—',
     startDate: formatDMY(plan.startDate),
     endDate: plan.endDate ? formatDMY(plan.endDate) : null,
+    startDateIso: plan.startDate ?? null,
+    endDateIso: plan.endDate ?? null,
     contractedHours: plan.contractedHours || null,
     consumedHours: plan.usedHours,
     hourValueUf: plan.planValueUf || null,

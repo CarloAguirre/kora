@@ -159,28 +159,32 @@ function ClientProjectsSection({
     {
       key: 'name',
       header: 'Proyecto',
+      sortValue: (p) => p.name,
       render: (project) => (
         <Link className={styles.projectLink} to={getProjectPath(project)}>
           {project.name}
         </Link>
       ),
     },
-    { key: 'leader', header: 'Líder Kabeli', render: (p) => p.leaderName },
-    { key: 'startDate', header: 'Inicio', render: (p) => p.startDate },
-    { key: 'endDate', header: 'Fin', render: (p) => p.endDate ?? '--' },
+    { key: 'leader', header: 'Líder Kabeli', sortValue: (p) => p.leaderName, render: (p) => p.leaderName },
+    { key: 'startDate', header: 'Inicio', sortValue: (p) => p.startDateIso, render: (p) => p.startDate },
+    { key: 'endDate', header: 'Fin', sortValue: (p) => p.endDateIso, render: (p) => p.endDate ?? '--' },
     {
       key: 'health',
       header: 'Estado',
+      sortValue: (p) => HEALTH_LABEL[p.health],
       render: (p) => <StatusPill tone={HEALTH_TONE[p.health]}>{HEALTH_LABEL[p.health]}</StatusPill>,
     },
     {
       key: 'stage',
       header: 'Etapa',
+      sortValue: (p) => p.stageLabel,
       render: (p) => <span className={styles.stageLabel}>{p.stageLabel}</span>,
     },
     {
       key: 'progress',
       header: 'Avance',
+      sortValue: (p) => p.progressPercent,
       // `null` = sin plan cargado: "--", no un 0% que parezca medido.
       render: (p) => (p.progressPercent != null ? `${p.progressPercent}%` : '--'),
     },
@@ -234,26 +238,29 @@ function ClientSupportSection({
       // contrato de soporte (`ClientSupportContractDetailPage`) con su lista
       // de tickets — ver docs/DECISION-PORTAL-CLIENTE.md.
       header: 'Contrato',
+      sortValue: (c) => c.name,
       render: (c) => (
         <Link className={styles.contractName} to={getContractPath(c)}>
           {c.name}
         </Link>
       ),
     },
-    { key: 'kabeliOwner', header: 'Responsable Kabeli', render: (c) => c.kabeliOwnerName },
-    { key: 'planType', header: 'Tipo', render: (c) => PLAN_TYPE_LABEL[c.planType] },
+    { key: 'kabeliOwner', header: 'Responsable Kabeli', sortValue: (c) => c.kabeliOwnerName, render: (c) => c.kabeliOwnerName },
+    { key: 'planType', header: 'Tipo', sortValue: (c) => PLAN_TYPE_LABEL[c.planType], render: (c) => PLAN_TYPE_LABEL[c.planType] },
     {
       key: 'dates',
       header: 'Inicio - Término',
+      sortValue: (c) => c.startDateIso,
       render: (c) => `${c.startDate} / ${c.endDate ?? '--'}`,
     },
-    { key: 'contractedHours', header: 'N° horas', render: (c) => c.contractedHours ?? '--' },
-    { key: 'consumedHours', header: 'HH consumidas', render: (c) => c.consumedHours != null ? `${c.consumedHours} UF` : '--' },
-    { key: 'hourValue', header: 'Valor HH', render: (c) => c.hourValueUf != null ? formatMoney(c.hourValueUf, c.currency) : '--' },
-    { key: 'billingState', header: 'Por facturar', render: (c) => c.billingState },
+    { key: 'contractedHours', header: 'N° horas', sortValue: (c) => c.contractedHours, render: (c) => c.contractedHours ?? '--' },
+    { key: 'consumedHours', header: 'HH consumidas', sortValue: (c) => c.consumedHours, render: (c) => c.consumedHours != null ? `${c.consumedHours} UF` : '--' },
+    { key: 'hourValue', header: 'Valor HH', sortValue: (c) => c.hourValueUf, render: (c) => c.hourValueUf != null ? formatMoney(c.hourValueUf, c.currency) : '--' },
+    { key: 'billingState', header: 'Por facturar', sortValue: (c) => (c.billingState === '--' ? null : c.billingState), render: (c) => c.billingState },
     {
       key: 'status',
       header: 'Estado del contrato',
+      sortValue: (c) => c.contractStatus,
       render: (c) => (
         <StatusPill tone={c.contractStatus === 'active' ? 'success' : 'neutral'}>
           {c.contractStatus === 'active' ? 'Vigente' : 'Finalizado'}

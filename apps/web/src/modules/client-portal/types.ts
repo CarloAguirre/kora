@@ -34,6 +34,9 @@ export interface ClientProjectRow {
   readonly leaderName: string;
   readonly startDate: string;
   readonly endDate: string | null;
+  /** Fechas ISO sin formatear, para ordenar la tabla (`startDate`/`endDate` vienen como dd-mm-aaaa). */
+  readonly startDateIso: string | null;
+  readonly endDateIso: string | null;
   readonly health: ClientProjectHealth;
   readonly stageLabel: string;
   /** Avance real (`progress.actual`); `null` = sin plan cargado. */
@@ -48,6 +51,8 @@ export interface ClientSupportContractRow {
   readonly kabeliOwnerName: string;
   readonly startDate: string;
   readonly endDate: string | null;
+  readonly startDateIso: string | null;
+  readonly endDateIso: string | null;
   readonly contractedHours: number | null;
   readonly consumedHours: number | null;
   readonly hourValueUf: number | null;
