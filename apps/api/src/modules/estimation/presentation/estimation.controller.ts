@@ -18,6 +18,10 @@ import {
   type ResolveEstimationDriveFolderInput,
 } from '@kora/contracts';
 import { RequirePermissions } from '../../../shared/presentation/decorators/require-permissions.decorator';
+import {
+  CurrentUser,
+  type RequestUser,
+} from '../../../shared/presentation/decorators/current-user.decorator';
 import { ZodValidationPipe } from '../../../shared/presentation/pipes/zod-validation.pipe';
 import { AnalyzeEstimationPocUseCase } from '../application/use-cases/analyze-estimation-poc.use-case';
 import { GenerateEstimationPocProposalUseCase } from '../application/use-cases/generate-estimation-poc-proposal.use-case';
@@ -46,28 +50,31 @@ export class EstimationController {
   @Post('drive/resolve')
   @RequirePermissions('projects:manage')
   driveResolve(
+    @CurrentUser() user: RequestUser,
     @Body(new ZodValidationPipe(resolveEstimationDriveFolderSchema))
     input: ResolveEstimationDriveFolderInput,
   ): Promise<EstimationDriveFolderResolution> {
-    return this.resolveDriveFolder.execute(input);
+    return this.resolveDriveFolder.execute(user.id, input);
   }
 
   @Post('drive/inventory')
   @RequirePermissions('projects:manage')
   driveInventory(
+    @CurrentUser() user: RequestUser,
     @Body(new ZodValidationPipe(inventoryEstimationDriveSchema))
     input: InventoryEstimationDriveInput,
   ): Promise<EstimationDriveInventory> {
-    return this.inventoryDrive.execute(input);
+    return this.inventoryDrive.execute(user.id, input);
   }
 
   @Post('drive/files')
   @RequirePermissions('projects:manage')
   driveFiles(
+    @CurrentUser() user: RequestUser,
     @Body(new ZodValidationPipe(listEstimationDriveFilesSchema))
     input: ListEstimationDriveFilesInput,
   ): Promise<EstimationDriveFolderListing> {
-    return this.listDriveFiles.execute(input);
+    return this.listDriveFiles.execute(user.id, input);
   }
 
   @Post('poc/analyze')
@@ -85,8 +92,9 @@ export class EstimationController {
   @Post('poc/proposal')
   @RequirePermissions('projects:manage')
   proposal(
+    @CurrentUser() user: RequestUser,
     @Body(new ZodValidationPipe(generateEstimationPocSchema)) input: GenerateEstimationPocInput,
   ): Promise<EstimationPocProposal> {
-    return this.generatePocProposal.execute(input);
+    return this.generatePocProposal.execute(user.id, input);
   }
 }
