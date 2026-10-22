@@ -6,9 +6,10 @@ const emptyDiscovery = {
   listChildren: async () => [],
   searchFolders: async () => [],
   getMetadata: async () => null,
+  readAnalysisContent: async () => null,
 } satisfies Pick<
   DriveFolderClient,
-  'listChildren' | 'searchFolders' | 'getMetadata'
+  'listChildren' | 'searchFolders' | 'getMetadata' | 'readAnalysisContent'
 >;
 
 describe('ListEstimationDriveFilesUseCase', () => {
