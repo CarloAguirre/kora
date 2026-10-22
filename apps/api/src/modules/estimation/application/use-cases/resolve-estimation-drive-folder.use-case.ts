@@ -10,6 +10,10 @@ import {
   type DriveFolderClient,
   type DriveFolderItem,
 } from '../ports/drive-folder-client.port';
+import {
+  FALLBACK_DRIVE_FOLDER_ID,
+  FALLBACK_DRIVE_FOLDER_URL,
+} from '../fallback-estimation-document';
 
 const GENERIC_PROJECT_TOKENS = new Set([
   'app',
@@ -64,11 +68,21 @@ export class ResolveEstimationDriveFolderUseCase {
     if (!this.drive.isConfigured()) {
       return estimationDriveFolderResolutionSchema.parse({
         connection: 'not_configured',
-        status: 'not_found',
-        selectedFolder: null,
+        status: 'resolved',
+        selectedFolder: {
+          folderId: FALLBACK_DRIVE_FOLDER_ID,
+          name: 'Antecedentes PoC · fallback local',
+          url: FALLBACK_DRIVE_FOLDER_URL,
+          score: 100,
+          confidence: 'high',
+          reasons: [
+            'Google Drive aún no está configurado; se usa el antecedente KDM de la PoC.',
+          ],
+          ancestorNames: ['PoC Calculadora'],
+        },
         candidates: [],
         message:
-          'Google Drive no está configurado en la API de Kora; no es posible descubrir carpetas automáticamente.',
+          'Google Drive aún no está configurado. Kora usará temporalmente el antecedente KDM de la PoC.',
       });
     }
 
