@@ -1,5 +1,7 @@
 import type {
   AnalyzeEstimationPocInput,
+  GoogleDriveConnectionStatus,
+  GoogleDriveConnectResponse,
   EstimationDriveFolderListing,
   EstimationDriveFolderResolution,
   EstimationDriveInventory,
@@ -13,20 +15,14 @@ import type {
 } from '@kora/contracts';
 import { api } from '@/shared/lib/api-client';
 
-export interface GoogleDriveConnectionStatus {
-  readonly connected: boolean;
-  readonly email: string | null;
-  readonly scopes: readonly string[];
-}
-
 export const estimationApi = {
   driveConnectionStatus(): Promise<GoogleDriveConnectionStatus> {
     return api.get<GoogleDriveConnectionStatus>('/auth/google/drive/status');
   },
   startDriveConnection(
     returnTo: string,
-  ): Promise<{ authorizationUrl: string }> {
-    return api.post<{ authorizationUrl: string }>(
+  ): Promise<GoogleDriveConnectResponse> {
+    return api.post<GoogleDriveConnectResponse>(
       '/auth/google/drive/connect',
       { returnTo },
     );
