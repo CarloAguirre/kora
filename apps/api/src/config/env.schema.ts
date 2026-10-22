@@ -47,6 +47,11 @@ export const envSchema = z.object({
   GOOGLE_DRIVE_CLIENT_EMAIL: z.email().optional(),
   GOOGLE_DRIVE_PRIVATE_KEY: z.string().optional(),
 
+  // Proveedor IA de la PoC de Calculadora. La API key es opcional: sin ella
+  // AiModule cae al proveedor simulado y la aplicación sigue arrancando.
+  GEMINI_API_KEY: z.string().trim().min(1).optional(),
+  GEMINI_MODEL: z.string().trim().min(1).default('gemini-2.5-flash-lite'),
+
   // Correo saliente (Resend). Sin RESEND_API_KEY los correos se escriben en el
   // log en vez de enviarse — solo admisible fuera de producción.
   RESEND_API_KEY: z.string().optional(),
