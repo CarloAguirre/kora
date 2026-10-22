@@ -362,7 +362,7 @@ export type EstimationDriveFile = z.infer<typeof estimationDriveFileSchema>;
 export const estimationDriveFolderListingSchema = z.object({
   folderId: z.string().trim().min(1),
   folderUrl: z.url(),
-  connection: z.enum(['connected', 'not_configured', 'unavailable']),
+  connection: z.enum(['connected', 'not_connected', 'not_configured', 'unavailable']),
   files: z.array(estimationDriveFileSchema).default([]),
   message: z.string().trim().max(1000).nullish(),
 });
@@ -390,7 +390,7 @@ export const estimationDriveFolderCandidateSchema = z.object({
 export type EstimationDriveFolderCandidate = z.infer<typeof estimationDriveFolderCandidateSchema>;
 
 export const estimationDriveFolderResolutionSchema = z.object({
-  connection: z.enum(['connected', 'not_configured', 'unavailable']),
+  connection: z.enum(['connected', 'not_connected', 'not_configured', 'unavailable']),
   status: z.enum(['resolved', 'needs_confirmation', 'not_found']),
   selectedFolder: estimationDriveFolderCandidateSchema.nullish(),
   candidates: z.array(estimationDriveFolderCandidateSchema).max(8).default([]),
@@ -437,7 +437,7 @@ export const estimationDriveInventoryItemSchema = z.object({
 export type EstimationDriveInventoryItem = z.infer<typeof estimationDriveInventoryItemSchema>;
 
 export const estimationDriveInventorySchema = z.object({
-  connection: z.enum(['connected', 'not_configured', 'unavailable']),
+  connection: z.enum(['connected', 'not_connected', 'not_configured', 'unavailable']),
   rootFolderId: z.string().trim().min(1),
   rootFolderUrl: z.url(),
   summary: z.object({
