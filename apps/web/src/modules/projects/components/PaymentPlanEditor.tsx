@@ -96,6 +96,23 @@ export function validatePaymentPlan(plan: PaymentPlanDraft): string | null {
   return null;
 }
 
+/**
+ * Datos de facturación que faltan para pasar el proyecto a Aprobado, o `null` si está completo. Al aprobarse,
+ * los tramos empiezan a quedar Por facturar, y un tramo en 0 no tiene nada que facturar (ver
+ * `PaymentMilestoneTriggerService`): por eso se exige al menos un tramo y que todos tengan monto.
+ */
+export function missingApprovalBillingData(plan: PaymentPlanDraft): string | null {
+  if (plan.items.length === 0) {
+    return 'Para que el proyecto quede Aprobado, completa el plan de pago: agrega al menos un tramo con su monto.';
+  }
+  const withoutAmount = plan.items.flatMap((item, index) =>
+    !isLocked(item) && !(Number(item.amount) > 0) ? [item.name.trim() || `tramo ${index + 1}`] : [],
+  );
+  if (withoutAmount.length === 0) return null;
+  const names = withoutAmount.length === 1 ? withoutAmount[0] : `${withoutAmount.slice(0, -1).join(', ')} y ${withoutAmount.at(-1)}`;
+  return `Para que el proyecto quede Aprobado, completa los datos de facturación: falta el monto de ${names}. Ingresa el monto del contrato o el de cada tramo en el plan de pago.`;
+}
+
 /** Payload de `createProjectSchema`/`updateProjectSchema` — la lista completa reemplaza a la guardada. */
 export function paymentPlanPayload(plan: PaymentPlanDraft): {
   contractAmount: number | null;

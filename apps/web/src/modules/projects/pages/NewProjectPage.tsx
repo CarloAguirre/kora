@@ -61,6 +61,7 @@ import { ClientFormDialog } from '@/modules/clients/components/ClientFormDialog'
 import {
   PaymentPlanEditor,
   defaultPaymentPlan,
+  missingApprovalBillingData,
   paymentPlanPayload,
   validatePaymentPlan,
   type PaymentPlanDraft,
@@ -634,9 +635,9 @@ export function NewProjectPage() {
   };
 
   /** Deja "Estimación" (no existe en Prospecto) — sin equipos/fases (Cotización, o el usuario eligió omitirlo) va directo a Resumen. */
-  /** El plan de pago vive en Estimación: se valida al dejar ese paso. */
+  /** El plan de pago vive en Estimación: se valida al dejar ese paso. Aprobado además exige los montos (datos de facturación). */
   const paymentPlanIsValid = () => {
-    const error = validatePaymentPlan(paymentPlan);
+    const error = (isApproved ? missingApprovalBillingData(paymentPlan) : null) ?? validatePaymentPlan(paymentPlan);
     setPaymentPlanError(error);
     return error === null;
   };
@@ -1178,7 +1179,7 @@ export function NewProjectPage() {
                 <div className={styles.infoBox}>
                   <InfoIcon size={16} />
                   <div>
-                    <b>Con fechas, horas vendidas y líder asignado ya puedes crear el proyecto.</b> Equipos y fases son
+                    <b>Con fechas, horas vendidas, el monto de cada tramo del plan de pago y líder asignado ya puedes crear el proyecto.</b> Equipos y fases son
                     opcionales: si los dejas vacíos, los completa {leaderLabel || 'el líder del proyecto'} cuando entre
                     al proyecto.
                   </div>

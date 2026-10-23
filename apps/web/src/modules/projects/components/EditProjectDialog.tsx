@@ -71,6 +71,7 @@ import { useToast } from '@/shared/components/ui/Toast';
 import { ApiRequestError } from '@/shared/lib/api-client';
 import {
   PaymentPlanEditor,
+  missingApprovalBillingData,
   paymentPlanFromProject,
   paymentPlanPayload,
   validatePaymentPlan,
@@ -260,6 +261,9 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
   const [estado, setEstado] = useState<ProjectStatus>(project.status);
   const [manualActivationReason, setManualActivationReason] = useState('');
   const [allowsOvertime, setAllowsOvertime] = useState(project.allowsOvertime);
+  /** Se intentó guardar con el aviso de facturación pendiente: el aviso pasa a error y se lleva a la vista. */
+  const [approvalBillingBlocked, setApprovalBillingBlocked] = useState(false);
+  const approvalBillingRef = useRef<HTMLDivElement>(null);
 
   const {
     register,
@@ -288,6 +292,7 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
     setPaymentPlanDirty(false);
     setPaymentPlanError(null);
     setCoveredProjectIds(null);
+    setApprovalBillingBlocked(false);
   }, [open, project, reset]);
 
   const clientId = watch('clientId') ?? '';
@@ -608,6 +613,9 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
   const estimationDisabled = isDevelopment && tipo === 'prospecto';
   /** Antes de Aprobado son horas estimadas para la cotización; al aprobarse quedan como horas vendidas. */
   const hoursLabel = isDevelopment && (tipo === 'prospecto' || tipo === 'cotizacion') ? 'HH estimadas' : 'HH vendidas';
+  /** Al pasar a Aprobado el plan de pago debe tener montos — se avisa apenas se elige el tipo y bloquea el guardado. */
+  const approvalBillingIssue =
+    isDevelopment && tipo === 'aprobado' && project.salesStage !== 'approved' ? missingApprovalBillingData(paymentPlan) : null;
 
   const handleTipoChange = (nextTipo: ProjectTipo) => {
     setTipo(nextTipo);
@@ -635,6 +643,11 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
     }
     // En Prospecto el plan de pago no se edita (ver `estimationDisabled`); aunque se haya tocado antes de volver a Prospecto, no se manda.
     const sendPaymentPlan = isDevelopment && paymentPlanDirty && !estimationDisabled;
+    if (approvalBillingIssue) {
+      setApprovalBillingBlocked(true);
+      approvalBillingRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
     if (sendPaymentPlan) {
       const planError = validatePaymentPlan(paymentPlan);
       setPaymentPlanError(planError);
@@ -785,6 +798,17 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
                 options={PHASE_OPTIONS}
                 {...register('phase', { setValueAs: emptyToNull })}
               />
+            </div>
+          )}
+
+          {approvalBillingIssue && (
+            <div
+              ref={approvalBillingRef}
+              className={approvalBillingBlocked ? styles.alert : styles.warnBox}
+              role={approvalBillingBlocked ? 'alert' : 'status'}
+            >
+              <AlertIcon size={18} className={styles.alertIcon} />
+              <span>{approvalBillingIssue}</span>
             </div>
           )}
         </div>
