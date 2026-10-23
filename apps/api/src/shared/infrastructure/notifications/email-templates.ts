@@ -8,6 +8,8 @@ import type {
   ProjectInvoiceBlockedNotification,
   ProjectPaymentMilestoneReadyNotification,
   ProjectReactivatedFromHoldNotification,
+  SupportBillingDigestItem,
+  SupportBillingDigestNotification,
   TeamReportDataRequestEmail,
   UserInvitation,
 } from '../../application/ports/notification.port';
@@ -530,6 +532,68 @@ export function renderPendingHoursDigest(input: PendingHoursDigestNotification, 
       input.recipientFirstName,
       [intro, '', `Ir a aprobar horas: ${url}`, ...textSections, ...(olderNote ? ['', olderNote] : [])],
       footer,
+    ),
+  };
+}
+
+// ─────────────────────────── Facturación de soporte ───────────────────────────
+
+export function renderSupportBillingDigest(input: SupportBillingDigestNotification, webAppUrl: string): RenderedEmail {
+  const total = input.items.length;
+  const totalHours = input.items.reduce((sum, item) => sum + item.usedHours, 0);
+  const items = input.items;
+
+  const subject = `Kora: soportes por cobrar de ${input.monthLabel}`;
+  const url = `${webAppUrl}/facturacion`;
+  const intro =
+    total > 0
+      ? `Termina ${input.monthLabel}. Estos son los ${total} ${plural(total, 'contrato de soporte activo', 'contratos de soporte activos')} por cobrar, con las HH aprobadas en el mes (${formatHours(totalHours)} en total):`
+      : `Termina ${input.monthLabel} y no hay contratos de soporte activos por cobrar.`;
+  const pendingNote = (item: SupportBillingDigestItem) =>
+    item.pendingHours > 0 ? `${formatHours(item.pendingHours)} por aprobar` : null;
+  const hasPending = items.some((item) => item.pendingHours > 0);
+  const pendingFooter = hasPending
+    ? 'Las HH por aprobar no se cobran hasta que se aprueben: revísalas antes de emitir la factura.'
+    : null;
+
+  return {
+    subject,
+    html: layout({
+      webAppUrl,
+      subject,
+      firstName: input.recipientFirstName,
+      paragraphs: [
+        escapeHtml(intro),
+        ...(total > 0
+          ? [
+              listTable(
+                items.map((item) => ({
+                  main: escapeHtml(item.clientName),
+                  sub: escapeHtml([item.planName, item.contractType, pendingNote(item)].filter(Boolean).join(' · ')),
+                  value: escapeHtml(formatHours(item.usedHours)),
+                })),
+              ),
+            ]
+          : []),
+        ...(pendingFooter ? [escapeHtml(pendingFooter)] : []),
+      ],
+      action: { label: 'Ir a Facturación', url },
+      footer: AUTOMATIC_FOOTER,
+    }),
+    text: plainText(
+      input.recipientFirstName,
+      [
+        intro,
+        '',
+        ...items.map((item) => {
+          const pending = pendingNote(item);
+          return `  - ${item.clientName} · ${item.planName} · ${item.contractType}: ${formatHours(item.usedHours)}${pending ? ` (${pending})` : ''}`;
+        }),
+        ...(pendingFooter ? ['', pendingFooter] : []),
+        '',
+        `Ir a Facturación: ${url}`,
+      ],
+      AUTOMATIC_FOOTER,
     ),
   };
 }

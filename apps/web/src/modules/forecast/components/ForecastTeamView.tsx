@@ -68,7 +68,7 @@ export function ForecastTeamView({ teams, allowAllTeams = false }: { teams: Team
     if (allTeams) return capacity?.members ?? [];
     if (!team) return [];
     const capacityById = new Map((capacity?.members ?? []).filter((m) => m.teamId === teamId).map((m) => [m.teamMemberId, m]));
-    return team.members.filter((member) => isForecastAssignableRole(member.userRole)).map(
+    return team.members.filter((member) => member.userStatus === 'active' && isForecastAssignableRole(member.userRole)).map(
       (member) =>
         capacityById.get(member.id) ?? {
           teamMemberId: member.id,

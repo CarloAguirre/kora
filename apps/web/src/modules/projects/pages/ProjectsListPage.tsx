@@ -40,7 +40,12 @@ import { useUsersList } from '@/modules/users/api/users.queries';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { projectPath } from '@/app/router/paths';
 
-const STATUS_OPTIONS = PROJECT_STATUSES.map((status) => ({ value: status, label: PROJECT_STATUS_LABELS[status] }));
+// Finalizado y Cancelado no se ofrecen en el filtro del dashboard.
+const HIDDEN_FILTER_STATUSES: readonly ProjectStatus[] = ['finished', 'cancelled'];
+const STATUS_OPTIONS = PROJECT_STATUSES.filter((status) => !HIDDEN_FILTER_STATUSES.includes(status)).map((status) => ({
+  value: status,
+  label: PROJECT_STATUS_LABELS[status],
+}));
 const PHASE_OPTIONS = PROJECT_PHASES.map((phase) => ({ value: phase, label: PROJECT_PHASE_LABELS[phase] }));
 const TABS = [
   { id: 'development', label: 'Proyectos Desarrollo' },

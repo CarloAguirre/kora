@@ -49,6 +49,7 @@ function setup(input: {
     findPendingHourEntries: async () => input.pending,
     findTeamLeaderIdsForMember: async (memberId) => input.teamLeaders?.[memberId] ?? [],
     findActiveUsersByIds: async (ids) => ids.filter((id) => (input.activeUsers ?? ids).includes(id)).map(user),
+    findActiveAdminTierUsers: async () => [],
   };
   const projects = {
     findApproverCandidatesForMember: async (projectId: string, memberId: string | null) =>

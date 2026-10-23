@@ -69,6 +69,9 @@ export interface HourReminderReader {
 
   /** Solo los activos y no borrados: a una cuenta deshabilitada no se le escribe. */
   findActiveUsersByIds(userIds: readonly string[]): Promise<ReminderRecipient[]>;
+
+  /** Usuarios activos de rol admin o PMO (`roles.is_admin_tier`) — destinatarios del resumen de soportes por cobrar. */
+  findActiveAdminTierUsers(): Promise<ReminderRecipient[]>;
 }
 
 export const HOUR_REMINDER_READER = Symbol('HourReminderReader');

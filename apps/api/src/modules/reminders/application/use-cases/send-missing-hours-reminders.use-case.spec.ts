@@ -30,6 +30,7 @@ function fakeReader(input: { registrants: HoursRegistrant[]; daily?: DailyHours[
     findPendingHourEntries: async () => [],
     findTeamLeaderIdsForMember: async () => [],
     findActiveUsersByIds: async () => [],
+    findActiveAdminTierUsers: async () => [],
   };
 }
 

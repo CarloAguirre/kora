@@ -7,6 +7,7 @@ import {
   projects,
   projectTeams,
   rolePermissions,
+  roles,
   teamMembers,
   teams,
   ticketHhRequests,
@@ -184,6 +185,15 @@ export class DrizzleHourReminderReader implements HourReminderReader {
       .select({ userId: users.id, email: users.email, firstName: users.firstName, lastName: users.lastName })
       .from(users)
       .where(and(inArray(users.id, [...userIds]), isActiveUser));
+    return rows.map(toRecipient);
+  }
+
+  async findActiveAdminTierUsers(): Promise<ReminderRecipient[]> {
+    const rows = await this.db
+      .select({ userId: users.id, email: users.email, firstName: users.firstName, lastName: users.lastName })
+      .from(users)
+      .innerJoin(roles, eq(roles.id, users.roleId))
+      .where(and(eq(roles.isAdminTier, true), isActiveUser));
     return rows.map(toRecipient);
   }
 }

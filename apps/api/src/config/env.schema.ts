@@ -51,7 +51,8 @@ export const envSchema = z.object({
   // URL pública del front: los enlaces de los correos tienen que ser absolutos.
   WEB_APP_URL: z.url().default('http://localhost:5173'),
   // Recordatorios diarios de horas (18:00 horas sin registrar, 08:00 horas por
-  // aprobar — ver modules/reminders). Apagados por defecto: con la base local
+  // aprobar) y resumen de soportes por cobrar del último día hábil del mes —
+  // ver modules/reminders. Apagados por defecto: con la base local
   // de copia de producción, encenderlos en desarrollo le escribiría a gente real.
   HOUR_REMINDERS_ENABLED: z.stringbool().default(false),
 
