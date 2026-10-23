@@ -128,7 +128,7 @@ export function DailyEntryForm({
   const { user } = useAuth();
   const createEntry = useCreateHourEntry();
   // El PMO puede registrar horas en cualquier proyecto; el resto solo en los que tiene asignados.
-  // Todos los proyectos salvo los finalizados.
+  // Solo proyectos No iniciados o Activos (ver `HOUR_ENTRY_PROJECT_STATUSES`).
   const { data: projects } = useProjectsList({
     page: 1,
     pageSize: 200,
