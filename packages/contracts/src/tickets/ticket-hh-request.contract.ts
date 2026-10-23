@@ -32,6 +32,8 @@ export const ticketHhRequestSchema = z.object({
   reviewedAt: isoDateTimeSchema.nullable(),
   hourEntryId: uuidSchema.nullable(),
   createdAt: isoDateTimeSchema,
+  /** ¿Puede quien consulta aprobar/rechazar ESTA solicitud? Mismo criterio que `ApproveTicketHhRequestUseCase` — solo `true` si está pendiente. */
+  canReview: z.boolean(),
 });
 export type TicketHhRequest = z.infer<typeof ticketHhRequestSchema>;
 

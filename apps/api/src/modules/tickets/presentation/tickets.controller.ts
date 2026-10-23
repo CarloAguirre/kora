@@ -164,8 +164,15 @@ export class TicketsController {
 
   @Get(':id/hh-requests')
   @RequireAnyPermission('tickets:read', 'tickets:read_assigned')
-  async listHhRequestsForTicket(@Param('id') id: string): Promise<TicketHhRequest[]> {
-    return unwrapOrThrow(await this.listHhRequests.execute({ ticketId: id }));
+  async listHhRequestsForTicket(@Param('id') id: string, @CurrentUser() actor: RequestUser): Promise<TicketHhRequest[]> {
+    return unwrapOrThrow(
+      await this.listHhRequests.execute({
+        ticketId: id,
+        actorUserId: actor.id,
+        actorRole: actor.role,
+        actorPermissions: actor.permissions,
+      }),
+    );
   }
 
   @Post(':id/hh-requests')

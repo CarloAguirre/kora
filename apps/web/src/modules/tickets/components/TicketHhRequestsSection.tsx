@@ -8,7 +8,6 @@ import { CheckIcon, ChevronDownIcon, InfoIcon, PlusIcon, TriangleAlertIcon } fro
 import { TextField } from '@/shared/components/ui/TextField';
 import { useToast } from '@/shared/components/ui/Toast';
 import { ApiRequestError } from '@/shared/lib/api-client';
-import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { useHourEntriesList } from '@/modules/hours/api/hours.queries';
 import {
@@ -67,7 +66,6 @@ export function TicketHhRequestsSection({
   hhApprovers,
   onUnsentHoursChange,
 }: TicketHhRequestsSectionProps) {
-  const { can } = usePermissions();
   const { user } = useAuth();
   const toast = useToast();
   const { data: requests, isLoading } = useTicketHhRequestsList(ticketId);
@@ -82,7 +80,6 @@ export function TicketHhRequestsSection({
   const [rejectionReason, setRejectionReason] = useState('');
   const [resolvedOpen, setResolvedOpen] = useState(false);
 
-  const canApprove = can('hours:approve');
   const pendingRequests = (requests ?? []).filter((request) => request.status === 'pending');
   const resolvedRequests = (requests ?? []).filter((request) => request.status !== 'pending');
 
@@ -169,7 +166,7 @@ export function TicketHhRequestsSection({
                     </span>
                     <span className={styles.itemMeta}>{requestMeta(request)}</span>
                   </div>
-                  {canApprove && rejectingId !== request.id && (
+                  {request.canReview && rejectingId !== request.id && (
                     <div className={styles.actions}>
                       <Button variant="tertiary" size="sm" className={styles.rejectButton} onClick={() => setRejectingId(request.id)}>
                         Rechazar
