@@ -17,6 +17,7 @@ import { useProjectsList } from '@/modules/projects/api/projects.queries';
 import { getProjectOptionLabel } from '@/modules/projects/lib/project-option-label';
 import { useUsersList } from '@/modules/users/api/users.queries';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
+import { HOUR_ENTRY_PROJECT_STATUSES } from '../lib/selectable-project-statuses';
 import { ApiRequestError } from '@/shared/lib/api-client';
 import {
   DAILY_CAP_HOURS,
@@ -148,7 +149,7 @@ function EditEntryForm({
     pageSize: 200,
     sortField: 'name',
     assignedToUserId: restrictToAssigned ? user?.id : undefined,
-    status: ['active'],
+    status: HOUR_ENTRY_PROJECT_STATUSES,
   });
   const { data: leaders } = useUsersList({ page: 1, pageSize: 200, sortField: 'firstName', role: 'leader' });
   /** Catálogo completo (unas decenas de filas): el calendario puede navegar a cualquier mes. */

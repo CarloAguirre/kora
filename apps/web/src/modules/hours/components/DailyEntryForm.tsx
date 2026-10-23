@@ -18,6 +18,7 @@ import { useProjectDetail, useProjectsList } from '@/modules/projects/api/projec
 import { getProjectOptionLabel } from '@/modules/projects/lib/project-option-label';
 import { useUsersList } from '@/modules/users/api/users.queries';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
+import { HOUR_ENTRY_PROJECT_STATUSES } from '../lib/selectable-project-statuses';
 import { ApiRequestError } from '@/shared/lib/api-client';
 
 /** Proyecto primero: es la asignación más común y el resto confundía al elegir. */
@@ -127,13 +128,13 @@ export function DailyEntryForm({
   const { user } = useAuth();
   const createEntry = useCreateHourEntry();
   // El PMO puede registrar horas en cualquier proyecto; el resto solo en los que tiene asignados.
-  // Solo proyectos activos: en uno finalizado ya no se cargan horas.
+  // Todos los proyectos salvo los finalizados.
   const { data: projects } = useProjectsList({
     page: 1,
     pageSize: 200,
     sortField: 'name',
     assignedToUserId: user?.role === 'pmo' ? undefined : user?.id,
-    status: ['active'],
+    status: HOUR_ENTRY_PROJECT_STATUSES,
   });
   const { data: leaders } = useUsersList({ page: 1, pageSize: 200, sortField: 'firstName', role: 'leader' });
 
