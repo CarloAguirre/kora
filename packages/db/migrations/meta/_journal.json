@@ -344,6 +344,13 @@
       "when": 1792509328260,
       "tag": "0048_backfill_project_teams_from_members",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1792762286466,
+      "tag": "0049_client_logo",
+      "breakpoints": true
     }
   ]
 }

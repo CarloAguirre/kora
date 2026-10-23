@@ -74,6 +74,7 @@ export class CreateClientUseCase implements UseCase<CreateClientCommand, { id: s
       taxId,
       website: data.website,
       address: data.address,
+      logoDataUrl: data.logoDataUrl,
       countryId: data.countryId,
       comunaId: data.comunaId,
       industryId: data.industryId,

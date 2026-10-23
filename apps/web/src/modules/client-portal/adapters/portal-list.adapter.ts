@@ -32,6 +32,7 @@ export function toClientCompanyInfo(client: ClientDetail): ClientCompanyInfo {
     name: client.companyName,
     contactName: client.primaryContactName ?? '—',
     contactPosition: matchingContact?.position ?? '',
+    logoUrl: client.logoDataUrl,
   };
 }
 

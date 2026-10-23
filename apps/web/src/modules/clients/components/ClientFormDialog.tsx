@@ -10,6 +10,7 @@ import { TextField } from '@/shared/components/ui/TextField';
 import { Combobox } from '@/shared/components/ui/Combobox';
 import { AlertIcon } from '@/shared/components/icons/Icons';
 import { ClientContactsEditor } from './ClientContactsEditor';
+import { ClientLogoField } from './ClientLogoField';
 import {
   useClientDetail,
   useClientFormOptions,
@@ -157,6 +158,19 @@ export function ClientFormDialog({ open, clientId, onClose, onSuccess, onCreated
           </div>
         )}
 
+        <Controller
+          control={control}
+          name="logoDataUrl"
+          render={({ field, fieldState }) => (
+            <ClientLogoField
+              value={field.value ?? null}
+              onChange={field.onChange}
+              errorText={fieldState.error?.message}
+              disabled={isSubmitting}
+            />
+          )}
+        />
+
         <div className={styles.row}>
           <TextField
             label="Nombre de la empresa"
@@ -268,6 +282,7 @@ function emptyValues(): ClientFormValues {
     taxId: '',
     website: '',
     address: '',
+    logoDataUrl: null,
     countryId: null,
     comunaId: null,
     industryId: null,
@@ -285,6 +300,7 @@ function toFormValues(client: ClientDetail): ClientFormValues {
     taxId: client.taxId,
     website: client.website ?? '',
     address: client.address ?? '',
+    logoDataUrl: client.logoDataUrl,
     countryId: client.country?.id ?? null,
     comunaId: client.comuna?.id ?? null,
     industryId: client.industry?.id ?? null,

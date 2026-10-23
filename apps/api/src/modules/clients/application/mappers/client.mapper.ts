@@ -65,6 +65,7 @@ export function toClientDetail(source: ClientDetailSource): ClientDetail {
     primaryContactName: source.primaryContactName,
     primaryContactEmail: source.primaryContactEmail,
     primaryContactPhone: source.primaryContactPhone,
+    logoDataUrl: snapshot.logoDataUrl,
     website: snapshot.website,
     address: snapshot.address,
     country: toCatalogOption(source.country),

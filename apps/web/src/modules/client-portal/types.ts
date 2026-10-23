@@ -15,6 +15,8 @@ export interface ClientCompanyInfo {
   readonly name: string;
   readonly contactName: string;
   readonly contactPosition: string;
+  /** Logo cargado en la ficha del cliente (data URL); sin él se muestra un ícono neutro. */
+  readonly logoUrl?: string | null;
 }
 
 /**

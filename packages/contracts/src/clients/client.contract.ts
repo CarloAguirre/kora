@@ -73,7 +73,20 @@ export const clientsStatsSchema = z.object({
 });
 export type ClientsStats = z.infer<typeof clientsStatsSchema>;
 
+/**
+ * Logo del cliente como data URL. El front lo redimensiona y re-codifica en
+ * un canvas antes de enviarlo (ver `ClientLogoField`), así que lo que llega es
+ * siempre un raster chico; el tope de largo (~300 KB) solo frena un envío
+ * que se haya saltado ese paso.
+ */
+export const CLIENT_LOGO_MAX_LENGTH = 400_000;
+export const clientLogoDataUrlSchema = z
+  .string()
+  .max(CLIENT_LOGO_MAX_LENGTH, 'El logo es demasiado pesado.')
+  .regex(/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+=*$/, 'El logo debe ser una imagen PNG, JPG o WebP.');
+
 export const clientDetailSchema = clientSummarySchema.extend({
+  logoDataUrl: z.string().nullable(),
   website: z.string().nullable(),
   address: z.string().nullable(),
   country: catalogOptionSchema.nullable(),
@@ -103,6 +116,7 @@ export const createClientSchema = z.object({
   taxId: nonEmptyTrimmed(50, 'El RUT'),
   website: z.string().trim().max(255).optional(),
   address: z.string().trim().max(300).optional(),
+  logoDataUrl: clientLogoDataUrlSchema.nullish(),
   countryId: uuidSchema.nullish(),
   comunaId: uuidSchema.nullish(),
   industryId: uuidSchema.nullish(),

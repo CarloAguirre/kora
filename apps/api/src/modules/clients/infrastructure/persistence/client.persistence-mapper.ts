@@ -11,6 +11,7 @@ export interface ClientRow {
   taxId: string;
   website: string | null;
   address: string | null;
+  logoDataUrl: string | null;
   countryId: string | null;
   comunaId: string | null;
   industryId: string | null;
@@ -36,6 +37,7 @@ export function toDomain(row: ClientRow): Client {
     taxId,
     website: row.website,
     address: row.address,
+    logoDataUrl: row.logoDataUrl,
     countryId: row.countryId,
     comunaId: row.comunaId,
     industryId: row.industryId,
@@ -61,6 +63,7 @@ export function toPersistence(client: Client) {
     taxId: snapshot.taxId.value,
     website: snapshot.website,
     address: snapshot.address,
+    logoDataUrl: snapshot.logoDataUrl,
     countryId: snapshot.countryId,
     comunaId: snapshot.comunaId,
     industryId: snapshot.industryId,
