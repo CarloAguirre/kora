@@ -409,18 +409,16 @@ export class DrizzleProjectRepository implements ProjectRepository {
     }
 
     // Restantes = vendidas menos consumidas (mínimo 0) y desviadas = el exceso
-    // de consumidas sobre vendidas (mínimo 0) — desarrollo usa `soldHours`,
-    // soporte usa `supportHours`, así que se elige según el tipo de proyecto
-    // de cada fila en vez de asumir que la consulta ya viene filtrada por uno.
-    const soldHoursByType = sql`case when ${projects.type} = 'support' then ${projects.supportHours} else ${projects.soldHours} end`;
-
+    // de consumidas sobre vendidas (mínimo 0). Vendidas es `soldHours` también en
+    // soporte (como `hh_vendidas` en la v1): es fijo y solo avanzan las consumidas;
+    // `supportHours` son las horas del plan, no las vendidas.
     if (sort.field === 'remainingHours') {
-      return [sql`greatest(${soldHoursByType} - ${projects.usedHours}, 0) ${sqlDirection}`, asc(projects.id)];
+      return [sql`greatest(${projects.soldHours} - ${projects.usedHours}, 0) ${sqlDirection}`, asc(projects.id)];
     }
 
     if (sort.field === 'deviationHours') {
       // Empates (p. ej. todos los sin desviación) quedan del más nuevo al más antiguo.
-      return [sql`greatest(${projects.usedHours} - ${soldHoursByType}, 0) ${sqlDirection}`, desc(projects.createdAt), asc(projects.id)];
+      return [sql`greatest(${projects.usedHours} - ${projects.soldHours}, 0) ${sqlDirection}`, desc(projects.createdAt), asc(projects.id)];
     }
 
     const column =

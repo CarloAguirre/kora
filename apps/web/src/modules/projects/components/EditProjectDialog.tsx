@@ -798,24 +798,22 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
               disabled={estimationDisabled}
               {...register('endDate', { setValueAs: emptyToNull })}
             />
-            {isDevelopment ? (
-              <TextField
-                label={hoursLabel}
-                type="number"
-                min={0}
-                // Desde el Hito 0 corren las horas vendidas: quedan fijas (`SoldHoursLockedAfterHito0Error`).
-                // Deshabilitado, react-hook-form no lo envía y `UpdateProjectUseCase` no toca `soldHours`.
-                disabled={soldHoursLocked || estimationDisabled}
-                helperText={soldHoursLocked ? 'No editable desde que el proyecto se activó (Hito 0).' : undefined}
-                errorText={errors.soldHours?.message}
-                {...register('soldHours')}
-              />
-            ) : (
-              // En soporte las HH vendidas son `supportHours` (las que leen el listado, la ficha y la creación);
-              // `soldHours` es solo de desarrollo.
-              <TextField label="HH vendidas" type="number" min={0} step="any" {...register('supportHours')} />
-            )}
+            <TextField
+              label={hoursLabel}
+              type="number"
+              min={0}
+              // Desde el Hito 0 corren las horas vendidas: quedan fijas (`SoldHoursLockedAfterHito0Error`).
+              // Deshabilitado, react-hook-form no lo envía y `UpdateProjectUseCase` no toca `soldHours`.
+              disabled={soldHoursLocked || estimationDisabled}
+              helperText={soldHoursLocked ? 'No editable desde que el proyecto se activó (Hito 0).' : undefined}
+              errorText={errors.soldHours?.message}
+              {...register('soldHours')}
+            />
           </div>
+
+          {!isDevelopment && (
+            <TextField label="Horas de soporte" type="number" min={0} {...register('supportHours')} />
+          )}
 
           {!isDevelopment && (
             <TextField

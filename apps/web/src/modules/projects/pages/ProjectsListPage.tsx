@@ -261,14 +261,15 @@ export function ProjectsListPage() {
     },
     { key: 'leader', header: 'Líder', sortable: true, render: (p) => p.leader?.fullName ?? <span className={styles.empty}>—</span> },
     { key: 'stage', header: 'Etapa', render: (p) => getProjectStageLabel(p) },
-    { key: 'supportHours', header: 'HH Vendidas', sortable: true, render: (p) => formatHours(p.supportHours) },
+    // Igual que en desarrollo, las vendidas son `soldHours` (fijas; solo avanzan las consumidas).
+    { key: 'soldHours', header: 'HH Vendidas', sortable: true, render: (p) => formatHours(p.soldHours) },
     { key: 'usedHours', header: 'HH Consumidas', sortable: true, render: (p) => formatHours(p.usedHours) },
-    { key: 'remainingHours', header: 'HH Restantes', sortable: true, render: (p) => formatHours(remainingHoursOf(p.supportHours, p.usedHours)) },
+    { key: 'remainingHours', header: 'HH Restantes', sortable: true, render: (p) => formatHours(remainingHoursOf(p.soldHours, p.usedHours)) },
     {
       key: 'deviationHours',
       header: 'HH desviadas',
       sortable: true,
-      render: (p) => renderDeviation(deviationHoursOf(p.supportHours, p.usedHours)),
+      render: (p) => renderDeviation(deviationHoursOf(p.soldHours, p.usedHours)),
     },
     ...managementColumns,
   ];

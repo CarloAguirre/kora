@@ -268,9 +268,9 @@ describe('EditProjectDialog', () => {
       isManagement: true,
     });
 
-    // En soporte "HH vendidas" edita `supportHours` (lo que muestra el listado), no `soldHours`.
-    expect(screen.getAllByLabelText('HH vendidas')).toHaveLength(1);
-    expect(screen.getByLabelText('HH vendidas')).toHaveValue(0);
+    expect(screen.getByLabelText('Horas de soporte')).toBeInTheDocument();
+    // Las HH vendidas son `soldHours` también en soporte (fijas; lo que avanza son las consumidas).
+    expect(screen.getByLabelText('HH vendidas')).toHaveValue(500);
     expect(screen.getByLabelText('Plan de soporte')).toBeInTheDocument();
     expect(screen.queryByLabelText('Tipo de proyecto')).not.toBeInTheDocument();
   });
