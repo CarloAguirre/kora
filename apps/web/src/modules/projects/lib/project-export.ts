@@ -12,6 +12,8 @@ interface ExportColumn {
 const formatDecimal = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 2 });
 // Fechas `YYYY-MM-DD`: `T00:00:00` las lee en hora local (sin él, en Chile salían con un día menos).
 const formatDate = (value: string | null) => (value ? new Date(`${value}T00:00:00`).toLocaleDateString('es-CL') : '-');
+const NOT_APPLICABLE = 'No aplica';
+const isOnDemand = (project: ProjectSummary) => project.supportPlanType === 'on_demand';
 
 const DEVELOPMENT_COLUMNS: readonly ExportColumn[] = [
   { label: 'Prioridad', getValue: (p) => (p.priority ? PROJECT_PRIORITY_LABELS[p.priority] : '-') },
@@ -36,10 +38,11 @@ const SUPPORT_COLUMNS: readonly ExportColumn[] = [
   { label: 'Tipo de Soporte', getValue: (p) => (p.supportPlanType ? SUPPORT_PLAN_TYPE_LABELS[p.supportPlanType] : '-') },
   { label: 'Líder', getValue: (p) => p.leader?.fullName ?? '-' },
   { label: 'Etapa', getValue: (p) => getProjectStageLabel(p) },
-  { label: 'HH Vendidas', getValue: (p) => formatDecimal(p.soldHours) },
+  // "A demanda" no tiene tope de horas: vendidas, restantes y desviadas no aplican (igual que en la tabla).
+  { label: 'HH Vendidas', getValue: (p) => (isOnDemand(p) ? NOT_APPLICABLE : formatDecimal(p.soldHours)) },
   { label: 'HH Consumidas', getValue: (p) => formatDecimal(p.usedHours) },
-  { label: 'HH Restantes', getValue: (p) => formatDecimal(Math.max(p.soldHours - p.usedHours, 0)) },
-  { label: 'HH desviadas', getValue: (p) => formatDecimal(Math.max(p.usedHours - p.soldHours, 0)) },
+  { label: 'HH Restantes', getValue: (p) => (isOnDemand(p) ? NOT_APPLICABLE : formatDecimal(Math.max(p.soldHours - p.usedHours, 0))) },
+  { label: 'HH desviadas', getValue: (p) => (isOnDemand(p) ? NOT_APPLICABLE : formatDecimal(Math.max(p.usedHours - p.soldHours, 0))) },
 ];
 
 function exportToWorkbook(projects: readonly ProjectSummary[], columns: readonly ExportColumn[], sheetName: string, filePrefix: string) {

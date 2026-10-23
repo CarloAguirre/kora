@@ -63,6 +63,7 @@ const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFr
 // y el exceso se muestra como desviación (nunca un número negativo).
 const remainingHoursOf = (sold: number, used: number) => Math.max(sold - used, 0);
 const deviationHoursOf = (sold: number, used: number) => Math.max(used - sold, 0);
+const isOnDemand = (project: ProjectSummary) => project.supportPlanType === 'on_demand';
 // Fechas `YYYY-MM-DD` (sin hora): con `T00:00:00` se leen en hora local — `new Date('2026-09-01')` es medianoche
 // UTC y en Chile se mostraba como el día anterior.
 const formatDate = (value: string | null) =>
@@ -191,6 +192,8 @@ export function ProjectsListPage() {
   // Sin `projects:manage` (p. ej. el líder) no hay ninguna acción disponible, así que la columna no se muestra.
   const managementColumns = can('projects:manage') ? [actionsColumn] : [];
 
+  const renderNotApplicable = () => <span className={styles.empty}>No aplica</span>;
+
   const renderDeviation = (deviation: number) =>
     deviation > 0 ? <span className={styles.deviated}>{formatHours(deviation)}</span> : <span className={styles.empty}>{formatHours(deviation)}</span>;
 
@@ -264,14 +267,25 @@ export function ProjectsListPage() {
     { key: 'leader', header: 'Líder', sortable: true, render: (p) => p.leader?.fullName ?? <span className={styles.empty}>—</span> },
     { key: 'stage', header: 'Etapa', render: (p) => getProjectStageLabel(p) },
     // Igual que en desarrollo, las vendidas son `soldHours` (fijas; solo avanzan las consumidas).
-    { key: 'soldHours', header: 'HH Vendidas', sortable: true, render: (p) => formatHours(p.soldHours) },
+    // En "A demanda" no hay tope de horas: vendidas, restantes y desviadas no aplican, solo las consumidas.
+    {
+      key: 'soldHours',
+      header: 'HH Vendidas',
+      sortable: true,
+      render: (p) => (isOnDemand(p) ? renderNotApplicable() : formatHours(p.soldHours)),
+    },
     { key: 'usedHours', header: 'HH Consumidas', sortable: true, render: (p) => formatHours(p.usedHours) },
-    { key: 'remainingHours', header: 'HH Restantes', sortable: true, render: (p) => formatHours(remainingHoursOf(p.soldHours, p.usedHours)) },
+    {
+      key: 'remainingHours',
+      header: 'HH Restantes',
+      sortable: true,
+      render: (p) => (isOnDemand(p) ? renderNotApplicable() : formatHours(remainingHoursOf(p.soldHours, p.usedHours))),
+    },
     {
       key: 'deviationHours',
       header: 'HH desviadas',
       sortable: true,
-      render: (p) => renderDeviation(deviationHoursOf(p.soldHours, p.usedHours)),
+      render: (p) => (isOnDemand(p) ? renderNotApplicable() : renderDeviation(deviationHoursOf(p.soldHours, p.usedHours))),
     },
     ...managementColumns,
   ];

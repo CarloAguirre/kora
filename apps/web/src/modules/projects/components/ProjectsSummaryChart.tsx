@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import type { ProjectPeriod, ProjectStatus, ProjectType } from '@kora/contracts';
+import type { ProjectPeriod, ProjectStatus, ProjectSummary, ProjectType } from '@kora/contracts';
 import styles from './ProjectsSummaryChart.module.css';
 import { Card } from '@/shared/components/ui/Card';
 import { MultiSelect } from '@/shared/components/ui/MultiSelect';
@@ -47,6 +47,9 @@ const STATUS_FILTER_OPTIONS: { value: StatusFilter; label: string }[] = [
 ];
 
 const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 2 });
+// Los soportes "A demanda" no tienen tope de horas: lo consumido nunca es desvío.
+const deviationOf = (project: ProjectSummary) =>
+  project.supportPlanType === 'on_demand' ? 0 : Math.max(project.usedHours - project.soldHours, 0);
 
 function getPeriodRange(period: PeriodOption, detail: string) {
   const options = SUB_PERIOD_OPTIONS[period];
@@ -147,7 +150,8 @@ export function ProjectsSummaryChart({ type, clientOptions, showFinalizedToggle 
         cliente: p.client?.companyName ?? '-',
         vendidas: p.soldHours,
         consumidas: p.usedHours,
-        desviadas: Math.max(p.usedHours - p.soldHours, 0),
+        desviadas: deviationOf(p),
+        onDemand: p.supportPlanType === 'on_demand',
       })),
     [filtered],
   );
@@ -158,7 +162,7 @@ export function ProjectsSummaryChart({ type, clientOptions, showFinalizedToggle 
         (acc, p) => ({
           vendidas: acc.vendidas + p.soldHours,
           consumidas: acc.consumidas + p.usedHours,
-          desviadas: acc.desviadas + Math.max(p.usedHours - p.soldHours, 0),
+          desviadas: acc.desviadas + deviationOf(p),
         }),
         { vendidas: 0, consumidas: 0, desviadas: 0 },
       ),
@@ -275,14 +279,21 @@ function Indicator({ label, value, tone }: { label: string; value: number; tone?
 
 function ChartTooltip({ active, payload }: { active?: boolean; payload?: readonly { payload: Record<string, unknown> }[] }) {
   if (!active || !payload?.length) return null;
-  const data = payload[0]?.payload as { fullName: string; cliente: string; vendidas: number; consumidas: number; desviadas: number };
+  const data = payload[0]?.payload as {
+    fullName: string;
+    cliente: string;
+    vendidas: number;
+    consumidas: number;
+    desviadas: number;
+    onDemand: boolean;
+  };
   return (
     <div className={styles.tooltip}>
       <p className={styles.tooltipTitle}>{data.fullName}</p>
       <p>Cliente: {data.cliente}</p>
-      <p>HH Vendidas: {formatHours(data.vendidas)}</p>
+      <p>HH Vendidas: {data.onDemand ? 'No aplica' : formatHours(data.vendidas)}</p>
       <p>HH Consumidas: {formatHours(data.consumidas)}</p>
-      <p className={styles.tooltipDanger}>HH Desviadas: {formatHours(data.desviadas)}</p>
+      <p className={styles.tooltipDanger}>HH Desviadas: {data.onDemand ? 'No aplica' : formatHours(data.desviadas)}</p>
     </div>
   );
 }

@@ -439,13 +439,29 @@ export class DrizzleProjectRepository implements ProjectRepository {
     // de consumidas sobre vendidas (mínimo 0). Vendidas es `soldHours` también en
     // soporte (como `hh_vendidas` en la v1): es fijo y solo avanzan las consumidas;
     // `supportHours` son las horas del plan, no las vendidas.
+    // En soportes "A demanda" no hay tope de horas: vendidas, restantes y desviadas no aplican
+    // (la tabla muestra "No aplica"), así que se ordenan como null y quedan al final.
+    const unlessOnDemand = (value: ReturnType<typeof sql>) =>
+      sql`case when ${supportPlanTypeOfProject} = 'on_demand' then null else ${value} end`;
+
+    if (sort.field === 'soldHours') {
+      return [sql`${unlessOnDemand(sql`${projects.soldHours}`)} ${sqlDirection} nulls last`, asc(projects.id)];
+    }
+
     if (sort.field === 'remainingHours') {
-      return [sql`greatest(${projects.soldHours} - ${projects.usedHours}, 0) ${sqlDirection}`, asc(projects.id)];
+      return [
+        sql`${unlessOnDemand(sql`greatest(${projects.soldHours} - ${projects.usedHours}, 0)`)} ${sqlDirection} nulls last`,
+        asc(projects.id),
+      ];
     }
 
     if (sort.field === 'deviationHours') {
       // Empates (p. ej. todos los sin desviación) quedan del más nuevo al más antiguo.
-      return [sql`greatest(${projects.usedHours} - ${projects.soldHours}, 0) ${sqlDirection}`, desc(projects.createdAt), asc(projects.id)];
+      return [
+        sql`${unlessOnDemand(sql`greatest(${projects.usedHours} - ${projects.soldHours}, 0)`)} ${sqlDirection} nulls last`,
+        desc(projects.createdAt),
+        asc(projects.id),
+      ];
     }
 
     const column =
@@ -453,13 +469,11 @@ export class DrizzleProjectRepository implements ProjectRepository {
         ? projects.name
         : sort.field === 'status'
           ? projects.status
-          : sort.field === 'soldHours'
-            ? projects.soldHours
-            : sort.field === 'usedHours'
-              ? projects.usedHours
-              : sort.field === 'supportHours'
-                ? projects.supportHours
-                : projects.createdAt;
+          : sort.field === 'usedHours'
+            ? projects.usedHours
+            : sort.field === 'supportHours'
+              ? projects.supportHours
+              : projects.createdAt;
     return [direction(column), asc(projects.id)];
   }
 }
