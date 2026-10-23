@@ -240,6 +240,12 @@ export class DrizzleProjectRepository implements ProjectRepository {
    * de un equipo asignado al proyecto (caso raro, pero no se descarta).
    * `memberUserId === null` (p.ej. un ticket sin responsable) no tiene equipo
    * que consultar: siempre vacío, sin ir a la base de datos.
+   *
+   * Acotado a proyectos `development`: uno de Soporte no tiene equipo fijo —
+   * el equipo que aparece ahí (si hay) es el que ejecuta, no un reemplazo del
+   * líder a cargo. Sin este filtro, un Soporte con equipo asignado le quitaba
+   * la aprobación de horas al líder del proyecto en favor del líder de ese
+   * equipo, que nadie esperaba viendo la ficha del proyecto.
    */
   private async findTeamLeadersForMemberOnProject(db: Database, projectId: string, memberUserId: string | null) {
     if (memberUserId === null) return [];
@@ -247,6 +253,7 @@ export class DrizzleProjectRepository implements ProjectRepository {
     return db
       .select({ id: users.id, firstName: users.firstName, lastName: users.lastName })
       .from(projectTeams)
+      .innerJoin(projects, and(eq(projects.id, projectTeams.projectId), eq(projects.type, 'development')))
       .innerJoin(teams, eq(teams.id, projectTeams.teamId))
       .innerJoin(users, sql`${users.id} = coalesce(${projectTeams.leaderUserId}, ${teams.leaderUserId})`)
       .innerJoin(
@@ -264,8 +271,10 @@ export class DrizzleProjectRepository implements ProjectRepository {
    * `findApproverCandidatesForMember`/`GetProjectPendingApprovalsUseCase`).
    * El líder de proyecto solo recupera la potestad de decidir cuando no hay
    * líder de equipo resoluble (ni override de proyecto ni líder orgánico del
-   * equipo), incluido `memberUserId === null` — ver docs/DECISION-M4-HORAS.md.
-   * Usado por Horas (dueño del registro) y Tickets (responsable del ticket).
+   * equipo) o el proyecto es de Soporte (sin equipo fijo, ver
+   * `findTeamLeadersForMemberOnProject`), incluido `memberUserId === null` —
+   * ver docs/DECISION-M4-HORAS.md. Usado por Horas (dueño del registro) y
+   * Tickets (responsable del ticket).
    */
   async isProjectLeaderOrTeamLeaderOfMember(
     projectId: string,
