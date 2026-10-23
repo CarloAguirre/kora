@@ -48,6 +48,7 @@ export function toProjectSummary(item: ProjectListItem, progress: ProjectProgres
     endDate: item.endDate?.toISOString().slice(0, 10) ?? null,
     progress,
     supportPlanDescription: item.supportPlanDescription,
+    supportPlanType: item.supportPlanType,
     supportHours: item.supportHours,
     allowsOvertime: item.allowsOvertime,
     createdAt: item.createdAt.toISOString(),

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { ProjectDetail } from '@kora/contracts';
+import { SUPPORT_SURPLUS_POLICY_LABELS, type ProjectDetail } from '@kora/contracts';
 import { EditProjectDialog, type EditProjectDialogProps } from './EditProjectDialog';
 import { ToastProvider } from '@/shared/components/ui/Toast';
 
@@ -33,10 +33,13 @@ vi.mock('../api/projects.queries', () => ({
   useProjectsList: () => ({ data: { items: [] } }),
 }));
 
+const updateSupportPlanMutateAsync = vi.fn().mockResolvedValue(undefined);
+const supportPlansForClientMock = vi.fn(() => ({ data: [] as unknown[] }));
+
 vi.mock('../api/support-plan.queries', () => ({
-  useSupportPlansForClient: () => ({ data: [] }),
+  useSupportPlansForClient: () => supportPlansForClientMock(),
   useSupportPlanDetail: () => ({ data: undefined }),
-  useUpdateSupportPlan: () => ({ mutateAsync: vi.fn() }),
+  useUpdateSupportPlan: () => ({ mutateAsync: updateSupportPlanMutateAsync }),
 }));
 
 vi.mock('@/modules/clients/api/clients.queries', () => ({
@@ -268,10 +271,12 @@ describe('EditProjectDialog', () => {
       isManagement: true,
     });
 
-    expect(screen.getByLabelText('Horas de soporte')).toBeInTheDocument();
+    // Las horas del plan (mensuales / bolsa) se editan en el contrato de soporte, no aquí.
+    expect(screen.queryByLabelText('Horas de soporte')).not.toBeInTheDocument();
     // Las HH vendidas son `soldHours` también en soporte (fijas; lo que avanza son las consumidas).
     expect(screen.getByLabelText('HH vendidas')).toHaveValue(500);
-    expect(screen.getByLabelText('Plan de soporte')).toBeInTheDocument();
+    // El tipo de soporte sale del contrato (`plan_type`); ya no es un texto libre editable aquí.
+    expect(screen.queryByLabelText('Plan de soporte')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Tipo de proyecto')).not.toBeInTheDocument();
   });
 
@@ -303,5 +308,36 @@ describe('EditProjectDialog', () => {
       ),
     );
     expect(onSuccess).toHaveBeenCalledWith('Se actualizaron los datos de Proyecto renombrado.');
+  });
+
+  it('muestra el tipo de soporte del contrato y guarda el cambio en el contrato', async () => {
+    supportPlansForClientMock.mockReturnValue({
+      data: [{ id: 'plan-1', projectId: 'project-1', planType: 'monthly', surplusPolicy: 'accumulate', contractedHours: 10 }],
+    });
+    const user = userEvent.setup();
+    renderDialog({
+      open: true,
+      project: buildProject({ type: 'support', salesStage: null, phase: null }),
+      onClose: vi.fn(),
+      onSuccess: vi.fn(),
+      isManagement: true,
+    });
+
+    expect(screen.getByRole('radio', { name: 'Mensual' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('radio', { name: SUPPORT_SURPLUS_POLICY_LABELS.accumulate })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByLabelText('Cantidad de HH mensuales')).toHaveValue(10);
+
+    await user.click(screen.getByRole('radio', { name: 'Bolsa' }));
+    // La política de excedente es solo de los planes mensuales.
+    expect(screen.queryByRole('radiogroup', { name: 'Política de excedente' })).not.toBeInTheDocument();
+    const bundleHours = screen.getByLabelText('Cantidad de HH de la bolsa');
+    await user.clear(bundleHours);
+    await user.type(bundleHours, '40');
+    fireEvent.submit(document.getElementById('edit-project-form') as HTMLFormElement);
+
+    await waitFor(() =>
+      expect(updateSupportPlanMutateAsync).toHaveBeenCalledWith({ planType: 'bundle', surplusPolicy: null, contractedHours: 40 }),
+    );
+    supportPlansForClientMock.mockReturnValue({ data: [] });
   });
 });

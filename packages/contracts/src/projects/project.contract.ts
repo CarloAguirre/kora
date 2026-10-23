@@ -686,6 +686,12 @@ export const projectSummarySchema = z.object({
   endDate: z.string().nullable(),
   progress: projectProgressSchema,
   supportPlanDescription: z.string().nullable(),
+  /**
+   * Tipo del contrato de soporte del proyecto (`support_plans.plan_type`, el vigente o el más reciente) —
+   * es lo que se muestra como "Tipo de Soporte". Mismos valores que `supportPlanTypeSchema` (no se importa:
+   * `support-plan.contract` ya importa este archivo). `null` si no es soporte o no tiene contrato.
+   */
+  supportPlanType: z.enum(['monthly', 'bundle', 'on_demand']).nullable(),
   supportHours: z.number(),
   /** Habilitado por el líder del proyecto/equipo — sin esto, las horas cargadas contra este proyecto no pueden marcarse como horas extra. */
   allowsOvertime: z.boolean(),
@@ -693,7 +699,8 @@ export const projectSummarySchema = z.object({
 });
 export type ProjectSummary = z.infer<typeof projectSummarySchema>;
 
-export const projectDetailSchema = projectSummarySchema.extend({
+// La ficha de soporte toma el tipo del contrato de `useSupportPlanSummary`, así que el detalle no lo trae.
+export const projectDetailSchema = projectSummarySchema.omit({ supportPlanType: true }).extend({
   developer: z.object({ id: uuidSchema, fullName: z.string() }).nullable(),
   /** Contacto principal DE ESTE PROYECTO (v1: `proyecto.id_contacto`) — puede diferir del contacto general del cliente. */
   primaryContact: clientContactSchema.nullable(),

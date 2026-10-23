@@ -17,6 +17,7 @@ import {
   projectTeams,
   projects,
   sql,
+  supportPlans,
   teamMembers,
   teams,
   users,
@@ -33,6 +34,19 @@ import type { Project } from '../../domain/entities/project.entity';
 import { DATABASE } from '../../../../shared/infrastructure/database/database.module';
 import { resolveDb } from '../../../../shared/infrastructure/database/unit-of-work';
 import { toDomain, toPersistence } from './project.persistence-mapper';
+
+type SupportPlanType = ProjectListItem['supportPlanType'];
+
+/**
+ * Tipo del contrato de soporte del proyecto: el vigente o, si no hay, el más reciente. Es la fuente
+ * del "Tipo de Soporte" (no el texto libre `support_plan_description` heredado de la v1).
+ */
+const supportPlanTypeOfProject = sql<SupportPlanType>`(
+  select ${supportPlans.planType} from ${supportPlans}
+  where ${supportPlans.projectId} = ${projects.id}
+  order by (${supportPlans.status} = 'active') desc, ${supportPlans.startDate} desc
+  limit 1
+)`;
 
 @Injectable()
 export class DrizzleProjectRepository implements ProjectRepository {
@@ -104,6 +118,7 @@ export class DrizzleProjectRepository implements ProjectRepository {
           endDate: projects.endDate,
           stopsClock: projects.stopsClock,
           supportPlanDescription: projects.supportPlanDescription,
+          supportPlanType: supportPlanTypeOfProject,
           supportHours: projects.supportHours,
           allowsOvertime: projects.allowsOvertime,
           createdAt: projects.createdAt,
@@ -146,6 +161,7 @@ export class DrizzleProjectRepository implements ProjectRepository {
       endDate: row.endDate,
       stopsClock: row.stopsClock,
       supportPlanDescription: row.supportPlanDescription,
+      supportPlanType: row.supportPlanType,
       supportHours: Number(row.supportHours),
       allowsOvertime: row.allowsOvertime,
       createdAt: row.createdAt,
@@ -405,7 +421,9 @@ export class DrizzleProjectRepository implements ProjectRepository {
     }
 
     if (sort.field === 'supportPlan') {
-      return [sql`${projects.supportPlanDescription} ${sqlDirection} nulls last`, asc(projects.id)];
+      // Por la etiqueta visible (A demanda / Bolsa / Mensual), no por el valor interno del enum.
+      const label = sql`case ${supportPlanTypeOfProject} when 'on_demand' then 'A demanda' when 'bundle' then 'Bolsa' when 'monthly' then 'Mensual' end`;
+      return [sql`${label} ${sqlDirection} nulls last`, asc(projects.id)];
     }
 
     // Restantes = vendidas menos consumidas (mínimo 0) y desviadas = el exceso

@@ -92,8 +92,13 @@ export const supportProjectSummarySchema = z.object({
   currentPeriod: z
     .object({
       usedHours: z.number(),
+      /** `planHours + priorSurplusHours`. */
       capacityHours: z.number(),
       remainingHours: z.number(),
+      /** HH que el plan entrega este mes (`support_monthly_periods.contracted_hours`). */
+      planHours: z.number(),
+      /** Saldo acumulado de meses anteriores (solo política acumulable; 0 si vence). */
+      priorSurplusHours: z.number(),
     })
     .nullable(),
   history: z.array(supportPlanHistoryPointSchema),

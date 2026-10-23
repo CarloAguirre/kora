@@ -101,6 +101,9 @@ export class CreateSupportPlanUseCase implements UseCase<CreateSupportPlanComman
       leaderUserId: data.leaderUserId,
       startDate,
       estimatedDeliveryDate: endDate,
+      // Las horas contratadas al crear el contrato son las HH vendidas del proyecto (lo que muestran
+      // listado, gráfico y dashboard); `supportHours` se mantiene sincronizado con el plan.
+      soldHours: data.contractedHours,
       supportHours: data.contractedHours,
       quotationLink: data.quotationLink,
       contractLink: data.contractLink,

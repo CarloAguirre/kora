@@ -5,6 +5,7 @@ import {
   PROJECT_PHASE_LABELS,
   PROJECT_STATUSES,
   PROJECT_STATUS_LABELS,
+  SUPPORT_PLAN_TYPE_LABELS,
   type ProjectPhase,
   type ProjectSortField,
   type ProjectStatus,
@@ -257,7 +258,8 @@ export function ProjectsListPage() {
       key: 'supportPlan',
       header: 'Tipo de Soporte',
       sortable: true,
-      render: (p) => p.supportPlanDescription || <span className={styles.empty}>—</span>,
+      // Sale del contrato de soporte (`plan_type`), no del texto libre heredado de la v1.
+      render: (p) => (p.supportPlanType ? SUPPORT_PLAN_TYPE_LABELS[p.supportPlanType] : <span className={styles.empty}>—</span>),
     },
     { key: 'leader', header: 'Líder', sortable: true, render: (p) => p.leader?.fullName ?? <span className={styles.empty}>—</span> },
     { key: 'stage', header: 'Etapa', render: (p) => getProjectStageLabel(p) },

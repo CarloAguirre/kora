@@ -489,7 +489,8 @@ export class GetDashboardSummaryUseCase implements UseCase<GetDashboardSummaryCo
     );
 
     const rows = page.items.map((p) => {
-      const contractedHours = isMonthlySupportPlan(p.supportPlanDescription) ? p.soldHours : p.supportHours || p.soldHours;
+      // El tipo sale del contrato (`supportPlanType`), no del texto libre "Plan de soporte".
+      const contractedHours = p.supportPlanType === 'monthly' ? p.soldHours : p.supportHours || p.soldHours;
       const usedHours = p.usedHours;
       return {
         client: p.clientName ?? 'Sin cliente',
@@ -618,19 +619,6 @@ function parseIsoDate(iso: string): Date {
 
 function priorityRank(priority: string | null): number {
   return priority ? (PRIORITY_RANK[priority] ?? 0) : 0;
-}
-
-const DIACRITICS_PATTERN = new RegExp('[\\u0300-\\u036f]', 'g');
-
-function isMonthlySupportPlan(description: string | null): boolean {
-  return (
-    (description ?? '')
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(DIACRITICS_PATTERN, '')
-      .replace(/\s+/g, '')
-      .trim() === 'mensual'
-  );
 }
 
 function developmentStageLabel(p: ProjectListItem): string {

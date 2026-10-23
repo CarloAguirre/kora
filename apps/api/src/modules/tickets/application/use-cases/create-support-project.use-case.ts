@@ -91,6 +91,9 @@ export class CreateSupportProjectUseCase implements UseCase<CreateSupportProject
       leaderUserId: data.leaderUserId,
       startDate: data.startDate ? new Date(data.startDate) : null,
       estimatedDeliveryDate: data.estimatedDeliveryDate ? new Date(data.estimatedDeliveryDate) : null,
+      // Las horas del plan al crear el soporte son las HH vendidas del proyecto (lo que muestran
+      // listado, gráfico y dashboard); `supportHours` se mantiene sincronizado con el plan.
+      soldHours: data.supportHours,
       supportHours: data.supportHours,
       quotationLink: data.quotationLink,
       contractLink: data.contractLink,

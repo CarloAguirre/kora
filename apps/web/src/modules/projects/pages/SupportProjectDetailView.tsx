@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { ProjectDetail, ProjectStatus, TicketSummary } from '@kora/contracts';
-import { PROJECT_STATUS_LABELS, PROJECT_STATUSES } from '@kora/contracts';
+import { PROJECT_STATUS_LABELS, PROJECT_STATUSES, SUPPORT_PLAN_TYPE_LABELS } from '@kora/contracts';
 import styles from './SupportProjectDetailView.module.css';
 import detailStyles from './ProjectDetailPage.module.css';
 import { Card } from '@/shared/components/ui/Card';
@@ -17,7 +17,7 @@ import { useChangeProjectStatus } from '../api/projects.queries';
 import { useSupportPlanSummary } from '../api/support-plan.queries';
 import { useTicketsList } from '@/modules/tickets/api/tickets.queries';
 import { TicketPriorityBadge } from '@/modules/tickets/components/TicketPriorityBadge';
-import { SupportHoursDonut } from '../components/SupportHoursDonut';
+import { SupportHoursStatus } from '../components/SupportHoursStatus';
 import { SupportProgressChart } from '../components/SupportProgressChart';
 import { formatMoney } from '@/shared/lib/format-money';
 import { ticketPath } from '@/app/router/paths';
@@ -142,7 +142,7 @@ export function SupportProjectDetailView({
               <DataRow label="Término" value={formatDate(project.endDate)} />
             </div>
             <p className={styles.supportLine}>
-              {project.supportPlanDescription || 'Sin plan'} · {formatHours(project.supportHours)} hrs · Hora extra:{' '}
+              {supportSummary ? SUPPORT_PLAN_TYPE_LABELS[supportSummary.planType] : 'Sin plan'} · {formatHours(project.soldHours)} hrs · Hora extra:{' '}
               {formatMoney(project.overtimeRateUf, 'UF')}
             </p>
             {supportSummary && (
@@ -173,7 +173,7 @@ export function SupportProjectDetailView({
           {loadingSummary ? (
             <p className={detailStyles.empty}>Cargando…</p>
           ) : supportSummary ? (
-            <SupportHoursDonut summary={supportSummary} />
+            <SupportHoursStatus summary={supportSummary} />
           ) : (
             <p className={detailStyles.empty}>Sin plan de soporte activo.</p>
           )}

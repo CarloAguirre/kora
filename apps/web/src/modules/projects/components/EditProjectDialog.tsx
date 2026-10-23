@@ -10,6 +10,9 @@ import {
   PROJECT_PHASES,
   PROJECT_PHASE_LABELS,
   PROJECT_STATUS_LABELS,
+  SUPPORT_PLAN_TYPE_LABELS,
+  SUPPORT_SURPLUS_POLICIES,
+  SUPPORT_SURPLUS_POLICY_LABELS,
   updateProjectSchema,
   type CreateProjectModuleInput,
   type ProjectDetail,
@@ -19,8 +22,11 @@ import {
   type ProjectModuleSegment,
   type ProjectSalesStage,
   type ProjectStatus,
+  type SupportPlanType,
+  type SupportSurplusPolicy,
   type UpdateProjectInput,
   type UpdateProjectModuleInput,
+  type UpdateSupportPlanInput,
 } from '@kora/contracts';
 import styles from './EditProjectDialog.module.css';
 import deliveryModalStyles from './DeliveryModal.module.css';
@@ -29,6 +35,7 @@ import { Button } from '@/shared/components/ui/Button';
 import { TextField } from '@/shared/components/ui/TextField';
 import { Select } from '@/shared/components/ui/Select';
 import { Combobox } from '@/shared/components/ui/Combobox';
+import { SegmentedControl } from '@/shared/components/ui/SegmentedControl';
 import { AlertIcon, PlusIcon, TrashIcon, CloseIcon } from '@/shared/components/icons/Icons';
 import { DeliveryModal, EMPTY_DELIVERY_MODAL_VALUES, type DeliveryModalValues } from './DeliveryModal';
 import { SupportSlaNote } from './SupportSlaNote';
@@ -74,6 +81,22 @@ type ProjectFormValues = z.input<typeof updateProjectSchema>;
 
 const PHASE_OPTIONS = PROJECT_PHASES.map((phase) => ({ value: phase, label: PROJECT_PHASE_LABELS[phase] }));
 const MODULE_STAGE_OPTIONS = PROJECT_MODULE_STAGES.map((stage) => ({ value: stage, label: PROJECT_MODULE_STAGE_LABELS[stage] }));
+/** Mismo orden que en `NewProjectPage` (Bolsa/Mensual/A demanda). */
+const SUPPORT_PLAN_TYPE_OPTIONS = (['bundle', 'monthly', 'on_demand'] as const).map((planType) => ({
+  value: planType,
+  label: SUPPORT_PLAN_TYPE_LABELS[planType],
+}));
+const SUPPORT_SURPLUS_POLICY_OPTIONS = SUPPORT_SURPLUS_POLICIES.map((policy) => ({
+  value: policy,
+  label: SUPPORT_SURPLUS_POLICY_LABELS[policy],
+}));
+
+/** Lo que se edita del contrato de soporte desde la ficha del proyecto. */
+interface SupportPlanDraft {
+  planType: SupportPlanType;
+  surplusPolicy: SupportSurplusPolicy | null;
+  contractedHours: number;
+}
 
 /** `2026-05-08` → `08-05-2026` — mismo formato que el resto de la ficha de proyecto. */
 function formatDeliveryDate(isoDate: string): string {
@@ -307,6 +330,32 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
     ...(finishedProjects?.items ?? []).map((candidate) => ({ id: candidate.id, name: candidate.name, status: candidate.status })),
     ...savedCoveredProjects.filter((linked) => !finishedProjects?.items.some((candidate) => candidate.id === linked.id)),
   ];
+
+  // Tipo de soporte, política de excedente y HH del plan viven en el contrato (`support_plans`), no en el
+  // proyecto: son la lógica de venta por tipo de paquete (períodos mensuales, saldo acumulable, bolsa).
+  /** `null` = sin tocar: se muestra lo guardado y no se manda nada al contrato. */
+  const [planDraft, setPlanDraft] = useState<SupportPlanDraft | null>(null);
+  const savedPlanDraft: SupportPlanDraft | null = supportPlan
+    ? { planType: supportPlan.planType, surplusPolicy: supportPlan.surplusPolicy, contractedHours: supportPlan.contractedHours }
+    : null;
+  const currentPlanDraft = planDraft ?? savedPlanDraft;
+  const editPlanDraft = (patch: Partial<SupportPlanDraft>) => {
+    if (!currentPlanDraft) return;
+    const next = { ...currentPlanDraft, ...patch };
+    // Mensual necesita política de excedente; Bolsa y A demanda no la usan.
+    if (next.planType === 'monthly' && !next.surplusPolicy) next.surplusPolicy = 'accumulate';
+    if (next.planType !== 'monthly') next.surplusPolicy = null;
+    if (next.planType === 'on_demand') next.contractedHours = 0;
+    setPlanDraft(next);
+  };
+
+  // Las HH mensuales son las del plan; el saldo acumulado de meses anteriores se suma aparte en cada
+  // período (`reusedBalanceHours`). Se muestra el desglose del mes en curso para que no se confundan.
+  const currentPeriod = supportPlanDetail?.summary.currentPeriod ?? null;
+  const currentPeriodBreakdown =
+    currentPeriod && currentPlanDraft?.planType === 'monthly' && savedPlanDraft?.planType === 'monthly'
+      ? `Este mes: ${formatPlanHours(currentPeriod.planHours)} h del plan + ${formatPlanHours(currentPeriod.priorSurplusHours)} h acumuladas de meses anteriores = ${formatPlanHours(currentPeriod.capacityHours)} h disponibles.`
+      : null;
 
   const toggleCoveredProject = (projectId: string) =>
     setCoveredProjectIds(
@@ -597,8 +646,17 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
         input: sendPaymentPlan ? { ...values, ...paymentPlanPayload(paymentPlan) } : values,
       });
       await applyPendingRemovals();
-      if (supportPlan && coveredProjectIds && !sameIds(coveredProjectIds, savedCoveredProjects.map((linked) => linked.id))) {
-        await updateSupportPlan.mutateAsync({ developmentProjectIds: coveredProjectIds });
+      if (supportPlan) {
+        const planInput: UpdateSupportPlanInput = {};
+        if (coveredProjectIds && !sameIds(coveredProjectIds, savedCoveredProjects.map((linked) => linked.id))) {
+          planInput.developmentProjectIds = coveredProjectIds;
+        }
+        if (planDraft && savedPlanDraft && !samePlanDraft(planDraft, savedPlanDraft)) {
+          planInput.planType = planDraft.planType;
+          planInput.surplusPolicy = planDraft.surplusPolicy;
+          planInput.contractedHours = planDraft.contractedHours;
+        }
+        if (Object.keys(planInput).length > 0) await updateSupportPlan.mutateAsync(planInput);
       }
       if (isDevelopment && estado !== project.status) {
         await changeStatus.mutateAsync({
@@ -811,18 +869,6 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
             />
           </div>
 
-          {!isDevelopment && (
-            <TextField label="Horas de soporte" type="number" min={0} {...register('supportHours')} />
-          )}
-
-          {!isDevelopment && (
-            <TextField
-              label="Plan de soporte"
-              placeholder="Ej: Mensual, Bolsa de horas…"
-              {...register('supportPlanDescription')}
-            />
-          )}
-
           {project.canAuthorizeOvertime && (
             <div>
               <label className={styles.checkboxLabel}>
@@ -854,6 +900,43 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
             </div>
           )}
         </div>
+
+        {!isDevelopment && currentPlanDraft && (
+          <div className={styles.section}>
+            <h3 className={styles.sectionTitle}>Contrato de soporte</h3>
+            <div className={styles.field}>
+              <span className={styles.label}>Tipo de soporte</span>
+              <SegmentedControl
+                aria-label="Tipo de soporte"
+                options={SUPPORT_PLAN_TYPE_OPTIONS}
+                value={currentPlanDraft.planType}
+                onChange={(value) => editPlanDraft({ planType: value as SupportPlanType })}
+              />
+            </div>
+            {currentPlanDraft.planType === 'monthly' && (
+              <div className={styles.field}>
+                <span className={styles.label}>Política de excedente</span>
+                <SegmentedControl
+                  aria-label="Política de excedente"
+                  options={SUPPORT_SURPLUS_POLICY_OPTIONS}
+                  value={currentPlanDraft.surplusPolicy ?? ''}
+                  onChange={(value) => editPlanDraft({ surplusPolicy: value as SupportSurplusPolicy })}
+                />
+              </div>
+            )}
+            {currentPlanDraft.planType !== 'on_demand' && (
+              <TextField
+                label={currentPlanDraft.planType === 'bundle' ? 'Cantidad de HH de la bolsa' : 'Cantidad de HH mensuales'}
+                type="number"
+                min={0}
+                step="any"
+                value={String(currentPlanDraft.contractedHours)}
+                onChange={(event) => editPlanDraft({ contractedHours: Number(event.target.value) || 0 })}
+                helperText={currentPeriodBreakdown ?? undefined}
+              />
+            )}
+          </div>
+        )}
 
         {!isDevelopment && (
           <div className={styles.section}>
@@ -1481,6 +1564,14 @@ function toFormValues(project: ProjectDetail): ProjectFormValues {
       assignedHours: team.assignedHours ?? undefined,
     })),
   };
+}
+
+function formatPlanHours(value: number): string {
+  return value.toLocaleString('es-CL', { maximumFractionDigits: 2 });
+}
+
+function samePlanDraft(a: SupportPlanDraft, b: SupportPlanDraft): boolean {
+  return a.planType === b.planType && a.surplusPolicy === b.surplusPolicy && a.contractedHours === b.contractedHours;
 }
 
 function sameIds(a: readonly string[], b: readonly string[]): boolean {

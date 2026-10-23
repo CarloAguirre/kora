@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx';
 import type { ProjectSummary } from '@kora/contracts';
-import { PROJECT_PRIORITY_LABELS } from '@kora/contracts';
+import { PROJECT_PRIORITY_LABELS, SUPPORT_PLAN_TYPE_LABELS } from '@kora/contracts';
 import { getProjectStageLabel } from './project-stage-display';
 import { formatProgressDelay, formatProgressPercent } from './project-progress-display';
 
@@ -33,7 +33,7 @@ const DEVELOPMENT_COLUMNS: readonly ExportColumn[] = [
 const SUPPORT_COLUMNS: readonly ExportColumn[] = [
   { label: 'Nombre proyecto', getValue: (p) => p.name },
   { label: 'Cliente', getValue: (p) => p.client?.companyName ?? '-' },
-  { label: 'Tipo de Soporte', getValue: (p) => p.supportPlanDescription ?? '-' },
+  { label: 'Tipo de Soporte', getValue: (p) => (p.supportPlanType ? SUPPORT_PLAN_TYPE_LABELS[p.supportPlanType] : '-') },
   { label: 'Líder', getValue: (p) => p.leader?.fullName ?? '-' },
   { label: 'Etapa', getValue: (p) => getProjectStageLabel(p) },
   { label: 'HH Vendidas', getValue: (p) => formatDecimal(p.soldHours) },

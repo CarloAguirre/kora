@@ -76,11 +76,14 @@ export class SupportPlanSummaryBuilder {
 
     const currentPeriod = current
       ? (() => {
-          const capacityHours = current.contractedHours + priorSurplusOf(current);
+          const priorSurplusHours = priorSurplusOf(current);
+          const capacityHours = current.contractedHours + priorSurplusHours;
           return {
             usedHours: current.consumedHoursPeriod,
             capacityHours,
             remainingHours: Math.max(capacityHours - current.consumedHoursPeriod, 0),
+            planHours: current.contractedHours,
+            priorSurplusHours,
           };
         })()
       : null;

@@ -60,6 +60,8 @@ export interface ProjectListItem {
   /** Ver `projectDetailSchema.stopsClock` — el avance (`calculateProjectProgress`) no evalúa Retraso con el reloj pausado. */
   readonly stopsClock: boolean;
   readonly supportPlanDescription: string | null;
+  /** Ver `projectSummarySchema.supportPlanType`. */
+  readonly supportPlanType: 'monthly' | 'bundle' | 'on_demand' | null;
   readonly supportHours: number;
   readonly allowsOvertime: boolean;
   readonly createdAt: Date;
