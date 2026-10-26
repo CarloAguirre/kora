@@ -84,3 +84,21 @@ automáticamente `projects.status`.
 La nueva pestaña usa el mismo `GET /projects` y la paginación existente;
 no requiere migración, cambio de contrato HTTP ni actualización de datos.
 El estado de navegación recuerda «Inactivos» al volver desde el detalle.
+
+La ficha de soporte presenta únicamente **Activo / Inactivo / Terminado**.
+`on_hold`, `draft` y `cancelled` se muestran como Inactivo, sin reescribir
+los estados históricos. El listado y su exportación usan las mismas etiquetas;
+la nomenclatura de proyectos de desarrollo permanece independiente.
+
+Elegir Terminado con un contrato activo abre el diálogo de cierre, que solicita
+fecha y motivo y cierra el plan junto con el proyecto en una transacción. Si
+queda otro contrato activo, el proyecto permanece en su estado anterior hasta
+cerrar el último. La API impide marcar terminado directamente mientras exista
+un contrato activo y solo permite corregir a terminado un soporte cuyo contrato
+ya esté cerrado. Tampoco permite reactivar un soporte sin contrato activo.
+
+La ficha obtiene el ID del contrato activo de su resumen por proyecto (que ya
+alimenta las horas), sin depender del listado de todos los contratos del cliente.
+El `projectId` de la URL puede ser un slug, por lo que no se compara con el UUID
+del contrato. Si no hay contrato activo, la API valida el cambio a Terminado;
+un fallo en el resumen no bloquea el cambio a Inactivo.

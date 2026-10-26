@@ -72,6 +72,8 @@ import { DrizzleProjectHourEntryReader } from './infrastructure/services/drizzle
 import { DrizzleProjectActivityReader } from './infrastructure/services/drizzle-project-activity-reader';
 import { DrizzleProjectTeamMemberValidator } from './infrastructure/services/drizzle-project-team-member-validator';
 import { DrizzleForecastSourceStore } from './infrastructure/services/drizzle-forecast-source-store';
+import { SUPPORT_CONTRACT_STATUS_READER } from './application/ports/support-contract-status-reader.port';
+import { DrizzleSupportContractStatusReader } from './infrastructure/services/drizzle-support-contract-status-reader';
 
 /**
  * Composición del módulo de proyectos.
@@ -140,6 +142,7 @@ import { DrizzleForecastSourceStore } from './infrastructure/services/drizzle-fo
     { provide: PROJECT_ACTIVITY_READER, useClass: DrizzleProjectActivityReader },
     { provide: PROJECT_TEAM_MEMBER_VALIDATOR, useClass: DrizzleProjectTeamMemberValidator },
     { provide: FORECAST_SOURCE_STORE, useClass: DrizzleForecastSourceStore },
+    { provide: SUPPORT_CONTRACT_STATUS_READER, useClass: DrizzleSupportContractStatusReader },
   ],
   exports: [
     PROJECT_REPOSITORY,
