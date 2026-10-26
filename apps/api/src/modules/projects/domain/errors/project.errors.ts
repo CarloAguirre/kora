@@ -45,6 +45,18 @@ export class ProjectAlreadyDeletedError extends ConflictError {
   }
 }
 
+export class ActiveSupportContractMustBeClosedError extends ConflictError {
+  constructor() {
+    super('Cierra el contrato de soporte antes de marcar el proyecto como terminado.', 'PROJECT_SUPPORT_ACTIVE_CONTRACT');
+  }
+}
+
+export class SupportContractRequiredForStatusError extends ConflictError {
+  constructor(message: string) {
+    super(message, 'PROJECT_SUPPORT_CONTRACT_REQUIRED');
+  }
+}
+
 export class ProjectTeamMemberNotFoundError extends NotFoundError {
   constructor(identifier: string) {
     super('Miembro asignado', identifier, 'PROJECT_TEAM_MEMBER_NOT_FOUND');
