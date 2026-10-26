@@ -33,8 +33,9 @@ import type {
   HourEntryRepository,
   HourEntrySortableField,
   HourEntrySummary,
-  OvertimeHoursByProjectAndUser,
+  OvertimeHoursByDayProjectAndUser,
   OvertimeHoursByUser,
+  OvertimeReportScope,
 } from '../../domain/repositories/hour-entry.repository';
 import type { HourEntry } from '../../domain/entities/hour-entry.entity';
 import { DATABASE } from '../../../../shared/infrastructure/database/database.module';
@@ -330,15 +331,17 @@ export class DrizzleHourEntryRepository implements HourEntryRepository {
       .sort((a, b) => b.approvedHours + b.pendingHours - (a.approvedHours + a.pendingHours));
   }
 
-  async sumOvertimeHoursByProjectAndUser(
+  async sumOvertimeHoursByDayProjectAndUser(
     dateFrom: Date,
     dateTo: Date,
+    scope: OvertimeReportScope = {},
     context?: TransactionContext,
-  ): Promise<OvertimeHoursByProjectAndUser[]> {
+  ): Promise<OvertimeHoursByDayProjectAndUser[]> {
     const db = resolveDb(this.database, context);
     const leaders = alias(users, 'project_leaders');
     const rows = await db
       .select({
+        date: hourEntries.date,
         projectId: projects.id,
         projectName: projects.name,
         projectType: projects.type,
@@ -361,9 +364,12 @@ export class DrizzleHourEntryRepository implements HourEntryRepository {
           ne(hourEntries.status, 'rejected'),
           gte(hourEntries.date, dateFrom),
           lte(hourEntries.date, dateTo),
+          scope.excludeUserId ? ne(hourEntries.userId, scope.excludeUserId) : undefined,
+          scope.leaderScopeUserId ? this.leaderScopeCondition(scope.leaderScopeUserId) : undefined,
         ),
       )
       .groupBy(
+        hourEntries.date,
         projects.id,
         projects.name,
         projects.type,
@@ -377,6 +383,7 @@ export class DrizzleHourEntryRepository implements HourEntryRepository {
     const fullName = (first: string | null, last: string | null) => `${first ?? ''} ${last ?? ''}`.trim();
     return rows
       .map((row) => ({
+        date: row.date,
         projectId: row.projectId,
         projectName: row.projectName,
         projectType: row.projectType,
@@ -389,8 +396,9 @@ export class DrizzleHourEntryRepository implements HourEntryRepository {
       }))
       .sort(
         (a, b) =>
+          a.date.getTime() - b.date.getTime() ||
           a.projectName.localeCompare(b.projectName, 'es') ||
-          b.approvedHours + b.pendingHours - (a.approvedHours + a.pendingHours),
+          a.userFullName.localeCompare(b.userFullName, 'es'),
       );
   }
 
@@ -438,76 +446,76 @@ export class DrizzleHourEntryRepository implements HourEntryRepository {
         filters.visibleToUserIds.length > 0 ? inArray(hourEntries.userId, [...filters.visibleToUserIds]) : sql`false`,
       );
     }
-    if (filters.leaderScopeUserId) {
-      const leaderId = filters.leaderScopeUserId;
-      conditions.push(
-        or(
-          eq(hourEntries.userId, leaderId),
-          // Sin proyecto: mismo criterio amplio que la autoridad de decisión
-          // para estos registros — lidera al dueño en general (no hay
-          // proyecto que acote).
-          sql`(
-            ${hourEntries.projectId} is null
-            and exists (
-              select 1 from ${teamMembers}
-              inner join ${teams} on ${teams.id} = ${teamMembers.teamId}
-              where ${teamMembers.userId} = ${hourEntries.userId}
-                and ${teamMembers.leftAt} is null
-                and (
-                  ${teams.leaderUserId} = ${leaderId}
-                  or exists (
-                    select 1 from ${projectTeams}
-                    where ${projectTeams.teamId} = ${teams.id} and ${projectTeams.leaderUserId} = ${leaderId}
-                  )
-                )
-            )
-          )`,
-          // Sin proyecto: el designado también puede decidir aunque no lidere
-          // a ese colaborador (la validación de la acción ya lo permite).
-          sql`(
-            ${hourEntries.projectId} is null
-            and ${hourEntries.designatedApproverUserId} = ${leaderId}
-          )`,
-          // Desarrollo: solo líder del equipo asignado a ESTE proyecto.
-          sql`(
-            ${hourEntries.projectId} is not null
-            and exists (
-              select 1 from ${projectTeams}
-              inner join ${projects} on ${projects.id} = ${projectTeams.projectId} and ${projects.type} = 'development'
-              inner join ${teams} on ${teams.id} = ${projectTeams.teamId}
-              inner join ${users} on ${users.id} = coalesce(${projectTeams.leaderUserId}, ${teams.leaderUserId})
-              inner join ${teamMembers} on ${teamMembers.teamId} = ${teams.id}
-                and ${teamMembers.userId} = ${hourEntries.userId} and ${teamMembers.leftAt} is null
-              where ${projectTeams.projectId} = ${hourEntries.projectId}
-                and ${users.id} = ${leaderId}
-            )
-          )`,
-          // Soporte: líder del proyecto. Desarrollo: líder del proyecto solo
-          // si el autor carece de líder de equipo resoluble en ese proyecto.
-          sql`(
-            ${hourEntries.projectId} is not null
-            and exists (
-              select 1 from ${projects}
-              where ${projects.id} = ${hourEntries.projectId}
-                and ${projects.leaderUserId} = ${leaderId}
-                and (
-                  ${projects.type} = 'support'
-                  or not exists (
-                    select 1 from ${projectTeams}
-                    inner join ${teams} on ${teams.id} = ${projectTeams.teamId}
-                    inner join ${users} on ${users.id} = coalesce(${projectTeams.leaderUserId}, ${teams.leaderUserId})
-                    inner join ${teamMembers} on ${teamMembers.teamId} = ${teams.id}
-                      and ${teamMembers.userId} = ${hourEntries.userId}
-                      and ${teamMembers.leftAt} is null
-                    where ${projectTeams.projectId} = ${hourEntries.projectId}
-                  )
-                )
-            )
-          )`,
-        ),
-      );
-    }
+    if (filters.leaderScopeUserId) conditions.push(this.leaderScopeCondition(filters.leaderScopeUserId));
     return conditions.length > 0 ? and(...conditions) : undefined;
+  }
+
+  /** Alcance de `hours:read_team` — ver `HourEntryFilters.leaderScopeUserId`. */
+  private leaderScopeCondition(leaderId: string) {
+    return or(
+      eq(hourEntries.userId, leaderId),
+      // Sin proyecto: mismo criterio amplio que la autoridad de decisión
+      // para estos registros — lidera al dueño en general (no hay
+      // proyecto que acote).
+      sql`(
+        ${hourEntries.projectId} is null
+        and exists (
+          select 1 from ${teamMembers}
+          inner join ${teams} on ${teams.id} = ${teamMembers.teamId}
+          where ${teamMembers.userId} = ${hourEntries.userId}
+            and ${teamMembers.leftAt} is null
+            and (
+              ${teams.leaderUserId} = ${leaderId}
+              or exists (
+                select 1 from ${projectTeams}
+                where ${projectTeams.teamId} = ${teams.id} and ${projectTeams.leaderUserId} = ${leaderId}
+              )
+            )
+        )
+      )`,
+      // Sin proyecto: el designado también puede decidir aunque no lidere
+      // a ese colaborador (la validación de la acción ya lo permite).
+      sql`(
+        ${hourEntries.projectId} is null
+        and ${hourEntries.designatedApproverUserId} = ${leaderId}
+      )`,
+      // Desarrollo: solo líder del equipo asignado a ESTE proyecto.
+      sql`(
+        ${hourEntries.projectId} is not null
+        and exists (
+          select 1 from ${projectTeams}
+          inner join ${projects} on ${projects.id} = ${projectTeams.projectId} and ${projects.type} = 'development'
+          inner join ${teams} on ${teams.id} = ${projectTeams.teamId}
+          inner join ${users} on ${users.id} = coalesce(${projectTeams.leaderUserId}, ${teams.leaderUserId})
+          inner join ${teamMembers} on ${teamMembers.teamId} = ${teams.id}
+            and ${teamMembers.userId} = ${hourEntries.userId} and ${teamMembers.leftAt} is null
+          where ${projectTeams.projectId} = ${hourEntries.projectId}
+            and ${users.id} = ${leaderId}
+        )
+      )`,
+      // Soporte: líder del proyecto. Desarrollo: líder del proyecto solo
+      // si el autor carece de líder de equipo resoluble en ese proyecto.
+      sql`(
+        ${hourEntries.projectId} is not null
+        and exists (
+          select 1 from ${projects}
+          where ${projects.id} = ${hourEntries.projectId}
+            and ${projects.leaderUserId} = ${leaderId}
+            and (
+              ${projects.type} = 'support'
+              or not exists (
+                select 1 from ${projectTeams}
+                inner join ${teams} on ${teams.id} = ${projectTeams.teamId}
+                inner join ${users} on ${users.id} = coalesce(${projectTeams.leaderUserId}, ${teams.leaderUserId})
+                inner join ${teamMembers} on ${teamMembers.teamId} = ${teams.id}
+                  and ${teamMembers.userId} = ${hourEntries.userId}
+                  and ${teamMembers.leftAt} is null
+                where ${projectTeams.projectId} = ${hourEntries.projectId}
+              )
+            )
+        )
+      )`,
+    );
   }
 
   private buildOrderBy(sort: SortRequest<HourEntrySortableField>) {

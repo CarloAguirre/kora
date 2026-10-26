@@ -6,8 +6,9 @@ import type {
   HourEntryRepository,
   HourEntrySortableField,
   HourEntrySummary,
-  OvertimeHoursByProjectAndUser,
+  OvertimeHoursByDayProjectAndUser,
   OvertimeHoursByUser,
+  OvertimeReportScope,
 } from '../../modules/hours/domain/repositories/hour-entry.repository';
 
 /**
@@ -119,16 +120,20 @@ export class InMemoryHourEntryRepository implements HourEntryRepository {
     return [...byUser.values()].sort((a, b) => b.approvedHours + b.pendingHours - (a.approvedHours + a.pendingHours));
   }
 
-  async sumOvertimeHoursByProjectAndUser(
+  /** `leaderScopeUserId` no se simula (es SQL puro), igual que en `summarize()`. */
+  async sumOvertimeHoursByDayProjectAndUser(
     dateFrom: Date,
     dateTo: Date,
-  ): Promise<OvertimeHoursByProjectAndUser[]> {
-    const rows = new Map<string, OvertimeHoursByProjectAndUser>();
+    scope: OvertimeReportScope = {},
+  ): Promise<OvertimeHoursByDayProjectAndUser[]> {
+    const rows = new Map<string, OvertimeHoursByDayProjectAndUser>();
     for (const item of this.items) {
       if (item.projectId === null || item.projectType === null || !item.isOvertime || item.status === 'rejected') continue;
       if (item.date.getTime() < dateFrom.getTime() || item.date.getTime() > dateTo.getTime()) continue;
-      const key = `${item.projectId}:${item.userId}`;
+      if (scope.excludeUserId && item.userId === scope.excludeUserId) continue;
+      const key = `${item.date.getTime()}:${item.projectId}:${item.userId}`;
       const existing = rows.get(key) ?? {
+        date: item.date,
         projectId: item.projectId,
         projectName: item.projectName ?? '',
         projectType: item.projectType,

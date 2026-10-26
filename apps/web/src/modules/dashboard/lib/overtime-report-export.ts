@@ -3,6 +3,12 @@ import { PROJECT_TYPE_LABELS, type DashboardOvertimeReportRow } from '@kora/cont
 
 const MONTHS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 
+/** `YYYY-MM-DD` → `DD/MM/YYYY`, como `hours-export.ts`. */
+function formatDate(value: string): string {
+  const [year, month, day] = value.split('-');
+  return `${day}/${month}/${year}`;
+}
+
 /** Mismo patrón xlsx que `exportSupportReport` — exporta las filas ya filtradas en pantalla (tipo y líder). */
 export function exportOvertimeReport(
   rows: readonly DashboardOvertimeReportRow[],
@@ -15,8 +21,9 @@ export function exportOvertimeReport(
     [`Tipo: ${filters.type}`],
     [`Líder: ${filters.leader}`],
     [],
-    ['Proyecto', 'Tipo', 'Líder', 'Colaborador', 'HH Extra Aprobadas', 'HH Extra Pendientes', 'Total'],
+    ['Fecha', 'Proyecto', 'Tipo', 'Líder', 'Colaborador', 'HH Extra Aprobadas', 'HH Extra Pendientes', 'Total'],
     ...rows.map((row) => [
+      formatDate(row.date),
       row.projectName,
       PROJECT_TYPE_LABELS[row.projectType],
       row.leaderFullName ?? 'Sin líder',
@@ -28,6 +35,7 @@ export function exportOvertimeReport(
     [],
     [
       'Total',
+      '',
       '',
       '',
       '',

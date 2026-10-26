@@ -12,6 +12,7 @@ import { useOvertimeReport } from '../api/dashboard.queries';
 import { exportOvertimeReport } from '../lib/overtime-report-export';
 
 const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 1 });
+const formatDate = (value: string) => new Date(`${value}T00:00:00`).toLocaleDateString('es-CL', { weekday: 'short', day: '2-digit', month: 'short' });
 const ALL_LEADERS = 'all';
 const ALL_TYPES = 'all';
 const TYPE_OPTIONS = [
@@ -24,6 +25,7 @@ const NO_ROWS: readonly DashboardOvertimeReportRow[] = [];
 const leaderKey = (row: DashboardOvertimeReportRow) => row.leaderUserId ?? NO_LEADER;
 
 const COLUMNS: Column<DashboardOvertimeReportRow>[] = [
+  { key: 'date', header: 'Fecha', render: (row) => <span className={styles.date}>{formatDate(row.date)}</span> },
   { key: 'project', header: 'Proyecto', render: (row) => row.projectName },
   { key: 'type', header: 'Tipo', render: (row) => PROJECT_TYPE_LABELS[row.projectType] },
   {
@@ -32,7 +34,12 @@ const COLUMNS: Column<DashboardOvertimeReportRow>[] = [
     render: (row) => row.leaderFullName ?? <span className={styles.muted}>Sin líder</span>,
   },
   { key: 'user', header: 'Colaborador', render: (row) => row.userFullName },
-  { key: 'approved', header: 'Aprobadas', align: 'right', render: (row) => `${formatHours(row.approvedHours)} h` },
+  {
+    key: 'approved',
+    header: 'Aprobadas',
+    align: 'right',
+    render: (row) => (row.approvedHours > 0 ? `${formatHours(row.approvedHours)} h` : <span className={styles.muted}>—</span>),
+  },
   {
     key: 'pending',
     header: 'Pendientes',
@@ -48,12 +55,17 @@ const COLUMNS: Column<DashboardOvertimeReportRow>[] = [
 ];
 
 /**
- * "Horas extra por proyecto" — vista general del PMO: horas extra de un mes en
- * todos los proyectos (soporte y desarrollo), por proyecto × colaborador con
- * su líder, filtrable por tipo y líder, y exportable a Excel. En soporte lo que
- * pasa de la jornada de 8h queda solo como horas extra (ver `CreateTicketHhRequestUseCase`).
+ * "Horas extra por proyecto" — horas extra de un mes en proyectos de soporte y
+ * desarrollo, por día × proyecto × colaborador con su líder, filtrable por tipo
+ * y exportable a Excel. En soporte lo que pasa de la jornada de 8h queda solo
+ * como horas extra (ver `CreateTicketHhRequestUseCase`).
+ *
+ * `scope="all"`: vista general del PMO (Administración), filtrable por líder.
+ * `scope="team"`: Dashboard del líder — el backend ya acota a las personas a
+ * su cargo, así que el filtro por líder sobra.
  */
-export function OvertimeReportSection() {
+export function OvertimeReportSection({ scope = 'all' }: { scope?: 'all' | 'team' }) {
+  const isTeam = scope === 'team';
   const today = new Date();
   const [period, setPeriod] = useState({ year: today.getFullYear(), month: today.getMonth() + 1 });
   const [leader, setLeader] = useState(ALL_LEADERS);
@@ -98,8 +110,12 @@ export function OvertimeReportSection() {
     <Card className={styles.card}>
       <div className={styles.header}>
         <div>
-          <span className={styles.title}>Horas extra por proyecto</span>
-          <p className={styles.subtitle}>Proyectos de desarrollo y soporte, por líder y colaborador</p>
+          <span className={styles.title}>{isTeam ? 'Horas extra de mi equipo' : 'Horas extra por proyecto'}</span>
+          <p className={styles.subtitle}>
+            {isTeam
+              ? 'Personas a tu cargo, en proyectos de desarrollo y soporte'
+              : 'Proyectos de desarrollo y soporte, por líder y colaborador'}
+          </p>
         </div>
         <div className={styles.controls}>
           <PeriodSelector year={period.year} month={period.month} onChange={changePeriod} />
@@ -110,18 +126,25 @@ export function OvertimeReportSection() {
             value={type}
             onChange={(event) => changeType(event.target.value)}
           />
-          <Select
-            aria-label="Líder"
-            className={styles.leaderSelect}
-            options={leaderOptions}
-            value={leader}
-            onChange={(event) => setLeader(event.target.value)}
-          />
+          {!isTeam && (
+            <Select
+              aria-label="Líder"
+              className={styles.leaderSelect}
+              options={leaderOptions}
+              value={leader}
+              onChange={(event) => setLeader(event.target.value)}
+            />
+          )}
           <Button
             variant="outlineDark"
             iconLeft={<DownloadIcon size={16} />}
             disabled={filtered.length === 0}
-            onClick={() => exportOvertimeReport(filtered, period.year, period.month, { type: typeLabel, leader: leaderLabel })}
+            onClick={() =>
+              exportOvertimeReport(filtered, period.year, period.month, {
+                type: typeLabel,
+                leader: isTeam ? 'Personas a mi cargo' : leaderLabel,
+              })
+            }
           >
             Exportar
           </Button>
@@ -154,7 +177,7 @@ export function OvertimeReportSection() {
       <DataTable
         columns={COLUMNS}
         items={pageItems}
-        getRowKey={(row) => `${row.projectId}:${row.userId}`}
+        getRowKey={(row) => `${row.date}:${row.projectId}:${row.userId}`}
         loading={isLoading}
         error={error ? 'No se pudieron cargar las horas extra.' : null}
         emptyMessage="No hay horas extra registradas en este período."

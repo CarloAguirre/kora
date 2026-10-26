@@ -87,8 +87,9 @@ export interface OvertimeHoursByUser {
   readonly pendingHours: number;
 }
 
-/** Horas extra no rechazadas de un autor en un proyecto, con el líder del proyecto. */
-export interface OvertimeHoursByProjectAndUser {
+/** Horas extra no rechazadas de un autor en un proyecto y un día, con el líder del proyecto. */
+export interface OvertimeHoursByDayProjectAndUser {
+  readonly date: Date;
   readonly projectId: string;
   readonly projectName: string;
   readonly projectType: ProjectType;
@@ -99,6 +100,9 @@ export interface OvertimeHoursByProjectAndUser {
   readonly approvedHours: number;
   readonly pendingHours: number;
 }
+
+/** Acota el reporte de horas extra — mismo significado que en `HourEntryFilters`. Vacío = todas. */
+export type OvertimeReportScope = Pick<HourEntryFilters, 'leaderScopeUserId' | 'excludeUserId'>;
 
 export interface HourEntryRepository {
   findById(id: string, context?: TransactionContext): Promise<HourEntry | null>;
@@ -148,15 +152,17 @@ export interface HourEntryRepository {
   ): Promise<OvertimeHoursByUser[]>;
 
   /**
-   * Horas extra (no rechazadas) por proyecto × autor, en todos los proyectos
-   * (soporte y desarrollo) y un rango de fechas — alimenta "Horas Extras" de
-   * Administración. Agregación en SQL.
+   * Horas extra (no rechazadas) por día × proyecto × autor, en todos los
+   * proyectos (soporte y desarrollo) y un rango de fechas — alimenta "Horas
+   * Extras" de Administración y la del Dashboard del líder (con `scope`).
+   * Agregación en SQL, ordenado por fecha, proyecto y autor.
    */
-  sumOvertimeHoursByProjectAndUser(
+  sumOvertimeHoursByDayProjectAndUser(
     dateFrom: Date,
     dateTo: Date,
+    scope?: OvertimeReportScope,
     context?: TransactionContext,
-  ): Promise<OvertimeHoursByProjectAndUser[]>;
+  ): Promise<OvertimeHoursByDayProjectAndUser[]>;
 
   /** Horas normales (no extra) y no rechazadas que `userId` ya tiene registradas para `date` (cualquier asignación/proyecto) — decide qué parte de una solicitud de HH de ticket cabe en la jornada de 8h y cuál queda como horas extra (ver `CreateTicketHhRequestUseCase`). */
   sumRegularHoursForUserAndDate(userId: string, date: Date, context?: TransactionContext): Promise<number>;

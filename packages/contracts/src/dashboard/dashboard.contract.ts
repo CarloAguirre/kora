@@ -168,7 +168,11 @@ export const dashboardSupportOvertimeSchema = z.object({
 });
 export type DashboardSupportOvertime = z.infer<typeof dashboardSupportOvertimeSchema>;
 
-/** "Horas extra por proyecto" (PMO/admin) — un mes, filas por proyecto (soporte y desarrollo) × colaborador. */
+/**
+ * "Horas extra por proyecto" — un mes, filas por día × proyecto (soporte y
+ * desarrollo) × colaborador. PMO/admin ven todo; un líder, solo las de las
+ * personas a su cargo.
+ */
 export const dashboardOvertimeReportQuerySchema = z.object({
   year: z.coerce.number().int().min(2000).max(2100),
   month: z.coerce.number().int().min(1).max(12),
@@ -176,6 +180,8 @@ export const dashboardOvertimeReportQuerySchema = z.object({
 export type DashboardOvertimeReportQuery = z.infer<typeof dashboardOvertimeReportQuerySchema>;
 
 export const dashboardOvertimeReportRowSchema = z.object({
+  /** Día de las horas (`YYYY-MM-DD`). */
+  date: z.string(),
   projectId: z.string(),
   projectName: z.string(),
   projectType: projectTypeSchema,
@@ -191,7 +197,7 @@ export type DashboardOvertimeReportRow = z.infer<typeof dashboardOvertimeReportR
 export const dashboardOvertimeReportSchema = z.object({
   year: z.number().int(),
   month: z.number().int(),
-  /** Ordenado por proyecto y, dentro de cada uno, de mayor a menor total. */
+  /** Ordenado por fecha, proyecto y colaborador. */
   rows: z.array(dashboardOvertimeReportRowSchema),
 });
 export type DashboardOvertimeReport = z.infer<typeof dashboardOvertimeReportSchema>;

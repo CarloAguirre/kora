@@ -14,11 +14,14 @@ import { DashboardMySummary } from '../components/DashboardMySummary';
 import { MyActivityPanel } from '../components/MyActivityPanel';
 import { DashboardProjectsTab } from './DashboardProjectsTab';
 import { DashboardSupportTab } from './DashboardSupportTab';
+import { OvertimeReportSection } from '../components/OvertimeReportSection';
 
 const ALL_TABS = [
   { id: 'proyectos', label: 'Proyectos' },
   { id: 'soporte', label: 'Soporte' },
+  { id: 'horas-extras', label: 'Horas extra' },
 ] as const;
+type DashboardTab = (typeof ALL_TABS)[number]['id'];
 
 /**
  * Panel principal — replica la disposición del `Dashboard` admin de la v1
@@ -40,12 +43,16 @@ export function DashboardPage() {
   // `leader` ya no tiene `billing:read` (no debe entrar a Facturación), pero esta tab es
   // de métricas de soporte, no de facturación — se mantiene visible para ese rol aparte.
   const showSupportTab = can('billing:read') || user?.role === 'leader';
-  const tabs = showSupportTab ? ALL_TABS : ALL_TABS.filter((t) => t.id !== 'soporte');
-  const [tab, setTab] = useState<'proyectos' | 'soporte'>('proyectos');
+  // Horas extra de las personas a cargo: PMO/admin ya tienen la vista general en Administración.
+  const showOvertimeTab = user?.role === 'leader';
+  const tabs = ALL_TABS.filter(
+    (t) => (t.id !== 'soporte' || showSupportTab) && (t.id !== 'horas-extras' || showOvertimeTab),
+  );
+  const [tab, setTab] = useState<DashboardTab>('proyectos');
   const [weekStart, setWeekStart] = useState<string | undefined>(undefined);
   const [registerHoursOpen, setRegisterHoursOpen] = useState(false);
   const { data: summary, isLoading } = useDashboardSummary(weekStart);
-  const activeTab = tab === 'soporte' && !showSupportTab ? 'proyectos' : tab;
+  const activeTab = tabs.some((t) => t.id === tab) ? tab : 'proyectos';
 
   // `cliente` no tiene ningún permiso de este dashboard interno (KPIs,
   // aprobaciones, forecast…): su "inicio" es el portal de solo-lectura de su
@@ -63,7 +70,7 @@ export function DashboardPage() {
     <DashboardLayout title="Dashboard Principal">
       <div className={styles.page}>
         <div className={styles.topRow}>
-          {isCollaborator ? <div /> : <Tabs tabs={tabs} activeId={activeTab} onSelect={(id) => setTab(id as 'proyectos' | 'soporte')} />}
+          {isCollaborator ? <div /> : <Tabs tabs={tabs} activeId={activeTab} onSelect={(id) => setTab(id as DashboardTab)} />}
           <div className={styles.actions}>
             {can('hours:register') && (
               <Button iconLeft={<ClockIcon size={16} />} onClick={() => setRegisterHoursOpen(true)}>
@@ -100,7 +107,7 @@ export function DashboardPage() {
               />
             )}
 
-            {activeTab === 'proyectos' ? (
+            {activeTab === 'proyectos' && (
               <DashboardProjectsTab
                 projects={summary?.projects ?? null}
                 capacity={summary?.capacity ?? null}
@@ -108,9 +115,9 @@ export function DashboardPage() {
                 weekStart={weekStart}
                 onWeekStartChange={setWeekStart}
               />
-            ) : (
-              <DashboardSupportTab support={summary?.support ?? null} loading={isLoading} />
             )}
+            {activeTab === 'soporte' && <DashboardSupportTab support={summary?.support ?? null} loading={isLoading} />}
+            {activeTab === 'horas-extras' && <OvertimeReportSection scope="team" />}
           </>
         )}
       </div>
