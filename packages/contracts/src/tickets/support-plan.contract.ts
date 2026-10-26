@@ -105,6 +105,10 @@ export const supportProjectSummarySchema = z.object({
 });
 export type SupportProjectSummary = z.infer<typeof supportProjectSummarySchema>;
 
+/** Resumen de la ficha de proyecto con el identificador del contrato activo que se puede cerrar. */
+export const supportProjectDetailSummarySchema = supportProjectSummarySchema.extend({ planId: uuidSchema });
+export type SupportProjectDetailSummary = z.infer<typeof supportProjectDetailSummarySchema>;
+
 /**
  * Las 3 alertas de negocio del contrato — no existían en ningún lado antes de
  * esto (v1 tampoco las tenía como dato persistente, solo la app las mostraba
