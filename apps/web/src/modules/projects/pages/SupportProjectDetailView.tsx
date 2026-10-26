@@ -14,7 +14,7 @@ import { useToast } from '@/shared/components/ui/Toast';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { useClientDetail } from '@/modules/clients/api/clients.queries';
 import { useChangeProjectStatus } from '../api/projects.queries';
-import { useCloseSupportPlan, useSupportPlanSummary, useSupportPlansForClient } from '../api/support-plan.queries';
+import { useCloseSupportPlan, useSupportPlanSummary } from '../api/support-plan.queries';
 import { CloseSupportPlanDialog } from '../components/CloseSupportPlanDialog';
 import { SUPPORT_STATUS_OPTIONS, supportProjectStatusLabel, supportSubTabForStatus, type SupportSubTab } from '../lib/projects-list-search';
 import { useTicketsList } from '@/modules/tickets/api/tickets.queries';
@@ -52,13 +52,9 @@ export function SupportProjectDetailView({
   const canManageStatus = can('projects:manage');
   const clientId = project.client?.id ?? null;
   const { data: client } = useClientDetail(project.client?.id ?? null);
-  const { data: supportSummary, isLoading: loadingSummary } = useSupportPlanSummary(projectId);
-  const { data: clientPlans, error: plansError } = useSupportPlansForClient(canManageStatus ? clientId : null);
-  const projectPlans = clientPlans?.filter((plan) => plan.projectId === projectId) ?? [];
-  const activePlans = projectPlans.filter((plan) => plan.status === 'active');
-  const hasClosedPlan = projectPlans.some((plan) => plan.status === 'ended');
-  const activePlan = activePlans.length === 1 ? activePlans[0] : null;
-  const closePlan = useCloseSupportPlan(activePlan?.id ?? '', clientId ?? undefined);
+  const { data: supportSummary, isLoading: loadingSummary, error: summaryError } = useSupportPlanSummary(projectId);
+  const activePlanId = supportSummary?.planId ?? null;
+  const closePlan = useCloseSupportPlan(activePlanId ?? '', clientId ?? undefined);
   const [closing, setClosing] = useState(false);
   const visibleStatus = supportSubTabForStatus(project.status);
   const [ticketsPage, setTicketsPage] = useState(1);
@@ -78,21 +74,15 @@ export function SupportProjectDetailView({
 
   const onStatusChange = async (next: SupportSubTab) => {
     if (next === visibleStatus) return;
-    if (next === 'finished' && activePlan) {
-      setClosing(true);
-      return;
-    }
-    if (next === 'finished' && activePlans.length > 1) {
-      toast.error('Cierra los contratos activos antes de terminar el proyecto.');
-      return;
-    }
-    if (next === 'finished' && !hasClosedPlan) {
-      toast.error('Solo un soporte con contrato cerrado puede marcarse como terminado.');
-      return;
-    }
-    if (next === 'active' && activePlans.length === 0) {
-      toast.error('Se necesita un contrato activo para activar este soporte.');
-      return;
+    if (next === 'finished') {
+      if (loadingSummary || summaryError) {
+        toast.error('No se pudo verificar el contrato activo. Inténtalo de nuevo.');
+        return;
+      }
+      if (activePlanId) {
+        setClosing(true);
+        return;
+      }
     }
     const status: ProjectStatus = next === 'inactive' ? 'on_hold' : next;
     try {
@@ -102,16 +92,6 @@ export function SupportProjectDetailView({
       toast.error(caught instanceof ApiRequestError ? caught.message : 'No se pudo actualizar el estado del proyecto.');
     }
   };
-
-  const statusOptions = SUPPORT_STATUS_OPTIONS.map((option) => ({
-    ...option,
-    disabled:
-      (option.value === 'active' && visibleStatus !== 'active' && activePlans.length === 0) ||
-      (option.value === 'inactive' && visibleStatus === 'finished' && activePlans.length === 0) ||
-      (option.value === 'finished' &&
-        visibleStatus !== 'finished' &&
-        (activePlans.length > 1 || (activePlans.length === 0 && !hasClosedPlan))),
-  }));
 
   const ticketColumns: Column<TicketSummary>[] = [
     {
@@ -205,19 +185,10 @@ export function SupportProjectDetailView({
               <Select
                 className={styles.stateSelect}
                 aria-label="Cambiar estado"
-                options={statusOptions}
+                options={SUPPORT_STATUS_OPTIONS}
                 value={visibleStatus}
-                disabled={
-                  !clientPlans || Boolean(plansError) || changeStatus.isPending || closePlan.isPending || closing ||
-                  (visibleStatus === 'finished' && activePlans.length === 0)
-                }
-                helperText={
-                  plansError
-                    ? 'No se pudieron cargar los contratos.'
-                    : activePlans.length > 1
-                      ? 'Cierra los contratos activos para terminar este soporte.'
-                      : undefined
-                }
+                disabled={changeStatus.isPending || closePlan.isPending || closing}
+                helperText={summaryError ? 'No se pudo verificar el contrato activo para terminar este soporte.' : undefined}
                 onChange={(event) => void onStatusChange(event.target.value as SupportSubTab)}
               />
             ) : (
@@ -272,7 +243,7 @@ export function SupportProjectDetailView({
         open={closing}
         onClose={() => setClosing(false)}
         onConfirm={async (input) => {
-          if (!activePlan) throw new Error('Ya no hay un contrato activo para cerrar.');
+          if (!activePlanId) throw new Error('Ya no hay un contrato activo para cerrar.');
           await closePlan.mutateAsync(input);
           toast.success('Se cerró el contrato.');
         }}
