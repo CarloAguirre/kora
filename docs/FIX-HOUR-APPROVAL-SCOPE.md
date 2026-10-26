@@ -61,3 +61,26 @@ No se modifican permisos, roles, datos productivos, esquema ni migraciones.
 
 Las pruebas en Vitest son regresiones de helper frontend y del predicado
 SQL; antes de integrar deben ejecutarse build, typecheck, tests y QA en BD.
+
+
+## Ajuste complementario: listado de Soporte
+
+La página `ProjectsListPage` ahora presenta tres sub-pestañas con sus
+contadores y filtro de API independientes:
+
+| Pestaña | Filtro `projects.status` | Interpretación |
+| --- | --- | --- |
+| Activos | `active` | Proyecto administrativamente activo |
+| Terminados | `finished` | Proyecto cerrado/finalizado |
+| Inactivos | `cancelled` | «Inactivo» legado, mapeado a `cancelled` en Kora v2 |
+
+La fecha de término del contrato (`support_plans.end_date`) **no determina**
+por sí sola la pertenencia a «Terminados». En Kora el cierre explícito del
+plan de soporte (`CloseSupportPlanUseCase`) cambia el proyecto contenedor
+a `finished` únicamente cuando no existe otro plan activo vinculado.
+El vencimiento por fecha puede finalizar períodos mensuales pero no cambia
+automáticamente `projects.status`.
+
+La nueva pestaña usa el mismo `GET /projects` y la paginación existente;
+no requiere migración, cambio de contrato HTTP ni actualización de datos.
+El estado de navegación recuerda «Inactivos» al volver desde el detalle.
