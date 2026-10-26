@@ -4,12 +4,25 @@ import { DEFAULT_PAGE_SIZE } from '@/shared/components/ui/Pagination';
 
 export const PROJECTS_LIST_PATH = '/proyectos';
 
+/** La categoría Inactivos de la v1 se migró a status 'cancelled' en Kora 2. */
+export const SUPPORT_SUB_TABS = [
+  { id: 'active', label: 'Activos', status: 'active' },
+  { id: 'finished', label: 'Terminados', status: 'finished' },
+  { id: 'inactive', label: 'Inactivos', status: 'cancelled' },
+] as const satisfies ReadonlyArray<{ id: string; label: string; status: ProjectStatus }>;
+
+export type SupportSubTab = (typeof SUPPORT_SUB_TABS)[number]['id'];
+
+export function supportSubTabStatus(tab: SupportSubTab): ProjectStatus {
+  return SUPPORT_SUB_TABS.find((item) => item.id === tab)!.status;
+}
+
 /** Por defecto, primero los proyectos con más horas desviadas. */
 export const DEFAULT_PROJECTS_SORT: SortState<ProjectSortField> = { field: 'deviationHours', direction: 'desc' };
 
 export interface ProjectsListSearch {
   tab: 'development' | 'support';
-  supportSubTab: 'active' | 'finished';
+  supportSubTab: SupportSubTab;
   search: string;
   leaderUserIds: string[];
   statuses: ProjectStatus[];
