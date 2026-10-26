@@ -253,7 +253,7 @@ export class GetDashboardSummaryUseCase implements UseCase<GetDashboardSummaryCo
     }
 
     const page = await this.hourEntries.search(
-      { status: 'pending', visibleToUserIds, leaderScopeUserId },
+      { status: 'pending', visibleToUserIds, leaderScopeUserId, ...(leaderScopeUserId ? { excludeUserId: actor.userId } : {}) },
       { page: 1, pageSize: PENDING_APPROVALS_PAGE_SIZE },
       { field: 'date', direction: 'desc' },
     );
