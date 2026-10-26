@@ -1,7 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ChangeProjectStatusUseCase } from './change-project-status.use-case';
 import { Project } from '../../domain/entities/project.entity';
-import { CannotActivateProjectError, ManualHito0ReasonRequiredError } from '../../domain/errors/project.errors';
+import {
+  ActiveSupportContractMustBeClosedError,
+  CannotActivateProjectError,
+  ManualHito0ReasonRequiredError,
+  SupportContractRequiredForStatusError,
+} from '../../domain/errors/project.errors';
+import type { SupportContractStatusReader } from '../ports/support-contract-status-reader.port';
+import type { SupportPlanStatus, ProjectStatus } from '@kora/contracts';
 import type { ProjectRepository } from '../../domain/repositories/project.repository';
 import type { AuditRecorder } from '../../../../shared/application/ports/audit-recorder.port';
 import type { ProjectChangeLogRecorder } from '../services/project-change-log.recorder';
@@ -24,7 +31,7 @@ function buildApprovedDraftProject() {
   }).unwrap();
 }
 
-function buildUseCase(project: Project) {
+function buildUseCase(project: Project, contractStatuses: SupportPlanStatus[] = []) {
   const projects = {
     findById: vi.fn().mockResolvedValue(project),
     save: vi.fn().mockResolvedValue(undefined),
@@ -33,9 +40,18 @@ function buildUseCase(project: Project) {
   const changeLog = { record: vi.fn().mockResolvedValue(undefined) } as unknown as ProjectChangeLogRecorder;
 
   const paymentTriggers = { promoteAndNotify: vi.fn().mockResolvedValue(undefined) } as unknown as PaymentMilestoneTriggerService;
+  const supportContracts = {
+    statusesForProject: vi.fn().mockResolvedValue(contractStatuses),
+  } as unknown as SupportContractStatusReader;
 
-  const useCase = new ChangeProjectStatusUseCase(projects, audit, changeLog, new FixedClock(NOW), paymentTriggers);
-  return { useCase, projects, changeLog, paymentTriggers };
+  const useCase = new ChangeProjectStatusUseCase(projects, audit, changeLog, new FixedClock(NOW), paymentTriggers, supportContracts);
+  return { useCase, projects, changeLog, paymentTriggers, supportContracts };
+}
+
+function buildSupportProject(status: ProjectStatus = 'on_hold') {
+  return Project.create({
+    id: 'support-1', name: 'Soporte CPT', slug: 'soporte-cpt', type: 'support', status, now: NOW,
+  }).unwrap();
 }
 
 describe('ChangeProjectStatusUseCase — Hito 0 manual', () => {
@@ -146,5 +162,41 @@ describe('ChangeProjectStatusUseCase — Hito 0 manual', () => {
     });
 
     expect(paymentTriggers.promoteAndNotify).toHaveBeenCalledWith(expect.objectContaining({ status: 'finished' }));
+  });
+});
+
+describe('ChangeProjectStatusUseCase — contratos de soporte', () => {
+  const command = (status: ProjectStatus) => ({
+    projectId: 'support-1', data: { status }, actor: ACTOR, actorPermissions: ['projects:manage'] as const,
+  });
+
+  it('impide marcar Terminado mientras el contrato sigue activo', async () => {
+    const { useCase, projects } = buildUseCase(buildSupportProject(), ['active']);
+    const result = await useCase.execute(command('finished'));
+    expect(result.isErr() && result.error).toBeInstanceOf(ActiveSupportContractMustBeClosedError);
+    expect(projects.save).not.toHaveBeenCalled();
+  });
+
+  it('permite corregir a Terminado si el contrato ya se cerró', async () => {
+    const { useCase, projects } = buildUseCase(buildSupportProject(), ['ended']);
+    const result = await useCase.execute(command('finished'));
+    expect(result.isOk()).toBe(true);
+    expect((projects.save as ReturnType<typeof vi.fn>).mock.calls[0]?.[0].status).toBe('finished');
+  });
+
+  it('no termina un soporte sin contrato cerrado ni reactiva uno sin contrato activo', async () => {
+    const { useCase, projects } = buildUseCase(buildSupportProject(), []);
+    const result = await useCase.execute(command('finished'));
+    expect(result.isErr() && result.error).toBeInstanceOf(SupportContractRequiredForStatusError);
+    const activation = await useCase.execute(command('active'));
+    expect(activation.isErr() && activation.error).toBeInstanceOf(SupportContractRequiredForStatusError);
+    expect(projects.save).not.toHaveBeenCalled();
+  });
+
+  it('no reabre un soporte terminado mientras no tenga un contrato activo', async () => {
+    const { useCase, projects } = buildUseCase(buildSupportProject('finished'), ['ended']);
+    const result = await useCase.execute(command('on_hold'));
+    expect(result.isErr() && result.error).toBeInstanceOf(SupportContractRequiredForStatusError);
+    expect(projects.save).not.toHaveBeenCalled();
   });
 });
