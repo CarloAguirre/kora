@@ -4,6 +4,14 @@
   gap: var(--kora-space-3);
 }
 
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--kora-space-4);
+  flex-wrap: wrap;
+}
+
 .title {
   font-size: var(--kora-text-lg);
   font-weight: var(--kora-weight-bold);
@@ -21,7 +29,6 @@
 
 .legend {
   display: flex;
-  justify-content: center;
   gap: var(--kora-space-5);
   flex-wrap: wrap;
 }
@@ -40,4 +47,31 @@
   height: 10px;
   border-radius: 50%;
   flex-shrink: 0;
+}
+
+.tooltip {
+  background: var(--kora-surface);
+  border: 1px solid var(--kora-blue-200);
+  border-radius: var(--kora-radius-sm);
+  box-shadow: var(--kora-shadow);
+  padding: var(--kora-space-2) var(--kora-space-3);
+  font-size: var(--kora-text-sm);
+  color: var(--kora-text);
+}
+
+.tooltipTitle {
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-navy);
+  margin-bottom: var(--kora-space-1);
+}
+
+.tooltipMuted {
+  margin-top: var(--kora-space-1);
+  color: var(--kora-text-muted);
+}
+
+.tooltipDanger {
+  margin-top: var(--kora-space-1);
+  color: var(--kora-danger);
+  font-weight: var(--kora-weight-semibold);
 }

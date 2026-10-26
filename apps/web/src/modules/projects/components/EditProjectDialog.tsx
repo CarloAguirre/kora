@@ -318,7 +318,8 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
   // Mismo criterio que la sección equivalente de `NewProjectPage`: 1 = "Único", 2+ = "Consolidado".
   const savedClientId = project.client?.id ?? null;
   const { data: clientSupportPlans } = useSupportPlansForClient(open && !isDevelopment ? savedClientId : null);
-  const supportPlan = clientSupportPlans?.find((plan) => plan.projectId === project.id) ?? null;
+  // Solo el contrato vigente: el proyecto puede arrastrar contratos terminados y editar uno de esos no cambia nada visible.
+  const supportPlan = clientSupportPlans?.find((plan) => plan.projectId === project.id && plan.status === 'active') ?? null;
   const { data: supportPlanDetail } = useSupportPlanDetail(supportPlan?.id ?? null);
   const updateSupportPlan = useUpdateSupportPlan(supportPlan?.id ?? '', savedClientId ?? undefined);
   const { data: finishedProjects } = useProjectsList(
@@ -653,10 +654,13 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
       setPaymentPlanError(planError);
       if (planError) return;
     }
+    // Con contrato de soporte, las HH del proyecto son las del plan: se editan en "Contrato de soporte" y el backend las
+    // sincroniza al guardar el contrato — mandarlas acá dejaría HH vendidas y bolsa desalineadas.
+    const projectValues = supportPlan ? { ...values, soldHours: undefined, supportHours: undefined } : values;
     try {
       await updateProject.mutateAsync({
         projectId: project.id,
-        input: sendPaymentPlan ? { ...values, ...paymentPlanPayload(paymentPlan) } : values,
+        input: sendPaymentPlan ? { ...projectValues, ...paymentPlanPayload(paymentPlan) } : projectValues,
       });
       await applyPendingRemovals();
       if (supportPlan) {
@@ -880,17 +884,20 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
               disabled={estimationDisabled}
               {...register('endDate', { setValueAs: emptyToNull })}
             />
-            <TextField
-              label={hoursLabel}
-              type="number"
-              min={0}
-              // Desde el Hito 0 corren las horas vendidas: quedan fijas (`SoldHoursLockedAfterHito0Error`).
-              // Deshabilitado, react-hook-form no lo envía y `UpdateProjectUseCase` no toca `soldHours`.
-              disabled={soldHoursLocked || estimationDisabled}
-              helperText={soldHoursLocked ? 'No editable desde que el proyecto se activó (Hito 0).' : undefined}
-              errorText={errors.soldHours?.message}
-              {...register('soldHours')}
-            />
+            {/* En soporte con contrato, las HH se editan una sola vez en "Contrato de soporte" (bolsa / HH mensuales). */}
+            {!supportPlan && (
+              <TextField
+                label={hoursLabel}
+                type="number"
+                min={0}
+                // Desde el Hito 0 corren las horas vendidas: quedan fijas (`SoldHoursLockedAfterHito0Error`).
+                // Deshabilitado, react-hook-form no lo envía y `UpdateProjectUseCase` no toca `soldHours`.
+                disabled={soldHoursLocked || estimationDisabled}
+                helperText={soldHoursLocked ? 'No editable desde que el proyecto se activó (Hito 0).' : undefined}
+                errorText={errors.soldHours?.message}
+                {...register('soldHours')}
+              />
+            )}
           </div>
 
           {project.canAuthorizeOvertime && (

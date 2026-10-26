@@ -35,24 +35,20 @@
 
 .body {
   display: grid;
-  grid-template-columns: 1fr 200px;
+  grid-template-columns: 1fr 240px;
   gap: var(--kora-space-6);
   align-items: stretch;
 }
 
 .chartArea {
   min-width: 0;
-}
-
-.chartScroll {
-  overflow-x: auto;
+  margin-top: var(--kora-space-4);
 }
 
 .legend {
   display: flex;
-  justify-content: center;
   gap: var(--kora-space-5);
-  margin-top: var(--kora-space-3);
+  margin-bottom: var(--kora-space-3);
   flex-wrap: wrap;
 }
 
@@ -64,11 +60,194 @@
   color: var(--kora-text-muted);
 }
 
-.legendDot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+.legendSwatch {
+  width: 16px;
+  height: 10px;
+  border-radius: 2px;
   flex-shrink: 0;
+}
+
+.legendSold {
+  height: 14px;
+  background: var(--kora-blue-surface);
+  border-right: 2px solid var(--kora-navy);
+  border-radius: 2px 0 0 2px;
+}
+
+.legendUsed {
+  background: var(--kora-lime-mid);
+}
+
+.legendOver {
+  background: var(--kora-danger);
+}
+
+.empty {
+  padding: var(--kora-space-6) 0;
+  text-align: center;
+  font-size: var(--kora-text-sm);
+  color: var(--kora-text-muted);
+}
+
+/* Nombre | barra | valores | desvío — la misma grilla en el eje y en cada fila. */
+.axisRow,
+.row {
+  display: grid;
+  grid-template-columns: minmax(160px, 300px) minmax(0, 1fr) 120px 84px;
+  column-gap: var(--kora-space-4);
+  align-items: center;
+}
+
+.axisRow {
+  padding-bottom: var(--kora-space-2);
+  border-bottom: 1px solid var(--kora-surface-disabled);
+}
+
+.axis {
+  position: relative;
+  height: 14px;
+}
+
+.axisTick {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  font-size: var(--kora-text-2xs);
+  color: var(--kora-text-muted);
+  white-space: nowrap;
+}
+
+.axisTick:first-child {
+  transform: none;
+}
+
+.axisTick:last-child {
+  transform: translateX(-100%);
+}
+
+.columnHeading {
+  font-size: var(--kora-text-2xs);
+  color: var(--kora-text-muted);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.row {
+  min-height: 46px;
+  border-radius: var(--kora-radius-sm);
+}
+
+.row:hover {
+  background: var(--kora-surface-alt);
+}
+
+.rowLabel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding-left: var(--kora-space-2);
+}
+
+.rowName,
+.rowClient {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowName {
+  font-size: var(--kora-text-sm);
+  color: var(--kora-text);
+}
+
+.rowClient {
+  font-size: var(--kora-text-2xs);
+  color: var(--kora-text-muted);
+}
+
+.track {
+  position: relative;
+  height: 22px;
+}
+
+.gridLine {
+  position: absolute;
+  top: -9px;
+  bottom: -9px;
+  width: 1px;
+  background: var(--kora-surface-disabled);
+}
+
+.soldBar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  background: var(--kora-blue-surface);
+  border-radius: 2px 0 0 2px;
+}
+
+.usedBar,
+.overBar {
+  position: absolute;
+  top: 5px;
+  bottom: 5px;
+}
+
+.usedBar {
+  left: 0;
+  background: var(--kora-lime-mid);
+  border-radius: 2px 0 0 2px;
+}
+
+.usedBarNeutral {
+  background: var(--kora-blue-400);
+  border-radius: 2px 4px 4px 2px;
+}
+
+.overBar {
+  background: var(--kora-danger);
+  border-radius: 0 4px 4px 0;
+}
+
+/* Marca de "meta": dónde terminan las horas vendidas. */
+.soldMarker {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--kora-navy);
+}
+
+.rowValue,
+.rowStatus {
+  font-size: var(--kora-text-sm);
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.rowValue {
+  color: var(--kora-text);
+}
+
+.rowStatus {
+  padding-right: var(--kora-space-2);
+  color: var(--kora-text-muted);
+}
+
+.rowStatusDanger {
+  color: var(--kora-danger);
+  font-weight: var(--kora-weight-semibold);
 }
 
 .indicators {
@@ -105,32 +284,53 @@
   color: var(--kora-navy);
 }
 
-.indicatorValue.brand {
-  color: var(--kora-lime-dark);
-}
-
 .indicatorValue.danger {
   color: var(--kora-danger);
 }
 
-.tooltip {
-  background: var(--kora-surface);
-  border: 1px solid var(--kora-blue-200);
-  border-radius: var(--kora-radius-sm);
-  box-shadow: var(--kora-shadow);
-  padding: var(--kora-space-2) var(--kora-space-3);
-  font-size: var(--kora-text-sm);
-  color: var(--kora-text);
+.indicatorValueSecondary {
+  font-size: var(--kora-text-lg);
+  font-weight: var(--kora-weight-semibold);
+  color: var(--kora-text-muted);
 }
 
-.tooltipTitle {
-  font-weight: var(--kora-weight-bold);
-  color: var(--kora-navy);
-  margin-bottom: var(--kora-space-1);
+.indicatorInfo {
+  display: inline-flex;
+  margin-left: var(--kora-space-1);
+  vertical-align: -2px;
+  color: var(--kora-text-muted);
+  cursor: help;
 }
 
-.tooltipDanger {
+.indicatorHint {
+  font-size: var(--kora-text-xs);
+  color: var(--kora-text-muted);
+}
+
+.indicatorHintDanger {
   color: var(--kora-danger);
+  font-weight: var(--kora-weight-semibold);
+}
+
+/* Mini "bullet" del total: reutiliza las barras de las filas. */
+.meter {
+  position: relative;
+  height: 18px;
+  margin: var(--kora-space-1) 0;
+}
+
+.meter .usedBar,
+.meter .overBar {
+  top: 4px;
+  bottom: 4px;
+}
+
+@media (max-width: 1100px) {
+  .axisRow,
+  .row {
+    grid-template-columns: minmax(120px, 160px) minmax(0, 1fr) 100px 72px;
+    column-gap: var(--kora-space-3);
+  }
 }
 
 @media (max-width: 768px) {
