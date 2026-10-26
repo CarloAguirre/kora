@@ -21,9 +21,10 @@ import {
   useRejectHourEntries,
   type BulkDecisionResult,
 } from '../api/hours.queries';
-import { resolvedApprover } from '../lib/approver';
+import { canDecideHourEntry, resolvedApprover } from '../lib/approver';
 import { canEditAnyMonth, isInCurrentMonth } from '../lib/edit-window';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
+import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 
 const formatDate = (value: string) => new Date(`${value}T00:00:00`).toLocaleDateString('es-CL', { weekday: 'short', day: '2-digit', month: 'short' });
 const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 2 });
@@ -71,6 +72,7 @@ export function HourEntriesApprovalTable({
   groupByUser?: boolean;
 }) {
   const { user } = useAuth();
+  const { can } = usePermissions();
   const toast = useToast();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [collapsedLeaders, setCollapsedLeaders] = useState<Set<string>>(new Set());
@@ -103,14 +105,16 @@ export function HourEntriesApprovalTable({
   const bulkRunning = approveEntries.isPending || rejectEntries.isPending;
 
   const entries = data?.items ?? [];
-  const allSelected = entries.length > 0 && entries.every((entry) => selected.has(entry.id));
+  const canActOn = (entry: HourEntrySummary) => canDecideHourEntry(entry, user, can('hours:approve'));
+  const approvableEntries = entries.filter(canActOn);
+  const allSelected = approvableEntries.length > 0 && approvableEntries.every((entry) => selected.has(entry.id));
   // `selected` puede arrastrar IDs que ya no están en la cola (aprobados en una
   // tanda que falló a medias, de otra página, o resueltos por otro aprobador):
   // las acciones masivas solo actúan sobre lo seleccionado que sigue visible.
-  const selectedEntries = entries.filter((entry) => selected.has(entry.id));
+  const selectedEntries = approvableEntries.filter((entry) => selected.has(entry.id));
   const selectedHours = selectedEntries.reduce((sum, entry) => sum + entry.hours, 0);
 
-  const toggleAll = () => setSelected(allSelected ? new Set() : new Set(entries.map((entry) => entry.id)));
+  const toggleAll = () => setSelected(allSelected ? new Set() : new Set(approvableEntries.map((entry) => entry.id)));
   const toggleOne = (id: string) =>
     setSelected((prev) => {
       const next = new Set(prev);
@@ -119,10 +123,12 @@ export function HourEntriesApprovalTable({
       return next;
     });
   const toggleGroup = (groupEntries: HourEntrySummary[]) => {
-    const allGroupSelected = groupEntries.every((entry) => selected.has(entry.id));
+    const allowedEntries = groupEntries.filter(canActOn);
+    if (allowedEntries.length === 0) return;
+    const allGroupSelected = allowedEntries.every((entry) => selected.has(entry.id));
     setSelected((prev) => {
       const next = new Set(prev);
-      for (const entry of groupEntries) {
+      for (const entry of allowedEntries) {
         if (allGroupSelected) next.delete(entry.id);
         else next.add(entry.id);
       }
@@ -226,7 +232,7 @@ export function HourEntriesApprovalTable({
       header: '',
       width: '40px',
       render: (entry) => (
-        <input type="checkbox" checked={selected.has(entry.id)} onChange={() => toggleOne(entry.id)} aria-label={`Seleccionar ${entry.user.fullName}`} />
+        <input type="checkbox" checked={selected.has(entry.id) && canActOn(entry)} disabled={!canActOn(entry)} onChange={() => toggleOne(entry.id)} aria-label={`Seleccionar ${entry.user.fullName}`} />
       ),
     },
     ...(groupByUser
@@ -300,17 +306,20 @@ export function HourEntriesApprovalTable({
           <DropdownMenu
             items={[
               { key: 'ver', label: 'Ver detalle', onSelect: () => setViewing(entry) },
-              ...(canEditAnyMonth(user?.role) || isInCurrentMonth(entry.date) ? [{ key: 'editar', label: 'Editar', onSelect: () => setEditing(entry) }] : []),
-              { key: 'aprobar', label: 'Aprobar', tone: 'success', onSelect: () => void approveOne(entry) },
-              {
-                key: 'rechazar',
-                label: 'Rechazar',
-                tone: 'danger',
-                onSelect: () => {
-                  setSelected(new Set([entry.id]));
-                  setRejecting(true);
+              ...(canActOn(entry) ? [
+                ...(canEditAnyMonth(user?.role) || isInCurrentMonth(entry.date)
+                  ? [{ key: 'editar', label: 'Editar', onSelect: () => setEditing(entry) }] : []),
+                { key: 'aprobar', label: 'Aprobar', tone: 'success' as const, onSelect: () => void approveOne(entry) },
+                {
+                  key: 'rechazar',
+                  label: 'Rechazar',
+                  tone: 'danger' as const,
+                  onSelect: () => {
+                    setSelected(new Set([entry.id]));
+                    setRejecting(true);
+                  },
                 },
-              },
+              ] : []),
             ]}
             trigger={({ onClick }) => (
               <Button variant="ghost" size="icon" onClick={onClick} aria-label={`Acciones — ${entry.user.fullName}`} title="Acciones">
@@ -325,7 +334,7 @@ export function HourEntriesApprovalTable({
 
   return (
     <div className={styles.wrapper}>
-      {entries.length > 0 && (
+      {approvableEntries.length > 0 && (
         <button type="button" className={styles.selectAll} onClick={toggleAll}>
           {allSelected ? 'Quitar selección' : 'Seleccionar todas'}
         </button>
@@ -345,7 +354,8 @@ export function HourEntriesApprovalTable({
         <div className={styles.leaderGroups}>
           {leaderGroups.map((leader) => {
             const leaderHours = leader.entries.reduce((sum, entry) => sum + entry.hours, 0);
-            const leaderSelected = leader.entries.every((entry) => selected.has(entry.id));
+            const allowedLeaderEntries = leader.entries.filter(canActOn);
+            const leaderSelected = allowedLeaderEntries.length > 0 && allowedLeaderEntries.every((entry) => selected.has(entry.id));
             const collapsed = collapsedLeaders.has(leader.key);
             return (
               <div key={leader.key} className={styles.leaderGroup}>
@@ -353,6 +363,7 @@ export function HourEntriesApprovalTable({
                   <input
                     type="checkbox"
                     checked={leaderSelected}
+                    disabled={allowedLeaderEntries.length === 0}
                     onChange={() => toggleGroup(leader.entries)}
                     aria-label={`Seleccionar todas las horas que aprueba ${leader.leaderName}`}
                   />
