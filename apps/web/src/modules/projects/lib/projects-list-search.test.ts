@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_PROJECTS_LIST_SEARCH,
   SUPPORT_SUB_TABS,
-  supportSubTabStatus,
+  supportSubTabStatuses,
   RESTORE_PROJECTS_LIST_STATE,
   initialProjectsListSearch,
   rememberProjectsListSearch,
@@ -24,10 +24,10 @@ describe('projects-list-search', () => {
     ]);
   });
 
-  it('Inactivos corresponde a cancelled, no a vencimiento de contrato', () => {
-    expect(supportSubTabStatus('active')).toBe('active');
-    expect(supportSubTabStatus('finished')).toBe('finished');
-    expect(supportSubTabStatus('inactive')).toBe('cancelled');
+  it('cada soporte no terminado pertenece a una pestaña según su estado', () => {
+    expect(supportSubTabStatuses('active')).toEqual(['active']);
+    expect(supportSubTabStatuses('finished')).toEqual(['finished']);
+    expect(supportSubTabStatuses('inactive')).toEqual(['draft', 'on_hold', 'cancelled']);
   });
 
   it('restaura la pestaña Inactivos cuando se vuelve desde una ficha', () => {
