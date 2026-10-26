@@ -8,6 +8,7 @@ import { DataTable, type Column } from '@/shared/components/ui/DataTable';
 import { HourEntryStatusBadge } from '@/modules/hours/components/HourEntryStatusBadge';
 import { useHourEntriesList } from '@/modules/hours/api/hours.queries';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
+import { resolvedApprover } from '@/modules/hours/lib/approver';
 
 function mondayOf(date: Date): Date {
   const result = new Date(date);
@@ -81,7 +82,7 @@ export function RecentHistoryCard({ weekStart, onWeekStartChange }: RecentHistor
       key: 'approver',
       header: 'Aprobador',
       render: (e) => {
-        const names = e.designatedApprover ? [e.designatedApprover.fullName] : e.projectApprovers.map((a) => a.fullName);
+        const names = e.project ? e.projectApprovers.map((a) => a.fullName) : (resolvedApprover(e) ? [resolvedApprover(e)!.fullName] : []);
         return names.length > 0 ? names.join(', ') : <span className={styles.empty}>—</span>;
       },
     },
