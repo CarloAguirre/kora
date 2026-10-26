@@ -96,3 +96,9 @@ queda otro contrato activo, el proyecto permanece en su estado anterior hasta
 cerrar el último. La API impide marcar terminado directamente mientras exista
 un contrato activo y solo permite corregir a terminado un soporte cuyo contrato
 ya esté cerrado. Tampoco permite reactivar un soporte sin contrato activo.
+
+La ficha obtiene el ID del contrato activo de su resumen por proyecto (que ya
+alimenta las horas), sin depender del listado de todos los contratos del cliente.
+El `projectId` de la URL puede ser un slug, por lo que no se compara con el UUID
+del contrato. Si no hay contrato activo, la API valida el cambio a Terminado;
+un fallo en el resumen no bloquea el cambio a Inactivo.

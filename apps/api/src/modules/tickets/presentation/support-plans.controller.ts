@@ -11,7 +11,7 @@ import {
   type MarkSupportInvoiceIssuedInput,
   type SupportPlanListItem,
   type SupportPlanWithInvoices,
-  type SupportProjectSummary,
+  type SupportProjectDetailSummary,
   type UpdateSupportPlanInput,
 } from '@kora/contracts';
 import { RequirePermissions } from '../../../shared/presentation/decorators/require-permissions.decorator';
@@ -43,7 +43,7 @@ export class SupportPlansController {
 
   @Get('project/:projectId')
   @RequirePermissions('projects:read')
-  async summaryForProject(@Param('projectId') projectId: string): Promise<SupportProjectSummary | null> {
+  async summaryForProject(@Param('projectId') projectId: string): Promise<SupportProjectDetailSummary | null> {
     return unwrapOrThrow(await this.getSummary.execute({ projectId }));
   }
 
