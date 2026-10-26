@@ -9,6 +9,7 @@ import { TICKET_HISTORY_REPOSITORY, type TicketHistoryRepository } from '../../d
 import { TICKET_HH_REQUEST_REPOSITORY, type TicketHhRequestRepository } from '../../domain/repositories/ticket-hh-request.repository';
 import { TICKET_PROJECT_READER, type TicketProjectReader } from '../ports/ticket-project-reader.port';
 import { HOUR_ENTRY_REPOSITORY, type HourEntryRepository } from '../../../hours/domain/repositories/hour-entry.repository';
+import { HOUR_ENTRY_PROJECT_READER, type HourEntryProjectReader } from '../../../hours/application/ports/hour-entry-project-reader.port';
 import { buildTicketHourEntry } from '../support/build-ticket-hour-entry';
 import { AUDIT_RECORDER, type AuditRecorder } from '../../../../shared/application/ports/audit-recorder.port';
 import type { ActorContext, UseCase } from '../../../../shared/application/use-case';
@@ -70,6 +71,7 @@ export class CreateTicketHhRequestUseCase implements UseCase<CreateTicketHhReque
     @Inject(TICKET_HH_REQUEST_REPOSITORY) private readonly requests: TicketHhRequestRepository,
     @Inject(TICKET_PROJECT_READER) private readonly projects: TicketProjectReader,
     @Inject(HOUR_ENTRY_REPOSITORY) private readonly hourEntries: HourEntryRepository,
+    @Inject(HOUR_ENTRY_PROJECT_READER) private readonly hourProjects: HourEntryProjectReader,
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
     @Inject(CLOCK) private readonly clock: Clock,
     @Inject(ID_GENERATOR) private readonly ids: IdGenerator,
@@ -151,6 +153,9 @@ export class CreateTicketHhRequestUseCase implements UseCase<CreateTicketHhReque
     if (isApprover) {
       ticket.recordUsedHours(ticket.usedHours + data.hours, now);
       await this.tickets.save(ticket);
+      // Las horas nacen aprobadas: cuentan ya en el consumo del proyecto, igual que al aprobar en Horas.
+      const usedHours = await this.hourEntries.sumApprovedHoursForProject(ticket.projectId);
+      await this.hourProjects.recalculateUsedHours(ticket.projectId, usedHours);
     }
 
     await this.history.append({

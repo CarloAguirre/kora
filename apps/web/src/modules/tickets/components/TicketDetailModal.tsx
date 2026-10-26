@@ -427,6 +427,11 @@ export function TicketDetailModal({ ticketId, onClose }: { ticketId: string; onC
               open={deleteOpen}
               title="Eliminar ticket"
               description={`¿Eliminar el ticket "${ticket.title}"? Esta acción no se puede deshacer.`}
+              warning={
+                hhRequests && hhRequests.length > 0
+                  ? `También se eliminarán las ${formatHours(hhRequests.reduce((sum, request) => sum + request.hours, 0))} HH registradas en este ticket.`
+                  : null
+              }
               confirmLabel="Eliminar"
               destructive
               onClose={() => setDeleteOpen(false)}

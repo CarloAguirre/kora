@@ -8,6 +8,7 @@ import type { TicketHhRequestRepository } from '../../domain/repositories/ticket
 import type { TicketProjectReader } from '../ports/ticket-project-reader.port';
 import type { HourEntry } from '../../../hours/domain/entities/hour-entry.entity';
 import type { HourEntryRepository } from '../../../hours/domain/repositories/hour-entry.repository';
+import type { HourEntryProjectReader } from '../../../hours/application/ports/hour-entry-project-reader.port';
 import { FixedClock, RecordingAuditRecorder, SequentialIdGenerator } from '../../../../test/fakes';
 import type { ActorContext } from '../../../../shared/application/use-case';
 
@@ -65,6 +66,7 @@ function buildUseCase(options: { regularHours?: number } = {}) {
     requests as unknown as TicketHhRequestRepository,
     new StubTicketProjectReader() as unknown as TicketProjectReader,
     hourEntries as unknown as HourEntryRepository,
+    { recalculateUsedHours: async () => {} } as unknown as HourEntryProjectReader,
     new RecordingAuditRecorder(),
     new FixedClock(NOW),
     new SequentialIdGenerator(),

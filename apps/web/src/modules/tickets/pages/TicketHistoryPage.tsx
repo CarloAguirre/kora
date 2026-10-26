@@ -298,6 +298,7 @@ export function TicketHistoryPage() {
         open={deleteTarget !== null}
         title="Eliminar ticket"
         description={`¿Eliminar el ticket "${deleteTarget?.title ?? ''}"? Esta acción no se puede deshacer.`}
+        warning={deleteTarget && deleteTarget.usedHours > 0 ? 'También se eliminarán las HH registradas en este ticket.' : null}
         confirmLabel="Eliminar"
         destructive
         onClose={() => setDeleteTarget(null)}
