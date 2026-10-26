@@ -72,7 +72,7 @@ contadores y filtro de API independientes:
 | --- | --- | --- |
 | Activos | `active` | Proyecto administrativamente activo |
 | Terminados | `finished` | Proyecto cerrado/finalizado |
-| Inactivos | `cancelled` | «Inactivo» legado, mapeado a `cancelled` en Kora v2 |
+| Inactivos | `draft`, `on_hold`, `cancelled` | Soporte no iniciado, detenido o cancelado (incluye «Inactivo» legado) |
 
 La fecha de término del contrato (`support_plans.end_date`) **no determina**
 por sí sola la pertenencia a «Terminados». En Kora el cierre explícito del
