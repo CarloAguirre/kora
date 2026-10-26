@@ -13,8 +13,23 @@ export const SUPPORT_SUB_TABS = [
 
 export type SupportSubTab = (typeof SUPPORT_SUB_TABS)[number]['id'];
 
+/** La ficha de soporte presenta los mismos tres grupos que el listado. */
+export const SUPPORT_STATUS_OPTIONS: ReadonlyArray<{ value: SupportSubTab; label: string }> = [
+  { value: 'active', label: 'Activo' },
+  { value: 'inactive', label: 'Inactivo' },
+  { value: 'finished', label: 'Terminado' },
+];
+
 export function supportSubTabStatuses(tab: SupportSubTab): ProjectStatus[] {
   return [...SUPPORT_SUB_TABS.find((item) => item.id === tab)!.statuses];
+}
+
+export function supportSubTabForStatus(status: ProjectStatus): SupportSubTab {
+  return SUPPORT_SUB_TABS.find((item) => (item.statuses as readonly ProjectStatus[]).includes(status))!.id;
+}
+
+export function supportProjectStatusLabel(status: ProjectStatus): string {
+  return SUPPORT_STATUS_OPTIONS.find((item) => item.value === supportSubTabForStatus(status))!.label;
 }
 
 /** Por defecto, primero los proyectos con más horas desviadas. */
