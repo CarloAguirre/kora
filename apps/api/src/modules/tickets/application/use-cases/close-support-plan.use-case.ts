@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { CLOCK, err, ok, type ApplicationError, type Clock, type Result } from '@kora/core';
+import { CLOCK, UNIT_OF_WORK, err, ok, type ApplicationError, type Clock, type Result, type TransactionContext, type UnitOfWork } from '@kora/core';
 import type { CloseSupportPlanInput } from '@kora/contracts';
 import { PROJECT_REPOSITORY, type ProjectRepository } from '../../../projects/domain/repositories/project.repository';
 import { SupportPlanNotFoundError } from '../../domain/errors/support-plan.errors';
@@ -20,6 +20,7 @@ export class CloseSupportPlanUseCase implements UseCase<CloseSupportPlanCommand,
     @Inject(PROJECT_REPOSITORY) private readonly projects: ProjectRepository,
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
     @Inject(CLOCK) private readonly clock: Clock,
+    @Inject(UNIT_OF_WORK) private readonly unitOfWork: UnitOfWork,
   ) {}
 
   async execute(command: CloseSupportPlanCommand): Promise<Result<void, ApplicationError>> {
@@ -31,8 +32,12 @@ export class CloseSupportPlanUseCase implements UseCase<CloseSupportPlanCommand,
     const closed = plan.close(new Date(data.closedAt), data.closeReason, now);
     if (closed.isErr()) return err(closed.error);
 
-    await this.plans.save(plan);
-    await this.finishContainerProject(plan.projectId, now);
+    // El contrato y su proyecto deben cambiar juntos: si falla cualquiera de
+    // las dos escrituras, no puede quedar un contrato cerrado en Inactivos.
+    await this.unitOfWork.run(async (tx) => {
+      await this.plans.save(plan, tx);
+      await this.finishContainerProject(plan.projectId, now, tx);
+    });
     await this.audit.record({
       actor: { userId: actor.userId, email: actor.email },
       action: 'status_change',
@@ -50,12 +55,12 @@ export class CloseSupportPlanUseCase implements UseCase<CloseSupportPlanCommand,
    * activo siga usando ese mismo proyecto (legados renovados: un contrato
    * `ended` y uno `active` sobre el mismo contenedor).
    */
-  private async finishContainerProject(projectId: string | null, now: Date): Promise<void> {
+  private async finishContainerProject(projectId: string | null, now: Date, tx: TransactionContext): Promise<void> {
     if (!projectId) return;
-    if (await this.plans.findActiveForProjectOrLinked(projectId)) return;
-    const project = await this.projects.findById(projectId);
+    if (await this.plans.findActiveForProjectOrLinked(projectId, tx)) return;
+    const project = await this.projects.findById(projectId, tx);
     if (!project || project.isDeleted || project.type !== 'support' || project.status === 'finished') return;
     project.changeStatus('finished', now);
-    await this.projects.save(project);
+    await this.projects.save(project, tx);
   }
 }
