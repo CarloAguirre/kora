@@ -310,9 +310,13 @@ describe('EditProjectDialog', () => {
     expect(onSuccess).toHaveBeenCalledWith('Se actualizaron los datos de Proyecto renombrado.');
   });
 
-  it('muestra el tipo de soporte del contrato y guarda el cambio en el contrato', async () => {
+  it('muestra el tipo de soporte del contrato vigente y guarda el cambio en el contrato', async () => {
     supportPlansForClientMock.mockReturnValue({
-      data: [{ id: 'plan-1', projectId: 'project-1', planType: 'monthly', surplusPolicy: 'accumulate', contractedHours: 10 }],
+      data: [
+        // Un contrato terminado del mismo proyecto no debe ser el que se edita.
+        { id: 'plan-0', projectId: 'project-1', status: 'ended', planType: 'bundle', surplusPolicy: null, contractedHours: 0 },
+        { id: 'plan-1', projectId: 'project-1', status: 'active', planType: 'monthly', surplusPolicy: 'accumulate', contractedHours: 10 },
+      ],
     });
     const user = userEvent.setup();
     renderDialog({
@@ -326,6 +330,8 @@ describe('EditProjectDialog', () => {
     expect(screen.getByRole('radio', { name: 'Mensual' })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('radio', { name: SUPPORT_SURPLUS_POLICY_LABELS.accumulate })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByLabelText('Cantidad de HH mensuales')).toHaveValue(10);
+    // Las HH del contenedor son las del plan: no hay un segundo campo "HH vendidas" que pueda contradecirlas.
+    expect(screen.queryByLabelText('HH vendidas')).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('radio', { name: 'Bolsa' }));
     // La política de excedente es solo de los planes mensuales.
@@ -338,6 +344,9 @@ describe('EditProjectDialog', () => {
     await waitFor(() =>
       expect(updateSupportPlanMutateAsync).toHaveBeenCalledWith({ planType: 'bundle', surplusPolicy: null, contractedHours: 40 }),
     );
+    const projectInput = mutateAsync.mock.calls.at(-1)?.[0].input;
+    expect(projectInput.soldHours).toBeUndefined();
+    expect(projectInput.supportHours).toBeUndefined();
     supportPlansForClientMock.mockReturnValue({ data: [] });
   });
 });
