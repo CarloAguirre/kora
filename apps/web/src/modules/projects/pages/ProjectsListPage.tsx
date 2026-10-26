@@ -30,9 +30,12 @@ import { formatProgressPercent } from '../lib/project-progress-display';
 import { exportDevelopmentProjects, exportSupportProjects } from '../lib/project-export';
 import {
   DEFAULT_PROJECTS_SORT,
+  SUPPORT_SUB_TABS,
+  supportSubTabStatus,
   initialProjectsListSearch,
   rememberProjectsListSearch,
   type ProjectsListSearch,
+  type SupportSubTab,
 } from '../lib/projects-list-search';
 import { useDeleteProject, useProjectsList } from '../api/projects.queries';
 import { projectsApi } from '../api/projects.api';
@@ -51,10 +54,6 @@ const PHASE_OPTIONS = PROJECT_PHASES.map((phase) => ({ value: phase, label: PROJ
 const TABS = [
   { id: 'development', label: 'Proyectos Desarrollo' },
   { id: 'support', label: 'Soporte' },
-] as const;
-const SUPPORT_SUB_TABS = [
-  { id: 'active', label: 'Activos' },
-  { id: 'finished', label: 'Terminados' },
 ] as const;
 const EXPORT_PAGE_SIZE = 200;
 
@@ -77,7 +76,7 @@ const DATE_COLUMN_WIDTH = '120px';
  * v1. La tab Desarrollo lleva los filtros Líder/Estado/Etapa/Buscar, los tres
  * primeros con selección múltiple (`MultiSelect`, checkboxes + búsqueda),
  * igual que en la v1; la tab Soporte, igual que en la v1, no lleva esos filtros — solo el
- * sub-selector Activos/Terminados y Buscar. Sin el filtro de
+ * sub-selector Activos/Terminados/Inactivos y Buscar. Sin el filtro de
  * Período/Detalle del gráfico, que depende de datos que aún no existen
  * (registro de horas por fecha — M4). La creación y la ficha completa se
  * abordan en la ficha de detalle.
@@ -112,7 +111,7 @@ export function ProjectsListPage() {
       : {
           type: tab,
           search: search || undefined,
-          status: [supportSubTab],
+          status: [supportSubTabStatus(supportSubTab)],
         };
 
   const { data, isLoading, error } = useProjectsList({
@@ -122,7 +121,7 @@ export function ProjectsListPage() {
     sortField: sort.field,
     sortDirection: sort.direction,
   });
-  // Totales de las sub-pestañas Activos/Terminados de Soporte: solo interesa
+  // Totales de Activos/Terminados/Inactivos de Soporte: solo interesa
   // `total`, así que basta con una página de 1. Respetan el Buscar para que
   // coincidan con lo que muestra la tabla al cambiar de pestaña.
   const supportCountQuery = { type: 'support' as const, search: search || undefined, page: 1, pageSize: 1 };
@@ -134,8 +133,17 @@ export function ProjectsListPage() {
     { ...supportCountQuery, status: ['finished'] },
     { enabled: tab === 'support' },
   );
+  const { data: supportInactiveCount } = useProjectsList(
+    { ...supportCountQuery, status: ['cancelled'] },
+    { enabled: tab === 'support' },
+  );
+  const supportCountByTab = {
+    active: supportActiveCount?.total,
+    finished: supportFinishedCount?.total,
+    inactive: supportInactiveCount?.total,
+  };
   const supportSubTabs = SUPPORT_SUB_TABS.map((subTab) => {
-    const total = (subTab.id === 'active' ? supportActiveCount : supportFinishedCount)?.total;
+    const total = supportCountByTab[subTab.id];
     return { id: subTab.id, label: total === undefined ? subTab.label : `${subTab.label} (${total})` };
   });
   const { data: clients } = useClientsList({ page: 1, pageSize: 200, sortField: 'companyName' });
@@ -153,7 +161,7 @@ export function ProjectsListPage() {
   const changeTab = (id: string) =>
     updateListSearch({ tab: id as 'development' | 'support', sort: DEFAULT_PROJECTS_SORT, page: 1 });
 
-  const changeSupportSubTab = (id: string) => updateListSearch({ supportSubTab: id as 'active' | 'finished', page: 1 });
+  const changeSupportSubTab = (id: string) => updateListSearch({ supportSubTab: id as SupportSubTab, page: 1 });
 
   const toggleSort = (field: string) =>
     updateListSearch({
