@@ -31,7 +31,7 @@ import { exportDevelopmentProjects, exportSupportProjects } from '../lib/project
 import {
   DEFAULT_PROJECTS_SORT,
   SUPPORT_SUB_TABS,
-  supportSubTabStatus,
+  supportSubTabStatuses,
   initialProjectsListSearch,
   rememberProjectsListSearch,
   type ProjectsListSearch,
@@ -111,7 +111,7 @@ export function ProjectsListPage() {
       : {
           type: tab,
           search: search || undefined,
-          status: [supportSubTabStatus(supportSubTab)],
+          status: supportSubTabStatuses(supportSubTab),
         };
 
   const { data, isLoading, error } = useProjectsList({
@@ -134,7 +134,7 @@ export function ProjectsListPage() {
     { enabled: tab === 'support' },
   );
   const { data: supportInactiveCount } = useProjectsList(
-    { ...supportCountQuery, status: ['cancelled'] },
+    { ...supportCountQuery, status: supportSubTabStatuses('inactive') },
     { enabled: tab === 'support' },
   );
   const supportCountByTab = {
