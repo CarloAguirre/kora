@@ -8,6 +8,7 @@ import type {
   UpdateSupportPlanInput,
 } from '@kora/contracts';
 import { supportPlanApi, supportPlanKeys } from './support-plan.api';
+import { projectKeys } from './projects.api';
 
 export function useSupportPlanSummary(projectId: string | null) {
   return useQuery({
@@ -72,9 +73,15 @@ export function useUpdateSupportPlan(planId: string, clientId?: string) {
 
 export function useCloseSupportPlan(planId: string, clientId?: string) {
   const invalidate = useInvalidateSupportPlans(clientId);
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: CloseSupportPlanInput) => supportPlanApi.close(planId, input),
-    onSuccess: () => invalidate(),
+    onSuccess: () => {
+      invalidate();
+      // El cierre también termina el proyecto contenedor si no queda otro contrato activo.
+      void queryClient.invalidateQueries({ queryKey: projectKeys.all });
+      void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    },
   });
 }
 

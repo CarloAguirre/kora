@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import { PROJECT_PHASE_LABELS, PROJECT_STATUS_LABELS, type ProjectDetail } from '@kora/contracts';
+import { supportProjectStatusLabel } from '../lib/projects-list-search';
 import styles from './TeamLeaderProjectView.module.css';
 import { Button } from '@/shared/components/ui/Button';
 import { Card } from '@/shared/components/ui/Card';
@@ -211,7 +212,9 @@ export function TeamLeaderProjectView({
           </div>
           <div>
             <span className={styles.infoLabel}>Estado del proyecto</span>
-            <span className={styles.chip}>{PROJECT_STATUS_LABELS[project.status]}</span>
+            <span className={styles.chip}>
+              {project.type === 'support' ? supportProjectStatusLabel(project.status) : PROJECT_STATUS_LABELS[project.status]}
+            </span>
           </div>
           <div>
             <span className={styles.infoLabel}>Etapa de avance</span>
