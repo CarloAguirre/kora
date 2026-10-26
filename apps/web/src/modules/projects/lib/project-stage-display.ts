@@ -1,4 +1,5 @@
 import { PROJECT_PHASE_LABELS, PROJECT_SALES_STAGE_LABELS, type ProjectSummary } from '@kora/contracts';
+import { supportProjectStatusLabel } from './projects-list-search';
 
 /**
  * Etiqueta de "Etapa de avance" para la columna del listado.
@@ -11,12 +12,12 @@ import { PROJECT_PHASE_LABELS, PROJECT_SALES_STAGE_LABELS, type ProjectSummary }
  * prioridad simple, sin reconstruir esa lógica confusa.
  */
 export function getProjectStageLabel(project: Pick<ProjectSummary, 'status' | 'type' | 'salesStage' | 'phase'>): string {
+  if (project.type === 'support') return supportProjectStatusLabel(project.status);
   if (project.status === 'finished') return 'Finalizado';
   if (project.status === 'cancelled') return 'Cancelado';
   if (project.status === 'on_hold') return 'Detenido';
   if (project.status === 'draft') return 'No iniciado';
 
-  if (project.type === 'support') return 'Soporte';
   if (project.salesStage && project.salesStage !== 'approved') return PROJECT_SALES_STAGE_LABELS[project.salesStage];
   if (project.phase) return PROJECT_PHASE_LABELS[project.phase];
   return 'No Aplica';
