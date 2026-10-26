@@ -1,14 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import type { ProjectDetail } from '@kora/contracts';
+import type { ProjectDetail, SupportProjectDetailSummary } from '@kora/contracts';
 import { ToastProvider } from '@/shared/components/ui/Toast';
 import { SupportProjectDetailView } from './SupportProjectDetailView';
 
 const changeStatus = vi.fn().mockResolvedValue(undefined);
 const closeContract = vi.fn().mockResolvedValue(undefined);
 let canManage = true;
-let plans: Array<{ id: string; projectId: string; status: 'active' | 'ended' }> = [];
+let summary: SupportProjectDetailSummary | null = null;
+let summaryError: Error | null = null;
+
+const activeSummary: SupportProjectDetailSummary = {
+  planId: 'plan-1', planType: 'monthly', contractedHours: 10, planValueUf: 0,
+  extraHourValueUf: 0, currency: 'UF', usedHours: 0, availableHours: null,
+  currentPeriod: null, history: [],
+};
 
 vi.mock('@/modules/auth/hooks/usePermissions', () => ({
   usePermissions: () => ({ can: (permission: string) => canManage && permission === 'projects:manage' }),
@@ -21,8 +28,7 @@ vi.mock('../api/projects.queries', () => ({
   useChangeProjectStatus: () => ({ mutateAsync: changeStatus, isPending: false }),
 }));
 vi.mock('../api/support-plan.queries', () => ({
-  useSupportPlanSummary: () => ({ data: null, isLoading: false }),
-  useSupportPlansForClient: () => ({ data: plans, error: null }),
+  useSupportPlanSummary: () => ({ data: summary, isLoading: false, error: summaryError }),
   useCloseSupportPlan: () => ({ mutateAsync: closeContract, isPending: false }),
 }));
 
@@ -47,7 +53,8 @@ function renderDetail(status: ProjectDetail['status'] = 'on_hold') {
 describe('SupportProjectDetailView — estados de soporte', () => {
   beforeEach(() => {
     canManage = true;
-    plans = [{ id: 'plan-1', projectId: 'project-1', status: 'active' }];
+    summary = activeSummary;
+    summaryError = null;
     changeStatus.mockClear();
     closeContract.mockClear();
   });
@@ -71,31 +78,24 @@ describe('SupportProjectDetailView — estados de soporte', () => {
     expect(changeStatus).not.toHaveBeenCalled();
   });
 
-  it('puede reconciliar un proyecto inactivo cuyo contrato ya está cerrado', () => {
-    plans = [{ id: 'plan-1', projectId: 'project-1', status: 'ended' }];
+  it('sin contrato activo delega en la API la validación para terminar el soporte', () => {
+    summary = null;
     renderDetail();
     fireEvent.change(screen.getByRole('combobox', { name: 'Cambiar estado' }), { target: { value: 'finished' } });
     expect(changeStatus).toHaveBeenCalledWith({ projectId: 'project-1', input: { status: 'finished' } });
     expect(closeContract).not.toHaveBeenCalled();
   });
 
-  it('no ofrece Terminado si no hay un contrato cerrado ni deja reactivar uno terminado sin contrato', () => {
-    plans = [];
-    renderDetail();
+  it('permite inactivar aunque falle la consulta del resumen, sin intentar terminar sin verificar el contrato', () => {
+    summary = null;
+    summaryError = new Error('Falló el resumen');
+    renderDetail('active');
     const select = screen.getByRole('combobox', { name: 'Cambiar estado' }) as HTMLSelectElement;
-    expect(select.options[0]?.disabled).toBe(true);
-    expect(select.options[2]?.disabled).toBe(true);
-  });
-
-  it('si hay más de un contrato activo exige cerrar cada uno desde su ficha', () => {
-    plans = [
-      { id: 'plan-1', projectId: 'project-1', status: 'active' },
-      { id: 'plan-2', projectId: 'project-1', status: 'active' },
-    ];
-    renderDetail();
-    const select = screen.getByRole('combobox', { name: 'Cambiar estado' }) as HTMLSelectElement;
-    expect(select.options[2]?.disabled).toBe(true);
-    expect(screen.getByText('Cierra los contratos activos para terminar este soporte.')).toBeInTheDocument();
+    expect(select.disabled).toBe(false);
+    fireEvent.change(select, { target: { value: 'finished' } });
+    expect(changeStatus).not.toHaveBeenCalled();
+    fireEvent.change(select, { target: { value: 'inactive' } });
+    expect(changeStatus).toHaveBeenCalledWith({ projectId: 'project-1', input: { status: 'on_hold' } });
   });
 
   it('muestra como Inactivo los estados heredados también en lectura', () => {
