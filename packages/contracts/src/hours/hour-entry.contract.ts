@@ -60,12 +60,11 @@ export const hourEntrySummarySchema = z.object({
   designatedApprover: z.object({ id: uuidSchema, fullName: z.string() }).nullable(),
   /**
    * Quién puede aprobar este registro cuando es de proyecto: EXCLUYENTE — el
-   * líder del propio equipo del autor si tiene uno resoluble para este
-   * proyecto, y si no, el líder del proyecto (ver DECISION-M4-HORAS.md "Con
-   * proyecto" — acotado al equipo del autor, no cualquier equipo asignado al
-   * proyecto). En la práctica trae como mucho una persona; es un arreglo por
-   * si el autor pertenece a más de un equipo asignado al proyecto. Vacío
-   * para registros sin proyecto — ahí el aprobador es `designatedApprover`.
+   * en desarrollo, el líder del equipo del autor asignado al proyecto o,
+   * cuando no existe uno resoluble, el líder del proyecto; en soporte,
+   * siempre el líder del proyecto. Puede haber múltiples líderes de equipo
+   * si el autor pertenece a varios equipos asignados. Vacío para registros
+   * sin proyecto, cuyo aprobador es designado o líder de equipo del autor.
    */
   projectApprovers: z.array(z.object({ id: uuidSchema, fullName: z.string() })),
   /** Ticket de origen si este registro viene de una solicitud de HH de ticket (ver `TicketHhRequestSyncPort`), null si es un registro de horas normal. */
