@@ -6,14 +6,14 @@ import type {
   MarkSupportInvoicePaidInput,
   SupportPlanListItem,
   SupportPlanWithInvoices,
-  SupportProjectSummary,
+  SupportProjectDetailSummary,
   UpdateSupportPlanInput,
 } from '@kora/contracts';
 import { api } from '@/shared/lib/api-client';
 
 export const supportPlanApi = {
-  getSummaryForProject(projectId: string): Promise<SupportProjectSummary | null> {
-    return api.get<SupportProjectSummary | null>(`/support-plans/project/${projectId}`);
+  getSummaryForProject(projectId: string): Promise<SupportProjectDetailSummary | null> {
+    return api.get<SupportProjectDetailSummary | null>(`/support-plans/project/${projectId}`);
   },
   listForClient(clientId: string): Promise<SupportPlanListItem[]> {
     return api.get<SupportPlanListItem[]>(`/support-plans/client/${clientId}`);
