@@ -1,8 +1,7 @@
 import { useMemo, useState } from 'react';
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import type { ProjectPeriod, ProjectStatus, ProjectSummary, ProjectType } from '@kora/contracts';
 import styles from './ProjectsSummaryChart.module.css';
-import { niceScale, type Scale } from './chartScale';
-import { InfoIcon } from '@/shared/components/icons/Icons';
 import { Card } from '@/shared/components/ui/Card';
 import { MultiSelect } from '@/shared/components/ui/MultiSelect';
 import { useProjectsList } from '../api/projects.queries';
@@ -82,8 +81,8 @@ function detailsToPeriods(details: readonly string[]): ProjectPeriod[] {
 }
 
 /**
- * Franja "Resumen de horas por proyecto" — gráfico de barras horizontales tipo
- * "bullet" (una fila por proyecto) + indicadores.
+ * Franja "Resumen de horas por proyecto" — gráfico de barras + indicadores,
+ * igual disposición que la v1 (`renderChart` en `Proyectos/index.tsx`).
  *
  * Estado de filtros totalmente independiente del de la tabla (v1:
  * `devChartFilterCliente`/`devFilterPeriodo`/`devFilterSubPeriodo` aparte de
@@ -143,43 +142,31 @@ export function ProjectsSummaryChart({ type, clientOptions, showFinalizedToggle 
   });
   const filtered = useMemo(() => data?.items ?? [], [data]);
 
-  // Lo más desviado arriba; a igual desvío, lo más cerca de agotar sus horas.
   const chartData = useMemo(
     () =>
-      filtered
-        .map<ChartRow>((p) => ({
-          id: p.id,
-          name: p.name,
-          cliente: p.client?.companyName ?? '-',
-          vendidas: p.soldHours,
-          consumidas: p.usedHours,
-          desviadas: deviationOf(p),
-          onDemand: p.supportPlanType === 'on_demand',
-        }))
-        .sort((a, b) => b.desviadas - a.desviadas || usageRatio(b) - usageRatio(a)),
+      filtered.map((p) => ({
+        name: p.name,
+        fullName: p.name,
+        cliente: p.client?.companyName ?? '-',
+        vendidas: p.soldHours,
+        consumidas: p.usedHours,
+        desviadas: deviationOf(p),
+        onDemand: p.supportPlanType === 'on_demand',
+      })),
     [filtered],
   );
 
-  const scale = useMemo(
-    () => niceScale(Math.max(0, ...chartData.map((row) => Math.max(row.vendidas, row.consumidas)))),
-    [chartData],
-  );
-
-  // Lo consumido en soportes "A demanda" va aparte: no tiene horas vendidas
-  // contra las cuales compararse, así que inflaría el % de consumo.
   const totals = useMemo(
     () =>
-      chartData.reduce(
-        (acc, row) => ({
-          vendidas: acc.vendidas + (row.onDemand ? 0 : row.vendidas),
-          consumidas: acc.consumidas + (row.onDemand ? 0 : row.consumidas),
-          consumidasOnDemand: acc.consumidasOnDemand + (row.onDemand ? row.consumidas : 0),
-          desviadas: acc.desviadas + row.desviadas,
-          desviados: acc.desviados + (row.desviadas > 0 ? 1 : 0),
+      filtered.reduce(
+        (acc, p) => ({
+          vendidas: acc.vendidas + p.soldHours,
+          consumidas: acc.consumidas + p.usedHours,
+          desviadas: acc.desviadas + deviationOf(p),
         }),
-        { vendidas: 0, consumidas: 0, consumidasOnDemand: 0, desviadas: 0, desviados: 0 },
+        { vendidas: 0, consumidas: 0, desviadas: 0 },
       ),
-    [chartData],
+    [filtered],
   );
 
   return (
@@ -233,185 +220,80 @@ export function ProjectsSummaryChart({ type, clientOptions, showFinalizedToggle 
 
       <div className={styles.body}>
         <div className={styles.chartArea}>
-          <div className={styles.legend}>
-            <span className={styles.legendItem}>
-              <span className={`${styles.legendSwatch} ${styles.legendSold}`} aria-hidden="true" />
-              HH Vendidas
-            </span>
-            <span className={styles.legendItem}>
-              <span className={`${styles.legendSwatch} ${styles.legendUsed}`} aria-hidden="true" />
-              HH Consumidas
-            </span>
-            <span className={styles.legendItem}>
-              <span className={`${styles.legendSwatch} ${styles.legendOver}`} aria-hidden="true" />
-              HH Desviadas
-            </span>
-          </div>
-
-          {chartData.length === 0 ? (
-            <p className={styles.empty}>No hay proyectos para los filtros seleccionados.</p>
-          ) : (
-            <div className={styles.bullet}>
-              <div className={styles.axisRow} aria-hidden="true">
-                <span />
-                <div className={styles.axis}>
-                  {scale.ticks.map((tick) => (
-                    <span key={tick} className={styles.axisTick} style={{ left: `${(tick / scale.max) * 100}%` }}>
-                      {formatHours(tick)}
-                    </span>
-                  ))}
-                </div>
-                <span className={styles.columnHeading}>Consumidas / Vendidas</span>
-                <span className={styles.columnHeading}>Desvío</span>
-              </div>
-
-              {/* Una fila por proyecto con scroll vertical: el nombre se lee completo
-                  sin importar cuántos proyectos pasen los filtros. */}
-              <ul className={styles.rows}>
-                {chartData.map((row) => (
-                  <BulletRow key={row.id} row={row} scale={scale} />
-                ))}
-              </ul>
+          {/* Cada proyecto reserva un ancho fijo y el contenedor scrollea
+              horizontalmente — con muchos proyectos, comprimir todo en el
+              ancho visible vuelve las etiquetas ilegibles (mismo ajuste que
+              la v1 aplicó en fix(proyectos): improve chart readability). */}
+          <div className={styles.chartScroll}>
+            <div style={{ minWidth: Math.max(chartData.length * 56, 100) }}>
+              <ResponsiveContainer width="100%" height={280}>
+                <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--kora-surface-disabled)" vertical={false} />
+                  <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} angle={-35} textAnchor="end" height={70} />
+                  <YAxis tick={{ fontSize: 11 }} />
+                  <Tooltip content={<ChartTooltip />} />
+                  <Bar dataKey="vendidas" name="HH Vendidas" fill="var(--kora-navy)" radius={[2, 2, 0, 0]} />
+                  <Bar dataKey="consumidas" name="HH Consumidas" fill="var(--kora-lime)" radius={[2, 2, 0, 0]} />
+                  <Bar dataKey="desviadas" name="HH Desviadas" fill="var(--kora-danger)" radius={[2, 2, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
-          )}
+          </div>
+          <div className={styles.legend}>
+            <LegendItem color="var(--kora-navy)" label="HH Vendidas" />
+            <LegendItem color="var(--kora-lime)" label="HH Consumidas" />
+            <LegendItem color="var(--kora-danger)" label="HH Desviadas" />
+          </div>
         </div>
 
         <div className={styles.indicators}>
           <p className={styles.indicatorsTitle}>Indicadores</p>
-          <ConsumptionIndicator
-            consumidas={totals.consumidas}
-            vendidas={totals.vendidas}
-            consumidasOnDemand={totals.consumidasOnDemand}
-          />
-          <div className={styles.indicator}>
-            <p className={styles.indicatorLabel}>
-              HH Desviadas
-              <span
-                className={styles.indicatorInfo}
-                tabIndex={0}
-                title="Suma de las horas que cada proyecto consumió por sobre lo vendido. Los proyectos bajo su tope no restan."
-              >
-                <InfoIcon size={13} />
-              </span>
-            </p>
-            <p className={`${styles.indicatorValue} ${styles.danger}`}>{formatHours(totals.desviadas)} hrs</p>
-            <p className={styles.indicatorHint}>
-              {totals.desviados > 0 ? (
-                <>
-                  <span className={styles.indicatorHintDanger}>▲ {totals.desviados}</span> de {chartData.length}{' '}
-                  {chartData.length === 1 ? 'proyecto' : 'proyectos'} con desvío
-                </>
-              ) : (
-                'Ningún proyecto con desvío'
-              )}
-            </p>
-          </div>
+          <Indicator label="HH Vendidas" value={totals.vendidas} />
+          <Indicator label="HH Consumidas" value={totals.consumidas} tone="brand" />
+          <Indicator label="HH Desviadas" value={totals.desviadas} tone="danger" />
         </div>
       </div>
     </Card>
   );
 }
 
-/**
- * Consumido vs vendido en un solo indicador, con el mismo lenguaje que las filas:
- * fondo = vendido (marca navy al final), verde = consumido, rojo = lo que se pasa.
- */
-function ConsumptionIndicator({
-  consumidas,
-  vendidas,
-  consumidasOnDemand,
-}: {
-  consumidas: number;
-  vendidas: number;
-  consumidasOnDemand: number;
-}) {
-  const max = Math.max(consumidas, vendidas, 1);
-  const pct = (value: number) => `${(value / max) * 100}%`;
-  const ratio = vendidas > 0 ? Math.round((consumidas / vendidas) * 100) : null;
+function LegendItem({ color, label }: { color: string; label: string }) {
+  return (
+    <span className={styles.legendItem}>
+      <span className={styles.legendDot} style={{ background: color }} aria-hidden="true" />
+      {label}
+    </span>
+  );
+}
 
+function Indicator({ label, value, tone }: { label: string; value: number; tone?: 'brand' | 'danger' }) {
   return (
     <div className={styles.indicator}>
-      <p className={styles.indicatorLabel}>HH Consumidas / Vendidas</p>
-      <p className={styles.indicatorValue}>
-        {formatHours(consumidas)}
-        <span className={styles.indicatorValueSecondary}> / {formatHours(vendidas)} hrs</span>
+      <p className={styles.indicatorLabel}>{label}</p>
+      <p className={[styles.indicatorValue, tone ? styles[tone] : ''].filter(Boolean).join(' ')}>
+        {formatHours(value)} hrs
       </p>
-      <div className={styles.meter} aria-hidden="true">
-        {vendidas > 0 && <span className={styles.soldBar} style={{ width: pct(vendidas) }} />}
-        {consumidas > 0 && <span className={styles.usedBar} style={{ width: pct(Math.min(consumidas, vendidas)) }} />}
-        {consumidas > vendidas && (
-          <span className={styles.overBar} style={{ left: pct(vendidas), width: pct(consumidas - vendidas) }} />
-        )}
-        {vendidas > 0 && <span className={styles.soldMarker} style={{ left: pct(vendidas) }} />}
-      </div>
-      {ratio !== null && (
-        <p className={styles.indicatorHint}>
-          <span className={ratio > 100 ? styles.indicatorHintDanger : undefined}>{formatHours(ratio)}%</span> de lo vendido
-        </p>
-      )}
-      {consumidasOnDemand > 0 && (
-        <p className={styles.indicatorHint}>+ {formatHours(consumidasOnDemand)} hrs a demanda (sin tope)</p>
-      )}
     </div>
   );
 }
 
-interface ChartRow {
-  id: string;
-  name: string;
-  cliente: string;
-  vendidas: number;
-  consumidas: number;
-  desviadas: number;
-  onDemand: boolean;
-}
-
-const usageRatio = (row: ChartRow) => (row.vendidas > 0 ? row.consumidas / row.vendidas : 0);
-
-/**
- * Fila tipo "bullet": el fondo claro es lo vendido (con una marca al final), la
- * barra interior es lo consumido y la parte que excede lo vendido va en rojo.
- * Los "A demanda" no tienen tope, así que solo muestran lo consumido en neutro.
- */
-function BulletRow({ row, scale }: { row: ChartRow; scale: Scale }) {
-  const pct = (value: number) => `${(value / scale.max) * 100}%`;
-  const withinSold = row.onDemand ? row.consumidas : Math.min(row.consumidas, row.vendidas);
-
+function ChartTooltip({ active, payload }: { active?: boolean; payload?: readonly { payload: Record<string, unknown> }[] }) {
+  if (!active || !payload?.length) return null;
+  const data = payload[0]?.payload as {
+    fullName: string;
+    cliente: string;
+    vendidas: number;
+    consumidas: number;
+    desviadas: number;
+    onDemand: boolean;
+  };
   return (
-    <li className={styles.row}>
-      <span className={styles.rowLabel} title={`${row.name} — ${row.cliente}`}>
-        <span className={styles.rowName}>{row.name}</span>
-        <span className={styles.rowClient}>{row.cliente}</span>
-      </span>
-
-      <div className={styles.track}>
-        {scale.ticks.map((tick) => (
-          <span key={tick} className={styles.gridLine} style={{ left: pct(tick) }} aria-hidden="true" />
-        ))}
-        {!row.onDemand && row.vendidas > 0 && <span className={styles.soldBar} style={{ width: pct(row.vendidas) }} />}
-        {withinSold > 0 && (
-          <span
-            className={row.onDemand ? `${styles.usedBar} ${styles.usedBarNeutral}` : styles.usedBar}
-            style={{ width: pct(withinSold) }}
-          />
-        )}
-        {row.desviadas > 0 && (
-          <span className={styles.overBar} style={{ left: pct(row.vendidas), width: pct(row.desviadas) }} />
-        )}
-        {!row.onDemand && row.vendidas > 0 && <span className={styles.soldMarker} style={{ left: pct(row.vendidas) }} />}
-      </div>
-
-      <span className={styles.rowValue}>
-        {formatHours(row.consumidas)} / {row.onDemand ? '—' : formatHours(row.vendidas)}
-      </span>
-
-      {row.onDemand ? (
-        <span className={styles.rowStatus}>Sin tope</span>
-      ) : row.desviadas > 0 ? (
-        <span className={`${styles.rowStatus} ${styles.rowStatusDanger}`}>▲ +{formatHours(row.desviadas)}</span>
-      ) : (
-        <span className={styles.rowStatus}>{row.vendidas > 0 ? `${Math.round(usageRatio(row) * 100)}%` : '—'}</span>
-      )}
-    </li>
+    <div className={styles.tooltip}>
+      <p className={styles.tooltipTitle}>{data.fullName}</p>
+      <p>Cliente: {data.cliente}</p>
+      <p>HH Vendidas: {data.onDemand ? 'No aplica' : formatHours(data.vendidas)}</p>
+      <p>HH Consumidas: {formatHours(data.consumidas)}</p>
+      <p className={styles.tooltipDanger}>HH Desviadas: {data.onDemand ? 'No aplica' : formatHours(data.desviadas)}</p>
+    </div>
   );
 }
