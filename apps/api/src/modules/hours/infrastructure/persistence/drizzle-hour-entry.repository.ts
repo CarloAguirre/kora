@@ -130,51 +130,50 @@ export class DrizzleHourEntryRepository implements HourEntryRepository {
       teamRows.map((row) => [row.userId, { id: row.teamId, name: row.teamName, leaderUserId: row.teamLeaderUserId }]),
     );
 
-    const projectIds = [...new Set(rows.map((row) => row.projectId).filter((id): id is string => Boolean(id)))];
-    const authorTeamIds = [...new Set([...teamByUserId.values()].map((team) => team.id))];
-    // Qué pares (proyecto, equipo) están realmente asignados — el líder de un
-    // equipo solo aprueba las horas de SU propio equipo, no las de cualquier
-    // otro equipo asignado al mismo proyecto.
-    const assignedProjectTeamRows =
-      projectIds.length && authorTeamIds.length
-        ? await db
-            .select({
-              projectId: projectTeams.projectId,
-              teamId: projectTeams.teamId,
-              // Líder del equipo PARA ESTE PROYECTO — distinto del líder
-              // orgánico del equipo (`teams.leaderUserId`); un mismo equipo
-              // puede tener un líder distinto por proyecto (ver
-              // `ProjectTeamRepository`/`UpsertProjectTeamInput.leaderUserId`).
-              projectTeamLeaderUserId: projectTeams.leaderUserId,
-            })
-            .from(projectTeams)
-            .where(and(inArray(projectTeams.projectId, projectIds), inArray(projectTeams.teamId, authorTeamIds)))
-        : [];
-    const assignedProjectTeamLeaderId = new Map(
-      assignedProjectTeamRows.map((row) => [`${row.projectId}:${row.teamId}`, row.projectTeamLeaderUserId]),
-    );
+    // Misma regla que ProjectRepository: desarrollo prioriza al líder del
+    // equipo del autor asignado al proyecto; soporte usa al líder del proyecto.
+    const developmentProjectIds = [...new Set(
+      rows.filter((row) => row.projectType === 'development')
+        .map((row) => row.projectId)
+        .filter((id): id is string => Boolean(id)),
+    )];
+    const teamLeaderRows = developmentProjectIds.length && authorIds.length
+      ? await db
+          .select({
+            projectId: projectTeams.projectId,
+            userId: teamMembers.userId,
+            leaderUserId: users.id,
+          })
+          .from(projectTeams)
+          .innerJoin(teams, eq(teams.id, projectTeams.teamId))
+          .innerJoin(users, sql`${users.id} = coalesce(${projectTeams.leaderUserId}, ${teams.leaderUserId})`)
+          .innerJoin(teamMembers, and(
+            eq(teamMembers.teamId, teams.id),
+            isNull(teamMembers.leftAt),
+            inArray(teamMembers.userId, authorIds),
+          ))
+          .where(inArray(projectTeams.projectId, developmentProjectIds))
+      : [];
+    const teamLeadersByProjectAndOwner = new Map<string, Set<string>>();
+    for (const leader of teamLeaderRows) {
+      const key = `${leader.projectId}:${leader.userId}`;
+      const ids = teamLeadersByProjectAndOwner.get(key) ?? new Set<string>();
+      ids.add(leader.leaderUserId);
+      teamLeadersByProjectAndOwner.set(key, ids);
+    }
 
-    // EXCLUYENTE (DECISION-M4-HORAS.md "Tercera corrección"): el líder del
-    // propio equipo del autor, si ese equipo está asignado al proyecto —
-    // tomado primero desde el override por-proyecto y, si no hay, desde el
-    // líder orgánico. El líder del proyecto solo aparece cuando el autor no
-    // tiene líder de equipo resoluble; mismo criterio que
-    // `ProjectRepository.isProjectLeaderOrTeamLeaderOfMember`, que decide
-    // quién puede aprobar de verdad — este cálculo es solo para mostrar
-    // "pendiente con quién" en el listado, y debe coincidir.
     const projectApproverIdsByEntryId = new Map<string, Set<string>>();
     for (const row of rows) {
       if (!row.projectId) continue;
-      let teamLeaderId: string | null = null;
-      const authorTeam = teamByUserId.get(row.userId);
-      if (authorTeam) {
-        const pairKey = `${row.projectId}:${authorTeam.id}`;
-        if (assignedProjectTeamLeaderId.has(pairKey)) {
-          teamLeaderId = assignedProjectTeamLeaderId.get(pairKey) ?? authorTeam.leaderUserId;
-        }
-      }
-      const approverId = teamLeaderId ?? row.projectLeaderUserId;
-      if (approverId) projectApproverIdsByEntryId.set(row.id, new Set([approverId]));
+      const teamLeaders = row.projectType === 'development'
+        ? teamLeadersByProjectAndOwner.get(`${row.projectId}:${row.userId}`)
+        : undefined;
+      const ids = teamLeaders?.size
+        ? teamLeaders
+        : row.projectLeaderUserId
+          ? new Set([row.projectLeaderUserId])
+          : new Set<string>();
+      if (ids.size > 0) projectApproverIdsByEntryId.set(row.id, ids);
     }
 
     const approverIds = [
@@ -463,32 +462,46 @@ export class DrizzleHourEntryRepository implements HourEntryRepository {
                 )
             )
           )`,
-          // Con proyecto, EXCLUYENTE: solo el líder del equipo del dueño
-          // PARA ESE PROYECTO — no cualquier equipo que lidere en general.
+          // Sin proyecto: el designado también puede decidir aunque no lidere
+          // a ese colaborador (la validación de la acción ya lo permite).
+          sql`(
+            ${hourEntries.projectId} is null
+            and ${hourEntries.designatedApproverUserId} = ${leaderId}
+          )`,
+          // Desarrollo: solo líder del equipo asignado a ESTE proyecto.
           sql`(
             ${hourEntries.projectId} is not null
             and exists (
               select 1 from ${projectTeams}
+              inner join ${projects} on ${projects.id} = ${projectTeams.projectId} and ${projects.type} = 'development'
               inner join ${teams} on ${teams.id} = ${projectTeams.teamId}
+              inner join ${users} on ${users.id} = coalesce(${projectTeams.leaderUserId}, ${teams.leaderUserId})
               inner join ${teamMembers} on ${teamMembers.teamId} = ${teams.id}
                 and ${teamMembers.userId} = ${hourEntries.userId} and ${teamMembers.leftAt} is null
               where ${projectTeams.projectId} = ${hourEntries.projectId}
-                and coalesce(${projectTeams.leaderUserId}, ${teams.leaderUserId}) = ${leaderId}
+                and ${users.id} = ${leaderId}
             )
           )`,
-          // Con proyecto y SIN líder de equipo resoluble para el dueño: cae
-          // al líder del proyecto — mismo respaldo que la autoridad de
-          // decisión.
+          // Soporte: líder del proyecto. Desarrollo: líder del proyecto solo
+          // si el autor carece de líder de equipo resoluble en ese proyecto.
           sql`(
             ${hourEntries.projectId} is not null
-            and exists (select 1 from ${projects} where ${projects.id} = ${hourEntries.projectId} and ${projects.leaderUserId} = ${leaderId})
-            and not exists (
-              select 1 from ${projectTeams}
-              inner join ${teams} on ${teams.id} = ${projectTeams.teamId}
-              inner join ${teamMembers} on ${teamMembers.teamId} = ${teams.id}
-                and ${teamMembers.userId} = ${hourEntries.userId} and ${teamMembers.leftAt} is null
-              where ${projectTeams.projectId} = ${hourEntries.projectId}
-                and coalesce(${projectTeams.leaderUserId}, ${teams.leaderUserId}) is not null
+            and exists (
+              select 1 from ${projects}
+              where ${projects.id} = ${hourEntries.projectId}
+                and ${projects.leaderUserId} = ${leaderId}
+                and (
+                  ${projects.type} = 'support'
+                  or not exists (
+                    select 1 from ${projectTeams}
+                    inner join ${teams} on ${teams.id} = ${projectTeams.teamId}
+                    inner join ${users} on ${users.id} = coalesce(${projectTeams.leaderUserId}, ${teams.leaderUserId})
+                    inner join ${teamMembers} on ${teamMembers.teamId} = ${teams.id}
+                      and ${teamMembers.userId} = ${hourEntries.userId}
+                      and ${teamMembers.leftAt} is null
+                    where ${projectTeams.projectId} = ${hourEntries.projectId}
+                  )
+                )
             )
           )`,
         ),
