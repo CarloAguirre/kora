@@ -494,6 +494,61 @@ button.ganttBar {
   transform: translate(calc(-1 * var(--marker-half) - 11px), -50%);
 }
 
+/* Varias entregas/tareas el mismo día (`MarkerTrackRow` en PhaseRoadmap.tsx): el
+   contenedor del `DropdownMenu` toma el posicionamiento que `.markerItem` tiene
+   cuando va suelto, y el botón de adentro queda en flujo. `--marker-half` viene
+   de `.markerItemTask` en las tareas. */
+.markerGroup {
+  position: absolute;
+  top: 50%;
+  transform: translate(calc(-1 * var(--marker-half, 9px)), -50%);
+  z-index: 6;
+}
+
+.markerGroupHighlighted {
+  transform: translate(calc(-1 * var(--marker-half, 9px) - 11px), -50%);
+}
+
+.markerGroup .markerItem {
+  position: static;
+  transform: none;
+}
+
+.markerSymbol {
+  position: relative;
+  display: inline-flex;
+}
+
+/* Contador del grupo, sobre la esquina del símbolo. */
+.markerCount {
+  position: absolute;
+  top: -7px;
+  right: -9px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #ffffff;
+  border-radius: 999px;
+  background: #2f5fd0;
+  color: #ffffff;
+  font-size: 9px;
+  font-weight: var(--kora-weight-bold);
+  line-height: 1;
+}
+
+.markerGroup .markerItem .markerSymbol + .markerLabel {
+  margin-left: 4px;
+}
+
+.markerChevron {
+  flex: none;
+  color: #5d6b7a;
+}
+
 .relatedBitacora {
   display: flex;
   flex-direction: column;

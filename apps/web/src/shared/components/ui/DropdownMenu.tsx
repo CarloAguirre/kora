@@ -21,6 +21,12 @@ export interface DropdownMenuItem {
   tone?: 'default' | 'success' | 'danger';
   onSelect: () => void;
   disabled?: boolean;
+  /** Símbolo a la izquierda del texto (p.ej. el marcador de una entrega en el Roadmap). */
+  icon?: ReactNode;
+  /** Texto secundario a la derecha (p.ej. el estado del ítem). */
+  hint?: string;
+  /** Marca el ítem como el seleccionado actualmente. */
+  active?: boolean;
 }
 
 export interface DropdownMenuProps {
@@ -102,15 +108,19 @@ export function DropdownMenu({ trigger, items, align = 'right', className }: Dro
                   styles.item,
                   item.tone === 'success' ? styles.itemSuccess : '',
                   item.tone === 'danger' ? styles.itemDanger : '',
+                  item.active ? styles.itemActive : '',
                 ]
                   .filter(Boolean)
                   .join(' ')}
+                aria-current={item.active || undefined}
                 onClick={() => {
                   setOpen(false);
                   item.onSelect();
                 }}
               >
-                {item.label}
+                {item.icon && <span className={styles.itemIcon}>{item.icon}</span>}
+                <span className={styles.itemLabel}>{item.label}</span>
+                {item.hint && <span className={styles.itemHint}>{item.hint}</span>}
               </button>
             ))}
           </div>,

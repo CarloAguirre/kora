@@ -17,7 +17,9 @@
 }
 
 .item {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-2);
   width: 100%;
   padding: var(--kora-space-2);
   border: none;
@@ -46,4 +48,26 @@
 
 .itemDanger {
   color: var(--kora-danger);
+}
+
+.itemActive,
+.itemActive:hover:not(:disabled) {
+  background: var(--kora-blue-surface-alt);
+}
+
+.itemIcon {
+  display: inline-flex;
+  flex: none;
+}
+
+.itemLabel {
+  flex: 1;
+  min-width: 0;
+}
+
+.itemHint {
+  flex: none;
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-regular);
+  color: var(--kora-text-muted);
 }
