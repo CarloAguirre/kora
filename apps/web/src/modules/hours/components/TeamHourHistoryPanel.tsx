@@ -25,7 +25,7 @@ import { HourEntryStatusBadge } from './HourEntryStatusBadge';
 import { HourEntryFormDialog } from './HourEntryFormDialog';
 import { useApproveHourEntry, useDeleteHourEntry, useHourEntriesList, useRejectHourEntry } from '../api/hours.queries';
 import { useHourEntriesExport } from '../hooks/useHourEntriesExport';
-import { resolvedApprover } from '../lib/approver';
+import { canDecideHourEntry, resolvedApprover } from '../lib/approver';
 import { isInCurrentMonth } from '../lib/edit-window';
 import { useProjectsList } from '@/modules/projects/api/projects.queries';
 import { getProjectOptionLabel } from '@/modules/projects/lib/project-option-label';
@@ -162,9 +162,10 @@ export function TeamHourHistoryPanel({ teamId, userId }: { teamId?: string; user
     const isPending = e.status === 'pending';
     const isApproved = e.status === 'approved';
     const inCurrentMonth = isInCurrentMonth(e.date);
-    const canEdit = isAdminLike || (inCurrentMonth && ((isOwner && !isApproved) || (canApprove && (isPending || isApproved))));
-    const canDecide = canApprove && isPending;
-    const canDelete = isAdminLike || (inCurrentMonth && (isApproved ? canApprove : isOwner));
+    const isApprover = canDecideHourEntry(e, user, canApprove);
+    const canEdit = isAdminLike || (inCurrentMonth && ((isOwner && !isApproved) || (isApprover && (isPending || isApproved))));
+    const canDecide = isApprover && isPending;
+    const canDelete = isAdminLike || (inCurrentMonth && (isApproved ? isApprover : isOwner));
     return [
       { key: 'ver', label: 'Ver detalle', onSelect: () => setDialog({ kind: 'view', entry: e }) },
       ...(canEdit ? [{ key: 'editar', label: 'Editar', onSelect: () => setDialog({ kind: 'edit', entry: e }) }] : []),
