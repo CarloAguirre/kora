@@ -189,12 +189,13 @@ const TIPO_TO_SALES_STAGE: Record<ProjectTipo, ProjectSalesStage | null> = {
 /**
  * Mismo criterio que `STATUS_OPTIONS_APPROVED`/`STATUS_OPTIONS_NOT_APPROVED` de `NewProjectPage`:
  * antes de Aprobado solo No iniciado o Detenido; Aprobado arranca "No iniciado" y pasa a Activo
- * por Hito 0 (factura del primer tramo, o manual con motivo).
+ * por Hito 0 (factura del primer tramo, o manual con motivo). Finalizar no es un Estado: se elige
+ * "Proyecto finalizado" en Tipo de proyecto.
  */
 const ESTADO_OPTIONS_BY_TIPO: Record<ProjectTipo, ProjectStatus[]> = {
   prospecto: ['draft', 'on_hold'],
   cotizacion: ['draft', 'on_hold'],
-  aprobado: ['draft', 'active', 'on_hold', 'finished'],
+  aprobado: ['draft', 'active', 'on_hold'],
   finalizado: ['finished'],
 };
 
@@ -623,7 +624,10 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
     const mappedSalesStage = TIPO_TO_SALES_STAGE[nextTipo];
     if (mappedSalesStage) setValue('salesStage', mappedSalesStage, { shouldValidate: true });
     const options = ESTADO_OPTIONS_BY_TIPO[nextTipo];
-    if (!options.includes(estado)) setEstado(ESTADO_DEFAULT_BY_TIPO[nextTipo]);
+    if (options.includes(estado)) return;
+    // Reabrir un finalizado que ya pasó el Hito 0 lo deja Activo (si quien edita puede activarlo), no "No iniciado".
+    const reopensActive = nextTipo === 'aprobado' && project.hito0At != null && isManagement;
+    setEstado(reopensActive ? 'active' : ESTADO_DEFAULT_BY_TIPO[nextTipo]);
   };
 
   const toggleTeam = (teamId: string) => {
