@@ -223,8 +223,8 @@ export interface EditProjectDialogProps {
   onSuccess: (message: string) => void;
   /**
    * Gerencia/PMO (`projects:manage`). Sin él, el propio líder no puede reasignar el proyecto a otro
-   * líder (campo bloqueado) ni pasarlo a Activo (la opción no se ofrece). El backend exige lo mismo
-   * (`CannotReassignProjectLeaderError`, `CannotActivateProjectError`).
+   * líder (campo bloqueado) — el backend exige lo mismo (`CannotReassignProjectLeaderError`). Pasar a
+   * Activo sí lo puede hacer el líder del proyecto: el diálogo solo se abre para él o Gerencia/PMO.
    */
   isManagement: boolean;
 }
@@ -602,10 +602,7 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
     if (next !== module.estimatedEndDate) void onSaveModuleField(module.id, { estimatedEndDate: next });
   };
 
-  /** Pasar a Activo es solo de Gerencia/PMO; si el proyecto ya está activo se mantiene la opción para que el select muestre su valor actual. */
-  const estadoOptions = ESTADO_OPTIONS_BY_TIPO[tipo].filter(
-    (status) => status !== 'active' || isManagement || project.status === 'active',
-  );
+  const estadoOptions = ESTADO_OPTIONS_BY_TIPO[tipo];
   const totalTeamHours = teamsValue.reduce((sum, team) => sum + (Number(team.assignedHours) || 0), 0);
   /** Hito 0 manual: activar a mano (sin factura) un proyecto Aprobado que seguía "No iniciado" — exige motivo (ver `ChangeProjectStatusUseCase`). */
   const isManualHito0 = isDevelopment && tipo === 'aprobado' && project.status === 'draft' && estado === 'active';
@@ -629,8 +626,8 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
     if (mappedSalesStage) setValue('salesStage', mappedSalesStage, { shouldValidate: true });
     const options = ESTADO_OPTIONS_BY_TIPO[nextTipo];
     if (options.includes(estado)) return;
-    // Reabrir un finalizado que ya pasó el Hito 0 lo deja Activo (si quien edita puede activarlo), no "No iniciado".
-    const reopensActive = nextTipo === 'aprobado' && project.hito0At != null && isManagement;
+    // Reabrir un finalizado que ya pasó el Hito 0 lo deja Activo, no "No iniciado".
+    const reopensActive = nextTipo === 'aprobado' && project.hito0At != null;
     setEstado(reopensActive ? 'active' : ESTADO_DEFAULT_BY_TIPO[nextTipo]);
   };
 

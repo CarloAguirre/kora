@@ -344,13 +344,3 @@ export class ManualHito0ReasonRequiredError extends ValidationError {
     super('Escribe el motivo o la referencia de la activación antes de continuar.', 'PROJECT_MANUAL_HITO0_REASON_REQUIRED');
   }
 }
-
-/**
- * Pasar un proyecto a Activo a mano (Hito 0 sin factura, o reactivarlo tras
- * Detenido) es de Gerencia/PMO — el líder del proyecto por sí solo no basta.
- */
-export class CannotActivateProjectError extends ForbiddenError {
-  constructor() {
-    super('Solo Gerencia/PMO puede pasar este proyecto a Activo.', 'PROJECT_CANNOT_ACTIVATE');
-  }
-}

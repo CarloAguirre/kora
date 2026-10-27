@@ -3,7 +3,7 @@ import { ChangeProjectStatusUseCase } from './change-project-status.use-case';
 import { Project } from '../../domain/entities/project.entity';
 import {
   ActiveSupportContractMustBeClosedError,
-  CannotActivateProjectError,
+  CannotManageProjectError,
   ManualHito0ReasonRequiredError,
   SupportContractRequiredForStatusError,
 } from '../../domain/errors/project.errors';
@@ -55,19 +55,35 @@ function buildSupportProject(status: ProjectStatus = 'on_hold') {
 }
 
 describe('ChangeProjectStatusUseCase — Hito 0 manual', () => {
-  it('rechaza activar manualmente sin projects:manage, aunque sea el líder del proyecto', async () => {
+  it('rechaza activar manualmente a un líder que no es el de este proyecto (sin projects:manage)', async () => {
     const { useCase, projects } = buildUseCase(buildApprovedDraftProject());
 
     const result = await useCase.execute({
       projectId: 'project-1',
-      data: { status: 'active' },
-      actor: ACTOR,
+      data: { status: 'active', reason: 'Contrato firmado.' },
+      actor: { userId: 'other-leader', email: 'other@kabeli.cl' },
       actorPermissions: ['projects:read_assigned'],
     });
 
     expect(result.isErr()).toBe(true);
-    expect(result.isErr() && result.error).toBeInstanceOf(CannotActivateProjectError);
+    expect(result.isErr() && result.error).toBeInstanceOf(CannotManageProjectError);
     expect(projects.save).not.toHaveBeenCalled();
+  });
+
+  it('permite al líder del proyecto activarlo manualmente con motivo, sin projects:manage', async () => {
+    const { useCase, projects } = buildUseCase(buildApprovedDraftProject());
+
+    const result = await useCase.execute({
+      projectId: 'project-1',
+      data: { status: 'active', reason: 'Contrato firmado.' },
+      actor: ACTOR,
+      actorPermissions: ['projects:read_assigned'],
+    });
+
+    expect(result.isOk()).toBe(true);
+    const saved = (projects.save as ReturnType<typeof vi.fn>).mock.calls[0]![0] as Project;
+    expect(saved.status).toBe('active');
+    expect(saved.hito0Source).toBe('manual');
   });
 
   it('rechaza activar manualmente sin motivo, aunque tenga projects:manage', async () => {
@@ -113,7 +129,7 @@ describe('ChangeProjectStatusUseCase — Hito 0 manual', () => {
     );
   });
 
-  it('rechaza reactivar un proyecto Detenido sin projects:manage, aunque sea el líder del proyecto', async () => {
+  it('permite al líder del proyecto reactivar un proyecto Detenido, sin projects:manage', async () => {
     const project = Project.create({
       id: 'project-1',
       name: 'Portal',
@@ -133,8 +149,9 @@ describe('ChangeProjectStatusUseCase — Hito 0 manual', () => {
       actorPermissions: ['projects:read_assigned'],
     });
 
-    expect(result.isErr() && result.error).toBeInstanceOf(CannotActivateProjectError);
-    expect(projects.save).not.toHaveBeenCalled();
+    expect(result.isOk()).toBe(true);
+    const saved = (projects.save as ReturnType<typeof vi.fn>).mock.calls[0]![0] as Project;
+    expect(saved.status).toBe('active');
   });
 
   it('no exige motivo para otras transiciones (ej. pausar a Detenido)', async () => {

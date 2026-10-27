@@ -3,7 +3,6 @@ import { CLOCK, err, ok, type ApplicationError, type Clock, type Result } from '
 import { PROJECT_STATUS_LABELS, type ChangeProjectStatusInput, type Permission } from '@kora/contracts';
 import {
   CannotManageProjectError,
-  CannotActivateProjectError,
   ManualHito0ReasonRequiredError,
   ProjectNotFoundError,
   ActiveSupportContractMustBeClosedError,
@@ -67,15 +66,10 @@ export class ChangeProjectStatusUseCase
       }
     }
 
-    /** Pasar a Activo (sea Hito 0 manual o reactivar tras Detenido) es de Gerencia/PMO, no del líder por sí solo. */
-    if (command.data.status === 'active' && !command.actorPermissions.includes('projects:manage')) {
-      return err(new CannotActivateProjectError());
-    }
-
     /**
      * Hito 0 manual (sin factura): activar a mano un proyecto `development`
-     * `aprobado` que seguía "No iniciado" — con motivo/referencia obligatorio
-     * (contrato firmado, OC, etc).
+     * `aprobado` que seguía "No iniciado" — Gerencia/PMO o el líder del proyecto
+     * (mismo control de arriba), con motivo/referencia obligatorio (contrato firmado, OC, etc).
      */
     const isManualHito0 =
       previousStatus === 'draft' && command.data.status === 'active' && project.type === 'development' && project.salesStage === 'approved';

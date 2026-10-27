@@ -227,7 +227,7 @@ describe('EditProjectDialog', () => {
     expect(estado).toHaveValue('draft');
   });
 
-  it('no ofrece "Activo" en el Estado a quien no es Gerencia/PMO (el líder no puede activar el proyecto)', () => {
+  it('ofrece la activación manual también al líder del proyecto (sin Gerencia/PMO)', () => {
     renderDialog({
       open: true,
       project: buildProject({ salesStage: 'approved', status: 'draft' }),
@@ -237,7 +237,7 @@ describe('EditProjectDialog', () => {
     });
 
     const estado = screen.getByLabelText('Estado') as HTMLSelectElement;
-    expect(Array.from(estado.options).map((option) => option.value)).not.toContain('active');
+    expect(Array.from(estado.options).map((option) => option.textContent)).toContain('Activo (activación manual)');
   });
 
   it('ofrece la activación manual a Gerencia/PMO', () => {
