@@ -48,8 +48,12 @@ import { useUsersList } from '@/modules/users/api/users.queries';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { projectPath } from '@/app/router/paths';
 
-// Todos los estados: el filtro ofrece exactamente los mismos valores que muestra la columna Estado.
-const STATUS_OPTIONS = PROJECT_STATUSES.map((status) => ({ value: status, label: PROJECT_STATUS_LABELS[status] }));
+// Finalizado y Cancelado no se ofrecen como filtro: el listado de desarrollo se filtra solo por los estados en curso.
+const HIDDEN_STATUS_FILTERS: readonly ProjectStatus[] = ['finished', 'cancelled'];
+const STATUS_OPTIONS = PROJECT_STATUSES.filter((status) => !HIDDEN_STATUS_FILTERS.includes(status)).map((status) => ({
+  value: status,
+  label: PROJECT_STATUS_LABELS[status],
+}));
 const PHASE_OPTIONS = PROJECT_PHASES.map((phase) => ({ value: phase, label: PROJECT_PHASE_LABELS[phase] }));
 const KIND_OPTIONS = PROJECT_KINDS.map((kind) => ({ value: kind, label: PROJECT_KIND_LABELS[kind] }));
 const TABS = [
