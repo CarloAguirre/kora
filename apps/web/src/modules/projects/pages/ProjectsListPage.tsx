@@ -55,7 +55,11 @@ const STATUS_OPTIONS = PROJECT_STATUSES.filter((status) => !HIDDEN_STATUS_FILTER
   label: PROJECT_STATUS_LABELS[status],
 }));
 const PHASE_OPTIONS = PROJECT_PHASES.map((phase) => ({ value: phase, label: PROJECT_PHASE_LABELS[phase] }));
-const KIND_OPTIONS = PROJECT_KINDS.map((kind) => ({ value: kind, label: PROJECT_KIND_LABELS[kind] }));
+// Igual que en Estado, "Finalizado" no se ofrece como filtro de Tipo de proyecto.
+const KIND_OPTIONS = PROJECT_KINDS.filter((kind) => kind !== 'finished').map((kind) => ({
+  value: kind,
+  label: PROJECT_KIND_LABELS[kind],
+}));
 const TABS = [
   { id: 'development', label: 'Proyectos Desarrollo' },
   { id: 'support', label: 'Soporte' },
