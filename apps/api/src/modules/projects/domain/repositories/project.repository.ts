@@ -25,6 +25,7 @@ export type ProjectSortableField =
   | 'name'
   | 'status'
   | 'stage'
+  | 'kind'
   | 'priority'
   | 'createdAt'
   | 'client'

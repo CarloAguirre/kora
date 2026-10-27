@@ -35,7 +35,7 @@ export const PROJECT_SALES_STAGE_LABELS: Readonly<Record<ProjectSalesStage, stri
 /**
  * "Tipo de proyecto" de desarrollo — capa sobre `salesStage` + `status` (mismo criterio que el
  * selector del diálogo de edición): `finished` es el estado Finalizado; el resto sale de
- * `salesStage` (sin `salesStage` cuenta como prospecto). Solo se usa como filtro del listado.
+ * `salesStage` (sin `salesStage` cuenta como prospecto). Filtro y columna "Tipo" del listado.
  */
 export const PROJECT_KINDS = ['prospect', 'quoted', 'approved', 'finished'] as const;
 export const projectKindSchema = z.enum(PROJECT_KINDS);
@@ -44,9 +44,16 @@ export type ProjectKind = z.infer<typeof projectKindSchema>;
 export const PROJECT_KIND_LABELS: Readonly<Record<ProjectKind, string>> = {
   prospect: 'Prospecto',
   quoted: 'En cotización',
-  approved: 'Proyecto aprobado',
-  finished: 'Proyecto finalizado',
+  approved: 'Aprobado',
+  finished: 'Finalizado',
 };
+
+export function projectKindOf(project: { salesStage: ProjectSalesStage | null; status: ProjectStatus }): ProjectKind {
+  if (project.status === 'finished') return 'finished';
+  if (project.salesStage === 'approved') return 'approved';
+  if (project.salesStage === 'quoted') return 'quoted';
+  return 'prospect';
+}
 
 export const PROJECT_STATUSES = ['draft', 'active', 'on_hold', 'finished', 'cancelled'] as const;
 export const projectStatusSchema = z.enum(PROJECT_STATUSES);
@@ -1023,6 +1030,7 @@ export const projectSortFieldSchema = z.enum([
   'name',
   'status',
   'stage',
+  'kind',
   'priority',
   'createdAt',
   'client',

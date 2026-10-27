@@ -441,25 +441,26 @@ export class DrizzleProjectRepository implements ProjectRepository {
     }
 
     if (sort.field === 'stage') {
-      // Orden de ciclo de vida de la etiqueta "Etapa" que muestra el listado (`getProjectStageLabel` del front):
-      // en desarrollo, Prospecto → Cotización → No iniciado → fases → Detenido → Finalizado → Cancelado;
-      // en soporte la etapa es el estado (Activo / Inactivo / Terminado). "No Aplica" queda al final.
+      // Orden de ciclo de vida de la columna "Etapa": en desarrollo es la fase (Levantamiento → … → Finalizado,
+      // sin fase al final); en soporte la etapa es el estado (Activo / Inactivo / Terminado).
       const rank = sql`case
         when ${projects.type} = 'support' then case ${projects.status}
           when 'active' then 1 when 'finished' then 3 else 2 end
-        when ${projects.status} = 'finished' then 9
-        when ${projects.status} = 'cancelled' then 10
-        when ${projects.status} = 'on_hold' then 8
-        when ${projects.status} = 'draft' then 3
-        when ${projects.salesStage} = 'prospect' then 1
-        when ${projects.salesStage} = 'quoted' then 2
-        when ${projects.phase} = 'discovery' then 4
-        when ${projects.phase} = 'development' then 5
-        when ${projects.phase} = 'testing' then 6
-        when ${projects.phase} = 'pilot' then 7
-        when ${projects.phase} = 'closed' then 9
+        else case ${projects.phase}
+          when 'discovery' then 1 when 'development' then 2 when 'testing' then 3 when 'pilot' then 4 when 'closed' then 5 end
       end`;
       return [sql`${rank} ${sqlDirection} nulls last`, asc(projects.id)];
+    }
+
+    if (sort.field === 'kind') {
+      // Mismo criterio que `projectKindOf`: Prospecto → En cotización → Aprobado → Finalizado.
+      const rank = sql`case
+        when ${projects.status} = 'finished' then 4
+        when ${projects.salesStage} = 'approved' then 3
+        when ${projects.salesStage} = 'quoted' then 2
+        else 1
+      end`;
+      return [sql`${rank} ${sqlDirection}`, asc(projects.id)];
     }
 
     if (sort.field === 'supportPlan') {

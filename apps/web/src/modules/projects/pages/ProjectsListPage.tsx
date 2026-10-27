@@ -8,6 +8,7 @@ import {
   PROJECT_STATUSES,
   PROJECT_STATUS_LABELS,
   SUPPORT_PLAN_TYPE_LABELS,
+  projectKindOf,
   type ProjectKind,
   type ProjectPhase,
   type ProjectSortField,
@@ -47,12 +48,8 @@ import { useUsersList } from '@/modules/users/api/users.queries';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { projectPath } from '@/app/router/paths';
 
-// Finalizado y Cancelado no se ofrecen en el filtro del dashboard.
-const HIDDEN_FILTER_STATUSES: readonly ProjectStatus[] = ['finished', 'cancelled'];
-const STATUS_OPTIONS = PROJECT_STATUSES.filter((status) => !HIDDEN_FILTER_STATUSES.includes(status)).map((status) => ({
-  value: status,
-  label: PROJECT_STATUS_LABELS[status],
-}));
+// Todos los estados: el filtro ofrece exactamente los mismos valores que muestra la columna Estado.
+const STATUS_OPTIONS = PROJECT_STATUSES.map((status) => ({ value: status, label: PROJECT_STATUS_LABELS[status] }));
 const PHASE_OPTIONS = PROJECT_PHASES.map((phase) => ({ value: phase, label: PROJECT_PHASE_LABELS[phase] }));
 const KIND_OPTIONS = PROJECT_KINDS.map((kind) => ({ value: kind, label: PROJECT_KIND_LABELS[kind] }));
 const TABS = [
@@ -223,8 +220,15 @@ export function ProjectsListPage() {
     },
     { key: 'client', header: 'Cliente', sortable: true, render: (p) => p.client?.companyName ?? <span className={styles.empty}>—</span> },
     { key: 'leader', header: 'Líder', sortable: true, render: (p) => p.leader?.fullName ?? <span className={styles.empty}>—</span> },
+    // Tipo, Estado y Etapa muestran cada uno su propio dato — los mismos valores que ofrecen sus filtros.
+    { key: 'kind', header: 'Tipo de proyecto', sortable: true, render: (p) => PROJECT_KIND_LABELS[projectKindOf(p)] },
     { key: 'status', header: 'Estado', sortable: true, render: (p) => <ProjectStatusBadge status={p.status} /> },
-    { key: 'stage', header: 'Etapa', sortable: true, render: (p) => getProjectStageLabel(p) },
+    {
+      key: 'stage',
+      header: 'Etapa',
+      sortable: true,
+      render: (p) => (p.phase ? PROJECT_PHASE_LABELS[p.phase] : <span className={styles.empty}>—</span>),
+    },
     {
       key: 'startDate',
       header: 'Inicio',

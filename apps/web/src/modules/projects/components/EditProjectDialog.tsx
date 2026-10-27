@@ -615,6 +615,8 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
   const estimationDisabled = isDevelopment && tipo === 'prospecto';
   /** Finalizado: Estado, etapa de avance y etapa de cada fase quedan fijos (se reabre volviendo a "Proyecto aprobado"). */
   const isFinalized = isDevelopment && tipo === 'finalizado';
+  /** La etapa de avance solo corresponde a proyectos Activos — Prospecto, Cotización y Aprobado No iniciado o Detenido la tienen bloqueada (igual que al crear). */
+  const phaseEnabled = estado === 'active';
   /** Antes de Aprobado son horas estimadas para la cotización; al aprobarse quedan como horas vendidas. */
   const hoursLabel = isDevelopment && (tipo === 'prospecto' || tipo === 'cotizacion') ? 'HH estimadas' : 'HH vendidas';
   /** Al pasar a Aprobado el plan de pago debe tener montos — se avisa apenas se elige el tipo y bloquea el guardado. */
@@ -806,8 +808,9 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
                 label="Etapa de avance"
                 placeholder="Sin definir"
                 options={PHASE_OPTIONS}
+                helperText={phaseEnabled || isFinalized ? undefined : 'Solo para proyectos activos.'}
                 // Deshabilitado, react-hook-form no lo envía y la etapa guardada se mantiene.
-                disabled={isFinalized}
+                disabled={!phaseEnabled}
                 {...register('phase', { setValueAs: emptyToNull })}
               />
             </div>
