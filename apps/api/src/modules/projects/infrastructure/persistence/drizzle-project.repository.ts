@@ -453,7 +453,7 @@ export class DrizzleProjectRepository implements ProjectRepository {
     }
 
     if (sort.field === 'kind') {
-      // Mismo criterio que `projectKindOf`: Prospecto → En cotización → Aprobado → Finalizado.
+      // Mismo criterio que `projectKindOf`: Prospecto → Cotización → Aprobado → Finalizado.
       const rank = sql`case
         when ${projects.status} = 'finished' then 4
         when ${projects.salesStage} = 'approved' then 3

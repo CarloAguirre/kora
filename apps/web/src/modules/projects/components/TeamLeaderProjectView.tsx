@@ -207,6 +207,10 @@ export function TeamLeaderProjectView({
             <span className={styles.infoValue}>{project.commercialManager?.fullName ?? '—'}</span>
           </div>
           <div>
+            <span className={styles.infoLabel}>Líder - PM Responsable</span>
+            <span className={styles.infoValue}>{project.leader?.fullName ?? '—'}</span>
+          </div>
+          <div>
             <span className={styles.infoLabel}>Fecha de inicio</span>
             <span className={styles.infoValue}>{project.startDate ? formatDate(project.startDate) : '—'}</span>
           </div>

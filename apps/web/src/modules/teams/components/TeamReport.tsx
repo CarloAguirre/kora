@@ -1,6 +1,12 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ClipboardEvent, type KeyboardEvent } from 'react';
 import { Link } from 'react-router-dom';
-import type { TeamReportProject, TeamReportResponse } from '@kora/contracts';
+import {
+  PROJECT_SALES_STAGES,
+  PROJECT_SALES_STAGE_LABELS,
+  type ProjectSalesStage,
+  type TeamReportProject,
+  type TeamReportResponse,
+} from '@kora/contracts';
 import styles from './TeamReport.module.css';
 import { Card } from '@/shared/components/ui/Card';
 import { Select } from '@/shared/components/ui/Select';
@@ -86,6 +92,7 @@ export function TeamReport({ team, currentUserId, memberUserId, onMemberChange }
   const [includePending, setIncludePending] = useState(false);
   const [statusFilter, setStatusFilter] = useState<ParticipationStatus | 'all'>('all');
   const [alertFilter, setAlertFilter] = useState<AlertFilter>('');
+  const [salesStageFilter, setSalesStageFilter] = useState<ProjectSalesStage | ''>('');
   const [search, setSearch] = useState('');
   // `null` = el orden del servidor (cliente, proyecto) — el del período "Acumulado".
   const [sort, setSort] = useState<SortState<SortField> | null>(null);
@@ -104,6 +111,8 @@ export function TeamReport({ team, currentUserId, memberUserId, onMemberChange }
       if (statusFilter !== 'all' && row.participation.status !== statusFilter) return false;
       if (alertFilter === 'missing_assigned' && !row.missingAssigned) return false;
       if (alertFilter === 'missing_dates' && !row.missingDates) return false;
+      // Sin `salesStage` cuenta como prospecto — mismo criterio que `projectKindOf` en el listado de proyectos.
+      if (salesStageFilter && (row.project.salesStage ?? 'prospect') !== salesStageFilter) return false;
       if (memberUserId && !((row.hoursByUser.get(memberUserId) ?? 0) > 0)) return false;
       if (query) {
         const haystack = [row.project.client?.companyName, row.project.name, row.project.comment].filter(Boolean).join(' ').toLowerCase();
@@ -114,13 +123,14 @@ export function TeamReport({ team, currentUserId, memberUserId, onMemberChange }
     if (!sort) return filtered;
     const valueOf = SORT_VALUE[sort.field];
     return [...filtered].sort((a, b) => compareSortValues(valueOf(a), valueOf(b), sort.direction));
-  }, [rows, statusFilter, alertFilter, memberUserId, search, sort]);
+  }, [rows, statusFilter, alertFilter, salesStageFilter, memberUserId, search, sort]);
 
   const pageCount = Math.max(1, Math.ceil(visibleRows.length / pageSize));
   const currentPage = Math.min(page, pageCount);
   const pageRows = visibleRows.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
-  const hasFilters = statusFilter !== 'all' || alertFilter !== '' || memberUserId !== '' || search.trim() !== '';
+  const hasFilters =
+    statusFilter !== 'all' || alertFilter !== '' || salesStageFilter !== '' || memberUserId !== '' || search.trim() !== '';
 
   const resetPage = () => setPage(1);
 
@@ -154,6 +164,7 @@ export function TeamReport({ team, currentUserId, memberUserId, onMemberChange }
   const clearFilters = () => {
     setStatusFilter('all');
     setAlertFilter('');
+    setSalesStageFilter('');
     setSearch('');
     onMemberChange('');
     resetPage();
@@ -267,6 +278,22 @@ export function TeamReport({ team, currentUserId, memberUserId, onMemberChange }
                 resetPage();
               }}
               iconLeft={<SearchIcon size={16} />}
+            />
+            <Select
+              className={styles.memberSelect}
+              aria-label="Tipo de proyecto"
+              options={[
+                { value: '', label: 'Tipo: todos' },
+                ...PROJECT_SALES_STAGES.map((stage) => ({
+                  value: stage,
+                  label: PROJECT_SALES_STAGE_LABELS[stage],
+                })),
+              ]}
+              value={salesStageFilter}
+              onChange={(event) => {
+                setSalesStageFilter(event.target.value as ProjectSalesStage | '');
+                resetPage();
+              }}
             />
             <Select
               className={styles.memberSelect}

@@ -173,7 +173,7 @@ function deriveTipo(salesStage: ProjectSalesStage | null, status: ProjectStatus)
 
 const TIPO_OPTIONS: Array<{ value: ProjectTipo; label: string }> = [
   { value: 'prospecto', label: 'Prospecto' },
-  { value: 'cotizacion', label: 'En cotización' },
+  { value: 'cotizacion', label: 'Cotización' },
   { value: 'aprobado', label: 'Proyecto aprobado' },
   { value: 'finalizado', label: 'Proyecto finalizado' },
 ];

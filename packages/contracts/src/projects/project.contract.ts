@@ -43,7 +43,7 @@ export type ProjectKind = z.infer<typeof projectKindSchema>;
 
 export const PROJECT_KIND_LABELS: Readonly<Record<ProjectKind, string>> = {
   prospect: 'Prospecto',
-  quoted: 'En cotización',
+  quoted: 'Cotización',
   approved: 'Aprobado',
   finished: 'Finalizado',
 };
@@ -73,7 +73,7 @@ export type ProjectPhase = z.infer<typeof projectPhaseSchema>;
 
 export const PROJECT_PHASE_LABELS: Readonly<Record<ProjectPhase, string>> = {
   discovery: 'Levantamiento',
-  development: 'En desarrollo',
+  development: 'Desarrollo',
   testing: 'Pruebas',
   pilot: 'Marcha blanca',
   closed: 'Finalizado',
