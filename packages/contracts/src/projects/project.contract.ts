@@ -32,6 +32,22 @@ export const PROJECT_SALES_STAGE_LABELS: Readonly<Record<ProjectSalesStage, stri
   approved: 'Aprobado',
 };
 
+/**
+ * "Tipo de proyecto" de desarrollo — capa sobre `salesStage` + `status` (mismo criterio que el
+ * selector del diálogo de edición): `finished` es el estado Finalizado; el resto sale de
+ * `salesStage` (sin `salesStage` cuenta como prospecto). Solo se usa como filtro del listado.
+ */
+export const PROJECT_KINDS = ['prospect', 'quoted', 'approved', 'finished'] as const;
+export const projectKindSchema = z.enum(PROJECT_KINDS);
+export type ProjectKind = z.infer<typeof projectKindSchema>;
+
+export const PROJECT_KIND_LABELS: Readonly<Record<ProjectKind, string>> = {
+  prospect: 'Prospecto',
+  quoted: 'En cotización',
+  approved: 'Proyecto aprobado',
+  finished: 'Proyecto finalizado',
+};
+
 export const PROJECT_STATUSES = ['draft', 'active', 'on_hold', 'finished', 'cancelled'] as const;
 export const projectStatusSchema = z.enum(PROJECT_STATUSES);
 export type ProjectStatus = z.infer<typeof projectStatusSchema>;
@@ -1006,6 +1022,7 @@ export type ResolveProjectObservationInput = z.infer<typeof resolveProjectObserv
 export const projectSortFieldSchema = z.enum([
   'name',
   'status',
+  'stage',
   'priority',
   'createdAt',
   'client',
@@ -1037,6 +1054,8 @@ export const listProjectsQuerySchema = paginationQuerySchema.extend({
   type: projectTypeSchema.optional(),
   status: arrayQueryParam(projectStatusSchema),
   phase: arrayQueryParam(projectPhaseSchema),
+  /** "Tipo de proyecto" (filtro Tipo de proyecto de la tab Desarrollo) — ver `PROJECT_KINDS`. */
+  kind: arrayQueryParam(projectKindSchema),
   /** Acepta id o slug: la ficha de cliente filtra por el `clientId` de la URL, que ahora es el slug del cliente — se resuelve a UUID en `ListProjectsUseCase`. */
   clientId: z.string().optional(),
   /** Varios clientes por UUID (filtro Cliente del gráfico resumen). */

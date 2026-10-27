@@ -1,5 +1,5 @@
 import type { Page, PageRequest, SortRequest, TransactionContext } from '@kora/core';
-import type { ProjectPhase, ProjectStatus, ProjectType } from '@kora/contracts';
+import type { ProjectKind, ProjectPhase, ProjectStatus, ProjectType } from '@kora/contracts';
 import type { Project } from '../entities/project.entity';
 
 export interface ProjectFilters {
@@ -7,6 +7,8 @@ export interface ProjectFilters {
   readonly type?: ProjectType | undefined;
   readonly status?: readonly ProjectStatus[] | undefined;
   readonly phase?: readonly ProjectPhase[] | undefined;
+  /** "Tipo de proyecto" — ver `PROJECT_KINDS`. */
+  readonly kind?: readonly ProjectKind[] | undefined;
   readonly clientId?: string | undefined;
   readonly clientIds?: readonly string[] | undefined;
   /** Proyectos cuyo rango Inicio–Fin se cruza con alguno de estos períodos (`YYYY-MM-DD`, ambos extremos incluidos). */
@@ -22,6 +24,7 @@ export interface ProjectFilters {
 export type ProjectSortableField =
   | 'name'
   | 'status'
+  | 'stage'
   | 'priority'
   | 'createdAt'
   | 'client'

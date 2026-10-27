@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
+  PROJECT_KINDS,
+  PROJECT_KIND_LABELS,
   PROJECT_PHASES,
   PROJECT_PHASE_LABELS,
   PROJECT_STATUSES,
   PROJECT_STATUS_LABELS,
   SUPPORT_PLAN_TYPE_LABELS,
+  type ProjectKind,
   type ProjectPhase,
   type ProjectSortField,
   type ProjectStatus,
@@ -51,6 +54,7 @@ const STATUS_OPTIONS = PROJECT_STATUSES.filter((status) => !HIDDEN_FILTER_STATUS
   label: PROJECT_STATUS_LABELS[status],
 }));
 const PHASE_OPTIONS = PROJECT_PHASES.map((phase) => ({ value: phase, label: PROJECT_PHASE_LABELS[phase] }));
+const KIND_OPTIONS = PROJECT_KINDS.map((kind) => ({ value: kind, label: PROJECT_KIND_LABELS[kind] }));
 const TABS = [
   { id: 'development', label: 'Proyectos Desarrollo' },
   { id: 'support', label: 'Soporte' },
@@ -73,8 +77,8 @@ const DATE_COLUMN_WIDTH = '120px';
 /**
  * Listado de proyectos: tabs Desarrollo/Soporte, gráfico resumen y tabla
  * completa, siguiendo la misma disposición que `Proyectos/index.tsx` en la
- * v1. La tab Desarrollo lleva los filtros Líder/Estado/Etapa/Buscar, los tres
- * primeros con selección múltiple (`MultiSelect`, checkboxes + búsqueda),
+ * v1. La tab Desarrollo lleva los filtros Líder/Tipo de proyecto/Estado/Etapa/Buscar, todos
+ * menos Buscar con selección múltiple (`MultiSelect`, checkboxes + búsqueda),
  * igual que en la v1; la tab Soporte, igual que en la v1, no lleva esos filtros — solo el
  * sub-selector Activos/Terminados/Inactivos y Buscar. Sin el filtro de
  * Período/Detalle del gráfico, que depende de datos que aún no existen
@@ -86,7 +90,7 @@ export function ProjectsListPage() {
   const toast = useToast();
   const location = useLocation();
   const [listSearch, setListSearch] = useState(() => initialProjectsListSearch(location.state));
-  const { tab, supportSubTab, search, leaderUserIds, statuses, phases, page, pageSize, sort } = listSearch;
+  const { tab, supportSubTab, search, leaderUserIds, kinds, statuses, phases, page, pageSize, sort } = listSearch;
   const updateListSearch = (patch: Partial<ProjectsListSearch>) => setListSearch((current) => ({ ...current, ...patch }));
   const setPage = (next: number) => updateListSearch({ page: next });
 
@@ -105,6 +109,7 @@ export function ProjectsListPage() {
           type: tab,
           search: search || undefined,
           leaderUserId: leaderUserIds.length > 0 ? leaderUserIds : undefined,
+          kind: kinds.length > 0 ? kinds : undefined,
           status: statuses.length > 0 ? statuses : undefined,
           phase: phases.length > 0 ? phases : undefined,
         }
@@ -219,7 +224,7 @@ export function ProjectsListPage() {
     { key: 'client', header: 'Cliente', sortable: true, render: (p) => p.client?.companyName ?? <span className={styles.empty}>—</span> },
     { key: 'leader', header: 'Líder', sortable: true, render: (p) => p.leader?.fullName ?? <span className={styles.empty}>—</span> },
     { key: 'status', header: 'Estado', sortable: true, render: (p) => <ProjectStatusBadge status={p.status} /> },
-    { key: 'stage', header: 'Etapa', render: (p) => getProjectStageLabel(p) },
+    { key: 'stage', header: 'Etapa', sortable: true, render: (p) => getProjectStageLabel(p) },
     {
       key: 'startDate',
       header: 'Inicio',
@@ -365,6 +370,15 @@ export function ProjectsListPage() {
                   options={leaderOptions}
                   value={leaderUserIds}
                   onChange={(next) => updateListSearch({ leaderUserIds: next, page: 1 })}
+                />
+                <MultiSelect
+                  className={styles.filter}
+                  label="Tipo de proyecto"
+                  placeholder="Todos"
+                  searchPlaceholder="Buscar tipo"
+                  options={KIND_OPTIONS}
+                  value={kinds}
+                  onChange={(next) => updateListSearch({ kinds: next as ProjectKind[], page: 1 })}
                 />
                 <MultiSelect
                   className={styles.filter}

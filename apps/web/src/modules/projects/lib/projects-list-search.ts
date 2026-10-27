@@ -1,4 +1,4 @@
-import type { ProjectPhase, ProjectSortField, ProjectStatus } from '@kora/contracts';
+import type { ProjectKind, ProjectPhase, ProjectSortField, ProjectStatus } from '@kora/contracts';
 import type { SortState } from '@/shared/components/ui/DataTable';
 import { DEFAULT_PAGE_SIZE } from '@/shared/components/ui/Pagination';
 
@@ -40,6 +40,7 @@ export interface ProjectsListSearch {
   supportSubTab: SupportSubTab;
   search: string;
   leaderUserIds: string[];
+  kinds: ProjectKind[];
   statuses: ProjectStatus[];
   phases: ProjectPhase[];
   page: number;
@@ -52,6 +53,7 @@ export const DEFAULT_PROJECTS_LIST_SEARCH: ProjectsListSearch = {
   supportSubTab: 'active',
   search: '',
   leaderUserIds: [],
+  kinds: [],
   statuses: [],
   phases: [],
   page: 1,

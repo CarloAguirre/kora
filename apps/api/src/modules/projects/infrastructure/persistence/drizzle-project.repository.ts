@@ -328,6 +328,17 @@ export class DrizzleProjectRepository implements ProjectRepository {
     if (filters.type) conditions.push(eq(projects.type, filters.type));
     if (filters.status?.length) conditions.push(inArray(projects.status, filters.status));
     if (filters.phase?.length) conditions.push(inArray(projects.phase, filters.phase));
+    if (filters.kind?.length) {
+      // Mismo criterio que `deriveTipo` del diálogo de edición: Finalizado manda sobre la etapa comercial.
+      const notFinished = sql`${projects.status} <> 'finished'`;
+      const byKind = {
+        finished: sql`${projects.status} = 'finished'`,
+        approved: sql`(${notFinished} and ${projects.salesStage} = 'approved')`,
+        quoted: sql`(${notFinished} and ${projects.salesStage} = 'quoted')`,
+        prospect: sql`(${notFinished} and (${projects.salesStage} = 'prospect' or ${projects.salesStage} is null))`,
+      };
+      conditions.push(or(...filters.kind.map((kind) => byKind[kind])));
+    }
     if (filters.clientId) conditions.push(eq(projects.clientId, filters.clientId));
     if (filters.clientIds?.length) conditions.push(inArray(projects.clientId, [...filters.clientIds]));
     if (filters.periods?.length) {
@@ -427,6 +438,28 @@ export class DrizzleProjectRepository implements ProjectRepository {
 
     if (sort.field === 'progress') {
       return [sql`${projects.actualProgress} ${sqlDirection} nulls last`, asc(projects.id)];
+    }
+
+    if (sort.field === 'stage') {
+      // Orden de ciclo de vida de la etiqueta "Etapa" que muestra el listado (`getProjectStageLabel` del front):
+      // en desarrollo, Prospecto → Cotización → No iniciado → fases → Detenido → Finalizado → Cancelado;
+      // en soporte la etapa es el estado (Activo / Inactivo / Terminado). "No Aplica" queda al final.
+      const rank = sql`case
+        when ${projects.type} = 'support' then case ${projects.status}
+          when 'active' then 1 when 'finished' then 3 else 2 end
+        when ${projects.status} = 'finished' then 9
+        when ${projects.status} = 'cancelled' then 10
+        when ${projects.status} = 'on_hold' then 8
+        when ${projects.status} = 'draft' then 3
+        when ${projects.salesStage} = 'prospect' then 1
+        when ${projects.salesStage} = 'quoted' then 2
+        when ${projects.phase} = 'discovery' then 4
+        when ${projects.phase} = 'development' then 5
+        when ${projects.phase} = 'testing' then 6
+        when ${projects.phase} = 'pilot' then 7
+        when ${projects.phase} = 'closed' then 9
+      end`;
+      return [sql`${rank} ${sqlDirection} nulls last`, asc(projects.id)];
     }
 
     if (sort.field === 'supportPlan') {

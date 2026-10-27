@@ -613,6 +613,8 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
   const soldHoursLocked = isDevelopment && project.hito0At != null;
   /** En Prospecto la estimación aún no se completa: fechas y horas se ingresan al pasar a Cotización (prototipo: `renderEstimacion()`). */
   const estimationDisabled = isDevelopment && tipo === 'prospecto';
+  /** Finalizado: Estado, etapa de avance y etapa de cada fase quedan fijos (se reabre volviendo a "Proyecto aprobado"). */
+  const isFinalized = isDevelopment && tipo === 'finalizado';
   /** Antes de Aprobado son horas estimadas para la cotización; al aprobarse quedan como horas vendidas. */
   const hoursLabel = isDevelopment && (tipo === 'prospecto' || tipo === 'cotizacion') ? 'HH estimadas' : 'HH vendidas';
   /** Al pasar a Aprobado el plan de pago debe tener montos — se avisa apenas se elige el tipo y bloquea el guardado. */
@@ -797,13 +799,15 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
                 label="Estado"
                 options={estadoOptions.map((status) => ({ value: status, label: estadoLabel(tipo, status, project.status) }))}
                 value={estado}
-                disabled={tipo === 'finalizado'}
+                disabled={isFinalized}
                 onChange={(event) => setEstado(event.target.value as ProjectStatus)}
               />
               <Select
                 label="Etapa de avance"
                 placeholder="Sin definir"
                 options={PHASE_OPTIONS}
+                // Deshabilitado, react-hook-form no lo envía y la etapa guardada se mantiene.
+                disabled={isFinalized}
                 {...register('phase', { setValueAs: emptyToNull })}
               />
             </div>
@@ -1150,6 +1154,7 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
                             label="Etapa actual"
                             options={MODULE_STAGE_OPTIONS}
                             value={module.currentStage}
+                            disabled={isFinalized}
                             onChange={(event) =>
                               void onSaveModuleField(module.id, { currentStage: event.target.value as ProjectModuleStage })
                             }
