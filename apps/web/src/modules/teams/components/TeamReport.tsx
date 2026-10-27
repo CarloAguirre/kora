@@ -111,8 +111,8 @@ export function TeamReport({ team, currentUserId, memberUserId, onMemberChange }
       if (statusFilter !== 'all' && row.participation.status !== statusFilter) return false;
       if (alertFilter === 'missing_assigned' && !row.missingAssigned) return false;
       if (alertFilter === 'missing_dates' && !row.missingDates) return false;
-      // Sin `salesStage` cuenta como prospecto — mismo criterio que `projectKindOf` en el listado de proyectos.
-      if (salesStageFilter && (row.project.salesStage ?? 'prospect') !== salesStageFilter) return false;
+      // En el reporte `salesStage` es `null` solo en soporte: esos proyectos no entran en ningún tipo.
+      if (salesStageFilter && row.project.salesStage !== salesStageFilter) return false;
       if (memberUserId && !((row.hoursByUser.get(memberUserId) ?? 0) > 0)) return false;
       if (query) {
         const haystack = [row.project.client?.companyName, row.project.name, row.project.comment].filter(Boolean).join(' ').toLowerCase();

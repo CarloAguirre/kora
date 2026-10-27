@@ -28,6 +28,7 @@ export interface ProjectDocument {
 export function ProjectInfoBar({
   clientName,
   leaderName,
+  commercialManagerName,
   dateRange,
   salesStage,
   status,
@@ -36,6 +37,7 @@ export function ProjectInfoBar({
 }: {
   clientName: string;
   leaderName: string;
+  commercialManagerName: string;
   dateRange: string;
   salesStage: ProjectSalesStage | null;
   status: ProjectStatus;
@@ -46,6 +48,7 @@ export function ProjectInfoBar({
     <div className={styles.bar}>
       <InfoItem icon={<BuildingIcon size={16} />} label="Cliente" value={clientName} />
       <InfoItem icon={<UserIcon size={16} />} label="Líder - PM Responsable" value={leaderName} />
+      <InfoItem icon={<UserIcon size={16} />} label="Responsable comercial" value={commercialManagerName} />
       <InfoItem icon={<CalendarIcon size={16} />} label="Fecha de inicio - fin" value={dateRange} />
       <InfoItem
         icon={<TrendingUpIcon size={16} />}

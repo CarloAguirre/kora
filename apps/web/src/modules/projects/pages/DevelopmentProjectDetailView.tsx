@@ -261,6 +261,7 @@ export function DevelopmentProjectDetailView({
         <ProjectInfoBar
           clientName={project.client?.companyName ?? "Sin cliente"}
           leaderName={project.leader?.fullName ?? "—"}
+          commercialManagerName={project.commercialManager?.fullName ?? "—"}
           dateRange={`${formatDate(project.startDate)} - ${formatDate(project.endDate)}`}
           salesStage={project.salesStage}
           status={project.status}
