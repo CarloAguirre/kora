@@ -325,6 +325,20 @@ export class ProjectManagementApprovalNotPendingError extends ConflictError {
  * evita casos de borde (proyecto activo sin equipos/horas/cotización). No
  * aplica a `type='support'`, que no tiene etapa comercial.
  */
+/** Marcar/desmarcar un proyecto como interno lo saca/devuelve de Facturación — decisión de Gerencia/PMO, no del líder. */
+export class CannotChangeProjectInternalFlagError extends ForbiddenError {
+  constructor() {
+    super('Solo Gerencia/PMO puede marcar o desmarcar un proyecto como interno.', 'PROJECT_CANNOT_CHANGE_INTERNAL_FLAG');
+  }
+}
+
+/** Un proyecto interno no se cobra: no tiene tramos de pago que crear ni facturar. */
+export class ProjectIsInternalError extends ValidationError {
+  constructor() {
+    super('Este proyecto es interno: no tiene plan de pago ni facturación.', 'PROJECT_IS_INTERNAL');
+  }
+}
+
 export class ProjectNotApprovedForInvoicingError extends ValidationError {
   constructor() {
     super(

@@ -82,6 +82,10 @@ export class UpdateProjectUseCase implements UseCase<UpdateProjectCommand, void,
       return err(new CannotReassignProjectLeaderError());
     }
 
+    if (!hasFullManage && data.isInternal !== undefined && data.isInternal !== project.isInternal) {
+      return err(new CannotChangeProjectInternalFlagError());
+    }
+
     /** Mismo criterio no-op que `leaderUserId`: reenviar el mismo valor sin tocarlo se deja pasar. */
     if (project.hito0At && data.soldHours !== undefined && data.soldHours !== project.toSnapshot().soldHours) {
       return err(new SoldHoursLockedAfterHito0Error());
@@ -174,6 +178,7 @@ export class UpdateProjectUseCase implements UseCase<UpdateProjectCommand, void,
         ...(data.qaFailedTests !== undefined ? { qaFailedTests: data.qaFailedTests } : {}),
         ...(data.contractAmount !== undefined ? { contractAmount: data.contractAmount ?? null } : {}),
         ...(data.contractCurrency !== undefined ? { contractCurrency: data.contractCurrency } : {}),
+        ...(data.isInternal !== undefined ? { isInternal: data.isInternal } : {}),
       },
       now,
     );
@@ -224,6 +229,15 @@ export class UpdateProjectUseCase implements UseCase<UpdateProjectCommand, void,
       });
     }
 
+    if (before.isInternal !== after.isInternal) {
+      changeEntries.push({
+        projectId: project.id,
+        message: after.isInternal
+          ? 'Proyecto marcado como interno: sin facturación ni avisos de cobro.'
+          : 'Proyecto desmarcado como interno: vuelve a tener plan de pago y facturación.',
+      });
+    }
+
     if (before.estimatedDeliveryDate?.getTime() !== after.estimatedDeliveryDate?.getTime()) {
       changeEntries.push({
         projectId: project.id,
@@ -235,7 +249,8 @@ export class UpdateProjectUseCase implements UseCase<UpdateProjectCommand, void,
     try {
       await this.unitOfWork.run(async (tx) => {
         await this.projects.save(project, tx);
-        if (project.type === 'development') {
+        // Un proyecto interno no se cobra: su plan de pago (si quedó de antes) no se toca ni se promueve.
+        if (project.type === 'development' && !project.isInternal) {
           if (data.paymentMilestones) {
             await syncPaymentPlan(
               this.paymentMilestones,

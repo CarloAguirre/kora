@@ -51,6 +51,7 @@ export function toProjectSummary(item: ProjectListItem, progress: ProjectProgres
     supportPlanType: item.supportPlanType,
     supportHours: item.supportHours,
     allowsOvertime: item.allowsOvertime,
+    isInternal: item.isInternal,
     createdAt: item.createdAt.toISOString(),
   };
 }
@@ -247,6 +248,7 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
     supportHours: Number(snapshot.supportHours),
     overtimeRateUf: Number(snapshot.overtimeRateUf),
     allowsOvertime: snapshot.allowsOvertime,
+    isInternal: snapshot.isInternal,
     canAuthorizeOvertime: source.canAuthorizeOvertime,
     quotationLink: snapshot.quotationLink,
     contractLink: snapshot.contractLink,

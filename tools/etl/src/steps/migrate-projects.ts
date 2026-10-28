@@ -166,13 +166,17 @@ export async function migrateProjects(context: EtlContext): Promise<void> {
       }
     }
 
+    // Prospecto y Cotización solo pueden estar "No iniciado": la v1 los dejaba "Activo" por defecto.
+    const legacyStatus = mapProjectStatus(row.etapa, row.fase_proyecto, row.estado_proyecto);
+    const status = (salesStage === 'prospect' || salesStage === 'quoted') && legacyStatus === 'active' ? 'draft' : legacyStatus;
+
     const values = {
       name: row.nombre_proyecto.trim(),
       clientId,
       primaryContactId,
       type,
       salesStage: type === 'development' ? (salesStage ?? 'approved') : null,
-      status: mapProjectStatus(row.etapa, row.fase_proyecto, row.estado_proyecto),
+      status,
       phase: type === 'development' ? mapProjectPhase(row.fase_proyecto) : null,
       priority: mapPriority(row.prioridad),
       leaderUserId: row.id_lider ? (userIds.get(row.id_lider) ?? null) : null,

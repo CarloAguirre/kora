@@ -188,13 +188,13 @@ const TIPO_TO_SALES_STAGE: Record<ProjectTipo, ProjectSalesStage | null> = {
 
 /**
  * Mismo criterio que `STATUS_OPTIONS_APPROVED`/`STATUS_OPTIONS_NOT_APPROVED` de `NewProjectPage`:
- * antes de Aprobado solo No iniciado o Detenido; Aprobado arranca "No iniciado" y pasa a Activo
- * por Hito 0 (factura del primer tramo, o manual con motivo). Finalizar no es un Estado: se elige
- * "Proyecto finalizado" en Tipo de proyecto.
+ * Prospecto y Cotización siempre son "No iniciado" (el Estado queda bloqueado); Aprobado arranca
+ * "No iniciado" y pasa a Activo por Hito 0 (factura del primer tramo, o manual con motivo).
+ * Finalizar no es un Estado: se elige "Proyecto finalizado" en Tipo de proyecto.
  */
 const ESTADO_OPTIONS_BY_TIPO: Record<ProjectTipo, ProjectStatus[]> = {
-  prospecto: ['draft', 'on_hold'],
-  cotizacion: ['draft', 'on_hold'],
+  prospecto: ['draft'],
+  cotizacion: ['draft'],
   aprobado: ['draft', 'active', 'on_hold'],
   finalizado: ['finished'],
 };
@@ -207,12 +207,8 @@ const ESTADO_DEFAULT_BY_TIPO: Record<ProjectTipo, ProjectStatus> = {
   finalizado: 'finished',
 };
 
-/** Antes de Aprobado, `draft` es "sin estado" y se muestra "—" (prototipo: `estadosDisponibles()` → ['—','Detenido']); "No iniciado" solo existe desde Aprobado. */
-const SIN_ESTADO_LABEL = '—';
-
 function estadoLabel(tipo: ProjectTipo, status: ProjectStatus, currentStatus: ProjectStatus): string {
   if (status === 'active' && tipo === 'aprobado' && currentStatus === 'draft') return 'Activo (activación manual)';
-  if (status === 'draft' && (tipo === 'prospecto' || tipo === 'cotizacion')) return SIN_ESTADO_LABEL;
   return PROJECT_STATUS_LABELS[status];
 }
 
@@ -612,6 +608,8 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
   const estimationDisabled = isDevelopment && tipo === 'prospecto';
   /** Finalizado: Estado, etapa de avance y etapa de cada fase quedan fijos (se reabre volviendo a "Proyecto aprobado"). */
   const isFinalized = isDevelopment && tipo === 'finalizado';
+  /** Prospecto y Cotización solo pueden estar "No iniciado": el Estado no se elige. */
+  const estadoLocked = isFinalized || tipo === 'prospecto' || tipo === 'cotizacion';
   /** La etapa de avance solo corresponde a proyectos Activos — Prospecto, Cotización y Aprobado No iniciado o Detenido la tienen bloqueada (igual que al crear). */
   const phaseEnabled = estado === 'active';
   /** Antes de Aprobado son horas estimadas para la cotización; al aprobarse quedan como horas vendidas. */
@@ -798,7 +796,7 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
                 label="Estado"
                 options={estadoOptions.map((status) => ({ value: status, label: estadoLabel(tipo, status, project.status) }))}
                 value={estado}
-                disabled={isFinalized}
+                disabled={estadoLocked}
                 onChange={(event) => setEstado(event.target.value as ProjectStatus)}
               />
               <Select

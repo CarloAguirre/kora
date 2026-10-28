@@ -212,7 +212,7 @@ describe('EditProjectDialog', () => {
     expect(screen.getByLabelText(/Responsable comercial/)).toBeInTheDocument();
   });
 
-  it.each(['prospect', 'quoted'] as const)('en %s el Estado solo ofrece "—" (sin estado) y Detenido, sin "No iniciado"', (salesStage) => {
+  it.each(['prospect', 'quoted'] as const)('en %s el Estado queda fijo en "No iniciado" y bloqueado', (salesStage) => {
     renderDialog({
       open: true,
       project: buildProject({ salesStage, status: 'draft', phase: null }),
@@ -223,8 +223,9 @@ describe('EditProjectDialog', () => {
 
     const estado = screen.getByLabelText('Estado') as HTMLSelectElement;
     const labels = Array.from(estado.options).map((option) => option.textContent);
-    expect(labels).toEqual(['—', 'Detenido']);
+    expect(labels).toEqual(['No iniciado']);
     expect(estado).toHaveValue('draft');
+    expect(estado).toBeDisabled();
   });
 
   it('ofrece la activación manual también al líder del proyecto (sin Gerencia/PMO)', () => {

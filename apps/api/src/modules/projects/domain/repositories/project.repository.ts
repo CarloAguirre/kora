@@ -68,6 +68,7 @@ export interface ProjectListItem {
   readonly supportPlanType: 'monthly' | 'bundle' | 'on_demand' | null;
   readonly supportHours: number;
   readonly allowsOvertime: boolean;
+  readonly isInternal: boolean;
   readonly createdAt: Date;
 }
 

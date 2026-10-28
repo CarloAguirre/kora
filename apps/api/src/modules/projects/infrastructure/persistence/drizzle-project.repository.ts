@@ -121,6 +121,7 @@ export class DrizzleProjectRepository implements ProjectRepository {
           supportPlanType: supportPlanTypeOfProject,
           supportHours: projects.supportHours,
           allowsOvertime: projects.allowsOvertime,
+          isInternal: projects.isInternal,
           createdAt: projects.createdAt,
         })
         .from(projects)
@@ -164,6 +165,7 @@ export class DrizzleProjectRepository implements ProjectRepository {
       supportPlanType: row.supportPlanType,
       supportHours: Number(row.supportHours),
       allowsOvertime: row.allowsOvertime,
+      isInternal: row.isInternal,
       createdAt: row.createdAt,
     }));
 

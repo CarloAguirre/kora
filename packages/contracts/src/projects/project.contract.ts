@@ -718,6 +718,8 @@ export const projectSummarySchema = z.object({
   supportHours: z.number(),
   /** Habilitado por el líder del proyecto/equipo — sin esto, las horas cargadas contra este proyecto no pueden marcarse como horas extra. */
   allowsOvertime: z.boolean(),
+  /** Proyecto interno (de la propia empresa): sin facturación, montos ni correos de cobro — ver `projects.is_internal`. */
+  isInternal: z.boolean(),
   createdAt: isoDateTimeSchema,
 });
 export type ProjectSummary = z.infer<typeof projectSummarySchema>;
@@ -838,6 +840,8 @@ export const createProjectSchema = z
     contractLink: z.string().trim().max(500).optional(),
     additionalLinks: z.string().trim().max(500).optional(),
     teams: z.array(createProjectTeamAssignmentSchema).max(20).default([]),
+    /** Proyecto interno — solo `type='development'`. Sin plan de pago ni monto: se ignoran `contractAmount`/`paymentMilestones`. */
+    isInternal: z.boolean().default(false),
     contractAmount: z.coerce.number().min(0).nullish(),
     contractCurrency: projectContractCurrencySchema.optional(),
     /** Plan de pago — solo `type='development'`. Sin valor: el cronograma mínimo Inicio 50% + Marcha blanca 50%. */
@@ -888,6 +892,10 @@ export const createProjectSchema = z
       path: ['commercialManagerUserId'],
     },
   )
+  .refine((data) => data.type === 'development' || !data.isInternal, {
+    message: 'Solo un proyecto de desarrollo puede ser interno.',
+    path: ['isInternal'],
+  })
   .refine((data) => data.type !== 'support' || data.supportPlanType, {
     message: 'Los proyectos de soporte requieren un tipo de contrato.',
     path: ['supportPlanType'],
@@ -939,6 +947,8 @@ export const updateProjectSchema = z.object({
   periodReportAchievements: z.array(z.string().trim().max(500)).max(20).nullish(),
   /** Agregar/quitar equipos y editar líder/colaboradores/horas de los ya asignados — la lista reemplaza a la actual. */
   teams: z.array(createProjectTeamAssignmentSchema).max(20).optional(),
+  /** Marcar interno no borra el plan de pago: sus tramos quedan guardados pero fuera de Facturación y sin avisos, y vuelven si se desmarca. */
+  isInternal: z.boolean().optional(),
   contractAmount: z.coerce.number().min(0).nullish(),
   contractCurrency: projectContractCurrencySchema.optional(),
   /** Plan de pago completo — la lista reemplaza a la actual (ver `projectPaymentPlanItemSchema`). */

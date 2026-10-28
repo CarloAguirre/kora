@@ -95,17 +95,16 @@ const PHASE_OPTIONS = PROJECT_PHASES.map((phase) => ({ value: phase, label: PROJ
 /**
  * Opciones de "Estado" al crear — dependen de la etapa comercial, mismo criterio que
  * `estadosDisponibles()` del prototipo de referencia (KORA · Definiciones de tipos, estados,
- * activación y horas de proyecto): Aprobado habilita los 3 estados operativos; antes de Aprobado
- * solo "—" (sin estado) o Detenido. El placeholder del Select es "No iniciado" en Aprobado y "—"
- * antes (valor vacío → sin `status`, y el backend asigna `draft` por defecto a todo proyecto de desarrollo).
+ * activación y horas de proyecto): Aprobado habilita los 3 estados operativos; Prospecto y
+ * Cotización siempre quedan "No iniciado" y el Select se bloquea. El placeholder es "No iniciado"
+ * (valor vacío → sin `status`, y el backend asigna `draft` por defecto a todo proyecto de desarrollo).
  */
-const STATUS_PLACEHOLDER_APPROVED = PROJECT_STATUS_LABELS.draft;
-const STATUS_PLACEHOLDER_NOT_APPROVED = '—';
+const STATUS_PLACEHOLDER = PROJECT_STATUS_LABELS.draft;
 const STATUS_OPTIONS_APPROVED = [
   { value: 'active', label: 'Activo (activación manual)' },
   { value: 'on_hold', label: PROJECT_STATUS_LABELS.on_hold },
 ];
-const STATUS_OPTIONS_NOT_APPROVED = [{ value: 'on_hold', label: PROJECT_STATUS_LABELS.on_hold }];
+const STATUS_OPTIONS_NOT_APPROVED: typeof STATUS_OPTIONS_APPROVED = [];
 
 /** Soporte no cambia: "Configuración de soporte" en el mismo índice donde Desarrollo tenía "Fases · Módulos". */
 const STEPS_SUPPORT = [
@@ -377,7 +376,6 @@ export function NewProjectPage() {
   const equiposEnabled = type === 'development' && isApproved;
   /** Opciones de "Estado" al crear — ver `STATUS_OPTIONS_APPROVED`/`STATUS_OPTIONS_NOT_APPROVED`. */
   const statusOptions = isApproved ? STATUS_OPTIONS_APPROVED : STATUS_OPTIONS_NOT_APPROVED;
-  const statusPlaceholder = isApproved ? STATUS_PLACEHOLDER_APPROVED : STATUS_PLACEHOLDER_NOT_APPROVED;
 
   const isSupport = type === 'support';
   const isSupportMonthly = isSupport && supportPlanType === 'monthly';
@@ -941,8 +939,9 @@ export function NewProjectPage() {
                     />
                     <Select
                       label="Estado"
-                      placeholder={statusPlaceholder}
+                      placeholder={STATUS_PLACEHOLDER}
                       options={statusOptions}
+                      disabled={!isApproved}
                       {...register('status', { setValueAs: emptyToUndefined })}
                       onChange={(event) => {
                         register('status', { setValueAs: emptyToUndefined }).onChange(event);
@@ -1761,7 +1760,7 @@ export function NewProjectPage() {
                   <h3 className={styles.summaryCardTitle}>Datos del proyecto</h3>
                   <SummaryItem label="Nombre del proyecto" value={watch('name')} />
                   <SummaryItem label="Etapa comercial" value={salesStage ? PROJECT_SALES_STAGE_LABELS[salesStage] : undefined} />
-                  <SummaryItem label="Estado" value={status ? PROJECT_STATUS_LABELS[status] : statusPlaceholder} />
+                  <SummaryItem label="Estado" value={status ? PROJECT_STATUS_LABELS[status] : STATUS_PLACEHOLDER} />
                   <SummaryItem label="Líder" value={leaderLabel} />
                   <SummaryItem
                     label="Responsable comercial"
