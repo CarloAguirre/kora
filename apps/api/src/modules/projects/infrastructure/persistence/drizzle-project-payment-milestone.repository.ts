@@ -98,7 +98,8 @@ export class DrizzleProjectPaymentMilestoneRepository implements ProjectPaymentM
       .from(projectPaymentMilestones)
       .innerJoin(projects, eq(projectPaymentMilestones.projectId, projects.id))
       .leftJoin(clients, eq(projects.clientId, clients.id))
-      .where(isNull(projects.deletedAt))
+      // Un proyecto interno no se cobra: sus tramos (si quedaron de antes de marcarlo) no van al libro de Facturación.
+      .where(and(isNull(projects.deletedAt), eq(projects.isInternal, false)))
       .orderBy(asc(projectPaymentMilestones.sortOrder));
 
     return rows.map((row) => ({
@@ -124,6 +125,7 @@ export class DrizzleProjectPaymentMilestoneRepository implements ProjectPaymentM
           lte(projectPaymentMilestones.triggerDate, new Date(today)),
           gt(projectPaymentMilestones.amount, '0'),
           isNull(projects.deletedAt),
+          eq(projects.isInternal, false),
         ),
       );
 

@@ -266,6 +266,7 @@ export function DevelopmentProjectDetailView({
           salesStage={project.salesStage}
           status={project.status}
           phase={project.phase}
+          isInternal={project.isInternal}
           documents={projectDocuments}
         />
         {onEdit && (

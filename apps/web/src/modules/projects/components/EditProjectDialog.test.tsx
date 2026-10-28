@@ -90,6 +90,7 @@ function buildProject(overrides: Partial<ProjectDetail> = {}): ProjectDetail {
     supportPlanDescription: null,
     supportHours: 0,
     allowsOvertime: false,
+    isInternal: false,
     createdAt: '2026-01-01T00:00:00.000Z',
     developer: null,
     commercialManager: null,
@@ -309,6 +310,36 @@ describe('EditProjectDialog', () => {
       ),
     );
     expect(onSuccess).toHaveBeenCalledWith('Se actualizaron los datos de Proyecto renombrado.');
+  });
+
+  it('al marcar "Proyecto interno" oculta el plan de pago y manda el flag al guardar', async () => {
+    const user = userEvent.setup();
+    renderDialog({
+      open: true,
+      project: buildProject({ commercialManager: { id: '22222222-2222-4222-8222-222222222222', fullName: 'Rodrigo Riveros' } }),
+      onClose: vi.fn(),
+      onSuccess: vi.fn(),
+      isManagement: true,
+    });
+
+    expect(screen.getByRole('heading', { name: 'Plan de pago' })).toBeInTheDocument();
+    await user.click(screen.getByLabelText('Proyecto interno'));
+    expect(screen.queryByRole('heading', { name: 'Plan de pago' })).not.toBeInTheDocument();
+
+    fireEvent.submit(document.getElementById('edit-project-form') as HTMLFormElement);
+
+    await waitFor(() =>
+      expect(mutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({ projectId: 'project-1', input: expect.objectContaining({ isInternal: true }) }),
+      ),
+    );
+  });
+
+  it('solo Gerencia/PMO puede cambiar "Proyecto interno"', () => {
+    renderDialog({ open: true, project: buildProject(), onClose: vi.fn(), onSuccess: vi.fn(), isManagement: false });
+
+    expect(screen.getByLabelText('Proyecto interno')).toBeDisabled();
+    expect(screen.getByText('Solo Gerencia/PMO puede marcar o desmarcar un proyecto como interno.')).toBeInTheDocument();
   });
 
   it('muestra el tipo de soporte del contrato vigente y guarda el cambio en el contrato', async () => {

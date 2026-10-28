@@ -3,6 +3,7 @@ import type { UnitOfWork } from '@kora/core';
 import { IssueProjectPaymentMilestoneInvoiceUseCase } from './issue-project-payment-milestone-invoice.use-case';
 import { Project } from '../../domain/entities/project.entity';
 import {
+  ProjectIsInternalError,
   ProjectNotApprovedForInvoicingError,
   ProjectPaymentMilestoneAlreadyIssuedError,
 } from '../../domain/errors/project.errors';
@@ -38,7 +39,9 @@ function milestone(overrides: Partial<ProjectPaymentMilestoneRecord> = {}): Proj
   };
 }
 
-function buildProject(overrides: { salesStage?: 'prospect' | 'quoted' | 'approved'; status?: 'draft' | 'on_hold' } = {}) {
+function buildProject(
+  overrides: { salesStage?: 'prospect' | 'quoted' | 'approved'; status?: 'draft' | 'on_hold'; isInternal?: boolean } = {},
+) {
   const salesStage = overrides.salesStage ?? 'approved';
   const project = Project.create({
     id: 'project-1',
@@ -47,6 +50,7 @@ function buildProject(overrides: { salesStage?: 'prospect' | 'quoted' | 'approve
     type: 'development',
     salesStage,
     status: salesStage === 'approved' ? 'draft' : undefined,
+    isInternal: overrides.isInternal,
     now: NOW,
   }).unwrap();
   if (overrides.status === 'on_hold') project.changeStatus('on_hold', NOW);
@@ -121,6 +125,22 @@ describe('IssueProjectPaymentMilestoneInvoiceUseCase', () => {
     expect(notifications.sendProjectInvoiceBlocked).toHaveBeenCalledWith(
       expect.objectContaining({ recipientEmail: 'gerente@kabeli.cl', projectId: 'project-1' }),
     );
+  });
+
+  it('rechaza facturar un tramo de un proyecto interno: sin Hito 0 ni correos', async () => {
+    const { useCase, milestones, projects, notifications } = buildUseCase({ project: buildProject({ isInternal: true }) });
+
+    const result = await useCase.execute({
+      milestoneId: 'milestone-1',
+      data: { folio: 'F-1', issuedAt: '2026-09-24' },
+      actor: ACTOR,
+    });
+
+    expect(result.isErr() && result.error).toBeInstanceOf(ProjectIsInternalError);
+    expect(milestones.markIssued).not.toHaveBeenCalled();
+    expect(projects.save).not.toHaveBeenCalled();
+    expect(notifications.sendProjectInvoiceBlocked).not.toHaveBeenCalled();
+    expect(notifications.sendProjectAutoActivated).not.toHaveBeenCalled();
   });
 
   it('rechaza un tramo que ya fue facturado', async () => {

@@ -4,6 +4,7 @@ import { PROJECT_PAYMENT_DEFAULT_TERM_DAYS, type Permission, type UpdateProjectP
 import {
   CannotManageProjectError,
   InvalidProjectPaymentMilestoneStateError,
+  ProjectIsInternalError,
   ProjectNotFoundError,
   ProjectPaymentMilestoneNotFoundError,
 } from '../../domain/errors/project.errors';
@@ -57,6 +58,7 @@ export class UpdateProjectPaymentMilestoneUseCase
     if (!command.actorPermissions.includes('projects:manage') && project.leaderUserId !== command.actor.userId) {
       return err(new CannotManageProjectError());
     }
+    if (project.isInternal) return err(new ProjectIsInternalError());
 
     const milestone = await this.milestones.findById(command.milestoneId);
     if (!milestone || milestone.projectId !== project.id) {

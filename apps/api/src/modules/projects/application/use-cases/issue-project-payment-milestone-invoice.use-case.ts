@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { CLOCK, UNIT_OF_WORK, err, ok, type ApplicationError, type Clock, type Result, type UnitOfWork } from '@kora/core';
 import { PROJECT_PAYMENT_DEFAULT_TERM_DAYS, type IssueProjectPaymentMilestoneInvoiceInput } from '@kora/contracts';
 import {
+  ProjectIsInternalError,
   ProjectNotApprovedForInvoicingError,
   ProjectPaymentMilestoneAlreadyIssuedError,
   ProjectPaymentMilestoneNotFoundError,
@@ -75,6 +76,8 @@ export class IssueProjectPaymentMilestoneInvoiceUseCase
     }
 
     const project = await this.projects.findById(milestone.projectId);
+    // Un proyecto interno no se factura: ni Hito 0 por factura ni alertas a Gerencia (se activa a mano).
+    if (project?.isInternal) return err(new ProjectIsInternalError());
     if (project && !project.isDeleted && project.type === 'development' && project.salesStage !== 'approved') {
       await this.notifyAdminTier((recipient) =>
         this.notifications.sendProjectInvoiceBlocked({

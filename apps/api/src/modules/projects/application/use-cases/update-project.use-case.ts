@@ -11,6 +11,7 @@ import {
 } from '@kora/core';
 import type { Permission, UpdateProjectInput } from '@kora/contracts';
 import {
+  CannotChangeProjectInternalFlagError,
   CannotManageProjectError,
   CannotReassignProjectLeaderError,
   ProjectNameAlreadyInUseError,

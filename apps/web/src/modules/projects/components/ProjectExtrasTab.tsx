@@ -138,7 +138,8 @@ export function ProjectExtrasTab({ project, canManage }: { project: ProjectDetai
   /** Sin `projects:manage`, el líder DE ESTE PROYECTO también configura el cronograma de cobro. */
   const canManageMilestones = can('projects:manage') || (user !== null && project.leader?.id === user.id);
   const canManageBillingActions = can('billing:manage');
-  const canViewBilling = canManageMilestones || canManageBillingActions || can('billing:read');
+  // Un proyecto interno no se cobra: no hay cronograma de tramos que mostrar.
+  const canViewBilling = !project.isInternal && (canManageMilestones || canManageBillingActions || can('billing:read'));
 
   const createMilestone = useCreateProjectPaymentMilestone();
   const updateMilestone = useUpdateProjectPaymentMilestone();

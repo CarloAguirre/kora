@@ -320,11 +320,6 @@ export class ProjectManagementApprovalNotPendingError extends ConflictError {
   }
 }
 
-/**
- * Solo un proyecto de desarrollo `aprobado` puede facturar un tramo de pago —
- * evita casos de borde (proyecto activo sin equipos/horas/cotización). No
- * aplica a `type='support'`, que no tiene etapa comercial.
- */
 /** Marcar/desmarcar un proyecto como interno lo saca/devuelve de Facturación — decisión de Gerencia/PMO, no del líder. */
 export class CannotChangeProjectInternalFlagError extends ForbiddenError {
   constructor() {
@@ -339,6 +334,11 @@ export class ProjectIsInternalError extends ValidationError {
   }
 }
 
+/**
+ * Solo un proyecto de desarrollo `aprobado` puede facturar un tramo de pago —
+ * evita casos de borde (proyecto activo sin equipos/horas/cotización). No
+ * aplica a `type='support'`, que no tiene etapa comercial.
+ */
 export class ProjectNotApprovedForInvoicingError extends ValidationError {
   constructor() {
     super(

@@ -258,6 +258,8 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
   const [estado, setEstado] = useState<ProjectStatus>(project.status);
   const [manualActivationReason, setManualActivationReason] = useState('');
   const [allowsOvertime, setAllowsOvertime] = useState(project.allowsOvertime);
+  /** Interno: sin plan de pago ni facturación — solo Gerencia/PMO lo cambia (`CannotChangeProjectInternalFlagError`). */
+  const [isInternal, setIsInternal] = useState(project.isInternal);
   /** Se intentó guardar con el aviso de facturación pendiente: el aviso pasa a error y se lleva a la vista. */
   const [approvalBillingBlocked, setApprovalBillingBlocked] = useState(false);
   const approvalBillingRef = useRef<HTMLDivElement>(null);
@@ -284,6 +286,7 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
     setTipo(deriveTipo(project.salesStage, project.status));
     setEstado(project.status);
     setAllowsOvertime(project.allowsOvertime);
+    setIsInternal(project.isInternal);
     setServerError(null);
     setPaymentPlan(paymentPlanFromProject(project));
     setPaymentPlanDirty(false);
@@ -616,7 +619,9 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
   const hoursLabel = isDevelopment && (tipo === 'prospecto' || tipo === 'cotizacion') ? 'HH estimadas' : 'HH vendidas';
   /** Al pasar a Aprobado el plan de pago debe tener montos — se avisa apenas se elige el tipo y bloquea el guardado. */
   const approvalBillingIssue =
-    isDevelopment && tipo === 'aprobado' && project.salesStage !== 'approved' ? missingApprovalBillingData(paymentPlan) : null;
+    isDevelopment && !isInternal && tipo === 'aprobado' && project.salesStage !== 'approved'
+      ? missingApprovalBillingData(paymentPlan)
+      : null;
 
   const handleTipoChange = (nextTipo: ProjectTipo) => {
     setTipo(nextTipo);
@@ -646,7 +651,8 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
       return;
     }
     // En Prospecto el plan de pago no se edita (ver `estimationDisabled`); aunque se haya tocado antes de volver a Prospecto, no se manda.
-    const sendPaymentPlan = isDevelopment && paymentPlanDirty && !estimationDisabled;
+    // Un proyecto interno no se cobra: su plan de pago no se edita ni se manda.
+    const sendPaymentPlan = isDevelopment && paymentPlanDirty && !estimationDisabled && !isInternal;
     if (approvalBillingIssue) {
       setApprovalBillingBlocked(true);
       approvalBillingRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -659,7 +665,8 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
     }
     // Con contrato de soporte, las HH del proyecto son las del plan: se editan en "Contrato de soporte" y el backend las
     // sincroniza al guardar el contrato — mandarlas acá dejaría HH vendidas y bolsa desalineadas.
-    const projectValues = supportPlan ? { ...values, soldHours: undefined, supportHours: undefined } : values;
+    const baseValues = supportPlan ? { ...values, soldHours: undefined, supportHours: undefined } : values;
+    const projectValues = isDevelopment && isInternal !== project.isInternal ? { ...baseValues, isInternal } : baseValues;
     try {
       await updateProject.mutateAsync({
         projectId: project.id,
@@ -811,6 +818,25 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
             </div>
           )}
 
+          {isDevelopment && (
+            <div>
+              <label className={styles.checkboxLabel}>
+                <input
+                  type="checkbox"
+                  checked={isInternal}
+                  disabled={!isManagement}
+                  onChange={(e) => setIsInternal(e.target.checked)}
+                />
+                Proyecto interno
+              </label>
+              <p className={styles.hint}>
+                {isManagement
+                  ? 'Proyecto de la propia empresa: no lleva monto ni plan de pago, no aparece en Facturación y no envía correos de cobro.'
+                  : 'Solo Gerencia/PMO puede marcar o desmarcar un proyecto como interno.'}
+              </p>
+            </div>
+          )}
+
           {approvalBillingIssue && (
             <div
               ref={approvalBillingRef}
@@ -863,8 +889,11 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
               />
             </div>
             <p className={styles.hint}>
-              Aún no hay factura del primer tramo. Al activarlo manualmente queda como Hito 0 de origen manual,
-              comienzan a correr las horas y el motivo queda registrado en la bitácora.
+              {isInternal
+                ? 'Un proyecto interno no tiene facturas: se activa siempre de forma manual.'
+                : 'Aún no hay factura del primer tramo.'}{' '}
+              Al activarlo manualmente queda como Hito 0 de origen manual, comienzan a correr las horas y el motivo
+              queda registrado en la bitácora.
             </p>
           </div>
         )}
@@ -1010,7 +1039,7 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
           </div>
         )}
 
-        {isDevelopment && (
+        {isDevelopment && !isInternal && (
           <div className={styles.section}>
             <h3 className={styles.sectionTitle}>Plan de pago</h3>
             <p className={styles.hint}>

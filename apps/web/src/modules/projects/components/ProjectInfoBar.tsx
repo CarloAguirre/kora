@@ -33,6 +33,7 @@ export function ProjectInfoBar({
   salesStage,
   status,
   phase,
+  isInternal = false,
   documents,
 }: {
   clientName: string;
@@ -42,6 +43,8 @@ export function ProjectInfoBar({
   salesStage: ProjectSalesStage | null;
   status: ProjectStatus;
   phase: ProjectPhase | null;
+  /** Proyecto interno (sin facturación): se marca junto al tipo para que no se confunda con un proyecto de cliente. */
+  isInternal?: boolean;
   documents: readonly ProjectDocument[];
 }) {
   return (
@@ -53,7 +56,12 @@ export function ProjectInfoBar({
       <InfoItem
         icon={<TrendingUpIcon size={16} />}
         label="Tipo del proyecto"
-        value={<Badge tone="info">{salesStage ? PROJECT_SALES_STAGE_LABELS[salesStage] : 'Sin definir'}</Badge>}
+        value={
+          <span className={styles.badgeRow}>
+            <Badge tone="info">{salesStage ? PROJECT_SALES_STAGE_LABELS[salesStage] : 'Sin definir'}</Badge>
+            {isInternal && <Badge tone="neutral">Interno</Badge>}
+          </span>
+        }
       />
       <InfoItem icon={<CheckIcon size={16} />} label="Estado del proyecto" value={<ProjectStatusBadge status={status} />} />
       <InfoItem icon={<FolderOpenIcon size={16} />} label="Etapa de avance" value={<ProjectPhaseBadge phase={phase} />} />

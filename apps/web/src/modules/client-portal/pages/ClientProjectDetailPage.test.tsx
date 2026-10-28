@@ -49,6 +49,7 @@ function buildProject(overrides: Partial<ProjectDetail> = {}): ProjectDetail {
     supportPlanDescription: null,
     supportHours: 0,
     allowsOvertime: false,
+    isInternal: false,
     createdAt: '2026-01-01T00:00:00.000Z',
     developer: null,
     primaryContact: null,

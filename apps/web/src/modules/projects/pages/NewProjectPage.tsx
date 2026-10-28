@@ -330,6 +330,7 @@ export function NewProjectPage() {
   const type = watch('type') as ProjectType;
   const salesStage = watch('salesStage');
   const status = watch('status');
+  const isInternal = type === 'development' && Boolean(watch('isInternal'));
   const leaderUserId = watch('leaderUserId');
   const commercialManagerUserId = watch('commercialManagerUserId');
   const soldHours = watch('soldHours');
@@ -635,6 +636,8 @@ export function NewProjectPage() {
   /** Deja "Estimación" (no existe en Prospecto) — sin equipos/fases (Cotización, o el usuario eligió omitirlo) va directo a Resumen. */
   /** El plan de pago vive en Estimación: se valida al dejar ese paso. Aprobado además exige los montos (datos de facturación). */
   const paymentPlanIsValid = () => {
+    // Un proyecto interno no se cobra: no hay plan de pago que validar.
+    if (isInternal) return true;
     const error = (isApproved ? missingApprovalBillingData(paymentPlan) : null) ?? validatePaymentPlan(paymentPlan);
     setPaymentPlanError(error);
     return error === null;
@@ -730,7 +733,9 @@ export function NewProjectPage() {
       // limpian por si se llenaron con otra etapa comercial antes de volver a Prospecto.
       const developmentValues = isProspecto
         ? { ...values, startDate: undefined, estimatedDeliveryDate: undefined, soldHours: 0 }
-        : { ...values, ...paymentPlanPayload(paymentPlan) };
+        : isInternal
+          ? values
+          : { ...values, ...paymentPlanPayload(paymentPlan) };
       const result = await createProject.mutateAsync(isManualHito0 ? { ...developmentValues, status: 'draft' } : developmentValues);
 
       if (values.type === 'development') {
@@ -850,7 +855,11 @@ export function NewProjectPage() {
                     aria-label="Tipo de proyecto"
                     options={TYPE_OPTIONS}
                     value={type}
-                    onChange={(value) => setValue('type', value as ProjectType, { shouldValidate: true })}
+                    onChange={(value) => {
+                      setValue('type', value as ProjectType, { shouldValidate: true });
+                      // Solo un proyecto de desarrollo puede ser interno (ver `createProjectSchema`).
+                      if (value !== 'development') setValue('isInternal', false);
+                    }}
                     fullWidth
                   />
                 </div>
@@ -979,6 +988,19 @@ export function NewProjectPage() {
                     />
                   )}
                 </div>
+
+                {type === 'development' && (
+                  <div>
+                    <label className={styles.checkboxLine}>
+                      <input type="checkbox" {...register('isInternal')} />
+                      Proyecto interno
+                    </label>
+                    <p className={styles.hint} style={{ marginTop: 'var(--kora-space-1)' }}>
+                      Proyecto de la propia empresa: no lleva monto ni plan de pago, no aparece en Facturación y no envía
+                      correos de cobro.
+                    </p>
+                  </div>
+                )}
               </Section>
 
               {type === 'development' && status === 'on_hold' && (
@@ -1013,8 +1035,9 @@ export function NewProjectPage() {
                 <div className={`${styles.subCard} ${styles.subCardActivo}`}>
                   <p className={styles.subCardTitle}>Activación manual · Hito 0 (kickoff)</p>
                   <p className={styles.subCardSub}>
-                    Lo normal es que el proyecto se active solo al marcar la primera factura como facturada. Usa esta
-                    opción cuando hay un respaldo sin factura, por ejemplo un contrato firmado o una orden de compra.
+                    {isInternal
+                      ? 'Un proyecto interno no tiene facturas: se activa siempre de forma manual. Indica desde cuándo y por qué.'
+                      : 'Lo normal es que el proyecto se active solo al marcar la primera factura como facturada. Usa esta opción cuando hay un respaldo sin factura, por ejemplo un contrato firmado o una orden de compra.'}
                   </p>
                   <div className={styles.row}>
                     <TextField
@@ -1045,8 +1068,8 @@ export function NewProjectPage() {
                     {estadoExtraErrors.motivoActivacion && <p className={styles.fieldError}>{estadoExtraErrors.motivoActivacion}</p>}
                   </div>
                   <p className={styles.hint}>
-                    Queda registrado en la bitácora quién activó el proyecto, cuándo y por qué. Cuando llegue la primera
-                    factura, se asocia a este Hito 0 sin cambiar el estado.
+                    Queda registrado en la bitácora quién activó el proyecto, cuándo y por qué.
+                    {!isInternal && ' Cuando llegue la primera factura, se asocia a este Hito 0 sin cambiar el estado.'}
                   </p>
                 </div>
               )}
@@ -1143,6 +1166,7 @@ export function NewProjectPage() {
                 </div>
               </Section>
 
+              {!isInternal && (
               <Section title="Plan de pago">
                 <p className={styles.hint}>
                   Tramos en que se cobra el proyecto. Cada tramo queda <b>Por facturar</b> cuando se cumple su hito y se
@@ -1162,14 +1186,16 @@ export function NewProjectPage() {
                   </div>
                 )}
               </Section>
+              )}
 
               <Section title="Registro de horas">
                 <div className={styles.warnBox}>
                   <InfoIcon size={16} />
                   <div>
                     Desde que se crea el proyecto, los colaboradores pueden cargar horas (por ejemplo, maquetas o
-                    estimaciones pedidas en Prospecto). Todas las horas registradas antes de la fecha de emisión de la
-                    primera factura quedan en la fase <b>Prospecto/Cotización</b>, que suma al proyecto vendido.
+                    estimaciones pedidas en Prospecto). Todas las horas registradas antes de{' '}
+                    {isInternal ? 'la activación (Hito 0)' : 'la fecha de emisión de la primera factura'} quedan en la fase{' '}
+                    <b>Prospecto/Cotización</b>, que suma al proyecto vendido.
                   </div>
                 </div>
               </Section>
@@ -1178,7 +1204,12 @@ export function NewProjectPage() {
                 <div className={styles.infoBox}>
                   <InfoIcon size={16} />
                   <div>
-                    <b>Con fechas, horas vendidas, el monto de cada tramo del plan de pago y líder asignado ya puedes crear el proyecto.</b> Equipos y fases son
+                    <b>
+                      {isInternal
+                        ? 'Con fechas, horas vendidas y líder asignado ya puedes crear el proyecto.'
+                        : 'Con fechas, horas vendidas, el monto de cada tramo del plan de pago y líder asignado ya puedes crear el proyecto.'}
+                    </b>{' '}
+                    Equipos y fases son
                     opcionales: si los dejas vacíos, los completa {leaderLabel || 'el líder del proyecto'} cuando entre
                     al proyecto.
                   </div>
@@ -1761,6 +1792,7 @@ export function NewProjectPage() {
                   <SummaryItem label="Nombre del proyecto" value={watch('name')} />
                   <SummaryItem label="Etapa comercial" value={salesStage ? PROJECT_SALES_STAGE_LABELS[salesStage] : undefined} />
                   <SummaryItem label="Estado" value={status ? PROJECT_STATUS_LABELS[status] : STATUS_PLACEHOLDER} />
+                  {isInternal && <SummaryItem label="Proyecto interno" value="Sí — sin facturación" />}
                   <SummaryItem label="Líder" value={leaderLabel} />
                   <SummaryItem
                     label="Responsable comercial"
@@ -1780,7 +1812,7 @@ export function NewProjectPage() {
                   </div>
                 )}
 
-                {!isProspecto && (
+                {!isProspecto && !isInternal && (
                   <div className={styles.summaryCard}>
                     <h3 className={styles.summaryCardTitle}>Plan de pago</h3>
                     <SummaryItem
@@ -1857,14 +1889,28 @@ export function NewProjectPage() {
                   {!isApproved && status !== 'on_hold' && (
                     <>
                       <li>Los colaboradores ya pueden registrar horas; quedan en la fase Prospecto/Cotización.</li>
+                      {!isInternal && (
                       <li>
                         No se pueden asociar facturas mientras el proyecto no sea Aprobado. Si Finanzas intenta subir
                         una, se bloquea la carga y se notifica a Gerencia y al líder PMO para que actualicen el tipo y
                         completen los datos.
                       </li>
+                      )}
                     </>
                   )}
-                  {isApproved && (!status || status === 'draft') && (
+                  {isInternal && (
+                    <li>
+                      Es un proyecto <b>interno</b>: no tiene plan de pago, no aparece en Facturación y no se envían
+                      correos de cobro.
+                    </li>
+                  )}
+                  {isApproved && (!status || status === 'draft') && isInternal && (
+                    <li>
+                      Queda <b>No iniciado</b> hasta que Gerencia o el líder PMO lo activen manualmente (no hay factura
+                      que lo active).
+                    </li>
+                  )}
+                  {isApproved && (!status || status === 'draft') && !isInternal && (
                     <>
                       <li>
                         Pasará a <b>Activo</b> automáticamente cuando Finanzas marque la primera factura como
@@ -1877,11 +1923,11 @@ export function NewProjectPage() {
                   {isApproved && status === 'active' && (
                     <li>
                       Queda <b>Activo</b> desde el {fechaActivacion || 'hoy'} (Hito 0 manual · {respaldoActivacion}). Las
-                      horas vendidas corren desde esa fecha. Cuando llegue la primera factura, se asocia a este Hito 0
-                      sin cambiar el estado.
+                      horas vendidas corren desde esa fecha.
+                      {!isInternal && ' Cuando llegue la primera factura, se asocia a este Hito 0 sin cambiar el estado.'}
                     </li>
                   )}
-                  {isApproved && status === 'on_hold' && (
+                  {isApproved && status === 'on_hold' && !isInternal && (
                     <li>Si llega la primera factura mientras está Detenido, se pide confirmación para reactivarlo a Activo.</li>
                   )}
                 </ul>

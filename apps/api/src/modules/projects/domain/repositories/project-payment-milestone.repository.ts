@@ -58,9 +58,9 @@ export interface IssueProjectPaymentMilestoneInvoiceInput {
 
 export interface ProjectPaymentMilestoneRepository {
   listForProject(projectId: string, context?: TransactionContext): Promise<ProjectPaymentMilestoneRecord[]>;
-  /** Todos los tramos de proyectos no eliminados, con nombre de proyecto/cliente y moneda — para el libro combinado de Facturación. */
+  /** Todos los tramos de proyectos no eliminados ni internos, con nombre de proyecto/cliente y moneda — para el libro combinado de Facturación. */
   listAll(context?: TransactionContext): Promise<ProjectPaymentMilestoneWithContext[]>;
-  /** Tramos `pending` con monto, por fecha, cuya fecha ya llegó (`today` = `YYYY-MM-DD`) — ver `PaymentMilestoneTriggerService`. */
+  /** Tramos `pending` con monto, por fecha, cuya fecha ya llegó (`today` = `YYYY-MM-DD`), de proyectos no internos — ver `PaymentMilestoneTriggerService`. */
   listPendingDateTriggered(today: string, context?: TransactionContext): Promise<ProjectPaymentMilestoneRecord[]>;
   findById(id: string, context?: TransactionContext): Promise<ProjectPaymentMilestoneRecord | null>;
 
