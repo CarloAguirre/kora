@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { TICKET_HH_REQUEST_STATUS_LABELS, type TicketHhRequest } from '@kora/contracts';
+import { TICKET_HH_REQUEST_NOTE_MAX_LENGTH, TICKET_HH_REQUEST_STATUS_LABELS, type TicketHhRequest } from '@kora/contracts';
 import styles from './TicketHhRequestsSection.module.css';
 import { Avatar } from '@/shared/components/ui/Avatar';
 import { Badge, type BadgeTone } from '@/shared/components/ui/Badge';
@@ -36,6 +36,12 @@ function requestMeta(request: TicketHhRequest): string {
   return [formatDate(request.date), request.isOvertime ? 'Horas extra' : 'Horas normales', request.note]
     .filter(Boolean)
     .join(' · ');
+}
+
+/** Si el backend rechazó por validación, muestra el motivo de cada campo en vez del genérico "Los datos enviados no son válidos." */
+function describeApiError(error: ApiRequestError): string {
+  const issues = error.fieldIssues ? Object.values(error.fieldIssues).flat() : [];
+  return issues.length > 0 ? issues.join(' ') : error.message;
 }
 
 interface TicketHhRequestsSectionProps {
@@ -110,7 +116,7 @@ export function TicketHhRequestsSection({
       setHours('');
       setNote('');
     } catch (error) {
-      toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo enviar la solicitud.');
+      toast.error(error instanceof ApiRequestError ? describeApiError(error) : 'No se pudo enviar la solicitud.');
     }
   };
 
@@ -297,15 +303,26 @@ export function TicketHhRequestsSection({
               value={hours}
               onChange={(event) => setHours(event.target.value)}
             />
-            <TextField
-              label="Nota (opcional)"
-              placeholder="¿En qué trabajaste?"
-              value={note}
-              onChange={(event) => setNote(event.target.value)}
-            />
+            <div className={styles.noteField}>
+              <label className={styles.noteLabel} htmlFor={`ticket-hh-note-${ticketId}`}>
+                Nota (opcional)
+              </label>
+              <textarea
+                id={`ticket-hh-note-${ticketId}`}
+                className={styles.noteTextarea}
+                placeholder="¿En qué trabajaste?"
+                rows={3}
+                maxLength={TICKET_HH_REQUEST_NOTE_MAX_LENGTH}
+                value={note}
+                onChange={(event) => setNote(event.target.value)}
+              />
+            </div>
           </div>
 
           <div className={styles.formFooter}>
+            <span className={styles.noteCounter}>
+              {note.length}/{TICKET_HH_REQUEST_NOTE_MAX_LENGTH}
+            </span>
             <Button
               variant="outlineDark"
               className={styles.submitButton}
