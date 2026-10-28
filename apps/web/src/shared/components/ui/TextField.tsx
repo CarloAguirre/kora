@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
-import { CalendarIcon, ChevronLeftIcon, ChevronRightIcon, CloseIcon } from "../icons/Icons";
+import { CalendarIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, CloseIcon } from "../icons/Icons";
 import styles from "./TextField.module.css";
 
 /**
@@ -57,6 +57,28 @@ function applyRef(
 }
 
 const WEEKDAY_LABELS = ["lu", "ma", "mi", "ju", "vi", "sá", "do"];
+
+/** Cuántos años muestra a la vez la vista de años (grilla de 3×4). */
+const YEARS_PER_PAGE = 12;
+
+/**
+ * Vista del calendario: la grilla de días, o las de meses/años a las que se
+ * llega pinchando el título — para saltar a una fecha lejana sin avanzar mes
+ * a mes con las flechas.
+ */
+type CalendarView = "days" | "months" | "years";
+
+function capitalize(text: string): string {
+  return text.charAt(0).toLocaleUpperCase("es-CL") + text.slice(1);
+}
+
+const MONTH_LABELS = Array.from({ length: 12 }, (_, month) =>
+  capitalize(
+    new Date(2000, month, 1)
+      .toLocaleDateString("es-CL", { month: "short" })
+      .replace(".", ""),
+  ),
+);
 
 function toISODate(date: Date): string {
   const year = date.getFullYear();
@@ -133,6 +155,7 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(
 
     const [calendarOpen, setCalendarOpen] = useState(false);
     const [viewMonth, setViewMonth] = useState(() => new Date());
+    const [calendarView, setCalendarView] = useState<CalendarView>("days");
     const [selectedISO, setSelectedISO] = useState("");
     // El panel se dibuja en un portal — de otro modo un ancestro con
     // `overflow: auto/hidden` (p. ej. el modal de detalle de un ticket, que
@@ -145,7 +168,9 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(
     // que herede su promoción a la top layer.
     const getPortalTarget = (): Element =>
       fieldRef.current?.closest("dialog") ?? document.body;
-    const [panelPosition, setPanelPosition] = useState<{ top: number; left: number } | null>(null);
+    const [panelPosition, setPanelPosition] = useState<
+      { top?: number; bottom?: number; left: number } | null
+    >(null);
 
     const updatePanelPosition = () => {
       const rect = fieldRef.current?.getBoundingClientRect();
@@ -158,10 +183,15 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(
       const PANEL_GAP = 8; // var(--kora-space-2)
       const left = rect.right - PANEL_WIDTH;
       // Si no cabe debajo del campo (p. ej. un campo cerca del borde inferior de
-      // la pantalla), se abre hacia arriba en su lugar.
+      // la pantalla), se abre hacia arriba en su lugar — anclado por `bottom`,
+      // para que siga pegado al campo aunque cambie de alto (las vistas de
+      // meses/años o la lista de feriados no miden lo mismo que la de días).
       const fitsBelow = rect.bottom + PANEL_GAP + PANEL_HEIGHT <= window.innerHeight;
-      const top = fitsBelow ? rect.bottom + PANEL_GAP : Math.max(PANEL_GAP, rect.top - PANEL_GAP - PANEL_HEIGHT);
-      setPanelPosition({ top, left });
+      setPanelPosition(
+        fitsBelow
+          ? { top: rect.bottom + PANEL_GAP, left }
+          : { bottom: window.innerHeight - rect.top + PANEL_GAP, left },
+      );
     };
 
     useEffect(() => {
@@ -199,6 +229,7 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(
       const parsed = parseISODate(current) ?? new Date();
       setSelectedISO(current);
       setViewMonth(new Date(parsed.getFullYear(), parsed.getMonth(), 1));
+      setCalendarView("days");
       setCalendarOpen(true);
     };
 
@@ -240,14 +271,31 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(
       ) : undefined);
 
     const gridDays = isDate && calendarOpen ? buildMonthGrid(viewMonth) : [];
-    const todayISO = toISODate(new Date());
-    const rawMonthLabel = viewMonth.toLocaleDateString("es-CL", {
-      month: "long",
-      year: "numeric",
-    });
-    const monthLabel =
-      rawMonthLabel.charAt(0).toLocaleUpperCase("es-CL") +
-      rawMonthLabel.slice(1);
+    const today = new Date();
+    const todayISO = toISODate(today);
+    const viewYear = viewMonth.getFullYear();
+    const selectedDate = parseISODate(selectedISO);
+    // La página de años deja el año visto en la segunda fila (4 años atrás, 7
+    // adelante): las fechas de proyectos suelen ser futuras, y con bloques
+    // fijos (2016–2027) el año siguiente quedaría a menudo en otra página.
+    const yearsPageStart = viewYear - 4;
+    const pageYears = Array.from({ length: YEARS_PER_PAGE }, (_, i) => yearsPageStart + i);
+    const panelTitle =
+      calendarView === "days"
+        ? capitalize(viewMonth.toLocaleDateString("es-CL", { month: "long", year: "numeric" }))
+        : calendarView === "months"
+          ? String(viewYear)
+          : `${yearsPageStart} – ${yearsPageStart + YEARS_PER_PAGE - 1}`;
+    // Cada vista mueve las flechas en su propia unidad: un mes, un año o una
+    // página de años.
+    const navStep = { days: 1, months: 12, years: 12 * YEARS_PER_PAGE }[calendarView];
+    const [prevLabel, nextLabel] = {
+      days: ["Mes anterior", "Mes siguiente"],
+      months: ["Año anterior", "Año siguiente"],
+      years: ["Años anteriores", "Años siguientes"],
+    }[calendarView];
+    const shiftView = (direction: 1 | -1) =>
+      setViewMonth((m) => new Date(m.getFullYear(), m.getMonth() + direction * navStep, 1));
     const holidayNames = new Map((holidays ?? []).map((h) => [h.date, h.name]));
     const viewMonthHolidays = gridDays
       .filter((day) => day.getMonth() === viewMonth.getMonth() && holidayNames.has(toISODate(day)))
@@ -307,7 +355,7 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(
             <div
               ref={panelRef}
               className={styles.datePanel}
-              style={{ top: panelPosition.top, left: panelPosition.left }}
+              style={panelPosition}
               role="dialog"
               aria-label="Seleccionar fecha"
             >
@@ -315,36 +363,102 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(
                 <button
                   type="button"
                   className={styles.datePanelNav}
-                  aria-label="Mes anterior"
-                  onClick={() =>
-                    setViewMonth(
-                      (m) => new Date(m.getFullYear(), m.getMonth() - 1, 1),
-                    )
-                  }
+                  aria-label={prevLabel}
+                  onClick={() => shiftView(-1)}
                 >
                   <ChevronLeftIcon size={16} />
                 </button>
-                <span className={styles.datePanelTitle}>{monthLabel}</span>
+                {calendarView === "years" ? (
+                  <span className={styles.datePanelTitle}>{panelTitle}</span>
+                ) : (
+                  <button
+                    type="button"
+                    className={[styles.datePanelTitle, styles.datePanelTitleButton].join(" ")}
+                    aria-label={`${panelTitle}. ${calendarView === "days" ? "Elegir mes y año" : "Elegir año"}`}
+                    onClick={() => setCalendarView(calendarView === "days" ? "months" : "years")}
+                  >
+                    {panelTitle}
+                    <ChevronDownIcon size={14} />
+                  </button>
+                )}
                 <button
                   type="button"
                   className={styles.datePanelNav}
-                  aria-label="Mes siguiente"
-                  onClick={() =>
-                    setViewMonth(
-                      (m) => new Date(m.getFullYear(), m.getMonth() + 1, 1),
-                    )
-                  }
+                  aria-label={nextLabel}
+                  onClick={() => shiftView(1)}
                 >
                   <ChevronRightIcon size={16} />
                 </button>
               </div>
 
-              <div className={styles.datePanelWeekdays}>
-                {WEEKDAY_LABELS.map((weekday) => (
-                  <span key={weekday}>{weekday}</span>
-                ))}
-              </div>
+              {calendarView === "months" && (
+                <div className={styles.datePanelGridWide}>
+                  {MONTH_LABELS.map((monthLabel, month) => {
+                    const isSelected =
+                      selectedDate?.getFullYear() === viewYear && selectedDate.getMonth() === month;
+                    const isCurrent = today.getFullYear() === viewYear && today.getMonth() === month;
+                    return (
+                      <button
+                        key={monthLabel}
+                        type="button"
+                        className={[
+                          styles.dateCell,
+                          styles.dateCellWide,
+                          isSelected ? styles.dateCellSelected : "",
+                          isCurrent && !isSelected ? styles.dateCellToday : "",
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
+                        onClick={() => {
+                          setViewMonth(new Date(viewYear, month, 1));
+                          setCalendarView("days");
+                        }}
+                      >
+                        {monthLabel}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
 
+              {calendarView === "years" && (
+                <div className={styles.datePanelGridWide}>
+                  {pageYears.map((year) => {
+                    const isSelected = selectedDate?.getFullYear() === year;
+                    const isCurrent = today.getFullYear() === year;
+                    return (
+                      <button
+                        key={year}
+                        type="button"
+                        className={[
+                          styles.dateCell,
+                          styles.dateCellWide,
+                          isSelected ? styles.dateCellSelected : "",
+                          isCurrent && !isSelected ? styles.dateCellToday : "",
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
+                        onClick={() => {
+                          setViewMonth(new Date(year, viewMonth.getMonth(), 1));
+                          setCalendarView("months");
+                        }}
+                      >
+                        {year}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {calendarView === "days" && (
+                <div className={styles.datePanelWeekdays}>
+                  {WEEKDAY_LABELS.map((weekday) => (
+                    <span key={weekday}>{weekday}</span>
+                  ))}
+                </div>
+              )}
+
+              {calendarView === "days" && (
               <div className={styles.datePanelGrid}>
                 {gridDays.map((day) => {
                   const iso = toISODate(day);
@@ -374,8 +488,9 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(
                   );
                 })}
               </div>
+              )}
 
-              {viewMonthHolidays.length > 0 && (
+              {calendarView === "days" && viewMonthHolidays.length > 0 && (
                 <ul className={styles.datePanelHolidays}>
                   {viewMonthHolidays.map((holiday) => (
                     <li key={holiday.day}>
