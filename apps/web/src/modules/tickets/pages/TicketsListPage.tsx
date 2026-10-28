@@ -52,6 +52,7 @@ export function TicketsListPage() {
   const changeStatus = useChangeTicketStatus();
   const { data: clients } = useTicketLinkableClients();
   const { data: users } = useUsersList({ page: 1, pageSize: 200, sortField: 'firstName' });
+  const { data: leaders } = useUsersList({ page: 1, pageSize: 200, sortField: 'firstName', role: 'leader' });
 
   const baseFilters = {
     search: search || undefined,
@@ -137,7 +138,7 @@ export function TicketsListPage() {
               label="Líder"
               placeholder="Todos"
               searchPlaceholder="Buscar líder"
-              options={(users?.items ?? []).map((user) => ({ value: user.id, label: user.fullName }))}
+              options={(leaders?.items ?? []).map((user) => ({ value: user.id, label: user.fullName }))}
               value={leaderUserIds}
               onChange={setLeaderUserIds}
             />
