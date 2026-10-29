@@ -3,7 +3,6 @@ import { CLOCK, ID_GENERATOR, UNIT_OF_WORK, err, ok, type ApplicationError, type
 import type { MarkSupportInvoiceIssuedInput } from '@kora/contracts';
 import {
   SupportInvoiceAlreadyExistsForPeriodError,
-  SupportInvoiceSplitAmountMismatchError,
   SupportPlanNotFoundError,
   SupportPlanNothingToInvoiceError,
 } from '../../domain/errors/support-plan.errors';
@@ -31,12 +30,14 @@ const DEFAULT_PAYMENT_TERM_DAYS = 30;
  * Registra que un contrato de soporte ya fue facturado — Kora no emite la
  * factura, solo registra folio y fecha (ver el comentario de
  * `support_invoices` en el schema). El monto lo calcula
- * `SupportBillingCalculator` y queda CONGELADO en las filas: no se recalcula
- * después aunque cambien las horas registradas.
- *
- * El total se puede dividir en varias facturas, que se registran todas juntas
- * y tienen que sumar exactamente el monto calculado (al centavo). Las horas
- * facturadas van solo en la primera — ver `hours_billed` en el schema.
+ * `SupportBillingCalculator` como referencia, pero lo que queda CONGELADO es
+ * lo que se registra: el total se puede dividir en varias facturas (todas
+ * juntas) y su suma puede diferir del calculado — p. ej. un contrato mensual
+ * con cuota fija que no cobra el excedente. La UI avisa la diferencia antes
+ * de guardar; una vez registrado, el período queda facturado por esa suma y
+ * la diferencia no se vuelve a cobrar (las horas calculadas quedan como
+ * facturadas, igual que si se hubiera cobrado el total). Las horas van solo
+ * en la primera factura — ver `hours_billed` en el schema.
  */
 @Injectable()
 export class MarkSupportInvoiceIssuedUseCase implements UseCase<MarkSupportInvoiceIssuedCommand, { ids: string[] }, ApplicationError> {
@@ -68,10 +69,6 @@ export class MarkSupportInvoiceIssuedUseCase implements UseCase<MarkSupportInvoi
     if (existing.length > 0) return err(new SupportInvoiceAlreadyExistsForPeriodError(calculation.periodKey));
 
     const amounts = data.invoices.map((invoice) => toCents(invoice.amountUf));
-    const totalCents = amounts.reduce((total, cents) => total + cents, 0);
-    if (totalCents !== toCents(calculation.amountUf)) {
-      return err(new SupportInvoiceSplitAmountMismatchError(calculation.amountUf, totalCents / 100, record.currency));
-    }
 
     const rows: CreateSupportInvoiceInput[] = data.invoices.map((invoice, position) => {
       const invoicedAt = new Date(invoice.invoicedAt);
@@ -113,7 +110,8 @@ export class MarkSupportInvoiceIssuedUseCase implements UseCase<MarkSupportInvoi
           amountUf: row.amountUf,
           folio: row.folio,
           position: row.position,
-          periodTotalUf: calculation.amountUf,
+          // Lo que calculó Kora — si difiere de la suma registrada, queda la traza.
+          calculatedAmountUf: calculation.amountUf,
         },
       });
     }

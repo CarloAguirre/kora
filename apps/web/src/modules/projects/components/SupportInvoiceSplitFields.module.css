@@ -10,7 +10,7 @@
 /* Folio y fecha lado a lado si hay espacio (diálogo); apilados en la tarjeta angosta de la ficha. */
 .singleRow {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: var(--kora-space-3);
 }
 
@@ -117,9 +117,26 @@
   color: var(--kora-success-text);
 }
 
-.statusPending {
-  background: var(--kora-danger-surface-soft);
-  color: var(--kora-danger-hover);
+.statusWarning {
+  background: var(--kora-warning-surface);
+  color: var(--kora-warning-text);
+}
+
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--kora-space-2);
+  padding: var(--kora-space-3);
+  border-radius: var(--kora-radius-sm);
+  background: var(--kora-warning-surface);
+  color: var(--kora-warning-text);
+  font-size: var(--kora-text-sm);
+  line-height: 1.45;
+}
+
+.noticeIcon {
+  flex-shrink: 0;
+  margin-top: 2px;
 }
 
 .addButton {

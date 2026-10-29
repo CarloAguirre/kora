@@ -79,20 +79,6 @@ export class SupportInvoiceAlreadyExistsForPeriodError extends ConflictError {
   }
 }
 
-/** Al dividir el total del período en varias facturas, sus montos tienen que sumar exactamente lo que corresponde facturar. */
-export class SupportInvoiceSplitAmountMismatchError extends ValidationError {
-  constructor(expected: number, actual: number, currency: string) {
-    super(
-      `Las facturas suman ${formatAmount(actual)} ${currency}, pero el monto a facturar del período es ${formatAmount(expected)} ${currency}.`,
-      'SUPPORT_INVOICE_SPLIT_AMOUNT_MISMATCH',
-    );
-  }
-}
-
-function formatAmount(value: number): string {
-  return value.toFixed(2);
-}
-
 /** No tiene sentido registrar una factura de un contrato que no debe nada este período — evita facturas "fantasma" con monto 0. */
 export class SupportPlanNothingToInvoiceError extends ConflictError {
   constructor() {

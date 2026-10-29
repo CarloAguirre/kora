@@ -12,8 +12,9 @@ import {
  * Una fila de `support_invoices` es un hecho consumado, no un estado: que
  * exista alguna para un `(planId, periodKey)` YA significa "facturado". El
  * total de un período se puede dividir en varias facturas (varias filas del
- * mismo período), que se registran todas juntas y suman exactamente el monto
- * a facturar. El estado de pago es de cada factura y se deriva al leer
+ * mismo período), que se registran todas juntas. Su suma es el monto
+ * congelado del período — puede diferir del calculado por Kora (p. ej. una
+ * cuota fija que no cobra el excedente); la UI avisa la diferencia. El estado de pago es de cada factura y se deriva al leer
  * (`paidAt` → pagado; `dueAt` vencido → atrasado; si no, pendiente) — nunca
  * se guarda, ver el comentario en `packages/db/src/schema/tickets.ts`. Kora
  * no emite la factura: solo registra que ya se emitió y cuándo se pagó.
@@ -68,7 +69,7 @@ export type SupportInvoice = z.infer<typeof supportInvoiceSchema>;
 export const supportInvoiceDocumentInputSchema = z.object({
   folio: nonEmptyTrimmed(50, 'El folio'),
   invoicedAt: z.iso.date(),
-  /** Parte del total que cubre esta factura. Entre todas deben sumar exactamente el monto a facturar del período. */
+  /** Monto de esta factura. La suma de todas queda como el monto facturado del período, aunque difiera del calculado. */
   amountUf: z.number().positive('El monto de cada factura debe ser mayor a 0.'),
   attachmentName: z.string().trim().max(255).optional(),
 });

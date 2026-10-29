@@ -90,11 +90,14 @@ describe('MarkSupportInvoiceIssuedUseCase', () => {
     expect(audit.entries).toHaveLength(2);
   });
 
-  it('rechaza la división si los montos no suman exactamente el total', async () => {
-    const { useCase, invoices } = build();
-    const result = await useCase.execute({ planId: 'plan-1', data: input([doc('27846', 100), doc('27847', 34.8)]), actor });
-    expect(result.isErr()).toBe(true);
-    expect(invoices.created).toEqual([]);
+  it('registra lo facturado aunque no sume el monto calculado (cuota fija sin cobrar el excedente)', async () => {
+    const { useCase, invoices, audit } = build();
+    const result = await useCase.execute({ planId: 'plan-1', data: input([doc('1527', 7.5), doc('1528', 7.5), doc('1529', 22.5)]), actor });
+    expect(result.isOk()).toBe(true);
+    expect(invoices.created.map((row) => row.amountUf)).toEqual([7.5, 7.5, 22.5]);
+    // Las horas calculadas quedan como facturadas: el excedente no cobrado no se arrastra al mes siguiente.
+    expect(invoices.created[0]).toMatchObject({ hoursBilled: 4 });
+    expect(audit.entries[0]!.metadata).toMatchObject({ calculatedAmountUf: 134.81 });
   });
 
   it('acepta montos que suman el total aunque la suma en coma flotante no sea exacta', async () => {

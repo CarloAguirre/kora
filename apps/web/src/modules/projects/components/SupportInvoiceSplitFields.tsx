@@ -4,7 +4,7 @@ import styles from './SupportInvoiceSplitFields.module.css';
 import { Button } from '@/shared/components/ui/Button';
 import { TextField } from '@/shared/components/ui/TextField';
 import { FileField } from '@/shared/components/ui/FileField';
-import { CircleCheckIcon, PlusIcon, TrashIcon } from '@/shared/components/icons/Icons';
+import { CircleCheckIcon, PlusIcon, TrashIcon, TriangleAlertIcon } from '@/shared/components/icons/Icons';
 import { formatMoney } from '@/shared/lib/format-money';
 
 interface InvoiceDraft {
@@ -34,20 +34,18 @@ export type SupportInvoiceSplit = ReturnType<typeof useSupportInvoiceSplit>;
 
 /**
  * Estado del formulario de registro de facturas de un período: una o varias
- * facturas que, entre todas, cubren exactamente `totalAmount`. Con una sola
- * factura el monto es el total (no se pide). Al dividir, el total se reparte
- * en dos mitades; cada factura que se agrega después arranca con lo que falta
- * por asignar.
+ * facturas, cada una con su monto. `totalAmount` (lo que calculó Kora) es la
+ * referencia — la primera factura arranca con ese monto, al dividir se
+ * reparte en dos mitades y cada factura que se agrega después arranca con lo
+ * que falta por asignar. La suma puede diferir del calculado (p. ej. una
+ * cuota fija que no cobra el excedente): no bloquea, solo se avisa.
  */
 export function useSupportInvoiceSplit(totalAmount: number) {
   const totalCents = toCents(totalAmount);
   const [drafts, setDrafts] = useState<InvoiceDraft[]>(() => [newDraft(totalCents)]);
 
   const isSplit = drafts.length > 1;
-  const assignedCents = useMemo(
-    () => (isSplit ? drafts.reduce((total, draft) => total + (draftCents(draft) ?? 0), 0) : totalCents),
-    [drafts, isSplit, totalCents],
-  );
+  const assignedCents = useMemo(() => drafts.reduce((total, draft) => total + (draftCents(draft) ?? 0), 0), [drafts]);
 
   const reset = useCallback(() => setDrafts([newDraft(totalCents)]), [totalCents]);
 
@@ -56,19 +54,16 @@ export function useSupportInvoiceSplit(totalAmount: number) {
       if (current.length >= MAX_SUPPORT_INVOICES_PER_PERIOD) return current;
       const last = current.at(-1)!;
       if (current.length === 1) {
-        const half = Math.floor(totalCents / 2);
-        return [{ ...last, amount: centsToInput(totalCents - half) }, newDraft(half, last.invoicedAt)];
+        // Se reparte lo que tenga la única factura (puede no ser el monto calculado, si ya se ajustó).
+        const amount = draftCents(last) ?? totalCents;
+        const half = Math.floor(amount / 2);
+        return [{ ...last, amount: centsToInput(amount - half) }, newDraft(half, last.invoicedAt)];
       }
       const assigned = current.reduce((total, draft) => total + (draftCents(draft) ?? 0), 0);
       return [...current, newDraft(totalCents - assigned, last.invoicedAt)];
     });
 
-  const remove = (key: number) =>
-    setDrafts((current) => {
-      const next = current.filter((draft) => draft.key !== key);
-      // Si queda una sola, vuelve a cubrir el total.
-      return next.length === 1 ? [{ ...next[0]!, amount: centsToInput(totalCents) }] : next;
-    });
+  const remove = (key: number) => setDrafts((current) => current.filter((draft) => draft.key !== key));
 
   const update = (key: number, patch: Partial<Omit<InvoiceDraft, 'key'>>) =>
     setDrafts((current) => current.map((draft) => (draft.key === key ? { ...draft, ...patch } : draft)));
@@ -80,9 +75,9 @@ export function useSupportInvoiceSplit(totalAmount: number) {
     }
     const folios = drafts.map((draft) => draft.folio.trim());
     if (new Set(folios).size !== folios.length) return 'Hay folios repetidos.';
-    if (!isSplit) return null;
-    if (drafts.some((draft) => (draftCents(draft) ?? 0) <= 0)) return 'Ingresa un monto mayor a 0 en cada factura.';
-    if (assignedCents !== totalCents) return 'Los montos de las facturas tienen que sumar exactamente el total a facturar.';
+    if (drafts.some((draft) => (draftCents(draft) ?? 0) <= 0)) {
+      return isSplit ? 'Ingresa un monto mayor a 0 en cada factura.' : 'Ingresa un monto mayor a 0.';
+    }
     return null;
   };
 
@@ -90,7 +85,7 @@ export function useSupportInvoiceSplit(totalAmount: number) {
     drafts.map((draft) => ({
       folio: draft.folio.trim(),
       invoicedAt: draft.invoicedAt,
-      amountUf: (isSplit ? (draftCents(draft) ?? 0) : totalCents) / 100,
+      amountUf: (draftCents(draft) ?? 0) / 100,
       attachmentName: draft.attachmentName ?? undefined,
     }));
 
@@ -104,10 +99,10 @@ export interface SupportInvoiceSplitFieldsProps {
 }
 
 /**
- * Campos de "Registrar factura". Con una sola factura: folio, fecha y PDF,
- * apilados. Al dividir el total: una fila compacta por factura (folio, fecha,
- * monto, PDF) bajo un encabezado común, y una fila de total que muestra si
- * los montos ya cuadran. Compartido por `IssueSupportInvoiceDialog` y
+ * Campos de "Registrar factura". Con una sola factura: folio, fecha, monto
+ * y PDF. Al dividir el total: una fila compacta por factura (folio, fecha,
+ * monto, PDF) bajo un encabezado común, y una fila de total contra el monto
+ * calculado. Si no cuadran, se avisa la diferencia, pero se puede guardar. Compartido por `IssueSupportInvoiceDialog` y
  * `SupportPlanBillingAction` — ambos se ensanchan cuando `split.isSplit`.
  */
 export function SupportInvoiceSplitFields({ split, currency, disabled }: SupportInvoiceSplitFieldsProps) {
@@ -134,7 +129,19 @@ export function SupportInvoiceSplitFields({ split, currency, disabled }: Support
             onChange={(e) => split.update(draft.key, { invoicedAt: e.target.value })}
             disabled={disabled}
           />
+          <TextField
+            label={`Monto (${currency})`}
+            type="number"
+            inputMode="decimal"
+            min="0"
+            step="0.01"
+            value={draft.amount}
+            onChange={(e) => split.update(draft.key, { amount: e.target.value })}
+            className={styles.amountField}
+            disabled={disabled}
+          />
         </div>
+        <DifferenceNotice split={split} currency={currency} />
         <FileField
           label="Adjuntar PDF (opcional)"
           fileName={draft.attachmentName}
@@ -216,6 +223,7 @@ export function SupportInvoiceSplitFields({ split, currency, disabled }: Support
       })}
 
       <SplitTotalRow split={split} currency={currency} />
+      <DifferenceNotice split={split} currency={currency} />
 
       {canAdd && (
         <Button variant="ghost" size="sm" iconLeft={<PlusIcon size={14} />} onClick={split.add} disabled={disabled} className={styles.addButton}>
@@ -226,25 +234,47 @@ export function SupportInvoiceSplitFields({ split, currency, disabled }: Support
   );
 }
 
-/** Total asignado contra el total del período — en verde cuando cuadra, en rojo con lo que falta o sobra. */
+/** Total registrado contra el monto calculado — verde cuando cuadra; si no, ámbar con el calculado (no bloquea). */
 function SplitTotalRow({ split, currency }: { split: SupportInvoiceSplit; currency: SupportPlanCurrency }) {
   const remainingCents = split.totalCents - split.assignedCents;
-  const matches = remainingCents === 0;
   return (
     <div className={[styles.gridRow, styles.totalRow].join(' ')}>
-      <span className={styles.totalLabel}>Total asignado</span>
+      <span className={styles.totalLabel}>Total a facturar</span>
       <span className={[styles.alignRight, styles.totalAmount].join(' ')}>{formatMoney(split.assignedCents / 100, currency)}</span>
-      <span className={[styles.totalStatus, matches ? styles.statusOk : styles.statusPending].join(' ')} aria-live="polite">
-        {matches ? (
+      <span className={[styles.totalStatus, remainingCents === 0 ? styles.statusOk : styles.statusWarning].join(' ')}>
+        {remainingCents === 0 ? (
           <>
             <CircleCheckIcon size={15} />
-            Cuadra con el total
+            Cuadra con el monto calculado
           </>
-        ) : remainingCents > 0 ? (
-          `Faltan ${formatMoney(remainingCents / 100, currency)} de ${formatMoney(split.totalCents / 100, currency)}`
         ) : (
-          `Sobran ${formatMoney(-remainingCents / 100, currency)} sobre ${formatMoney(split.totalCents / 100, currency)}`
+          `Calculado: ${formatMoney(split.totalCents / 100, currency)}`
         )}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * Aviso cuando lo que se va a facturar no coincide con lo que calculó Kora.
+ * No bloquea el guardado (ver `MarkSupportInvoiceIssuedUseCase`): el mes
+ * queda facturado por lo registrado y la diferencia no se cobra después.
+ */
+function DifferenceNotice({ split, currency }: { split: SupportInvoiceSplit; currency: SupportPlanCurrency }) {
+  const remainingCents = split.totalCents - split.assignedCents;
+  if (remainingCents === 0 || split.assignedCents <= 0) return null;
+  const difference = formatMoney(Math.abs(remainingCents) / 100, currency);
+  const calculated = formatMoney(split.totalCents / 100, currency);
+  const billed = formatMoney(split.assignedCents / 100, currency);
+  return (
+    <div className={styles.notice} role="status">
+      <TriangleAlertIcon size={16} className={styles.noticeIcon} />
+      <span>
+        <strong>
+          {remainingCents > 0 ? `Faltan ${difference}` : `Sobran ${difference}`}
+        </strong>
+        {remainingCents > 0 ? ` para llegar al monto calculado (${calculated}). ` : ` sobre el monto calculado (${calculated}). `}
+        Puedes guardar igual: el mes queda facturado por {billed} y la diferencia no se cobra después.
       </span>
     </div>
   );

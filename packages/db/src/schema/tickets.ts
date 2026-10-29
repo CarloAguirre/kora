@@ -272,8 +272,8 @@ export const supportPlanProjects = pgTable(
  * se guarda de antemano.
  *
  * El total de un período se puede dividir en varias facturas: una fila por
- * factura, numeradas con `position` (0, 1, …), registradas todas juntas y
- * sumando exactamente el monto calculado. El índice único
+ * factura, numeradas con `position` (0, 1, …), registradas todas juntas. Su
+ * suma es lo facturado del período, aunque difiera del monto calculado. El índice único
  * `(plan_id, period_key, position)` impide que dos registros simultáneos del
  * mismo período queden ambos guardados (los dos intentan la `position` 0).
  *
