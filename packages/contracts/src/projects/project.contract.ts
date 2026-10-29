@@ -127,8 +127,10 @@ export const projectTeamSchema = z.object({
   assignedHours: z.number().nullable(),
   memberCount: z.number().int(),
   maxMembers: z.number().int().nullable(),
+  /** HH aprobadas del líder que no es miembro asignado del proyecto — suman al consumo del equipo (ver `ProjectTeamRecord`). */
+  leaderConsumedHours: z.number(),
 });
-export type ProjectTeam = z.infer<typeof projectTeamSchema>;
+export type ProjectTeam =z.infer<typeof projectTeamSchema>;
 
 /** Catálogo propio de la etapa del módulo/fase — independiente de `projectPhaseSchema` (avance del proyecto completo). */
 export const PROJECT_MODULE_STAGES = ['discovery', 'development', 'production', 'pilot', 'closed'] as const;

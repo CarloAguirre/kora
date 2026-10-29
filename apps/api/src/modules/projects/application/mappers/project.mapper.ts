@@ -107,6 +107,7 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
     assignedHours: team.assignedHours,
     memberCount: team.memberCount,
     maxMembers: team.maxMembers,
+    leaderConsumedHours: team.leaderConsumedHours,
   }));
 
   const observations: ProjectObservationDto[] = source.observations.map((observation) => ({

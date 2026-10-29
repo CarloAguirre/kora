@@ -1,5 +1,16 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, projectTeamMembers, projectTeams, sql, teams, users, type Database } from '@kora/db';
+import {
+  and,
+  eq,
+  hourEntries,
+  projectTeamMembers,
+  projectTeams,
+  sql,
+  teamMembers,
+  teams,
+  users,
+  type Database,
+} from '@kora/db';
 import type { TransactionContext } from '@kora/core';
 import type {
   ProjectTeamRecord,
@@ -38,6 +49,7 @@ export class DrizzleProjectTeamRepository implements ProjectTeamRepository {
 
   async findByProject(projectId: string, context?: TransactionContext): Promise<ProjectTeamRecord[]> {
     const db = resolveDb(this.database, context);
+    const effectiveLeaderUserId = sql<string | null>`coalesce(${projectTeams.leaderUserId}, ${teams.leaderUserId})`;
     const rows = await db
       .select({
         id: projectTeams.id,
@@ -50,6 +62,15 @@ export class DrizzleProjectTeamRepository implements ProjectTeamRepository {
         assignedHours: projectTeams.assignedHours,
         memberCount: sql<string>`count(${projectTeamMembers.id})`,
         maxMembers: projectTeams.memberCount,
+        createdAt: projectTeams.createdAt,
+        effectiveLeaderUserId,
+        // Mismo criterio que `consumedHours` de `DrizzleProjectTeamMemberRepository`: en vivo desde las aprobadas.
+        leaderApprovedHours: sql<string>`coalesce((
+          select sum(${hourEntries.hours}) from ${hourEntries}
+          where ${hourEntries.projectId} = ${projectTeams.projectId}
+            and ${hourEntries.userId} = ${effectiveLeaderUserId}
+            and ${hourEntries.status} = 'approved'
+        ), 0)`,
       })
       .from(projectTeams)
       .innerJoin(teams, eq(teams.id, projectTeams.teamId))
@@ -62,19 +83,38 @@ export class DrizzleProjectTeamRepository implements ProjectTeamRepository {
         ),
       )
       .where(eq(projectTeams.projectId, projectId))
-      .groupBy(projectTeams.id, teams.slug, teams.name, users.firstName, users.lastName);
+      .groupBy(projectTeams.id, teams.slug, teams.name, teams.leaderUserId, users.firstName, users.lastName)
+      .orderBy(projectTeams.createdAt, projectTeams.id);
 
-    return rows.map((row) => ({
-      id: row.id,
-      teamId: row.teamId,
-      teamSlug: row.teamSlug,
-      teamName: row.teamName,
-      leaderUserId: row.leaderUserId,
-      leaderName: row.leaderUserId ? `${row.leaderFirstName ?? ''} ${row.leaderLastName ?? ''}`.trim() : null,
-      assignedHours: row.assignedHours !== null ? Number(row.assignedHours) : null,
-      memberCount: Number(row.memberCount),
-      maxMembers: row.maxMembers,
-    }));
+    const assignedUserIds = new Set(
+      (
+        await db
+          .select({ userId: teamMembers.userId })
+          .from(projectTeamMembers)
+          .innerJoin(teamMembers, eq(teamMembers.id, projectTeamMembers.teamMemberId))
+          .where(eq(projectTeamMembers.projectId, projectId))
+      ).map((row) => row.userId),
+    );
+    // Un líder que no es miembro se cuenta una sola vez: en el primer equipo que lidera (orden de asignación).
+    const creditedLeaderIds = new Set<string>();
+
+    return rows.map((row) => {
+      const leaderId = row.effectiveLeaderUserId;
+      const credits = leaderId !== null && !assignedUserIds.has(leaderId) && !creditedLeaderIds.has(leaderId);
+      if (credits) creditedLeaderIds.add(leaderId);
+      return {
+        id: row.id,
+        teamId: row.teamId,
+        teamSlug: row.teamSlug,
+        teamName: row.teamName,
+        leaderUserId: row.leaderUserId,
+        leaderName: row.leaderUserId ? `${row.leaderFirstName ?? ''} ${row.leaderLastName ?? ''}`.trim() : null,
+        assignedHours: row.assignedHours !== null ? Number(row.assignedHours) : null,
+        memberCount: Number(row.memberCount),
+        maxMembers: row.maxMembers,
+        leaderConsumedHours: credits ? Number(row.leaderApprovedHours) : 0,
+      };
+    });
   }
 
   async isTeamLeaderForProject(

@@ -111,7 +111,8 @@ export function DevelopmentProjectDetailView({
         teamName: team.teamName,
         leaderName: leader?.fullName ?? null,
         assignedHours: team.assignedHours ?? 0,
-        consumedHours: 0,
+        // Líder que no es miembro asignado: sus horas van a su equipo, no a "Sin equipo".
+        consumedHours: team.leaderConsumedHours,
       });
     }
 
@@ -146,16 +147,18 @@ export function DevelopmentProjectDetailView({
   const remainingHours = project.soldHours - project.usedHours;
 
   /**
-   * HH aprobadas de gente que no está en `project_team_members` (p.ej. el líder
-   * del proyecto o de un equipo que carga horas sin estar asignado como
-   * miembro). `project.usedHours` las cuenta y el desglose por equipo no, así que
+   * HH aprobadas de gente que no está en `project_team_members` ni lidera un
+   * equipo del proyecto (p.ej. el líder del proyecto que carga horas sin estar
+   * asignado). `project.usedHours` las cuenta y el desglose por equipo no, así que
    * "HH Utilizadas" del gráfico no cuadraba con "HH consumidas" de arriba. Cada
-   * persona se cuenta una vez aunque esté en dos equipos — sus horas no guardan equipo.
+   * persona se cuenta una vez aunque esté en dos equipos — sus horas no guardan
+   * equipo. Las del líder de equipo no asignado ya vienen en `leaderConsumedHours`.
    */
   const unassignedHours = useMemo(() => {
     const consumedByUser = new Map(project.members.map((member) => [member.userId, member.consumedHours]));
-    const attributed = [...consumedByUser.values()].reduce((sum, hours) => sum + hours, 0);
-    return Math.max(0, project.usedHours - attributed);
+    const attributedToMembers = [...consumedByUser.values()].reduce((sum, hours) => sum + hours, 0);
+    const attributedToLeaders = project.teams.reduce((sum, team) => sum + team.leaderConsumedHours, 0);
+    return Math.max(0, project.usedHours - attributedToMembers - attributedToLeaders);
   }, [project]);
 
   const projectDocuments: ProjectDocument[] = [

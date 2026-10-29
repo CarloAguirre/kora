@@ -81,7 +81,7 @@ export function TeamLeaderProjectView({
     const leaderName = teamRow?.leader?.fullName ?? null;
     const maxMembers = teamRow?.maxMembers || null;
     const assignedHours = teamRow?.assignedHours ?? members.reduce((sum, m) => sum + m.assignedHours, 0);
-    const consumedHours = members.reduce((sum, m) => sum + m.consumedHours, 0);
+    const consumedHours = members.reduce((sum, m) => sum + m.consumedHours, 0) + (teamRow?.leaderConsumedHours ?? 0);
     return { teamId, teamName, leaderId, leaderName, maxMembers, assignedHours, consumedHours, members };
   }, [project, teamId]);
   const { pageItems: pagedMembers, pagination: membersPagination } = usePaginatedItems(team.members);
