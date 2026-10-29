@@ -86,6 +86,12 @@ export function TicketHhRequestsSection({
   const [rejectionReason, setRejectionReason] = useState('');
   const [resolvedOpen, setResolvedOpen] = useState(false);
 
+  // Mismo criterio que `CreateTicketHhRequestUseCase`: solo el colaborador
+  // espera aprobación por sus horas normales; las extra siempre la esperan
+  // salvo que el propio usuario sea quien decide en este proyecto.
+  const selfApprovesRegularHours = Boolean(user && user.role !== 'collaborator');
+  const approverNames = hhApprovers.map((approver) => approver.fullName).join(' o ');
+
   const pendingRequests = (requests ?? []).filter((request) => request.status === 'pending');
   const resolvedRequests = (requests ?? []).filter((request) => request.status !== 'pending');
 
@@ -266,9 +272,13 @@ export function TicketHhRequestsSection({
           <div className={styles.headerStack}>
             <span className={styles.title}>Registrar horas</span>
             <span className={styles.subtitle}>
-              {hhApprovers.length > 0
-                ? `Tus horas quedan pendientes hasta que las apruebe ${hhApprovers.map((approver) => approver.fullName).join(' o ')}.`
-                : 'Este proyecto no tiene un aprobador definido para tu solicitud.'}
+              {selfApprovesRegularHours
+                ? approverNames && !hhApprovers.some((approver) => approver.id === user?.id)
+                  ? `Tus horas normales quedan aprobadas al registrarlas; las horas extra las aprueba ${approverNames}.`
+                  : 'Tus horas quedan aprobadas al registrarlas.'
+                : approverNames
+                  ? `Tus horas quedan pendientes hasta que las apruebe ${approverNames}.`
+                  : 'Este proyecto no tiene un aprobador definido para tu solicitud.'}
             </span>
           </div>
 

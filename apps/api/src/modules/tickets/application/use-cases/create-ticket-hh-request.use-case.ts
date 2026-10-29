@@ -61,7 +61,11 @@ export interface CreateTicketHhRequestCommand {
  * su propia solicitud aprobada al instante — igual que en la v1, donde el
  * líder del proyecto de soporte registra HH ya aprobadas directamente
  * (`createApprovedTicketHHRegistration`) en vez de quedar pendiente de
- * revisión. Cualquier otro responsable sigue quedando `pending`.
+ * revisión. Fuera de eso rige lo mismo que en Horas
+ * (`CreateHourEntryUseCase`): solo el colaborador necesita aprobación para
+ * sus horas normales — un líder que no decide en este proyecto (p. ej. el
+ * soporte lo lidera otra persona) también las ve aprobadas al instante, y
+ * solo su tramo de horas extra queda `pending`.
  */
 @Injectable()
 export class CreateTicketHhRequestUseCase implements UseCase<CreateTicketHhRequestCommand, { id: string }, ApplicationError> {
@@ -91,6 +95,7 @@ export class CreateTicketHhRequestUseCase implements UseCase<CreateTicketHhReque
     // proyecto si no tiene uno) — mismo criterio EXCLUYENTE que Horas.
     const isApprover = isAdminTier ? true : await this.projects.isProjectApprover(ticket.projectId, actor.userId, actor.userId);
     if (!isAdminTier && !isAssignee && !isApprover) return err(new CannotSubmitTicketHhRequestError());
+    const autoApproves = (tranche: HoursTranche) => isApprover || (actorRole !== 'collaborator' && !tranche.isOvertime);
 
     const requestDate = new Date(`${data.date}T00:00:00.000Z`);
     // Solo las horas normales ya registradas ese día (cualquier ticket/proceso)
@@ -102,6 +107,7 @@ export class CreateTicketHhRequestUseCase implements UseCase<CreateTicketHhReque
     const now = this.clock.now();
     const created: TicketHhRequest[] = [];
     for (const tranche of tranches) {
+      const approvesNow = autoApproves(tranche);
       const requestCreated = TicketHhRequest.create({
         id: this.ids.generate(),
         ticketId,
@@ -129,13 +135,13 @@ export class CreateTicketHhRequestUseCase implements UseCase<CreateTicketHhReque
         note: request.note,
         isOvertime: request.isOvertime,
         ticketDisplayId: ticket.legacyId ?? ticket.id,
-        ownerRequiresApproval: !isApprover,
+        ownerRequiresApproval: !approvesNow,
         now,
       });
       if (entryCreated.isErr()) return err(entryCreated.error);
       const entry = entryCreated.value;
 
-      if (isApprover) {
+      if (approvesNow) {
         const approved = request.approve(actor.userId, entry.id, now);
         if (approved.isErr()) return err(approved.error);
       } else {
@@ -149,9 +155,11 @@ export class CreateTicketHhRequestUseCase implements UseCase<CreateTicketHhReque
 
     const overtimeHours = sumHours(tranches.filter((tranche) => tranche.isOvertime));
     const overtimeNote = overtimeHours > 0 ? ` (${overtimeHours} HH como horas extra)` : '';
+    const approvedHours = sumHours(tranches.filter(autoApproves));
+    const pendingHours = roundHours(data.hours - approvedHours);
 
-    if (isApprover) {
-      ticket.recordUsedHours(ticket.usedHours + data.hours, now);
+    if (approvedHours > 0) {
+      ticket.recordUsedHours(ticket.usedHours + approvedHours, now);
       await this.tickets.save(ticket);
       // Las horas nacen aprobadas: cuentan ya en el consumo del proyecto, igual que al aprobar en Horas.
       const usedHours = await this.hourEntries.sumApprovedHoursForProject(ticket.projectId);
@@ -160,10 +168,13 @@ export class CreateTicketHhRequestUseCase implements UseCase<CreateTicketHhReque
 
     await this.history.append({
       ticketId,
-      eventType: isApprover ? 'ticket_hh_direct_approved' : 'ticket_hh_requested',
-      description: isApprover
-        ? `Se registraron ${data.hours} HH aprobadas directamente para el ${data.date}${overtimeNote}.`
-        : `Se solicitaron ${data.hours} HH para el ${data.date}${overtimeNote}.`,
+      eventType: pendingHours === 0 ? 'ticket_hh_direct_approved' : 'ticket_hh_requested',
+      description:
+        pendingHours === 0
+          ? `Se registraron ${data.hours} HH aprobadas directamente para el ${data.date}${overtimeNote}.`
+          : approvedHours > 0
+            ? `Se registraron ${approvedHours} HH aprobadas directamente y se solicitaron ${pendingHours} HH como horas extra para el ${data.date}.`
+            : `Se solicitaron ${data.hours} HH para el ${data.date}${overtimeNote}.`,
       actorUserId: actor.userId,
       occurredAt: now,
     });
@@ -174,7 +185,7 @@ export class CreateTicketHhRequestUseCase implements UseCase<CreateTicketHhReque
         action: 'create',
         entityType: 'ticket_hh_request',
         entityId: request.id,
-        metadata: { ticketId, hours: request.hours, date: data.date, isOvertime: request.isOvertime, directlyApproved: isApprover },
+        metadata: { ticketId, hours: request.hours, date: data.date, isOvertime: request.isOvertime, directlyApproved: request.status === 'approved' },
       });
     }
 

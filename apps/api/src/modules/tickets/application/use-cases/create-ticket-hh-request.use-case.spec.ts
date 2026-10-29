@@ -45,6 +45,9 @@ class StubHourEntryRepository implements Partial<HourEntryRepository> {
   async save(entry: HourEntry): Promise<void> {
     this.saved.push(entry);
   }
+  async sumApprovedHoursForProject(): Promise<number> {
+    return 0;
+  }
 }
 
 function buildTicket(): Ticket {
@@ -143,5 +146,40 @@ describe('CreateTicketHhRequestUseCase — horas extra automáticas sobre 8h', (
 
     expect(result.isOk()).toBe(true);
     expect(tranchesOf(requests)).toEqual([{ hours: 4, isOvertime: false }]);
+  });
+});
+
+describe('CreateTicketHhRequestUseCase — líder que no decide en el proyecto', () => {
+  it('aprueba al instante sus horas normales aunque el proyecto lo lidere otra persona (igual que en Horas)', async () => {
+    const { useCase, requests, hourEntries } = buildUseCase();
+
+    const result = await useCase.execute({
+      ticketId: 'ticket-1',
+      data: { date: '2026-09-10', hours: 1 },
+      actor: ACTOR,
+      actorRole: 'leader',
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(requests.saved.map((request) => request.status)).toEqual(['approved']);
+    expect(hourEntries.saved.map((entry) => entry.status)).toEqual(['approved']);
+  });
+
+  it('deja pendiente solo el tramo de horas extra', async () => {
+    const { useCase, requests, hourEntries } = buildUseCase({ regularHours: 7 });
+
+    const result = await useCase.execute({
+      ticketId: 'ticket-1',
+      data: { date: '2026-09-10', hours: 3 },
+      actor: ACTOR,
+      actorRole: 'leader',
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(requests.saved.map((request) => [request.hours, request.isOvertime, request.status])).toEqual([
+      [1, false, 'approved'],
+      [2, true, 'pending'],
+    ]);
+    expect(hourEntries.saved.map((entry) => entry.status)).toEqual(['approved', 'pending']);
   });
 });
