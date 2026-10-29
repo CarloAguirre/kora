@@ -24,10 +24,15 @@ class FakeInvoices implements Pick<SupportInvoiceRepository, 'listByPlanAndPerio
   }
 }
 
-class FakeTickets implements Pick<TicketRepository, 'findClosedUnbilledIds' | 'linkToInvoice'> {
+class FakeTickets implements Pick<TicketRepository, 'findClosedUnbilledIds' | 'findUnbilledIdsWithHoursBefore' | 'linkToInvoice'> {
   linked: { ticketIds: readonly string[]; invoiceId: string } | null = null;
+  hoursBefore: Date | null = null;
   async findClosedUnbilledIds(): Promise<string[]> {
     return ['ticket-1'];
+  }
+  async findUnbilledIdsWithHoursBefore(_projectIds: readonly string[], before: Date): Promise<string[]> {
+    this.hoursBefore = before;
+    return ['ticket-2'];
   }
   async linkToInvoice(ticketIds: readonly string[], invoiceId: string): Promise<void> {
     this.linked = { ticketIds, invoiceId };
@@ -51,7 +56,10 @@ function build(options: { planType?: SupportPlanRecord['planType']; existing?: S
   const audit = new FakeAudit();
   let nextId = 0;
   const useCase = new MarkSupportInvoiceIssuedUseCase(
-    { findById: async () => ({ toSnapshot: () => record }) } as unknown as SupportPlanRepository,
+    {
+      findById: async () => ({ toSnapshot: () => record }),
+      listPeriodsForPlan: async () => [{ id: 'period-oct', endDate: new Date('2026-11-01T00:00:00Z') }],
+    } as unknown as SupportPlanRepository,
     invoices as unknown as SupportInvoiceRepository,
     tickets as unknown as TicketRepository,
     { calculate: async () => CALCULATION } as unknown as SupportBillingCalculator,
@@ -118,5 +126,12 @@ describe('MarkSupportInvoiceIssuedUseCase', () => {
     const { useCase, tickets } = build({ planType: 'on_demand' });
     await useCase.execute({ planId: 'plan-1', data: input([doc('27846', 100), doc('27847', 34.81)]), actor });
     expect(tickets.linked).toEqual({ ticketIds: ['ticket-1'], invoiceId: 'invoice-1' });
+  });
+
+  it('en un contrato mensual enlaza los tickets con horas hasta el fin del período facturado', async () => {
+    const { useCase, tickets } = build({ planType: 'monthly' });
+    await useCase.execute({ planId: 'plan-1', data: input([doc('27846', 134.81)]), actor });
+    expect(tickets.hoursBefore).toEqual(new Date('2026-11-01T00:00:00Z'));
+    expect(tickets.linked).toEqual({ ticketIds: ['ticket-2'], invoiceId: 'invoice-1' });
   });
 });

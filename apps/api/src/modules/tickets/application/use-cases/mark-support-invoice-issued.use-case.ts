@@ -91,11 +91,12 @@ export class MarkSupportInvoiceIssuedUseCase implements UseCase<MarkSupportInvoi
     await this.unitOfWork.run(async (tx) => {
       await this.invoices.createMany(rows, tx);
 
-      if (record.planType === 'on_demand') {
-        // Un ticket enlaza a una sola factura: la primera del período (`tickets.invoice_id` solo marca "ya facturado").
-        const ticketIds = await this.tickets.findClosedUnbilledIds(linkedProjectIds, tx);
-        await this.tickets.linkToInvoice(ticketIds, rows[0]!.id, tx);
-      }
+      // Un ticket enlaza a una sola factura: la primera del período (`tickets.invoice_id` solo marca "ya facturado").
+      const ticketIds =
+        record.planType === 'on_demand'
+          ? await this.tickets.findClosedUnbilledIds(linkedProjectIds, tx)
+          : await this.tickets.findUnbilledIdsWithHoursBefore(linkedProjectIds, await this.coveredUntil(record, calculation, rows[0]!.invoicedAt), tx);
+      await this.tickets.linkToInvoice(ticketIds, rows[0]!.id, tx);
     });
 
     for (const row of rows) {
@@ -117,6 +118,20 @@ export class MarkSupportInvoiceIssuedUseCase implements UseCase<MarkSupportInvoi
     }
 
     return ok({ ids: rows.map((row) => row.id) });
+  }
+
+  /**
+   * Hasta cuándo (exclusivo) cubre la factura las horas de los tickets: en
+   * `monthly`, el fin del período facturado — así también entran los tickets
+   * de meses anteriores que quedaron sin enlazar (con horas cargadas después
+   * de facturar ese mes); en `bundle`, el día de emisión inclusive.
+   */
+  private async coveredUntil(record: SupportPlanRecord, calculation: { monthlyPeriodId: string | null }, invoicedAt: Date): Promise<Date> {
+    if (calculation.monthlyPeriodId) {
+      const period = (await this.plans.listPeriodsForPlan(record.id)).find((item) => item.id === calculation.monthlyPeriodId);
+      if (period) return period.endDate;
+    }
+    return addDays(invoicedAt, 1);
   }
 }
 

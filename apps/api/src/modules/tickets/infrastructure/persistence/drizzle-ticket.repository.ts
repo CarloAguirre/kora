@@ -1,5 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { alias, and, asc, clients, count, desc, eq, ilike, inArray, isNull, isUuid, or, projects, sql, ticketHhRequests, tickets, users, type Database } from '@kora/db';
+import { alias, and, asc, clients, count, desc, eq, gt, gte, ilike, inArray, isNull, isUuid, lt, or, projects, sql, ticketHhRequests, tickets, users, type Database } from '@kora/db';
+
+/** `YYYY-MM-DD` para comparar contra columnas `date` sin corrimiento de zona horaria. */
+const isoDay = (date: Date) => date.toISOString().slice(0, 10);
 import { buildPage, toOffset, type Page, type PageRequest, type SortRequest, type TransactionContext } from '@kora/core';
 import type { TicketFilters, TicketListItem, TicketRepository, TicketSortableField } from '../../domain/repositories/ticket.repository';
 import type { Ticket } from '../../domain/entities/ticket.entity';
@@ -137,6 +140,29 @@ export class DrizzleTicketRepository implements TicketRepository {
       .onConflictDoUpdate({ target: tickets.id, set: values });
   }
 
+  async sumHours(filters: TicketFilters, context?: TransactionContext): Promise<number> {
+    const db = resolveDb(this.database, context);
+    const where = this.buildWhere(filters);
+    if (filters.activityBetween) {
+      const { from, to } = filters.activityBetween;
+      const rows = await db
+        .select({ total: sql<string>`coalesce(sum(${ticketHhRequests.hours}), 0)` })
+        .from(ticketHhRequests)
+        .innerJoin(tickets, eq(tickets.id, ticketHhRequests.ticketId))
+        .where(
+          and(
+            where,
+            eq(ticketHhRequests.status, 'approved'),
+            gte(ticketHhRequests.date, from),
+            lt(ticketHhRequests.date, to),
+          ),
+        );
+      return Number(rows[0]?.total ?? 0);
+    }
+    const rows = await db.select({ total: sql<string>`coalesce(sum(${tickets.usedHours}), 0)` }).from(tickets).where(where);
+    return Number(rows[0]?.total ?? 0);
+  }
+
   async findClosedUnbilledIds(projectIds: readonly string[], context?: TransactionContext): Promise<string[]> {
     if (projectIds.length === 0) return [];
     const db = resolveDb(this.database, context);
@@ -149,6 +175,30 @@ export class DrizzleTicketRepository implements TicketRepository {
           eq(tickets.status, 'closed'),
           isNull(tickets.invoiceId),
           isNull(tickets.deletedAt),
+        ),
+      );
+    return rows.map((row) => row.id);
+  }
+
+  async findUnbilledIdsWithHoursBefore(projectIds: readonly string[], before: Date, context?: TransactionContext): Promise<string[]> {
+    if (projectIds.length === 0) return [];
+    const db = resolveDb(this.database, context);
+    const rows = await db
+      .select({ id: tickets.id })
+      .from(tickets)
+      .where(
+        and(
+          or(inArray(tickets.projectId, [...projectIds]), inArray(tickets.developmentProjectId, [...projectIds])),
+          isNull(tickets.invoiceId),
+          isNull(tickets.deletedAt),
+          or(
+            sql`exists (select 1 from ${ticketHhRequests} r where r.ticket_id = ${tickets.id} and r.status = 'approved' and r.date < ${isoDay(before)})`,
+            and(
+              sql`not exists (select 1 from ${ticketHhRequests} r where r.ticket_id = ${tickets.id})`,
+              gt(tickets.usedHours, '0'),
+              lt(tickets.createdAt, before),
+            ),
+          ),
         ),
       );
     return rows.map((row) => row.id);
@@ -179,6 +229,17 @@ export class DrizzleTicketRepository implements TicketRepository {
     }
     if (filters.status) conditions.push(eq(tickets.status, filters.status));
     if (filters.priority) conditions.push(eq(tickets.priority, filters.priority));
+    if (filters.activityBetween) {
+      const { from, to } = filters.activityBetween;
+      conditions.push(
+        or(
+          // Operadores tipados y no `sql` crudo: postgres-js no serializa un `Date` suelto en un fragmento `sql`.
+          and(gte(tickets.createdAt, from), lt(tickets.createdAt, to)),
+          and(gte(tickets.resolvedAt, from), lt(tickets.resolvedAt, to)),
+          sql`exists (select 1 from ${ticketHhRequests} r where r.ticket_id = ${tickets.id} and r.status <> 'rejected' and r.date >= ${isoDay(from)} and r.date < ${isoDay(to)})`,
+        ),
+      );
+    }
     if (filters.search) {
       const term = `%${filters.search.trim()}%`;
       // El código visible ("IN0948"/"ME0012"/"OP0003") no se persiste: se arma en

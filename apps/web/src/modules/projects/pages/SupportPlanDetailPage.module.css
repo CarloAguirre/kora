@@ -180,3 +180,23 @@
   gap: var(--kora-space-4);
   width: 100%;
 }
+
+/* Título de "Tickets del proyecto" con el selector de mes a la derecha. */
+.ticketsHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kora-space-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--kora-space-3);
+}
+
+.ticketsHead .sectionTitle {
+  margin: 0;
+}
+
+.ticketsMonth {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-2);
+}

@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ListSupportBillingRowsQuery, MarkSupportInvoiceIssuedInput, MarkSupportInvoicePaidInput } from '@kora/contracts';
 import { billingApi, billingKeys } from './billing.api';
 import { supportPlanApi, supportPlanKeys } from '@/modules/projects/api/support-plan.api';
+import { ticketKeys } from '@/modules/tickets/api/tickets.api';
 
 /** Tras facturar o registrar un pago desde el panel: sus KPIs y filas, y la ficha del contrato si estaba en caché. */
 function useInvalidateBilling() {
@@ -9,6 +10,7 @@ function useInvalidateBilling() {
   return () => {
     void queryClient.invalidateQueries({ queryKey: ['billing'] });
     void queryClient.invalidateQueries({ queryKey: supportPlanKeys.details() });
+    void queryClient.invalidateQueries({ queryKey: ticketKeys.lists() });
   };
 }
 

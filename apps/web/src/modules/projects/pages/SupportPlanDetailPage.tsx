@@ -8,6 +8,7 @@ import { PageLoadError } from '@/shared/components/ui/PageLoadError';
 import { Card } from '@/shared/components/ui/Card';
 import { DEFAULT_PAGE_SIZE, Pagination, usePaginatedItems } from '@/shared/components/ui/Pagination';
 import { Tabs } from '@/shared/components/ui/Tabs';
+import { PeriodSelector } from '@/shared/components/ui/PeriodSelector';
 import { DataTable, type Column } from '@/shared/components/ui/DataTable';
 import { ChevronLeftIcon, DownloadIcon, LinkIcon } from '@/shared/components/icons/Icons';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
@@ -42,6 +43,11 @@ const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFr
 
 type PayAction = { invoice: SupportInvoice } | null;
 
+function currentMonth(): { year: number; month: number } {
+  const now = new Date();
+  return { year: now.getFullYear(), month: now.getMonth() + 1 };
+}
+
 /**
  * Ficha de contrato de soporte. Para `scope='consolidated'` muestra subtabs
  * por proyecto de desarrollo cubierto — igual mecanismo que la vista antigua
@@ -72,6 +78,8 @@ export function SupportPlanDetailPage() {
   const [closing, setClosing] = useState(false);
   const [ticketsPage, setTicketsPage] = useState(1);
   const [ticketsPageSize, setTicketsPageSize] = useState(DEFAULT_PAGE_SIZE);
+  /** `null` = todos los meses. Por defecto, el mes en curso. */
+  const [ticketsMonth, setTicketsMonth] = useState<{ year: number; month: number } | null>(currentMonth);
 
   const issueInvoice = useIssueSupportInvoice(plan?.id ?? '', plan?.clientId);
   const markPaid = useMarkSupportInvoicePaid(plan?.id ?? '', plan?.clientId);
@@ -84,6 +92,7 @@ export function SupportPlanDetailPage() {
     projectId: currentProjectId ?? undefined,
     page: ticketsPage,
     pageSize: ticketsPageSize,
+    month: ticketsMonth ? `${ticketsMonth.year}-${String(ticketsMonth.month).padStart(2, '0')}` : undefined,
     sortField: 'createdAt',
     sortDirection: 'desc',
   });
@@ -325,9 +334,47 @@ export function SupportPlanDetailPage() {
       )}
 
       <Card>
-        <p className={styles.sectionTitle}>Tickets del proyecto</p>
+        <div className={styles.ticketsHead}>
+          <p className={styles.sectionTitle}>Tickets del proyecto</p>
+          <div className={styles.ticketsMonth}>
+            {ticketsMonth ? (
+              <>
+                <PeriodSelector
+                  year={ticketsMonth.year}
+                  month={ticketsMonth.month}
+                  onChange={(next) => {
+                    setTicketsMonth(next);
+                    setTicketsPage(1);
+                  }}
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setTicketsMonth(null);
+                    setTicketsPage(1);
+                  }}
+                >
+                  Ver todos los meses
+                </Button>
+              </>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setTicketsMonth(currentMonth());
+                  setTicketsPage(1);
+                }}
+              >
+                Filtrar por mes
+              </Button>
+            )}
+          </div>
+        </div>
         <p className={styles.ticketSummaryLine}>
-          Tickets: <strong>{tickets?.total ?? 0}</strong> · HH utilizadas: <strong>{formatHours(plan.usedHours)}h</strong>
+          {ticketsMonth ? 'Tickets con actividad en el mes' : 'Tickets'}: <strong>{tickets?.total ?? 0}</strong> ·{' '}
+          {ticketsMonth ? 'HH aprobadas en el mes' : 'HH utilizadas'} en tickets de este proyecto: <strong>{formatHours(tickets?.totalHours ?? 0)}h</strong>
         </p>
 
         <SupportTicketBrowser

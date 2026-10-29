@@ -221,12 +221,21 @@ export const listTicketsQuerySchema = paginationQuerySchema.extend({
   leaderUserId: arrayQueryParam(uuidSchema),
   status: ticketStatusSchema.optional(),
   priority: ticketPrioritySchema.optional(),
+  /** 'YYYY-MM': solo tickets con actividad en ese mes — creados, resueltos o con horas (no rechazadas) en el mes. */
+  month: z.string().regex(/^\d{4}-\d{2}$/, 'Formato de mes inválido.').optional(),
   sortField: ticketSortFieldSchema.default('createdAt'),
   sortDirection: sortDirectionSchema.default('desc'),
 });
 export type ListTicketsQuery = z.infer<typeof listTicketsQuerySchema>;
 
-export const listTicketsResponseSchema = pageSchema(ticketSummarySchema);
+export const listTicketsResponseSchema = pageSchema(ticketSummarySchema).extend({
+  /**
+   * Horas de TODOS los tickets del filtro (no solo de la página): con `month`,
+   * las HH aprobadas de esos tickets dentro del mes; sin él, la suma de sus
+   * horas utilizadas.
+   */
+  totalHours: z.number(),
+});
 export type ListTicketsResponse = z.infer<typeof listTicketsResponseSchema>;
 
 /**

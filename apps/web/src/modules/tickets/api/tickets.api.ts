@@ -23,6 +23,7 @@ export const ticketsApi = {
       leaderUserId: query.leaderUserId,
       status: query.status,
       priority: query.priority,
+      month: query.month,
       sortField: query.sortField,
       sortDirection: query.sortDirection,
     });
