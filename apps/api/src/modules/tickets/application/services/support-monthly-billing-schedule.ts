@@ -1,7 +1,7 @@
 import type { SupportMonthlyBillingPeriod } from '@kora/contracts';
 import type { SupportMonthlyPeriodRecord, SupportPlanRecord } from '../../domain/repositories/support-plan.repository';
 import type { SupportInvoiceRecord } from '../../domain/repositories/support-invoice.repository';
-import { monthlyPeriodCharge } from './support-billing-calculator';
+import { monthlyPeriodCharge, unbilledMonthlyOverageHours } from './support-billing-calculator';
 
 /** Tope de meses futuros proyectados — un contrato sin fecha de término solo proyecta el próximo. */
 const MAX_PROJECTED_PERIODS = 120;
@@ -44,7 +44,10 @@ export function buildMonthlyBillingSchedule(
       endDate: toIsoDate(period.endDate),
       isCurrent: period.status === 'active' && hasStarted && today.getTime() < period.endDate.getTime(),
       status: invoice ? 'invoiced' : hasStarted ? 'to_invoice' : 'upcoming',
-      amountUf: invoice ? invoice.amountUf : monthlyPeriodCharge(plan, period).amountUf,
+      // Mismo monto que cobraría `SupportBillingCalculator`: cuota + excedente aún no facturado.
+      amountUf: invoice
+        ? invoice.amountUf
+        : round2(period.contractedHours * plan.planValueUf + unbilledMonthlyOverageHours(plan, chain, invoices, period) * plan.extraHourValueUf),
       invoiceId: invoice?.id ?? null,
       folio: invoice?.folio ?? null,
     };
@@ -69,7 +72,7 @@ export function buildMonthlyBillingSchedule(
       status: invoice ? 'invoiced' : 'upcoming',
       amountUf: invoice
         ? invoice.amountUf
-        : monthlyPeriodCharge(plan, { contractedHours: plan.contractedHours, reusedBalanceHours: 0, consumedHoursPeriod: 0, endDate }).amountUf,
+        : monthlyPeriodCharge(plan, { contractedHours: plan.contractedHours, reusedBalanceHours: 0, consumedHoursPeriod: 0 }).amountUf,
       invoiceId: invoice?.id ?? null,
       folio: invoice?.folio ?? null,
     });
@@ -77,6 +80,10 @@ export function buildMonthlyBillingSchedule(
   }
 
   return schedule;
+}
+
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
 }
 
 function toUtcDate(date: Date): Date {

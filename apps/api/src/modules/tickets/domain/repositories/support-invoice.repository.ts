@@ -35,7 +35,8 @@ export interface SupportInvoiceRecord {
 /**
  * Una fila es un hecho consumado: que exista para `(planId, periodKey)` YA
  * significa "facturado". No hay `update` de estado de facturación — solo
- * `create` (al facturar) y `markPaid` (al registrar el pago). Ver el
+ * `create` (al facturar), `markPaid` (al registrar el pago) y `remove` (al
+ * anular una factura mal emitida, ver `VoidSupportInvoiceUseCase`). Ver el
  * comentario de la tabla en `packages/db/src/schema/tickets.ts`.
  */
 export interface SupportInvoiceRepository {
@@ -55,6 +56,8 @@ export interface SupportInvoiceRepository {
 
   create(input: CreateSupportInvoiceInput, context?: TransactionContext): Promise<void>;
   markPaid(id: string, paidAt: Date, context?: TransactionContext): Promise<void>;
+  /** Borra la fila — el período vuelve a quedar "por facturar"; los tickets enlazados quedan sin factura (`on delete set null`). */
+  remove(id: string, context?: TransactionContext): Promise<void>;
 }
 
 export const SUPPORT_INVOICE_REPOSITORY = Symbol('SupportInvoiceRepository');

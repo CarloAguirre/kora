@@ -23,6 +23,7 @@ import { GetSupportPlanUseCase } from './application/use-cases/get-support-plan.
 import { ListSupportPlansForClientUseCase } from './application/use-cases/list-support-plans-for-client.use-case';
 import { MarkSupportInvoiceIssuedUseCase } from './application/use-cases/mark-support-invoice-issued.use-case';
 import { MarkSupportInvoicePaidUseCase } from './application/use-cases/mark-support-invoice-paid.use-case';
+import { VoidSupportInvoiceUseCase } from './application/use-cases/void-support-invoice.use-case';
 import { GetSupportBillingOverviewUseCase } from './application/use-cases/get-support-billing-overview.use-case';
 import { ListBillingLedgerEntriesUseCase } from './application/use-cases/list-billing-ledger-entries.use-case';
 import { ListSupportBillingRowsUseCase } from './application/use-cases/list-support-billing-rows.use-case';
@@ -94,6 +95,7 @@ import { HoursModule } from '../hours/hours.module';
     ListSupportPlansForClientUseCase,
     MarkSupportInvoiceIssuedUseCase,
     MarkSupportInvoicePaidUseCase,
+    VoidSupportInvoiceUseCase,
     GetSupportBillingOverviewUseCase,
     ListBillingLedgerEntriesUseCase,
     ListSupportBillingRowsUseCase,

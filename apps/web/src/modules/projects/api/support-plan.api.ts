@@ -40,6 +40,10 @@ export const supportPlanApi = {
   markInvoicePaid(invoiceId: string, input: MarkSupportInvoicePaidInput): Promise<void> {
     return api.patch<void>(`/support-invoices/${invoiceId}/paid`, input);
   },
+  /** "Anular factura" — solo pendientes de pago; el período vuelve a quedar por facturar. */
+  voidInvoice(invoiceId: string): Promise<void> {
+    return api.delete<void>(`/support-invoices/${invoiceId}`);
+  },
 };
 
 export const supportPlanKeys = {

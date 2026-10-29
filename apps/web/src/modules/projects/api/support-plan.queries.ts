@@ -101,3 +101,11 @@ export function useMarkSupportInvoicePaid(planId: string, clientId?: string) {
     onSuccess: () => invalidate(),
   });
 }
+
+export function useVoidSupportInvoice(clientId?: string) {
+  const invalidate = useInvalidateSupportPlans(clientId);
+  return useMutation({
+    mutationFn: (invoiceId: string) => supportPlanApi.voidInvoice(invoiceId),
+    onSuccess: () => invalidate(),
+  });
+}

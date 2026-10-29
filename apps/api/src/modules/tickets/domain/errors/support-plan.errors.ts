@@ -91,3 +91,10 @@ export class SupportInvoiceAlreadyPaidError extends ConflictError {
     super('Esta factura ya está marcada como pagada.', 'SUPPORT_INVOICE_ALREADY_PAID');
   }
 }
+
+/** Una factura pagada ya movió dinero: anularla en Kora dejaría el pago sin respaldo. */
+export class SupportInvoicePaidCannotBeVoidedError extends ConflictError {
+  constructor() {
+    super('No se puede anular una factura que ya está pagada.', 'SUPPORT_INVOICE_PAID_CANNOT_BE_VOIDED');
+  }
+}

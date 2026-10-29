@@ -1,5 +1,6 @@
 import type { SupportPlanAlert } from '@kora/contracts';
 import type { SupportMonthlyPeriodRecord, SupportPlanRecord } from '../../domain/repositories/support-plan.repository';
+import { monthlyPeriodOverageHours } from './support-billing-calculator';
 
 /** Umbral desde el que "vence el cupo acumulado" se muestra como alerta — ajustable, no es una regla financiera. */
 const QUOTA_EXPIRING_WARNING_DAYS = 60;
@@ -30,7 +31,9 @@ export function computeSupportPlanAlerts(
       if (daysUntilExpiry !== null && daysUntilExpiry <= QUOTA_EXPIRING_WARNING_DAYS) {
         alerts.push({ type: 'quota_expiring', daysUntilExpiry });
       }
-    } else if (current && isLastPeriod(plan, current) && current.consumedHoursPeriod > current.contractedHours) {
+    }
+    // El exceso sobre el cupo del mes se cobra como hora extra en la factura (ver `monthlyPeriodOverageHours`).
+    if (current && monthlyPeriodOverageHours(plan, current) > 0) {
       alerts.push({ type: 'last_period_overage', daysUntilExpiry: null });
     }
   }
@@ -40,10 +43,6 @@ export function computeSupportPlanAlerts(
 
 function findCurrentPeriod(periods: readonly SupportMonthlyPeriodRecord[], day: Date): SupportMonthlyPeriodRecord | undefined {
   return periods.find((period) => period.status === 'active' && period.startDate.getTime() <= day.getTime() && day.getTime() < period.endDate.getTime());
-}
-
-function isLastPeriod(plan: SupportPlanRecord, period: SupportMonthlyPeriodRecord): boolean {
-  return plan.endDate !== null && period.endDate.getTime() >= plan.endDate.getTime();
 }
 
 /**

@@ -31,7 +31,9 @@ import {
   useIssueSupportInvoice,
   useMarkSupportInvoicePaid,
   useSupportPlanDetail,
+  useVoidSupportInvoice,
 } from '../api/support-plan.queries';
+import { ConfirmActionDialog } from '@/shared/components/ui/ConfirmActionDialog';
 import { formatMoney } from '@/shared/lib/format-money';
 import { clientPath, clientPortalPreviewPath } from '@/app/router/paths';
 
@@ -65,6 +67,7 @@ export function SupportPlanDetailPage() {
   const { data: plan, isLoading, error } = useSupportPlanDetail(planId ?? null);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [payAction, setPayAction] = useState<PayAction>(null);
+  const [invoiceToVoid, setInvoiceToVoid] = useState<SupportInvoice | null>(null);
   const [issuePeriod, setIssuePeriod] = useState<SupportMonthlyBillingPeriod | null>(null);
   const [closing, setClosing] = useState(false);
   const [ticketsPage, setTicketsPage] = useState(1);
@@ -72,6 +75,7 @@ export function SupportPlanDetailPage() {
 
   const issueInvoice = useIssueSupportInvoice(plan?.id ?? '', plan?.clientId);
   const markPaid = useMarkSupportInvoicePaid(plan?.id ?? '', plan?.clientId);
+  const voidInvoice = useVoidSupportInvoice(plan?.clientId);
   const closePlan = useCloseSupportPlan(plan?.id ?? '', plan?.clientId);
 
   const currentProjectId = activeProjectId ?? plan?.linkedProjects[0]?.id ?? null;
@@ -143,9 +147,14 @@ export function SupportPlanDetailPage() {
       header: '',
       render: (i) =>
         i.paymentStatus !== 'paid' && canManageBilling ? (
-          <Button variant="outline" size="sm" onClick={() => setPayAction({ invoice: i })}>
-            Marcar como pagado
-          </Button>
+          <span className={styles.invoiceActions}>
+            <Button variant="outline" size="sm" onClick={() => setPayAction({ invoice: i })}>
+              Marcar como pagado
+            </Button>
+            <Button variant="dangerOutline" size="sm" onClick={() => setInvoiceToVoid(i)}>
+              Anular factura
+            </Button>
+          </span>
         ) : null,
     },
   ];
@@ -338,6 +347,24 @@ export function SupportPlanDetailPage() {
           await markPaid.mutateAsync({ invoiceId: payAction.invoice.id, input });
           toast.success('Se registró el pago.');
         }}
+      />
+      <ConfirmActionDialog
+        open={invoiceToVoid !== null}
+        title="Anular factura"
+        description={
+          invoiceToVoid
+            ? `Se anulará el folio ${invoiceToVoid.folio} (${invoiceToVoid.periodKey} · ${formatMoney(invoiceToVoid.amountUf, invoiceToVoid.currency)}). El mes vuelve a quedar "Por facturar" para registrarlo de nuevo con el monto correcto.`
+            : ''
+        }
+        warning="Kora no emite la factura: anula también el documento en el sistema de facturación."
+        confirmLabel="Anular factura"
+        destructive
+        onConfirm={async () => {
+          if (!invoiceToVoid) return;
+          await voidInvoice.mutateAsync(invoiceToVoid.id);
+          toast.success(`Se anuló el folio ${invoiceToVoid.folio}.`);
+        }}
+        onClose={() => setInvoiceToVoid(null)}
       />
       <IssueSupportInvoiceDialog
         open={issuePeriod !== null}

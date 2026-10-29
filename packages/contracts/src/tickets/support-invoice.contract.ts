@@ -1,6 +1,12 @@
 import { z } from 'zod';
 import { arrayQueryParam, nonEmptyTrimmed, pageSchema, paginationQuerySchema, sortDirectionSchema, uuidSchema } from '../common/primitives';
-import { supportPlanCurrencySchema, supportPlanDetailSchema, supportPlanScopeSchema, supportPlanTypeSchema } from './support-plan.contract';
+import {
+  supportPlanAlertTypeSchema,
+  supportPlanCurrencySchema,
+  supportPlanDetailSchema,
+  supportPlanScopeSchema,
+  supportPlanTypeSchema,
+} from './support-plan.contract';
 
 /**
  * Una fila de `support_invoices` es un hecho consumado, no un estado: que
@@ -112,7 +118,14 @@ export const supportBillingRowSchema = z.object({
   currency: supportPlanCurrencySchema,
   billingStatus: supportInvoiceBillingStatusSchema.nullable(),
   paymentStatus: supportInvoicePaymentStatusSchema.nullable(),
+  /** Factura del período de la fila, si existe — para "Marcar como pagado" desde el panel. */
+  invoiceId: uuidSchema.nullable(),
+  folio: z.string().nullable(),
+  /** Solo en el período en curso, por facturar y con monto > 0 — mismas condiciones que exige `MarkSupportInvoiceIssuedUseCase`. */
+  canInvoice: z.boolean(),
   hasAlert: z.boolean(),
+  /** Qué alertas tiene — para el tooltip del ícono. Vacío ⇔ `hasAlert` falso. */
+  alerts: z.array(supportPlanAlertTypeSchema),
   isOverdue: z.boolean(),
 });
 export type SupportBillingRow = z.infer<typeof supportBillingRowSchema>;

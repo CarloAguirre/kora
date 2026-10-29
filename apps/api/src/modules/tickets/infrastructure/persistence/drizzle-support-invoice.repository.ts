@@ -127,4 +127,9 @@ export class DrizzleSupportInvoiceRepository implements SupportInvoiceRepository
     const db = resolveDb(this.database, context);
     await db.update(supportInvoices).set({ paidAt, updatedAt: new Date() }).where(eq(supportInvoices.id, id));
   }
+
+  async remove(id: string, context?: TransactionContext): Promise<void> {
+    const db = resolveDb(this.database, context);
+    await db.delete(supportInvoices).where(eq(supportInvoices.id, id));
+  }
 }

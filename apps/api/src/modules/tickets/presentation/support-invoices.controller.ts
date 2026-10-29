@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Patch, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Query } from '@nestjs/common';
 import {
   listSupportBillingRowsQuerySchema,
   markSupportInvoicePaidSchema,
@@ -16,6 +16,7 @@ import { ZodValidationPipe } from '../../../shared/presentation/pipes/zod-valida
 import { unwrapOrThrow } from '../../../shared/presentation/unwrap-result';
 import type { ActorContext } from '../../../shared/application/use-case';
 import { MarkSupportInvoicePaidUseCase } from '../application/use-cases/mark-support-invoice-paid.use-case';
+import { VoidSupportInvoiceUseCase } from '../application/use-cases/void-support-invoice.use-case';
 import { GetSupportBillingOverviewUseCase } from '../application/use-cases/get-support-billing-overview.use-case';
 import { ListBillingLedgerEntriesUseCase } from '../application/use-cases/list-billing-ledger-entries.use-case';
 import { ListSupportBillingRowsUseCase } from '../application/use-cases/list-support-billing-rows.use-case';
@@ -24,6 +25,7 @@ import { ListSupportBillingRowsUseCase } from '../application/use-cases/list-sup
 export class SupportInvoicesController {
   constructor(
     private readonly markPaid: MarkSupportInvoicePaidUseCase,
+    private readonly voidInvoice: VoidSupportInvoiceUseCase,
     private readonly getOverview: GetSupportBillingOverviewUseCase,
     private readonly getLedger: ListBillingLedgerEntriesUseCase,
     private readonly listRows: ListSupportBillingRowsUseCase,
@@ -64,6 +66,14 @@ export class SupportInvoicesController {
     @CurrentUser() actor: RequestUser,
   ): Promise<void> {
     unwrapOrThrow(await this.markPaid.execute({ invoiceId: id, data: body, actor: toActorContext(actor) }));
+  }
+
+  /** "Anular factura" — solo pendientes de pago; el período vuelve a quedar por facturar. */
+  @Delete(':id')
+  @RequirePermissions('billing:manage')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async void(@Param('id') id: string, @CurrentUser() actor: RequestUser): Promise<void> {
+    unwrapOrThrow(await this.voidInvoice.execute({ invoiceId: id, actor: toActorContext(actor) }));
   }
 }
 

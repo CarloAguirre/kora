@@ -27,6 +27,12 @@
   flex-wrap: wrap;
 }
 
+.invoiceActions {
+  display: inline-flex;
+  gap: var(--kora-space-2);
+  flex-wrap: wrap;
+}
+
 .titleRow {
   display: flex;
   align-items: center;
@@ -151,6 +157,8 @@
 .folioCell {
   display: flex;
   flex-direction: column;
+  /* Sin esto el badge ("Próximo", "Facturado") se estira a todo el ancho de la celda. */
+  align-items: flex-start;
   gap: 2px;
 }
 

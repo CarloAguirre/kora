@@ -22,7 +22,7 @@ function alertDescription(alert: SupportPlanAlert): string {
         ? `El cupo de horas acumuladas vence en ${alert.daysUntilExpiry} día${alert.daysUntilExpiry === 1 ? '' : 's'} si no se usa.`
         : 'El cupo de horas acumuladas está por vencer.';
     case 'last_period_overage':
-      return 'Es el último período del contrato — el excedente de horas se cobra como hora extra en vez de pasar al próximo período.';
+      return 'Este mes se superaron las HH incluidas — el excedente se cobra como hora extra en la factura del mes.';
   }
 }
 

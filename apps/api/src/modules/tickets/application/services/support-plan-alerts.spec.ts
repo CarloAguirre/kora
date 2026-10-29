@@ -72,7 +72,7 @@ describe('computeSupportPlanAlerts', () => {
     expect(alerts).toEqual([]);
   });
 
-  it('"último mes con excedente" cuando el último período (sin acumulable) excede su cupo', () => {
+  it('"mes con excedente" cuando el período activo (sin acumulable) excede su cupo', () => {
     const plan = basePlan({ planType: 'monthly', surplusPolicy: 'expire', endDate: new Date('2026-09-30T00:00:00Z') });
     const alerts = computeSupportPlanAlerts(
       plan,
@@ -83,9 +83,15 @@ describe('computeSupportPlanAlerts', () => {
     expect(alerts).toEqual([{ type: 'last_period_overage', daysUntilExpiry: null }]);
   });
 
-  it('no marca "último mes con excedente" si el período activo no es el último del contrato', () => {
+  it('"mes con excedente" también en un período que no es el último — el excedente se cobra cada mes', () => {
     const plan = basePlan({ planType: 'monthly', surplusPolicy: 'expire', endDate: new Date('2027-06-30T00:00:00Z') });
     const alerts = computeSupportPlanAlerts(plan, [period({ consumedHoursPeriod: 28, contractedHours: 20 })], 0, TODAY);
+    expect(alerts).toEqual([{ type: 'last_period_overage', daysUntilExpiry: null }]);
+  });
+
+  it('no marca "mes con excedente" si el período activo no supera su cupo', () => {
+    const plan = basePlan({ planType: 'monthly', surplusPolicy: 'expire' });
+    const alerts = computeSupportPlanAlerts(plan, [period({ consumedHoursPeriod: 20, contractedHours: 20 })], 0, TODAY);
     expect(alerts).toEqual([]);
   });
 

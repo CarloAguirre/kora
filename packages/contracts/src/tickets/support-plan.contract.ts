@@ -121,7 +121,8 @@ export type SupportPlanAlertType = z.infer<typeof supportPlanAlertTypeSchema>;
 export const SUPPORT_PLAN_ALERT_LABELS: Readonly<Record<SupportPlanAlertType, string>> = {
   deviated_hours: 'Horas desviadas sin facturar',
   quota_expiring: 'Cupo acumulado por vencer',
-  last_period_overage: 'Último mes con excedente de horas',
+  /** El id quedó de cuando el excedente solo se cobraba en el último mes — hoy aplica a cualquier mes sin política acumulable. */
+  last_period_overage: 'Mes con excedente de horas',
 };
 
 export const supportPlanAlertSchema = z.object({
