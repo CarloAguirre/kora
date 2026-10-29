@@ -1,6 +1,16 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import styles from './ProjectBitacora.module.css';
+import { TextField } from '@/shared/components/ui/TextField';
+import { SearchIcon } from '@/shared/components/icons/Icons';
 import type { ClientBitacoraEntry, ClientBitacoraEntryKind } from '../types';
+
+type BitacoraTypeFilter = 'all' | 'incidents' | 'work';
+
+const TYPE_FILTERS: ReadonlyArray<{ key: BitacoraTypeFilter; label: string }> = [
+  { key: 'all', label: 'Todos' },
+  { key: 'incidents', label: 'Incidentes' },
+  { key: 'work', label: 'Entregas y tareas' },
+];
 
 /** Cuántas entradas se ven antes de tener que pedir "Ver más". */
 const PAGE_SIZE = 5;
@@ -34,17 +44,69 @@ const KIND_ICON_CLASS: Readonly<Record<ClientBitacoraEntryKind, string>> = {
  */
 export function ProjectBitacora({ entries }: { entries: readonly ClientBitacoraEntry[] }) {
   const [expanded, setExpanded] = useState(false);
-  const visibleEntries = expanded ? entries : entries.slice(0, PAGE_SIZE);
+  // Mismos filtros que la Bitácora interna (`BitacoraCard`): Tipo, Buscar, Desde y Hasta.
+  const [filter, setFilter] = useState<BitacoraTypeFilter>('all');
+  const [search, setSearch] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+
+  const filteredEntries = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return entries.filter((entry) => {
+      if (filter === 'incidents' && !entry.isIncident) return false;
+      if (filter === 'work' && !entry.isDeliveryOrTask) return false;
+      if (dateFrom && entry.filterDate < dateFrom) return false;
+      if (dateTo && entry.filterDate > dateTo) return false;
+      if (q) {
+        const haystack = `${entry.title} ${entry.registeredByName} ${entry.phaseTag ?? ''}`.toLowerCase();
+        if (!haystack.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [entries, filter, search, dateFrom, dateTo]);
+  const visibleEntries = expanded ? filteredEntries : filteredEntries.slice(0, PAGE_SIZE);
 
   return (
     <div className={styles.card}>
+      {entries.length > 0 && (
+        <div className={styles.toolbar}>
+          <div className={styles.filterField}>
+            <span className={styles.filterFieldLabel}>Tipo</span>
+            <div className={styles.filterTabs} role="group" aria-label="Filtrar por tipo">
+              {TYPE_FILTERS.map(({ key, label }) => (
+                <button
+                  key={key}
+                  type="button"
+                  aria-pressed={filter === key}
+                  className={[styles.filterTab, filter === key ? styles.filterTabActive : ''].join(' ')}
+                  onClick={() => setFilter(key)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <TextField
+            className={styles.search}
+            label="Buscar"
+            type="search"
+            placeholder="Buscar en la bitácora…"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            iconLeft={<SearchIcon size={16} />}
+          />
+          <TextField className={styles.date} type="date" label="Desde" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
+          <TextField className={styles.date} type="date" label="Hasta" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
+        </div>
+      )}
       {entries.length === 0 && <p className={styles.empty}>Aún no hay registros en la bitácora de este proyecto.</p>}
+      {entries.length > 0 && filteredEntries.length === 0 && <p className={styles.empty}>No hay registros que coincidan con el filtro.</p>}
       {visibleEntries.map((entry) => (
         <BitacoraEntryRow key={entry.id} entry={entry} />
       ))}
-      {!expanded && entries.length > PAGE_SIZE && (
+      {!expanded && filteredEntries.length > PAGE_SIZE && (
         <button type="button" className={styles.seeMore} onClick={() => setExpanded(true)}>
-          Ver más ({entries.length - PAGE_SIZE})
+          Ver más ({filteredEntries.length - PAGE_SIZE})
         </button>
       )}
     </div>

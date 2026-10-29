@@ -44,6 +44,8 @@ export const hourEntrySummarySchema = z.object({
   team: z.object({ id: uuidSchema, name: z.string() }).nullable(),
   /** Fase/módulo contra la que se imputó la hora, si se eligió una. */
   module: z.object({ id: uuidSchema, name: z.string() }).nullable(),
+  /** Tiempo de ejecución (tramo) de esa fase contra el que se imputó la hora, si se eligió uno. */
+  segment: z.object({ id: uuidSchema, name: z.string() }).nullable(),
   assignment: z.string().nullable(),
   category: z.string(),
   description: z.string(),
@@ -89,6 +91,7 @@ export const createHourEntrySchema = z
     userId: uuidSchema.optional(),
     projectId: uuidSchema.nullish(),
     moduleId: uuidSchema.nullish(),
+    segmentId: uuidSchema.nullish(),
     assignment: hourEntryAssignmentSchema,
     category: hourEntryCategorySchema,
     description: z.string().trim().max(2000).optional(),
@@ -111,6 +114,10 @@ export const createHourEntrySchema = z
     message: 'Selecciona un proyecto para elegir un módulo.',
     path: ['moduleId'],
   })
+  .refine((data) => !data.segmentId || Boolean(data.moduleId), {
+    message: 'Selecciona una fase para elegir un tiempo de ejecución.',
+    path: ['segmentId'],
+  })
   .refine((data) => !data.hasBlocker || Boolean(data.blockerDescription?.trim()), {
     message: 'Describe el bloqueo.',
     path: ['blockerDescription'],
@@ -121,6 +128,7 @@ export const updateHourEntrySchema = z.object({
   assignment: hourEntryAssignmentSchema.optional(),
   projectId: uuidSchema.nullish(),
   moduleId: uuidSchema.nullish(),
+  segmentId: uuidSchema.nullish(),
   category: hourEntryCategorySchema.optional(),
   description: z.string().trim().max(2000).optional(),
   hours: z.coerce.number().positive().max(24).optional(),

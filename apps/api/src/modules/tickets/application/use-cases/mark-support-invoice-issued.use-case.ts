@@ -52,7 +52,7 @@ export class MarkSupportInvoiceIssuedUseCase implements UseCase<MarkSupportInvoi
     const record = plan.toSnapshot() as SupportPlanRecord;
 
     const linkedProjectIds = await this.summaryBuilder.resolveLinkedProjectIds(record);
-    const calculation = await this.billing.calculate(record, linkedProjectIds, now);
+    const calculation = await this.billing.calculate(record, linkedProjectIds, now, { monthlyPeriodId: data.monthlyPeriodId });
     if (!calculation) return err(new SupportPlanNothingToInvoiceError());
 
     const existing = await this.invoices.findByPlanAndPeriod(planId, calculation.periodKey);

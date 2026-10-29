@@ -171,7 +171,7 @@ export function SupportProjectDetailView({
             </p>
             {supportSummary && (
               <p className={styles.supportLine}>
-                Valor plan: {formatMoney(supportSummary.planValueUf, supportSummary.currency)} · Hora extra del plan:{' '}
+                Valor hora del plan: {formatMoney(supportSummary.planValueUf, supportSummary.currency)} · Hora extra del plan:{' '}
                 {formatMoney(supportSummary.extraHourValueUf, supportSummary.currency)}
               </p>
             )}

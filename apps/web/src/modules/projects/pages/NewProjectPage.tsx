@@ -66,7 +66,14 @@ import {
   validatePaymentPlan,
   type PaymentPlanDraft,
 } from '../components/PaymentPlanEditor';
-import { DeliveryModal, EMPTY_DELIVERY_MODAL_VALUES, type DeliveryModalValues } from '../components/DeliveryModal';
+import {
+  DeliveryModal,
+  EMPTY_DELIVERY_MODAL_VALUES,
+  draftSegmentKey,
+  resolveDraftSegmentId,
+  toDeliverySegmentOption,
+  type DeliveryModalValues,
+} from '../components/DeliveryModal';
 import deliveryModalStyles from '../components/DeliveryModal.module.css';
 import { SUPPORT_SLA_TARGET_HOURS, SupportSlaNote } from '../components/SupportSlaNote';
 import {
@@ -182,6 +189,8 @@ interface DeliveryDraft {
   teamId: string;
   estimatedDate: string;
   description: string;
+  /** Clave local del tramo (`draftSegmentKey`) — se traduce al id real al crear la fase. */
+  segmentId: string;
 }
 interface SegmentDraft extends ExecutionSegmentModalValues {
   localId: number;
@@ -558,9 +567,20 @@ export function NewProjectPage() {
     const draft = moduleDrafts.find((m) => m.localId === deliveryModal.moduleLocalId);
     const delivery = draft?.deliveries.find((d) => d.localId === deliveryModal.deliveryLocalId);
     return delivery
-      ? { teamId: delivery.teamId, name: delivery.name, description: delivery.description, estimatedDate: delivery.estimatedDate }
+      ? {
+          teamId: delivery.teamId,
+          name: delivery.name,
+          description: delivery.description,
+          estimatedDate: delivery.estimatedDate,
+          segmentId: delivery.segmentId,
+        }
       : EMPTY_DELIVERY_MODAL_VALUES;
   })();
+
+  // Los tramos del wizard todavía no tienen id: la entrega los referencia por su clave local.
+  const deliveryModalSegmentOptions = (
+    moduleDrafts.find((m) => m.localId === deliveryModal?.moduleLocalId)?.segments ?? []
+  ).map((segment) => toDeliverySegmentOption(draftSegmentKey(segment.localId), segment));
 
   const onConfirmDeliveryModal = (values: DeliveryModalValues) => {
     if (!deliveryModal) return;
@@ -772,6 +792,21 @@ export function NewProjectPage() {
                 estimatedEndDate: draft.estimatedEndDate || undefined,
               };
               const module = await createModule.mutateAsync({ projectId: result.id, input });
+              // Primero los tramos: las entregas del borrador los referencian por su clave local.
+              const pendingSegments = draft.segments.filter(
+                (segment) => segment.teamId && segment.name.trim() && segment.startDate && segment.endDate,
+              );
+              const segmentIdsByDraftKey = new Map(
+                await Promise.all(
+                  pendingSegments.map(
+                    async (segment) =>
+                      [
+                        draftSegmentKey(segment.localId),
+                        (await createSegment.mutateAsync({ projectId: result.id, moduleId: module.id, input: toSegmentInput(segment) })).id,
+                      ] as const,
+                  ),
+                ),
+              );
               const pendingDeliveries = draft.deliveries.filter((delivery) => delivery.estimatedDate && delivery.name.trim());
               if (pendingDeliveries.length > 0) {
                 await Promise.all(
@@ -783,22 +818,9 @@ export function NewProjectPage() {
                         name: delivery.name.trim(),
                         description: delivery.description.trim() || undefined,
                         teamId: delivery.teamId || undefined,
+                        segmentId: resolveDraftSegmentId(delivery.segmentId, segmentIdsByDraftKey),
                         estimatedDate: delivery.estimatedDate,
                       },
-                    }),
-                  ),
-                );
-              }
-              const pendingSegments = draft.segments.filter(
-                (segment) => segment.teamId && segment.name.trim() && segment.startDate && segment.endDate,
-              );
-              if (pendingSegments.length > 0) {
-                await Promise.all(
-                  pendingSegments.map((segment) =>
-                    createSegment.mutateAsync({
-                      projectId: result.id,
-                      moduleId: module.id,
-                      input: toSegmentInput(segment),
                     }),
                   ),
                 );
@@ -1961,6 +1983,7 @@ export function NewProjectPage() {
           value: field.teamId,
           label: teams?.items.find((team) => team.id === field.teamId)?.name ?? field.teamId,
         }))}
+        segmentOptions={deliveryModalSegmentOptions}
         initialValues={deliveryModalInitialValues}
         onCancel={() => setDeliveryModal(null)}
         onConfirm={onConfirmDeliveryModal}

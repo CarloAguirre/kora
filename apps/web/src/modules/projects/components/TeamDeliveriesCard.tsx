@@ -86,7 +86,11 @@ export function TeamDeliveriesCard({ project, projectId, teamId }: TeamDeliverie
               header: 'Colaborador',
               render: ({ delivery }) => delivery.assigneeName ?? <span style={{ fontStyle: 'italic' }}>Sin asignar</span>,
             },
-            { key: 'module', header: 'Módulo', render: ({ moduleName }) => moduleName },
+            {
+              key: 'module',
+              header: 'Módulo',
+              render: ({ delivery, moduleName }) => (delivery.segmentName ? `${moduleName} · ${delivery.segmentName}` : moduleName),
+            },
             {
               key: 'status',
               header: 'Estado',

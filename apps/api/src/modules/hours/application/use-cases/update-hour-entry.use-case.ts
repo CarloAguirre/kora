@@ -6,6 +6,7 @@ import {
   HourEntryOutsideCurrentMonthError,
   InvalidDesignatedApproverError,
   ModuleNotInProjectError,
+  SegmentNotInModuleError,
   ProjectClosedError,
   ProjectOvertimeNotAllowedError,
   ProjectStoppedError,
@@ -98,11 +99,22 @@ export class UpdateHourEntryUseCase implements UseCase<UpdateHourEntryCommand, v
       }
     }
 
-    const moduleId = data.moduleId !== undefined ? data.moduleId : entry.toSnapshot().moduleId;
+    const previous = entry.toSnapshot();
+    const moduleId = data.moduleId !== undefined ? data.moduleId : previous.moduleId;
+    // Sin `segmentId` explícito, el tramo se conserva solo si la fase no cambió.
+    const segmentId =
+      data.segmentId !== undefined
+        ? data.segmentId
+        : (moduleId ?? null) === previous.moduleId
+          ? previous.segmentId
+          : null;
     if (moduleId) {
       const module = await this.projects.findModuleById(moduleId);
       if (!module) return err(new ReferencedModuleNotFoundError(moduleId));
       if (module.projectId !== projectId) return err(new ModuleNotInProjectError());
+      if (segmentId && !module.segments.some((segment) => segment.id === segmentId)) {
+        return err(new SegmentNotInModuleError());
+      }
     }
 
     const owner = await this.users.findById(entry.userId);
@@ -114,6 +126,7 @@ export class UpdateHourEntryUseCase implements UseCase<UpdateHourEntryCommand, v
         assignment: data.assignment,
         projectId: data.projectId === undefined ? undefined : data.projectId,
         moduleId: data.moduleId === undefined ? undefined : data.moduleId,
+        segmentId: moduleId ? (segmentId ?? null) : null,
         category: data.category,
         description: data.description,
         hours: data.hours,

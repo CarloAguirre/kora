@@ -1,7 +1,12 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CLOCK, UNIT_OF_WORK, err, ok, type ApplicationError, type Clock, type Result, type UnitOfWork } from '@kora/core';
 import type { AddProjectModuleDeliveryInput, Permission } from '@kora/contracts';
-import { CannotManageProjectError, ProjectModuleNotFoundError, ProjectNotFoundError } from '../../domain/errors/project.errors';
+import {
+  CannotManageProjectError,
+  ProjectModuleNotFoundError,
+  ProjectNotFoundError,
+  SegmentNotInModuleError,
+} from '../../domain/errors/project.errors';
 import { PROJECT_REPOSITORY, type ProjectRepository } from '../../domain/repositories/project.repository';
 import {
   PROJECT_MODULE_REPOSITORY,
@@ -54,6 +59,11 @@ export class AddProjectModuleDeliveryUseCase
       return err(new CannotManageProjectError());
     }
 
+    const segmentId = command.data.segmentId ?? null;
+    if (segmentId && !module.segments.some((segment) => segment.id === segmentId)) {
+      return err(new SegmentNotInModuleError());
+    }
+
     const now = this.clock.now();
     // Alta y registro en la misma transacción: no queda una entrega sin su registro de creación.
     const id = await this.unitOfWork.run(async (tx) => {
@@ -64,6 +74,7 @@ export class AddProjectModuleDeliveryUseCase
           name: command.data.name,
           description: command.data.description ?? null,
           assigneeUserId: command.data.assigneeUserId ?? null,
+          segmentId,
           estimatedDate: new Date(command.data.estimatedDate),
         },
         now,

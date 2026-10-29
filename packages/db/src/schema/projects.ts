@@ -316,6 +316,8 @@ export const projectModuleDeliveries = pgTable('project_module_deliveries', {
   description: text('description'),
   /** Colaborador del equipo responsable a quien se le asignó esta entrega — `null` ⇔ "Sin asignar". */
   assigneeUserId: uuid('assignee_user_id').references(() => users.id, { onDelete: 'set null' }),
+  /** Tiempo de ejecución (tramo) de la misma fase al que pertenece la entrega — opcional. */
+  segmentId: uuid('segment_id').references(() => projectModuleSegments.id, { onDelete: 'set null' }),
   estimatedDate: date('estimated_date', { mode: 'date' }).notNull(),
   status: projectModuleDeliveryStatusEnum('status').notNull().default('planned'),
   /** Motivo del último rechazo del líder — se limpia al aprobar o al volver a marcarla entregada. */
@@ -370,6 +372,8 @@ export const projectModuleTasks = pgTable('project_module_tasks', {
     .references(() => projectModules.id, { onDelete: 'cascade' }),
   teamId: uuid('team_id').references(() => teams.id, { onDelete: 'set null' }),
   assigneeUserId: uuid('assignee_user_id').references(() => users.id, { onDelete: 'set null' }),
+  /** Tiempo de ejecución (tramo) de la misma fase al que pertenece la tarea — opcional. */
+  segmentId: uuid('segment_id').references(() => projectModuleSegments.id, { onDelete: 'set null' }),
   name: varchar('name', { length: 300 }).notNull(),
   description: text('description'),
   /** Inicio de la tarea — el Roadmap la dibuja como barra hasta `date` (fecha límite) y el Forecast reparte sus HH en ese rango. */

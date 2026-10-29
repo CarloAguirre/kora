@@ -27,6 +27,7 @@ import {
   ProjectModuleNotFoundError,
   ProjectNotFoundError,
   RejectionReasonRequiredError,
+  SegmentNotInModuleError,
 } from '../../domain/errors/project.errors';
 import { PROJECT_REPOSITORY, type ProjectRepository } from '../../domain/repositories/project.repository';
 import {
@@ -150,6 +151,13 @@ export class UpdateProjectModuleDeliveryUseCase
     }
     const assigneeChanged = nextAssigneeUserId !== delivery.assigneeUserId;
 
+    // --- Tiempo de ejecución ----------------------------------------------------------------
+    const nextSegmentId = command.data.segmentId !== undefined ? (command.data.segmentId ?? null) : delivery.segmentId;
+    const segmentChanged = nextSegmentId !== delivery.segmentId;
+    if (segmentChanged && nextSegmentId !== null && !module.segments.some((segment) => segment.id === nextSegmentId)) {
+      return err(new SegmentNotInModuleError());
+    }
+
     // --- Estado ----------------------------------------------------------------------------
     const nextStatus = command.data.status;
     const statusChanged = nextStatus !== undefined && nextStatus !== delivery.status;
@@ -215,6 +223,15 @@ export class UpdateProjectModuleDeliveryUseCase
             : `Entrega${label} reasignada de ${delivery.assigneeName ?? 'otro colaborador'} a ${nextName} ${inPhase}.`,
       );
     }
+    if (segmentChanged) {
+      const segmentName = (segmentId: string | null, fallback: string | null) =>
+        segmentId === null
+          ? 'sin tiempo de ejecución'
+          : `"${module.segments.find((segment) => segment.id === segmentId)?.name ?? fallback ?? 'tramo'}"`;
+      messages.push(
+        `Entrega${label} ${inPhase}: tiempo de ejecución cambiado de ${segmentName(delivery.segmentId, delivery.segmentName)} a ${segmentName(nextSegmentId, null)}.`,
+      );
+    }
     if (command.data.estimatedDate !== undefined) {
       const nextDate = new Date(command.data.estimatedDate);
       if (nextDate.getTime() !== delivery.estimatedDate.getTime()) {
@@ -260,6 +277,7 @@ export class UpdateProjectModuleDeliveryUseCase
           ...(command.data.name !== undefined ? { name: command.data.name } : {}),
           ...(command.data.description !== undefined ? { description: command.data.description ?? null } : {}),
           ...(assigneeChanged ? { assigneeUserId: nextAssigneeUserId } : {}),
+          ...(segmentChanged ? { segmentId: nextSegmentId } : {}),
           ...(nextStatus !== undefined ? { status: nextStatus } : {}),
           ...(command.data.estimatedDate !== undefined ? { estimatedDate: new Date(command.data.estimatedDate) } : {}),
           ...(rejectionReason !== undefined ? { rejectionReason } : {}),

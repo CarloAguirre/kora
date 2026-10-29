@@ -54,6 +54,8 @@ export const markSupportInvoiceIssuedSchema = z.object({
   folio: nonEmptyTrimmed(50, 'El folio'),
   invoicedAt: z.iso.date(),
   attachmentName: z.string().trim().max(255).optional(),
+  /** Solo `monthly`: el período a facturar (el vigente o uno ya cerrado que quedó sin factura). Sin él, se factura el vigente. */
+  monthlyPeriodId: uuidSchema.optional(),
 });
 export type MarkSupportInvoiceIssuedInput = z.infer<typeof markSupportInvoiceIssuedSchema>;
 
@@ -62,9 +64,38 @@ export const markSupportInvoicePaidSchema = z.object({
 });
 export type MarkSupportInvoicePaidInput = z.infer<typeof markSupportInvoicePaidSchema>;
 
+/**
+ * `invoiced`: ya tiene factura. `to_invoice`: el período vigente o uno ya
+ * cerrado sin factura — se puede registrar ahora. `upcoming`: un mes futuro
+ * del contrato; se habilita cuando empieza (`startDate`).
+ */
+export const SUPPORT_MONTHLY_BILLING_PERIOD_STATUSES = ['invoiced', 'to_invoice', 'upcoming'] as const;
+export const supportMonthlyBillingPeriodStatusSchema = z.enum(SUPPORT_MONTHLY_BILLING_PERIOD_STATUSES);
+export type SupportMonthlyBillingPeriodStatus = z.infer<typeof supportMonthlyBillingPeriodStatusSchema>;
+
+/** Un mes del calendario de facturación de un contrato `monthly`. */
+export const supportMonthlyBillingPeriodSchema = z.object({
+  /** `null` en los meses futuros: el período se crea recién cuando empieza. */
+  monthlyPeriodId: uuidSchema.nullable(),
+  /** 'YYYY-MM' — el mismo `periodKey` con que queda la factura. */
+  periodKey: z.string(),
+  startDate: z.iso.date(),
+  /** Exclusivo: el período es [startDate, endDate). */
+  endDate: z.iso.date(),
+  isCurrent: z.boolean(),
+  status: supportMonthlyBillingPeriodStatusSchema,
+  /** Facturado: el monto congelado de la factura. Si no: la cuota (HH del período × valor hora, más el excedente si corresponde) — en los meses futuros es una estimación. */
+  amountUf: z.number(),
+  invoiceId: uuidSchema.nullable(),
+  folio: z.string().nullable(),
+});
+export type SupportMonthlyBillingPeriod = z.infer<typeof supportMonthlyBillingPeriodSchema>;
+
 /** Ficha de contrato + su historial de facturas — la respuesta de `GET /support-plans/:id`. */
 export const supportPlanWithInvoicesSchema = supportPlanDetailSchema.extend({
   invoices: z.array(supportInvoiceSchema),
+  /** Solo `monthly` (vacío en bolsa/a demanda): todos los meses del contrato, del primero al último. */
+  billingPeriods: z.array(supportMonthlyBillingPeriodSchema),
 });
 export type SupportPlanWithInvoices = z.infer<typeof supportPlanWithInvoicesSchema>;
 

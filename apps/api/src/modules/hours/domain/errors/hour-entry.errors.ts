@@ -98,6 +98,12 @@ export class ModuleNotInProjectError extends DomainError {
   }
 }
 
+export class SegmentNotInModuleError extends DomainError {
+  constructor() {
+    super('HOUR_ENTRY_SEGMENT_NOT_IN_MODULE', 'El tiempo de ejecución elegido no pertenece a esta fase.');
+  }
+}
+
 export class ProjectStoppedError extends ConflictError {
   constructor() {
     super('No se pueden registrar horas en un proyecto detenido.', 'HOUR_ENTRY_PROJECT_STOPPED');

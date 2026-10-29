@@ -24,10 +24,12 @@ import {
   InvalidTaskDatesError,
   ProjectAssigneeDisabledError,
   RejectionReasonRequiredError,
+  SegmentNotInModuleError,
 } from '../../domain/errors/project.errors';
 import { PROJECT_REPOSITORY, type ProjectRepository } from '../../domain/repositories/project.repository';
 import {
   PROJECT_MODULE_REPOSITORY,
+  type ProjectModuleRecord,
   type ProjectModuleRepository,
   type ProjectModuleTaskRecord,
 } from '../../domain/repositories/project-module.repository';
@@ -124,6 +126,10 @@ export class UpdateProjectModuleTaskUseCase
     const nextStart = command.data.startDate !== undefined ? new Date(command.data.startDate) : task.startDate;
     const nextDate = command.data.date !== undefined ? new Date(command.data.date) : task.date;
     if (nextStart > nextDate) return err(new InvalidTaskDatesError());
+    const nextSegmentId = command.data.segmentId;
+    if (nextSegmentId && !module.segments.some((segment) => segment.id === nextSegmentId)) {
+      return err(new SegmentNotInModuleError());
+    }
 
     // Solo se valida si el colaborador cambia: editar una tarea vieja de alguien ya deshabilitado sigue permitido.
     const nextAssigneeUserId = command.data.assigneeUserId;
@@ -158,13 +164,14 @@ export class UpdateProjectModuleTaskUseCase
 
     // Se describen contra el estado previo, antes de escribir: cambio y registro van en la misma
     // transacción — si no se puede escribir la bitácora, la tarea tampoco cambia.
-    const messages = await this.describeChanges(project.id, module.name, task, command.data, rejectionReason ?? null, now);
+    const messages = await this.describeChanges(project.id, module, task, command.data, rejectionReason ?? null, now);
     await this.unitOfWork.run(async (tx) => {
       await this.modules.updateTask(
         command.taskId,
         {
           ...(command.data.teamId !== undefined ? { teamId: command.data.teamId ?? null } : {}),
           ...(command.data.assigneeUserId !== undefined ? { assigneeUserId: command.data.assigneeUserId ?? null } : {}),
+          ...(command.data.segmentId !== undefined ? { segmentId: command.data.segmentId ?? null } : {}),
           ...(command.data.name !== undefined ? { name: command.data.name } : {}),
           ...(command.data.description !== undefined ? { description: command.data.description ?? null } : {}),
           ...(command.data.startDate !== undefined ? { startDate: new Date(command.data.startDate) } : {}),
@@ -206,14 +213,14 @@ export class UpdateProjectModuleTaskUseCase
   /** Un mensaje por cambio real — un campo enviado con el mismo valor que ya tenía no genera registro. */
   private async describeChanges(
     projectId: string,
-    moduleName: string,
+    module: ProjectModuleRecord,
     task: ProjectModuleTaskRecord,
     data: UpdateProjectModuleTaskInput,
     rejectionReason: string | null,
     now: Date,
   ): Promise<string[]> {
     const label = `Tarea "${task.name}"`;
-    const inPhase = `en fase "${moduleName}"`;
+    const inPhase = `en fase "${module.name}"`;
     const messages: string[] = [];
     const sameDay = (a: Date | null, b: Date | null) => (a?.getTime() ?? null) === (b?.getTime() ?? null);
 
@@ -240,6 +247,15 @@ export class UpdateProjectModuleTaskUseCase
           : task.assigneeUserId === null
             ? `${label} asignada a ${nextName} ${inPhase}.`
             : `${label} reasignada de ${task.assigneeName ?? 'otro colaborador'} a ${nextName} ${inPhase}.`,
+      );
+    }
+    if (data.segmentId !== undefined && (data.segmentId ?? null) !== task.segmentId) {
+      const segmentName = (segmentId: string | null) =>
+        segmentId === null
+          ? 'sin tiempo de ejecución'
+          : `"${module.segments.find((segment) => segment.id === segmentId)?.name ?? (segmentId === task.segmentId ? task.segmentName : null) ?? 'tramo'}"`;
+      messages.push(
+        `${label} ${inPhase}: tiempo de ejecución cambiado de ${segmentName(task.segmentId)} a ${segmentName(data.segmentId ?? null)}.`,
       );
     }
     if (data.startDate !== undefined && !sameDay(new Date(data.startDate), task.startDate)) {

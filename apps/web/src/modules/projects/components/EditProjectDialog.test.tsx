@@ -35,10 +35,11 @@ vi.mock('../api/projects.queries', () => ({
 
 const updateSupportPlanMutateAsync = vi.fn().mockResolvedValue(undefined);
 const supportPlansForClientMock = vi.fn(() => ({ data: [] as unknown[] }));
+const supportPlanDetailMock = vi.fn(() => ({ data: undefined as unknown }));
 
 vi.mock('../api/support-plan.queries', () => ({
   useSupportPlansForClient: () => supportPlansForClientMock(),
-  useSupportPlanDetail: () => ({ data: undefined }),
+  useSupportPlanDetail: () => supportPlanDetailMock(),
   useUpdateSupportPlan: () => ({ mutateAsync: updateSupportPlanMutateAsync }),
 }));
 
@@ -350,6 +351,7 @@ describe('EditProjectDialog', () => {
         { id: 'plan-1', projectId: 'project-1', status: 'active', planType: 'monthly', surplusPolicy: 'accumulate', contractedHours: 10 },
       ],
     });
+    supportPlanDetailMock.mockReturnValue({ data: activeMonthlyPlanDetail });
     const user = userEvent.setup();
     renderDialog({
       open: true,
@@ -374,11 +376,61 @@ describe('EditProjectDialog', () => {
     fireEvent.submit(document.getElementById('edit-project-form') as HTMLFormElement);
 
     await waitFor(() =>
-      expect(updateSupportPlanMutateAsync).toHaveBeenCalledWith({ planType: 'bundle', surplusPolicy: null, contractedHours: 40 }),
+      expect(updateSupportPlanMutateAsync).toHaveBeenCalledWith({
+        planType: 'bundle',
+        surplusPolicy: null,
+        contractedHours: 40,
+        planValueUf: 0.6,
+        extraHourValueUf: 1.1,
+        currency: 'UF',
+      }),
     );
     const projectInput = mutateAsync.mock.calls.at(-1)?.[0].input;
     expect(projectInput.soldHours).toBeUndefined();
     expect(projectInput.supportHours).toBeUndefined();
     supportPlansForClientMock.mockReturnValue({ data: [] });
+    supportPlanDetailMock.mockReturnValue({ data: undefined });
+  });
+
+  it('edita el valor de la hora del contrato y muestra la cuota que se facturará', async () => {
+    supportPlansForClientMock.mockReturnValue({
+      data: [{ id: 'plan-1', projectId: 'project-1', status: 'active', planType: 'monthly', surplusPolicy: 'accumulate', contractedHours: 10 }],
+    });
+    supportPlanDetailMock.mockReturnValue({ data: activeMonthlyPlanDetail });
+    const user = userEvent.setup();
+    renderDialog({
+      open: true,
+      project: buildProject({ type: 'support', salesStage: null, phase: null }),
+      onClose: vi.fn(),
+      onSuccess: vi.fn(),
+      isManagement: true,
+    });
+
+    const hourValue = screen.getByLabelText('Valor de la hora');
+    expect(hourValue).toHaveValue(0.6);
+    expect(screen.getByLabelText('Valor de horas extra')).toHaveValue(1.1);
+    await user.clear(hourValue);
+    await user.type(hourValue, '1.5');
+    expect(screen.getByText(/Cuota mensual: 10 HH ×/)).toBeInTheDocument();
+    fireEvent.submit(document.getElementById('edit-project-form') as HTMLFormElement);
+
+    await waitFor(() =>
+      expect(updateSupportPlanMutateAsync).toHaveBeenCalledWith(expect.objectContaining({ planValueUf: 1.5, extraHourValueUf: 1.1, currency: 'UF' })),
+    );
+    supportPlansForClientMock.mockReturnValue({ data: [] });
+    supportPlanDetailMock.mockReturnValue({ data: undefined });
   });
 });
+
+/** Solo los campos del detalle que lee el diálogo. */
+const activeMonthlyPlanDetail = {
+  id: 'plan-1',
+  planType: 'monthly',
+  surplusPolicy: 'accumulate',
+  contractedHours: 10,
+  planValueUf: 0.6,
+  extraHourValueUf: 1.1,
+  currency: 'UF',
+  linkedProjects: [],
+  summary: { currentPeriod: null },
+};

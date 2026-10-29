@@ -17,6 +17,8 @@ export interface HourEntryModuleReference {
   readonly id: string;
   readonly name: string;
   readonly projectId: string;
+  /** Tiempos de ejecución de la fase — contra cuáles se puede imputar una hora. */
+  readonly segments: readonly { readonly id: string; readonly name: string }[];
 }
 
 export interface HourEntryProjectReader {

@@ -182,6 +182,9 @@ export const projectModuleDeliverySchema = z.object({
   /** Colaborador del equipo responsable a quien se le asignó esta entrega — `null` ⇔ "Sin asignar". */
   assigneeUserId: uuidSchema.nullable(),
   assigneeName: z.string().nullable(),
+  /** Tiempo de ejecución (tramo) de la misma fase al que pertenece — `null` ⇔ sin tramo. */
+  segmentId: uuidSchema.nullable(),
+  segmentName: z.string().nullable(),
   estimatedDate: z.string(),
   status: projectModuleDeliveryStatusSchema,
   /** Motivo del último rechazo del líder — se limpia al aprobar o al volver a marcarla entregada. */
@@ -289,6 +292,9 @@ export const projectModuleTaskSchema = z.object({
   teamName: z.string().nullable(),
   assigneeUserId: uuidSchema.nullable(),
   assigneeName: z.string().nullable(),
+  /** Tiempo de ejecución (tramo) de la misma fase al que pertenece — `null` ⇔ sin tramo. */
+  segmentId: uuidSchema.nullable(),
+  segmentName: z.string().nullable(),
   name: z.string(),
   description: z.string().nullable(),
   startDate: z.string(),
@@ -305,6 +311,8 @@ export type ProjectModuleTask = z.infer<typeof projectModuleTaskSchema>;
 export const createProjectModuleTaskSchema = z.object({
   teamId: uuidSchema.nullish(),
   assigneeUserId: uuidSchema.nullish(),
+  /** Tiempo de ejecución de la misma fase — opcional; `null` lo quita. */
+  segmentId: uuidSchema.nullish(),
   name: nonEmptyTrimmed(300, 'El nombre de la tarea'),
   description: z.string().trim().max(2000).nullish(),
   /** Obligatorio: el Forecast reparte las HH estimadas entre el inicio y la fecha límite. */
@@ -380,6 +388,8 @@ export const addProjectModuleDeliverySchema = z.object({
   estimatedDate: z.iso.date(),
   teamId: uuidSchema.nullish(),
   assigneeUserId: uuidSchema.nullish(),
+  /** Tiempo de ejecución de la misma fase — opcional. */
+  segmentId: uuidSchema.nullish(),
 });
 export type AddProjectModuleDeliveryInput = z.infer<typeof addProjectModuleDeliverySchema>;
 
@@ -389,6 +399,8 @@ export const updateProjectModuleDeliverySchema = z.object({
   status: projectModuleDeliveryStatusSchema.optional(),
   teamId: uuidSchema.nullish(),
   assigneeUserId: uuidSchema.nullish(),
+  /** Tiempo de ejecución de la misma fase — `null` lo quita. */
+  segmentId: uuidSchema.nullish(),
   estimatedDate: z.iso.date().optional(),
   /** Solo quien aprueba/rechaza puede enviarlo — obligatorio al rechazar, se limpia (`null`) en cualquier otra transición. */
   rejectionReason: z.string().trim().max(1000).nullish(),

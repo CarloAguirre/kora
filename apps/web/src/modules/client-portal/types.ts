@@ -306,6 +306,12 @@ export interface ClientBitacoraEntry {
   readonly statusTone: ClientBitacoraStatusTone;
   /** Cajita de confirmación bajo la descripción (Figma: "✓ Aprobado por Camila Reyes el 15-06-2026 09:15") — no todas las entradas la tienen. */
   readonly secondaryNote?: string;
+  /** Filtro "Incidentes" — registro tipo Incidente u hora con bloqueo (igual que la Bitácora interna). */
+  readonly isIncident: boolean;
+  /** Filtro "Entregas y tareas" — la entrega en sí o un registro de cambio sobre una entrega/tarea. */
+  readonly isDeliveryOrTask: boolean;
+  /** `YYYY-MM-DD` contra el que se comparan los filtros Desde/Hasta. */
+  readonly filterDate: string;
 }
 
 /**

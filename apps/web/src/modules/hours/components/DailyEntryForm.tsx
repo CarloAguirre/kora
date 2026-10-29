@@ -29,6 +29,8 @@ export const DAILY_CAP_HOURS = 8;
 const MIN_DESCRIPTION_LENGTH = 5;
 const HOURS_STEP = 0.25;
 const today = () => new Date().toISOString().slice(0, 10);
+/** `2026-11-03` → `03-11-2026`. */
+const formatSegmentDate = (isoDate: string) => isoDate.split('-').reverse().join('-');
 export const isWeekend = (isoDate: string) => {
   const day = new Date(`${isoDate}T00:00:00`).getDay();
   return day === 0 || day === 6;
@@ -40,6 +42,8 @@ export interface DailyBlock {
   assignment: HourEntryAssignment | '';
   projectId: string;
   moduleId: string;
+  /** Tiempo de ejecución de la fase elegida — vacío ⇔ sin tramo. */
+  segmentId: string;
   category: string;
   hours: string;
   description: string;
@@ -56,6 +60,7 @@ const createEmptyBlock = (): DailyBlock => ({
   assignment: '',
   projectId: '',
   moduleId: '',
+  segmentId: '',
   category: '',
   hours: '',
   description: '',
@@ -216,6 +221,7 @@ export function DailyEntryForm({
           assignment: block.assignment as HourEntryAssignment,
           projectId: needsProject ? block.projectId : undefined,
           moduleId: needsProject && block.moduleId ? block.moduleId : undefined,
+          segmentId: needsProject && block.moduleId && block.segmentId ? block.segmentId : undefined,
           category: block.category.trim(),
           description: block.description || undefined,
           hours: Number(block.hours),
@@ -410,6 +416,7 @@ export function DailyEntryBlockFields({
                   assignment: event.target.value as HourEntryAssignment,
                   projectId: needsProjectNext ? block.projectId : '',
                   moduleId: needsProjectNext ? block.moduleId : '',
+                  segmentId: needsProjectNext ? block.segmentId : '',
                   designatedApproverUserId: needsProjectNext ? '' : block.designatedApproverUserId,
                 });
               }}
@@ -435,6 +442,7 @@ export function DailyEntryBlockFields({
                   onUpdate({
                     projectId: nextProjectId,
                     moduleId: '',
+                    segmentId: '',
                     isOvertime: nextProject?.allowsOvertime ? block.isOvertime : false,
                   });
                 }}
@@ -449,12 +457,26 @@ export function DailyEntryBlockFields({
                 placeholder="Seleccionar módulo (opcional)"
                 options={(projectDetail?.modules ?? []).map((module) => ({ value: module.id, label: module.name }))}
                 value={block.moduleId}
-                onChange={(event) => onUpdate({ moduleId: event.target.value })}
+                // Los tramos son de la fase: si cambia la fase, el elegido deja de aplicar.
+                onChange={(event) => onUpdate({ moduleId: event.target.value, segmentId: '' })}
               />
               {selectedModule && (
                 <span className={styles.stepperLabel}>Etapa: {PROJECT_MODULE_STAGE_LABELS[selectedModule.currentStage]}</span>
               )}
             </div>
+          )}
+
+          {needsProject && selectedModule && selectedModule.segments.length > 0 && (
+            <Select
+              label="Tiempo de ejecución"
+              placeholder="Seleccionar tiempo de ejecución (opcional)"
+              options={selectedModule.segments.map((segment) => ({
+                value: segment.id,
+                label: `${segment.teamName} — ${segment.name} (${formatSegmentDate(segment.startDate)} → ${formatSegmentDate(segment.endDate)})`,
+              }))}
+              value={block.segmentId}
+              onChange={(event) => onUpdate({ segmentId: event.target.value })}
+            />
           )}
 
           <TextField

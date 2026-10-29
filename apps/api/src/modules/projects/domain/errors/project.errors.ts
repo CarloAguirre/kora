@@ -173,6 +173,13 @@ export class ProjectModuleTaskNotFoundError extends NotFoundError {
   }
 }
 
+/** Una tarea/entrega solo puede apuntar a un tiempo de ejecución de su misma fase. */
+export class SegmentNotInModuleError extends ValidationError {
+  constructor() {
+    super('El tiempo de ejecución elegido no pertenece a esta fase.', 'PROJECT_MODULE_SEGMENT_NOT_IN_MODULE');
+  }
+}
+
 export class InvalidTaskDatesError extends ValidationError {
   constructor() {
     super('La fecha de inicio no puede ser posterior a la fecha límite.', 'PROJECT_MODULE_TASK_INVALID_DATES');

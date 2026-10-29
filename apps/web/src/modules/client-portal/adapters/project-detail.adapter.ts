@@ -10,7 +10,13 @@ import {
   type ProjectObservation,
 } from '@kora/contracts';
 import { getTeamStyle } from '@/modules/projects/utils/team-style';
-import { toBitacoraRows, type BitacoraRow } from '@/modules/projects/lib/bitacora-row';
+import {
+  rowFilterDate,
+  rowIsDeliveryOrTask,
+  rowIsIncident,
+  toBitacoraRows,
+  type BitacoraRow,
+} from '@/modules/projects/lib/bitacora-row';
 import { entryTitle, EVENT_STATUS_LABEL } from '@/modules/projects/lib/hour-entry-log';
 import { projectHealth } from './portal-list.adapter';
 import type {
@@ -167,7 +173,13 @@ function toBitacoraEntry(observation: ProjectObservation, moduleBadgeByModuleId:
     description: observation.message,
     statusLabel: OBSERVATION_STATUS_LABELS[status] ?? 'Registrado',
     statusTone: OBSERVATION_STATUS_TONES[status] ?? 'info',
+    ...filterFields({ kind: observation.type, observation }),
   };
+}
+
+/** Mismo criterio que los filtros Tipo/Desde/Hasta de la Bitácora interna (`BitacoraCard`). */
+function filterFields(row: BitacoraRow): Pick<ClientBitacoraEntry, 'isIncident' | 'isDeliveryOrTask' | 'filterDate'> {
+  return { isIncident: rowIsIncident(row), isDeliveryOrTask: rowIsDeliveryOrTask(row), filterDate: rowFilterDate(row) };
 }
 
 const EVENT_STATUS_TONES: Record<HourEntryStatus, ClientBitacoraStatusTone> = {
@@ -212,6 +224,7 @@ function rowToBitacoraEntry(row: BitacoraRow, moduleBadgeByModuleId: ReadonlyMap
       description,
       statusLabel: EVENT_STATUS_LABEL[entry.status],
       statusTone: EVENT_STATUS_TONES[entry.status],
+      ...filterFields(row),
     };
   }
   if (row.kind === 'entrega') {
@@ -226,6 +239,7 @@ function rowToBitacoraEntry(row: BitacoraRow, moduleBadgeByModuleId: ReadonlyMap
       description: deliveryLabel(delivery),
       statusLabel: CLIENT_DELIVERY_STATUS_LABELS[delivery.status],
       statusTone: DELIVERY_STATUS_TONES[delivery.status],
+      ...filterFields(row),
     };
   }
   return toBitacoraEntry(row.observation, moduleBadgeByModuleId);

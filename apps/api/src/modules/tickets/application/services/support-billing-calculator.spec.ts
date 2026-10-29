@@ -182,9 +182,9 @@ describe('SupportBillingCalculator — monthly', () => {
     expect(result).toBeNull();
   });
 
-  it('factura solo la cuota cuando el uso no supera el cupo del período', async () => {
+  it('factura solo la cuota (HH del período × valor hora) cuando el uso no supera el cupo', async () => {
     const calculator = buildCalculator(0, [period({ consumedHoursPeriod: 15, contractedHours: 20 })]);
-    const result = await calculator.calculate(basePlan({ planType: 'monthly', planValueUf: 12 }), [], TODAY);
+    const result = await calculator.calculate(basePlan({ planType: 'monthly', planValueUf: 0.6 }), [], TODAY);
     expect(result).toEqual({ amountUf: 12, hoursBilled: null, periodKey: '2026-09', monthlyPeriodId: 'period-1' });
   });
 
@@ -192,7 +192,7 @@ describe('SupportBillingCalculator — monthly', () => {
     const calculator = buildCalculator(0, [period({ consumedHoursPeriod: 28, contractedHours: 20, endDate: new Date('2026-10-01T00:00:00Z') })]);
     const plan = basePlan({
       planType: 'monthly',
-      planValueUf: 12,
+      planValueUf: 0.6,
       extraHourValueUf: 0.5,
       surplusPolicy: 'expire',
       endDate: new Date('2026-09-30T00:00:00Z'),
@@ -205,7 +205,7 @@ describe('SupportBillingCalculator — monthly', () => {
     const calculator = buildCalculator(0, [period({ consumedHoursPeriod: 28, contractedHours: 20, endDate: new Date('2026-10-01T00:00:00Z') })]);
     const plan = basePlan({
       planType: 'monthly',
-      planValueUf: 12,
+      planValueUf: 0.6,
       surplusPolicy: 'accumulate',
       endDate: new Date('2026-09-30T00:00:00Z'),
     });
@@ -215,7 +215,7 @@ describe('SupportBillingCalculator — monthly', () => {
 
   it('no cobra excedente como hora extra si NO es el último período, aunque se exceda el cupo', async () => {
     const calculator = buildCalculator(0, [period({ consumedHoursPeriod: 28, contractedHours: 20 })]);
-    const plan = basePlan({ planType: 'monthly', planValueUf: 12, surplusPolicy: 'expire', endDate: new Date('2027-01-01T00:00:00Z') });
+    const plan = basePlan({ planType: 'monthly', planValueUf: 0.6, surplusPolicy: 'expire', endDate: new Date('2027-01-01T00:00:00Z') });
     const result = await calculator.calculate(plan, [], TODAY);
     expect(result).toEqual({ amountUf: 12, hoursBilled: null, periodKey: '2026-09', monthlyPeriodId: 'period-1' });
   });
@@ -227,7 +227,7 @@ describe('SupportBillingCalculator — monthly', () => {
     );
     const plan = basePlan({
       planType: 'monthly',
-      planValueUf: 12,
+      planValueUf: 0.6,
       extraHourValueUf: 0.5,
       surplusPolicy: 'expire',
       endDate: new Date('2026-09-30T00:00:00Z'),
@@ -235,5 +235,25 @@ describe('SupportBillingCalculator — monthly', () => {
     // Cupo real = 20 (el saldo reutilizado de 10h se ignora por ser política 'expire') → excedente = 25 - 20 = 5.
     const result = await calculator.calculate(plan, [], TODAY);
     expect(result).toEqual({ amountUf: 14.5, hoursBilled: 5, periodKey: '2026-09', monthlyPeriodId: 'period-1' });
+  });
+  it('con monthlyPeriodId factura un período ya cerrado que quedó sin factura', async () => {
+    const august = period({
+      id: 'period-0',
+      startDate: new Date('2026-08-01T00:00:00Z'),
+      endDate: new Date('2026-09-01T00:00:00Z'),
+      status: 'expired',
+      contractedHours: 10,
+    });
+    const calculator = buildCalculator(0, [august, period()]);
+    const plan = basePlan({ planType: 'monthly', planValueUf: 25, surplusPolicy: 'accumulate' });
+    const result = await calculator.calculate(plan, [], TODAY, { monthlyPeriodId: 'period-0' });
+    expect(result).toEqual({ amountUf: 250, hoursBilled: null, periodKey: '2026-08', monthlyPeriodId: 'period-0' });
+  });
+
+  it('no factura un período que todavía no empieza', async () => {
+    const october = period({ id: 'period-2', startDate: new Date('2026-10-01T00:00:00Z'), endDate: new Date('2026-11-01T00:00:00Z') });
+    const calculator = buildCalculator(0, [period(), october]);
+    const result = await calculator.calculate(basePlan({ planType: 'monthly', planValueUf: 0.6 }), [], TODAY, { monthlyPeriodId: 'period-2' });
+    expect(result).toBeNull();
   });
 });

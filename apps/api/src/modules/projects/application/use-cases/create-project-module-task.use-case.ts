@@ -16,6 +16,7 @@ import {
   ProjectAssigneeDisabledError,
   ProjectModuleNotFoundError,
   ProjectNotFoundError,
+  SegmentNotInModuleError,
 } from '../../domain/errors/project.errors';
 import { PROJECT_REPOSITORY, type ProjectRepository } from '../../domain/repositories/project.repository';
 import {
@@ -89,6 +90,10 @@ export class CreateProjectModuleTaskUseCase
     }
 
     if (command.data.startDate > command.data.date) return err(new InvalidTaskDatesError());
+    const segmentId = command.data.segmentId ?? null;
+    if (segmentId && !module.segments.some((segment) => segment.id === segmentId)) {
+      return err(new SegmentNotInModuleError());
+    }
 
     const now = this.clock.now();
     const assigneeUserId = command.data.assigneeUserId ?? null;
@@ -105,6 +110,7 @@ export class CreateProjectModuleTaskUseCase
           moduleId: command.moduleId,
           teamId: command.data.teamId ?? null,
           assigneeUserId,
+          segmentId,
           name: command.data.name,
           description: command.data.description ?? null,
           startDate: new Date(command.data.startDate),

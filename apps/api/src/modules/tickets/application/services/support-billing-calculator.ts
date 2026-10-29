@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { HOUR_ENTRY_REPOSITORY, type HourEntryRepository } from '../../../hours/domain/repositories/hour-entry.repository';
-import type { SupportPlanRecord } from '../../domain/repositories/support-plan.repository';
+import type { SupportMonthlyPeriodRecord, SupportPlanRecord } from '../../domain/repositories/support-plan.repository';
 import { SUPPORT_INVOICE_REPOSITORY, type SupportInvoiceRepository } from '../../domain/repositories/support-invoice.repository';
 import { SupportMonthlyPeriodReconciler } from './support-monthly-period-reconciler';
 
@@ -25,8 +25,8 @@ export interface SupportBillingCalculation {
  * si no, las horas de un mes que se cerró sin facturar quedaban sin cobrar);
  * en `bundle`, la bolsa completa de una vez en su primera factura, más el
  * excedente NUEVO desde la última; en `monthly`, reutiliza el mismo árbol de
- * decisión que `GetSupportPlanSummaryUseCase` para la cuota y el excedente
- * del período activo.
+ * decisión que `GetSupportPlanSummaryUseCase` para la cuota (HH del período ×
+ * valor hora) y el excedente del período activo.
  */
 @Injectable()
 export class SupportBillingCalculator {
@@ -41,10 +41,11 @@ export class SupportBillingCalculator {
     plan: SupportPlanRecord,
     linkedProjectIds: readonly string[],
     today: Date,
+    options: { readonly monthlyPeriodId?: string } = {},
   ): Promise<SupportBillingCalculation | null> {
     if (plan.planType === 'on_demand') return this.calculateOnDemand(plan, linkedProjectIds, today);
     if (plan.planType === 'bundle') return this.calculateBundle(plan, linkedProjectIds, today);
-    return this.calculateMonthly(plan, today);
+    return this.calculateMonthly(plan, today, options.monthlyPeriodId);
   }
 
   private async calculateOnDemand(
@@ -87,29 +88,50 @@ export class SupportBillingCalculator {
     };
   }
 
-  private async calculateMonthly(plan: SupportPlanRecord, today: Date): Promise<SupportBillingCalculation | null> {
+  /**
+   * Por defecto factura el período vigente; con `monthlyPeriodId`, también uno
+   * ya cerrado que quedó sin factura (nunca uno futuro: todavía no existe).
+   */
+  private async calculateMonthly(plan: SupportPlanRecord, today: Date, monthlyPeriodId?: string): Promise<SupportBillingCalculation | null> {
     const day = toUtcDate(today);
     const periods = await this.periods.listPeriods(plan, today);
-    const current = periods.find(
-      (period) => period.status === 'active' && period.startDate.getTime() <= day.getTime() && day.getTime() < period.endDate.getTime(),
-    );
-    if (!current) return null;
+    const target = monthlyPeriodId
+      ? periods.find((period) => period.id === monthlyPeriodId && period.status !== 'cancelled' && period.startDate.getTime() <= day.getTime())
+      : periods.find(
+          (period) => period.status === 'active' && period.startDate.getTime() <= day.getTime() && day.getTime() < period.endDate.getTime(),
+        );
+    if (!target) return null;
 
-    /** Igual criterio que `GetSupportPlanSummaryUseCase.buildMonthlySummary`: el saldo reutilizado solo cuenta si la política es acumulable. */
-    const priorSurplus = plan.surplusPolicy === 'accumulate' ? current.reusedBalanceHours : 0;
-    const capacity = current.contractedHours + priorSurplus;
-    const overage = Math.max(0, current.consumedHoursPeriod - capacity);
+    const { amountUf, hoursBilled } = monthlyPeriodCharge(plan, target);
+    if (amountUf <= 0) return null;
 
-    const isLastPeriod = plan.endDate !== null && current.endDate.getTime() >= plan.endDate.getTime();
-    const billsOverageAsExtra = isLastPeriod && plan.surplusPolicy !== 'accumulate' && overage > 0;
-
-    return {
-      amountUf: round2(plan.planValueUf + (billsOverageAsExtra ? overage * plan.extraHourValueUf : 0)),
-      hoursBilled: billsOverageAsExtra ? overage : null,
-      periodKey: periodKeyOf(current.startDate),
-      monthlyPeriodId: current.id,
-    };
+    return { amountUf, hoursBilled, periodKey: periodKeyOf(target.startDate), monthlyPeriodId: target.id };
   }
+}
+
+/**
+ * Lo que se cobra por UN período mensual. `planValueUf` es el valor de la
+ * HORA (así lo pide y lo muestra toda la UI, igual que en bolsa/a demanda),
+ * no la cuota: la cuota del mes son las HH del período × ese valor. El
+ * excedente solo se cobra como hora extra en el último período y sin
+ * política acumulable. Pura: la usa también el calendario de facturación de
+ * la ficha del contrato.
+ */
+export function monthlyPeriodCharge(
+  plan: Pick<SupportPlanRecord, 'planValueUf' | 'extraHourValueUf' | 'surplusPolicy' | 'endDate'>,
+  period: Pick<SupportMonthlyPeriodRecord, 'contractedHours' | 'reusedBalanceHours' | 'consumedHoursPeriod' | 'endDate'>,
+): { amountUf: number; hoursBilled: number | null } {
+  /** Igual criterio que `SupportPlanSummaryBuilder.buildMonthlySummary`: el saldo reutilizado solo cuenta si la política es acumulable. */
+  const priorSurplus = plan.surplusPolicy === 'accumulate' ? period.reusedBalanceHours : 0;
+  const overage = Math.max(0, period.consumedHoursPeriod - (period.contractedHours + priorSurplus));
+
+  const isLastPeriod = plan.endDate !== null && period.endDate.getTime() >= plan.endDate.getTime();
+  const billsOverageAsExtra = isLastPeriod && plan.surplusPolicy !== 'accumulate' && overage > 0;
+
+  return {
+    amountUf: round2(period.contractedHours * plan.planValueUf + (billsOverageAsExtra ? overage * plan.extraHourValueUf : 0)),
+    hoursBilled: billsOverageAsExtra ? overage : null,
+  };
 }
 
 function toUtcDate(date: Date): Date {

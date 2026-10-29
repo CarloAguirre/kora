@@ -5,6 +5,7 @@ import { HourEntry } from '../../domain/entities/hour-entry.entity';
 import {
   InvalidDesignatedApproverError,
   ModuleNotInProjectError,
+  SegmentNotInModuleError,
   ProjectClosedError,
   ProjectOvertimeNotAllowedError,
   ProjectStoppedError,
@@ -72,6 +73,10 @@ export class CreateHourEntryUseCase implements UseCase<CreateHourEntryCommand, {
       const module = await this.projects.findModuleById(data.moduleId);
       if (!module) return err(new ReferencedModuleNotFoundError(data.moduleId));
       if (module.projectId !== data.projectId) return err(new ModuleNotInProjectError());
+      const segmentId = data.segmentId;
+      if (segmentId && !module.segments.some((segment) => segment.id === segmentId)) {
+        return err(new SegmentNotInModuleError());
+      }
     }
 
     if (data.designatedApproverUserId) {
@@ -86,6 +91,7 @@ export class CreateHourEntryUseCase implements UseCase<CreateHourEntryCommand, {
       userId: ownerId,
       projectId: data.projectId ?? null,
       moduleId: data.moduleId ?? null,
+      segmentId: data.moduleId ? (data.segmentId ?? null) : null,
       assignment: data.assignment,
       category: data.category,
       description: data.description,

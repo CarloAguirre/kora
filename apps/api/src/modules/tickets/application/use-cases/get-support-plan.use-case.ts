@@ -10,6 +10,7 @@ import { TICKET_PROJECT_READER, type TicketProjectReader } from '../ports/ticket
 import { TICKET_USER_READER, type TicketUserReader } from '../ports/ticket-user-reader.port';
 import { computeSupportPlanAlerts } from '../services/support-plan-alerts';
 import { SupportMonthlyPeriodReconciler } from '../services/support-monthly-period-reconciler';
+import { buildMonthlyBillingSchedule } from '../services/support-monthly-billing-schedule';
 import { SupportPlanCurrentBillingResolver } from '../services/support-plan-current-billing.resolver';
 import { resolveSupportPlanName } from '../services/support-plan-naming';
 import { SupportPlanSummaryBuilder } from '../services/support-plan-summary-builder';
@@ -116,6 +117,7 @@ export class GetSupportPlanUseCase implements UseCase<GetSupportPlanQuery, Suppo
         attachmentName: invoice.attachmentName,
         paymentStatus: paymentStatusOf(invoice, now),
       })),
+      billingPeriods: buildMonthlyBillingSchedule(record, periods, invoiceRows, now),
     });
   }
 

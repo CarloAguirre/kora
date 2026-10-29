@@ -15,6 +15,9 @@ export interface ProjectModuleDeliveryRecord {
   readonly description: string | null;
   readonly assigneeUserId: string | null;
   readonly assigneeName: string | null;
+  /** Tiempo de ejecución (tramo) de la misma fase — `null` ⇔ sin tramo. */
+  readonly segmentId: string | null;
+  readonly segmentName: string | null;
   readonly estimatedDate: Date;
   readonly status: ProjectModuleDeliveryStatus;
   readonly rejectionReason: string | null;
@@ -47,6 +50,9 @@ export interface ProjectModuleTaskRecord {
   readonly teamName: string | null;
   readonly assigneeUserId: string | null;
   readonly assigneeName: string | null;
+  /** Tiempo de ejecución (tramo) de la misma fase — `null` ⇔ sin tramo. */
+  readonly segmentId: string | null;
+  readonly segmentName: string | null;
   readonly name: string;
   readonly description: string | null;
   readonly startDate: Date;
@@ -115,6 +121,7 @@ export interface CreateProjectModuleTaskInput {
   readonly moduleId: string;
   readonly teamId: string | null;
   readonly assigneeUserId: string | null;
+  readonly segmentId: string | null;
   readonly name: string;
   readonly description: string | null;
   readonly startDate: Date;
@@ -127,6 +134,7 @@ export interface CreateProjectModuleTaskInput {
 export interface UpdateProjectModuleTaskInput {
   readonly teamId?: string | null;
   readonly assigneeUserId?: string | null;
+  readonly segmentId?: string | null;
   readonly name?: string;
   readonly description?: string | null;
   readonly startDate?: Date;
@@ -144,6 +152,7 @@ export interface CreateProjectModuleDeliveryInput {
   readonly name: string;
   readonly description: string | null;
   readonly assigneeUserId: string | null;
+  readonly segmentId: string | null;
   readonly estimatedDate: Date;
 }
 
@@ -152,6 +161,7 @@ export interface UpdateProjectModuleDeliveryInput {
   readonly name?: string;
   readonly description?: string | null;
   readonly assigneeUserId?: string | null;
+  readonly segmentId?: string | null;
   readonly status?: ProjectModuleDeliveryStatus;
   readonly estimatedDate?: Date;
   readonly rejectionReason?: string | null;

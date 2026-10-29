@@ -48,6 +48,8 @@ export interface HourEntryListItem {
   readonly projectName: string | null;
   readonly moduleId: string | null;
   readonly moduleName: string | null;
+  readonly segmentId: string | null;
+  readonly segmentName: string | null;
   /** Equipo activo del autor al momento de listar — no es histórico, refleja la membresía actual. */
   readonly teamId: string | null;
   readonly teamName: string | null;

@@ -102,10 +102,14 @@ export function SupportPlanBillingAction({ plan, canManageBilling, onIssue }: Su
         </Card>
       );
     }
+    const nextPeriod = plan.billingPeriods.find((period) => period.status === 'upcoming');
     return (
       <Card>
         {plan.currentBillingStatus === 'invoiced' && (
-          <p className={styles.hint}>Ya se registró la factura de este período — para marcarla como pagada, usa el historial de arriba.</p>
+          <p className={styles.hint}>
+            Ya se registró la factura de este período — para marcarla como pagada, usa el historial de arriba.
+            {nextPeriod && ` La del mes siguiente se registra desde el ${formatDate(nextPeriod.startDate)}, en "Meses del contrato".`}
+          </p>
         )}
         {plan.currentBillingStatus === null && <p className={styles.hint}>No hay nada por facturar en el período en curso.</p>}
       </Card>

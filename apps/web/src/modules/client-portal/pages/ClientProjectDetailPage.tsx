@@ -72,14 +72,15 @@ type SectionKey = 'info' | 'billing' | 'links' | 'progress' | 'hours' | 'gantt' 
  * del periodo" se quitó — su contenido ya vive en "Bitácora").
  */
 const SECTION_TOGGLES: ReadonlyArray<{ key: SectionKey; label: string; icon: typeof LinkIcon }> = [
+  // Mismo orden en que se renderizan las secciones más abajo.
+  { key: 'info', label: 'Datos del proyecto', icon: ListIcon },
+  { key: 'billing', label: 'Facturación', icon: DollarSignIcon },
   { key: 'links', label: 'Accesos y enlaces', icon: LinkIcon },
   { key: 'progress', label: 'Avance del proyecto', icon: CircleCheckIcon },
-  { key: 'billing', label: 'Facturación', icon: DollarSignIcon },
-  { key: 'info', label: 'Datos del proyecto', icon: ListIcon },
   { key: 'hours', label: 'Horas y avance', icon: ClockIcon },
+  { key: 'gantt', label: 'Roadmap por Fases', icon: CalendarIcon },
   { key: 'impact', label: 'Impacto en el negocio', icon: TrendingUpIcon },
   { key: 'qa', label: 'Métricas de la etapa actual', icon: BarChartIcon },
-  { key: 'gantt', label: 'Roadmap por Fases', icon: CalendarIcon },
   { key: 'bitacora', label: 'Bitácora', icon: HistoryIcon },
 ];
 
@@ -298,7 +299,7 @@ export function ClientProjectDetailPage({
               className={[styles.sectionToggle, visible[key] ? styles.sectionToggleOn : ''].filter(Boolean).join(' ')}
               aria-pressed={visible[key]}
               aria-label={`${visible[key] ? 'Ocultar' : 'Mostrar'} ${label}`}
-              title={label}
+              data-tooltip={label}
               onClick={() => toggleSection(key)}
             >
               <Icon size={16} />
@@ -309,7 +310,7 @@ export function ClientProjectDetailPage({
             className={[styles.sectionToggle, usedHoursVisible ? styles.sectionToggleOn : ''].filter(Boolean).join(' ')}
             aria-pressed={usedHoursVisible}
             aria-label={`${usedHoursVisible ? 'Ocultar' : 'Mostrar'} horas consumidas`}
-            title={usedHoursVisible ? 'Ocultar horas consumidas' : 'Mostrar horas consumidas'}
+            data-tooltip={usedHoursVisible ? 'Ocultar horas consumidas' : 'Mostrar horas consumidas'}
             onClick={toggleUsedHours}
           >
             <EyeIcon size={16} />

@@ -15,6 +15,7 @@ import {
   lte,
   ne,
   or,
+  projectModuleSegments,
   projectModules,
   projects,
   projectTeams,
@@ -83,6 +84,8 @@ export class DrizzleHourEntryRepository implements HourEntryRepository {
           clientName: clients.companyName,
           moduleId: hourEntries.moduleId,
           moduleName: projectModules.name,
+          segmentId: hourEntries.segmentId,
+          segmentName: projectModuleSegments.name,
           assignment: hourEntries.assignment,
           category: hourEntries.category,
           description: hourEntries.description,
@@ -105,6 +108,7 @@ export class DrizzleHourEntryRepository implements HourEntryRepository {
         .leftJoin(projects, eq(projects.id, hourEntries.projectId))
         .leftJoin(clients, eq(clients.id, projects.clientId))
         .leftJoin(projectModules, eq(projectModules.id, hourEntries.moduleId))
+        .leftJoin(projectModuleSegments, eq(projectModuleSegments.id, hourEntries.segmentId))
         // Un `hour_entries` viene de a lo más UNA solicitud de HH de ticket
         // (índice único parcial en `ticket_hh_requests.hour_entry_id`), así
         // que este join no duplica filas.
@@ -207,6 +211,8 @@ export class DrizzleHourEntryRepository implements HourEntryRepository {
       projectName: row.projectName,
       moduleId: row.moduleId,
       moduleName: row.moduleName,
+      segmentId: row.segmentId,
+      segmentName: row.segmentName,
       teamId: teamByUserId.get(row.userId)?.id ?? null,
       teamName: teamByUserId.get(row.userId)?.name ?? null,
       assignment: row.assignment,

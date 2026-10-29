@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { alias } from 'drizzle-orm/pg-core';
 import {
   and,
   asc,
@@ -40,6 +41,9 @@ import type {
 import { DATABASE } from '../../../../shared/infrastructure/database/database.module';
 import { resolveDb } from '../../../../shared/infrastructure/database/unit-of-work';
 
+/** Tramo al que apunta una tarea/entrega — alias porque las consultas de tramos ya usan la tabla. */
+const linkedSegments = alias(projectModuleSegments, 'linked_segments');
+
 @Injectable()
 export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
   constructor(@Inject(DATABASE) private readonly database: Database) {}
@@ -66,6 +70,8 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
           assigneeUserId: projectModuleDeliveries.assigneeUserId,
           assigneeFirstName: users.firstName,
           assigneeLastName: users.lastName,
+          segmentId: projectModuleDeliveries.segmentId,
+          segmentName: linkedSegments.name,
           estimatedDate: projectModuleDeliveries.estimatedDate,
           status: projectModuleDeliveries.status,
           rejectionReason: projectModuleDeliveries.rejectionReason,
@@ -75,6 +81,7 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
         .innerJoin(projectModules, eq(projectModules.id, projectModuleDeliveries.moduleId))
         .leftJoin(teams, eq(teams.id, projectModuleDeliveries.teamId))
         .leftJoin(users, eq(users.id, projectModuleDeliveries.assigneeUserId))
+        .leftJoin(linkedSegments, eq(linkedSegments.id, projectModuleDeliveries.segmentId))
         .where(eq(projectModules.projectId, projectId))
         .orderBy(asc(projectModuleDeliveries.estimatedDate)),
       db
@@ -101,6 +108,8 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
           assigneeUserId: projectModuleTasks.assigneeUserId,
           assigneeFirstName: users.firstName,
           assigneeLastName: users.lastName,
+          segmentId: projectModuleTasks.segmentId,
+          segmentName: linkedSegments.name,
           name: projectModuleTasks.name,
           description: projectModuleTasks.description,
           startDate: projectModuleTasks.startDate,
@@ -115,6 +124,7 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
         .innerJoin(projectModules, eq(projectModules.id, projectModuleTasks.moduleId))
         .leftJoin(teams, eq(teams.id, projectModuleTasks.teamId))
         .leftJoin(users, eq(users.id, projectModuleTasks.assigneeUserId))
+        .leftJoin(linkedSegments, eq(linkedSegments.id, projectModuleTasks.segmentId))
         .where(eq(projectModules.projectId, projectId))
         .orderBy(asc(projectModuleTasks.date)),
       db
@@ -231,6 +241,8 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
           assigneeUserId: projectModuleDeliveries.assigneeUserId,
           assigneeFirstName: users.firstName,
           assigneeLastName: users.lastName,
+          segmentId: projectModuleDeliveries.segmentId,
+          segmentName: linkedSegments.name,
           estimatedDate: projectModuleDeliveries.estimatedDate,
           status: projectModuleDeliveries.status,
           rejectionReason: projectModuleDeliveries.rejectionReason,
@@ -239,6 +251,7 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
         .from(projectModuleDeliveries)
         .leftJoin(teams, eq(teams.id, projectModuleDeliveries.teamId))
         .leftJoin(users, eq(users.id, projectModuleDeliveries.assigneeUserId))
+        .leftJoin(linkedSegments, eq(linkedSegments.id, projectModuleDeliveries.segmentId))
         .where(eq(projectModuleDeliveries.moduleId, id))
         .orderBy(asc(projectModuleDeliveries.estimatedDate)),
       db
@@ -264,6 +277,8 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
           assigneeUserId: projectModuleTasks.assigneeUserId,
           assigneeFirstName: users.firstName,
           assigneeLastName: users.lastName,
+          segmentId: projectModuleTasks.segmentId,
+          segmentName: linkedSegments.name,
           name: projectModuleTasks.name,
           description: projectModuleTasks.description,
           startDate: projectModuleTasks.startDate,
@@ -277,6 +292,7 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
         .from(projectModuleTasks)
         .leftJoin(teams, eq(teams.id, projectModuleTasks.teamId))
         .leftJoin(users, eq(users.id, projectModuleTasks.assigneeUserId))
+        .leftJoin(linkedSegments, eq(linkedSegments.id, projectModuleTasks.segmentId))
         .where(eq(projectModuleTasks.moduleId, id))
         .orderBy(asc(projectModuleTasks.date)),
       db
@@ -355,6 +371,7 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
         name: input.name,
         description: input.description,
         assigneeUserId: input.assigneeUserId,
+        segmentId: input.segmentId,
         estimatedDate: input.estimatedDate,
         createdAt: now,
         updatedAt: now,
@@ -381,6 +398,7 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
         ...(input.name !== undefined ? { name: input.name } : {}),
         ...(input.description !== undefined ? { description: input.description } : {}),
         ...(input.assigneeUserId !== undefined ? { assigneeUserId: input.assigneeUserId } : {}),
+        ...(input.segmentId !== undefined ? { segmentId: input.segmentId } : {}),
         ...(input.status !== undefined ? { status: input.status } : {}),
         ...(input.estimatedDate !== undefined ? { estimatedDate: input.estimatedDate } : {}),
         ...(input.rejectionReason !== undefined ? { rejectionReason: input.rejectionReason } : {}),
@@ -473,6 +491,7 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
         moduleId: input.moduleId,
         teamId: input.teamId,
         assigneeUserId: input.assigneeUserId,
+        segmentId: input.segmentId,
         name: input.name,
         description: input.description,
         startDate: input.startDate,
@@ -503,6 +522,7 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
       .set({
         ...(input.teamId !== undefined ? { teamId: input.teamId } : {}),
         ...(input.assigneeUserId !== undefined ? { assigneeUserId: input.assigneeUserId } : {}),
+        ...(input.segmentId !== undefined ? { segmentId: input.segmentId } : {}),
         ...(input.name !== undefined ? { name: input.name } : {}),
         ...(input.description !== undefined ? { description: input.description } : {}),
         ...(input.startDate !== undefined ? { startDate: input.startDate } : {}),
@@ -601,6 +621,8 @@ interface DeliveryRow {
   assigneeUserId: string | null;
   assigneeFirstName: string | null;
   assigneeLastName: string | null;
+  segmentId: string | null;
+  segmentName: string | null;
   estimatedDate: Date;
   status: ProjectModuleDeliveryRecord['status'];
   rejectionReason: string | null;
@@ -625,6 +647,8 @@ interface RawTaskRow {
   assigneeUserId: string | null;
   assigneeFirstName: string | null;
   assigneeLastName: string | null;
+  segmentId: string | null;
+  segmentName: string | null;
   name: string;
   description: string | null;
   startDate: Date;
@@ -644,6 +668,8 @@ function toTaskRow(row: RawTaskRow): ProjectModuleTaskRecord {
     teamName: row.teamName,
     assigneeUserId: row.assigneeUserId,
     assigneeName: row.assigneeUserId ? `${row.assigneeFirstName ?? ''} ${row.assigneeLastName ?? ''}`.trim() : null,
+    segmentId: row.segmentId,
+    segmentName: row.segmentName,
     name: row.name,
     description: row.description,
     startDate: row.startDate,
@@ -717,6 +743,8 @@ function toRecord(
       description: d.description,
       assigneeUserId: d.assigneeUserId,
       assigneeName: d.assigneeUserId ? `${d.assigneeFirstName ?? ''} ${d.assigneeLastName ?? ''}`.trim() : null,
+      segmentId: d.segmentId,
+      segmentName: d.segmentName,
       estimatedDate: d.estimatedDate,
       status: d.status,
       rejectionReason: d.rejectionReason,

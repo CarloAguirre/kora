@@ -23,7 +23,12 @@ export class ProjectsModuleHourEntryProjectReader implements HourEntryProjectRea
   async findModuleById(moduleId: string): Promise<HourEntryModuleReference | null> {
     const module = await this.modules.findById(moduleId);
     if (!module) return null;
-    return { id: module.id, name: module.name, projectId: module.projectId };
+    return {
+      id: module.id,
+      name: module.name,
+      projectId: module.projectId,
+      segments: module.segments.map((segment) => ({ id: segment.id, name: segment.name })),
+    };
   }
 
   async findById(projectId: string): Promise<HourEntryProjectReference | null> {

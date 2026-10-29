@@ -10,6 +10,8 @@ import {
   PROJECT_PHASES,
   PROJECT_PHASE_LABELS,
   PROJECT_STATUS_LABELS,
+  SUPPORT_PLAN_CURRENCIES,
+  SUPPORT_PLAN_CURRENCY_LABELS,
   SUPPORT_PLAN_TYPE_LABELS,
   SUPPORT_SURPLUS_POLICIES,
   SUPPORT_SURPLUS_POLICY_LABELS,
@@ -22,6 +24,7 @@ import {
   type ProjectModuleSegment,
   type ProjectSalesStage,
   type ProjectStatus,
+  type SupportPlanCurrency,
   type SupportPlanType,
   type SupportSurplusPolicy,
   type UpdateProjectInput,
@@ -33,11 +36,19 @@ import deliveryModalStyles from './DeliveryModal.module.css';
 import { Modal } from '@/shared/components/ui/Modal';
 import { Button } from '@/shared/components/ui/Button';
 import { TextField } from '@/shared/components/ui/TextField';
+import { MoneyField } from '@/shared/components/ui/MoneyField';
 import { Select } from '@/shared/components/ui/Select';
 import { Combobox } from '@/shared/components/ui/Combobox';
 import { SegmentedControl } from '@/shared/components/ui/SegmentedControl';
 import { AlertIcon, PlusIcon, TrashIcon, CloseIcon } from '@/shared/components/icons/Icons';
-import { DeliveryModal, EMPTY_DELIVERY_MODAL_VALUES, type DeliveryModalValues } from './DeliveryModal';
+import {
+  DeliveryModal,
+  EMPTY_DELIVERY_MODAL_VALUES,
+  draftSegmentKey,
+  resolveDraftSegmentId,
+  toDeliverySegmentOption,
+  type DeliveryModalValues,
+} from './DeliveryModal';
 import { SupportSlaNote } from './SupportSlaNote';
 import {
   ExecutionSegmentModal,
@@ -69,6 +80,7 @@ import { assignableOptions } from '@/modules/users/lib/assignable-options';
 import { useTeamsList } from '@/modules/teams/api/teams.queries';
 import { useToast } from '@/shared/components/ui/Toast';
 import { ApiRequestError } from '@/shared/lib/api-client';
+import { formatMoney } from '@/shared/lib/format-money';
 import {
   PaymentPlanEditor,
   missingApprovalBillingData,
@@ -91,12 +103,17 @@ const SUPPORT_SURPLUS_POLICY_OPTIONS = SUPPORT_SURPLUS_POLICIES.map((policy) => 
   value: policy,
   label: SUPPORT_SURPLUS_POLICY_LABELS[policy],
 }));
+const SUPPORT_CURRENCY_OPTIONS = SUPPORT_PLAN_CURRENCIES.map((currency) => ({ value: currency, label: SUPPORT_PLAN_CURRENCY_LABELS[currency] }));
 
 /** Lo que se edita del contrato de soporte desde la ficha del proyecto. */
 interface SupportPlanDraft {
   planType: SupportPlanType;
   surplusPolicy: SupportSurplusPolicy | null;
   contractedHours: number;
+  /** Valor de la hora y de la hora extra, como texto del input (para no perder "0," mientras se escribe). En la moneda de `currency`. */
+  planValueUf: string;
+  extraHourValueUf: string;
+  currency: SupportPlanCurrency;
 }
 
 /** `2026-05-08` → `08-05-2026` — mismo formato que el resto de la ficha de proyecto. */
@@ -292,6 +309,7 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
     setPaymentPlanDirty(false);
     setPaymentPlanError(null);
     setCoveredProjectIds(null);
+    setPlanDraft(null);
     setApprovalBillingBlocked(false);
   }, [open, project, reset]);
 
@@ -341,9 +359,18 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
   // proyecto: son la lógica de venta por tipo de paquete (períodos mensuales, saldo acumulable, bolsa).
   /** `null` = sin tocar: se muestra lo guardado y no se manda nada al contrato. */
   const [planDraft, setPlanDraft] = useState<SupportPlanDraft | null>(null);
-  const savedPlanDraft: SupportPlanDraft | null = supportPlan
-    ? { planType: supportPlan.planType, surplusPolicy: supportPlan.surplusPolicy, contractedHours: supportPlan.contractedHours }
-    : null;
+  // Del detalle y no del listado: el valor de la hora extra solo viene en el detalle — partir sin él lo mandaría en 0 al guardar.
+  const savedPlanDraft: SupportPlanDraft | null =
+    supportPlan && supportPlanDetail
+      ? {
+          planType: supportPlanDetail.planType,
+          surplusPolicy: supportPlanDetail.surplusPolicy,
+          contractedHours: supportPlanDetail.contractedHours,
+          planValueUf: String(supportPlanDetail.planValueUf),
+          extraHourValueUf: String(supportPlanDetail.extraHourValueUf),
+          currency: supportPlanDetail.currency,
+        }
+      : null;
   const currentPlanDraft = planDraft ?? savedPlanDraft;
   const editPlanDraft = (patch: Partial<SupportPlanDraft>) => {
     if (!currentPlanDraft) return;
@@ -362,6 +389,13 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
     currentPeriod && currentPlanDraft?.planType === 'monthly' && savedPlanDraft?.planType === 'monthly'
       ? `Este mes: ${formatPlanHours(currentPeriod.planHours)} h del plan + ${formatPlanHours(currentPeriod.priorSurplusHours)} h acumuladas de meses anteriores = ${formatPlanHours(currentPeriod.capacityHours)} h disponibles.`
       : null;
+
+  // Facturación cobra HH × valor hora (la bolsa una vez, el mensual cada mes): se muestra el monto resultante para que no se lea como cuota.
+  const planHourValue = Number(currentPlanDraft?.planValueUf) || 0;
+  const planChargeHint =
+    currentPlanDraft && currentPlanDraft.planType !== 'on_demand' && currentPlanDraft.contractedHours > 0 && planHourValue > 0
+      ? `${currentPlanDraft.planType === 'bundle' ? 'Monto de la bolsa' : 'Cuota mensual'}: ${formatPlanHours(currentPlanDraft.contractedHours)} HH × ${formatMoney(planHourValue, currentPlanDraft.currency)} = ${formatMoney(currentPlanDraft.contractedHours * planHourValue, currentPlanDraft.currency)}.`
+      : undefined;
 
   const toggleCoveredProject = (projectId: string) =>
     setCoveredProjectIds(
@@ -397,6 +431,7 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
       name: delivery.name ?? '',
       description: delivery.description ?? '',
       estimatedDate: delivery.estimatedDate,
+      segmentId: delivery.segmentId ?? '',
     };
   })();
 
@@ -418,6 +453,7 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
       name: values.name.trim(),
       description: values.description.trim() || undefined,
       teamId: values.teamId || undefined,
+      segmentId: values.segmentId || null,
       estimatedDate: values.estimatedDate,
     };
     try {
@@ -436,6 +472,15 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
   // acá y recién se crean apenas responde `createModule`.
   const [newModuleSegments, setNewModuleSegments] = useState<SegmentDraft[]>([]);
   const nextNewModuleSegmentId = useRef(1);
+
+  // Tiempos de ejecución de la fase de la entrega — los del módulo en borrador aún no tienen id.
+  const deliveryModalSegmentOptions = !deliveryModal
+    ? []
+    : deliveryModal.kind === 'existing'
+      ? (project.modules.find((m) => m.id === deliveryModal.moduleId)?.segments ?? []).map((segment) =>
+          toDeliverySegmentOption(segment.id, segment),
+        )
+      : newModuleSegments.map((segment) => toDeliverySegmentOption(draftSegmentKey(segment.localId), segment));
 
   const removeNewModuleSegment = (localId: number) => {
     setNewModuleSegments((prev) => prev.filter((segment) => segment.localId !== localId));
@@ -522,6 +567,21 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
   const onCreateModule = newModuleForm.handleSubmit(async (values) => {
     try {
       const module = await createModule.mutateAsync({ projectId: project.id, input: values });
+      // Primero los tramos: las entregas del borrador los referencian por su clave local.
+      const pendingSegments = newModuleSegments.filter(
+        (segment) => segment.teamId && segment.name.trim() && segment.startDate && segment.endDate,
+      );
+      const segmentIdsByDraftKey = new Map(
+        await Promise.all(
+          pendingSegments.map(
+            async (segment) =>
+              [
+                draftSegmentKey(segment.localId),
+                (await createSegment.mutateAsync({ projectId: project.id, moduleId: module.id, input: toSegmentInput(segment) })).id,
+              ] as const,
+          ),
+        ),
+      );
       const pendingDeliveries = newModuleDeliveries.filter((delivery) => delivery.estimatedDate && delivery.name.trim());
       if (pendingDeliveries.length > 0) {
         await Promise.all(
@@ -533,22 +593,9 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
                 name: delivery.name.trim(),
                 description: delivery.description.trim() || undefined,
                 teamId: delivery.teamId || undefined,
+                segmentId: resolveDraftSegmentId(delivery.segmentId, segmentIdsByDraftKey),
                 estimatedDate: delivery.estimatedDate,
               },
-            }),
-          ),
-        );
-      }
-      const pendingSegments = newModuleSegments.filter(
-        (segment) => segment.teamId && segment.name.trim() && segment.startDate && segment.endDate,
-      );
-      if (pendingSegments.length > 0) {
-        await Promise.all(
-          pendingSegments.map((segment) =>
-            createSegment.mutateAsync({
-              projectId: project.id,
-              moduleId: module.id,
-              input: toSegmentInput(segment),
             }),
           ),
         );
@@ -682,6 +729,9 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
           planInput.planType = planDraft.planType;
           planInput.surplusPolicy = planDraft.surplusPolicy;
           planInput.contractedHours = planDraft.contractedHours;
+          planInput.planValueUf = Number(planDraft.planValueUf) || 0;
+          planInput.extraHourValueUf = Number(planDraft.extraHourValueUf) || 0;
+          planInput.currency = planDraft.currency;
         }
         if (Object.keys(planInput).length > 0) await updateSupportPlan.mutateAsync(planInput);
       }
@@ -1001,6 +1051,32 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
                 helperText={currentPeriodBreakdown ?? undefined}
               />
             )}
+            {/* Mismos campos que al crear (`NewProjectPage`): una sola moneda para ambos valores. */}
+            <div className={styles.row}>
+              <MoneyField
+                label="Valor de la hora"
+                currency={currentPlanDraft.currency}
+                onCurrencyChange={(value) => editPlanDraft({ currency: value as SupportPlanCurrency })}
+                currencyOptions={SUPPORT_CURRENCY_OPTIONS}
+                step="0.01"
+                min={0}
+                value={currentPlanDraft.planValueUf}
+                onChange={(event) => editPlanDraft({ planValueUf: event.target.value })}
+              />
+              {currentPlanDraft.planType !== 'on_demand' && (
+                <MoneyField
+                  label="Valor de horas extra"
+                  currency={currentPlanDraft.currency}
+                  onCurrencyChange={(value) => editPlanDraft({ currency: value as SupportPlanCurrency })}
+                  currencyOptions={SUPPORT_CURRENCY_OPTIONS}
+                  step="0.01"
+                  min={0}
+                  value={currentPlanDraft.extraHourValueUf}
+                  onChange={(event) => editPlanDraft({ extraHourValueUf: event.target.value })}
+                />
+              )}
+            </div>
+            {planChargeHint && <p className={styles.hint}>{planChargeHint}</p>}
           </div>
         )}
 
@@ -1310,6 +1386,7 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
                                   </span>
                                   <span className={deliveryModalStyles.listMeta}>
                                     {formatDeliveryDate(delivery.estimatedDate)} · {PROJECT_MODULE_DELIVERY_STATUS_LABELS[delivery.status]}
+                                    {delivery.segmentName ? ` · ${delivery.segmentName}` : ''}
                                     {delivery.description ? ` · ${delivery.description}` : ''}
                                   </span>
                                   {deliveryRemoved && <span className={deliveryModalStyles.pendingRemovalNote}>Se quitará al guardar</span>}
@@ -1581,6 +1658,7 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
       open={deliveryModal !== null}
       mode={deliveryModal?.delivery ? 'edit' : 'create'}
       teamOptions={deliveryModalTeamOptions}
+      segmentOptions={deliveryModalSegmentOptions}
       initialValues={deliveryModalInitialValues}
       submitting={addDelivery.isPending || updateDelivery.isPending}
       onCancel={() => setDeliveryModal(null)}
@@ -1638,7 +1716,14 @@ function formatPlanHours(value: number): string {
 }
 
 function samePlanDraft(a: SupportPlanDraft, b: SupportPlanDraft): boolean {
-  return a.planType === b.planType && a.surplusPolicy === b.surplusPolicy && a.contractedHours === b.contractedHours;
+  return (
+    a.planType === b.planType &&
+    a.surplusPolicy === b.surplusPolicy &&
+    a.contractedHours === b.contractedHours &&
+    Number(a.planValueUf) === Number(b.planValueUf) &&
+    Number(a.extraHourValueUf) === Number(b.extraHourValueUf) &&
+    a.currency === b.currency
+  );
 }
 
 function sameIds(a: readonly string[], b: readonly string[]): boolean {

@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { SUPPORT_PLAN_TYPE_LABELS, type SupportInvoice } from '@kora/contracts';
+import { SUPPORT_PLAN_TYPE_LABELS, type SupportInvoice, type SupportMonthlyBillingPeriod } from '@kora/contracts';
 import styles from './SupportPlanDetailPage.module.css';
 import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Button } from '@/shared/components/ui/Button';
@@ -23,6 +23,8 @@ import {
   SupportPlanTypeBadge,
 } from '../components/SupportPlanBadges';
 import { MarkSupportInvoicePaidDialog } from '../components/MarkSupportInvoicePaidDialog';
+import { IssueSupportInvoiceDialog } from '../components/IssueSupportInvoiceDialog';
+import { SupportMonthlyBillingSchedule, formatPeriodMonth } from '../components/SupportMonthlyBillingSchedule';
 import { CloseSupportPlanDialog } from '../components/CloseSupportPlanDialog';
 import {
   useCloseSupportPlan,
@@ -63,6 +65,7 @@ export function SupportPlanDetailPage() {
   const { data: plan, isLoading, error } = useSupportPlanDetail(planId ?? null);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [payAction, setPayAction] = useState<PayAction>(null);
+  const [issuePeriod, setIssuePeriod] = useState<SupportMonthlyBillingPeriod | null>(null);
   const [closing, setClosing] = useState(false);
   const [ticketsPage, setTicketsPage] = useState(1);
   const [ticketsPageSize, setTicketsPageSize] = useState(DEFAULT_PAGE_SIZE);
@@ -278,6 +281,15 @@ export function SupportPlanDetailPage() {
         <Pagination {...invoicesPagination} />
       </Card>
 
+      {plan.planType === 'monthly' && (
+        <SupportMonthlyBillingSchedule
+          periods={plan.billingPeriods}
+          currency={plan.currency}
+          canManageBilling={canManageBilling}
+          onIssue={setIssuePeriod}
+        />
+      )}
+
       <SupportPlanBillingAction
         plan={plan}
         canManageBilling={canManageBilling}
@@ -325,6 +337,16 @@ export function SupportPlanDetailPage() {
           if (!payAction) return;
           await markPaid.mutateAsync({ invoiceId: payAction.invoice.id, input });
           toast.success('Se registró el pago.');
+        }}
+      />
+      <IssueSupportInvoiceDialog
+        open={issuePeriod !== null}
+        description={issuePeriod ? `${formatPeriodMonth(issuePeriod.periodKey)} · ${formatMoney(issuePeriod.amountUf, plan.currency)}` : ''}
+        onClose={() => setIssuePeriod(null)}
+        onConfirm={async (input) => {
+          if (!issuePeriod?.monthlyPeriodId) return;
+          await issueInvoice.mutateAsync({ ...input, monthlyPeriodId: issuePeriod.monthlyPeriodId });
+          toast.success('Se registró la factura.');
         }}
       />
       <CloseSupportPlanDialog
