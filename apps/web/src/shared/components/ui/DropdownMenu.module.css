@@ -9,6 +9,11 @@
   flex-direction: column;
   gap: 2px;
   min-width: 160px;
+  /* Acotado a la ventana: con etiquetas largas (tareas del Roadmap) el panel no se sale ni queda
+     como una columna angosta; si hay muchos ítems, se desplaza por dentro. */
+  max-width: min(360px, calc(100vw - 16px));
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
   padding: var(--kora-space-2);
   border-radius: var(--kora-radius);
   border: 1px solid var(--kora-border-soft);
