@@ -28,7 +28,11 @@ function StatusCell({ period }: { period: SupportMonthlyBillingPeriod }) {
     return (
       <span className={styles.folioCell}>
         <Badge tone="info">Facturado</Badge>
-        {period.folio && <span className={styles.folioSub}>Folio {period.folio}</span>}
+        {period.invoices.length > 0 && (
+          <span className={styles.folioSub}>
+            {period.invoices.length === 1 ? 'Folio' : 'Folios'} {period.invoices.map((invoice) => invoice.folio).join(', ')}
+          </span>
+        )}
       </span>
     );
   }

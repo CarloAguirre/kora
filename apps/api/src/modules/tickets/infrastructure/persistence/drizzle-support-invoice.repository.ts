@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, inArray, isNull, lt, sql, supportInvoices, type Database } from '@kora/db';
+import { and, asc, eq, inArray, isNull, lt, sql, supportInvoices, type Database } from '@kora/db';
 import type { TransactionContext } from '@kora/core';
 import type {
   CreateSupportInvoiceInput,
@@ -16,6 +16,7 @@ interface SupportInvoiceRow {
   amountUf: string;
   currency: string;
   hoursBilled: string | null;
+  position: number;
   folio: string;
   invoicedAt: Date;
   dueAt: Date | null;
@@ -32,6 +33,7 @@ function toRecord(row: SupportInvoiceRow): SupportInvoiceRecord {
     amountUf: Number(row.amountUf),
     currency: row.currency as SupportInvoiceRecord['currency'],
     hoursBilled: row.hoursBilled !== null ? Number(row.hoursBilled) : null,
+    position: row.position,
     folio: row.folio,
     invoicedAt: row.invoicedAt,
     dueAt: row.dueAt,
@@ -52,15 +54,14 @@ export class DrizzleSupportInvoiceRepository implements SupportInvoiceRepository
     return row ? toRecord(row as SupportInvoiceRow) : null;
   }
 
-  async findByPlanAndPeriod(planId: string, periodKey: string, context?: TransactionContext): Promise<SupportInvoiceRecord | null> {
+  async listByPlanAndPeriod(planId: string, periodKey: string, context?: TransactionContext): Promise<SupportInvoiceRecord[]> {
     const db = resolveDb(this.database, context);
     const rows = await db
       .select()
       .from(supportInvoices)
       .where(and(eq(supportInvoices.planId, planId), eq(supportInvoices.periodKey, periodKey)))
-      .limit(1);
-    const row = rows[0];
-    return row ? toRecord(row as SupportInvoiceRow) : null;
+      .orderBy(asc(supportInvoices.position));
+    return rows.map((row) => toRecord(row as SupportInvoiceRow));
   }
 
   async listForPlan(planId: string, context?: TransactionContext): Promise<SupportInvoiceRecord[]> {
@@ -106,21 +107,25 @@ export class DrizzleSupportInvoiceRepository implements SupportInvoiceRepository
     return Number(rows[0]?.total ?? 0);
   }
 
-  async create(input: CreateSupportInvoiceInput, context?: TransactionContext): Promise<void> {
+  async createMany(inputs: readonly CreateSupportInvoiceInput[], context?: TransactionContext): Promise<void> {
+    if (inputs.length === 0) return;
     const db = resolveDb(this.database, context);
-    await db.insert(supportInvoices).values({
-      id: input.id,
-      planId: input.planId,
-      periodKey: input.periodKey,
-      amountUf: String(input.amountUf),
-      currency: input.currency,
-      hoursBilled: input.hoursBilled !== null ? String(input.hoursBilled) : null,
-      folio: input.folio,
-      invoicedAt: input.invoicedAt,
-      dueAt: input.dueAt,
-      attachmentName: input.attachmentName,
-      monthlyPeriodId: input.monthlyPeriodId,
-    });
+    await db.insert(supportInvoices).values(
+      inputs.map((input) => ({
+        id: input.id,
+        planId: input.planId,
+        periodKey: input.periodKey,
+        amountUf: String(input.amountUf),
+        currency: input.currency,
+        hoursBilled: input.hoursBilled !== null ? String(input.hoursBilled) : null,
+        position: input.position,
+        folio: input.folio,
+        invoicedAt: input.invoicedAt,
+        dueAt: input.dueAt,
+        attachmentName: input.attachmentName,
+        monthlyPeriodId: input.monthlyPeriodId,
+      })),
+    );
   }
 
   async markPaid(id: string, paidAt: Date, context?: TransactionContext): Promise<void> {
@@ -128,8 +133,9 @@ export class DrizzleSupportInvoiceRepository implements SupportInvoiceRepository
     await db.update(supportInvoices).set({ paidAt, updatedAt: new Date() }).where(eq(supportInvoices.id, id));
   }
 
-  async remove(id: string, context?: TransactionContext): Promise<void> {
+  async removeMany(ids: readonly string[], context?: TransactionContext): Promise<void> {
+    if (ids.length === 0) return;
     const db = resolveDb(this.database, context);
-    await db.delete(supportInvoices).where(eq(supportInvoices.id, id));
+    await db.delete(supportInvoices).where(inArray(supportInvoices.id, [...ids]));
   }
 }

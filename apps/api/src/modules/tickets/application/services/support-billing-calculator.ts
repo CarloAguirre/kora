@@ -147,8 +147,8 @@ export function monthlyPeriodOverageHours(plan: MonthlyChargePlan, period: Month
  * atrás: los meses viejos (también los migrados de la v1) ya están cerrados y
  * conciliados — arrastrarlos cobraría de golpe excedentes que nadie esperaba.
  *
- * Se simula en orden: cada período suma su excedente a la bolsa; la factura de
- * cada período descuenta su `hours_billed` de lo pendiente de ese período y del
+ * Se simula en orden: cada período suma su excedente a la bolsa; las facturas de
+ * cada período descuentan su `hours_billed` de lo pendiente de ese período y del
  * anterior (primero lo más antiguo), y lo de períodos más viejos se descarta.
  * Pura.
  */
@@ -169,16 +169,28 @@ export function unbilledMonthlyOverageHours(
     pending = monthlyPeriodOverageHours(plan, period);
     if (period.id === target.id) break;
 
-    const periodKey = periodKeyOf(period.startDate);
-    const invoice =
-      invoices.find((item) => item.monthlyPeriodId === period.id) ?? invoices.find((item) => item.periodKey === periodKey);
-    let billed = invoice?.hoursBilled ?? 0;
+    let billed = invoicesOfMonthlyPeriod(invoices, period).reduce((total, invoice) => total + (invoice.hoursBilled ?? 0), 0);
     const fromPrevious = Math.min(previousPending, billed);
     previousPending -= fromPrevious;
     billed -= fromPrevious;
     pending = Math.max(0, pending - billed);
   }
   return round2(previousPending + pending);
+}
+
+/**
+ * Las facturas de un período mensual: las enlazadas a él por
+ * `monthlyPeriodId` o, si no hay ninguna (facturas migradas sin enlace), las
+ * de su mismo `periodKey`. Pueden ser varias — el total del período dividido.
+ */
+export function invoicesOfMonthlyPeriod<T extends Pick<SupportInvoiceRecord, 'monthlyPeriodId' | 'periodKey'>>(
+  invoices: readonly T[],
+  period: Pick<SupportMonthlyPeriodRecord, 'id' | 'startDate'>,
+): T[] {
+  const linked = invoices.filter((invoice) => invoice.monthlyPeriodId === period.id);
+  if (linked.length > 0) return linked;
+  const periodKey = periodKeyOf(period.startDate);
+  return invoices.filter((invoice) => invoice.periodKey === periodKey);
 }
 
 /**

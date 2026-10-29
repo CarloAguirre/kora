@@ -116,7 +116,7 @@ export class SupportPlansController {
     @Param('id') id: string,
     @Body(new ZodValidationPipe(markSupportInvoiceIssuedSchema)) body: MarkSupportInvoiceIssuedInput,
     @CurrentUser() actor: RequestUser,
-  ): Promise<{ id: string }> {
+  ): Promise<{ ids: string[] }> {
     return unwrapOrThrow(await this.markInvoiceIssued.execute({ planId: id, data: body, actor: toActorContext(actor) }));
   }
 }

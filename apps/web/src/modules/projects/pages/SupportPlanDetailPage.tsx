@@ -89,8 +89,13 @@ export function SupportPlanDetailPage() {
   });
 
   const sortedInvoices = useMemo(
-    () => [...(plan?.invoices ?? [])].sort((a, b) => b.periodKey.localeCompare(a.periodKey)),
+    () => [...(plan?.invoices ?? [])].sort((a, b) => b.periodKey.localeCompare(a.periodKey) || a.position - b.position),
     [plan],
+  );
+  // Las facturas de un período se anulan juntas (ver `VoidSupportInvoiceUseCase`) — el diálogo tiene que nombrarlas todas.
+  const invoicesToVoid = useMemo(
+    () => (invoiceToVoid ? sortedInvoices.filter((i) => i.periodKey === invoiceToVoid.periodKey) : []),
+    [invoiceToVoid, sortedInvoices],
   );
   const { pageItems: pagedInvoices, pagination: invoicesPagination } = usePaginatedItems(sortedInvoices);
 
@@ -340,35 +345,43 @@ export function SupportPlanDetailPage() {
 
       <MarkSupportInvoicePaidDialog
         open={payAction !== null}
-        folio={payAction?.invoice.folio ?? ''}
+        invoices={payAction ? [{ id: payAction.invoice.id, folio: payAction.invoice.folio }] : []}
         onClose={() => setPayAction(null)}
-        onConfirm={async (input) => {
-          if (!payAction) return;
-          await markPaid.mutateAsync({ invoiceId: payAction.invoice.id, input });
+        onConfirm={async (invoiceId, input) => {
+          await markPaid.mutateAsync({ invoiceId, input });
           toast.success('Se registró el pago.');
         }}
       />
       <ConfirmActionDialog
         open={invoiceToVoid !== null}
-        title="Anular factura"
+        title={invoicesToVoid.length > 1 ? 'Anular facturas del período' : 'Anular factura'}
         description={
           invoiceToVoid
-            ? `Se anulará el folio ${invoiceToVoid.folio} (${invoiceToVoid.periodKey} · ${formatMoney(invoiceToVoid.amountUf, invoiceToVoid.currency)}). El mes vuelve a quedar "Por facturar" para registrarlo de nuevo con el monto correcto.`
+            ? invoicesToVoid.length > 1
+              ? `El total de ${invoiceToVoid.periodKey} se dividió en ${invoicesToVoid.length} facturas y se anulan todas juntas: folios ${invoicesToVoid.map((i) => i.folio).join(', ')} (${formatMoney(invoicesToVoid.reduce((total, i) => total + i.amountUf, 0), invoiceToVoid.currency)}). El mes vuelve a quedar "Por facturar" para registrarlo de nuevo con el monto correcto.`
+              : `Se anulará el folio ${invoiceToVoid.folio} (${invoiceToVoid.periodKey} · ${formatMoney(invoiceToVoid.amountUf, invoiceToVoid.currency)}). El mes vuelve a quedar "Por facturar" para registrarlo de nuevo con el monto correcto.`
             : ''
         }
-        warning="Kora no emite la factura: anula también el documento en el sistema de facturación."
-        confirmLabel="Anular factura"
+        warning={
+          invoicesToVoid.length > 1
+            ? 'Kora no emite las facturas: anula también cada documento en el sistema de facturación.'
+            : 'Kora no emite la factura: anula también el documento en el sistema de facturación.'
+        }
+        confirmLabel={invoicesToVoid.length > 1 ? 'Anular facturas' : 'Anular factura'}
         destructive
         onConfirm={async () => {
           if (!invoiceToVoid) return;
+          const folios = invoicesToVoid.map((i) => i.folio);
           await voidInvoice.mutateAsync(invoiceToVoid.id);
-          toast.success(`Se anuló el folio ${invoiceToVoid.folio}.`);
+          toast.success(folios.length > 1 ? `Se anularon los folios ${folios.join(', ')}.` : `Se anuló el folio ${invoiceToVoid.folio}.`);
         }}
         onClose={() => setInvoiceToVoid(null)}
       />
       <IssueSupportInvoiceDialog
         open={issuePeriod !== null}
         description={issuePeriod ? `${formatPeriodMonth(issuePeriod.periodKey)} · ${formatMoney(issuePeriod.amountUf, plan.currency)}` : ''}
+        totalAmount={issuePeriod?.amountUf ?? 0}
+        currency={plan.currency}
         onClose={() => setIssuePeriod(null)}
         onConfirm={async (input) => {
           if (!issuePeriod?.monthlyPeriodId) return;

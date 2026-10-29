@@ -34,8 +34,8 @@ export const supportPlanApi = {
   close(planId: string, input: CloseSupportPlanInput): Promise<void> {
     return api.patch<void>(`/support-plans/${planId}/close`, input);
   },
-  issueInvoice(planId: string, input: MarkSupportInvoiceIssuedInput): Promise<{ id: string }> {
-    return api.post<{ id: string }>(`/support-plans/${planId}/invoices`, input);
+  issueInvoice(planId: string, input: MarkSupportInvoiceIssuedInput): Promise<{ ids: string[] }> {
+    return api.post<{ ids: string[] }>(`/support-plans/${planId}/invoices`, input);
   },
   markInvoicePaid(invoiceId: string, input: MarkSupportInvoicePaidInput): Promise<void> {
     return api.patch<void>(`/support-invoices/${invoiceId}/paid`, input);

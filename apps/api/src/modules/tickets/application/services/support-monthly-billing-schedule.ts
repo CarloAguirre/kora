@@ -1,14 +1,15 @@
 import type { SupportMonthlyBillingPeriod } from '@kora/contracts';
 import type { SupportMonthlyPeriodRecord, SupportPlanRecord } from '../../domain/repositories/support-plan.repository';
 import type { SupportInvoiceRecord } from '../../domain/repositories/support-invoice.repository';
-import { monthlyPeriodCharge, unbilledMonthlyOverageHours } from './support-billing-calculator';
+import { invoicesOfMonthlyPeriod, monthlyPeriodCharge, unbilledMonthlyOverageHours } from './support-billing-calculator';
+import { sumInvoiceAmounts, toInvoiceRefs } from './support-invoice-payment-status';
 
 /** Tope de meses futuros proyectados — un contrato sin fecha de término solo proyecta el próximo. */
 const MAX_PROJECTED_PERIODS = 120;
 
 /**
  * Calendario de facturación de un contrato `monthly` para su ficha: cada mes
- * del contrato con su factura (si la tiene), o con lo que corresponde cobrar.
+ * del contrato con sus facturas (si las tiene), o con lo que corresponde cobrar.
  *
  * - Los períodos que ya existen (`support_monthly_periods`) salen tal cual:
  *   el vigente y los cerrados sin factura quedan `to_invoice` — se pueden
@@ -35,7 +36,7 @@ export function buildMonthlyBillingSchedule(
 
   const schedule = chain.map((period): SupportMonthlyBillingPeriod => {
     const periodKey = periodKeyOf(period.startDate);
-    const invoice = invoices.find((item) => item.monthlyPeriodId === period.id) ?? invoices.find((item) => item.periodKey === periodKey);
+    const periodInvoices = invoicesOfMonthlyPeriod(invoices, period);
     const hasStarted = period.startDate.getTime() <= today.getTime();
     return {
       monthlyPeriodId: period.id,
@@ -43,13 +44,13 @@ export function buildMonthlyBillingSchedule(
       startDate: toIsoDate(period.startDate),
       endDate: toIsoDate(period.endDate),
       isCurrent: period.status === 'active' && hasStarted && today.getTime() < period.endDate.getTime(),
-      status: invoice ? 'invoiced' : hasStarted ? 'to_invoice' : 'upcoming',
+      status: periodInvoices.length > 0 ? 'invoiced' : hasStarted ? 'to_invoice' : 'upcoming',
       // Mismo monto que cobraría `SupportBillingCalculator`: cuota + excedente aún no facturado.
-      amountUf: invoice
-        ? invoice.amountUf
-        : round2(period.contractedHours * plan.planValueUf + unbilledMonthlyOverageHours(plan, chain, invoices, period) * plan.extraHourValueUf),
-      invoiceId: invoice?.id ?? null,
-      folio: invoice?.folio ?? null,
+      amountUf:
+        periodInvoices.length > 0
+          ? sumInvoiceAmounts(periodInvoices)
+          : round2(period.contractedHours * plan.planValueUf + unbilledMonthlyOverageHours(plan, chain, invoices, period) * plan.extraHourValueUf),
+      invoices: toInvoiceRefs(periodInvoices, now),
     };
   });
 
@@ -62,19 +63,19 @@ export function buildMonthlyBillingSchedule(
   for (let projected = 0; projected < maxProjected && inForce(nextStart); projected += 1) {
     const endDate = addMonthsUtc(nextStart, 1);
     const periodKey = periodKeyOf(nextStart);
-    const invoice = invoices.find((item) => item.periodKey === periodKey);
+    const periodInvoices = invoices.filter((item) => item.periodKey === periodKey);
     schedule.push({
       monthlyPeriodId: null,
       periodKey,
       startDate: toIsoDate(nextStart),
       endDate: toIsoDate(endDate),
       isCurrent: false,
-      status: invoice ? 'invoiced' : 'upcoming',
-      amountUf: invoice
-        ? invoice.amountUf
-        : monthlyPeriodCharge(plan, { contractedHours: plan.contractedHours, reusedBalanceHours: 0, consumedHoursPeriod: 0 }).amountUf,
-      invoiceId: invoice?.id ?? null,
-      folio: invoice?.folio ?? null,
+      status: periodInvoices.length > 0 ? 'invoiced' : 'upcoming',
+      amountUf:
+        periodInvoices.length > 0
+          ? sumInvoiceAmounts(periodInvoices)
+          : monthlyPeriodCharge(plan, { contractedHours: plan.contractedHours, reusedBalanceHours: 0, consumedHoursPeriod: 0 }).amountUf,
+      invoices: toInvoiceRefs(periodInvoices, now),
     });
     nextStart = endDate;
   }

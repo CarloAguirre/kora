@@ -1,0 +1,169 @@
+/* ── Una sola factura ─────────────────────────────────────────────────── */
+
+.single {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-4);
+  width: 100%;
+}
+
+/* Folio y fecha lado a lado si hay espacio (diálogo); apilados en la tarjeta angosta de la ficha. */
+.singleRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: var(--kora-space-3);
+}
+
+.splitPrompt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kora-space-2);
+  padding: var(--kora-space-2) var(--kora-space-2) var(--kora-space-2) var(--kora-space-3);
+  border: 1px dashed var(--kora-border);
+  border-radius: var(--kora-radius-sm);
+  font-size: var(--kora-text-sm);
+  color: var(--kora-text-muted);
+}
+
+/* ── Varias facturas: una fila por factura ────────────────────────────── */
+
+.table {
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-2);
+  width: 100%;
+}
+
+.gridRow {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) 168px 120px minmax(0, 1.25fr) 32px;
+  column-gap: var(--kora-space-3);
+  align-items: center;
+}
+
+.head {
+  padding: 0 0 var(--kora-space-1);
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-medium);
+  color: var(--kora-text-muted);
+}
+
+.invoiceRow {
+  padding: var(--kora-space-2) 0;
+  border-top: 1px solid var(--kora-border-soft);
+}
+
+.index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--kora-radius-pill);
+  background: var(--kora-surface-muted);
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-semibold);
+  color: var(--kora-navy);
+}
+
+.alignRight {
+  text-align: right;
+}
+
+.amountField input {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.totalRow {
+  padding: var(--kora-space-3) 0 0;
+  border-top: 1px solid var(--kora-border);
+}
+
+.totalLabel {
+  grid-column: 1 / 4;
+  text-align: right;
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-semibold);
+  color: var(--kora-navy);
+}
+
+.totalAmount {
+  /* Alineado con el texto del input de monto, que tiene su propio padding. */
+  padding-right: var(--kora-space-3);
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-bold);
+  color: var(--kora-navy);
+  font-variant-numeric: tabular-nums;
+}
+
+.totalStatus {
+  grid-column: 5 / 7;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kora-space-1);
+  justify-self: start;
+  padding: 2px var(--kora-space-2);
+  border-radius: var(--kora-radius-pill);
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-semibold);
+}
+
+.statusOk {
+  background: var(--kora-success-surface);
+  color: var(--kora-success-text);
+}
+
+.statusPending {
+  background: var(--kora-danger-surface-soft);
+  color: var(--kora-danger-hover);
+}
+
+.addButton {
+  align-self: flex-start;
+}
+
+/* ── Angosto: cada factura en dos/tres líneas, sin encabezado ─────────── */
+
+@container (max-width: 620px) {
+  .head {
+    display: none;
+  }
+
+  .invoiceRow {
+    grid-template-columns: 24px minmax(0, 1fr) minmax(0, 1fr) 32px;
+    grid-template-areas:
+      'idx folio folio del'
+      '.   date  amount .'
+      '.   pdf   pdf    .';
+    row-gap: var(--kora-space-2);
+  }
+
+  .invoiceRow > :nth-child(1) { grid-area: idx; }
+  .invoiceRow > :nth-child(2) { grid-area: folio; }
+  .invoiceRow > :nth-child(3) { grid-area: date; }
+  .invoiceRow > :nth-child(4) { grid-area: amount; }
+  .invoiceRow > :nth-child(5) { grid-area: pdf; }
+  .invoiceRow > :nth-child(6) { grid-area: del; }
+
+  .totalRow {
+    grid-template-columns: 1fr auto;
+    row-gap: var(--kora-space-2);
+  }
+
+  .totalLabel,
+  .totalStatus {
+    grid-column: auto;
+  }
+
+  .totalLabel {
+    text-align: left;
+  }
+
+  .totalStatus {
+    grid-column: 1 / -1;
+  }
+}

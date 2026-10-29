@@ -155,14 +155,14 @@ export function SupportBillingSection() {
         if (!canManageBilling) return null;
         if (r.canInvoice) {
           return (
-            <Button variant="outline" size="sm" onClick={() => setIssueRow(r)}>
+            <Button size="sm" onClick={() => setIssueRow(r)}>
               Registrar factura
             </Button>
           );
         }
-        if (r.invoiceId && r.paymentStatus !== 'paid') {
+        if (r.invoices.some((invoice) => invoice.paymentStatus !== 'paid')) {
           return (
-            <Button variant="outline" size="sm" onClick={() => setPayRow(r)}>
+            <Button size="sm" onClick={() => setPayRow(r)}>
               Marcar como pagado
             </Button>
           );
@@ -274,6 +274,8 @@ export function SupportBillingSection() {
       <IssueSupportInvoiceDialog
         open={issueRow !== null}
         description={issueRow ? `${issueRow.planName} · ${formatMoney(issueRow.amountUf ?? 0, issueRow.currency)}` : ''}
+        totalAmount={issueRow?.amountUf ?? 0}
+        currency={issueRow?.currency ?? 'UF'}
         onClose={() => setIssueRow(null)}
         onConfirm={async (input) => {
           if (!issueRow) return;
@@ -283,11 +285,12 @@ export function SupportBillingSection() {
       />
       <MarkSupportInvoicePaidDialog
         open={payRow !== null}
-        folio={payRow?.folio ?? ''}
+        invoices={(payRow?.invoices ?? [])
+          .filter((invoice) => invoice.paymentStatus !== 'paid')
+          .map((invoice) => ({ id: invoice.id, folio: invoice.folio, amountLabel: formatMoney(invoice.amountUf, payRow!.currency) }))}
         onClose={() => setPayRow(null)}
-        onConfirm={async (input) => {
-          if (!payRow?.invoiceId) return;
-          await markPaid.mutateAsync({ invoiceId: payRow.invoiceId, input });
+        onConfirm={async (invoiceId, input) => {
+          await markPaid.mutateAsync({ invoiceId, input });
           toast.success('Se registró el pago.');
         }}
       />

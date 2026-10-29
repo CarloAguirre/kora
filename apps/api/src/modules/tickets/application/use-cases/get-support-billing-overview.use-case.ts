@@ -59,7 +59,8 @@ export class GetSupportBillingOverviewUseCase implements UseCase<GetSupportBilli
       } else if (row.billingStatus === 'invoiced') {
         const group = kpiGroupFor(row.currency);
         group.invoicedAmount += amountUf;
-        if (row.paymentStatus === 'paid') group.paidAmount += amountUf;
+        // Con el total dividido en varias facturas, cada una se paga por separado — solo suman las ya pagadas.
+        group.paidAmount += row.invoices.filter((invoice) => invoice.paymentStatus === 'paid').reduce((total, invoice) => total + invoice.amountUf, 0);
       }
     }
 

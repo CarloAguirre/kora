@@ -79,6 +79,20 @@ export class SupportInvoiceAlreadyExistsForPeriodError extends ConflictError {
   }
 }
 
+/** Al dividir el total del período en varias facturas, sus montos tienen que sumar exactamente lo que corresponde facturar. */
+export class SupportInvoiceSplitAmountMismatchError extends ValidationError {
+  constructor(expected: number, actual: number, currency: string) {
+    super(
+      `Las facturas suman ${formatAmount(actual)} ${currency}, pero el monto a facturar del período es ${formatAmount(expected)} ${currency}.`,
+      'SUPPORT_INVOICE_SPLIT_AMOUNT_MISMATCH',
+    );
+  }
+}
+
+function formatAmount(value: number): string {
+  return value.toFixed(2);
+}
+
 /** No tiene sentido registrar una factura de un contrato que no debe nada este período — evita facturas "fantasma" con monto 0. */
 export class SupportPlanNothingToInvoiceError extends ConflictError {
   constructor() {
@@ -92,9 +106,18 @@ export class SupportInvoiceAlreadyPaidError extends ConflictError {
   }
 }
 
-/** Una factura pagada ya movió dinero: anularla en Kora dejaría el pago sin respaldo. */
+/**
+ * Una factura pagada ya movió dinero: anularla en Kora dejaría el pago sin
+ * respaldo. Como las facturas de un período se anulan juntas, basta con que
+ * una de ellas esté pagada (`paidFolio`, si no es la que se pidió anular).
+ */
 export class SupportInvoicePaidCannotBeVoidedError extends ConflictError {
-  constructor() {
-    super('No se puede anular una factura que ya está pagada.', 'SUPPORT_INVOICE_PAID_CANNOT_BE_VOIDED');
+  constructor(paidFolio?: string) {
+    super(
+      paidFolio
+        ? `No se puede anular: el folio ${paidFolio} del mismo período ya está pagado, y las facturas de un período se anulan juntas.`
+        : 'No se puede anular una factura que ya está pagada.',
+      'SUPPORT_INVOICE_PAID_CANNOT_BE_VOIDED',
+    );
   }
 }

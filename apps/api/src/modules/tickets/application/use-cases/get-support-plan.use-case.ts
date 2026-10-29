@@ -110,6 +110,7 @@ export class GetSupportPlanUseCase implements UseCase<GetSupportPlanQuery, Suppo
         amountUf: invoice.amountUf,
         currency: invoice.currency,
         hoursBilled: invoice.hoursBilled,
+        position: invoice.position,
         folio: invoice.folio,
         invoicedAt: toIsoDate(invoice.invoicedAt),
         dueAt: invoice.dueAt ? toIsoDate(invoice.dueAt) : null,

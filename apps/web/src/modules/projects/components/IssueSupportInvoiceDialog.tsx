@@ -1,47 +1,47 @@
 import { useEffect, useState } from 'react';
-import type { MarkSupportInvoiceIssuedInput } from '@kora/contracts';
+import type { MarkSupportInvoiceIssuedInput, SupportPlanCurrency } from '@kora/contracts';
 import styles from './SupportPlanActionDialog.module.css';
 import { Modal } from '@/shared/components/ui/Modal';
 import { Button } from '@/shared/components/ui/Button';
-import { TextField } from '@/shared/components/ui/TextField';
-import { FileField } from '@/shared/components/ui/FileField';
 import { AlertIcon } from '@/shared/components/icons/Icons';
 import { ApiRequestError } from '@/shared/lib/api-client';
+import { SupportInvoiceSplitFields, useSupportInvoiceSplit } from './SupportInvoiceSplitFields';
 
 export interface IssueSupportInvoiceDialogProps {
   open: boolean;
   /** Ej. "Octubre 2026 · USD 250,00" — qué mes se está facturando. */
   description: string;
+  /** Monto a facturar del período — al dividirlo, las facturas tienen que sumar exactamente esto. */
+  totalAmount: number;
+  currency: SupportPlanCurrency;
   onClose: () => void;
   onConfirm: (input: Omit<MarkSupportInvoiceIssuedInput, 'monthlyPeriodId'>) => Promise<void>;
 }
 
-/** Registrar la factura de un mes puntual del calendario de un contrato mensual — mismos campos que el formulario de `SupportPlanBillingAction`. */
-export function IssueSupportInvoiceDialog({ open, description, onClose, onConfirm }: IssueSupportInvoiceDialogProps) {
-  const [folio, setFolio] = useState('');
-  const [invoicedAt, setInvoicedAt] = useState('');
-  const [attachmentName, setAttachmentName] = useState<string | null>(null);
+/** Registrar la(s) factura(s) de un período — mismos campos que el formulario de `SupportPlanBillingAction`. */
+export function IssueSupportInvoiceDialog({ open, description, totalAmount, currency, onClose, onConfirm }: IssueSupportInvoiceDialogProps) {
+  const split = useSupportInvoiceSplit(totalAmount);
+  const { reset } = split;
   const [error, setError] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
 
   useEffect(() => {
     if (open) {
-      setFolio('');
-      setInvoicedAt(new Date().toISOString().slice(0, 10));
-      setAttachmentName(null);
+      reset();
       setError(null);
     }
-  }, [open]);
+  }, [open, reset]);
 
   const handleConfirm = async () => {
-    if (!folio.trim() || !invoicedAt) {
-      setError('Ingresa el folio y la fecha de emisión.');
+    const problem = split.validate();
+    if (problem) {
+      setError(problem);
       return;
     }
     setError(null);
     setRunning(true);
     try {
-      await onConfirm({ folio: folio.trim(), invoicedAt, attachmentName: attachmentName ?? undefined });
+      await onConfirm({ invoices: split.toInput() });
       onClose();
     } catch (caught) {
       setError(caught instanceof ApiRequestError ? caught.message : 'No se pudo registrar la factura. Inténtalo de nuevo.');
@@ -53,9 +53,10 @@ export function IssueSupportInvoiceDialog({ open, description, onClose, onConfir
   return (
     <Modal
       open={open}
-      title="Registrar factura"
+      title={split.isSplit ? 'Registrar facturas' : 'Registrar factura'}
       description={description}
       onClose={onClose}
+      wide={split.isSplit}
       dismissible={!running}
       footer={
         <>
@@ -68,15 +69,7 @@ export function IssueSupportInvoiceDialog({ open, description, onClose, onConfir
         </>
       }
     >
-      <div className={styles.field}>
-        <TextField label="N° de documento (folio)" placeholder="Ej: 27846" value={folio} onChange={(e) => setFolio(e.target.value)} autoFocus />
-      </div>
-      <div className={styles.field}>
-        <TextField label="Fecha de emisión" type="date" value={invoicedAt} onChange={(e) => setInvoicedAt(e.target.value)} />
-      </div>
-      <div className={styles.field}>
-        <FileField label="Adjuntar PDF (opcional)" fileName={attachmentName} onChange={setAttachmentName} accept="application/pdf" />
-      </div>
+      <SupportInvoiceSplitFields split={split} currency={currency} disabled={running} />
 
       {error && (
         <div className={styles.alert} role="alert">

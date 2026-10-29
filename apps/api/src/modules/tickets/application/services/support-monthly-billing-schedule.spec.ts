@@ -39,7 +39,7 @@ function period(overrides: Partial<SupportMonthlyPeriodRecord> = {}): SupportMon
 }
 
 const invoice = (overrides: Partial<SupportInvoiceRecord> = {}) =>
-  ({ id: 'inv-1', planId: 'plan-1', periodKey: '2026-10', amountUf: 250, folio: '27846', monthlyPeriodId: 'period-oct', ...overrides }) as SupportInvoiceRecord;
+  ({ id: 'inv-1', planId: 'plan-1', periodKey: '2026-10', amountUf: 250, position: 0, folio: '27846', monthlyPeriodId: 'period-oct', paidAt: null, dueAt: null, ...overrides }) as SupportInvoiceRecord;
 
 describe('buildMonthlyBillingSchedule', () => {
   it('lista el mes vigente y proyecta los meses que faltan hasta el término del contrato', () => {
@@ -54,7 +54,18 @@ describe('buildMonthlyBillingSchedule', () => {
 
   it('muestra el monto congelado y el folio de la factura ya registrada', () => {
     const schedule = buildMonthlyBillingSchedule(plan(), [period()], [invoice({ amountUf: 240 })], utc('2026-10-29'));
-    expect(schedule[0]).toMatchObject({ status: 'invoiced', amountUf: 240, invoiceId: 'inv-1', folio: '27846' });
+    expect(schedule[0]).toMatchObject({ status: 'invoiced', amountUf: 240, invoices: [{ id: 'inv-1', folio: '27846', amountUf: 240 }] });
+  });
+
+  it('con el total dividido en varias facturas, suma sus montos y lista sus folios en orden', () => {
+    const schedule = buildMonthlyBillingSchedule(
+      plan(),
+      [period()],
+      [invoice({ id: 'inv-2', folio: '27847', amountUf: 34.81, position: 1 }), invoice({ amountUf: 100 })],
+      utc('2026-10-29'),
+    );
+    expect(schedule[0]).toMatchObject({ status: 'invoiced', amountUf: 134.81 });
+    expect(schedule[0]!.invoices.map((item) => item.folio)).toEqual(['27846', '27847']);
   });
 
   it('un mes que se cerró sin factura queda por facturar', () => {

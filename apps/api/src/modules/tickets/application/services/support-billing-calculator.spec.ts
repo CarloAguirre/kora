@@ -185,6 +185,7 @@ describe('SupportBillingCalculator — monthly', () => {
     amountUf: 0,
     currency: 'UF',
     hoursBilled: null,
+    position: 0,
     folio: '1',
     invoicedAt: new Date('2026-01-01T00:00:00Z'),
     dueAt: null,
@@ -289,6 +290,19 @@ describe('SupportBillingCalculator — monthly', () => {
     const plan = basePlan({ planType: 'monthly', planValueUf: 0.6, extraHourValueUf: 0.5, surplusPolicy: 'expire' });
     const result = await calculator.calculate(plan, [], TODAY);
     // Agosto (4) + septiembre (2) = 6 HH × 0,5 = 3 sobre la cuota de 12.
+    expect(result).toEqual({ amountUf: 15, hoursBilled: 6, periodKey: '2026-09', monthlyPeriodId: 'period-1' });
+  });
+
+  it('un mes con el total dividido en varias facturas descuenta las horas de todas ellas', async () => {
+    const july = period({ id: 'p-jul', startDate: new Date('2026-07-01T00:00:00Z'), endDate: new Date('2026-08-01T00:00:00Z'), status: 'expired', consumedHoursPeriod: 25 });
+    const august = period({ id: 'p-ago', startDate: new Date('2026-08-01T00:00:00Z'), endDate: new Date('2026-09-01T00:00:00Z'), status: 'expired', consumedHoursPeriod: 24 });
+    const calculator = buildCalculator(0, [july, august, period({ consumedHoursPeriod: 22 })], 0, 0, [
+      invoice({ monthlyPeriodId: 'p-jul', hoursBilled: null }),
+      invoice({ id: 'ago-1', monthlyPeriodId: 'p-ago', hoursBilled: 5, position: 0 }),
+      invoice({ id: 'ago-2', monthlyPeriodId: 'p-ago', hoursBilled: null, position: 1 }),
+    ]);
+    const plan = basePlan({ planType: 'monthly', planValueUf: 0.6, extraHourValueUf: 0.5, surplusPolicy: 'expire' });
+    const result = await calculator.calculate(plan, [], TODAY);
     expect(result).toEqual({ amountUf: 15, hoursBilled: 6, periodKey: '2026-09', monthlyPeriodId: 'period-1' });
   });
 
