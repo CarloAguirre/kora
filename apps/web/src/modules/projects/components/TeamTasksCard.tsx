@@ -342,6 +342,10 @@ export function TeamTasksCard({ project, projectId, teamId }: TeamTasksCardProps
                 onSelect: () => setReassignTarget({ moduleId: task.moduleId, taskId: task.id }),
               },
             ];
+    // Mismo criterio que el clic en el nombre: una tarea en revisión se resuelve con Aprobar/Rechazar.
+    if (task.status !== 'in_review') {
+      items.unshift({ key: 'editar', label: 'Editar', onSelect: () => openEditTaskModal(task.moduleId, task) });
+    }
     items.push({
       key: 'eliminar',
       label: 'Eliminar',
