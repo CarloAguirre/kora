@@ -240,7 +240,8 @@ export function AnalysisEvidenceCard({
               <tbody>{analysis.dailyPlan.slice(0, 250).map((day, index) => (
                 <tr key={day.activityId + '-' + day.workingDay + '-' + day.role + '-' + index}>
                   <td>{day.workingDay}</td><td>{day.trancheId}</td>
-                  <td>{day.activityId} · {day.description}</td><td>{day.role}</td>
+                  <td><strong>{day.wbs ?? day.activityId}</strong> · {day.description}
+                    {day.wbs && <small>Referencia interna: {day.activityId}</small>}</td><td>{day.role}</td>
                   <td className={styles.right}>{formatHours(day.hours)}</td>
                 </tr>
               ))}</tbody>

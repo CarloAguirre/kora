@@ -59,7 +59,8 @@ export const estimationAnalysisArtifactSchema = z.object({
   }).passthrough()).min(1).max(1000),
   dailyPlan: z.array(z.object({
     workingDay: z.number().int().min(1), trancheId: z.string(), role: z.string(),
-    activityId: z.string(), description: z.string(), hours: z.number().min(0),
+    activityId: z.string(), wbs: z.string().min(1).optional(),
+    description: z.string(), hours: z.number().min(0),
   }).passthrough()).max(5000),
   weeklyPlan: z.array(z.object({
     week: z.string(), hoursByRole: hoursByRoleSchema,
@@ -130,6 +131,62 @@ export const estimationAnalysisArtifactSchema = z.object({
   if (artifact.dailyPlan.length > 0 &&
       !approx(sum(artifact.dailyPlan.map((row) => row.hours)), artifact.summary.baseHours)) {
     ctx.addIssue({ code: 'custom', message: 'Plan diario no concuerda con HH base.', path: ['dailyPlan'] });
+  }
+
+  // Las sumas globales pueden cerrar mientras las HH están mal asignadas a
+  // actividades: conciliar cada WBS contra el plan diario cuando trae el campo.
+  if (artifact.dailyPlan.some((row) => row.wbs)) {
+    const byWbs = new Map(artifact.activities.map((row) => [row.wbs, row]));
+    const dayHours = new Map<string, number>();
+    for (const row of artifact.dailyPlan) {
+      const activity = row.wbs ? byWbs.get(row.wbs) : undefined;
+      if (!row.wbs || !activity || row.trancheId !== activity.trancheId ||
+          !roleSet.has(row.role)) {
+        ctx.addIssue({ code: 'custom',
+          message: 'Plan diario con WBS, tramo o perfil inexistente.',
+          path: ['dailyPlan'] });
+        continue;
+      }
+      dayHours.set(row.wbs, (dayHours.get(row.wbs) ?? 0) + row.hours);
+    }
+    for (const activity of artifact.activities) {
+      if (!approx(dayHours.get(activity.wbs) ?? 0, activity.totalHours)) {
+        ctx.addIssue({ code: 'custom',
+          message: 'Plan diario y actividades WBS no concuerdan en HH.',
+          path: ['dailyPlan'] });
+        break;
+      }
+    }
+  }
+
+  if (artifact.weeklyPlan.length > 0 &&
+      !approx(sum(artifact.weeklyPlan.flatMap((week) => Object.values(week.hoursByRole))),
+        artifact.summary.baseHours)) {
+    ctx.addIssue({ code: 'custom',
+      message: 'Plan semanal y HH base no concuerdan.', path: ['weeklyPlan'] });
+  }
+
+  const requirementIds = new Set(artifact.sourceRequirements.map((row) => row.id));
+  for (const activity of artifact.activities) {
+    if (activity.requirementIds.some((id) => !requirementIds.has(id))) {
+      ctx.addIssue({ code: 'custom', message: 'Referencia a requisito inexistente.',
+        path: ['activities'] });
+    }
+  }
+  for (const story of artifact.userStories) {
+    if (story.requirementIds.some((id) => !requirementIds.has(id))) {
+      ctx.addIssue({ code: 'custom', message: 'Historia con requisito inexistente.',
+        path: ['userStories'] });
+    }
+  }
+
+  for (const module of artifact.modules) {
+    const activities = artifact.activities.filter((item) => item.module === module.name);
+    if (activities.length !== module.activityCount ||
+        !approx(sum(activities.map((item) => item.totalHours)), module.totalHours)) {
+      ctx.addIssue({ code: 'custom', message: 'Módulo y actividades EDT no concuerdan.',
+        path: ['modules'] });
+    }
   }
 });
 export type EstimationAnalysisArtifact = z.infer<typeof estimationAnalysisArtifactSchema>;
