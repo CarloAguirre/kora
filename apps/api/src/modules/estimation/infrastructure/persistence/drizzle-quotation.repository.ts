@@ -1,5 +1,6 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { projectAnalysisToQuotationDraft } from '../../domain/project-analysis-to-quotation';
+import { reconcileQuotationAnalysis } from '../../domain/quotation-analysis-integrity';
 import { and, asc, desc, eq, inArray, isNull, projectQuotations, projects, quotationEvents, quotationVersions, sql, teams, type Database } from '@kora/db';
 import {
   quotationDraftDataSchema,
@@ -120,9 +121,22 @@ export class DrizzleQuotationRepository implements QuotationRepository {
     const [quotation] = await this.db.select({ id: projectQuotations.id }).from(projectQuotations)
       .where(eq(projectQuotations.projectId, projectId)).limit(1);
     if (!quotation) return null;
-    const totals = calculateQuotation(input.draft, input.hourlyRate, input.tax);
     return this.db.transaction(async (tx) => {
-      const teamIds = input.draft.teams.map((team) => team.teamId);
+      const [currentRow] = await tx.select({
+        draft: quotationVersions.draft,
+        status: quotationVersions.status,
+        revision: quotationVersions.revision,
+      }).from(quotationVersions).where(and(
+        eq(quotationVersions.id, versionId),
+        eq(quotationVersions.quotationId, quotation.id),
+      )).limit(1);
+      if (!currentRow || currentRow.status !== 'draft' || currentRow.revision !== input.revision) {
+        return null;
+      }
+      const savedDraft = quotationDraftDataSchema.parse(currentRow.draft);
+      const draft = reconcileQuotationAnalysis(savedDraft, input.draft);
+      const totals = calculateQuotation(draft, input.hourlyRate, input.tax);
+      const teamIds = draft.teams.map((team) => team.teamId);
       if (teamIds.length > 0) {
         const available = await tx.select({ id: teams.id }).from(teams)
           .where(and(inArray(teams.id, teamIds), eq(teams.isActive, true), isNull(teams.deletedAt)));
@@ -135,7 +149,7 @@ export class DrizzleQuotationRepository implements QuotationRepository {
         hourlyRate: input.hourlyRate?.toFixed(4) ?? null,
         currency: input.currency,
         tax: input.tax,
-        draft: input.draft,
+        draft,
         totalHours: totals.totalHours.toFixed(2),
         netAmount: totals.netAmount?.toFixed(4) ?? null,
         totalAmount: totals.totalAmount?.toFixed(4) ?? null,
