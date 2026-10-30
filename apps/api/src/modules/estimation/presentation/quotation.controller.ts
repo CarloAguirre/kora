@@ -1,7 +1,7 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post } from '@nestjs/common';
 import {
-  createQuotationVersionSchema, updateQuotationDraftSchema, quotationReconciliationReviewSchema,
-  type CreateQuotationVersionInput, type ProjectQuotation, type QuotationVersion, type UpdateQuotationDraftInput, type QuotationTransferPreview, type QuotationReconciliationReview, type SavedQuotationReconciliationReview,
+  createQuotationVersionSchema, updateQuotationDraftSchema, quotationReconciliationReviewSchema, assessQuotationReconciliationSchema,
+  type CreateQuotationVersionInput, type ProjectQuotation, type QuotationVersion, type UpdateQuotationDraftInput, type QuotationTransferPreview, type QuotationReconciliationReview, type SavedQuotationReconciliationReview, type AssessQuotationReconciliationInput, type SavedQuotationReviewAssessment,
 } from '@kora/contracts';
 import { CurrentUser, type RequestUser } from '../../../shared/presentation/decorators/current-user.decorator';
 import { RequireAnyPermission } from '../../../shared/presentation/decorators/require-permissions.decorator';
@@ -52,6 +52,28 @@ export class QuotationController {
     @CurrentUser() actor: RequestUser,
   ): Promise<SavedQuotationReconciliationReview> {
     return this.drafts.saveReconciliationReview(projectId, versionId, actor, review);
+  }
+
+  @Get('versions/:versionId/reconciliation-assessments')
+  @RequireAnyPermission('projects:manage', 'projects:read_assigned')
+  listReconciliationAssessments(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('versionId', ParseUUIDPipe) versionId: string,
+    @CurrentUser() actor: RequestUser,
+  ): Promise<SavedQuotationReviewAssessment[]> {
+    return this.drafts.listReconciliationAssessments(projectId, versionId, actor);
+  }
+
+  @Post('versions/:versionId/reconciliation-assessments')
+  @HttpCode(HttpStatus.CREATED)
+  @RequireAnyPermission('projects:manage')
+  assessReconciliationReview(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('versionId', ParseUUIDPipe) versionId: string,
+    @Body(new ZodValidationPipe(assessQuotationReconciliationSchema)) input: AssessQuotationReconciliationInput,
+    @CurrentUser() actor: RequestUser,
+  ): Promise<SavedQuotationReviewAssessment> {
+    return this.drafts.assessReconciliationReview(projectId, versionId, actor, input);
   }
 
   @Post('versions')
