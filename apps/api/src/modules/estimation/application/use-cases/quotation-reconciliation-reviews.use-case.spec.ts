@@ -268,9 +268,6 @@ describe('R3-e — evaluación técnica sin aprobación comercial', () => {
 
   it('solicitar cambios es válido para actas incompletas; revisada para discusión no', async () => {
     const { useCase, repo } = setup();
-    const pending = saved();
-    pending.review.moduleDecisions[0]!.decision = 'pending';
-    pending.review.moduleDecisions[0]!.targetModuleId = null;
     // Con un acta incompleta CANÓNICA, la evaluación técnica solicita cambios.
     const preview = buildQuotationTransferPreview(version, operational, '2026-10-30T18:00:00.000Z');
     const incompleteReview = buildReconciliationReview(preview, {
