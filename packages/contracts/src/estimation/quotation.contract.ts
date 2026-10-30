@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { estimationAnalysisArtifactSchema } from './analysis-artifact.contract';
 import { isoDateTimeSchema, nonEmptyTrimmed, uuidSchema } from '../common/primitives';
 
 /**
@@ -75,6 +76,9 @@ export const quotationDraftDataSchema = z.object({
   exclusions: z.array(z.string().trim().max(2000)).max(100).default([]),
   sourceRefs: z.array(z.string().trim().max(1000)).max(100).default([]),
   answers: z.record(z.string(), z.unknown()).default({}),
+  /** Snapshot de evidencia de IA o simulación. Nunca se descarta al editar HH. */
+  analysis: estimationAnalysisArtifactSchema.nullish(),
+  analysisProjectionStatus: z.enum(['synced', 'modified']).optional(),
 }).superRefine((data, ctx) => {
   const teamIds = data.teams.map((team) => team.teamId);
   if (new Set(teamIds).size !== teamIds.length) {
@@ -94,6 +98,12 @@ export type QuotationDraftData = z.infer<typeof quotationDraftDataSchema>;
 
 export const createQuotationVersionSchema = z.object({
   sourceVersionId: uuidSchema.optional(),
+  simulation: z.object({
+    analysis: estimationAnalysisArtifactSchema,
+    roleTeamIds: z.record(z.string(), uuidSchema),
+  }).optional(),
+}).refine((value) => !value.sourceVersionId || !value.simulation, {
+  message: 'No se puede copiar y simular una versión simultáneamente.',
 });
 export type CreateQuotationVersionInput = z.infer<typeof createQuotationVersionSchema>;
 
