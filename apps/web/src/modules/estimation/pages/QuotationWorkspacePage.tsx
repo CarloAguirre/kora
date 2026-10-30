@@ -9,6 +9,7 @@ import { Card } from '@/shared/components/ui/Card';
 import { Select } from '@/shared/components/ui/Select';
 import { TextField } from '@/shared/components/ui/TextField';
 import { useCreateQuotationVersion, useProjectQuotation, useSaveQuotationDraft } from '../api/quotation.queries';
+import { AnalysisEvidenceCard } from '../components/AnalysisEvidenceCard';
 import styles from './QuotationWorkspacePage.module.css';
 
 type Form = Pick<UpdateQuotationDraftInput, 'name' | 'hourlyRate' | 'currency' | 'tax' | 'draft'>;
@@ -324,6 +325,13 @@ export function QuotationWorkspacePage() {
 
               {selected && form && (
                 <>
+                  {form.draft.analysis && (
+                    <AnalysisEvidenceCard
+                      analysis={form.draft.analysis}
+                      projectionStatus={form.draft.analysisProjectionStatus}
+                      versionLabel={`v${selected.versionNumber}`}
+                    />
+                  )}
                   <Card>
                     <div className={styles.cardTitle}>
                       <div><span className={styles.eyebrow}>v{selected.versionNumber} · {selected.origin}</span><h2>Datos generales</h2></div>
