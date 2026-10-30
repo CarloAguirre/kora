@@ -1,18 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { quotationTransferPreviewSchema } from '@kora/contracts';
+import { buildReconciliationReview, emptyReconciliationChoices, quotationTransferPreviewSchema } from '@kora/contracts';
 import { QuotationReconciliationReviewCard } from './QuotationReconciliationReviewCard';
 
-const mocks = vi.hoisted(() => ({ save: vi.fn() }));
+const mocks = vi.hoisted(() => ({ save: vi.fn(), assess: vi.fn(), history: [] as unknown[], assessments: [] as unknown[] }));
 vi.mock('../api/quotation.queries', () => ({
   useQuotationReconciliationReviews: vi.fn(() => ({
-    data: [], isLoading: false, isError: false,
+    data: mocks.history, isLoading: false, isError: false,
   })),
   useQuotationReconciliationAssessments: vi.fn(() => ({
-    data: [], isLoading: false, isError: false,
+    data: mocks.assessments, isLoading: false, isError: false,
   })),
   useAssessQuotationReconciliation: vi.fn(() => ({
-    isPending: false, mutateAsync: vi.fn(),
+    isPending: false, mutateAsync: mocks.assess,
   })),
   useSaveQuotationReconciliationReview: vi.fn(() => ({
     isPending: false, mutateAsync: mocks.save,
@@ -59,6 +59,13 @@ const preview = quotationTransferPreviewSchema.parse({
 });
 
 beforeEach(() => {
+  mocks.history = [];
+  mocks.assessments = [];
+  mocks.assess.mockReset().mockImplementation(async (input: { decision: string }) => ({
+    id: '0777e456-fd76-445e-83f1-afc25061c108',
+    decision: input.decision,
+    status: 'technical_review_only', transferEnabled: false,
+  }));
   mocks.save.mockReset().mockImplementation(async (review: unknown) => ({
     id: '0777e456-fd76-445e-83f1-afc25061c104',
     actorUserId: '0777e456-fd76-445e-83f1-afc25061c105',
@@ -87,4 +94,44 @@ describe('QuotationReconciliationReviewCard — persistencia de borradores', () 
     expect(screen.getByRole('button', { name: 'Exportar acta JSON de revisión' })).toBeEnabled();
     expect(mocks.save).not.toHaveBeenCalled();
   });
+  it('registra una evaluación técnica de la última acta con fundamento', async () => {
+    const saved = {
+      id: '0777e456-fd76-445e-83f1-afc25061c106',
+      actorUserId: '0777e456-fd76-445e-83f1-afc25061c107',
+      occurredAt: '2026-10-30T18:06:00.000Z',
+      review: buildReconciliationReview(preview, emptyReconciliationChoices(),
+        '2026-10-30T18:05:00.000Z'),
+    };
+    mocks.history = [saved];
+    render(<QuotationReconciliationReviewCard preview={preview}
+      canAssess currentUserId="0777e456-fd76-445e-83f1-afc25061c109" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Preparar acta' }));
+    expect(screen.getByRole('button', { name: 'Registrar evaluación técnica' })).toBeDisabled();
+    fireEvent.change(screen.getByPlaceholderText(/Documenta qué verificaste/), {
+      target: { value: 'Debemos resolver las actividades WBS pendientes.' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar evaluación técnica' }));
+    await waitFor(() => expect(mocks.assess).toHaveBeenCalledTimes(1));
+    expect(mocks.assess.mock.calls[0]?.[0]).toMatchObject({
+      reviewId: saved.id, versionRevision: 3, decision: 'changes_requested',
+    });
+    await waitFor(() => expect(screen.getByText(/Se registraron observaciones técnicas/)).toBeInTheDocument());
+  });
+
+  it('no permite evaluar la propia acta ni muestra aprobación contractual', () => {
+    const actorId = '0777e456-fd76-445e-83f1-afc25061c107';
+    mocks.history = [{
+      id: '0777e456-fd76-445e-83f1-afc25061c106',
+      actorUserId: actorId, occurredAt: '2026-10-30T18:06:00.000Z',
+      review: buildReconciliationReview(preview, emptyReconciliationChoices(),
+        '2026-10-30T18:05:00.000Z'),
+    }];
+    render(<QuotationReconciliationReviewCard preview={preview}
+      canAssess currentUserId={actorId} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Preparar acta' }));
+    expect(screen.getByText(/No puedes evaluar un acta creada por ti mismo/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Aprobar cotización|Traspasar/i })).not.toBeInTheDocument();
+    expect(mocks.assess).not.toHaveBeenCalled();
+  });
+
 });
