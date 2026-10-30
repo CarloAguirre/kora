@@ -24,6 +24,7 @@ import {
   DailyEntryBlockFields,
   DailyEntryForm,
   isWeekend,
+  overflowByBlock,
   stepBlockHours,
   validateDailyBlock,
   type DailyBlock,
@@ -179,7 +180,8 @@ function EditEntryForm({
     .filter((e) => e.id !== entry.id && e.status !== 'rejected' && !e.isOvertime)
     .reduce((sum, e) => sum + e.hours, 0);
   const nonOvertimeTotal = otherNonOvertimeHours + (block.isOvertime ? 0 : Number(block.hours) || 0);
-  const exceedsDailyCap = nonOvertimeTotal > DAILY_CAP_HOURS;
+  /** Lo que el backend dejará como horas extra al guardar (ver `splitByDailyCap`). */
+  const autoOvertimeHours = overflowByBlock(otherNonOvertimeHours, [block.isOvertime ? 0 : Number(block.hours) || 0])[0] ?? 0;
 
   // El aprobador obligatorio depende del rol del DUEÑO, no de quien edita. Al
   // editar el registro de otro (líder/PMO desde aprobaciones) no conocemos su
@@ -190,8 +192,9 @@ function EditEntryForm({
     projects,
     isCollaborator: ownerRequiresApprover,
     overtimeAlreadyGranted: entry.isOvertime && block.projectId === entry.project?.id,
+    exceedsDailyCap: autoOvertimeHours > 0,
   };
-  const canSubmit = !blockingMessage && !exceedsDailyCap && validateDailyBlock(block, validationOptions) === null;
+  const canSubmit = !blockingMessage && validateDailyBlock(block, validationOptions) === null;
   const blockTitle = (() => {
     const project = projects.find((p) => p.id === block.projectId);
     return project ? getProjectOptionLabel(project) : block.assignment || 'Registro';
@@ -199,7 +202,7 @@ function EditEntryForm({
 
   const onSubmit = async () => {
     setServerError(null);
-    if (blockingMessage || exceedsDailyCap) return;
+    if (blockingMessage) return;
     const error = validateDailyBlock(block, validationOptions);
     setBlockError(error);
     if (error) return;
@@ -250,12 +253,13 @@ function EditEntryForm({
         onChange={(event) => setDate(event.target.value)}
       />
 
-      {!blockingMessage && exceedsDailyCap && (
-        <div className={styles.noticeWarning} role="alert">
+      {!blockingMessage && autoOvertimeHours > 0 && (
+        <div className={styles.noticeWarning} role="status">
           <AlertIcon size={16} />
           <span>
-            Superarías el límite diario de {DAILY_CAP_HOURS}h ({nonOvertimeTotal.toLocaleString('es-CL', { maximumFractionDigits: 1 })}h
-            sin horas extra ese día). Marca las horas que correspondan como "Horas Extra" para poder guardar.
+            Superas la jornada de {DAILY_CAP_HOURS}h ({nonOvertimeTotal.toLocaleString('es-CL', { maximumFractionDigits: 1 })}h
+            normales ese día): {autoOvertimeHours.toLocaleString('es-CL', { maximumFractionDigits: 2 })}h quedarán como horas
+            extra, pendientes de aprobación.
           </span>
         </div>
       )}
@@ -274,6 +278,7 @@ function EditEntryForm({
         projects={projects}
         leaders={leaders?.items ?? []}
         isCollaborator={ownerRequiresApprover}
+        exceedsDailyCap={autoOvertimeHours > 0}
         error={blockError ?? undefined}
         title={blockTitle}
         onUpdate={(patch) => setBlock((prev) => ({ ...prev, ...patch }))}

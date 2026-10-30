@@ -1,6 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { CLOCK, ForbiddenError, err, ok, type ApplicationError, type Clock, type Result } from '@kora/core';
+import { CLOCK, ForbiddenError, ID_GENERATOR, err, ok, type ApplicationError, type Clock, type IdGenerator, type Result } from '@kora/core';
 import type { RoleCode, UpdateHourEntryInput } from '@kora/contracts';
+import { HourEntry } from '../../domain/entities/hour-entry.entity';
+import { splitByDailyCap, type HoursTranche } from '../../domain/services/daily-cap';
 import {
   HourEntryNotFoundError,
   HourEntryOutsideCurrentMonthError,
@@ -34,6 +36,9 @@ export interface UpdateHourEntryCommand {
  * (incluye admin/PMO) — desde el "Historial Reciente" del líder — y sigue aprobado.
  * Salvo admin/PMO (que editan cualquier registro), solo dentro del mes en curso
  * (y sin mover el registro a otro mes).
+ *
+ * Lo que una hora normal pase de la jornada de 8h del día queda como horas
+ * extra (ver `splitByDailyCap`).
  */
 @Injectable()
 export class UpdateHourEntryUseCase implements UseCase<UpdateHourEntryCommand, void, ApplicationError> {
@@ -44,6 +49,7 @@ export class UpdateHourEntryUseCase implements UseCase<UpdateHourEntryCommand, v
     @Inject(HOUR_ENTRY_PROJECT_READER) private readonly projects: HourEntryProjectReader,
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
     @Inject(CLOCK) private readonly clock: Clock,
+    @Inject(ID_GENERATOR) private readonly ids: IdGenerator,
   ) {}
 
   async execute(command: UpdateHourEntryCommand): Promise<Result<void, ApplicationError>> {
@@ -117,9 +123,21 @@ export class UpdateHourEntryUseCase implements UseCase<UpdateHourEntryCommand, v
       }
     }
 
+    // Una hora normal que con la edición pase de la jornada de 8h del día se
+    // queda con lo que cabe; el resto pasa a un registro nuevo de horas extra
+    // (o el registro entero, si la jornada ya estaba completa) — misma regla
+    // que el alta (`CreateHourEntryUseCase`). Fuera de rango no se divide:
+    // lo rechaza `updateDetails`.
+    const hours = data.hours ?? entry.hours;
+    const date = data.date ? new Date(data.date) : entry.date;
+    const [ownTranche, overtimeTranche]: HoursTranche[] =
+      isOvertime || !(hours > 0) || hours > 24
+        ? [{ hours, isOvertime }]
+        : splitByDailyCap(hours, await this.entries.sumRegularHoursForUserAndDate(entry.userId, date, entry.id));
+
     const owner = await this.users.findById(entry.userId);
     // Horas extra siempre exigen aprobación de líder, aunque el rol del dueño no la requiera.
-    const ownerRequiresApproval = owner?.role === 'collaborator' || isOvertime;
+    const ownerRequiresApproval = owner?.role === 'collaborator' || ownTranche!.isOvertime;
 
     const result = entry.updateDetails(
       {
@@ -129,9 +147,9 @@ export class UpdateHourEntryUseCase implements UseCase<UpdateHourEntryCommand, v
         segmentId: moduleId ? (segmentId ?? null) : null,
         category: data.category,
         description: data.description,
-        hours: data.hours,
+        hours: ownTranche!.hours,
         date: data.date ? new Date(data.date) : undefined,
-        isOvertime: data.isOvertime,
+        isOvertime: ownTranche!.isOvertime,
         designatedApproverUserId: data.designatedApproverUserId === undefined ? undefined : data.designatedApproverUserId,
         hasBlocker: data.hasBlocker,
         blockerDescription: data.blockerDescription === undefined ? undefined : data.blockerDescription,
@@ -142,7 +160,32 @@ export class UpdateHourEntryUseCase implements UseCase<UpdateHourEntryCommand, v
     );
     if (result.isErr()) return err(result.error);
 
+    let overtimeEntry: HourEntry | null = null;
+    if (overtimeTranche) {
+      const updated = entry.toSnapshot();
+      const created = HourEntry.create({
+        id: this.ids.generate(),
+        userId: updated.userId,
+        projectId: updated.projectId,
+        moduleId: updated.moduleId,
+        segmentId: updated.segmentId,
+        assignment: updated.assignment ?? '',
+        category: updated.category,
+        description: updated.description,
+        hours: overtimeTranche.hours,
+        date: updated.date,
+        isOvertime: true,
+        projectStageAtEntry: updated.projectStageAtEntry,
+        designatedApproverUserId: updated.designatedApproverUserId,
+        ownerRequiresApproval: true,
+        now,
+      });
+      if (created.isErr()) return err(created.error);
+      overtimeEntry = created.value;
+    }
+
     await this.entries.save(entry);
+    if (overtimeEntry) await this.entries.save(overtimeEntry);
 
     if (entry.projectId && entry.status === 'approved') {
       const usedHours = await this.entries.sumApprovedHoursForProject(entry.projectId);
@@ -160,6 +203,15 @@ export class UpdateHourEntryUseCase implements UseCase<UpdateHourEntryCommand, v
       entityType: 'hour_entry',
       entityId: entry.id,
     });
+    if (overtimeEntry) {
+      await this.audit.record({
+        actor: { userId: actor.userId, email: actor.email },
+        action: 'create',
+        entityType: 'hour_entry',
+        entityId: overtimeEntry.id,
+        metadata: { ownerId: entry.userId, hours: overtimeEntry.hours, isOvertime: true, status: overtimeEntry.status, splitFrom: entry.id },
+      });
+    }
 
     return ok(undefined);
   }

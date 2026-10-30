@@ -6,7 +6,7 @@ import type { HourEntryRepository } from '../../domain/repositories/hour-entry.r
 import type { HourEntryProjectReader } from '../ports/hour-entry-project-reader.port';
 import type { HourEntryUserReader } from '../ports/hour-entry-user-reader.port';
 import type { HourEntryApprovalAuthorityService } from '../services/hour-entry-approval-authority.service';
-import { FixedClock, RecordingAuditRecorder } from '../../../../test/fakes';
+import { FixedClock, RecordingAuditRecorder, SequentialIdGenerator } from '../../../../test/fakes';
 
 const NOW = new Date('2026-10-21T12:00:00.000Z');
 
@@ -24,11 +24,16 @@ function buildEntry(date: string) {
   }).unwrap();
 }
 
-function buildUseCase(entry: HourEntry, statuses: Record<string, ProjectStatus>, options: { canDecide?: boolean } = {}) {
+function buildUseCase(
+  entry: HourEntry,
+  statuses: Record<string, ProjectStatus>,
+  options: { canDecide?: boolean; regularHoursForDate?: number } = {},
+) {
   const entries = {
     findById: vi.fn().mockResolvedValue(entry),
     save: vi.fn().mockResolvedValue(undefined),
     sumApprovedHoursForProject: vi.fn().mockResolvedValue(0),
+    sumRegularHoursForUserAndDate: vi.fn().mockResolvedValue(options.regularHoursForDate ?? 0),
   } as unknown as HourEntryRepository;
   const users = {
     findById: vi.fn().mockResolvedValue({ id: 'collab-1', role: 'collaborator', status: 'active' }),
@@ -43,7 +48,15 @@ function buildUseCase(entry: HourEntry, statuses: Record<string, ProjectStatus>,
     canDecide: vi.fn().mockResolvedValue(options.canDecide ?? false),
   } as unknown as HourEntryApprovalAuthorityService;
 
-  const useCase = new UpdateHourEntryUseCase(entries, authority, users, projects, new RecordingAuditRecorder(), new FixedClock(NOW));
+  const useCase = new UpdateHourEntryUseCase(
+    entries,
+    authority,
+    users,
+    projects,
+    new RecordingAuditRecorder(),
+    new FixedClock(NOW),
+    new SequentialIdGenerator(),
+  );
   return { useCase, entries };
 }
 
@@ -95,5 +108,29 @@ describe('UpdateHourEntryUseCase', () => {
 
     expect(result.isOk()).toBe(true);
     expect(entries.save).toHaveBeenCalled();
+  });
+
+  it('si con la edición el día pasa de 8h normales, el excedente queda como un registro de horas extra', async () => {
+    // Proyecto sin horas extra autorizadas: el excedente automático no la exige.
+    const { useCase, entries } = buildUseCase(buildEntry('2026-10-20'), { 'project-1': 'active' }, { regularHoursForDate: 5 });
+
+    const result = await useCase.execute({ entryId: 'entry-1', data: { hours: 6 }, actor: OWNER, actorRole: 'collaborator' });
+
+    expect(result.isOk()).toBe(true);
+    const saved = vi.mocked(entries.save).mock.calls.map(([entry]) => ({ hours: entry.hours, isOvertime: entry.isOvertime }));
+    expect(saved).toEqual([
+      { hours: 3, isOvertime: false },
+      { hours: 3, isOvertime: true },
+    ]);
+  });
+
+  it('con la jornada ya completa, el registro editado pasa entero a horas extra', async () => {
+    const { useCase, entries } = buildUseCase(buildEntry('2026-10-20'), { 'project-1': 'active' }, { regularHoursForDate: 8 });
+
+    const result = await useCase.execute({ entryId: 'entry-1', data: { hours: 2 }, actor: OWNER, actorRole: 'collaborator' });
+
+    expect(result.isOk()).toBe(true);
+    const saved = vi.mocked(entries.save).mock.calls.map(([entry]) => ({ hours: entry.hours, isOvertime: entry.isOvertime }));
+    expect(saved).toEqual([{ hours: 2, isOvertime: true }]);
   });
 });

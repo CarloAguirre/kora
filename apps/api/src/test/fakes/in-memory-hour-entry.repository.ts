@@ -128,14 +128,14 @@ export class InMemoryHourEntryRepository implements HourEntryRepository {
   ): Promise<OvertimeHoursByDayProjectAndUser[]> {
     const rows = new Map<string, OvertimeHoursByDayProjectAndUser>();
     for (const item of this.items) {
-      if (item.projectId === null || item.projectType === null || !item.isOvertime || item.status === 'rejected') continue;
+      if (!item.isOvertime || item.status === 'rejected') continue;
       if (item.date.getTime() < dateFrom.getTime() || item.date.getTime() > dateTo.getTime()) continue;
       if (scope.excludeUserId && item.userId === scope.excludeUserId) continue;
       const key = `${item.date.getTime()}:${item.projectId}:${item.userId}`;
       const existing = rows.get(key) ?? {
         date: item.date,
         projectId: item.projectId,
-        projectName: item.projectName ?? '',
+        projectName: item.projectName,
         projectType: item.projectType,
         leaderUserId: null,
         leaderFullName: null,
@@ -153,11 +153,15 @@ export class InMemoryHourEntryRepository implements HourEntryRepository {
     return [...rows.values()];
   }
 
-  async sumRegularHoursForUserAndDate(userId: string, date: Date): Promise<number> {
+  async sumRegularHoursForUserAndDate(userId: string, date: Date, excludeEntryId?: string): Promise<number> {
     return this.items
       .filter(
         (item) =>
-          item.userId === userId && item.date.getTime() === date.getTime() && !item.isOvertime && item.status !== 'rejected',
+          item.userId === userId &&
+          item.date.getTime() === date.getTime() &&
+          !item.isOvertime &&
+          item.status !== 'rejected' &&
+          item.id !== excludeEntryId,
       )
       .reduce((sum, item) => sum + item.hours, 0);
   }

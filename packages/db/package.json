@@ -34,6 +34,7 @@
     "backfill:ticket-hh-request-hour-entries": "tsx src/backfill-ticket-hh-request-hour-entries.ts",
     "backfill:support-plan-container-projects": "tsx src/backfill-support-plan-container-projects.ts",
     "backfill:support-invoice-tickets": "tsx src/backfill-support-invoice-tickets.ts",
+    "fix:daily-cap-overtime": "tsx src/fix-daily-cap-overtime.ts",
     "clean": "rimraf dist .turbo"
   },
   "dependencies": {

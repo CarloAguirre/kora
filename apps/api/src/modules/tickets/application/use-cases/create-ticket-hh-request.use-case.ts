@@ -11,33 +11,12 @@ import { TICKET_PROJECT_READER, type TicketProjectReader } from '../ports/ticket
 import { HOUR_ENTRY_REPOSITORY, type HourEntryRepository } from '../../../hours/domain/repositories/hour-entry.repository';
 import { HOUR_ENTRY_PROJECT_READER, type HourEntryProjectReader } from '../../../hours/application/ports/hour-entry-project-reader.port';
 import { buildTicketHourEntry } from '../support/build-ticket-hour-entry';
+import { splitByDailyCap, type HoursTranche } from '../../../hours/domain/services/daily-cap';
 import { AUDIT_RECORDER, type AuditRecorder } from '../../../../shared/application/ports/audit-recorder.port';
 import type { ActorContext, UseCase } from '../../../../shared/application/use-case';
 
-/** Jornada diaria — sobre este total, las horas de una solicitud de ticket se registran como horas extra. */
-const DAILY_CAP_HOURS = 8;
-
-interface HoursTranche {
-  readonly hours: number;
-  readonly isOvertime: boolean;
-}
-
 const roundHours = (value: number) => Math.round(value * 100) / 100;
 const sumHours = (tranches: readonly HoursTranche[]) => roundHours(tranches.reduce((sum, tranche) => sum + tranche.hours, 0));
-
-/**
- * Divide las horas pedidas en el tramo que aún cabe en la jornada de
- * `DAILY_CAP_HOURS` (normales) y el resto (horas extra). Devuelve uno o dos
- * tramos, nunca uno de 0h.
- */
-export function splitByDailyCap(requestedHours: number, regularHoursForDate: number): HoursTranche[] {
-  const regularHours = roundHours(Math.min(requestedHours, Math.max(0, DAILY_CAP_HOURS - regularHoursForDate)));
-  const overtimeHours = roundHours(requestedHours - regularHours);
-  const tranches: HoursTranche[] = [];
-  if (regularHours > 0) tranches.push({ hours: regularHours, isOvertime: false });
-  if (overtimeHours > 0) tranches.push({ hours: overtimeHours, isOvertime: true });
-  return tranches;
-}
 
 export interface CreateTicketHhRequestCommand {
   readonly ticketId: string;

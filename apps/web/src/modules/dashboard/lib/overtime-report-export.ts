@@ -24,8 +24,8 @@ export function exportOvertimeReport(
     ['Fecha', 'Proyecto', 'Tipo', 'Líder', 'Colaborador', 'HH Extra Aprobadas', 'HH Extra Pendientes', 'Total'],
     ...rows.map((row) => [
       formatDate(row.date),
-      row.projectName,
-      PROJECT_TYPE_LABELS[row.projectType],
+      row.projectName ?? 'Sin proyecto',
+      row.projectType ? PROJECT_TYPE_LABELS[row.projectType] : '',
       row.leaderFullName ?? 'Sin líder',
       row.userFullName,
       row.approvedHours,

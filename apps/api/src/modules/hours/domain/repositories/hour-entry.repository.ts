@@ -91,12 +91,12 @@ export interface OvertimeHoursByUser {
   readonly pendingHours: number;
 }
 
-/** Horas extra no rechazadas de un autor en un proyecto y un día, con el líder del proyecto. */
+/** Horas extra no rechazadas de un autor en un proyecto (o sin proyecto: `projectId` `null`) y un día, con el líder del proyecto. */
 export interface OvertimeHoursByDayProjectAndUser {
   readonly date: Date;
-  readonly projectId: string;
-  readonly projectName: string;
-  readonly projectType: ProjectType;
+  readonly projectId: string | null;
+  readonly projectName: string | null;
+  readonly projectType: ProjectType | null;
   readonly leaderUserId: string | null;
   readonly leaderFullName: string | null;
   readonly userId: string;
@@ -157,7 +157,8 @@ export interface HourEntryRepository {
 
   /**
    * Horas extra (no rechazadas) por día × proyecto × autor, en todos los
-   * proyectos (soporte y desarrollo) y un rango de fechas — alimenta "Horas
+   * proyectos (soporte y desarrollo) y sin proyecto (una fila por día y autor
+   * con `projectId` `null`), en un rango de fechas — alimenta "Horas
    * Extras" de Administración y la del Dashboard del líder (con `scope`).
    * Agregación en SQL, ordenado por fecha, proyecto y autor.
    */
@@ -168,8 +169,18 @@ export interface HourEntryRepository {
     context?: TransactionContext,
   ): Promise<OvertimeHoursByDayProjectAndUser[]>;
 
-  /** Horas normales (no extra) y no rechazadas que `userId` ya tiene registradas para `date` (cualquier asignación/proyecto) — decide qué parte de una solicitud de HH de ticket cabe en la jornada de 8h y cuál queda como horas extra (ver `CreateTicketHhRequestUseCase`). */
-  sumRegularHoursForUserAndDate(userId: string, date: Date, context?: TransactionContext): Promise<number>;
+  /**
+   * Horas normales (no extra) y no rechazadas que `userId` ya tiene registradas
+   * para `date` (cualquier asignación/proyecto), sin contar `excludeEntryId` (el
+   * registro que se está editando) — decide qué parte de un registro cabe en la
+   * jornada de 8h y cuál queda como horas extra (ver `splitByDailyCap`).
+   */
+  sumRegularHoursForUserAndDate(
+    userId: string,
+    date: Date,
+    excludeEntryId?: string,
+    context?: TransactionContext,
+  ): Promise<number>;
 }
 
 export const HOUR_ENTRY_REPOSITORY = Symbol('HourEntryRepository');

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CreateTicketHhRequestUseCase, splitByDailyCap } from './create-ticket-hh-request.use-case';
+import { CreateTicketHhRequestUseCase } from './create-ticket-hh-request.use-case';
 import { Ticket } from '../../domain/entities/ticket.entity';
 import type { TicketHhRequest } from '../../domain/entities/ticket-hh-request.entity';
 import type { TicketRepository } from '../../domain/repositories/ticket.repository';
@@ -79,23 +79,6 @@ function buildUseCase(options: { regularHours?: number } = {}) {
 
 const tranchesOf = (requests: StubTicketHhRequestRepository) =>
   requests.saved.map((request) => ({ hours: request.hours, isOvertime: request.isOvertime }));
-
-describe('splitByDailyCap', () => {
-  it('deja todo como horas normales mientras quepa en la jornada de 8h', () => {
-    expect(splitByDailyCap(4, 3)).toEqual([{ hours: 4, isOvertime: false }]);
-  });
-
-  it('separa el excedente de 8h como horas extra', () => {
-    expect(splitByDailyCap(4, 5)).toEqual([
-      { hours: 3, isOvertime: false },
-      { hours: 1, isOvertime: true },
-    ]);
-  });
-
-  it('marca todo como horas extra si la jornada ya está completa', () => {
-    expect(splitByDailyCap(2.5, 8)).toEqual([{ hours: 2.5, isOvertime: true }]);
-  });
-});
 
 describe('CreateTicketHhRequestUseCase — horas extra automáticas sobre 8h', () => {
   it('acepta una solicitud que por sí sola supera las 8h, separando 8h normales y el resto como horas extra', async () => {

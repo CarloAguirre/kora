@@ -361,7 +361,9 @@ export class DrizzleHourEntryRepository implements HourEntryRepository {
         pending: sql<string>`coalesce(sum(${hourEntries.hours}) filter (where ${hourEntries.status} = 'pending'), 0)`,
       })
       .from(hourEntries)
-      .innerJoin(projects, eq(projects.id, hourEntries.projectId))
+      // `leftJoin`: las horas extra sin proyecto también cuentan — Capacity
+      // excluye todas las extra, así que si no salen aquí no salen en ningún lado.
+      .leftJoin(projects, eq(projects.id, hourEntries.projectId))
       .innerJoin(users, eq(users.id, hourEntries.userId))
       .leftJoin(leaders, eq(leaders.id, projects.leaderUserId))
       .where(
@@ -403,12 +405,17 @@ export class DrizzleHourEntryRepository implements HourEntryRepository {
       .sort(
         (a, b) =>
           a.date.getTime() - b.date.getTime() ||
-          a.projectName.localeCompare(b.projectName, 'es') ||
+          (a.projectName ?? '').localeCompare(b.projectName ?? '', 'es') ||
           a.userFullName.localeCompare(b.userFullName, 'es'),
       );
   }
 
-  async sumRegularHoursForUserAndDate(userId: string, date: Date, context?: TransactionContext): Promise<number> {
+  async sumRegularHoursForUserAndDate(
+    userId: string,
+    date: Date,
+    excludeEntryId?: string,
+    context?: TransactionContext,
+  ): Promise<number> {
     const db = resolveDb(this.database, context);
     const rows = await db
       .select({ total: sql<string>`coalesce(sum(${hourEntries.hours}), 0)` })
@@ -419,6 +426,7 @@ export class DrizzleHourEntryRepository implements HourEntryRepository {
           eq(hourEntries.date, date),
           eq(hourEntries.isOvertime, false),
           ne(hourEntries.status, 'rejected'),
+          excludeEntryId ? ne(hourEntries.id, excludeEntryId) : undefined,
         ),
       );
     return Number(rows[0]?.total ?? 0);

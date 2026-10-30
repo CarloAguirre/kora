@@ -77,10 +77,27 @@ export const stepBlockHours = (hours: string, delta: number) => {
 };
 
 /**
+ * Horas de cada bloque (en orden) que el backend dejará como horas extra
+ * porque pasan de la jornada de `DAILY_CAP_HOURS` sobre las `existingHours`
+ * normales del día — misma regla que `splitByDailyCap` en la API. Los bloques
+ * ya marcados como extra van como `0`.
+ */
+export function overflowByBlock(existingHours: number, blockHours: readonly number[]): number[] {
+  let running = existingHours;
+  return blockHours.map((hours) => {
+    const room = Math.max(0, DAILY_CAP_HOURS - running);
+    running += hours;
+    return Math.max(0, Math.round((hours - room) * 100) / 100);
+  });
+}
+
+/**
  * Reglas de un bloque compartidas por el alta (`DailyEntryForm`) y la edición
  * (`HourEntryFormDialog`). `overtimeAlreadyGranted` cubre registros que ya
  * nacieron como horas extra en un proyecto que no las autoriza (p. ej. el
  * excedente de una solicitud de HH de ticket): el backend permite conservarlos.
+ * `exceedsDailyCap`: parte del bloque quedará como horas extra (ver
+ * `overflowByBlock`), y sin proyecto esas exigen aprobador.
  */
 export function validateDailyBlock(
   block: DailyBlock,
@@ -88,7 +105,8 @@ export function validateDailyBlock(
     projects,
     isCollaborator,
     overtimeAlreadyGranted = false,
-  }: { projects: ProjectSummary[]; isCollaborator: boolean; overtimeAlreadyGranted?: boolean },
+    exceedsDailyCap = false,
+  }: { projects: ProjectSummary[]; isCollaborator: boolean; overtimeAlreadyGranted?: boolean; exceedsDailyCap?: boolean },
 ): string | null {
   if (!block.assignment) return 'Selecciona una asignación.';
   const hours = Number(block.hours);
@@ -102,7 +120,7 @@ export function validateDailyBlock(
   }
   // Horas de proyecto se aprueban por acceso al proyecto, no por aprobador
   // designado (docs/DECISION-M4-HORAS.md) — el backend rechaza ambos a la vez.
-  const needsApprover = !needsProject && (isCollaborator || block.isOvertime);
+  const needsApprover = !needsProject && (isCollaborator || block.isOvertime || exceedsDailyCap);
   if (needsApprover && !block.designatedApproverUserId) return 'Selecciona a quién aprueba estas horas.';
   if (!block.category.trim()) return 'Indica la actividad realizada.';
   if (block.description.trim().length > 0 && block.description.trim().length < MIN_DESCRIPTION_LENGTH) {
@@ -118,7 +136,8 @@ export function validateDailyBlock(
  * (bloques agregables); cada bloque se guarda como un `hour_entries`
  * independiente. Marcar "Horas Extra" deja el registro `pending` y exige
  * aprobador cuando no hay proyecto (el backend siempre lo exige, ver
- * `HourEntry.create`).
+ * `HourEntry.create`). Lo que pase de 8h normales en el día lo deja el backend
+ * como horas extra por sí solo; aquí solo se avisa.
  */
 export function DailyEntryForm({
   onClose,
@@ -187,22 +206,29 @@ export function DailyEntryForm({
 
   const dailyTotal = blocks.reduce((sum, block) => sum + (Number(block.hours) || 0), 0);
   const totalWithExisting = existingHoursForDate + dailyTotal;
-  const nonOvertimeBlockTotal = blocks.reduce((sum, block) => sum + (block.isOvertime ? 0 : Number(block.hours) || 0), 0);
-  const nonOvertimeTotalWithExisting = existingNonOvertimeHoursForDate + nonOvertimeBlockTotal;
-  const exceedsDailyCap = nonOvertimeTotalWithExisting > DAILY_CAP_HOURS;
+  const blockOverflow = overflowByBlock(
+    existingNonOvertimeHoursForDate,
+    blocks.map((block) => (block.isOvertime ? 0 : Number(block.hours) || 0)),
+  );
+  const overflowByKey = new Map(blocks.map((block, index) => [block.key, blockOverflow[index] ?? 0]));
+  const autoOvertimeHours = blockOverflow.reduce((sum, hours) => sum + hours, 0);
 
   useEffect(() => {
     onTotalChange?.(totalWithExisting);
   }, [totalWithExisting, onTotalChange]);
 
   const validateBlock = (block: DailyBlock) =>
-    validateDailyBlock(block, { projects: projects?.items ?? [], isCollaborator: user?.role === 'collaborator' });
+    validateDailyBlock(block, {
+      projects: projects?.items ?? [],
+      isCollaborator: user?.role === 'collaborator',
+      exceedsDailyCap: (overflowByKey.get(block.key) ?? 0) > 0,
+    });
 
-  const canSubmit = !blockingMessage && !exceedsDailyCap && blocks.every((block) => validateBlock(block) === null);
+  const canSubmit = !blockingMessage && blocks.every((block) => validateBlock(block) === null);
 
   const onSubmit = async () => {
     setServerError(null);
-    if (blockingMessage || exceedsDailyCap) return;
+    if (blockingMessage) return;
     const nextErrors: Record<string, string> = {};
     for (const block of blocks) {
       const error = validateBlock(block);
@@ -263,22 +289,23 @@ export function DailyEntryForm({
         onChange={(event) => setDate(event.target.value)}
       />
 
-      {!blockingMessage && !exceedsDailyCap && existingNonOvertimeHoursForDate > 0 && existingNonOvertimeHoursForDate < DAILY_CAP_HOURS && (
+      {!blockingMessage && autoOvertimeHours === 0 && existingNonOvertimeHoursForDate > 0 && existingNonOvertimeHoursForDate < DAILY_CAP_HOURS && (
         <div className={styles.noticeInfo} role="status">
           <AlertIcon size={16} />
           <span>
             Ya tienes {existingNonOvertimeHoursForDate.toLocaleString('es-CL', { maximumFractionDigits: 1 })}h registradas este
-            día. Al superar {DAILY_CAP_HOURS}h, marca horas extra.
+            día. Lo que pase de {DAILY_CAP_HOURS}h quedará como horas extra.
           </span>
         </div>
       )}
 
-      {!blockingMessage && exceedsDailyCap && (
-        <div className={styles.noticeWarning} role="alert">
+      {!blockingMessage && autoOvertimeHours > 0 && (
+        <div className={styles.noticeWarning} role="status">
           <AlertIcon size={16} />
           <span>
-            Superarías el límite diario de {DAILY_CAP_HOURS}h ({totalWithExisting.toLocaleString('es-CL', { maximumFractionDigits: 1 })}h
-            en total ese día). Marca las horas que correspondan como "Horas Extra" para poder guardar.
+            Superas la jornada de {DAILY_CAP_HOURS}h ({totalWithExisting.toLocaleString('es-CL', { maximumFractionDigits: 1 })}h en
+            total ese día): {autoOvertimeHours.toLocaleString('es-CL', { maximumFractionDigits: 2 })}h quedarán como horas extra,
+            pendientes de aprobación.
           </span>
         </div>
       )}
@@ -299,6 +326,7 @@ export function DailyEntryForm({
           projects={projects?.items ?? []}
           leaders={leaders?.items ?? []}
           isCollaborator={user?.role === 'collaborator'}
+          exceedsDailyCap={(overflowByKey.get(block.key) ?? 0) > 0}
           error={blockErrors[block.key]}
           title={blockTitle(block, index)}
           onUpdate={(patch) => updateBlock(block.key, patch)}
@@ -405,6 +433,7 @@ export function DailyEntryBlockFields({
   projects,
   leaders,
   isCollaborator,
+  exceedsDailyCap = false,
   error,
   title,
   onUpdate,
@@ -418,6 +447,8 @@ export function DailyEntryBlockFields({
   projects: ProjectSummary[];
   leaders: { id: string; fullName: string }[];
   isCollaborator: boolean;
+  /** Parte del bloque quedará como horas extra — sin proyecto, eso exige aprobador. */
+  exceedsDailyCap?: boolean;
   error?: string;
   title: string;
   onUpdate: (patch: Partial<DailyBlock>) => void;
@@ -426,7 +457,7 @@ export function DailyEntryBlockFields({
   onAdjustHours: (delta: number) => void;
 }) {
   const needsProject = PROJECT_REQUIRING_ASSIGNMENTS.has(block.assignment as HourEntryAssignment);
-  const showApproverInRow = block.assignment !== '' && !needsProject && (isCollaborator || block.isOvertime);
+  const showApproverInRow = block.assignment !== '' && !needsProject && (isCollaborator || block.isOvertime || exceedsDailyCap);
   const selectedProject = needsProject ? projects.find((p) => p.id === block.projectId) : undefined;
   const overtimeDisabled = needsProject && !selectedProject?.allowsOvertime;
 

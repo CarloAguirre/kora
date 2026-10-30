@@ -26,8 +26,16 @@ const leaderKey = (row: DashboardOvertimeReportRow) => row.leaderUserId ?? NO_LE
 
 const COLUMNS: Column<DashboardOvertimeReportRow>[] = [
   { key: 'date', header: 'Fecha', render: (row) => <span className={styles.date}>{formatDate(row.date)}</span> },
-  { key: 'project', header: 'Proyecto', render: (row) => row.projectName },
-  { key: 'type', header: 'Tipo', render: (row) => PROJECT_TYPE_LABELS[row.projectType] },
+  {
+    key: 'project',
+    header: 'Proyecto',
+    render: (row) => row.projectName ?? <span className={styles.muted}>Sin proyecto</span>,
+  },
+  {
+    key: 'type',
+    header: 'Tipo',
+    render: (row) => (row.projectType ? PROJECT_TYPE_LABELS[row.projectType] : <span className={styles.muted}>—</span>),
+  },
   {
     key: 'leader',
     header: 'Líder',
@@ -57,8 +65,9 @@ const COLUMNS: Column<DashboardOvertimeReportRow>[] = [
 /**
  * "Horas extra por proyecto" — horas extra de un mes en proyectos de soporte y
  * desarrollo, por día × proyecto × colaborador con su líder, filtrable por tipo
- * y exportable a Excel. En soporte lo que pasa de la jornada de 8h queda solo
- * como horas extra (ver `CreateTicketHhRequestUseCase`).
+ * y exportable a Excel. Incluye las horas extra sin proyecto. Lo que pasa de la
+ * jornada de 8h del día queda solo como horas extra (ver `splitByDailyCap`), así
+ * que estas horas y las de Capacity (solo normales) no se pisan.
  *
  * `scope="all"`: vista general del PMO (Administración), filtrable por líder.
  * `scope="team"`: Dashboard del líder — el backend ya acota a las personas a
@@ -90,7 +99,7 @@ export function OvertimeReportSection({ scope = 'all' }: { scope?: 'all' | 'team
 
   const approvedHours = filtered.reduce((sum, row) => sum + row.approvedHours, 0);
   const pendingHours = filtered.reduce((sum, row) => sum + row.pendingHours, 0);
-  const projectCount = new Set(filtered.map((row) => row.projectId)).size;
+  const projectCount = new Set(filtered.flatMap((row) => (row.projectId ? [row.projectId] : []))).size;
   const userCount = new Set(filtered.map((row) => row.userId)).size;
   const leaderLabel = leaderOptions.find((option) => option.value === leader)?.label ?? 'Todos los líderes';
   const typeLabel = TYPE_OPTIONS.find((option) => option.value === type)?.label ?? 'Todos los tipos';

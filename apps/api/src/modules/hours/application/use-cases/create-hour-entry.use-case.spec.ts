@@ -20,10 +20,11 @@ const INPUT = {
   hasBlocker: false,
 } as CreateHourEntryInput;
 
-function buildUseCase(projectStatus: ProjectStatus) {
+function buildUseCase(projectStatus: ProjectStatus, regularHoursForDate = 0) {
   const entries = {
     save: vi.fn().mockResolvedValue(undefined),
     sumApprovedHoursForProject: vi.fn().mockResolvedValue(0),
+    sumRegularHoursForUserAndDate: vi.fn().mockResolvedValue(regularHoursForDate),
   } as unknown as HourEntryRepository;
   const users = {
     findById: vi.fn().mockResolvedValue({ id: 'collab-1', role: 'collaborator', status: 'active' }),
@@ -68,5 +69,29 @@ describe('CreateHourEntryUseCase', () => {
 
     expect(result.isOk()).toBe(true);
     expect(entries.save).toHaveBeenCalled();
+  });
+
+  it('lo que pase de las 8h normales del día queda como un segundo registro de horas extra', async () => {
+    // Proyecto sin horas extra autorizadas: el excedente automático no la exige.
+    const { useCase, entries } = buildUseCase('active', 6);
+
+    const result = await useCase.execute({ data: { ...INPUT, hours: 5 }, actor: ACTOR, actorRole: 'collaborator' });
+
+    expect(result.isOk()).toBe(true);
+    const saved = vi.mocked(entries.save).mock.calls.map(([entry]) => ({ hours: entry.hours, isOvertime: entry.isOvertime }));
+    expect(saved).toEqual([
+      { hours: 2, isOvertime: false },
+      { hours: 3, isOvertime: true },
+    ]);
+  });
+
+  it('con la jornada ya completa, todo queda como horas extra', async () => {
+    const { useCase, entries } = buildUseCase('active', 8);
+
+    const result = await useCase.execute({ data: INPUT, actor: ACTOR, actorRole: 'collaborator' });
+
+    expect(result.isOk()).toBe(true);
+    const saved = vi.mocked(entries.save).mock.calls.map(([entry]) => ({ hours: entry.hours, isOvertime: entry.isOvertime }));
+    expect(saved).toEqual([{ hours: 4, isOvertime: true }]);
   });
 });
