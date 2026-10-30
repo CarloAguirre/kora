@@ -25,7 +25,7 @@ Todos bajo `/api/estimations/projects/:projectId/quotation`, requieren sesión y
 - **No se han ejecutado migraciones ni pruebas sobre BD real.** Revisar respaldo y entorno QA antes de ejecutar `pnpm --filter @kora/db migrate`.
 - Un borrador editado no escribe `projects`, `project_teams`, `project_modules`, `project_payment_milestones`, ni Forecast. No hay endpoints de envío/aprobación/traspaso.
 - La API ya está conectada al editor web de borradores (`/proyectos/:projectId/cotizacion`). El flujo PoC `/poc/*` sigue aislado y requiere `projects:manage`.
-- En esta entrega no se implementa copiar versiones de OTROS proyectos, ni tratar recotización de un proyecto activo o aprobado.
+- En esta entrega no se implementa copiar versiones de OTROS proyectos, ni aplicar una recotización al plan operativo de un proyecto activo o aprobado. Se permite preparar borradores comerciales aislados en `active` cuando `sales_stage` es `prospect|quoted`.
 - Se versiona el snapshot comercial, pero no se ha cerrado la decisión de redondeos/UF, por lo que NO debe habilitarse envío ni facturación antes de D06.
 - La autorización provisoria de líderes debe confirmarse con Diseño; la consulta general `projects:read_assigned` **no** da acceso a todas las cotizaciones.
 - No existe todavía una verificación de integración continua ni validación con postgresql real de transacciones; efectuar typecheck/test antes de merge o desplegar.
@@ -74,7 +74,7 @@ GROUP BY sales_stage, status
 ORDER BY sales_stage, status;
 ```
 
-El resultado es necesario antes de flexibilizar `project.status = draft`, ya que el código previo de Calculadora mostraba proyectos `quoted` distintos de `cancelled` y el estado comercial puede coexistir con `active` en datos reales. No suponer el mapeo sin resultados.
+**Resultado recibido 30-oct-2026**: 207 proyectos de desarrollo, de los cuales 39 están en `prospect|quoted`: 2 `draft` y 37 `active`. La regla R1 cambió para permitir borradores aislados en `draft|active` cuando la etapa comercial sea `prospect|quoted`. Etapa `approved`, estado `on_hold|finished|cancelled` y soporte permanecen fuera de escritura hasta definir recotización. Véase `docs/VALIDACION-ESTADOS-COTIZACIONES-2026-10-30.md`.
 
 ## Pendientes para considerar estable
 
@@ -82,5 +82,5 @@ El resultado es necesario antes de flexibilizar `project.status = draft`, ya que
 2. Confirmar que la migración 0048, su snapshot/journal y Drizzle Kit no producen diferencias ni fallos contra una BD QA limpia y una BD QA con historial.
 3. Revisar API con dos sesiones concurrentes y conflicto 409, copia serializada, validación de equipos activos y versiones bloqueadas.
 4. Validar UI completa, incluida navegación con slug, 403/409, pago por fase/fecha, proyecto sin cotización, recarga y permisos de Líder PM.
-5. La lista `/calculadora` todavía reutiliza una página de proyectos con límite de 200; la pantalla final de Cotizaciones con paginación y filtros de versiones corresponde a R2 posterior.
+5. La lista `/calculadora` todavía reutiliza una página de proyectos con límite de 200; la pantalla final de Cotizaciones con filtros específicos de versiones corresponde a R2 posterior. La lista actual ya recorre todas las páginas de proyectos de desarrollo.
 6. Resolver D01–D06 con Diseño/Levantamiento antes de cerrar importes comerciales, recotizaciones o traspaso.
