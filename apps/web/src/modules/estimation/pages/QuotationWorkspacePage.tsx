@@ -118,7 +118,16 @@ export function QuotationWorkspacePage() {
   const usedPercent = (form?.draft.paymentPlan ?? []).reduce((sum, payment) => sum + payment.percent, 0);
   const editTeam = (index: number, patch: Partial<QuotationDraftData['teams'][number]>) => {
     if (!form) return;
-    updateDraft({ teams: teamRows.map((row, position) => position === index ? { ...row, ...patch } : row) });
+    const original = teamRows[index];
+    const changedId = original && patch.teamId && patch.teamId !== original.teamId;
+    updateDraft({
+      teams: teamRows.map((row, position) => position === index ? { ...row, ...patch } : row),
+      ...(changedId ? { phases: phaseRows.map((phase) => ({
+        ...phase,
+        teamHours: phase.teamHours.map((hours) =>
+          hours.teamId === original.teamId ? { ...hours, teamId: patch.teamId as string } : hours),
+      })) } : {}),
+    });
   };
   const editPhase = (index: number, patch: Partial<QuotationDraftData['phases'][number]>) => {
     updateDraft({ phases: phaseRows.map((row, position) => position === index ? { ...row, ...patch } : row) });
@@ -325,6 +334,23 @@ export function QuotationWorkspacePage() {
                         {editable && <Button variant="ghost" size="sm"
                           onClick={() => updateDraft({ paymentPlan: form.draft.paymentPlan.filter((_, i) => i !== index) })}>Quitar</Button>}
                       </div>
+                      {payment.trigger === 'phase' && (
+                        <div className={styles.paymentDetail} key={'phase-' + index}>
+                          <Select label="Fase disparadora" disabled={!editable}
+                            value={payment.triggerPhase ?? ''}
+                            placeholder="Seleccionar fase"
+                            options={phaseRows.map((phase) => ({ value: phase.name, label: phase.name }))}
+                            onChange={(e) => updateDraft({ paymentPlan: form.draft.paymentPlan.map((p, i) =>
+                              i === index ? { ...p, triggerPhase: e.target.value || null } : p) })} />
+                        </div>
+                      )}
+                      {payment.trigger === 'date' && (
+                        <div className={styles.paymentDetail} key={'date-' + index}>
+                          <TextField label="Fecha disparadora" type="date" value={payment.triggerDate ?? ''}
+                            disabled={!editable} onChange={(e) => updateDraft({ paymentPlan: form.draft.paymentPlan.map((p, i) =>
+                              i === index ? { ...p, triggerDate: e.target.value || null } : p) })} />
+                        </div>
+                      )}
                     ))}
                     <p className={styles.helper}>Porcentaje configurado: {money(usedPercent)}% {usedPercent === 100 ? '· Completo' : '· Pendiente de completar'}</p>
                     <p className={styles.helper}>Los parámetros específicos por fecha/fase se completarán al habilitar R3. El plan no se traspasa todavía.</p>
