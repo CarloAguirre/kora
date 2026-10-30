@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { quotationDraftDataSchema, type QuotationDraftData, type QuotationVersion, type UpdateQuotationDraftInput } from '@kora/contracts';
+import { isQuotationDraftEligibleProject, quotationDraftDataSchema, type QuotationDraftData, type QuotationVersion, type UpdateQuotationDraftInput } from '@kora/contracts';
 import { useProjectDetail } from '@/modules/projects/api/projects.queries';
 import { useTeamsList } from '@/modules/teams/api/teams.queries';
 import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
@@ -60,8 +60,7 @@ export function QuotationWorkspacePage() {
     setError('');
   }, [selected?.id, selected?.revision]);
 
-  const mayWrite = Boolean(project && project.type === 'development' &&
-    project.status === 'draft' && (project.salesStage === 'prospect' || project.salesStage === 'quoted'));
+  const mayWrite = Boolean(project && isQuotationDraftEligibleProject(project));
   const editable = Boolean(mayWrite && selected?.status === 'draft' && form);
 
   const change = (update: (current: Form) => Form) => {
@@ -145,7 +144,7 @@ export function QuotationWorkspacePage() {
           <div>
             <span className={styles.eyebrow}>Cotizaciones · Kora</span>
             <h1>{project?.name ?? 'Cotización del proyecto'}</h1>
-            <p>Versiones comerciales independientes de la planificación y las HH reales del proyecto.</p>
+            <p>Versiones comerciales independientes de la planificación y las HH reales del proyecto, incluso si su estado operativo es Activo.</p>
           </div>
           <Link to="/calculadora">Volver al listado</Link>
         </header>
@@ -159,7 +158,7 @@ export function QuotationWorkspacePage() {
         {project && !mayWrite && (
           <Card>
             <strong>Consulta histórica</strong>
-            <p>Este proyecto no permite crear o editar borradores en su etapa actual. Los cambios sobre proyectos activos o aprobados requieren el flujo de recotización todavía pendiente.</p>
+            <p>Este proyecto no permite crear o editar borradores en su etapa comercial actual. Los proyectos aprobados, detenidos, finalizados o cancelados quedan en modo consulta hasta acordar el flujo de recotización.</p>
           </Card>
         )}
 

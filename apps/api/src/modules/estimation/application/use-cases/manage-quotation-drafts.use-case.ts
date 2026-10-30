@@ -1,4 +1,5 @@
 import { ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { isQuotationDraftEligibleProject } from '@kora/contracts';
 import type {
   CreateQuotationVersionInput, Permission, ProjectQuotation, QuotationVersion, UpdateQuotationDraftInput,
 } from '@kora/contracts';
@@ -19,11 +20,8 @@ export class ManageQuotationDraftsUseCase {
     const allowed = actor.permissions.includes('projects:manage') ||
       (actor.permissions.includes('projects:read_assigned') && project.leaderUserId === actor.id);
     if (!allowed) throw new ForbiddenException('No tienes acceso comercial a esta cotización.');
-    if (write && (
-      project.status !== 'draft' ||
-      !['prospect', 'quoted'].includes(project.salesStage ?? '')
-    )) {
-      throw new ConflictException('La cotización no admite nuevas versiones o cambios en el estado actual del proyecto.');
+    if (write && !isQuotationDraftEligibleProject(project)) {
+      throw new ConflictException('El proyecto no admite borradores comerciales en esta etapa y estado.');
     }
     return project;
   }

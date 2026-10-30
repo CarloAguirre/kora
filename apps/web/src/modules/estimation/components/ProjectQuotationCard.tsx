@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import type { ProjectDetail } from '@kora/contracts';
+import { isQuotationDraftEligibleProject, type ProjectDetail } from '@kora/contracts';
 import { projectQuotationPath } from '@/app/router/paths';
 import { useProjectQuotation } from '../api/quotation.queries';
 import { Card } from '@/shared/components/ui/Card';
@@ -9,8 +9,7 @@ export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
   const { data, isLoading, error } = useProjectQuotation(project.id);
   const versions = data?.versions ?? [];
   const latest = versions[versions.length - 1];
-  const eligible = project.status === 'draft' &&
-    (project.salesStage === 'prospect' || project.salesStage === 'quoted');
+  const eligible = isQuotationDraftEligibleProject(project);
 
   return (
     <Card>

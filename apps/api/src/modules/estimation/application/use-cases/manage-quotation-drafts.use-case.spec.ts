@@ -29,9 +29,52 @@ describe('ManageQuotationDraftsUseCase', () => {
       .rejects.toBeInstanceOf(ForbiddenException);
   });
 
-  it('no crea nuevos borradores cuando el proyecto está activo', async () => {
-    const { useCase } = setup({ ...project, status: 'active' as const });
-    await expect(useCase.create(project.id, manager, {})).rejects.toBeInstanceOf(ConflictException);
+  it('permite crear borradores en prospectos o cotizados activos, sin mutar Proyectos', async () => {
+    for (const salesStage of ['prospect', 'quoted'] as const) {
+      const { useCase, repository } = setup({ ...project, salesStage, status: 'active' });
+      await expect(useCase.create(project.id, manager, {})).resolves.toBeDefined();
+      expect(repository.createDraft).toHaveBeenCalledWith(project.id, manager.id, {});
+    }
+  });
+
+  it('no altera permisos por estar activo: rechaza líderes ajenos', async () => {
+    const { useCase } = setup({ ...project, status: 'active' });
+    await expect(useCase.create(project.id,
+      { id: manager.id, permissions: ['projects:read_assigned'] }, {}))
+      .rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('bloquea escritura en aprobados, finalizados, detenidos, cancelados y soporte', async () => {
+    const denied: QuotationProjectScope[] = [
+      { ...project, salesStage: 'approved', status: 'draft' },
+      { ...project, salesStage: 'approved', status: 'active' },
+      { ...project, salesStage: 'quoted', status: 'finished' },
+      { ...project, salesStage: 'prospect', status: 'cancelled' },
+      { ...project, salesStage: 'quoted', status: 'on_hold' },
+      { ...project, type: 'support', salesStage: 'quoted', status: 'active' },
+    ];
+    for (const deniedProject of denied) {
+      const { useCase } = setup(deniedProject);
+      await expect(useCase.create(project.id, manager, {})).rejects.toThrow();
+    }
+  });
+
+  it('permite consultar historial comercial aunque el proyecto esté aprobado', async () => {
+    const { useCase } = setup({ ...project, salesStage: 'approved', status: 'active' });
+    await expect(useCase.get(project.id, manager)).resolves.toBeNull();
+  });
+
+  it('permite editar una versión draft de un proyecto active/quoted con revision', async () => {
+    const { useCase, repository } = setup({ ...project, status: 'active' });
+    const versionId = '0777e456-fd76-445e-83f1-afc25061c105';
+    const input = {
+      revision: 2, name: 'v2', hourlyRate: 2, currency: 'UF' as const, tax: 'iva19' as const,
+      draft: { mode: 'team' as const, teams: [], phases: [], costs: [], paymentPlan: [],
+        assumptions: [], exclusions: [], sourceRefs: [], answers: {} },
+    };
+    vi.mocked(repository.updateDraft).mockResolvedValueOnce({ id: versionId } as never);
+    await expect(useCase.update(project.id, versionId, manager, input)).resolves.toBeDefined();
+    expect(repository.updateDraft).toHaveBeenCalledWith(project.id, versionId, manager.id, input);
   });
 
   it('impide sobrescribir una versión ya modificada o bloqueada', async () => {

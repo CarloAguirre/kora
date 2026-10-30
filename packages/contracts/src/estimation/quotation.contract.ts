@@ -5,6 +5,27 @@ import { isoDateTimeSchema, nonEmptyTrimmed, uuidSchema } from '../common/primit
  * Modelo persistente de cotización. Separado de los estados PoC de IA y de los
  * proyectos en ejecución: ninguna edición de borrador modifica Proyectos.
  */
+/**
+ * La etapa comercial no equivale al estado operativo. En BD existen proyectos
+ * prospect/quoted que ya están active: se permite preparar borradores
+ * comerciales INDEPENDIENTES, sin alterar las HH, equipos ni facturación.
+ *
+ * No autoriza envío, aprobación, traspaso ni cambios de alcance en ejecución.
+ * Los estados detenidos/terminados/cancelados quedan fuera de esta regla
+ * provisional hasta acordar el flujo de recotización.
+ */
+export interface QuotationEligibilityProject {
+  readonly type: 'development' | 'support';
+  readonly salesStage: 'prospect' | 'quoted' | 'approved' | null;
+  readonly status: 'draft' | 'active' | 'on_hold' | 'finished' | 'cancelled';
+}
+
+export function isQuotationDraftEligibleProject(project: QuotationEligibilityProject): boolean {
+  return project.type === 'development' &&
+    (project.salesStage === 'prospect' || project.salesStage === 'quoted') &&
+    (project.status === 'draft' || project.status === 'active');
+}
+
 export const QUOTATION_VERSION_STATUSES = ['draft', 'sent', 'approved'] as const;
 export const quotationVersionStatusSchema = z.enum(QUOTATION_VERSION_STATUSES);
 export const QUOTATION_VERSION_ORIGINS = ['manual', 'copy', 'ai'] as const;

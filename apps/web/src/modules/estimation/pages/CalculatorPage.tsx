@@ -6,6 +6,7 @@ import { projectQuotationPath } from '@/app/router/paths';
 import {
   PROJECT_SALES_STAGE_LABELS,
   PROJECT_STATUS_LABELS,
+  isQuotationDraftEligibleProject,
   type ProjectSummary,
 } from '@kora/contracts';
 import { useProjectsList } from '@/modules/projects/api/projects.queries';
@@ -22,13 +23,11 @@ const formatHours = (value: number) =>
 
 const isVisibleProject = (project: ProjectSummary) =>
   project.type === 'development' &&
-  (project.salesStage === 'quoted' || project.salesStage === 'approved') &&
+  (project.salesStage === 'prospect' || project.salesStage === 'quoted' || project.salesStage === 'approved') &&
   project.status !== 'cancelled';
 
 const isQuotationProspect = (project: ProjectSummary) =>
-  project.type === 'development' &&
-  (project.salesStage === 'prospect' || project.salesStage === 'quoted') &&
-  project.status === 'draft';
+  isQuotationDraftEligibleProject(project);
 
 export function CalculatorPage() {
   const { user } = useAuth();

@@ -240,7 +240,7 @@ export function NewEstimationModal({ open, prospects, onClose }: NewEstimationMo
           setError(null);
         }}
         options={projectOptions}
-        helperText="Solo proyectos de desarrollo en cotización que todavía no se encuentran activos."
+        helperText="Proyectos de desarrollo en etapa Prospecto o Cotización, aunque su estado operativo sea Activo. Los borradores no cambian las HH ni la ejecución."
       />
 
       <fieldset className={styles.fieldset}>
