@@ -5,10 +5,13 @@ import { and, asc, desc, eq, inArray, isNull, projectQuotations, projects, quota
 import {
   quotationDraftDataSchema,
   quotationVersionSchema,
+  savedQuotationReconciliationReviewSchema,
   type CreateQuotationVersionInput,
   type ProjectQuotation,
   type QuotationDraftData,
   type QuotationOperationalSnapshot,
+  type QuotationReconciliationReview,
+  type SavedQuotationReconciliationReview,
   type QuotationVersion,
   type UpdateQuotationDraftInput,
 } from '@kora/contracts';
@@ -118,6 +121,66 @@ export class DrizzleQuotationRepository implements QuotationRepository {
     const rows = await this.db.select().from(quotationVersions)
       .where(eq(quotationVersions.quotationId, quotation.id)).orderBy(asc(quotationVersions.versionNumber));
     return { ...quotation, versions: rows.map(toVersion) };
+  }
+
+  /** Sólo consulta de actas inmutables relacionadas con ESTA cotización. */
+  async listReconciliationReviews(projectId: string, versionId: string): Promise<SavedQuotationReconciliationReview[]> {
+    const [quotation] = await this.db.select({ id: projectQuotations.id })
+      .from(projectQuotations).where(eq(projectQuotations.projectId, projectId)).limit(1);
+    if (!quotation) return [];
+    const [version] = await this.db.select({ id: quotationVersions.id })
+      .from(quotationVersions).where(and(
+        eq(quotationVersions.id, versionId), eq(quotationVersions.quotationId, quotation.id),
+      )).limit(1);
+    if (!version) return [];
+
+    const rows = await this.db.select({
+      id: quotationEvents.id, actorUserId: quotationEvents.actorUserId,
+      occurredAt: quotationEvents.occurredAt, metadata: quotationEvents.metadata,
+    }).from(quotationEvents).where(and(
+      eq(quotationEvents.versionId, versionId),
+      eq(quotationEvents.action, 'reconciliation_review_saved'),
+    )).orderBy(desc(quotationEvents.occurredAt), desc(quotationEvents.id)).limit(25);
+
+    return rows.map((row) => savedQuotationReconciliationReviewSchema.parse({
+      id: row.id, actorUserId: row.actorUserId,
+      occurredAt: row.occurredAt.toISOString(), review: row.metadata['review'],
+    }));
+  }
+
+  /** Append-only: sólo evento de auditoría, jamás modifica ejecución o versión. */
+  async appendReconciliationReview(
+    projectId: string, versionId: string, actorId: string,
+    review: QuotationReconciliationReview,
+  ): Promise<SavedQuotationReconciliationReview | null> {
+    return this.db.transaction(async (tx) => {
+      const [quotation] = await tx.select({ id: projectQuotations.id })
+        .from(projectQuotations).where(eq(projectQuotations.projectId, projectId)).limit(1);
+      if (!quotation) return null;
+      await tx.execute(sql`SELECT id FROM quotation_versions WHERE id = ${versionId} AND quotation_id = ${quotation.id} FOR UPDATE`);
+      const [version] = await tx.select({
+        id: quotationVersions.id, revision: quotationVersions.revision, status: quotationVersions.status,
+      }).from(quotationVersions).where(and(
+        eq(quotationVersions.id, versionId), eq(quotationVersions.quotationId, quotation.id),
+      )).limit(1);
+      if (!version || version.status !== 'draft' || version.revision !== review.versionRevision) return null;
+      const [created] = await tx.insert(quotationEvents).values({
+        versionId, actorUserId: actorId,
+        action: 'reconciliation_review_saved',
+        metadata: {
+          schemaVersion: review.schemaVersion, status: 'draft_for_discussion',
+          versionRevision: review.versionRevision, review,
+        },
+      }).returning({
+        id: quotationEvents.id, actorUserId: quotationEvents.actorUserId,
+        occurredAt: quotationEvents.occurredAt,
+      });
+      if (!created) throw new Error('No se pudo registrar el acta de revisión.');
+      return savedQuotationReconciliationReviewSchema.parse({
+        id: created.id, actorUserId: created.actorUserId,
+        occurredAt: created.occurredAt.toISOString(), review,
+      });
+    });
   }
 
   async createDraft(projectId: string, userId: string, input: CreateQuotationVersionInput): Promise<QuotationVersion> {
