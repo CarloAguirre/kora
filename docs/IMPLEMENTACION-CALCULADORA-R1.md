@@ -88,3 +88,7 @@ ORDER BY sales_stage, status;
 ## Corte R2-b: artefacto JSON IA y simulación Zurich (30-10-2026)
 
 Ver docs/ARTEFACTO-JSON-IA-COTIZACIONES-2026-10-30.md. Contrato Zod para artefacto trazable, importador del JSON de ejemplo Zurich, mapeo explícito de roles a equipos Kora, conversión de tramos en fases, versión de IA simulada pendiente de revisión y almacenamiento íntegro en quotation_versions.draft.analysis (JSONB de 0048). Corregido aislamiento del nuevo hook en tests de ficha. Sin tests ejecutados desde los commits de este corte y sin nuevas migraciones.
+
+## Corte R2-c · 30/10/2026
+
+Visor de evidencia EDT/ERS/cronograma integrado a cotización con `analysis`, descarga del JSON original, y comparador de versiones por HH, equipo e importe comparable. En API se añade `reconcileQuotationAnalysis`: protege la evidencia original y define servidor-side el estado `synced|modified`. Ver [IMPLEMENTACION-CALCULADORA-R2C-VISOR-COMPARADOR.md](./IMPLEMENTACION-CALCULADORA-R2C-VISOR-COMPARADOR.md) para pruebas y comandos. No se ejecutaron pruebas ni migraciones con el conector.
