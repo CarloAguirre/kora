@@ -1,4 +1,5 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { projectAnalysisToQuotationDraft } from '../../domain/project-analysis-to-quotation';
 import { and, asc, desc, eq, inArray, isNull, projectQuotations, projects, quotationEvents, quotationVersions, sql, teams, type Database } from '@kora/db';
 import {
   quotationDraftDataSchema,
@@ -53,14 +54,35 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       let hourlyRate: number | null = null;
       let currency: 'UF' | 'CLP' | 'USD' = 'UF';
       let tax: 'iva19' | 'igv18' | 'exempt' = 'iva19';
-      let origin: 'manual' | 'copy' = 'manual';
+      let origin: 'manual' | 'copy' | 'ai' = 'manual';
+      let aiReviewStatus: 'pending' | null = null;
+      if (input.simulation) {
+        if (input.simulation.analysis.provenance.mode !== 'simulated_fixture') {
+          throw new BadRequestException('Esta ruta solo admite artefactos de simulación explícitos.');
+        }
+        try {
+          draft = projectAnalysisToQuotationDraft(
+            input.simulation.analysis, input.simulation.roleTeamIds,
+          );
+        } catch (error) {
+          throw new BadRequestException(error instanceof Error ? error.message : 'EDT simulado inválido.');
+        }
+        const teamIds = draft.teams.map((team) => team.teamId);
+        const existing = await tx.select({ id: teams.id }).from(teams)
+          .where(and(inArray(teams.id, teamIds), eq(teams.isActive, true), isNull(teams.deletedAt)));
+        if (existing.length !== teamIds.length) {
+          throw new BadRequestException('El mapeo debe utilizar equipos existentes, activos y no eliminados de Kora.');
+        }
+        origin = 'ai';
+        aiReviewStatus = 'pending';
+      }
       if (input.sourceVersionId) {
         const [source] = await tx.select().from(quotationVersions)
           .where(and(eq(quotationVersions.id, input.sourceVersionId), eq(quotationVersions.quotationId, quotation.id))).limit(1);
         if (!source) throw new NotFoundException('La versión para copiar no pertenece a esta cotización.');
         // Una copia MANUAL desde una propuesta IA no hereda fuentes ni respuestas IA.
         const previous = quotationDraftDataSchema.parse(source.draft);
-        draft = { ...previous, sourceRefs: [], answers: {} };
+        draft = { ...previous, sourceRefs: [], answers: {}, analysis: null, analysisProjectionStatus: undefined };
         hourlyRate = source.hourlyRate === null ? null : Number(source.hourlyRate);
         currency = source.currency as typeof currency;
         tax = source.tax as typeof tax;
@@ -71,10 +93,10 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       const [created] = await tx.insert(quotationVersions).values({
         quotationId: quotation.id,
         versionNumber: next,
-        name: `Versión ${next}`,
+        name: input.simulation ? `Simulación IA · ${input.simulation.analysis.project.client}` : `Versión ${next}`,
         status: 'draft',
         origin,
-        aiReviewStatus: null,
+        aiReviewStatus,
         createdByUserId: userId,
         hourlyRate: hourlyRate?.toFixed(4) ?? null,
         currency,
@@ -87,7 +109,8 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       if (!created) throw new Error('No se pudo crear la versión.');
       await tx.insert(quotationEvents).values({
         versionId: created.id, actorUserId: userId, action: 'draft_created',
-        metadata: { origin, sourceVersionId: input.sourceVersionId ?? null },
+        metadata: { origin, sourceVersionId: input.sourceVersionId ?? null,
+          simulation: input.simulation ? 'simulated_fixture' : null },
       });
       return toVersion(created);
     });
