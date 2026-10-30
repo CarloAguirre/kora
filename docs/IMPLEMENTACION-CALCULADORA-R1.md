@@ -104,3 +104,7 @@ Extiende el GET preflight read-only de R3-a con `edtReconciliation`: comparació
 ## R3-c — Acta JSON D04 (30/10/2026)
 
 Se incorpora revisión local de correspondencias humanas entre módulos/actividades EDT y módulos/tareas operativos, exportable como JSON `draft_for_discussion` sin permiso de traspaso. No escribe en BD y no requiere migración. Ver `docs/IMPLEMENTACION-CALCULADORA-R3C-ACTA-CONCILIACION.md`. Pruebas por ejecutar localmente.
+
+## R3-d — Actas de conciliación persistidas (30/10/2026)
+
+GET/POST de historial de actas `draft_for_discussion` registradas como eventos append-only en `quotation_events` con actor y timestamp. API recompone el acta y verifica pertenencia a proyecto, versión/revisión, UUID y estado operativo; UI añade guardar e historial. **Sin migración nueva; sin aprobación ni traspaso de ejecución**. Ver docs/IMPLEMENTACION-CALCULADORA-R3D-ACTAS-AUDITABLES.md. Pruebas pendientes en checkout del usuario.

@@ -57,3 +57,7 @@ Para preparar D04 se agregó una conciliación de solo lectura EDT → candidato
 ## R3-c — Revisión humana D04 (30-oct-2026)
 
 Una pantalla local permite preparar una propuesta explícita de asociación de módulos/actividades EDT a módulos/tareas operativos por UUID y exportar un acta JSON, sin guardarla en Kora ni ejecutar cambios. Una asociación por nombre no es identidad comprobada. Las decisiones marcadas en el acta no constituyen aprobación comercial ni ratifican D04–D06. Ver `docs/IMPLEMENTACION-CALCULADORA-R3C-ACTA-CONCILIACION.md`.
+
+## R3-d — Registro de actas en Kora (30-oct-2026)
+
+Las actas propuestas por el responsable pueden guardarse como registros append-only de `quotation_events` sin modificar la cotización ni ejecutar traspasos. Cada guardado conserva JSON canónico, autor, fecha y revisión; un preflight stale se rechaza. El registro **no equivale** a ratificación de D04/D05/D06 ni es aprobación contractual. Ver docs/IMPLEMENTACION-CALCULADORA-R3D-ACTAS-AUDITABLES.md.
