@@ -107,7 +107,7 @@ export function QuotationReconciliationReviewCard({ preview, canSave = false, ca
   const latestReview = history.data?.[0];
   const latestAssessment = assessments.data?.find((record) => record.reviewId === latestReview?.id);
   const mayAssess = Boolean(
-    canAssess && latestReview && !latestAssessment &&
+    canAssess && latestReview && !latestAssessment && !assessments.isLoading && !assessments.isError &&
     latestReview.actorUserId !== currentUserId &&
     latestReview.review.versionRevision === preview.revision &&
     !assessMutation.isPending
@@ -270,7 +270,7 @@ export function QuotationReconciliationReviewCard({ preview, canSave = false, ca
             {assessments.isError && <p role="alert" className={styles.error}>
               No se pudo consultar el estado de las evaluaciones técnicas.
             </p>}
-            {canAssess && latestReview && !latestAssessment && (
+            {canAssess && latestReview && !latestAssessment && !assessments.isLoading && !assessments.isError && (
               <div className={styles.assessmentForm}>
                 <strong>Evaluar la última acta · {latestReview.id.slice(0, 8)}</strong>
                 {latestReview.actorUserId === currentUserId
@@ -297,12 +297,13 @@ export function QuotationReconciliationReviewCard({ preview, canSave = false, ca
                           disabled={!mayAssess || assessmentReason.trim().length < 10}
                           onClick={() => void submitAssessment()}>Registrar evaluación técnica</Button>
                         {assessmentError && <p role="alert" className={styles.error}>{assessmentError}</p>}
-                        {assessmentNotice && <p role="status" className={styles.notice}>{assessmentNotice}</p>}
+
                       </>
                     )}
               </div>
             )}
 
+            {assessmentNotice && <p role="status" className={styles.notice}>{assessmentNotice}</p>}
             <strong>Historial guardado en Kora (hasta 25 actas)</strong>
             {history.isLoading && <p>Cargando historial…</p>}
             {history.isError && <p role="alert" className={styles.error}>
