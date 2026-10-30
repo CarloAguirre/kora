@@ -7,7 +7,8 @@ import type {
   EstimationDriveInventoryItem,
   ProjectSummary,
 } from '@kora/contracts';
-import { projectEstimationPath } from '@/app/router/paths';
+import { projectEstimationPath, projectQuotationPath } from '@/app/router/paths';
+import { useCreateQuotationVersion } from '../api/quotation.queries';
 import {
   useProjectDetail,
   useUpdateProjectExtras,
@@ -34,29 +35,21 @@ const MODE_OPTIONS: readonly {
   description: string;
 }[] = [
   {
-    value: 'ai',
-    title: '✦ Propuesta del agente IA',
-    description:
-      'Lee los antecedentes relevantes de Drive y propone roles, horas y supuestos para una estimación inicial.',
-  },
-  {
     value: 'standard',
-    title: 'Plantilla estándar',
-    description:
-      'Desarrollo, Líder, QA, Arquitecto, IA, PMO y UX como base editable.',
+    title: 'En blanco · cotización versionada',
+    description: 'Crea un borrador persistente y agrega equipos y fases de Kora, tarifa y costos.',
   },
   {
-    value: 'rpa',
-    title: 'Plantilla RPA',
-    description:
-      'Dev RPA, Líder, QA, Arquitecto, Dev IA, PMO y marcha blanca como base editable.',
+    value: 'ai',
+    title: '✦ Propuesta del agente IA (PoC)',
+    description: 'El agente IA aún usa el flujo anterior. No guarda una versión comercial hasta R4.',
   },
 ];
 
 export function NewEstimationModal({ open, prospects, onClose }: NewEstimationModalProps) {
   const navigate = useNavigate();
   const [projectRef, setProjectRef] = useState('');
-  const [mode, setMode] = useState<EstimationCreationMode>('ai');
+  const [mode, setMode] = useState<EstimationCreationMode>('standard');
   const [driveFolderUrl, setDriveFolderUrl] = useState('');
   const [instructions, setInstructions] = useState('');
   const [driveTouched, setDriveTouched] = useState(false);
@@ -68,6 +61,7 @@ export function NewEstimationModal({ open, prospects, onClose }: NewEstimationMo
   );
   const detail = useProjectDetail(selected?.slug ?? null);
   const updateProjectExtras = useUpdateProjectExtras();
+  const createQuotation = useCreateQuotationVersion(selected?.id ?? '');
 
   const resolutionInput = useMemo(() => {
     if (!detail.data) return null;
@@ -94,7 +88,7 @@ export function NewEstimationModal({ open, prospects, onClose }: NewEstimationMo
   useEffect(() => {
     if (!open) {
       setProjectRef('');
-      setMode('ai');
+      setMode('standard');
       setDriveFolderUrl('');
       setInstructions('');
       setDriveTouched(false);
@@ -132,6 +126,18 @@ export function NewEstimationModal({ open, prospects, onClose }: NewEstimationMo
   const submit = async () => {
     if (!selected) {
       setError('Elige un prospecto en cotización.');
+      return;
+    }
+
+    if (mode === 'standard') {
+      setError(null);
+      try {
+        const created = await createQuotation.mutateAsync({});
+        navigate(projectQuotationPath(selected) + '?version=' + created.id);
+        onClose();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'No fue posible crear la cotización.');
+      }
       return;
     }
 
@@ -213,7 +219,7 @@ export function NewEstimationModal({ open, prospects, onClose }: NewEstimationMo
         <>
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
           <Button
-            loading={updateProjectExtras.isPending}
+            loading={updateProjectExtras.isPending || createQuotation.isPending}
             onClick={() => void submit()}
           >
             Crear estimación
@@ -232,7 +238,7 @@ export function NewEstimationModal({ open, prospects, onClose }: NewEstimationMo
           setError(null);
         }}
         options={projectOptions}
-        helperText="Solo aparecen prospectos en cotización. Los proyectos ya aprobados o en ejecución no se seleccionan aquí."
+        helperText="Solo proyectos de desarrollo en cotización que todavía no se encuentran activos."
       />
 
       <fieldset className={styles.fieldset}>
@@ -265,8 +271,8 @@ export function NewEstimationModal({ open, prospects, onClose }: NewEstimationMo
           <div className={styles.optionDisabled} aria-disabled="true">
             <span className={styles.fakeRadio} />
             <span>
-              <strong>Copiar una estimación existente</strong>
-              <small>Se habilitará cuando el historial de estimaciones quede persistido.</small>
+              <strong>Copiar versión de cotización</strong>
+              <small>En el editor de cotizaciones puedes copiar cualquiera de sus versiones guardadas.</small>
             </span>
           </div>
         </div>

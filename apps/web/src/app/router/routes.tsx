@@ -34,6 +34,7 @@ import { ForbiddenPage } from '@/app/pages/ForbiddenPage';
 import { NotFoundPage } from '@/app/pages/NotFoundPage';
 import { CalculatorPage } from '@/modules/estimation/pages/CalculatorPage';
 import { EstimationWorkspacePage } from '@/modules/estimation/pages/EstimationWorkspacePage';
+import { QuotationWorkspacePage } from '@/modules/estimation/pages/QuotationWorkspacePage';
 
 /**
  * Tabla de rutas.
@@ -114,7 +115,6 @@ export const router = createBrowserRouter([
     element: <ProtectedRoute permission="projects:manage" />,
     children: [
       { path: '/proyectos/nuevo', element: <NewProjectPage /> },
-      { path: '/calculadora', element: <CalculatorPage /> },
       { path: '/proyectos/:projectId/estimacion', element: <EstimationWorkspacePage /> },
     ],
   },
@@ -123,6 +123,15 @@ export const router = createBrowserRouter([
     children: [
       { path: '/proyectos/:projectId', element: <ProjectDetailPage /> },
       { path: '/proyectos/:projectId/equipos/:teamId', element: <ProjectTeamDetailPage /> },
+    ],
+  },
+
+  // ── Cotizaciones: Líder PM del proyecto o Gerencia/PMO; API verifica pertenencia. ──
+  {
+    element: <ProtectedRoute anyOf={['projects:manage', 'projects:read_assigned']} />,
+    children: [
+      { path: '/calculadora', element: <CalculatorPage /> },
+      { path: '/proyectos/:projectId/cotizacion', element: <QuotationWorkspacePage /> },
     ],
   },
 

@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { projectQuotationPath } from '@/app/router/paths';
 import {
   PROJECT_SALES_STAGE_LABELS,
   PROJECT_STATUS_LABELS,
@@ -23,8 +25,8 @@ const isVisibleProject = (project: ProjectSummary) =>
 
 const isQuotationProspect = (project: ProjectSummary) =>
   project.type === 'development' &&
-  project.salesStage === 'quoted' &&
-  project.status !== 'cancelled';
+  (project.salesStage === 'prospect' || project.salesStage === 'quoted') &&
+  project.status === 'draft';
 
 export function CalculatorPage() {
   const [search, setSearch] = useState('');
@@ -64,12 +66,12 @@ export function CalculatorPage() {
             <span className={styles.eyebrow}>Estimación de proyectos</span>
             <h1>Calculadora</h1>
             <p>
-              Estima las HH de cada rol para prospectos en cotización y mantén visibles los
-              proyectos vigentes como referencia.
+              Administra borradores comerciales versionados y mantén visibles los
+              proyectos vigentes como referencia, sin modificar todavía sus HH operativas.
             </p>
           </div>
           <div className={styles.headerActions}>
-            <span className={styles.pocBadge}>PoC</span>
+            <span className={styles.pocBadge}>Cotizaciones</span>
             <Button onClick={() => setNewEstimationOpen(true)}>+ Nueva estimación</Button>
           </div>
         </header>
@@ -84,7 +86,7 @@ export function CalculatorPage() {
             aria-label="Buscar proyectos"
           />
           <div className={styles.toolbarNote}>
-            La creación de una estimación parte siempre desde <strong>+ Nueva estimación</strong>.
+            La cotización manual se guarda como versión en PostgreSQL. La opción IA continúa como PoC separada.
           </div>
         </Card>
 
@@ -106,6 +108,7 @@ export function CalculatorPage() {
                     <th>Estado</th>
                     <th className={styles.numeric}>HH actuales</th>
                     <th>Líder</th>
+                    <th>Cotización</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -130,6 +133,7 @@ export function CalculatorPage() {
                       <td>{PROJECT_STATUS_LABELS[project.status]}</td>
                       <td className={styles.numeric}>{formatHours(project.soldHours)}</td>
                       <td>{project.leader?.fullName ?? 'Sin asignar'}</td>
+                      <td><Link to={projectQuotationPath(project)}>Ver versiones</Link></td>
                     </tr>
                   ))}
                 </tbody>
