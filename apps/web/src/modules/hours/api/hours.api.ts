@@ -24,6 +24,7 @@ export const hoursApi = {
       search: query.search || undefined,
       teamId: query.teamId,
       outsideLedTeams: query.outsideLedTeams === undefined ? undefined : String(query.outsideLedTeams),
+      excludeOwn: query.excludeOwn === undefined ? undefined : String(query.excludeOwn),
       projectId: query.projectId,
       projectIds: query.projectIds,
       status: query.status,

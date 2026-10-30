@@ -137,6 +137,22 @@ describe('ListHourEntriesUseCase — alcance de visibilidad', () => {
     expect(filters.leaderScopeUserId).toBe('leader-1');
   });
 
+  it('excludeOwn: deja fuera solo los registros propios, sin tocar los equipos', async () => {
+    const repo = new FakeEntryRepository();
+    const useCase = new ListHourEntriesUseCase(repo, new FakeProjectReader());
+
+    await useCase.execute({
+      query: { ...baseQuery(), teamId: 'team-1', excludeOwn: true },
+      actor: { userId: 'leader-1', email: 'l@kabeli.cl' },
+      actorPermissions: ['hours:read_team'],
+    });
+
+    const filters: HourEntryFilters = repo.search.mock.calls[0]![0];
+    expect(filters.excludeUserId).toBe('leader-1');
+    expect(filters.outsideTeamsLedByUserId).toBeUndefined();
+    expect(filters.teamId).toBe('team-1');
+  });
+
   it('sin outsideLedTeams: no excluye equipos ni registros propios', async () => {
     const repo = new FakeEntryRepository();
     const useCase = new ListHourEntriesUseCase(repo, new FakeProjectReader());

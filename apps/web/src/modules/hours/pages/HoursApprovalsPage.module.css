@@ -22,6 +22,16 @@
   font-size: var(--kora-text-sm);
 }
 
+.otherTeams {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kora-space-2);
+  margin: calc(-1 * var(--kora-space-1)) 0 var(--kora-space-3);
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-sm);
+}
+
 .divider {
   height: 1px;
   background: var(--kora-surface-disabled);

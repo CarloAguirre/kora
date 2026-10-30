@@ -159,6 +159,8 @@ export const listHourEntriesQuerySchema = paginationQuerySchema.extend({
    * nunca los muestra, pero sí cuentan en la campanita y el Dashboard.
    */
   outsideLedTeams: z.stringbool().optional(),
+  /** Deja fuera los registros del propio actor (los decide otro) — así cuenta la campanita los pendientes del líder. */
+  excludeOwn: z.stringbool().optional(),
   /** Acepta id o slug: la ficha de proyecto filtra por el `projectId` de la URL, que ahora es el slug del proyecto — se resuelve a UUID en `ListHourEntriesUseCase`. */
   projectId: z.string().optional(),
   /** Varios proyectos por UUID (filtro Proyecto del historial de equipo). */

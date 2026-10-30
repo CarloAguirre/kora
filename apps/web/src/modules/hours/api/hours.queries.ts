@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   AvailabilityQuery,
   CreateHourEntryInput,
@@ -17,6 +17,29 @@ export function useHourEntriesList(query: Partial<ListHourEntriesQuery>, options
     placeholderData: (previous) => previous,
     staleTime: 15_000,
     enabled: options.enabled ?? true,
+  });
+}
+
+/**
+ * Horas por aprobar de cada equipo, sin las propias del actor — el mismo
+ * criterio con que la campanita cuenta "N registros por aprobar". `undefined`
+ * mientras alguno carga.
+ */
+export function useTeamsPendingCounts(teamIds: readonly string[], options: { enabled?: boolean } = {}) {
+  return useQueries({
+    queries: teamIds.map((teamId) => {
+      const query: Partial<ListHourEntriesQuery> = { status: 'pending', teamId, excludeOwn: true, pageSize: 1 };
+      return {
+        queryKey: hourKeys.list(query),
+        queryFn: () => hoursApi.list(query),
+        staleTime: 15_000,
+        enabled: options.enabled ?? true,
+      };
+    }),
+    combine: (results) =>
+      results.every((result) => result.data)
+        ? new Map(teamIds.map((teamId, index) => [teamId, results[index]!.data!.total]))
+        : undefined,
   });
 }
 
