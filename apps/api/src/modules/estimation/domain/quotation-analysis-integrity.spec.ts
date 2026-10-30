@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { BadRequestException } from '@nestjs/common';
 import { estimationAnalysisArtifactSchema, quotationDraftDataSchema } from '@kora/contracts';
-import { reconcileQuotationAnalysis } from './quotation-analysis-integrity';
+import { QuotationAnalysisIntegrityError, reconcileQuotationAnalysis } from './quotation-analysis-integrity';
 
 const analysis = estimationAnalysisArtifactSchema.parse({
   schemaVersion: 'kora.estimation.analysis.v1',
@@ -53,20 +52,20 @@ describe('reconcileQuotationAnalysis', () => {
 
   it('rechaza reemplazar, quitar o inyectar un análisis por PATCH', () => {
     expect(() => reconcileQuotationAnalysis(saved, { ...saved, analysis: null }))
-      .toThrow(BadRequestException);
+      .toThrow(QuotationAnalysisIntegrityError);
     const edited = structuredClone(saved);
     if (!edited.analysis) throw new Error('Fixture sin análisis');
     edited.analysis.project.name = 'Otro proyecto';
-    expect(() => reconcileQuotationAnalysis(saved, edited)).toThrow(BadRequestException);
+    expect(() => reconcileQuotationAnalysis(saved, edited)).toThrow(QuotationAnalysisIntegrityError);
     const manual = quotationDraftDataSchema.parse({});
-    expect(() => reconcileQuotationAnalysis(manual, saved)).toThrow(BadRequestException);
+    expect(() => reconcileQuotationAnalysis(manual, saved)).toThrow(QuotationAnalysisIntegrityError);
   });
 
   it('protege referencias y respuestas de la evidencia original', () => {
     expect(() => reconcileQuotationAnalysis(saved, { ...saved, sourceRefs: [] }))
-      .toThrow(BadRequestException);
+      .toThrow(QuotationAnalysisIntegrityError);
     expect(() => reconcileQuotationAnalysis(saved, { ...saved, answers: {} }))
-      .toThrow(BadRequestException);
+      .toThrow(QuotationAnalysisIntegrityError);
   });
 
   it('no genera marca IA sobre un borrador puramente manual', () => {

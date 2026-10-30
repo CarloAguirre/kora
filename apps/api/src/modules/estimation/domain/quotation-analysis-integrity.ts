@@ -1,6 +1,12 @@
-import { BadRequestException } from '@nestjs/common';
 import { isDeepStrictEqual } from 'node:util';
 import type { QuotationDraftData } from '@kora/contracts';
+
+export class QuotationAnalysisIntegrityError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'QuotationAnalysisIntegrityError';
+  }
+}
 
 const commercialFields = [
   'teams', 'phases', 'costs', 'paymentPlan', 'assumptions', 'exclusions',
@@ -18,7 +24,7 @@ export function reconcileQuotationAnalysis(
 ): QuotationDraftData {
   if (!saved.analysis) {
     if (incoming.analysis) {
-      throw new BadRequestException(
+      throw new QuotationAnalysisIntegrityError(
         'El análisis IA se incorpora únicamente mediante la creación de una nueva versión.',
       );
     }
@@ -26,13 +32,13 @@ export function reconcileQuotationAnalysis(
   }
 
   if (!isDeepStrictEqual(saved.analysis, incoming.analysis)) {
-    throw new BadRequestException(
+    throw new QuotationAnalysisIntegrityError(
       'No se puede sobrescribir ni quitar la evidencia original del análisis IA.',
     );
   }
   if (!isDeepStrictEqual(saved.sourceRefs, incoming.sourceRefs) ||
       !isDeepStrictEqual(saved.answers, incoming.answers)) {
-    throw new BadRequestException(
+    throw new QuotationAnalysisIntegrityError(
       'Las fuentes y respuestas originales deben conservarse durante la edición.',
     );
   }

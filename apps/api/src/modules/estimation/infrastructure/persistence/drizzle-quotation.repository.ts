@@ -1,6 +1,6 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { projectAnalysisToQuotationDraft } from '../../domain/project-analysis-to-quotation';
-import { reconcileQuotationAnalysis } from '../../domain/quotation-analysis-integrity';
+import { QuotationAnalysisIntegrityError, reconcileQuotationAnalysis } from '../../domain/quotation-analysis-integrity';
 import { and, asc, desc, eq, inArray, isNull, projectQuotations, projects, quotationEvents, quotationVersions, sql, teams, type Database } from '@kora/db';
 import {
   quotationDraftDataSchema,
@@ -134,7 +134,15 @@ export class DrizzleQuotationRepository implements QuotationRepository {
         return null;
       }
       const savedDraft = quotationDraftDataSchema.parse(currentRow.draft);
-      const draft = reconcileQuotationAnalysis(savedDraft, input.draft);
+      let draft: QuotationDraftData;
+      try {
+        draft = reconcileQuotationAnalysis(savedDraft, input.draft);
+      } catch (error) {
+        if (error instanceof QuotationAnalysisIntegrityError) {
+          throw new BadRequestException(error.message);
+        }
+        throw error;
+      }
       const totals = calculateQuotation(draft, input.hourlyRate, input.tax);
       const teamIds = draft.teams.map((team) => team.teamId);
       if (teamIds.length > 0) {
