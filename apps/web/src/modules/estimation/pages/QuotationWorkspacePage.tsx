@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { isQuotationDraftEligibleProject, quotationDraftDataSchema, type QuotationDraftData, type QuotationVersion, type UpdateQuotationDraftInput } from '@kora/contracts';
+import { estimationAnalysisArtifactSchema, isQuotationDraftEligibleProject, quotationDraftDataSchema, type EstimationAnalysisArtifact, type QuotationDraftData, type QuotationVersion, type UpdateQuotationDraftInput } from '@kora/contracts';
 import { useProjectDetail } from '@/modules/projects/api/projects.queries';
 import { useTeamsList } from '@/modules/teams/api/teams.queries';
 import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
@@ -40,6 +40,11 @@ export function QuotationWorkspacePage() {
   const [dirty, setDirty] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [sampleAnalysis, setSampleAnalysis] = useState<EstimationAnalysisArtifact | null>(null);
+  const [sampleTeamMap, setSampleTeamMap] = useState<Record<string, string>>({});
+  const [sampleError, setSampleError] = useState('');
+  const [sampleSuccess, setSampleSuccess] = useState('');
+
   const quotation = quotationQuery.data;
   const versions = quotation?.versions ?? [];
   const versionParam = params.get('version');
@@ -70,7 +75,18 @@ export function QuotationWorkspacePage() {
     setError('');
   };
   const updateDraft = (patch: Partial<QuotationDraftData>) =>
-    change((current) => ({ ...current, draft: { ...current.draft, ...patch } }));
+    change((current) => ({
+      ...current,
+      draft: {
+        ...current.draft,
+        ...patch,
+        // El artefacto conserva el cálculo original; editar el presupuesto
+        // requiere conciliarlo antes de usarlo para producir documentos.
+        ...(current.draft.analysis && Object.keys(patch).some(
+          (field) => ['teams', 'phases', 'costs', 'paymentPlan', 'assumptions', 'exclusions'].includes(field),
+        ) ? { analysisProjectionStatus: 'modified' as const } : {}),
+      },
+    }));
   const selectVersion = (id: string) => {
     if (dirty && !window.confirm('Hay cambios sin guardar. ¿Deseas descartarlos?')) return;
     setParams({ version: id });
@@ -108,6 +124,69 @@ export function QuotationWorkspacePage() {
       setNotice('Borrador guardado. Revisión ' + saved.revision + '.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo guardar. Revisa los campos.');
+    }
+  };
+
+
+  const importSimulatedAnalysis = async (file?: File) => {
+    setSampleAnalysis(null);
+    setSampleTeamMap({});
+    setSampleError('');
+    setSampleSuccess('');
+    if (!file) return;
+    if (file.size > 1_000_000) {
+      setSampleError('El JSON supera el límite de 1 MB para este ejemplo.');
+      return;
+    }
+    try {
+      const json: unknown = JSON.parse(await file.text());
+      const validation = estimationAnalysisArtifactSchema.safeParse(json);
+      if (!validation.success) {
+        setSampleError('El artefacto no coincide con el esquema o sus totales: ' +
+          (validation.error.issues[0]?.message ?? 'JSON inválido.'));
+        return;
+      }
+      if (validation.data.provenance.mode !== 'simulated_fixture') {
+        setSampleError('Este importador acepta solo simulaciones explícitas, no resultados de IA real.');
+        return;
+      }
+      setSampleAnalysis(validation.data);
+      // Sugerencias de nombre, pero ningún mapeo es definitivo sin revisión.
+      const suggested: Record<string, string> = {};
+      for (const role of validation.data.roles) {
+        const name = validation.data.roleTeamMappings.suggestions[role.role];
+        if (typeof name !== 'string') continue;
+        const team = activeTeams.find((candidate) =>
+          candidate.name.toLocaleLowerCase('es-CL') === name.toLocaleLowerCase('es-CL'));
+        if (team) suggested[role.role] = team.id;
+      }
+      setSampleTeamMap(suggested);
+    } catch {
+      setSampleError('No se pudo interpretar el archivo JSON seleccionado.');
+    }
+  };
+
+  const saveSimulatedAnalysis = async () => {
+    if (!sampleAnalysis || !projectId || !mayWrite || createVersion.isPending) return;
+    if (dirty && !window.confirm('Hay cambios sin guardar. ¿Deseas descartarlos?')) return;
+    if (sampleAnalysis.roles.some((role) => !sampleTeamMap[role.role])) {
+      setSampleError('Asocia todos los perfiles del EDT con equipos activos de Kora.');
+      return;
+    }
+    if (!window.confirm('El artefacto corresponde al ejemplo Zurich, no al análisis de este proyecto. ¿Deseas guardar una versión de DEMOSTRACIÓN explícitamente identificada?')) return;
+    setSampleError('');
+    setSampleSuccess('');
+    try {
+      const created = await createVersion.mutateAsync({
+        simulation: { analysis: sampleAnalysis, roleTeamIds: sampleTeamMap },
+      });
+      setParams({ version: created.id });
+      setForm(fromVersion(created));
+      setDirty(false);
+      setSampleSuccess('Versión de demostración creada con trazabilidad y HH verificadas.');
+      setNotice('Versión de IA simulada: pendiente de revisión.');
+    } catch (err) {
+      setSampleError(err instanceof Error ? err.message : 'No se pudo guardar la simulación.');
     }
   };
 
@@ -189,6 +268,59 @@ export function QuotationWorkspacePage() {
                       ))}
                     </div>}
               </Card>
+
+
+              {mayWrite && (
+                <Card>
+                  <div className={styles.cardTitle}>
+                    <div>
+                      <span className={styles.eyebrow}>PoC · simulación controlada</span>
+                      <h2>Importar análisis estructurado de ejemplo</h2>
+                      <p>Carga el JSON de Zurich generado a partir de su ERS y EDT. No invoca Gemini ni analiza documentos nuevos.</p>
+                    </div>
+                  </div>
+                  <label className={styles.longField}>Archivo JSON (máximo 1 MB)
+                    <input type="file" accept=".json,application/json" onChange={(e) =>
+                      void importSimulatedAnalysis(e.target.files?.[0])} />
+                  </label>
+                  {sampleAnalysis && (
+                    <div className={styles.simulation}>
+                      <strong>{sampleAnalysis.project.name}</strong>
+                      <p className={styles.helper}>{sampleAnalysis.provenance.warning}</p>
+                      <div className={styles.summaryStats}>
+                        <span>{sampleAnalysis.activities.length} actividades WBS</span>
+                        <span>{sampleAnalysis.tranches.length} tramos</span>
+                        <span>{money(sampleAnalysis.summary.baseHours)} HH base</span>
+                        <span>Reserva separada: {money(sampleAnalysis.summary.reserveHours)} HH</span>
+                      </div>
+                      <p className={styles.warn}>Los perfiles del EDT no son necesariamente los equipos registrados en Kora. Revisa cada correspondencia. Si varios perfiles usan el mismo equipo, sus HH se agregan sin perder el desglose original.</p>
+                      <div className={styles.mapping}>
+                        {sampleAnalysis.roles.map((role) => (
+                          <div key={role.role} className={styles.mappingRow}>
+                            <div><strong>{role.role}</strong><small>{money(role.baseHours)} HH</small></div>
+                            <Select label="Equipo Kora" placeholder="Asignar equipo"
+                              value={sampleTeamMap[role.role] ?? ''}
+                              options={activeTeams.map((team) => ({ value: team.id, label: team.name }))}
+                              onChange={(e) => {
+                                setSampleTeamMap((mapping) => ({ ...mapping, [role.role]: e.target.value }));
+                                setSampleError('');
+                              }} />
+                          </div>
+                        ))}
+                      </div>
+                      <p className={styles.helper}>La reserva no se suma a la cotización. Tarifa, impuesto y plan comercial requieren revisión humana. Se conserva el artefacto con ERS/EDT para futura generación documental.</p>
+                      <Button
+                        disabled={sampleAnalysis.roles.some((role) => !sampleTeamMap[role.role])}
+                        loading={createVersion.isPending}
+                        onClick={() => void saveSimulatedAnalysis()}>
+                        Crear versión de IA simulada
+                      </Button>
+                    </div>
+                  )}
+                  {sampleError && <p className={styles.error} role="alert">{sampleError}</p>}
+                  {sampleSuccess && <p className={styles.success} role="status">{sampleSuccess}</p>}
+                </Card>
+              )}
 
               {selected && form && (
                 <>
@@ -381,6 +513,14 @@ export function QuotationWorkspacePage() {
                     <div className={styles.stat}><span>Neto guardado</span><strong>{selected.netAmount === null ? 'Sin valor HH' : money(selected.netAmount) + ' ' + selected.currency}</strong></div>
                     <div className={styles.stat}><span>Total guardado</span><strong>{selected.totalAmount === null ? '—' : money(selected.totalAmount) + ' ' + selected.currency}</strong></div>
                     <p className={styles.helper}>Revisión {selected.revision}. Los importes se recalculan en servidor al guardar.</p>
+                    {form?.draft.analysis && (
+                      <p className={form.draft.analysisProjectionStatus === 'modified' ? styles.warn : styles.helper}>
+                        {form.draft.analysis.provenance.mode === 'simulated_fixture' ? 'IA simulada · ' : 'IA · '}
+                        {form.draft.analysisProjectionStatus === 'modified'
+                          ? 'La edición manual difiere del EDT de origen. Conciliar antes de generar documentos.'
+                          : 'WBS y trazabilidad conservados para generación documental.'}
+                      </p>
+                    )}
                     {dirty && <p className={styles.warn}>Hay cambios sin guardar; los totales aún corresponden a la última versión guardada.</p>}
                     {notice && <p className={styles.success} role="status">{notice}</p>}
                     {error && <p className={styles.error} role="alert">{error}</p>}
