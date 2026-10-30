@@ -14,6 +14,7 @@ function setup(p: QuotationProjectScope = project) {
   const repository = {
     getProjectScope: vi.fn().mockResolvedValue(p),
     getByProjectId: vi.fn().mockResolvedValue(null),
+    getOperationalSnapshot: vi.fn().mockResolvedValue(null),
     createDraft: vi.fn().mockResolvedValue({ id: 'version' }),
     updateDraft: vi.fn().mockResolvedValue(null),
   } as unknown as QuotationRepository;
@@ -83,5 +84,51 @@ describe('ManageQuotationDraftsUseCase', () => {
       revision: 1, name: 'v1', hourlyRate: null, currency: 'UF', tax: 'iva19',
       draft: { mode: 'team', teams: [], phases: [], costs: [], paymentPlan: [], assumptions: [], exclusions: [], sourceRefs: [], answers: {} },
     })).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('R3 preflight: verifica permisos y no utiliza métodos de escritura', async () => {
+    const { useCase, repository } = setup();
+    const versionId = '0777e456-fd76-445e-83f1-afc25061c105';
+    vi.mocked(repository.getByProjectId).mockResolvedValueOnce({
+      id: '0777e456-fd76-445e-83f1-afc25061c106',
+      projectId: project.id,
+      versions: [{
+        id: versionId,
+        quotationId: '0777e456-fd76-445e-83f1-afc25061c106',
+        versionNumber: 1, name: 'Borrador', status: 'draft', origin: 'manual',
+        aiReviewStatus: null, revision: 1,
+        createdByUserId: manager.id, hourlyRate: null, currency: 'UF', tax: 'iva19',
+        draft: { mode: 'team', teams: [], phases: [], costs: [], paymentPlan: [],
+          assumptions: [], exclusions: [], sourceRefs: [], answers: {} },
+        totalHours: 0, netAmount: null, totalAmount: null,
+        createdAt: '2026-10-30T12:00:00.000Z',
+        updatedAt: '2026-10-30T12:00:00.000Z',
+      }],
+    });
+    vi.mocked(repository.getOperationalSnapshot).mockResolvedValueOnce({
+      projectId: project.id, salesStage: 'quoted', status: 'active',
+      soldHours: 100, usedHours: 80, startDate: null,
+      contractAmount: null, contractCurrency: 'UF', teams: [],
+      moduleCount: 0, taskCount: 0, segmentCount: 0, paymentMilestones: [],
+    });
+    const result = await useCase.getTransferPreview(project.id, versionId, manager);
+    expect(result.transferEnabled).toBe(false);
+    expect(result.operational.usedHours).toBe(80);
+    expect(repository.createDraft).not.toHaveBeenCalled();
+    expect(repository.updateDraft).not.toHaveBeenCalled();
+  });
+
+  it('R3 preflight: un líder no asignado no puede consultar versiones ni estado operativo', async () => {
+    const { useCase, repository } = setup();
+    await expect(useCase.getTransferPreview(project.id, 'version', {
+      id: manager.id, permissions: ['projects:read_assigned'],
+    })).rejects.toBeInstanceOf(ForbiddenException);
+    expect(repository.getOperationalSnapshot).not.toHaveBeenCalled();
+  });
+
+  it('R3 preflight: no revela información operativa si la versión no pertenece al proyecto', async () => {
+    const { useCase, repository } = setup();
+    await expect(useCase.getTransferPreview(project.id, 'version', manager)).rejects.toThrow();
+    expect(repository.getOperationalSnapshot).not.toHaveBeenCalled();
   });
 });
