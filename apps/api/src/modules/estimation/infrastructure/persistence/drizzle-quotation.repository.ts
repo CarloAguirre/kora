@@ -6,12 +6,15 @@ import {
   quotationDraftDataSchema,
   quotationVersionSchema,
   savedQuotationReconciliationReviewSchema,
+  savedQuotationReviewAssessmentSchema,
   type CreateQuotationVersionInput,
   type ProjectQuotation,
   type QuotationDraftData,
   type QuotationOperationalSnapshot,
   type QuotationReconciliationReview,
   type SavedQuotationReconciliationReview,
+  type AssessQuotationReconciliationInput,
+  type SavedQuotationReviewAssessment,
   type QuotationVersion,
   type UpdateQuotationDraftInput,
 } from '@kora/contracts';
@@ -179,6 +182,82 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       return savedQuotationReconciliationReviewSchema.parse({
         id: created.id, actorUserId: created.actorUserId,
         occurredAt: created.occurredAt.toISOString(), review,
+      });
+    });
+  }
+
+  /** Historial de decisiones técnicas, independiente del estado contractual. */
+  async listReconciliationAssessments(projectId: string, versionId: string): Promise<SavedQuotationReviewAssessment[]> {
+    const [quotation] = await this.db.select({ id: projectQuotations.id })
+      .from(projectQuotations).where(eq(projectQuotations.projectId, projectId)).limit(1);
+    if (!quotation) return [];
+    const [version] = await this.db.select({ id: quotationVersions.id })
+      .from(quotationVersions).where(and(
+        eq(quotationVersions.id, versionId), eq(quotationVersions.quotationId, quotation.id),
+      )).limit(1);
+    if (!version) return [];
+    const rows = await this.db.select({
+      id: quotationEvents.id, actorUserId: quotationEvents.actorUserId,
+      occurredAt: quotationEvents.occurredAt, metadata: quotationEvents.metadata,
+    }).from(quotationEvents).where(and(
+      eq(quotationEvents.versionId, versionId),
+      eq(quotationEvents.action, 'reconciliation_review_assessed'),
+    )).orderBy(desc(quotationEvents.occurredAt), desc(quotationEvents.id)).limit(25);
+    return rows.map((row) => savedQuotationReviewAssessmentSchema.parse({
+      id: row.id,
+      reviewId: row.metadata['reviewId'],
+      versionId, versionRevision: row.metadata['versionRevision'],
+      reviewerUserId: row.actorUserId, occurredAt: row.occurredAt.toISOString(),
+      decision: row.metadata['decision'], reason: row.metadata['reason'],
+      status: 'technical_review_only', transferEnabled: false,
+    }));
+  }
+
+  /** Serializa bajo lock para impedir revisiones dobles o de actas obsoletas. */
+  async appendReconciliationAssessment(
+    projectId: string, versionId: string, reviewerUserId: string,
+    input: AssessQuotationReconciliationInput,
+  ): Promise<SavedQuotationReviewAssessment | null> {
+    return this.db.transaction(async (tx) => {
+      const [quotation] = await tx.select({ id: projectQuotations.id })
+        .from(projectQuotations).where(eq(projectQuotations.projectId, projectId)).limit(1);
+      if (!quotation) return null;
+      await tx.execute(sql`SELECT id FROM quotation_versions WHERE id = ${versionId} AND quotation_id = ${quotation.id} FOR UPDATE`);
+      const [version] = await tx.select({
+        id: quotationVersions.id, revision: quotationVersions.revision, status: quotationVersions.status,
+      }).from(quotationVersions).where(and(
+        eq(quotationVersions.id, versionId), eq(quotationVersions.quotationId, quotation.id),
+      )).limit(1);
+      if (!version || version.status !== 'draft' || version.revision !== input.versionRevision) return null;
+
+      const [latest] = await tx.select({
+        id: quotationEvents.id, actorUserId: quotationEvents.actorUserId,
+      }).from(quotationEvents).where(and(
+        eq(quotationEvents.versionId, versionId),
+        eq(quotationEvents.action, 'reconciliation_review_saved'),
+      )).orderBy(desc(quotationEvents.occurredAt), desc(quotationEvents.id)).limit(1);
+      if (!latest || latest.id !== input.reviewId || latest.actorUserId === reviewerUserId) return null;
+      const [prior] = await tx.select({ id: quotationEvents.id })
+        .from(quotationEvents).where(and(
+          eq(quotationEvents.versionId, versionId),
+          eq(quotationEvents.action, 'reconciliation_review_assessed'),
+          sql`${quotationEvents.metadata}->>'reviewId' = ${input.reviewId}`,
+        )).limit(1);
+      if (prior) return null;
+
+      const [created] = await tx.insert(quotationEvents).values({
+        versionId, actorUserId: reviewerUserId, action: 'reconciliation_review_assessed',
+        metadata: { reviewId: input.reviewId, versionRevision: input.versionRevision,
+          decision: input.decision, reason: input.reason, status: 'technical_review_only',
+          transferEnabled: false },
+      }).returning({ id: quotationEvents.id, actorUserId: quotationEvents.actorUserId,
+        occurredAt: quotationEvents.occurredAt });
+      if (!created) throw new Error('No se pudo guardar la evaluación técnica.');
+      return savedQuotationReviewAssessmentSchema.parse({
+        id: created.id, reviewId: input.reviewId, versionId,
+        versionRevision: input.versionRevision, reviewerUserId: created.actorUserId,
+        occurredAt: created.occurredAt.toISOString(), decision: input.decision,
+        reason: input.reason, status: 'technical_review_only', transferEnabled: false,
       });
     });
   }
