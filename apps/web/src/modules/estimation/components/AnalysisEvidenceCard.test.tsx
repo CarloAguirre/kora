@@ -34,7 +34,7 @@ const evidence = estimationAnalysisArtifactSchema.parse({
     trace: { artifact: 'edt', sheet: 'EDT_Detalle', row: 5 },
   }],
   dailyPlan: [{ workingDay: 1, trancheId: 'T01', role: 'Fullstack',
-    activityId: 'T01.01', description: 'Implementar carga Excel', hours: 8 }],
+    activityId: 'ACT-001', wbs: 'T01.01', description: 'Implementar carga Excel', hours: 8 }],
   weeklyPlan: [{ week: 'S01', hoursByRole: { Fullstack: 8 } }],
   milestones: [],
   assumptions: [],
@@ -63,7 +63,11 @@ describe('AnalysisEvidenceCard', () => {
     fireEvent.click(screen.getByRole('tab', { name: /Cronograma/ }));
     expect(screen.getByRole('heading', { name: 'Plan semanal — HH por perfil' })).toBeInTheDocument();
     fireEvent.click(screen.getByText(/Ver plan diario/));
-    expect(screen.getByText('T01.01 · Implementar carga Excel')).toBeInTheDocument();
+    // El WBS y la descripción comparten celda, pero React los renderiza en nodos distintos.
+    // Comprobar su relación en la misma fila evita depender de la estructura del texto.
+    const wbsRow = screen.getByText('T01.01').closest('tr');
+    expect(wbsRow).toBeInTheDocument();
+    expect(wbsRow).toHaveTextContent('Implementar carga Excel');
   });
 
   it('advierte que el presupuesto editado puede diferir del EDT', () => {
