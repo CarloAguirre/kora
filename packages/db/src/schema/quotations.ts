@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { index, integer, jsonb, numeric, pgTable, text, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
+import { check, index, integer, jsonb, numeric, pgTable, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
 import { primaryId, timestamps } from './columns';
 import { projects } from './projects';
 import { users } from './identity';
@@ -37,6 +37,15 @@ export const quotationVersions = pgTable('quotation_versions', {
 }, (t) => [
   uniqueIndex('quotation_versions_number_key').on(t.quotationId, t.versionNumber),
   index('quotation_versions_status_idx').on(t.quotationId, t.status),
+  check('quotation_versions_status_chk', sql`${t.status} IN ('draft','sent','approved')`),
+  check('quotation_versions_origin_chk', sql`${t.origin} IN ('manual','copy','ai')`),
+  check('quotation_versions_ai_review_chk', sql`${t.aiReviewStatus} IS NULL OR ${t.aiReviewStatus} IN ('pending','accepted')`),
+  check('quotation_versions_revision_chk', sql`${t.revision} >= 1`),
+  check('quotation_versions_number_chk', sql`${t.versionNumber} >= 1`),
+  check('quotation_versions_rate_chk', sql`${t.hourlyRate} IS NULL OR ${t.hourlyRate} >= 0`),
+  check('quotation_versions_total_hours_chk', sql`${t.totalHours} >= 0`),
+  check('quotation_versions_net_chk', sql`${t.netAmount} IS NULL OR ${t.netAmount} >= 0`),
+  check('quotation_versions_total_chk', sql`${t.totalAmount} IS NULL OR ${t.totalAmount} >= 0`),
 ]);
 
 /** Eventos inmutables: creación y edición. En R3 añadiremos envío, aprobación y traspaso. */

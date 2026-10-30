@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ConflictException, ForbiddenException } from '@nestjs/common';
 import { ManageQuotationDraftsUseCase } from './manage-quotation-drafts.use-case';
-import type { QuotationRepository } from '../../domain/repositories/quotation.repository';
+import type { QuotationProjectScope, QuotationRepository } from '../../domain/repositories/quotation.repository';
 
 const project = {
   id: '0777e456-fd76-445e-83f1-afc25061c101',
@@ -10,7 +10,7 @@ const project = {
 };
 const manager = { id: '0777e456-fd76-445e-83f1-afc25061c103', permissions: ['projects:manage'] as const };
 const leader = { id: project.leaderUserId, permissions: ['projects:read_assigned'] as const };
-function setup(p = project) {
+function setup(p: QuotationProjectScope = project) {
   const repository = {
     getProjectScope: vi.fn().mockResolvedValue(p),
     getByProjectId: vi.fn().mockResolvedValue(null),
