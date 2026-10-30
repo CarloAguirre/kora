@@ -3,6 +3,7 @@ import type { QuotationVersion } from '@kora/contracts';
 import { Button } from '@/shared/components/ui/Button';
 import { Card } from '@/shared/components/ui/Card';
 import { useQuotationTransferPreview } from '../api/quotation.queries';
+import { QuotationReconciliationReviewCard } from './QuotationReconciliationReviewCard';
 import styles from './QuotationTransferPreviewCard.module.css';
 
 const number = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 2 });
@@ -131,6 +132,10 @@ export function QuotationTransferPreviewCard({
                 {preview.edtReconciliation.notes.map((note) =>
                   <p className={styles.edtNote} key={note}>{note}</p>)}
               </div>
+              <QuotationReconciliationReviewCard
+                key={preview.projectId + ':' + preview.versionId + ':' + preview.revision + ':' + preview.calculatedAt}
+                preview={preview}
+              />
               <h3>Facturación y cobros existentes</h3>
               <p className={styles.helper}>
                 Pendientes: {preview.operational.milestoneCounts.pending} ·
