@@ -71,7 +71,7 @@ describe('QuotationReconciliationReviewCard — persistencia de borradores', () 
     expect(review.transferEnabled).toBe(false);
     expect(review.status).toBe('draft_for_discussion');
     expect(review.versionRevision).toBe(3);
-    expect(screen.getByRole('status')).toHaveTextContent(/Sigue pendiente de discusión/);
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/Sigue pendiente de discusión/));
   });
 
   it('no permite guardar sin autorización, pero conserva la exportación JSON', () => {
