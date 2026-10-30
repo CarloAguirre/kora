@@ -41,6 +41,22 @@ const preview = quotationTransferPreviewSchema.parse({
     teamId, name: 'Desarrollo', currentAssignedHours: 50,
     proposedHours: 75, delta: 25, existsInProject: true,
   }],
+  edtReconciliation: {
+    source: 'analysis', activityCount: 1, proposedModuleCount: 1, proposedHours: 75,
+    modules: [{
+      name: 'Portal', proposedHours: 75, matchStatus: 'possible_match',
+      deltaVsExisting: 5,
+      existingCandidates: [{
+        id: '0777e456-fd76-445e-83f1-afc25061c108',
+        name: 'Portal', estimatedHours: 70, taskCount: 1,
+      }],
+      activities: [{
+        wbs: 'T01.01', description: 'Construir endpoint', role: 'Fullstack',
+        proposedHours: 75, possibleExistingTasks: [],
+      }],
+    }],
+    notes: ['La coincidencia es por nombre.'],
+  },
   findings: [{ code: 'R3_NOT_IMPLEMENTED', severity: 'blocker',
     message: 'Traspaso todavía bloqueado.' },
     { code: 'HISTORICAL_HOURS', severity: 'review', message: 'Hay HH históricas.' }],
@@ -76,6 +92,18 @@ describe('QuotationTransferPreviewCard', () => {
     expect(within(teamRow!).getByText('+25')).toBeInTheDocument();
     expect(screen.getByText('HH consumidas')).toBeInTheDocument();
     expect(screen.getByText('Pagados: 1', { exact: false })).toBeInTheDocument();
+  });
+
+  it('muestra WBS y coincidencias sin acciones de modificación', () => {
+    render(<QuotationTransferPreviewCard projectId={projectId} version={version}
+      teamNames={new Map()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Analizar conflictos' }));
+    expect(screen.getByText('Portal', { exact: true })).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Actividades WBS (1)'));
+    expect(screen.getByText('T01.01')).toBeInTheDocument();
+    expect(screen.getByText(/La coincidencia es por nombre/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Traspasar|Crear tareas|Sincronizar EDT/i }))
+      .not.toBeInTheDocument();
   });
 
   it('actualiza solo la lectura al solicitarlo', () => {

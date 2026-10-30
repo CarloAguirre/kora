@@ -69,6 +69,68 @@ export function QuotationTransferPreviewCard({
                   </tbody>
                 </table>
               </div>
+              <h3>Conciliación granular EDT / ejecución</h3>
+              <div className={styles.edtSummary}>
+                {preview.edtReconciliation.source === 'no_analysis'
+                  ? <p>Esta versión no tiene EDT granular. No es seguro derivar tareas reales desde sus fases comerciales.</p>
+                  : (
+                    <>
+                      <p>
+                        {preview.edtReconciliation.proposedModuleCount} módulos,
+                        {' '}{preview.edtReconciliation.activityCount} actividades WBS y
+                        {' '}{number(preview.edtReconciliation.proposedHours)} HH del EDT fuente.
+                        {preview.edtReconciliation.source === 'modified_analysis' &&
+                          <strong> Atención: la cotización fue editada después del análisis; sus HH comerciales pueden diferir.</strong>}
+                      </p>
+                      <div className={styles.scroll}>
+                        <table className={styles.table}>
+                          <thead><tr>
+                            <th>Módulo EDT</th><th>HH EDT</th><th>Coincidencias operativas</th><th>Variación HH</th>
+                          </tr></thead>
+                          <tbody>{preview.edtReconciliation.modules.map((module) => (
+                            <tr key={module.name}>
+                              <td>
+                                <strong>{module.name}</strong>
+                                <details className={styles.taskDetails}>
+                                  <summary>Actividades WBS ({module.activities.length})</summary>
+                                  <ul>{module.activities.map((activity) => (
+                                    <li key={activity.wbs}>
+                                      <strong>{activity.wbs}</strong> · {activity.description}
+                                      {' · '}{number(activity.proposedHours)} HH · {activity.role}
+                                      {activity.possibleExistingTasks.length > 0 &&
+                                        <small>Posibles tareas existentes por nombre:
+                                          {' '}{activity.possibleExistingTasks.map((task) =>
+                                            task.name + ' (' + task.status + ', ' +
+                                            (task.estimatedHours === null ? 'HH sin valor' : number(task.estimatedHours) + ' HH') + ')',
+                                          ).join('; ')}
+                                        </small>}
+                                    </li>
+                                  ))}</ul>
+                                </details>
+                              </td>
+                              <td>{number(module.proposedHours)}</td>
+                              <td>
+                                {module.matchStatus === 'no_match' && 'Sin nombre coincidente'}
+                                {module.matchStatus === 'possible_match' && 'Una coincidencia posible'}
+                                {module.matchStatus === 'ambiguous' && 'Ambiguo: múltiples módulos homónimos'}
+                                {module.existingCandidates.map((existing) => (
+                                  <small key={existing.id}>{existing.name} ·
+                                    {' '}{existing.taskCount} tareas ·
+                                    {' '}{existing.estimatedHours === null ? 'HH sin valor' : number(existing.estimatedHours) + ' HH'}
+                                  </small>
+                                ))}
+                              </td>
+                              <td>{module.deltaVsExisting === null
+                                ? 'No comparable' : delta(module.deltaVsExisting)}</td>
+                            </tr>
+                          ))}</tbody>
+                        </table>
+                      </div>
+                    </>
+                  )}
+                {preview.edtReconciliation.notes.map((note) =>
+                  <p className={styles.edtNote} key={note}>{note}</p>)}
+              </div>
               <h3>Facturación y cobros existentes</h3>
               <p className={styles.helper}>
                 Pendientes: {preview.operational.milestoneCounts.pending} ·
