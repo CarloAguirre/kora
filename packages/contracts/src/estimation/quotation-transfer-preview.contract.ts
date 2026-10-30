@@ -193,3 +193,12 @@ export const quotationReconciliationReviewSchema = z.object({
 });
 export type QuotationReconciliationReview = z.infer<typeof quotationReconciliationReviewSchema>;
 export type QuotationReconciliationDecision = z.infer<typeof quotationReconciliationDecisionSchema>;
+
+/** Evento append-only de revisión R3-d. Su status sigue siendo borrador. */
+export const savedQuotationReconciliationReviewSchema = z.object({
+  id: uuidSchema,
+  actorUserId: uuidSchema.nullable(),
+  occurredAt: z.string().datetime(),
+  review: quotationReconciliationReviewSchema,
+});
+export type SavedQuotationReconciliationReview = z.infer<typeof savedQuotationReconciliationReviewSchema>;
