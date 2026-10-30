@@ -323,7 +323,8 @@ export function QuotationWorkspacePage() {
                         onClick={() => updateDraft({ paymentPlan: [...form.draft.paymentPlan, { name: 'Nuevo hito', percent: 0, trigger: 'approval' }] })}>Añadir hito</Button>}
                     </div>
                     {form.draft.paymentPlan.map((payment, index) => (
-                      <div className={styles.inlineRow} key={index}>
+                      <div key={index}>
+                      <div className={styles.inlineRow}>
                         <TextField label="Hito" value={payment.name} disabled={!editable}
                           onChange={(e) => updateDraft({ paymentPlan: form.draft.paymentPlan.map((p, i) => i === index ? { ...p, name: e.target.value } : p) })} />
                         <TextField label="%" type="number" min={0} max={100} step="0.01" value={payment.percent} disabled={!editable}
@@ -351,6 +352,7 @@ export function QuotationWorkspacePage() {
                               i === index ? { ...p, triggerDate: e.target.value || null } : p) })} />
                         </div>
                       )}
+                      </div>
                     ))}
                     <p className={styles.helper}>Porcentaje configurado: {money(usedPercent)}% {usedPercent === 100 ? '· Completo' : '· Pendiente de completar'}</p>
                     <p className={styles.helper}>Los parámetros específicos por fecha/fase se completarán al habilitar R3. El plan no se traspasa todavía.</p>
