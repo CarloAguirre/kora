@@ -22,6 +22,18 @@ export const quotationOperationalSnapshotSchema = z.object({
     memberLimit: z.number().int().nullable(),
   })),
   moduleCount: z.number().int().nonnegative(),
+  /** Sólo para análisis EDT. No se interpreta nombre coincidente como identidad. */
+  executionModules: z.array(z.object({
+    id: uuidSchema,
+    name: z.string(),
+    estimatedHours: z.number().nullable(),
+    tasks: z.array(z.object({
+      id: uuidSchema,
+      name: z.string(),
+      status: z.enum(['todo', 'in_progress', 'in_review', 'done']),
+      estimatedHours: z.number().nullable(),
+    })),
+  })).optional(),
   taskCount: z.number().int().nonnegative(),
   segmentCount: z.number().int().nonnegative(),
   paymentMilestones: z.array(z.object({
@@ -82,6 +94,33 @@ export const quotationTransferPreviewSchema = z.object({
     delta: z.number().nullable(),
     existsInProject: z.boolean(),
   })),
+  /** Simulación de conciliación D04: jamás orden de crear/editar tareas. */
+  edtReconciliation: z.object({
+    source: z.enum(['analysis', 'modified_analysis', 'no_analysis']),
+    activityCount: z.number().int().nonnegative(),
+    proposedModuleCount: z.number().int().nonnegative(),
+    proposedHours: z.number().nonnegative(),
+    modules: z.array(z.object({
+      name: z.string(),
+      proposedHours: z.number().nonnegative(),
+      existingCandidates: z.array(z.object({
+        id: uuidSchema, name: z.string(), estimatedHours: z.number().nullable(),
+        taskCount: z.number().int().nonnegative(),
+      })),
+      matchStatus: z.enum(['no_match', 'possible_match', 'ambiguous']),
+      deltaVsExisting: z.number().nullable(),
+      activities: z.array(z.object({
+        wbs: z.string(), description: z.string(), role: z.string(),
+        proposedHours: z.number().nonnegative(),
+        possibleExistingTasks: z.array(z.object({
+          id: uuidSchema, name: z.string(),
+          status: z.enum(['todo', 'in_progress', 'in_review', 'done']),
+          estimatedHours: z.number().nullable(),
+        })),
+      })),
+    })),
+    notes: z.array(z.string()),
+  }),
   findings: z.array(z.object({
     code: z.string(),
     severity: z.enum(['blocker', 'review']),
