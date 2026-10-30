@@ -202,3 +202,30 @@ export const savedQuotationReconciliationReviewSchema = z.object({
   review: quotationReconciliationReviewSchema,
 });
 export type SavedQuotationReconciliationReview = z.infer<typeof savedQuotationReconciliationReviewSchema>;
+
+
+/** R3-e: verificación técnica, separada de aprobación contractual y traspaso. */
+export const quotationReviewAssessmentDecisionSchema = z.enum([
+  'reviewed_for_discussion', 'changes_requested',
+]);
+export const assessQuotationReconciliationSchema = z.object({
+  reviewId: uuidSchema,
+  versionRevision: z.number().int().positive(),
+  decision: quotationReviewAssessmentDecisionSchema,
+  reason: z.string().trim().min(10).max(2000),
+});
+export type AssessQuotationReconciliationInput = z.infer<typeof assessQuotationReconciliationSchema>;
+
+export const savedQuotationReviewAssessmentSchema = z.object({
+  id: uuidSchema,
+  reviewId: uuidSchema,
+  versionId: uuidSchema,
+  versionRevision: z.number().int().positive(),
+  reviewerUserId: uuidSchema.nullable(),
+  occurredAt: z.string().datetime(),
+  decision: quotationReviewAssessmentDecisionSchema,
+  reason: z.string(),
+  status: z.literal('technical_review_only'),
+  transferEnabled: z.literal(false),
+});
+export type SavedQuotationReviewAssessment = z.infer<typeof savedQuotationReviewAssessmentSchema>;
