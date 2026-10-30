@@ -68,6 +68,12 @@ vi.mock('../api/quotation.queries', () => ({
     data: preview, isLoading: false, isError: false,
     isFetching: false, refetch: refresh,
   })),
+  useQuotationReconciliationReviews: vi.fn(() => ({
+    data: [], isLoading: false, isError: false,
+  })),
+  useSaveQuotationReconciliationReview: vi.fn(() => ({
+    isPending: false, mutateAsync: vi.fn(),
+  })),
 }));
 
 describe('QuotationTransferPreviewCard', () => {
@@ -113,9 +119,18 @@ describe('QuotationTransferPreviewCard', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Preparar acta' }));
     expect(screen.getByText(/Módulos revisados: 0\/1/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Exportar acta JSON de revisión' })).toBeInTheDocument();
-    expect(screen.getByText(/no quedan guardadas en Kora/)).toBeInTheDocument();
+    expect(screen.getByText(/Guardar un acta no aprueba ni traspasa HH/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Aplicar traspaso|Aprobar cotización/ }))
       .not.toBeInTheDocument();
+  });
+
+  it('mantiene el guardado deshabilitado sin autorización y no habilita transferencia', () => {
+    render(<QuotationTransferPreviewCard projectId={projectId} version={version}
+      teamNames={new Map()} canSaveReview={false} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Analizar conflictos' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Preparar acta' }));
+    expect(screen.getByRole('button', { name: 'Guardar acta en Kora' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: /Aplicar traspaso/i })).not.toBeInTheDocument();
   });
 
   it('actualiza solo la lectura al solicitarlo', () => {
