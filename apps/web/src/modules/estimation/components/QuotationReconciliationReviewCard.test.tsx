@@ -8,6 +8,12 @@ vi.mock('../api/quotation.queries', () => ({
   useQuotationReconciliationReviews: vi.fn(() => ({
     data: [], isLoading: false, isError: false,
   })),
+  useQuotationReconciliationAssessments: vi.fn(() => ({
+    data: [], isLoading: false, isError: false,
+  })),
+  useAssessQuotationReconciliation: vi.fn(() => ({
+    isPending: false, mutateAsync: vi.fn(),
+  })),
   useSaveQuotationReconciliationReview: vi.fn(() => ({
     isPending: false, mutateAsync: mocks.save,
   })),
