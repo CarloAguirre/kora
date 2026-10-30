@@ -61,3 +61,7 @@ Una pantalla local permite preparar una propuesta explícita de asociación de m
 ## R3-d — Registro de actas en Kora (30-oct-2026)
 
 Las actas propuestas por el responsable pueden guardarse como registros append-only de `quotation_events` sin modificar la cotización ni ejecutar traspasos. Cada guardado conserva JSON canónico, autor, fecha y revisión; un preflight stale se rechaza. El registro **no equivale** a ratificación de D04/D05/D06 ni es aprobación contractual. Ver docs/IMPLEMENTACION-CALCULADORA-R3D-ACTAS-AUDITABLES.md.
+
+## R3-e — Segundo revisor técnico (30-oct-2026)
+
+La política conservadora provisional exige un segundo usuario con `projects:manage` distinto al autor para evaluar técnicamente la última acta. Resultados: `changes_requested` o `reviewed_for_discussion`, siempre con `status=technical_review_only` y `transferEnabled=false`; se escriben únicamente eventos append-only. D02/D04/D05/D06 siguen abiertos. La revisión técnica jamás equivale a aprobación contractual; consultar docs/IMPLEMENTACION-CALCULADORA-R3E-EVALUACION-TECNICA.md.

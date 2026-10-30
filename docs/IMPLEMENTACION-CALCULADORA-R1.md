@@ -108,3 +108,7 @@ Se incorpora revisión local de correspondencias humanas entre módulos/activida
 ## R3-d — Actas de conciliación persistidas (30/10/2026)
 
 GET/POST de historial de actas `draft_for_discussion` registradas como eventos append-only en `quotation_events` con actor y timestamp. API recompone el acta y verifica pertenencia a proyecto, versión/revisión, UUID y estado operativo; UI añade guardar e historial. **Sin migración nueva; sin aprobación ni traspaso de ejecución**. Ver docs/IMPLEMENTACION-CALCULADORA-R3D-ACTAS-AUDITABLES.md. Pruebas pendientes en checkout del usuario.
+
+## R3-e — Evaluación técnica de actas (30/10/2026)
+
+Segundo usuario con `projects:manage` puede registrar evento `reconciliation_review_assessed` para la última acta, indicando `changes_requested` o `reviewed_for_discussion`, con motivos y separación de autoría; no afecta `quotation_versions` ni las HH operativas. Ver docs/IMPLEMENTACION-CALCULADORA-R3E-EVALUACION-TECNICA.md. Pendiente QA en checkout.
