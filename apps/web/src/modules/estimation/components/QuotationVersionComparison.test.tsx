@@ -42,7 +42,7 @@ describe('QuotationVersionComparison', () => {
     render(<QuotationVersionComparison versions={[v1, v2]} teamNames={new Map([[TEAM, 'Desarrollo']])} />);
     fireEvent.click(screen.getByRole('button', { name: 'Comparar' }));
     expect(screen.getByText('Desarrollo')).toBeInTheDocument();
-    expect(screen.getByText('+30')).toBeInTheDocument();
+    expect(screen.getAllByText('+30')).toHaveLength(2);
     expect(screen.getByText(/Diferencia de neto/)).toBeInTheDocument();
     expect(v1.draft.mode).toBe('team');
     expect(v2.draft.mode).toBe('phases');
