@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   HOUR_ENTRY_ASSIGNMENTS,
   PROJECT_REQUIRING_ASSIGNMENTS,
+  hourEntryRequiresApproval,
   type CreateHourEntryInput,
   type HourEntryAssignment,
 } from '@kora/contracts';
@@ -130,9 +131,13 @@ export function WeeklyEntryForm({
   const overflowDays = dayOverflow.flatMap((hours, index) => (hours > 0 ? [{ label: WEEKDAY_LABELS[index]!, hours }] : []));
   // Horas de proyecto se aprueban por acceso al proyecto, no por aprobador
   // designado (docs/DECISION-M4-HORAS.md) — el backend rechaza ambos a la vez.
-  // Sin proyecto, las horas extra (marcadas o por exceso) exigen aprobador.
+  // Sin proyecto, las horas extra (marcadas o por exceso) exigen aprobador,
+  // salvo las de un líder, que se autoaprueban.
+  const overtimeNeedsApproval = hourEntryRequiresApproval(user?.role, true);
   const needsApprover =
-    !needsProject && assignment !== '' && (user?.role === 'collaborator' || isOvertime || overflowDays.length > 0);
+    !needsProject &&
+    assignment !== '' &&
+    (user?.role === 'collaborator' || (overtimeNeedsApproval && (isOvertime || overflowDays.length > 0)));
   const showApproverInRow = needsApprover;
   const holidayDayIndexes = new Set(
     (holidaysThisWeek ?? []).map((h) => Math.round((new Date(`${h.date}T00:00:00`).getTime() - monday.getTime()) / 86_400_000)),
@@ -254,8 +259,8 @@ export function WeeklyEntryForm({
           <AlertIcon size={16} />
           <span>
             Superas la jornada de {DAILY_CAP_HOURS}h (contando lo ya registrado):{' '}
-            {overflowDays.map((day) => `${day.label} ${formatHours(day.hours)}h`).join(', ')} quedarán como horas extra, pendientes
-            de aprobación.
+            {overflowDays.map((day) => `${day.label} ${formatHours(day.hours)}h`).join(', ')} quedarán como horas extra
+            {overtimeNeedsApproval ? ', pendientes de aprobación.' : '.'}
           </span>
         </div>
       )}
@@ -344,6 +349,7 @@ export function WeeklyEntryForm({
             <span className={styles.overtimeState}>{isOvertime ? 'Marcada' : 'No marcada'}</span>
           </label>
           {isOvertime ? (
+            overtimeNeedsApproval &&
             <span className={styles.overtimeHelp}>
               {needsProject
                 ? 'Quedará pendiente de aprobación del líder del proyecto.'

@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CLOCK, ForbiddenError, ID_GENERATOR, err, ok, type ApplicationError, type Clock, type IdGenerator, type Result } from '@kora/core';
-import type { CreateHourEntryInput, RoleCode } from '@kora/contracts';
+import { hourEntryRequiresApproval, type CreateHourEntryInput, type RoleCode } from '@kora/contracts';
 import { HourEntry } from '../../domain/entities/hour-entry.entity';
 import {
   InvalidDesignatedApproverError,
@@ -118,8 +118,7 @@ export class CreateHourEntryUseCase implements UseCase<CreateHourEntryCommand, {
         designatedApproverUserId: data.designatedApproverUserId ?? null,
         hasBlocker: data.hasBlocker,
         blockerDescription: data.blockerDescription ?? null,
-        // Horas extra siempre exigen aprobación de líder, aunque el rol del dueño no la requiera.
-        ownerRequiresApproval: owner.role === 'collaborator' || tranche.isOvertime,
+        ownerRequiresApproval: hourEntryRequiresApproval(owner.role, tranche.isOvertime),
         now,
       });
       if (created.isErr()) return err(created.error);

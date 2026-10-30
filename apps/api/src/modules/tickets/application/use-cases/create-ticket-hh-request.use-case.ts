@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CLOCK, ID_GENERATOR, err, ok, type ApplicationError, type Clock, type IdGenerator, type Result } from '@kora/core';
-import type { CreateTicketHhRequestInput, RoleCode } from '@kora/contracts';
+import { hourEntryRequiresApproval, type CreateTicketHhRequestInput, type RoleCode } from '@kora/contracts';
 import { TicketHhRequest } from '../../domain/entities/ticket-hh-request.entity';
 import { TicketNotFoundError } from '../../domain/errors/ticket.errors';
 import { CannotSubmitTicketHhRequestError, TicketProjectMissingForHhRequestError } from '../../domain/errors/ticket-hh-request.errors';
@@ -43,8 +43,8 @@ export interface CreateTicketHhRequestCommand {
  * revisión. Fuera de eso rige lo mismo que en Horas
  * (`CreateHourEntryUseCase`): solo el colaborador necesita aprobación para
  * sus horas normales — un líder que no decide en este proyecto (p. ej. el
- * soporte lo lidera otra persona) también las ve aprobadas al instante, y
- * solo su tramo de horas extra queda `pending`.
+ * soporte lo lidera otra persona) también las ve aprobadas al instante,
+ * incluido su tramo de horas extra (`hourEntryRequiresApproval`).
  */
 @Injectable()
 export class CreateTicketHhRequestUseCase implements UseCase<CreateTicketHhRequestCommand, { id: string }, ApplicationError> {
@@ -74,7 +74,7 @@ export class CreateTicketHhRequestUseCase implements UseCase<CreateTicketHhReque
     // proyecto si no tiene uno) — mismo criterio EXCLUYENTE que Horas.
     const isApprover = isAdminTier ? true : await this.projects.isProjectApprover(ticket.projectId, actor.userId, actor.userId);
     if (!isAdminTier && !isAssignee && !isApprover) return err(new CannotSubmitTicketHhRequestError());
-    const autoApproves = (tranche: HoursTranche) => isApprover || (actorRole !== 'collaborator' && !tranche.isOvertime);
+    const autoApproves = (tranche: HoursTranche) => isApprover || !hourEntryRequiresApproval(actorRole, tranche.isOvertime);
 
     const requestDate = new Date(`${data.date}T00:00:00.000Z`);
     // Solo las horas normales ya registradas ese día (cualquier ticket/proceso)

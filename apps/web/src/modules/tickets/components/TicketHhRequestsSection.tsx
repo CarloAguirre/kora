@@ -1,5 +1,10 @@
 import { useEffect, useState } from 'react';
-import { TICKET_HH_REQUEST_NOTE_MAX_LENGTH, TICKET_HH_REQUEST_STATUS_LABELS, type TicketHhRequest } from '@kora/contracts';
+import {
+  TICKET_HH_REQUEST_NOTE_MAX_LENGTH,
+  TICKET_HH_REQUEST_STATUS_LABELS,
+  hourEntryRequiresApproval,
+  type TicketHhRequest,
+} from '@kora/contracts';
 import styles from './TicketHhRequestsSection.module.css';
 import { Avatar } from '@/shared/components/ui/Avatar';
 import { Badge, type BadgeTone } from '@/shared/components/ui/Badge';
@@ -87,9 +92,10 @@ export function TicketHhRequestsSection({
   const [resolvedOpen, setResolvedOpen] = useState(false);
 
   // Mismo criterio que `CreateTicketHhRequestUseCase`: solo el colaborador
-  // espera aprobación por sus horas normales; las extra siempre la esperan
-  // salvo que el propio usuario sea quien decide en este proyecto.
+  // espera aprobación por sus horas normales; las extra la esperan salvo que
+  // el usuario sea líder o quien decide en este proyecto.
   const selfApprovesRegularHours = Boolean(user && user.role !== 'collaborator');
+  const overtimeNeedsApproval = hourEntryRequiresApproval(user?.role, true);
   const approverNames = hhApprovers.map((approver) => approver.fullName).join(' o ');
 
   const pendingRequests = (requests ?? []).filter((request) => request.status === 'pending');
@@ -273,7 +279,7 @@ export function TicketHhRequestsSection({
             <span className={styles.title}>Registrar horas</span>
             <span className={styles.subtitle}>
               {selfApprovesRegularHours
-                ? approverNames && !hhApprovers.some((approver) => approver.id === user?.id)
+                ? overtimeNeedsApproval && approverNames && !hhApprovers.some((approver) => approver.id === user?.id)
                   ? `Tus horas normales quedan aprobadas al registrarlas; las horas extra las aprueba ${approverNames}.`
                   : 'Tus horas quedan aprobadas al registrarlas.'
                 : approverNames

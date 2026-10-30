@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { CreateHourEntryInput, ProjectStatus } from '@kora/contracts';
+import type { CreateHourEntryInput, ProjectStatus, RoleCode } from '@kora/contracts';
 import { CreateHourEntryUseCase } from './create-hour-entry.use-case';
 import type { HourEntryRepository } from '../../domain/repositories/hour-entry.repository';
 import type { HourEntryProjectReader } from '../ports/hour-entry-project-reader.port';
@@ -20,14 +20,14 @@ const INPUT = {
   hasBlocker: false,
 } as CreateHourEntryInput;
 
-function buildUseCase(projectStatus: ProjectStatus, regularHoursForDate = 0) {
+function buildUseCase(projectStatus: ProjectStatus, regularHoursForDate = 0, ownerRole: RoleCode = 'collaborator') {
   const entries = {
     save: vi.fn().mockResolvedValue(undefined),
     sumApprovedHoursForProject: vi.fn().mockResolvedValue(0),
     sumRegularHoursForUserAndDate: vi.fn().mockResolvedValue(regularHoursForDate),
   } as unknown as HourEntryRepository;
   const users = {
-    findById: vi.fn().mockResolvedValue({ id: 'collab-1', role: 'collaborator', status: 'active' }),
+    findById: vi.fn().mockResolvedValue({ id: 'collab-1', role: ownerRole, status: 'active' }),
   } as unknown as HourEntryUserReader;
   const projects = {
     findById: vi.fn().mockResolvedValue({
@@ -93,5 +93,31 @@ describe('CreateHourEntryUseCase', () => {
     expect(result.isOk()).toBe(true);
     const saved = vi.mocked(entries.save).mock.calls.map(([entry]) => ({ hours: entry.hours, isOvertime: entry.isOvertime }));
     expect(saved).toEqual([{ hours: 4, isOvertime: true }]);
+  });
+
+  it('las horas extra de un líder también se autoaprueban', async () => {
+    const { useCase, entries } = buildUseCase('active', 6, 'leader');
+
+    const result = await useCase.execute({ data: { ...INPUT, hours: 5 }, actor: ACTOR, actorRole: 'leader' });
+
+    expect(result.isOk()).toBe(true);
+    const saved = vi.mocked(entries.save).mock.calls.map(([entry]) => ({ isOvertime: entry.isOvertime, status: entry.status }));
+    expect(saved).toEqual([
+      { isOvertime: false, status: 'approved' },
+      { isOvertime: true, status: 'approved' },
+    ]);
+  });
+
+  it('las horas extra de PMO siguen quedando pendientes', async () => {
+    const { useCase, entries } = buildUseCase('active', 6, 'pmo');
+
+    const result = await useCase.execute({ data: { ...INPUT, hours: 5 }, actor: ACTOR, actorRole: 'pmo' });
+
+    expect(result.isOk()).toBe(true);
+    const saved = vi.mocked(entries.save).mock.calls.map(([entry]) => ({ isOvertime: entry.isOvertime, status: entry.status }));
+    expect(saved).toEqual([
+      { isOvertime: false, status: 'approved' },
+      { isOvertime: true, status: 'pending' },
+    ]);
   });
 });

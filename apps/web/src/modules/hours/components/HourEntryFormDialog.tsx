@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   HOUR_ENTRY_ASSIGNMENTS,
   PROJECT_REQUIRING_ASSIGNMENTS,
+  hourEntryRequiresApproval,
   type HourEntryAssignment,
   type HourEntrySummary,
   type ProjectSummary,
@@ -188,9 +189,12 @@ function EditEntryForm({
   // rol: si ya tenía aprobador designado, se sigue exigiendo.
   const ownerRequiresApprover =
     user?.id === entry.user.id ? user.role === 'collaborator' : entry.designatedApprover !== null;
+  // Las horas extra de un líder se autoaprueban; con el registro de otro se asume que no.
+  const overtimeNeedsApproval = user?.id === entry.user.id ? hourEntryRequiresApproval(user.role, true) : true;
   const validationOptions = {
     projects,
     isCollaborator: ownerRequiresApprover,
+    overtimeNeedsApproval,
     overtimeAlreadyGranted: entry.isOvertime && block.projectId === entry.project?.id,
     exceedsDailyCap: autoOvertimeHours > 0,
   };
@@ -259,7 +263,7 @@ function EditEntryForm({
           <span>
             Superas la jornada de {DAILY_CAP_HOURS}h ({nonOvertimeTotal.toLocaleString('es-CL', { maximumFractionDigits: 1 })}h
             normales ese día): {autoOvertimeHours.toLocaleString('es-CL', { maximumFractionDigits: 2 })}h quedarán como horas
-            extra, pendientes de aprobación.
+            extra{overtimeNeedsApproval ? ', pendientes de aprobación.' : '.'}
           </span>
         </div>
       )}
@@ -278,6 +282,7 @@ function EditEntryForm({
         projects={projects}
         leaders={leaders?.items ?? []}
         isCollaborator={ownerRequiresApprover}
+        overtimeNeedsApproval={overtimeNeedsApproval}
         exceedsDailyCap={autoOvertimeHours > 0}
         error={blockError ?? undefined}
         title={blockTitle}

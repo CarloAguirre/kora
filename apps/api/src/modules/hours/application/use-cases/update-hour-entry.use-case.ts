@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CLOCK, ForbiddenError, ID_GENERATOR, err, ok, type ApplicationError, type Clock, type IdGenerator, type Result } from '@kora/core';
-import type { RoleCode, UpdateHourEntryInput } from '@kora/contracts';
+import { hourEntryRequiresApproval, type RoleCode, type UpdateHourEntryInput } from '@kora/contracts';
 import { HourEntry } from '../../domain/entities/hour-entry.entity';
 import { splitByDailyCap, type HoursTranche } from '../../domain/services/daily-cap';
 import {
@@ -136,8 +136,7 @@ export class UpdateHourEntryUseCase implements UseCase<UpdateHourEntryCommand, v
         : splitByDailyCap(hours, await this.entries.sumRegularHoursForUserAndDate(entry.userId, date, entry.id));
 
     const owner = await this.users.findById(entry.userId);
-    // Horas extra siempre exigen aprobación de líder, aunque el rol del dueño no la requiera.
-    const ownerRequiresApproval = owner?.role === 'collaborator' || ownTranche!.isOvertime;
+    const ownerRequiresApproval = hourEntryRequiresApproval(owner?.role, ownTranche!.isOvertime);
 
     const result = entry.updateDetails(
       {
@@ -177,7 +176,7 @@ export class UpdateHourEntryUseCase implements UseCase<UpdateHourEntryCommand, v
         isOvertime: true,
         projectStageAtEntry: updated.projectStageAtEntry,
         designatedApproverUserId: updated.designatedApproverUserId,
-        ownerRequiresApproval: true,
+        ownerRequiresApproval: hourEntryRequiresApproval(owner?.role, true),
         now,
       });
       if (created.isErr()) return err(created.error);

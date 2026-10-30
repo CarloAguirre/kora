@@ -148,7 +148,7 @@ describe('CreateTicketHhRequestUseCase — líder que no decide en el proyecto',
     expect(hourEntries.saved.map((entry) => entry.status)).toEqual(['approved']);
   });
 
-  it('deja pendiente solo el tramo de horas extra', async () => {
+  it('también aprueba al instante el tramo de horas extra: todas las horas de un líder se autoaprueban', async () => {
     const { useCase, requests, hourEntries } = buildUseCase({ regularHours: 7 });
 
     const result = await useCase.execute({
@@ -161,8 +161,8 @@ describe('CreateTicketHhRequestUseCase — líder que no decide en el proyecto',
     expect(result.isOk()).toBe(true);
     expect(requests.saved.map((request) => [request.hours, request.isOvertime, request.status])).toEqual([
       [1, false, 'approved'],
-      [2, true, 'pending'],
+      [2, true, 'approved'],
     ]);
-    expect(hourEntries.saved.map((entry) => entry.status)).toEqual(['approved', 'pending']);
+    expect(hourEntries.saved.map((entry) => entry.status)).toEqual(['approved', 'approved']);
   });
 });

@@ -1,8 +1,18 @@
 import { z } from 'zod';
 import { arrayQueryParam, isoDateTimeSchema, nonEmptyTrimmed, pageSchema, paginationQuerySchema, sortDirectionSchema, uuidSchema } from '../common/primitives';
-import { roleCodeSchema } from '../users/roles';
+import { roleCodeSchema, type RoleCode } from '../users/roles';
 
 /** Ver docs/DECISION-M4-HORAS.md. */
+
+/**
+ * ¿El registro nace pendiente de aprobación? Las horas de un colaborador
+ * siempre (regla de la v1); las horas extra también, salvo las de un líder:
+ * todas sus horas se autoaprueban. Misma regla en el alta y edición de horas,
+ * las solicitudes de HH de ticket y los avisos de los formularios.
+ */
+export function hourEntryRequiresApproval(ownerRole: RoleCode | null | undefined, isOvertime: boolean): boolean {
+  return ownerRole === 'collaborator' || (isOvertime && ownerRole !== 'leader');
+}
 
 export const HOUR_ENTRY_STATUSES = ['pending', 'approved', 'rejected'] as const;
 export const hourEntryStatusSchema = z.enum(HOUR_ENTRY_STATUSES);
