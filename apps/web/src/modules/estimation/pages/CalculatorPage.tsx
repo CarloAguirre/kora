@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
@@ -9,7 +10,7 @@ import {
   isQuotationDraftEligibleProject,
   type ProjectSummary,
 } from '@kora/contracts';
-import { useProjectsList } from '@/modules/projects/api/projects.queries';
+import { projectKeys, projectsApi } from '@/modules/projects/api/projects.api';
 import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Button } from '@/shared/components/ui/Button';
 import { Card } from '@/shared/components/ui/Card';
@@ -34,21 +35,39 @@ export function CalculatorPage() {
   const { can } = usePermissions();
   const [search, setSearch] = useState('');
   const [newEstimationOpen, setNewEstimationOpen] = useState(false);
-  const { data, isLoading, error } = useProjectsList({
-    type: 'development',
-    page: 1,
-    pageSize: 200,
-    sortField: 'createdAt',
-    sortDirection: 'desc',
+  // El origen tiene más de 200 proyectos de desarrollo (207 en el preflight
+  // del 30-oct); cargar solamente la primera página ocultaba cotizaciones.
+  const { data, isLoading, error } = useQuery({
+    queryKey: [...projectKeys.lists(), 'calculadora-all-development'],
+    queryFn: async (): Promise<ProjectSummary[]> => {
+      const options = {
+        type: 'development' as const,
+        pageSize: 200,
+        sortField: 'createdAt' as const,
+        sortDirection: 'desc' as const,
+      };
+      const first = await projectsApi.list({ ...options, page: 1 });
+      const remaining = await Promise.all(
+        Array.from({ length: Math.max(0, first.pageCount - 1) }, (_, index) =>
+          projectsApi.list({ ...options, page: index + 2 }),
+        ),
+      );
+      return [...first.items, ...remaining.flatMap((part) => part.items)];
+    },
+    staleTime: 30_000,
   });
 
-  const sourceProjects = data?.items ?? [];
+  const sourceProjects = data ?? [];
   const canQuote = (project: ProjectSummary) => can('projects:manage') || project.leader?.id === user?.id;
 
   const projects = useMemo(() => {
     const term = search.trim().toLocaleLowerCase('es-CL');
     return sourceProjects
       .filter(isVisibleProject)
+      .sort((a, b) => {
+        const priority = { prospect: 0, quoted: 1, approved: 2 };
+        return (priority[a.salesStage ?? 'approved'] - priority[b.salesStage ?? 'approved']);
+      })
       .filter((project) => {
         if (!term) return true;
         return `${project.name} ${project.client?.companyName ?? ''}`
