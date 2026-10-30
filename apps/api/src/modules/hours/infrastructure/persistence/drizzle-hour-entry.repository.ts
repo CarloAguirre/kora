@@ -445,6 +445,27 @@ export class DrizzleHourEntryRepository implements HourEntryRepository {
         )`,
       );
     }
+    if (filters.outsideTeamsLedByUserId) {
+      // Mismo criterio que `leaderUserId` + `isActive` de los equipos: líder
+      // oficial o líder de ese equipo en algún proyecto.
+      conditions.push(
+        sql`not exists (
+          select 1 from ${teamMembers}
+          inner join ${teams} on ${teams.id} = ${teamMembers.teamId}
+          where ${teamMembers.userId} = ${hourEntries.userId}
+            and ${teamMembers.leftAt} is null
+            and ${teams.isActive} = true
+            and ${teams.deletedAt} is null
+            and (
+              ${teams.leaderUserId} = ${filters.outsideTeamsLedByUserId}
+              or exists (
+                select 1 from ${projectTeams}
+                where ${projectTeams.teamId} = ${teams.id} and ${projectTeams.leaderUserId} = ${filters.outsideTeamsLedByUserId}
+              )
+            )
+        )`,
+      );
+    }
     if (filters.dateFrom) conditions.push(gte(hourEntries.date, filters.dateFrom));
     if (filters.dateTo) conditions.push(lte(hourEntries.date, filters.dateTo));
     if (filters.visibleToUserIds) {

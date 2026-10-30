@@ -102,14 +102,19 @@ export function TicketHistoryPage() {
       // entera, así que pagina hasta juntar `total` filas en vez de asumir
       // que todo cabe en una página.
       const EXPORT_PAGE_SIZE = 200;
-      const first = await ticketsApi.list({ ...query, page: 1, pageSize: EXPORT_PAGE_SIZE });
-      const rows = [...first.items];
-      const pageCount = Math.ceil(first.total / EXPORT_PAGE_SIZE);
-      for (let currentPage = 2; currentPage <= pageCount; currentPage += 1) {
-        const next = await ticketsApi.list({ ...query, page: currentPage, pageSize: EXPORT_PAGE_SIZE });
-        rows.push(...next.items);
-      }
-      exportTicketHistory(rows);
+      const fetchAllTickets = async () => {
+        const first = await ticketsApi.list({ ...query, page: 1, pageSize: EXPORT_PAGE_SIZE });
+        const rows = [...first.items];
+        const pageCount = Math.ceil(first.total / EXPORT_PAGE_SIZE);
+        for (let currentPage = 2; currentPage <= pageCount; currentPage += 1) {
+          const next = await ticketsApi.list({ ...query, page: currentPage, pageSize: EXPORT_PAGE_SIZE });
+          rows.push(...next.items);
+        }
+        return rows;
+      };
+      // El desglose por día viene de un endpoint aparte (sin paginar, mismos filtros) — en paralelo con las páginas.
+      const [rows, dailyHours] = await Promise.all([fetchAllTickets(), ticketsApi.dailyHours(query)]);
+      exportTicketHistory(rows, dailyHours);
     } catch (exportErr) {
       setExportError(exportErr instanceof ApiRequestError ? exportErr.message : 'No se pudo generar el Excel.');
     } finally {

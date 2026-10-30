@@ -47,6 +47,14 @@ export interface TicketListItem {
   readonly createdAt: Date;
 }
 
+export interface TicketDailyHoursRow {
+  readonly ticketId: string;
+  /** 'YYYY-MM-DD'. */
+  readonly date: string;
+  readonly userFullName: string;
+  readonly hours: number;
+}
+
 export interface TicketRepository {
   findById(id: string, context?: TransactionContext): Promise<Ticket | null>;
   findByLegacyId(legacyId: string, context?: TransactionContext): Promise<Ticket | null>;
@@ -64,6 +72,13 @@ export interface TicketRepository {
    * `used_hours`.
    */
   sumHours(filters: TicketFilters, context?: TransactionContext): Promise<number>;
+
+  /**
+   * HH aprobadas de los tickets que cumplen `filters`, sumadas por ticket +
+   * día + persona (con `activityBetween`, solo los días del rango). Ordenadas
+   * por ticket y fecha.
+   */
+  listDailyHours(filters: TicketFilters, context?: TransactionContext): Promise<TicketDailyHoursRow[]>;
 
   save(ticket: Ticket, context?: TransactionContext): Promise<void>;
 

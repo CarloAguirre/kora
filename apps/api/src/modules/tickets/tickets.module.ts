@@ -6,6 +6,7 @@ import { SupportInvoicesController } from './presentation/support-invoices.contr
 import { CreateTicketUseCase } from './application/use-cases/create-ticket.use-case';
 import { UpdateTicketUseCase } from './application/use-cases/update-ticket.use-case';
 import { ListTicketsUseCase } from './application/use-cases/list-tickets.use-case';
+import { ListTicketDailyHoursUseCase } from './application/use-cases/list-ticket-daily-hours.use-case';
 import { GetTicketUseCase } from './application/use-cases/get-ticket.use-case';
 import { ChangeTicketStatusUseCase } from './application/use-cases/change-ticket-status.use-case';
 import { DeleteTicketUseCase } from './application/use-cases/delete-ticket.use-case';
@@ -78,6 +79,7 @@ import { HoursModule } from '../hours/hours.module';
     CreateTicketUseCase,
     UpdateTicketUseCase,
     ListTicketsUseCase,
+    ListTicketDailyHoursUseCase,
     GetTicketUseCase,
     ChangeTicketStatusUseCase,
     DeleteTicketUseCase,

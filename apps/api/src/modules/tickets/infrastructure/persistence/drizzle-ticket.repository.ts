@@ -4,7 +4,13 @@ import { alias, and, asc, clients, count, desc, eq, gt, gte, ilike, inArray, isN
 /** `YYYY-MM-DD` para comparar contra columnas `date` sin corrimiento de zona horaria. */
 const isoDay = (date: Date) => date.toISOString().slice(0, 10);
 import { buildPage, toOffset, type Page, type PageRequest, type SortRequest, type TransactionContext } from '@kora/core';
-import type { TicketFilters, TicketListItem, TicketRepository, TicketSortableField } from '../../domain/repositories/ticket.repository';
+import type {
+  TicketDailyHoursRow,
+  TicketFilters,
+  TicketListItem,
+  TicketRepository,
+  TicketSortableField,
+} from '../../domain/repositories/ticket.repository';
 import type { Ticket } from '../../domain/entities/ticket.entity';
 import { DATABASE } from '../../../../shared/infrastructure/database/database.module';
 import { resolveDb } from '../../../../shared/infrastructure/database/unit-of-work';
@@ -161,6 +167,36 @@ export class DrizzleTicketRepository implements TicketRepository {
     }
     const rows = await db.select({ total: sql<string>`coalesce(sum(${tickets.usedHours}), 0)` }).from(tickets).where(where);
     return Number(rows[0]?.total ?? 0);
+  }
+
+  async listDailyHours(filters: TicketFilters, context?: TransactionContext): Promise<TicketDailyHoursRow[]> {
+    const db = resolveDb(this.database, context);
+    const conditions = [this.buildWhere(filters), eq(ticketHhRequests.status, 'approved')];
+    if (filters.activityBetween) {
+      const { from, to } = filters.activityBetween;
+      conditions.push(gte(ticketHhRequests.date, from), lt(ticketHhRequests.date, to));
+    }
+    const rows = await db
+      .select({
+        ticketId: ticketHhRequests.ticketId,
+        date: ticketHhRequests.date,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        hours: sql<string>`sum(${ticketHhRequests.hours})`,
+      })
+      .from(ticketHhRequests)
+      .innerJoin(tickets, eq(tickets.id, ticketHhRequests.ticketId))
+      .leftJoin(users, eq(users.id, ticketHhRequests.userId))
+      .where(and(...conditions))
+      .groupBy(ticketHhRequests.ticketId, ticketHhRequests.date, ticketHhRequests.userId, users.firstName, users.lastName)
+      .orderBy(asc(ticketHhRequests.ticketId), asc(ticketHhRequests.date), asc(users.firstName));
+
+    return rows.map((row) => ({
+      ticketId: row.ticketId,
+      date: isoDay(row.date),
+      userFullName: `${row.firstName ?? ''} ${row.lastName ?? ''}`.trim(),
+      hours: Number(row.hours),
+    }));
   }
 
   async findClosedUnbilledIds(projectIds: readonly string[], context?: TransactionContext): Promise<string[]> {

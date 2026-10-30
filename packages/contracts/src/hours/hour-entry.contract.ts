@@ -152,6 +152,13 @@ export const listHourEntriesQuerySchema = paginationQuerySchema.extend({
   search: z.string().trim().max(120).optional(),
   /** Acota a los autores con membresía activa en este equipo, dentro del alcance de visibilidad ya resuelto. */
   teamId: uuidSchema.optional(),
+  /**
+   * Solo autores sin membresía activa en ningún equipo que lidera el actor (y
+   * sin sus propios registros) — p.ej. horas de soporte de otro equipo en un
+   * proyecto que el actor lidera. La cola por equipo de `/horas/aprobaciones`
+   * nunca los muestra, pero sí cuentan en la campanita y el Dashboard.
+   */
+  outsideLedTeams: z.stringbool().optional(),
   /** Acepta id o slug: la ficha de proyecto filtra por el `projectId` de la URL, que ahora es el slug del proyecto — se resuelve a UUID en `ListHourEntriesUseCase`. */
   projectId: z.string().optional(),
   /** Varios proyectos por UUID (filtro Proyecto del historial de equipo). */

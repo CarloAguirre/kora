@@ -14,6 +14,7 @@ import {
   type ListTicketsQuery,
   type ListTicketsResponse,
   type RejectTicketHhRequestInput,
+  type TicketDailyHours,
   type TicketDetail,
   type TicketHhRequest,
   type TicketLinkableClient,
@@ -30,6 +31,7 @@ import { ListLinkableTicketProjectsUseCase } from '../application/use-cases/list
 import { ListLinkableTicketClientsUseCase } from '../application/use-cases/list-linkable-ticket-clients.use-case';
 import { UpdateTicketUseCase } from '../application/use-cases/update-ticket.use-case';
 import { ListTicketsUseCase } from '../application/use-cases/list-tickets.use-case';
+import { ListTicketDailyHoursUseCase } from '../application/use-cases/list-ticket-daily-hours.use-case';
 import { GetTicketUseCase } from '../application/use-cases/get-ticket.use-case';
 import { ChangeTicketStatusUseCase } from '../application/use-cases/change-ticket-status.use-case';
 import { DeleteTicketUseCase } from '../application/use-cases/delete-ticket.use-case';
@@ -44,6 +46,7 @@ export class TicketsController {
     private readonly createTicket: CreateTicketUseCase,
     private readonly updateTicket: UpdateTicketUseCase,
     private readonly listTickets: ListTicketsUseCase,
+    private readonly listDailyHours: ListTicketDailyHoursUseCase,
     private readonly getTicket: GetTicketUseCase,
     private readonly changeStatus: ChangeTicketStatusUseCase,
     private readonly deleteTicket: DeleteTicketUseCase,
@@ -65,6 +68,22 @@ export class TicketsController {
       await this.listTickets.execute({ query, actor: toActorContext(actor), actorPermissions: actor.permissions }),
     );
     return { ...page, items: [...page.items] };
+  }
+
+  /**
+   * Desglose por día de las HH de los tickets del filtro, para el Excel del
+   * historial. Mismos filtros que `GET /tickets` (sin paginar). Debe
+   * declararse antes de `:id`.
+   */
+  @Get('daily-hours')
+  @RequireAnyPermission('tickets:read', 'tickets:read_assigned')
+  async dailyHours(
+    @Query(new ZodValidationPipe(listTicketsQuerySchema)) query: ListTicketsQuery,
+    @CurrentUser() actor: RequestUser,
+  ): Promise<TicketDailyHours[]> {
+    return unwrapOrThrow(
+      await this.listDailyHours.execute({ query, actor: toActorContext(actor), actorPermissions: actor.permissions }),
+    );
   }
 
   /**

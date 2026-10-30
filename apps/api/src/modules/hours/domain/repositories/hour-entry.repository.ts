@@ -8,6 +8,8 @@ export interface HourEntryFilters {
   readonly search?: string | undefined;
   /** Acota a autores con membresía activa en este equipo. */
   readonly teamId?: string | undefined;
+  /** Deja fuera a los autores con membresía activa en algún equipo activo que lidera este usuario (mismo criterio que el selector de equipos de `/horas/aprobaciones`). */
+  readonly outsideTeamsLedByUserId?: string | undefined;
   readonly projectId?: string | undefined;
   readonly projectIds?: readonly string[] | undefined;
   readonly status?: HourEntryStatus | undefined;

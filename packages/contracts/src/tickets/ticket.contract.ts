@@ -239,6 +239,20 @@ export const listTicketsResponseSchema = pageSchema(ticketSummarySchema).extend(
 export type ListTicketsResponse = z.infer<typeof listTicketsResponseSchema>;
 
 /**
+ * HH aprobadas de un ticket en un día, por persona — el desglose del Excel del
+ * historial (`GET /tickets/daily-hours`, mismos filtros que `GET /tickets`).
+ * Con `month`, solo los días de ese mes.
+ */
+export const ticketDailyHoursSchema = z.object({
+  ticketId: uuidSchema,
+  /** 'YYYY-MM-DD'. */
+  date: z.string(),
+  userFullName: z.string(),
+  hours: z.number(),
+});
+export type TicketDailyHours = z.infer<typeof ticketDailyHoursSchema>;
+
+/**
  * Proyecto seleccionable para vincular un ticket (selector "Proyecto"/"Proyecto
  * de desarrollo" del modal). A propósito un tipo aparte, más angosto que
  * `ProjectSummary`: lo sirve un endpoint sin el acotamiento a "mis proyectos

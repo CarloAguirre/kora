@@ -29,25 +29,11 @@ export class ListTicketsUseCase implements UseCase<ListTicketsQueryCommand, Tick
   ) {}
 
   async execute(command: ListTicketsQueryCommand): Promise<Result<TicketsPage, never>> {
-    const { query, actor, actorPermissions } = command;
-    const hasFullRead = actorPermissions.includes('tickets:read');
-
-    // `query.projectId` llega como el slug de la URL (`SupportProjectDetailView`), no como UUID.
-    const project = query.projectId ? await this.projects.findById(query.projectId) : null;
-    if (query.projectId && !project) {
+    const { query } = command;
+    const filters = await resolveTicketFilters(command, this.projects);
+    if (!filters) {
       return ok({ ...buildPage<TicketSummary>([], 0, { page: query.page, pageSize: query.pageSize }), totalHours: 0 });
     }
-
-    const filters: TicketFilters = {
-      search: query.search,
-      clientId: query.clientId,
-      projectId: project?.id,
-      assigneeUserId: hasFullRead ? query.assigneeUserId : [actor.userId],
-      leaderUserId: query.leaderUserId,
-      status: query.status,
-      priority: query.priority,
-      activityBetween: query.month ? monthRange(query.month) : undefined,
-    };
     const [page, totalHours] = await Promise.all([
       this.tickets.search(filters, { page: query.page, pageSize: query.pageSize }, { field: query.sortField, direction: query.sortDirection }),
       this.tickets.sumHours(filters),
@@ -55,6 +41,35 @@ export class ListTicketsUseCase implements UseCase<ListTicketsQueryCommand, Tick
 
     return ok({ ...mapPage(page, toTicketSummary), totalHours });
   }
+}
+
+/**
+ * Filtros del listado a partir de la query — compartido con
+ * `ListTicketDailyHoursUseCase` para que el desglose del Excel cubra
+ * exactamente los mismos tickets. `null` si `projectId` no resuelve a ningún
+ * proyecto (el resultado es vacío).
+ */
+export async function resolveTicketFilters(
+  command: ListTicketsQueryCommand,
+  projects: TicketProjectReader,
+): Promise<TicketFilters | null> {
+  const { query, actor, actorPermissions } = command;
+  const hasFullRead = actorPermissions.includes('tickets:read');
+
+  // `query.projectId` llega como el slug de la URL (`SupportProjectDetailView`), no como UUID.
+  const project = query.projectId ? await projects.findById(query.projectId) : null;
+  if (query.projectId && !project) return null;
+
+  return {
+    search: query.search,
+    clientId: query.clientId,
+    projectId: project?.id,
+    assigneeUserId: hasFullRead ? query.assigneeUserId : [actor.userId],
+    leaderUserId: query.leaderUserId,
+    status: query.status,
+    priority: query.priority,
+    activityBetween: query.month ? monthRange(query.month) : undefined,
+  };
 }
 
 /** [primer día del mes, primer día del siguiente) en UTC, desde 'YYYY-MM'. */

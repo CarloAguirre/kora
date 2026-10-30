@@ -63,6 +63,16 @@ export function HoursApprovalsPage() {
   const activeTeamId = teamId || busiestTeamId || teams[0]?.id || '';
   const resolvingDefaultTeam = choosingDefault && !pendingSample;
 
+  // Lo que le toca aprobar al líder pero no cae en ninguno de sus equipos (p.ej.
+  // soporte de otro equipo en un proyecto que lidera): la cola por equipo no lo
+  // muestra y la campanita seguía contándolo sin que hubiera dónde aprobarlo.
+  const showOutsideTeams = user?.role === 'leader' && teams.length > 0;
+  const { data: outsideTeamsSample } = useHourEntriesList(
+    { status: 'pending', outsideLedTeams: true, pageSize: 1 },
+    { enabled: showOutsideTeams },
+  );
+  const hasOutsideTeamsEntries = showOutsideTeams && (outsideTeamsSample?.total ?? 0) > 0;
+
   // Se llega tanto desde "Equipos" como desde el card de Aprobaciones Pendientes
   // del dashboard, así que no hay un único destino fijo al que volver: se usa
   // el historial del navegador y solo se cae a "Equipos" si no hay de dónde volver
@@ -106,6 +116,14 @@ export function HoursApprovalsPage() {
             </>
           )}
         </Card>
+
+        {hasOutsideTeamsEntries && (
+          <Card>
+            <h2 className={styles.sectionTitle}>Otros registros que te toca aprobar</h2>
+            <p className={styles.sectionHint}>De colaboradores fuera de tus equipos, en proyectos que lideras.</p>
+            <HourEntriesApprovalTable query={{ outsideLedTeams: true }} />
+          </Card>
+        )}
       </div>
     </DashboardLayout>
   );
