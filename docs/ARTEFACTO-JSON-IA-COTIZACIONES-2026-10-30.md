@@ -64,3 +64,7 @@ git status --short
 ~~~
 
 **Nota sobre las pruebas previas:** el último log reportó 37 contratos y 457 API aprobadas; de 63 pruebas web, 59 aprobadas y 4 fallidas por una consulta sin QueryClientProvider en DevelopmentProjectDetailView. Se introdujo un mock del hook de cotizaciones en esa prueba, pero **no se han ejecutado pruebas nuevas aquí**. No aplicar la migración 0048 a producción antes de revisar QA.
+
+## Capacidad informativa de equipos
+
+En el modo por fases, los equipos muestran número de colaboradores de los perfiles agrupados y una dedicación promedio orientativa derivada de HH base / (personas x semanas x 40). La dedicación por semana real se conserva en weeklyPlan y dailyPlan del análisis. El cálculo monetario y las HH comerciales siempre se determinan por la suma de HH por fase, **no** por multiplicar nuevamente esta dedicación media.

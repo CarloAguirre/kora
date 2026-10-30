@@ -46,6 +46,8 @@ describe('projectAnalysisToQuotationDraft', () => {
     const draft = projectAnalysisToQuotationDraft(artifact, { Fullstack: ids.Fullstack, 'UX/UI': ids.UX });
     expect(draft.mode).toBe('phases');
     expect(draft.phases[0]?.teamHours).toHaveLength(2);
+    expect(draft.teams.find((team) => team.teamId === ids.Fullstack)?.dedicationPercent).toBe(20);
+    expect(draft.teams.find((team) => team.teamId === ids.UX)?.dedicationPercent).toBe(5);
     expect(draft.phases[0]?.teamHours.reduce((n, x) => n + x.hours, 0)).toBe(20);
     expect(draft.analysis?.activities).toHaveLength(2);
     expect(draft.analysis?.summary.reserveHours).toBe(2);
@@ -56,6 +58,8 @@ describe('projectAnalysisToQuotationDraft', () => {
   it('agrega roles en el mismo equipo sin duplicarlo ni perder desglose original', () => {
     const draft = projectAnalysisToQuotationDraft(artifact, { Fullstack: ids.Fullstack, 'UX/UI': ids.Fullstack });
     expect(draft.teams).toHaveLength(1);
+    expect(draft.teams[0]?.collaborators).toBe(2);
+    expect(draft.teams[0]?.dedicationPercent).toBe(12.5);
     expect(draft.phases[0]?.teamHours).toEqual([{ teamId: ids.Fullstack, hours: 20 }]);
     expect(draft.analysis?.roles).toHaveLength(2);
   });

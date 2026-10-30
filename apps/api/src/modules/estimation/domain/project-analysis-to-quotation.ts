@@ -38,10 +38,19 @@ export function projectAnalysisToQuotationDraft(
 
   const draft = quotationDraftDataSchema.parse({
     mode: 'phases',
-    teams: uniqueTeamIds.map((teamId) => ({
-      teamId, collaborators: 1, unit: 'week', duration,
-      hoursPerWeek: 40, dedicationPercent: 100,
-    })),
+    teams: uniqueTeamIds.map((teamId) => {
+      const sourceRoles = analysis.roles.filter((role) => roleTeamIds[role.role] === teamId);
+      const collaborators = sourceRoles.reduce((sum, role) => sum + role.headcount, 0);
+      const hours = sourceRoles.reduce((sum, role) => sum + role.baseHours, 0);
+      // Valor medio INFORMATIVO derivado de la EDT: la carga real se rige
+      // exclusivamente por fases. No implica dedicación constante por semana.
+      const dedicationPercent = Math.min(100,
+        Math.round((hours / (collaborators * duration * 40)) * 10_000) / 100);
+      return {
+        teamId, collaborators, unit: 'week', duration,
+        hoursPerWeek: 40, dedicationPercent,
+      };
+    }),
     phases, costs: [], paymentPlan: [],
     assumptions: analysis.assumptions.map((item) =>
       (item.key + ': ' + String(item.value ?? '') + '. ' + item.condition).slice(0, 2000)),
