@@ -3,6 +3,8 @@ import type {
   ProjectQuotation,
   QuotationVersion,
   QuotationTransferPreview,
+  QuotationReconciliationReview,
+  SavedQuotationReconciliationReview,
   UpdateQuotationDraftInput,
 } from '@kora/contracts';
 import { api } from '@/shared/lib/api-client';
@@ -16,6 +18,18 @@ export const quotationApi = {
   transferPreview(projectId: string, versionId: string): Promise<QuotationTransferPreview> {
     return api.get<QuotationTransferPreview>(base(projectId) + '/versions/' + versionId + '/transfer-preview');
   },
+  listReconciliationReviews(projectId: string, versionId: string): Promise<SavedQuotationReconciliationReview[]> {
+    return api.get<SavedQuotationReconciliationReview[]>(
+      base(projectId) + '/versions/' + versionId + '/reconciliation-reviews',
+    );
+  },
+  saveReconciliationReview(
+    projectId: string, versionId: string, review: QuotationReconciliationReview,
+  ): Promise<SavedQuotationReconciliationReview> {
+    return api.post<SavedQuotationReconciliationReview>(
+      base(projectId) + '/versions/' + versionId + '/reconciliation-reviews', review,
+    );
+  },
   create(projectId: string, input: CreateQuotationVersionInput = {}): Promise<QuotationVersion> {
     return api.post<QuotationVersion>(base(projectId) + '/versions', input);
   },
@@ -27,6 +41,8 @@ export const quotationApi = {
 export const quotationKeys = {
   all: ['quotations'] as const,
   project: (projectId: string) => [...quotationKeys.all, projectId] as const,
+  reconciliationReviews: (projectId: string, versionId: string) =>
+    [...quotationKeys.project(projectId), 'reconciliation-reviews', versionId] as const,
   transferPreview: (projectId: string, versionId: string, revision: number) =>
     [...quotationKeys.project(projectId), 'transfer-preview', versionId, revision] as const,
 };
