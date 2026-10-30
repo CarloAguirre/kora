@@ -13,6 +13,7 @@ import { DataTable, type Column } from '@/shared/components/ui/DataTable';
 import { DropdownMenu, type DropdownMenuItem } from '@/shared/components/ui/DropdownMenu';
 import { Modal } from '@/shared/components/ui/Modal';
 import { MultiSelect } from '@/shared/components/ui/MultiSelect';
+import { PeriodRangeFilter, type PeriodRange } from '@/shared/components/ui/PeriodRangeFilter';
 import { ConfirmActionDialog } from '@/shared/components/ui/ConfirmActionDialog';
 import { DEFAULT_PAGE_SIZE, Pagination } from '@/shared/components/ui/Pagination';
 import { Select } from '@/shared/components/ui/Select';
@@ -35,6 +36,8 @@ import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 const STATUS_OPTIONS = HOUR_ENTRY_STATUSES.map((status) => ({ value: status, label: HOUR_ENTRY_STATUS_LABELS[status] }));
 const formatDate = (value: string) => new Date(`${value}T00:00:00`).toLocaleDateString('es-CL');
 const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 2 });
+/** Sin fechas: todo el historial, como antes de existir el filtro por semana. */
+const NO_PERIOD: PeriodRange = { mode: 'range', dateFrom: '', dateTo: '' };
 
 type DialogState = { kind: 'none' } | { kind: 'view' | 'edit'; entry: HourEntrySummary | null };
 
@@ -42,7 +45,7 @@ type DialogState = { kind: 'none' } | { kind: 'view' | 'edit'; entry: HourEntryS
  * "Registro de horas Líder" — réplica del card homónimo de `LiderDashboardB`
  * (v1), sin el botón "Registrar horas" que tenía allá (se sacó por diseño):
  * el historial de TODO el equipo (no solo el propio) con filtro por persona,
- * proyecto, fecha y estado. La visibilidad viene gratis del alcance `hours:read_team`
+ * proyecto, período (semana o rango de fechas) y estado. La visibilidad viene gratis del alcance `hours:read_team`
  * ya resuelto en el backend (propias + del equipo liderado).
  *
  * Las acciones de cada fila van en un menú ⋮ (mismo patrón que la cola de
@@ -61,8 +64,9 @@ export function TeamHourHistoryPanel({ teamId, userId }: { teamId?: string; user
   const toast = useToast();
   const [personSearch, setPersonSearch] = useState('');
   const [projectIds, setProjectIds] = useState<string[]>([]);
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const [period, setPeriod] = useState<PeriodRange>(NO_PERIOD);
+  const dateFrom = period.dateFrom;
+  const dateTo = period.dateTo;
   const [status, setStatus] = useState<HourEntryStatus | ''>('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
@@ -112,8 +116,7 @@ export function TeamHourHistoryPanel({ teamId, userId }: { teamId?: string; user
   const clearFilters = () => {
     setPersonSearch('');
     setProjectIds([]);
-    setDateFrom('');
-    setDateTo('');
+    setPeriod(NO_PERIOD);
     setStatus('');
     setPage(1);
   };
@@ -297,23 +300,10 @@ export function TeamHourHistoryPanel({ teamId, userId }: { teamId?: string; user
             setPage(1);
           }}
         />
-        <TextField
-          className={styles.filter}
-          label="Fecha HH desde"
-          type="date"
-          value={dateFrom}
-          onChange={(event) => {
-            setDateFrom(event.target.value);
-            setPage(1);
-          }}
-        />
-        <TextField
-          className={styles.filter}
-          label="Fecha HH hasta"
-          type="date"
-          value={dateTo}
-          onChange={(event) => {
-            setDateTo(event.target.value);
+        <PeriodRangeFilter
+          value={period}
+          onChange={(next) => {
+            setPeriod(next);
             setPage(1);
           }}
         />
