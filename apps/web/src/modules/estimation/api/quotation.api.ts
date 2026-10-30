@@ -2,6 +2,7 @@ import type {
   CreateQuotationVersionInput,
   ProjectQuotation,
   QuotationVersion,
+  QuotationTransferPreview,
   UpdateQuotationDraftInput,
 } from '@kora/contracts';
 import { api } from '@/shared/lib/api-client';
@@ -11,6 +12,9 @@ const base = (projectId: string) => '/estimations/projects/' + projectId + '/quo
 export const quotationApi = {
   get(projectId: string): Promise<ProjectQuotation | null> {
     return api.get<ProjectQuotation | null>(base(projectId));
+  },
+  transferPreview(projectId: string, versionId: string): Promise<QuotationTransferPreview> {
+    return api.get<QuotationTransferPreview>(base(projectId) + '/versions/' + versionId + '/transfer-preview');
   },
   create(projectId: string, input: CreateQuotationVersionInput = {}): Promise<QuotationVersion> {
     return api.post<QuotationVersion>(base(projectId) + '/versions', input);
@@ -23,4 +27,6 @@ export const quotationApi = {
 export const quotationKeys = {
   all: ['quotations'] as const,
   project: (projectId: string) => [...quotationKeys.all, projectId] as const,
+  transferPreview: (projectId: string, versionId: string, revision: number) =>
+    [...quotationKeys.project(projectId), 'transfer-preview', versionId, revision] as const,
 };

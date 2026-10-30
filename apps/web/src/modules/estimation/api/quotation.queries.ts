@@ -27,3 +27,12 @@ export function useSaveQuotationDraft(projectId: string) {
     onSuccess: () => client.invalidateQueries({ queryKey: quotationKeys.project(projectId) }),
   });
 }
+
+export function useQuotationTransferPreview(projectId: string, versionId: string, revision: number, enabled: boolean) {
+  return useQuery({
+    queryKey: quotationKeys.transferPreview(projectId, versionId, revision),
+    queryFn: () => quotationApi.transferPreview(projectId, versionId),
+    enabled: enabled && Boolean(projectId) && Boolean(versionId),
+    retry: false,
+  });
+}
