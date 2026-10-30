@@ -16,7 +16,7 @@ export function reconcileQuotationEdt(
   const analysis = version.draft.analysis;
   if (!analysis) return {
     source: 'no_analysis', activityCount: 0, proposedModuleCount: 0,
-    proposedHours: 0, modules: [],
+    proposedHours: 0, availableExistingModules: operational.executionModules ?? [], modules: [],
     notes: [
       'La versión no tiene EDT detallada. Las fases comerciales no se convierten automáticamente en módulos ni tareas de ejecución.',
     ],
@@ -74,6 +74,9 @@ export function reconcileQuotationEdt(
     activityCount: analysis.activities.length,
     proposedModuleCount: modules.length,
     proposedHours: round(analysis.summary.baseHours),
+    // Permite elegir por ID un módulo distinto al sugerido por nombre.
+    // El usuario debe confirmar cada vínculo; no autoriza actualización alguna.
+    availableExistingModules: existingModules,
     modules, notes,
   };
 }
