@@ -1,4 +1,5 @@
 import { useAuth } from "@/modules/auth/hooks/useAuth";
+import { ProjectQuotationCard } from "@/modules/estimation/components/ProjectQuotationCard";
 import { usePermissions } from "@/modules/auth/hooks/usePermissions";
 import {
   useHourEntriesList,
@@ -324,6 +325,8 @@ export function DevelopmentProjectDetailView({
           </div>
         </div>
       </Card>
+
+      {!readOnly && <ProjectQuotationCard project={project} />}
 
       <div className={styles.tabsShell}>
         <div className={styles.tabsShellBar}>
