@@ -937,7 +937,7 @@ export function NewProjectPage() {
                       <div className={styles.section} style={{ paddingTop: 'var(--kora-space-3)' }}>
                         <TextField label="Nombre" value={contactName} onChange={(event) => setContactName(event.target.value)} />
                         <TextField label="Cargo" value={contactPosition} onChange={(event) => setContactPosition(event.target.value)} />
-                        <TextField label="Teléfono" value={contactPhone} onChange={(event) => setContactPhone(event.target.value)} />
+                        <TextField label="Teléfono" spellCheck={false} value={contactPhone} onChange={(event) => setContactPhone(event.target.value)} />
                         <TextField
                           label="Correo electrónico"
                           type="email"

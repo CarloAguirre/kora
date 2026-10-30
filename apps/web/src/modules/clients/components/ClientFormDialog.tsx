@@ -187,8 +187,8 @@ export function ClientFormDialog({ open, clientId, onClose, onSuccess, onCreated
         </div>
 
         <div className={styles.row}>
-          <TextField label="RUT" required errorText={errors.taxId?.message} {...register('taxId')} />
-          <TextField label="Sitio web" {...register('website')} />
+          <TextField label="RUT" required spellCheck={false} errorText={errors.taxId?.message} {...register('taxId')} />
+          <TextField label="Sitio web" spellCheck={false} {...register('website')} />
         </div>
 
         <TextField label="Dirección" {...register('address')} />

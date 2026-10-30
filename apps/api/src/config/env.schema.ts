@@ -56,6 +56,11 @@ export const envSchema = z.object({
   // de copia de producción, encenderlos en desarrollo le escribiría a gente real.
   HOUR_REMINDERS_ENABLED: z.stringbool().default(false),
 
+  // Servidor LanguageTool propio para la revisión gramatical del corrector
+  // (tildes según el contexto, concordancia). Opcional: sin él, el front
+  // sigue corrigiendo la ortografía con su diccionario local.
+  LANGUAGETOOL_URL: z.url().optional(),
+
   MAX_FAILED_LOGIN_ATTEMPTS: z.coerce.number().int().min(1).max(50).default(5),
   ACCOUNT_LOCK_MINUTES: z.coerce.number().int().min(1).max(1440).default(15),
 

@@ -344,6 +344,9 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(
                   }
                 : onFocus
             }
+            // En un buscador se escriben fragmentos de nombres y códigos: el
+            // subrayado del corrector ahí solo distrae.
+            spellCheck={isSearch ? false : undefined}
             {...rest}
           />
 
