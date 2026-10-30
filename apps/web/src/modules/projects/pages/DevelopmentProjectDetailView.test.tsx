@@ -46,6 +46,17 @@ vi.mock('@/modules/users/api/users.queries', () => ({
   useUsersList: () => ({ data: { items: [] } }),
 }));
 
+// Estas pruebas verifican la ficha y los equipos, no el endpoint comercial.
+ // Aislar el nuevo widget evita requerir QueryClientProvider y peticiones de red
+ // en un test que ya sustituye los demás hooks de datos por mocks.
+vi.mock('@/modules/estimation/api/quotation.queries', () => ({
+  useProjectQuotation: () => ({
+    data: null,
+    isLoading: false,
+    error: null,
+  }),
+}));
+
 vi.mock('@/modules/forecast/api/forecast.queries', () => ({
   useForecastLoadPreview: () => ({ data: undefined }),
   useCheckForecastOverload: () => async () => [],
