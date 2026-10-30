@@ -355,7 +355,7 @@ export function QuotationWorkspacePage() {
                       </div>
                     ))}
                     <p className={styles.helper}>Porcentaje configurado: {money(usedPercent)}% {usedPercent === 100 ? '· Completo' : '· Pendiente de completar'}</p>
-                    <p className={styles.helper}>Los parámetros específicos por fecha/fase se completarán al habilitar R3. El plan no se traspasa todavía.</p>
+                    <p className={styles.helper}>Puedes registrar fecha o fase como referencia comercial. La ejecución y validación del plan de pago se habilitarán recién en R3.</p>
                   </Card>
 
                   <Card>
