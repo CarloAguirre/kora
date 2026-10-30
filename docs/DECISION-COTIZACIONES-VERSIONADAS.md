@@ -45,3 +45,7 @@ Acordar con Diseño/Levantamiento los seis puntos, documentar decisión definiti
 ## Evidencia de PostgreSQL y regla operativa provisional (30-oct-2026)
 
 El resultado de la consulta de estados (ver `VALIDACION-ESTADOS-COTIZACIONES-2026-10-30.md`) revela 37 proyectos `development` en `prospect|quoted` que también están `active`. La Calculadora **puede preparar un borrador comercial aislado** en esos proyectos, igual que si estuvieran `draft`; esto NO valida ni reemplaza un contrato o alcance operativo, y NO habilita transferencia sobre un proyecto activo. La etapa `approved` se mantiene de solo lectura para borradores nuevos en esta fase. La decisión D05 sigue abierta para el reemplazo de la versión transferida y la protección de HH/facturas históricas.
+
+## R3-a · Preflight read-only (30-oct-2026)
+
+Se incorpora GET de previsualización operativa con HH vendidas/usadas, equipos, módulos/tareas/segmentos e hitos por estado; transferEnabled permanece false. La lectura no modifica BD. No se compara contract_amount con el neto propuesto (D06 no define la base). Consultar docs/IMPLEMENTACION-CALCULADORA-R3A-PREFLIGHT.md. D04, D05 y D06 continúan abiertas; ninguna mutación de aprobación/traspaso se habilita.

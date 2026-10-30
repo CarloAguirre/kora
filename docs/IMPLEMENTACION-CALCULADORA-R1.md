@@ -92,3 +92,7 @@ Ver docs/ARTEFACTO-JSON-IA-COTIZACIONES-2026-10-30.md. Contrato Zod para artefac
 ## Corte R2-c · 30/10/2026
 
 Visor de evidencia EDT/ERS/cronograma integrado a cotización con `analysis`, descarga del JSON original, y comparador de versiones por HH, equipo e importe comparable. En API se añade `reconcileQuotationAnalysis`: protege la evidencia original y define servidor-side el estado `synced|modified`. Ver [IMPLEMENTACION-CALCULADORA-R2C-VISOR-COMPARADOR.md](./IMPLEMENTACION-CALCULADORA-R2C-VISOR-COMPARADOR.md) para pruebas y comandos. No se ejecutaron pruebas ni migraciones con el conector.
+
+## R3-a · Previsualización read-only, 30/10/2026
+
+GET /api/estimations/projects/:projectId/quotation/versions/:versionId/transfer-preview y widget para comparar propuesta con estado operativo real. Ver docs/IMPLEMENTACION-CALCULADORA-R3A-PREFLIGHT.md. NO hay envío, aprobación ni traspaso. No requiere migración nueva. Validación local pendiente.
