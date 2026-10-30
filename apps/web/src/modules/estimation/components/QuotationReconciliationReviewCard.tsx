@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import type {
   QuotationReconciliationDecision, QuotationTransferPreview, QuotationReconciliationReview,
+  AssessQuotationReconciliationInput,
 } from '@kora/contracts';
 import { Button } from '@/shared/components/ui/Button';
-import { useQuotationReconciliationReviews, useSaveQuotationReconciliationReview } from '../api/quotation.queries';
+import { useQuotationReconciliationReviews, useSaveQuotationReconciliationReview,
+  useQuotationReconciliationAssessments, useAssessQuotationReconciliation } from '../api/quotation.queries';
 import { Select } from '@/shared/components/ui/Select';
 import { buildReconciliationReview, emptyReconciliationChoices,
   type ReconciliationChoice } from '../lib/quotation-reconciliation-review';
@@ -21,9 +23,11 @@ const blank: ReconciliationChoice = { decision: 'pending', targetId: null, note:
  * Actas inmutables de DISCUSIÓN R3-d. Edición local y descarga; guardar añade
  * solo un evento a quotation_events. No aprueba ni modifica cotización/ejecución.
  */
-export function QuotationReconciliationReviewCard({ preview, canSave = false }: {
+export function QuotationReconciliationReviewCard({ preview, canSave = false, canAssess = false, currentUserId = null }: {
   preview: QuotationTransferPreview;
   canSave?: boolean;
+  canAssess?: boolean;
+  currentUserId?: string | null;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [choices, setChoices] = useState(emptyReconciliationChoices);
@@ -31,6 +35,13 @@ export function QuotationReconciliationReviewCard({ preview, canSave = false }: 
   const [notice, setNotice] = useState('');
   const history = useQuotationReconciliationReviews(preview.projectId, preview.versionId, expanded);
   const saveMutation = useSaveQuotationReconciliationReview(preview.projectId, preview.versionId);
+  const assessments = useQuotationReconciliationAssessments(preview.projectId, preview.versionId, expanded);
+  const assessMutation = useAssessQuotationReconciliation(preview.projectId, preview.versionId);
+  const [assessmentDecision, setAssessmentDecision] =
+    useState<AssessQuotationReconciliationInput['decision']>('changes_requested');
+  const [assessmentReason, setAssessmentReason] = useState('');
+  const [assessmentError, setAssessmentError] = useState('');
+  const [assessmentNotice, setAssessmentNotice] = useState('');
   const reconciliation = preview.edtReconciliation;
   const existingModules = reconciliation.availableExistingModules ?? [];
   if (reconciliation.source === 'no_analysis') return (
@@ -91,6 +102,34 @@ export function QuotationReconciliationReviewCard({ preview, canSave = false }: 
       setError('');
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : 'No se pudo generar el acta.');
+    }
+  };
+  const latestReview = history.data?.[0];
+  const latestAssessment = assessments.data?.find((record) => record.reviewId === latestReview?.id);
+  const mayAssess = Boolean(
+    canAssess && latestReview && !latestAssessment &&
+    latestReview.actorUserId !== currentUserId &&
+    latestReview.review.versionRevision === preview.revision &&
+    !assessMutation.isPending
+  );
+  const submitAssessment = async () => {
+    if (!mayAssess || !latestReview) return;
+    setAssessmentError('');
+    setAssessmentNotice('');
+    try {
+      const result = await assessMutation.mutateAsync({
+        reviewId: latestReview.id,
+        versionRevision: latestReview.review.versionRevision,
+        decision: assessmentDecision,
+        reason: assessmentReason.trim(),
+      });
+      setAssessmentNotice(result.decision === 'changes_requested'
+        ? 'Se registraron observaciones técnicas; la cotización no cambió.'
+        : 'Se registró la revisión técnica; no es aprobación de cotización.');
+      setAssessmentReason('');
+    } catch (exception) {
+      setAssessmentError(exception instanceof Error ? exception.message
+        : 'No fue posible registrar la evaluación técnica.');
     }
   };
   const reviewedModules = reconciliation.modules.filter((_, index) =>
@@ -223,6 +262,47 @@ export function QuotationReconciliationReviewCard({ preview, canSave = false }: 
           </div>
           {!canSave && <p className={styles.warning}>Guardado deshabilitado: la versión o el proyecto no admite nuevas revisiones de borrador. Puedes exportar el JSON.</p>}
           <div className={styles.history}>
+            <div className={styles.assessmentIntro}>
+              <strong>Evaluación técnica de actas</strong>
+              <p>Los estados «Revisada para discusión» y «Solicitar cambios» solo documentan una revisión interna.
+                No aprueban el contrato ni cambian fases, HH o tareas de ejecución.</p>
+            </div>
+            {assessments.isError && <p role="alert" className={styles.error}>
+              No se pudo consultar el estado de las evaluaciones técnicas.
+            </p>}
+            {canAssess && latestReview && !latestAssessment && (
+              <div className={styles.assessmentForm}>
+                <strong>Evaluar la última acta · {latestReview.id.slice(0, 8)}</strong>
+                {latestReview.actorUserId === currentUserId
+                  ? <p className={styles.warning}>No puedes evaluar un acta creada por ti mismo.</p>
+                  : latestReview.review.versionRevision !== preview.revision
+                    ? <p className={styles.warning}>Esta acta corresponde a una revisión anterior de la cotización.</p>
+                    : (
+                      <>
+                        <Select label="Resultado de la revisión técnica"
+                          value={assessmentDecision}
+                          options={[
+                            { value: 'changes_requested', label: 'Solicitar cambios' },
+                            { value: 'reviewed_for_discussion', label: 'Revisada para discusión' },
+                          ]}
+                          onChange={(event) => setAssessmentDecision(
+                            event.target.value as AssessQuotationReconciliationInput['decision'],
+                          )} />
+                        <label className={styles.field}>Fundamento de la evaluación técnica
+                          <textarea rows={3} maxLength={2000} value={assessmentReason}
+                            onChange={(event) => setAssessmentReason(event.target.value)}
+                            placeholder="Documenta qué verificaste, qué riesgos permanecen y los ajustes requeridos..." />
+                        </label>
+                        <Button variant="outline" loading={assessMutation.isPending}
+                          disabled={!mayAssess || assessmentReason.trim().length < 10}
+                          onClick={() => void submitAssessment()}>Registrar evaluación técnica</Button>
+                        {assessmentError && <p role="alert" className={styles.error}>{assessmentError}</p>}
+                        {assessmentNotice && <p role="status" className={styles.notice}>{assessmentNotice}</p>}
+                      </>
+                    )}
+              </div>
+            )}
+
             <strong>Historial guardado en Kora (hasta 25 actas)</strong>
             {history.isLoading && <p>Cargando historial…</p>}
             {history.isError && <p role="alert" className={styles.error}>
@@ -238,6 +318,13 @@ export function QuotationReconciliationReviewCard({ preview, canSave = false }: 
                     {' '}{entry.review.moduleDecisions.length} módulos ·
                     {' '}{entry.review.issues.length} observaciones</small>
                   <small>Acta de discusión, no aprobada · ID {entry.id.slice(0, 8)}</small>
+                  {assessments.data?.filter((item) => item.reviewId === entry.id).map((item) => (
+                    <small key={item.id}>
+                      Revisión técnica: {item.decision === 'changes_requested' ? 'Se solicitaron cambios' : 'Revisada para discusión'}
+                      {' · '}{new Date(item.occurredAt).toLocaleString('es-CL')}
+                      {' · '}{item.reason}
+                    </small>
+                  ))}
                 </div>
                 <Button variant="outline" size="sm"
                   onClick={() => downloadReview(entry.review, '-' + entry.id.slice(0, 8))}>

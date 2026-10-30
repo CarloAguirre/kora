@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { estimationAnalysisArtifactSchema, isQuotationDraftEligibleProject, quotationDraftDataSchema, type EstimationAnalysisArtifact, type QuotationDraftData, type QuotationVersion, type UpdateQuotationDraftInput } from '@kora/contracts';
+import { useAuth } from '@/modules/auth/hooks/useAuth';
+import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { useProjectDetail } from '@/modules/projects/api/projects.queries';
 import { useTeamsList } from '@/modules/teams/api/teams.queries';
 import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
@@ -28,6 +30,8 @@ const emptyTeam = (teamId: string): QuotationDraftData['teams'][number] => ({
 });
 
 export function QuotationWorkspacePage() {
+  const { user } = useAuth();
+  const { can } = usePermissions();
   const { projectId: projectRef } = useParams<{ projectId: string }>();
   const [params, setParams] = useSearchParams();
   // El segmento de la ruta puede ser un slug; la API de cotizaciones usa el UUID.
@@ -278,7 +282,8 @@ export function QuotationWorkspacePage() {
               )}
               {selected && projectId && (
                 <QuotationTransferPreviewCard projectId={projectId} version={selected} teamNames={teamById}
-                  canSaveReview={mayWrite} />
+                  canSaveReview={mayWrite} canAssessReview={mayWrite && can('projects:manage')}
+                  currentUserId={user?.id ?? null} />
               )}
 
               {mayWrite && (
