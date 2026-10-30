@@ -1,7 +1,7 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post } from '@nestjs/common';
 import {
-  createQuotationVersionSchema, updateQuotationDraftSchema,
-  type CreateQuotationVersionInput, type ProjectQuotation, type QuotationVersion, type UpdateQuotationDraftInput, type QuotationTransferPreview,
+  createQuotationVersionSchema, updateQuotationDraftSchema, quotationReconciliationReviewSchema,
+  type CreateQuotationVersionInput, type ProjectQuotation, type QuotationVersion, type UpdateQuotationDraftInput, type QuotationTransferPreview, type QuotationReconciliationReview, type SavedQuotationReconciliationReview,
 } from '@kora/contracts';
 import { CurrentUser, type RequestUser } from '../../../shared/presentation/decorators/current-user.decorator';
 import { RequireAnyPermission } from '../../../shared/presentation/decorators/require-permissions.decorator';
@@ -30,6 +30,28 @@ export class QuotationController {
     @CurrentUser() actor: RequestUser,
   ): Promise<QuotationTransferPreview> {
     return this.drafts.getTransferPreview(projectId, versionId, actor);
+  }
+
+  @Get('versions/:versionId/reconciliation-reviews')
+  @RequireAnyPermission('projects:manage', 'projects:read_assigned')
+  listReconciliationReviews(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('versionId', ParseUUIDPipe) versionId: string,
+    @CurrentUser() actor: RequestUser,
+  ): Promise<SavedQuotationReconciliationReview[]> {
+    return this.drafts.listReconciliationReviews(projectId, versionId, actor);
+  }
+
+  @Post('versions/:versionId/reconciliation-reviews')
+  @HttpCode(HttpStatus.CREATED)
+  @RequireAnyPermission('projects:manage', 'projects:read_assigned')
+  saveReconciliationReview(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('versionId', ParseUUIDPipe) versionId: string,
+    @Body(new ZodValidationPipe(quotationReconciliationReviewSchema)) review: QuotationReconciliationReview,
+    @CurrentUser() actor: RequestUser,
+  ): Promise<SavedQuotationReconciliationReview> {
+    return this.drafts.saveReconciliationReview(projectId, versionId, actor, review);
   }
 
   @Post('versions')

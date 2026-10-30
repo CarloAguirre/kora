@@ -1,7 +1,8 @@
-import { ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { isQuotationDraftEligibleProject } from '@kora/contracts';
+import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { buildReconciliationReview, isQuotationDraftEligibleProject } from '@kora/contracts';
+import { isDeepStrictEqual } from 'node:util';
 import type {
-  CreateQuotationVersionInput, Permission, ProjectQuotation, QuotationVersion, UpdateQuotationDraftInput, QuotationTransferPreview,
+  CreateQuotationVersionInput, Permission, ProjectQuotation, QuotationVersion, UpdateQuotationDraftInput, QuotationTransferPreview, QuotationReconciliationReview, SavedQuotationReconciliationReview,
 } from '@kora/contracts';
 import { buildQuotationTransferPreview } from '../../domain/quotation-transfer-preview';
 import { QUOTATION_REPOSITORY, type QuotationProjectScope, type QuotationRepository } from '../../domain/repositories/quotation.repository';
@@ -44,6 +45,75 @@ export class ManageQuotationDraftsUseCase {
     const operational = await this.repository.getOperationalSnapshot(projectId);
     if (!operational) throw new NotFoundException('Proyecto operativo no encontrado.');
     return buildQuotationTransferPreview(version, operational, new Date().toISOString());
+  }
+
+  async listReconciliationReviews(
+    projectId: string, versionId: string, actor: QuotationActor,
+  ): Promise<SavedQuotationReconciliationReview[]> {
+    await this.authorize(projectId, actor, false);
+    const quotation = await this.repository.getByProjectId(projectId);
+    if (!quotation?.versions.some((version) => version.id === versionId)) {
+      throw new NotFoundException('La versión de cotización no pertenece al proyecto.');
+    }
+    return this.repository.listReconciliationReviews(projectId, versionId);
+  }
+
+  async saveReconciliationReview(
+    projectId: string, versionId: string, actor: QuotationActor,
+    review: QuotationReconciliationReview,
+  ): Promise<SavedQuotationReconciliationReview> {
+    // Se guarda exclusivamente un borrador de DISCUSIÓN; no se aprueban
+    // correspondencias ni se habilita el traspaso de HH o facturas.
+    await this.authorize(projectId, actor, true);
+    if (JSON.stringify(review).length > 90_000) {
+      throw new BadRequestException('El acta supera el tamaño máximo admitido (90 KB).');
+    }
+    if (review.projectId !== projectId || review.versionId !== versionId) {
+      throw new ConflictException('La identificación del acta no coincide con el proyecto y versión.');
+    }
+    const quotation = await this.repository.getByProjectId(projectId);
+    const version = quotation?.versions.find((item) => item.id === versionId);
+    if (!version) throw new NotFoundException('La versión no pertenece a esta cotización.');
+    if (version.status !== 'draft' || version.revision !== review.versionRevision ||
+        version.versionNumber !== review.versionNumber) {
+      throw new ConflictException('La versión cambió o dejó de ser editable. Actualiza el análisis.');
+    }
+    const operational = await this.repository.getOperationalSnapshot(projectId);
+    if (!operational) throw new NotFoundException('Estado operativo no encontrado.');
+    const preview = buildQuotationTransferPreview(version, operational, new Date().toISOString());
+    if (preview.edtReconciliation.source === 'no_analysis') {
+      throw new ConflictException('Esta versión no tiene EDT para preparar un acta.');
+    }
+
+    // Reconstrucción CANÓNICA desde el preflight del servidor. Impide enviar
+    // módulos/tareas de otro proyecto, ocultar advertencias o falsificar HH.
+    const choices = {
+      modules: Object.fromEntries(review.moduleDecisions.map((item) => [
+        item.moduleIndex,
+        { decision: item.decision, targetId: item.targetModuleId, note: item.note },
+      ])),
+      activities: Object.fromEntries(review.moduleDecisions.flatMap((item) =>
+        item.activityDecisions.map((activity) => [
+          activity.wbs,
+          { decision: activity.decision, targetId: activity.targetTaskId, note: activity.note },
+        ]))),
+    };
+    let canonical: QuotationReconciliationReview;
+    try {
+      canonical = buildReconciliationReview(preview, choices, review.exportedAt);
+    } catch {
+      throw new ConflictException('El acta contiene vinculaciones incompatibles con el estado operativo actual.');
+    }
+    // La fecha de lectura anterior es histórica; el resto se comprueba
+    // contra un preflight RECIÉN consultado, incluidas sus advertencias.
+    const checked = { ...canonical, previewCalculatedAt: review.previewCalculatedAt };
+    if (!isDeepStrictEqual(checked, review)) {
+      throw new ConflictException('Acta desactualizada o alterada. Refresca el preflight y revisa las decisiones.');
+    }
+
+    const created = await this.repository.appendReconciliationReview(projectId, versionId, actor.id, review);
+    if (!created) throw new ConflictException('La versión cambió durante el guardado. Actualiza e inténtalo nuevamente.');
+    return created;
   }
 
   async create(projectId: string, actor: QuotationActor, input: CreateQuotationVersionInput): Promise<QuotationVersion> {
