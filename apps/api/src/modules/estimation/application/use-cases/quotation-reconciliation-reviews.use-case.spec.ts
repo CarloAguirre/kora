@@ -93,6 +93,15 @@ function setup() {
     getByProjectId: vi.fn().mockResolvedValue({ id: ids.quotation, projectId: ids.project, versions: [version] }),
     getOperationalSnapshot: vi.fn().mockResolvedValue(operational),
     listReconciliationReviews: vi.fn().mockResolvedValue([]),
+    listReconciliationAssessments: vi.fn().mockResolvedValue([]),
+    appendReconciliationAssessment: vi.fn().mockImplementation(async (_p, versionId, reviewerId, input) => ({
+      id: '0777e456-fd76-445e-83f1-afc25061c111',
+      reviewId: input.reviewId, versionId,
+      versionRevision: input.versionRevision, reviewerUserId: reviewerId,
+      decision: input.decision, reason: input.reason,
+      status: 'technical_review_only', transferEnabled: false,
+      occurredAt: '2026-10-30T18:15:00.000Z',
+    })),
     appendReconciliationReview: vi.fn().mockImplementation(async (_p, _v, actorId, review) => ({
       id: ids.savedEvent, actorUserId: actorId,
       occurredAt: '2026-10-30T18:06:00.000Z', review,
@@ -182,5 +191,115 @@ describe('R3-d — actas persistidas sin mutaciones operativas', () => {
     await expect(useCase.saveReconciliationReview(ids.project, ids.version, actor, makeReview()))
       .rejects.toBeInstanceOf(ConflictException);
     expect(repo.appendReconciliationReview).not.toHaveBeenCalled();
+  });
+});
+
+
+describe('R3-e — evaluación técnica sin aprobación comercial', () => {
+  const reviewer = { id: ids.outsider, permissions: ['projects:manage'] as const };
+  const saved = () => ({
+    id: ids.savedEvent, actorUserId: ids.user,
+    occurredAt: '2026-10-30T18:06:00.000Z',
+    review: makeReview(),
+  });
+  const input = () => ({
+    reviewId: ids.savedEvent, versionRevision: 3,
+    decision: 'reviewed_for_discussion' as const,
+    reason: 'Correspondencias WBS revisadas; conservar horas y facturación.',
+  });
+
+  it('registra evaluación técnica de otro administrador, sin aprobar ni actualizar cotización', async () => {
+    const { useCase, repo } = setup();
+    vi.mocked(repo.listReconciliationReviews).mockResolvedValueOnce([saved()]);
+    const result = await useCase.assessReconciliationReview(ids.project, ids.version, reviewer, input());
+    expect(result.status).toBe('technical_review_only');
+    expect(result.transferEnabled).toBe(false);
+    expect(result.decision).toBe('reviewed_for_discussion');
+    expect(result.reviewerUserId).toBe(ids.outsider);
+    expect(repo.appendReconciliationAssessment).toHaveBeenCalledWith(
+      ids.project, ids.version, ids.outsider, input(),
+    );
+    expect(repo.updateDraft).not.toHaveBeenCalled();
+    expect(repo.createDraft).not.toHaveBeenCalled();
+  });
+
+  it('no permite autoevaluar el acta, ni deja usar permisos solo de líder', async () => {
+    const { useCase, repo } = setup();
+    vi.mocked(repo.listReconciliationReviews).mockResolvedValueOnce([saved()]);
+    await expect(useCase.assessReconciliationReview(ids.project, ids.version, actor, input()))
+      .rejects.toBeInstanceOf(ForbiddenException);
+    const leader = { id: ids.user, permissions: ['projects:read_assigned'] as const };
+    await expect(useCase.assessReconciliationReview(ids.project, ids.version, leader, input()))
+      .rejects.toBeInstanceOf(ForbiddenException);
+    expect(repo.appendReconciliationAssessment).not.toHaveBeenCalled();
+  });
+
+  it('impide evaluar actas antiguas o ya evaluadas', async () => {
+    const { useCase, repo } = setup();
+    vi.mocked(repo.listReconciliationReviews).mockResolvedValueOnce([{
+      ...saved(), id: ids.differentTask,
+    }]);
+    await expect(useCase.assessReconciliationReview(ids.project, ids.version, reviewer, input()))
+      .rejects.toBeInstanceOf(ConflictException);
+
+    vi.mocked(repo.listReconciliationReviews).mockResolvedValueOnce([saved()]);
+    vi.mocked(repo.listReconciliationAssessments).mockResolvedValueOnce([{
+      id: '0777e456-fd76-445e-83f1-afc25061c111',
+      reviewId: ids.savedEvent, versionId: ids.version, versionRevision: 3,
+      reviewerUserId: ids.outsider, occurredAt: '2026-10-30T18:15:00.000Z',
+      decision: 'changes_requested', reason: 'Prueba de evaluación previa.',
+      status: 'technical_review_only', transferEnabled: false,
+    }]);
+    await expect(useCase.assessReconciliationReview(ids.project, ids.version, reviewer, input()))
+      .rejects.toBeInstanceOf(ConflictException);
+    expect(repo.appendReconciliationAssessment).not.toHaveBeenCalled();
+  });
+
+  it('si cambia el estado operativo desde guardar el acta exige una nueva revisión', async () => {
+    const { useCase, repo } = setup();
+    vi.mocked(repo.listReconciliationReviews).mockResolvedValueOnce([saved()]);
+    vi.mocked(repo.getOperationalSnapshot).mockResolvedValueOnce({
+      ...operational, usedHours: operational.usedHours + 5,
+    });
+    await expect(useCase.assessReconciliationReview(ids.project, ids.version, reviewer, input()))
+      .rejects.toBeInstanceOf(ConflictException);
+    expect(repo.appendReconciliationAssessment).not.toHaveBeenCalled();
+  });
+
+  it('solicitar cambios es válido para actas incompletas; revisada para discusión no', async () => {
+    const { useCase, repo } = setup();
+    const pending = saved();
+    pending.review.moduleDecisions[0]!.decision = 'pending';
+    pending.review.moduleDecisions[0]!.targetModuleId = null;
+    // Con un acta incompleta CANÓNICA, la evaluación técnica solicita cambios.
+    const preview = buildQuotationTransferPreview(version, operational, '2026-10-30T18:00:00.000Z');
+    const incompleteReview = buildReconciliationReview(preview, {
+      modules: {}, activities: {},
+    }, '2026-10-30T18:05:00.000Z');
+    vi.mocked(repo.listReconciliationReviews).mockResolvedValueOnce([{
+      ...saved(), review: incompleteReview,
+    }]);
+    await expect(useCase.assessReconciliationReview(ids.project, ids.version, reviewer, input()))
+      .rejects.toBeInstanceOf(ConflictException);
+
+    vi.mocked(repo.listReconciliationReviews).mockResolvedValueOnce([{
+      ...saved(), review: incompleteReview,
+    }]);
+    await expect(useCase.assessReconciliationReview(ids.project, ids.version, reviewer, {
+      ...input(), decision: 'changes_requested',
+    })).resolves.toMatchObject({
+      status: 'technical_review_only', decision: 'changes_requested', transferEnabled: false,
+    });
+  });
+
+  it('exige mantener la revisión comercial y permite consultar historial con autorización', async () => {
+    const { useCase, repo } = setup();
+    vi.mocked(repo.listReconciliationReviews).mockResolvedValueOnce([saved()]);
+    await expect(useCase.assessReconciliationReview(ids.project, ids.version, reviewer, {
+      ...input(), versionRevision: 999,
+    })).rejects.toBeInstanceOf(ConflictException);
+    await expect(useCase.listReconciliationAssessments(ids.project, ids.version, reviewer))
+      .resolves.toEqual([]);
+    expect(repo.listReconciliationAssessments).toHaveBeenCalled();
   });
 });
