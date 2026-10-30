@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '@/modules/auth/hooks/useAuth';
+import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { projectQuotationPath } from '@/app/router/paths';
 import {
   PROJECT_SALES_STAGE_LABELS,
@@ -29,6 +31,8 @@ const isQuotationProspect = (project: ProjectSummary) =>
   project.status === 'draft';
 
 export function CalculatorPage() {
+  const { user } = useAuth();
+  const { can } = usePermissions();
   const [search, setSearch] = useState('');
   const [newEstimationOpen, setNewEstimationOpen] = useState(false);
   const { data, isLoading, error } = useProjectsList({
@@ -40,6 +44,7 @@ export function CalculatorPage() {
   });
 
   const sourceProjects = data?.items ?? [];
+  const canQuote = (project: ProjectSummary) => can('projects:manage') || project.leader?.id === user?.id;
 
   const projects = useMemo(() => {
     const term = search.trim().toLocaleLowerCase('es-CL');
@@ -54,8 +59,8 @@ export function CalculatorPage() {
   }, [search, sourceProjects]);
 
   const prospects = useMemo(
-    () => sourceProjects.filter(isQuotationProspect),
-    [sourceProjects],
+    () => sourceProjects.filter((project) => isQuotationProspect(project) && canQuote(project)),
+    [sourceProjects, user?.id, can],
   );
 
   return (
@@ -133,7 +138,7 @@ export function CalculatorPage() {
                       <td>{PROJECT_STATUS_LABELS[project.status]}</td>
                       <td className={styles.numeric}>{formatHours(project.soldHours)}</td>
                       <td>{project.leader?.fullName ?? 'Sin asignar'}</td>
-                      <td><Link to={projectQuotationPath(project)}>Ver versiones</Link></td>
+                      <td>{canQuote(project) ? <Link to={projectQuotationPath(project)}>Ver versiones</Link> : '—'}</td>
                     </tr>
                   ))}
                 </tbody>

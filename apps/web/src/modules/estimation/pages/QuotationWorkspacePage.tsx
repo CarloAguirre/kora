@@ -14,7 +14,6 @@ import styles from './QuotationWorkspacePage.module.css';
 type Form = Pick<UpdateQuotationDraftInput, 'name' | 'hourlyRate' | 'currency' | 'tax' | 'draft'>;
 
 const money = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 4 });
-const initialDraft = (): QuotationDraftData => quotationDraftDataSchema.parse({});
 const fromVersion = (version: QuotationVersion): Form => ({
   name: version.name, hourlyRate: version.hourlyRate, currency: version.currency,
   tax: version.tax, draft: structuredClone(version.draft),
@@ -209,7 +208,10 @@ export function QuotationWorkspacePage() {
                   <Card>
                     <div className={styles.cardTitle}><div><h2>Equipos y dedicación</h2><p>Selecciona equipos activos del catálogo Kora.</p></div>
                       {editable && <Button size="sm" variant="outline" disabled={!available.length}
-                        onClick={() => updateDraft({ teams: [...teamRows, emptyTeam(available[0].id)] })}>Añadir equipo</Button>}
+                        onClick={() => {
+                          const nextTeam = available[0];
+                          if (nextTeam) updateDraft({ teams: [...teamRows, emptyTeam(nextTeam.id)] });
+                        }}>Añadir equipo</Button>}
                     </div>
                     <div className={styles.tableWrap}>
                       <table className={styles.table}>
