@@ -100,3 +100,7 @@ GET /api/estimations/projects/:projectId/quotation/versions/:versionId/transfer-
 ## R3-b — EDT contra ejecución (30/10/2026)
 
 Extiende el GET preflight read-only de R3-a con `edtReconciliation`: comparación informativa de nombres de módulos y tareas, HH base EDT y actividades WBS, evitando fusiones automáticas e identificando homónimos y propuestas desactualizadas. Ver docs/IMPLEMENTACION-CALCULADORA-R3B-EDT-CONCILIACION.md. D04–D06 continúan abiertas; transferEnabled=false.
+
+## R3-c — Acta JSON D04 (30/10/2026)
+
+Se incorpora revisión local de correspondencias humanas entre módulos/actividades EDT y módulos/tareas operativos, exportable como JSON `draft_for_discussion` sin permiso de traspaso. No escribe en BD y no requiere migración. Ver `docs/IMPLEMENTACION-CALCULADORA-R3C-ACTA-CONCILIACION.md`. Pruebas por ejecutar localmente.

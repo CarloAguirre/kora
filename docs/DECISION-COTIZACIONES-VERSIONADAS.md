@@ -53,3 +53,7 @@ Se incorpora GET de previsualización operativa con HH vendidas/usadas, equipos,
 ## R3-b — Evidencia D04 antes de traspasar (30-oct-2026)
 
 Para preparar D04 se agregó una conciliación de solo lectura EDT → candidatos de módulos/tareas existentes. La coincidencia de nombres NO es una relación de identidad y no habilita editar ni reemplazar tareas reales. Si la EDT se modificó comercialmente, se identifica como evidencia desfasada; fases comerciales sin EDT no se convierten en tareas. Ver docs/IMPLEMENTACION-CALCULADORA-R3B-EDT-CONCILIACION.md. D04, D05 y D06 permanecen pendientes.
+
+## R3-c — Revisión humana D04 (30-oct-2026)
+
+Una pantalla local permite preparar una propuesta explícita de asociación de módulos/actividades EDT a módulos/tareas operativos por UUID y exportar un acta JSON, sin guardarla en Kora ni ejecutar cambios. Una asociación por nombre no es identidad comprobada. Las decisiones marcadas en el acta no constituyen aprobación comercial ni ratifican D04–D06. Ver `docs/IMPLEMENTACION-CALCULADORA-R3C-ACTA-CONCILIACION.md`.
