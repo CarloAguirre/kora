@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import type {
   EstimationCreationMode,
   EstimationDriveFolderResolution,
@@ -48,6 +49,7 @@ const MODE_OPTIONS: readonly {
 
 export function NewEstimationModal({ open, prospects, onClose }: NewEstimationModalProps) {
   const navigate = useNavigate();
+  const { can } = usePermissions();
   const [projectRef, setProjectRef] = useState('');
   const [mode, setMode] = useState<EstimationCreationMode>('standard');
   const [driveFolderUrl, setDriveFolderUrl] = useState('');
@@ -244,7 +246,7 @@ export function NewEstimationModal({ open, prospects, onClose }: NewEstimationMo
       <fieldset className={styles.fieldset}>
         <legend>Partir desde</legend>
         <div className={styles.options}>
-          {MODE_OPTIONS.map((option) => (
+          {MODE_OPTIONS.filter((option) => option.value !== 'ai' || can('projects:manage')).map((option) => (
             <label
               key={option.value}
               className={[
