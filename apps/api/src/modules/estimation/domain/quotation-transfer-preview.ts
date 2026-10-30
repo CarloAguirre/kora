@@ -2,6 +2,7 @@ import type {
   QuotationOperationalSnapshot, QuotationTransferPreview, QuotationVersion,
 } from '@kora/contracts';
 import { calculateQuotation } from './quotation-math';
+import { reconcileQuotationEdt } from './quotation-edt-reconciliation';
 
 const round = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
 
@@ -114,6 +115,20 @@ export function buildQuotationTransferPreview(
     message: 'Proyecto con etapa comercial aprobada: verificar contrato y traspaso histórico.',
   });
 
+  const edtReconciliation = reconcileQuotationEdt(version, project);
+  if (edtReconciliation.source === 'no_analysis') findings.push({
+    code: 'NO_GRANULAR_EDT', severity: 'review',
+    message: 'No hay EDT granular; las fases de cotización no identifican tareas reales de Kora.',
+  });
+  if (edtReconciliation.source === 'analysis') findings.push({
+    code: 'EDT_RECONCILIATION_REQUIRED', severity: 'review',
+    message: 'Las coincidencias entre EDT y módulos/tareas son sugerencias por nombre: exigen revisión humana.',
+  });
+  if (edtReconciliation.modules.some((module) => module.matchStatus === 'ambiguous')) findings.push({
+    code: 'AMBIGUOUS_MODULE_MATCH', severity: 'review',
+    message: 'Hay nombres de módulo duplicados en el proyecto; no existe asignación automática segura.',
+  });
+
   const totals = calculateQuotation(version.draft, version.hourlyRate, version.tax);
   // D06 sin resolver: `contractAmount` operativo no certifica si corresponde
   // al neto o al monto con impuestos. Ni siquiera con la misma moneda se puede
@@ -149,6 +164,7 @@ export function buildQuotationTransferPreview(
         ? round(totals.netAmount - project.contractAmount) : null,
     },
     teams,
+    edtReconciliation,
     findings,
     pendingDecisionIds: ['D04', 'D05', 'D06'],
   };

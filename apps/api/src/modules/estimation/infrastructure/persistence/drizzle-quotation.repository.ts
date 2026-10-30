@@ -58,15 +58,23 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       }).from(projectTeams)
         .leftJoin(teams, eq(projectTeams.teamId, teams.id))
         .where(eq(projectTeams.projectId, projectId)),
-      this.db.select({ id: projectModules.id })
-        .from(projectModules).where(eq(projectModules.projectId, projectId)),
+      this.db.select({
+        id: projectModules.id,
+        name: projectModules.name,
+        estimatedHours: projectModules.estimatedHours,
+      }).from(projectModules).where(eq(projectModules.projectId, projectId)),
       this.db.select({ status: projectPaymentMilestones.status, amount: projectPaymentMilestones.amount })
         .from(projectPaymentMilestones).where(eq(projectPaymentMilestones.projectId, projectId)),
     ]);
     const ids = modules.map((row) => row.id);
     const [tasks, segments] = ids.length > 0 ? await Promise.all([
-      this.db.select({ id: projectModuleTasks.id })
-        .from(projectModuleTasks).where(inArray(projectModuleTasks.moduleId, ids)),
+      this.db.select({
+        id: projectModuleTasks.id,
+        moduleId: projectModuleTasks.moduleId,
+        name: projectModuleTasks.name,
+        status: projectModuleTasks.status,
+        estimatedHours: projectModuleTasks.estimatedHours,
+      }).from(projectModuleTasks).where(inArray(projectModuleTasks.moduleId, ids)),
       this.db.select({ id: projectModuleSegments.id })
         .from(projectModuleSegments).where(inArray(projectModuleSegments.moduleId, ids)),
     ]) : [[], []];
@@ -86,6 +94,15 @@ export class DrizzleQuotationRepository implements QuotationRepository {
         memberLimit: team.memberLimit,
       })),
       moduleCount: modules.length,
+      executionModules: modules.map((module) => ({
+        id: module.id,
+        name: module.name,
+        estimatedHours: module.estimatedHours === null ? null : Number(module.estimatedHours),
+        tasks: tasks.filter((task) => task.moduleId === module.id).map((task) => ({
+          id: task.id, name: task.name, status: task.status,
+          estimatedHours: task.estimatedHours === null ? null : Number(task.estimatedHours),
+        })),
+      })),
       taskCount: tasks.length,
       segmentCount: segments.length,
       paymentMilestones: milestones.map((milestone) => ({
