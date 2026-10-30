@@ -84,3 +84,7 @@ ORDER BY sales_stage, status;
 4. Validar UI completa, incluida navegación con slug, 403/409, pago por fase/fecha, proyecto sin cotización, recarga y permisos de Líder PM.
 5. La lista `/calculadora` todavía reutiliza una página de proyectos con límite de 200; la pantalla final de Cotizaciones con filtros específicos de versiones corresponde a R2 posterior. La lista actual ya recorre todas las páginas de proyectos de desarrollo.
 6. Resolver D01–D06 con Diseño/Levantamiento antes de cerrar importes comerciales, recotizaciones o traspaso.
+
+## Corte R2-b: artefacto JSON IA y simulación Zurich (30-10-2026)
+
+Ver docs/ARTEFACTO-JSON-IA-COTIZACIONES-2026-10-30.md. Contrato Zod para artefacto trazable, importador del JSON de ejemplo Zurich, mapeo explícito de roles a equipos Kora, conversión de tramos en fases, versión de IA simulada pendiente de revisión y almacenamiento íntegro en quotation_versions.draft.analysis (JSONB de 0048). Corregido aislamiento del nuevo hook en tests de ficha. Sin tests ejecutados desde los commits de este corte y sin nuevas migraciones.
