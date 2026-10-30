@@ -45,6 +45,7 @@ export function buildReconciliationReview(
     issues.push('HITOS_FACTURADOS: no sustituir facturas/hitos existentes; revisar D05.');
   }
   const usedTargets = new Map<string, number>();
+  const usedTaskTargets = new Map<string, number>();
   const moduleDecisions = edt.modules.map((module, moduleIndex) => {
     const selected = choices.modules[moduleIndex] ?? pending;
     const targetModuleId = selected.decision === 'link_existing' ? selected.targetId : null;
@@ -57,6 +58,9 @@ export function buildReconciliationReview(
     } else if (selected.decision === 'pending') {
       issues.push('MODULO_PENDIENTE: ' + module.name);
     }
+    if (selected.decision !== 'pending' && !selected.note.trim()) {
+      issues.push('MODULO_SIN_FUNDAMENTO: ' + module.name);
+    }
 
     const activityDecisions = module.activities.map((activity) => {
       const decision = choices.activities[activity.wbs] ?? pending;
@@ -66,6 +70,7 @@ export function buildReconciliationReview(
           throw new Error('La actividad ' + activity.wbs +
             ' solo puede enlazarse con una tarea del módulo operativo elegido.');
         }
+        if (targetTaskId) usedTaskTargets.set(targetTaskId, (usedTaskTargets.get(targetTaskId) ?? 0) + 1);
       } else if (decision.decision === 'pending') {
         issues.push('ACTIVIDAD_PENDIENTE: ' + activity.wbs);
       }
@@ -96,6 +101,12 @@ export function buildReconciliationReview(
     if (count > 1) issues.push(
       'DESTINO_COMPARTIDO: ' + id + ' está seleccionado por ' + count +
       ' módulos EDT. Requiere análisis de alcance; no fusionar automáticamente.',
+    );
+  }
+  for (const [id, count] of usedTaskTargets) {
+    if (count > 1) issues.push(
+      'TAREA_COMPARTIDA: ' + id + ' está seleccionada por ' + count +
+      ' actividades WBS. No duplicar HH ni sobrescribir histórico.',
     );
   }
   if (Math.abs(preview.proposed.totalHours - edt.proposedHours) > 0.011 &&

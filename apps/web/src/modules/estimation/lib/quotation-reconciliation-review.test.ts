@@ -77,8 +77,18 @@ describe('buildReconciliationReview — acta D04 no ejecutable', () => {
     expect(doc.moduleDecisions[0]?.targetModuleId).toBe(IDS.module);
     expect(doc.moduleDecisions[0]?.activityDecisions[0]?.targetTaskId).toBe(IDS.task);
     expect(doc.moduleDecisions[0]?.note).toBe('Revisado por el equipo');
+    expect(doc.issues.some((value) => value.startsWith('MODULO_SIN_FUNDAMENTO'))).toBe(false);
     expect(doc.transferEnabled).toBe(false);
     expect(doc.issues.some((value) => value.startsWith('MODULO_PENDIENTE'))).toBe(false);
+  });
+
+  it('advierte cuando se propone un vínculo sin justificación', () => {
+    const doc = buildReconciliationReview(preview, {
+      modules: { 0: { decision: 'link_existing', targetId: IDS.module, note: '' } },
+      activities: {},
+    }, when);
+    expect(doc.issues).toContain('MODULO_SIN_FUNDAMENTO: Portal');
+    expect(doc.transferEnabled).toBe(false);
   });
 
   it('rechaza módulos o tareas que no figuran en el snapshot de este proyecto', () => {
