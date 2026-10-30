@@ -72,6 +72,7 @@ describe('buildQuotationTransferPreview', () => {
         currentAssignedHours: null, proposedHours: 25, delta: null, existsInProject: false },
     ]);
     expect(before).toEqual(snapshot);
+    expect(result.difference.netAmountDelta).toBeNull(); // D06: base neta/bruta no acordada
     expect(result.operational.milestoneCounts).toEqual({
       pending: 0, toInvoice: 1, invoiced: 0, paid: 1,
     });

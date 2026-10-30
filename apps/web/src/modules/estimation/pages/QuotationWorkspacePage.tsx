@@ -277,7 +277,7 @@ export function QuotationWorkspacePage() {
                 <QuotationVersionComparison versions={versions} teamNames={teamById} />
               )}
               {selected && projectId && (
-                <QuotationTransferPreviewCard projectId={projectId} version={selected} />
+                <QuotationTransferPreviewCard projectId={projectId} version={selected} teamNames={teamById} />
               )}
 
               {mayWrite && (

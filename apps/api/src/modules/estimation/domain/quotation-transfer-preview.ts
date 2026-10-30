@@ -81,6 +81,14 @@ export function buildQuotationTransferPreview(
     code: 'PAYMENT_PLAN_INCOMPLETE', severity: 'blocker',
     message: 'El plan comercial no completa exactamente el 100% del contrato.',
   });
+  if (project.status === 'finished' || project.status === 'cancelled') findings.push({
+    code: 'PROJECT_CLOSED', severity: 'blocker',
+    message: 'El proyecto está terminado o cancelado. No se permite reemplazar su ejecución.',
+  });
+  if (project.contractAmount !== null) findings.push({
+    code: 'CONTRACT_AMOUNT_BASE_UNCONFIRMED', severity: 'review',
+    message: 'Existe un monto de contrato operativo. No se conoce si es neto o total con impuestos; comparar montos está pendiente de D06.',
+  });
   if (project.status === 'active' || project.status === 'on_hold') findings.push({
     code: 'PROJECT_IN_EXECUTION', severity: 'review',
     message: 'El estado operativo no es Borrador; revisar el alcance que ya está en ejecución.',
@@ -107,8 +115,10 @@ export function buildQuotationTransferPreview(
   });
 
   const totals = calculateQuotation(version.draft, version.hourlyRate, version.tax);
-  const comparable = project.contractCurrency === version.currency &&
-    project.contractAmount !== null && totals.netAmount !== null;
+  // D06 sin resolver: `contractAmount` operativo no certifica si corresponde
+  // al neto o al monto con impuestos. Ni siquiera con la misma moneda se puede
+  // presentar una diferencia económica como verdadera.
+  const comparable = false;
   return {
     projectId: project.projectId,
     versionId: version.id,
@@ -135,7 +145,8 @@ export function buildQuotationTransferPreview(
     difference: {
       soldHoursDelta: round(totals.totalHours - project.soldHours),
       remainingComparedToUsed: round(totals.totalHours - project.usedHours),
-      netAmountDelta: comparable ? round(totals.netAmount! - project.contractAmount!) : null,
+      netAmountDelta: comparable && totals.netAmount !== null && project.contractAmount !== null
+        ? round(totals.netAmount - project.contractAmount) : null,
     },
     teams,
     findings,

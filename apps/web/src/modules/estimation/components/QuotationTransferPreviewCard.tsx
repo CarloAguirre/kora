@@ -9,8 +9,8 @@ const number = (value: number) => value.toLocaleString('es-CL', { maximumFractio
 const delta = (value: number) => (value > 0 ? '+' : '') + number(value);
 
 export function QuotationTransferPreviewCard({
-  projectId, version,
-}: { projectId: string; version: QuotationVersion }) {
+  projectId, version, teamNames,
+}: { projectId: string; version: QuotationVersion; teamNames: ReadonlyMap<string, string> }) {
   const [visible, setVisible] = useState(false);
   const previewQuery = useQuotationTransferPreview(projectId, version.id, version.revision, visible);
   const preview = previewQuery.data;
@@ -59,7 +59,7 @@ export function QuotationTransferPreviewCard({
                   <tbody>
                     {preview.teams.map((team) => (
                       <tr key={team.teamId}>
-                        <td>{team.name}{!team.existsInProject && <small>Nuevo equipo propuesto</small>}</td>
+                        <td>{teamNames.get(team.teamId) ?? team.name}{!team.existsInProject && <small>Nuevo equipo propuesto</small>}</td>
                         <td>{team.currentAssignedHours === null ? 'Sin valor' : number(team.currentAssignedHours)}</td>
                         <td>{number(team.proposedHours)}</td>
                         <td>{team.delta === null ? 'No comparable' : delta(team.delta)}</td>
