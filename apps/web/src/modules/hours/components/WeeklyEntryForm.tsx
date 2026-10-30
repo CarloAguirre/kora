@@ -18,6 +18,7 @@ import { useUsersList } from '@/modules/users/api/users.queries';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { HOUR_ENTRY_PROJECT_STATUSES } from '../lib/selectable-project-statuses';
 import { ApiRequestError } from '@/shared/lib/api-client';
+import { PhaseSegmentFields } from './DailyEntryForm';
 
 /** Proyecto primero: es la asignación más común y el resto confundía al elegir. */
 const ASSIGNMENT_OPTIONS = [...HOUR_ENTRY_ASSIGNMENTS]
@@ -84,6 +85,9 @@ export function WeeklyEntryForm({
   const [monday, setMonday] = useState(() => mondayOf(new Date().toISOString().slice(0, 10)));
   const [assignment, setAssignment] = useState<HourEntryAssignment | ''>('');
   const [projectId, setProjectId] = useState('');
+  const [moduleId, setModuleId] = useState('');
+  /** Tiempo de ejecución de la fase elegida — vacío ⇔ sin tramo. */
+  const [segmentId, setSegmentId] = useState('');
   const [category, setCategory] = useState('');
   const [description, setDescription] = useState('');
   const [designatedApproverUserId, setDesignatedApproverUserId] = useState('');
@@ -183,6 +187,8 @@ export function WeeklyEntryForm({
         const input: CreateHourEntryInput = {
           assignment: assignment as HourEntryAssignment,
           projectId: needsProject ? projectId : undefined,
+          moduleId: needsProject && moduleId ? moduleId : undefined,
+          segmentId: needsProject && moduleId && segmentId ? segmentId : undefined,
           category: category.trim(),
           description: description || undefined,
           hours: day.hours,
@@ -248,6 +254,8 @@ export function WeeklyEntryForm({
               setDesignatedApproverUserId('');
             } else {
               setProjectId('');
+              setModuleId('');
+              setSegmentId('');
             }
           }}
         />
@@ -270,11 +278,25 @@ export function WeeklyEntryForm({
             onChange={(nextProjectId) => {
               const nextProject = (projects?.items ?? []).find((p) => p.id === nextProjectId);
               setProjectId(nextProjectId);
+              setModuleId('');
+              setSegmentId('');
               if (!nextProject?.allowsOvertime) setIsOvertime(false);
             }}
           />
         )}
       </div>
+
+      {needsProject && (
+        <PhaseSegmentFields
+          projectId={projectId}
+          moduleId={moduleId}
+          segmentId={segmentId}
+          onChange={(patch) => {
+            setModuleId(patch.moduleId);
+            setSegmentId(patch.segmentId);
+          }}
+        />
+      )}
 
       <div className={styles.row}>
         <TextField label="Actividad" required placeholder="Ej: Diseño webapp" value={category} onChange={(event) => setCategory(event.target.value)} />

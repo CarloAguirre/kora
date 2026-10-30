@@ -365,6 +365,16 @@ export const projectModuleSchema = z.object({
 });
 export type ProjectModule = z.infer<typeof projectModuleSchema>;
 
+/**
+ * Fase con sus tiempos de ejecución, sin el resto de la ficha — selector de
+ * Fase/Tiempo de ejecución del registro de horas, que usa quien registra
+ * horas aunque no pueda ver el detalle del proyecto (`GET /projects/:id/phases`).
+ */
+export const projectPhaseOptionSchema = projectModuleSchema.pick({ id: true, name: true, currentStage: true }).extend({
+  segments: z.array(projectModuleSegmentSchema.pick({ id: true, teamName: true, name: true, startDate: true, endDate: true })),
+});
+export type ProjectPhaseOption = z.infer<typeof projectPhaseOptionSchema>;
+
 export const createProjectModuleSchema = z.object({
   name: nonEmptyTrimmed(300, 'El nombre del módulo'),
   initialStage: projectModuleStageSchema,

@@ -14,7 +14,7 @@ import { Select } from '@/shared/components/ui/Select';
 import { Combobox } from '@/shared/components/ui/Combobox';
 import { AlertIcon, ChevronDownIcon, ChevronRightIcon, PlusIcon, TrashIcon } from '@/shared/components/icons/Icons';
 import { useCreateHourEntry, useHolidays, useHourEntriesList } from '../api/hours.queries';
-import { useProjectDetail, useProjectsList } from '@/modules/projects/api/projects.queries';
+import { useProjectPhases, useProjectsList } from '@/modules/projects/api/projects.queries';
 import { getProjectOptionLabel } from '@/modules/projects/lib/project-option-label';
 import { useUsersList } from '@/modules/users/api/users.queries';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
@@ -330,10 +330,73 @@ export function DailyEntryForm({
 }
 
 /**
- * Aislado del formulario principal porque necesita `useProjectDetail` (para
- * el selector de Módulo) por bloque — llamarlo dentro de `blocks.map(...)`
- * directamente rompería las reglas de hooks. También lo reutiliza la edición
- * de un registro (`HourEntryFormDialog`) para verse igual que el alta.
+ * Fase y Tiempo de ejecución del proyecto elegido — asocian el registro de
+ * horas a ellas (ambos opcionales). Los usan el registro diario, la edición y
+ * el registro semanal; aislado porque necesita `useProjectPhases` por bloque.
+ * No usa la ficha del proyecto: un colaborador no tiene permiso para verla.
+ */
+export function PhaseSegmentFields({
+  projectId,
+  moduleId,
+  segmentId,
+  onChange,
+}: {
+  projectId: string;
+  moduleId: string;
+  segmentId: string;
+  onChange: (patch: { moduleId: string; segmentId: string }) => void;
+}) {
+  const { data: phases, isLoading } = useProjectPhases(projectId || null);
+  const modules = phases ?? [];
+  const selectedModule = modules.find((m) => m.id === moduleId);
+  const segments = selectedModule?.segments ?? [];
+
+  return (
+    <div className={styles.row}>
+      <Select
+        label="Fase"
+        placeholder={
+          !projectId
+            ? 'Primero selecciona un proyecto'
+            : isLoading
+              ? 'Cargando fases…'
+              : modules.length > 0
+                ? 'Sin fase'
+                : 'El proyecto no tiene fases'
+        }
+        options={modules.map((module, index) => ({ value: module.id, label: `Fase ${index + 1} — ${module.name}` }))}
+        value={moduleId}
+        disabled={modules.length === 0}
+        helperText={selectedModule ? `Etapa: ${PROJECT_MODULE_STAGE_LABELS[selectedModule.currentStage]}` : undefined}
+        // Los tramos son de la fase: si cambia la fase, el elegido deja de aplicar.
+        onChange={(event) => onChange({ moduleId: event.target.value, segmentId: '' })}
+      />
+      <Select
+        label="Tiempo de ejecución"
+        placeholder={
+          !selectedModule
+            ? 'Primero selecciona una fase'
+            : segments.length > 0
+              ? 'Sin tiempo de ejecución'
+              : 'La fase no tiene tiempos de ejecución'
+        }
+        options={segments.map((segment) => ({
+          value: segment.id,
+          label: `${segment.teamName} — ${segment.name} (${formatSegmentDate(segment.startDate)} → ${formatSegmentDate(segment.endDate)})`,
+        }))}
+        value={segmentId}
+        disabled={segments.length === 0}
+        onChange={(event) => onChange({ moduleId, segmentId: event.target.value })}
+      />
+    </div>
+  );
+}
+
+/**
+ * Aislado del formulario principal para que cada bloque tenga sus propios
+ * hooks (Fase/Tiempo de ejecución vía `PhaseSegmentFields`). También lo
+ * reutiliza la edición de un registro (`HourEntryFormDialog`) para verse
+ * igual que el alta.
  */
 export function DailyEntryBlockFields({
   block,
@@ -366,8 +429,6 @@ export function DailyEntryBlockFields({
   const showApproverInRow = block.assignment !== '' && !needsProject && (isCollaborator || block.isOvertime);
   const selectedProject = needsProject ? projects.find((p) => p.id === block.projectId) : undefined;
   const overtimeDisabled = needsProject && !selectedProject?.allowsOvertime;
-  const { data: projectDetail } = useProjectDetail(needsProject && block.projectId ? block.projectId : null);
-  const selectedModule = projectDetail?.modules.find((m) => m.id === block.moduleId);
 
   return (
     <div className={styles.block}>
@@ -450,32 +511,12 @@ export function DailyEntryBlockFields({
             )}
           </div>
 
-          {needsProject && block.projectId && (projectDetail?.modules.length ?? 0) > 0 && (
-            <div className={styles.row}>
-              <Select
-                label="Módulo"
-                placeholder="Seleccionar módulo (opcional)"
-                options={(projectDetail?.modules ?? []).map((module) => ({ value: module.id, label: module.name }))}
-                value={block.moduleId}
-                // Los tramos son de la fase: si cambia la fase, el elegido deja de aplicar.
-                onChange={(event) => onUpdate({ moduleId: event.target.value, segmentId: '' })}
-              />
-              {selectedModule && (
-                <span className={styles.stepperLabel}>Etapa: {PROJECT_MODULE_STAGE_LABELS[selectedModule.currentStage]}</span>
-              )}
-            </div>
-          )}
-
-          {needsProject && selectedModule && selectedModule.segments.length > 0 && (
-            <Select
-              label="Tiempo de ejecución"
-              placeholder="Seleccionar tiempo de ejecución (opcional)"
-              options={selectedModule.segments.map((segment) => ({
-                value: segment.id,
-                label: `${segment.teamName} — ${segment.name} (${formatSegmentDate(segment.startDate)} → ${formatSegmentDate(segment.endDate)})`,
-              }))}
-              value={block.segmentId}
-              onChange={(event) => onUpdate({ segmentId: event.target.value })}
+          {needsProject && (
+            <PhaseSegmentFields
+              projectId={block.projectId}
+              moduleId={block.moduleId}
+              segmentId={block.segmentId}
+              onChange={onUpdate}
             />
           )}
 

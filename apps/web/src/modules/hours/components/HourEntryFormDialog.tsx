@@ -122,7 +122,7 @@ const blockFromEntry = (entry: HourEntrySummary): DailyBlock => ({
 
 /**
  * Edición de un registro existente — mismo bloque que el "Registro diario"
- * (`DailyEntryBlockFields`: stepper de horas, switch de horas extra, módulo,
+ * (`DailyEntryBlockFields`: stepper de horas, switch de horas extra, fase/tiempo de ejecución,
  * bitácora y bloqueo) con las mismas validaciones, pero de una sola entrada.
  */
 function EditEntryForm({
@@ -322,6 +322,13 @@ function ViewEntryDetail({ entry, onClose }: { entry: HourEntrySummary; onClose:
               <TextField label="Aprobador designado" disabled readOnly value={entry.designatedApprover?.fullName ?? '—'} />
             )}
           </div>
+
+          {needsProject && (
+            <div className={styles.row}>
+              <TextField label="Fase" disabled readOnly value={entry.module?.name ?? '—'} />
+              <TextField label="Tiempo de ejecución" disabled readOnly value={entry.segment?.name ?? '—'} />
+            </div>
+          )}
 
           <TextField label="Actividad" disabled readOnly value={entry.category} />
 

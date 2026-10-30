@@ -46,6 +46,15 @@ export function useProjectDetail(projectId: string | null) {
   });
 }
 
+/** Fases y tiempos de ejecución — no exige ver la ficha, solo registrar horas en el proyecto. */
+export function useProjectPhases(projectId: string | null) {
+  return useQuery({
+    queryKey: projectKeys.phases(projectId ?? ''),
+    queryFn: () => projectsApi.phases(projectId as string),
+    enabled: Boolean(projectId),
+  });
+}
+
 function useInvalidateProjects() {
   const queryClient = useQueryClient();
   return () => {

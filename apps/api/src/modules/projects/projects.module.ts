@@ -7,6 +7,7 @@ import { UpdateProjectUseCase } from './application/use-cases/update-project.use
 import { UpdateProjectExtrasUseCase } from './application/use-cases/update-project-extras.use-case';
 import { ListProjectsUseCase } from './application/use-cases/list-projects.use-case';
 import { GetProjectUseCase } from './application/use-cases/get-project.use-case';
+import { ListProjectPhasesUseCase } from './application/use-cases/list-project-phases.use-case';
 import { ChangeProjectStatusUseCase } from './application/use-cases/change-project-status.use-case';
 import { SetProjectOvertimeAuthorizationUseCase } from './application/use-cases/set-project-overtime-authorization.use-case';
 import { DeleteProjectUseCase } from './application/use-cases/delete-project.use-case';
@@ -92,6 +93,7 @@ import { DrizzleSupportContractStatusReader } from './infrastructure/services/dr
     UpdateProjectExtrasUseCase,
     ListProjectsUseCase,
     GetProjectUseCase,
+    ListProjectPhasesUseCase,
     ChangeProjectStatusUseCase,
     SetProjectOvertimeAuthorizationUseCase,
     DeleteProjectUseCase,
