@@ -11,6 +11,10 @@ import { ResolveEstimationDriveFolderUseCase } from './application/use-cases/res
 import { GoogleDriveDocumentSourceReader } from './infrastructure/drive/google-drive-document-source.reader';
 import { GoogleDriveFolderClient } from './infrastructure/drive/google-drive-folder.client';
 import { EstimationController } from './presentation/estimation.controller';
+import { QUOTATION_REPOSITORY } from './domain/repositories/quotation.repository';
+import { DrizzleQuotationRepository } from './infrastructure/persistence/drizzle-quotation.repository';
+import { ManageQuotationDraftsUseCase } from './application/use-cases/manage-quotation-drafts.use-case';
+import { QuotationController } from './presentation/quotation.controller';
 
 /**
  * Dominio backend de la Calculadora / Estimación Inteligente.
@@ -20,9 +24,12 @@ import { EstimationController } from './presentation/estimation.controller';
  */
 @Module({
   imports: [AiModule],
-  controllers: [EstimationController],
+  controllers: [EstimationController, QuotationController],
   providers: [
     GetEstimationQuestionnaireDefinitionUseCase,
+    ManageQuotationDraftsUseCase,
+    DrizzleQuotationRepository,
+    { provide: QUOTATION_REPOSITORY, useExisting: DrizzleQuotationRepository },
     AnalyzeEstimationPocUseCase,
     GenerateEstimationPocProposalUseCase,
     ListEstimationDriveFilesUseCase,
