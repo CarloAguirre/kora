@@ -1,8 +1,9 @@
 import { ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { isQuotationDraftEligibleProject } from '@kora/contracts';
 import type {
-  CreateQuotationVersionInput, Permission, ProjectQuotation, QuotationVersion, UpdateQuotationDraftInput,
+  CreateQuotationVersionInput, Permission, ProjectQuotation, QuotationVersion, UpdateQuotationDraftInput, QuotationTransferPreview,
 } from '@kora/contracts';
+import { buildQuotationTransferPreview } from '../../domain/quotation-transfer-preview';
 import { QUOTATION_REPOSITORY, type QuotationProjectScope, type QuotationRepository } from '../../domain/repositories/quotation.repository';
 
 export interface QuotationActor {
@@ -29,6 +30,20 @@ export class ManageQuotationDraftsUseCase {
   async get(projectId: string, actor: QuotationActor): Promise<ProjectQuotation | null> {
     await this.authorize(projectId, actor, false);
     return this.repository.getByProjectId(projectId);
+  }
+
+  async getTransferPreview(
+    projectId: string, versionId: string, actor: QuotationActor,
+  ): Promise<QuotationTransferPreview> {
+    // Lectura comercial autorizada; la vista previa NO requiere permiso de
+    // escritura ni puede alterar proyectos por error.
+    await this.authorize(projectId, actor, false);
+    const quotation = await this.repository.getByProjectId(projectId);
+    const version = quotation?.versions.find((item) => item.id === versionId);
+    if (!version) throw new NotFoundException('Versión de cotización no encontrada en este proyecto.');
+    const operational = await this.repository.getOperationalSnapshot(projectId);
+    if (!operational) throw new NotFoundException('Proyecto operativo no encontrado.');
+    return buildQuotationTransferPreview(version, operational, new Date().toISOString());
   }
 
   async create(projectId: string, actor: QuotationActor, input: CreateQuotationVersionInput): Promise<QuotationVersion> {

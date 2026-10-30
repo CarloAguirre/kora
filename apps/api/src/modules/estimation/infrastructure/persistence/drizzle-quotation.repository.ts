@@ -1,13 +1,14 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { projectAnalysisToQuotationDraft } from '../../domain/project-analysis-to-quotation';
 import { QuotationAnalysisIntegrityError, reconcileQuotationAnalysis } from '../../domain/quotation-analysis-integrity';
-import { and, asc, desc, eq, inArray, isNull, projectQuotations, projects, quotationEvents, quotationVersions, sql, teams, type Database } from '@kora/db';
+import { and, asc, desc, eq, inArray, isNull, projectQuotations, projects, quotationEvents, quotationVersions, sql, teams, projectTeams, projectModules, projectModuleTasks, projectModuleSegments, projectPaymentMilestones, type Database } from '@kora/db';
 import {
   quotationDraftDataSchema,
   quotationVersionSchema,
   type CreateQuotationVersionInput,
   type ProjectQuotation,
   type QuotationDraftData,
+  type QuotationOperationalSnapshot,
   type QuotationVersion,
   type UpdateQuotationDraftInput,
 } from '@kora/contracts';
@@ -28,6 +29,69 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       leaderUserId: projects.leaderUserId,
     }).from(projects).where(and(eq(projects.id, projectId), isNull(projects.deletedAt))).limit(1);
     return p ?? null;
+  }
+
+  /**
+   * Lectura puntual del proyecto operativo para R3. No inserta ni cambia
+   * registros y no sigue supuestos sobre traspasos de versiones antiguas.
+   */
+  async getOperationalSnapshot(projectId: string): Promise<QuotationOperationalSnapshot | null> {
+    const [project] = await this.db.select({
+      id: projects.id,
+      salesStage: projects.salesStage,
+      status: projects.status,
+      soldHours: projects.soldHours,
+      usedHours: projects.usedHours,
+      startDate: projects.startDate,
+      contractAmount: projects.contractAmount,
+      contractCurrency: projects.contractCurrency,
+    }).from(projects)
+      .where(and(eq(projects.id, projectId), isNull(projects.deletedAt))).limit(1);
+    if (!project) return null;
+
+    const [assignedTeams, modules, milestones] = await Promise.all([
+      this.db.select({
+        teamId: projectTeams.teamId,
+        teamName: teams.name,
+        assignedHours: projectTeams.assignedHours,
+        memberLimit: projectTeams.memberCount,
+      }).from(projectTeams)
+        .leftJoin(teams, eq(projectTeams.teamId, teams.id))
+        .where(eq(projectTeams.projectId, projectId)),
+      this.db.select({ id: projectModules.id })
+        .from(projectModules).where(eq(projectModules.projectId, projectId)),
+      this.db.select({ status: projectPaymentMilestones.status, amount: projectPaymentMilestones.amount })
+        .from(projectPaymentMilestones).where(eq(projectPaymentMilestones.projectId, projectId)),
+    ]);
+    const ids = modules.map((row) => row.id);
+    const [tasks, segments] = ids.length > 0 ? await Promise.all([
+      this.db.select({ id: projectModuleTasks.id })
+        .from(projectModuleTasks).where(inArray(projectModuleTasks.moduleId, ids)),
+      this.db.select({ id: projectModuleSegments.id })
+        .from(projectModuleSegments).where(inArray(projectModuleSegments.moduleId, ids)),
+    ]) : [[], []];
+    return {
+      projectId: project.id,
+      salesStage: project.salesStage,
+      status: project.status,
+      soldHours: Number(project.soldHours),
+      usedHours: Number(project.usedHours),
+      startDate: project.startDate?.toISOString().slice(0, 10) ?? null,
+      contractAmount: project.contractAmount === null ? null : Number(project.contractAmount),
+      contractCurrency: project.contractCurrency,
+      teams: assignedTeams.map((team) => ({
+        teamId: team.teamId,
+        name: team.teamName ?? 'Equipo histórico',
+        assignedHours: team.assignedHours === null ? null : Number(team.assignedHours),
+        memberLimit: team.memberLimit,
+      })),
+      moduleCount: modules.length,
+      taskCount: tasks.length,
+      segmentCount: segments.length,
+      paymentMilestones: milestones.map((milestone) => ({
+        status: milestone.status, amount: Number(milestone.amount),
+      })),
+    };
   }
 
   async getByProjectId(projectId: string): Promise<ProjectQuotation | null> {
