@@ -1,4 +1,4 @@
-import type { CreateQuotationVersionInput, ProjectQuotation, QuotationVersion, UpdateQuotationDraftInput, QuotationOperationalSnapshot, QuotationReconciliationReview, SavedQuotationReconciliationReview } from '@kora/contracts';
+import type { CreateQuotationVersionInput, ProjectQuotation, QuotationVersion, UpdateQuotationDraftInput, QuotationOperationalSnapshot, QuotationReconciliationReview, SavedQuotationReconciliationReview, AssessQuotationReconciliationInput, SavedQuotationReviewAssessment } from '@kora/contracts';
 
 export const QUOTATION_REPOSITORY = Symbol('QUOTATION_REPOSITORY');
 
@@ -19,6 +19,11 @@ export interface QuotationRepository {
     projectId: string, versionId: string, actorId: string,
     review: QuotationReconciliationReview,
   ): Promise<SavedQuotationReconciliationReview | null>;
+  listReconciliationAssessments(projectId: string, versionId: string): Promise<SavedQuotationReviewAssessment[]>;
+  appendReconciliationAssessment(
+    projectId: string, versionId: string, reviewerUserId: string,
+    input: AssessQuotationReconciliationInput,
+  ): Promise<SavedQuotationReviewAssessment | null>;
   createDraft(projectId: string, userId: string, input: CreateQuotationVersionInput): Promise<QuotationVersion>;
   updateDraft(projectId: string, versionId: string, userId: string, input: UpdateQuotationDraftInput): Promise<QuotationVersion | null>;
 }
