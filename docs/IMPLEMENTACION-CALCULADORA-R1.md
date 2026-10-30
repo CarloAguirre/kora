@@ -96,3 +96,7 @@ Visor de evidencia EDT/ERS/cronograma integrado a cotización con `analysis`, de
 ## R3-a · Previsualización read-only, 30/10/2026
 
 GET /api/estimations/projects/:projectId/quotation/versions/:versionId/transfer-preview y widget para comparar propuesta con estado operativo real. Ver docs/IMPLEMENTACION-CALCULADORA-R3A-PREFLIGHT.md. NO hay envío, aprobación ni traspaso. No requiere migración nueva. Validación local pendiente.
+
+## R3-b — EDT contra ejecución (30/10/2026)
+
+Extiende el GET preflight read-only de R3-a con `edtReconciliation`: comparación informativa de nombres de módulos y tareas, HH base EDT y actividades WBS, evitando fusiones automáticas e identificando homónimos y propuestas desactualizadas. Ver docs/IMPLEMENTACION-CALCULADORA-R3B-EDT-CONCILIACION.md. D04–D06 continúan abiertas; transferEnabled=false.

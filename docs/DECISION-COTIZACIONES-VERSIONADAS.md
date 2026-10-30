@@ -49,3 +49,7 @@ El resultado de la consulta de estados (ver `VALIDACION-ESTADOS-COTIZACIONES-202
 ## R3-a · Preflight read-only (30-oct-2026)
 
 Se incorpora GET de previsualización operativa con HH vendidas/usadas, equipos, módulos/tareas/segmentos e hitos por estado; transferEnabled permanece false. La lectura no modifica BD. No se compara contract_amount con el neto propuesto (D06 no define la base). Consultar docs/IMPLEMENTACION-CALCULADORA-R3A-PREFLIGHT.md. D04, D05 y D06 continúan abiertas; ninguna mutación de aprobación/traspaso se habilita.
+
+## R3-b — Evidencia D04 antes de traspasar (30-oct-2026)
+
+Para preparar D04 se agregó una conciliación de solo lectura EDT → candidatos de módulos/tareas existentes. La coincidencia de nombres NO es una relación de identidad y no habilita editar ni reemplazar tareas reales. Si la EDT se modificó comercialmente, se identifica como evidencia desfasada; fases comerciales sin EDT no se convierten en tareas. Ver docs/IMPLEMENTACION-CALCULADORA-R3B-EDT-CONCILIACION.md. D04, D05 y D06 permanecen pendientes.
