@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import type {
-  QuotationReconciliationDecision, QuotationTransferPreview,
+  QuotationReconciliationDecision, QuotationTransferPreview, QuotationReconciliationReview,
 } from '@kora/contracts';
 import { Button } from '@/shared/components/ui/Button';
+import { useQuotationReconciliationReviews, useSaveQuotationReconciliationReview } from '../api/quotation.queries';
 import { Select } from '@/shared/components/ui/Select';
 import { buildReconciliationReview, emptyReconciliationChoices,
   type ReconciliationChoice } from '../lib/quotation-reconciliation-review';
@@ -17,15 +18,19 @@ const OPTIONS: { value: QuotationReconciliationDecision; label: string }[] = [
 const blank: ReconciliationChoice = { decision: 'pending', targetId: null, note: '' };
 
 /**
- * Acta LOCAL de trabajo para D04. No envía decisiones a servidor, no modifica
- * cotización ni crea relaciones con tareas. El JSON permite revisión externa.
+ * Actas inmutables de DISCUSIÓN R3-d. Edición local y descarga; guardar añade
+ * solo un evento a quotation_events. No aprueba ni modifica cotización/ejecución.
  */
-export function QuotationReconciliationReviewCard({ preview }: {
+export function QuotationReconciliationReviewCard({ preview, canSave = false }: {
   preview: QuotationTransferPreview;
+  canSave?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [choices, setChoices] = useState(emptyReconciliationChoices);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const history = useQuotationReconciliationReviews(preview.projectId, preview.versionId, expanded);
+  const saveMutation = useSaveQuotationReconciliationReview(preview.projectId, preview.versionId);
   const reconciliation = preview.edtReconciliation;
   const existingModules = reconciliation.availableExistingModules ?? [];
   if (reconciliation.source === 'no_analysis') return (
@@ -51,20 +56,38 @@ export function QuotationReconciliationReviewCard({ preview }: {
     });
     setError('');
   };
+
+  const downloadReview = (review: QuotationReconciliationReview, suffix: string) => {
+    const objectUrl = URL.createObjectURL(
+      new Blob([JSON.stringify(review, null, 2)], { type: 'application/json' }),
+    );
+    const link = window.document.createElement('a');
+    link.href = objectUrl;
+    link.download = 'kora-conciliacion-' + preview.projectId.slice(0, 8) +
+      '-v' + review.versionNumber + '-r' + review.versionRevision + suffix + '.json';
+    window.document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(objectUrl);
+  };
+
+  const saveReview = async () => {
+    if (!canSave || saveMutation.isPending) return;
+    setError('');
+    setNotice('');
+    try {
+      const document = buildReconciliationReview(preview, choices, new Date().toISOString());
+      const saved = await saveMutation.mutateAsync(document);
+      setNotice('Acta guardada en el historial. Registro ' + saved.id.slice(0, 8) +
+        '. Sigue pendiente de discusión; no se traspasaron HH.');
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : 'No se pudo guardar el acta.');
+    }
+  };
   const exportReview = () => {
     try {
       const document = buildReconciliationReview(preview, choices, new Date().toISOString());
-      const objectUrl = URL.createObjectURL(
-        new Blob([JSON.stringify(document, null, 2)], { type: 'application/json' }),
-      );
-      const link = window.document.createElement('a');
-      link.href = objectUrl;
-      link.download = 'kora-conciliacion-' + preview.projectId.slice(0, 8) +
-        '-v' + preview.versionNumber + '-r' + preview.revision + '.json';
-      window.document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(objectUrl);
+      downloadReview(document, '');
       setError('');
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : 'No se pudo generar el acta.');
@@ -80,8 +103,8 @@ export function QuotationReconciliationReviewCard({ preview }: {
       <div className={styles.header}>
         <div>
           <h3>Acta de conciliación D04</h3>
-          <p>Revisa vínculos por ID, documenta propuestas y exporta un JSON de discusión.
-            Las decisiones son locales: no quedan guardadas en Kora ni autorizan traspasos.</p>
+          <p>Revisa vínculos por ID, registra propuestas y consulta el historial de actas.
+            Guardar un acta no aprueba ni traspasa HH.</p>
         </div>
         <Button size="sm" variant="outline" aria-expanded={expanded}
           onClick={() => setExpanded((value) => !value)}>
@@ -187,14 +210,42 @@ export function QuotationReconciliationReviewCard({ preview }: {
             );
           })}
           <p className={styles.warning}>
-            Esta revisión se mantiene solo en memoria. Exporta el JSON antes de cerrar
-            esta pantalla, cambiar de versión o actualizar la lectura del proyecto.
-            Incluso con todas las filas revisadas, D04–D06 siguen pendientes y el traspaso permanece bloqueado.
+            Los cambios de este formulario son locales hasta que guardes el acta.
+            Exporta o guarda antes de cambiar de versión o actualizar el preflight.
+            Las actas son propuestas: D04–D06 siguen pendientes y el traspaso está bloqueado.
           </p>
           {error && <p role="alert" className={styles.error}>{error}</p>}
-          <Button variant="outline" onClick={exportReview}>
-            Exportar acta JSON de revisión
-          </Button>
+          {notice && <p role="status" className={styles.notice}>{notice}</p>}
+          <div className={styles.actions}>
+            <Button variant="outline" onClick={exportReview}>Exportar acta JSON de revisión</Button>
+            <Button onClick={() => void saveReview()} disabled={!canSave || saveMutation.isPending}
+              loading={saveMutation.isPending}>Guardar acta en Kora</Button>
+          </div>
+          {!canSave && <p className={styles.warning}>Guardado deshabilitado: la versión o el proyecto no admite nuevas revisiones de borrador. Puedes exportar el JSON.</p>}
+          <div className={styles.history}>
+            <strong>Historial guardado en Kora (hasta 25 actas)</strong>
+            {history.isLoading && <p>Cargando historial…</p>}
+            {history.isError && <p role="alert" className={styles.error}>
+              No se pudo consultar el historial de actas.
+            </p>}
+            {history.data?.length === 0 && <p>Aún no hay actas guardadas en esta versión.</p>}
+            {history.data?.map((entry) => (
+              <div className={styles.historyRow} key={entry.id}>
+                <div>
+                  <strong>Revisión comercial {entry.review.versionRevision}</strong>
+                  <small>{new Date(entry.occurredAt).toLocaleString('es-CL')} ·
+                    {' '}Usuario {entry.actorUserId?.slice(0, 8) ?? 'no disponible'} ·
+                    {' '}{entry.review.moduleDecisions.length} módulos ·
+                    {' '}{entry.review.issues.length} observaciones</small>
+                  <small>Acta de discusión, no aprobada · ID {entry.id.slice(0, 8)}</small>
+                </div>
+                <Button variant="outline" size="sm"
+                  onClick={() => downloadReview(entry.review, '-' + entry.id.slice(0, 8))}>
+                  Descargar acta
+                </Button>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

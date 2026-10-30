@@ -10,8 +10,8 @@ const number = (value: number) => value.toLocaleString('es-CL', { maximumFractio
 const delta = (value: number) => (value > 0 ? '+' : '') + number(value);
 
 export function QuotationTransferPreviewCard({
-  projectId, version, teamNames,
-}: { projectId: string; version: QuotationVersion; teamNames: ReadonlyMap<string, string> }) {
+  projectId, version, teamNames, canSaveReview = false,
+}: { projectId: string; version: QuotationVersion; teamNames: ReadonlyMap<string, string>; canSaveReview?: boolean }) {
   const [visible, setVisible] = useState(false);
   const previewQuery = useQuotationTransferPreview(projectId, version.id, version.revision, visible);
   const preview = previewQuery.data;
@@ -135,6 +135,7 @@ export function QuotationTransferPreviewCard({
               <QuotationReconciliationReviewCard
                 key={preview.projectId + ':' + preview.versionId + ':' + preview.revision + ':' + preview.calculatedAt}
                 preview={preview}
+                canSave={canSaveReview && version.status === 'draft'}
               />
               <h3>Facturación y cobros existentes</h3>
               <p className={styles.helper}>
