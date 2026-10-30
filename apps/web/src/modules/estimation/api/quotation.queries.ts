@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { CreateQuotationVersionInput, UpdateQuotationDraftInput, QuotationReconciliationReview } from '@kora/contracts';
+import type { CreateQuotationVersionInput, UpdateQuotationDraftInput, QuotationReconciliationReview, AssessQuotationReconciliationInput } from '@kora/contracts';
 import { quotationApi, quotationKeys } from './quotation.api';
 
 export function useProjectQuotation(projectId: string | null, enabled = true) {
@@ -53,6 +53,26 @@ export function useSaveQuotationReconciliationReview(projectId: string, versionI
       quotationApi.saveReconciliationReview(projectId, versionId, review),
     onSuccess: () => client.invalidateQueries({
       queryKey: quotationKeys.reconciliationReviews(projectId, versionId),
+    }),
+  });
+}
+
+export function useQuotationReconciliationAssessments(projectId: string, versionId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: quotationKeys.reconciliationAssessments(projectId, versionId),
+    queryFn: () => quotationApi.listReconciliationAssessments(projectId, versionId),
+    enabled: enabled && Boolean(projectId) && Boolean(versionId),
+    retry: false,
+  });
+}
+
+export function useAssessQuotationReconciliation(projectId: string, versionId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (input: AssessQuotationReconciliationInput) =>
+      quotationApi.assessReconciliationReview(projectId, versionId, input),
+    onSuccess: () => client.invalidateQueries({
+      queryKey: quotationKeys.reconciliationAssessments(projectId, versionId),
     }),
   });
 }
