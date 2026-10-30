@@ -106,6 +106,18 @@ describe('QuotationTransferPreviewCard', () => {
       .not.toBeInTheDocument();
   });
 
+  it('permite preparar un acta local sin botones de escritura en BD', () => {
+    render(<QuotationTransferPreviewCard projectId={projectId} version={version}
+      teamNames={new Map()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Analizar conflictos' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Preparar acta' }));
+    expect(screen.getByText(/Módulos revisados: 0\/1/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Exportar acta JSON de revisión' })).toBeInTheDocument();
+    expect(screen.getByText(/no quedan guardadas en Kora/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Aplicar traspaso|Aprobar cotización/ }))
+      .not.toBeInTheDocument();
+  });
+
   it('actualiza solo la lectura al solicitarlo', () => {
     refresh.mockClear();
     render(<QuotationTransferPreviewCard projectId={projectId} version={version}
