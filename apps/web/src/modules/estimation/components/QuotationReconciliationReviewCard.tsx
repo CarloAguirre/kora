@@ -106,6 +106,8 @@ export function QuotationReconciliationReviewCard({ preview, canSave = false, ca
   };
   const latestReview = history.data?.[0];
   const latestAssessment = assessments.data?.find((record) => record.reviewId === latestReview?.id);
+  const latestHasUnresolved = latestReview?.review.issues.some((issue) =>
+    /^(MODULO_PENDIENTE|ACTIVIDAD_PENDIENTE|MODULO_SIN_FUNDAMENTO|DESTINO_COMPARTIDO|TAREA_COMPARTIDA|EDT_DESACTUALIZADA|HH_DIVERGENTES):/.test(issue)) ?? false;
   const mayAssess = Boolean(
     canAssess && latestReview && !latestAssessment && !assessments.isLoading && !assessments.isError &&
     latestReview.actorUserId !== currentUserId &&
@@ -293,8 +295,13 @@ export function QuotationReconciliationReviewCard({ preview, canSave = false, ca
                             onChange={(event) => setAssessmentReason(event.target.value)}
                             placeholder="Documenta qué verificaste, qué riesgos permanecen y los ajustes requeridos..." />
                         </label>
+                        {assessmentDecision === 'reviewed_for_discussion' && latestHasUnresolved &&
+                          <p className={styles.warning}>
+                            Hay decisiones o HH sin conciliar. Esta acta requiere solicitar cambios antes de considerarse revisada.
+                          </p>}
                         <Button variant="outline" loading={assessMutation.isPending}
-                          disabled={!mayAssess || assessmentReason.trim().length < 10}
+                          disabled={!mayAssess || assessmentReason.trim().length < 10 ||
+                            (assessmentDecision === 'reviewed_for_discussion' && latestHasUnresolved)}
                           onClick={() => void submitAssessment()}>Registrar evaluación técnica</Button>
                         {assessmentError && <p role="alert" className={styles.error}>{assessmentError}</p>}
 
@@ -323,6 +330,7 @@ export function QuotationReconciliationReviewCard({ preview, canSave = false, ca
                     <small key={item.id}>
                       Revisión técnica: {item.decision === 'changes_requested' ? 'Se solicitaron cambios' : 'Revisada para discusión'}
                       {' · '}{new Date(item.occurredAt).toLocaleString('es-CL')}
+                      {' · '}Revisor {item.reviewerUserId?.slice(0, 8) ?? 'no disponible'}
                       {' · '}{item.reason}
                     </small>
                   ))}
