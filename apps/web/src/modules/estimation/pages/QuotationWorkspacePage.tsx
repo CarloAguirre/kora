@@ -10,6 +10,7 @@ import { Select } from '@/shared/components/ui/Select';
 import { TextField } from '@/shared/components/ui/TextField';
 import { useCreateQuotationVersion, useProjectQuotation, useSaveQuotationDraft } from '../api/quotation.queries';
 import { AnalysisEvidenceCard } from '../components/AnalysisEvidenceCard';
+import { QuotationVersionComparison } from '../components/QuotationVersionComparison';
 import styles from './QuotationWorkspacePage.module.css';
 
 type Form = Pick<UpdateQuotationDraftInput, 'name' | 'hourlyRate' | 'currency' | 'tax' | 'draft'>;
@@ -270,6 +271,10 @@ export function QuotationWorkspacePage() {
                     </div>}
               </Card>
 
+
+              {versions.length > 1 && (
+                <QuotationVersionComparison versions={versions} teamNames={teamById} />
+              )}
 
               {mayWrite && (
                 <Card>
