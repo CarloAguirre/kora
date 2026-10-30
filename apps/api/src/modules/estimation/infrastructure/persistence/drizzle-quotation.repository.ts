@@ -1,5 +1,5 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, asc, desc, eq, isNull, projectQuotations, projects, quotationEvents, quotationVersions, sql, type Database } from '@kora/db';
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { and, asc, desc, eq, inArray, isNull, projectQuotations, projects, quotationEvents, quotationVersions, sql, teams, type Database } from '@kora/db';
 import {
   quotationDraftDataSchema,
   quotationVersionSchema,
@@ -99,6 +99,14 @@ export class DrizzleQuotationRepository implements QuotationRepository {
     if (!quotation) return null;
     const totals = calculateQuotation(input.draft, input.hourlyRate, input.tax);
     return this.db.transaction(async (tx) => {
+      const teamIds = input.draft.teams.map((team) => team.teamId);
+      if (teamIds.length > 0) {
+        const available = await tx.select({ id: teams.id }).from(teams)
+          .where(and(inArray(teams.id, teamIds), eq(teams.isActive, true), isNull(teams.deletedAt)));
+        if (available.length !== teamIds.length) {
+          throw new BadRequestException('Todos los equipos cotizados deben existir y estar activos en Kora.');
+        }
+      }
       const [updated] = await tx.update(quotationVersions).set({
         name: input.name,
         hourlyRate: input.hourlyRate?.toFixed(4) ?? null,
