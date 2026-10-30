@@ -16,3 +16,4 @@ export * from './dashboard/dashboard.contract';
 export * from './admin/legacy-import.contract';
 
 export * from './estimation/estimation.contract';
+export * from './estimation/quotation.contract';

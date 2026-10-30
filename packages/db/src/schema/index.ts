@@ -17,3 +17,4 @@ export * from './tickets';
 export * from './forecast';
 export * from './jobs';
 export * from './notifications';
+export * from './quotations';
