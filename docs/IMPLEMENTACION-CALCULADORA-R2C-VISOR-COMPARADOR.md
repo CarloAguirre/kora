@@ -94,3 +94,11 @@ git status --short
 
 ## Próxima etapa sugerida
 R2 siguiente: filtros de listado y una vista de observaciones de análisis por cambios editados, antes del R3 de aprobación/traspaso. R3 depende de las decisiones D04–D06 y de validar proyectos activos con HH históricas en QA.
+
+## Corrección de trazabilidad WBS
+
+En el EDT de muestra, cada fila diaria usa un `activityId` técnico como `ACT-001`, mientras el identificador WBS comercial/documental es `T01.01`. El JSON incluye ambos (`dailyPlan[*].wbs`); el visor ahora muestra el WBS y mantiene el ID técnico como referencia secundaria. Se añadieron validaciones en el contrato de artefacto: WBS existentes, tramo y perfil coherentes, conciliación de HH diarias **por actividad**, suma del plan semanal, referencias a requisitos existentes y consistencia módulo/actividad. Estas reglas están cubiertas por tests de contratos.
+
+Preflight independiente sobre el archivo Zurich adjunto: 45 actividades WBS, 69 referencias diarias, 257 HH y **sin inconsistencias** bajo las nuevas verificaciones (cálculo cruzado local, no ejecución de la suite TypeScript).
+
+Nota de arquitectura: `QuotationAnalysisIntegrityError` es una excepción propia del dominio, sin dependencia de NestJS; la infraestructura la traduce a `BadRequestException` HTTP 400. Esto respeta `src/test/architecture.spec.ts`.
