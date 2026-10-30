@@ -9,8 +9,8 @@ import { ZodValidationPipe } from '../../../shared/presentation/pipes/zod-valida
 import { ManageQuotationDraftsUseCase } from '../application/use-cases/manage-quotation-drafts.use-case';
 
 /**
- * API nueva, separada de /poc/*. R1 solamente habilita crear, leer y editar
- * borradores. Envío, aprobación y traspaso se implementan en R3.
+ * API comercial separada de /poc/*. Gestiona borradores y actas append-only
+ * de discusión. Envío, aprobación y traspaso siguen SIN implementar.
  */
 @Controller('estimations/projects/:projectId/quotation')
 export class QuotationController {

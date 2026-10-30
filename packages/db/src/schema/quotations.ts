@@ -48,7 +48,7 @@ export const quotationVersions = pgTable('quotation_versions', {
   check('quotation_versions_total_chk', sql`${t.totalAmount} IS NULL OR ${t.totalAmount} >= 0`),
 ]);
 
-/** Eventos inmutables: creación y edición. En R3 añadiremos envío, aprobación y traspaso. */
+/** Eventos append-only: creación, edición y actas de conciliación R3-d; envío/aprobación/traspaso aún no implementados. */
 export const quotationEvents = pgTable('quotation_events', {
   id: primaryId(),
   versionId: uuid('version_id').notNull().references(() => quotationVersions.id, { onDelete: 'cascade' }),

@@ -144,10 +144,10 @@ export type QuotationTransferPreview = z.infer<typeof quotationTransferPreviewSc
 
 
 /**
- * Acta de revisión exportable R3-c. NO es una orden, propuesta aprobada,
- * aprobación contractual, ni registro persistido en Kora.
+ * Acta de discusión R3-c/R3-d: exportable y registrable en el historial de
+ * eventos. NO es una orden de traspaso ni una aprobación contractual.
  *
- * Las decisiones son recomendaciones humanas aún no ratificadas por D04-D06.
+ * Las decisiones son propuestas humanas aún no ratificadas por D04-D06.
  * Su origen está vinculado a versión/revisión y a una lectura operativa fechada.
  */
 export const quotationReconciliationDecisionSchema = z.enum([
