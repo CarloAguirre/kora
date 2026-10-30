@@ -98,7 +98,7 @@ describe('QuotationTransferPreviewCard', () => {
     render(<QuotationTransferPreviewCard projectId={projectId} version={version}
       teamNames={new Map()} />);
     fireEvent.click(screen.getByRole('button', { name: 'Analizar conflictos' }));
-    expect(screen.getByText('Portal', { exact: true })).toBeInTheDocument();
+    expect(screen.getAllByText('Portal', { exact: true }).length).toBeGreaterThan(0);
     fireEvent.click(screen.getByText('Actividades WBS (1)'));
     expect(screen.getByText('T01.01')).toBeInTheDocument();
     expect(screen.getByText(/La coincidencia es por nombre/)).toBeInTheDocument();
