@@ -100,6 +100,18 @@ export const quotationTransferPreviewSchema = z.object({
     activityCount: z.number().int().nonnegative(),
     proposedModuleCount: z.number().int().nonnegative(),
     proposedHours: z.number().nonnegative(),
+    /** Catálogo operativo completo del mismo proyecto, no solo coincidencias de nombre. */
+    availableExistingModules: z.array(z.object({
+      id: uuidSchema,
+      name: z.string(),
+      estimatedHours: z.number().nullable(),
+      tasks: z.array(z.object({
+        id: uuidSchema,
+        name: z.string(),
+        status: z.enum(['todo', 'in_progress', 'in_review', 'done']),
+        estimatedHours: z.number().nullable(),
+      })),
+    })).optional(),
     modules: z.array(z.object({
       name: z.string(),
       proposedHours: z.number().nonnegative(),
@@ -129,3 +141,55 @@ export const quotationTransferPreviewSchema = z.object({
   pendingDecisionIds: z.array(z.enum(['D04', 'D05', 'D06'])),
 });
 export type QuotationTransferPreview = z.infer<typeof quotationTransferPreviewSchema>;
+
+
+/**
+ * Acta de revisión exportable R3-c. NO es una orden, propuesta aprobada,
+ * aprobación contractual, ni registro persistido en Kora.
+ *
+ * Las decisiones son recomendaciones humanas aún no ratificadas por D04-D06.
+ * Su origen está vinculado a versión/revisión y a una lectura operativa fechada.
+ */
+export const quotationReconciliationDecisionSchema = z.enum([
+  'pending', 'link_existing', 'propose_new', 'do_not_transfer',
+]);
+
+export const quotationReconciliationReviewSchema = z.object({
+  schemaVersion: z.literal('kora.quotation.reconciliation-review.v1'),
+  status: z.literal('draft_for_discussion'),
+  transferEnabled: z.literal(false),
+  projectId: uuidSchema,
+  versionId: uuidSchema,
+  versionNumber: z.number().int().positive(),
+  versionRevision: z.number().int().positive(),
+  previewCalculatedAt: z.string().datetime(),
+  exportedAt: z.string().datetime(),
+  snapshot: z.object({
+    projectStatus: projectStatusSchema,
+    salesStage: projectSalesStageSchema.nullable(),
+    soldHours: z.number().nonnegative(),
+    usedHours: z.number().nonnegative(),
+    quotationHours: z.number().nonnegative(),
+    edtHours: z.number().nonnegative(),
+    milestoneCounts: quotationTransferPreviewSchema.shape.operational.shape.milestoneCounts,
+  }),
+  moduleDecisions: z.array(z.object({
+    moduleIndex: z.number().int().nonnegative(),
+    edtName: z.string().min(1),
+    edtHours: z.number().nonnegative(),
+    decision: quotationReconciliationDecisionSchema,
+    targetModuleId: uuidSchema.nullable(),
+    note: z.string().max(2000),
+    activityDecisions: z.array(z.object({
+      wbs: z.string().min(1), description: z.string().min(1),
+      edtHours: z.number().nonnegative(),
+      decision: quotationReconciliationDecisionSchema,
+      targetTaskId: uuidSchema.nullable(),
+      note: z.string().max(2000),
+    })),
+  })),
+  issues: z.array(z.string()),
+  pendingDecisionIds: z.array(z.enum(['D04', 'D05', 'D06'])),
+});
+export type QuotationReconciliationReview = z.infer<typeof quotationReconciliationReviewSchema>;
+export type QuotationReconciliationDecision = z.infer<typeof quotationReconciliationDecisionSchema>;
