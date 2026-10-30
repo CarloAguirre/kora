@@ -93,7 +93,7 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       const [created] = await tx.insert(quotationVersions).values({
         quotationId: quotation.id,
         versionNumber: next,
-        name: input.simulation ? `Simulación IA · ${input.simulation.analysis.project.client}` : `Versión ${next}`,
+        name: input.simulation ? `Simulación IA · ${input.simulation.analysis.project.client.slice(0, 170)}` : `Versión ${next}`,
         status: 'draft',
         origin,
         aiReviewStatus,

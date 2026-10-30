@@ -18,13 +18,13 @@ export function projectAnalysisToQuotationDraft(
     throw new Error('Todos los perfiles del EDT deben asociarse explícitamente con un equipo Kora.');
   }
 
-  const uniqueTeamIds = [...new Set(roles.map((role) => roleTeamIds[role]))];
+  const uniqueTeamIds = [...new Set(roles.map((role) => roleTeamIds[role]!))];
   const duration = Math.ceil(analysis.summary.durationWorkingDays / 5);
 
   const phases = analysis.tranches.map((tranche) => {
     const sums = new Map<string, number>();
     for (const role of roles) {
-      const teamId = roleTeamIds[role];
+      const teamId = roleTeamIds[role]!;
       const hours = tranche.hoursByRole[role] ?? 0;
       if (hours > 0) sums.set(teamId, (sums.get(teamId) ?? 0) + hours);
     }
