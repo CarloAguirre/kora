@@ -25,6 +25,7 @@ import { GetEstimationQuestionnaireDefinitionUseCase } from '../application/use-
 import { InventoryEstimationDriveUseCase } from '../application/use-cases/inventory-estimation-drive.use-case';
 import { ListEstimationDriveFilesUseCase } from '../application/use-cases/list-estimation-drive-files.use-case';
 import { ResolveEstimationDriveFolderUseCase } from '../application/use-cases/resolve-estimation-drive-folder.use-case';
+import { validateFixedQuestionnaireAnswers } from '../application/validate-estimation-questionnaire';
 
 @Controller('estimations')
 export class EstimationController {
@@ -76,6 +77,20 @@ export class EstimationController {
     @Body(new ZodValidationPipe(analyzeEstimationPocSchema)) input: AnalyzeEstimationPocInput,
   ): Promise<EstimationPocAnalysis> {
     return this.analyzePoc.execute(input);
+  }
+
+  /**
+   * R4-a: ruta estricta del nuevo flujo de cuestionario.
+   * El endpoint PoC heredado se conserva para compatibilidad, pero la nueva
+   * pantalla no permite enviar answers=[] ni IDs no definidos.
+   */
+  @Post('poc/proposal-answered')
+  @RequirePermissions('projects:manage')
+  proposalAnswered(
+    @Body(new ZodValidationPipe(generateEstimationPocSchema)) input: GenerateEstimationPocInput,
+  ): Promise<EstimationPocProposal> {
+    validateFixedQuestionnaireAnswers(this.getQuestionnaireDefinition.execute(), input.answers);
+    return this.generatePocProposal.execute(input);
   }
 
   /**
