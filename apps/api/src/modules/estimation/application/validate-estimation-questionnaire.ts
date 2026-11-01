@@ -64,5 +64,7 @@ function validQuestionValue(
       return typeof value === 'number' && Number.isFinite(value);
     case 'confirmation':
       return typeof value === 'boolean';
+    default:
+      return false;
   }
 }
