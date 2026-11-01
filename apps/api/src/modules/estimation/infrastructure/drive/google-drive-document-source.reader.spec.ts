@@ -46,6 +46,21 @@ describe('GoogleDriveDocumentSourceReader', () => {
     expect(result[0]?.text).toContain('Microsoft Entra ID');
   });
 
+  it('no sustituye silenciosamente otro proyecto por el PDF KDM de demostración', async () => {
+    const drive: DriveFolderClient = {
+      isConfigured: () => false,
+      listFiles: async () => [],
+      listChildren: async () => [],
+      searchFolders: async () => [],
+      getMetadata: async () => null,
+      readAnalysisContent: async () => null,
+    };
+    const reader = new GoogleDriveDocumentSourceReader(drive);
+    await expect(reader.readDriveSources(
+      'https://drive.google.com/drive/folders/proyecto-real',
+    )).rejects.toThrow(/Google Drive no está configurado/);
+  });
+
   it('prioriza antecedentes relevantes y omite credenciales y Office no convertido', async () => {
     const drive: DriveFolderClient = {
       isConfigured: () => true,
