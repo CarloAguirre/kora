@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { extractDriveFolderId } from '../drive-source-selection';
 import {
   estimationPocAiDraftSchema,
   estimationPocProposalSchema,
@@ -167,7 +168,9 @@ export class GenerateEstimationPocProposalUseCase {
     return estimationPocProposalSchema.parse({
       projectId: input.projectId,
       provider: this.ai.name,
-      sourceMode: this.ai.name === 'poc-ai' ? 'poc_simulated' : 'drive',
+      sourceMode: this.ai.name === 'poc-ai' ||
+        extractDriveFolderId(input.driveFolderUrl) === 'kora-poc-fallback'
+        ? 'poc_simulated' : 'drive',
       documentsAnalyzed:
         this.ai.name === 'poc-ai' ? 0 : documents.length,
       summary: draft.summary,

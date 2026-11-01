@@ -113,6 +113,7 @@ describe('GenerateEstimationPocProposalUseCase', () => {
     expect(receivedDocumentText).toContain('Facele');
     expect(receivedDocumentText).toContain('SAP');
     expect(result.documentsAnalyzed).toBe(1);
+    expect(result.sourceMode).toBe('poc_simulated'); // Gemini real, fuentes KDM de DEMO
     expect(result.totalHours).toBe(160);
   });
 
