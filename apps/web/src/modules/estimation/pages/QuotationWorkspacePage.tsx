@@ -14,6 +14,7 @@ import { useCreateQuotationVersion, useProjectQuotation, useSaveQuotationDraft }
 import { AnalysisEvidenceCard } from '../components/AnalysisEvidenceCard';
 import { QuotationVersionComparison } from '../components/QuotationVersionComparison';
 import { QuotationTransferPreviewCard } from '../components/QuotationTransferPreviewCard';
+import { QuotationCommercialPreflightCard } from '../components/QuotationCommercialPreflightCard';
 import styles from './QuotationWorkspacePage.module.css';
 
 type Form = Pick<UpdateQuotationDraftInput, 'name' | 'hourlyRate' | 'currency' | 'tax' | 'draft'>;
@@ -279,6 +280,10 @@ export function QuotationWorkspacePage() {
 
               {versions.length > 1 && (
                 <QuotationVersionComparison versions={versions} teamNames={teamById} />
+              )}
+              {selected && projectId && (
+                <QuotationCommercialPreflightCard key={selected.id + ':' + selected.revision}
+                  projectId={projectId} version={selected} hasUnsavedChanges={dirty} />
               )}
               {selected && projectId && (
                 <QuotationTransferPreviewCard projectId={projectId} version={selected} teamNames={teamById}
