@@ -119,7 +119,7 @@ export function buildQuotationCommercialPreflight(
   add('TAX_POLICY_PENDING', 'policy', 'warning',
     'La moneda, los impuestos, el redondeo y la base neta/bruta requieren la regla comercial D06.');
 
-  if (draft.paymentPlan.length === 0 || Math.abs(paymentPercent - 100) > 0.011) {
+  if (draft.paymentPlan.length === 0 || Math.abs(paymentPercent - 100) > 0.001) {
     add('PAYMENT_PLAN_NOT_100', 'payments', 'blocker',
       'El plan de pagos debe existir y sumar exactamente 100 %.');
   }
