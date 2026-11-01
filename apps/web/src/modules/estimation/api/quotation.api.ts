@@ -4,6 +4,7 @@ import type {
   QuotationVersion,
   QuotationTransferPreview,
   QuotationCommercialPreflight,
+  QuotationCommercialDossier,
   QuotationReconciliationReview,
   SavedQuotationReconciliationReview,
   AssessQuotationReconciliationInput,
@@ -17,6 +18,11 @@ const base = (projectId: string) => '/estimations/projects/' + projectId + '/quo
 export const quotationApi = {
   get(projectId: string): Promise<ProjectQuotation | null> {
     return api.get<ProjectQuotation | null>(base(projectId));
+  },
+  commercialDossier(projectId: string, versionId: string): Promise<QuotationCommercialDossier> {
+    return api.get<QuotationCommercialDossier>(
+      base(projectId) + '/versions/' + versionId + '/commercial-dossier',
+    );
   },
   commercialPreflight(projectId: string, versionId: string): Promise<QuotationCommercialPreflight> {
     return api.get<QuotationCommercialPreflight>(

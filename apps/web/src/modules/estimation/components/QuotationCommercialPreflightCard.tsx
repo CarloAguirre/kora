@@ -3,6 +3,7 @@ import type { QuotationCommercialPreflight, QuotationVersion } from '@kora/contr
 import { Button } from '@/shared/components/ui/Button';
 import { Card } from '@/shared/components/ui/Card';
 import { useQuotationCommercialPreflight } from '../api/quotation.queries';
+import { quotationApi } from '../api/quotation.api';
 import styles from './QuotationCommercialPreflightCard.module.css';
 
 const sections: Record<QuotationCommercialPreflight['findings'][number]['section'], string> = {
@@ -19,8 +20,41 @@ export function QuotationCommercialPreflightCard({ projectId, version, hasUnsave
   hasUnsavedChanges?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState('');
   const query = useQuotationCommercialPreflight(projectId, version.id, version.revision, expanded);
   const preflight = query.data;
+  const downloadDossier = async () => {
+    if (!preflight || hasUnsavedChanges || downloading) return;
+    setDownloading(true);
+    setDownloadError('');
+    try {
+      // API vuelve a calcular la validación desde la versión persistida.
+      // No confía en el resultado que pudo quedar cacheado en React Query.
+      const dossier = await quotationApi.commercialDossier(projectId, version.id);
+      if (dossier.projectId !== projectId || dossier.versionId !== version.id ||
+          dossier.revision !== version.revision || dossier.deliveryEnabled !== false) {
+        throw new Error('La versión cambió durante la descarga. Actualiza las cotizaciones.');
+      }
+      const blob = new Blob([JSON.stringify(dossier, null, 2)], { type: 'application/json' });
+      const objectUrl = URL.createObjectURL(blob);
+      try {
+        const link = window.document.createElement('a');
+        link.href = objectUrl;
+        link.download = 'kora-expediente-interno-' + projectId.slice(0, 8) +
+          '-v' + dossier.versionNumber + '-r' + dossier.revision + '.json';
+        window.document.body.appendChild(link);
+        link.click();
+        link.remove();
+      } finally {
+        URL.revokeObjectURL(objectUrl);
+      }
+    } catch (exception) {
+      setDownloadError(exception instanceof Error ? exception.message : 'No se pudo descargar el expediente.');
+    } finally {
+      setDownloading(false);
+    }
+  };
   return (
     <Card>
       <div className={styles.header}>
@@ -76,6 +110,18 @@ export function QuotationCommercialPreflightCard({ projectId, version, hasUnsave
                     ))}
                   </div>
                 )}
+              <div className={styles.dossier}>
+                <strong>Expediente de revisión interna</strong>
+                <p>Incluye el presupuesto guardado, sus validaciones y D02, D05 y D06 pendientes.
+                  El archivo es una evidencia de trabajo, no una cotización aprobada ni enviada al cliente.</p>
+                {downloadError && <p role="alert" className={styles.error}>{downloadError}</p>}
+                <Button variant="outline" size="sm" loading={downloading}
+                  disabled={hasUnsavedChanges || query.isFetching}
+                  onClick={() => void downloadDossier()}>
+                  Descargar expediente interno JSON
+                </Button>
+                {hasUnsavedChanges && <small>Guarda los cambios del formulario para habilitar la descarga.</small>}
+              </div>
               <div className={styles.footer}>
                 <small>Revisión {preflight.revision} · Lectura: {new Date(preflight.calculatedAt).toLocaleString('es-CL')}.
                   {' '}La validación debe repetirse al cambiar la versión o las condiciones operativas.</small>
