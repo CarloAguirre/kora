@@ -120,3 +120,7 @@ GET de solo lectura sobre versión persistida, equipos reales y snapshot operati
 ## R3-g — Expediente interno de revisión comercial (01/11/2026)
 
 Nuevo GET protegido para construir un JSON interno desde la versión persistida y el preflight R3-f calculado en servidor. Incluye HH, equipos/fases, importes, costos, pagos, hallazgos y D02/D05/D06 pendientes. La UI permite descargarlo sin guardar datos adicionales ni habilitar estados o acciones de envío/aprobación/traspaso. No incluye respuestas del cuestionario ni URLs de fuentes. Ver `docs/IMPLEMENTACION-CALCULADORA-R3G-EXPEDIENTE-INTERNO.md`. QA pendiente.
+
+## R4-a — Preguntas F01–F05 integradas al flujo IA (01/11/2026)
+
+El workspace deja de enviar `answers: []` automáticamente, carga las cinco preguntas fijas y muestra un stepper antes de `/poc/proposal-answered`, que valida IDs, obligatoriedad, tipos, opciones y duplicados. Se corrigió el fallback KDM para que no sustituya documentos de proyectos reales cuando Drive está sin configurar. Sigue pendiente la lectura documental para preguntas dinámicas y la creación de versiones comerciales desde IA. Ver `docs/IMPLEMENTACION-CALCULADORA-R4A-CUESTIONARIO-FIJO.md`. QA local pendiente.

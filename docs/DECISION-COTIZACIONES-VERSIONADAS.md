@@ -73,3 +73,7 @@ La comprobación automática antes del envío diagnostica inconsistencias de ver
 ## R3-g — Evidencia interna previa al envío (01-nov-2026)
 
 El GET `commercial-dossier` genera un expediente estructurado para revisión humana a partir de la versión persistida y un preflight reciente. Tiene `internal_review_only`, `deliveryEnabled:false`, `commercialApprovalEnabled:false`, `transferEnabled:false` y deja D02/D05/D06 en estado pendiente. Es un documento interno descargable, no un documento de cliente ni una aprobación; no se almacena ni altera proyectos. Ver `docs/IMPLEMENTACION-CALCULADORA-R3G-EXPEDIENTE-INTERNO.md`.
+
+## R4-a — Cuestionario antes de generar propuesta (01-nov-2026)
+
+F01–F05 son obligatorias/opcionales según definición ya aprobada por contrato; el nuevo endpoint `/poc/proposal-answered` exige respuestas válidas. No se generan aclaraciones dinámicas sin lectura documental, el análisis preliminar previo sigue siendo PoC y la lectura Drive depende de D03. Se restringió el fallback de KDM a su URL demo explícita, evitando considerar documentación ajena como evidencia. La cotización real y estados comerciales permanecen separados. Ver `docs/IMPLEMENTACION-CALCULADORA-R4A-CUESTIONARIO-FIJO.md`.
