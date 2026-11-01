@@ -95,3 +95,55 @@ describe('getCommercialPreflight · GET protegido', () => {
     expect(repo.getTeamCatalogForQuotation).not.toHaveBeenCalled();
   });
 });
+
+
+describe('R3-g · expediente comercial interno por GET protegido', () => {
+  it('genera expediente de la revisión guardada sin una sola escritura', async () => {
+    const { useCase, repo } = setup();
+    const dossier = await useCase.getCommercialDossier(id.project, id.version, manager);
+    expect(dossier).toMatchObject({
+      schemaVersion: 'kora.quotation.commercial-dossier.v1',
+      documentStatus: 'internal_review_only',
+      projectId: id.project,
+      versionId: id.version,
+      revision: 3,
+      deliveryEnabled: false,
+      commercialApprovalEnabled: false,
+      transferEnabled: false,
+    });
+    expect(dossier.validation.sendEnabled).toBe(false);
+    expect(dossier.quotation.totalHours).toBe(80);
+    expect(repo.getByProjectId).toHaveBeenCalledTimes(1);
+    expect(repo.getOperationalSnapshot).toHaveBeenCalledTimes(1);
+    expect(repo.getTeamCatalogForQuotation).toHaveBeenCalledWith([id.team]);
+    expect(repo.createDraft).not.toHaveBeenCalled();
+    expect(repo.updateDraft).not.toHaveBeenCalled();
+    expect(repo.appendReconciliationReview).not.toHaveBeenCalled();
+    expect(repo.appendReconciliationAssessment).not.toHaveBeenCalled();
+  });
+
+  it('no permite generar expediente de una cotización ajena al usuario', async () => {
+    const { useCase, repo } = setup();
+    await expect(useCase.getCommercialDossier(id.project, id.version, {
+      id: id.manager, permissions: ['projects:read_assigned'],
+    })).rejects.toBeInstanceOf(ForbiddenException);
+    expect(repo.getByProjectId).not.toHaveBeenCalled();
+  });
+
+  it('permite lectura al líder asignado, nunca autorización de envío', async () => {
+    const { useCase } = setup();
+    const dossier = await useCase.getCommercialDossier(id.project, id.version, {
+      id: id.leader, permissions: ['projects:read_assigned'],
+    });
+    expect(dossier.deliveryEnabled).toBe(false);
+    expect(dossier.validation.contentChecksPassed).toBe(true);
+  });
+
+  it('rechaza identificador de versión de otro proyecto antes de leer los equipos', async () => {
+    const { useCase, repo } = setup();
+    await expect(useCase.getCommercialDossier(id.project, id.leader, manager))
+      .rejects.toBeInstanceOf(NotFoundException);
+    expect(repo.getOperationalSnapshot).not.toHaveBeenCalled();
+    expect(repo.getTeamCatalogForQuotation).not.toHaveBeenCalled();
+  });
+});
