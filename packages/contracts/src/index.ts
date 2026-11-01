@@ -20,3 +20,4 @@ export * from './estimation/quotation.contract';
 export * from './estimation/analysis-artifact.contract';
 export * from './estimation/quotation-transfer-preview.contract';
 export * from './estimation/quotation-reconciliation-review';
+export * from './estimation/quotation-commercial-preflight.contract';
