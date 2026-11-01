@@ -33,6 +33,8 @@ export function EstimationQuestionnaireForm({
   );
   const [answers, setAnswers] = useState<Record<string, EstimationAnswerValue>>({});
   const [showErrors, setShowErrors] = useState(false);
+  const [currentStep, setCurrentStep] = useState(0);
+  const activeQuestion = questions[currentStep];
 
   const setAnswer = (questionId: string, value: EstimationAnswerValue) => {
     setAnswers((current) => ({ ...current, [questionId]: value }));
@@ -40,19 +42,35 @@ export function EstimationQuestionnaireForm({
 
   const toggleMulti = (questionId: string, option: string) => {
     const current = Array.isArray(answers[questionId]) ? answers[questionId] as string[] : [];
+    // "Ninguna" es excluyente respecto a UAT/estabilización/soporte.
+    if (option === 'none') {
+      setAnswer(questionId, current.includes('none') ? [] : ['none']);
+      return;
+    }
     setAnswer(
       questionId,
       current.includes(option)
         ? current.filter((value) => value !== option)
-        : [...current, option],
+        : [...current.filter((value) => value !== 'none'), option],
     );
   };
 
+  const next = () => {
+    if (!activeQuestion) return;
+    if (activeQuestion.required && !hasAnswer(answers[activeQuestion.id])) {
+      setShowErrors(true);
+      return;
+    }
+    setShowErrors(false);
+    setCurrentStep((step) => Math.min(step + 1, questions.length - 1));
+  };
+
   const submit = () => {
-    const missingRequired = questions.some(
+    const firstMissing = questions.findIndex(
       (question) => question.required && !hasAnswer(answers[question.id]),
     );
-    if (missingRequired) {
+    if (firstMissing >= 0) {
+      setCurrentStep(firstMissing);
       setShowErrors(true);
       return;
     }
@@ -75,7 +93,7 @@ export function EstimationQuestionnaireForm({
           <span>Contexto de estimación</span>
           <h2>Confirma solo lo que falta</h2>
         </div>
-        <strong>{questions.length} preguntas</strong>
+        <strong>Paso {Math.min(currentStep + 1, questions.length)} de {questions.length}</strong>
       </div>
 
       <p className={styles.description}>
@@ -85,6 +103,7 @@ export function EstimationQuestionnaireForm({
 
       <div className={styles.questions}>
         {questions.map((question, index) => {
+          if (index !== currentStep) return null;
           const value = answers[question.id];
           const hasError = showErrors && question.required && !hasAnswer(value);
           const isDynamic = question.kind === 'dynamic';
@@ -206,10 +225,20 @@ export function EstimationQuestionnaireForm({
       </div>
 
       <div className={styles.footer}>
-        <span>Después de confirmar, la PoC genera la propuesta final de HH.</span>
-        <Button onClick={submit} loading={submitting} loadingText="Generando estimación…">
-          Generar estimación final
-        </Button>
+        <span>Las respuestas se mantienen al avanzar o retroceder. Las HH finales las calcula Kora.</span>
+        <div className={styles.stepActions}>
+          {currentStep > 0 && (
+            <Button variant="outline" onClick={() => {
+              setCurrentStep((step) => Math.max(step - 1, 0));
+              setShowErrors(false);
+            }} disabled={submitting}>Anterior</Button>
+          )}
+          {currentStep < questions.length - 1
+            ? <Button onClick={next} disabled={submitting}>Siguiente pregunta</Button>
+            : <Button onClick={submit} loading={submitting} loadingText="Generando estimación…">
+                Generar estimación final
+              </Button>}
+        </div>
       </div>
     </div>
   );

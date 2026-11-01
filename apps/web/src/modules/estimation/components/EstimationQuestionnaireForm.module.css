@@ -177,3 +177,5 @@
     display: grid;
   }
 }
+
+.stepActions{display:flex;gap:8px;align-items:center;justify-content:flex-end;flex-wrap:wrap}
