@@ -4,6 +4,7 @@ import {
   estimationAnalysisArtifactSchema,
   quotationOperationalSnapshotSchema,
   quotationVersionSchema,
+  type QuotationEligibilityProject,
 } from '@kora/contracts';
 import { buildQuotationCommercialPreflight } from './quotation-commercial-preflight';
 
@@ -15,9 +16,9 @@ const ids = {
   team: '0777e456-fd76-445e-83f1-afc25061c105',
 };
 const at = '2026-11-01T13:30:00.000Z';
-const scope = {
-  type: 'development' as const, salesStage: 'quoted' as const,
-  status: 'draft' as const,
+const scope: QuotationEligibilityProject = {
+  type: 'development', salesStage: 'quoted',
+  status: 'draft',
 };
 const catalog = [{ teamId: ids.team, name: 'Desarrollo', isActive: true }];
 
