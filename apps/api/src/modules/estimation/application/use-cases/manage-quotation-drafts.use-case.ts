@@ -2,10 +2,11 @@ import { BadRequestException, ConflictException, ForbiddenException, Inject, Inj
 import { buildReconciliationReview, isQuotationDraftEligibleProject } from '@kora/contracts';
 import { isDeepStrictEqual } from 'node:util';
 import type {
-  CreateQuotationVersionInput, Permission, ProjectQuotation, QuotationVersion, UpdateQuotationDraftInput, QuotationTransferPreview, QuotationCommercialPreflight, QuotationReconciliationReview, SavedQuotationReconciliationReview, AssessQuotationReconciliationInput, SavedQuotationReviewAssessment,
+  CreateQuotationVersionInput, Permission, ProjectQuotation, QuotationVersion, UpdateQuotationDraftInput, QuotationTransferPreview, QuotationCommercialPreflight, QuotationCommercialDossier, QuotationOperationalSnapshot, QuotationTeamCatalogEntry, QuotationReconciliationReview, SavedQuotationReconciliationReview, AssessQuotationReconciliationInput, SavedQuotationReviewAssessment,
 } from '@kora/contracts';
 import { buildQuotationTransferPreview } from '../../domain/quotation-transfer-preview';
 import { buildQuotationCommercialPreflight } from '../../domain/quotation-commercial-preflight';
+import { buildQuotationCommercialDossier } from '../../domain/quotation-commercial-dossier';
 import { QUOTATION_REPOSITORY, type QuotationProjectScope, type QuotationRepository } from '../../domain/repositories/quotation.repository';
 
 export interface QuotationActor {
@@ -34,11 +35,15 @@ export class ManageQuotationDraftsUseCase {
     return this.repository.getByProjectId(projectId);
   }
 
-  async getCommercialPreflight(
+  /** La versión y el catálogo se leen después de validar acceso al proyecto. */
+  private async loadCommercialSnapshot(
     projectId: string, versionId: string, actor: QuotationActor,
-  ): Promise<QuotationCommercialPreflight> {
-    // No crea eventos ni versiones. No está ligado al permiso de escritura
-    // porque también sirve para diagnosticar versiones históricas.
+  ): Promise<{
+    project: QuotationProjectScope;
+    version: QuotationVersion;
+    operational: QuotationOperationalSnapshot;
+    catalog: QuotationTeamCatalogEntry[];
+  }> {
     const project = await this.authorize(projectId, actor, false);
     const quotation = await this.repository.getByProjectId(projectId);
     const version = quotation?.versions.find((item) => item.id === versionId);
@@ -48,7 +53,30 @@ export class ManageQuotationDraftsUseCase {
       this.repository.getTeamCatalogForQuotation(version.draft.teams.map((team) => team.teamId)),
     ]);
     if (!operational) throw new NotFoundException('No se encontró el estado operativo del proyecto.');
+    return { project, version, operational, catalog };
+  }
+
+  async getCommercialPreflight(
+    projectId: string, versionId: string, actor: QuotationActor,
+  ): Promise<QuotationCommercialPreflight> {
+    const { project, version, operational, catalog } =
+      await this.loadCommercialSnapshot(projectId, versionId, actor);
     return buildQuotationCommercialPreflight(version, project, operational, catalog, new Date().toISOString());
+  }
+
+  /** Archivo de discusión derivado del mismo snapshot que el GET R3-f.
+   * No crea una versión, no envía una oferta, ni aprueba una cotización.
+   */
+  async getCommercialDossier(
+    projectId: string, versionId: string, actor: QuotationActor,
+  ): Promise<QuotationCommercialDossier> {
+    const { project, version, operational, catalog } =
+      await this.loadCommercialSnapshot(projectId, versionId, actor);
+    const generatedAt = new Date().toISOString();
+    const validation = buildQuotationCommercialPreflight(
+      version, project, operational, catalog, generatedAt,
+    );
+    return buildQuotationCommercialDossier(version, validation, catalog, generatedAt);
   }
 
   async getTransferPreview(
