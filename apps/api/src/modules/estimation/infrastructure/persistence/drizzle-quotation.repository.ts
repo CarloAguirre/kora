@@ -16,6 +16,7 @@ import {
   type AssessQuotationReconciliationInput,
   type SavedQuotationReviewAssessment,
   type QuotationVersion,
+  type QuotationTeamCatalogEntry,
   type UpdateQuotationDraftInput,
 } from '@kora/contracts';
 import { DATABASE } from '../../../../shared/infrastructure/database/database.module';
@@ -35,6 +36,22 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       leaderUserId: projects.leaderUserId,
     }).from(projects).where(and(eq(projects.id, projectId), isNull(projects.deletedAt))).limit(1);
     return p ?? null;
+  }
+
+  /** Consulta TODOS los IDs cotizados, incluyendo equipos ahora inactivos. */
+  async getTeamCatalogForQuotation(teamIds: readonly string[]): Promise<QuotationTeamCatalogEntry[]> {
+    if (teamIds.length === 0) return [];
+    const rows = await this.db.select({
+      teamId: teams.id,
+      name: teams.name,
+      isActive: teams.isActive,
+      deletedAt: teams.deletedAt,
+    }).from(teams).where(inArray(teams.id, [...new Set(teamIds)]));
+    return rows.map((row) => ({
+      teamId: row.teamId,
+      name: row.name,
+      isActive: row.isActive && row.deletedAt === null,
+    }));
   }
 
   /**
