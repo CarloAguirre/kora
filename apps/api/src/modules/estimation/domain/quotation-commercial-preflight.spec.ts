@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   quotationCommercialPreflightSchema,
+  estimationAnalysisArtifactSchema,
   quotationOperationalSnapshotSchema,
   quotationVersionSchema,
 } from '@kora/contracts';
@@ -145,6 +146,40 @@ describe('R3-f · validación comercial de solo lectura', () => {
     expect(codes(result)).toEqual(expect.arrayContaining([
       'AI_EVIDENCE_MISSING', 'AI_REVIEW_REQUIRED', 'ANALYSIS_NOT_RECONCILED',
     ]));
+    expect(result.sendEnabled).toBe(false);
+  });
+
+
+  it('bloquea explícitamente el artefacto demostrativo incluso si otra validación luce completa', () => {
+    const simulated = estimationAnalysisArtifactSchema.parse({
+      schemaVersion: 'kora.estimation.analysis.v1',
+      provenance: { mode: 'simulated_fixture', provider: null, model: null,
+        label: 'Demo Zurich', warning: 'Sin IA productiva',
+        sourceFiles: [{ id: 'edt', name: 'EDT.xlsx', kind: 'edt', sha256: 'a'.repeat(64) }] },
+      project: { name: 'Proyecto', client: 'Cliente', objective: 'Ejemplo' },
+      scope: { included: ['Alcance'], excluded: [], validationStatus: 'ejemplo' },
+      sourceRequirements: [], userStories: [], pendingDecisions: [],
+      roles: [{ role: 'Fullstack', headcount: 1, baseHours: 8 }],
+      modules: [{ name: 'Portal', activityCount: 1, totalHours: 8,
+        hoursByRole: { Fullstack: 8 } }],
+      tranches: [{ id: 'T01', name: 'Portal', startWeek: 1, durationWeeks: 1,
+        totalHours: 8, hoursByRole: { Fullstack: 8 } }],
+      activities: [{ wbs: 'T01.01', trancheId: 'T01', module: 'Portal',
+        description: 'Crear endpoint', requirementIds: [], sourceClassification: 'C',
+        responsibleRole: 'Fullstack', hoursByRole: { Fullstack: 8 }, totalHours: 8 }],
+      dailyPlan: [], weeklyPlan: [], milestones: [], assumptions: [],
+      summary: { baseHours: 8, reservePercent: 10, reserveHours: 0.8,
+        hoursWithReserve: 8.8, durationWorkingDays: 1, hoursByRole: { Fullstack: 8 } },
+      commercial: { hourlyRate: null, currency: null, tax: null, paymentPlan: [] },
+      roleTeamMappings: { status: 'mapped_to_kora_teams', suggestions: {} },
+      renderBlueprints: { ers: [], edt: [] },
+    });
+    const v = version({ analysis: simulated }, {
+      origin: 'ai', aiReviewStatus: 'accepted',
+    });
+    const result = run(v);
+    expect(codes(result)).toContain('SIMULATED_ANALYSIS');
+    expect(result.contentChecksPassed).toBe(false);
     expect(result.sendEnabled).toBe(false);
   });
 
