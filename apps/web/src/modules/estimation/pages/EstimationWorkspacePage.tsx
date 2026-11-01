@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useMemo } from 'react';
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import type {
   EstimationCreationMode,
@@ -6,7 +6,8 @@ import type {
 } from '@kora/contracts';
 import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Card } from '@/shared/components/ui/Card';
-import { useGenerateEstimationPocProposal } from '../api/estimation.queries';
+import { useEstimationQuestionnaireDefinition, useGenerateAnsweredEstimationPocProposal } from '../api/estimation.queries';
+import { EstimationQuestionnaireForm } from '../components/EstimationQuestionnaireForm';
 import { useEstimationWorkspace } from '../hooks/useEstimationWorkspace';
 import { getManualEstimationTemplate } from '../lib/estimation-templates';
 import styles from './EstimationWorkspacePage.module.css';
@@ -87,8 +88,8 @@ export function EstimationWorkspacePage() {
     : navigationState.creationMode ?? 'standard';
 
   const { project, isLoading } = useEstimationWorkspace(projectId ?? null);
-  const generateProposal = useGenerateEstimationPocProposal();
-  const proposalStarted = useRef<string | null>(null);
+  const generateProposal = useGenerateAnsweredEstimationPocProposal();
+  const questionnaire = useEstimationQuestionnaireDefinition(mode === 'ai');
 
   const driveFolderUrl =
     navigationState.driveFolderUrl?.trim() ||
@@ -102,28 +103,17 @@ export function EstimationWorkspacePage() {
     [mode],
   );
 
-  useEffect(() => {
-    if (mode !== 'ai' || !project.data || !driveFolderUrl) return;
-
-    const proposalKey = `${project.data.id}::${driveFolderUrl}::${instructions}`;
-    if (proposalStarted.current === proposalKey) return;
-    proposalStarted.current = proposalKey;
-
+  const submitQuestionnaire = (answers: Parameters<typeof generateProposal.mutate>[0]['answers']) => {
+    if (mode !== 'ai' || !project.data || !driveFolderUrl || generateProposal.isPending) return;
     generateProposal.mutate({
       projectId: project.data.id,
       projectName: project.data.name,
       clientName: project.data.client?.companyName ?? null,
       driveFolderUrl,
       instructions: instructions || null,
-      answers: [],
+      answers,
     });
-  }, [
-    driveFolderUrl,
-    generateProposal,
-    instructions,
-    mode,
-    project.data,
-  ]);
+  };
 
   if (!projectId) {
     return (
@@ -162,7 +152,7 @@ export function EstimationWorkspacePage() {
             <h1>{project.data?.name ?? 'Prospecto'}</h1>
             <p>
               {mode === 'ai'
-                ? 'El agente lee los antecedentes relevantes de Drive y propone los equipos, roles, duración, dedicación y supuestos para una estimación inicial.'
+                ? 'Confirma el cuestionario F01–F05 antes de generar la estimación. La lectura de Drive depende de la configuración del proveedor.'
                 : 'La estimación parte desde una plantilla de roles y dedicaciones, tal como en el flujo original de Calculadora.'}
             </p>
           </div>
@@ -233,6 +223,38 @@ export function EstimationWorkspacePage() {
                   </p>
                 </Card>
               )}
+
+              {mode === 'ai' && driveFolderUrl && questionnaire.isLoading && (
+                <Card className={styles.analysisCard}>
+                  <h2>Cargando preguntas de estimación…</h2>
+                </Card>
+              )}
+
+              {mode === 'ai' && driveFolderUrl && questionnaire.isError && (
+                <Card className={styles.errorCard}>
+                  <h2>No se pudo cargar el cuestionario</h2>
+                  <p>No está disponible la definición F01–F05 para esta sesión.
+                    Revisa tu acceso y vuelve a cargar la página.</p>
+                </Card>
+              )}
+
+              {mode === 'ai' && driveFolderUrl && project.data &&
+                questionnaire.data && !generateProposal.data && (
+                  <Card className={styles.analysisCard}>
+                    <p className={styles.metaNote}>
+                      R4-a · Confirma las preguntas F01–F05 antes de estimar.
+                      Las aclaraciones dinámicas requieren integrar un análisis
+                      documental real; no se han generado en este paso.
+                    </p>
+                    <EstimationQuestionnaireForm
+                      key={project.data.id + ':' + driveFolderUrl}
+                      fixedQuestions={questionnaire.data.fixedQuestions}
+                      dynamicQuestions={[]}
+                      submitting={generateProposal.isPending}
+                      onSubmit={submitQuestionnaire}
+                    />
+                  </Card>
+                )}
 
               {mode === 'ai' &&
                 driveFolderUrl &&
@@ -322,9 +344,10 @@ export function EstimationWorkspacePage() {
                   <span className={styles.eyebrow}>Alcance de esta PoC</span>
                   <h2>Estimación ejecutiva por equipos</h2>
                   <p>
-                    Esta versión termina deliberadamente en roles, duración,
-                    dedicación, HH y supuestos. No genera todavía requerimientos,
-                    historias de usuario, tareas ni EDT.
+                    Esta PoC estima roles, duración, dedicación, HH y supuestos
+                    utilizando las respuestas del cuestionario. No genera todavía
+                    requerimientos, historias de usuario, tareas ni EDT granular.
+                    Las preguntas dinámicas documentales siguen pendientes.
                   </p>
                 </Card>
               )}
