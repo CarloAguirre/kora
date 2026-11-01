@@ -2,9 +2,10 @@ import { BadRequestException, ConflictException, ForbiddenException, Inject, Inj
 import { buildReconciliationReview, isQuotationDraftEligibleProject } from '@kora/contracts';
 import { isDeepStrictEqual } from 'node:util';
 import type {
-  CreateQuotationVersionInput, Permission, ProjectQuotation, QuotationVersion, UpdateQuotationDraftInput, QuotationTransferPreview, QuotationReconciliationReview, SavedQuotationReconciliationReview, AssessQuotationReconciliationInput, SavedQuotationReviewAssessment,
+  CreateQuotationVersionInput, Permission, ProjectQuotation, QuotationVersion, UpdateQuotationDraftInput, QuotationTransferPreview, QuotationCommercialPreflight, QuotationReconciliationReview, SavedQuotationReconciliationReview, AssessQuotationReconciliationInput, SavedQuotationReviewAssessment,
 } from '@kora/contracts';
 import { buildQuotationTransferPreview } from '../../domain/quotation-transfer-preview';
+import { buildQuotationCommercialPreflight } from '../../domain/quotation-commercial-preflight';
 import { QUOTATION_REPOSITORY, type QuotationProjectScope, type QuotationRepository } from '../../domain/repositories/quotation.repository';
 
 export interface QuotationActor {
@@ -31,6 +32,23 @@ export class ManageQuotationDraftsUseCase {
   async get(projectId: string, actor: QuotationActor): Promise<ProjectQuotation | null> {
     await this.authorize(projectId, actor, false);
     return this.repository.getByProjectId(projectId);
+  }
+
+  async getCommercialPreflight(
+    projectId: string, versionId: string, actor: QuotationActor,
+  ): Promise<QuotationCommercialPreflight> {
+    // No crea eventos ni versiones. No está ligado al permiso de escritura
+    // porque también sirve para diagnosticar versiones históricas.
+    const project = await this.authorize(projectId, actor, false);
+    const quotation = await this.repository.getByProjectId(projectId);
+    const version = quotation?.versions.find((item) => item.id === versionId);
+    if (!version) throw new NotFoundException('Versión de cotización no encontrada en este proyecto.');
+    const [operational, catalog] = await Promise.all([
+      this.repository.getOperationalSnapshot(projectId),
+      this.repository.getTeamCatalogForQuotation(version.draft.teams.map((team) => team.teamId)),
+    ]);
+    if (!operational) throw new NotFoundException('No se encontró el estado operativo del proyecto.');
+    return buildQuotationCommercialPreflight(version, project, operational, catalog, new Date().toISOString());
   }
 
   async getTransferPreview(

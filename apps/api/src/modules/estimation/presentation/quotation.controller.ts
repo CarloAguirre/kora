@@ -1,7 +1,7 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post } from '@nestjs/common';
 import {
   createQuotationVersionSchema, updateQuotationDraftSchema, quotationReconciliationReviewSchema, assessQuotationReconciliationSchema,
-  type CreateQuotationVersionInput, type ProjectQuotation, type QuotationVersion, type UpdateQuotationDraftInput, type QuotationTransferPreview, type QuotationReconciliationReview, type SavedQuotationReconciliationReview, type AssessQuotationReconciliationInput, type SavedQuotationReviewAssessment,
+  type CreateQuotationVersionInput, type ProjectQuotation, type QuotationVersion, type UpdateQuotationDraftInput, type QuotationTransferPreview, type QuotationCommercialPreflight, type QuotationReconciliationReview, type SavedQuotationReconciliationReview, type AssessQuotationReconciliationInput, type SavedQuotationReviewAssessment,
 } from '@kora/contracts';
 import { CurrentUser, type RequestUser } from '../../../shared/presentation/decorators/current-user.decorator';
 import { RequireAnyPermission } from '../../../shared/presentation/decorators/require-permissions.decorator';
@@ -20,6 +20,16 @@ export class QuotationController {
   @RequireAnyPermission('projects:manage', 'projects:read_assigned')
   get(@Param('projectId', ParseUUIDPipe) projectId: string, @CurrentUser() actor: RequestUser): Promise<ProjectQuotation | null> {
     return this.drafts.get(projectId, actor);
+  }
+
+  @Get('versions/:versionId/commercial-preflight')
+  @RequireAnyPermission('projects:manage', 'projects:read_assigned')
+  getCommercialPreflight(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('versionId', ParseUUIDPipe) versionId: string,
+    @CurrentUser() actor: RequestUser,
+  ): Promise<QuotationCommercialPreflight> {
+    return this.drafts.getCommercialPreflight(projectId, versionId, actor);
   }
 
   @Get('versions/:versionId/transfer-preview')
