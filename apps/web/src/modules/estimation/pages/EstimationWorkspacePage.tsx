@@ -3,6 +3,7 @@ import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom'
 import type {
   EstimationCreationMode,
   EstimationPocRole,
+  SubmitEstimationAnswerInput,
 } from '@kora/contracts';
 import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Card } from '@/shared/components/ui/Card';
@@ -103,7 +104,7 @@ export function EstimationWorkspacePage() {
     [mode],
   );
 
-  const submitQuestionnaire = (answers: Parameters<typeof generateProposal.mutate>[0]['answers']) => {
+  const submitQuestionnaire = (answers: SubmitEstimationAnswerInput[]) => {
     if (mode !== 'ai' || !project.data || !driveFolderUrl || generateProposal.isPending) return;
     generateProposal.mutate({
       projectId: project.data.id,
@@ -123,7 +124,8 @@ export function EstimationWorkspacePage() {
     );
   }
 
-  const proposal = generateProposal.data;
+  const proposal = mode === 'ai' && generateProposal.data?.projectId === project.data?.id
+    ? generateProposal.data : undefined;
   const roles = proposal?.roles ?? manualRoles;
   const totalHours =
     proposal?.totalHours ??
@@ -239,7 +241,7 @@ export function EstimationWorkspacePage() {
               )}
 
               {mode === 'ai' && driveFolderUrl && project.data &&
-                questionnaire.data && !generateProposal.data && (
+                questionnaire.data && !proposal && (
                   <Card className={styles.analysisCard}>
                     <p className={styles.metaNote}>
                       R4-a · Confirma las preguntas F01–F05 antes de estimar.
@@ -263,9 +265,9 @@ export function EstimationWorkspacePage() {
                     <span className={styles.agentEyebrow}>✦ Agente IA</span>
                     <h2>El agente está preparando la propuesta</h2>
                     <p className={styles.summaryText}>
-                      Kora selecciona los antecedentes relevantes de la carpeta,
-                      los analiza y dimensiona el proyecto solo a nivel de
-                      equipos y roles.
+                      Kora prepara una estimación ejecutiva a partir de tus respuestas.
+                      Con un proveedor real, lee los antecedentes accesibles en Drive;
+                      en modo PoC simulado no se consultan documentos.
                     </p>
                     <ol className={styles.analysisSteps}>
                       {ANALYSIS_STEPS.map((step, index) => (
@@ -316,7 +318,8 @@ export function EstimationWorkspacePage() {
                       </p>
                       <div className={styles.analysisMeta}>
                         <span>
-                          {proposal.documentsAnalyzed} documentos analizados
+                          {proposal.documentsAnalyzed} documentos {proposal.sourceMode === 'poc_simulated'
+                            ? 'de demostración (no fuentes reales del proyecto)' : 'procesados desde Drive'}
                         </span>
                         <span>
                           Proveedor:{' '}
@@ -365,9 +368,11 @@ export function EstimationWorkspacePage() {
                   <span>Origen</span>
                   <strong>
                     {mode === 'ai'
-                      ? proposal?.provider === 'gemini'
-                        ? 'Agente IA · Gemini'
-                        : 'Agente IA'
+                      ? proposal?.sourceMode === 'poc_simulated'
+                        ? 'Demostración PoC (sin Drive real)'
+                        : proposal?.provider === 'gemini'
+                          ? 'Agente IA · Gemini + Drive'
+                          : 'Pendiente de análisis'
                       : mode === 'rpa'
                         ? 'Plantilla RPA'
                         : 'Plantilla estándar'}
