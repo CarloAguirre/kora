@@ -33,6 +33,9 @@ export const estimationApi = {
   analyzePoc(input: AnalyzeEstimationPocInput): Promise<EstimationPocAnalysis> {
     return api.post<EstimationPocAnalysis>('/estimations/poc/analyze', input);
   },
+  generateAnsweredPocProposal(input: GenerateEstimationPocInput): Promise<EstimationPocProposal> {
+    return api.post<EstimationPocProposal>('/estimations/poc/proposal-answered', input);
+  },
   generatePocProposal(input: GenerateEstimationPocInput): Promise<EstimationPocProposal> {
     return api.post<EstimationPocProposal>('/estimations/poc/proposal', input);
   },

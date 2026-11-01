@@ -6,10 +6,11 @@ import type {
 } from '@kora/contracts';
 import { estimationApi, estimationKeys } from './estimation.api';
 
-export function useEstimationQuestionnaireDefinition() {
+export function useEstimationQuestionnaireDefinition(enabled = true) {
   return useQuery({
     queryKey: estimationKeys.questionnaireDefinition(),
     queryFn: () => estimationApi.questionnaireDefinition(),
+    enabled,
     staleTime: 5 * 60_000,
   });
 }
@@ -66,5 +67,12 @@ export function useAnalyzeEstimationPoc() {
 export function useGenerateEstimationPocProposal() {
   return useMutation({
     mutationFn: (input: GenerateEstimationPocInput) => estimationApi.generatePocProposal(input),
+  });
+}
+
+/** En R4-a exige cuestionario F01–F05 antes de producir la propuesta de PoC. */
+export function useGenerateAnsweredEstimationPocProposal() {
+  return useMutation({
+    mutationFn: (input: GenerateEstimationPocInput) => estimationApi.generateAnsweredPocProposal(input),
   });
 }
