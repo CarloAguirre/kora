@@ -3,6 +3,7 @@ import type {
   ProjectQuotation,
   QuotationVersion,
   QuotationTransferPreview,
+  QuotationCommercialPreflight,
   QuotationReconciliationReview,
   SavedQuotationReconciliationReview,
   AssessQuotationReconciliationInput,
@@ -16,6 +17,11 @@ const base = (projectId: string) => '/estimations/projects/' + projectId + '/quo
 export const quotationApi = {
   get(projectId: string): Promise<ProjectQuotation | null> {
     return api.get<ProjectQuotation | null>(base(projectId));
+  },
+  commercialPreflight(projectId: string, versionId: string): Promise<QuotationCommercialPreflight> {
+    return api.get<QuotationCommercialPreflight>(
+      base(projectId) + '/versions/' + versionId + '/commercial-preflight',
+    );
   },
   transferPreview(projectId: string, versionId: string): Promise<QuotationTransferPreview> {
     return api.get<QuotationTransferPreview>(base(projectId) + '/versions/' + versionId + '/transfer-preview');
@@ -59,6 +65,8 @@ export const quotationKeys = {
     [...quotationKeys.project(projectId), 'reconciliation-reviews', versionId] as const,
   reconciliationAssessments: (projectId: string, versionId: string) =>
     [...quotationKeys.project(projectId), 'reconciliation-assessments', versionId] as const,
+  commercialPreflight: (projectId: string, versionId: string, revision: number) =>
+    [...quotationKeys.project(projectId), 'commercial-preflight', versionId, revision] as const,
   transferPreview: (projectId: string, versionId: string, revision: number) =>
     [...quotationKeys.project(projectId), 'transfer-preview', versionId, revision] as const,
 };

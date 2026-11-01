@@ -76,3 +76,13 @@ export function useAssessQuotationReconciliation(projectId: string, versionId: s
     }),
   });
 }
+
+/** Preflight de contenido guardado; no envía ni aprueba cotizaciones. */
+export function useQuotationCommercialPreflight(projectId: string, versionId: string, revision: number, enabled: boolean) {
+  return useQuery({
+    queryKey: quotationKeys.commercialPreflight(projectId, versionId, revision),
+    queryFn: () => quotationApi.commercialPreflight(projectId, versionId),
+    enabled: enabled && Boolean(projectId) && Boolean(versionId),
+    retry: false,
+  });
+}
