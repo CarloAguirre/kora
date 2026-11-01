@@ -112,3 +112,7 @@ GET/POST de historial de actas `draft_for_discussion` registradas como eventos a
 ## R3-e — Evaluación técnica de actas (30/10/2026)
 
 Segundo usuario con `projects:manage` puede registrar evento `reconciliation_review_assessed` para la última acta, indicando `changes_requested` o `reviewed_for_discussion`, con motivos y separación de autoría; no afecta `quotation_versions` ni las HH operativas. Ver docs/IMPLEMENTACION-CALCULADORA-R3E-EVALUACION-TECNICA.md. Pendiente QA en checkout.
+
+## R3-f — Validación comercial previa al envío (01/11/2026)
+
+GET de solo lectura sobre versión persistida, equipos reales y snapshot operativo: comprobaciones por modo equipos/fases, HH, tarifa, impuestos, pagos, IA y datos históricos. Interfaz con bloqueos/advertencias. Siempre `sendEnabled:false` y sin mutaciones. Ver `docs/IMPLEMENTACION-CALCULADORA-R3F-VALIDACION-COMERCIAL.md`; pendiente ejecución de suite local.

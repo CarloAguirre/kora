@@ -65,3 +65,7 @@ Las actas propuestas por el responsable pueden guardarse como registros append-o
 ## R3-e — Segundo revisor técnico (30-oct-2026)
 
 La política conservadora provisional exige un segundo usuario con `projects:manage` distinto al autor para evaluar técnicamente la última acta. Resultados: `changes_requested` o `reviewed_for_discussion`, siempre con `status=technical_review_only` y `transferEnabled=false`; se escriben únicamente eventos append-only. D02/D04/D05/D06 siguen abiertos. La revisión técnica jamás equivale a aprobación contractual; consultar docs/IMPLEMENTACION-CALCULADORA-R3E-EVALUACION-TECNICA.md.
+
+## R3-f — Validación sin permiso comercial (01-nov-2026)
+
+La comprobación automática antes del envío diagnostica inconsistencias de versión/equipos/HH/tarifas/fases/pagos e IA, pero NO envía ni aprueba. El resultado `contentChecksPassed` no es un permiso y `sendEnabled` sigue fijo en `false`. Se advierte explícitamente que costos recurrentes no están incluidos en el cálculo actual y que D02/D05/D06 continúan pendientes. Ver `docs/IMPLEMENTACION-CALCULADORA-R3F-VALIDACION-COMERCIAL.md`.
