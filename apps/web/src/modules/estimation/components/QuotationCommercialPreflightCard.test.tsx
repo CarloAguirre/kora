@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { quotationCommercialPreflightSchema, quotationVersionSchema } from '@kora/contracts';
 import { QuotationCommercialPreflightCard } from './QuotationCommercialPreflightCard';
 
@@ -48,6 +48,10 @@ const mockQuery = vi.fn((_: string, __: string, ___: number, enabled: boolean) =
   isLoading: false, isError: false, isFetching: false,
   refetch: refresh,
 }));
+const dossierRequest = vi.hoisted(() => vi.fn());
+vi.mock('../api/quotation.api', () => ({
+  quotationApi: { commercialDossier: dossierRequest },
+}));
 vi.mock('../api/quotation.queries', () => ({
   useQuotationCommercialPreflight: (...args: [string, string, number, boolean]) => mockQuery(...args),
 }));
@@ -76,4 +80,43 @@ describe('QuotationCommercialPreflightCard (R3-f)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Actualizar validación' }));
     expect(refresh).toHaveBeenCalledTimes(1);
   });
+  it('impide descargar el expediente de un formulario con cambios sin guardar', () => {
+    dossierRequest.mockReset();
+    render(<QuotationCommercialPreflightCard projectId={projectId}
+      version={version} hasUnsavedChanges />);
+    fireEvent.click(screen.getByRole('button', { name: 'Validar cotización' }));
+    expect(screen.getByRole('button', { name: 'Descargar expediente interno JSON' })).toBeDisabled();
+    expect(dossierRequest).not.toHaveBeenCalled();
+  });
+
+  it('descarga documento interno desde GET sin enviar, aprobar ni transferir', async () => {
+    dossierRequest.mockReset().mockResolvedValue({
+      projectId, versionId, versionNumber: 2, revision: 5,
+      documentStatus: 'internal_review_only', deliveryEnabled: false,
+      commercialApprovalEnabled: false, transferEnabled: false,
+    });
+    const originalCreate = URL.createObjectURL;
+    const originalRevoke = URL.revokeObjectURL;
+    const mockCreate = vi.fn().mockReturnValue('blob:expediente-interno');
+    const mockRevoke = vi.fn();
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: mockCreate });
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: mockRevoke });
+    const clicked = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    try {
+      render(<QuotationCommercialPreflightCard projectId={projectId} version={version} />);
+      fireEvent.click(screen.getByRole('button', { name: 'Validar cotización' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Descargar expediente interno JSON' }));
+      await waitFor(() => expect(dossierRequest).toHaveBeenCalledWith(projectId, versionId));
+      await waitFor(() => expect(clicked).toHaveBeenCalledTimes(1));
+      expect(mockCreate).toHaveBeenCalledTimes(1);
+      expect(mockRevoke).toHaveBeenCalledWith('blob:expediente-interno');
+      expect(screen.queryByRole('button', { name: /Enviar cotización|Aprobar|Traspasar/i }))
+        .not.toBeInTheDocument();
+    } finally {
+      clicked.mockRestore();
+      Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: originalCreate });
+      Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: originalRevoke });
+    }
+  });
+
 });
