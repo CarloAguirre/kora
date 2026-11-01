@@ -69,3 +69,7 @@ La política conservadora provisional exige un segundo usuario con `projects:man
 ## R3-f — Validación sin permiso comercial (01-nov-2026)
 
 La comprobación automática antes del envío diagnostica inconsistencias de versión/equipos/HH/tarifas/fases/pagos e IA, pero NO envía ni aprueba. El resultado `contentChecksPassed` no es un permiso y `sendEnabled` sigue fijo en `false`. Se advierte explícitamente que costos recurrentes no están incluidos en el cálculo actual y que D02/D05/D06 continúan pendientes. Ver `docs/IMPLEMENTACION-CALCULADORA-R3F-VALIDACION-COMERCIAL.md`.
+
+## R3-g — Evidencia interna previa al envío (01-nov-2026)
+
+El GET `commercial-dossier` genera un expediente estructurado para revisión humana a partir de la versión persistida y un preflight reciente. Tiene `internal_review_only`, `deliveryEnabled:false`, `commercialApprovalEnabled:false`, `transferEnabled:false` y deja D02/D05/D06 en estado pendiente. Es un documento interno descargable, no un documento de cliente ni una aprobación; no se almacena ni altera proyectos. Ver `docs/IMPLEMENTACION-CALCULADORA-R3G-EXPEDIENTE-INTERNO.md`.

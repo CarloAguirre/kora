@@ -116,3 +116,7 @@ Segundo usuario con `projects:manage` puede registrar evento `reconciliation_rev
 ## R3-f — Validación comercial previa al envío (01/11/2026)
 
 GET de solo lectura sobre versión persistida, equipos reales y snapshot operativo: comprobaciones por modo equipos/fases, HH, tarifa, impuestos, pagos, IA y datos históricos. Interfaz con bloqueos/advertencias. Siempre `sendEnabled:false` y sin mutaciones. Ver `docs/IMPLEMENTACION-CALCULADORA-R3F-VALIDACION-COMERCIAL.md`; pendiente ejecución de suite local.
+
+## R3-g — Expediente interno de revisión comercial (01/11/2026)
+
+Nuevo GET protegido para construir un JSON interno desde la versión persistida y el preflight R3-f calculado en servidor. Incluye HH, equipos/fases, importes, costos, pagos, hallazgos y D02/D05/D06 pendientes. La UI permite descargarlo sin guardar datos adicionales ni habilitar estados o acciones de envío/aprobación/traspaso. No incluye respuestas del cuestionario ni URLs de fuentes. Ver `docs/IMPLEMENTACION-CALCULADORA-R3G-EXPEDIENTE-INTERNO.md`. QA pendiente.
