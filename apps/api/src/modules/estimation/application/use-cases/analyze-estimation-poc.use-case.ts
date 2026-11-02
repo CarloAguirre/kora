@@ -34,6 +34,7 @@ const DYNAMIC_QUESTIONS_JSON_SCHEMA = {
           required: { type: 'BOOLEAN' },
           confidence: { type: 'STRING', enum: ['high', 'medium', 'low'] },
           priorityScore: { type: 'INTEGER' },
+          assumptionIfSkipped: { type: 'STRING' },
           sourceRefs: { type: 'ARRAY', items: {
             type: 'OBJECT', properties: {
               sourceId: { type: 'STRING' }, fileName: { type: 'STRING' },
@@ -83,6 +84,7 @@ export class AnalyzeEstimationPocUseCase {
         'No repitas las preguntas fijas de nivel de entrega, plazo, equipo, postproducción y condiciones generales.',
         'Cada pregunta debe señalar un motivo técnico concreto y citar sourceId de uno de los documentos proporcionados.',
         'Las opciones deben ser específicas y mutuamente compatibles, o usa answerType=text.',
+        'Para cada aclaración, propone assumptionIfSkipped: un supuesto prudente y específico si el usuario aún no puede responder. Nunca afirmes que ese supuesto ya fue validado.',
         'No estimes HH todavía ni redactes un EDT: solo resumen del entendimiento y aclaraciones.',
         input.instructions ?? '',
       ].filter(Boolean).join('\n'),

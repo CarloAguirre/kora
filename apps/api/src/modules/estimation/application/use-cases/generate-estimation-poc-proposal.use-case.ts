@@ -168,10 +168,12 @@ export class GenerateEstimationPocProposalUseCase {
         provider: 'gemini',
         source: 'kdm_demo',
         answers: input.answers,
+        confirmedUnderstanding: 'confirmedUnderstanding' in input ? input.confirmedUnderstanding : null,
         roles: proposal.roles.map((role) => ({ name: role.role, totalHours: role.totalHours })),
       },
       instructions: [
         'Desglosa el alcance del documento KDM en módulos/fases y tareas de referencia concretas.',
+        'Si hay entendimiento confirmado por el usuario en el contexto, úsalo para resolver ambigüedades del documento.',
         'Cada tarea debe tener un único role que coincida EXACTAMENTE con uno de los roles del contexto.',
         'Usa weight relativo > 0 para repartir el trabajo de CADA rol entre tareas.',
         'No calcules HH: Kora distribuye las HH de la propuesta original de manera determinista.',
