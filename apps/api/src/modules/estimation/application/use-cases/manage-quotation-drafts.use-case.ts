@@ -251,9 +251,6 @@ export class ManageQuotationDraftsUseCase {
   }
 
   async authorizeAiPoc(projectId: string, actor: QuotationActor): Promise<void> {
-    if (!actor.permissions.includes('projects:manage')) {
-      throw new ForbiddenException('La creación de propuestas IA está reservada a Gerencia.');
-    }
     await this.authorize(projectId, actor, true);
   }
 
@@ -294,10 +291,7 @@ export class ManageQuotationDraftsUseCase {
   async create(projectId: string, actor: QuotationActor, input: CreateQuotationVersionInput): Promise<QuotationVersion> {
     await this.authorize(projectId, actor, true);
     if (input.sourceProjectId && input.sourceProjectId !== projectId) {
-      if (!actor.permissions.includes('projects:manage')) {
-        throw new ForbiddenException('Solo Gerencia puede copiar cotizaciones entre proyectos.');
-      }
-      // Se autoriza el origen por separado. Nunca copiar desde proyectos de soporte.
+      // Mismo permiso para Líder PM/PMO/Gerencia, pero acceso validado EN AMBOS proyectos.
       await this.authorize(input.sourceProjectId, actor, false);
     }
     return this.repository.createDraft(projectId, actor.id, input);

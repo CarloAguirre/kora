@@ -13,9 +13,10 @@ import { isoDateTimeSchema, nonEmptyTrimmed, uuidSchema } from '../common/primit
  * prospect/quoted que ya están active: se permite preparar borradores
  * comerciales INDEPENDIENTES, sin alterar las HH, equipos ni facturación.
  *
- * No autoriza envío, aprobación, traspaso ni cambios de alcance en ejecución.
- * Los estados detenidos/terminados/cancelados quedan fuera de esta regla
- * provisional hasta acordar el flujo de recotización.
+ * La creación de versiones también procede en proyectos comerciales
+ * aprobados que siguen activos. Reemplazar un roadmap ejecutado requiere un
+ * traspaso separado, auditado; crear la versión nunca lo altera.
+ * Los estados detenidos/finalizados/cancelados son de consulta.
  */
 export interface QuotationEligibilityProject {
   readonly type: 'development' | 'support';
@@ -25,7 +26,7 @@ export interface QuotationEligibilityProject {
 
 export function isQuotationDraftEligibleProject(project: QuotationEligibilityProject): boolean {
   return project.type === 'development' &&
-    (project.salesStage === 'prospect' || project.salesStage === 'quoted') &&
+    (project.salesStage === 'prospect' || project.salesStage === 'quoted' || project.salesStage === 'approved') &&
     (project.status === 'draft' || project.status === 'active');
 }
 
@@ -161,5 +162,6 @@ export const projectQuotationSchema = z.object({
   id: uuidSchema,
   projectId: uuidSchema,
   versions: z.array(quotationVersionSchema),
+  transferredVersionId: uuidSchema.nullable().optional(),
 });
 export type ProjectQuotation = z.infer<typeof projectQuotationSchema>;

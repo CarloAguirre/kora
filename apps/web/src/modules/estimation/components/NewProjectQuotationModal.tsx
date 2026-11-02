@@ -23,14 +23,14 @@ export function NewProjectQuotationModal({ project, versions, onClose }: {
 }) {
   const navigate = useNavigate();
   const { can } = usePermissions();
-  const [mode, setMode] = useState<Mode>(can('projects:manage') ? 'ai' : 'blank');
+  const [mode, setMode] = useState<Mode>('ai');
   const [sourceProjectId, setSourceProjectId] = useState(project.id);
   const [sourceVersionId, setSourceVersionId] = useState('');
   const [error, setError] = useState('');
   const [aiWizardOpen, setAiWizardOpen] = useState(false);
   const create = useCreateQuotationVersion(project.id);
   const otherProjects = useProjectsList({ type: 'development', page: 1, pageSize: 200 },
-    { enabled: can('projects:manage') && mode === 'copy' });
+    { enabled: mode === 'copy' });
   const source = useProjectQuotation(sourceProjectId, mode === 'copy' && sourceProjectId !== project.id);
   const copyVersions = sourceProjectId === project.id ? versions : source.data?.versions ?? [];
   const selectedVersionId = copyVersions.some((v) => v.id === sourceVersionId)
@@ -80,7 +80,7 @@ export function NewProjectQuotationModal({ project, versions, onClose }: {
             'Crea un borrador versionado en PostgreSQL con equipos y horas por definir.'],
           ['copy', 'Copiar otra cotización',
             'Copia datos comerciales de una versión existente sin modificar su proyecto.'],
-        ] as const).filter(([value]) => value !== 'ai' || can('projects:manage')).map(([value, title, description]) => (
+        ] as const).filter(([value]) => true).map(([value, title, description]) => (
           <label key={value}
             className={[estimationStyles.option,
               mode === value ? estimationStyles.optionSelected : ''].filter(Boolean).join(' ')}>
@@ -100,7 +100,7 @@ export function NewProjectQuotationModal({ project, versions, onClose }: {
 
       {mode === 'copy' && (
         <div className={styles.copy}>
-          {can('projects:manage') && (
+          {(
             <Select label="Proyecto de origen" value={sourceProjectId}
               options={[
                 { value: project.id, label: project.name + ' (actual)' },

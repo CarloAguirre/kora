@@ -130,7 +130,7 @@ export class QuotationController {
 
   @Post('versions/ai-poc')
   @HttpCode(HttpStatus.CREATED)
-  @RequireAnyPermission('projects:manage')
+  @RequireAnyPermission('projects:manage', 'projects:read_assigned')
   async createAiPoc(
     @Param('projectId', ParseUUIDPipe) projectId: string,
     @Body(new ZodValidationPipe(generateAiDemoQuotationSchema)) input: GenerateAiDemoQuotationInput,
