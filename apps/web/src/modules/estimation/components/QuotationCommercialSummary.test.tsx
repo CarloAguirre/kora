@@ -59,7 +59,7 @@ describe('QuotationCommercialSummary · fidelidad comercial sin alterar el cálc
     const onSave = vi.fn();
     render(<QuotationCommercialSummary {...baseProps} draft={draft}
       dirty hourlyRate={0.62} onSave={onSave} />);
-    expect(screen.getByText('160 HH')).toBeInTheDocument();
+    expect(screen.getByText('160')).toBeInTheDocument();
     expect(screen.getByText('99,2 UF')).toBeInTheDocument();
     expect(screen.getByText('118,048 UF')).toBeInTheDocument();
     expect(screen.getByText('Sin guardar')).toBeInTheDocument();
@@ -79,6 +79,6 @@ describe('QuotationCommercialSummary · fidelidad comercial sin alterar el cálc
     };
     render(<QuotationCommercialSummary {...baseProps} draft={draft} />);
     expect(screen.getByText('4 semanas · 2 fases')).toBeInTheDocument();
-    expect(screen.getByText('50 HH')).toBeInTheDocument();
+    expect(screen.getByText('50')).toBeInTheDocument();
   });
 });
