@@ -31,6 +31,7 @@ import {
 } from '@kora/contracts';
 import { DATABASE } from '../../../../shared/infrastructure/database/database.module';
 import { calculateQuotation } from '../../domain/quotation-math';
+import { hasOnlyUntouchedDefaultPaymentMilestones } from '../../domain/default-payment-plan-eligibility';
 import type { QuotationProjectScope, QuotationRepository } from '../../domain/repositories/quotation.repository';
 
 @Injectable()
@@ -501,16 +502,31 @@ export class DrizzleQuotationRepository implements QuotationRepository {
           .where(eq(projectTeams.projectId, projectId)).limit(1),
         tx.select({ id: projectModules.id }).from(projectModules)
           .where(eq(projectModules.projectId, projectId)).limit(1),
-        tx.select({ id: projectPaymentMilestones.id }).from(projectPaymentMilestones)
-          .where(eq(projectPaymentMilestones.projectId, projectId)).limit(1),
+        tx.select({
+          name: projectPaymentMilestones.name,
+          percent: projectPaymentMilestones.percent,
+          amount: projectPaymentMilestones.amount,
+          sortOrder: projectPaymentMilestones.sortOrder,
+          triggerType: projectPaymentMilestones.triggerType,
+          triggerPhase: projectPaymentMilestones.triggerPhase,
+          triggerDate: projectPaymentMilestones.triggerDate,
+          status: projectPaymentMilestones.status,
+          invoiceNumber: projectPaymentMilestones.invoiceNumber,
+          issuedAt: projectPaymentMilestones.issuedAt,
+          dueAt: projectPaymentMilestones.dueAt,
+          paidAt: projectPaymentMilestones.paidAt,
+        }).from(projectPaymentMilestones)
+          .where(eq(projectPaymentMilestones.projectId, projectId)),
         tx.select({ id: hourEntries.id }).from(hourEntries)
           .where(eq(hourEntries.projectId, projectId)).limit(1),
       ]);
       if (Number(project.soldHours) !== 0 || Number(project.usedHours) !== 0 ||
           project.contractAmount !== null || project.startDate !== null ||
-          existingTeams.length || existingModules.length || existingPayments.length || existingHours.length) {
+          existingTeams.length || existingModules.length || existingHours.length ||
+          !hasOnlyUntouchedDefaultPaymentMilestones(existingPayments)) {
         throw new ConflictException(
-          'El proyecto ya tiene planificación, HH, fechas, contrato o pagos. No se sobreescribe.',
+          'El proyecto ya tiene planificación, HH, contrato o pagos comprometidos. ' +
+          'Solo se toleran los dos hitos predeterminados pendientes, sin monto ni facturas.',
         );
       }
       const draft = quotationDraftDataSchema.parse(version.draft);
