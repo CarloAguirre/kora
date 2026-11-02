@@ -3,9 +3,14 @@ import { Link } from 'react-router-dom';
 import {
   PROJECT_PHASES,
   PROJECT_PHASE_LABELS,
+  PROJECT_SALES_STAGES,
+  PROJECT_SALES_STAGE_LABELS,
+  PROJECT_QUOTATION_LIST_STATUSES,
   PROJECT_STATUSES,
   PROJECT_STATUS_LABELS,
   type ProjectPhase,
+  type ProjectSalesStage,
+  type ProjectQuotationListStatus,
   type ProjectSortField,
   type ProjectStatus,
   type ProjectSummary,
@@ -36,6 +41,20 @@ import { projectPath } from '@/app/router/paths';
 
 const STATUS_OPTIONS = PROJECT_STATUSES.map((status) => ({ value: status, label: PROJECT_STATUS_LABELS[status] }));
 const PHASE_OPTIONS = PROJECT_PHASES.map((phase) => ({ value: phase, label: PROJECT_PHASE_LABELS[phase] }));
+const SALES_STAGE_OPTIONS = PROJECT_SALES_STAGES.map((stage) => ({
+  value: stage, label: PROJECT_SALES_STAGE_LABELS[stage],
+}));
+const QUOTATION_LABELS: Record<ProjectQuotationListStatus, string> = {
+  none: 'Sin cotización',
+  draft: 'En cotización',
+  sent: 'Enviada al cliente',
+  approved_pending: 'Traspaso pendiente',
+  transferred: 'Traspasada',
+  planning_applied: 'Planificación preliminar aplicada',
+};
+const QUOTATION_OPTIONS = PROJECT_QUOTATION_LIST_STATUSES.map((status) => ({
+  value: status, label: QUOTATION_LABELS[status],
+});
 const TABS = [
   { id: 'development', label: 'Proyectos Desarrollo' },
   { id: 'support', label: 'Soporte' },
@@ -81,6 +100,8 @@ export function ProjectsListPage() {
   const [leaderUserIds, setLeaderUserIds] = useState<string[]>([]);
   const [statuses, setStatuses] = useState<ProjectStatus[]>([]);
   const [phases, setPhases] = useState<ProjectPhase[]>([]);
+  const [salesStages, setSalesStages] = useState<ProjectSalesStage[]>([]);
+  const [quotationStatuses, setQuotationStatuses] = useState<ProjectQuotationListStatus[]>([]);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [sort, setSort] = useState<SortState<ProjectSortField>>(DEFAULT_SORT);
@@ -96,6 +117,8 @@ export function ProjectsListPage() {
           leaderUserId: leaderUserIds.length > 0 ? leaderUserIds : undefined,
           status: statuses.length > 0 ? statuses : undefined,
           phase: phases.length > 0 ? phases : undefined,
+          salesStage: salesStages.length > 0 ? salesStages : undefined,
+          quotationStatus: quotationStatuses.length > 0 ? quotationStatuses : undefined,
         }
       : {
           type: tab,
@@ -202,8 +225,22 @@ export function ProjectsListPage() {
     },
     { key: 'client', header: 'Cliente', sortable: true, render: (p) => p.client?.companyName ?? <span className={styles.empty}>—</span> },
     { key: 'leader', header: 'Líder', sortable: true, render: (p) => p.leader?.fullName ?? <span className={styles.empty}>—</span> },
+    {
+      key: 'salesStage', header: 'Tipo de proyecto', sortable: true,
+      render: (p) => p.salesStage
+        ? PROJECT_SALES_STAGE_LABELS[p.salesStage]
+        : <span className={styles.empty}>—</span>,
+    },
     { key: 'status', header: 'Estado', sortable: true, render: (p) => <ProjectStatusBadge status={p.status} /> },
     { key: 'stage', header: 'Etapa', render: (p) => getProjectStageLabel(p) },
+    {
+      key: 'quotationStatus', header: 'Cotización', sortable: true,
+      render: (p) => p.quotationStatus
+        ? <span className={styles.quotationStatus} data-state={p.quotationStatus}>
+            {QUOTATION_LABELS[p.quotationStatus]}
+          </span>
+        : <span className={styles.empty}>—</span>,
+    },
     {
       key: 'startDate',
       header: 'Inicio',
@@ -342,6 +379,18 @@ export function ProjectsListPage() {
                 />
                 <MultiSelect
                   className={styles.filter}
+                  label="Tipo de proyecto"
+                  placeholder="Todos"
+                  searchPlaceholder="Buscar tipo"
+                  options={SALES_STAGE_OPTIONS}
+                  value={salesStages}
+                  onChange={(next) => {
+                    setSalesStages(next as ProjectSalesStage[]);
+                    setPage(1);
+                  }}
+                />
+                <MultiSelect
+                  className={styles.filter}
                   label="Estado"
                   placeholder="Todos"
                   searchPlaceholder="Buscar estado"
@@ -361,6 +410,18 @@ export function ProjectsListPage() {
                   value={phases}
                   onChange={(next) => {
                     setPhases(next as ProjectPhase[]);
+                    setPage(1);
+                  }}
+                />
+                <MultiSelect
+                  className={styles.filter}
+                  label="Cotización"
+                  placeholder="Todas"
+                  searchPlaceholder="Buscar cotización"
+                  options={QUOTATION_OPTIONS}
+                  value={quotationStatuses}
+                  onChange={(next) => {
+                    setQuotationStatuses(next as ProjectQuotationListStatus[]);
                     setPage(1);
                   }}
                 />
