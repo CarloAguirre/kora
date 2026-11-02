@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { ProjectDetail, QuotationVersion } from '@kora/contracts';
 import { projectQuotationPath } from '@/app/router/paths';
-import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { useProjectsList } from '@/modules/projects/api/projects.queries';
 import { Button } from '@/shared/components/ui/Button';
 import { Modal } from '@/shared/components/ui/Modal';
@@ -22,7 +21,6 @@ export function NewProjectQuotationModal({ project, versions, onClose }: {
   onClose: () => void;
 }) {
   const navigate = useNavigate();
-  const { can } = usePermissions();
   const [mode, setMode] = useState<Mode>('ai');
   const [sourceProjectId, setSourceProjectId] = useState(project.id);
   const [sourceVersionId, setSourceVersionId] = useState('');
@@ -80,7 +78,7 @@ export function NewProjectQuotationModal({ project, versions, onClose }: {
             'Crea un borrador versionado en PostgreSQL con equipos y horas por definir.'],
           ['copy', 'Copiar otra cotización',
             'Copia datos comerciales de una versión existente sin modificar su proyecto.'],
-        ] as const).filter(([value]) => true).map(([value, title, description]) => (
+        ] as const).map(([value, title, description]) => (
           <label key={value}
             className={[estimationStyles.option,
               mode === value ? estimationStyles.optionSelected : ''].filter(Boolean).join(' ')}>
@@ -100,8 +98,7 @@ export function NewProjectQuotationModal({ project, versions, onClose }: {
 
       {mode === 'copy' && (
         <div className={styles.copy}>
-          {(
-            <Select label="Proyecto de origen" value={sourceProjectId}
+          <Select label="Proyecto de origen" value={sourceProjectId}
               options={[
                 { value: project.id, label: project.name + ' (actual)' },
                 ...(otherProjects.data?.items ?? []).filter((item) => item.id !== project.id)
@@ -109,7 +106,6 @@ export function NewProjectQuotationModal({ project, versions, onClose }: {
               ]}
               onChange={(event) => { setSourceProjectId(event.target.value); setSourceVersionId(''); }}
             />
-          )}
           {source.isLoading && <p>Consultando versiones de origen…</p>}
           {source.error && <p role="alert">No tienes acceso a las versiones de ese proyecto.</p>}
           <Select label="Versión a copiar" value={selectedVersionId}
