@@ -327,6 +327,11 @@ export const estimationPocAnalysisSchema = z.object({
   documentsAnalyzed: z.number().int().min(0),
   summary: nonEmptyTrimmed(3000, 'El resumen'),
   detectedDocuments: z.array(z.string().trim().min(1).max(500)).default([]),
+  fixedPrefills: z.array(z.object({
+    questionId: z.enum(['F01', 'F02', 'F04']),
+    value: estimationAnswerValueSchema,
+    sourceRefs: z.array(estimationSourceReferenceSchema).min(1),
+  })).max(3).default([]),
   dynamicQuestions: z.array(estimationQuestionSchema).max(5).default([]),
 });
 export type EstimationPocAnalysis = z.infer<typeof estimationPocAnalysisSchema>;

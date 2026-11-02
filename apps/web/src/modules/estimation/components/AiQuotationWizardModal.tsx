@@ -53,7 +53,7 @@ function displayAnswer(question: EstimationQuestion, value: EstimationAnswerValu
 }
 
 function QuestionField({
-  question, value, assumed, onChange, onAssume, error,
+  question, value, assumed, onChange, onAssume, error, prefillSource,
 }: {
   question: EstimationQuestion;
   value: EstimationAnswerValue | undefined;
@@ -61,16 +61,20 @@ function QuestionField({
   onChange: (value: EstimationAnswerValue) => void;
   onAssume: () => void;
   error: boolean;
+  prefillSource?: string;
 }) {
   const selected = (option: string) => Array.isArray(value)
     ? value.includes(option) : value === option;
-  const option = (key: string, label: string, multi = false) => (
+  const option = (key: string, label: string, multi = false) => {
+    const disabled = question.id === 'F03' && key !== 'ideal';
+    return (
     <label key={key} className={[
       optionStyles.option,
+      disabled ? optionStyles.optionDisabled : '',
       selected(key) && !assumed ? optionStyles.optionSelected : '',
     ].filter(Boolean).join(' ')}>
       <input type={multi ? 'checkbox' : 'radio'} name={question.id}
-        value={key} checked={selected(key) && !assumed}
+        value={key} checked={selected(key) && !assumed} disabled={disabled}
         onChange={() => {
           if (!multi) { onChange(key); return; }
           const current = Array.isArray(value) && !assumed ? value : [];
@@ -82,9 +86,10 @@ function QuestionField({
               : [...current.filter((item) => item !== 'none'), key]);
           }
         }} />
-      <span><strong>{label}</strong></span>
+      <span><strong>{label}</strong>{disabled &&
+        <small>Disponible al integrar capacidad real de Kora</small>}</span>
     </label>
-  );
+  );};
 
   return (
     <fieldset className={styles.question}>
@@ -96,8 +101,9 @@ function QuestionField({
       </legend>
       {question.kind === 'dynamic' && question.reason &&
         <p className={styles.reason}>Por qué preguntamos: {question.reason}</p>}
-      {question.canPrefill && question.detectedValue !== undefined &&
-        <p className={styles.source}>El documento propone una respuesta. Puedes corregirla.</p>}
+      {prefillSource && <p className={styles.source}>
+        Prellenada desde el documento de demostración: {prefillSource}. Puedes corregirla.
+      </p>}
       {question.answerType === 'text' &&
         <textarea aria-label={question.question} className={styles.textarea}
           placeholder="Escribe una respuesta breve"
@@ -219,7 +225,16 @@ export function AiQuotationWizardModal({ project, onClose }: {
       }
       setUnderstanding(result.summary);
       const prefilled: AnswerState = {};
-      for (const question of [...fixed, ...result.dynamicQuestions]) {
+      for (const question of fixed) {
+        const recommendation = result.fixedPrefills?.find((item) =>
+          item.questionId === question.id,
+        );
+        if (question.canPrefill && recommendation &&
+            matchesQuestion(question, recommendation.value)) {
+          prefilled[question.id] = recommendation.value;
+        }
+      }
+      for (const question of result.dynamicQuestions) {
         if (question.canPrefill && matchesQuestion(question, question.detectedValue)) {
           prefilled[question.id] = question.detectedValue;
         }
@@ -359,6 +374,9 @@ export function AiQuotationWizardModal({ project, onClose }: {
           {fixed.map((question) => (
             <QuestionField key={question.id} question={question}
               value={answers[question.id]} assumed={assumptions.includes(question.id)}
+              prefillSource={verifiedAnalysis?.fixedPrefills?.find(
+                (item) => item.questionId === question.id,
+              )?.sourceRefs.map((source) => source.fileName).join(', ')}
               onChange={(value) => change(question.id, value)}
               onAssume={() => assume(question.id)} error={invalidId === question.id} />
           ))}
