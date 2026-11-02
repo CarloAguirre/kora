@@ -98,12 +98,15 @@ export type QuotationDraftData = z.infer<typeof quotationDraftDataSchema>;
 
 export const createQuotationVersionSchema = z.object({
   sourceVersionId: uuidSchema.optional(),
+  sourceProjectId: uuidSchema.optional(),
   simulation: z.object({
     analysis: estimationAnalysisArtifactSchema,
     roleTeamIds: z.record(z.string(), uuidSchema),
   }).optional(),
 }).refine((value) => !value.sourceVersionId || !value.simulation, {
   message: 'No se puede copiar y simular una versión simultáneamente.',
+}).refine((value) => !value.sourceProjectId || Boolean(value.sourceVersionId), {
+  message: 'Se requiere una versión de origen al seleccionar otro proyecto.',
 });
 export type CreateQuotationVersionInput = z.infer<typeof createQuotationVersionSchema>;
 

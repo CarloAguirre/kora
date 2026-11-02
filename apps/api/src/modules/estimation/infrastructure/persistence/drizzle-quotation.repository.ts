@@ -318,9 +318,14 @@ export class DrizzleQuotationRepository implements QuotationRepository {
         aiReviewStatus = 'pending';
       }
       if (input.sourceVersionId) {
+        const sourceProjectId = input.sourceProjectId ?? projectId;
+        const [sourceQuotation] = await tx.select({ id: projectQuotations.id })
+          .from(projectQuotations).where(eq(projectQuotations.projectId, sourceProjectId)).limit(1);
+        if (!sourceQuotation) throw new NotFoundException('Cotización de origen no encontrada.');
         const [source] = await tx.select().from(quotationVersions)
-          .where(and(eq(quotationVersions.id, input.sourceVersionId), eq(quotationVersions.quotationId, quotation.id))).limit(1);
-        if (!source) throw new NotFoundException('La versión para copiar no pertenece a esta cotización.');
+          .where(and(eq(quotationVersions.id, input.sourceVersionId),
+            eq(quotationVersions.quotationId, sourceQuotation.id))).limit(1);
+        if (!source) throw new NotFoundException('La versión no pertenece a la cotización de origen.');
         // Una copia MANUAL desde una propuesta IA no hereda fuentes ni respuestas IA.
         const previous = quotationDraftDataSchema.parse(source.draft);
         draft = { ...previous, sourceRefs: [], answers: {}, analysis: null, analysisProjectionStatus: undefined };
@@ -351,6 +356,7 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       await tx.insert(quotationEvents).values({
         versionId: created.id, actorUserId: userId, action: 'draft_created',
         metadata: { origin, sourceVersionId: input.sourceVersionId ?? null,
+          sourceProjectId: input.sourceVersionId ? (input.sourceProjectId ?? projectId) : null,
           simulation: input.simulation ? 'simulated_fixture' : null },
       });
       return toVersion(created);
