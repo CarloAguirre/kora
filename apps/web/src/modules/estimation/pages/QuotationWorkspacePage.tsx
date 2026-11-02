@@ -17,6 +17,7 @@ import { QuotationTransferPreviewCard } from '../components/QuotationTransferPre
 import { QuotationCommercialPreflightCard } from '../components/QuotationCommercialPreflightCard';
 import { AiPocRoleMappingCard } from '../components/AiPocRoleMappingCard';
 import { QuotationPlanningAcceptanceCard } from '../components/QuotationPlanningAcceptanceCard';
+import { QuotationCommercialLifecycleCard } from '../components/QuotationCommercialLifecycleCard';
 import styles from './QuotationWorkspacePage.module.css';
 
 type Form = Pick<UpdateQuotationDraftInput, 'name' | 'hourlyRate' | 'currency' | 'tax' | 'draft'>;
@@ -300,10 +301,18 @@ export function QuotationWorkspacePage() {
                 <QuotationPlanningAcceptanceCard
                   key={selected.id + ':' + selected.revision}
                   projectId={projectId} version={selected}
-                  canManage={can('projects:manage')} hasUnsavedChanges={dirty}
+                  canManage={mayWrite} hasUnsavedChanges={dirty}
                 />
               )}
 
+              {selected && project && (
+                <QuotationCommercialLifecycleCard
+                  key={selected.id + ':' + selected.revision}
+                  project={project} version={selected}
+                  quotation={quotation ?? null}
+                  canOperate={mayWrite} hasUnsavedChanges={dirty}
+                />
+              )}
               {versions.length > 1 && (
                 <QuotationVersionComparison versions={versions} teamNames={teamById} />
               )}
