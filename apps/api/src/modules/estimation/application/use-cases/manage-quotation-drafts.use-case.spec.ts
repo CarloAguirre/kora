@@ -161,4 +161,41 @@ describe('ManageQuotationDraftsUseCase', () => {
       .rejects.toBeInstanceOf(ConflictException);
   });
 
+  it('solo Gerencia acepta el baseline; conserva revision y exige proyecto elegible', async () => {
+    const versionId = '0777e456-fd76-445e-83f1-afc25061c105';
+    const input = {
+      revision: 3, confirmation: 'APLICAR_PLANIFICACION_KDM_DEMO' as const,
+    };
+    const { useCase, repository } = setup();
+    const apply = vi.fn().mockResolvedValue({
+      projectId: project.id, versionId, status: 'accepted_for_planning_only',
+      totalHours: 80, commercialApproval: false, modules: [],
+    });
+    repository.applyPlanningBaseline = apply;
+    await expect(useCase.applyPlanningBaseline(project.id, versionId, leader, input))
+      .rejects.toBeInstanceOf(ForbiddenException);
+    expect(apply).not.toHaveBeenCalled();
+    const baseline = await useCase.applyPlanningBaseline(project.id, versionId, manager, input);
+    expect(baseline.commercialApproval).toBe(false);
+    expect(apply).toHaveBeenCalledWith(project.id, versionId, manager.id, input);
+
+    const historical = setup({ ...project, salesStage: 'approved' });
+    historical.repository.applyPlanningBaseline = vi.fn();
+    await expect(historical.useCase.applyPlanningBaseline(project.id, versionId, manager, input))
+      .rejects.toBeInstanceOf(ConflictException);
+    expect(historical.repository.applyPlanningBaseline).not.toHaveBeenCalled();
+  });
+
+  it('solo permite leer planificación aplicada al gerente o líder asignado', async () => {
+    const { useCase, repository } = setup();
+    const getPlan = vi.fn().mockResolvedValue(null);
+    repository.getAppliedPlanningBaseline = getPlan;
+    expect(await useCase.getAppliedPlanningBaseline(project.id, leader)).toBeNull();
+    await expect(useCase.getAppliedPlanningBaseline(project.id,
+      { id: manager.id, permissions: ['projects:read_assigned'] }))
+      .rejects.toBeInstanceOf(ForbiddenException);
+    expect(getPlan).toHaveBeenCalledTimes(1);
+  });
+
+
 });
