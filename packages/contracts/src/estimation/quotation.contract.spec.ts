@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isQuotationDraftEligibleProject, type QuotationEligibilityProject } from './quotation.contract';
+import { isQuotationDraftEligibleProject, approveClientQuotationSchema, type QuotationEligibilityProject } from './quotation.contract';
 
 const base: QuotationEligibilityProject = { type: 'development', salesStage: 'quoted', status: 'draft' };
 
@@ -22,5 +22,27 @@ describe('isQuotationDraftEligibleProject', () => {
 
   it('no permite cotizar soporte aunque tenga etapa quoted/active', () => {
     expect(isQuotationDraftEligibleProject({ ...base, type: 'support', status: 'active' })).toBe(false);
+  });
+});
+
+
+describe('Aprobación comercial directa sin envío', () => {
+  it('admite aprobación normal de versión enviada', () => {
+    expect(approveClientQuotationSchema.parse({
+      revision: 2, confirmation: 'CLIENTE_APROBO_ESTA_VERSION',
+    })).toEqual({ revision: 2, confirmation: 'CLIENTE_APROBO_ESTA_VERSION' });
+  });
+
+  it('requiere una declaración literal verificable para aprobación directa', () => {
+    const input = { revision: 2, confirmation: 'CLIENTE_APROBO_ESTA_VERSION' };
+    expect(approveClientQuotationSchema.parse({
+      ...input, confirmWithoutSend: true,
+    })).toMatchObject({ confirmWithoutSend: true });
+    expect(approveClientQuotationSchema.safeParse({
+      ...input, confirmWithoutSend: false,
+    }).success).toBe(false);
+    expect(approveClientQuotationSchema.safeParse({
+      ...input, confirmWithoutSend: 'true',
+    }).success).toBe(false);
   });
 });

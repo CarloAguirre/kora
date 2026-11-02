@@ -27,13 +27,25 @@ Gerencia/PMO con `projects:manage`, y líder asignado con `projects:read_assigne
 
 Crear una versión en proyecto aprobado **no cambia** las HH ejecutadas, equipos operativos, Roadmap ni pagos históricos. Una recotización puede quedar aprobada comercialmente y **con traspaso pendiente** mientras su conciliación operativa requiere trabajo específico.
 
+## R4-e.1 — Aprobación sin marcar previamente como enviada (02/11/2026)
+
+Se cierra la diferencia con la especificación (secciones 5.6 y Flujo 5): una versión **Borrador** puede ser aprobada directamente por el cliente, sin forzar un envío comercial ficticio.
+
+- En el editor y en la ficha del proyecto aparece **Registrar aprobación** también para el último borrador que cumpla valor HH, equipos, plan de pago al 100 %, aceptación IA y EDT conciliada.
+- La interfaz advierte explícitamente que **no existe envío registrado** y pide al usuario confirmar la aprobación real del cliente. Si cancela, no ejecuta la API.
+- El contrato `approveClientQuotationSchema` admite `confirmWithoutSend: true`, solo cuando el operador reconoce esa situación. El backend exige este valor para una versión en `draft`; sin él rechaza la operación, aunque el cliente HTTP evite la ventana de confirmación.
+- La API sigue requiriendo versión **vigente**, revisión optimista, elegibilidad, autorización, verificación comercial y prohibición de KDM de demostración en producción. Registra `quotation_client_approved` con `wasSent: false` y `directApprovalConfirmed: true` cuando corresponde.
+- **Aprobar no traspasa** equipos, HH ni Roadmap. La opción de traspasar ahora requiere la siguiente operación separada y conserva su protección ante proyectos existentes.
+
+Esto no implementa envío real de correos. Las versiones marcadas `sent` siguen la ruta original y no necesitan confirmación de envío omitido.
+
 ## Estados y operaciones del ciclo comercial
 
 | Operación | Precondiciones | Cambios persistidos |
 |---|---|---|
 | **Aceptar propuesta IA** | `draft`, origen IA, revisión vigente, roles y HH mapeados, EDT disponible | `ai_review_status=accepted`, incremento de revisión, evento `ai_proposal_accepted`; **sin cambios en proyectos** |
 | **Marcar como enviada** | Última versión `draft`, valor HH, equipos, plan de pagos 100 %, aceptación IA si aplica y EDT conciliada | `status=sent`, `sent_at`, incremento de revisión, evento `quotation_marked_sent` |
-| **Registrar aprobación de cliente** | Última versión `sent`, revisión vigente y comprobaciones comerciales | `status=approved`, `approved_at`, `projects.sales_stage=approved`, evento `quotation_client_approved`; **sin traspaso automático** |
+| **Registrar aprobación de cliente** | Última versión `draft` con `confirmWithoutSend: true`, o `sent`; revisión vigente y comprobaciones comerciales | `status=approved`, `approved_at`, `projects.sales_stage=approved`, evento `quotation_client_approved`; **sin traspaso automático** |
 | **Traspasar cotización aprobada** | Última versión `approved`, proyecto Desarrollo **No iniciado**, sin equipos, módulos, ejecución, pagos reales, ni baseline previo | Una transacción crea equipos/HH, fases, nuevo plan de hitos desde la cotización, contrato y evento `quotation_transferred` |
 
 **Marcar como enviada es un registro de envío externo; NO manda correos.** La UI advierte y pide confirmación de que el envío ocurrió.
@@ -99,6 +111,7 @@ git status --short
 3. Mapear roles, guardar, aceptar IA; comprobar evento `ai_proposal_accepted` y ausencia de cambios en `projects.sold_hours`, `project_teams`, `project_modules` y `project_payment_milestones`.
 4. Configurar valor HH y plan de pagos 100 %, guardar, marcar Enviada; confirmar bloqueo de edición y que no se envió ningún correo.
 5. Registrar aprobación; comprobar que queda traspaso pendiente sin modificar aún equipos/HH del proyecto.
+   - También aprobar directamente un **borrador** con confirmación: debe registrar `wasSent=false`; cancelar la advertencia o llamar al endpoint sin `confirmWithoutSend: true` debe impedirlo.
 6. Traspasar solo en proyecto nuevo y sin historial. Comprobar en una transacción equipos/HH, fases, contrato y plan de pagos. Repetir solicitud: debe rechazar duplicados.
 7. Crear nueva versión de proyecto aprobado activo; editar y aprobar nueva versión, y comprobar que la versión histórica conserva su condición anterior. No permitir transferir automáticamente sobre datos históricos.
 8. Modificar HH después de aceptar IA: debe invalidar la aceptación y bloquear envío si el desglose EDT no concuerda.
