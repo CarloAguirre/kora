@@ -136,6 +136,34 @@ export const updateQuotationDraftSchema = z.object({
   draft: quotationDraftDataSchema,
 });
 export type UpdateQuotationDraftInput = z.infer<typeof updateQuotationDraftSchema>;
+/** Transiciones comerciales explícitas; ninguna modificación de borrador equivale
+ * a aprobación de cliente, ni aceptar IA modifica el proyecto operativo. */
+export const quotationRevisionActionSchema = z.object({
+  revision: z.number().int().positive(),
+});
+export type QuotationRevisionActionInput = z.infer<typeof quotationRevisionActionSchema>;
+
+export const approveClientQuotationSchema = quotationRevisionActionSchema.extend({
+  confirmation: z.literal('CLIENTE_APROBO_ESTA_VERSION'),
+});
+export type ApproveClientQuotationInput = z.infer<typeof approveClientQuotationSchema>;
+
+export const transferApprovedQuotationSchema = quotationRevisionActionSchema.extend({
+  confirmation: z.literal('TRASPASAR_COTIZACION_APROBADA'),
+});
+export type TransferApprovedQuotationInput = z.infer<typeof transferApprovedQuotationSchema>;
+
+export const quotationTransferResultSchema = z.object({
+  projectId: uuidSchema,
+  versionId: uuidSchema,
+  transferredAt: isoDateTimeSchema,
+  projectHours: z.number().nonnegative(),
+  teamCount: z.number().int().nonnegative(),
+  moduleCount: z.number().int().nonnegative(),
+  paymentMilestoneCount: z.number().int().nonnegative(),
+});
+export type QuotationTransferResult = z.infer<typeof quotationTransferResultSchema>;
+
 
 export const quotationVersionSchema = z.object({
   id: uuidSchema,

@@ -1,4 +1,4 @@
-import type { CreateQuotationVersionInput, EstimationPocProposal, SubmitEstimationAnswerInput, EstimationQuestion, QuotationReferenceEdt, AppliedQuotationPlanning, ApplyQuotationPlanningInput, ProjectQuotation, QuotationVersion, UpdateQuotationDraftInput, QuotationOperationalSnapshot, QuotationReconciliationReview, SavedQuotationReconciliationReview, AssessQuotationReconciliationInput, SavedQuotationReviewAssessment, QuotationTeamCatalogEntry } from '@kora/contracts';
+import type { CreateQuotationVersionInput, EstimationPocProposal, SubmitEstimationAnswerInput, EstimationQuestion, QuotationReferenceEdt, AppliedQuotationPlanning, ApplyQuotationPlanningInput, QuotationRevisionActionInput, ApproveClientQuotationInput, TransferApprovedQuotationInput, QuotationTransferResult, ProjectQuotation, QuotationVersion, UpdateQuotationDraftInput, QuotationOperationalSnapshot, QuotationReconciliationReview, SavedQuotationReconciliationReview, AssessQuotationReconciliationInput, SavedQuotationReviewAssessment, QuotationTeamCatalogEntry } from '@kora/contracts';
 
 export const QUOTATION_REPOSITORY = Symbol('QUOTATION_REPOSITORY');
 
@@ -31,6 +31,14 @@ export interface QuotationRepository {
     dynamicQuestions: readonly EstimationQuestion[], edt: QuotationReferenceEdt,
     confirmedUnderstanding?: string): Promise<QuotationVersion>;
   updateDraft(projectId: string, versionId: string, userId: string, input: UpdateQuotationDraftInput): Promise<QuotationVersion | null>;
+  acceptAiProposal(projectId: string, versionId: string, userId: string,
+    input: QuotationRevisionActionInput): Promise<QuotationVersion>;
+  markSent(projectId: string, versionId: string, userId: string,
+    input: QuotationRevisionActionInput): Promise<QuotationVersion>;
+  approveClient(projectId: string, versionId: string, userId: string,
+    input: ApproveClientQuotationInput): Promise<QuotationVersion>;
+  transferApproved(projectId: string, versionId: string, userId: string,
+    input: TransferApprovedQuotationInput): Promise<QuotationTransferResult>;
   getAppliedPlanningBaseline(projectId: string): Promise<AppliedQuotationPlanning | null>;
   applyPlanningBaseline(projectId: string, versionId: string, actorId: string,
     input: ApplyQuotationPlanningInput): Promise<AppliedQuotationPlanning>;
