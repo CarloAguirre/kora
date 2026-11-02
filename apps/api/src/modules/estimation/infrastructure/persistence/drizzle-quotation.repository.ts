@@ -16,6 +16,10 @@ import {
   type EstimationQuestion,
   type QuotationReferenceEdt,
   type ApplyQuotationPlanningInput,
+  type QuotationRevisionActionInput,
+  type ApproveClientQuotationInput,
+  type TransferApprovedQuotationInput,
+  type QuotationTransferResult,
   type AppliedQuotationPlanning,
   type SubmitEstimationAnswerInput,
   type ProjectQuotation,
@@ -32,6 +36,7 @@ import {
 import { DATABASE } from '../../../../shared/infrastructure/database/database.module';
 import { calculateQuotation } from '../../domain/quotation-math';
 import { hasOnlyUntouchedDefaultPaymentMilestones } from '../../domain/default-payment-plan-eligibility';
+import { assertQuotationReadyForClient, assertAiProposalReadyToAccept } from '../../domain/quotation-commercial-eligibility';
 import type { QuotationProjectScope, QuotationRepository } from '../../domain/repositories/quotation.repository';
 
 @Injectable()
@@ -151,7 +156,15 @@ export class DrizzleQuotationRepository implements QuotationRepository {
     if (!quotation) return null;
     const rows = await this.db.select().from(quotationVersions)
       .where(eq(quotationVersions.quotationId, quotation.id)).orderBy(asc(quotationVersions.versionNumber));
-    return { ...quotation, versions: rows.map(toVersion) };
+    const ids = rows.map((row) => row.id);
+    const [transfer] = ids.length ? await this.db.select({
+      versionId: quotationEvents.versionId,
+    }).from(quotationEvents).where(and(
+      inArray(quotationEvents.versionId, ids),
+      eq(quotationEvents.action, 'quotation_transferred'),
+    )).orderBy(desc(quotationEvents.occurredAt)).limit(1) : [];
+    return { ...quotation, versions: rows.map(toVersion),
+      transferredVersionId: transfer?.versionId ?? null };
   }
 
   /** Sólo consulta de actas inmutables relacionadas con ESTA cotización. */
@@ -631,6 +644,117 @@ export class DrizzleQuotationRepository implements QuotationRepository {
           totalHours: module.totalHours, tasks: module.tasks,
         })),
       });
+    });
+  }
+
+  /** Aceptación IA: nunca modifica project_teams, proyectos ni Roadmap. */
+  async acceptAiProposal(projectId: string, versionId: string, userId: string,
+    input: QuotationRevisionActionInput): Promise<QuotationVersion> {
+    return this.db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT id FROM quotation_versions WHERE id = ${versionId} FOR UPDATE`);
+      const [qv] = await tx.select().from(quotationVersions)
+        .innerJoin(projectQuotations, eq(quotationVersions.quotationId, projectQuotations.id))
+        .where(and(eq(quotationVersions.id, versionId),
+          eq(projectQuotations.projectId, projectId))).limit(1);
+      const current = qv?.quotation_versions;
+      if (!current) throw new NotFoundException('Versión no encontrada.');
+      if (current.status !== 'draft' || current.revision !== input.revision) {
+        throw new ConflictException('Revisión obsoleta o versión bloqueada.');
+      }
+      const version = toVersion(current);
+      assertAiProposalReadyToAccept(version);
+      const [updated] = await tx.update(quotationVersions).set({
+        aiReviewStatus: 'accepted', revision: sql`${quotationVersions.revision} + 1`,
+        editedByUserId: userId, updatedAt: new Date(),
+      }).where(eq(quotationVersions.id, versionId)).returning();
+      await tx.insert(quotationEvents).values({
+        versionId, actorUserId: userId, action: 'ai_proposal_accepted',
+        metadata: { previousRevision: input.revision, newRevision: input.revision + 1 },
+      });
+      return toVersion(updated!);
+    });
+  }
+
+  async markSent(projectId: string, versionId: string, userId: string,
+    input: QuotationRevisionActionInput): Promise<QuotationVersion> {
+    return this.db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT id FROM quotation_versions WHERE id = ${versionId} FOR UPDATE`);
+      const [qv] = await tx.select().from(quotationVersions)
+        .innerJoin(projectQuotations, eq(quotationVersions.quotationId, projectQuotations.id))
+        .where(and(eq(quotationVersions.id, versionId),
+          eq(projectQuotations.projectId, projectId))).limit(1);
+      const current = qv?.quotation_versions;
+      if (!current) throw new NotFoundException('Versión no encontrada.');
+      if (current.status !== 'draft' || current.revision !== input.revision) {
+        throw new ConflictException('Solo se envían borradores en la revisión vigente.');
+      }
+      assertQuotationReadyForClient(toVersion(current));
+      const [updated] = await tx.update(quotationVersions).set({
+        status: 'sent', sentAt: new Date(), updatedAt: new Date(),
+        editedByUserId: userId,
+        revision: sql`${quotationVersions.revision} + 1`,
+      }).where(eq(quotationVersions.id, versionId)).returning();
+      await tx.insert(quotationEvents).values({
+        versionId, actorUserId: userId, action: 'quotation_marked_sent',
+        metadata: { previousRevision: input.revision, newRevision: input.revision + 1,
+          note: 'Registro manual; no envía correo electrónico' },
+      });
+      return toVersion(updated!);
+    });
+  }
+
+  async approveClient(projectId: string, versionId: string, userId: string,
+    input: ApproveClientQuotationInput): Promise<QuotationVersion> {
+    return this.db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT id FROM projects WHERE id = ${projectId} FOR UPDATE`);
+      const [project] = await tx.select({ id: projects.id, type: projects.type,
+        status: projects.status }).from(projects).where(and(
+        eq(projects.id, projectId), isNull(projects.deletedAt),
+      )).limit(1);
+      if (!project || project.type !== 'development') throw new NotFoundException('Proyecto no disponible.');
+      if (!['draft', 'active'].includes(project.status)) throw new ConflictException(
+        'No se aprueba una cotización de proyecto detenido o finalizado.',
+      );
+      const [quotation] = await tx.select({ id: projectQuotations.id })
+        .from(projectQuotations).where(eq(projectQuotations.projectId, projectId)).limit(1);
+      if (!quotation) throw new NotFoundException('Cotización no encontrada.');
+      await tx.execute(sql`SELECT id FROM project_quotations WHERE id = ${quotation.id} FOR UPDATE`);
+      const [current] = await tx.select().from(quotationVersions).where(and(
+        eq(quotationVersions.id, versionId),
+        eq(quotationVersions.quotationId, quotation.id),
+      )).limit(1);
+      if (!current) throw new NotFoundException('Versión no encontrada.');
+      if (!['draft', 'sent'].includes(current.status) ||
+          current.revision !== input.revision) throw new ConflictException(
+        'La versión cambió o ya estaba aprobada.',
+      );
+      assertQuotationReadyForClient(toVersion(current));
+      const previous = await tx.select({ id: quotationVersions.id }).from(quotationVersions)
+        .where(and(eq(quotationVersions.quotationId, quotation.id),
+          eq(quotationVersions.status, 'approved')));
+      for (const item of previous) {
+        await tx.update(quotationVersions).set({
+          status: 'sent', updatedAt: new Date(),
+        }).where(eq(quotationVersions.id, item.id));
+        await tx.insert(quotationEvents).values({
+          versionId: item.id, actorUserId: userId,
+          action: 'quotation_approval_superseded', metadata: { replacedBy: versionId },
+        });
+      }
+      const [updated] = await tx.update(quotationVersions).set({
+        status: 'approved', approvedAt: new Date(), updatedAt: new Date(),
+        editedByUserId: userId,
+        revision: sql`${quotationVersions.revision} + 1`,
+      }).where(eq(quotationVersions.id, versionId)).returning();
+      await tx.update(projects).set({ salesStage: 'approved',
+        updatedAt: new Date() }).where(eq(projects.id, projectId));
+      await tx.insert(quotationEvents).values({
+        versionId, actorUserId: userId, action: 'quotation_client_approved',
+        metadata: { wasSent: current.status === 'sent',
+          previousRevision: input.revision, newRevision: input.revision + 1,
+          transferStatus: 'pending' },
+      });
+      return toVersion(updated!);
     });
   }
 
