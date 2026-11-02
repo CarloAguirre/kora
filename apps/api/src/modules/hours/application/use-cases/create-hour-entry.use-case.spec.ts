@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { CreateHourEntryInput, ProjectStatus, RoleCode } from '@kora/contracts';
+import type { CreateHourEntryInput, ProjectStatus, RoleCode, UserStatus } from '@kora/contracts';
 import { CreateHourEntryUseCase } from './create-hour-entry.use-case';
 import type { HourEntryRepository } from '../../domain/repositories/hour-entry.repository';
 import type { HourEntryProjectReader } from '../ports/hour-entry-project-reader.port';
@@ -20,14 +20,14 @@ const INPUT = {
   hasBlocker: false,
 } as CreateHourEntryInput;
 
-function buildUseCase(projectStatus: ProjectStatus, regularHoursForDate = 0, ownerRole: RoleCode = 'collaborator') {
+function buildUseCase(projectStatus: ProjectStatus, regularHoursForDate = 0, ownerRole: RoleCode = 'collaborator', ownerStatus: UserStatus = 'active') {
   const entries = {
     save: vi.fn().mockResolvedValue(undefined),
     sumApprovedHoursForProject: vi.fn().mockResolvedValue(0),
     sumRegularHoursForUserAndDate: vi.fn().mockResolvedValue(regularHoursForDate),
   } as unknown as HourEntryRepository;
   const users = {
-    findById: vi.fn().mockResolvedValue({ id: 'collab-1', role: ownerRole, status: 'active' }),
+    findById: vi.fn().mockResolvedValue({ id: 'collab-1', role: ownerRole, status: ownerStatus }),
   } as unknown as HourEntryUserReader;
   const projects = {
     findById: vi.fn().mockResolvedValue({
@@ -59,6 +59,20 @@ describe('CreateHourEntryUseCase', () => {
 
     expect(result.isErr()).toBe(true);
     expect(result.isErr() && result.error.code).toBe('HOUR_ENTRY_PROJECT_CLOSED');
+    expect(entries.save).not.toHaveBeenCalled();
+  });
+
+  it('rechaza nuevas horas para un usuario deshabilitado, aun cuando las registre un administrador', async () => {
+    const { useCase, entries } = buildUseCase('active', 0, 'collaborator', 'disabled');
+
+    const result = await useCase.execute({
+      data: { ...INPUT, userId: 'collab-1' },
+      actor: { userId: 'admin-1', email: 'admin@kabeli.cl' },
+      actorRole: 'admin',
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result.isErr() && result.error.code).toBe('HOUR_ENTRY_OWNER_DISABLED');
     expect(entries.save).not.toHaveBeenCalled();
   });
 
