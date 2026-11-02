@@ -17,12 +17,17 @@ export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
   const versions = [...(data?.versions ?? [])].sort((a, b) => b.versionNumber - a.versionNumber);
   const eligible = isQuotationDraftEligibleProject(project);
   const transferredVersion = versions.find((version) => version.id === data?.transferredVersionId);
-  const registerApproval = async (versionId: string, revision: number) => {
+  const registerApproval = async (versionId: string, revision: number, withoutSend: boolean) => {
     setActionError(''); setActionNotice('');
-    if (!window.confirm('¿Confirmas que el cliente aprobó expresamente esta versión? ' +
+    if (!window.confirm((withoutSend
+      ? 'ATENCIÓN: no existe registro de envío comercial de este borrador. ' +
+        'Debes confirmar que el cliente lo aprobó explícitamente. '
+      : '') +
+      '¿Confirmas que el cliente aprobó expresamente esta versión? ' +
       'Las HH del proyecto NO se modificarán hasta el traspaso.')) return;
     try {
-      await lifecycle.approveClient.mutateAsync({ versionId, revision });
+      await lifecycle.approveClient.mutateAsync({ versionId, revision,
+        ...(withoutSend ? { confirmWithoutSend: true as const } : {}) });
       setActionNotice('Aprobación registrada · traspaso pendiente.');
     } catch (e) {
       setActionError(e instanceof Error ? e.message : 'No fue posible registrar la aprobación.');
@@ -84,10 +89,11 @@ export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
                         <Link to={projectQuotationPath(project) + '?version=' + v.id}>
                           Abrir en calculadora
                         </Link>
-                        {eligible && v.status === 'sent' && versions[0]?.id === v.id &&
+                        {eligible && (v.status === 'sent' || v.status === 'draft') &&
+                          versions[0]?.id === v.id &&
                           <Button size="sm" variant="ghost"
                             disabled={lifecycle.approveClient.isPending}
-                            onClick={() => void registerApproval(v.id, v.revision)}>
+                            onClick={() => void registerApproval(v.id, v.revision, v.status === 'draft')}>
                             Registrar aprobación
                           </Button>}
                         {eligible && v.status === 'approved' && versions[0]?.id === v.id &&

@@ -93,10 +93,25 @@ describe('Ciclo comercial separado · Kora', () => {
     expect(screen.getByText(/La versión aprobada permanece registrada/)).toBeInTheDocument();
   });
 
-  it('no permite aprobar directamente un borrador sin envío comercial', () => {
+  it('permite aprobar un borrador sin envío solo con advertencia y confirmación reforzada', async () => {
     show({ ...version, aiReviewStatus: 'accepted' });
     expect(screen.getByRole('button', { name: 'Marcar como enviada' })).toBeEnabled();
-    expect(screen.queryByRole('button', { name: 'Registrar aprobación' })).not.toBeInTheDocument();
+    expect(screen.getByText(/No hay envío comercial registrado/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar aprobación' }));
+    await waitFor(() => expect(mocks.approveClient).toHaveBeenCalledWith({
+      versionId: version.id, revision: 3, confirmWithoutSend: true,
+    }));
+    expect(window.confirm).toHaveBeenCalledWith(
+      expect.stringContaining('no hay un envío al cliente registrado'),
+    );
+    expect(mocks.transferApproved).not.toHaveBeenCalled();
+  });
+
+  it('si se cancela la advertencia del borrador, no registra aprobación', () => {
+    vi.mocked(window.confirm).mockReturnValueOnce(false);
+    show({ ...version, aiReviewStatus: 'accepted' });
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar aprobación' }));
+    expect(mocks.approveClient).not.toHaveBeenCalled();
   });
 
   it('no permite acciones comerciales con cambios sin guardar', () => {

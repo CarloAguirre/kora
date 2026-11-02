@@ -140,10 +140,12 @@ export function useQuotationLifecycle(projectId: string) {
     onSuccess: refresh,
   });
   const approveClient = useMutation({
-    mutationFn: ({ versionId, revision }: { versionId: string; revision: number }) =>
-      quotationApi.approveClient(projectId, versionId, {
-        revision, confirmation: 'CLIENTE_APROBO_ESTA_VERSION',
-      }),
+    mutationFn: ({ versionId, revision, confirmWithoutSend }: {
+      versionId: string; revision: number; confirmWithoutSend?: true;
+    }) => quotationApi.approveClient(projectId, versionId, {
+      revision, confirmation: 'CLIENTE_APROBO_ESTA_VERSION',
+      ...(confirmWithoutSend ? { confirmWithoutSend: true as const } : {}),
+    }),
     onSuccess: refresh,
   });
   const transferApproved = useMutation({

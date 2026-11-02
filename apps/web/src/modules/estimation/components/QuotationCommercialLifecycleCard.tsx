@@ -67,7 +67,12 @@ export function QuotationCommercialLifecycleCard({
   const approveClient = async () => {
     setError(''); setNotice('');
     const initialTransfer = project.status === 'draft' && transferTiming === 'now';
+    const withoutSend = version.status === 'draft';
     if (!window.confirm(
+      (withoutSend
+        ? 'ATENCIÓN: esta versión está en BORRADOR y no hay un envío al cliente registrado. ' +
+          'Debes haber recibido la aprobación explícita del cliente pese a ello. '
+        : '') +
       'Confirma que el CLIENTE APROBÓ expresamente esta versión. ' +
       (demo ? 'ATENCIÓN: contiene evidencia KDM de demostración, ajena al proyecto. ' : '') +
       (initialTransfer
@@ -77,6 +82,7 @@ export function QuotationCommercialLifecycleCard({
     try {
       const approved = await actions.approveClient.mutateAsync({
         versionId: version.id, revision: version.revision,
+        ...(withoutSend ? { confirmWithoutSend: true as const } : {}),
       });
       if (!initialTransfer) {
         setNotice('Aprobación del cliente registrada. Traspaso pendiente.');
@@ -143,10 +149,14 @@ export function QuotationCommercialLifecycleCard({
             onClick={() => void markSent()}>Marcar como enviada</Button>
         </div>
       )}
-      {version.status === 'sent' && (
+      {(version.status === 'sent' || version.status === 'draft') && (
         <div className={styles.approval}>
           <div><strong>3. Registrar aprobación del cliente</strong>
-            <p>Requiere valor HH, plan de pago 100 % y aceptación IA si aplica.</p></div>
+            <p>Requiere valor HH, plan de pago 100 % y aceptación IA si aplica.</p>
+            {version.status === 'draft' && <p className={styles.warning}>
+              No hay envío comercial registrado. Se solicitará confirmación explícita del
+              cliente antes de aprobar directamente el borrador.
+            </p>}</div>
           <Select label="Tipo de traspaso" value={transferTiming}
             onChange={(event) => setTransferTiming(event.target.value as 'now' | 'later')}
             options={[
