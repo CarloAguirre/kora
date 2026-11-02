@@ -1,7 +1,7 @@
 import { BadRequestException, Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post } from '@nestjs/common';
 import {
-  generateEstimationPocSchema, createQuotationVersionSchema, updateQuotationDraftSchema, quotationReconciliationReviewSchema, assessQuotationReconciliationSchema,
-  type GenerateEstimationPocInput, type CreateQuotationVersionInput, type ProjectQuotation, type QuotationVersion, type UpdateQuotationDraftInput, type QuotationTransferPreview, type QuotationCommercialPreflight, type QuotationCommercialDossier, type QuotationReconciliationReview, type SavedQuotationReconciliationReview, type AssessQuotationReconciliationInput, type SavedQuotationReviewAssessment,
+  generateAiDemoQuotationSchema, createQuotationVersionSchema, updateQuotationDraftSchema, quotationReconciliationReviewSchema, assessQuotationReconciliationSchema,
+  type GenerateAiDemoQuotationInput, type CreateQuotationVersionInput, type ProjectQuotation, type QuotationVersion, type UpdateQuotationDraftInput, type QuotationTransferPreview, type QuotationCommercialPreflight, type QuotationCommercialDossier, type QuotationReconciliationReview, type SavedQuotationReconciliationReview, type AssessQuotationReconciliationInput, type SavedQuotationReviewAssessment,
 } from '@kora/contracts';
 import { CurrentUser, type RequestUser } from '../../../shared/presentation/decorators/current-user.decorator';
 import { RequireAnyPermission } from '../../../shared/presentation/decorators/require-permissions.decorator';
@@ -9,7 +9,7 @@ import { ZodValidationPipe } from '../../../shared/presentation/pipes/zod-valida
 import { ManageQuotationDraftsUseCase } from '../application/use-cases/manage-quotation-drafts.use-case';
 import { GenerateEstimationPocProposalUseCase } from '../application/use-cases/generate-estimation-poc-proposal.use-case';
 import { GetEstimationQuestionnaireDefinitionUseCase } from '../application/use-cases/get-estimation-questionnaire-definition.use-case';
-import { validateFixedQuestionnaireAnswers } from '../application/validate-estimation-questionnaire';
+import { validateQuestionnaireAnswers } from '../application/validate-estimation-questionnaire';
 
 /**
  * API comercial separada de /poc/*. Gestiona borradores y actas append-only
@@ -110,14 +110,22 @@ export class QuotationController {
   @RequireAnyPermission('projects:manage')
   async createAiPoc(
     @Param('projectId', ParseUUIDPipe) projectId: string,
-    @Body(new ZodValidationPipe(generateEstimationPocSchema)) input: GenerateEstimationPocInput,
+    @Body(new ZodValidationPipe(generateAiDemoQuotationSchema)) input: GenerateAiDemoQuotationInput,
     @CurrentUser() actor: RequestUser,
   ): Promise<QuotationVersion> {
     if (input.projectId !== projectId ||
         input.driveFolderUrl !== 'https://drive.google.com/drive/folders/kora-poc-fallback') {
       throw new BadRequestException('La simulación documental solo admite la fuente KDM explícita.');
     }
-    validateFixedQuestionnaireAnswers(this.questionnaire.execute(), input.answers);
+    if (input.dynamicQuestions.some((question) =>
+      question.kind !== 'dynamic' || question.sourceRefs.length === 0 ||
+      question.sourceRefs.some((ref) => ref.sourceId !== 'kora-poc-requerimiento-kdm')
+    )) {
+      throw new BadRequestException('Las preguntas dinámicas deben acreditar la fuente KDM.');
+    }
+    validateQuestionnaireAnswers(
+      this.questionnaire.execute(), input.answers, input.dynamicQuestions,
+    );
     await this.drafts.authorizeAiPoc(projectId, actor);
     const proposal = await this.generator.execute(input);
     if (proposal.provider !== 'gemini' || proposal.sourceMode !== 'poc_simulated' ||
@@ -126,7 +134,7 @@ export class QuotationController {
         'No se generó una propuesta válida con Gemini y el PDF KDM de demostración.',
       );
     }
-    return this.drafts.createAiPocDraft(projectId, actor, proposal, input.answers);
+    return this.drafts.createAiPocDraft(projectId, actor, proposal, input.answers, input.dynamicQuestions);
   }
 
   @Post('versions')

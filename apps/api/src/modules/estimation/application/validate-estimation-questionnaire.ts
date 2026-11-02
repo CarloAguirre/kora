@@ -12,10 +12,32 @@ export function validateFixedQuestionnaireAnswers(
   definition: EstimationQuestionnaireDefinition,
   answers: readonly SubmitEstimationAnswerInput[],
 ): void {
-  const fixed = new Map(definition.fixedQuestions.map((question) => [question.id, question]));
+  validateQuestionnaireAnswers(definition, answers, []);
+}
+
+/** R4-b: valida en el servidor el cuestionario F01–F05 junto con las
+ * preguntas dinámicas provenientes del análisis KDM. El borrador permanece
+ * pendiente y no puede enviarse comercialmente. */
+export function validateQuestionnaireAnswers(
+  definition: EstimationQuestionnaireDefinition,
+  answers: readonly SubmitEstimationAnswerInput[],
+  dynamicQuestions: readonly EstimationQuestion[],
+): void {
+  if (dynamicQuestions.length > definition.maxDynamicFirstRound) {
+    throw new BadRequestException('Se superó el máximo de preguntas dinámicas.');
+  }
+  const questions = new Map(definition.fixedQuestions.map((question) => [question.id, question]));
+  for (const question of dynamicQuestions) {
+    if (question.kind !== 'dynamic' || !/^D0[1-5]$/.test(question.id) ||
+        questions.has(question.id) || !question.reason?.trim() ||
+        question.sourceRefs.length === 0) {
+      throw new BadRequestException('Pregunta dinámica inválida o sin origen documental.');
+    }
+    questions.set(question.id, question);
+  }
   const seen = new Set<string>();
   for (const answer of answers) {
-    const question = fixed.get(answer.questionId);
+    const question = questions.get(answer.questionId);
     if (!question) throw new BadRequestException(
       'Pregunta desconocida o dinámica sin análisis documental: ' + answer.questionId,
     );
@@ -33,7 +55,7 @@ export function validateFixedQuestionnaireAnswers(
       throw new BadRequestException('Respuesta inválida para ' + question.id + '.');
     }
   }
-  for (const question of definition.fixedQuestions) {
+  for (const question of questions.values()) {
     if (question.required && !seen.has(question.id)) {
       throw new BadRequestException('Falta responder la pregunta obligatoria ' + question.id + '.');
     }

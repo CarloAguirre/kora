@@ -274,6 +274,13 @@ export const generateEstimationPocSchema = analyzeEstimationPocSchema.extend({
   answers: z.array(submitEstimationAnswerSchema).default([]),
 });
 export type GenerateEstimationPocInput = z.infer<typeof generateEstimationPocSchema>;
+/** Generación y guardado de cotización desde la fuente documental KDM.
+ * Las preguntas dinámicas se devuelven en el análisis preliminar Gemini. */
+export const generateAiDemoQuotationSchema = generateEstimationPocSchema.extend({
+  dynamicQuestions: z.array(estimationQuestionSchema).max(5).default([]),
+});
+export type GenerateAiDemoQuotationInput = z.infer<typeof generateAiDemoQuotationSchema>;
+
 
 export const estimationPocRoleDraftSchema = z.object({
   role: nonEmptyTrimmed(120, 'El rol'),

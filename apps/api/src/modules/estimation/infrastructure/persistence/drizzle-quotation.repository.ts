@@ -11,6 +11,7 @@ import {
   savedQuotationReviewAssessmentSchema,
   type CreateQuotationVersionInput,
   type EstimationPocProposal,
+  type EstimationQuestion,
   type SubmitEstimationAnswerInput,
   type ProjectQuotation,
   type QuotationDraftData,
@@ -288,19 +289,21 @@ export class DrizzleQuotationRepository implements QuotationRepository {
   }
 
   async createAiPocDraft(projectId: string, userId: string, proposal: EstimationPocProposal,
-    answers: readonly SubmitEstimationAnswerInput[]): Promise<QuotationVersion> {
+    answers: readonly SubmitEstimationAnswerInput[],
+    dynamicQuestions: readonly EstimationQuestion[]): Promise<QuotationVersion> {
     if (proposal.projectId !== projectId || proposal.provider !== 'gemini' ||
         proposal.sourceMode !== 'poc_simulated' || proposal.documentsAnalyzed < 1 ||
         proposal.totalHours <= 0 || proposal.roles.some((role) => role.totalHours <= 0) ||
         Math.abs(proposal.roles.reduce((total, role) => total + role.totalHours, 0) - proposal.totalHours) > 0.011) {
       throw new BadRequestException('Propuesta Gemini KDM inválida o sin trazabilidad documental.');
     }
-    return this.createVersionInternal(projectId, userId, {}, { proposal, answers });
+    return this.createVersionInternal(projectId, userId, {}, { proposal, answers, dynamicQuestions });
   }
 
   private async createVersionInternal(
     projectId: string, userId: string, input: CreateQuotationVersionInput,
-    aiPoc?: { proposal: EstimationPocProposal; answers: readonly SubmitEstimationAnswerInput[] },
+    aiPoc?: { proposal: EstimationPocProposal; answers: readonly SubmitEstimationAnswerInput[];
+      dynamicQuestions: readonly EstimationQuestion[] },
   ): Promise<QuotationVersion> {
     return this.db.transaction(async (tx) => {
       await tx.insert(projectQuotations).values({ projectId, createdByUserId: userId }).onConflictDoNothing();
@@ -334,7 +337,7 @@ export class DrizzleQuotationRepository implements QuotationRepository {
           ])),
           aiPoc: quotationAiPocSnapshotSchema.parse({
             source: 'kdm_demo', proposal: aiPoc.proposal,
-            answers: aiPoc.answers, roleTeamIds: {},
+            answers: aiPoc.answers, dynamicQuestions: aiPoc.dynamicQuestions, roleTeamIds: {},
           }),
         });
         origin = 'ai';

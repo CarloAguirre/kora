@@ -113,6 +113,7 @@ export function validatePocDraftIntegrity(
   if (!next.aiPoc ||
       !sameJson(previous.aiPoc.proposal, next.aiPoc.proposal) ||
       !sameJson(previous.aiPoc.answers, next.aiPoc.answers) ||
+      !sameJson(previous.aiPoc.dynamicQuestions, next.aiPoc.dynamicQuestions) ||
       !sameJson(previous.sourceRefs, next.sourceRefs) ||
       !sameJson(previous.answers, next.answers) ||
       previous.aiPoc.source !== next.aiPoc.source) {
