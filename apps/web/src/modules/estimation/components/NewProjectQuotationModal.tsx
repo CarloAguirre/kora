@@ -10,6 +10,7 @@ import { Select } from '@/shared/components/ui/Select';
 import { useCreateQuotationVersion, useProjectQuotation } from '../api/quotation.queries';
 import { DEMO_KDM_FOLDER_URL } from '../lib/demo-source';
 import styles from './NewProjectQuotationModal.module.css';
+import estimationStyles from './NewEstimationModal.module.css';
 
 type Mode = 'ai' | 'blank' | 'copy';
 
@@ -71,8 +72,9 @@ export function NewProjectQuotationModal({ project, versions, onClose }: {
         <Button variant="outline" onClick={onClose} disabled={create.isPending}>Cancelar</Button>
         <Button loading={create.isPending} onClick={() => void submit()}>Continuar</Button>
       </>}>
-      <fieldset className={styles.choices}>
+      <fieldset className={estimationStyles.fieldset}>
         <legend>Partir desde</legend>
+        <div className={estimationStyles.options}>
         {([
           ['ai', '✦ Con el agente IA',
             'Gemini analiza el documento KDM de ejemplo. Preguntas y HH reales; fuente Drive simulada.'],
@@ -81,12 +83,15 @@ export function NewProjectQuotationModal({ project, versions, onClose }: {
           ['copy', 'Copiar otra cotización',
             'Copia datos comerciales de una versión existente sin modificar su proyecto.'],
         ] as const).filter(([value]) => value !== 'ai' || can('projects:manage')).map(([value, title, description]) => (
-          <label key={value} className={mode === value ? styles.active : styles.choice}>
+          <label key={value}
+            className={[estimationStyles.option,
+              mode === value ? estimationStyles.optionSelected : ''].filter(Boolean).join(' ')}>
             <input type="radio" name="new-quotation-mode" value={value}
               checked={mode === value} onChange={() => { setMode(value); setError(''); }} />
             <span><strong>{title}</strong><small>{description}</small></span>
           </label>
         ))}
+        </div>
       </fieldset>
 
       {mode === 'ai' && <p className={styles.demo}>
