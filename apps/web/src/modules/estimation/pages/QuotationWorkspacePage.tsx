@@ -15,6 +15,7 @@ import { AnalysisEvidenceCard } from '../components/AnalysisEvidenceCard';
 import { QuotationVersionComparison } from '../components/QuotationVersionComparison';
 import { QuotationTransferPreviewCard } from '../components/QuotationTransferPreviewCard';
 import { QuotationCommercialPreflightCard } from '../components/QuotationCommercialPreflightCard';
+import { AiPocRoleMappingCard } from '../components/AiPocRoleMappingCard';
 import styles from './QuotationWorkspacePage.module.css';
 
 type Form = Pick<UpdateQuotationDraftInput, 'name' | 'hourlyRate' | 'currency' | 'tax' | 'draft'>;
@@ -90,7 +91,7 @@ export function QuotationWorkspacePage() {
         ...patch,
         // El artefacto conserva el cálculo original; editar el presupuesto
         // requiere conciliarlo antes de usarlo para producir documentos.
-        ...(current.draft.analysis && Object.keys(patch).some(
+        ...((current.draft.analysis || current.draft.aiPoc) && Object.keys(patch).some(
           (field) => ['teams', 'phases', 'costs', 'paymentPlan', 'assumptions', 'exclusions'].includes(field),
         ) ? { analysisProjectionStatus: 'modified' as const } : {}),
       },
@@ -277,6 +278,20 @@ export function QuotationWorkspacePage() {
                     </div>}
               </Card>
 
+
+              {selected?.draft.aiPoc && form && (
+                <AiPocRoleMappingCard
+                  key={selected.id + ':' + selected.revision}
+                  version={selected}
+                  teams={activeTeams}
+                  canEdit={editable}
+                  hasUnsavedChanges={dirty}
+                  onApply={(draft) => {
+                    change((current) => ({ ...current, draft }));
+                    setNotice('Proyección de HH aplicada. Guarda el borrador para persistir la distribución.');
+                  }}
+                />
+              )}
 
               {versions.length > 1 && (
                 <QuotationVersionComparison versions={versions} teamNames={teamById} />
