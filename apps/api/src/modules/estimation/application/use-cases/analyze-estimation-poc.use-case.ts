@@ -131,7 +131,7 @@ export class AnalyzeEstimationPocUseCase {
         questionId?: string; value?: string; sourceId?: string;
       };
       const id = candidate.questionId;
-      const value = candidate.value?.trim();
+      const value = typeof candidate.value === 'string' ? candidate.value.trim() : null;
       const sourceId = candidate.sourceId;
       if (!id || !value || !sourceId || !allowedSources.has(sourceId) ||
           seenFixed.has(id)) continue;
@@ -183,6 +183,12 @@ export class AnalyzeEstimationPocUseCase {
         ...candidate,
         id: 'D' + String(index + 1).padStart(2, '0'),
         kind: 'dynamic',
+        // Cuando Gemini no propone un escenario concreto, solo es posible
+        // declarar el dato como pendiente; nunca inventar una decisión comercial.
+        assumptionIfSkipped: typeof candidate.assumptionIfSkipped === 'string' &&
+          candidate.assumptionIfSkipped.trim()
+          ? candidate.assumptionIfSkipped.trim().slice(0, 1500)
+          : 'Pendiente de confirmar con el cliente; puede cambiar el alcance y las HH.',
         dependsOn: [],
       };
     });

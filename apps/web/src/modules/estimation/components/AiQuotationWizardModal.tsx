@@ -424,6 +424,9 @@ export function AiQuotationWizardModal({ project, onClose }: {
               .map((question) => <li key={question.id}>{question.assumptionIfSkipped}</li>)}</ul>
               : <p>No se han adoptado supuestos por respuestas omitidas.</p>}
             <h4>Pendientes</h4>
+            {assumptions.length > 0 &&
+              <ul>{dynamic.filter((question) => assumptions.includes(question.id))
+                .map((question) => <li key={question.id}>Confirmar: {question.question}</li>)}</ul>}
             <p>Validar con el cliente los resultados de esta estimación basada en KDM,
               antes de utilizarla en un proyecto real.</p>
           </div>
