@@ -314,100 +314,6 @@ export function QuotationWorkspacePage() {
               </Card>
 
 
-              {selected?.draft.aiPoc && form && (
-                <AiPocRoleMappingCard
-                  key={selected.id + ':' + selected.revision}
-                  version={selected}
-                  teams={activeTeams}
-                  canEdit={editable}
-                  hasUnsavedChanges={dirty}
-                  onApply={(draft) => {
-                    change((current) => ({ ...current, draft }));
-                    setNotice('Proyección de HH aplicada. Guarda el borrador para persistir la distribución.');
-                  }}
-                />
-              )}
-
-              {selected?.draft.aiPoc?.edt && projectId && (
-                <QuotationPlanningAcceptanceCard
-                  key={selected.id + ':' + selected.revision}
-                  version={selected}
-                />
-              )}
-
-              {selected && project && (
-                <QuotationCommercialLifecycleCard
-                  key={selected.id + ':' + selected.revision}
-                  project={project} version={selected}
-                  quotation={quotation ?? null}
-                  canOperate={mayWrite} hasUnsavedChanges={dirty}
-                />
-              )}
-              {versions.length > 1 && (
-                <QuotationVersionComparison versions={versions} teamNames={teamById} />
-              )}
-              {selected && projectId && (
-                <QuotationCommercialPreflightCard key={selected.id + ':' + selected.revision}
-                  projectId={projectId} version={selected} hasUnsavedChanges={dirty} />
-              )}
-              {selected && projectId && (
-                <QuotationTransferPreviewCard projectId={projectId} version={selected} teamNames={teamById}
-                  canSaveReview={mayWrite} canAssessReview={mayWrite && can('projects:manage')}
-                  currentUserId={user?.id ?? null} />
-              )}
-
-              {mayWrite && (
-                <Card>
-                  <div className={styles.cardTitle}>
-                    <div>
-                      <span className={styles.eyebrow}>PoC · simulación controlada</span>
-                      <h2>Importar análisis estructurado de ejemplo</h2>
-                      <p>Carga el JSON de Zurich generado a partir de su ERS y EDT. No invoca Gemini ni analiza documentos nuevos.</p>
-                    </div>
-                  </div>
-                  <label className={styles.longField}>Archivo JSON (máximo 1 MB)
-                    <input type="file" accept=".json,application/json" onChange={(e) =>
-                      void importSimulatedAnalysis(e.target.files?.[0])} />
-                  </label>
-                  {sampleAnalysis && (
-                    <div className={styles.simulation}>
-                      <strong>{sampleAnalysis.project.name}</strong>
-                      <p className={styles.helper}>{sampleAnalysis.provenance.warning}</p>
-                      <div className={styles.summaryStats}>
-                        <span>{sampleAnalysis.activities.length} actividades WBS</span>
-                        <span>{sampleAnalysis.tranches.length} tramos</span>
-                        <span>{money(sampleAnalysis.summary.baseHours)} HH base</span>
-                        <span>Reserva separada: {money(sampleAnalysis.summary.reserveHours)} HH</span>
-                      </div>
-                      <p className={styles.warn}>Los perfiles del EDT no son necesariamente los equipos registrados en Kora. Revisa cada correspondencia. Si varios perfiles usan el mismo equipo, sus HH se agregan sin perder el desglose original.</p>
-                      <div className={styles.mapping}>
-                        {sampleAnalysis.roles.map((role) => (
-                          <div key={role.role} className={styles.mappingRow}>
-                            <div><strong>{role.role}</strong><small>{money(role.baseHours)} HH</small></div>
-                            <Select label="Equipo Kora" placeholder="Asignar equipo"
-                              value={sampleTeamMap[role.role] ?? ''}
-                              options={activeTeams.map((team) => ({ value: team.id, label: team.name }))}
-                              onChange={(e) => {
-                                setSampleTeamMap((mapping) => ({ ...mapping, [role.role]: e.target.value }));
-                                setSampleError('');
-                              }} />
-                          </div>
-                        ))}
-                      </div>
-                      <p className={styles.helper}>La reserva no se suma a la cotización. Tarifa, impuesto y plan comercial requieren revisión humana. Se conserva el artefacto con ERS/EDT para futura generación documental.</p>
-                      <Button
-                        disabled={sampleAnalysis.roles.some((role) => !sampleTeamMap[role.role])}
-                        loading={createVersion.isPending}
-                        onClick={() => void saveSimulatedAnalysis()}>
-                        Crear versión de IA simulada
-                      </Button>
-                    </div>
-                  )}
-                  {sampleError && <p className={styles.error} role="alert">{sampleError}</p>}
-                  {sampleSuccess && <p className={styles.success} role="status">{sampleSuccess}</p>}
-                </Card>
-              )}
-
               {selected && form && (
                 <>
                   {form.draft.analysis && (
@@ -589,6 +495,101 @@ export function QuotationWorkspacePage() {
                   </Card>
                 </>
               )}
+
+              {selected?.draft.aiPoc && form && (
+                <AiPocRoleMappingCard
+                  key={selected.id + ':' + selected.revision}
+                  version={selected}
+                  teams={activeTeams}
+                  canEdit={editable}
+                  hasUnsavedChanges={dirty}
+                  onApply={(draft) => {
+                    change((current) => ({ ...current, draft }));
+                    setNotice('Proyección de HH aplicada. Guarda el borrador para persistir la distribución.');
+                  }}
+                />
+              )}
+
+              {selected?.draft.aiPoc?.edt && projectId && (
+                <QuotationPlanningAcceptanceCard
+                  key={selected.id + ':' + selected.revision}
+                  version={selected}
+                />
+              )}
+
+              {selected && project && (
+                <QuotationCommercialLifecycleCard
+                  key={selected.id + ':' + selected.revision}
+                  project={project} version={selected}
+                  quotation={quotation ?? null}
+                  canOperate={mayWrite} hasUnsavedChanges={dirty}
+                />
+              )}
+              {versions.length > 1 && (
+                <QuotationVersionComparison versions={versions} teamNames={teamById} />
+              )}
+              {selected && projectId && (
+                <QuotationCommercialPreflightCard key={selected.id + ':' + selected.revision}
+                  projectId={projectId} version={selected} hasUnsavedChanges={dirty} />
+              )}
+              {selected && projectId && (
+                <QuotationTransferPreviewCard projectId={projectId} version={selected} teamNames={teamById}
+                  canSaveReview={mayWrite} canAssessReview={mayWrite && can('projects:manage')}
+                  currentUserId={user?.id ?? null} />
+              )}
+
+              {mayWrite && (
+                <Card>
+                  <div className={styles.cardTitle}>
+                    <div>
+                      <span className={styles.eyebrow}>PoC · simulación controlada</span>
+                      <h2>Importar análisis estructurado de ejemplo</h2>
+                      <p>Carga el JSON de Zurich generado a partir de su ERS y EDT. No invoca Gemini ni analiza documentos nuevos.</p>
+                    </div>
+                  </div>
+                  <label className={styles.longField}>Archivo JSON (máximo 1 MB)
+                    <input type="file" accept=".json,application/json" onChange={(e) =>
+                      void importSimulatedAnalysis(e.target.files?.[0])} />
+                  </label>
+                  {sampleAnalysis && (
+                    <div className={styles.simulation}>
+                      <strong>{sampleAnalysis.project.name}</strong>
+                      <p className={styles.helper}>{sampleAnalysis.provenance.warning}</p>
+                      <div className={styles.summaryStats}>
+                        <span>{sampleAnalysis.activities.length} actividades WBS</span>
+                        <span>{sampleAnalysis.tranches.length} tramos</span>
+                        <span>{money(sampleAnalysis.summary.baseHours)} HH base</span>
+                        <span>Reserva separada: {money(sampleAnalysis.summary.reserveHours)} HH</span>
+                      </div>
+                      <p className={styles.warn}>Los perfiles del EDT no son necesariamente los equipos registrados en Kora. Revisa cada correspondencia. Si varios perfiles usan el mismo equipo, sus HH se agregan sin perder el desglose original.</p>
+                      <div className={styles.mapping}>
+                        {sampleAnalysis.roles.map((role) => (
+                          <div key={role.role} className={styles.mappingRow}>
+                            <div><strong>{role.role}</strong><small>{money(role.baseHours)} HH</small></div>
+                            <Select label="Equipo Kora" placeholder="Asignar equipo"
+                              value={sampleTeamMap[role.role] ?? ''}
+                              options={activeTeams.map((team) => ({ value: team.id, label: team.name }))}
+                              onChange={(e) => {
+                                setSampleTeamMap((mapping) => ({ ...mapping, [role.role]: e.target.value }));
+                                setSampleError('');
+                              }} />
+                          </div>
+                        ))}
+                      </div>
+                      <p className={styles.helper}>La reserva no se suma a la cotización. Tarifa, impuesto y plan comercial requieren revisión humana. Se conserva el artefacto con ERS/EDT para futura generación documental.</p>
+                      <Button
+                        disabled={sampleAnalysis.roles.some((role) => !sampleTeamMap[role.role])}
+                        loading={createVersion.isPending}
+                        onClick={() => void saveSimulatedAnalysis()}>
+                        Crear versión de IA simulada
+                      </Button>
+                    </div>
+                  )}
+                  {sampleError && <p className={styles.error} role="alert">{sampleError}</p>}
+                  {sampleSuccess && <p className={styles.success} role="status">{sampleSuccess}</p>}
+                </Card>
+              )}
+
             </section>
 
             <aside className={styles.sidebar}>
