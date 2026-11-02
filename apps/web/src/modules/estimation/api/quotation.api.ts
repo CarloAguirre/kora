@@ -1,6 +1,8 @@
 import type {
   CreateQuotationVersionInput,
   GenerateAiDemoQuotationInput,
+  AppliedQuotationPlanning,
+  ApplyQuotationPlanningInput,
   ProjectQuotation,
   QuotationVersion,
   QuotationTransferPreview,
@@ -19,6 +21,15 @@ const base = (projectId: string) => '/estimations/projects/' + projectId + '/quo
 export const quotationApi = {
   get(projectId: string): Promise<ProjectQuotation | null> {
     return api.get<ProjectQuotation | null>(base(projectId));
+  },
+  appliedPlan(projectId: string): Promise<AppliedQuotationPlanning | null> {
+    return api.get<AppliedQuotationPlanning | null>(base(projectId) + '/applied-plan');
+  },
+  applyPlan(projectId: string, versionId: string,
+    input: ApplyQuotationPlanningInput): Promise<AppliedQuotationPlanning> {
+    return api.post<AppliedQuotationPlanning>(
+      base(projectId) + '/versions/' + versionId + '/apply-plan', input,
+    );
   },
   commercialDossier(projectId: string, versionId: string): Promise<QuotationCommercialDossier> {
     return api.get<QuotationCommercialDossier>(
@@ -77,6 +88,7 @@ export const quotationKeys = {
     [...quotationKeys.project(projectId), 'reconciliation-assessments', versionId] as const,
   commercialPreflight: (projectId: string, versionId: string, revision: number) =>
     [...quotationKeys.project(projectId), 'commercial-preflight', versionId, revision] as const,
+  appliedPlan: (projectId: string) => [...quotationKeys.project(projectId), 'applied-plan'] as const,
   transferPreview: (projectId: string, versionId: string, revision: number) =>
     [...quotationKeys.project(projectId), 'transfer-preview', versionId, revision] as const,
 };

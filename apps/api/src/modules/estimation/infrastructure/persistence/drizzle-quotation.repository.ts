@@ -480,6 +480,7 @@ export class DrizzleQuotationRepository implements QuotationRepository {
         eq(quotationVersions.id, versionId),
         eq(quotationVersions.quotationId, quotation.id),
       )).limit(1);
+      await tx.execute(sql`SELECT id FROM quotation_versions WHERE id = ${versionId} FOR UPDATE`);
       if (!version) throw new NotFoundException('Versión ajena al proyecto.');
       const [already] = await tx.select({ id: quotationEvents.id }).from(quotationEvents)
         .innerJoin(quotationVersions, eq(quotationEvents.versionId, quotationVersions.id))
@@ -610,6 +611,7 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       .where(eq(projectQuotations.projectId, projectId)).limit(1);
     if (!quotation) return null;
     return this.db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT id FROM quotation_versions WHERE id = ${versionId} FOR UPDATE`);
       const [currentRow] = await tx.select({
         draft: quotationVersions.draft,
         status: quotationVersions.status,

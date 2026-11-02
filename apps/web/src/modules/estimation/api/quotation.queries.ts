@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { GenerateAiDemoQuotationInput, CreateQuotationVersionInput, UpdateQuotationDraftInput, QuotationReconciliationReview, AssessQuotationReconciliationInput } from '@kora/contracts';
+import type { ApplyQuotationPlanningInput, GenerateAiDemoQuotationInput, CreateQuotationVersionInput, UpdateQuotationDraftInput, QuotationReconciliationReview, AssessQuotationReconciliationInput } from '@kora/contracts';
 import { quotationApi, quotationKeys } from './quotation.api';
 
 export function useProjectQuotation(projectId: string | null, enabled = true) {
@@ -93,5 +93,31 @@ export function useQuotationCommercialPreflight(projectId: string, versionId: st
     queryFn: () => quotationApi.commercialPreflight(projectId, versionId),
     enabled: enabled && Boolean(projectId) && Boolean(versionId),
     retry: false,
+  });
+}
+
+/** Fases y tareas de referencia aceptadas, visibles desde Roadmap. */
+export function useAppliedQuotationPlanning(projectId: string | null) {
+  return useQuery({
+    queryKey: quotationKeys.appliedPlan(projectId ?? ''),
+    queryFn: () => quotationApi.appliedPlan(projectId as string),
+    enabled: Boolean(projectId),
+    retry: false,
+  });
+}
+
+/** El backend vuelve a verificar revisión y proyecto bajo locks antes de escribir. */
+export function useApplyQuotationPlanning(projectId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ versionId, input }: {
+      versionId: string; input: ApplyQuotationPlanningInput;
+    }) => quotationApi.applyPlan(projectId, versionId, input),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: quotationKeys.project(projectId) });
+      void client.invalidateQueries({ queryKey: quotationKeys.appliedPlan(projectId) });
+      // El módulo de proyectos tiene su propia cache de detalle/roadmap.
+      void client.invalidateQueries({ queryKey: ['projects'] });
+    },
   });
 }
