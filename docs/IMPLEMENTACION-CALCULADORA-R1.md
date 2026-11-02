@@ -140,3 +140,7 @@ El tab Cotizaciones abre un modal IA de Análisis → Entendimiento editable →
 ## R4-e — Ciclo comercial Kora v5 y filtros de Proyectos (02/11/2026)
 
 Se agregaron filtros Tipo de proyecto (etapa comercial) y Cotización más columna Cotización/Tipo en la tabla existente. El estado comercial se obtiene de versiones y eventos reales en PostgreSQL. Gerencia/PMO y líder asignado pueden recotizar aprobados activos, aceptar IA, marcar enviada, registrar aprobación del cliente y traspasar una versión aprobada a un proyecto limpio/no iniciado. El antiguo botón de traspasar desde borrador queda bloqueado; aceptación IA nunca toca Roadmap. Se conservan permisos y audit logs; la recotización con ejecución previa requiere conciliación D05. Ver `docs/IMPLEMENTACION-CALCULADORA-R4E-ALINEACION-COMERCIAL-LISTADO.md`; QA local y build pendientes.
+
+## R4-e — Estados comerciales, filtros Proyectos, recotización y traspaso (02/11/2026)
+
+Se agrega Tipo de proyecto + Cotización a filtros y columna del listado, con estado SQL de la última versión. Líder/PMO/Gerencia pueden operar cotizaciones según acceso y proyectos aprobados admiten recotización. Se separan aceptación IA, envío registrado, aprobación y traspaso transaccional inicial. Recotizaciones históricas no cambian equipos, pagos ni HH operativas; aprobaciones históricas son inmutables. La fuente KDM se bloquea comercialmente en producción. Ver `docs/IMPLEMENTACION-CALCULADORA-R4E-ESTADOS-COMERCIALES-V5.md`. Validación local pendiente.
