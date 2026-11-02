@@ -125,9 +125,9 @@ export function QuotationCommercialLifecycleCard({
       {proposalPending && version.status === 'draft' && (
         <div className={styles.action}>
           <div><strong>1. Revisión del agente IA</strong>
-            <p>Confirma el mapeo de perfiles y HH; guarda antes de aceptar.</p></div>
+            <p>Confirma perfiles, HH y cualquier ajuste manual; guarda antes de aceptar.</p></div>
           <Button disabled={!mayAct || !isLatest ||
-            version.draft.analysisProjectionStatus !== 'synced'}
+            version.draft.teams.length === 0}
             onClick={() => void acceptAi()}>Aceptar propuesta IA</Button>
         </div>
       )}

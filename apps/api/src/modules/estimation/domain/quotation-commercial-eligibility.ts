@@ -22,10 +22,9 @@ export function assertQuotationReadyForClient(
   if (percents.length === 0 || Math.abs(percentTotal - 100) > 0.001) {
     throw new InvalidCommercialQuotation('El plan de pagos debe sumar exactamente 100 %.');
   }
-  if (version.origin === 'ai' && (version.aiReviewStatus !== 'accepted' ||
-      version.draft.analysisProjectionStatus === 'modified')) {
+  if (version.origin === 'ai' && version.aiReviewStatus !== 'accepted') {
     throw new InvalidCommercialQuotation(
-      'Primero revisa y acepta la propuesta IA vigente después de editar sus HH.',
+      'Primero revisa y acepta la propuesta IA, incluidos los ajustes manuales de HH.',
     );
   }
 }
@@ -39,14 +38,14 @@ export function assertAiProposalReadyToAccept(
     throw new InvalidCommercialQuotation('Solo se puede aceptar una propuesta IA pendiente.');
   }
   const { aiPoc, analysisProjectionStatus, teams } = version.draft;
-  if (!aiPoc || !aiPoc.edt ||
-      analysisProjectionStatus !== 'synced' || teams.length === 0) {
+  if (!aiPoc || !aiPoc.edt || teams.length === 0) {
     throw new InvalidCommercialQuotation('Primero revisa y asigna todos los perfiles IA a los equipos de Kora.');
   }
   const names = aiPoc.proposal.roles.map((r) => r.role);
   if (!names.length || names.some((name) => !aiPoc.roleTeamIds[name]) ||
       Object.keys(aiPoc.roleTeamIds).length !== names.length ||
-      Math.abs(aiPoc.edt.totalHours - version.totalHours) > 0.011) {
+      (analysisProjectionStatus !== 'modified' &&
+       Math.abs(aiPoc.edt.totalHours - version.totalHours) > 0.011)) {
     throw new InvalidCommercialQuotation('La distribución de HH o perfiles no coincide con el análisis IA.');
   }
 }

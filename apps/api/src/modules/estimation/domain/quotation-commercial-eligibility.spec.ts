@@ -27,6 +27,10 @@ describe('Transiciones comerciales', () => {
   it('distingue aceptación IA de aprobación comercial', () => {
     expect(() => assertQuotationReadyForClient({ ...base(), origin:'ai', aiReviewStatus:'pending' }))
       .toThrow(/acepta la propuesta/);
+    expect(() => assertQuotationReadyForClient({ ...base(), origin:'ai',
+      aiReviewStatus:'accepted',
+      draft: { ...base().draft, analysisProjectionStatus: 'modified' } }))
+      .not.toThrow();
     expect(() => assertAiProposalReadyToAccept({ ...base(), origin:'ai',
       aiReviewStatus:'pending' })).toThrow(/asigna/);
   });

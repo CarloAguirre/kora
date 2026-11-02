@@ -671,7 +671,10 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       }).where(eq(quotationVersions.id, versionId)).returning();
       await tx.insert(quotationEvents).values({
         versionId, actorUserId: userId, action: 'ai_proposal_accepted',
-        metadata: { previousRevision: input.revision, newRevision: input.revision + 1 },
+        metadata: { previousRevision: input.revision,
+          newRevision: input.revision + 1,
+          manualAdjustments: version.draft.analysisProjectionStatus === 'modified',
+          approvedHours: version.totalHours },
       });
       return toVersion(updated!);
     });
