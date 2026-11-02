@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { QuotationDraftData, QuotationVersion } from '@kora/contracts';
 import { Button } from '@/shared/components/ui/Button';
 import { Card } from '@/shared/components/ui/Card';
@@ -55,7 +56,7 @@ function durationLabel(draft: QuotationDraftData) {
 }
 
 export function QuotationCommercialSummary({
-  version, draft, hourlyRate, currency, tax, teamNames, editable, dirty, saving, onSave,
+  version, draft, hourlyRate, currency, tax, teamNames, editable, dirty, saving, onSave, actions,
 }: {
   version: QuotationVersion | null;
   draft: QuotationDraftData | null;
@@ -67,6 +68,7 @@ export function QuotationCommercialSummary({
   dirty: boolean;
   saving: boolean;
   onSave: () => void;
+  actions?: ReactNode;
 }) {
   if (!version || !draft) return <Card><h2>Resumen comercial</h2><p>Selecciona una versión.</p></Card>;
   const numbers = preview(draft, hourlyRate, tax);
@@ -121,6 +123,7 @@ export function QuotationCommercialSummary({
         </div>
         {editable && <Button onClick={onSave} loading={saving} disabled={!dirty}
           aria-label="Guardar cambios del borrador">Guardar borrador</Button>}
+        {actions}
         <small className={styles.saved}>
           {dirty ? 'Los valores mostrados son una vista previa sin guardar.' :
             'Versión v' + version.versionNumber + ' guardada · revisión ' + version.revision}
