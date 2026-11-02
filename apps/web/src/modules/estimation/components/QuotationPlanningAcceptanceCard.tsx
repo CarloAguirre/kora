@@ -26,7 +26,7 @@ export function QuotationPlanningAcceptanceCard({
       </p>
       <div className={styles.modules}>
         {edt.modules.map((module, index) => (
-          <details key={index} className={styles.module} name="quotation-edt-modules" defaultOpen={index === 0}>
+          <details key={index} className={styles.module} defaultOpen={index === 0}>
             <summary className={styles.moduleHeader}>
               <span className={styles.moduleIndex}>{String(index + 1).padStart(2, '0')}</span>
               <span className={styles.moduleTitle}>
