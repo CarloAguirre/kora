@@ -476,11 +476,11 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       const [quotation] = await tx.select({ id: projectQuotations.id })
         .from(projectQuotations).where(eq(projectQuotations.projectId, projectId)).limit(1);
       if (!quotation) throw new NotFoundException('Cotización no encontrada.');
+      await tx.execute(sql`SELECT id FROM quotation_versions WHERE id = ${versionId} FOR UPDATE`);
       const [version] = await tx.select().from(quotationVersions).where(and(
         eq(quotationVersions.id, versionId),
         eq(quotationVersions.quotationId, quotation.id),
       )).limit(1);
-      await tx.execute(sql`SELECT id FROM quotation_versions WHERE id = ${versionId} FOR UPDATE`);
       if (!version) throw new NotFoundException('Versión ajena al proyecto.');
       const [already] = await tx.select({ id: quotationEvents.id }).from(quotationEvents)
         .innerJoin(quotationVersions, eq(quotationEvents.versionId, quotationVersions.id))
