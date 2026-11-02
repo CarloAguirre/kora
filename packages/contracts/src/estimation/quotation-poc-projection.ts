@@ -113,6 +113,8 @@ export function validatePocDraftIntegrity(
   if (!next.aiPoc ||
       !sameJson(previous.aiPoc.proposal, next.aiPoc.proposal) ||
       !sameJson(previous.aiPoc.answers, next.aiPoc.answers) ||
+      !sameJson(previous.sourceRefs, next.sourceRefs) ||
+      !sameJson(previous.answers, next.answers) ||
       previous.aiPoc.source !== next.aiPoc.source) {
     throw new Error('La evidencia original de IA no puede borrarse ni reemplazarse.');
   }

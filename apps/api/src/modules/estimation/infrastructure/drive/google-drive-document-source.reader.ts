@@ -51,14 +51,9 @@ export class GoogleDriveDocumentSourceReader
     if (!rootFolderId) {
       throw new Error('No se pudo identificar la carpeta raíz de Google Drive.');
     }
-    if (!this.drive.isConfigured()) {
-      // Fixture de KDM disponible únicamente mediante su ID explícito de demo.
-      // No sustituir silenciosamente documentos de cualquier otro proyecto.
-      if (rootFolderId !== 'kora-poc-fallback') {
-        throw new Error(
-          'Google Drive no está configurado. No se puede leer la documentación del proyecto ni usar un ejemplo ajeno como evidencia.',
-        );
-      }
+    if (rootFolderId === 'kora-poc-fallback') {
+      // Fuente demostrativa explícita, incluso si Drive real está configurado.
+      // Nunca se consulta la API Drive para este ID ficticio.
       return [
         {
           sourceId: FALLBACK_DOCUMENT_ID,
@@ -69,6 +64,11 @@ export class GoogleDriveDocumentSourceReader
           text: FALLBACK_DOCUMENT_TEXT,
         },
       ];
+    }
+    if (!this.drive.isConfigured()) {
+      throw new Error(
+        'Google Drive no está configurado. No se puede leer la documentación del proyecto ni usar un ejemplo ajeno como evidencia.',
+      );
     }
 
     const candidates = await this.collectCandidates(rootFolderId);

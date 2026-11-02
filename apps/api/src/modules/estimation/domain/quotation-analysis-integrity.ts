@@ -28,7 +28,11 @@ export function reconcileQuotationAnalysis(
         'El análisis IA se incorpora únicamente mediante la creación de una nueva versión.',
       );
     }
-    return { ...incoming, analysis: null, analysisProjectionStatus: undefined };
+    return {
+      ...incoming,
+      analysis: null,
+      analysisProjectionStatus: saved.aiPoc ? incoming.analysisProjectionStatus : undefined,
+    };
   }
 
   if (!isDeepStrictEqual(saved.analysis, incoming.analysis)) {
