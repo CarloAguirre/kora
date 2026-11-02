@@ -210,6 +210,7 @@ export function AiQuotationWizardModal({ project, onClose }: {
   const [stage, setStage] = useState(0);
   const [instructions, setInstructions] = useState('');
   const [understanding, setUnderstanding] = useState('');
+  const [editingUnderstanding, setEditingUnderstanding] = useState(false);
   const [answers, setAnswers] = useState<AnswerState>({});
   const [assumptions, setAssumptions] = useState<string[]>([]);
   const [error, setError] = useState('');
@@ -280,6 +281,7 @@ export function AiQuotationWizardModal({ project, onClose }: {
         return;
       }
       setUnderstanding(result.summary);
+      setEditingUnderstanding(false);
       const prefilled: AnswerState = {};
       for (const question of fixed) {
         const recommendation = result.fixedPrefills?.find((item) =>
@@ -356,16 +358,19 @@ export function AiQuotationWizardModal({ project, onClose }: {
   };
 
   return (
-    <Modal open wide
-      title="Nueva cotización con el agente IA"
-      description={project.name + ' · ' + (project.client?.companyName ?? 'Cliente por confirmar')}
+    <Modal open wide className={styles.dialog}
+      title="✦ Nueva cotización con el agente IA"
       onClose={onClose}
       dismissible={!working}
       footer={<>
-        <Button variant="outline" disabled={working} onClick={stage === 0 ? onClose : back}>
-          {stage === 0 ? 'Cancelar' : 'Atrás'}
+        <Button variant="outline" className={styles.secondaryAction}
+          disabled={working}
+          onClick={stage === 0 ? onClose :
+            stage === 1 ? () => setEditingUnderstanding((current) => !current) : back}>
+          {stage === 0 ? 'Cancelar' :
+            stage === 1 ? editingUnderstanding ? 'Guardar resumen' : 'Editar' : 'Atrás'}
         </Button>
-        <Button loading={working} disabled={
+        <Button className={styles.primaryAction} loading={working} disabled={
           (stage === 0 && (questionnaire.isLoading || questionnaire.isError)) ||
           (stage > 0 && !verifiedAnalysis)
         } onClick={() => void next()}>
@@ -377,30 +382,38 @@ export function AiQuotationWizardModal({ project, onClose }: {
         <ol>{STAGES.map((label, index) => (
           <li key={label} aria-current={index === stage ? 'step' : undefined}
             className={index === stage ? styles.current : index < stage ? styles.done : ''}>
-            <span>{index + 1}</span>{label}
+            {index + 1}. {label}
           </li>
         ))}</ol>
       </nav>
 
       {stage === 0 && (
         <section className={styles.stage}>
-          <h3>Documentos para el análisis</h3>
-          <p>El agente revisará los antecedentes antes de hacer preguntas.</p>
-          <div className={styles.sourceBox}>
-            <strong>Requerimiento_KDM.pdf</strong>
-            <span>Carpeta de ejemplo KDM · fuente temporal que sustituye Drive</span>
-          </div>
-          <p className={styles.warning}>
-            No existe una conexión real con Google Drive. Gemini analizará
-            este archivo de demostración, no los documentos del proyecto seleccionado.
+          <h3 className={styles.srOnly}>Documentos para el análisis</h3>
+          <p className={styles.intro}>El agente lee todo antes de preguntar. Usando:
+            {' '}<strong>Documento de demostración KDM</strong>
           </p>
-          <label className={styles.textLabel} htmlFor="kora-quotation-instructions">
-            Indicaciones adicionales · opcional
-          </label>
-          <textarea id="kora-quotation-instructions" className={styles.textarea}
-            value={instructions} maxLength={3000}
-            onChange={(event) => setInstructions(event.target.value)}
-            placeholder="Ej. Considerar integración SAP, excluir soporte de postproducción..." />
+          <ul className={styles.documents} aria-label="Documentos que analizará el agente">
+            <li>
+              <span className={styles.docIcon} aria-hidden="true">▣</span>
+              <span>Requerimiento_KDM.pdf</span>
+              <span className={styles.docDate}>Fuente de prueba</span>
+            </li>
+          </ul>
+          <p className={styles.demoNote}>
+            No existe una conexión real con Google Drive. El documento KDM de ejemplo
+            sustituye temporalmente los antecedentes del proyecto.
+          </p>
+          <details className={styles.more}>
+            <summary>Indicaciones adicionales · opcional</summary>
+            <label className={styles.textLabel} htmlFor="kora-quotation-instructions">
+              Instrucciones para Gemini
+            </label>
+            <textarea id="kora-quotation-instructions" className={styles.textarea}
+              value={instructions} maxLength={3000}
+              onChange={(event) => setInstructions(event.target.value)}
+              placeholder="Ej. Considerar integración SAP, excluir soporte de postproducción..." />
+          </details>
           {analysis.isPending && <p role="status" className={styles.progress}>
             Gemini está analizando el documento y preparando el entendimiento inicial.
           </p>}
@@ -411,15 +424,27 @@ export function AiQuotationWizardModal({ project, onClose }: {
 
       {stage === 1 && (
         <section className={styles.stage}>
-          <h3>Entendimiento del proyecto</h3>
-          <p>Confirma lo que entendió Gemini. Puedes corregir el resumen antes de estimar.</p>
-          <label className={styles.textLabel} htmlFor="kora-understanding">
-            Resumen editable
-          </label>
-          <textarea id="kora-understanding" className={styles.understanding}
-            value={understanding} maxLength={4000}
-            onChange={(event) => setUnderstanding(event.target.value)} />
-          <p className={styles.source}>Fuente analizada: {verifiedAnalysis?.detectedDocuments.join(', ')}</p>
+          <h3 className={styles.srOnly}>Entendimiento del proyecto</h3>
+          <p className={styles.intro}>
+            Confirma que el agente entendió bien el proyecto. Si algo no calza, corrígelo en bloque.
+          </p>
+          {editingUnderstanding ? (
+            <>
+              <label className={styles.textLabel} htmlFor="kora-understanding">
+                Resumen editable
+              </label>
+              <textarea id="kora-understanding" className={styles.understanding}
+                value={understanding} maxLength={4000}
+                onChange={(event) => setUnderstanding(event.target.value)} />
+            </>
+          ) : (
+            <div className={styles.summaryBox} aria-label="Resumen del proyecto">
+              {understanding}
+            </div>
+          )}
+          <p className={styles.source}>
+            Fuente analizada: {verifiedAnalysis?.detectedDocuments.join(', ')}
+          </p>
         </section>
       )}
 
