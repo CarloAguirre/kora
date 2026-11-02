@@ -46,7 +46,8 @@ function setup() {
     }),
   };
   const generator = { execute: vi.fn().mockResolvedValue(proposal),
-    generateEdt: vi.fn().mockResolvedValue(edt) };
+    generateEdt: vi.fn().mockResolvedValue(edt),
+    reconcileProposalWithEdt: vi.fn().mockReturnValue(proposal) };
   const definition = new GetEstimationQuestionnaireDefinitionUseCase();
   const controller = new QuotationController(drafts as never, generator as never, definition);
   return { drafts, generator, controller };
@@ -59,6 +60,7 @@ describe('POST versions/ai-poc · Gemini con KDM', () => {
     expect(drafts.authorizeAiPoc).toHaveBeenCalledWith(projectId, actor);
     expect(generator.execute).toHaveBeenCalledWith(input);
     expect(generator.generateEdt).toHaveBeenCalledWith(input, proposal);
+    expect(generator.reconcileProposalWithEdt).toHaveBeenCalledWith(proposal, edt);
     expect(drafts.createAiPocDraft).toHaveBeenCalledWith(
       projectId, actor, proposal, input.answers, input.dynamicQuestions, edt, undefined,
     );
