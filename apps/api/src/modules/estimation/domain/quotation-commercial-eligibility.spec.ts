@@ -36,7 +36,7 @@ describe('Transiciones comerciales', () => {
     expect(() => assertQuotationReadyForClient({ ...base(), origin:'ai',
       aiReviewStatus:'accepted',
       draft: { ...base().draft, aiPoc: { edt: { modules: [] } },
-        analysisProjectionStatus: 'modified' } } as QuotationVersion))
+        analysisProjectionStatus: 'modified' } } as unknown as QuotationVersion))
       .toThrow(/Concilia la planificación/);
     expect(() => assertAiProposalReadyToAccept({ ...base(), origin:'ai',
       aiReviewStatus:'pending' })).toThrow(/asigna/);

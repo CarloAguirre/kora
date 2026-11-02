@@ -1,7 +1,6 @@
-import { BadRequestException } from '@nestjs/common';
 import type { QuotationVersion } from '@kora/contracts';
 
-export class InvalidCommercialQuotation extends BadRequestException {
+export class InvalidCommercialQuotation extends Error {
   constructor(message: string) { super(message); this.name = 'InvalidCommercialQuotation'; }
 }
 

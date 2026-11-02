@@ -54,7 +54,7 @@ const QUOTATION_LABELS: Record<ProjectQuotationListStatus, string> = {
 };
 const QUOTATION_OPTIONS = PROJECT_QUOTATION_LIST_STATUSES.map((status) => ({
   value: status, label: QUOTATION_LABELS[status],
-});
+}));
 const TABS = [
   { id: 'development', label: 'Proyectos Desarrollo' },
   { id: 'support', label: 'Soporte' },

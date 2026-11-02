@@ -18,7 +18,7 @@ const project = {
 const fixedQuestions = [
   estimationQuestionSchema.parse({
     id: 'F01', kind: 'fixed', category: 'Alcance', question: '¿Nivel de entrega?',
-    impact: 'high', answerType: 'single_choice', required: true,
+    impact: 'high', answerType: 'single_choice', required: true, canPrefill: true,
     options: [{ value: 'mvp', label: 'MVP' }, { value: 'poc', label: 'PoC' }],
   }),
   estimationQuestionSchema.parse({

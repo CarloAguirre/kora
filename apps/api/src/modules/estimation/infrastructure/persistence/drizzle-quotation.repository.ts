@@ -36,8 +36,20 @@ import {
 import { DATABASE } from '../../../../shared/infrastructure/database/database.module';
 import { calculateQuotation } from '../../domain/quotation-math';
 import { hasOnlyUntouchedDefaultPaymentMilestones } from '../../domain/default-payment-plan-eligibility';
-import { assertQuotationReadyForClient, assertAiProposalReadyToAccept, assertDirectClientApprovalAcknowledged } from '../../domain/quotation-commercial-eligibility';
+import { InvalidCommercialQuotation, assertQuotationReadyForClient, assertAiProposalReadyToAccept, assertDirectClientApprovalAcknowledged } from '../../domain/quotation-commercial-eligibility';
 import type { QuotationProjectScope, QuotationRepository } from '../../domain/repositories/quotation.repository';
+
+/** Mantener Nest fuera del dominio y traducir a HTTP 400 en infraestructura. */
+function validateCommercial(action: () => void): void {
+  try {
+    action();
+  } catch (error) {
+    if (error instanceof InvalidCommercialQuotation) {
+      throw new BadRequestException(error.message);
+    }
+    throw error;
+  }
+}
 
 @Injectable()
 export class DrizzleQuotationRepository implements QuotationRepository {
@@ -664,7 +676,7 @@ export class DrizzleQuotationRepository implements QuotationRepository {
         throw new ConflictException('Revisión obsoleta o versión bloqueada.');
       }
       const version = toVersion(current);
-      assertAiProposalReadyToAccept(version);
+      validateCommercial(() => assertAiProposalReadyToAccept(version));
       const [updated] = await tx.update(quotationVersions).set({
         aiReviewStatus: 'accepted', revision: sql`${quotationVersions.revision} + 1`,
         editedByUserId: userId, updatedAt: new Date(),
@@ -700,7 +712,7 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       if (latest?.id !== versionId) {
         throw new ConflictException('Solo se puede enviar la última versión comercial.');
       }
-      assertQuotationReadyForClient(toVersion(current));
+      validateCommercial(() => assertQuotationReadyForClient(toVersion(current)));
       if (process.env.NODE_ENV === 'production' &&
           quotationDraftDataSchema.parse(current.draft).aiPoc?.source === 'kdm_demo') {
         throw new ConflictException('La evidencia KDM es de demostración: no puede enviarse desde producción.');
@@ -708,10 +720,7 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       const [updated] = await tx.update(quotationVersions).set({
         status: 'sent', sentAt: new Date(), updatedAt: new Date(),
         editedByUserId: userId,
-        // Cambiar las HH después de aceptar IA requiere una nueva revisión IA.
-        aiReviewStatus: currentRow.status === 'draft' && savedDraft.aiPoc &&
-          draft.analysisProjectionStatus === 'modified'
-          ? 'pending' : undefined,
+        // El envío congela el borrador ya validado; nunca altera la aceptación IA.
         revision: sql`${quotationVersions.revision} + 1`,
       }).where(eq(quotationVersions.id, versionId)).returning();
       await tx.insert(quotationEvents).values({
@@ -748,9 +757,9 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       if (!['draft', 'sent'].includes(current.status) || current.revision !== input.revision) {
         throw new ConflictException('Solo se puede aprobar un borrador o envío vigente.');
       }
-      assertDirectClientApprovalAcknowledged(
+      validateCommercial(() => assertDirectClientApprovalAcknowledged(
         current.status as 'draft' | 'sent', input.confirmWithoutSend,
-      );
+      ));
       const [latest] = await tx.select({ id: quotationVersions.id })
         .from(quotationVersions)
         .where(eq(quotationVersions.quotationId, quotation.id))
@@ -824,7 +833,7 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       if (latestVersion?.id !== versionId) {
         throw new ConflictException('Hay una cotización posterior; revisa cuál es la versión vigente.');
       }
-      assertQuotationReadyForClient(toVersion(version));
+      validateCommercial(() => assertQuotationReadyForClient(toVersion(version)));
       if (process.env.NODE_ENV === 'production' &&
           quotationDraftDataSchema.parse(version.draft).aiPoc?.source === 'kdm_demo') {
         throw new ConflictException('No se transfiere a producción una EDT creada sobre el documento KDM de prueba.');
@@ -945,6 +954,9 @@ export class DrizzleQuotationRepository implements QuotationRepository {
             ? new Date(item.triggerDate! + 'T00:00:00.000Z') : null,
         });
         billed += amount;
+      }
+      if (version.currency !== 'UF' && version.currency !== 'CLP' && version.currency !== 'USD') {
+        throw new BadRequestException('Moneda de la cotización incompatible con el contrato del proyecto.');
       }
       await tx.update(projects).set({
         soldHours: Number(version.totalHours).toFixed(2),

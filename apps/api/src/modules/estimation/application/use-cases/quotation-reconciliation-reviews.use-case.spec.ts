@@ -182,11 +182,11 @@ describe('R3-d — actas persistidas sin mutaciones operativas', () => {
       .rejects.toBeInstanceOf(NotFoundException);
   });
 
-  it('no acepta guardar actas cuando el proyecto no es elegible para un borrador', async () => {
+  it('no acepta guardar actas cuando el proyecto está finalizado', async () => {
     const { useCase, repo } = setup();
     vi.mocked(repo.getProjectScope).mockResolvedValueOnce({
       id: ids.project, type: 'development', salesStage: 'approved',
-      status: 'active', leaderUserId: ids.user,
+      status: 'finished', leaderUserId: ids.user,
     });
     await expect(useCase.saveReconciliationReview(ids.project, ids.version, actor, makeReview()))
       .rejects.toBeInstanceOf(ConflictException);
