@@ -4,10 +4,13 @@ import { QuotationAnalysisIntegrityError, reconcileQuotationAnalysis } from '../
 import { and, asc, desc, eq, inArray, isNull, projectQuotations, projects, quotationEvents, quotationVersions, sql, teams, projectTeams, projectModules, projectModuleTasks, projectModuleSegments, projectPaymentMilestones, type Database } from '@kora/db';
 import {
   quotationDraftDataSchema,
+  quotationAiPocSnapshotSchema,
   quotationVersionSchema,
   savedQuotationReconciliationReviewSchema,
   savedQuotationReviewAssessmentSchema,
   type CreateQuotationVersionInput,
+  type EstimationPocProposal,
+  type SubmitEstimationAnswerInput,
   type ProjectQuotation,
   type QuotationDraftData,
   type QuotationOperationalSnapshot,
@@ -280,6 +283,24 @@ export class DrizzleQuotationRepository implements QuotationRepository {
   }
 
   async createDraft(projectId: string, userId: string, input: CreateQuotationVersionInput): Promise<QuotationVersion> {
+    return this.createVersionInternal(projectId, userId, input);
+  }
+
+  async createAiPocDraft(projectId: string, userId: string, proposal: EstimationPocProposal,
+    answers: readonly SubmitEstimationAnswerInput[]): Promise<QuotationVersion> {
+    if (proposal.projectId !== projectId || proposal.provider !== 'gemini' ||
+        proposal.sourceMode !== 'poc_simulated' || proposal.documentsAnalyzed < 1 ||
+        proposal.totalHours <= 0 || proposal.roles.some((role) => role.totalHours <= 0) ||
+        Math.abs(proposal.roles.reduce((total, role) => total + role.totalHours, 0) - proposal.totalHours) > 0.011) {
+      throw new BadRequestException('Propuesta Gemini KDM inválida o sin trazabilidad documental.');
+    }
+    return this.createVersionInternal(projectId, userId, {}, { proposal, answers });
+  }
+
+  private async createVersionInternal(
+    projectId: string, userId: string, input: CreateQuotationVersionInput,
+    aiPoc?: { proposal: EstimationPocProposal; answers: readonly SubmitEstimationAnswerInput[] },
+  ): Promise<QuotationVersion> {
     return this.db.transaction(async (tx) => {
       await tx.insert(projectQuotations).values({ projectId, createdByUserId: userId }).onConflictDoNothing();
       const [quotation] = await tx.select({ id: projectQuotations.id })
@@ -297,6 +318,27 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       let tax: 'iva19' | 'igv18' | 'exempt' = 'iva19';
       let origin: 'manual' | 'copy' | 'ai' = 'manual';
       let aiReviewStatus: 'pending' | null = null;
+      if (aiPoc) {
+        draft = quotationDraftDataSchema.parse({
+          mode: 'phases',
+          teams: [],
+          phases: [],
+          costs: [],
+          paymentPlan: [],
+          assumptions: aiPoc.proposal.assumptions,
+          exclusions: [],
+          sourceRefs: ['demo:kdm_fixture'],
+          answers: Object.fromEntries(aiPoc.answers.map((answer) => [
+            answer.questionId, answer.value,
+          ])),
+          aiPoc: quotationAiPocSnapshotSchema.parse({
+            source: 'kdm_demo', proposal: aiPoc.proposal,
+            answers: aiPoc.answers, roleTeamIds: {},
+          }),
+        });
+        origin = 'ai';
+        aiReviewStatus = 'pending';
+      }
       if (input.simulation) {
         if (input.simulation.analysis.provenance.mode !== 'simulated_fixture') {
           throw new BadRequestException('Esta ruta solo admite artefactos de simulación explícitos.');
@@ -339,7 +381,7 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       const [created] = await tx.insert(quotationVersions).values({
         quotationId: quotation.id,
         versionNumber: next,
-        name: input.simulation ? `Simulación IA · ${input.simulation.analysis.project.client.slice(0, 170)}` : `Versión ${next}`,
+        name: aiPoc ? `IA KDM (demo) · versión ${next}` : input.simulation ? `Simulación IA · ${input.simulation.analysis.project.client.slice(0, 170)}` : `Versión ${next}`,
         status: 'draft',
         origin,
         aiReviewStatus,
@@ -357,7 +399,9 @@ export class DrizzleQuotationRepository implements QuotationRepository {
         versionId: created.id, actorUserId: userId, action: 'draft_created',
         metadata: { origin, sourceVersionId: input.sourceVersionId ?? null,
           sourceProjectId: input.sourceVersionId ? (input.sourceProjectId ?? projectId) : null,
-          simulation: input.simulation ? 'simulated_fixture' : null },
+          simulation: input.simulation ? 'simulated_fixture' : aiPoc ? 'kdm_demo' : null,
+          provider: aiPoc?.proposal.provider ?? null,
+          proposedHours: aiPoc?.proposal.totalHours ?? null },
       });
       return toVersion(created);
     });

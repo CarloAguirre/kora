@@ -26,5 +26,7 @@ export interface QuotationRepository {
     input: AssessQuotationReconciliationInput,
   ): Promise<SavedQuotationReviewAssessment | null>;
   createDraft(projectId: string, userId: string, input: CreateQuotationVersionInput): Promise<QuotationVersion>;
+  createAiPocDraft(projectId: string, userId: string,
+    proposal: EstimationPocProposal, answers: readonly SubmitEstimationAnswerInput[]): Promise<QuotationVersion>;
   updateDraft(projectId: string, versionId: string, userId: string, input: UpdateQuotationDraftInput): Promise<QuotationVersion | null>;
 }

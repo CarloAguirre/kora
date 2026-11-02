@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { estimationAnalysisArtifactSchema } from './analysis-artifact.contract';
+import { estimationPocProposalSchema, submitEstimationAnswerSchema } from './estimation.contract';
 import { isoDateTimeSchema, nonEmptyTrimmed, uuidSchema } from '../common/primitives';
 
 /**
@@ -66,6 +67,16 @@ export const quotationPaymentItemSchema = z.object({
   triggerPhase: z.string().max(100).nullish(),
   triggerDate: z.iso.date().nullish(),
 });
+/** Evidencia de una propuesta Gemini obtenida desde el documento de demostración KDM.
+ * Distinta del artefacto EDT: no simula requerimientos ni entregables inexistentes. */
+export const quotationAiPocSnapshotSchema = z.object({
+  source: z.literal('kdm_demo'),
+  proposal: estimationPocProposalSchema,
+  answers: z.array(submitEstimationAnswerSchema),
+  roleTeamIds: z.record(z.string(), uuidSchema).default({}),
+});
+export type QuotationAiPocSnapshot = z.infer<typeof quotationAiPocSnapshotSchema>;
+
 export const quotationDraftDataSchema = z.object({
   mode: z.enum(['team', 'phases']).default('team'),
   teams: z.array(quotationTeamDraftSchema).max(100).default([]),
@@ -78,6 +89,7 @@ export const quotationDraftDataSchema = z.object({
   answers: z.record(z.string(), z.unknown()).default({}),
   /** Snapshot de evidencia de IA o simulación. Nunca se descarta al editar HH. */
   analysis: estimationAnalysisArtifactSchema.nullish(),
+  aiPoc: quotationAiPocSnapshotSchema.nullish(),
   analysisProjectionStatus: z.enum(['synced', 'modified']).optional(),
 }).superRefine((data, ctx) => {
   const teamIds = data.teams.map((team) => team.teamId);
