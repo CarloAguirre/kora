@@ -6,6 +6,7 @@ import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { useProjectsList } from '@/modules/projects/api/projects.queries';
 import { Button } from '@/shared/components/ui/Button';
 import { Modal } from '@/shared/components/ui/Modal';
+import { Select } from '@/shared/components/ui/Select';
 import { useCreateQuotationVersion, useProjectQuotation } from '../api/quotation.queries';
 import { DEMO_KDM_FOLDER_URL } from '../lib/demo-source';
 import styles from './NewProjectQuotationModal.module.css';
@@ -21,7 +22,7 @@ export function NewProjectQuotationModal({ project, versions, onClose }: {
 }) {
   const navigate = useNavigate();
   const { can } = usePermissions();
-  const [mode, setMode] = useState<Mode>('ai');
+  const [mode, setMode] = useState<Mode>(can('projects:manage') ? 'ai' : 'blank');
   const [sourceProjectId, setSourceProjectId] = useState(project.id);
   const [sourceVersionId, setSourceVersionId] = useState('');
   const [error, setError] = useState('');
@@ -79,7 +80,7 @@ export function NewProjectQuotationModal({ project, versions, onClose }: {
             'Crea un borrador versionado en PostgreSQL con equipos y horas por definir.'],
           ['copy', 'Copiar otra cotización',
             'Copia datos comerciales de una versión existente sin modificar su proyecto.'],
-        ] as const).map(([value, title, description]) => (
+        ] as const).filter(([value]) => value !== 'ai' || can('projects:manage')).map(([value, title, description]) => (
           <label key={value} className={mode === value ? styles.active : styles.choice}>
             <input type="radio" name="new-quotation-mode" value={value}
               checked={mode === value} onChange={() => { setMode(value); setError(''); }} />
@@ -97,26 +98,27 @@ export function NewProjectQuotationModal({ project, versions, onClose }: {
       {mode === 'copy' && (
         <div className={styles.copy}>
           {can('projects:manage') && (
-            <label>Proyecto de origen
-              <select aria-label="Proyecto de origen" value={sourceProjectId}
-                onChange={(event) => { setSourceProjectId(event.target.value); setSourceVersionId(''); }}>
-                <option value={project.id}>{project.name} (actual)</option>
-                {(otherProjects.data?.items ?? []).filter((item) => item.id !== project.id)
-                  .map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-              </select>
-            </label>
+            <Select label="Proyecto de origen" value={sourceProjectId}
+              options={[
+                { value: project.id, label: project.name + ' (actual)' },
+                ...(otherProjects.data?.items ?? []).filter((item) => item.id !== project.id)
+                  .map((item) => ({ value: item.id, label: item.name })),
+              ]}
+              onChange={(event) => { setSourceProjectId(event.target.value); setSourceVersionId(''); }}
+            />
           )}
           {source.isLoading && <p>Consultando versiones de origen…</p>}
           {source.error && <p role="alert">No tienes acceso a las versiones de ese proyecto.</p>}
-          <label>Versión a copiar
-            <select aria-label="Versión a copiar" value={selectedVersionId}
-              onChange={(event) => setSourceVersionId(event.target.value)}>
-              {copyVersions.length === 0 && <option value="">Sin versiones disponibles</option>}
-              {copyVersions.map((v) => <option key={v.id} value={v.id}>
-                v{v.versionNumber} · {v.name} ({v.status === 'draft' ? 'Borrador' : 'Histórica'})
-              </option>)}
-            </select>
-          </label>
+          <Select label="Versión a copiar" value={selectedVersionId}
+            placeholder={copyVersions.length === 0 ? 'Sin versiones disponibles' : undefined}
+            options={copyVersions.map((v) => ({
+              value: v.id,
+              label: 'v' + v.versionNumber + ' · ' + v.name +
+                (v.status === 'draft' ? ' (Borrador)' : ' (Histórica)'),
+            }))}
+            disabled={source.isLoading || Boolean(source.error)}
+            onChange={(event) => setSourceVersionId(event.target.value)}
+          />
           <small>La copia se crea como borrador independiente y no hereda la evidencia ni la aceptación IA.</small>
         </div>
       )}
