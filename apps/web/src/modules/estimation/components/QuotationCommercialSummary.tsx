@@ -7,6 +7,7 @@ import styles from './QuotationCommercialSummary.module.css';
 
 type TeamHours = { teamId: string; name: string; hours: number; tone: string };
 const fmt = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 2 });
+const fmtMoney = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 4 });
 const round = (n: number, places: number) =>
   Math.round((n + Number.EPSILON) * 10 ** places) / 10 ** places;
 
@@ -80,7 +81,7 @@ export function QuotationCommercialSummary({
   const aiHours = version.draft.aiPoc?.proposal.totalHours ?? null;
   const unmapped = aiHours !== null && numbers.totalHours === 0 && aiHours > 0;
   const displayAmount = (amount: number | null) =>
-    amount === null ? '—' : fmt(amount) + ' ' + currency;
+    amount === null ? '—' : fmtMoney(amount) + ' ' + currency;
 
   return (
     <Card>
