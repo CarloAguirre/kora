@@ -664,15 +664,16 @@ export function QuotationWorkspacePage() {
                 dirty={dirty}
                 saving={saveDraft.isPending}
                 onSave={() => void save()}
+                actions={selected && project ? (
+                  <QuotationCommercialLifecycleCard
+                    key={selected.id + ':' + selected.revision}
+                    project={project} version={selected}
+                    quotation={quotation ?? null}
+                    canOperate={mayWrite} hasUnsavedChanges={dirty}
+                    embedded
+                  />
+                ) : null}
               />
-              {selected && project && (
-                <QuotationCommercialLifecycleCard
-                  key={selected.id + ':' + selected.revision}
-                  project={project} version={selected}
-                  quotation={quotation ?? null}
-                  canOperate={mayWrite} hasUnsavedChanges={dirty}
-                />
-              )}
 
               {dirty && <p className={styles.pendingNotice}>Guarda los cambios de la versión antes de enviar o aprobar.</p>}
               {notice && <p role="status" className={styles.success}>{notice}</p>}
