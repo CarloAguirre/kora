@@ -1,14 +1,17 @@
 import { useMemo } from 'react';
-import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import type {
   EstimationCreationMode,
   EstimationPocRole,
   SubmitEstimationAnswerInput,
 } from '@kora/contracts';
 import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
+import { projectQuotationPath } from '@/app/router/paths';
 import { Card } from '@/shared/components/ui/Card';
 import { useEstimationQuestionnaireDefinition, useGenerateAnsweredEstimationPocProposal } from '../api/estimation.queries';
 import { EstimationQuestionnaireForm } from '../components/EstimationQuestionnaireForm';
+import { useGenerateAiDemoQuotationVersion } from '../api/quotation.queries';
+import { DEMO_KDM_FOLDER_URL } from '../lib/demo-source';
 import { useEstimationWorkspace } from '../hooks/useEstimationWorkspace';
 import { getManualEstimationTemplate } from '../lib/estimation-templates';
 import styles from './EstimationWorkspacePage.module.css';
@@ -81,6 +84,7 @@ function isCreationMode(value: string | null): value is EstimationCreationMode {
 export function EstimationWorkspacePage() {
   const { projectId } = useParams();
   const location = useLocation();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const navigationState = (location.state ?? {}) as EstimationNavigationState;
   const modeParam = searchParams.get('mode');
@@ -89,11 +93,14 @@ export function EstimationWorkspacePage() {
     : navigationState.creationMode ?? 'standard';
 
   const { project, isLoading } = useEstimationWorkspace(projectId ?? null);
+  const demoMode = searchParams.get('demo') === 'kdm';
   const generateProposal = useGenerateAnsweredEstimationPocProposal();
+  const generateDemo = useGenerateAiDemoQuotationVersion(projectId ?? '');
+  const generating = demoMode ? generateDemo.isPending : generateProposal.isPending;
   const questionnaire = useEstimationQuestionnaireDefinition(mode === 'ai');
 
   const driveFolderUrl =
-    navigationState.driveFolderUrl?.trim() ||
+    (demoMode ? DEMO_KDM_FOLDER_URL : navigationState.driveFolderUrl?.trim()) ||
     (project.data?.documentationLink?.includes('drive.google.com')
       ? project.data.documentationLink
       : '');
@@ -105,15 +112,25 @@ export function EstimationWorkspacePage() {
   );
 
   const submitQuestionnaire = (answers: SubmitEstimationAnswerInput[]) => {
-    if (mode !== 'ai' || !project.data || !driveFolderUrl || generateProposal.isPending) return;
-    generateProposal.mutate({
+    if (mode !== 'ai' || !project.data || !driveFolderUrl || generating) return;
+    const input = {
       projectId: project.data.id,
       projectName: project.data.name,
       clientName: project.data.client?.companyName ?? null,
-      driveFolderUrl,
+      driveFolderUrl: demoMode ? DEMO_KDM_FOLDER_URL : driveFolderUrl,
       instructions: instructions || null,
       answers,
-    });
+    };
+    if (demoMode) {
+      // En una sola solicitud el servidor valida, llama a Gemini con KDM y
+      // persiste una versión IA. Ninguna propuesta creada solo en el navegador.
+      generateDemo.mutate(input, {
+        onSuccess: (created) => navigate(projectQuotationPath(project.data) +
+          '?version=' + created.id + '&map-ai=1'),
+      });
+    } else {
+      generateProposal.mutate(input);
+    }
   };
 
   if (!projectId) {
@@ -124,7 +141,7 @@ export function EstimationWorkspacePage() {
     );
   }
 
-  const proposal = mode === 'ai' && generateProposal.data?.projectId === project.data?.id
+  const proposal = mode === 'ai' && !demoMode && generateProposal.data?.projectId === project.data?.id
     ? generateProposal.data : undefined;
   const roles = proposal?.roles ?? manualRoles;
   const totalHours =
@@ -208,7 +225,8 @@ export function EstimationWorkspacePage() {
                 {mode === 'ai' && (
                   <p className={styles.driveNote}>
                     📁{' '}
-                    {driveFolderUrl
+                    {demoMode ? 'Fuente de demostración: Requerimiento_KDM.pdf (sin conexión Drive real).'
+                      : driveFolderUrl
                       ? 'Carpeta de Drive vinculada como raíz del análisis.'
                       : 'No hay carpeta de Drive vinculada.'}
                   </p>
@@ -244,15 +262,16 @@ export function EstimationWorkspacePage() {
                 questionnaire.data && !proposal && (
                   <Card className={styles.analysisCard}>
                     <p className={styles.metaNote}>
-                      R4-a · Confirma las preguntas F01–F05 antes de estimar.
-                      Las aclaraciones dinámicas requieren integrar un análisis
-                      documental real; no se han generado en este paso.
+                      Confirma F01–F05 antes de generar la propuesta Gemini.
+                      {demoMode
+                        ? ' Fuente de demostración: PDF KDM; la carpeta real del proyecto no se consulta.'
+                        : ' Las preguntas dinámicas requieren analizar la documentación real.'}
                     </p>
                     <EstimationQuestionnaireForm
                       key={project.data.id + ':' + driveFolderUrl}
                       fixedQuestions={questionnaire.data.fixedQuestions}
                       dynamicQuestions={[]}
-                      submitting={generateProposal.isPending}
+                      submitting={generating}
                       onSubmit={submitQuestionnaire}
                     />
                   </Card>
@@ -260,14 +279,13 @@ export function EstimationWorkspacePage() {
 
               {mode === 'ai' &&
                 driveFolderUrl &&
-                generateProposal.isPending && (
+                generating && (
                   <Card className={styles.analysisCard}>
                     <span className={styles.agentEyebrow}>✦ Agente IA</span>
                     <h2>El agente está preparando la propuesta</h2>
                     <p className={styles.summaryText}>
-                      Kora prepara una estimación ejecutiva a partir de tus respuestas.
-                      Con un proveedor real, lee los antecedentes accesibles en Drive;
-                      en modo PoC simulado no se consultan documentos.
+                      Gemini procesa las respuestas y el PDF KDM de prueba.
+                      Después guarda el borrador de cotización en PostgreSQL. No se consulta el Drive del proyecto.
                     </p>
                     <ol className={styles.analysisSteps}>
                       {ANALYSIS_STEPS.map((step, index) => (
@@ -280,12 +298,12 @@ export function EstimationWorkspacePage() {
                   </Card>
                 )}
 
-              {mode === 'ai' && generateProposal.error && (
+              {mode === 'ai' && (demoMode ? generateDemo.error : generateProposal.error) && (
                 <Card className={styles.errorCard}>
                   <h2>No se pudo generar la propuesta</h2>
                   <p>
-                    {generateProposal.error instanceof Error
-                      ? generateProposal.error.message
+                    {(demoMode ? generateDemo.error : generateProposal.error) instanceof Error
+                      ? (demoMode ? generateDemo.error : generateProposal.error)?.message
                       : 'Revisa la configuración de Google Drive y del proveedor IA.'}
                   </p>
                 </Card>
@@ -384,7 +402,7 @@ export function EstimationWorkspacePage() {
                     {proposal
                       ? 'Propuesta lista para revisar'
                       : mode === 'ai'
-                        ? generateProposal.isPending
+                        ? generating
                           ? 'Analizando antecedentes'
                           : 'Esperando análisis'
                         : 'Borrador manual'}

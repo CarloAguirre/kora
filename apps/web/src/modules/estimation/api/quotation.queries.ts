@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { CreateQuotationVersionInput, UpdateQuotationDraftInput, QuotationReconciliationReview, AssessQuotationReconciliationInput } from '@kora/contracts';
+import type { GenerateEstimationPocInput, CreateQuotationVersionInput, UpdateQuotationDraftInput, QuotationReconciliationReview, AssessQuotationReconciliationInput } from '@kora/contracts';
 import { quotationApi, quotationKeys } from './quotation.api';
 
 export function useProjectQuotation(projectId: string | null, enabled = true) {
@@ -15,6 +15,15 @@ export function useCreateQuotationVersion(projectId: string) {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (input: CreateQuotationVersionInput) => quotationApi.create(projectId, input),
+    onSuccess: () => client.invalidateQueries({ queryKey: quotationKeys.project(projectId) }),
+  });
+}
+
+/** Gemini real + KDM como fuente de demostración, guardado en PostgreSQL. */
+export function useGenerateAiDemoQuotationVersion(projectId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (input: GenerateEstimationPocInput) => quotationApi.generateAiDemoDraft(projectId, input),
     onSuccess: () => client.invalidateQueries({ queryKey: quotationKeys.project(projectId) }),
   });
 }
