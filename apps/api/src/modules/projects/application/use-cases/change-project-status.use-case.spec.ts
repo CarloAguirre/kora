@@ -52,6 +52,25 @@ describe('Regla de inicio: cotización aprobada y traspasada', () => {
     expect(projects.save).not.toHaveBeenCalled();
   });
 
+  it('no permite iniciar un prospecto o cotización sin aprobación del cliente', async () => {
+    for (const salesStage of ['prospect', 'quoted'] as const) {
+      const project = Project.create({
+        id: 'project-1', name: 'Prospecto', slug: 'prospecto',
+        type: 'development', status: 'draft', salesStage,
+        leaderUserId: 'leader-1', now: NOW,
+      }).unwrap();
+      const { useCase, projects } = buildUseCase(project);
+      const result = await useCase.execute({
+        projectId: project.id,
+        data: { status: 'active', reason: 'Preparar ejecución' },
+        actor: ACTOR, actorPermissions: ['projects:manage'],
+      });
+      expect(result.isErr()).toBe(true);
+      expect(result.isErr() && result.error).toBeInstanceOf(ProjectQuotationTransferRequiredError);
+      expect(projects.save).not.toHaveBeenCalled();
+    }
+  });
+
   it('no bloquea proyectos heredados sin cotización pendiente', async () => {
     const { useCase, projects } = buildUseCase(buildApprovedDraftProject());
     vi.mocked(projects.hasPendingQuotationTransfer!).mockResolvedValueOnce(false);

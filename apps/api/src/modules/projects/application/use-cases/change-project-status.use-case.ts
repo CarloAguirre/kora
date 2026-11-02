@@ -54,7 +54,8 @@ export class ChangeProjectStatusUseCase
 
     if (previousStatus === 'draft' && command.data.status === 'active' &&
         project.type === 'development' &&
-        await this.projects.hasPendingQuotationTransfer?.(project.id)) {
+        (project.salesStage !== 'approved' ||
+         await this.projects.hasPendingQuotationTransfer?.(project.id))) {
       return err(new ProjectQuotationTransferRequiredError());
     }
 
