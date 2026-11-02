@@ -45,10 +45,8 @@ describe('ManageQuotationDraftsUseCase', () => {
       .rejects.toBeInstanceOf(ForbiddenException);
   });
 
-  it('bloquea escritura en aprobados, finalizados, detenidos, cancelados y soporte', async () => {
+  it('bloquea escritura en finalizados, detenidos, cancelados y soporte', async () => {
     const denied: QuotationProjectScope[] = [
-      { ...project, salesStage: 'approved', status: 'draft' },
-      { ...project, salesStage: 'approved', status: 'active' },
       { ...project, salesStage: 'quoted', status: 'finished' },
       { ...project, salesStage: 'prospect', status: 'cancelled' },
       { ...project, salesStage: 'quoted', status: 'on_hold' },
@@ -131,7 +129,7 @@ describe('ManageQuotationDraftsUseCase', () => {
     await expect(useCase.getTransferPreview(project.id, 'version', manager)).rejects.toThrow();
     expect(repository.getOperationalSnapshot).not.toHaveBeenCalled();
   });
-  it('copia entre proyectos solo con permiso de Gerencia y origen autorizado', async () => {
+  it('copia entre proyectos solo si el usuario tiene acceso a ambos proyectos', async () => {
     const otherId = '0777e456-fd76-445e-83f1-afc25061c111';
     const versionId = '0777e456-fd76-445e-83f1-afc25061c112';
     const { useCase, repository } = setup();
@@ -144,46 +142,64 @@ describe('ManageQuotationDraftsUseCase', () => {
       sourceProjectId: otherId, sourceVersionId: versionId,
     });
 
+    const leaderAccess = setup();
+    await expect(leaderAccess.useCase.create(project.id, leader, {
+      sourceProjectId: otherId, sourceVersionId: versionId,
+    })).resolves.toBeDefined();
     const outsider = setup();
-    await expect(outsider.useCase.create(project.id, leader, {
+    await expect(outsider.useCase.create(project.id, { id: manager.id,
+      permissions: ['projects:read_assigned'] }, {
       sourceProjectId: otherId, sourceVersionId: versionId,
     })).rejects.toBeInstanceOf(ForbiddenException);
     expect(outsider.repository.createDraft).not.toHaveBeenCalled();
   });
 
-  it('no genera borrador IA para usuarios no gerentes ni para proyectos no elegibles', async () => {
+  it('líder y Gerencia pueden generar IA en proyectos aprobados activos; bloquea históricos cerrados', async () => {
     const { useCase, repository } = setup();
-    await expect(useCase.authorizeAiPoc(project.id, leader))
-      .rejects.toBeInstanceOf(ForbiddenException);
+    await expect(useCase.authorizeAiPoc(project.id, leader)).resolves.toBeUndefined();
     expect(repository.createAiPocDraft).toBeUndefined();
-    const historical = setup({ ...project, salesStage: 'approved' });
-    await expect(historical.useCase.authorizeAiPoc(project.id, manager))
+    const approved = setup({ ...project, salesStage: 'approved', status: 'active' });
+    await expect(approved.useCase.authorizeAiPoc(project.id, manager)).resolves.toBeUndefined();
+    const finished = setup({ ...project, salesStage: 'approved', status: 'finished' });
+    await expect(finished.useCase.authorizeAiPoc(project.id, manager))
       .rejects.toBeInstanceOf(ConflictException);
   });
 
-  it('solo Gerencia acepta el baseline; conserva revision y exige proyecto elegible', async () => {
+  it('bloquea el endpoint histórico de aceptación que escribía antes de aprobar al cliente', async () => {
     const versionId = '0777e456-fd76-445e-83f1-afc25061c105';
-    const input = {
-      revision: 3, confirmation: 'APLICAR_PLANIFICACION_KDM_DEMO' as const,
-    };
+    const input = { revision: 3, confirmation: 'APLICAR_PLANIFICACION_KDM_DEMO' as const };
     const { useCase, repository } = setup();
-    const apply = vi.fn().mockResolvedValue({
-      projectId: project.id, versionId, status: 'accepted_for_planning_only',
-      totalHours: 80, commercialApproval: false, modules: [],
-    });
-    repository.applyPlanningBaseline = apply;
+    repository.applyPlanningBaseline = vi.fn();
     await expect(useCase.applyPlanningBaseline(project.id, versionId, leader, input))
-      .rejects.toBeInstanceOf(ForbiddenException);
-    expect(apply).not.toHaveBeenCalled();
-    const baseline = await useCase.applyPlanningBaseline(project.id, versionId, manager, input);
-    expect(baseline.commercialApproval).toBe(false);
-    expect(apply).toHaveBeenCalledWith(project.id, versionId, manager.id, input);
-
-    const historical = setup({ ...project, salesStage: 'approved' });
-    historical.repository.applyPlanningBaseline = vi.fn();
-    await expect(historical.useCase.applyPlanningBaseline(project.id, versionId, manager, input))
       .rejects.toBeInstanceOf(ConflictException);
-    expect(historical.repository.applyPlanningBaseline).not.toHaveBeenCalled();
+    await expect(useCase.applyPlanningBaseline(project.id, versionId, manager, input))
+      .rejects.toBeInstanceOf(ConflictException);
+    expect(repository.applyPlanningBaseline).not.toHaveBeenCalled();
+  });
+
+  it('aceptar IA, registrar envío, aprobar cliente y traspasar verifican acceso al proyecto', async () => {
+    const id = '0777e456-fd76-445e-83f1-afc25061c105';
+    const { useCase, repository } = setup();
+    repository.acceptAiProposal = vi.fn().mockResolvedValue({ id });
+    repository.markSent = vi.fn().mockResolvedValue({ id });
+    repository.approveClient = vi.fn().mockResolvedValue({ id });
+    repository.transferApproved = vi.fn().mockResolvedValue({ versionId: id });
+    await useCase.acceptAiProposal(project.id, id, leader, { revision: 1 });
+    await useCase.markSent(project.id, id, leader, { revision: 2 });
+    await useCase.approveClient(project.id, id, leader, {
+      revision: 3, confirmation: 'CLIENTE_APROBO_ESTA_VERSION',
+    });
+    await useCase.transferApproved(project.id, id, leader, {
+      revision: 4, confirmation: 'TRASPASAR_COTIZACION_APROBADA',
+    });
+    expect(repository.acceptAiProposal).toHaveBeenCalled();
+    expect(repository.markSent).toHaveBeenCalled();
+    expect(repository.approveClient).toHaveBeenCalled();
+    expect(repository.transferApproved).toHaveBeenCalled();
+    await expect(useCase.transferApproved(project.id, id, {
+      id: manager.id, permissions: ['projects:read_assigned'],
+    }, { revision: 4, confirmation: 'TRASPASAR_COTIZACION_APROBADA' }))
+      .rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it('solo permite leer planificación aplicada al gerente o líder asignado', async () => {

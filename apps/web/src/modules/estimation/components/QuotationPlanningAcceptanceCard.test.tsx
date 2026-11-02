@@ -60,51 +60,14 @@ const version = quotationVersionSchema.parse({
     },
   },
 });
-afterEach(() => {
-  vi.restoreAllMocks();
-  mocks.applied = null;
-  mocks.mutate.mockReset();
-});
-
-describe('Aceptación de planificación KDM', () => {
-  it('muestra tareas de referencia sin fechas y exige confirmación de Gerencia', async () => {
-    mocks.mutate.mockResolvedValue({
-      versionId, totalHours: 40,
-      modules: [{ name: 'Portal', tasks: [], totalHours: 40 }],
-    });
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
-    render(<QuotationPlanningAcceptanceCard projectId={projectId}
-      version={version} canManage hasUnsavedChanges={false} />);
+describe('EDT de cotización sin aplicación prematura', () => {
+  it('muestra WBS y HH de Gemini sin habilitar traspaso hasta aprobación comercial', () => {
+    render(<QuotationPlanningAcceptanceCard version={version} />);
     expect(screen.getByText(/EDT de referencia/)).toBeInTheDocument();
     fireEvent.click(screen.getByText(/Portal · 1 tareas · 40 HH/));
     expect(screen.getByText(/1.1 · Backend/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Aceptar estimación y crear planificación' }));
-    await waitFor(() => expect(mocks.mutate).toHaveBeenCalledTimes(1));
-    expect(mocks.mutate).toHaveBeenCalledWith({
-      versionId,
-      input: { revision: 2, confirmation: 'APLICAR_PLANIFICACION_KDM_DEMO' },
-    });
-    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('KDM DE PRUEBA'));
-    expect(screen.getByText(/Las tareas quedan como referencia/)).toBeInTheDocument();
-  });
-
-  it('bloquea doble aplicación, cambios locales y actores sin autorización', () => {
-    const first = render(<QuotationPlanningAcceptanceCard projectId={projectId}
-      version={version} canManage hasUnsavedChanges />);
-    expect(screen.getByRole('button', { name: 'Aceptar estimación y crear planificación' }))
-      .toBeDisabled();
-    first.unmount();
-    mocks.applied = { versionId };
-    const second = render(<QuotationPlanningAcceptanceCard projectId={projectId}
-      version={version} canManage hasUnsavedChanges={false} />);
-    expect(screen.getByText(/ya se aplicó al Roadmap/)).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Aceptar estimación y crear planificación' }))
-      .not.toBeInTheDocument();
-    second.unmount();
-    mocks.applied = null;
-    render(<QuotationPlanningAcceptanceCard projectId={projectId}
-      version={version} canManage={false} hasUnsavedChanges={false} />);
-    expect(screen.queryByRole('button', { name: 'Aceptar estimación y crear planificación' }))
+    expect(screen.getByText(/Solo se traspasa/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Aceptar estimación y crear planificación/ }))
       .not.toBeInTheDocument();
     expect(mocks.mutate).not.toHaveBeenCalled();
   });
