@@ -34,6 +34,41 @@ import { DATABASE } from '../../../../shared/infrastructure/database/database.mo
 import { resolveDb } from '../../../../shared/infrastructure/database/unit-of-work';
 import { toDomain, toPersistence } from './project.persistence-mapper';
 
+/** Calculado desde versiones y eventos reales, sin inferir aprobación desde sales_stage.
+ * Es una subconsulta correlacionada: no multiplica filas ni altera la paginación. */
+const quotationStatusSql = sql<
+  'none' | 'draft' | 'sent' | 'approved_pending' | 'transferred' | 'planning_applied'
+>`case
+  when exists (
+    select 1 from project_quotations pq
+    join quotation_versions qv on qv.quotation_id = pq.id
+    join quotation_events qe on qe.version_id = qv.id
+    where pq.project_id = ${projects.id} and qe.action = 'quotation_transferred'
+  ) then 'transferred'
+  when exists (
+    select 1 from project_quotations pq
+    join quotation_versions qv on qv.quotation_id = pq.id
+    join quotation_events qe on qe.version_id = qv.id
+    where pq.project_id = ${projects.id} and qe.action = 'planning_baseline_applied'
+  ) then 'planning_applied'
+  when exists (
+    select 1 from project_quotations pq
+    join quotation_versions qv on qv.quotation_id = pq.id
+    where pq.project_id = ${projects.id} and qv.status = 'approved'
+  ) then 'approved_pending'
+  when exists (
+    select 1 from project_quotations pq
+    join quotation_versions qv on qv.quotation_id = pq.id
+    where pq.project_id = ${projects.id} and qv.status = 'sent'
+  ) then 'sent'
+  when exists (
+    select 1 from project_quotations pq
+    join quotation_versions qv on qv.quotation_id = pq.id
+    where pq.project_id = ${projects.id}
+  ) then 'draft'
+  else 'none'
+end`;
+
 @Injectable()
 export class DrizzleProjectRepository implements ProjectRepository {
   constructor(@Inject(DATABASE) private readonly database: Database) {}
@@ -87,6 +122,7 @@ export class DrizzleProjectRepository implements ProjectRepository {
           clientName: clients.companyName,
           type: projects.type,
           salesStage: projects.salesStage,
+          quotationStatus: quotationStatusSql,
           status: projects.status,
           phase: projects.phase,
           priority: projects.priority,
@@ -129,6 +165,7 @@ export class DrizzleProjectRepository implements ProjectRepository {
       clientName: row.clientName,
       type: row.type,
       salesStage: row.salesStage,
+      quotationStatus: row.quotationStatus,
       status: row.status,
       phase: row.phase,
       priority: row.priority,
@@ -303,6 +340,8 @@ export class DrizzleProjectRepository implements ProjectRepository {
     if (filters.type) conditions.push(eq(projects.type, filters.type));
     if (filters.status?.length) conditions.push(inArray(projects.status, filters.status));
     if (filters.phase?.length) conditions.push(inArray(projects.phase, filters.phase));
+    if (filters.salesStage?.length) conditions.push(inArray(projects.salesStage, [...filters.salesStage]));
+    if (filters.quotationStatus?.length) conditions.push(inArray(quotationStatusSql, [...filters.quotationStatus]));
     if (filters.clientId) conditions.push(eq(projects.clientId, filters.clientId));
     if (filters.clientIds?.length) conditions.push(inArray(projects.clientId, [...filters.clientIds]));
     if (filters.periods?.length) {
@@ -390,6 +429,13 @@ export class DrizzleProjectRepository implements ProjectRepository {
 
     if (sort.field === 'leader') {
       return [sql`${users.firstName} ${sqlDirection} nulls last`, sql`${users.lastName} ${sqlDirection} nulls last`, asc(projects.id)];
+    }
+
+    if (sort.field === 'salesStage') {
+      return [sql`${projects.salesStage} ${sqlDirection} nulls last`, asc(projects.id)];
+    }
+    if (sort.field === 'quotationStatus') {
+      return [sql`${quotationStatusSql} ${sqlDirection}`, asc(projects.id)];
     }
 
     if (sort.field === 'startDate') {
