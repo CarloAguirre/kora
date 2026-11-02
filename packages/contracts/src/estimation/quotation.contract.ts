@@ -145,6 +145,8 @@ export type QuotationRevisionActionInput = z.infer<typeof quotationRevisionActio
 
 export const approveClientQuotationSchema = quotationRevisionActionSchema.extend({
   confirmation: z.literal('CLIENTE_APROBO_ESTA_VERSION'),
+  /** Obligatoria cuando el cliente aprobó un borrador sin envío registrado. */
+  confirmWithoutSend: z.literal(true).optional(),
 });
 export type ApproveClientQuotationInput = z.infer<typeof approveClientQuotationSchema>;
 

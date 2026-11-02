@@ -36,6 +36,19 @@ export function assertQuotationReadyForClient(
   }
 }
 
+/** La especificación permite aprobar sin envío previo, pero exige una segunda
+ * confirmación explícita que el servidor valida independientemente de la UI. */
+export function assertDirectClientApprovalAcknowledged(
+  currentStatus: 'draft' | 'sent',
+  confirmedWithoutSend: true | undefined,
+): void {
+  if (currentStatus === 'draft' && confirmedWithoutSend !== true) {
+    throw new InvalidCommercialQuotation(
+      'Para aprobar un borrador sin envío comercial debes confirmar explícitamente que el cliente aprobó esta versión.',
+    );
+  }
+}
+
 /** La IA puede aceptarse sin aprobación contractual y sin traspasar equipos.
  * Verifica que se haya proyectado y conciliado su presupuesto. */
 export function assertAiProposalReadyToAccept(

@@ -36,7 +36,7 @@ import {
 import { DATABASE } from '../../../../shared/infrastructure/database/database.module';
 import { calculateQuotation } from '../../domain/quotation-math';
 import { hasOnlyUntouchedDefaultPaymentMilestones } from '../../domain/default-payment-plan-eligibility';
-import { assertQuotationReadyForClient, assertAiProposalReadyToAccept } from '../../domain/quotation-commercial-eligibility';
+import { assertQuotationReadyForClient, assertAiProposalReadyToAccept, assertDirectClientApprovalAcknowledged } from '../../domain/quotation-commercial-eligibility';
 import type { QuotationProjectScope, QuotationRepository } from '../../domain/repositories/quotation.repository';
 
 @Injectable()
@@ -745,9 +745,12 @@ export class DrizzleQuotationRepository implements QuotationRepository {
         eq(quotationVersions.quotationId, quotation.id),
       )).limit(1);
       if (!current) throw new NotFoundException('Versión no encontrada.');
-      if (current.status !== 'sent' || current.revision !== input.revision) {
-        throw new ConflictException('La versión debe estar enviada antes de registrar aprobación del cliente.');
+      if (!['draft', 'sent'].includes(current.status) || current.revision !== input.revision) {
+        throw new ConflictException('Solo se puede aprobar un borrador o envío vigente.');
       }
+      assertDirectClientApprovalAcknowledged(
+        current.status as 'draft' | 'sent', input.confirmWithoutSend,
+      );
       const [latest] = await tx.select({ id: quotationVersions.id })
         .from(quotationVersions)
         .where(eq(quotationVersions.quotationId, quotation.id))
@@ -782,7 +785,8 @@ export class DrizzleQuotationRepository implements QuotationRepository {
         versionId, actorUserId: userId, action: 'quotation_client_approved',
         metadata: { wasSent: current.status === 'sent',
           previousRevision: input.revision, newRevision: input.revision + 1,
-          transferStatus: 'pending' },
+          transferStatus: 'pending',
+          directApprovalConfirmed: current.status === 'draft' && input.confirmWithoutSend === true },
       });
       return toVersion(updated!);
     });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assertQuotationReadyForClient, assertAiProposalReadyToAccept } from './quotation-commercial-eligibility';
+import { assertQuotationReadyForClient, assertAiProposalReadyToAccept, assertDirectClientApprovalAcknowledged } from './quotation-commercial-eligibility';
 import type { QuotationVersion } from '@kora/contracts';
 const base = () => ({
   hourlyRate: 1, totalHours: 40, netAmount: 40, totalAmount: 47.6,
@@ -16,6 +16,12 @@ const base = () => ({
   },
 }) as unknown as QuotationVersion;
 describe('Transiciones comerciales', () => {
+  it('requiere confirmación adicional al aprobar un borrador sin marcarlo enviado', () => {
+    expect(() => assertDirectClientApprovalAcknowledged('draft', undefined))
+      .toThrow(/confirmar explícitamente/);
+    expect(() => assertDirectClientApprovalAcknowledged('draft', true)).not.toThrow();
+    expect(() => assertDirectClientApprovalAcknowledged('sent', undefined)).not.toThrow();
+  });
   it('exige HH valorizadas y plan de pagos 100%', () => {
     expect(() => assertQuotationReadyForClient(base())).not.toThrow();
     expect(() => assertQuotationReadyForClient({ ...base(), hourlyRate: null })).toThrow(/valor HH/);
