@@ -437,11 +437,11 @@ export function QuotationWorkspacePage() {
                     </details>
                   </Card>
 
+                  {form.draft.mode === 'phases' && (
                   <Card>
-                    <div className={styles.cardTitle}><div><h2>Modalidad de estimación</h2><p>Las HH por fases reemplazan el cálculo global de equipos, no se suman dos veces.</p></div></div>
-                    <Select value={form.draft.mode} disabled={!editable}
-                      options={[{ value: 'team', label: 'Equipos / dedicación' }, { value: 'phases', label: 'Por fases y semanas' }]}
-                      onChange={(e) => updateDraft({ mode: e.target.value as QuotationDraftData['mode'] })} />
+                    <div className={styles.cardTitle}>
+                      <div><h2>Fases · Módulos</h2><p>En semanas desde el inicio. Las HH por fase reemplazan, no se suman, al cálculo por equipo.</p></div>
+                    </div>
                     {form.draft.mode === 'phases' && (
                       <>
                         <div className={styles.cardTitle}>
@@ -478,7 +478,9 @@ export function QuotationWorkspacePage() {
                         ))}
                       </>
                     )}
+                  
                   </Card>
+                )}
 
                   <div id="quotation-ai-role-review" className={styles.aiRoleReview}>
               {selected?.draft.aiPoc && form && (
