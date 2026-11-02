@@ -1,5 +1,6 @@
 import type { QuotationVersion } from '@kora/contracts';
 import { Card } from '@/shared/components/ui/Card';
+import { buildReferenceDailyPlan, referenceDailyPlanCsv } from '../lib/quotation-reference-daily-plan';
 import styles from './QuotationPlanningAcceptanceCard.module.css';
 
 const fmt = (hours: number) => hours.toLocaleString('es-CL', { maximumFractionDigits: 2 });
@@ -26,6 +27,22 @@ export function QuotationPlanningAcceptanceCard({
     const teamId = mapping[role];
     if (!teamId || !teamNames) return null;
     return teamNames.get(teamId) ?? 'Equipo no disponible';
+  };
+  const dailyPlan = detailed && version.draft.aiPoc
+    ? buildReferenceDailyPlan(edt, version.draft.aiPoc.proposal.roles)
+    : null;
+  const exportDailyPlan = () => {
+    if (!dailyPlan || dailyPlan.issues.length > 0) return;
+    const csv = referenceDailyPlanCsv(dailyPlan, (role) => mappedName(role) ?? role);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'plan-diario-referencial-v' + version.versionNumber + '.csv';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
   };
   return (
     <Card>
@@ -63,6 +80,61 @@ export function QuotationPlanningAcceptanceCard({
             ))}
           </div>
         </div>
+      )}
+      {dailyPlan && (
+        <details className={styles.dailyPlan}>
+          <summary>
+            <span>Plan diario de referencia</span>
+            <small>{dailyPlan.rows.length} asignaciones · {dailyPlan.dayCount} días hábiles relativos
+              {' · '}{fmt(dailyPlan.plannedHours)} / {fmt(dailyPlan.sourceHours)} HH</small>
+          </summary>
+          <div className={styles.dailyBody}>
+            <p>
+              Distribución matemática de las HH de Gemini por actividad y perfil,
+              dentro de las semanas propuestas. Sin fechas reales, responsables nominales,
+              dependencias aprobadas ni impacto en Forecast.
+              Capacidad máxima de 8 HH por persona/día, ajustada a la dedicación propuesta.
+            </p>
+            {dailyPlan.issues.length > 0 && (
+              <div role="alert" className={styles.dailyIssues}>
+                <strong>Distribución incompleta: {fmt(dailyPlan.pendingHours)} HH pendientes.</strong>
+                <ul>{dailyPlan.issues.map((issue, index) => <li key={index}>{issue}</li>)}</ul>
+                <p>Revisar semanas, duración o capacidad antes de considerar este plan viable.</p>
+              </div>
+            )}
+            <div className={styles.dailyActions}>
+              <button type="button" onClick={exportDailyPlan}
+                disabled={dailyPlan.issues.length > 0}>
+                Exportar Plan_Diario (CSV)
+              </button>
+              <small>
+                Estructura equivalente al Excel Zurich; la columna Fecha queda vacía.
+              </small>
+            </div>
+            <div className={styles.dailyScroll}>
+              <table>
+                <thead><tr>
+                  <th>Día</th><th>Tramo</th><th>Equipo / perfil</th>
+                  <th>Actividad WBS</th><th>Actividad</th><th>HH</th>
+                </tr></thead>
+                <tbody>
+                  {dailyPlan.rows.slice(0, 70).map((row, index) => (
+                    <tr key={row.day + '-' + row.wbs + '-' + row.role + '-' + index}>
+                      <td>{row.day}</td>
+                      <td>{row.stageCode}</td>
+                      <td>{mappedName(row.role) ?? row.role}</td>
+                      <td>{row.wbs}</td>
+                      <td>{row.activity}</td>
+                      <td className={styles.dailyHours}>{fmt(row.hours)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {dailyPlan.rows.length > 70 &&
+              <p>Vista limitada a 70 asignaciones. Exporta el CSV para verlas todas.</p>}
+          </div>
+        </details>
       )}
       <p className={styles.notice}>
         La EDT permanece en la versión comercial hasta su aprobación y traspaso.
