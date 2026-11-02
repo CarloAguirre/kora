@@ -95,6 +95,7 @@ describe('EDT de cotización sin aplicación prematura', () => {
     render(<QuotationPlanningAcceptanceCard version={quotationVersionSchema.parse(extended)} />);
     expect(screen.getByText('Plan diario de referencia')).toBeInTheDocument();
     expect(screen.getByText(/5 días hábiles relativos/)).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Plan diario de referencia'));
     expect(screen.getByRole('button', { name: 'Exportar Plan_Diario (CSV)' })).toBeEnabled();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(mocks.mutate).not.toHaveBeenCalled();
@@ -117,6 +118,7 @@ describe('EDT de cotización sin aplicación prematura', () => {
       }] }],
     };
     render(<QuotationPlanningAcceptanceCard version={quotationVersionSchema.parse(extended)} />);
+    fireEvent.click(screen.getByText('Plan diario de referencia'));
     expect(screen.getByRole('alert')).toHaveTextContent('8 HH pendientes');
     expect(screen.getByRole('button', { name: 'Exportar Plan_Diario (CSV)' })).toBeDisabled();
   });
