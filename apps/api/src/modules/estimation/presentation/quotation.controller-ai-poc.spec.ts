@@ -1,6 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
-import { estimationPocProposalSchema } from '@kora/contracts';
+import { estimationPocProposalSchema, quotationReferenceEdtSchema } from '@kora/contracts';
 import { QuotationController } from './quotation.controller';
 import { GetEstimationQuestionnaireDefinitionUseCase } from '../application/use-cases/get-estimation-questionnaire-definition.use-case';
 
@@ -28,6 +28,15 @@ const proposal = estimationPocProposalSchema.parse({
   }],
   totalHours: 40, assumptions: [], clarifyingQuestions: [],
 });
+const edt = quotationReferenceEdtSchema.parse({
+  schemaVersion: 'kora.quotation.reference-edt.v1',
+  source: 'kdm_demo', provider: 'gemini', totalHours: 40,
+  modules: [{
+    name: 'Portal', totalHours: 40,
+    tasks: [{ wbs: '1.1', name: 'Implementación',
+      description: 'Portal KDM', role: 'Desarrollo', hours: 40 }],
+  }],
+});
 function setup() {
   const drafts = {
     authorizeAiPoc: vi.fn().mockResolvedValue(undefined),
@@ -36,7 +45,8 @@ function setup() {
       origin: 'ai', status: 'draft', aiReviewStatus: 'pending',
     }),
   };
-  const generator = { execute: vi.fn().mockResolvedValue(proposal) };
+  const generator = { execute: vi.fn().mockResolvedValue(proposal),
+    generateEdt: vi.fn().mockResolvedValue(edt) };
   const definition = new GetEstimationQuestionnaireDefinitionUseCase();
   const controller = new QuotationController(drafts as never, generator as never, definition);
   return { drafts, generator, controller };
@@ -48,8 +58,9 @@ describe('POST versions/ai-poc · Gemini con KDM', () => {
     const result = await controller.createAiPoc(projectId, input, actor as never);
     expect(drafts.authorizeAiPoc).toHaveBeenCalledWith(projectId, actor);
     expect(generator.execute).toHaveBeenCalledWith(input);
+    expect(generator.generateEdt).toHaveBeenCalledWith(input, proposal);
     expect(drafts.createAiPocDraft).toHaveBeenCalledWith(
-      projectId, actor, proposal, input.answers, input.dynamicQuestions,
+      projectId, actor, proposal, input.answers, input.dynamicQuestions, edt,
     );
     expect(result).toMatchObject({
       origin: 'ai', status: 'draft', aiReviewStatus: 'pending',
@@ -69,6 +80,7 @@ describe('POST versions/ai-poc · Gemini con KDM', () => {
       projectId, { ...input, answers: input.answers.slice(1) }, actor as never,
     )).rejects.toBeInstanceOf(BadRequestException);
     expect(generator.execute).not.toHaveBeenCalled();
+    expect(generator.generateEdt).not.toHaveBeenCalled();
     expect(drafts.createAiPocDraft).not.toHaveBeenCalled();
   });
 
@@ -78,6 +90,7 @@ describe('POST versions/ai-poc · Gemini con KDM', () => {
     await expect(controller.createAiPoc(projectId, input, actor as never))
       .rejects.toBeInstanceOf(BadRequestException);
     expect(drafts.createAiPocDraft).not.toHaveBeenCalled();
+    expect(generator.generateEdt).not.toHaveBeenCalled();
   });
 
   it('rechaza preguntas dinámicas que no documenten su origen KDM', async () => {
