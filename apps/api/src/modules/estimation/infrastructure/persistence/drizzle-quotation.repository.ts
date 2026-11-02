@@ -758,6 +758,161 @@ export class DrizzleQuotationRepository implements QuotationRepository {
     });
   }
 
+  /** Traspaso SOLO de una versión aprobada, a proyecto nuevo sin ejecución.
+   * La recotización histórica debe reconciliarse con un proceso distinto. */
+  async transferApproved(projectId: string, versionId: string, userId: string,
+    input: TransferApprovedQuotationInput): Promise<QuotationTransferResult> {
+    return this.db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT id FROM projects WHERE id = ${projectId} FOR UPDATE`);
+      const [project] = await tx.select().from(projects).where(and(
+        eq(projects.id, projectId), isNull(projects.deletedAt),
+      )).limit(1);
+      if (!project || project.type !== 'development') throw new NotFoundException('Proyecto no encontrado.');
+      if (project.status !== 'draft' || project.salesStage !== 'approved') {
+        throw new ConflictException('Este traspaso inicial requiere proyecto aprobado y No iniciado.');
+      }
+      const [quotation] = await tx.select({ id: projectQuotations.id })
+        .from(projectQuotations).where(eq(projectQuotations.projectId, projectId)).limit(1);
+      if (!quotation) throw new NotFoundException('Cotización no encontrada.');
+      await tx.execute(sql`SELECT id FROM project_quotations WHERE id = ${quotation.id} FOR UPDATE`);
+      const [version] = await tx.select().from(quotationVersions).where(and(
+        eq(quotationVersions.id, versionId),
+        eq(quotationVersions.quotationId, quotation.id),
+      )).limit(1);
+      if (!version) throw new NotFoundException('Versión no encontrada.');
+      if (version.status !== 'approved' || version.revision !== input.revision) {
+        throw new ConflictException('Solo se traspasa la versión aprobada vigente.');
+      }
+      assertQuotationReadyForClient(toVersion(version));
+      const [already] = await tx.select({ id: quotationEvents.id }).from(quotationEvents)
+        .innerJoin(quotationVersions, eq(quotationEvents.versionId, quotationVersions.id))
+        .where(and(eq(quotationVersions.quotationId, quotation.id),
+          inArray(quotationEvents.action,
+            ['quotation_transferred', 'planning_baseline_applied'])))
+        .limit(1);
+      if (already) throw new ConflictException(
+        'Ya existe un baseline operativo. No sobrescribir registros históricos.',
+      );
+      await tx.execute(sql`SELECT id FROM project_payment_milestones WHERE project_id = ${projectId} FOR UPDATE`);
+      const [existingTeams, existingModules, existingHours, existingPayments] =
+        await Promise.all([
+          tx.select({ id: projectTeams.id }).from(projectTeams)
+            .where(eq(projectTeams.projectId, projectId)).limit(1),
+          tx.select({ id: projectModules.id }).from(projectModules)
+            .where(eq(projectModules.projectId, projectId)).limit(1),
+          tx.select({ id: hourEntries.id }).from(hourEntries)
+            .where(eq(hourEntries.projectId, projectId)).limit(1),
+          tx.select().from(projectPaymentMilestones)
+            .where(eq(projectPaymentMilestones.projectId, projectId)),
+        ]);
+      if (Number(project.soldHours) !== 0 || Number(project.usedHours) !== 0 ||
+          project.startDate !== null || project.contractAmount !== null ||
+          existingTeams.length || existingModules.length || existingHours.length ||
+          !hasOnlyUntouchedDefaultPaymentMilestones(existingPayments)) {
+        throw new ConflictException(
+          'El proyecto tiene ejecución, facturación o una planificación previa. ' +
+          'El traspaso histórico requiere conciliación y no se hará automáticamente.',
+        );
+      }
+      const draft = quotationDraftDataSchema.parse(version.draft);
+      const ids = draft.teams.map((team) => team.teamId);
+      if (ids.length === 0 || ids.length !== new Set(ids).size) {
+        throw new BadRequestException('Se requieren equipos únicos en la cotización.');
+      }
+      const active = await tx.select({ id: teams.id }).from(teams).where(and(
+        inArray(teams.id, ids), eq(teams.isActive, true), isNull(teams.deletedAt),
+      ));
+      if (active.length !== ids.length) throw new ConflictException('Hay equipos inactivos.');
+      const byTeam = new Map<string, number>(ids.map((id): [string,number] => [id,0]));
+      if (draft.mode === 'phases') {
+        for (const phase of draft.phases) for (const row of phase.teamHours) {
+          byTeam.set(row.teamId, (byTeam.get(row.teamId) ?? 0) + row.hours);
+        }
+      } else for (const team of draft.teams) {
+        const weeks = team.unit === 'day' ? team.duration / 5 : team.duration;
+        byTeam.set(team.teamId,
+          team.collaborators * weeks * team.hoursPerWeek * team.dedicationPercent / 100);
+      }
+      const sum = [...byTeam.values()].reduce((a,b) => a+b,0);
+      if (Math.abs(sum - Number(version.totalHours)) > 0.011) {
+        throw new BadRequestException('Las HH por equipo difieren del total aprobado.');
+      }
+      for (const team of draft.teams) {
+        await tx.insert(projectTeams).values({
+          projectId, teamId: team.teamId, memberCount: team.collaborators,
+          assignedHours: (byTeam.get(team.teamId) ?? 0).toFixed(2),
+        });
+      }
+      const modules = draft.aiPoc?.edt?.modules.map((module) => ({
+        name: module.name, hours: module.totalHours,
+      })) ?? draft.phases.map((phase) => ({
+        name: phase.name,
+        hours: phase.teamHours.reduce((n, row) => n + row.hours, 0),
+      }));
+      const moduleIds: string[] = [];
+      for (const module of modules) {
+        if (module.hours <= 0) continue;
+        const [saved] = await tx.insert(projectModules).values({
+          projectId, name: module.name, initialStage: 'development',
+          currentStage: 'development', estimatedHours: module.hours.toFixed(2),
+        }).returning({ id: projectModules.id });
+        if (!saved) throw new Error('No se pudo guardar un módulo.');
+        moduleIds.push(saved.id);
+      }
+      // El plan predeterminado solo se reemplaza si no se facturó ni alteró.
+      await tx.delete(projectPaymentMilestones).where(eq(projectPaymentMilestones.projectId, projectId));
+      const total = Number(version.totalAmount);
+      if (!Number.isFinite(total) || total < 0) throw new BadRequestException('Monto aprobado inválido.');
+      const targetTotal = Math.round((total + Number.EPSILON) * 100) / 100;
+      let billed = 0;
+      for (const [index, item] of draft.paymentPlan.entries()) {
+        let amount = index === draft.paymentPlan.length - 1
+          ? Math.round((targetTotal - billed + Number.EPSILON) * 100) / 100
+          : Math.round((targetTotal * item.percent / 100 + Number.EPSILON) * 100) / 100;
+        if (amount < 0) amount = 0;
+        const phases = ['discovery','development','testing','pilot','closed'];
+        if (item.trigger === 'phase' && (!item.triggerPhase ||
+            !phases.includes(item.triggerPhase))) {
+          throw new BadRequestException('Hito ligado a fase no reconocida por Kora.');
+        }
+        if (item.trigger === 'date' && !item.triggerDate) {
+          throw new BadRequestException('Hito por fecha sin fecha definida.');
+        }
+        await tx.insert(projectPaymentMilestones).values({
+          projectId, name: item.name, percent: item.percent.toFixed(2),
+          amount: amount.toFixed(2), sortOrder: index, status: 'pending',
+          triggerType: item.trigger,
+          triggerPhase: item.trigger === 'phase'
+            ? item.triggerPhase as 'discovery'|'development'|'testing'|'pilot'|'closed' : null,
+          triggerDate: item.trigger === 'date'
+            ? new Date(item.triggerDate! + 'T00:00:00.000Z') : null,
+        });
+        billed += amount;
+      }
+      await tx.update(projects).set({
+        soldHours: Number(version.totalHours).toFixed(2),
+        contractAmount: targetTotal.toFixed(2),
+        contractCurrency: version.currency,
+        updatedAt: new Date(),
+      }).where(eq(projects.id, projectId));
+      const [event] = await tx.insert(quotationEvents).values({
+        versionId, actorUserId: userId, action: 'quotation_transferred',
+        metadata: { moduleIds, versionRevision: input.revision,
+          totalHours: Number(version.totalHours),
+          paymentCount: draft.paymentPlan.length,
+          preservedStartDate: true,
+          source: draft.aiPoc?.source ?? 'manual',
+        },
+      }).returning();
+      return {
+        projectId, versionId, transferredAt: event!.occurredAt.toISOString(),
+        projectHours: Number(version.totalHours), teamCount: draft.teams.length,
+        moduleCount: moduleIds.length,
+        paymentMilestoneCount: draft.paymentPlan.length,
+      };
+    });
+  }
+
   async updateDraft(projectId: string, versionId: string, userId: string, input: UpdateQuotationDraftInput): Promise<QuotationVersion | null> {
     const [quotation] = await this.db.select({ id: projectQuotations.id }).from(projectQuotations)
       .where(eq(projectQuotations.projectId, projectId)).limit(1);
