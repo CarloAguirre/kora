@@ -1,6 +1,6 @@
 import type { QuotationVersion } from '@kora/contracts';
 
-export class InvalidCommercialQuotation extends Error {
+export class InvalidCommercialQuotation extends BadRequestException {
   constructor(message: string) { super(message); this.name = 'InvalidCommercialQuotation'; }
 }
 
