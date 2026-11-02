@@ -2,7 +2,7 @@ import { BadRequestException, ConflictException, ForbiddenException, Inject, Inj
 import { buildReconciliationReview, isQuotationDraftEligibleProject } from '@kora/contracts';
 import { isDeepStrictEqual } from 'node:util';
 import type {
-  CreateQuotationVersionInput, Permission, ProjectQuotation, QuotationVersion, UpdateQuotationDraftInput, QuotationTransferPreview, QuotationCommercialPreflight, QuotationCommercialDossier, QuotationOperationalSnapshot, QuotationTeamCatalogEntry, QuotationReconciliationReview, SavedQuotationReconciliationReview, AssessQuotationReconciliationInput, SavedQuotationReviewAssessment,
+  CreateQuotationVersionInput, EstimationPocProposal, SubmitEstimationAnswerInput, Permission, ProjectQuotation, QuotationVersion, UpdateQuotationDraftInput, QuotationTransferPreview, QuotationCommercialPreflight, QuotationCommercialDossier, QuotationOperationalSnapshot, QuotationTeamCatalogEntry, QuotationReconciliationReview, SavedQuotationReconciliationReview, AssessQuotationReconciliationInput, SavedQuotationReviewAssessment,
 } from '@kora/contracts';
 import { buildQuotationTransferPreview } from '../../domain/quotation-transfer-preview';
 import { buildQuotationCommercialPreflight } from '../../domain/quotation-commercial-preflight';
@@ -248,6 +248,25 @@ export class ManageQuotationDraftsUseCase {
       throw new ConflictException('El acta ya fue evaluada o cambió durante la revisión.');
     }
     return result;
+  }
+
+  async authorizeAiPoc(projectId: string, actor: QuotationActor): Promise<void> {
+    if (!actor.permissions.includes('projects:manage')) {
+      throw new ForbiddenException('La creación de propuestas IA está reservada a Gerencia.');
+    }
+    await this.authorize(projectId, actor, true);
+  }
+
+  async createAiPocDraft(
+    projectId: string, actor: QuotationActor, proposal: EstimationPocProposal,
+    answers: readonly SubmitEstimationAnswerInput[],
+  ): Promise<QuotationVersion> {
+    await this.authorizeAiPoc(projectId, actor);
+    if (proposal.projectId !== projectId || proposal.provider !== 'gemini' ||
+        proposal.sourceMode !== 'poc_simulated') {
+      throw new BadRequestException('El proyecto y el origen de la propuesta IA no coinciden.');
+    }
+    return this.repository.createAiPocDraft(projectId, actor.id, proposal, answers);
   }
 
   async create(projectId: string, actor: QuotationActor, input: CreateQuotationVersionInput): Promise<QuotationVersion> {
