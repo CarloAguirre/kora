@@ -309,3 +309,6 @@
     grid-column: 3;
   }
 }
+
+/* EDT de referencia, dentro de las fases reales, sin fechas de tareas inventadas. */
+.referenceTasks{flex-basis:100%;border-top:1px solid var(--kora-border,#e4e9ee);padding-top:12px;font-size:12px}.referenceTasks summary{cursor:pointer;font-weight:var(--kora-weight-semibold);color:#0f2a44}.referenceTasks p{color:#637384;line-height:1.5}.referenceTasks ol{display:grid;gap:9px;padding-left:20px}.referenceTasks li{display:grid;gap:3px}.referenceTasks li strong{font-weight:var(--kora-weight-semibold)}.referenceTasks li span,.referenceTasks li small{color:#637384}

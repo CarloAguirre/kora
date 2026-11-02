@@ -26,6 +26,7 @@ import { PhaseRoadmap, type PhaseRoadmapSelection } from '@/modules/client-porta
 import { roleFromTeamName, toPhaseRoadmap } from '@/modules/client-portal/adapters/project-detail.adapter';
 import { PHASE_ROADMAP_ROLE_COLORS } from '@/modules/client-portal/types';
 import { useUpdateProjectModule, useUpdateProjectModuleSegment } from '../api/projects.queries';
+import { useAppliedQuotationPlanning } from '@/modules/estimation/api/quotation.queries';
 import {
   EMPTY_EXECUTION_SEGMENT_MODAL_VALUES,
   ExecutionSegmentModal,
@@ -100,6 +101,7 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
   const toast = useToast();
   const updateModule = useUpdateProjectModule();
   const updateSegment = useUpdateProjectModuleSegment();
+  const appliedPlanning = useAppliedQuotationPlanning(project.id);
   const phaseRoadmap = useMemo(() => toPhaseRoadmap(project), [project]);
   const modulesById = useMemo(() => new Map(project.modules.map((module) => [module.id, module])), [project.modules]);
 
@@ -152,6 +154,7 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
   const renderPhaseExtras = (phase: { id: string }) => {
     const module = modulesById.get(phase.id);
     if (!module) return null;
+    const reference = appliedPlanning.data?.modules.find((item) => item.moduleId === module.id);
     return (
       <div className={styles.moduleFields}>
         <Select
@@ -167,6 +170,24 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
         <Meta label="Fechas estimadas" value={`${formatDate(module.estimatedStartDate)} — ${formatDate(module.estimatedEndDate)}`} />
         {module.progress.actual != null && (
           <Meta label="Avance real · esperado" value={`${module.progress.actual}% · ${module.progress.expected ?? 0}%`} />
+        )}
+        {reference && (
+          <details className={styles.referenceTasks}>
+            <summary>
+              {reference.tasks.length} tareas de referencia de la cotización · {reference.totalHours} HH
+            </summary>
+            <p>EDT generada con Gemini y el documento KDM de ejemplo.
+              Sin fechas ni responsables: aún no son tareas operativas.</p>
+            <ol>
+              {reference.tasks.map((task) => (
+                <li key={task.wbs}>
+                  <strong>{task.wbs} · {task.name}</strong>
+                  <span>{task.role} · {task.hours} HH</span>
+                  {task.description && <small>{task.description}</small>}
+                </li>
+              ))}
+            </ol>
+          </details>
         )}
       </div>
     );
