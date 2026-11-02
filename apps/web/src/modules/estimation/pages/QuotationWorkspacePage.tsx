@@ -339,14 +339,74 @@ export function QuotationWorkspacePage() {
                    </Card>
 
                   <Card>
-                    <div className={styles.cardTitle}><div><h2>Equipos y dedicación</h2><p>Selecciona equipos activos del catálogo Kora.</p></div>
-                      {editable && <Button size="sm" variant="outline" disabled={!available.length}
-                        onClick={() => {
-                          const nextTeam = available[0];
-                          if (nextTeam) updateDraft({ teams: [...teamRows, emptyTeam(nextTeam.id)] });
-                        }}>Añadir equipo</Button>}
+                    <div className={styles.teamsHeading}>
+                      <div><h2>Equipos</h2><p>Las HH se suman según la modalidad de estimación. Los líderes se asignan en Kora.</p></div>
+                      {editable
+                        ? <SegmentedControl aria-label="Modalidad de estimación"
+                            options={[{ value: 'team', label: 'Por equipo' }, { value: 'phases', label: 'Por fases y módulos' }]}
+                            value={form.draft.mode}
+                            onChange={(mode) => updateDraft({ mode: mode as QuotationDraftData['mode'] })} />
+                        : <span className={styles.readonlyMode}>{form.draft.mode === 'team' ? 'Por equipo' : 'Por fases y módulos'}</span>}
                     </div>
-                    <div className={styles.tableWrap}>
+                    <div className={styles.teamOverview}>
+                      <div className={styles.teamColumns}>
+                        <span>Equipo</span><span>N° colab.</span><span>Horas</span>
+                      </div>
+                      {teamRows.map((team, index) => {
+                        const name = teamById.get(team.teamId) ?? 'Equipo no disponible';
+                        const hours = form.draft.mode === 'team'
+                          ? team.collaborators * (team.unit === 'day' ? team.duration / 5 : team.duration) *
+                            team.hoursPerWeek * team.dedicationPercent / 100
+                          : phaseRows.reduce((sum, phase) =>
+                            sum + (phase.teamHours.find((row) => row.teamId === team.teamId)?.hours ?? 0), 0);
+                        const category = name.toLocaleLowerCase('es');
+                        const color = category.includes('desarrollo') || category.includes('dev') ? 'var(--kora-orange)'
+                          : category.includes('qa') ? 'var(--kora-blue-link)'
+                          : category.includes('ux') || category.includes('diseño') ? 'var(--kora-success)'
+                          : category.includes('pmo') ? 'var(--kora-text-muted)'
+                          : category.includes('rpa') ? 'var(--kora-cyan)' : 'var(--kora-blue-400)';
+                        return (
+                          <div className={styles.teamLine} key={team.teamId}>
+                            <label className={styles.teamLabel}>
+                              <input type="checkbox" checked disabled={!editable}
+                                aria-label={'Incluir ' + name}
+                                onChange={() => updateDraft({
+                                  teams: teamRows.filter((_, i) => i !== index),
+                                  phases: phaseRows.map((p) => ({
+                                    ...p, teamHours: p.teamHours.filter((h) => h.teamId !== team.teamId),
+                                  })),
+                                })} />
+                              <span className={styles.teamDot} style={{ background: color }} aria-hidden="true" />
+                              <strong>{name}</strong>
+                            </label>
+                            <input className={styles.collabInput} aria-label={'Colaboradores de ' + name}
+                              type="number" min={1} max={100} disabled={!editable} value={team.collaborators}
+                              onChange={(event) => editTeam(index, { collaborators: numeric(event.target.value) })} />
+                            <strong className={styles.teamHours}>{money(hours)} HH</strong>
+                          </div>
+                        );
+                      })}
+                      {teamRows.length === 0 && (
+                        <p className={styles.emptyTeams}>Todavía no hay HH distribuidas. Agrega los equipos y, si la versión es IA, revisa los perfiles propuestos.</p>
+                      )}
+                    </div>
+                    {editable && available.length > 0 && (
+                      <details className={styles.addTeams}>
+                        <summary>+ Agregar equipo de Kora</summary>
+                        <div className={styles.availableTeams}>
+                          {available.map((team) => (
+                            <Button size="sm" variant="outline" key={team.id}
+                              onClick={() => updateDraft({ teams: [...teamRows, emptyTeam(team.id)] })}>
+                              + {team.name}
+                            </Button>
+                          ))}
+                        </div>
+                      </details>
+                    )}
+                    <details className={styles.advanced}>
+                      <summary>Ajustes avanzados de equipos · duración, unidad y dedicación</summary>
+                      <p className={styles.helper}>Horas por equipo = colaboradores × duración × HH semanales × dedicación. En modalidad por fases, las HH se toman de las fases.</p>
+<div className={styles.tableWrap}>
                       <table className={styles.table}>
                         <thead><tr><th>Equipo</th><th>Personas</th><th>Unidad</th><th>Duración</th><th>HH/sem.</th><th>Dedicación %</th><th></th></tr></thead>
                         <tbody>
@@ -374,7 +434,7 @@ export function QuotationWorkspacePage() {
                         </tbody>
                       </table>
                     </div>
-                    {teamRows.length === 0 && <p className={styles.helper}>Agrega un equipo para comenzar a calcular HH.</p>}
+                    </details>
                   </Card>
 
                   <Card>
