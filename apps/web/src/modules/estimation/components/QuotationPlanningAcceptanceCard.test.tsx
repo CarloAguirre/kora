@@ -88,7 +88,7 @@ describe('EDT de cotización sin aplicación prematura', () => {
       stages: [{ code: 'T01', name: 'Implementación',
         startWeek: 1, durationWeeks: 1, totalHours: 40 }],
       modules: [{ name: 'Portal', totalHours: 40, tasks: [{
-        wbs: 'T01.01', name: 'API', role: 'Desarrollo', hours: 40,
+        wbs: 'T01.01', name: 'API', description: 'Implementación del servicio API.', role: 'Desarrollo', hours: 40,
         stageCode: 'T01', roleEffort: [{ role: 'Desarrollo', hours: 40 }],
       }] }],
     };
@@ -113,7 +113,7 @@ describe('EDT de cotización sin aplicación prematura', () => {
       stages: [{ code: 'T01', name: 'Implementación',
         startWeek: 1, durationWeeks: 1, totalHours: 48 }],
       modules: [{ name: 'Portal', totalHours: 48, tasks: [{
-        wbs: 'T01.01', name: 'API', role: 'Desarrollo', hours: 48,
+        wbs: 'T01.01', name: 'API', description: 'Implementación del servicio API.', role: 'Desarrollo', hours: 48,
         stageCode: 'T01', roleEffort: [{ role: 'Desarrollo', hours: 48 }],
       }] }],
     };
