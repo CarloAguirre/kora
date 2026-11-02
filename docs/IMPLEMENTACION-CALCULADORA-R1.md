@@ -128,3 +128,7 @@ El workspace deja de enviar `answers: []` automáticamente, carga las cinco preg
 ## Integración visual v5 + KDM/Gemini y cotización versionada (02/11/2026)
 
 Cotizaciones se traslada a pestaña de ficha de desarrollo, manteniendo los componentes y estilos existentes. Nuevo modal para IA demo KDM, borrador en blanco o copia (también entre proyectos con permisos). Gemini analiza KDM y genera preguntas dinámicas justificadas por fuentes, cuestionario y propuesta real; la API persiste versión de IA pendiente, y el editor mapea perfiles a equipos con HH deterministas. Sin envío ni traspaso operativo. Ver `docs/IMPLEMENTACION-CALCULADORA-V5-TAB-KDM-GEMINI.md`. QA local pendiente.
+
+## R4-c — EDT Gemini KDM y baseline operativo inicial (02/11/2026)
+
+Se corrigieron imports TS2304 y expectativa de test R4-a. Gemini genera módulos, WBS y tareas desde KDM, con reparto HH exacto y persistencia de EDT en quotation_versions.draft.aiPoc. Gerencia puede aceptar la planificación inicial de la última versión solo en proyectos sin ejecución ni facturación: transacción en project_teams, project_modules y projects.sold_hours, sin cambiar estado comercial ni generar pagos. Roadmap muestra tareas de referencia sin fechas desde la versión aplicada; las tareas operativas siguen independientes. Ver docs/IMPLEMENTACION-CALCULADORA-R4C-EDT-ROADMAP-ACEPTACION.md. Tests y build local pendientes.

@@ -77,3 +77,7 @@ El GET `commercial-dossier` genera un expediente estructurado para revisión hum
 ## R4-a — Cuestionario antes de generar propuesta (01-nov-2026)
 
 F01–F05 son obligatorias/opcionales según definición ya aprobada por contrato; el nuevo endpoint `/poc/proposal-answered` exige respuestas válidas. No se generan aclaraciones dinámicas sin lectura documental, el análisis preliminar previo sigue siendo PoC y la lectura Drive depende de D03. Se restringió el fallback de KDM a su URL demo explícita, evitando considerar documentación ajena como evidencia. La cotización real y estados comerciales permanecen separados. Ver `docs/IMPLEMENTACION-CALCULADORA-R4A-CUESTIONARIO-FIJO.md`.
+
+## R4-c — Aceptación técnica inicial no es aprobación comercial (02-nov-2026)
+
+Se habilitó la materialización de un baseline técnico generado desde Gemini+KDM únicamente para prospectos/cotizados sin ejecución ni registros previos. Un evento planning_baseline_applied marca la versión usada y los moduleIds. La aplicación llena project_teams, project_modules y sold_hours; NO altera sales_stage, contrato, pagos, tareas fechadas, usados ni status contractual approved. D02/D05/D06 continúan abiertos. El frontend no debe presentar este evento como aceptación del cliente. Ver docs/IMPLEMENTACION-CALCULADORA-R4C-EDT-ROADMAP-ACEPTACION.md.
