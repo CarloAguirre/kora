@@ -36,7 +36,7 @@ El botón **Aceptar estimación y crear planificación** solicita confirmación 
 El backend abre transacción y bloquea fila de projects y quotation_versions antes de leer datos vigentes. Rechaza:
 
 - Proyecto que no sea desarrollo, no esté en Prospecto/Cotización o esté detenido, terminado o cancelado.
-- Proyecto con HH vendidas/consumidas distintas de cero, fecha de inicio, monto de contrato, equipos, módulos, registros de horas (incluso pendientes) o hitos de pago preexistentes.
+- Proyecto con HH vendidas/consumidas distintas de cero, fecha de inicio, monto de contrato, equipos, módulos, registros de horas (incluso pendientes) o hitos de pago distintos del plan predeterminado intacto y sin facturar.
 - Versión histórica, revisión obsoleta, estado no draft u origen no IA.
 - Otra planificación ya aplicada en el proyecto (se evita duplicar ante reintentos).
 - Evidencia IA que no sea Gemini/KDM, EDT ausente, perfiles sin equipos, mapeo no conciliado, diferencias de HH entre tareas, roles, versión y propuesta.
@@ -106,7 +106,7 @@ git status --short
 3. Mapear cada perfil a un equipo activo y pulsar **Aplicar distribución de HH**; **Guardar borrador**. La suma del presupuesto debe coincidir con las HH del expediente EDT.
 4. Pulsar **Aceptar estimación y crear planificación**, confirmar. Comprobar creación en proyectos de HH vendidas, project_teams y project_modules y referencias en Roadmap.
 5. Intentar repetir aceptación o editar la misma versión después: debe responder conflicto; no duplicar filas.
-6. Repetir en un prospecto con horas consumidas, fecha de inicio, equipos, módulos, registros de horas o pagos preexistentes: debe fallar íntegramente, sin crear ni alterar registros.
+6. Repetir en un prospecto con horas consumidas, fecha de inicio, equipos, módulos, registros de horas o hitos emitidos/pagados/alterados: debe fallar íntegramente. Los dos hitos predeterminados pendientes y en monto cero pueden coexistir y deben permanecer idénticos.
 7. Confirmar que project_module_tasks no se rellena con fechas inventadas y que facturación/Forecast/hours consumidas siguen intactas.
 8. Comprobar que la UI sigue el diseño propio de Kora, no estilos copiados del HTML.
 
@@ -143,3 +143,37 @@ Sustituir :project_id por el UUID del proyecto en el cliente SQL.
 - No hay migración nueva (los campos de EDT y vínculos de evento están en JSONB existente); no se añadió entidad relacional específica para tareas de referencia.
 - Una recotización de un proyecto ya iniciado requiere D05 y conciliación explícita; no se reemplaza el baseline en automático.
 - El conector GitHub no ejecuta pnpm, no valida servicios ni aplica migraciones. Ejecutar build, pruebas y QA antes de integrar o desplegar.
+
+
+## Ajuste posterior — hitos de pago iniciales (02/11/2026)
+
+**Incidencia observada:** el proyecto Motor de notificaciones es prospect/draft, sin equipos, módulos, HH ni contrato, pero contiene los dos hitos predeterminados por CreateProjectUseCase:
+
+- Inicio: 50 %, monto 0, pending, activador approval, orden 0.
+- Marcha blanca: 50 %, monto 0, pending, activador phase/pilot, orden 1.
+
+La validación anterior bloqueaba cualquier fila de project_payment_milestones. Ahora hasOnlyUntouchedDefaultPaymentMilestones permite ausencia de hitos o exactamente la pareja predeterminada, con importes cero, ambos pending y sin factura, emisión, vencimiento, pago ni fecha de activación manual.
+
+Se sigue rechazando todo hito diferente, con importe positivo, por facturar, facturado, pagado o alterado. La aceptación de EDT no borra, reemplaza, rellena ni modifica los hitos existentes; solo crea equipos, fases y HH vendidas, con las restricciones previas.
+
+Se añadieron pruebas unitarias en apps/api/src/modules/estimation/domain/default-payment-plan-eligibility.spec.ts. No hay migración adicional; las tablas de cotizaciones requieren 0048_project_quotations.sql aplicada.
+
+Pruebas locales:
+
+```powershell
+pnpm --filter @kora/api exec vitest run src/modules/estimation/domain/default-payment-plan-eligibility.spec.ts
+pnpm --filter @kora/api typecheck
+pnpm --filter @kora/api build
+```
+
+Verificación SQL:
+
+```sql
+SELECT name, percent, amount, status, invoice_number, issued_at, due_at, paid_at,
+       trigger_type, trigger_phase, trigger_date, sort_order
+FROM project_payment_milestones
+WHERE project_id = '47478c22-0e15-4ce7-9664-6b46d185316b'
+ORDER BY sort_order;
+```
+
+Validar integración con PostgreSQL local o QA y que los hitos son idénticos antes/después de la aceptación. No aplicar una EDT derivada del fixture KDM a proyectos de producción.
