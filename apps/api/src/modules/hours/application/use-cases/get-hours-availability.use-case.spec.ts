@@ -78,6 +78,33 @@ describe('GetHoursAvailabilityUseCase', () => {
     expect(result.value.users.map((u) => u.userId)).toEqual(['collab-1']);
   });
 
+  it('excluye usuarios disabled y conserva sus registros históricos fuera de la disponibilidad', async () => {
+    const active = buildUser('active-1', 'collaborator', 'Activo');
+    const disabled = buildUser('disabled-1', 'collaborator', 'Julio');
+    expect(disabled.changeStatus('disabled', 'admin-id', NOW).isOk()).toBe(true);
+    const users = new InMemoryUserRepository().seed(active, disabled);
+    const entries = new InMemoryHourEntryRepository().seed(
+      buildEntry({ id: 'historic-1', userId: disabled.id, status: 'approved', hours: 8 }),
+      buildEntry({ id: 'current-1', userId: active.id, status: 'approved', hours: 5 }),
+    );
+    const result = await new GetHoursAvailabilityUseCase(
+      users, entries, new FakePermissionReader(),
+    ).execute({ query: { dateFrom: '2026-08-10', dateTo: '2026-08-10' } });
+
+    expect(result.isOk()).toBe(true);
+    if (!result.isOk()) return;
+    expect(result.value.users.map((item) => item.userId)).toEqual([active.id]);
+    expect(result.value.hoursByUserAndDate[`${disabled.id}:2026-08-10`]).toBeUndefined();
+    expect(result.value.registeredHoursByUserAndDate[`${disabled.id}:2026-08-10`]).toBeUndefined();
+    expect(result.value.hoursByUserAndDate[`${active.id}:2026-08-10`]).toBe(5);
+    // La consulta de disponibilidad no modifica ni elimina las horas ya registradas.
+    expect((await entries.search(
+      { status: 'approved', dateFrom: new Date('2026-08-10T00:00:00.000Z'),
+        dateTo: new Date('2026-08-10T00:00:00.000Z') },
+      { page: 1, pageSize: 10 }, { field: 'date', direction: 'asc' },
+    )).items.some((item) => item.userId === disabled.id)).toBe(true);
+  });
+
   it('filtra por rol solicitado además del filtro implícito de "puede registrar horas"', async () => {
     const users = new InMemoryUserRepository().seed(
       buildUser('collab-1', 'collaborator'),

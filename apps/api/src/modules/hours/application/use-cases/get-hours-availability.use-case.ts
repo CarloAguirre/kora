@@ -65,7 +65,8 @@ export class GetHoursAvailabilityUseCase implements UseCase<GetHoursAvailability
     const requestedRole = query.role ? ROLE_FILTER_TO_ROLE_CODE[query.role] : undefined;
 
     const visibleUsers = usersPage.items.filter(
-      (item) => rolesThatRegisterHours.has(item.role) && (!requestedRole || item.role === requestedRole),
+      (item) => item.status === 'active' &&
+        rolesThatRegisterHours.has(item.role) && (!requestedRole || item.role === requestedRole),
     );
     const visibleUserIds = new Set(visibleUsers.map((item) => item.id));
 
