@@ -62,6 +62,27 @@ describe('CreateHourEntryUseCase', () => {
     expect(entries.save).not.toHaveBeenCalled();
   });
 
+  it('rechaza nuevas horas para un usuario deshabilitado, aun cuando las registre un administrador', async () => {
+    const { useCase, entries } = buildUseCase('active');
+    const users = (useCase as unknown as { users: HourEntryUserReader }).users;
+    vi.mocked(users.findById).mockResolvedValue({
+      id: 'collab-1',
+      fullName: 'Julio Andrés Alarcón Caballero',
+      role: 'collaborator',
+      status: 'disabled',
+    });
+
+    const result = await useCase.execute({
+      data: { ...INPUT, userId: 'collab-1' },
+      actor: { userId: 'admin-1', email: 'admin@kabeli.cl' },
+      actorRole: 'admin',
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result.isErr() && result.error.code).toBe('HOUR_ENTRY_OWNER_DISABLED');
+    expect(entries.save).not.toHaveBeenCalled();
+  });
+
   it('permite cargar horas en un proyecto activo', async () => {
     const { useCase, entries } = buildUseCase('active');
 
