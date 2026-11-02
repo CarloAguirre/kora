@@ -70,15 +70,15 @@ export class DrizzleProjectRepository implements ProjectRepository {
     const [quotation] = await this.database.select({ id: projectQuotations.id })
       .from(projectQuotations).where(eq(projectQuotations.projectId, projectId)).limit(1);
     if (!quotation) return false; // Proyectos heredados sin calculadora no se bloquean retroactivamente.
-    const [approved] = await this.database.select({ id: quotationVersions.id })
-      .from(quotationVersions).where(and(
-        eq(quotationVersions.quotationId, quotation.id),
-        eq(quotationVersions.status, 'approved'),
-      )).limit(1);
-    if (!approved) return true;
+    const [latest] = await this.database.select({
+      id: quotationVersions.id, status: quotationVersions.status,
+    }).from(quotationVersions)
+      .where(eq(quotationVersions.quotationId, quotation.id))
+      .orderBy(desc(quotationVersions.versionNumber)).limit(1);
+    if (!latest || latest.status !== 'approved') return true;
     const [transferred] = await this.database.select({ id: quotationEvents.id })
       .from(quotationEvents).where(and(
-        eq(quotationEvents.versionId, approved.id),
+        eq(quotationEvents.versionId, latest.id),
         eq(quotationEvents.action, 'quotation_transferred'),
       )).limit(1);
     return !transferred;

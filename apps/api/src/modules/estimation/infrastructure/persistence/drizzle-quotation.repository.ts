@@ -756,9 +756,8 @@ export class DrizzleQuotationRepository implements QuotationRepository {
         .where(and(eq(quotationVersions.quotationId, quotation.id),
           eq(quotationVersions.status, 'approved')));
       for (const item of previous) {
-        await tx.update(quotationVersions).set({
-          status: 'sent', updatedAt: new Date(),
-        }).where(eq(quotationVersions.id, item.id));
+        // Una aprobación histórica conserva su estado original. El evento
+        // identifica qué versión la reemplaza sin reescribir su evidencia.
         await tx.insert(quotationEvents).values({
           versionId: item.id, actorUserId: userId,
           action: 'quotation_approval_superseded', metadata: { replacedBy: versionId },
