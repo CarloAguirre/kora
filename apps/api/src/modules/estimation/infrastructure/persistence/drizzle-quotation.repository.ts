@@ -5,6 +5,7 @@ import { and, asc, desc, eq, inArray, isNull, projectQuotations, projects, quota
 import {
   quotationDraftDataSchema,
   quotationAiPocSnapshotSchema,
+  validatePocDraftIntegrity,
   quotationVersionSchema,
   savedQuotationReconciliationReviewSchema,
   savedQuotationReviewAssessmentSchema,
@@ -370,7 +371,7 @@ export class DrizzleQuotationRepository implements QuotationRepository {
         if (!source) throw new NotFoundException('La versión no pertenece a la cotización de origen.');
         // Una copia MANUAL desde una propuesta IA no hereda fuentes ni respuestas IA.
         const previous = quotationDraftDataSchema.parse(source.draft);
-        draft = { ...previous, sourceRefs: [], answers: {}, analysis: null, analysisProjectionStatus: undefined };
+        draft = { ...previous, sourceRefs: [], answers: {}, analysis: null, aiPoc: null, analysisProjectionStatus: undefined };
         hourlyRate = source.hourlyRate === null ? null : Number(source.hourlyRate);
         currency = source.currency as typeof currency;
         tax = source.tax as typeof tax;
@@ -426,9 +427,10 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       const savedDraft = quotationDraftDataSchema.parse(currentRow.draft);
       let draft: QuotationDraftData;
       try {
+        validatePocDraftIntegrity(savedDraft, input.draft);
         draft = reconcileQuotationAnalysis(savedDraft, input.draft);
       } catch (error) {
-        if (error instanceof QuotationAnalysisIntegrityError) {
+        if (error instanceof QuotationAnalysisIntegrityError || error instanceof Error) {
           throw new BadRequestException(error.message);
         }
         throw error;

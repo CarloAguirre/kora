@@ -141,8 +141,16 @@ export function buildQuotationCommercialPreflight(
   }
 
   if (version.origin === 'ai') {
-    if (!draft.analysis) add('AI_EVIDENCE_MISSING', 'ai', 'blocker',
+    if (!draft.analysis && !draft.aiPoc) add('AI_EVIDENCE_MISSING', 'ai', 'blocker',
       'La versión IA no conserva un artefacto de análisis verificable.');
+    if (draft.aiPoc) {
+      add('AI_POC_DEMO_NOT_COMMERCIAL', 'ai', 'blocker',
+        'La propuesta de roles proviene de Gemini con el PDF KDM de prueba; no tiene EDT ni documentación del proyecto real.');
+      if (Object.keys(draft.aiPoc.roleTeamIds).length !== draft.aiPoc.proposal.roles.length) {
+        add('AI_ROLE_MAPPING_PENDING', 'ai', 'blocker',
+          'Debes mapear todos los perfiles propuestos a equipos activos de Kora.');
+      }
+    }
     if (version.aiReviewStatus !== 'accepted') add('AI_REVIEW_REQUIRED', 'ai', 'blocker',
       'La propuesta IA sigue pendiente de aceptación por una persona autorizada.');
   }

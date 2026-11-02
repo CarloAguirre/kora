@@ -1,4 +1,18 @@
-import { isDeepStrictEqual } from 'node:util';
+/** Comparación de snapshots JSON compatible con navegador y Node. */
+function sameJson(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) return true;
+  if (Array.isArray(a) || Array.isArray(b)) {
+    return Array.isArray(a) && Array.isArray(b) &&
+      a.length === b.length && a.every((item, index) => sameJson(item, b[index]));
+  }
+  if (!a || !b || typeof a !== 'object' || typeof b !== 'object') return false;
+  const first = a as Record<string, unknown>;
+  const second = b as Record<string, unknown>;
+  const keysA = Object.keys(first).sort();
+  const keysB = Object.keys(second).sort();
+  return keysA.length === keysB.length &&
+    keysA.every((key, index) => key === keysB[index] && sameJson(first[key], second[key]));
+}
 import {
   quotationDraftDataSchema,
   quotationAiPocSnapshotSchema,
@@ -97,20 +111,20 @@ export function validatePocDraftIntegrity(
   }
   if (!previous.aiPoc) return;
   if (!next.aiPoc ||
-      !isDeepStrictEqual(previous.aiPoc.proposal, next.aiPoc.proposal) ||
-      !isDeepStrictEqual(previous.aiPoc.answers, next.aiPoc.answers) ||
+      !sameJson(previous.aiPoc.proposal, next.aiPoc.proposal) ||
+      !sameJson(previous.aiPoc.answers, next.aiPoc.answers) ||
       previous.aiPoc.source !== next.aiPoc.source) {
     throw new Error('La evidencia original de IA no puede borrarse ni reemplazarse.');
   }
-  const mappingChanged = !isDeepStrictEqual(
+  const mappingChanged = !sameJson(
     previous.aiPoc.roleTeamIds, next.aiPoc.roleTeamIds,
   );
   if (mappingChanged) {
     const projected = projectPocRolesToQuotationDraft(
       previous, next.aiPoc.roleTeamIds,
     );
-    if (!isDeepStrictEqual(projected.teams, next.teams) ||
-        !isDeepStrictEqual(projected.phases, next.phases) ||
+    if (!sameJson(projected.teams, next.teams) ||
+        !sameJson(projected.phases, next.phases) ||
         next.mode !== 'phases' || next.analysisProjectionStatus !== 'synced') {
       throw new Error('El mapeo debe aplicar la proyección original de roles/HH sin alteraciones.');
     }
@@ -119,8 +133,8 @@ export function validatePocDraftIntegrity(
     const projected = projectPocRolesToQuotationDraft(
       previous, next.aiPoc.roleTeamIds,
     );
-    if (!isDeepStrictEqual(projected.teams, next.teams) ||
-        !isDeepStrictEqual(projected.phases, next.phases) || next.mode !== 'phases') {
+    if (!sameJson(projected.teams, next.teams) ||
+        !sameJson(projected.phases, next.phases) || next.mode !== 'phases') {
       throw new Error('Las HH cambiaron: marca la propuesta como modificada antes de guardarla.');
     }
   }
