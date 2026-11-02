@@ -825,6 +825,12 @@ export class DrizzleQuotationRepository implements QuotationRepository {
         );
       }
       const draft = quotationDraftDataSchema.parse(version.draft);
+      if (draft.aiPoc?.edt && draft.analysisProjectionStatus === 'modified') {
+        throw new ConflictException(
+          'Se modificaron las HH de la EDT IA original. Primero concilia tareas y fases ' +
+          'antes de traspasar los cambios; no se alterará la planificación por aproximación.',
+        );
+      }
       const ids = draft.teams.map((team) => team.teamId);
       if (ids.length === 0 || ids.length !== new Set(ids).size) {
         throw new BadRequestException('Se requieren equipos únicos en la cotización.');
@@ -859,6 +865,12 @@ export class DrizzleQuotationRepository implements QuotationRepository {
         name: phase.name,
         hours: phase.teamHours.reduce((n, row) => n + row.hours, 0),
       }));
+      const moduleHours = modules.reduce((sum, module) => sum + module.hours, 0);
+      if (modules.length > 0 && Math.abs(moduleHours - Number(version.totalHours)) > 0.011) {
+        throw new ConflictException(
+          'El desglose de fases difiere de las HH aprobadas. No se transferirá un Roadmap inconsistente.',
+        );
+      }
       const moduleIds: string[] = [];
       for (const module of modules) {
         if (module.hours <= 0) continue;

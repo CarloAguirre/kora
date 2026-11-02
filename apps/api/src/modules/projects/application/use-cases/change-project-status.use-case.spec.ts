@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ChangeProjectStatusUseCase } from './change-project-status.use-case';
 import { Project } from '../../domain/entities/project.entity';
-import { CannotActivateProjectError, ManualHito0ReasonRequiredError } from '../../domain/errors/project.errors';
+import { CannotActivateProjectError, ManualHito0ReasonRequiredError, ProjectQuotationTransferRequiredError } from '../../domain/errors/project.errors';
 import type { ProjectRepository } from '../../domain/repositories/project.repository';
 import type { AuditRecorder } from '../../../../shared/application/ports/audit-recorder.port';
 import type { ProjectChangeLogRecorder } from '../services/project-change-log.recorder';
@@ -27,6 +27,7 @@ function buildApprovedDraftProject() {
 function buildUseCase(project: Project) {
   const projects = {
     findById: vi.fn().mockResolvedValue(project),
+    hasPendingQuotationTransfer: vi.fn().mockResolvedValue(false),
     save: vi.fn().mockResolvedValue(undefined),
   } as unknown as ProjectRepository;
   const audit = { record: vi.fn().mockResolvedValue(undefined) } as unknown as AuditRecorder;
@@ -37,6 +38,31 @@ function buildUseCase(project: Project) {
   const useCase = new ChangeProjectStatusUseCase(projects, audit, changeLog, new FixedClock(NOW), paymentTriggers);
   return { useCase, projects, changeLog, paymentTriggers };
 }
+
+describe('Regla de inicio: cotización aprobada y traspasada', () => {
+  it('bloquea la primera activación cuando el proyecto tiene cotización pendiente', async () => {
+    const { useCase, projects } = buildUseCase(buildApprovedDraftProject());
+    vi.mocked(projects.hasPendingQuotationTransfer!).mockResolvedValueOnce(true);
+    const result = await useCase.execute({
+      projectId: 'project-1', data: { status: 'active', reason: 'Contrato firmado' },
+      actor: ACTOR, actorPermissions: ['projects:manage'],
+    });
+    expect(result.isErr()).toBe(true);
+    expect(result.isErr() && result.error).toBeInstanceOf(ProjectQuotationTransferRequiredError);
+    expect(projects.save).not.toHaveBeenCalled();
+  });
+
+  it('no bloquea proyectos heredados sin cotización pendiente', async () => {
+    const { useCase, projects } = buildUseCase(buildApprovedDraftProject());
+    vi.mocked(projects.hasPendingQuotationTransfer!).mockResolvedValueOnce(false);
+    const result = await useCase.execute({
+      projectId: 'project-1', data: { status: 'active', reason: 'Contrato firmado' },
+      actor: ACTOR, actorPermissions: ['projects:manage'],
+    });
+    expect(result.isOk()).toBe(true);
+    expect(projects.save).toHaveBeenCalled();
+  });
+});
 
 describe('ChangeProjectStatusUseCase — Hito 0 manual', () => {
   it('rechaza activar manualmente sin projects:manage, aunque sea el líder del proyecto', async () => {
