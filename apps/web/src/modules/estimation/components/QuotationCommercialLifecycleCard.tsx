@@ -65,8 +65,7 @@ export function QuotationCommercialLifecycleCard({
     setError(''); setNotice('');
     const initialTransfer = project.status === 'draft' && transferTiming === 'now';
     if (!window.confirm(
-      'Confirma que el CLIENTE APROBÓ expresamente esta versión' +
-      ('') + '. ' +
+      'Confirma que el CLIENTE APROBÓ expresamente esta versión. ' +
       (demo ? 'ATENCIÓN: contiene evidencia KDM de demostración, ajena al proyecto. ' : '') +
       (initialTransfer
         ? 'Se intentará traspasar los datos al proyecto tras registrar la aprobación.'

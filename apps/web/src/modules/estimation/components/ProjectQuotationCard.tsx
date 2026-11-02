@@ -60,7 +60,7 @@ export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
               </div>
               {eligible && <Button size="sm" onClick={() => setNewOpen(true)}>+ Nueva versión</Button>}
             </div>
-            {versions.some((v) => v.status === 'approved' && data?.transferredVersionId !== v.id) && (
+            {versions[0]?.status === 'approved' && data?.transferredVersionId !== versions[0]?.id && (
               <p className={styles.helper}>Existe una versión aprobada con traspaso pendiente.</p>
             )}
             <div className={styles.scroll}>
@@ -84,13 +84,13 @@ export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
                         <Link to={projectQuotationPath(project) + '?version=' + v.id}>
                           Abrir en calculadora
                         </Link>
-                        {eligible && ['draft', 'sent'].includes(v.status) &&
+                        {eligible && v.status === 'sent' && versions[0]?.id === v.id &&
                           <Button size="sm" variant="ghost"
                             disabled={lifecycle.approveClient.isPending}
                             onClick={() => void registerApproval(v.id, v.revision)}>
                             Registrar aprobación
                           </Button>}
-                        {eligible && v.status === 'approved' &&
+                        {eligible && v.status === 'approved' && versions[0]?.id === v.id &&
                           data?.transferredVersionId !== v.id &&
                           <Button size="sm" variant="ghost"
                             disabled={lifecycle.transferApproved.isPending || project.status !== 'draft'}

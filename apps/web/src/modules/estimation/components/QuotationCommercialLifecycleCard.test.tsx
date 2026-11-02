@@ -78,7 +78,7 @@ describe('Ciclo comercial separado · Kora', () => {
   });
 
   it('la aprobación con traspaso después no altera el proyecto', async () => {
-    show({ ...version, aiReviewStatus: 'accepted' });
+    show({ ...version, status: 'sent', aiReviewStatus: 'accepted' });
     fireEvent.click(screen.getByRole('button', { name: 'Registrar aprobación' }));
     await waitFor(() => expect(mocks.approveClient).toHaveBeenCalledWith({
       versionId: version.id, revision: 3,

@@ -41,40 +41,26 @@ import { toDomain, toPersistence } from './project.persistence-mapper';
  * Es una subconsulta correlacionada: no multiplica filas ni altera la paginación. */
 const quotationStatusSql = sql<
   'none' | 'draft' | 'sent' | 'approved_pending' | 'transferred' | 'planning_applied'
->`case
-  when exists (
-    select 1 from project_quotations pq
-    join quotation_versions qv on qv.quotation_id = pq.id
-    where pq.project_id = ${projects.id} and qv.status = 'approved'
-      and not exists (
-        select 1 from quotation_events qe
-        where qe.version_id = qv.id and qe.action = 'quotation_transferred'
-      )
-  ) then 'approved_pending'
-  when exists (
-    select 1 from project_quotations pq
-    join quotation_versions qv on qv.quotation_id = pq.id
-    join quotation_events qe on qe.version_id = qv.id
-    where pq.project_id = ${projects.id} and qe.action = 'quotation_transferred'
-  ) then 'transferred'
-  when exists (
-    select 1 from project_quotations pq
-    join quotation_versions qv on qv.quotation_id = pq.id
-    join quotation_events qe on qe.version_id = qv.id
-    where pq.project_id = ${projects.id} and qe.action = 'planning_baseline_applied'
-  ) then 'planning_applied'
-  when exists (
-    select 1 from project_quotations pq
-    join quotation_versions qv on qv.quotation_id = pq.id
-    where pq.project_id = ${projects.id} and qv.status = 'sent'
-  ) then 'sent'
-  when exists (
-    select 1 from project_quotations pq
-    join quotation_versions qv on qv.quotation_id = pq.id
-    where pq.project_id = ${projects.id}
-  ) then 'draft'
-  else 'none'
-end`;
+>`coalesce((
+  select case
+    when qv.status = 'approved' and exists (
+      select 1 from quotation_events qe
+      where qe.version_id = qv.id and qe.action = 'quotation_transferred'
+    ) then 'transferred'
+    when qv.status = 'approved' then 'approved_pending'
+    when qv.status = 'sent' then 'sent'
+    when exists (
+      select 1 from quotation_events qe
+      where qe.version_id = qv.id and qe.action = 'planning_baseline_applied'
+    ) then 'planning_applied'
+    else 'draft'
+  end
+  from project_quotations pq
+  join quotation_versions qv on qv.quotation_id = pq.id
+  where pq.project_id = ${projects.id}
+  order by qv.version_number desc
+  limit 1
+), 'none')`;
 
 @Injectable()
 export class DrizzleProjectRepository implements ProjectRepository {
