@@ -367,6 +367,9 @@ export class DrizzleProjectRepository implements ProjectRepository {
     if (filters.phase?.length) conditions.push(inArray(projects.phase, filters.phase));
     if (filters.salesStage?.length) conditions.push(inArray(projects.salesStage, [...filters.salesStage]));
     if (filters.quotationStatus?.length) conditions.push(inArray(quotationStatusSql, [...filters.quotationStatus]));
+    if (filters.quotationViewerUserId) {
+      conditions.push(eq(projects.leaderUserId, filters.quotationViewerUserId));
+    }
     if (filters.clientId) conditions.push(eq(projects.clientId, filters.clientId));
     if (filters.clientIds?.length) conditions.push(inArray(projects.clientId, [...filters.clientIds]));
     if (filters.periods?.length) {

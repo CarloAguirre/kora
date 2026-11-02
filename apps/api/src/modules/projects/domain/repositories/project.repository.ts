@@ -9,6 +9,8 @@ export interface ProjectFilters {
   readonly phase?: readonly ProjectPhase[] | undefined;
   readonly salesStage?: readonly ProjectSalesStage[] | undefined;
   readonly quotationStatus?: readonly ProjectQuotationListStatus[] | undefined;
+  /** Acota filtros comerciales para el líder asignado; nunca revela el estado de otro proyecto. */
+  readonly quotationViewerUserId?: string | undefined;
   readonly clientId?: string | undefined;
   readonly clientIds?: readonly string[] | undefined;
   /** Proyectos cuyo rango Inicio–Fin se cruza con alguno de estos períodos (`YYYY-MM-DD`, ambos extremos incluidos). */
