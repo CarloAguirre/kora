@@ -85,7 +85,7 @@ describe('Proyección IA Gemini KDM a cotización', () => {
     const moved = structuredClone(mapped);
     moved.phases[0]!.teamHours[0]!.hours = 200;
     expect(() => validatePocDraftIntegrity(draft, moved)).toThrow(/proyección/i);
-    expect(() => validatePocDraftIntegrity(mapped, moved)).toThrow(/modificadas/i);
+    expect(() => validatePocDraftIntegrity(mapped, moved)).toThrow(/HH cambiaron/i);
     moved.analysisProjectionStatus = 'modified';
     expect(() => validatePocDraftIntegrity(mapped, moved)).not.toThrow();
   });

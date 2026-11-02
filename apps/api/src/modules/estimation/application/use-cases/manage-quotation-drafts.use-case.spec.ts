@@ -131,4 +131,34 @@ describe('ManageQuotationDraftsUseCase', () => {
     await expect(useCase.getTransferPreview(project.id, 'version', manager)).rejects.toThrow();
     expect(repository.getOperationalSnapshot).not.toHaveBeenCalled();
   });
+  it('copia entre proyectos solo con permiso de Gerencia y origen autorizado', async () => {
+    const otherId = '0777e456-fd76-445e-83f1-afc25061c111';
+    const versionId = '0777e456-fd76-445e-83f1-afc25061c112';
+    const { useCase, repository } = setup();
+    await expect(useCase.create(project.id, manager, {
+      sourceProjectId: otherId, sourceVersionId: versionId,
+    })).resolves.toBeDefined();
+    expect(repository.getProjectScope).toHaveBeenCalledWith(project.id);
+    expect(repository.getProjectScope).toHaveBeenCalledWith(otherId);
+    expect(repository.createDraft).toHaveBeenCalledWith(project.id, manager.id, {
+      sourceProjectId: otherId, sourceVersionId: versionId,
+    });
+
+    const outsider = setup();
+    await expect(outsider.useCase.create(project.id, leader, {
+      sourceProjectId: otherId, sourceVersionId: versionId,
+    })).rejects.toBeInstanceOf(ForbiddenException);
+    expect(outsider.repository.createDraft).not.toHaveBeenCalled();
+  });
+
+  it('no genera borrador IA para usuarios no gerentes ni para proyectos no elegibles', async () => {
+    const { useCase, repository } = setup();
+    await expect(useCase.authorizeAiPoc(project.id, leader))
+      .rejects.toBeInstanceOf(ForbiddenException);
+    expect(repository.createAiPocDraft).toBeUndefined();
+    const historical = setup({ ...project, salesStage: 'approved' });
+    await expect(historical.useCase.authorizeAiPoc(project.id, manager))
+      .rejects.toBeInstanceOf(ConflictException);
+  });
+
 });
