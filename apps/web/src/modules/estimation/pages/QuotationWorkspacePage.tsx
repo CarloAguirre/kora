@@ -418,25 +418,19 @@ export function QuotationWorkspacePage() {
                     />
                   )}
                   <Card>
-                    <div className={styles.cardTitle}>
-                      <div><span className={styles.eyebrow}>v{selected.versionNumber} · {selected.origin}</span><h2>Datos generales</h2></div>
-                      <span className={styles.status}>{selected.status === 'draft' ? 'Borrador' : selected.status === 'sent' ? 'Enviada' : 'Aprobada'}</span>
-                    </div>
-                    <div className={styles.grid}>
-                      <TextField label="Nombre de versión" value={form.name} maxLength={200} disabled={!editable}
-                        onChange={(e) => change((f) => ({ ...f, name: e.target.value }))} />
-                      <TextField label="Valor de HH" type="number" min={0} step="0.0001"
-                        value={form.hourlyRate ?? ''} disabled={!editable}
-                        onChange={(e) => change((f) => ({ ...f, hourlyRate: e.target.value === '' ? null : numeric(e.target.value) }))} />
-                      <Select label="Moneda" value={form.currency} disabled={!editable}
-                        options={[{ value: 'UF', label: 'UF' }, { value: 'CLP', label: 'CLP' }, { value: 'USD', label: 'USD' }]}
-                        onChange={(e) => change((f) => ({ ...f, currency: e.target.value as Form['currency'] }))} />
-                      <Select label="Impuesto" value={form.tax} disabled={!editable}
-                        options={[{ value: 'iva19', label: 'IVA 19%' }, { value: 'igv18', label: 'IGV 18%' }, { value: 'exempt', label: 'Exento' }]}
-                        onChange={(e) => change((f) => ({ ...f, tax: e.target.value as Form['tax'] }))} />
-                    </div>
-                    <p className={styles.helper}>El valor HH es comercial y nunca lo determina la IA. Importes no se transfieren al proyecto hasta una aprobación y traspaso futuros.</p>
-                  </Card>
+                     <div className={styles.cardTitle}><h2>Valor HH del proyecto</h2></div>
+                     <div className={styles.priceGrid}>
+                       <TextField label="Valor HH" type="number" min={0} step="0.0001" placeholder="Ej. 0,62"
+                         value={form.hourlyRate ?? ''} disabled={!editable}
+                         onChange={(e) => change((current) => ({ ...current, hourlyRate: e.target.value === '' ? null : numeric(e.target.value) }))} />
+                       <Select label="Moneda" value={form.currency} disabled={!editable}
+                         options={[{ value: 'UF', label: 'UF' }, { value: 'CLP', label: 'CLP' }, { value: 'USD', label: 'USD' }]}
+                         onChange={(e) => change((current) => ({ ...current, currency: e.target.value as Form['currency'] }))} />
+                       <Select label="Impuesto" value={form.tax} disabled={!editable}
+                         options={[{ value: 'iva19', label: 'Neto + IVA 19%' }, { value: 'igv18', label: 'Neto + IGV 18%' }, { value: 'exempt', label: 'Exento' }]}
+                         onChange={(e) => change((current) => ({ ...current, tax: e.target.value as Form['tax'] }))} />
+                     </div>
+                   </Card>
 
                   <Card>
                     <div className={styles.cardTitle}><div><h2>Equipos y dedicación</h2><p>Selecciona equipos activos del catálogo Kora.</p></div>
