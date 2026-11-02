@@ -135,6 +135,19 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
       name: 'Etapas del asistente de cotización',
     })).toBeInTheDocument();
     expect(screen.getByText('Requerimiento_KDM.pdf')).toBeInTheDocument();
+    // Atributos visuales/semánticos tomados del HTML v5: título con ✦,
+    // stepper en píldoras y listado compacto de documentos.
+    expect(screen.getByRole('dialog', { name: '✦ Nueva cotización con el agente IA' }))
+      .toBeInTheDocument();
+    expect(screen.getByText('1. Análisis')).toHaveAttribute('aria-current', 'step');
+    expect(screen.getByText('2. Entendimiento')).toBeInTheDocument();
+    expect(screen.getByText('Fuente de prueba')).toBeInTheDocument();
+    expect(screen.getByRole('list', { name: 'Documentos que analizará el agente' }))
+      .toBeInTheDocument();
+    const instructions = screen.getByText('Indicaciones adicionales · opcional').closest('details');
+    expect(instructions).not.toHaveAttribute('open');
+    fireEvent.click(screen.getByText('Indicaciones adicionales · opcional'));
+    expect(instructions).toHaveAttribute('open');
     expect(screen.getByText(/No existe una conexión real con Google Drive/)).toBeInTheDocument();
     expect(mocks.analyze).not.toHaveBeenCalled();
     expect(mocks.generate).not.toHaveBeenCalled();
@@ -171,6 +184,7 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
     renderWizard();
     fireEvent.click(screen.getByRole('button', { name: 'Analizar proyecto' }));
     expect(await screen.findByText('Entendimiento del proyecto')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Editar' }));
     const summary = screen.getByLabelText('Resumen editable');
     fireEvent.change(summary, { target: {
       value: 'Resumen corregido: plataforma centralizada, sin integración SAP real.',
@@ -200,9 +214,9 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
       ],
     }));
     await waitFor(() => expect(mocks.onClose).toHaveBeenCalledTimes(1));
-    expect(screen.getByTestId('location')).toHaveTextContent(
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent(
       '/proyectos/proyecto-prueba/cotizacion?version=',
-    );
+    ));
   });
 
   it('no permite confirmar un resumen vacío y conserva el modal si falla la generación', async () => {
@@ -210,6 +224,7 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
     renderWizard();
     fireEvent.click(screen.getByRole('button', { name: 'Analizar proyecto' }));
     expect(await screen.findByText('Entendimiento del proyecto')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Editar' }));
     fireEvent.change(screen.getByLabelText('Resumen editable'), {
       target: { value: '' },
     });

@@ -160,8 +160,11 @@ export class QuotationController {
       );
     }
     const edt = await this.generator.generateEdt(input, proposal);
+    // La EDT detallada determina las HH finales; la primera llamada propone
+    // perfiles/capacidad, pero no impone un presupuesto a las actividades.
+    const reconciled = this.generator.reconcileProposalWithEdt(proposal, edt);
     return this.drafts.createAiPocDraft(
-      projectId, actor, proposal, input.answers, input.dynamicQuestions, edt,
+      projectId, actor, reconciled, input.answers, input.dynamicQuestions, edt,
       input.confirmedUnderstanding,
     );
   }

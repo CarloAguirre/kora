@@ -50,34 +50,68 @@ export function projectPocRolesToQuotationDraft(
   if (Object.keys(roleTeamIds).some((role) => !names.has(role))) {
     throw new Error('El mapeo incluye perfiles que no pertenecen a la propuesta original.');
   }
-  const grouped = new Map<string, { hours: number; maxWeeks: number }>();
-  const phases = roles.map((role) => {
+  const edt = aiPoc.edt;
+  const detailed = edt?.schemaVersion === 'kora.quotation.reference-edt.v2';
+  const grouped = new Map<string, { hours: number; maxWeeks: number; collaborators: number }>();
+  // Los colaboradores por equipo representan perfiles de capacidad sugeridos
+  // (nunca responsables nominativos ni asignaciones al proyecto real).
+  for (const role of roles) {
     const teamId = roleTeamIds[role.role]!;
-    const durationWeeks = Math.max(1, Math.ceil(role.duration / (role.unit === 'day' ? 5 : 1)));
-    if (durationWeeks > 520) throw new Error('Un perfil excede el horizonte máximo de 520 semanas.');
-    const current = grouped.get(teamId) ?? { hours: 0, maxWeeks: 1 };
+    const weeks = Math.max(1, Math.ceil(role.duration / (role.unit === 'day' ? 5 : 1)));
+    const current = grouped.get(teamId) ?? { hours: 0, maxWeeks: 1, collaborators: 0 };
     grouped.set(teamId, {
       hours: current.hours + role.totalHours,
-      maxWeeks: Math.max(durationWeeks, current.maxWeeks),
+      maxWeeks: Math.max(weeks, current.maxWeeks),
+      collaborators: current.collaborators + role.people,
     });
-    return {
-      name: role.role,
-      startWeek: 1,
-      durationWeeks,
-      teamHours: [{ teamId, hours: role.totalHours }],
-    };
-  });
+  }
+  // v2: agrupar por tramo cronológico, no por perfil. Los roles pueden
+  // participar en varios módulos, tareas y tramos simultáneamente.
+  const phases = detailed
+    ? (edt.stages ?? []).map((stage) => {
+        const byTeam = new Map<string, number>();
+        for (const module of edt.modules) {
+          for (const task of module.tasks) {
+            if (task.stageCode !== stage.code) continue;
+            for (const effort of task.roleEffort ?? []) {
+              const teamId = roleTeamIds[effort.role];
+              if (!teamId) throw new Error('La EDT contiene perfiles sin equipo asignado.');
+              byTeam.set(teamId, Math.round(((byTeam.get(teamId) ?? 0) + effort.hours) * 100) / 100);
+            }
+          }
+        }
+        const stageTotal = [...byTeam.values()].reduce((sum, hours) => sum + hours, 0);
+        if (Math.abs(stageTotal - stage.totalHours) > 0.011) {
+          throw new Error('Las HH del tramo no concilian con las actividades de la EDT.');
+        }
+        return {
+          name: stage.code + ' · ' + stage.name,
+          startWeek: stage.startWeek,
+          durationWeeks: stage.durationWeeks,
+          teamHours: [...byTeam].map(([teamId, hours]) => ({ teamId, hours })),
+        };
+      })
+    : roles.map((role) => ({
+        name: role.role,
+        startWeek: 1,
+        durationWeeks: Math.max(1, Math.ceil(role.duration / (role.unit === 'day' ? 5 : 1))),
+        teamHours: [{ teamId: roleTeamIds[role.role]!, hours: role.totalHours }],
+      }));
+  const lastStageWeek = detailed
+    ? Math.max(1, ...(edt.stages ?? []).map((stage) => stage.startWeek + stage.durationWeeks - 1))
+    : 1;
   const teams = [...grouped.entries()].map(([teamId, group]) => {
-    const duration = Math.max(group.maxWeeks, Math.ceil(group.hours / 168));
+    const collaborators = Math.max(1, group.collaborators);
+    if (collaborators > 100) throw new Error('Los perfiles superan la capacidad de 100 colaboradores por equipo.');
+    const duration = Math.max(group.maxWeeks, detailed ? lastStageWeek : 1,
+      Math.ceil(group.hours / (168 * collaborators)));
     if (duration > 520 || !Number.isFinite(duration)) {
       throw new Error('Las HH de un equipo no caben en el horizonte máximo de 520 semanas.');
     }
     return {
-      teamId,
-      collaborators: 1,
-      unit: 'week' as const,
-      duration,
-      hoursPerWeek: Math.min(168, Math.round(group.hours / duration * 100) / 100),
+      teamId, collaborators,
+      unit: 'week' as const, duration,
+      hoursPerWeek: Math.min(168, Math.round(group.hours / duration / collaborators * 100) / 100),
       dedicationPercent: 100,
     };
   });

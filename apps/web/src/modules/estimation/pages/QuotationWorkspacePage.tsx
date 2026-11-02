@@ -543,6 +543,8 @@ export function QuotationWorkspacePage() {
                 <QuotationPlanningAcceptanceCard
                   key={selected.id + ':' + selected.revision}
                   version={selected}
+                  teamNames={teamById}
+                  roleTeamIds={form?.draft.aiPoc?.roleTeamIds}
                 />
               )}
 

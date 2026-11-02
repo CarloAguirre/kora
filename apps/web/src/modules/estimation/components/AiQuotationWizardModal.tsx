@@ -16,7 +16,6 @@ import {
 } from '../api/estimation.queries';
 import { useGenerateAiDemoQuotationVersion } from '../api/quotation.queries';
 import { DEMO_KDM_FOLDER_URL } from '../lib/demo-source';
-import optionStyles from './NewEstimationModal.module.css';
 import styles from './AiQuotationWizardModal.module.css';
 
 const STAGES = ['Análisis', 'Entendimiento', 'Condiciones', 'Aclaraciones', 'Confirmación'] as const;
@@ -63,53 +62,56 @@ function QuestionField({
   error: boolean;
   prefillSource?: string;
 }) {
-  const selected = (option: string) => Array.isArray(value)
-    ? value.includes(option) : value === option;
+  const selected = (key: string) =>
+    Array.isArray(value) ? value.includes(key) : value === key;
   const plazo = typeof value === 'string' && !assumed ? value : '';
   const dateMode = plazo.startsWith('Fecha objetivo:');
   const weeksMode = plazo.startsWith('N semanas:');
-  const customMode = question.id === 'F02' && !dateMode && !weeksMode &&
-    plazo !== 'Sin restricción';
+  const customMode = question.id === 'F02' &&
+    !dateMode && !weeksMode && plazo !== 'Sin restricción';
 
-  const option = (key: string, label: string, multi = false) => {
+  // Control nativo, pero con apariencia de píldora v5.
+  // Los radios/checkboxes permanecen accesibles por teclado.
+  const choice = (key: string, label: string, multi = false) => {
     const disabled = question.id === 'F03' && key !== 'ideal';
+    const checked = selected(key) && !assumed;
     return (
-    <label key={key} className={[
-      optionStyles.option,
-      disabled ? optionStyles.optionDisabled : '',
-      selected(key) && !assumed ? optionStyles.optionSelected : '',
-    ].filter(Boolean).join(' ')}>
-      <input type={multi ? 'checkbox' : 'radio'} name={question.id}
-        value={key} checked={selected(key) && !assumed} disabled={disabled}
-        onChange={() => {
-          if (!multi) { onChange(key); return; }
-          const current = Array.isArray(value) && !assumed ? value : [];
-          if (key === 'none') {
-            onChange(current.includes('none') ? [] : ['none']);
-          } else {
-            onChange(current.includes(key)
-              ? current.filter((item) => item !== key)
-              : [...current.filter((item) => item !== 'none'), key]);
-          }
-        }} />
-      <span><strong>{label}</strong>{disabled &&
-        <small>Disponible al integrar capacidad real de Kora</small>}</span>
-    </label>
-  );};
-
+      <label key={key} className={[
+        styles.choice, checked ? styles.choiceSelected : '',
+        disabled ? styles.choiceDisabled : '',
+      ].filter(Boolean).join(' ')}>
+        <input type={multi ? 'checkbox' : 'radio'} name={question.id}
+          value={key} checked={checked} disabled={disabled}
+          onChange={() => {
+            if (!multi) { onChange(key); return; }
+            const current = Array.isArray(value) && !assumed ? value : [];
+            if (key === 'none') {
+              onChange(current.includes('none') ? [] : ['none']);
+            } else {
+              onChange(current.includes(key)
+                ? current.filter((item) => item !== key)
+                : [...current.filter((item) => item !== 'none'), key]);
+            }
+          }} />
+        <span><strong>{label}</strong>
+          {disabled && <small>Disponible al integrar capacidad real de Kora</small>}
+        </span>
+      </label>
+    );
+  };
   return (
     <fieldset className={styles.question}>
       <legend>
-        <span className={styles.category}>{question.category}</span>
+        <span className={styles.category}>
+          {question.kind === 'fixed' ? 'Condición' : question.category}
+          {prefillSource && <span className={styles.prefill}>Prellenada</span>}
+        </span>
         <span className={styles.questionTitle}>
           {question.question}{question.required ? ' *' : ' · Opcional'}
         </span>
       </legend>
       {question.kind === 'dynamic' && question.reason &&
         <p className={styles.reason}>Por qué preguntamos: {question.reason}</p>}
-      {prefillSource && <p className={styles.source}>
-        Prellenada desde el documento de demostración: {prefillSource}. Puedes corregirla.
-      </p>}
       {question.id === 'F02' && (
         <div className={styles.schedule}>
           <div className={styles.options}>
@@ -119,8 +121,7 @@ function QuestionField({
               ['N semanas', weeksMode, 'N semanas: '],
             ] as const).map(([label, checked, next]) => (
               <label key={label} className={[
-                optionStyles.option,
-                checked ? optionStyles.optionSelected : '',
+                styles.choice, checked ? styles.choiceSelected : '',
               ].filter(Boolean).join(' ')}>
                 <input type="radio" name="plazo-objetivo" checked={checked}
                   onChange={() => onChange(next)} />
@@ -135,8 +136,7 @@ function QuestionField({
             value={plazo.slice('N semanas:'.length).trim()}
             onChange={(event) => onChange('N semanas: ' + event.target.value)} />}
           {customMode && <TextField label="Plazo descrito"
-            value={plazo}
-            placeholder="Ej. Ocho semanas a partir del kickoff"
+            value={plazo} placeholder="Ej. Ocho semanas a partir del kickoff"
             onChange={(event) => onChange(event.target.value)} />}
         </div>
       )}
@@ -152,43 +152,52 @@ function QuestionField({
       {question.answerType === 'number' &&
         <TextField label={question.question} type="number"
           value={typeof value === 'number' && !assumed ? value : ''}
-          onChange={(event) => onChange(event.target.value === '' ? null : Number(event.target.value))} />}
+          onChange={(event) =>
+            onChange(event.target.value === '' ? null : Number(event.target.value))} />}
       {question.answerType === 'confirmation' &&
-        <div className={optionStyles.options}>
-          <label className={optionStyles.option}>
-            <input type="radio" name={question.id} checked={value === true && !assumed}
-              onChange={() => onChange(true)} />Sí
-          </label>
-          <label className={optionStyles.option}>
-            <input type="radio" name={question.id} checked={value === false && !assumed}
-              onChange={() => onChange(false)} />No
-          </label>
+        <div className={styles.options}>
+          {([['Sí', true], ['No', false]] as const).map(([label, option]) => (
+            <label key={label} className={[
+              styles.choice, value === option && !assumed ? styles.choiceSelected : '',
+            ].filter(Boolean).join(' ')}>
+              <input type="radio" name={question.id}
+                checked={value === option && !assumed} onChange={() => onChange(option)} />
+              <span>{label}</span>
+            </label>
+          ))}
         </div>}
       {(question.answerType === 'single_choice' || question.answerType === 'multi_choice') &&
         <div className={styles.options}>
-          {question.options.map((item) => option(
-            item.value, item.label, question.answerType === 'multi_choice',
-          ))}
+          {question.options.map((item) =>
+            choice(item.value, item.label, question.answerType === 'multi_choice'))}
         </div>}
       {question.kind === 'dynamic' && question.assumptionIfSkipped && (
-        <label className={[optionStyles.option, assumed ? optionStyles.optionSelected : '']
-          .filter(Boolean).join(' ')}>
-          <input type="checkbox" checked={assumed} onChange={() => {
-            if (assumed) onChange(null);
-            else onAssume();
-          }} />
+        <label className={[
+          styles.choice, styles.choiceAssumption,
+          assumed ? styles.choiceSelected : '',
+        ].filter(Boolean).join(' ')}>
+          <input type="checkbox" checked={assumed}
+            onChange={() => {
+              if (assumed) onChange(null);
+              else onAssume();
+            }} />
           <span><strong>No lo sé / dejar como supuesto</strong>
             <small>{question.assumptionIfSkipped}</small></span>
         </label>
       )}
-      {question.sourceRefs.length > 0 && (
-        <p className={styles.source}>Fuente: {question.sourceRefs
-          .map((source) => source.fileName + (source.excerpt ? ' · ' + source.excerpt : ''))
-          .join(' / ')}</p>
-      )}
-      {error && <p role="alert" className={styles.error}>
-        Responde esta pregunta antes de continuar o utiliza un supuesto permitido.
+      {prefillSource && <p className={styles.source}>
+        Prellenada desde el documento de demostración: <span className={styles.sourceBadge}>{prefillSource}</span>.
+        Puedes corregirla.
       </p>}
+      {question.sourceRefs.length > 0 &&
+        <p className={styles.source}>
+          Fuente: {question.sourceRefs.map((source) =>
+            source.fileName + (source.excerpt ? ' · ' + source.excerpt : '')).join(' / ')}
+        </p>}
+      {error &&
+        <p role="alert" className={styles.error}>
+          Responde esta pregunta antes de continuar o utiliza un supuesto permitido.
+        </p>}
     </fieldset>
   );
 }
@@ -201,6 +210,7 @@ export function AiQuotationWizardModal({ project, onClose }: {
   const [stage, setStage] = useState(0);
   const [instructions, setInstructions] = useState('');
   const [understanding, setUnderstanding] = useState('');
+  const [editingUnderstanding, setEditingUnderstanding] = useState(false);
   const [answers, setAnswers] = useState<AnswerState>({});
   const [assumptions, setAssumptions] = useState<string[]>([]);
   const [error, setError] = useState('');
@@ -271,6 +281,7 @@ export function AiQuotationWizardModal({ project, onClose }: {
         return;
       }
       setUnderstanding(result.summary);
+      setEditingUnderstanding(false);
       const prefilled: AnswerState = {};
       for (const question of fixed) {
         const recommendation = result.fixedPrefills?.find((item) =>
@@ -347,16 +358,19 @@ export function AiQuotationWizardModal({ project, onClose }: {
   };
 
   return (
-    <Modal open wide
-      title="Nueva cotización con el agente IA"
-      description={project.name + ' · ' + (project.client?.companyName ?? 'Cliente por confirmar')}
+    <Modal open wide className={styles.dialog}
+      title="✦ Nueva cotización con el agente IA"
       onClose={onClose}
       dismissible={!working}
       footer={<>
-        <Button variant="outline" disabled={working} onClick={stage === 0 ? onClose : back}>
-          {stage === 0 ? 'Cancelar' : 'Atrás'}
+        <Button variant="outline" className={styles.secondaryAction}
+          disabled={working}
+          onClick={stage === 0 ? onClose :
+            stage === 1 ? () => setEditingUnderstanding((current) => !current) : back}>
+          {stage === 0 ? 'Cancelar' :
+            stage === 1 ? editingUnderstanding ? 'Guardar resumen' : 'Editar' : 'Atrás'}
         </Button>
-        <Button loading={working} disabled={
+        <Button className={styles.primaryAction} loading={working} disabled={
           (stage === 0 && (questionnaire.isLoading || questionnaire.isError)) ||
           (stage > 0 && !verifiedAnalysis)
         } onClick={() => void next()}>
@@ -368,30 +382,38 @@ export function AiQuotationWizardModal({ project, onClose }: {
         <ol>{STAGES.map((label, index) => (
           <li key={label} aria-current={index === stage ? 'step' : undefined}
             className={index === stage ? styles.current : index < stage ? styles.done : ''}>
-            <span>{index + 1}</span>{label}
+            {index + 1}. {label}
           </li>
         ))}</ol>
       </nav>
 
       {stage === 0 && (
         <section className={styles.stage}>
-          <h3>Documentos para el análisis</h3>
-          <p>El agente revisará los antecedentes antes de hacer preguntas.</p>
-          <div className={styles.sourceBox}>
-            <strong>Requerimiento_KDM.pdf</strong>
-            <span>Carpeta de ejemplo KDM · fuente temporal que sustituye Drive</span>
-          </div>
-          <p className={styles.warning}>
-            No existe una conexión real con Google Drive. Gemini analizará
-            este archivo de demostración, no los documentos del proyecto seleccionado.
+          <h3 className={styles.srOnly}>Documentos para el análisis</h3>
+          <p className={styles.intro}>El agente lee todo antes de preguntar. Usando:
+            {' '}<strong>Documento de demostración KDM</strong>
           </p>
-          <label className={styles.textLabel} htmlFor="kora-quotation-instructions">
-            Indicaciones adicionales · opcional
-          </label>
-          <textarea id="kora-quotation-instructions" className={styles.textarea}
-            value={instructions} maxLength={3000}
-            onChange={(event) => setInstructions(event.target.value)}
-            placeholder="Ej. Considerar integración SAP, excluir soporte de postproducción..." />
+          <ul className={styles.documents} aria-label="Documentos que analizará el agente">
+            <li>
+              <span className={styles.docIcon} aria-hidden="true">📄</span>
+              <span>Requerimiento_KDM.pdf</span>
+              <span className={styles.docDate}>Fuente de prueba</span>
+            </li>
+          </ul>
+          <p className={styles.demoNote}>
+            No existe una conexión real con Google Drive. El documento KDM de ejemplo
+            sustituye temporalmente los antecedentes del proyecto.
+          </p>
+          <details className={styles.more}>
+            <summary>Indicaciones adicionales · opcional</summary>
+            <label className={styles.textLabel} htmlFor="kora-quotation-instructions">
+              Instrucciones para Gemini
+            </label>
+            <textarea id="kora-quotation-instructions" className={styles.textarea}
+              value={instructions} maxLength={3000}
+              onChange={(event) => setInstructions(event.target.value)}
+              placeholder="Ej. Considerar integración SAP, excluir soporte de postproducción..." />
+          </details>
           {analysis.isPending && <p role="status" className={styles.progress}>
             Gemini está analizando el documento y preparando el entendimiento inicial.
           </p>}
@@ -402,22 +424,34 @@ export function AiQuotationWizardModal({ project, onClose }: {
 
       {stage === 1 && (
         <section className={styles.stage}>
-          <h3>Entendimiento del proyecto</h3>
-          <p>Confirma lo que entendió Gemini. Puedes corregir el resumen antes de estimar.</p>
-          <label className={styles.textLabel} htmlFor="kora-understanding">
-            Resumen editable
-          </label>
-          <textarea id="kora-understanding" className={styles.understanding}
-            value={understanding} maxLength={4000}
-            onChange={(event) => setUnderstanding(event.target.value)} />
-          <p className={styles.source}>Fuente analizada: {verifiedAnalysis?.detectedDocuments.join(', ')}</p>
+          <h3 className={styles.srOnly}>Entendimiento del proyecto</h3>
+          <p className={styles.intro}>
+            Confirma que el agente entendió bien el proyecto. Si algo no calza, corrígelo en bloque.
+          </p>
+          {editingUnderstanding ? (
+            <>
+              <label className={styles.textLabel} htmlFor="kora-understanding">
+                Resumen editable
+              </label>
+              <textarea id="kora-understanding" className={styles.understanding}
+                value={understanding} maxLength={4000}
+                onChange={(event) => setUnderstanding(event.target.value)} />
+            </>
+          ) : (
+            <div className={styles.summaryBox} aria-label="Resumen del proyecto">
+              {understanding}
+            </div>
+          )}
+          <p className={styles.source}>
+            Fuente analizada: {verifiedAnalysis?.detectedDocuments.join(', ')}
+          </p>
         </section>
       )}
 
       {stage === 2 && (
         <section className={styles.stage}>
-          <h3>Condiciones de la estimación</h3>
-          <p>Responde las preguntas base del alcance. Las sugerencias documentales son editables.</p>
+          <h3 className={styles.srOnly}>Condiciones de la estimación</h3>
+          <p className={styles.intro}>Preguntas base. Las prellenadas se detectaron en el documento; puedes cambiarlas.</p>
           {fixed.map((question) => (
             <QuestionField key={question.id} question={question}
               value={answers[question.id]} assumed={assumptions.includes(question.id)}
@@ -432,15 +466,13 @@ export function AiQuotationWizardModal({ project, onClose }: {
 
       {stage === 3 && (
         <section className={styles.stage}>
-          <h3>Aclaraciones de mayor impacto</h3>
-          <p>Preguntas generadas por Gemini a partir del documento KDM.
-            Puedes dejar como supuesto únicamente cuando exista una propuesta explícita.</p>
+          <h3 className={styles.srOnly}>Aclaraciones de mayor impacto</h3>
+          <p className={styles.intro}>{dynamic.length} aclaraciones de mayor impacto. Lo demás quedó como supuesto.</p>
           {dynamic.length === 0 ? (
-            <p className={styles.sourceBox}>Gemini no detectó aclaraciones adicionales de impacto.</p>
+            <p className={styles.summaryBox}>Gemini no detectó aclaraciones adicionales de impacto.</p>
           ) : dynamic.map((question, index) => (
             <div key={question.id} className={styles.dynamic}>
-              <span className={styles.category}>Aclaración {index + 1} de {dynamic.length}</span>
-              <QuestionField question={question} value={answers[question.id]}
+              <QuestionField question={{ ...question, category: 'Aclaración ' + (index + 1) + ' de ' + dynamic.length + ' · ' + question.category }} value={answers[question.id]}
                 assumed={assumptions.includes(question.id)}
                 onChange={(value) => change(question.id, value)}
                 onAssume={() => assume(question.id)} error={invalidId === question.id} />
@@ -451,12 +483,13 @@ export function AiQuotationWizardModal({ project, onClose }: {
 
       {stage === 4 && (
         <section className={styles.stage}>
-          <h3>Confirmar la estimación</h3>
-          <p>Revisa las respuestas y los supuestos antes de generar la propuesta y EDT.</p>
+          <h3 className={styles.srOnly}>Confirmar la estimación</h3>
+          <p className={styles.intro}>Revisa las respuestas y los supuestos antes de generar la propuesta y EDT.</p>
           <div className={styles.review}>
-            <h4>Entendimiento confirmado</h4>
-            <p className={styles.summary}>{understanding}</p>
-            <h4>Respuestas</h4>
+            <details className={styles.more}>
+              <summary>Ver entendimiento confirmado</summary>
+              <p className={styles.summary}>{understanding}</p>
+            </details>
             <dl>{[...fixed, ...dynamic].map((question) => (
               <div key={question.id}>
                 <dt>{question.category} · {question.question}</dt>

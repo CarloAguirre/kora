@@ -90,6 +90,50 @@ describe('Proyección IA Gemini KDM a cotización', () => {
     expect(() => validatePocDraftIntegrity(mapped, moved)).not.toThrow();
   });
 
+  it('proyecta tramos Zurich-style en lugar de crear fases por perfil, sin duplicar HH', () => {
+    const draft = original();
+    const edt = {
+      schemaVersion: 'kora.quotation.reference-edt.v2' as const,
+      source: 'kdm_demo' as const, provider: 'gemini' as const,
+      totalHours: 80, reservePercent: 10, reserveHours: 8, totalWithReserve: 88,
+      stages: [
+        { code: 'T01', name: 'Diseño y base', startWeek: 1, durationWeeks: 2, totalHours: 50 },
+        { code: 'T02', name: 'Pruebas y entrega', startWeek: 2, durationWeeks: 2, totalHours: 30 },
+      ],
+      modules: [{
+        name: 'Portal', totalHours: 80, tasks: [
+          { wbs: 'T01.01', name: 'Implementación',
+            description: 'React y servicios', role: 'Desarrollo', hours: 50,
+            stageCode: 'T01',
+            roleEffort: [{ role: 'Desarrollo', hours: 30 }, { role: 'QA', hours: 20 }] },
+          { wbs: 'T02.01', name: 'Regresión',
+            description: 'UAT', role: 'QA', hours: 30,
+            stageCode: 'T02',
+            roleEffort: [{ role: 'Desarrollo', hours: 10 }, { role: 'QA', hours: 20 }] },
+        ],
+      }],
+    };
+    const detailed = quotationDraftDataSchema.parse({
+      ...draft, aiPoc: { ...draft.aiPoc!, edt },
+    });
+    const result = projectPocRolesToQuotationDraft(detailed, {
+      Desarrollo: t1, QA: t2,
+    });
+    expect(result.mode).toBe('phases');
+    expect(result.phases).toEqual([
+      { name: 'T01 · Diseño y base', startWeek: 1, durationWeeks: 2,
+        teamHours: [{ teamId: t1, hours: 30 }, { teamId: t2, hours: 20 }] },
+      { name: 'T02 · Pruebas y entrega', startWeek: 2, durationWeeks: 2,
+        teamHours: [{ teamId: t1, hours: 10 }, { teamId: t2, hours: 20 }] },
+    ]);
+    expect(result.phases.flatMap((phase) => phase.teamHours)
+      .reduce((total, row) => total + row.hours, 0)).toBe(80);
+    expect(result.aiPoc?.edt?.reserveHours).toBe(8);
+    expect(result.aiPoc?.proposal.totalHours).toBe(80);
+    expect(() => validatePocDraftIntegrity(detailed, result)).not.toThrow();
+    expect(edt.totalWithReserve).toBe(88); // No se suma a las HH base.
+  });
+
   it('impide borrar evidencia IA o reemplazar fuentes en una versión ya guardada', () => {
     const draft = original();
     expect(() => validatePocDraftIntegrity(draft, { ...draft, aiPoc: null })).toThrow();
