@@ -276,6 +276,7 @@ export class GenerateEstimationPocProposalUseCase {
           clientName: input.clientName,
           estimationLevel: 'team_roles_only',
           answers: input.answers,
+          confirmedUnderstanding: 'confirmedUnderstanding' in input ? input.confirmedUnderstanding : null,
           sourceDocuments: documents.map((document) => ({
             sourceId: document.sourceId,
             name: document.name,
@@ -285,6 +286,9 @@ export class GenerateEstimationPocProposalUseCase {
         },
         instructions: [
           BASE_INSTRUCTIONS,
+          'confirmedUnderstanding' in input && input.confirmedUnderstanding
+            ? `Entendimiento corregido y confirmado por el usuario (dar prioridad frente a inferencias del documento):\n${input.confirmedUnderstanding}`
+            : '',
           input.instructions
             ? `Indicaciones del usuario:\n${input.instructions}`
             : '',

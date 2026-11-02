@@ -75,6 +75,7 @@ export const quotationAiPocSnapshotSchema = z.object({
   proposal: estimationPocProposalSchema,
   answers: z.array(submitEstimationAnswerSchema),
   dynamicQuestions: z.array(estimationQuestionSchema).max(5).default([]),
+  confirmedUnderstanding: z.string().trim().max(4000).nullish(),
   edt: quotationReferenceEdtSchema.nullish(),
   roleTeamIds: z.record(z.string(), uuidSchema).default({}),
 });

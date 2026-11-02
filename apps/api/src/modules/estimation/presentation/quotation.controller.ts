@@ -160,6 +160,7 @@ export class QuotationController {
     const edt = await this.generator.generateEdt(input, proposal);
     return this.drafts.createAiPocDraft(
       projectId, actor, proposal, input.answers, input.dynamicQuestions, edt,
+      input.confirmedUnderstanding,
     );
   }
 

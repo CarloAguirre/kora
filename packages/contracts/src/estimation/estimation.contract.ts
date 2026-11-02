@@ -278,6 +278,7 @@ export type GenerateEstimationPocInput = z.infer<typeof generateEstimationPocSch
  * Las preguntas dinámicas se devuelven en el análisis preliminar Gemini. */
 export const generateAiDemoQuotationSchema = generateEstimationPocSchema.extend({
   dynamicQuestions: z.array(estimationQuestionSchema).max(5).default([]),
+  confirmedUnderstanding: z.string().trim().min(20).max(4000).optional(),
 });
 export type GenerateAiDemoQuotationInput = z.infer<typeof generateAiDemoQuotationSchema>;
 

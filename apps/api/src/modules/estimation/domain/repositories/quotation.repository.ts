@@ -28,7 +28,8 @@ export interface QuotationRepository {
   createDraft(projectId: string, userId: string, input: CreateQuotationVersionInput): Promise<QuotationVersion>;
   createAiPocDraft(projectId: string, userId: string,
     proposal: EstimationPocProposal, answers: readonly SubmitEstimationAnswerInput[],
-    dynamicQuestions: readonly EstimationQuestion[], edt: QuotationReferenceEdt): Promise<QuotationVersion>;
+    dynamicQuestions: readonly EstimationQuestion[], edt: QuotationReferenceEdt,
+    confirmedUnderstanding?: string): Promise<QuotationVersion>;
   updateDraft(projectId: string, versionId: string, userId: string, input: UpdateQuotationDraftInput): Promise<QuotationVersion | null>;
   getAppliedPlanningBaseline(projectId: string): Promise<AppliedQuotationPlanning | null>;
   applyPlanningBaseline(projectId: string, versionId: string, actorId: string,

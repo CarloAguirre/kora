@@ -115,6 +115,7 @@ export function validatePocDraftIntegrity(
       !sameJson(previous.aiPoc.proposal, next.aiPoc.proposal) ||
       !sameJson(previous.aiPoc.answers, next.aiPoc.answers) ||
       !sameJson(previous.aiPoc.dynamicQuestions, next.aiPoc.dynamicQuestions) ||
+      !sameJson(previous.aiPoc.confirmedUnderstanding, next.aiPoc.confirmedUnderstanding) ||
       !sameJson(previous.aiPoc.edt, next.aiPoc.edt) ||
       !sameJson(previous.sourceRefs, next.sourceRefs) ||
       !sameJson(previous.answers, next.answers) ||
