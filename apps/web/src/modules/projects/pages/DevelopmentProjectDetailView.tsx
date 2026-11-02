@@ -40,7 +40,7 @@ const formatHours = (value: number) =>
  * docs/PLAN-MODULOS.md). La ficha de soporte es una pantalla distinta —
  * ver `SupportProjectDetailView`.
  */
-type DetailTab = "resumen" | "roadmap" | "bitacora" | "extras";
+type DetailTab = "resumen" | "roadmap" | "bitacora" | "extras" | "cotizaciones";
 
 export function DevelopmentProjectDetailView({
   project,
@@ -326,11 +326,15 @@ export function DevelopmentProjectDetailView({
         </div>
       </Card>
 
-      {!readOnly && <ProjectQuotationCard project={project} />}
-
       <div className={styles.tabsShell}>
         <div className={styles.tabsShellBar}>
-          {DETAIL_TABS.filter((tabDef) => !readOnly || tabDef.id !== "extras").map((tabDef) => (
+          {DETAIL_TABS.filter((tabDef) =>
+            (tabDef.id !== 'extras' || !readOnly) &&
+            (tabDef.id !== 'cotizaciones' || (!readOnly && (
+              can('projects:manage') ||
+              (can('projects:read_assigned') && user?.id === project.leader?.id)
+            )))
+          ).map((tabDef) => (
             <button
               key={tabDef.id}
               type="button"
@@ -406,6 +410,10 @@ export function DevelopmentProjectDetailView({
           {tab === "extras" && !readOnly && (
             <ProjectExtrasTab project={project} canManage={canManageExtras} />
           )}
+          {tab === "cotizaciones" && !readOnly &&
+            (can('projects:manage') || (can('projects:read_assigned') && user?.id === project.leader?.id)) && (
+              <ProjectQuotationCard project={project} />
+            )}
         </div>
       </div>
     </div>
@@ -417,4 +425,5 @@ const DETAIL_TABS: ReadonlyArray<{ id: DetailTab; label: string }> = [
   { id: "roadmap", label: "Roadmap" },
   { id: "bitacora", label: "Bitácora" },
   { id: "extras", label: "Extras" },
+  { id: "cotizaciones", label: "Cotizaciones" },
 ];
