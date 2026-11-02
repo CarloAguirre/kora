@@ -60,6 +60,12 @@ export class CreateHourEntryUseCase implements UseCase<CreateHourEntryCommand, {
 
     const owner = await this.users.findById(ownerId);
     if (!owner) return err(new ForbiddenError('El usuario indicado no existe.', 'HOUR_ENTRY_OWNER_NOT_FOUND'));
+    // Un usuario dado de baja administrativamente no debe recibir registros nuevos,
+    // ni siquiera si un líder/PMO intenta crearlos a su nombre mediante la API.
+    // Sus registros existentes siguen disponibles para consulta y corrección histórica.
+    if (owner.status === 'disabled') {
+      return err(new ForbiddenError('El usuario indicado está deshabilitado.', 'HOUR_ENTRY_OWNER_DISABLED'));
+    }
 
     let projectStageAtEntry: string | null = null;
     if (data.projectId) {
