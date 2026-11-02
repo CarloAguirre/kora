@@ -80,6 +80,33 @@ describe('Plan_Diario referencial derivado de EDT v2', () => {
     expect(result?.rows.every((row) => row.day <= 5)).toBe(true);
   });
 
+  it('reserva primero los días del tramo con vencimiento más cercano cuando se solapan', () => {
+    const overlap = quotationReferenceEdtSchema.parse({
+      schemaVersion: 'kora.quotation.reference-edt.v2',
+      source: 'kdm_demo', provider: 'gemini', totalHours: 80,
+      reservePercent: 0, reserveHours: 0, totalWithReserve: 80,
+      stages: [
+        { code: 'T01', name: 'Flexible', startWeek: 1, durationWeeks: 2, totalHours: 40 },
+        { code: 'T02', name: 'Urgente', startWeek: 1, durationWeeks: 1, totalHours: 40 },
+      ],
+      modules: [{ name: 'Portal', totalHours: 80, tasks: [
+        { wbs: '1.1', name: 'Flexible', description: '', role: 'Desarrollo',
+          hours: 40, stageCode: 'T01',
+          roleEffort: [{ role: 'Desarrollo', hours: 40 }] },
+        { wbs: '2.1', name: 'Urgente', description: '', role: 'Desarrollo',
+          hours: 40, stageCode: 'T02',
+          roleEffort: [{ role: 'Desarrollo', hours: 40 }] },
+      ] }],
+    });
+    const result = buildReferenceDailyPlan(overlap, roles);
+    expect(result?.issues).toEqual([]);
+    expect(result?.plannedHours).toBe(80);
+    expect(result?.rows.filter((row) => row.stageCode === 'T02')
+      .every((row) => row.day <= 5)).toBe(true);
+    expect(result?.rows.filter((row) => row.stageCode === 'T01')
+      .every((row) => row.day >= 6 && row.day <= 10)).toBe(true);
+  });
+
   it('conserva los centésimos y admite varias personas por perfil', () => {
     const small = quotationReferenceEdtSchema.parse({
       schemaVersion: 'kora.quotation.reference-edt.v2',
