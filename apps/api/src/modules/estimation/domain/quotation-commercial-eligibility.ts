@@ -1,4 +1,4 @@
-import type { QuotationVersion, QuotationDraftData } from '@kora/contracts';
+import type { QuotationVersion } from '@kora/contracts';
 
 export class InvalidCommercialQuotation extends Error {
   constructor(message: string) { super(message); this.name = 'InvalidCommercialQuotation'; }
@@ -22,8 +22,11 @@ export function assertQuotationReadyForClient(
   if (percents.length === 0 || Math.abs(percentTotal - 100) > 0.001) {
     throw new InvalidCommercialQuotation('El plan de pagos debe sumar exactamente 100 %.');
   }
-  if (version.origin === 'ai' && version.aiReviewStatus !== 'accepted') {
-    throw new InvalidCommercialQuotation('Primero acepta la propuesta del agente IA.');
+  if (version.origin === 'ai' && (version.aiReviewStatus !== 'accepted' ||
+      version.draft.analysisProjectionStatus === 'modified')) {
+    throw new InvalidCommercialQuotation(
+      'Primero revisa y acepta la propuesta IA vigente después de editar sus HH.',
+    );
   }
 }
 

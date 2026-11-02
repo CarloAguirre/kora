@@ -694,6 +694,10 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       const [updated] = await tx.update(quotationVersions).set({
         status: 'sent', sentAt: new Date(), updatedAt: new Date(),
         editedByUserId: userId,
+        // Cambiar las HH después de aceptar IA requiere una nueva revisión IA.
+        aiReviewStatus: currentRow.status === 'draft' && savedDraft.aiPoc &&
+          draft.analysisProjectionStatus === 'modified'
+          ? 'pending' : undefined,
         revision: sql`${quotationVersions.revision} + 1`,
       }).where(eq(quotationVersions.id, versionId)).returning();
       await tx.insert(quotationEvents).values({
