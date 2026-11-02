@@ -205,6 +205,30 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
     );
   });
 
+  it('no permite confirmar un resumen vacío y conserva el modal si falla la generación', async () => {
+    mocks.generate.mockRejectedValueOnce(new Error('Gemini no está disponible'));
+    renderWizard();
+    fireEvent.click(screen.getByRole('button', { name: 'Analizar proyecto' }));
+    expect(await screen.findByText('Entendimiento del proyecto')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Resumen editable'), {
+      target: { value: '' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Está correcto' }));
+    expect(screen.getByText(/debe contener al menos 20 caracteres/)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Resumen editable'), {
+      target: { value: 'Confirmado: portal de notificaciones de prueba.' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Está correcto' }));
+    answerFixed();
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar' }));
+    fireEvent.click(screen.getByLabelText('Sí'));
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Generar estimación' }));
+    expect(await screen.findByText('Gemini no está disponible')).toBeInTheDocument();
+    expect(screen.getByText('Confirmar la estimación')).toBeInTheDocument();
+    expect(mocks.onClose).not.toHaveBeenCalled();
+  });
+
   it('no sustituye Gemini por datos simulados si el análisis falla o devuelve otro proveedor', async () => {
     mocks.analyze.mockResolvedValueOnce({
       ...analysisResult, provider: 'poc-ai',

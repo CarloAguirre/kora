@@ -67,6 +67,20 @@ describe('POST versions/ai-poc · Gemini con KDM', () => {
     });
   });
 
+  it('pasa el entendimiento confirmado a Gemini y lo conserva al crear la versión', async () => {
+    const { controller, drafts, generator } = setup();
+    const confirmedUnderstanding =
+      'El usuario confirmó portal web con integración SAP opcional y sin app nativa.';
+    const enriched = { ...input, confirmedUnderstanding };
+    await controller.createAiPoc(projectId, enriched, actor as never);
+    expect(generator.execute).toHaveBeenCalledWith(enriched);
+    expect(generator.generateEdt).toHaveBeenCalledWith(enriched, proposal);
+    expect(drafts.createAiPocDraft).toHaveBeenCalledWith(
+      projectId, actor, proposal, input.answers, input.dynamicQuestions,
+      edt, confirmedUnderstanding,
+    );
+  });
+
   it('no llama al modelo cuando cambia proyecto, URL o falta una respuesta fija', async () => {
     const { controller, generator, drafts } = setup();
     await expect(controller.createAiPoc(
