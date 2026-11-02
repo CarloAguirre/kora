@@ -134,7 +134,10 @@ export class QuotationController {
         'No se generó una propuesta válida con Gemini y el PDF KDM de demostración.',
       );
     }
-    return this.drafts.createAiPocDraft(projectId, actor, proposal, input.answers, input.dynamicQuestions);
+    const edt = await this.generator.generateEdt(input, proposal);
+    return this.drafts.createAiPocDraft(
+      projectId, actor, proposal, input.answers, input.dynamicQuestions, edt,
+    );
   }
 
   @Post('versions')

@@ -12,6 +12,7 @@ import {
   type CreateQuotationVersionInput,
   type EstimationPocProposal,
   type EstimationQuestion,
+  type QuotationReferenceEdt,
   type SubmitEstimationAnswerInput,
   type ProjectQuotation,
   type QuotationDraftData,
@@ -290,20 +291,22 @@ export class DrizzleQuotationRepository implements QuotationRepository {
 
   async createAiPocDraft(projectId: string, userId: string, proposal: EstimationPocProposal,
     answers: readonly SubmitEstimationAnswerInput[],
-    dynamicQuestions: readonly EstimationQuestion[]): Promise<QuotationVersion> {
+    dynamicQuestions: readonly EstimationQuestion[], edt: QuotationReferenceEdt): Promise<QuotationVersion> {
     if (proposal.projectId !== projectId || proposal.provider !== 'gemini' ||
         proposal.sourceMode !== 'poc_simulated' || proposal.documentsAnalyzed < 1 ||
         proposal.totalHours <= 0 || proposal.roles.some((role) => role.totalHours <= 0) ||
-        Math.abs(proposal.roles.reduce((total, role) => total + role.totalHours, 0) - proposal.totalHours) > 0.011) {
+        Math.abs(proposal.roles.reduce((total, role) => total + role.totalHours, 0) - proposal.totalHours) > 0.011 ||
+        Math.abs(edt.totalHours - proposal.totalHours) > 0.011 ||
+        edt.source !== 'kdm_demo' || edt.provider !== 'gemini') {
       throw new BadRequestException('Propuesta Gemini KDM inválida o sin trazabilidad documental.');
     }
-    return this.createVersionInternal(projectId, userId, {}, { proposal, answers, dynamicQuestions });
+    return this.createVersionInternal(projectId, userId, {}, { proposal, answers, dynamicQuestions, edt });
   }
 
   private async createVersionInternal(
     projectId: string, userId: string, input: CreateQuotationVersionInput,
     aiPoc?: { proposal: EstimationPocProposal; answers: readonly SubmitEstimationAnswerInput[];
-      dynamicQuestions: readonly EstimationQuestion[] },
+      dynamicQuestions: readonly EstimationQuestion[]; edt: QuotationReferenceEdt },
   ): Promise<QuotationVersion> {
     return this.db.transaction(async (tx) => {
       await tx.insert(projectQuotations).values({ projectId, createdByUserId: userId }).onConflictDoNothing();
@@ -337,7 +340,8 @@ export class DrizzleQuotationRepository implements QuotationRepository {
           ])),
           aiPoc: quotationAiPocSnapshotSchema.parse({
             source: 'kdm_demo', proposal: aiPoc.proposal,
-            answers: aiPoc.answers, dynamicQuestions: aiPoc.dynamicQuestions, roleTeamIds: {},
+            answers: aiPoc.answers, dynamicQuestions: aiPoc.dynamicQuestions,
+            edt: aiPoc.edt, roleTeamIds: {},
           }),
         });
         origin = 'ai';
