@@ -79,6 +79,48 @@ describe('EDT de cotización sin aplicación prematura', () => {
       .not.toBeInTheDocument();
     expect(mocks.mutate).not.toHaveBeenCalled();
   });
+  it('presenta Plan_Diario plegable de cinco días y exportable cuando hay capacidad', () => {
+    const extended = structuredClone(version);
+    extended.draft.aiPoc!.edt = {
+      schemaVersion: 'kora.quotation.reference-edt.v2',
+      source: 'kdm_demo', provider: 'gemini',
+      totalHours: 40, reservePercent: 0, reserveHours: 0, totalWithReserve: 40,
+      stages: [{ code: 'T01', name: 'Implementación',
+        startWeek: 1, durationWeeks: 1, totalHours: 40 }],
+      modules: [{ name: 'Portal', totalHours: 40, tasks: [{
+        wbs: 'T01.01', name: 'API', role: 'Desarrollo', hours: 40,
+        stageCode: 'T01', roleEffort: [{ role: 'Desarrollo', hours: 40 }],
+      }] }],
+    };
+    render(<QuotationPlanningAcceptanceCard version={quotationVersionSchema.parse(extended)} />);
+    expect(screen.getByText('Plan diario de referencia')).toBeInTheDocument();
+    expect(screen.getByText(/5 días hábiles relativos/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Exportar Plan_Diario (CSV)' })).toBeEnabled();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(mocks.mutate).not.toHaveBeenCalled();
+  });
+
+  it('no exporta una planificación que excede las HH posibles del tramo', () => {
+    const extended = structuredClone(version);
+    extended.totalHours = 48;
+    extended.draft.aiPoc!.proposal.totalHours = 48;
+    extended.draft.aiPoc!.proposal.roles[0]!.totalHours = 48;
+    extended.draft.aiPoc!.edt = {
+      schemaVersion: 'kora.quotation.reference-edt.v2',
+      source: 'kdm_demo', provider: 'gemini',
+      totalHours: 48, reservePercent: 0, reserveHours: 0, totalWithReserve: 48,
+      stages: [{ code: 'T01', name: 'Implementación',
+        startWeek: 1, durationWeeks: 1, totalHours: 48 }],
+      modules: [{ name: 'Portal', totalHours: 48, tasks: [{
+        wbs: 'T01.01', name: 'API', role: 'Desarrollo', hours: 48,
+        stageCode: 'T01', roleEffort: [{ role: 'Desarrollo', hours: 48 }],
+      }] }],
+    };
+    render(<QuotationPlanningAcceptanceCard version={quotationVersionSchema.parse(extended)} />);
+    expect(screen.getByRole('alert')).toHaveTextContent('8 HH pendientes');
+    expect(screen.getByRole('button', { name: 'Exportar Plan_Diario (CSV)' })).toBeDisabled();
+  });
+
   it('presenta el desglose EDT v2 por tramo, perfil, equipo y reserva sin sumar dos veces', () => {
     const extended = structuredClone(version);
     const ai = extended.draft.aiPoc!;
