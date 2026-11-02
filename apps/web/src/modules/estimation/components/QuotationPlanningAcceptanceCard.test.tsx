@@ -64,8 +64,16 @@ describe('EDT de cotización sin aplicación prematura', () => {
   it('muestra WBS y HH de Gemini sin habilitar traspaso hasta aprobación comercial', () => {
     render(<QuotationPlanningAcceptanceCard version={version} />);
     expect(screen.getByText(/EDT de referencia/)).toBeInTheDocument();
-    fireEvent.click(screen.getByText(/Portal · 1 tareas · 40 HH/));
-    expect(screen.getByText(/1.1 · Backend/)).toBeInTheDocument();
+    expect(screen.getByText('Portal')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Portal'));
+    expect(screen.getByText('1.1')).toBeInTheDocument();
+    expect(screen.getByText('Backend')).toBeInTheDocument();
+    const task = screen.getByText('Backend').closest('details');
+    expect(task).not.toBeNull();
+    fireEvent.click(screen.getByText('Backend'));
+    expect(task).toHaveAttribute('open');
+    expect(screen.getByText('Servicio API')).toBeInTheDocument();
+    expect(screen.getByText('Perfil responsable: Desarrollo')).toBeInTheDocument();
     expect(screen.getByText(/Solo se traspasa/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Aceptar estimación y crear planificación/ }))
       .not.toBeInTheDocument();

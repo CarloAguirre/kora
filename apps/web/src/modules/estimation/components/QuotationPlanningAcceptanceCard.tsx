@@ -27,16 +27,32 @@ export function QuotationPlanningAcceptanceCard({
       <div className={styles.modules}>
         {edt.modules.map((module, index) => (
           <details key={index} className={styles.module}>
-            <summary>{module.name} · {module.tasks.length} tareas · {module.totalHours} HH</summary>
-            <ol className={styles.taskList}>
+            <summary className={styles.moduleHeader}>
+              <span className={styles.moduleIndex}>{String(index + 1).padStart(2, '0')}</span>
+              <span className={styles.moduleTitle}>
+                <strong>{module.name}</strong>
+                <small>{module.tasks.length} {module.tasks.length === 1 ? 'tarea' : 'tareas'} · Pulsa para ver el desglose</small>
+              </span>
+              <span className={styles.moduleHours}>{module.totalHours.toLocaleString('es-CL')} HH</span>
+              <span className={styles.chevron} aria-hidden="true" />
+            </summary>
+            <div className={styles.moduleBody}>
               {module.tasks.map((task) => (
-                <li key={task.wbs}>
-                  <strong>{task.wbs} · {task.name}</strong>
-                  <span>{task.role} · {task.hours} HH</span>
-                  {task.description && <small>{task.description}</small>}
-                </li>
+                <details key={task.wbs} className={styles.task}>
+                  <summary className={styles.taskHeader}>
+                    <span className={styles.taskCode}>{task.wbs}</span>
+                    <span className={styles.taskTitle}>{task.name}</span>
+                    <span className={styles.taskHours}>{task.hours.toLocaleString('es-CL')} HH</span>
+                    <span className={styles.chevron} aria-hidden="true" />
+                  </summary>
+                  <div className={styles.taskBody}>
+                    <span className={styles.role}>Perfil responsable: {task.role}</span>
+                    <p>{task.description?.trim() || 'Gemini no incorporó una descripción adicional para esta tarea.'}</p>
+                    <small>Referencia de estimación. No se asignan fechas ni colaboradores hasta el traspaso aprobado.</small>
+                  </div>
+                </details>
               ))}
-            </ol>
+            </div>
           </details>
         ))}
       </div>

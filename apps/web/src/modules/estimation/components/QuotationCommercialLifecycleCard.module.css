@@ -1,1 +1,13 @@
 .heading{display:flex;align-items:center;justify-content:space-between;gap:12px}.heading h2{font-size:16px;margin:0}.heading span{font-size:12px;color:var(--kora-text-muted,#667085);font-weight:700}.helper{font-size:12px;color:var(--kora-text-muted,#667085);line-height:1.5}.warning{font-size:12px;padding:10px;background:var(--kora-surface-muted,#f8fafc);border:1px solid var(--kora-border,#dde2e8);border-radius:8px}.success{font-size:12px;color:#176c49}.error{font-size:12px;color:var(--kora-danger,#b42318)}.action{border-top:1px solid var(--kora-border,#dde2e8);padding-top:12px;margin-top:12px;display:flex;justify-content:space-between;gap:16px;align-items:center}.action strong,.approval strong{font-size:13px}.action p,.approval p{margin:5px 0 0;font-size:12px;color:var(--kora-text-muted,#667085);line-height:1.4}.approval{display:grid;gap:12px;border-top:1px solid var(--kora-border,#dde2e8);padding-top:12px;margin-top:12px}.approval button{justify-self:start}@media(max-width:700px){.heading,.action{display:grid}}
+
+/* Ciclo comercial incrustado en el resumen de cotización: mismos guards y mutations. */
+.embedded{border-top:1px solid var(--kora-border-subtle);padding-top:12px;margin-top:4px;display:grid;gap:9px}
+.embedded>.heading{display:none}
+.embedded>.helper{font-size:11px;line-height:1.45;margin:0;color:var(--kora-text-muted)}
+.embedded>.warning{font-size:11px;line-height:1.45;margin:0}
+.embedded .action,.embedded .approval{display:grid;gap:8px;align-items:stretch;border-top:none;padding-top:0;margin-top:0}
+.embedded .action p,.embedded .approval p{font-size:11px;line-height:1.5}
+.embedded .action strong,.embedded .approval strong{font-size:12px}
+.embedded button{width:100%}
+.embedded .approval{gap:8px}
+.embedded .approval button{justify-self:stretch}

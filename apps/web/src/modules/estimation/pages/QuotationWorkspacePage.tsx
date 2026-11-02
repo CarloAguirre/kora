@@ -9,6 +9,8 @@ import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Button } from '@/shared/components/ui/Button';
 import { Card } from '@/shared/components/ui/Card';
 import { Select } from '@/shared/components/ui/Select';
+import { Badge } from '@/shared/components/ui/Badge';
+import { SegmentedControl } from '@/shared/components/ui/SegmentedControl';
 import { TextField } from '@/shared/components/ui/TextField';
 import { useAppliedQuotationPlanning, useCreateQuotationVersion, useProjectQuotation, useSaveQuotationDraft } from '../api/quotation.queries';
 import { AnalysisEvidenceCard } from '../components/AnalysisEvidenceCard';
@@ -18,6 +20,8 @@ import { QuotationCommercialPreflightCard } from '../components/QuotationCommerc
 import { AiPocRoleMappingCard } from '../components/AiPocRoleMappingCard';
 import { QuotationPlanningAcceptanceCard } from '../components/QuotationPlanningAcceptanceCard';
 import { QuotationCommercialLifecycleCard } from '../components/QuotationCommercialLifecycleCard';
+import { QuotationCommercialSummary } from '../components/QuotationCommercialSummary';
+import { NewProjectQuotationModal } from '../components/NewProjectQuotationModal';
 import styles from './QuotationWorkspacePage.module.css';
 
 type Form = Pick<UpdateQuotationDraftInput, 'name' | 'hourlyRate' | 'currency' | 'tax' | 'draft'>;
@@ -49,6 +53,7 @@ export function QuotationWorkspacePage() {
   const teamQuery = useTeamsList({ page: 1, pageSize: 200, isActive: true, sortField: 'name' }, { enabled: Boolean(projectId) });
 
   const [form, setForm] = useState<Form | null>(null);
+  const [newQuotationOpen, setNewQuotationOpen] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -96,7 +101,7 @@ export function QuotationWorkspacePage() {
         // El artefacto conserva el cálculo original; editar el presupuesto
         // requiere conciliarlo antes de usarlo para producir documentos.
         ...((current.draft.analysis || current.draft.aiPoc) && Object.keys(patch).some(
-          (field) => ['teams', 'phases', 'costs', 'paymentPlan', 'assumptions', 'exclusions'].includes(field),
+          (field) => ['mode', 'teams', 'phases', 'costs', 'paymentPlan', 'assumptions', 'exclusions'].includes(field),
         ) ? { analysisProjectionStatus: 'modified' as const } : {}),
       },
     }));
@@ -227,19 +232,10 @@ export function QuotationWorkspacePage() {
   return (
     <DashboardLayout title="Cotizaciones">
       <main className={styles.page}>
-        <nav className={styles.breadcrumb}>
-          <Link to="/proyectos">Proyectos</Link> <span>/</span>
-          <Link to={project ? '/proyectos/' + project.slug : '/proyectos'}>{project?.name ?? 'Proyecto'}</Link>
-          <span>/</span> <strong>Cotización{selected ? ' v' + selected.versionNumber : ''}</strong>
+        <nav className={styles.breadcrumb} aria-label="Navegación de cotización">
+          <Link to={project ? '/proyectos/' + project.slug : '/proyectos'}>‹ Volver a la ficha del proyecto</Link>
+          <Link className={styles.listLink} to="/calculadora">Ver todas las cotizaciones</Link>
         </nav>
-        <header className={styles.header}>
-          <div>
-            <span className={styles.eyebrow}>Cotizaciones · Kora</span>
-            <h1>{project?.name ?? 'Cotización del proyecto'}</h1>
-            <p>Versiones comerciales independientes de la planificación y las HH reales del proyecto, incluso si su estado operativo es Activo.</p>
-          </div>
-          <Link to="/calculadora">Volver al listado</Link>
-        </header>
 
         {projectQuery.isLoading && <Card>Cargando proyecto…</Card>}
         {projectQuery.error && <Card>No se pudo cargar el proyecto.</Card>}
@@ -258,124 +254,70 @@ export function QuotationWorkspacePage() {
           <div className={styles.layout}>
             <section className={styles.main}>
               <Card>
-                <div className={styles.cardTitle}>
-                  <div><h2>Versiones de cotización</h2><p>Solo se pueden editar versiones en Borrador.</p></div>
-                  {mayWrite && (
-                    <div className={styles.actions}>
-                      <Button size="sm" variant="outline" loading={createVersion.isPending}
-                        onClick={() => void newVersion()}>Nueva en blanco</Button>
-                      {selected && <Button size="sm" variant="secondary" loading={createVersion.isPending}
-                        onClick={() => void newVersion(selected.id)}>Copiar versión</Button>}
-                    </div>
-                  )}
+                <div className={styles.identityHeading}>
+                  <div>
+                    <h1>Cotización · {project?.client?.companyName ?? project?.name ?? 'Proyecto'}</h1>
+                    <p>{project?.name} · Versión comercial independiente del proyecto operativo</p>
+                  </div>
+                  <Badge tone={selected?.status === 'approved' ? 'success' : selected?.status === 'sent' ? 'info' : 'neutral'}>
+                    {selected?.status === 'approved' ? 'Aprobada' : selected?.status === 'sent' ? 'Enviada' : 'Cotización'}
+                  </Badge>
                 </div>
-                {versions.length === 0
-                  ? <p>No hay versiones guardadas para este proyecto.</p>
-                  : <div className={styles.versions}>
-                      {versions.map((version) => (
-                        <button key={version.id} type="button" onClick={() => selectVersion(version.id)}
-                          className={[styles.version, selected?.id === version.id ? styles.selected : ''].join(' ')}>
-                          <b>v{version.versionNumber} · {version.name}</b>
-                          <span>{version.status === 'draft' ? 'Borrador' : version.status === 'sent' ? 'Enviada' : 'Aprobada'} · {money(version.totalHours)} HH</span>
-                        </button>
-                      ))}
-                    </div>}
-              </Card>
-
-
-              {selected?.draft.aiPoc && form && (
-                <AiPocRoleMappingCard
-                  key={selected.id + ':' + selected.revision}
-                  version={selected}
-                  teams={activeTeams}
-                  canEdit={editable}
-                  hasUnsavedChanges={dirty}
-                  onApply={(draft) => {
-                    change((current) => ({ ...current, draft }));
-                    setNotice('Proyección de HH aplicada. Guarda el borrador para persistir la distribución.');
-                  }}
-                />
-              )}
-
-              {selected?.draft.aiPoc?.edt && projectId && (
-                <QuotationPlanningAcceptanceCard
-                  key={selected.id + ':' + selected.revision}
-                  version={selected}
-                />
-              )}
-
-              {selected && project && (
-                <QuotationCommercialLifecycleCard
-                  key={selected.id + ':' + selected.revision}
-                  project={project} version={selected}
-                  quotation={quotation ?? null}
-                  canOperate={mayWrite} hasUnsavedChanges={dirty}
-                />
-              )}
-              {versions.length > 1 && (
-                <QuotationVersionComparison versions={versions} teamNames={teamById} />
-              )}
-              {selected && projectId && (
-                <QuotationCommercialPreflightCard key={selected.id + ':' + selected.revision}
-                  projectId={projectId} version={selected} hasUnsavedChanges={dirty} />
-              )}
-              {selected && projectId && (
-                <QuotationTransferPreviewCard projectId={projectId} version={selected} teamNames={teamById}
-                  canSaveReview={mayWrite} canAssessReview={mayWrite && can('projects:manage')}
-                  currentUserId={user?.id ?? null} />
-              )}
-
-              {mayWrite && (
-                <Card>
-                  <div className={styles.cardTitle}>
-                    <div>
-                      <span className={styles.eyebrow}>PoC · simulación controlada</span>
-                      <h2>Importar análisis estructurado de ejemplo</h2>
-                      <p>Carga el JSON de Zurich generado a partir de su ERS y EDT. No invoca Gemini ni analiza documentos nuevos.</p>
+                <div className={styles.versions}>
+                  {versions.map((version) => (
+                    <button key={version.id} type="button" onClick={() => selectVersion(version.id)}
+                      aria-label={'Abrir versión ' + version.versionNumber}
+                      aria-pressed={selected?.id === version.id} title={version.name}
+                      className={[styles.version, selected?.id === version.id ? styles.selected : ''].join(' ')}>
+                      v{version.versionNumber}{version.origin === 'ai' ? ' ✦' : ''}
+                    </button>
+                  ))}
+                  {mayWrite && <>
+                    <button type="button" className={styles.textAction} disabled={createVersion.isPending}
+                      onClick={() => void newVersion(selected?.id)}>+ Nueva versión</button>
+                    <button type="button" className={styles.textAction + ' ' + styles.aiAction}
+                      onClick={() => {
+                        if (dirty && !window.confirm('Hay cambios sin guardar. ¿Deseas descartarlos?')) return;
+                        setNewQuotationOpen(true);
+                      }}>✦ Nueva versión con IA</button>
+                    <button type="button" className={styles.textAction} disabled={createVersion.isPending}
+                      onClick={() => void newVersion()}>En blanco</button>
+                  </>}
+                </div>
+                {selected && form && <>
+                  <div className={styles.identityFields}>
+                    <TextField label="Nombre de la versión" value={form.name} maxLength={200} disabled={!editable}
+                      onChange={(e) => change((current) => ({ ...current, name: e.target.value }))} />
+                    <div className={styles.readonlyField}>
+                      <span>Origen · fecha</span>
+                      <strong>{selected.origin === 'ai' ? 'Agente IA' : selected.origin === 'copy' ? 'Copia' : 'Manual'} · {new Date(selected.createdAt).toLocaleDateString('es-CL')}</strong>
+                    </div>
+                    <div className={styles.statusField}>
+                      <span>Estado</span>
+                      <Badge tone={selected.status === 'approved' ? 'success' : selected.status === 'sent' ? 'info' : 'neutral'}>
+                        {selected.status === 'approved' ? 'Aprobada' : selected.status === 'sent' ? 'Enviada al cliente' : 'Borrador'}
+                      </Badge>
                     </div>
                   </div>
-                  <label className={styles.longField}>Archivo JSON (máximo 1 MB)
-                    <input type="file" accept=".json,application/json" onChange={(e) =>
-                      void importSimulatedAnalysis(e.target.files?.[0])} />
-                  </label>
-                  {sampleAnalysis && (
-                    <div className={styles.simulation}>
-                      <strong>{sampleAnalysis.project.name}</strong>
-                      <p className={styles.helper}>{sampleAnalysis.provenance.warning}</p>
-                      <div className={styles.summaryStats}>
-                        <span>{sampleAnalysis.activities.length} actividades WBS</span>
-                        <span>{sampleAnalysis.tranches.length} tramos</span>
-                        <span>{money(sampleAnalysis.summary.baseHours)} HH base</span>
-                        <span>Reserva separada: {money(sampleAnalysis.summary.reserveHours)} HH</span>
+                  {selected.origin === 'ai' && selected.aiReviewStatus === 'pending' && (
+                    <div className={styles.aiBanner}>
+                      <div><strong>✦ Propuesta generada con Gemini</strong>
+                        <p>{selected.draft.aiPoc
+                          ? money(selected.draft.aiPoc.proposal.totalHours) + ' HH propuestas desde KDM de demostración y ' + selected.draft.aiPoc.answers.length + ' respuestas. '
+                          : 'Propuesta IA pendiente. '}
+                          Revisa perfiles y HH antes de aceptar. La IA no define el valor HH comercial.</p>
                       </div>
-                      <p className={styles.warn}>Los perfiles del EDT no son necesariamente los equipos registrados en Kora. Revisa cada correspondencia. Si varios perfiles usan el mismo equipo, sus HH se agregan sin perder el desglose original.</p>
-                      <div className={styles.mapping}>
-                        {sampleAnalysis.roles.map((role) => (
-                          <div key={role.role} className={styles.mappingRow}>
-                            <div><strong>{role.role}</strong><small>{money(role.baseHours)} HH</small></div>
-                            <Select label="Equipo Kora" placeholder="Asignar equipo"
-                              value={sampleTeamMap[role.role] ?? ''}
-                              options={activeTeams.map((team) => ({ value: team.id, label: team.name }))}
-                              onChange={(e) => {
-                                setSampleTeamMap((mapping) => ({ ...mapping, [role.role]: e.target.value }));
-                                setSampleError('');
-                              }} />
-                          </div>
-                        ))}
-                      </div>
-                      <p className={styles.helper}>La reserva no se suma a la cotización. Tarifa, impuesto y plan comercial requieren revisión humana. Se conserva el artefacto con ERS/EDT para futura generación documental.</p>
-                      <Button
-                        disabled={sampleAnalysis.roles.some((role) => !sampleTeamMap[role.role])}
-                        loading={createVersion.isPending}
-                        onClick={() => void saveSimulatedAnalysis()}>
-                        Crear versión de IA simulada
-                      </Button>
+                      {selected.draft.aiPoc && (
+                        <Button size="sm" variant="secondary" onClick={() =>
+                          document.getElementById('quotation-ai-role-review')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                        }>Revisar propuesta</Button>
+                      )}
                     </div>
                   )}
-                  {sampleError && <p className={styles.error} role="alert">{sampleError}</p>}
-                  {sampleSuccess && <p className={styles.success} role="status">{sampleSuccess}</p>}
-                </Card>
-              )}
+                </>}
+                {versions.length === 0 && <p className={styles.helper}>Aún no hay versiones. Crea un borrador para comenzar.</p>}
+              </Card>
+
 
               {selected && form && (
                 <>
@@ -387,35 +329,123 @@ export function QuotationWorkspacePage() {
                     />
                   )}
                   <Card>
-                    <div className={styles.cardTitle}>
-                      <div><span className={styles.eyebrow}>v{selected.versionNumber} · {selected.origin}</span><h2>Datos generales</h2></div>
-                      <span className={styles.status}>{selected.status === 'draft' ? 'Borrador' : selected.status === 'sent' ? 'Enviada' : 'Aprobada'}</span>
-                    </div>
-                    <div className={styles.grid}>
-                      <TextField label="Nombre de versión" value={form.name} maxLength={200} disabled={!editable}
-                        onChange={(e) => change((f) => ({ ...f, name: e.target.value }))} />
-                      <TextField label="Valor de HH" type="number" min={0} step="0.0001"
-                        value={form.hourlyRate ?? ''} disabled={!editable}
-                        onChange={(e) => change((f) => ({ ...f, hourlyRate: e.target.value === '' ? null : numeric(e.target.value) }))} />
-                      <Select label="Moneda" value={form.currency} disabled={!editable}
-                        options={[{ value: 'UF', label: 'UF' }, { value: 'CLP', label: 'CLP' }, { value: 'USD', label: 'USD' }]}
-                        onChange={(e) => change((f) => ({ ...f, currency: e.target.value as Form['currency'] }))} />
-                      <Select label="Impuesto" value={form.tax} disabled={!editable}
-                        options={[{ value: 'iva19', label: 'IVA 19%' }, { value: 'igv18', label: 'IGV 18%' }, { value: 'exempt', label: 'Exento' }]}
-                        onChange={(e) => change((f) => ({ ...f, tax: e.target.value as Form['tax'] }))} />
-                    </div>
-                    <p className={styles.helper}>El valor HH es comercial y nunca lo determina la IA. Importes no se transfieren al proyecto hasta una aprobación y traspaso futuros.</p>
-                  </Card>
+                     <div className={styles.cardTitle}><h2>Valor HH del proyecto</h2></div>
+                     <div className={styles.priceGrid}>
+                       <TextField label="Valor HH" type="number" min={0} step="0.0001" placeholder="Ej. 0,62"
+                         value={form.hourlyRate ?? ''} disabled={!editable}
+                         onChange={(e) => change((current) => ({ ...current, hourlyRate: e.target.value === '' ? null : numeric(e.target.value) }))} />
+                       <Select label="Moneda" value={form.currency} disabled={!editable}
+                         options={[{ value: 'UF', label: 'UF' }, { value: 'CLP', label: 'CLP' }, { value: 'USD', label: 'USD' }]}
+                         onChange={(e) => change((current) => ({ ...current, currency: e.target.value as Form['currency'] }))} />
+                       <Select label="Impuesto" value={form.tax} disabled={!editable}
+                         options={[{ value: 'iva19', label: 'Neto + IVA 19%' }, { value: 'igv18', label: 'Neto + IGV 18%' }, { value: 'exempt', label: 'Exento' }]}
+                         onChange={(e) => change((current) => ({ ...current, tax: e.target.value as Form['tax'] }))} />
+                     </div>
+                   </Card>
 
                   <Card>
-                    <div className={styles.cardTitle}><div><h2>Equipos y dedicación</h2><p>Selecciona equipos activos del catálogo Kora.</p></div>
-                      {editable && <Button size="sm" variant="outline" disabled={!available.length}
-                        onClick={() => {
-                          const nextTeam = available[0];
-                          if (nextTeam) updateDraft({ teams: [...teamRows, emptyTeam(nextTeam.id)] });
-                        }}>Añadir equipo</Button>}
+                    <div className={styles.teamsHeading}>
+                      <div><h2>Equipos</h2><p>Las HH se suman según la modalidad de estimación. Los líderes se asignan en Kora.</p></div>
+                      {editable
+                        ? <SegmentedControl aria-label="Modalidad de estimación"
+                            options={[{ value: 'team', label: 'Por equipo' }, { value: 'phases', label: 'Por fases y módulos' }]}
+                            value={form.draft.mode}
+                            onChange={(mode) => updateDraft({ mode: mode as QuotationDraftData['mode'] })} />
+                        : <span className={styles.readonlyMode}>{form.draft.mode === 'team' ? 'Por equipo' : 'Por fases y módulos'}</span>}
                     </div>
-                    <div className={styles.tableWrap}>
+                    {form.draft.mode === 'phases' && phaseRows.length === 0 && teamRows.length > 0 && (
+                      <p className={styles.modeNotice} role="status">
+                        No hay fases configuradas. Esta modalidad calcula HH desde las fases,
+                        no desde la duración de cada equipo; agrega una fase para distribuirlas.
+                      </p>
+                    )}
+                    <div className={styles.teamOverview}>
+                      <div className={styles.teamColumns}>
+                        <span>Equipo</span><span>N° colab.</span><span>Horas</span>
+                      </div>
+                      {teamRows.map((team, index) => {
+                        const name = teamById.get(team.teamId) ?? 'Equipo no disponible';
+                        const hours = form.draft.mode === 'team'
+                          ? team.collaborators * (team.unit === 'day' ? team.duration / 5 : team.duration) *
+                            team.hoursPerWeek * team.dedicationPercent / 100
+                          : phaseRows.reduce((sum, phase) =>
+                            sum + (phase.teamHours.find((row) => row.teamId === team.teamId)?.hours ?? 0), 0);
+                        const category = name.toLocaleLowerCase('es');
+                        const color = category.includes('desarrollo') || category.includes('dev') ? 'var(--kora-orange)'
+                          : category.includes('qa') ? 'var(--kora-blue-link)'
+                          : category.includes('ux') || category.includes('diseño') ? 'var(--kora-success)'
+                          : category.includes('pmo') ? 'var(--kora-text-muted)'
+                          : category.includes('rpa') ? 'var(--kora-cyan)' : 'var(--kora-blue-400)';
+                        return (
+                          <div className={styles.teamLine} key={team.teamId}>
+                            <label className={styles.teamLabel}>
+                              <input type="checkbox" checked disabled={!editable}
+                                aria-label={'Incluir ' + name}
+                                onChange={() => updateDraft({
+                                  teams: teamRows.filter((_, i) => i !== index),
+                                  phases: phaseRows.map((p) => ({
+                                    ...p, teamHours: p.teamHours.filter((h) => h.teamId !== team.teamId),
+                                  })),
+                                })} />
+                              <span className={styles.teamDot} style={{ background: color }} aria-hidden="true" />
+                              <strong>{name}</strong>
+                            </label>
+                            <input className={styles.collabInput} aria-label={'Colaboradores de ' + name}
+                              type="number" min={1} max={100} disabled={!editable} value={team.collaborators}
+                              onChange={(event) => editTeam(index, { collaborators: numeric(event.target.value) })} />
+                            <strong className={styles.teamHours}>{money(hours)} HH</strong>
+                          </div>
+                        );
+                      })}
+                      {available.filter((team) => ['desarrollo', 'pmo', 'qa', 'rpa', 'ux', 'diseño', 'inteligencia', 'ia']
+                        .some((keyword) => team.name.toLocaleLowerCase('es').includes(keyword))).slice(0, 8)
+                        .map((team) => {
+                          const name = team.name.toLocaleLowerCase('es');
+                          const color = name.includes('desarrollo') ? 'var(--kora-orange)'
+                            : name.includes('qa') ? 'var(--kora-blue-link)'
+                            : name.includes('ux') || name.includes('diseño') ? 'var(--kora-success)'
+                            : name.includes('pmo') ? 'var(--kora-text-muted)'
+                            : name.includes('rpa') ? 'var(--kora-cyan)' : 'var(--kora-blue-400)';
+                          return (
+                            <div key={team.id} className={styles.teamLine + ' ' + styles.inactiveTeam}>
+                              <label className={styles.teamLabel}>
+                                <input type="checkbox" checked={false} disabled={!editable}
+                                  aria-label={'Incluir ' + team.name}
+                                  onChange={() => updateDraft({ teams: [...teamRows, emptyTeam(team.id)] })} />
+                                <span className={styles.teamDot} style={{ background: color }} aria-hidden="true" />
+                                <strong>{team.name}</strong>
+                              </label>
+                              <input className={styles.collabInput} type="number" value={1} disabled
+                                aria-label={'Colaboradores de ' + team.name} />
+                              <strong className={styles.teamHours}>—</strong>
+                            </div>
+                          );
+                        })}
+                      {teamRows.length === 0 && available.length === 0 && (
+                        <p className={styles.emptyTeams}>Todavía no hay HH distribuidas. Agrega equipos activos para comenzar.</p>
+                      )}
+                      {teamRows.length === 0 && available.length > 0 &&
+                        !form.draft.aiPoc && (
+                          <p className={styles.emptyTeams}>Selecciona un equipo para comenzar a distribuir las HH.</p>
+                        )}
+                    </div>
+                    {editable && available.length > 0 && (
+                      <details className={styles.addTeams}>
+                        <summary>+ Agregar equipo de Kora</summary>
+                        <div className={styles.availableTeams}>
+                          {available.map((team) => (
+                            <Button size="sm" variant="outline" key={team.id}
+                              onClick={() => updateDraft({ teams: [...teamRows, emptyTeam(team.id)] })}>
+                              + {team.name}
+                            </Button>
+                          ))}
+                        </div>
+                      </details>
+                    )}
+                    <details className={styles.advanced}>
+                      <summary>Ajustes avanzados de equipos · duración, unidad y dedicación</summary>
+                      <p className={styles.helper}>Horas por equipo = colaboradores × duración × HH semanales × dedicación. En modalidad por fases, las HH se toman de las fases.</p>
+<div className={styles.tableWrap}>
                       <table className={styles.table}>
                         <thead><tr><th>Equipo</th><th>Personas</th><th>Unidad</th><th>Duración</th><th>HH/sem.</th><th>Dedicación %</th><th></th></tr></thead>
                         <tbody>
@@ -443,14 +473,14 @@ export function QuotationWorkspacePage() {
                         </tbody>
                       </table>
                     </div>
-                    {teamRows.length === 0 && <p className={styles.helper}>Agrega un equipo para comenzar a calcular HH.</p>}
+                    </details>
                   </Card>
 
+                  {form.draft.mode === 'phases' && (
                   <Card>
-                    <div className={styles.cardTitle}><div><h2>Modalidad de estimación</h2><p>Las HH por fases reemplazan el cálculo global de equipos, no se suman dos veces.</p></div></div>
-                    <Select value={form.draft.mode} disabled={!editable}
-                      options={[{ value: 'team', label: 'Equipos / dedicación' }, { value: 'phases', label: 'Por fases y semanas' }]}
-                      onChange={(e) => updateDraft({ mode: e.target.value as QuotationDraftData['mode'] })} />
+                    <div className={styles.cardTitle}>
+                      <div><h2>Fases · Módulos</h2><p>En semanas desde el inicio. Las HH por fase reemplazan, no se suman, al cálculo por equipo.</p></div>
+                    </div>
                     {form.draft.mode === 'phases' && (
                       <>
                         <div className={styles.cardTitle}>
@@ -487,8 +517,37 @@ export function QuotationWorkspacePage() {
                         ))}
                       </>
                     )}
+                  
                   </Card>
+                )}
 
+                  <div id="quotation-ai-role-review" className={styles.aiRoleReview}>
+              {selected?.draft.aiPoc && form && (
+                <AiPocRoleMappingCard
+                  key={selected.id + ':' + selected.revision}
+                  version={selected}
+                  teams={activeTeams}
+                  canEdit={editable}
+                  hasUnsavedChanges={dirty}
+                  onApply={(draft) => {
+                    change((current) => ({ ...current, draft }));
+                    setNotice('Proyección de HH aplicada. Guarda el borrador para persistir la distribución.');
+                  }}
+                />
+              )}
+
+
+                  </div>
+                  <div className={styles.edtView} id="quotation-edt-reference">
+              {selected?.draft.aiPoc?.edt && projectId && (
+                <QuotationPlanningAcceptanceCard
+                  key={selected.id + ':' + selected.revision}
+                  version={selected}
+                />
+              )}
+
+
+                  </div>
                   <Card>
                     <div className={styles.cardTitle}><div><h2>Costos externos</h2><p>Los recurrentes se registran aparte; no inflan el neto inicial.</p></div>
                       {editable && <Button size="sm" variant="outline" onClick={() => updateDraft({ costs: [
@@ -564,44 +623,105 @@ export function QuotationWorkspacePage() {
                   </Card>
                 </>
               )}
+
+              {versions.length > 1 && (
+                <QuotationVersionComparison versions={versions} teamNames={teamById} />
+              )}
+              {selected && projectId && (
+                <QuotationCommercialPreflightCard key={selected.id + ':' + selected.revision}
+                  projectId={projectId} version={selected} hasUnsavedChanges={dirty} />
+              )}
+              {selected && projectId && (
+                <QuotationTransferPreviewCard projectId={projectId} version={selected} teamNames={teamById}
+                  canSaveReview={mayWrite} canAssessReview={mayWrite && can('projects:manage')}
+                  currentUserId={user?.id ?? null} />
+              )}
+
+              {mayWrite && (
+                <Card>
+                  <div className={styles.cardTitle}>
+                    <div>
+                      <span className={styles.eyebrow}>PoC · simulación controlada</span>
+                      <h2>Importar análisis estructurado de ejemplo</h2>
+                      <p>Carga el JSON de Zurich generado a partir de su ERS y EDT. No invoca Gemini ni analiza documentos nuevos.</p>
+                    </div>
+                  </div>
+                  <label className={styles.longField}>Archivo JSON (máximo 1 MB)
+                    <input type="file" accept=".json,application/json" onChange={(e) =>
+                      void importSimulatedAnalysis(e.target.files?.[0])} />
+                  </label>
+                  {sampleAnalysis && (
+                    <div className={styles.simulation}>
+                      <strong>{sampleAnalysis.project.name}</strong>
+                      <p className={styles.helper}>{sampleAnalysis.provenance.warning}</p>
+                      <div className={styles.summaryStats}>
+                        <span>{sampleAnalysis.activities.length} actividades WBS</span>
+                        <span>{sampleAnalysis.tranches.length} tramos</span>
+                        <span>{money(sampleAnalysis.summary.baseHours)} HH base</span>
+                        <span>Reserva separada: {money(sampleAnalysis.summary.reserveHours)} HH</span>
+                      </div>
+                      <p className={styles.warn}>Los perfiles del EDT no son necesariamente los equipos registrados en Kora. Revisa cada correspondencia. Si varios perfiles usan el mismo equipo, sus HH se agregan sin perder el desglose original.</p>
+                      <div className={styles.mapping}>
+                        {sampleAnalysis.roles.map((role) => (
+                          <div key={role.role} className={styles.mappingRow}>
+                            <div><strong>{role.role}</strong><small>{money(role.baseHours)} HH</small></div>
+                            <Select label="Equipo Kora" placeholder="Asignar equipo"
+                              value={sampleTeamMap[role.role] ?? ''}
+                              options={activeTeams.map((team) => ({ value: team.id, label: team.name }))}
+                              onChange={(e) => {
+                                setSampleTeamMap((mapping) => ({ ...mapping, [role.role]: e.target.value }));
+                                setSampleError('');
+                              }} />
+                          </div>
+                        ))}
+                      </div>
+                      <p className={styles.helper}>La reserva no se suma a la cotización. Tarifa, impuesto y plan comercial requieren revisión humana. Se conserva el artefacto con ERS/EDT para futura generación documental.</p>
+                      <Button
+                        disabled={sampleAnalysis.roles.some((role) => !sampleTeamMap[role.role])}
+                        loading={createVersion.isPending}
+                        onClick={() => void saveSimulatedAnalysis()}>
+                        Crear versión de IA simulada
+                      </Button>
+                    </div>
+                  )}
+                  {sampleError && <p className={styles.error} role="alert">{sampleError}</p>}
+                  {sampleSuccess && <p className={styles.success} role="status">{sampleSuccess}</p>}
+                </Card>
+              )}
+
             </section>
 
             <aside className={styles.sidebar}>
-              <Card>
-                <h2>Resumen de versión</h2>
-                {selected ? (
-                  <>
-                    <div className={styles.stat}><span>HH guardadas</span><strong>{money(selected.totalHours)}</strong></div>
-                    <div className={styles.stat}><span>Neto guardado</span><strong>{selected.netAmount === null ? 'Sin valor HH' : money(selected.netAmount) + ' ' + selected.currency}</strong></div>
-                    <div className={styles.stat}><span>Total guardado</span><strong>{selected.totalAmount === null ? '—' : money(selected.totalAmount) + ' ' + selected.currency}</strong></div>
-                    <p className={styles.helper}>Revisión {selected.revision}. Los importes se recalculan en servidor al guardar.</p>
-                    {form?.draft.analysis && (
-                      <p className={form.draft.analysisProjectionStatus === 'modified' ? styles.warn : styles.helper}>
-                        {form.draft.analysis.provenance.mode === 'simulated_fixture' ? 'IA simulada · ' : 'IA · '}
-                        {form.draft.analysisProjectionStatus === 'modified'
-                          ? 'La edición manual difiere del EDT de origen. Conciliar antes de generar documentos.'
-                          : 'WBS y trazabilidad conservados para generación documental.'}
-                      </p>
-                    )}
-                    {dirty && <p className={styles.warn}>Hay cambios sin guardar; los totales aún corresponden a la última versión guardada.</p>}
-                    {notice && <p className={styles.success} role="status">{notice}</p>}
-                    {error && <p className={styles.error} role="alert">{error}</p>}
-                    {editable && <Button onClick={() => void save()} loading={saveDraft.isPending}
-                      disabled={!dirty || !form?.name.trim()}>Guardar borrador</Button>}
-                    {!editable && <p className={styles.helper}>La versión es de consulta o el proyecto ya no permite editarla.</p>}
-                  </>
-                ) : (
-                  <p className={styles.helper}>Crea una versión en blanco para empezar.</p>
-                )}
-                {!selected && error && <p className={styles.error} role="alert">{error}</p>}
-                {!selected && notice && <p className={styles.success} role="status">{notice}</p>}
-              </Card>
-              <Card>
-                <h3>Siguiente etapa</h3>
-                <p className={styles.helper}>Envío, aprobación y traspaso todavía no están habilitados. Los cambios de esta pantalla no afectan Proyectos ni Forecast.</p>
-              </Card>
+              <QuotationCommercialSummary
+                version={selected}
+                draft={form?.draft ?? null}
+                hourlyRate={form?.hourlyRate ?? null}
+                tax={form?.tax ?? 'iva19'}
+                currency={form?.currency ?? 'UF'}
+                teamNames={teamById}
+                editable={editable}
+                dirty={dirty}
+                saving={saveDraft.isPending}
+                onSave={() => void save()}
+                actions={selected && project ? (
+                  <QuotationCommercialLifecycleCard
+                    key={selected.id + ':' + selected.revision}
+                    project={project} version={selected}
+                    quotation={quotation ?? null}
+                    canOperate={mayWrite} hasUnsavedChanges={dirty}
+                    embedded
+                  />
+                ) : null}
+              />
+
+              {dirty && <p className={styles.pendingNotice}>Guarda los cambios de la versión antes de enviar o aprobar.</p>}
+              {notice && <p role="status" className={styles.success}>{notice}</p>}
+              {error && <p role="alert" className={styles.error}>{error}</p>}
             </aside>
           </div>
+        )}
+        {project && newQuotationOpen && (
+          <NewProjectQuotationModal project={project} versions={versions} onClose={() => setNewQuotationOpen(false)} />
         )}
       </main>
     </DashboardLayout>
