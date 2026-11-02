@@ -68,7 +68,7 @@ export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
               <table className={styles.versions}>
                 <thead><tr><th>Versión</th><th>Estado</th><th>Horas</th><th>Total</th><th>Acciones</th></tr></thead>
                 <tbody>{versions.map((v) => (
-                  <tr key={v.id}>
+                  <tr key={v.id} className={v.status === 'sent' ? styles.sentRow : undefined}>
                     <td><strong>v{v.versionNumber} · {v.name}</strong>
                       <small>{new Date(v.createdAt).toLocaleDateString('es-CL')}
                         {v.origin === 'ai' ? ' · Origen IA (KDM de prueba)' : ''}</small></td>
