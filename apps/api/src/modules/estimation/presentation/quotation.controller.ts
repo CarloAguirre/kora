@@ -12,8 +12,10 @@ import { GetEstimationQuestionnaireDefinitionUseCase } from '../application/use-
 import { validateQuestionnaireAnswers } from '../application/validate-estimation-questionnaire';
 
 /**
- * API comercial separada de /poc/*. Gestiona borradores y actas append-only
- * de discusión. Envío, aprobación y traspaso siguen SIN implementar.
+ * API comercial separada de /poc/*. Además de borradores y actas,
+ * permite aplicar SOLO el baseline técnico inicial al Roadmap de un prospecto
+ * vacío; envío/aprobación contractual, facturación y recotización histórica
+ * permanecen sin implementar.
  */
 @Controller('estimations/projects/:projectId/quotation')
 export class QuotationController {

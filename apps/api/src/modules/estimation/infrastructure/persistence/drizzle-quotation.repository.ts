@@ -561,7 +561,9 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       const active = await tx.select({ id: teams.id }).from(teams)
         .where(and(inArray(teams.id, ids), eq(teams.isActive, true), isNull(teams.deletedAt)));
       if (active.length !== ids.length) throw new ConflictException('Equipo cotizado inactivo o eliminado.');
-      const hoursByTeam = new Map(ids.map((id) => [id, 0]));
+      const hoursByTeam = new Map<string, number>(
+        ids.map((id): [string, number] => [id, 0]),
+      );
       for (const [role, hh] of hoursByRole) {
         const teamId = snapshot.roleTeamIds[role]!;
         hoursByTeam.set(teamId, (hoursByTeam.get(teamId) ?? 0) + hh);
