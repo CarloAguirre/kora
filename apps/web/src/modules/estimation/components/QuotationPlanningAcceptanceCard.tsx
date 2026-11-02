@@ -28,12 +28,14 @@ export function QuotationPlanningAcceptanceCard({
     if (!teamId || !teamNames) return null;
     return teamNames.get(teamId) ?? 'Equipo no disponible';
   };
+  const mappedRoleLabel = (role: string) => mappedName(role)
+    ? mappedName(role) + ' · ' + role : role;
   const dailyPlan = detailed && version.draft.aiPoc
     ? buildReferenceDailyPlan(edt, version.draft.aiPoc.proposal.roles)
     : null;
   const exportDailyPlan = () => {
     if (!dailyPlan || dailyPlan.issues.length > 0) return;
-    const csv = referenceDailyPlanCsv(dailyPlan, (role) => mappedName(role) ?? role);
+    const csv = referenceDailyPlanCsv(dailyPlan, mappedRoleLabel);
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -122,7 +124,7 @@ export function QuotationPlanningAcceptanceCard({
                     <tr key={row.day + '-' + row.wbs + '-' + row.role + '-' + index}>
                       <td>{row.day}</td>
                       <td>{row.stageCode}</td>
-                      <td>{mappedName(row.role) ?? row.role}</td>
+                      <td>{mappedRoleLabel(row.role)}</td>
                       <td>{row.wbs}</td>
                       <td>{row.activity}</td>
                       <td className={styles.dailyHours}>{fmt(row.hours)}</td>
