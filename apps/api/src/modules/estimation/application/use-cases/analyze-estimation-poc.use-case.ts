@@ -102,6 +102,9 @@ export class AnalyzeEstimationPocUseCase {
       ? data.dynamicQuestions.slice(0, 5) : [];
     const allowedSources = new Map(selected.map((doc) => [doc.sourceId, doc.name]));
     const normalizedQuestions = questions.map((question, index) => {
+      if (!question || typeof question !== 'object' || Array.isArray(question)) {
+        throw new BadRequestException('Gemini devolvió una pregunta inválida.');
+      }
       const candidate = question as Record<string, unknown>;
       if (!isLegacyPoc) {
         const refs = Array.isArray(candidate.sourceRefs) ? candidate.sourceRefs : [];

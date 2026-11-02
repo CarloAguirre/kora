@@ -184,7 +184,9 @@ export function EstimationWorkspacePage() {
             <h1>{project.data?.name ?? 'Prospecto'}</h1>
             <p>
               {mode === 'ai'
-                ? 'Confirma el cuestionario F01–F05 antes de generar la estimación. La lectura de Drive depende de la configuración del proveedor.'
+                ? demoMode
+                  ? 'Gemini analizará el PDF KDM de demostración, planteará aclaraciones y guardará un borrador de cotización en Kora.'
+                  : 'Confirma el cuestionario F01–F05 antes de generar la estimación. La lectura de Drive depende de la configuración del proveedor.'
                 : 'La estimación parte desde una plantilla de roles y dedicaciones, tal como en el flujo original de Calculadora.'}
             </p>
           </div>
