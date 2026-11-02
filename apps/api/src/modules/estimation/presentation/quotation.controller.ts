@@ -1,6 +1,8 @@
 import { BadRequestException, Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post } from '@nestjs/common';
 import {
   applyQuotationPlanningSchema, generateAiDemoQuotationSchema, createQuotationVersionSchema, updateQuotationDraftSchema, quotationReconciliationReviewSchema, assessQuotationReconciliationSchema,
+  quotationRevisionActionSchema, approveClientQuotationSchema, transferApprovedQuotationSchema,
+  type QuotationRevisionActionInput, type ApproveClientQuotationInput, type TransferApprovedQuotationInput, type QuotationTransferResult,
   type ApplyQuotationPlanningInput, type AppliedQuotationPlanning, type GenerateAiDemoQuotationInput, type CreateQuotationVersionInput, type ProjectQuotation, type QuotationVersion, type UpdateQuotationDraftInput, type QuotationTransferPreview, type QuotationCommercialPreflight, type QuotationCommercialDossier, type QuotationReconciliationReview, type SavedQuotationReconciliationReview, type AssessQuotationReconciliationInput, type SavedQuotationReviewAssessment,
 } from '@kora/contracts';
 import { CurrentUser, type RequestUser } from '../../../shared/presentation/decorators/current-user.decorator';
@@ -173,6 +175,50 @@ export class QuotationController {
     @CurrentUser() actor: RequestUser,
   ): Promise<QuotationVersion> {
     return this.drafts.create(projectId, actor, body);
+  }
+
+  @Post('versions/:versionId/accept-ai')
+  @RequireAnyPermission('projects:manage', 'projects:read_assigned')
+  acceptAi(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('versionId', ParseUUIDPipe) versionId: string,
+    @Body(new ZodValidationPipe(quotationRevisionActionSchema)) input: QuotationRevisionActionInput,
+    @CurrentUser() actor: RequestUser,
+  ): Promise<QuotationVersion> {
+    return this.drafts.acceptAiProposal(projectId, versionId, actor, input);
+  }
+
+  @Post('versions/:versionId/mark-sent')
+  @RequireAnyPermission('projects:manage', 'projects:read_assigned')
+  markSent(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('versionId', ParseUUIDPipe) versionId: string,
+    @Body(new ZodValidationPipe(quotationRevisionActionSchema)) input: QuotationRevisionActionInput,
+    @CurrentUser() actor: RequestUser,
+  ): Promise<QuotationVersion> {
+    return this.drafts.markSent(projectId, versionId, actor, input);
+  }
+
+  @Post('versions/:versionId/approve-client')
+  @RequireAnyPermission('projects:manage', 'projects:read_assigned')
+  approveClient(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('versionId', ParseUUIDPipe) versionId: string,
+    @Body(new ZodValidationPipe(approveClientQuotationSchema)) input: ApproveClientQuotationInput,
+    @CurrentUser() actor: RequestUser,
+  ): Promise<QuotationVersion> {
+    return this.drafts.approveClient(projectId, versionId, actor, input);
+  }
+
+  @Post('versions/:versionId/transfer-approved')
+  @RequireAnyPermission('projects:manage', 'projects:read_assigned')
+  transferApproved(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('versionId', ParseUUIDPipe) versionId: string,
+    @Body(new ZodValidationPipe(transferApprovedQuotationSchema)) input: TransferApprovedQuotationInput,
+    @CurrentUser() actor: RequestUser,
+  ): Promise<QuotationTransferResult> {
+    return this.drafts.transferApproved(projectId, versionId, actor, input);
   }
 
   @Patch('versions/:versionId')

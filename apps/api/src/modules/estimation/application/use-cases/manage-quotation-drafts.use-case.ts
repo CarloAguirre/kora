@@ -2,7 +2,7 @@ import { BadRequestException, ConflictException, ForbiddenException, Inject, Inj
 import { buildReconciliationReview, isQuotationDraftEligibleProject } from '@kora/contracts';
 import { isDeepStrictEqual } from 'node:util';
 import type {
-  ApplyQuotationPlanningInput, AppliedQuotationPlanning, CreateQuotationVersionInput, EstimationPocProposal, EstimationQuestion, QuotationReferenceEdt, SubmitEstimationAnswerInput, Permission, ProjectQuotation, QuotationVersion, UpdateQuotationDraftInput, QuotationTransferPreview, QuotationCommercialPreflight, QuotationCommercialDossier, QuotationOperationalSnapshot, QuotationTeamCatalogEntry, QuotationReconciliationReview, SavedQuotationReconciliationReview, AssessQuotationReconciliationInput, SavedQuotationReviewAssessment,
+  QuotationRevisionActionInput, ApproveClientQuotationInput, TransferApprovedQuotationInput, QuotationTransferResult, ApplyQuotationPlanningInput, AppliedQuotationPlanning, CreateQuotationVersionInput, EstimationPocProposal, EstimationQuestion, QuotationReferenceEdt, SubmitEstimationAnswerInput, Permission, ProjectQuotation, QuotationVersion, UpdateQuotationDraftInput, QuotationTransferPreview, QuotationCommercialPreflight, QuotationCommercialDossier, QuotationOperationalSnapshot, QuotationTeamCatalogEntry, QuotationReconciliationReview, SavedQuotationReconciliationReview, AssessQuotationReconciliationInput, SavedQuotationReviewAssessment,
 } from '@kora/contracts';
 import { buildQuotationTransferPreview } from '../../domain/quotation-transfer-preview';
 import { buildQuotationCommercialPreflight } from '../../domain/quotation-commercial-preflight';
@@ -274,11 +274,11 @@ export class ManageQuotationDraftsUseCase {
     projectId: string, versionId: string, actor: QuotationActor,
     input: ApplyQuotationPlanningInput,
   ): Promise<AppliedQuotationPlanning> {
-    if (!actor.permissions.includes('projects:manage')) {
-      throw new ForbiddenException('Solo Gerencia puede aplicar la planificación inicial.');
-    }
     await this.authorize(projectId, actor, true);
-    return this.repository.applyPlanningBaseline(projectId, versionId, actor.id, input);
+    // R4: la aceptación IA jamás traspasa. Este endpoint previo ya no escribe.
+    throw new ConflictException(
+      'Esta acción fue reemplazada. Primero acepta IA, registra la aprobación del cliente y traspasa la cotización aprobada.',
+    );
   }
 
   async getAppliedPlanningBaseline(
@@ -286,6 +286,30 @@ export class ManageQuotationDraftsUseCase {
   ): Promise<AppliedQuotationPlanning | null> {
     await this.authorize(projectId, actor, false);
     return this.repository.getAppliedPlanningBaseline(projectId);
+  }
+
+  async acceptAiProposal(projectId: string, versionId: string, actor: QuotationActor,
+    input: QuotationRevisionActionInput): Promise<QuotationVersion> {
+    await this.authorize(projectId, actor, true);
+    return this.repository.acceptAiProposal(projectId, versionId, actor.id, input);
+  }
+
+  async markSent(projectId: string, versionId: string, actor: QuotationActor,
+    input: QuotationRevisionActionInput): Promise<QuotationVersion> {
+    await this.authorize(projectId, actor, true);
+    return this.repository.markSent(projectId, versionId, actor.id, input);
+  }
+
+  async approveClient(projectId: string, versionId: string, actor: QuotationActor,
+    input: ApproveClientQuotationInput): Promise<QuotationVersion> {
+    await this.authorize(projectId, actor, true);
+    return this.repository.approveClient(projectId, versionId, actor.id, input);
+  }
+
+  async transferApproved(projectId: string, versionId: string, actor: QuotationActor,
+    input: TransferApprovedQuotationInput): Promise<QuotationTransferResult> {
+    await this.authorize(projectId, actor, true);
+    return this.repository.transferApproved(projectId, versionId, actor.id, input);
   }
 
   async create(projectId: string, actor: QuotationActor, input: CreateQuotationVersionInput): Promise<QuotationVersion> {
