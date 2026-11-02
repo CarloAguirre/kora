@@ -420,6 +420,33 @@ export function QuotationWorkspacePage() {
                     )}
                   </Card>
 
+                  <div id="quotation-ai-role-review" className={styles.aiRoleReview}>
+              {selected?.draft.aiPoc && form && (
+                <AiPocRoleMappingCard
+                  key={selected.id + ':' + selected.revision}
+                  version={selected}
+                  teams={activeTeams}
+                  canEdit={editable}
+                  hasUnsavedChanges={dirty}
+                  onApply={(draft) => {
+                    change((current) => ({ ...current, draft }));
+                    setNotice('Proyección de HH aplicada. Guarda el borrador para persistir la distribución.');
+                  }}
+                />
+              )}
+
+
+                  </div>
+                  <div className={styles.edtView} id="quotation-edt-reference">
+              {selected?.draft.aiPoc?.edt && projectId && (
+                <QuotationPlanningAcceptanceCard
+                  key={selected.id + ':' + selected.revision}
+                  version={selected}
+                />
+              )}
+
+
+                  </div>
                   <Card>
                     <div className={styles.cardTitle}><div><h2>Costos externos</h2><p>Los recurrentes se registran aparte; no inflan el neto inicial.</p></div>
                       {editable && <Button size="sm" variant="outline" onClick={() => updateDraft({ costs: [
@@ -496,35 +523,6 @@ export function QuotationWorkspacePage() {
                 </>
               )}
 
-              {selected?.draft.aiPoc && form && (
-                <AiPocRoleMappingCard
-                  key={selected.id + ':' + selected.revision}
-                  version={selected}
-                  teams={activeTeams}
-                  canEdit={editable}
-                  hasUnsavedChanges={dirty}
-                  onApply={(draft) => {
-                    change((current) => ({ ...current, draft }));
-                    setNotice('Proyección de HH aplicada. Guarda el borrador para persistir la distribución.');
-                  }}
-                />
-              )}
-
-              {selected?.draft.aiPoc?.edt && projectId && (
-                <QuotationPlanningAcceptanceCard
-                  key={selected.id + ':' + selected.revision}
-                  version={selected}
-                />
-              )}
-
-              {selected && project && (
-                <QuotationCommercialLifecycleCard
-                  key={selected.id + ':' + selected.revision}
-                  project={project} version={selected}
-                  quotation={quotation ?? null}
-                  canOperate={mayWrite} hasUnsavedChanges={dirty}
-                />
-              )}
               {versions.length > 1 && (
                 <QuotationVersionComparison versions={versions} teamNames={teamById} />
               )}
@@ -593,41 +591,35 @@ export function QuotationWorkspacePage() {
             </section>
 
             <aside className={styles.sidebar}>
-              <Card>
-                <h2>Resumen de versión</h2>
-                {selected ? (
-                  <>
-                    <div className={styles.stat}><span>HH guardadas</span><strong>{money(selected.totalHours)}</strong></div>
-                    <div className={styles.stat}><span>Neto guardado</span><strong>{selected.netAmount === null ? 'Sin valor HH' : money(selected.netAmount) + ' ' + selected.currency}</strong></div>
-                    <div className={styles.stat}><span>Total guardado</span><strong>{selected.totalAmount === null ? '—' : money(selected.totalAmount) + ' ' + selected.currency}</strong></div>
-                    <p className={styles.helper}>Revisión {selected.revision}. Los importes se recalculan en servidor al guardar.</p>
-                    {form?.draft.analysis && (
-                      <p className={form.draft.analysisProjectionStatus === 'modified' ? styles.warn : styles.helper}>
-                        {form.draft.analysis.provenance.mode === 'simulated_fixture' ? 'IA simulada · ' : 'IA · '}
-                        {form.draft.analysisProjectionStatus === 'modified'
-                          ? 'La edición manual difiere del EDT de origen. Conciliar antes de generar documentos.'
-                          : 'WBS y trazabilidad conservados para generación documental.'}
-                      </p>
-                    )}
-                    {dirty && <p className={styles.warn}>Hay cambios sin guardar; los totales aún corresponden a la última versión guardada.</p>}
-                    {notice && <p className={styles.success} role="status">{notice}</p>}
-                    {error && <p className={styles.error} role="alert">{error}</p>}
-                    {editable && <Button onClick={() => void save()} loading={saveDraft.isPending}
-                      disabled={!dirty || !form?.name.trim()}>Guardar borrador</Button>}
-                    {!editable && <p className={styles.helper}>La versión es de consulta o el proyecto ya no permite editarla.</p>}
-                  </>
-                ) : (
-                  <p className={styles.helper}>Crea una versión en blanco para empezar.</p>
-                )}
-                {!selected && error && <p className={styles.error} role="alert">{error}</p>}
-                {!selected && notice && <p className={styles.success} role="status">{notice}</p>}
-              </Card>
-              <Card>
-                <h3>Siguiente etapa</h3>
-                <p className={styles.helper}>Envío, aprobación y traspaso todavía no están habilitados. Los cambios de esta pantalla no afectan Proyectos ni Forecast.</p>
-              </Card>
+              <QuotationCommercialSummary
+                version={selected}
+                draft={form?.draft ?? null}
+                hourlyRate={form?.hourlyRate ?? null}
+                tax={form?.tax ?? 'iva19'}
+                currency={form?.currency ?? 'UF'}
+                teamNames={teamById}
+                editable={editable}
+                dirty={dirty}
+                saving={saveDraft.isPending}
+                onSave={() => void save()}
+              />
+              {selected && project && (
+                <QuotationCommercialLifecycleCard
+                  key={selected.id + ':' + selected.revision}
+                  project={project} version={selected}
+                  quotation={quotation ?? null}
+                  canOperate={mayWrite} hasUnsavedChanges={dirty}
+                />
+              )}
+
+              {dirty && <p className={styles.pendingNotice}>Guarda los cambios de la versión antes de enviar o aprobar.</p>}
+              {notice && <p role="status" className={styles.success}>{notice}</p>}
+              {error && <p role="alert" className={styles.error}>{error}</p>}
             </aside>
           </div>
+        )}
+        {project && newQuotationOpen && (
+          <NewProjectQuotationModal project={project} versions={versions} onClose={() => setNewQuotationOpen(false)} />
         )}
       </main>
     </DashboardLayout>
