@@ -11,3 +11,61 @@
 .summaryStats span{background:#edf2ff;padding:6px 9px;border-radius:7px}
 .simulation>.warn{margin:0}
 @media(max-width:600px){.mappingRow{grid-template-columns:1fr}}
+
+
+/* Cotizaciones v5 — capas locales de fidelidad visual; no alteran tokens globales. */
+.page{width:min(100%,1140px);margin:0 auto;gap:14px;padding-bottom:36px}
+.breadcrumb{justify-content:space-between;margin:2px 0 0;font-size:12px}
+.breadcrumb a:first-child{font-weight:700;color:var(--kora-navy)}
+.listLink{color:var(--kora-text-muted)}
+.layout{grid-template-columns:minmax(0,1fr) 262px;gap:16px}
+.main{gap:14px}
+.sidebar{gap:12px;top:18px}
+.sidebar>p{margin:0}
+.identityHeading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:9px}
+.identityHeading h1{font-size:16px;line-height:1.35;margin:0 0 4px;font-weight:800;color:var(--kora-navy)}
+.identityHeading p{margin:0;font-size:11px;color:var(--kora-text-muted);line-height:1.5}
+.versions{display:flex;align-items:center;gap:6px 10px;flex-wrap:wrap;padding:3px 0 12px}
+.versions .version{min-width:unset;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:var(--kora-navy);border:1px solid var(--kora-border-soft);border-radius:8px;background:var(--kora-surface-muted);padding:6px 10px;min-height:30px;line-height:1}
+.versions .selected{background:var(--kora-navy);border-color:var(--kora-navy);color:white}
+.versions .textAction{border:0;background:transparent;text-align:left;font-size:11px;font-weight:750;color:var(--kora-navy);padding:5px 1px;cursor:pointer}
+.versions .textAction:disabled{opacity:.45;cursor:not-allowed}
+.versions .aiAction{color:#6b21a8}
+.identityFields{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) minmax(105px,.65fr);align-items:end;gap:10px;padding:8px 0 0;border-top:1px solid var(--kora-border-subtle)}
+.readonlyField,.statusField{min-height:58px;display:grid;align-content:start;gap:7px;min-width:0}
+.readonlyField>span,.statusField>span{font-size:11px;color:var(--kora-text-muted)}
+.readonlyField strong{font-size:12px;font-weight:650;color:var(--kora-text);padding:9px 9px;border:1px solid var(--kora-border-soft);background:var(--kora-surface-muted);border-radius:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.statusField>span:last-child{justify-self:start}
+.aiBanner{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:14px;padding:12px 14px;border-radius:9px;background:#f0eaff;color:#6421a6}
+.aiBanner div{min-width:0}.aiBanner strong{font-size:12px}.aiBanner p{margin:3px 0 0;font-size:11px;line-height:1.5;color:#6421a6}.aiBanner button{white-space:nowrap}
+.priceGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.teamsHeading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap}
+.teamsHeading>div:first-child{flex:1;min-width:160px}
+.teamsHeading h2{font-size:16px;margin:0 0 4px}
+.teamsHeading p{font-size:11px;margin:0;color:var(--kora-text-muted)}
+.teamsHeading [role=radiogroup]{max-width:340px}
+.readonlyMode{font-size:11px;font-weight:750;color:var(--kora-text-muted)}
+.teamOverview{border-top:1px solid var(--kora-border-subtle);margin-top:4px}
+.teamColumns,.teamLine{display:grid;grid-template-columns:minmax(0,1fr) 85px 95px;align-items:center;gap:10px}
+.teamColumns{color:var(--kora-text-muted);background:var(--kora-surface-muted);font-size:11px;padding:10px 8px}
+.teamColumns span:last-child{text-align:right}
+.teamLine{min-height:45px;padding:7px 8px;border-bottom:1px solid var(--kora-border-subtle)}
+.teamLabel{display:flex;align-items:center;gap:7px;font-size:12px;min-width:0;cursor:pointer}
+.teamLabel input{accent-color:var(--kora-navy);flex-shrink:0}
+.teamLabel strong{min-width:0;overflow-wrap:anywhere;font-weight:700}
+.teamDot{display:block;width:9px;height:9px;border-radius:3px;flex-shrink:0}
+.collabInput{width:60px;text-align:center;border:1px solid var(--kora-border-soft);border-radius:7px;min-height:31px;padding:5px;color:var(--kora-text);background:white}
+.collabInput:disabled{background:var(--kora-surface-muted)}
+.teamHours{text-align:right;font-size:12px;font-variant-numeric:tabular-nums}
+.emptyTeams{padding:13px 9px;color:var(--kora-text-muted);font-size:12px;line-height:1.5;margin:0}
+.addTeams,.advanced{margin-top:10px;border:1px dashed var(--kora-border-soft);border-radius:8px;padding:10px 12px}
+.addTeams>summary,.advanced>summary{font-size:12px;color:var(--kora-navy);font-weight:750;cursor:pointer}
+.availableTeams{display:flex;gap:7px;flex-wrap:wrap;max-height:190px;overflow:auto;padding-top:12px}
+.availableTeams button{font-size:11px}
+.advanced{margin-top:10px;border-style:solid;border-color:var(--kora-border-subtle);background:var(--kora-surface-alt)}
+.advanced .tableWrap{margin-top:12px}
+.aiRoleReview,.edtView{min-width:0;scroll-margin-top:110px}
+.pendingNotice{font-size:11px;color:var(--kora-warning-text);line-height:1.5}
+@media(max-width:1100px){.page{max-width:100%;padding-inline:0}.layout{grid-template-columns:minmax(0,1fr) 250px}}
+@media(max-width:910px){.layout{grid-template-columns:1fr}.sidebar{position:static;max-width:none}.priceGrid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:630px){.identityHeading{flex-wrap:wrap}.identityFields{grid-template-columns:1fr}.priceGrid{grid-template-columns:1fr}.teamColumns,.teamLine{grid-template-columns:minmax(0,1fr) 70px 75px;gap:5px}.teamsHeading [role=radiogroup]{width:100%;max-width:100%}.listLink{display:none}.aiBanner{display:grid}.aiBanner button{justify-self:start}}
