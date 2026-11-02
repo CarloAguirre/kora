@@ -151,7 +151,7 @@ describe('EDT de cotización sin aplicación prematura', () => {
     expect(screen.getAllByText('24 HH').length).toBeGreaterThanOrEqual(2);
     expect(screen.getAllByText('16 HH').length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText('Desarrollo:')).toBeInTheDocument();
-    fireEvent.click(screen.getByText('API y pruebas'));
+    fireEvent.click(screen.getByText('API y pruebas', { selector: 'summary span' }));
     expect(screen.getByText(/Referencias: R01, R09/)).toBeInTheDocument();
     expect(screen.getByText(/Clasificación: C/)).toBeInTheDocument();
     expect(screen.getByText(/Tramo: T01/)).toBeInTheDocument();
