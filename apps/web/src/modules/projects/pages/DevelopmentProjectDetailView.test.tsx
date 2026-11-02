@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import type { Permission, ProjectDetail, ProjectTeamMember } from '@kora/contracts';
 import { DevelopmentProjectDetailView } from './DevelopmentProjectDetailView';
@@ -241,6 +241,20 @@ function renderView(permissions: Permission[] = ['projects:manage'], pendingAppr
 function getTeamCard(teamName: string) {
   return screen.getByText(`Equipo ${teamName}`).closest('a') as HTMLAnchorElement;
 }
+
+describe('Cotizaciones integradas en ficha Kora', () => {
+  it('muestra el nuevo tab dentro de las pestañas y no la tarjeta exterior anterior', () => {
+    renderView();
+    const button = screen.getByRole('button', { name: 'Cotizaciones' });
+    expect(button).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Cotizaciones del proyecto' })).not.toBeInTheDocument();
+    fireEvent.click(button);
+    expect(screen.getByRole('region', { name: 'Cotizaciones del proyecto' })).toBeInTheDocument();
+    expect(screen.getByText('Este proyecto aún no tiene cotización')).toBeInTheDocument();
+    // Proyecto aprobado: lectura histórica, sin permitir crear un borrador nuevo.
+    expect(screen.queryByRole('button', { name: '+ Nueva cotización' })).not.toBeInTheDocument();
+  });
+});
 
 describe('DevelopmentProjectDetailView — equipos asignados', () => {
   it('muestra el líder de cada equipo, incluso si no está fijado a nivel de proyecto', () => {
