@@ -58,6 +58,11 @@ describe('AnalyzeEstimationPocUseCase', () => {
         seen.task = request.task;
         return {
           summary: 'KDM requiere confirmar disponibilidad de APIs.',
+          fixedPrefills: [
+            { questionId: 'F01', value: 'mvp', sourceId, reason: 'Primera versión documentada' },
+            { questionId: 'F04', value: 'none,uat', sourceId, reason: 'Contradicción' },
+            { questionId: 'F02', value: '8 semanas', sourceId: 'otro-doc', reason: 'Fuente no incluida' },
+          ],
           dynamicQuestions: [{
             id: 'ejemplo', kind: 'dynamic',
             category: 'Integraciones', question: '¿Existe API SAP documentada?',
@@ -94,6 +99,10 @@ describe('AnalyzeEstimationPocUseCase', () => {
     expect(result.sourceMode).toBe('poc_simulated');
     expect(result.documentsAnalyzed).toBe(1);
     expect(result.detectedDocuments).toEqual(['Requerimiento_KDM.pdf']);
+    expect(result.fixedPrefills).toEqual([{
+      questionId: 'F01', value: 'mvp',
+      sourceRefs: [{ sourceId, fileName: 'Requerimiento_KDM.pdf' }],
+    }]);
     expect(result.dynamicQuestions[0]).toMatchObject({
       id: 'D01',
       sourceRefs: [{ sourceId, fileName: 'Requerimiento_KDM.pdf' }],

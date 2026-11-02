@@ -55,6 +55,11 @@ const analysisResult = {
   projectId: project.id, provider: 'gemini', sourceMode: 'poc_simulated',
   documentsAnalyzed: 1, detectedDocuments: ['Requerimiento_KDM.pdf'],
   summary: 'El motor centraliza notificaciones y requiere confirmar su API.',
+  fixedPrefills: [{
+    questionId: 'F01', value: 'mvp',
+    sourceRefs: [{ sourceId: 'kora-poc-requerimiento-kdm',
+      fileName: 'Requerimiento_KDM.pdf' }],
+  }],
   dynamicQuestions,
 };
 
@@ -144,6 +149,8 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
   it('permite corregir el entendimiento, valida las fijas agrupadas y conserva respuestas', async () => {
     renderWizard();
     await analyzeAndConfirm();
+    expect(screen.getByLabelText('MVP')).toBeChecked();
+    expect(screen.getByText(/Prellenada desde el documento de demostración/)).toBeInTheDocument();
     // No avanza hasta completar F01-F04, pero F05 es opcional.
     fireEvent.click(screen.getByRole('button', { name: 'Continuar' }));
     expect(screen.getByText('Condiciones de la estimación')).toBeInTheDocument();
