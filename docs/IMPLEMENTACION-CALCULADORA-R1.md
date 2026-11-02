@@ -136,3 +136,7 @@ Se corrigieron imports TS2304 y expectativa de test R4-a. Gemini genera módulos
 ## R4-d — Asistente IA v5 con cinco etapas reales (02/11/2026)
 
 El tab Cotizaciones abre un modal IA de Análisis → Entendimiento editable → Condiciones F01–F05 agrupadas → Aclaraciones dinámicas → Confirmación. Se elimina la navegación automática a la PoC y el envío sin revisión. Gemini analiza KDM explícitamente, prellena condiciones solo con evidencia, permite supuestos marcados como pendientes y recibe el resumen confirmado del usuario en roles/EDT. Se conservan diseño Kora, APIs, JSONB y guardado transaccional. Ver `docs/IMPLEMENTACION-CALCULADORA-R4D-ASISTENTE-V5.md`. Pruebas locales pendientes.
+
+## R4-e — Ciclo comercial Kora v5 y filtros de Proyectos (02/11/2026)
+
+Se agregaron filtros Tipo de proyecto (etapa comercial) y Cotización más columna Cotización/Tipo en la tabla existente. El estado comercial se obtiene de versiones y eventos reales en PostgreSQL. Gerencia/PMO y líder asignado pueden recotizar aprobados activos, aceptar IA, marcar enviada, registrar aprobación del cliente y traspasar una versión aprobada a un proyecto limpio/no iniciado. El antiguo botón de traspasar desde borrador queda bloqueado; aceptación IA nunca toca Roadmap. Se conservan permisos y audit logs; la recotización con ejecución previa requiere conciliación D05. Ver `docs/IMPLEMENTACION-CALCULADORA-R4E-ALINEACION-COMERCIAL-LISTADO.md`; QA local y build pendientes.
