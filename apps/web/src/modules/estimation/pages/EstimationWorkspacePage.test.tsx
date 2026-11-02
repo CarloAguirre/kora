@@ -114,7 +114,7 @@ describe('R4-a · EstimationWorkspacePage', () => {
     mocks.mutate.mockClear();
     renderWorkspace();
     expect(screen.getByText('¿Alcance?')).toBeInTheDocument();
-    expect(screen.getByText(/R4-a · Confirma las preguntas F01–F05/)).toBeInTheDocument();
+    expect(screen.getByText(/Confirma F01–F05 antes de generar la propuesta Gemini/)).toBeInTheDocument();
     expect(screen.queryByText('No se pudo generar la propuesta')).not.toBeInTheDocument();
     expect(mocks.mutate).not.toHaveBeenCalled();
   });
