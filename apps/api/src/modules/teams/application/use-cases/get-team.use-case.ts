@@ -31,13 +31,16 @@ export class GetTeamUseCase implements UseCase<GetTeamCommand, TeamDetail, Appli
       : await this.teams.findBySlug(command.teamId);
     if (!team || team.isDeleted) return err(new TeamNotFoundError(command.teamId));
 
-    const [activeMembers, memberList, leader, teamType] = await Promise.all([
-      this.teams.countActiveMembers(team.id),
+    const [memberList, leader, teamType] = await Promise.all([
       this.members.listActiveForTeam(team.id),
       team.leaderUserId ? this.users.findById(team.leaderUserId) : Promise.resolve(null),
       team.teamTypeId ? this.teamTypes.findById(team.teamTypeId) : Promise.resolve(null),
     ]);
 
+    // La relación team_members.left_at puede seguir vigente tras deshabilitar la cuenta.
+    // Este endpoint alimenta los selectores operativos de colaboradores: ocultar aquí
+    // al usuario deshabilitado, sin modificar su pertenencia ni sus horas históricas.
+    const visibleMembers = memberList.filter((member) => member.userStatus === 'active');
     const snapshot = team.toSnapshot();
 
     return ok({
@@ -48,8 +51,8 @@ export class GetTeamUseCase implements UseCase<GetTeamCommand, TeamDetail, Appli
       isActive: snapshot.isActive,
       leader: leader ? { id: leader.id, fullName: leader.fullName } : null,
       teamType: teamType ? { id: teamType.id, name: teamType.name, color: teamType.color, icon: teamType.icon } : null,
-      memberCount: activeMembers,
-      members: memberList.map((member) => ({
+      memberCount: visibleMembers.length,
+      members: visibleMembers.map((member) => ({
         id: member.id,
         userId: member.userId,
         fullName: member.userFullName,
