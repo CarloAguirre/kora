@@ -122,7 +122,15 @@ describe('Ciclo comercial separado · Kora', () => {
   it('no permite enviar cuando la EDT ya no concuerda con las HH ajustadas', () => {
     show({ ...version, aiReviewStatus: 'accepted',
       draft: { ...version.draft,
-        aiPoc: { ...version.draft.aiPoc, edt: { modules: [] } },
+        aiPoc: { ...version.draft.aiPoc!,
+          edt: {
+            schemaVersion: 'kora.quotation.reference-edt.v1',
+            source: 'kdm_demo',
+            provider: 'gemini',
+            modules: [],
+            totalHours: 0,
+          },
+        },
         analysisProjectionStatus: 'modified',
       },
     });

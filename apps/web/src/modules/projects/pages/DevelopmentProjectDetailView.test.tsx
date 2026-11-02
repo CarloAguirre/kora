@@ -256,8 +256,8 @@ describe('Cotizaciones integradas en ficha Kora', () => {
     fireEvent.click(button);
     expect(screen.getByRole('region', { name: 'Cotizaciones del proyecto' })).toBeInTheDocument();
     expect(screen.getByText('Este proyecto aún no tiene cotización')).toBeInTheDocument();
-    // Proyecto aprobado: lectura histórica, sin permitir crear un borrador nuevo.
-    expect(screen.queryByRole('button', { name: '+ Nueva cotización' })).not.toBeInTheDocument();
+    // Una etapa comercial aprobada activa puede recotizarse sin sobrescribir el plan.
+    expect(screen.getByRole('button', { name: '+ Nueva cotización' })).toBeEnabled();
   });
 });
 

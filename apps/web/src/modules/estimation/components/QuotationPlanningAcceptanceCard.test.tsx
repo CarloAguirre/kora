@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { quotationVersionSchema } from '@kora/contracts';
 import { QuotationPlanningAcceptanceCard } from './QuotationPlanningAcceptanceCard';
 
