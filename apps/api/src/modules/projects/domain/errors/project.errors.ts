@@ -337,6 +337,15 @@ export class ManualHito0ReasonRequiredError extends ValidationError {
  * Pasar un proyecto a Activo a mano (Hito 0 sin factura, o reactivarlo tras
  * Detenido) es de Gerencia/PMO — el líder del proyecto por sí solo no basta.
  */
+export class ProjectQuotationTransferRequiredError extends ValidationError {
+  constructor() {
+    super(
+      'Debes aprobar una versión de cotización y traspasarla antes de pasar el proyecto a Activo.',
+      'PROJECT_QUOTATION_TRANSFER_REQUIRED',
+    );
+  }
+}
+
 export class CannotActivateProjectError extends ForbiddenError {
   constructor() {
     super('Solo Gerencia/PMO puede pasar este proyecto a Activo.', 'PROJECT_CANNOT_ACTIVATE');

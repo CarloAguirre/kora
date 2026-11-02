@@ -74,6 +74,9 @@ export interface ProjectRepository {
   findById(id: string, context?: TransactionContext): Promise<Project | null>;
   findBySlug(slug: string, context?: TransactionContext): Promise<Project | null>;
   findByLegacyId(legacyId: number, context?: TransactionContext): Promise<Project | null>;
+  /** Bloquea un primer Hito 0 si el proyecto tiene cotización comercial
+   * pero su versión aprobada no está traspasada. Opcional para adaptadores legados. */
+  hasPendingQuotationTransfer?(projectId: string): Promise<boolean>;
 
   search(
     filters: ProjectFilters,

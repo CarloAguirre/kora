@@ -4,6 +4,7 @@ import { PROJECT_STATUS_LABELS, type ChangeProjectStatusInput, type Permission }
 import {
   CannotManageProjectError,
   CannotActivateProjectError,
+  ProjectQuotationTransferRequiredError,
   ManualHito0ReasonRequiredError,
   ProjectNotFoundError,
 } from '../../domain/errors/project.errors';
@@ -49,6 +50,12 @@ export class ChangeProjectStatusUseCase
     /** Pasar a Activo (sea Hito 0 manual o reactivar tras Detenido) es de Gerencia/PMO, no del líder por sí solo. */
     if (command.data.status === 'active' && !command.actorPermissions.includes('projects:manage')) {
       return err(new CannotActivateProjectError());
+    }
+
+    if (previousStatus === 'draft' && command.data.status === 'active' &&
+        project.type === 'development' &&
+        await this.projects.hasPendingQuotationTransfer?.(project.id)) {
+      return err(new ProjectQuotationTransferRequiredError());
     }
 
     /**
