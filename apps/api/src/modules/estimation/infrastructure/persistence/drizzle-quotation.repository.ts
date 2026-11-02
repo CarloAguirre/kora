@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { projectAnalysisToQuotationDraft } from '../../domain/project-analysis-to-quotation';
 import { QuotationAnalysisIntegrityError, reconcileQuotationAnalysis } from '../../domain/quotation-analysis-integrity';
-import { and, asc, desc, eq, inArray, isNull, projectQuotations, projects, quotationEvents, quotationVersions, sql, teams, projectTeams, projectModules, projectModuleTasks, projectModuleSegments, projectPaymentMilestones, type Database } from '@kora/db';
+import { and, asc, desc, eq, inArray, isNull, hourEntries, projectQuotations, projects, quotationEvents, quotationVersions, sql, teams, projectTeams, projectModules, projectModuleTasks, projectModuleSegments, projectPaymentMilestones, type Database } from '@kora/db';
 import {
   quotationDraftDataSchema,
   quotationAiPocSnapshotSchema,
@@ -496,17 +496,19 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       if (version.status !== 'draft' || version.revision !== input.revision || version.origin !== 'ai') {
         throw new ConflictException('La revisión cambió o la versión no es un borrador IA.');
       }
-      const [existingTeams, existingModules, existingPayments] = await Promise.all([
+      const [existingTeams, existingModules, existingPayments, existingHours] = await Promise.all([
         tx.select({ id: projectTeams.id }).from(projectTeams)
           .where(eq(projectTeams.projectId, projectId)).limit(1),
         tx.select({ id: projectModules.id }).from(projectModules)
           .where(eq(projectModules.projectId, projectId)).limit(1),
         tx.select({ id: projectPaymentMilestones.id }).from(projectPaymentMilestones)
           .where(eq(projectPaymentMilestones.projectId, projectId)).limit(1),
+        tx.select({ id: hourEntries.id }).from(hourEntries)
+          .where(eq(hourEntries.projectId, projectId)).limit(1),
       ]);
       if (Number(project.soldHours) !== 0 || Number(project.usedHours) !== 0 ||
           project.contractAmount !== null || project.startDate !== null ||
-          existingTeams.length || existingModules.length || existingPayments.length) {
+          existingTeams.length || existingModules.length || existingPayments.length || existingHours.length) {
         throw new ConflictException(
           'El proyecto ya tiene planificación, HH, fechas, contrato o pagos. No se sobreescribe.',
         );

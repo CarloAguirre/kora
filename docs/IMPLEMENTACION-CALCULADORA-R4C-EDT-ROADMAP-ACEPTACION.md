@@ -36,7 +36,7 @@ El botón **Aceptar estimación y crear planificación** solicita confirmación 
 El backend abre transacción y bloquea fila de projects y quotation_versions antes de leer datos vigentes. Rechaza:
 
 - Proyecto que no sea desarrollo, no esté en Prospecto/Cotización o esté detenido, terminado o cancelado.
-- Proyecto con HH vendidas/consumidas distintas de cero, fecha de inicio, monto de contrato, equipos, módulos o hitos de pago preexistentes.
+- Proyecto con HH vendidas/consumidas distintas de cero, fecha de inicio, monto de contrato, equipos, módulos, registros de horas (incluso pendientes) o hitos de pago preexistentes.
 - Versión histórica, revisión obsoleta, estado no draft u origen no IA.
 - Otra planificación ya aplicada en el proyecto (se evita duplicar ante reintentos).
 - Evidencia IA que no sea Gemini/KDM, EDT ausente, perfiles sin equipos, mapeo no conciliado, diferencias de HH entre tareas, roles, versión y propuesta.
@@ -106,7 +106,7 @@ git status --short
 3. Mapear cada perfil a un equipo activo y pulsar **Aplicar distribución de HH**; **Guardar borrador**. La suma del presupuesto debe coincidir con las HH del expediente EDT.
 4. Pulsar **Aceptar estimación y crear planificación**, confirmar. Comprobar creación en proyectos de HH vendidas, project_teams y project_modules y referencias en Roadmap.
 5. Intentar repetir aceptación o editar la misma versión después: debe responder conflicto; no duplicar filas.
-6. Repetir en un prospecto con horas consumidas, fecha de inicio, equipos, módulos o pagos preexistentes: debe fallar íntegramente, sin crear ni alterar registros.
+6. Repetir en un prospecto con horas consumidas, fecha de inicio, equipos, módulos, registros de horas o pagos preexistentes: debe fallar íntegramente, sin crear ni alterar registros.
 7. Confirmar que project_module_tasks no se rellena con fechas inventadas y que facturación/Forecast/hours consumidas siguen intactas.
 8. Comprobar que la UI sigue el diseño propio de Kora, no estilos copiados del HTML.
 
