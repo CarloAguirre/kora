@@ -2,7 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import { describe, expect, it } from 'vitest';
 import type { SubmitEstimationAnswerInput } from '@kora/contracts';
 import { GetEstimationQuestionnaireDefinitionUseCase } from './use-cases/get-estimation-questionnaire-definition.use-case';
-import { validateFixedQuestionnaireAnswers } from './validate-estimation-questionnaire';
+import { validateFixedQuestionnaireAnswers, validateQuestionnaireAnswers } from './validate-estimation-questionnaire';
 
 const definition = new GetEstimationQuestionnaireDefinitionUseCase().execute();
 const complete = (): SubmitEstimationAnswerInput[] => [
@@ -58,4 +58,27 @@ describe('R4-a · respuestas de cuestionario F01–F05', () => {
       questionId: 'F05', value: null, usedAssumption: true,
     }])).not.toThrow();
   });
+  it('R4-b: valida las dinámicas ligadas a KDM, sin permitir omitirlas', () => {
+    const dynamic = {
+      id: 'D01', kind: 'dynamic' as const,
+      category: 'Integraciones', question: '¿Existe API SAP?', reason: 'Impacta HH',
+      impact: 'high' as const, answerType: 'single_choice' as const,
+      required: true, options: [
+        { value: 'yes', label: 'Sí' }, { value: 'no', label: 'No' },
+      ],
+      canPrefill: false, confidence: 'medium' as const, priorityScore: 5,
+      sourceRefs: [{
+        sourceId: 'kora-poc-requerimiento-kdm', fileName: 'Requerimiento_KDM.pdf',
+      }], dependsOn: [],
+    };
+    expect(() => validateQuestionnaireAnswers(definition, [
+      ...complete(), { questionId: 'D01', value: 'yes', usedAssumption: false },
+    ], [dynamic])).not.toThrow();
+    expect(() => validateQuestionnaireAnswers(definition, complete(), [dynamic]))
+      .toThrow(/D01/);
+    expect(() => validateQuestionnaireAnswers(definition, [
+      ...complete(), { questionId: 'D01', value: 'unknown', usedAssumption: false },
+    ], [dynamic])).toThrow(/D01/);
+  });
+
 });

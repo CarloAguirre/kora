@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { AiProvider } from '../../../ai/application/ports/ai-provider.port';
+import type { DocumentSourceReader } from '../ports/document-source-reader.port';
 import { AnalyzeEstimationPocUseCase } from './analyze-estimation-poc.use-case';
 
 describe('AnalyzeEstimationPocUseCase', () => {
@@ -47,4 +48,83 @@ describe('AnalyzeEstimationPocUseCase', () => {
     expect(result).not.toHaveProperty('roles');
     expect(result).not.toHaveProperty('totalHours');
   });
+  it('pide preguntas dinámicas a Gemini usando el documento KDM real de la fuente de demo', async () => {
+    const sourceId = 'kora-poc-requerimiento-kdm';
+    const seen: { documents?: unknown; task?: string } = {};
+    const ai: AiProvider = {
+      name: 'gemini',
+      generateStructured: async (request) => {
+        seen.documents = request.documents;
+        seen.task = request.task;
+        return {
+          summary: 'KDM requiere confirmar disponibilidad de APIs.',
+          dynamicQuestions: [{
+            id: 'ejemplo', kind: 'dynamic',
+            category: 'Integraciones', question: '¿Existe API SAP documentada?',
+            reason: 'La implementación cambia las HH.',
+            impact: 'high', answerType: 'single_choice',
+            options: [
+              { value: 'yes', label: 'Sí' },
+              { value: 'no', label: 'No' },
+            ],
+            required: true, confidence: 'medium', priorityScore: 5,
+            sourceRefs: [{ sourceId, fileName: 'Requerimiento_KDM.pdf' }],
+          }],
+        };
+      },
+    };
+    const sources: DocumentSourceReader = {
+      readDriveSources: async () => [{
+        sourceId, name: 'Requerimiento_KDM.pdf',
+        mimeType: 'application/pdf', path: 'Levantamiento/Requerimiento_KDM.pdf',
+        text: 'El sistema integra SAP, verificar APIs disponibles.',
+      }],
+    };
+    const result = await new AnalyzeEstimationPocUseCase(ai, sources).execute({
+      projectId: '550e8400-e29b-41d4-a716-446655440000',
+      projectName: 'Proyecto', clientName: 'Cliente',
+      driveFolderUrl: 'https://drive.google.com/drive/folders/kora-poc-fallback',
+      instructions: null,
+    });
+    expect(seen.task).toBe('estimation.poc.analysis');
+    expect(seen.documents).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: 'Requerimiento_KDM.pdf' }),
+    ]));
+    expect(result.provider).toBe('gemini');
+    expect(result.sourceMode).toBe('poc_simulated');
+    expect(result.documentsAnalyzed).toBe(1);
+    expect(result.detectedDocuments).toEqual(['Requerimiento_KDM.pdf']);
+    expect(result.dynamicQuestions[0]).toMatchObject({
+      id: 'D01',
+      sourceRefs: [{ sourceId, fileName: 'Requerimiento_KDM.pdf' }],
+    });
+  });
+
+  it('rechaza aclaraciones que citan archivos inexistentes o ajenos al KDM', async () => {
+    const ai: AiProvider = {
+      name: 'gemini',
+      generateStructured: async () => ({
+        summary: 'Análisis',
+        dynamicQuestions: [{
+          id: 'D01', kind: 'dynamic', category: 'SAP',
+          question: '¿API?', reason: 'Impacta integración',
+          impact: 'high', answerType: 'text', options: [], required: true,
+          sourceRefs: [{ sourceId: 'otro-documento', fileName: 'otro.pdf' }],
+        }],
+      }),
+    };
+    const reader: DocumentSourceReader = {
+      readDriveSources: async () => [{
+        sourceId: 'kora-poc-requerimiento-kdm', name: 'Requerimiento_KDM.pdf',
+        mimeType: 'application/pdf', path: 'Demo/KDM', text: 'SAP',
+      }],
+    };
+    await expect(new AnalyzeEstimationPocUseCase(ai, reader).execute({
+      projectId: '550e8400-e29b-41d4-a716-446655440000',
+      projectName: 'Proyecto', clientName: 'Cliente',
+      driveFolderUrl: 'https://drive.google.com/drive/folders/kora-poc-fallback',
+      instructions: null,
+    })).rejects.toThrow(/documento proporcionado/);
+  });
+
 });
