@@ -9,12 +9,23 @@ const fmt = (hours: number) => hours.toLocaleString('es-CL', { maximumFractionDi
  * Compatible con cotizaciones Gemini v1 sin roleEffort / stages.
  * Solo es un borrador comercial, nunca ejecución ni asignación nominal.
  */
-export function QuotationPlanningAcceptanceCard({ version }: { version: QuotationVersion }) {
+export function QuotationPlanningAcceptanceCard({
+  version, teamNames, roleTeamIds,
+}: {
+  version: QuotationVersion;
+  teamNames?: ReadonlyMap<string, string>;
+  roleTeamIds?: Readonly<Record<string, string>>;
+}) {
   const edt = version.draft.aiPoc?.edt;
   if (!edt) return null;
   const detailed = edt.schemaVersion === 'kora.quotation.reference-edt.v2';
   const stages = detailed ? edt.stages ?? [] : [];
   const reserve = detailed ? edt.reserveHours ?? 0 : 0;
+  const mapping = roleTeamIds ?? version.draft.aiPoc?.roleTeamIds ?? {};
+  const mappedName = (role: string) => {
+    const teamId = mapping[role];
+    return teamId ? teamNames?.get(teamId) ?? 'Equipo no disponible' : null;
+  };
   return (
     <Card>
       <div className={styles.head}>
@@ -64,6 +75,12 @@ export function QuotationPlanningAcceptanceCard({ version }: { version: Quotatio
               effortByRole.set(item.role, Math.round(((effortByRole.get(item.role) ?? 0) + item.hours) * 100) / 100);
             }
           }
+          const effortByTeam = new Map<string, number>();
+          for (const [role, hours] of effortByRole) {
+            const label = mappedName(role);
+            if (label) effortByTeam.set(label,
+              Math.round(((effortByTeam.get(label) ?? 0) + hours) * 100) / 100);
+          }
           return (
             <details key={index} className={styles.module}>
               <summary className={styles.moduleHeader}>
@@ -80,9 +97,17 @@ export function QuotationPlanningAcceptanceCard({ version }: { version: Quotatio
               <div className={styles.moduleBody}>
                 <div className={styles.moduleRoles} aria-label={'Distribución por perfil en ' + module.name}>
                   {[...effortByRole].map(([role, hours]) => (
-                    <div key={role}><span>{role}</span><strong>{fmt(hours)} HH</strong></div>
+                    <div key={role}><span>{role}{mappedName(role) ? ' · ' + mappedName(role) : ''}</span>
+                      <strong>{fmt(hours)} HH</strong></div>
                   ))}
                 </div>
+                {effortByTeam.size > 0 && (
+                  <div className={styles.teamTotals} aria-label={'HH por equipo del módulo ' + module.name}>
+                    {[...effortByTeam].map(([name, hours]) => (
+                      <span key={name}>{name}: <strong>{fmt(hours)} HH</strong></span>
+                    ))}
+                  </div>
+                )}
                 {module.tasks.map((task) => (
                   <details key={task.wbs} className={styles.task}>
                     <summary className={styles.taskHeader}>
@@ -98,7 +123,7 @@ export function QuotationPlanningAcceptanceCard({ version }: { version: Quotatio
                       <div className={styles.taskRoleEffort}>
                         {(task.roleEffort ?? [{ role: task.role, hours: task.hours }]).map((part) => (
                           <span key={part.role} className={styles.role}>
-                            {part.role}: {fmt(part.hours)} HH
+                            {part.role}{mappedName(part.role) ? ' · ' + mappedName(part.role) : ''}: {fmt(part.hours)} HH
                           </span>
                         ))}
                       </div>
