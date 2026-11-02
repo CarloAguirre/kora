@@ -60,14 +60,18 @@ export function buildReferenceDailyPlan(
   const issues: string[] = [];
   let pending = 0;
 
-  // Al recorrer primero los tramos que comienzan antes, el calendario
-  // respeta su orden relativo incluso cuando comparten días.
+  // Priorizamos el vencimiento más cercano (earliest deadline first).
+  // Si los tramos se solapan, no agotamos la semana de un tramo flexible
+  // antes de reservar capacidad al tramo que solo puede ejecutarse allí.
   const activities = edt.modules.flatMap((module) =>
     module.tasks.map((task) => ({ module: module.name, task })));
   activities.sort((a, b) => {
-    const first = byStage.get(a.task.stageCode ?? '')?.startWeek ?? Infinity;
-    const second = byStage.get(b.task.stageCode ?? '')?.startWeek ?? Infinity;
-    return first - second ||
+    const stageA = byStage.get(a.task.stageCode ?? '');
+    const stageB = byStage.get(b.task.stageCode ?? '');
+    const deadlineA = stageA ? stageA.startWeek + stageA.durationWeeks - 1 : Infinity;
+    const deadlineB = stageB ? stageB.startWeek + stageB.durationWeeks - 1 : Infinity;
+    return deadlineA - deadlineB ||
+      (stageA?.startWeek ?? Infinity) - (stageB?.startWeek ?? Infinity) ||
       (a.task.stageCode ?? '').localeCompare(b.task.stageCode ?? '') ||
       a.task.wbs.localeCompare(b.task.wbs);
   });
