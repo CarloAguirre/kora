@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { estimationAnalysisArtifactSchema } from './analysis-artifact.contract';
+import { quotationReferenceEdtSchema } from './quotation-reference-edt.contract';
 import { estimationPocProposalSchema, submitEstimationAnswerSchema, estimationQuestionSchema } from './estimation.contract';
 import { isoDateTimeSchema, nonEmptyTrimmed, uuidSchema } from '../common/primitives';
 
@@ -74,6 +75,7 @@ export const quotationAiPocSnapshotSchema = z.object({
   proposal: estimationPocProposalSchema,
   answers: z.array(submitEstimationAnswerSchema),
   dynamicQuestions: z.array(estimationQuestionSchema).max(5).default([]),
+  edt: quotationReferenceEdtSchema.nullish(),
   roleTeamIds: z.record(z.string(), uuidSchema).default({}),
 });
 export type QuotationAiPocSnapshot = z.infer<typeof quotationAiPocSnapshotSchema>;

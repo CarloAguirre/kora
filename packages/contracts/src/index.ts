@@ -23,3 +23,4 @@ export * from './estimation/quotation-reconciliation-review';
 export * from './estimation/quotation-commercial-preflight.contract';
 export * from './estimation/quotation-commercial-dossier.contract';
 export * from './estimation/quotation-poc-projection';
+export * from './estimation/quotation-reference-edt.contract';
