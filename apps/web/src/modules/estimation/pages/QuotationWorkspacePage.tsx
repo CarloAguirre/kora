@@ -276,7 +276,10 @@ export function QuotationWorkspacePage() {
                     <button type="button" className={styles.textAction} disabled={createVersion.isPending}
                       onClick={() => void newVersion(selected?.id)}>+ Nueva versión</button>
                     <button type="button" className={styles.textAction + ' ' + styles.aiAction}
-                      onClick={() => setNewQuotationOpen(true)}>✦ Nueva versión con IA</button>
+                      onClick={() => {
+                        if (dirty && !window.confirm('Hay cambios sin guardar. ¿Deseas descartarlos?')) return;
+                        setNewQuotationOpen(true);
+                      }}>✦ Nueva versión con IA</button>
                     <button type="button" className={styles.textAction} disabled={createVersion.isPending}
                       onClick={() => void newVersion()}>En blanco</button>
                   </>}
@@ -304,9 +307,11 @@ export function QuotationWorkspacePage() {
                           : 'Propuesta IA pendiente. '}
                           Revisa perfiles y HH antes de aceptar. La IA no define el valor HH comercial.</p>
                       </div>
-                      <Button size="sm" variant="secondary" onClick={() =>
-                        document.getElementById('quotation-ai-role-review')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                      }>Revisar propuesta</Button>
+                      {selected.draft.aiPoc && (
+                        <Button size="sm" variant="secondary" onClick={() =>
+                          document.getElementById('quotation-ai-role-review')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                        }>Revisar propuesta</Button>
+                      )}
                     </div>
                   )}
                 </>}
