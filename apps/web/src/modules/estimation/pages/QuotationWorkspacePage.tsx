@@ -101,7 +101,7 @@ export function QuotationWorkspacePage() {
         // El artefacto conserva el cálculo original; editar el presupuesto
         // requiere conciliarlo antes de usarlo para producir documentos.
         ...((current.draft.analysis || current.draft.aiPoc) && Object.keys(patch).some(
-          (field) => ['teams', 'phases', 'costs', 'paymentPlan', 'assumptions', 'exclusions'].includes(field),
+          (field) => ['mode', 'teams', 'phases', 'costs', 'paymentPlan', 'assumptions', 'exclusions'].includes(field),
         ) ? { analysisProjectionStatus: 'modified' as const } : {}),
       },
     }));
@@ -353,6 +353,12 @@ export function QuotationWorkspacePage() {
                             onChange={(mode) => updateDraft({ mode: mode as QuotationDraftData['mode'] })} />
                         : <span className={styles.readonlyMode}>{form.draft.mode === 'team' ? 'Por equipo' : 'Por fases y módulos'}</span>}
                     </div>
+                    {form.draft.mode === 'phases' && phaseRows.length === 0 && teamRows.length > 0 && (
+                      <p className={styles.modeNotice} role="status">
+                        No hay fases configuradas. Esta modalidad calcula HH desde las fases,
+                        no desde la duración de cada equipo; agrega una fase para distribuirlas.
+                      </p>
+                    )}
                     <div className={styles.teamOverview}>
                       <div className={styles.teamColumns}>
                         <span>Equipo</span><span>N° colab.</span><span>Horas</span>
@@ -391,9 +397,37 @@ export function QuotationWorkspacePage() {
                           </div>
                         );
                       })}
-                      {teamRows.length === 0 && (
-                        <p className={styles.emptyTeams}>Todavía no hay HH distribuidas. Agrega los equipos y, si la versión es IA, revisa los perfiles propuestos.</p>
+                      {available.filter((team) => ['desarrollo', 'pmo', 'qa', 'rpa', 'ux', 'diseño', 'inteligencia', 'ia']
+                        .some((keyword) => team.name.toLocaleLowerCase('es').includes(keyword))).slice(0, 8)
+                        .map((team) => {
+                          const name = team.name.toLocaleLowerCase('es');
+                          const color = name.includes('desarrollo') ? 'var(--kora-orange)'
+                            : name.includes('qa') ? 'var(--kora-blue-link)'
+                            : name.includes('ux') || name.includes('diseño') ? 'var(--kora-success)'
+                            : name.includes('pmo') ? 'var(--kora-text-muted)'
+                            : name.includes('rpa') ? 'var(--kora-cyan)' : 'var(--kora-blue-400)';
+                          return (
+                            <div key={team.id} className={styles.teamLine + ' ' + styles.inactiveTeam}>
+                              <label className={styles.teamLabel}>
+                                <input type="checkbox" checked={false} disabled={!editable}
+                                  aria-label={'Incluir ' + team.name}
+                                  onChange={() => updateDraft({ teams: [...teamRows, emptyTeam(team.id)] })} />
+                                <span className={styles.teamDot} style={{ background: color }} aria-hidden="true" />
+                                <strong>{team.name}</strong>
+                              </label>
+                              <input className={styles.collabInput} type="number" value={1} disabled
+                                aria-label={'Colaboradores de ' + team.name} />
+                              <strong className={styles.teamHours}>—</strong>
+                            </div>
+                          );
+                        })}
+                      {teamRows.length === 0 && available.length === 0 && (
+                        <p className={styles.emptyTeams}>Todavía no hay HH distribuidas. Agrega equipos activos para comenzar.</p>
                       )}
+                      {teamRows.length === 0 && available.length > 0 &&
+                        !form.draft.aiPoc && (
+                          <p className={styles.emptyTeams}>Selecciona un equipo para comenzar a distribuir las HH.</p>
+                        )}
                     </div>
                     {editable && available.length > 0 && (
                       <details className={styles.addTeams}>
