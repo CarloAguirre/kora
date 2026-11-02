@@ -1,6 +1,6 @@
 import type {
   CreateQuotationVersionInput,
-  GenerateEstimationPocInput,
+  GenerateAiDemoQuotationInput,
   ProjectQuotation,
   QuotationVersion,
   QuotationTransferPreview,
@@ -57,7 +57,7 @@ export const quotationApi = {
       base(projectId) + '/versions/' + versionId + '/reconciliation-assessments', input,
     );
   },
-  generateAiDemoDraft(projectId: string, input: GenerateEstimationPocInput): Promise<QuotationVersion> {
+  generateAiDemoDraft(projectId: string, input: GenerateAiDemoQuotationInput): Promise<QuotationVersion> {
     return api.post<QuotationVersion>(base(projectId) + '/versions/ai-poc', input);
   },
   create(projectId: string, input: CreateQuotationVersionInput = {}): Promise<QuotationVersion> {

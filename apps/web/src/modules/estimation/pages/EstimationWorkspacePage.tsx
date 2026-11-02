@@ -8,7 +8,7 @@ import type {
 import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { projectQuotationPath } from '@/app/router/paths';
 import { Card } from '@/shared/components/ui/Card';
-import { useEstimationQuestionnaireDefinition, useGenerateAnsweredEstimationPocProposal } from '../api/estimation.queries';
+import { useEstimationDocumentAnalysis, useEstimationQuestionnaireDefinition, useGenerateAnsweredEstimationPocProposal } from '../api/estimation.queries';
 import { EstimationQuestionnaireForm } from '../components/EstimationQuestionnaireForm';
 import { useGenerateAiDemoQuotationVersion } from '../api/quotation.queries';
 import { DEMO_KDM_FOLDER_URL } from '../lib/demo-source';
@@ -23,10 +23,11 @@ interface EstimationNavigationState {
 }
 
 const PIPELINE = [
-  'Antecedentes de Drive',
-  'Análisis IA',
-  'Estimación por equipos',
-  'Revisión',
+  'Análisis',
+  'Entendimiento',
+  'Condiciones',
+  'Aclaraciones',
+  'Confirmación',
 ] as const;
 
 const ANALYSIS_STEPS = [
@@ -105,6 +106,18 @@ export function EstimationWorkspacePage() {
       ? project.data.documentationLink
       : '');
   const instructions = navigationState.instructions?.trim() || '';
+  const analysis = useEstimationDocumentAnalysis(
+    project.data && demoMode ? {
+      projectId: project.data.id,
+      projectName: project.data.name,
+      clientName: project.data.client?.companyName ?? null,
+      driveFolderUrl: DEMO_KDM_FOLDER_URL,
+      instructions: instructions || null,
+    } : null,
+    demoMode && mode === 'ai' && Boolean(project.data),
+  );
+  const dynamicQuestions = demoMode && analysis.data?.provider === 'gemini'
+    ? analysis.data.dynamicQuestions : [];
 
   const manualRoles = useMemo(
     () => (mode === 'ai' ? [] : getManualEstimationTemplate(mode)),
@@ -124,7 +137,7 @@ export function EstimationWorkspacePage() {
     if (demoMode) {
       // En una sola solicitud el servidor valida, llama a Gemini con KDM y
       // persiste una versión IA. Ninguna propuesta creada solo en el navegador.
-      generateDemo.mutate(input, {
+      generateDemo.mutate({ ...input, dynamicQuestions }, {
         onSuccess: (created) => navigate(projectQuotationPath(project.data) +
           '?version=' + created.id + '&map-ai=1'),
       });
@@ -244,6 +257,41 @@ export function EstimationWorkspacePage() {
                 </Card>
               )}
 
+              {demoMode && mode === 'ai' && analysis.isLoading && (
+                <Card className={styles.analysisCard}>
+                  <h2>Analizando el documento KDM con Gemini…</h2>
+                  <p>Se identifican procesos e incertidumbres antes de formular las aclaraciones.</p>
+                </Card>
+              )}
+
+              {demoMode && mode === 'ai' && analysis.isError && (
+                <Card className={styles.errorCard}>
+                  <h2>No se pudo analizar el ejemplo KDM</h2>
+                  <p>{analysis.error instanceof Error
+                    ? analysis.error.message
+                    : 'Comprueba GEMINI_API_KEY y vuelve a cargar.'}</p>
+                </Card>
+              )}
+
+              {demoMode && mode === 'ai' && analysis.data?.provider !== 'gemini' &&
+                !analysis.isLoading && !analysis.isError && (
+                  <Card className={styles.errorCard}>
+                    <p>El modo KDM requiere Gemini real; no continúa con resultados simulados del proveedor PoC.</p>
+                  </Card>
+                )}
+
+              {demoMode && analysis.data?.provider === 'gemini' && (
+                <Card className={styles.analysisCard}>
+                  <span className={styles.eyebrow}>Análisis documental · fuente KDM de prueba</span>
+                  <h2>Entendimiento preliminar</h2>
+                  <p>{analysis.data.summary}</p>
+                  <p className={styles.metaNote}>
+                    {analysis.data.documentsAnalyzed} documento(s) de demostración ·
+                    {' '}{dynamicQuestions.length} pregunta(s) dinámica(s) propuestas por Gemini.
+                  </p>
+                </Card>
+              )}
+
               {mode === 'ai' && driveFolderUrl && questionnaire.isLoading && (
                 <Card className={styles.analysisCard}>
                   <h2>Cargando preguntas de estimación…</h2>
@@ -259,18 +307,18 @@ export function EstimationWorkspacePage() {
               )}
 
               {mode === 'ai' && driveFolderUrl && project.data &&
-                questionnaire.data && !proposal && (
+                questionnaire.data && !proposal && (!demoMode || analysis.data?.provider === 'gemini') && (
                   <Card className={styles.analysisCard}>
                     <p className={styles.metaNote}>
                       Confirma F01–F05 antes de generar la propuesta Gemini.
                       {demoMode
-                        ? ' Fuente de demostración: PDF KDM; la carpeta real del proyecto no se consulta.'
+                        ? ' Fuente de demostración: PDF KDM; Gemini genera preguntas dinámicas justificadas por ese archivo.'
                         : ' Las preguntas dinámicas requieren analizar la documentación real.'}
                     </p>
                     <EstimationQuestionnaireForm
                       key={project.data.id + ':' + driveFolderUrl}
                       fixedQuestions={questionnaire.data.fixedQuestions}
-                      dynamicQuestions={[]}
+                      dynamicQuestions={dynamicQuestions}
                       submitting={generating}
                       onSubmit={submitQuestionnaire}
                     />

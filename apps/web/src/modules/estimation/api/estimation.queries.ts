@@ -76,3 +76,21 @@ export function useGenerateAnsweredEstimationPocProposal() {
     mutationFn: (input: GenerateEstimationPocInput) => estimationApi.generateAnsweredPocProposal(input),
   });
 }
+
+/** Análisis preliminar real por Gemini (el modo KDM mantiene fuente de demo). */
+export function useEstimationDocumentAnalysis(
+  input: AnalyzeEstimationPocInput | null, enabled: boolean,
+) {
+  return useQuery({
+    queryKey: [...estimationKeys.questionnaireDefinition(), 'document-analysis',
+      input?.projectId ?? '', input?.driveFolderUrl ?? '',
+      input?.instructions ?? ''] as const,
+    queryFn: () => {
+      if (!input) throw new Error('No existe contexto documental para analizar.');
+      return estimationApi.analyzePoc(input);
+    },
+    enabled: enabled && Boolean(input),
+    retry: false,
+    staleTime: 10 * 60_000,
+  });
+}
