@@ -42,6 +42,15 @@ const quotationStatusSql = sql<
   when exists (
     select 1 from project_quotations pq
     join quotation_versions qv on qv.quotation_id = pq.id
+    where pq.project_id = ${projects.id} and qv.status = 'approved'
+      and not exists (
+        select 1 from quotation_events qe
+        where qe.version_id = qv.id and qe.action = 'quotation_transferred'
+      )
+  ) then 'approved_pending'
+  when exists (
+    select 1 from project_quotations pq
+    join quotation_versions qv on qv.quotation_id = pq.id
     join quotation_events qe on qe.version_id = qv.id
     where pq.project_id = ${projects.id} and qe.action = 'quotation_transferred'
   ) then 'transferred'
@@ -51,11 +60,6 @@ const quotationStatusSql = sql<
     join quotation_events qe on qe.version_id = qv.id
     where pq.project_id = ${projects.id} and qe.action = 'planning_baseline_applied'
   ) then 'planning_applied'
-  when exists (
-    select 1 from project_quotations pq
-    join quotation_versions qv on qv.quotation_id = pq.id
-    where pq.project_id = ${projects.id} and qv.status = 'approved'
-  ) then 'approved_pending'
   when exists (
     select 1 from project_quotations pq
     join quotation_versions qv on qv.quotation_id = pq.id

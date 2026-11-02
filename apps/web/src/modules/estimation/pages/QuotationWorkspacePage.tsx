@@ -300,8 +300,7 @@ export function QuotationWorkspacePage() {
               {selected?.draft.aiPoc?.edt && projectId && (
                 <QuotationPlanningAcceptanceCard
                   key={selected.id + ':' + selected.revision}
-                  projectId={projectId} version={selected}
-                  canManage={mayWrite} hasUnsavedChanges={dirty}
+                  version={selected}
                 />
               )}
 

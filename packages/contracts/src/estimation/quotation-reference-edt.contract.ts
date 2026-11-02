@@ -41,8 +41,8 @@ export const appliedQuotationPlanningSchema = z.object({
   appliedAt: z.string().datetime(),
   appliedByUserId: uuidSchema.nullable(),
   source: z.literal('kdm_demo'),
-  status: z.literal('accepted_for_planning_only'),
-  commercialApproval: z.literal(false),
+  status: z.enum(['accepted_for_planning_only', 'transferred']),
+  commercialApproval: z.boolean(),
   totalHours: z.number().positive(),
   modules: z.array(z.object({
     moduleId: uuidSchema,

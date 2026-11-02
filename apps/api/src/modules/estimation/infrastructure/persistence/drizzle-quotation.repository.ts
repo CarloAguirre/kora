@@ -447,20 +447,22 @@ export class DrizzleQuotationRepository implements QuotationRepository {
     if (!versions.length) return null;
     const [event] = await this.db.select().from(quotationEvents)
       .where(and(inArray(quotationEvents.versionId, versions.map((v) => v.id)),
-        eq(quotationEvents.action, 'planning_baseline_applied')))
+        inArray(quotationEvents.action, ['planning_baseline_applied', 'quotation_transferred'])))
       .orderBy(desc(quotationEvents.occurredAt)).limit(1);
     if (!event) return null;
     const version = versions.find((v) => v.id === event.versionId);
     if (!version) return null;
-    const metadata = event.metadata as { moduleIds?: string[]; revision?: number };
+    const metadata = event.metadata as { moduleIds?: string[]; revision?: number; versionRevision?: number };
     const edt = quotationDraftDataSchema.parse(version.draft).aiPoc?.edt;
     if (!edt || !metadata.moduleIds || metadata.moduleIds.length !== edt.modules.length) return null;
     return appliedQuotationPlanningSchema.parse({
       projectId, versionId: version.id, versionNumber: version.versionNumber,
-      revision: metadata.revision ?? version.revision,
+      revision: metadata.revision ?? metadata.versionRevision ?? version.revision,
       appliedAt: event.occurredAt.toISOString(),
       appliedByUserId: event.actorUserId, source: 'kdm_demo',
-      status: 'accepted_for_planning_only', commercialApproval: false,
+      status: event.action === 'quotation_transferred'
+        ? 'transferred' : 'accepted_for_planning_only',
+      commercialApproval: event.action === 'quotation_transferred',
       totalHours: edt.totalHours,
       modules: edt.modules.map((module, i) => ({
         moduleId: metadata.moduleIds![i], name: module.name,
