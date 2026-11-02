@@ -24,7 +24,8 @@ export function QuotationPlanningAcceptanceCard({
   const mapping = roleTeamIds ?? version.draft.aiPoc?.roleTeamIds ?? {};
   const mappedName = (role: string) => {
     const teamId = mapping[role];
-    return teamId ? teamNames?.get(teamId) ?? 'Equipo no disponible' : null;
+    if (!teamId || !teamNames) return null;
+    return teamNames.get(teamId) ?? 'Equipo no disponible';
   };
   return (
     <Card>
