@@ -39,7 +39,7 @@ export const appliedQuotationPlanningSchema = z.object({
   versionNumber: z.number().int().positive(),
   revision: z.number().int().positive(),
   appliedAt: z.string().datetime(),
-  appliedByUserId: uuidSchema,
+  appliedByUserId: uuidSchema.nullable(),
   source: z.literal('kdm_demo'),
   status: z.literal('accepted_for_planning_only'),
   commercialApproval: z.literal(false),

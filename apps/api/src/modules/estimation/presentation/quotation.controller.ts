@@ -1,7 +1,7 @@
 import { BadRequestException, Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post } from '@nestjs/common';
 import {
-  generateAiDemoQuotationSchema, createQuotationVersionSchema, updateQuotationDraftSchema, quotationReconciliationReviewSchema, assessQuotationReconciliationSchema,
-  type GenerateAiDemoQuotationInput, type CreateQuotationVersionInput, type ProjectQuotation, type QuotationVersion, type UpdateQuotationDraftInput, type QuotationTransferPreview, type QuotationCommercialPreflight, type QuotationCommercialDossier, type QuotationReconciliationReview, type SavedQuotationReconciliationReview, type AssessQuotationReconciliationInput, type SavedQuotationReviewAssessment,
+  applyQuotationPlanningSchema, generateAiDemoQuotationSchema, createQuotationVersionSchema, updateQuotationDraftSchema, quotationReconciliationReviewSchema, assessQuotationReconciliationSchema,
+  type ApplyQuotationPlanningInput, type AppliedQuotationPlanning, type GenerateAiDemoQuotationInput, type CreateQuotationVersionInput, type ProjectQuotation, type QuotationVersion, type UpdateQuotationDraftInput, type QuotationTransferPreview, type QuotationCommercialPreflight, type QuotationCommercialDossier, type QuotationReconciliationReview, type SavedQuotationReconciliationReview, type AssessQuotationReconciliationInput, type SavedQuotationReviewAssessment,
 } from '@kora/contracts';
 import { CurrentUser, type RequestUser } from '../../../shared/presentation/decorators/current-user.decorator';
 import { RequireAnyPermission } from '../../../shared/presentation/decorators/require-permissions.decorator';
@@ -105,6 +105,27 @@ export class QuotationController {
 
   /** Fuente documental KDM explícita. Gemini procesa el documento real del
    * fixture; se almacena un borrador auditado, sin venta ni aprobación. */
+  @Get('applied-plan')
+  @RequireAnyPermission('projects:manage', 'projects:read_assigned')
+  getAppliedPlan(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @CurrentUser() actor: RequestUser,
+  ): Promise<AppliedQuotationPlanning | null> {
+    return this.drafts.getAppliedPlanningBaseline(projectId, actor);
+  }
+
+  @Post('versions/:versionId/apply-plan')
+  @RequireAnyPermission('projects:manage')
+  @HttpCode(HttpStatus.OK)
+  applyPlan(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('versionId', ParseUUIDPipe) versionId: string,
+    @Body(new ZodValidationPipe(applyQuotationPlanningSchema)) input: ApplyQuotationPlanningInput,
+    @CurrentUser() actor: RequestUser,
+  ): Promise<AppliedQuotationPlanning> {
+    return this.drafts.applyPlanningBaseline(projectId, versionId, actor, input);
+  }
+
   @Post('versions/ai-poc')
   @HttpCode(HttpStatus.CREATED)
   @RequireAnyPermission('projects:manage')

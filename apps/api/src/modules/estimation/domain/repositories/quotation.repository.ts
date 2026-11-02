@@ -1,4 +1,4 @@
-import type { CreateQuotationVersionInput, EstimationPocProposal, SubmitEstimationAnswerInput, EstimationQuestion, QuotationReferenceEdt, ProjectQuotation, QuotationVersion, UpdateQuotationDraftInput, QuotationOperationalSnapshot, QuotationReconciliationReview, SavedQuotationReconciliationReview, AssessQuotationReconciliationInput, SavedQuotationReviewAssessment, QuotationTeamCatalogEntry } from '@kora/contracts';
+import type { CreateQuotationVersionInput, EstimationPocProposal, SubmitEstimationAnswerInput, EstimationQuestion, QuotationReferenceEdt, AppliedQuotationPlanning, ApplyQuotationPlanningInput, ProjectQuotation, QuotationVersion, UpdateQuotationDraftInput, QuotationOperationalSnapshot, QuotationReconciliationReview, SavedQuotationReconciliationReview, AssessQuotationReconciliationInput, SavedQuotationReviewAssessment, QuotationTeamCatalogEntry } from '@kora/contracts';
 
 export const QUOTATION_REPOSITORY = Symbol('QUOTATION_REPOSITORY');
 
@@ -30,4 +30,7 @@ export interface QuotationRepository {
     proposal: EstimationPocProposal, answers: readonly SubmitEstimationAnswerInput[],
     dynamicQuestions: readonly EstimationQuestion[], edt: QuotationReferenceEdt): Promise<QuotationVersion>;
   updateDraft(projectId: string, versionId: string, userId: string, input: UpdateQuotationDraftInput): Promise<QuotationVersion | null>;
+  getAppliedPlanningBaseline(projectId: string): Promise<AppliedQuotationPlanning | null>;
+  applyPlanningBaseline(projectId: string, versionId: string, actorId: string,
+    input: ApplyQuotationPlanningInput): Promise<AppliedQuotationPlanning>;
 }

@@ -2,7 +2,7 @@ import { BadRequestException, ConflictException, ForbiddenException, Inject, Inj
 import { buildReconciliationReview, isQuotationDraftEligibleProject } from '@kora/contracts';
 import { isDeepStrictEqual } from 'node:util';
 import type {
-  CreateQuotationVersionInput, EstimationPocProposal, EstimationQuestion, QuotationReferenceEdt, SubmitEstimationAnswerInput, Permission, ProjectQuotation, QuotationVersion, UpdateQuotationDraftInput, QuotationTransferPreview, QuotationCommercialPreflight, QuotationCommercialDossier, QuotationOperationalSnapshot, QuotationTeamCatalogEntry, QuotationReconciliationReview, SavedQuotationReconciliationReview, AssessQuotationReconciliationInput, SavedQuotationReviewAssessment,
+  ApplyQuotationPlanningInput, AppliedQuotationPlanning, CreateQuotationVersionInput, EstimationPocProposal, EstimationQuestion, QuotationReferenceEdt, SubmitEstimationAnswerInput, Permission, ProjectQuotation, QuotationVersion, UpdateQuotationDraftInput, QuotationTransferPreview, QuotationCommercialPreflight, QuotationCommercialDossier, QuotationOperationalSnapshot, QuotationTeamCatalogEntry, QuotationReconciliationReview, SavedQuotationReconciliationReview, AssessQuotationReconciliationInput, SavedQuotationReviewAssessment,
 } from '@kora/contracts';
 import { buildQuotationTransferPreview } from '../../domain/quotation-transfer-preview';
 import { buildQuotationCommercialPreflight } from '../../domain/quotation-commercial-preflight';
@@ -268,6 +268,26 @@ export class ManageQuotationDraftsUseCase {
       throw new BadRequestException('El proyecto y el origen de la propuesta IA no coinciden.');
     }
     return this.repository.createAiPocDraft(projectId, actor.id, proposal, answers, dynamicQuestions, edt);
+  }
+
+  /** Aceptación del baseline técnico KDM: NO es aprobación del cliente ni
+   * transfiere pagos. El repositorio revalida bajo locks transaccionales. */
+  async applyPlanningBaseline(
+    projectId: string, versionId: string, actor: QuotationActor,
+    input: ApplyQuotationPlanningInput,
+  ): Promise<AppliedQuotationPlanning> {
+    if (!actor.permissions.includes('projects:manage')) {
+      throw new ForbiddenException('Solo Gerencia puede aplicar la planificación inicial.');
+    }
+    await this.authorize(projectId, actor, true);
+    return this.repository.applyPlanningBaseline(projectId, versionId, actor.id, input);
+  }
+
+  async getAppliedPlanningBaseline(
+    projectId: string, actor: QuotationActor,
+  ): Promise<AppliedQuotationPlanning | null> {
+    await this.authorize(projectId, actor, false);
+    return this.repository.getAppliedPlanningBaseline(projectId);
   }
 
   async create(projectId: string, actor: QuotationActor, input: CreateQuotationVersionInput): Promise<QuotationVersion> {
