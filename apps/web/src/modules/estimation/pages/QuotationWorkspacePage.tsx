@@ -9,6 +9,8 @@ import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Button } from '@/shared/components/ui/Button';
 import { Card } from '@/shared/components/ui/Card';
 import { Select } from '@/shared/components/ui/Select';
+import { Badge } from '@/shared/components/ui/Badge';
+import { SegmentedControl } from '@/shared/components/ui/SegmentedControl';
 import { TextField } from '@/shared/components/ui/TextField';
 import { useAppliedQuotationPlanning, useCreateQuotationVersion, useProjectQuotation, useSaveQuotationDraft } from '../api/quotation.queries';
 import { AnalysisEvidenceCard } from '../components/AnalysisEvidenceCard';
@@ -18,6 +20,8 @@ import { QuotationCommercialPreflightCard } from '../components/QuotationCommerc
 import { AiPocRoleMappingCard } from '../components/AiPocRoleMappingCard';
 import { QuotationPlanningAcceptanceCard } from '../components/QuotationPlanningAcceptanceCard';
 import { QuotationCommercialLifecycleCard } from '../components/QuotationCommercialLifecycleCard';
+import { QuotationCommercialSummary } from '../components/QuotationCommercialSummary';
+import { NewProjectQuotationModal } from '../components/NewProjectQuotationModal';
 import styles from './QuotationWorkspacePage.module.css';
 
 type Form = Pick<UpdateQuotationDraftInput, 'name' | 'hourlyRate' | 'currency' | 'tax' | 'draft'>;
@@ -49,6 +53,7 @@ export function QuotationWorkspacePage() {
   const teamQuery = useTeamsList({ page: 1, pageSize: 200, isActive: true, sortField: 'name' }, { enabled: Boolean(projectId) });
 
   const [form, setForm] = useState<Form | null>(null);
+  const [newQuotationOpen, setNewQuotationOpen] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -227,19 +232,10 @@ export function QuotationWorkspacePage() {
   return (
     <DashboardLayout title="Cotizaciones">
       <main className={styles.page}>
-        <nav className={styles.breadcrumb}>
-          <Link to="/proyectos">Proyectos</Link> <span>/</span>
-          <Link to={project ? '/proyectos/' + project.slug : '/proyectos'}>{project?.name ?? 'Proyecto'}</Link>
-          <span>/</span> <strong>Cotización{selected ? ' v' + selected.versionNumber : ''}</strong>
+        <nav className={styles.breadcrumb} aria-label="Navegación de cotización">
+          <Link to={project ? '/proyectos/' + project.slug : '/proyectos'}>‹ Volver a la ficha del proyecto</Link>
+          <Link className={styles.listLink} to="/calculadora">Ver todas las cotizaciones</Link>
         </nav>
-        <header className={styles.header}>
-          <div>
-            <span className={styles.eyebrow}>Cotizaciones · Kora</span>
-            <h1>{project?.name ?? 'Cotización del proyecto'}</h1>
-            <p>Versiones comerciales independientes de la planificación y las HH reales del proyecto, incluso si su estado operativo es Activo.</p>
-          </div>
-          <Link to="/calculadora">Volver al listado</Link>
-        </header>
 
         {projectQuery.isLoading && <Card>Cargando proyecto…</Card>}
         {projectQuery.error && <Card>No se pudo cargar el proyecto.</Card>}
@@ -258,28 +254,63 @@ export function QuotationWorkspacePage() {
           <div className={styles.layout}>
             <section className={styles.main}>
               <Card>
-                <div className={styles.cardTitle}>
-                  <div><h2>Versiones de cotización</h2><p>Solo se pueden editar versiones en Borrador.</p></div>
-                  {mayWrite && (
-                    <div className={styles.actions}>
-                      <Button size="sm" variant="outline" loading={createVersion.isPending}
-                        onClick={() => void newVersion()}>Nueva en blanco</Button>
-                      {selected && <Button size="sm" variant="secondary" loading={createVersion.isPending}
-                        onClick={() => void newVersion(selected.id)}>Copiar versión</Button>}
+                <div className={styles.identityHeading}>
+                  <div>
+                    <h1>Cotización · {project?.client?.companyName ?? project?.name ?? 'Proyecto'}</h1>
+                    <p>{project?.name} · Versión comercial independiente del proyecto operativo</p>
+                  </div>
+                  <Badge tone={selected?.status === 'approved' ? 'success' : selected?.status === 'sent' ? 'info' : 'neutral'}>
+                    {selected?.status === 'approved' ? 'Aprobada' : selected?.status === 'sent' ? 'Enviada' : 'Cotización'}
+                  </Badge>
+                </div>
+                <div className={styles.versions}>
+                  {versions.map((version) => (
+                    <button key={version.id} type="button" onClick={() => selectVersion(version.id)}
+                      aria-label={'Abrir versión ' + version.versionNumber}
+                      aria-pressed={selected?.id === version.id} title={version.name}
+                      className={[styles.version, selected?.id === version.id ? styles.selected : ''].join(' ')}>
+                      v{version.versionNumber}{version.origin === 'ai' ? ' ✦' : ''}
+                    </button>
+                  ))}
+                  {mayWrite && <>
+                    <button type="button" className={styles.textAction} disabled={createVersion.isPending}
+                      onClick={() => void newVersion(selected?.id)}>+ Nueva versión</button>
+                    <button type="button" className={styles.textAction + ' ' + styles.aiAction}
+                      onClick={() => setNewQuotationOpen(true)}>✦ Nueva versión con IA</button>
+                    <button type="button" className={styles.textAction} disabled={createVersion.isPending}
+                      onClick={() => void newVersion()}>En blanco</button>
+                  </>}
+                </div>
+                {selected && form && <>
+                  <div className={styles.identityFields}>
+                    <TextField label="Nombre de la versión" value={form.name} maxLength={200} disabled={!editable}
+                      onChange={(e) => change((current) => ({ ...current, name: e.target.value }))} />
+                    <div className={styles.readonlyField}>
+                      <span>Origen · fecha</span>
+                      <strong>{selected.origin === 'ai' ? 'Agente IA' : selected.origin === 'copy' ? 'Copia' : 'Manual'} · {new Date(selected.createdAt).toLocaleDateString('es-CL')}</strong>
+                    </div>
+                    <div className={styles.statusField}>
+                      <span>Estado</span>
+                      <Badge tone={selected.status === 'approved' ? 'success' : selected.status === 'sent' ? 'info' : 'neutral'}>
+                        {selected.status === 'approved' ? 'Aprobada' : selected.status === 'sent' ? 'Enviada al cliente' : 'Borrador'}
+                      </Badge>
+                    </div>
+                  </div>
+                  {selected.origin === 'ai' && selected.aiReviewStatus === 'pending' && (
+                    <div className={styles.aiBanner}>
+                      <div><strong>✦ Propuesta generada con Gemini</strong>
+                        <p>{selected.draft.aiPoc
+                          ? money(selected.draft.aiPoc.proposal.totalHours) + ' HH propuestas desde KDM de demostración y ' + selected.draft.aiPoc.answers.length + ' respuestas. '
+                          : 'Propuesta IA pendiente. '}
+                          Revisa perfiles y HH antes de aceptar. La IA no define el valor HH comercial.</p>
+                      </div>
+                      <Button size="sm" variant="secondary" onClick={() =>
+                        document.getElementById('quotation-ai-role-review')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                      }>Revisar propuesta</Button>
                     </div>
                   )}
-                </div>
-                {versions.length === 0
-                  ? <p>No hay versiones guardadas para este proyecto.</p>
-                  : <div className={styles.versions}>
-                      {versions.map((version) => (
-                        <button key={version.id} type="button" onClick={() => selectVersion(version.id)}
-                          className={[styles.version, selected?.id === version.id ? styles.selected : ''].join(' ')}>
-                          <b>v{version.versionNumber} · {version.name}</b>
-                          <span>{version.status === 'draft' ? 'Borrador' : version.status === 'sent' ? 'Enviada' : 'Aprobada'} · {money(version.totalHours)} HH</span>
-                        </button>
-                      ))}
-                    </div>}
+                </>}
+                {versions.length === 0 && <p className={styles.helper}>Aún no hay versiones. Crea un borrador para comenzar.</p>}
               </Card>
 
 
