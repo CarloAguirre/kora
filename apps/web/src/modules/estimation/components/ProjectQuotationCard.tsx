@@ -20,7 +20,6 @@ export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
   const registerApproval = async (versionId: string, revision: number) => {
     setActionError(''); setActionNotice('');
     if (!window.confirm('¿Confirmas que el cliente aprobó expresamente esta versión? ' +
-      'Si aún no fue marcada como enviada, se aprobará directamente. ' +
       'Las HH del proyecto NO se modificarán hasta el traspaso.')) return;
     try {
       await lifecycle.approveClient.mutateAsync({ versionId, revision });

@@ -66,7 +66,7 @@ export function QuotationCommercialLifecycleCard({
     const initialTransfer = project.status === 'draft' && transferTiming === 'now';
     if (!window.confirm(
       'Confirma que el CLIENTE APROBÓ expresamente esta versión' +
-      (version.status === 'draft' ? ' (sin envío registrado)' : '') + '. ' +
+      ('') + '. ' +
       (demo ? 'ATENCIÓN: contiene evidencia KDM de demostración, ajena al proyecto. ' : '') +
       (initialTransfer
         ? 'Se intentará traspasar los datos al proyecto tras registrar la aprobación.'
@@ -137,11 +137,11 @@ export function QuotationCommercialLifecycleCard({
         <div className={styles.action}>
           <div><strong>2. Envío comercial</strong>
             <p>Registrar un envío externo y bloquear esta versión.</p></div>
-          <Button variant="outline" disabled={!mayAct || !readyForClient}
+          <Button variant="outline" disabled={!mayAct || !readyForClient || !isLatest}
             onClick={() => void markSent()}>Marcar como enviada</Button>
         </div>
       )}
-      {(version.status === 'draft' || version.status === 'sent') && (
+      {version.status === 'sent' && (
         <div className={styles.approval}>
           <div><strong>3. Registrar aprobación del cliente</strong>
             <p>Requiere valor HH, plan de pago 100 % y aceptación IA si aplica.</p></div>
@@ -154,7 +154,7 @@ export function QuotationCommercialLifecycleCard({
           {transferTiming === 'now' && project.status !== 'draft' &&
             <p className={styles.warning}>Este proyecto no está en No iniciado.
               Por seguridad, la aprobación quedará pendiente de conciliación y traspaso.</p>}
-          <Button disabled={!mayAct || !readyForClient}
+          <Button disabled={!mayAct || !readyForClient || !isLatest}
             onClick={() => void approveClient()}>Registrar aprobación</Button>
         </div>
       )}
@@ -163,7 +163,7 @@ export function QuotationCommercialLifecycleCard({
           <div><strong>4. Traspaso pendiente</strong>
             <p>La versión aprobada permanece registrada. El proyecto todavía no ha recibido
               esta planificación.</p></div>
-          <Button disabled={!mayAct || project.status !== 'draft'}
+          <Button disabled={!mayAct || project.status !== 'draft' || !isLatest}
             onClick={() => void transfer()}>Traspasar ahora</Button>
         </div>}
       {transferred && <p className={styles.success}>

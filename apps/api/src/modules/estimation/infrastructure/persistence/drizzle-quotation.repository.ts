@@ -693,6 +693,13 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       if (current.status !== 'draft' || current.revision !== input.revision) {
         throw new ConflictException('Solo se envían borradores en la revisión vigente.');
       }
+      const [latest] = await tx.select({ id: quotationVersions.id })
+        .from(quotationVersions)
+        .where(eq(quotationVersions.quotationId, current.quotationId))
+        .orderBy(desc(quotationVersions.versionNumber)).limit(1);
+      if (latest?.id !== versionId) {
+        throw new ConflictException('Solo se puede enviar la última versión comercial.');
+      }
       assertQuotationReadyForClient(toVersion(current));
       const [updated] = await tx.update(quotationVersions).set({
         status: 'sent', sentAt: new Date(), updatedAt: new Date(),
@@ -734,10 +741,16 @@ export class DrizzleQuotationRepository implements QuotationRepository {
         eq(quotationVersions.quotationId, quotation.id),
       )).limit(1);
       if (!current) throw new NotFoundException('Versión no encontrada.');
-      if (!['draft', 'sent'].includes(current.status) ||
-          current.revision !== input.revision) throw new ConflictException(
-        'La versión cambió o ya estaba aprobada.',
-      );
+      if (current.status !== 'sent' || current.revision !== input.revision) {
+        throw new ConflictException('La versión debe estar enviada antes de registrar aprobación del cliente.');
+      }
+      const [latest] = await tx.select({ id: quotationVersions.id })
+        .from(quotationVersions)
+        .where(eq(quotationVersions.quotationId, quotation.id))
+        .orderBy(desc(quotationVersions.versionNumber)).limit(1);
+      if (latest?.id !== versionId) {
+        throw new ConflictException('No se puede aprobar una versión comercial anterior.');
+      }
       assertQuotationReadyForClient(toVersion(current));
       const previous = await tx.select({ id: quotationVersions.id }).from(quotationVersions)
         .where(and(eq(quotationVersions.quotationId, quotation.id),
@@ -792,6 +805,13 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       if (!version) throw new NotFoundException('Versión no encontrada.');
       if (version.status !== 'approved' || version.revision !== input.revision) {
         throw new ConflictException('Solo se traspasa la versión aprobada vigente.');
+      }
+      const [latestVersion] = await tx.select({ id: quotationVersions.id })
+        .from(quotationVersions)
+        .where(eq(quotationVersions.quotationId, quotation.id))
+        .orderBy(desc(quotationVersions.versionNumber)).limit(1);
+      if (latestVersion?.id !== versionId) {
+        throw new ConflictException('Hay una cotización posterior; revisa cuál es la versión vigente.');
       }
       assertQuotationReadyForClient(toVersion(version));
       const [already] = await tx.select({ id: quotationEvents.id }).from(quotationEvents)
