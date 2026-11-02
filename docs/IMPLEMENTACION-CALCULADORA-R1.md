@@ -132,3 +132,7 @@ Cotizaciones se traslada a pestaña de ficha de desarrollo, manteniendo los comp
 ## R4-c — EDT Gemini KDM y baseline operativo inicial (02/11/2026)
 
 Se corrigieron imports TS2304 y expectativa de test R4-a. Gemini genera módulos, WBS y tareas desde KDM, con reparto HH exacto y persistencia de EDT en quotation_versions.draft.aiPoc. Gerencia puede aceptar la planificación inicial de la última versión solo en proyectos sin ejecución ni facturación: transacción en project_teams, project_modules y projects.sold_hours, sin cambiar estado comercial ni generar pagos. Roadmap muestra tareas de referencia sin fechas desde la versión aplicada; las tareas operativas siguen independientes. Ver docs/IMPLEMENTACION-CALCULADORA-R4C-EDT-ROADMAP-ACEPTACION.md. Tests y build local pendientes.
+
+## R4-d — Asistente IA v5 con cinco etapas reales (02/11/2026)
+
+El tab Cotizaciones abre un modal IA de Análisis → Entendimiento editable → Condiciones F01–F05 agrupadas → Aclaraciones dinámicas → Confirmación. Se elimina la navegación automática a la PoC y el envío sin revisión. Gemini analiza KDM explícitamente, prellena condiciones solo con evidencia, permite supuestos marcados como pendientes y recibe el resumen confirmado del usuario en roles/EDT. Se conservan diseño Kora, APIs, JSONB y guardado transaccional. Ver `docs/IMPLEMENTACION-CALCULADORA-R4D-ASISTENTE-V5.md`. Pruebas locales pendientes.
