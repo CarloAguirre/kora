@@ -200,9 +200,9 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
       ],
     }));
     await waitFor(() => expect(mocks.onClose).toHaveBeenCalledTimes(1));
-    expect(screen.getByTestId('location')).toHaveTextContent(
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent(
       '/proyectos/proyecto-prueba/cotizacion?version=',
-    );
+    ));
   });
 
   it('no permite confirmar un resumen vacío y conserva el modal si falla la generación', async () => {
