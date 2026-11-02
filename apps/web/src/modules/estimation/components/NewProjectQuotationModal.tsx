@@ -1,14 +1,14 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { ProjectDetail, QuotationVersion } from '@kora/contracts';
-import { projectEstimationPath, projectQuotationPath } from '@/app/router/paths';
+import { projectQuotationPath } from '@/app/router/paths';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { useProjectsList } from '@/modules/projects/api/projects.queries';
 import { Button } from '@/shared/components/ui/Button';
 import { Modal } from '@/shared/components/ui/Modal';
 import { Select } from '@/shared/components/ui/Select';
 import { useCreateQuotationVersion, useProjectQuotation } from '../api/quotation.queries';
-import { DEMO_KDM_FOLDER_URL } from '../lib/demo-source';
+import { AiQuotationWizardModal } from './AiQuotationWizardModal';
 import styles from './NewProjectQuotationModal.module.css';
 import estimationStyles from './NewEstimationModal.module.css';
 
@@ -27,6 +27,7 @@ export function NewProjectQuotationModal({ project, versions, onClose }: {
   const [sourceProjectId, setSourceProjectId] = useState(project.id);
   const [sourceVersionId, setSourceVersionId] = useState('');
   const [error, setError] = useState('');
+  const [aiWizardOpen, setAiWizardOpen] = useState(false);
   const create = useCreateQuotationVersion(project.id);
   const otherProjects = useProjectsList({ type: 'development', page: 1, pageSize: 200 },
     { enabled: can('projects:manage') && mode === 'copy' });
@@ -38,14 +39,7 @@ export function NewProjectQuotationModal({ project, versions, onClose }: {
   const submit = async () => {
     setError('');
     if (mode === 'ai') {
-      navigate(projectEstimationPath(project) + '?mode=ai&demo=kdm', {
-        state: {
-          creationMode: 'ai',
-          driveFolderUrl: DEMO_KDM_FOLDER_URL,
-          demoSource: 'kdm',
-        },
-      });
-      onClose();
+      setAiWizardOpen(true);
       return;
     }
     if (mode === 'copy' && !selectedVersionId) {
@@ -63,6 +57,10 @@ export function NewProjectQuotationModal({ project, versions, onClose }: {
       setError(err instanceof Error ? err.message : 'No se pudo crear la versión.');
     }
   };
+
+  if (aiWizardOpen) {
+    return <AiQuotationWizardModal project={project} onClose={onClose} />;
+  }
 
   return (
     <Modal open title="Nueva cotización"
