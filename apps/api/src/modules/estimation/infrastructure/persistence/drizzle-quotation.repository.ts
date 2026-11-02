@@ -976,6 +976,7 @@ export class DrizzleQuotationRepository implements QuotationRepository {
         draft: quotationVersions.draft,
         status: quotationVersions.status,
         revision: quotationVersions.revision,
+        aiReviewStatus: quotationVersions.aiReviewStatus,
       }).from(quotationVersions).where(and(
         eq(quotationVersions.id, versionId),
         eq(quotationVersions.quotationId, quotation.id),
@@ -1002,6 +1003,11 @@ export class DrizzleQuotationRepository implements QuotationRepository {
         }
         throw error;
       }
+      const scopeChangedAfterAiAcceptance = Boolean(savedDraft.aiPoc &&
+        currentRow.aiReviewStatus === 'accepted' &&
+        (JSON.stringify(savedDraft.teams) !== JSON.stringify(draft.teams) ||
+         JSON.stringify(savedDraft.phases) !== JSON.stringify(draft.phases) ||
+         savedDraft.analysisProjectionStatus !== draft.analysisProjectionStatus));
       const totals = calculateQuotation(draft, input.hourlyRate, input.tax);
       const teamIds = draft.teams.map((team) => team.teamId);
       if (teamIds.length > 0) {
@@ -1017,6 +1023,7 @@ export class DrizzleQuotationRepository implements QuotationRepository {
         currency: input.currency,
         tax: input.tax,
         draft,
+        ...(scopeChangedAfterAiAcceptance ? { aiReviewStatus: 'pending' as const } : {}),
         totalHours: totals.totalHours.toFixed(2),
         netAmount: totals.netAmount?.toFixed(4) ?? null,
         totalAmount: totals.totalAmount?.toFixed(4) ?? null,
@@ -1032,7 +1039,10 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       if (!updated) return null;
       await tx.insert(quotationEvents).values({
         versionId: updated.id, actorUserId: userId, action: 'draft_updated',
-        metadata: { previousRevision: input.revision, newRevision: input.revision + 1 },
+        metadata: {
+          previousRevision: input.revision, newRevision: input.revision + 1,
+          aiReviewReset: scopeChangedAfterAiAcceptance,
+        },
       });
       return toVersion(updated);
     });

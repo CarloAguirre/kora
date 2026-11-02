@@ -31,8 +31,11 @@ export function QuotationCommercialLifecycleCard({
   const planTotal = version.draft.paymentPlan.reduce((sum, row) => sum + row.percent, 0);
   const hasValidPlan = version.draft.paymentPlan.length > 0 && Math.abs(planTotal - 100) < 0.001;
   const hasRate = version.hourlyRate !== null && version.hourlyRate > 0;
+  const edtMismatch = version.origin === 'ai' &&
+    Boolean(version.draft.aiPoc?.edt) &&
+    version.draft.analysisProjectionStatus === 'modified';
   const readyForClient = hasRate && version.totalHours > 0 && hasValidPlan &&
-    !proposalPending && version.draft.teams.length > 0;
+    !proposalPending && !edtMismatch && version.draft.teams.length > 0;
 
   const acceptAi = async () => {
     setError(''); setNotice('');
@@ -170,6 +173,10 @@ export function QuotationCommercialLifecycleCard({
       </p>}
       {hasUnsavedChanges && <p className={styles.warning}>
         Guarda los cambios del borrador antes de usar cualquier acción comercial.
+      </p>}
+      {edtMismatch && <p className={styles.warning}>
+        El desglose de tareas Gemini no coincide con las HH ajustadas.
+        Concilia la EDT antes de registrar un envío comercial.
       </p>}
       {!hasValidPlan && version.status === 'draft' &&
         <p className={styles.helper}>El plan de pagos debe sumar 100 % para enviar o aprobar.</p>}

@@ -28,6 +28,12 @@ export function assertQuotationReadyForClient(
       'Primero revisa y acepta la propuesta IA, incluidos los ajustes manuales de HH.',
     );
   }
+  if (version.origin === 'ai' && version.draft.aiPoc?.edt &&
+      version.draft.analysisProjectionStatus === 'modified') {
+    throw new InvalidCommercialQuotation(
+      'La EDT y las HH manuales difieren. Concilia la planificación IA antes del envío comercial.',
+    );
+  }
 }
 
 /** La IA puede aceptarse sin aprobación contractual y sin traspasar equipos.
