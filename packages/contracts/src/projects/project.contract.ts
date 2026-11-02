@@ -32,6 +32,13 @@ export const PROJECT_SALES_STAGE_LABELS: Readonly<Record<ProjectSalesStage, stri
   approved: 'Aprobado',
 };
 
+/** Estado observable de la cotización; no equivale al estado comercial del proyecto. */
+export const PROJECT_QUOTATION_LIST_STATUSES = [
+  'none', 'draft', 'sent', 'approved_pending', 'transferred', 'planning_applied',
+] as const;
+export const projectQuotationListStatusSchema = z.enum(PROJECT_QUOTATION_LIST_STATUSES);
+export type ProjectQuotationListStatus = z.infer<typeof projectQuotationListStatusSchema>;
+
 export const PROJECT_STATUSES = ['draft', 'active', 'on_hold', 'finished', 'cancelled'] as const;
 export const projectStatusSchema = z.enum(PROJECT_STATUSES);
 export type ProjectStatus = z.infer<typeof projectStatusSchema>;
@@ -667,6 +674,8 @@ export const projectSummarySchema = z.object({
   client: z.object({ id: uuidSchema, companyName: z.string() }).nullable(),
   type: projectTypeSchema,
   salesStage: projectSalesStageSchema.nullable(),
+  /** Solo se informa a roles comerciales autorizados, puede venir null para otros usuarios. */
+  quotationStatus: projectQuotationListStatusSchema.nullish(),
   status: projectStatusSchema,
   phase: projectPhaseSchema.nullable(),
   priority: projectPrioritySchema.nullable(),
@@ -996,6 +1005,8 @@ export type ResolveProjectObservationInput = z.infer<typeof resolveProjectObserv
 export const projectSortFieldSchema = z.enum([
   'name',
   'status',
+  'salesStage',
+  'quotationStatus',
   'priority',
   'createdAt',
   'client',
@@ -1027,6 +1038,8 @@ export const listProjectsQuerySchema = paginationQuerySchema.extend({
   type: projectTypeSchema.optional(),
   status: arrayQueryParam(projectStatusSchema),
   phase: arrayQueryParam(projectPhaseSchema),
+  salesStage: arrayQueryParam(projectSalesStageSchema),
+  quotationStatus: arrayQueryParam(projectQuotationListStatusSchema),
   /** Acepta id o slug: la ficha de cliente filtra por el `clientId` de la URL, que ahora es el slug del cliente — se resuelve a UUID en `ListProjectsUseCase`. */
   clientId: z.string().optional(),
   /** Varios clientes por UUID (filtro Cliente del gráfico resumen). */

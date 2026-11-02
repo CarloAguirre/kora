@@ -39,6 +39,8 @@ export const projectsApi = {
       type: query.type,
       status: query.status,
       phase: query.phase,
+      salesStage: query.salesStage,
+      quotationStatus: query.quotationStatus,
       clientId: query.clientId,
       clientIds: query.clientIds,
       period: query.period?.map((period) => `${period.from}..${period.to}`),

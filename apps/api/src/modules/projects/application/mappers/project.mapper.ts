@@ -33,6 +33,7 @@ export function toProjectSummary(item: ProjectListItem, progress: ProjectProgres
     client: item.clientId ? { id: item.clientId, companyName: item.clientName ?? '' } : null,
     type: item.type,
     salesStage: item.salesStage as ProjectSummary['salesStage'],
+    quotationStatus: item.quotationStatus,
     status: item.status,
     phase: item.phase as ProjectSummary['phase'],
     priority: item.priority as ProjectSummary['priority'],
