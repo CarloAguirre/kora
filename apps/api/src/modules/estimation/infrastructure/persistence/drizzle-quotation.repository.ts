@@ -482,6 +482,12 @@ export class DrizzleQuotationRepository implements QuotationRepository {
         eq(quotationVersions.quotationId, quotation.id),
       )).limit(1);
       if (!version) throw new NotFoundException('Versión ajena al proyecto.');
+      const [latest] = await tx.select({ id: quotationVersions.id })
+        .from(quotationVersions).where(eq(quotationVersions.quotationId, quotation.id))
+        .orderBy(desc(quotationVersions.versionNumber)).limit(1);
+      if (!latest || latest.id !== versionId) {
+        throw new ConflictException('Solo la última versión de la cotización puede crear la planificación inicial.');
+      }
       const [already] = await tx.select({ id: quotationEvents.id }).from(quotationEvents)
         .innerJoin(quotationVersions, eq(quotationEvents.versionId, quotationVersions.id))
         .where(and(eq(quotationVersions.quotationId, quotation.id),

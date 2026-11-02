@@ -85,7 +85,7 @@ describe('Aceptación de planificación KDM', () => {
       input: { revision: 2, confirmation: 'APLICAR_PLANIFICACION_KDM_DEMO' },
     });
     expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('KDM DE PRUEBA'));
-    expect(screen.getByText(/Sin fechas ni responsables/)).toBeInTheDocument();
+    expect(screen.getByText(/Las tareas quedan como referencia/)).toBeInTheDocument();
   });
 
   it('bloquea doble aplicación, cambios locales y actores sin autorización', () => {
