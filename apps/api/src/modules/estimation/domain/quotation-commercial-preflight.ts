@@ -144,6 +144,10 @@ export function buildQuotationCommercialPreflight(
     if (!draft.analysis && !draft.aiPoc) add('AI_EVIDENCE_MISSING', 'ai', 'blocker',
       'La versión IA no conserva un artefacto de análisis verificable.');
     if (draft.aiPoc) {
+      if (draft.aiPoc.dynamicQuestions.some((q) => q.kind !== 'dynamic')) {
+        add('AI_QUESTIONS_INVALID', 'ai', 'blocker',
+          'El expediente IA contiene preguntas que no corresponden al análisis dinámico.');
+      }
       add('AI_POC_DEMO_NOT_COMMERCIAL', 'ai', 'blocker',
         'La propuesta de roles proviene de Gemini con el PDF KDM de prueba; no tiene EDT ni documentación del proyecto real.');
       if (Object.keys(draft.aiPoc.roleTeamIds).length !== draft.aiPoc.proposal.roles.length) {
