@@ -124,3 +124,7 @@ Nuevo GET protegido para construir un JSON interno desde la versión persistida 
 ## R4-a — Preguntas F01–F05 integradas al flujo IA (01/11/2026)
 
 El workspace deja de enviar `answers: []` automáticamente, carga las cinco preguntas fijas y muestra un stepper antes de `/poc/proposal-answered`, que valida IDs, obligatoriedad, tipos, opciones y duplicados. Se corrigió el fallback KDM para que no sustituya documentos de proyectos reales cuando Drive está sin configurar. Sigue pendiente la lectura documental para preguntas dinámicas y la creación de versiones comerciales desde IA. Ver `docs/IMPLEMENTACION-CALCULADORA-R4A-CUESTIONARIO-FIJO.md`. QA local pendiente.
+
+## Integración visual v5 + KDM/Gemini y cotización versionada (02/11/2026)
+
+Cotizaciones se traslada a pestaña de ficha de desarrollo, manteniendo los componentes y estilos existentes. Nuevo modal para IA demo KDM, borrador en blanco o copia (también entre proyectos con permisos). Gemini analiza KDM y genera preguntas dinámicas justificadas por fuentes, cuestionario y propuesta real; la API persiste versión de IA pendiente, y el editor mapea perfiles a equipos con HH deterministas. Sin envío ni traspaso operativo. Ver `docs/IMPLEMENTACION-CALCULADORA-V5-TAB-KDM-GEMINI.md`. QA local pendiente.
