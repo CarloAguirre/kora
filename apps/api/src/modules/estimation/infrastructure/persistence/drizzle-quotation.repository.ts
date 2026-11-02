@@ -701,6 +701,10 @@ export class DrizzleQuotationRepository implements QuotationRepository {
         throw new ConflictException('Solo se puede enviar la última versión comercial.');
       }
       assertQuotationReadyForClient(toVersion(current));
+      if (process.env.NODE_ENV === 'production' &&
+          quotationDraftDataSchema.parse(current.draft).aiPoc?.source === 'kdm_demo') {
+        throw new ConflictException('La evidencia KDM es de demostración: no puede enviarse desde producción.');
+      }
       const [updated] = await tx.update(quotationVersions).set({
         status: 'sent', sentAt: new Date(), updatedAt: new Date(),
         editedByUserId: userId,
@@ -752,6 +756,10 @@ export class DrizzleQuotationRepository implements QuotationRepository {
         throw new ConflictException('No se puede aprobar una versión comercial anterior.');
       }
       assertQuotationReadyForClient(toVersion(current));
+      if (process.env.NODE_ENV === 'production' &&
+          quotationDraftDataSchema.parse(current.draft).aiPoc?.source === 'kdm_demo') {
+        throw new ConflictException('No se puede registrar aprobación comercial con documentación KDM de demostración.');
+      }
       const previous = await tx.select({ id: quotationVersions.id }).from(quotationVersions)
         .where(and(eq(quotationVersions.quotationId, quotation.id),
           eq(quotationVersions.status, 'approved')));
@@ -813,6 +821,10 @@ export class DrizzleQuotationRepository implements QuotationRepository {
         throw new ConflictException('Hay una cotización posterior; revisa cuál es la versión vigente.');
       }
       assertQuotationReadyForClient(toVersion(version));
+      if (process.env.NODE_ENV === 'production' &&
+          quotationDraftDataSchema.parse(version.draft).aiPoc?.source === 'kdm_demo') {
+        throw new ConflictException('No se transfiere a producción una EDT creada sobre el documento KDM de prueba.');
+      }
       const [already] = await tx.select({ id: quotationEvents.id }).from(quotationEvents)
         .innerJoin(quotationVersions, eq(quotationEvents.versionId, quotationVersions.id))
         .where(and(eq(quotationVersions.quotationId, quotation.id),

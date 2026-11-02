@@ -70,18 +70,19 @@ export class DrizzleProjectRepository implements ProjectRepository {
     const [quotation] = await this.database.select({ id: projectQuotations.id })
       .from(projectQuotations).where(eq(projectQuotations.projectId, projectId)).limit(1);
     if (!quotation) return false; // Proyectos heredados sin calculadora no se bloquean retroactivamente.
-    const [latest] = await this.database.select({
-      id: quotationVersions.id, status: quotationVersions.status,
-    }).from(quotationVersions)
-      .where(eq(quotationVersions.quotationId, quotation.id))
-      .orderBy(desc(quotationVersions.versionNumber)).limit(1);
-    if (!latest || latest.status !== 'approved') return true;
-    const [transferred] = await this.database.select({ id: quotationEvents.id })
-      .from(quotationEvents).where(and(
-        eq(quotationEvents.versionId, latest.id),
-        eq(quotationEvents.action, 'quotation_transferred'),
-      )).limit(1);
-    return !transferred;
+    // Hito 0 es un hito de inicio, NO una operación de recotización:
+    // una transferencia histórica válida permite continuar operando aunque
+    // después se abra un borrador comercial independiente.
+    const [alreadyTransferred] = await this.database.select({ id: quotationEvents.id })
+      .from(quotationEvents)
+      .innerJoin(quotationVersions, eq(quotationEvents.versionId, quotationVersions.id))
+      .where(and(eq(quotationVersions.quotationId, quotation.id),
+        eq(quotationEvents.action, 'quotation_transferred'))).limit(1);
+    if (alreadyTransferred) return false;
+    const [anyVersion] = await this.database.select({ id: quotationVersions.id })
+      .from(quotationVersions).where(eq(quotationVersions.quotationId, quotation.id))
+      .limit(1);
+    return Boolean(anyVersion);
   }
 
   async findById(id: string, context?: TransactionContext): Promise<Project | null> {
