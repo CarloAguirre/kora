@@ -450,8 +450,8 @@ export function AiQuotationWizardModal({ project, onClose }: {
 
       {stage === 2 && (
         <section className={styles.stage}>
-          <h3>Condiciones de la estimación</h3>
-          <p>Responde las preguntas base del alcance. Las sugerencias documentales son editables.</p>
+          <h3 className={styles.srOnly}>Condiciones de la estimación</h3>
+          <p className={styles.intro}>Preguntas base. Las prellenadas se detectaron en el documento; puedes cambiarlas.</p>
           {fixed.map((question) => (
             <QuestionField key={question.id} question={question}
               value={answers[question.id]} assumed={assumptions.includes(question.id)}
@@ -466,15 +466,13 @@ export function AiQuotationWizardModal({ project, onClose }: {
 
       {stage === 3 && (
         <section className={styles.stage}>
-          <h3>Aclaraciones de mayor impacto</h3>
-          <p>Preguntas generadas por Gemini a partir del documento KDM.
-            Puedes dejar como supuesto únicamente cuando exista una propuesta explícita.</p>
+          <h3 className={styles.srOnly}>Aclaraciones de mayor impacto</h3>
+          <p className={styles.intro}>{dynamic.length} aclaraciones de mayor impacto. Lo demás quedó como supuesto.</p>
           {dynamic.length === 0 ? (
-            <p className={styles.sourceBox}>Gemini no detectó aclaraciones adicionales de impacto.</p>
+            <p className={styles.summaryBox}>Gemini no detectó aclaraciones adicionales de impacto.</p>
           ) : dynamic.map((question, index) => (
             <div key={question.id} className={styles.dynamic}>
-              <span className={styles.category}>Aclaración {index + 1} de {dynamic.length}</span>
-              <QuestionField question={question} value={answers[question.id]}
+              <QuestionField question={{ ...question, category: 'Aclaración ' + (index + 1) + ' de ' + dynamic.length + ' · ' + question.category }} value={answers[question.id]}
                 assumed={assumptions.includes(question.id)}
                 onChange={(value) => change(question.id, value)}
                 onAssume={() => assume(question.id)} error={invalidId === question.id} />
@@ -485,12 +483,13 @@ export function AiQuotationWizardModal({ project, onClose }: {
 
       {stage === 4 && (
         <section className={styles.stage}>
-          <h3>Confirmar la estimación</h3>
-          <p>Revisa las respuestas y los supuestos antes de generar la propuesta y EDT.</p>
+          <h3 className={styles.srOnly}>Confirmar la estimación</h3>
+          <p className={styles.intro}>Revisa las respuestas y los supuestos antes de generar la propuesta y EDT.</p>
           <div className={styles.review}>
-            <h4>Entendimiento confirmado</h4>
-            <p className={styles.summary}>{understanding}</p>
-            <h4>Respuestas</h4>
+            <details className={styles.more}>
+              <summary>Ver entendimiento confirmado</summary>
+              <p className={styles.summary}>{understanding}</p>
+            </details>
             <dl>{[...fixed, ...dynamic].map((question) => (
               <div key={question.id}>
                 <dt>{question.category} · {question.question}</dt>
