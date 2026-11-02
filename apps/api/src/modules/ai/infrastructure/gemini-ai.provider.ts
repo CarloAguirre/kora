@@ -15,6 +15,8 @@ interface GeminiCandidate {
 interface GeminiResponse {
   candidates?: GeminiCandidate[];
   error?: {
+    code?: number;
+    status?: string;
     message?: string;
   };
 }
@@ -59,9 +61,12 @@ export class GeminiAiProvider implements AiProvider {
 
     const body = (await response.json()) as GeminiResponse;
     if (!response.ok) {
+      // Diagnóstico sin exponer API key, documentos ni respuestas de negocio.
+      // El task distingue propuesta (1.er paso) de EDT (2.º paso).
+      const reason = body.error?.message ?? 'Solicitud rechazada sin detalle.';
+      const status = body.error?.status ? `, ${body.error.status}` : '';
       throw new Error(
-        body.error?.message ??
-          `Gemini rechazó la solicitud (HTTP ${response.status}).`,
+        `Gemini [${input.task}] modelo ${geminiModel}: HTTP ${response.status}${status}: ${reason}`,
       );
     }
 
