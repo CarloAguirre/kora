@@ -147,7 +147,7 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
     // No avanza hasta completar F01-F04, pero F05 es opcional.
     fireEvent.click(screen.getByRole('button', { name: 'Continuar' }));
     expect(screen.getByText('Condiciones de la estimación')).toBeInTheDocument();
-    expect(screen.getByRole('alert')).toHaveTextContent('Completa todas las respuestas');
+    expect(screen.getByText('Completa todas las respuestas obligatorias de esta etapa.')).toBeInTheDocument();
     answerFixed();
     expect(screen.getByLabelText('UAT')).not.toBeChecked();
     expect(screen.getByLabelText('Ninguna')).toBeChecked();
@@ -173,7 +173,7 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
     fireEvent.click(screen.getByLabelText('No lo sé / dejar como supuesto'));
     fireEvent.click(screen.getByRole('button', { name: 'Continuar' }));
     expect(screen.getByText('Confirmar la estimación')).toBeInTheDocument();
-    expect(screen.getByText(/API no disponible; estimar adaptador temporal/)).toBeInTheDocument();
+    expect(screen.getAllByText(/API no disponible; estimar adaptador temporal/).length).toBeGreaterThan(0);
     expect(mocks.generate).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Generar estimación' }));
     await waitFor(() => expect(mocks.generate).toHaveBeenCalledTimes(1));

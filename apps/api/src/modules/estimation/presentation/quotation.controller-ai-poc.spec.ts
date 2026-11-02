@@ -60,7 +60,7 @@ describe('POST versions/ai-poc · Gemini con KDM', () => {
     expect(generator.execute).toHaveBeenCalledWith(input);
     expect(generator.generateEdt).toHaveBeenCalledWith(input, proposal);
     expect(drafts.createAiPocDraft).toHaveBeenCalledWith(
-      projectId, actor, proposal, input.answers, input.dynamicQuestions, edt,
+      projectId, actor, proposal, input.answers, input.dynamicQuestions, edt, undefined,
     );
     expect(result).toMatchObject({
       origin: 'ai', status: 'draft', aiReviewStatus: 'pending',
