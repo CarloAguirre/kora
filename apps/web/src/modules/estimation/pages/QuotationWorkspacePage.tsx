@@ -10,12 +10,13 @@ import { Button } from '@/shared/components/ui/Button';
 import { Card } from '@/shared/components/ui/Card';
 import { Select } from '@/shared/components/ui/Select';
 import { TextField } from '@/shared/components/ui/TextField';
-import { useCreateQuotationVersion, useProjectQuotation, useSaveQuotationDraft } from '../api/quotation.queries';
+import { useAppliedQuotationPlanning, useCreateQuotationVersion, useProjectQuotation, useSaveQuotationDraft } from '../api/quotation.queries';
 import { AnalysisEvidenceCard } from '../components/AnalysisEvidenceCard';
 import { QuotationVersionComparison } from '../components/QuotationVersionComparison';
 import { QuotationTransferPreviewCard } from '../components/QuotationTransferPreviewCard';
 import { QuotationCommercialPreflightCard } from '../components/QuotationCommercialPreflightCard';
 import { AiPocRoleMappingCard } from '../components/AiPocRoleMappingCard';
+import { QuotationPlanningAcceptanceCard } from '../components/QuotationPlanningAcceptanceCard';
 import styles from './QuotationWorkspacePage.module.css';
 
 type Form = Pick<UpdateQuotationDraftInput, 'name' | 'hourlyRate' | 'currency' | 'tax' | 'draft'>;
@@ -41,6 +42,7 @@ export function QuotationWorkspacePage() {
   const project = projectQuery.data;
   const projectId = project?.id ?? null;
   const quotationQuery = useProjectQuotation(projectId);
+  const appliedPlan = useAppliedQuotationPlanning(projectId);
   const createVersion = useCreateQuotationVersion(projectId ?? '');
   const saveDraft = useSaveQuotationDraft(projectId ?? '');
   const teamQuery = useTeamsList({ page: 1, pageSize: 200, isActive: true, sortField: 'name' }, { enabled: Boolean(projectId) });
@@ -75,7 +77,8 @@ export function QuotationWorkspacePage() {
   }, [selected?.id, selected?.revision]);
 
   const mayWrite = Boolean(project && isQuotationDraftEligibleProject(project));
-  const editable = Boolean(mayWrite && selected?.status === 'draft' && form);
+  const editable = Boolean(mayWrite && selected?.status === 'draft' && form &&
+    appliedPlan.data?.versionId !== selected?.id && !appliedPlan.isLoading);
 
   const change = (update: (current: Form) => Form) => {
     setForm((current) => current ? update(current) : null);
@@ -290,6 +293,14 @@ export function QuotationWorkspacePage() {
                     change((current) => ({ ...current, draft }));
                     setNotice('Proyección de HH aplicada. Guarda el borrador para persistir la distribución.');
                   }}
+                />
+              )}
+
+              {selected?.draft.aiPoc?.edt && projectId && (
+                <QuotationPlanningAcceptanceCard
+                  key={selected.id + ':' + selected.revision}
+                  projectId={projectId} version={selected}
+                  canManage={can('projects:manage')} hasUnsavedChanges={dirty}
                 />
               )}
 
