@@ -175,11 +175,13 @@ describe('GenerateEstimationPocProposalUseCase', () => {
     const projectId = '550e8400-e29b-41d4-a716-446655440000';
     let requestedTask = '';
     let documentName = '';
+    let requestedSchema: Readonly<Record<string, unknown>> | undefined;
     const ai: AiProvider = {
       name: 'gemini',
       generateStructured: async (request) => {
         requestedTask = request.task;
         documentName = request.documents?.[0]?.name ?? '';
+        requestedSchema = request.responseJsonSchema;
         return { modules: [
           { name: 'Portal', tasks: [
             { wbs: '1.1', name: 'Backend', description: 'API',
@@ -223,6 +225,10 @@ describe('GenerateEstimationPocProposalUseCase', () => {
     }, proposal);
     expect(requestedTask).toBe('estimation.poc.reference-edt');
     expect(documentName).toBe('Requerimiento_KDM.pdf');
+    // Las restricciones se aplican en Zod; no enviarlas en responseSchema
+    // evita 400/INVALID_ARGUMENT de Gemini en esquemas anidados.
+    expect(requestedSchema).toBeDefined();
+    expect(JSON.stringify(requestedSchema)).not.toMatch(/"minItems"|"maxItems"|"minimum"|"maximum"/);
     expect(output.totalHours).toBe(80);
     expect(output.modules.map((module) => module.totalHours)).toEqual([50, 30]);
     expect(output.modules.flatMap((module) => module.tasks.map((task) => task.hours)))
