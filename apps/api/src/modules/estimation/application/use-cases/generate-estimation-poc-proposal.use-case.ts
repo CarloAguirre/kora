@@ -103,22 +103,39 @@ const edtResponseSchema = z.object({
     })).min(1).max(60),
   })).min(1).max(30),
 });
+// El esquema transmitido a Gemini es deliberadamente mínimo. Modelos como
+// Flash-Lite pueden rechazar con 400/INVALID_ARGUMENT esquemas anidados con
+// límites minItems/maxItems/minimum. Las restricciones de cantidad, positividad,
+// roles, WBS y preservación de HH se verifican aquí con Zod y reglas de negocio.
 const EDT_JSON_SCHEMA = {
   type: 'OBJECT',
   properties: {
-    modules: { type: 'ARRAY', minItems: 1, maxItems: 30, items: {
-      type: 'OBJECT', properties: {
-        name: { type: 'STRING' },
-        tasks: { type: 'ARRAY', minItems: 1, maxItems: 60, items: {
-          type: 'OBJECT', properties: {
-            wbs: { type: 'STRING' }, name: { type: 'STRING' },
-            description: { type: 'STRING' }, role: { type: 'STRING' },
-            weight: { type: 'NUMBER', minimum: 0.01 },
-          }, required: ['wbs', 'name', 'description', 'role', 'weight'],
-        } },
-      }, required: ['name', 'tasks'],
-    } },
-  }, required: ['modules'],
+    modules: {
+      type: 'ARRAY',
+      items: {
+        type: 'OBJECT',
+        properties: {
+          name: { type: 'STRING' },
+          tasks: {
+            type: 'ARRAY',
+            items: {
+              type: 'OBJECT',
+              properties: {
+                wbs: { type: 'STRING' },
+                name: { type: 'STRING' },
+                description: { type: 'STRING' },
+                role: { type: 'STRING' },
+                weight: { type: 'NUMBER' },
+              },
+              required: ['wbs', 'name', 'description', 'role', 'weight'],
+            },
+          },
+        },
+        required: ['name', 'tasks'],
+      },
+    },
+  },
+  required: ['modules'],
 } as const;
 
 const BASE_INSTRUCTIONS = [
