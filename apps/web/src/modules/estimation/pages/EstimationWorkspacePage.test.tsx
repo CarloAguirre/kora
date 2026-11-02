@@ -8,7 +8,7 @@ import { EstimationWorkspacePage } from './EstimationWorkspacePage';
 const ids = {
   project: '0777e456-fd76-445e-83f1-afc25061c101',
 };
-const mocks = vi.hoisted(() => ({ mutate: vi.fn() }));
+const mocks = vi.hoisted(() => ({ mutate: vi.fn(), demoMutate: vi.fn() }));
 const questions = [
   estimationQuestionSchema.parse({
     id: 'F01', kind: 'fixed', category: 'Alcance', question: '¿Alcance?',
@@ -52,21 +52,51 @@ vi.mock('../hooks/useEstimationWorkspace', () => ({
     isLoading: false,
   }),
 }));
+const dynamic = [
+  estimationQuestionSchema.parse({
+    id: 'D01', kind: 'dynamic', category: 'Integraciones',
+    question: '¿Existe un API de SAP documentada?',
+    reason: 'Afecta las HH de integración.',
+    impact: 'high', answerType: 'single_choice', required: true,
+    options: [
+      { value: 'yes', label: 'Sí, documentada' },
+      { value: 'no', label: 'No disponible' },
+    ],
+    sourceRefs: [{
+      sourceId: 'kora-poc-requerimiento-kdm',
+      fileName: 'Requerimiento_KDM.pdf',
+    }],
+  }),
+];
+vi.mock('../api/quotation.queries', () => ({
+  useGenerateAiDemoQuotationVersion: () => ({
+    mutate: mocks.demoMutate, isPending: false, error: null,
+  }),
+}));
 vi.mock('../api/estimation.queries', () => ({
   useEstimationQuestionnaireDefinition: () => ({
     data: { fixedQuestions: questions, maxDynamicFirstRound: 5,
       maxDynamicFollowUp: 2, targetMinutesMin: 3, targetMinutesMax: 5 },
     isLoading: false, isError: false,
   }),
+  useEstimationDocumentAnalysis: () => ({
+    data: {
+      projectId: ids.project, provider: 'gemini', sourceMode: 'poc_simulated',
+      documentsAnalyzed: 1, summary: 'Análisis KDM',
+      detectedDocuments: ['Requerimiento_KDM.pdf'],
+      dynamicQuestions: dynamic,
+    },
+    isLoading: false, isError: false, error: null,
+  }),
   useGenerateAnsweredEstimationPocProposal: () => ({
     mutate: mocks.mutate, isPending: false, data: undefined, error: null,
   }),
 }));
 
-const renderWorkspace = () => render(
+const renderWorkspace = (demo = false) => render(
   <MemoryRouter initialEntries={[{
     pathname: '/estimar/' + ids.project,
-    search: '?mode=ai',
+    search: demo ? '?mode=ai&demo=kdm' : '?mode=ai',
     state: {
       creationMode: 'ai',
       driveFolderUrl: 'https://drive.google.com/drive/folders/carpeta-proyecto',
@@ -118,4 +148,41 @@ describe('R4-a · EstimationWorkspacePage', () => {
       ],
     });
   });
+  it('con KDM espera a que Gemini proponga preguntas dinámicas y no genera sin contestarlas', () => {
+    mocks.demoMutate.mockClear();
+    renderWorkspace(true);
+    expect(screen.getByText(/Entendimiento preliminar/)).toBeInTheDocument();
+    expect(screen.getByText(/Análisis KDM/)).toBeInTheDocument();
+    expect(mocks.demoMutate).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByLabelText('MVP'));
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente pregunta' }));
+    fireEvent.change(screen.getByPlaceholderText('Escribe una respuesta breve'), {
+      target: { value: '8 semanas' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente pregunta' }));
+    fireEvent.click(screen.getByLabelText('Equipo ideal'));
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente pregunta' }));
+    fireEvent.click(screen.getByLabelText('Ninguna'));
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente pregunta' }));
+    // F05 es opcional.
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente pregunta' }));
+    expect(screen.getByText('¿Existe un API de SAP documentada?')).toBeInTheDocument();
+    expect(mocks.demoMutate).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByLabelText('Sí, documentada'));
+    fireEvent.click(screen.getByRole('button', { name: 'Generar estimación final' }));
+    expect(mocks.demoMutate).toHaveBeenCalledTimes(1);
+    expect(mocks.demoMutate.mock.calls[0]?.[0]).toMatchObject({
+      projectId: ids.project,
+      driveFolderUrl: 'https://drive.google.com/drive/folders/kora-poc-fallback',
+      dynamicQuestions: [{ id: 'D01', kind: 'dynamic' }],
+      answers: [
+        { questionId: 'F01', value: 'mvp' },
+        { questionId: 'F02', value: '8 semanas' },
+        { questionId: 'F03', value: 'ideal' },
+        { questionId: 'F04', value: ['none'] },
+        { questionId: 'D01', value: 'yes' },
+      ],
+    });
+  });
+
 });
