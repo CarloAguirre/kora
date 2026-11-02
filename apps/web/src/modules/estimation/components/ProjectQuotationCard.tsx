@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { isQuotationDraftEligibleProject, type ProjectDetail } from '@kora/contracts';
 import { projectQuotationPath } from '@/app/router/paths';
-import { useAppliedQuotationPlanning, useProjectQuotation } from '../api/quotation.queries';
+import { useAppliedQuotationPlanning, useProjectQuotation, useQuotationLifecycle } from '../api/quotation.queries';
 import { Button } from '@/shared/components/ui/Button';
 import { NewProjectQuotationModal } from './NewProjectQuotationModal';
 import styles from './ProjectQuotationCard.module.css';
@@ -10,9 +10,36 @@ import styles from './ProjectQuotationCard.module.css';
 export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
   const { data, isLoading, error } = useProjectQuotation(project.id);
   const applied = useAppliedQuotationPlanning(project.id);
+  const lifecycle = useQuotationLifecycle(project.id);
+  const [actionError, setActionError] = useState('');
+  const [actionNotice, setActionNotice] = useState('');
   const [newOpen, setNewOpen] = useState(false);
   const versions = [...(data?.versions ?? [])].sort((a, b) => b.versionNumber - a.versionNumber);
   const eligible = isQuotationDraftEligibleProject(project);
+  const transferredVersion = versions.find((version) => version.id === data?.transferredVersionId);
+  const registerApproval = async (versionId: string, revision: number) => {
+    setActionError(''); setActionNotice('');
+    if (!window.confirm('¿Confirmas que el cliente aprobó expresamente esta versión? ' +
+      'Si aún no fue marcada como enviada, se aprobará directamente. ' +
+      'Las HH del proyecto NO se modificarán hasta el traspaso.')) return;
+    try {
+      await lifecycle.approveClient.mutateAsync({ versionId, revision });
+      setActionNotice('Aprobación registrada · traspaso pendiente.');
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : 'No fue posible registrar la aprobación.');
+    }
+  };
+  const transferNow = async (versionId: string, revision: number) => {
+    setActionError(''); setActionNotice('');
+    if (!window.confirm('Esta acción traspasará equipos, HH, fases y pagos de una versión aprobada. ' +
+      'Solo continúa si el proyecto no tiene ejecución ni facturación. ¿Confirmas?')) return;
+    try {
+      await lifecycle.transferApproved.mutateAsync({ versionId, revision });
+      setActionNotice('Traspaso guardado y registrado en el historial.');
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : 'No se pudo efectuar el traspaso.');
+    }
+  };
   const number = (n: number) => n.toLocaleString('es-CL', { maximumFractionDigits: 2 });
   return (
     <section className={styles.tabContent} aria-label="Cotizaciones del proyecto">
@@ -32,8 +59,11 @@ export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
                 <h3>Versiones de la cotización</h3>
                 <p>Las versiones enviadas o aprobadas son históricas y no se editan.</p>
               </div>
-              {eligible && <Button size="sm" onClick={() => setNewOpen(true)}>+ Nueva cotización</Button>}
+              {eligible && <Button size="sm" onClick={() => setNewOpen(true)}>+ Nueva versión</Button>}
             </div>
+            {versions.some((v) => v.status === 'approved' && data?.transferredVersionId !== v.id) && (
+              <p className={styles.helper}>Existe una versión aprobada con traspaso pendiente.</p>
+            )}
             <div className={styles.scroll}>
               <table className={styles.versions}>
                 <thead><tr><th>Versión</th><th>Estado</th><th>Horas</th><th>Total</th><th>Acciones</th></tr></thead>
@@ -43,19 +73,64 @@ export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
                       <small>{new Date(v.createdAt).toLocaleDateString('es-CL')}
                         {v.origin === 'ai' ? ' · Origen IA (KDM de prueba)' : ''}</small></td>
                     <td><span className={styles.status}>
-                      {applied.data?.versionId === v.id ? 'Planificación aplicada (no aprobación comercial)' :
+                      {data?.transferredVersionId === v.id ? 'Traspasada' :
+                        applied.data?.versionId === v.id ? 'Planificación previa (sin aprobación)' :
                         v.status === 'draft' ? 'Borrador' :
-                          v.status === 'sent' ? 'Enviada al cliente' : 'Aprobada por el cliente'}
+                          v.status === 'sent' ? 'Enviada al cliente' : 'Aprobada · traspaso pendiente'}
                     </span></td>
                     <td>{number(v.totalHours)} HH</td>
                     <td>{v.totalAmount === null ? 'Sin valor HH' : number(v.totalAmount) + ' ' + v.currency}</td>
-                    <td><Link to={projectQuotationPath(project) + '?version=' + v.id}>Abrir en calculadora</Link></td>
+                    <td>
+                      <div className={styles.actionLinks}>
+                        <Link to={projectQuotationPath(project) + '?version=' + v.id}>
+                          Abrir en calculadora
+                        </Link>
+                        {eligible && ['draft', 'sent'].includes(v.status) &&
+                          <Button size="sm" variant="ghost"
+                            disabled={lifecycle.approveClient.isPending}
+                            onClick={() => void registerApproval(v.id, v.revision)}>
+                            Registrar aprobación
+                          </Button>}
+                        {eligible && v.status === 'approved' &&
+                          data?.transferredVersionId !== v.id &&
+                          <Button size="sm" variant="ghost"
+                            disabled={lifecycle.transferApproved.isPending || project.status !== 'draft'}
+                            onClick={() => void transferNow(v.id, v.revision)}>
+                            Traspasar ahora
+                          </Button>}
+                      </div>
+                    </td>
                   </tr>
                 ))}</tbody>
               </table>
             </div>
+            {transferredVersion && (
+              <div className={styles.commercialSummary}>
+                <h3>Resumen comercial · versión traspasada v{transferredVersion.versionNumber}</h3>
+                <p>Consulta histórica; no modifica el proyecto operativo.</p>
+                <div className={styles.summaryGrid}>
+                  <span>Valor HH: <strong>{transferredVersion.hourlyRate ?? '—'} {transferredVersion.currency}</strong></span>
+                  <span>HH cotizadas: <strong>{number(transferredVersion.totalHours)}</strong></span>
+                  <span>Neto: <strong>{transferredVersion.netAmount ?? '—'} {transferredVersion.currency}</strong></span>
+                  <span>Total: <strong>{transferredVersion.totalAmount ?? '—'} {transferredVersion.currency}</strong></span>
+                </div>
+                {transferredVersion.draft.costs.length > 0 && (
+                  <p>Costos externos: {transferredVersion.draft.costs.map((cost) =>
+                    cost.description + ' (' + cost.amount + ' ' + transferredVersion.currency + ' · ' +
+                    cost.recurrence + ')').join('; ')}</p>
+                )}
+                {transferredVersion.draft.assumptions.length > 0 && (
+                  <p>Supuestos: {transferredVersion.draft.assumptions.join('; ')}</p>
+                )}
+                <Link to={projectQuotationPath(project) + '?version=' + transferredVersion.id}>
+                  Ver ficha comercial completa
+                </Link>
+              </div>
+            )}
           </>
         )}
+      {actionError && <p role="alert" className={styles.error}>{actionError}</p>}
+      {actionNotice && <p role="status" className={styles.helper}>{actionNotice}</p>}
       {newOpen && <NewProjectQuotationModal project={project} versions={data?.versions ?? []}
         onClose={() => setNewOpen(false)} />}
     </section>
