@@ -103,7 +103,7 @@ function QuestionField({
     <fieldset className={styles.question}>
       <legend>
         <span className={styles.category}>
-          {question.category}
+          {question.kind === 'fixed' ? 'Condición' : question.category}
           {prefillSource && <span className={styles.prefill}>Prellenada</span>}
         </span>
         <span className={styles.questionTitle}>
@@ -395,7 +395,7 @@ export function AiQuotationWizardModal({ project, onClose }: {
           </p>
           <ul className={styles.documents} aria-label="Documentos que analizará el agente">
             <li>
-              <span className={styles.docIcon} aria-hidden="true">▣</span>
+              <span className={styles.docIcon} aria-hidden="true">📄</span>
               <span>Requerimiento_KDM.pdf</span>
               <span className={styles.docDate}>Fuente de prueba</span>
             </li>
