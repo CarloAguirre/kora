@@ -9,13 +9,15 @@ import styles from './QuotationCommercialLifecycleCard.module.css';
 /** Los estados comerciales de la versión no son los estados del proyecto.
  * Aceptar IA no toca el Roadmap; traspasar exige aprobación del cliente. */
 export function QuotationCommercialLifecycleCard({
-  project, quotation, version, canOperate, hasUnsavedChanges,
+  project, quotation, version, canOperate, hasUnsavedChanges, embedded = false,
 }: {
   project: ProjectDetail;
   quotation: ProjectQuotation | null;
   version: QuotationVersion;
   canOperate: boolean;
   hasUnsavedChanges: boolean;
+  /** Renderizar acciones dentro del resumen comercial, sin una tarjeta anidada. */
+  embedded?: boolean;
 }) {
   const actions = useQuotationLifecycle(project.id);
   const [transferTiming, setTransferTiming] = useState<'now' | 'later'>('later');
@@ -118,8 +120,8 @@ export function QuotationCommercialLifecycleCard({
     }
   };
 
-  return (
-    <Card>
+  const content = (
+    <>
       <div className={styles.heading}>
         <h2>Ciclo comercial de la cotización</h2>
         <span>{transferred ? 'Traspasada' :
@@ -192,6 +194,7 @@ export function QuotationCommercialLifecycleCard({
         <p className={styles.helper}>El plan de pagos debe sumar 100 % para enviar o aprobar.</p>}
       {error && <p role="alert" className={styles.error}>{error}</p>}
       {notice && <p role="status" className={styles.success}>{notice}</p>}
-    </Card>
+    </>
   );
+  return embedded ? <div className={styles.embedded}>{content}</div> : <Card>{content}</Card>;
 }
