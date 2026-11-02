@@ -70,9 +70,11 @@ describe('Plan_Diario referencial derivado de EDT v2', () => {
       { code: 'T01', name: 'Una semana', startWeek: 1, durationWeeks: 1, totalHours: 30 },
       { code: 'T02', name: 'Otra semana', startWeek: 1, durationWeeks: 1, totalHours: 20 },
     ];
-    const result = buildReferenceDailyPlan(overloaded, roles);
-    expect(result?.plannedHours).toBe(40);
-    expect(result?.pendingHours).toBe(10);
+    const reducedCapacity = roles.map((role) => role.role === 'Desarrollo'
+      ? { ...role, hoursPerUnit: 20 } : role);
+    const result = buildReferenceDailyPlan(overloaded, reducedCapacity);
+    expect(result?.plannedHours).toBe(30);
+    expect(result?.pendingHours).toBe(20);
     expect(result?.sourceHours).toBe(50);
     expect(result?.issues.length).toBeGreaterThan(0);
     expect(result?.rows.every((row) => row.day <= 5)).toBe(true);
