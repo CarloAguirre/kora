@@ -59,7 +59,10 @@ export class GetTeamAvailabilityUseCase
 
     return ok({
       teamId: team.id,
-      members: activeMembers.map((member) => {
+      // La membresía puede seguir vigente aunque la cuenta de la persona haya
+      // sido deshabilitada. El heatmap muestra disponibilidad actual, no historia:
+      // misma regla que GetTeamUseCase y ListTeamMemberOptionsUseCase.
+      members: activeMembers.filter((member) => member.userStatus !== 'disabled').map((member) => {
         const byDate = hoursByMemberId.get(member.id);
         return {
           teamMemberId: member.id,
