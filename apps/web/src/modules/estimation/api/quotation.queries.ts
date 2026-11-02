@@ -121,3 +121,37 @@ export function useApplyQuotationPlanning(projectId: string) {
     },
   });
 }
+
+/** Acciones del ciclo comercial, independientes de aceptar el presupuesto IA. */
+export function useQuotationLifecycle(projectId: string) {
+  const client = useQueryClient();
+  const refresh = () => {
+    void client.invalidateQueries({ queryKey: quotationKeys.project(projectId) });
+    void client.invalidateQueries({ queryKey: ['projects'] });
+  };
+  const acceptAi = useMutation({
+    mutationFn: ({ versionId, revision }: { versionId: string; revision: number }) =>
+      quotationApi.acceptAi(projectId, versionId, { revision }),
+    onSuccess: refresh,
+  });
+  const markSent = useMutation({
+    mutationFn: ({ versionId, revision }: { versionId: string; revision: number }) =>
+      quotationApi.markSent(projectId, versionId, { revision }),
+    onSuccess: refresh,
+  });
+  const approveClient = useMutation({
+    mutationFn: ({ versionId, revision }: { versionId: string; revision: number }) =>
+      quotationApi.approveClient(projectId, versionId, {
+        revision, confirmation: 'CLIENTE_APROBO_ESTA_VERSION',
+      }),
+    onSuccess: refresh,
+  });
+  const transferApproved = useMutation({
+    mutationFn: ({ versionId, revision }: { versionId: string; revision: number }) =>
+      quotationApi.transferApproved(projectId, versionId, {
+        revision, confirmation: 'TRASPASAR_COTIZACION_APROBADA',
+      }),
+    onSuccess: refresh,
+  });
+  return { acceptAi, markSent, approveClient, transferApproved };
+}

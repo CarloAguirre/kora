@@ -3,6 +3,10 @@ import type {
   GenerateAiDemoQuotationInput,
   AppliedQuotationPlanning,
   ApplyQuotationPlanningInput,
+  QuotationRevisionActionInput,
+  ApproveClientQuotationInput,
+  TransferApprovedQuotationInput,
+  QuotationTransferResult,
   ProjectQuotation,
   QuotationVersion,
   QuotationTransferPreview,
@@ -67,6 +71,23 @@ export const quotationApi = {
     return api.post<SavedQuotationReviewAssessment>(
       base(projectId) + '/versions/' + versionId + '/reconciliation-assessments', input,
     );
+  },
+  acceptAi(projectId: string, versionId: string,
+    input: QuotationRevisionActionInput): Promise<QuotationVersion> {
+    return api.post<QuotationVersion>(base(projectId) + '/versions/' + versionId + '/accept-ai', input);
+  },
+  markSent(projectId: string, versionId: string,
+    input: QuotationRevisionActionInput): Promise<QuotationVersion> {
+    return api.post<QuotationVersion>(base(projectId) + '/versions/' + versionId + '/mark-sent', input);
+  },
+  approveClient(projectId: string, versionId: string,
+    input: ApproveClientQuotationInput): Promise<QuotationVersion> {
+    return api.post<QuotationVersion>(base(projectId) + '/versions/' + versionId + '/approve-client', input);
+  },
+  transferApproved(projectId: string, versionId: string,
+    input: TransferApprovedQuotationInput): Promise<QuotationTransferResult> {
+    return api.post<QuotationTransferResult>(
+      base(projectId) + '/versions/' + versionId + '/transfer-approved', input);
   },
   generateAiDemoDraft(projectId: string, input: GenerateAiDemoQuotationInput): Promise<QuotationVersion> {
     return api.post<QuotationVersion>(base(projectId) + '/versions/ai-poc', input);
