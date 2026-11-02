@@ -1,3 +1,9 @@
+import {
+  quotationDraftDataSchema,
+  quotationAiPocSnapshotSchema,
+  type QuotationDraftData,
+} from './quotation.contract';
+
 /** Comparación de snapshots JSON compatible con navegador y Node. */
 function sameJson(a: unknown, b: unknown): boolean {
   if (Object.is(a, b)) return true;
@@ -13,11 +19,6 @@ function sameJson(a: unknown, b: unknown): boolean {
   return keysA.length === keysB.length &&
     keysA.every((key, index) => key === keysB[index] && sameJson(first[key], second[key]));
 }
-import {
-  quotationDraftDataSchema,
-  quotationAiPocSnapshotSchema,
-  type QuotationDraftData,
-} from './quotation.contract';
 
 /** Las fases por rol se proyectan desde la propuesta ORIGINAL guardada,
  * nunca desde totales HH calculados por el navegador.

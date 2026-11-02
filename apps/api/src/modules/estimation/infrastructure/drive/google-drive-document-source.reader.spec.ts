@@ -46,6 +46,25 @@ describe('GoogleDriveDocumentSourceReader', () => {
     expect(result[0]?.text).toContain('Microsoft Entra ID');
   });
 
+  it('selecciona KDM por su ID aunque existan credenciales Drive y no llama a Drive real', async () => {
+    let usedDrive = false;
+    const drive: DriveFolderClient = {
+      isConfigured: () => true,
+      listFiles: async () => { usedDrive = true; return []; },
+      listChildren: async () => { usedDrive = true; return []; },
+      searchFolders: async () => { usedDrive = true; return []; },
+      getMetadata: async () => { usedDrive = true; return null; },
+      readAnalysisContent: async () => { usedDrive = true; return null; },
+    };
+    const reader = new GoogleDriveDocumentSourceReader(drive);
+    const docs = await reader.readDriveSources(
+      'https://drive.google.com/drive/folders/kora-poc-fallback',
+    );
+    expect(docs).toHaveLength(1);
+    expect(docs[0]?.name).toBe('Requerimiento_KDM.pdf');
+    expect(usedDrive).toBe(false);
+  });
+
   it('no sustituye silenciosamente otro proyecto por el PDF KDM de demostración', async () => {
     const drive: DriveFolderClient = {
       isConfigured: () => false,
