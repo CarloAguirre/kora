@@ -65,6 +65,7 @@ describe('EDT de cotización sin aplicación prematura', () => {
     render(<QuotationPlanningAcceptanceCard version={version} />);
     expect(screen.getByText(/EDT de referencia/)).toBeInTheDocument();
     expect(screen.getByText('Portal')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Portal'));
     expect(screen.getByText('1.1')).toBeInTheDocument();
     expect(screen.getByText('Backend')).toBeInTheDocument();
     const task = screen.getByText('Backend').closest('details');
