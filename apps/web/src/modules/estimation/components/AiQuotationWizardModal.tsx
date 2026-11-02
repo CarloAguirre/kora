@@ -65,6 +65,12 @@ function QuestionField({
 }) {
   const selected = (option: string) => Array.isArray(value)
     ? value.includes(option) : value === option;
+  const plazo = typeof value === 'string' && !assumed ? value : '';
+  const dateMode = plazo.startsWith('Fecha objetivo:');
+  const weeksMode = plazo.startsWith('N semanas:');
+  const customMode = question.id === 'F02' && !dateMode && !weeksMode &&
+    plazo !== 'Sin restricción';
+
   const option = (key: string, label: string, multi = false) => {
     const disabled = question.id === 'F03' && key !== 'ideal';
     return (
@@ -104,7 +110,37 @@ function QuestionField({
       {prefillSource && <p className={styles.source}>
         Prellenada desde el documento de demostración: {prefillSource}. Puedes corregirla.
       </p>}
-      {question.answerType === 'text' &&
+      {question.id === 'F02' && (
+        <div className={styles.schedule}>
+          <div className={styles.options}>
+            {([
+              ['Sin restricción', plazo === 'Sin restricción', 'Sin restricción'],
+              ['Fecha objetivo', dateMode, 'Fecha objetivo: '],
+              ['N semanas', weeksMode, 'N semanas: '],
+            ] as const).map(([label, checked, next]) => (
+              <label key={label} className={[
+                optionStyles.option,
+                checked ? optionStyles.optionSelected : '',
+              ].filter(Boolean).join(' ')}>
+                <input type="radio" name="plazo-objetivo" checked={checked}
+                  onChange={() => onChange(next)} />
+                <span><strong>{label}</strong></span>
+              </label>
+            ))}
+          </div>
+          {dateMode && <TextField type="date" label="Fecha objetivo"
+            value={plazo.slice('Fecha objetivo:'.length).trim()}
+            onChange={(event) => onChange('Fecha objetivo: ' + event.target.value)} />}
+          {weeksMode && <TextField type="number" min={1} label="Número de semanas"
+            value={plazo.slice('N semanas:'.length).trim()}
+            onChange={(event) => onChange('N semanas: ' + event.target.value)} />}
+          {customMode && <TextField label="Plazo descrito"
+            value={plazo}
+            placeholder="Ej. Ocho semanas a partir del kickoff"
+            onChange={(event) => onChange(event.target.value)} />}
+        </div>
+      )}
+      {question.answerType === 'text' && question.id !== 'F02' &&
         <textarea aria-label={question.question} className={styles.textarea}
           placeholder="Escribe una respuesta breve"
           value={typeof value === 'string' && !assumed ? value : ''}
@@ -180,9 +216,20 @@ export function AiQuotationWizardModal({ project, onClose }: {
   const dynamic = verifiedAnalysis?.dynamicQuestions ?? [];
   const working = analysis.isPending || generate.isPending;
   const relevant = stage === 2 ? fixed : dynamic;
-  const answered = (question: EstimationQuestion) =>
-    assumptions.includes(question.id) ||
-    matchesQuestion(question, answers[question.id]);
+  const answered = (question: EstimationQuestion) => {
+    if (assumptions.includes(question.id)) return true;
+    const value = answers[question.id];
+    if (question.id === 'F02' && typeof value === 'string') {
+      if (value.startsWith('Fecha objetivo:')) {
+        return /^Fecha objetivo:\s*\d{4}-\d{2}-\d{2}$/.test(value);
+      }
+      if (value.startsWith('N semanas:')) {
+        const match = /^N semanas:\s*(\d+)$/.exec(value);
+        return Boolean(match && Number(match[1]) > 0);
+      }
+    }
+    return matchesQuestion(question, value);
+  };
 
   const change = (id: string, value: EstimationAnswerValue) => {
     setAnswers((current) => ({ ...current, [id]: value }));

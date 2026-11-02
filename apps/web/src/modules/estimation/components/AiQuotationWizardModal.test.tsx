@@ -121,7 +121,8 @@ async function analyzeAndConfirm() {
 }
 function answerFixed() {
   fireEvent.click(screen.getByLabelText('MVP'));
-  fireEvent.change(screen.getByLabelText('¿Plazo?'), { target: { value: '8 semanas' } });
+  fireEvent.click(screen.getByLabelText('N semanas'));
+  fireEvent.change(screen.getByLabelText('Número de semanas'), { target: { value: '8' } });
   fireEvent.click(screen.getByLabelText('Equipo ideal'));
   fireEvent.click(screen.getByLabelText('UAT'));
   fireEvent.click(screen.getByLabelText('Ninguna'));
@@ -162,7 +163,7 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
     expect(screen.getByText('Aclaraciones de mayor impacto')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Atrás' }));
     expect(screen.getByLabelText('MVP')).toBeChecked();
-    expect(screen.getByLabelText('¿Plazo?')).toHaveValue('8 semanas');
+    expect(screen.getByLabelText('Número de semanas')).toHaveValue(8);
     expect(mocks.generate).not.toHaveBeenCalled();
   });
 
@@ -177,7 +178,7 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Está correcto' }));
     answerFixed();
     fireEvent.click(screen.getByRole('button', { name: 'Continuar' }));
-    fireEvent.click(screen.getByLabelText('No lo sé / dejar como supuesto'));
+    fireEvent.click(screen.getByLabelText(/No lo sé \/ dejar como supuesto/));
     fireEvent.click(screen.getByRole('button', { name: 'Continuar' }));
     expect(screen.getByText('Confirmar la estimación')).toBeInTheDocument();
     expect(screen.getAllByText(/API no disponible; estimar adaptador temporal/).length).toBeGreaterThan(0);
@@ -192,7 +193,7 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
       ]),
       answers: [
         { questionId: 'F01', value: 'mvp', usedAssumption: false },
-        { questionId: 'F02', value: '8 semanas', usedAssumption: false },
+        { questionId: 'F02', value: 'N semanas: 8', usedAssumption: false },
         { questionId: 'F03', value: 'ideal', usedAssumption: false },
         { questionId: 'F04', value: ['none'], usedAssumption: false },
         { questionId: 'D01', value: null, usedAssumption: true },
