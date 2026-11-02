@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { estimationPocProposalSchema } from '@kora/contracts';
 import type { AiProvider } from '../../../ai/application/ports/ai-provider.port';
 import type { DocumentSourceReader } from '../ports/document-source-reader.port';
 import type { DriveFolderClient } from '../ports/drive-folder-client.port';
@@ -170,4 +171,95 @@ describe('GenerateEstimationPocProposalUseCase', () => {
     expect(result.documentsAnalyzed).toBe(1);
     expect(result.totalHours).toBe(160);
   });
+  it('genera EDT desde Gemini y reparte las HH exactas entre tareas y módulos', async () => {
+    const projectId = '550e8400-e29b-41d4-a716-446655440000';
+    let requestedTask = '';
+    let documentName = '';
+    const ai: AiProvider = {
+      name: 'gemini',
+      generateStructured: async (request) => {
+        requestedTask = request.task;
+        documentName = request.documents?.[0]?.name ?? '';
+        return { modules: [
+          { name: 'Portal', tasks: [
+            { wbs: '1.1', name: 'Backend', description: 'API',
+              role: 'Desarrollo', weight: 1 },
+            { wbs: '1.2', name: 'Frontend', description: 'UI',
+              role: 'Desarrollo', weight: 3 },
+          ] },
+          { name: 'QA', tasks: [
+            { wbs: '2.1', name: 'Pruebas', description: 'Regresión',
+              role: 'QA', weight: 1 },
+          ] },
+        ] };
+      },
+    };
+    const sources: DocumentSourceReader = {
+      readDriveSources: async () => [{
+        sourceId: 'kora-poc-requerimiento-kdm',
+        name: 'Requerimiento_KDM.pdf',
+        mimeType: 'application/pdf',
+        path: 'Demostracion/Requerimiento_KDM.pdf',
+        text: 'Portal web y pruebas funcionales.',
+      }],
+    };
+    const proposal = estimationPocProposalSchema.parse({
+      projectId, provider: 'gemini', sourceMode: 'poc_simulated',
+      documentsAnalyzed: 1, summary: 'KDM',
+      roles: [
+        { role: 'Desarrollo', unit: 'week', duration: 1,
+          hoursPerUnit: 50, people: 1, totalHours: 50 },
+        { role: 'QA', unit: 'week', duration: 1,
+          hoursPerUnit: 30, people: 1, totalHours: 30 },
+      ],
+      totalHours: 80, assumptions: [], clarifyingQuestions: [],
+    });
+    const output = await new GenerateEstimationPocProposalUseCase(
+      ai, sources,
+    ).generateEdt({
+      projectId, projectName: 'Proyecto', clientName: 'Cliente',
+      driveFolderUrl: 'https://drive.google.com/drive/folders/kora-poc-fallback',
+      instructions: null, answers: [],
+    }, proposal);
+    expect(requestedTask).toBe('estimation.poc.reference-edt');
+    expect(documentName).toBe('Requerimiento_KDM.pdf');
+    expect(output.totalHours).toBe(80);
+    expect(output.modules.map((module) => module.totalHours)).toEqual([50, 30]);
+    expect(output.modules.flatMap((module) => module.tasks.map((task) => task.hours)))
+      .toEqual([12.5, 37.5, 30]);
+    expect(output.modules[0]?.tasks[0]?.role).toBe('Desarrollo');
+  });
+
+  it('rechaza tareas que Gemini asigne a roles inexistentes', async () => {
+    const ai: AiProvider = {
+      name: 'gemini',
+      generateStructured: async () => ({ modules: [{
+        name: 'Portal', tasks: [
+          { wbs: '1.1', name: 'Inventada', description: '',
+            role: 'Rol inexistente', weight: 1 },
+        ],
+      }] }),
+    };
+    const reader: DocumentSourceReader = {
+      readDriveSources: async () => [{
+        sourceId: 'kora-poc-requerimiento-kdm', name: 'Requerimiento_KDM.pdf',
+        mimeType: 'application/pdf', path: 'Demo/KDM', text: 'Desarrollo',
+      }],
+    };
+    const projectId = '550e8400-e29b-41d4-a716-446655440000';
+    const proposal = estimationPocProposalSchema.parse({
+      projectId, provider: 'gemini', sourceMode: 'poc_simulated',
+      documentsAnalyzed: 1, summary: 'KDM',
+      roles: [{ role: 'Desarrollo', unit: 'week', duration: 1,
+        hoursPerUnit: 40, people: 1, totalHours: 40 }],
+      totalHours: 40, assumptions: [], clarifyingQuestions: [],
+    });
+    await expect(new GenerateEstimationPocProposalUseCase(ai, reader)
+      .generateEdt({
+        projectId, projectName: 'Proyecto', clientName: 'Cliente',
+        driveFolderUrl: 'https://drive.google.com/drive/folders/kora-poc-fallback',
+        instructions: null, answers: [],
+      }, proposal)).rejects.toThrow(/perfiles únicos cotizados/);
+  });
+
 });
