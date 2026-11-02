@@ -93,9 +93,25 @@ describe('Ciclo comercial separado · Kora', () => {
     expect(screen.getByText(/La versión aprobada permanece registrada/)).toBeInTheDocument();
   });
 
-  it('no permite acción comercial con cambios sin guardar', () => {
-    show({ ...version, aiReviewStatus: 'accepted' }, project, true);
-    expect(screen.getByRole('button', { name: 'Marcar como enviada' })).toBeDisabled();
+  it('no permite aprobar directamente un borrador sin envío comercial', () => {
+    show({ ...version, aiReviewStatus: 'accepted' });
+    expect(screen.getByRole('button', { name: 'Marcar como enviada' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Registrar aprobación' })).not.toBeInTheDocument();
+  });
+
+  it('no permite acciones comerciales con cambios sin guardar', () => {
+    show({ ...version, status: 'sent', aiReviewStatus: 'accepted' }, project, true);
     expect(screen.getByRole('button', { name: 'Registrar aprobación' })).toBeDisabled();
+  });
+
+  it('no permite enviar cuando la EDT ya no concuerda con las HH ajustadas', () => {
+    show({ ...version, aiReviewStatus: 'accepted',
+      draft: { ...version.draft,
+        aiPoc: { ...version.draft.aiPoc, edt: { modules: [] } },
+        analysisProjectionStatus: 'modified',
+      },
+    });
+    expect(screen.getByRole('button', { name: 'Marcar como enviada' })).toBeDisabled();
+    expect(screen.getByText(/Concilia la EDT antes de registrar un envío/)).toBeInTheDocument();
   });
 });
