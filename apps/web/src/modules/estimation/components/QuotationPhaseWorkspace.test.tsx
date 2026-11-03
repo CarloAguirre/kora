@@ -162,6 +162,7 @@ describe('Cotización HTML v5 · fases y tareas', () => {
 
   it('muestra añadir tarea, Excel y plantilla dentro de cada fase EDT', () => {
     renderEditor(mappedDraft);
+    screen.getAllByText('Tareas').forEach((title) => title.closest('details')?.setAttribute('open', ''));
     expect(screen.getAllByRole('button', { name: '+ Agregar tarea' })).toHaveLength(2);
     expect(screen.getAllByText('Importar Excel')).toHaveLength(2);
     expect(screen.getAllByRole('button', { name: 'Ver plantilla' })).toHaveLength(2);
@@ -198,6 +199,7 @@ describe('Cotización HTML v5 · fases y tareas', () => {
     expect(phases).toHaveLength(3);
     expect(phases[2]?.teamHours).toEqual([{ teamId: qa, hours: 12 }]);
     renderEditor(composed);
+    screen.getAllByText('Tareas').forEach((title) => title.closest('details')?.setAttribute('open', ''));
     expect(screen.getByText('Fase 4')).toBeInTheDocument();
     expect(screen.getByDisplayValue('Control de entregas')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Quitar tarea ' + extraTask.wbs }));
