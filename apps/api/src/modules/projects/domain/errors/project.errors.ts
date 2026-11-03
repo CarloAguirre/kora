@@ -270,15 +270,12 @@ export class CannotReassignProjectLeaderError extends ForbiddenError {
   }
 }
 
-/**
- * Desde el Hito 0 corren las horas vendidas: quedan fijas aunque el proyecto después se detenga o
- * finalice. Ver `UpdateProjectUseCase`.
- */
-export class SoldHoursLockedAfterHito0Error extends ConflictError {
+/** Corregir HH vendidas después de Hito 0 requiere dejar evidencia del motivo en bitácora. */
+export class SoldHoursChangeReasonRequiredError extends ValidationError {
   constructor() {
     super(
-      'Las HH vendidas no se pueden modificar desde que el proyecto se activó (Hito 0).',
-      'PROJECT_SOLD_HOURS_LOCKED',
+      'Indica el motivo del ajuste de HH vendidas para este proyecto, que ya pasó por Hito 0.',
+      'PROJECT_SOLD_HOURS_CHANGE_REASON_REQUIRED',
     );
   }
 }
