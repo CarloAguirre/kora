@@ -28,29 +28,36 @@ const hours = (value: number) => value / 100;
  *
  * No usa colaboradores, hh/semana ni dedicación como multiplicadores:
  * esas cifras no son la fuente de HH de una propuesta Gemini.
+ * También admite cotizaciones manuales en modo fases, que ya tienen semanas.
  * Una EDT v1 sin calendario explícito no produce una planificación inventada.
  */
 export function quotationTeamWeeklyPlan(
   draft: QuotationDraftData,
 ): QuotationTeamWeeklyPlan | null {
   const edt = draft.aiPoc?.edt;
-  if (!edt) return null;
+  if (!edt && (draft.mode !== 'phases' || !draft.phases.length)) return null;
   const overrides = new Map((draft.edtStageSettings ?? []).map((setting) =>
     [setting.stageCode, setting]));
-  const isV2 = edt.schemaVersion === 'kora.quotation.reference-edt.v2';
-  const stages = isV2
-    ? (edt.stages ?? []).map((stage) => ({
-        code: stage.code,
-        startWeek: overrides.get(stage.code)?.startWeek ?? stage.startWeek,
-        durationWeeks: overrides.get(stage.code)?.durationWeeks ?? stage.durationWeeks,
-      }))
-    : edt.modules.map((module) => {
-        const code = 'module:' + module.name;
-        const explicit = overrides.get(code);
-        return explicit ? {
-          code, startWeek: explicit.startWeek, durationWeeks: explicit.durationWeeks,
-        } : null;
-      });
+  const isV2 = edt?.schemaVersion === 'kora.quotation.reference-edt.v2';
+  const stages = edt
+    ? isV2
+      ? (edt.stages ?? []).map((stage) => ({
+          code: stage.code,
+          startWeek: overrides.get(stage.code)?.startWeek ?? stage.startWeek,
+          durationWeeks: overrides.get(stage.code)?.durationWeeks ?? stage.durationWeeks,
+        }))
+      : edt.modules.map((module) => {
+          const code = 'module:' + module.name;
+          const explicit = overrides.get(code);
+          return explicit ? {
+            code, startWeek: explicit.startWeek, durationWeeks: explicit.durationWeeks,
+          } : null;
+        })
+    : draft.phases.map((phase, index) => ({
+        code: 'phase:' + index,
+        startWeek: phase.startWeek,
+        durationWeeks: phase.durationWeeks,
+      }));
   // La EDT v1 no registra semanas: solo se muestran cuando TODOS sus
   // módulos tienen una planificación comercial explícita.
   if (!stages.length || stages.some((stage) => !stage)) return null;
@@ -60,10 +67,19 @@ export function quotationTeamWeeklyPlan(
   const lastWeek = Math.max(...scheduled.map((stage) =>
     stage.startWeek + stage.durationWeeks - 1));
 
-  const assignments = quotationEdtAssignments(draft);
+  const assignments = edt
+    ? quotationEdtAssignments(draft).map((row) => ({
+        teamKey: row.teamKey,
+        stageCode: isV2 ? row.stageCode : 'module:' + row.module,
+        hours: row.hours,
+      }))
+    : draft.phases.flatMap((phase, index) =>
+        phase.teamHours.map((row) => ({
+          teamKey: row.teamId, stageCode: 'phase:' + index, hours: row.hours,
+        })));
   const byTeamStage = new Map<string, Map<string, number>>();
   for (const row of assignments) {
-    const stageCode = isV2 ? row.stageCode : 'module:' + row.module;
+    const stageCode = row.stageCode;
     if (!stageCode || !stageByCode.has(stageCode)) return null;
     let stagesForTeam = byTeamStage.get(row.teamKey);
     if (!stagesForTeam) {
