@@ -2,7 +2,7 @@ import { BadRequestException, ConflictException, ForbiddenException, Inject, Inj
 import { buildReconciliationReview, isQuotationDraftEligibleProject } from '@kora/contracts';
 import { isDeepStrictEqual } from 'node:util';
 import type {
-  QuotationRevisionActionInput, ApproveClientQuotationInput, TransferApprovedQuotationInput, QuotationTransferResult, ApplyQuotationPlanningInput, AppliedQuotationPlanning, CreateQuotationVersionInput, EstimationPocProposal, EstimationQuestion, QuotationReferenceEdt, SubmitEstimationAnswerInput, Permission, ProjectQuotation, QuotationVersion, UpdateQuotationDraftInput, QuotationTransferPreview, QuotationCommercialPreflight, QuotationCommercialDossier, QuotationOperationalSnapshot, QuotationTeamCatalogEntry, QuotationReconciliationReview, SavedQuotationReconciliationReview, AssessQuotationReconciliationInput, SavedQuotationReviewAssessment,
+  QuotationRevisionActionInput, ApproveClientQuotationInput, TransferApprovedQuotationInput, QuotationTransferResult, ApplyQuotationPlanningInput, AppliedQuotationPlanning, CreateQuotationVersionInput, EstimationPocProposal, EstimationQuestion, QuotationReferenceEdt, SubmitEstimationAnswerInput, Permission, ProjectQuotation, QuotationVersion, UpdateQuotationDraftInput, QuotationTransferPreview, QuotationCommercialPreflight, QuotationCommercialDossier, QuotationOperationalSnapshot, QuotationTeamCatalogEntry, QuotationTaskCatalogEntry, QuotationReconciliationReview, SavedQuotationReconciliationReview, AssessQuotationReconciliationInput, SavedQuotationReviewAssessment,
 } from '@kora/contracts';
 import { buildQuotationTransferPreview } from '../../domain/quotation-transfer-preview';
 import { buildQuotationCommercialPreflight } from '../../domain/quotation-commercial-preflight';
@@ -252,6 +252,12 @@ export class ManageQuotationDraftsUseCase {
 
   async authorizeAiPoc(projectId: string, actor: QuotationActor): Promise<void> {
     await this.authorize(projectId, actor, true);
+  }
+
+  /** Fuente BD para desplegables de cotización y plantilla Excel. */
+  async listActiveTaskTypes(projectId: string, actor: QuotationActor): Promise<QuotationTaskCatalogEntry[]> {
+    await this.authorize(projectId, actor, false);
+    return this.repository.listActiveQuotationTaskTypes();
   }
 
   /** Consultar el catálogo solo DESPUÉS de autorizar el proyecto. */
