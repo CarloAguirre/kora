@@ -28,6 +28,18 @@ export function useGenerateAiDemoQuotationVersion(projectId: string) {
   });
 }
 
+export function useDeleteQuotationVersion(projectId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ versionId, revision }: { versionId: string; revision: number }) =>
+      quotationApi.deleteVersion(projectId, versionId, revision),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: quotationKeys.project(projectId) });
+      void client.invalidateQueries({ queryKey: ['projects'] });
+    },
+  });
+}
+
 export function useSaveQuotationDraft(projectId: string) {
   const client = useQueryClient();
   return useMutation({
