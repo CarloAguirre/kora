@@ -1,4 +1,4 @@
-import type { QuotationVersion } from '@kora/contracts';
+import { effectiveQuotationEdt, type QuotationVersion } from '@kora/contracts';
 
 /** Requisitos visibles del mismo flujo que valida el backend al aceptar IA.
  * No se puede aceptar una propuesta con HH sin guardar ni perfiles sin equipo. */
@@ -23,6 +23,16 @@ export function quotationAiAcceptanceBlockReason(
   if (dirty) requirements.push('guarda los cambios del borrador');
   if (!aiPoc.proposal.roles.length || missing.length) {
     requirements.push('asigna todos los perfiles de Gemini a equipos de Kora');
+  }
+  if (Object.keys(aiPoc.roleTeamIds).length !== aiPoc.proposal.roles.length &&
+      missing.length === 0) {
+    requirements.push('corrige el mapeo de perfiles IA sobrantes');
+  }
+  if (!dirty && missing.length === 0 &&
+      version.draft.analysisProjectionStatus !== 'modified' &&
+      Math.abs((effectiveQuotationEdt(version.draft)?.totalHours ?? 0) -
+        version.totalHours) > 0.011) {
+    requirements.push('concilia las HH comerciales con la EDT guardada');
   }
   return requirements.length ? 'Para aceptar: ' + requirements.join(' y ') + '.' : null;
 }
