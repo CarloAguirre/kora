@@ -18,6 +18,7 @@ export function toPaymentMilestoneSchedule(
     sortOrder: item.sortOrder ?? fallbackSortOrder,
     triggerType: item.triggerType,
     triggerPhase: item.triggerType === 'phase' ? (item.triggerPhase ?? null) : null,
+    triggerModuleId: item.triggerType === 'phase' ? (item.triggerModuleId ?? null) : null,
     triggerDate: item.triggerType === 'date' && item.triggerDate ? new Date(item.triggerDate) : null,
   };
 }
@@ -30,6 +31,7 @@ export function paymentScheduleChanged(current: ProjectPaymentMilestoneRecord, n
     current.amount !== next.amount ||
     current.triggerType !== next.triggerType ||
     current.triggerPhase !== next.triggerPhase ||
+    current.triggerModuleId !== next.triggerModuleId ||
     !sameDay(current.triggerDate, next.triggerDate)
   );
 }
