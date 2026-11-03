@@ -23,6 +23,7 @@ import { QuotationCommercialLifecycleCard } from '../components/QuotationCommerc
 import { QuotationCommercialSummary } from '../components/QuotationCommercialSummary';
 import { QuotationPhaseWorkspace } from '../components/QuotationPhaseWorkspace';
 import { QuotationTeamsWorkspace } from '../components/QuotationTeamsWorkspace';
+import { quotationAiAcceptanceBlockReason } from '../components/quotation-ai-acceptance';
 import { QuotationCommercialSections } from '../components/QuotationCommercialSections';
 import { NewProjectQuotationModal } from '../components/NewProjectQuotationModal';
 import styles from './QuotationWorkspacePage.module.css';
@@ -220,10 +221,15 @@ export function QuotationWorkspacePage() {
   const phaseRows = form?.draft.phases ?? [];
   const effectiveEdt = form?.draft.aiPoc?.edt ? effectiveQuotationEdt(form.draft) : null;
   const aiSnapshot = selected?.draft.aiPoc;
-  const aiRolesMapped = Boolean(aiSnapshot && aiSnapshot.proposal.roles.every((role) =>
-    Boolean(aiSnapshot.roleTeamIds[role.role]) &&
-    teamRows.some((team) => team.teamId === aiSnapshot.roleTeamIds[role.role]),
-  ));
+  const aiRolesMapped = Boolean(aiSnapshot && aiSnapshot.proposal.roles.length > 0 &&
+    aiSnapshot.proposal.roles.every((role) =>
+      Boolean(aiSnapshot.roleTeamIds[role.role]) &&
+      selected?.draft.teams.some((team) =>
+        team.teamId === aiSnapshot.roleTeamIds[role.role]),
+    ));
+  const aiAcceptBlockReason = selected ? quotationAiAcceptanceBlockReason(selected, {
+    editable, dirty, isLatest: selected.id === versions.at(-1)?.id,
+  }) : null;
   const editTeamById = (teamId: string, patch: Partial<QuotationDraftData['teams'][number]>) => {
     if (!editable || !form) return;
     const draft = {
@@ -332,9 +338,7 @@ export function QuotationWorkspacePage() {
           })) });
   };
   const acceptAiProposal = async () => {
-    if (!selected || !editable || dirty || selected.status !== 'draft' ||
-      selected.aiReviewStatus !== 'pending' || !aiRolesMapped ||
-      selected.id !== versions.at(-1)?.id || lifecycle.acceptAi.isPending) return;
+    if (!selected || aiAcceptBlockReason || lifecycle.acceptAi.isPending) return;
     if (!window.confirm('Aceptar la propuesta de Gemini no aprueba al cliente ni traspasa el proyecto. ¿Confirmas?')) return;
     setError('');
     setNotice('');
@@ -427,16 +431,13 @@ export function QuotationWorkspacePage() {
                         <p>{selected.draft.aiPoc
                           ? money(selected.draft.aiPoc.proposal.totalHours) + ' HH propuestas desde KDM de demostración y ' + selected.draft.aiPoc.answers.length + ' respuestas. '
                           : 'Propuesta IA pendiente. '}
-                          Revisa perfiles y HH antes de aceptar. La IA no define el valor HH comercial.</p>
+                          {aiAcceptBlockReason ?? 'Revisa perfiles y HH antes de aceptar.'} La IA no define el valor HH comercial.</p>
                       </div>
                       {selected.draft.aiPoc && (
                         <Button size="sm" className={styles.aiAccept}
-                          disabled={!editable || dirty || !aiRolesMapped ||
-                            selected.id !== versions.at(-1)?.id || lifecycle.acceptAi.isPending}
+                          disabled={Boolean(aiAcceptBlockReason) || lifecycle.acceptAi.isPending}
                           loading={lifecycle.acceptAi.isPending}
-                          title={!aiRolesMapped
-                            ? 'Asigna todos los perfiles IA a equipos activos y guarda la versión.'
-                            : dirty ? 'Guarda los cambios antes de aceptar la propuesta.' : undefined}
+                          title={aiAcceptBlockReason ?? undefined}
                           onClick={() => void acceptAiProposal()}>
                           Aceptar propuesta
                         </Button>
