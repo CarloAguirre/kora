@@ -28,7 +28,6 @@ export function QuotationCommercialLifecycleCard({
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const transferred = quotation?.transferredVersionId === version.id;
-  const isLatest = quotation?.versions.at(-1)?.id === version.id;
   const busy = actions.acceptAi.isPending || actions.markSent.isPending ||
     actions.approveClient.isPending || actions.transferApproved.isPending;
   const mayAct = canOperate && !hasUnsavedChanges && !busy;
@@ -40,7 +39,7 @@ export function QuotationCommercialLifecycleCard({
     Boolean(version.draft.aiPoc?.edt) &&
     version.draft.analysisProjectionStatus === 'modified';
   const blockers = quotationCommercialBlockers(version, {
-    dirty: hasUnsavedChanges, latest: isLatest, canOperate,
+    dirty: hasUnsavedChanges, canOperate,
     demoProduction: import.meta.env.PROD,
   });
   const readyForClient = blockers.length === 0;
@@ -142,7 +141,7 @@ export function QuotationCommercialLifecycleCard({
         <div className={styles.action}>
           <div><strong>1. Revisión del agente IA</strong>
             <p>Confirma perfiles, HH y cualquier ajuste manual; guarda antes de aceptar.</p></div>
-          <Button disabled={!mayAct || !isLatest ||
+          <Button disabled={!mayAct ||
             version.draft.teams.length === 0}
             onClick={() => void acceptAi()}>Aceptar propuesta IA</Button>
         </div>
@@ -153,7 +152,7 @@ export function QuotationCommercialLifecycleCard({
         <div className={styles.action}>
           <div><strong>2. Envío comercial</strong>
             <p>Registrar un envío externo y bloquear esta versión.</p></div>
-          <Button variant="outline" disabled={!mayAct || !readyForClient || !isLatest}
+          <Button variant="outline" disabled={!mayAct || !readyForClient}
             onClick={() => void markSent()}>Marcar como enviada</Button>
         </div>
       )}
@@ -177,7 +176,7 @@ export function QuotationCommercialLifecycleCard({
           {transferTiming === 'now' && project.status !== 'draft' &&
             <p className={styles.warning}>Este proyecto no está en No iniciado.
               Por seguridad, la aprobación quedará pendiente de conciliación y traspaso.</p>}
-          <Button disabled={!mayAct || !readyForClient || !isLatest}
+          <Button disabled={!mayAct || !readyForClient}
             onClick={() => void approveClient()}>Registrar aprobación</Button>
         </div>
       )}
@@ -186,7 +185,7 @@ export function QuotationCommercialLifecycleCard({
           <div><strong>4. Traspaso pendiente</strong>
             <p>La versión aprobada permanece registrada. El proyecto todavía no ha recibido
               esta planificación.</p></div>
-          <Button disabled={!mayAct || project.status !== 'draft' || !isLatest}
+          <Button disabled={!mayAct || project.status !== 'draft'}
             onClick={() => void transfer()}>Traspasar ahora</Button>
         </div>}
       {transferred && <p className={styles.success}>
@@ -213,17 +212,17 @@ export function QuotationCommercialLifecycleCard({
       <div className={styles.v5Actions}>
         {version.status === 'draft' &&
           <Button variant="outline" className={styles.v5Send}
-            disabled={!mayAct || !readyForClient || !isLatest}
+            disabled={!mayAct || !readyForClient}
             title={blockers.length ? blockers.join(' ') : undefined}
             onClick={() => void markSent()}>Marcar como enviada al cliente</Button>}
         {(version.status === 'sent' || version.status === 'draft') &&
           <Button className={styles.v5Approve}
-            disabled={!mayAct || !readyForClient || !isLatest}
+            disabled={!mayAct || !readyForClient}
             title={blockers.length ? blockers.join(' ') : undefined}
             onClick={() => void approveClient()}>Registrar aprobación del cliente</Button>}
         {version.status === 'approved' && !transferred &&
           <Button className={styles.v5Approve}
-            disabled={!mayAct || project.status !== 'draft' || !isLatest}
+            disabled={!mayAct || project.status !== 'draft'}
             onClick={() => void transfer()}>Traspasar al proyecto</Button>}
         {blockers.length > 0 && (version.status === 'draft' || version.status === 'sent') && (
           <div className={styles.checklist} role="status" aria-label="Requisitos comerciales pendientes">
