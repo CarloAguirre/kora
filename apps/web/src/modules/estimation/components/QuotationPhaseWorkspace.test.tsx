@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { quotationReferenceEdtSchema, type QuotationDraftData } from '@kora/contracts';
-import { QuotationPhaseWorkspace, referenceTasksForPhase } from './QuotationPhaseWorkspace';
+import { QuotationPhaseWorkspace, referenceTasksForPhase, referencePhasesFromEdt } from './QuotationPhaseWorkspace';
 
 const devId = '0777e456-fd76-445e-83f1-afc25061c103';
 const qaId = '0777e456-fd76-445e-83f1-afc25061c104';
@@ -69,6 +69,55 @@ describe('Cotización v5 · fases y módulos', () => {
     expect(rows.reduce((sum, row) => sum + row.hours, 0)).toBe(15);
     expect(rows[0]?.wbs).toBe('T01.01');
     expect(rows[0]?.references).toEqual(['R09']);
+  });
+
+  it('muestra los tramos, tareas y roadmap de Gemini antes de aplicar equipos a la cotización', () => {
+    const reference = referencePhasesFromEdt(edt, {}, teamNames);
+    expect(reference).toHaveLength(2);
+    expect(reference[0]?.name).toBe('T01 · Portal de cliente');
+    expect(reference[0]?.teamHours).toEqual([
+      { teamId: 'profile:Fullstack', hours: 12 },
+      { teamId: 'profile:Tester', hours: 3 },
+    ]);
+    expect(reference.flatMap((phase) => phase.teamHours)
+      .reduce((sum, row) => sum + row.hours, 0)).toBe(edt.totalHours);
+    render(<QuotationPhaseWorkspace
+      phases={[]} teams={[]} edt={edt}
+      commercialMode="team" teamNames={teamNames} roleTeamIds={{}}
+      editable onEditPhase={callbacks.onEditPhase}
+      onAddPhase={callbacks.onAddPhase} onRemovePhase={callbacks.onRemovePhase} />);
+    expect(screen.getByText(/Planificación propuesta por Gemini/)).toHaveTextContent('23 HH');
+    expect(screen.getByText('Fase 2')).toBeInTheDocument();
+    expect(screen.getByText('Fase 3')).toBeInTheDocument();
+    expect(screen.getByText('Roadmap preliminar')).toBeInTheDocument();
+    expect(screen.getByLabelText('T01 · Portal de cliente, semanas 1 a 2')).toBeInTheDocument();
+    expect(screen.getAllByText('Integración SAP')).toHaveLength(2);
+    expect(screen.getByDisplayValue('T01 · Portal de cliente')).toBeDisabled();
+    expect(screen.getByLabelText('HH de Fullstack para fase 2')).toBeDisabled();
+    expect(screen.getByRole('link', { name: /Asignar perfiles a equipos/ }))
+      .toHaveAttribute('href', '#quotation-ai-role-review');
+    expect(screen.queryByText('Aún no hay fases configuradas para esta versión.'))
+      .not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Agregar fase \/ módulo/ }))
+      .not.toBeInTheDocument();
+    expect(callbacks.onEditPhase).not.toHaveBeenCalled();
+    expect(callbacks.onAddPhase).not.toHaveBeenCalled();
+  });
+
+  it('representa módulos de EDT v1 sin tramos y conserva sus tareas', () => {
+    const legacy = quotationReferenceEdtSchema.parse({
+      schemaVersion: 'kora.quotation.reference-edt.v1', provider: 'gemini',
+      source: 'kdm_demo', totalHours: 12,
+      modules: [{ name: 'Módulo autenticación', totalHours: 12,
+        tasks: [{ wbs: '1.1', name: 'Inicio de sesión',
+          description: 'Formulario', role: 'Fullstack', hours: 12 }] }],
+    });
+    const reference = referencePhasesFromEdt(legacy, {}, teamNames);
+    expect(reference).toHaveLength(1);
+    expect(reference[0]?.teamHours).toEqual([{ teamId: 'profile:Fullstack', hours: 12 }]);
+    const tasks = referenceTasksForPhase(reference[0]!, legacy, {}, teamNames);
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0]?.name).toBe('Inicio de sesión');
   });
 
   it('representa las tarjetas, tareas, roadmap y conserva las HH comerciales editables', () => {
