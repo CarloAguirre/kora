@@ -18,7 +18,7 @@ import {
   ProjectNotFoundError,
   ProjectTeamMaxMembersBelowAssignedError,
   ReferencedClientNotFoundError,
-  SoldHoursLockedAfterHito0Error,
+  SoldHoursChangeReasonRequiredError,
 } from '../../domain/errors/project.errors';
 import { PROJECT_REPOSITORY, type ProjectRepository } from '../../domain/repositories/project.repository';
 import { PROJECT_TEAM_REPOSITORY, type ProjectTeamRepository } from '../../domain/repositories/project-team.repository';
@@ -87,9 +87,10 @@ export class UpdateProjectUseCase implements UseCase<UpdateProjectCommand, void,
       return err(new CannotChangeProjectInternalFlagError());
     }
 
-    /** Mismo criterio no-op que `leaderUserId`: reenviar el mismo valor sin tocarlo se deja pasar. */
+    // Hito 0 ya no bloquea el ajuste de HH vendidas. Como cambia los indicadores
+    // de consumo/desviación, exigir un motivo solo cuando hay un cambio real.
     if (project.hito0At && data.soldHours !== undefined && data.soldHours !== project.toSnapshot().soldHours) {
-      return err(new SoldHoursLockedAfterHito0Error());
+      if (!data.soldHoursChangeReason?.trim()) return err(new SoldHoursChangeReasonRequiredError());
     }
 
     if (data.teams) {
@@ -212,7 +213,9 @@ export class UpdateProjectUseCase implements UseCase<UpdateProjectCommand, void,
     if (before.soldHours !== after.soldHours) {
       changeEntries.push({
         projectId: project.id,
-        message: `HH vendidas actualizadas de ${before.soldHours} a ${after.soldHours}.`,
+        message: project.hito0At
+          ? `HH vendidas actualizadas de ${before.soldHours} a ${after.soldHours} después del Hito 0. Motivo: ${data.soldHoursChangeReason!.trim()}`
+          : `HH vendidas actualizadas de ${before.soldHours} a ${after.soldHours}.`,
       });
     }
 
