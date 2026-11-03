@@ -248,7 +248,7 @@ export function QuotationWorkspacePage() {
         const initial = task?.roleEffort?.find((item) => item.role === role)?.hours ??
           (task?.role === role ? task.hours : null);
         if (initial === null || !Number.isFinite(hours) || hours <= 0) return current;
-        const edits = current.draft.edtHourAdjustments.filter((entry) =>
+        const edits = (current.draft.edtHourAdjustments ?? []).filter((entry) =>
           entry.wbs !== wbs || entry.role !== role);
         if (Math.abs(initial - hours) > 0.0001) edits.push({ wbs, role, hours });
         const nextDraft: QuotationDraftData = {
