@@ -85,3 +85,20 @@
  .plannedColumns{min-width:735px}
  .weeklyTable{min-width:700px}
 }
+
+.pendingProfiles{display:grid;gap:10px;padding:13px;border:1px solid #e5def2;
+ background:#faf8fe;border-radius:9px}
+.pendingProfiles h3{font-size:12.5px;font-weight:750;color:#4b2b77;margin:0 0 4px}
+.pendingProfiles p{margin:0;font-size:11px;line-height:1.5;color:#6d6280}
+.pendingList{display:grid;gap:7px}
+.pendingRole{display:grid;grid-template-columns:minmax(0,1fr) 110px minmax(150px,.9fr);
+ align-items:center;gap:12px;padding:8px 10px;background:white;border:1px solid #eee9f5;
+ border-radius:8px}
+.pendingRole strong{font-size:12px;color:#34324b}
+.pendingRole>span{font-size:11.5px;color:#4d4761;font-variant-numeric:tabular-nums}
+.pendingRole label{display:flex;align-items:center;justify-content:flex-end;gap:8px;
+ font-size:10.5px;color:#7a7485}
+.pendingRole input{width:54px;padding:6px;border:1px solid #e0e4ec;border-radius:6px;
+ font:inherit;color:#17233b}
+@media(max-width:650px){.pendingRole{grid-template-columns:1fr 1fr}
+ .pendingRole label{grid-column:1/-1;justify-content:flex-start}}
