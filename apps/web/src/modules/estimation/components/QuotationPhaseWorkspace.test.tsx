@@ -60,7 +60,7 @@ const callbacks = {
   onEditTaskHours: vi.fn(), onEditTaskFixed: vi.fn(), onEditTaskTeam: vi.fn(),
   onEditGroupHours: vi.fn(), onEditStage: vi.fn(), onOpenRoleMapping: vi.fn(),
   onAddTask: vi.fn(), onDeleteTask: vi.fn(),
-  onEditTaskName: vi.fn(), onEditTaskType: vi.fn(),
+  onEditTaskName: vi.fn(),
   onImportTaskExcel: vi.fn().mockResolvedValue(undefined),
   onRemoveCommercialPhase: vi.fn(),
 };
@@ -69,7 +69,6 @@ function renderEditor(custom = draft) {
     phases={custom.phases} teams={custom.teams} edt={edt}
     draft={custom} teamNames={teams} roleTeamIds={custom.aiPoc?.roleTeamIds}
     activeTeams={[{ id: dev, name: 'Desarrollo' }, { id: qa, name: 'QA' }]}
-    taskTypes={['Sin tipo', 'Integración con API', 'Pruebas funcionales'].map((name, i) => ({ id: String(i), name }))}
     editable commercialMode={custom.mode}
     {...callbacks}/>);
 }
@@ -92,7 +91,6 @@ describe('Cotización HTML v5 · fases y tareas', () => {
     expect(screen.getAllByText('Tarea')).toHaveLength(2);
     expect(screen.getAllByText('Equipo')).toHaveLength(2);
     expect(screen.getAllByText('Fija')).toHaveLength(2);
-    expect(screen.getAllByText('Tipo (catálogo)')).toHaveLength(2);
     expect(screen.queryByText('Perfil requerido: Fullstack')).not.toBeInTheDocument();
     expect(screen.queryByText('Descripción y referencias')).not.toBeInTheDocument();
     expect(screen.getAllByRole('option', { name: 'Desarrollo' }).length).toBeGreaterThan(0);
@@ -174,15 +172,12 @@ describe('Cotización HTML v5 · fases y tareas', () => {
     expect(callbacks.onAddPhase).toHaveBeenCalledOnce();
   });
 
-  it('permite cambiar el nombre y tipo de tarea, sin mostrar metadatos Gemini', () => {
+  it('permite cambiar el nombre de tarea, sin mostrar metadatos Gemini', () => {
     renderEditor(mappedDraft);
     const name = screen.getByLabelText('Tarea T01.01 · Fullstack');
     fireEvent.change(name, { target: { value: 'Integración revisada' } });
     fireEvent.blur(name);
     expect(callbacks.onEditTaskName).toHaveBeenCalledWith('T01.01', 'Integración revisada');
-    fireEvent.change(screen.getByLabelText('Tipo de T01.01 · Fullstack'),
-      { target: { value: 'Integración con API' } });
-    expect(callbacks.onEditTaskType).toHaveBeenCalledWith('T01.01', 'Integración con API');
     expect(screen.queryByText(/Propuesta del agente/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Descripción y referencias/)).not.toBeInTheDocument();
   });
@@ -192,7 +187,7 @@ describe('Cotización HTML v5 · fases y tareas', () => {
       name: 'Control', startWeek: 5, durationWeeks: 2 };
     const extraTask = { wbs: 'KT-0777e456-fd76-445e-83f1-afc25061c105',
       stageCode: extraPhase.code, name: 'Control de entregas',
-      teamId: qa, hours: 12, fixed: false, classification: 'Pruebas funcionales' };
+      teamId: qa, hours: 12, fixed: false };
     const composed = quotationDraftDataSchema.parse({
       ...mappedDraft, edtCommercialStages: [extraPhase], edtCommercialTasks: [extraTask],
     });
