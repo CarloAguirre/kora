@@ -46,6 +46,10 @@ const edtDraft = quotationDraftDataSchema.parse({
     },
   },
 });
+const mappedEdtDraft = quotationDraftDataSchema.parse({
+  ...edtDraft, mode: 'phases', teams: [team(dev)],
+  aiPoc: { ...edtDraft.aiPoc!, roleTeamIds: { Desarrollo: dev } },
+});
 const renderTeams = (draft: typeof manual, view: 'team' | 'phases' = 'team') =>
   render(<QuotationTeamsWorkspace
     draft={draft} editable teamNames={names} activeTeams={activeTeams}
@@ -64,7 +68,7 @@ describe('Switch Equipos · HTML v5', () => {
   });
 
   it('muestra HH derivadas del EDT, editables globalmente, sin capacidad artificial', () => {
-    renderTeams(edtDraft);
+    renderTeams(mappedEdtDraft);
     expect(screen.getByLabelText('Horas totales de Desarrollo')).toHaveValue(40);
     expect(screen.queryByText('Unidad')).not.toBeInTheDocument();
     expect(screen.queryByText('Duración')).not.toBeInTheDocument();
@@ -83,7 +87,22 @@ describe('Switch Equipos · HTML v5', () => {
     fireEvent.change(groupHours, { target: { value: '38' } });
     expect(handlers.onEditGroupHours).not.toHaveBeenCalled();
     fireEvent.blur(groupHours);
-    expect(handlers.onEditGroupHours).toHaveBeenCalledWith('profile:Desarrollo', 38);
+    expect(handlers.onEditGroupHours).toHaveBeenCalledWith(dev, 38);
+    fireEvent.change(screen.getByLabelText('Colaboradores de Desarrollo'),
+      { target: { value: '3' } });
+    expect(handlers.onEditMappedCollaborators).toHaveBeenCalledWith(dev, 3);
+  });
+
+  it('separa perfiles pendientes de equipos reales, sin matriz semanal ficticia', () => {
+    renderTeams(edtDraft);
+    expect(screen.getByRole('region', { name: 'Perfiles IA pendientes de asignación' }))
+      .toBeInTheDocument();
+    expect(screen.getByText('Perfiles IA sin equipo Kora')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Horas totales de Desarrollo')).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Distribución semanal orientativa' }))
+      .not.toBeInTheDocument();
+    expect(screen.getByText(/La distribución por equipos se habilitará/))
+      .toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Colaboradores de Desarrollo'),
       { target: { value: '3' } });
     expect(handlers.onEditRoleCollaborators).toHaveBeenCalledWith('Desarrollo', 3);
@@ -91,7 +110,7 @@ describe('Switch Equipos · HTML v5', () => {
 
   it('pagina ocho semanas sin inventar carga ni perder las semanas restantes', () => {
     const extended = quotationDraftDataSchema.parse({
-      ...edtDraft,
+      ...mappedEdtDraft,
       edtStageSettings: [{
         stageCode: 'S1', name: 'Portal', startWeek: 1, durationWeeks: 10,
       }],
