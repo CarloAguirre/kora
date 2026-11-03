@@ -71,6 +71,13 @@ export function quotationEdtAssignments(draft: Draft): QuotationEdtAssignment[] 
     }
     commercialWbs.add(item.wbs);
   }
+  const typed = new Set<string>();
+  for (const edit of draft.edtTaskTypes ?? []) {
+    if (typed.has(edit.wbs) || !sourceWbs.has(edit.wbs)) {
+      throw new Error('Tipo comercial con WBS inexistente o duplicado.');
+    }
+    typed.add(edit.wbs);
+  }
   const renamed = new Set<string>();
   for (const edit of draft.edtTaskNames ?? []) {
     if (renamed.has(edit.wbs) || !sourceWbs.has(edit.wbs)) {
@@ -118,7 +125,9 @@ export function quotationEdtAssignments(draft: Draft): QuotationEdtAssignment[] 
         name: draft.edtTaskNames?.find((item) => item.wbs === task.wbs)?.name ?? task.name,
         description: task.description, references: task.referenceIds ?? [],
         hours: effort.hours, originalHours: sourceEffort.get(id) ?? effort.hours,
-        fixed: item?.fixed ?? false, classification: task.classification,
+        fixed: item?.fixed ?? false,
+        classification: draft.edtTaskTypes?.find((edit) =>
+          edit.wbs === task.wbs)?.classification ?? task.classification,
         teamId: item?.teamId ?? draft.aiPoc?.roleTeamIds[effort.role] ?? null,
         teamKey: quotationAssignmentTeamKey(draft, task.wbs, effort.role),
       });
@@ -366,6 +375,19 @@ export function withoutQuotationCommercialTask(draft: Draft, wbs: string): Draft
   }
   const next = { ...draft, edtCommercialTasks: draft.edtCommercialTasks.filter((task) =>
     task.wbs !== wbs) };
+  quotationEdtAssignments(next);
+  return next;
+}
+export function withQuotationTaskCatalogType(
+  draft: Draft, wbs: string, classification: string,
+): Draft {
+  if (!classification.trim() || classification.length > 40) {
+    throw new Error('Tipo de tarea inválido.');
+  }
+  if (draft.edtCommercialTasks?.some((task) => task.wbs === wbs))
+    return patchQuotationCommercialTask(draft, wbs, { classification });
+  const edits = (draft.edtTaskTypes ?? []).filter((item) => item.wbs !== wbs);
+  const next = { ...draft, edtTaskTypes: [...edits, { wbs, classification }] };
   quotationEdtAssignments(next);
   return next;
 }
