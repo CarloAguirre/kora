@@ -18,11 +18,12 @@ type ApprovalProps = {
   onCancel: () => void;
   onApprove: () => void;
   pending: boolean;
+  error?: string;
 };
 
 export function QuotationApprovalDialog({
   project, version, previouslyApprovedVersionNumber, timing, onTimingChange,
-  onCancel, onApprove, pending,
+  onCancel, onApprove, pending, error,
 }: ApprovalProps) {
   const canTransferNow = project.status === 'draft';
   return (
@@ -73,6 +74,7 @@ export function QuotationApprovalDialog({
           exige conciliación de la ejecución existente.
         </p>
       )}
+      {error && <p role="alert" className={styles.dialogError}>{error}</p>}
     </Modal>
   );
 }
@@ -83,6 +85,7 @@ type TransferProps = {
   open: boolean;
   afterApproval: boolean;
   pending: boolean;
+  error?: string;
   onClose: () => void;
   onTransfer: () => void;
 };
@@ -90,7 +93,7 @@ type TransferProps = {
 /** Solo una vista previa comercial: el backend sigue validando el traspaso y
  * protegiendo registros operativos existentes antes de aplicar cualquier dato. */
 export function QuotationTransferDialog({
-  project, version, open, afterApproval, pending, onClose, onTransfer,
+  project, version, open, afterApproval, pending, error, onClose, onTransfer,
 }: TransferProps) {
   const teams = version.draft.teams.map((team) => {
     const teamName = project.teams.find((t) => t.teamId === team.teamId)?.teamName ??
@@ -164,6 +167,7 @@ export function QuotationTransferDialog({
           </div>
         ))}
       </div>
+      {error && <p role="alert" className={styles.dialogError}>{error}</p>}
     </Modal>
   );
 }
