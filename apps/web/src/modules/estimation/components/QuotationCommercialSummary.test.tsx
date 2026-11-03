@@ -74,7 +74,9 @@ describe('QuotationCommercialSummary · fidelidad comercial sin alterar el cálc
     expect(screen.getByText('Falta el valor HH del proyecto.')).toBeInTheDocument();
     expect(screen.getByText('40')).toBeInTheDocument();
     expect(screen.getByText('40 hh')).toBeInTheDocument();
-    expect(screen.getAllByText('0 UF')).toHaveLength(2);
+    expect(screen.getAllByText('—')).toHaveLength(2);
+    expect(screen.getByText('Sin equipo Kora · Desarrollo')).toBeInTheDocument();
+    expect(screen.getByText(/1 perfil\(es\) IA aún sin equipo Kora/)).toBeInTheDocument();
     expect(screen.queryByText(/Vista previa/)).not.toBeInTheDocument();
   });
 
