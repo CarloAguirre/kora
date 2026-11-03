@@ -107,6 +107,26 @@ export const quotationDraftDataSchema = z.object({
     role: z.string().trim().min(1).max(120),
     collaborators: z.number().int().min(1).max(100),
   })).max(100).optional(),
+  /** Capas comerciales añadidas por el usuario. Nunca se mezclan con aiPoc.edt. */
+  edtCommercialStages: z.array(z.object({
+    code: z.string().regex(/^KS-[a-f0-9-]{36}$/),
+    name: nonEmptyTrimmed(300, 'El nombre de la fase'),
+    startWeek: z.number().int().min(1).max(520),
+    durationWeeks: z.number().int().min(1).max(520),
+  })).max(100).optional(),
+  edtCommercialTasks: z.array(z.object({
+    wbs: z.string().regex(/^KT-[a-f0-9-]{36}$/),
+    stageCode: z.string().trim().min(1).max(40),
+    name: nonEmptyTrimmed(300, 'El nombre de la tarea'),
+    teamId: uuidSchema,
+    hours: z.number().positive().max(1000000),
+    fixed: z.boolean().default(false),
+    classification: z.string().trim().max(40).default('Sin tipo'),
+  })).max(240).optional(),
+  edtTaskNames: z.array(z.object({
+    wbs: z.string().trim().min(1).max(40),
+    name: nonEmptyTrimmed(300, 'El nombre de la tarea'),
+  })).max(240).optional(),
   /** Fechas relativas y nombre comercial del tramo, sin mutar las etapas Gemini. */
   edtStageSettings: z.array(z.object({
     stageCode: z.string().trim().min(1).max(40),
