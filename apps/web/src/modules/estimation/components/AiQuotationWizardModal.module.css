@@ -238,6 +238,11 @@
 }
 .error { font-size: 12px; color: #b91c1c; font-weight: 600; margin: 10px 0 0; }
 .progress { color: var(--ia-purple) !important; font-weight: 600; }
+.analysisMilestones { list-style: none; margin: 5px 0 8px; padding: 0; display: grid; gap: 12px; font-size: 12px; line-height: 1.35; }
+.milestoneDone { color: var(--ia-purple); }
+.milestoneActive { color: var(--ia-purple); font-weight: 700; }
+.milestonePending { color: #94a3b8; }
+.analysisComplete { color: #22734a !important; font-weight: 600; }
 @media(max-width:680px) {
   .dialog.dialog { max-width: calc(100vw - 20px); }
   .dialog > header { padding: 18px 16px 0; }
