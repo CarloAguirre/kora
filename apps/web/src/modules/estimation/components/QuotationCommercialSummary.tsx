@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { effectiveQuotationEdt, type QuotationDraftData, type QuotationVersion } from '@kora/contracts';
+import { effectiveQuotationEdt, quotationEdtAssignments, type QuotationDraftData, type QuotationVersion } from '@kora/contracts';
 import { Card } from '@/shared/components/ui/Card';
 import { quotationTeamColor } from './quotation-team-colors';
 import styles from './QuotationCommercialSummary.module.css';
@@ -70,19 +70,18 @@ export function QuotationCommercialSummary({
       const name = teamNames.get(row.teamId) ?? 'Equipo no disponible';
       return { ...row, name, color: quotationTeamColor(name) };
     });
-  const roleHours = new Map<string, number>();
+  const referenceGroupHours = new Map<string, number>();
   if (edt) {
-    for (const module of edt.modules) {
-      for (const task of module.tasks) {
-        for (const effort of task.roleEffort ?? [{ role: task.role, hours: task.hours }]) {
-          roleHours.set(effort.role, round((roleHours.get(effort.role) ?? 0) + effort.hours, 2));
-        }
-      }
+    for (const row of quotationEdtAssignments(draft)) {
+      referenceGroupHours.set(row.teamKey, round(
+        (referenceGroupHours.get(row.teamKey) ?? 0) + row.hours, 2));
     }
   }
-  const referenceRows: TeamHours[] = [...roleHours].map(([role, hours]) => ({
-    teamId: 'role:' + role, name: role, hours, color: quotationTeamColor(role),
-  })).filter((row) => row.hours > 0);
+  const referenceRows: TeamHours[] = [...referenceGroupHours].map(([teamKey, hours]) => {
+    const name = teamKey.startsWith('profile:') ? teamKey.slice(8) :
+      teamNames.get(teamKey) ?? 'Equipo';
+    return { teamId: teamKey, name, hours, color: quotationTeamColor(name) };
+  }).filter((row) => row.hours > 0);
   const rows = referenceOnly ? referenceRows : commercialRows;
   const duration = referenceOnly && edt
     ? edt.schemaVersion === 'kora.quotation.reference-edt.v2'
