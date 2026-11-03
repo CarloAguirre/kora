@@ -19,6 +19,8 @@ const project = {
   id: '0777e456-fd76-445e-83f1-afc25061c101',
   name: 'Motor de notificaciones',
   status: 'draft', salesStage: 'quoted',
+  teams: [{ teamId: '0777e456-fd76-445e-83f1-afc25061c103',
+    teamName: 'Desarrollo' }],
 } as unknown as ProjectDetail;
 const version = {
   id: '0777e456-fd76-445e-83f1-afc25061c102',
@@ -26,7 +28,11 @@ const version = {
   status: 'draft', hourlyRate: 1, currency: 'UF',
   totalHours: 40, netAmount: 40, totalAmount: 47.6,
   draft: {
-    teams: [{ teamId: '0777e456-fd76-445e-83f1-afc25061c103' }],
+    mode: 'team',
+    teams: [{ teamId: '0777e456-fd76-445e-83f1-afc25061c103',
+      collaborators: 1, unit: 'week', duration: 1,
+      hoursPerWeek: 40, dedicationPercent: 100 }],
+    phases: [],
     paymentPlan: [
       { name: 'Inicio', percent: 50, trigger: 'approval' },
       { name: 'Cierre', percent: 50, trigger: 'phase', triggerPhase: 'pilot' },
