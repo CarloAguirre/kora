@@ -121,15 +121,10 @@ export const quotationDraftDataSchema = z.object({
     teamId: uuidSchema,
     hours: z.number().positive().max(1000000),
     fixed: z.boolean().default(false),
-    classification: z.string().trim().max(40).default('Sin tipo'),
   })).max(240).optional(),
   edtTaskNames: z.array(z.object({
     wbs: z.string().trim().min(1).max(40),
     name: nonEmptyTrimmed(300, 'El nombre de la tarea'),
-  })).max(240).optional(),
-  edtTaskTypes: z.array(z.object({
-    wbs: z.string().trim().min(1).max(40),
-    classification: z.string().trim().min(1).max(40),
   })).max(240).optional(),
   /** Fechas relativas y nombre comercial del tramo, sin mutar las etapas Gemini. */
   edtStageSettings: z.array(z.object({
