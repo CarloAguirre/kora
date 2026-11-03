@@ -3,7 +3,7 @@ import { quotationEdtAssignments } from '@kora/contracts';
 import { Card } from '@/shared/components/ui/Card';
 import { quotationTeamColor } from './quotation-team-colors';
 import { QuotationGroupHoursInput } from './QuotationGroupHoursInput';
-import { downloadQuotationTaskTemplate, QUOTATION_TASK_TYPES } from '../lib/quotation-task-excel';
+import { downloadQuotationTaskTemplate, type QuotationTaskType } from '../lib/quotation-task-excel';
 import styles from './QuotationPhaseWorkspace.module.css';
 
 type Phase = QuotationDraftData['phases'][number];
@@ -119,7 +119,7 @@ export function referencePhasesFromEdt(
 
 export function QuotationPhaseWorkspace({
   phases, teams, teamNames, edt, roleTeamIds, editable,
-  commercialMode = 'phases', draft, activeTeams = [],
+  commercialMode = 'phases', draft, activeTeams = [], taskTypes = [],
   onEditPhase, onAddPhase, onRemovePhase,
   onEditTaskHours, onEditTaskFixed, onEditTaskTeam, onEditGroupHours,
   onEditStage, onOpenRoleMapping,
@@ -132,6 +132,7 @@ export function QuotationPhaseWorkspace({
   edt?: QuotationReferenceEdt | null;
   draft?: QuotationDraftData;
   activeTeams?: readonly { id: string; name: string }[];
+  taskTypes?: readonly QuotationTaskType[];
   roleTeamIds?: Readonly<Record<string, string>>;
   editable: boolean;
   commercialMode?: QuotationDraftData['mode'];
@@ -300,13 +301,15 @@ export function QuotationPhaseWorkspace({
                             {task.teamId && !activeTeams.some((t) => t.id === task.teamId) &&
                               <option value={task.teamId}>{task.team} (no activo)</option>}
                           </select>
-                          <select className={styles.teamSelect} disabled={!editable}
+                          <select className={styles.teamSelect} disabled={!editable || !taskTypes.length}
                             aria-label={'Tipo de ' + task.wbs + ' · ' + task.role}
-                            value={QUOTATION_TASK_TYPES.includes(task.classification as typeof QUOTATION_TASK_TYPES[number])
-                              ? task.classification : 'Sin tipo'}
+                            value={task.classification ?? ''}
                             onChange={(e) => onEditTaskType?.(task.wbs, e.target.value)}>
-                            {QUOTATION_TASK_TYPES.map((type) =>
-                              <option key={type} value={type}>{type}</option>)}
+                            <option value="" disabled>Seleccionar tipo</option>
+                            {taskTypes.map((type) =>
+                              <option key={type.id} value={type.name}>{type.name}</option>)}
+                            {task.classification && !taskTypes.some((t) => t.name === task.classification) &&
+                              <option value={task.classification}>{task.classification} (histórico)</option>}
                           </select>
                           {editable && onEditTaskHours
                             ? <input className={styles.editableHours} type="number"
@@ -356,7 +359,8 @@ export function QuotationPhaseWorkspace({
                           }}/>
                       </label>
                       <button type="button" className={styles.templateLink}
-                        onClick={() => downloadQuotationTaskTemplate(visibleName, activeTeams)}>
+                        disabled={!activeTeams.length || !taskTypes.length}
+                        onClick={() => downloadQuotationTaskTemplate(visibleName, activeTeams, taskTypes)}>
                         Ver plantilla
                       </button>
                     </div>
