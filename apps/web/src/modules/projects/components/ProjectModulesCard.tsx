@@ -155,6 +155,9 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
     const module = modulesById.get(phase.id);
     if (!module) return null;
     const reference = appliedPlanning.data?.modules.find((item) => item.moduleId === module.id);
+    const relativeBlocks = reference?.relativeTeamBlocks ?? [];
+    const teamName = (id: string) =>
+      teamOptions.find((option) => option.value === id)?.label ?? 'Equipo Kora';
     return (
       <div className={styles.moduleFields}>
         <Select
@@ -171,22 +174,37 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
         {module.progress.actual != null && (
           <Meta label="Avance real · esperado" value={`${module.progress.actual}% · ${module.progress.expected ?? 0}%`} />
         )}
-        {reference && (
+        {reference && (reference.tasks.length > 0 || relativeBlocks.length > 0) && (
           <details className={styles.referenceTasks}>
             <summary>
-              {reference.tasks.length} tareas de referencia de la cotización · {reference.totalHours} HH
+              {reference.tasks.length} tareas EDT · {relativeBlocks.length} bloques por equipo de referencia
+              {' · '}{reference.totalHours} HH
             </summary>
-            <p>EDT generada con Gemini y el documento KDM de ejemplo.
-              Sin fechas ni responsables: aún no son tareas operativas.</p>
-            <ol>
-              {reference.tasks.map((task) => (
-                <li key={task.wbs}>
-                  <strong>{task.wbs} · {task.name}</strong>
-                  <span>{task.role} · {task.hours} HH</span>
-                  {task.description && <small>{task.description}</small>}
-                </li>
-              ))}
-            </ol>
+            <p>Distribución recibida de la cotización v{appliedPlanning.data?.versionNumber}.
+              Todavía no son tareas operativas: no tienen fechas ni responsables.
+              El Roadmap y sus tramos existentes se mantienen intactos.</p>
+            {relativeBlocks.length > 0 && (
+              <ul>
+                {relativeBlocks.map((block) => (
+                  <li key={block.teamId}>
+                    <strong>{teamName(block.teamId)}</strong>
+                    <span>{block.hours} HH · semanas {block.startWeek} a
+                      {' '}{block.startWeek + block.durationWeeks - 1}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {reference.tasks.length > 0 && (
+              <ol>
+                {reference.tasks.map((task) => (
+                  <li key={task.wbs + ':' + task.role}>
+                    <strong>{task.wbs} · {task.name}</strong>
+                    <span>{task.role} · {task.hours} HH</span>
+                    {task.description && <small>{task.description}</small>}
+                  </li>
+                ))}
+              </ol>
+            )}
           </details>
         )}
       </div>
@@ -217,6 +235,24 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
 
   return (
     <>
+      {(appliedPlanning.data?.unassignedTasks?.length ?? 0) > 0 && (
+        <Card>
+          <details className={styles.referenceTasks}>
+            <summary>
+              {appliedPlanning.data!.unassignedTasks!.length} tareas de referencia sin fase vinculada
+            </summary>
+            <p>Revisa el vínculo comercial antes de crear tareas operativas. No se modificó el Roadmap.</p>
+            <ol>
+              {appliedPlanning.data!.unassignedTasks!.map((task) => (
+                <li key={task.wbs + ':' + task.role}>
+                  <strong>{task.wbs} · {task.name}</strong>
+                  <span>{task.role} · {task.hours} HH</span>
+                </li>
+              ))}
+            </ol>
+          </details>
+        </Card>
+      )}
       <PhaseRoadmap phaseRoadmap={phaseRoadmap} renderPhaseExtras={renderPhaseExtras} renderSelectionDetail={renderSelectionDetail} />
       <ExecutionSegmentModal
         open={editingSegment !== null}
