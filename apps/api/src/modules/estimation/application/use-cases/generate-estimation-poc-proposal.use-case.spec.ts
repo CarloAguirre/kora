@@ -176,7 +176,7 @@ describe('GenerateEstimationPocProposalUseCase', () => {
     projectId, projectName: 'KDM', clientName: 'Cliente',
     driveFolderUrl: 'https://drive.google.com/drive/folders/kora-poc-fallback',
     instructions: null, answers: [],
-  } as const;
+  };
   const sources: DocumentSourceReader = {
     readDriveSources: async () => [{
       sourceId: 'kora-poc-requerimiento-kdm',
