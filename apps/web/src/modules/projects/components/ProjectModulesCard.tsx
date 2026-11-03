@@ -160,10 +160,6 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
   const renderPhaseExtras = (phase: { id: string }) => {
     const module = modulesById.get(phase.id);
     if (!module) return null;
-    const reference = appliedPlanning.data?.modules.find((item) => item.moduleId === module.id);
-    const relativeBlocks = reference?.relativeTeamBlocks ?? [];
-    const teamName = (id: string) =>
-      teamOptions.find((option) => option.value === id)?.label ?? 'Equipo Kora';
     return (
       <div className={styles.moduleFields}>
         <Select
@@ -180,46 +176,88 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
         {module.progress.actual != null && (
           <Meta label="Avance real · esperado" value={`${module.progress.actual}% · ${module.progress.expected ?? 0}%`} />
         )}
-        {reference && (reference.tasks.length > 0 || relativeBlocks.length > 0) && (
-          <details className={styles.referenceTasks}>
+      </div>
+    );
+  };
+
+  /** Las referencias vienen DESPUÉS del cronograma, como en el HTML v5.
+   * Nunca convertimos semanas relativas en fechas operativas sin planificar. */
+  const renderPhaseReferences = (phase: { id: string }) => {
+    const module = modulesById.get(phase.id);
+    if (!module) return null;
+    const reference = appliedPlanning.data?.modules.find((entry) => entry.moduleId === module.id);
+    if (!reference || (!reference.tasks.length && !reference.relativeTeamBlocks?.length)) return null;
+    const versionId = appliedPlanning.data!.versionId;
+    const converted = (task: typeof reference.tasks[number]) =>
+      module.tasks.some((existing) => existing.description?.includes(
+        'Referencia cotización ' + versionId + ' · WBS ' + task.wbs + ' · ' + task.role,
+      ));
+    return (
+      <div className={styles.commercialReferences}>
+        {!!reference.relativeTeamBlocks?.length && (
+          <details className={styles.referenceBlocks}>
             <summary>
-              {reference.tasks.length} tareas EDT · {relativeBlocks.length} bloques por equipo de referencia
-              {' · '}{reference.totalHours} HH
+              {reference.relativeTeamBlocks.length} bloques por equipo de referencia
+              {' · '}{reference.totalHours} HH · semanas relativas, sin fechas asignadas
             </summary>
-            <p>Distribución recibida de la cotización v{appliedPlanning.data?.versionNumber}.
-              Todavía no son tareas operativas: no tienen fechas ni responsables.
-              El Roadmap y sus tramos existentes se mantienen intactos.</p>
-            {relativeBlocks.length > 0 && (
-              <ul>
-                {relativeBlocks.map((block) => (
-                  <li key={block.teamId}>
-                    <strong>{teamName(block.teamId)}</strong>
-                    <span>{block.hours} HH · semanas {block.startWeek} a
-                      {' '}{block.startWeek + block.durationWeeks - 1}</span>
+            <div className={styles.referenceBlockList}>
+              {reference.relativeTeamBlocks.map((block) => {
+                const team = teamOptions.find((option) => option.value === block.teamId);
+                const teamLabel = team?.label ?? 'Equipo no disponible';
+                return (
+                  <div key={block.teamId} className={styles.referenceBlockRow}>
+                    <span className={styles.referenceTaskDot}
+                      style={{ background: teamColor(teamLabel) }} aria-hidden="true" />
+                    <span className={styles.referenceTaskName}>{teamLabel}</span>
+                    <span className={styles.referenceTaskMeta}>
+                      {block.hours} HH · semanas {block.startWeek} a
+                      {' '}{block.startWeek + block.durationWeeks - 1}
+                    </span>
+                    {canManage && team && (
+                      <Button variant="ghost" size="sm"
+                        onClick={() => setPlanningBlock({
+                          moduleId: module.id, teamId: block.teamId,
+                          name: module.name + ' · ' + teamLabel,
+                        })}>
+                        Planificar bloque
+                      </Button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </details>
+        )}
+        {reference.tasks.length > 0 && (
+          <details className={styles.referenceTasks} open>
+            <summary>
+              {reference.tasks.length} tareas de referencia de la cotización
+              {' '}(sin fechas ni asignados)
+            </summary>
+            <ul className={styles.referenceTaskList}>
+              {reference.tasks.map((task) => {
+                const team = teamOptions.find((option) => option.value === task.teamId);
+                const teamLabel = team?.label ?? task.role;
+                return (
+                  <li key={task.wbs + ':' + task.role} className={styles.referenceTaskRow}>
+                    <span className={styles.referenceTaskDot}
+                      style={{ background: teamColor(teamLabel) }} aria-hidden="true" />
+                    <span className={styles.referenceTaskName}>{task.name}</span>
+                    <span className={styles.referenceTaskMeta}>
+                      · {teamLabel} · {task.hours} HH
+                    </span>
+                    {converted(task) ? (
+                      <span className={styles.referenceConverted}>Tarea creada</span>
+                    ) : canManage ? (
+                      <Button variant="ghost" size="sm"
+                        onClick={() => setCreatingFromReference({ moduleId: module.id, task })}>
+                        Crear tarea
+                      </Button>
+                    ) : null}
                   </li>
-                ))}
-              </ul>
-            )}
-            {reference.tasks.length > 0 && (
-              <ol>
-                {reference.tasks.map((task) => (
-                  <li key={task.wbs + ':' + task.role}>
-                    <strong>{task.wbs} · {task.name}</strong>
-                    <span>{task.role} · {task.hours} HH</span>
-                    {task.description && <small>{task.description}</small>}
-                    {canManage && (module.tasks.some((existing) =>
-                      existing.description?.includes(
-                        'Referencia cotización ' + appliedPlanning.data?.versionId +
-                        ' · WBS ' + task.wbs + ' · ' + task.role,
-                      )) ? <small>Ya convertida en tarea operativa</small> :
-                        <Button variant="ghost" size="sm"
-                          onClick={() => setCreatingFromReference({ moduleId: module.id, task })}>
-                          Crear tarea
-                        </Button>)}
-                  </li>
-                ))}
-              </ol>
-            )}
+                );
+              })}
+            </ul>
           </details>
         )}
       </div>
@@ -278,7 +316,8 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
           </details>
         </Card>
       )}
-      <PhaseRoadmap phaseRoadmap={phaseRoadmap} renderPhaseExtras={renderPhaseExtras} renderSelectionDetail={renderSelectionDetail} />
+      <PhaseRoadmap phaseRoadmap={phaseRoadmap} renderPhaseExtras={renderPhaseExtras}
+        renderPhaseReferences={renderPhaseReferences} renderSelectionDetail={renderSelectionDetail} />
       {creatingFromReference && appliedPlanning.data && (
         <QuotationReferenceTaskModal
           key={creatingFromReference.task.wbs + ':' + creatingFromReference.task.role}
