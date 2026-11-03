@@ -113,11 +113,11 @@ describe('Ciclo comercial separado · Kora', () => {
   it('una versión revisada puede marcarse enviada y se registra sin correo', async () => {
     show({ ...version, aiReviewStatus: 'accepted' });
     fireEvent.click(screen.getByRole('button', { name: 'Marcar como enviada' }));
+    expect(screen.getByText('Registrar envío comercial')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Registrar envío' }));
     await waitFor(() => expect(mocks.markSent).toHaveBeenCalledWith({
       versionId: version.id, revision: 3,
     }));
-    expect(screen.queryByText('Registrar envío comercial')).toBeInTheDocument();
   });
 
   it('la aprobación con traspaso después no altera el proyecto', async () => {
@@ -142,10 +142,11 @@ describe('Ciclo comercial separado · Kora', () => {
     expect(screen.getByRole('button', { name: 'Marcar como enviada' })).toBeEnabled();
     expect(screen.getByText(/No hay envío comercial registrado/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Registrar aprobación' }));
+    expect(screen.getByText(/no hay un envío al cliente registrado/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar aprobación' }));
     await waitFor(() => expect(mocks.approveClient).toHaveBeenCalledWith({
       versionId: version.id, revision: 3, confirmWithoutSend: true,
     }));
-    expect(screen.getByText(/no hay un envío al cliente registrado/i)).toBeInTheDocument();
     expect(mocks.transferApproved).not.toHaveBeenCalled();
   });
 
