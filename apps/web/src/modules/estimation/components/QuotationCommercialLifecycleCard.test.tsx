@@ -67,6 +67,30 @@ describe('Ciclo comercial separado · Kora', () => {
       .not.toBeInTheDocument();
   });
 
+  it('explica el motivo preciso: falta aceptar Gemini aun con HH, tarifa y plan 100%', () => {
+    render(<QuotationCommercialLifecycleCard project={project} quotation={quotation}
+      version={version} canOperate hasUnsavedChanges={false}
+      embedded showAiAcceptance={false}/>);
+    expect(screen.getByRole('button', { name: 'Registrar aprobación del cliente' })).toBeDisabled();
+    const notice = screen.getByRole('status', { name: 'Requisitos comerciales pendientes' });
+    expect(notice).toHaveTextContent('Acepta la propuesta IA en el bloque violeta');
+    expect(notice).not.toHaveTextContent('Completa el plan de pago');
+    expect(notice).not.toHaveTextContent('Asigna equipos Kora y horas');
+  });
+
+  it('muestra cada bloqueo comercial restante sin depender del tooltip', () => {
+    render(<QuotationCommercialLifecycleCard project={project} quotation={quotation}
+      version={{ ...version, hourlyRate: null,
+        draft: { ...version.draft, paymentPlan: [{ name: 'Inicio', percent: 50,
+          trigger: 'approval' }] } }} canOperate hasUnsavedChanges
+      embedded showAiAcceptance={false}/>);
+    const notice = screen.getByRole('status', { name: 'Requisitos comerciales pendientes' });
+    expect(notice).toHaveTextContent('Guarda los cambios del borrador.');
+    expect(notice).toHaveTextContent('Ingresa y guarda un valor HH');
+    expect(notice).toHaveTextContent('50% de 100%');
+    expect(notice).toHaveTextContent('Acepta la propuesta IA');
+  });
+
   it('resumen v5 bloquea envío y aprobación mientras haya cambios sin guardar', () => {
     render(<QuotationCommercialLifecycleCard project={project} quotation={quotation}
       version={{ ...version, aiReviewStatus: 'accepted' }} canOperate
