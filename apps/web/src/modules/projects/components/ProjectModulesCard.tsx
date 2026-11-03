@@ -21,7 +21,7 @@ import { Button } from '@/shared/components/ui/Button';
 import { Select } from '@/shared/components/ui/Select';
 import { Avatar } from '@/shared/components/ui/Avatar';
 import { Badge, type BadgeTone } from '@/shared/components/ui/Badge';
-import { CloseIcon, PencilIcon } from '@/shared/components/icons/Icons';
+import { CloseIcon, PencilIcon, TrashIcon } from '@/shared/components/icons/Icons';
 import { useToast } from '@/shared/components/ui/Toast';
 import { ApiRequestError } from '@/shared/lib/api-client';
 import { PhaseRoadmap, type PhaseRoadmapSelection } from '@/modules/client-portal/components/PhaseRoadmap';
@@ -312,7 +312,7 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
                 ? 'La fase tiene bloques, tareas, entregas, horas, incidencias o referencias EDT que deben conservarse.'
                 : 'Eliminar fase'}
               aria-label={'Eliminar fase ' + module.name}
-              onClick={() => void onDeletePhase(module)}>🗑</Button>
+              onClick={() => void onDeletePhase(module)}><TrashIcon size={15} /></Button>
           </>
         )}
       </div>
