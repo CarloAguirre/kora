@@ -1025,6 +1025,12 @@ export class DrizzleQuotationRepository implements QuotationRepository {
          JSON.stringify(savedDraft.phases) !== JSON.stringify(draft.phases) ||
          JSON.stringify(savedDraft.edtHourAdjustments ?? []) !==
            JSON.stringify(draft.edtHourAdjustments ?? []) ||
+         JSON.stringify(savedDraft.edtTaskSettings ?? []) !==
+           JSON.stringify(draft.edtTaskSettings ?? []) ||
+         JSON.stringify(savedDraft.edtStageSettings ?? []) !==
+           JSON.stringify(draft.edtStageSettings ?? []) ||
+         JSON.stringify(savedDraft.edtRoleCollaborators ?? []) !==
+           JSON.stringify(draft.edtRoleCollaborators ?? []) ||
          savedDraft.analysisProjectionStatus !== draft.analysisProjectionStatus));
       const totals = calculateQuotation(draft, input.hourlyRate, input.tax);
       const teamIds = draft.teams.map((team) => team.teamId);
