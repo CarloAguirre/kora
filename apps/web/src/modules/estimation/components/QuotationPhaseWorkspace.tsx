@@ -28,9 +28,14 @@ export function referenceTasksForPhase(
   if (!edt) return [];
   const stage = edt.stages?.find((item) => phase.name.startsWith(item.code + ' · '));
   if (draft) return quotationEdtAssignments(draft)
-    .filter((task) => stage ? task.stageCode === stage.code
-      : edt.schemaVersion === 'kora.quotation.reference-edt.v1' &&
-        (task.module === phase.name || task.role === phase.name))
+    .filter((task) => {
+      if (stage) return task.stageCode === stage.code;
+      const originalName = draft.edtStageSettings?.find((setting) =>
+        setting.stageCode.startsWith('module:') &&
+        setting.name === phase.name)?.stageCode.slice(7);
+      return edt.schemaVersion === 'kora.quotation.reference-edt.v1' &&
+        (task.module === (originalName ?? phase.name) || task.role === phase.name);
+    })
     .map((task) => ({
       ...task, team: nameOf(task.teamKey, teamNames),
     }));
@@ -147,7 +152,7 @@ export function QuotationPhaseWorkspace({
         {displayPhases.map((phase, index) => {
           const stage = edt?.stages?.find((item) => phase.name.startsWith(item.code + ' · '));
           const stageCode = stage?.code ?? (edt?.schemaVersion === 'kora.quotation.reference-edt.v1'
-            ? 'module:' + phase.name : undefined);
+            ? 'module:' + (edt.modules[index]?.name ?? phase.name) : undefined);
           const prefix = stage ? stage.code + ' · ' : '';
           const visibleName = prefix ? phase.name.slice(prefix.length) : phase.name;
           const total = phase.teamHours.reduce((sum, row) => sum + row.hours, 0);
@@ -261,6 +266,8 @@ export function QuotationPhaseWorkspace({
                           {editable && onEditTaskHours
                             ? <input className={styles.editableHours} type="number"
                                 min="0.01" max="1000000" step="0.01"
+                                disabled={task.fixed}
+                                title={task.fixed ? 'Desmarca Fija para editar las HH de esta tarea.' : undefined}
                                 aria-label={'HH de ' + task.wbs + ' · ' + task.role}
                                 value={task.hours}
                                 onChange={(e) => {
