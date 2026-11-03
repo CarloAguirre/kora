@@ -56,7 +56,7 @@ describe('EstimationController · líder PM de proyecto asignado', () => {
   it('protege generación de propuesta y resolución de Drive con el mismo alcance', async () => {
     const { controller, drafts, generator, resolver } = setup();
     await controller.proposal({ ...request, answers: [] }, actor as never);
-    await controller.driveResolve({ projectId }, actor as never);
+    await controller.driveResolve({ projectId, projectName: 'Proyecto PM' }, actor as never);
     expect(drafts.authorizeAiPoc).toHaveBeenCalledTimes(2);
     expect(generator.execute).toHaveBeenCalledOnce();
     expect(resolver.execute).toHaveBeenCalledOnce();
