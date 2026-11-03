@@ -1,13 +1,13 @@
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { z } from 'zod';
 import { extractDriveFolderId } from '../drive-source-selection';
+import { resolveEstimationQuestionnaireContext, type EstimationInputWithQuestions } from '../resolve-estimation-questionnaire-context';
 import {
   estimationPocAiDraftSchema,
   quotationReferenceEdtSchema,
   type QuotationReferenceEdt,
   estimationPocProposalSchema,
   type EstimationPocProposal,
-  type GenerateEstimationPocInput,
 } from '@kora/contracts';
 import {
   AI_PROVIDER,
@@ -177,6 +177,7 @@ const BASE_INSTRUCTIONS = [
   'Para cada rol devuelve unidad (week o day), duración, horas por unidad y cantidad de personas.',
   'No calcules HH totales: Kora realizará esa aritmética de forma determinística.',
   'En source cita el nombre del documento que sustenta la decisión; si no existe evidencia directa, indica que es un supuesto técnico.',
+  'Interpreta decisiones de alcance desde context.resolvedAnswers: incluye la pregunta completa, la opción textual y los supuestos NO CONFIRMADOS. Nunca interpretes D01=yes por su código sin consultar el enunciado.',
   'Cuando falte información, documenta el supuesto en assumptions en vez de inventar funcionalidades.',
   'Los roles habituales pueden incluir Desarrollo, Tech Lead/Líder, QA, Arquitectura, UX/UI, IA, RPA o PMO, pero no es obligatorio incluirlos todos.',
   'Devuelve una propuesta razonable para dimensionamiento inicial comercial, no un compromiso definitivo.',
@@ -196,7 +197,7 @@ export class GenerateEstimationPocProposalUseCase {
    * Tramos semanales son relativos y no representan un cronograma aprobado.
    */
   async generateEdt(
-    input: GenerateEstimationPocInput,
+    input: EstimationInputWithQuestions,
     proposal: EstimationPocProposal,
   ): Promise<QuotationReferenceEdt> {
     if (this.ai.name !== 'gemini' || proposal.provider !== 'gemini' ||
@@ -217,6 +218,7 @@ export class GenerateEstimationPocProposalUseCase {
         provider: 'gemini',
         source: 'kdm_demo',
         answers: input.answers,
+        resolvedAnswers: resolveEstimationQuestionnaireContext(input),
         confirmedUnderstanding: 'confirmedUnderstanding' in input ? input.confirmedUnderstanding : null,
         allowedRoles: proposal.roles.map((role) => ({
           role: role.role, people: role.people,
@@ -231,6 +233,7 @@ export class GenerateEstimationPocProposalUseCase {
         'Estima las horas por actividad y perfil en roleHours según su complejidad y alcance. No hagas que sumen un total predeterminado.',
         'Solo utiliza role que coincida EXACTAMENTE con allowedRoles. Cada perfil declarado debe intervenir en al menos una actividad real.',
         'No inventes funciones fuera del alcance: separa explícitamente exclusiones y supuestos en la descripción.',
+        'Respeta las opciones seleccionadas y los supuestos de context.resolvedAnswers al definir actividades/HH; no confundas supuesto pendiente con decisión confirmada.',
         'Agrupa actividades en módulos funcionales (module), submódulos (submodule) y tramos cronológicos (stageCode, stageName). Un tramo puede abarcar varios módulos y perfiles.',
         'Cada stageCode de activities debe existir exactamente una vez en stages. Los periodos se definen SOLO en stages, nunca por actividad.',
         'startWeek y durationWeeks son rangos SEMANALES RELATIVOS y estimativos, nunca fechas del proyecto; los tramos pueden solaparse con trabajo paralelo.',
@@ -496,7 +499,7 @@ export class GenerateEstimationPocProposalUseCase {
   }
 
   async execute(
-    input: GenerateEstimationPocInput,
+    input: EstimationInputWithQuestions,
   ): Promise<EstimationPocProposal> {
     const documents =
       this.ai.name === 'poc-ai'
@@ -518,6 +521,7 @@ export class GenerateEstimationPocProposalUseCase {
           clientName: input.clientName,
           estimationLevel: 'team_roles_only',
           answers: input.answers,
+        resolvedAnswers: resolveEstimationQuestionnaireContext(input),
           confirmedUnderstanding: 'confirmedUnderstanding' in input ? input.confirmedUnderstanding : null,
           sourceDocuments: documents.map((document) => ({
             sourceId: document.sourceId,
