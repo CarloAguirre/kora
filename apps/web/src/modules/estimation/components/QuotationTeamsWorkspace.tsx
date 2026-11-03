@@ -39,7 +39,7 @@ export function QuotationTeamsWorkspace({
   const grouped = new Map<string, number>();
   for (const row of all) grouped.set(row.teamKey,
     Math.round(((grouped.get(row.teamKey) ?? 0) + row.hours) * 100) / 100);
-  const weeklyPlan = hasEdt ? quotationTeamWeeklyPlan(draft) : null;
+  const weeklyPlan = quotationTeamWeeklyPlan(draft);
   const weeklyByTeam = new Map(weeklyPlan?.rows.map((row) => [row.teamKey, row]) ?? []);
   const lastPage = weeklyPlan ? Math.max(0, Math.ceil(weeklyPlan.lastWeek / WEEK_PAGE_SIZE) - 1) : 0;
   const currentPage = Math.min(weekPage, lastPage);
@@ -71,7 +71,7 @@ export function QuotationTeamsWorkspace({
     return team ? team.collaborators * (team.unit === 'day' ? team.duration / 5 :
       team.duration) * team.hoursPerWeek * team.dedicationPercent / 100 : 0;
   };
-  const planned = view === 'team' && hasEdt;
+  const planned = view === 'team' && (hasEdt || draft.mode === 'phases');
   const columns = planned ? styles.plannedColumns :
     view === 'team' ? styles.detailedColumns : styles.compactColumns;
   return (
@@ -87,7 +87,9 @@ export function QuotationTeamsWorkspace({
       </div>
       <p className={styles.caption}>
         {planned
-          ? 'Las HH provienen de las actividades de la EDT. Las semanas se calculan desde las fases; la dotación es referencial y no multiplica las HH.'
+          ? hasEdt
+            ? 'Las HH provienen de las actividades de la EDT. Las semanas se calculan desde las fases; la dotación es referencial y no multiplica las HH.'
+            : 'Las HH se obtienen de las fases comerciales. Las semanas muestran su distribución; colaboradores no recalcula las HH de fase.'
           : hasEdt
             ? 'Las horas de cada equipo se suman desde las tareas de las fases.'
             : view === 'team'
@@ -266,8 +268,9 @@ export function QuotationTeamsWorkspace({
       )}
       {planned && !weeklyPlan && (
         <p className={styles.weeklyUnavailable}>
-          Esta EDT no contiene una planificación semanal completa. No se inventan semanas ni dedicaciones:
-          define las semanas de sus módulos en «Por fases y módulos» para mostrar la carga semanal.
+          {hasEdt
+            ? 'Esta EDT no contiene una planificación semanal completa. No se inventan semanas ni dedicaciones: define las semanas de sus módulos en «Por fases y módulos».'
+            : 'Aún no hay fases con semanas configuradas. Define las fases en «Por fases y módulos» para mostrar la carga semanal.'}
         </p>
       )}
     </div>
