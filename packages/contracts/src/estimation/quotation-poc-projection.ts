@@ -60,6 +60,13 @@ export function projectPocRolesToQuotationDraft(
   const edt = effectiveQuotationEdt(mappedDraft);
   const assignments = edt ? quotationEdtAssignments(mappedDraft) : [];
   const detailed = edt?.schemaVersion === 'kora.quotation.reference-edt.v2';
+  const commercialStages = draft.edtCommercialStages ?? [];
+  const commercialTotal = Math.round((draft.edtCommercialTasks ?? [])
+    .reduce((sum, item) => sum + item.hours, 0) * 100) / 100;
+  const stageRows = [
+    ...(edt?.stages ?? []),
+    ...commercialStages.map((stage) => ({ ...stage, totalHours: 0 })),
+  ];
   type Capacity = { hours: number; maxWeeks: number; collaborators: number };
   const grouped = new Map<string, Capacity>();
   for (const role of roles) {
@@ -85,7 +92,7 @@ export function projectPocRolesToQuotationDraft(
     });
   }
   const phases = detailed && edt
-    ? (edt.stages ?? []).map((stage) => {
+    ? stageRows.map((stage) => {
         const byTeam = new Map<string, number>();
         for (const assignment of assignments) {
           if (assignment.stageCode !== stage.code) continue;
@@ -94,9 +101,12 @@ export function projectPocRolesToQuotationDraft(
           byTeam.set(teamId, Math.round(
             ((byTeam.get(teamId) ?? 0) + assignment.hours) * 100) / 100);
         }
-        const total = [...byTeam.values()].reduce((sum, hours) => sum + hours, 0);
-        if (Math.abs(total - stage.totalHours) > 0.011) {
-          throw new Error('Las HH del tramo no concilian con sus tareas.');
+        const sourceHours = assignments
+          .filter((row) => row.stageCode === stage.code && !row.wbs.startsWith('KT-'))
+          .reduce((sum, row) => sum + row.hours, 0);
+        if (!stage.code.startsWith('KS-') &&
+            Math.abs(sourceHours - stage.totalHours) > 0.011) {
+          throw new Error('Las HH originales del tramo no concilian con la EDT.');
         }
         const edited = draft.edtStageSettings?.find((item) => item.stageCode === stage.code);
         return {
@@ -122,10 +132,27 @@ export function projectPocRolesToQuotationDraft(
             : [{ teamId: roleTeamIds[role.role]!, hours: role.totalHours }],
         };
       });
+  // En EDT v1 también se conservan las fases comerciales nuevas.
+  if (!detailed && commercialStages.length) {
+    for (const stage of commercialStages) {
+      const grouped = new Map<string, number>();
+      for (const assignment of assignments.filter((row) => row.stageCode === stage.code)) {
+        const id = assignment.teamId ?? roleTeamIds[assignment.role];
+        if (!id) throw new Error('La tarea comercial no tiene equipo Kora.');
+        grouped.set(id, Math.round(((grouped.get(id) ?? 0) + assignment.hours) * 100) / 100);
+      }
+      phases.push({
+        name: stage.code + ' · ' + stage.name,
+        startWeek: stage.startWeek, durationWeeks: stage.durationWeeks,
+        teamHours: [...grouped].map(([teamId, hours]) => ({ teamId, hours })),
+      });
+    }
+  }
   const lastWeek = detailed && edt
-    ? Math.max(1, ...(edt.stages ?? []).map((stage) =>
+    ? Math.max(1, ...stageRows.map((stage) =>
         stage.startWeek + stage.durationWeeks - 1))
-    : 1;
+    : Math.max(1, ...commercialStages.map((stage) =>
+        stage.startWeek + stage.durationWeeks - 1));
   const teams = [...grouped.entries()].map(([teamId, group]) => {
     const collaborators = Math.max(1, group.collaborators);
     if (collaborators > 100) {
@@ -151,7 +178,8 @@ export function projectPocRolesToQuotationDraft(
   });
   const calculated = projection.phases.reduce((sum, phase) =>
     sum + phase.teamHours.reduce((acc, item) => acc + item.hours, 0), 0);
-  if (Math.abs(calculated - (edt?.totalHours ?? aiPoc.proposal.totalHours)) > 0.011) {
+  if (Math.abs(calculated -
+      ((edt?.totalHours ?? aiPoc.proposal.totalHours) + commercialTotal)) > 0.011) {
     throw new Error('La proyección de roles no conserva el total HH de la EDT.');
   }
   return projection;
