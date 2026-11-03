@@ -30,7 +30,10 @@ export function assertQuotationReadyForClient(
   if (version.origin === 'ai' && version.draft.aiPoc?.edt &&
       version.draft.analysisProjectionStatus === 'synced') {
     const effective = effectiveQuotationEdt(version.draft);
-    if (!effective || Math.abs(effective.totalHours - version.totalHours) > 0.011) {
+    const additional = (version.draft.edtCommercialTasks ?? [])
+      .reduce((sum, task) => sum + task.hours, 0);
+    if (!effective ||
+        Math.abs(effective.totalHours + additional - version.totalHours) > 0.011) {
       throw new InvalidCommercialQuotation(
         'Las HH comerciales deben conciliar con los ajustes de tareas guardados.',
       );
@@ -73,7 +76,9 @@ export function assertAiProposalReadyToAccept(
   if (!names.length || names.some((name) => !aiPoc.roleTeamIds[name]) ||
       Object.keys(aiPoc.roleTeamIds).length !== names.length ||
       (analysisProjectionStatus !== 'modified' &&
-       Math.abs((effectiveQuotationEdt(version.draft)?.totalHours ?? 0) - version.totalHours) > 0.011)) {
+       Math.abs((effectiveQuotationEdt(version.draft)?.totalHours ?? 0) +
+         (version.draft.edtCommercialTasks ?? []).reduce((sum, task) => sum + task.hours, 0) -
+         version.totalHours) > 0.011)) {
     throw new InvalidCommercialQuotation('La distribución de HH o perfiles no coincide con el análisis IA.');
   }
 }
