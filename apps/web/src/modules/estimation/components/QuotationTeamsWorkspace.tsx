@@ -3,6 +3,7 @@ import type { QuotationDraftData } from '@kora/contracts';
 import { quotationEdtAssignments } from '@kora/contracts';
 import { SegmentedControl } from '@/shared/components/ui/SegmentedControl';
 import { quotationTeamColor } from './quotation-team-colors';
+import { QuotationGroupHoursInput } from './QuotationGroupHoursInput';
 import styles from './QuotationTeamsWorkspace.module.css';
 
 type Team = QuotationDraftData['teams'][number];
@@ -146,14 +147,10 @@ export function QuotationTeamsWorkspace({
                   })}/>
               </>}
               {hasEdt
-                ? <input className={styles.hoursInput} type="number" min={0} step="0.01"
-                    aria-label={'Horas totales de ' + label}
+                ? <QuotationGroupHoursInput className={styles.hoursInput}
+                    label={'Horas totales de ' + label}
                     disabled={!editable} value={getHours(teamId)}
-                    onChange={(e) => {
-                      const hours = Number(e.target.value);
-                      if (Number.isFinite(hours) && hours >= 0)
-                        onEditGroupHours(teamId, hours);
-                    }}/>
+                    onCommit={(hours) => onEditGroupHours(teamId, hours)}/>
                 : <strong className={styles.hours}>{checked ? fmt(getHours(teamId)) : '—'}</strong>}
             </div>
           );
