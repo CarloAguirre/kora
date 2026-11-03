@@ -1,4 +1,5 @@
-import type { QuotationDraftData, QuotationVersion } from '@kora/contracts';
+import type { EstimationQuestion, QuotationDraftData, QuotationVersion } from '@kora/contracts';
+import { useEstimationQuestionnaireDefinition } from '../api/estimation.queries';
 import { Card } from '@/shared/components/ui/Card';
 import styles from './QuotationCommercialSections.module.css';
 
@@ -22,9 +23,10 @@ function commercialNet(draft: QuotationDraftData, hourlyRate: number | null) {
   return Math.round((teamHours * hourlyRate + once + Number.EPSILON) * 10000) / 10000;
 }
 
-function readableAnswer(questionId: string, value: unknown, version: QuotationVersion) {
+function readableAnswer(questionId: string, value: unknown, version: QuotationVersion,
+  fixedQuestions: readonly EstimationQuestion[]) {
   const definition = version.draft.aiPoc?.dynamicQuestions.find((question) =>
-    question.id === questionId);
+    question.id === questionId) ?? fixedQuestions.find((question) => question.id === questionId);
   const render = (item: unknown): string => {
     if (item === null || item === undefined) return 'Sin respuesta';
     if (typeof item === 'boolean') return item ? 'Sí' : 'No';
@@ -35,8 +37,9 @@ function readableAnswer(questionId: string, value: unknown, version: QuotationVe
     return 'Respuesta estructurada';
   };
   return {
-    label: definition?.question ?? ('Pregunta fija ' + questionId),
+    label: definition?.question ?? ('Pregunta ' + questionId),
     value: render(value),
+    assumption: definition?.assumptionIfSkipped,
   };
 }
 
@@ -59,6 +62,7 @@ export function QuotationCommercialSections({
       (row, i) => i === index ? { ...row, ...patch } : row,
     ) });
   const answers = version.draft.aiPoc?.answers ?? [];
+  const questionnaire = useEstimationQuestionnaireDefinition(answers.length > 0);
 
   return (
     <>
@@ -207,12 +211,14 @@ export function QuotationCommercialSections({
             <summary>Respuestas del cuestionario IA</summary>
             <dl className={styles.answers}>
               {answers.map((item, index) => {
-                const answer = readableAnswer(item.questionId, item.value, version);
+                const answer = readableAnswer(item.questionId, item.value, version,
+                  questionnaire.data?.fixedQuestions ?? []);
                 return (
                   <div key={item.questionId + ':' + index}>
                     <dt>{answer.label}</dt>
                     <dd>{item.usedAssumption
-                      ? 'Supuesto no confirmado' : answer.value}</dd>
+                      ? 'Supuesto no confirmado: ' + (answer.assumption ?? 'pendiente de aclaración')
+                      : answer.value}</dd>
                   </div>
                 );
               })}
