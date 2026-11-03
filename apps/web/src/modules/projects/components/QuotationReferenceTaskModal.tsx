@@ -21,7 +21,7 @@ export function QuotationReferenceTaskModal({
   project, moduleId, versionId, versionNumber, reference, onClose,
 }: {
   project: ProjectDetail;
-  moduleId: string;
+  moduleId: string | null;
   versionId: string;
   versionNumber: number;
   reference: ReferenceTask;
@@ -31,6 +31,7 @@ export function QuotationReferenceTaskModal({
   const initialTeamId = reference.teamId && project.teams.some((t) =>
     t.teamId === reference.teamId) ? reference.teamId : '';
   const [name, setName] = useState(reference.name);
+  const [targetModuleId, setTargetModuleId] = useState(moduleId ?? '');
   const [teamId, setTeamId] = useState(initialTeamId);
   const [assignee, setAssignee] = useState('');
   const [startDate, setStartDate] = useState('');
@@ -42,7 +43,7 @@ export function QuotationReferenceTaskModal({
     member.teamId === teamId && member.userStatus === 'active');
   const sourceMarker = 'Referencia cotización ' + versionId + ' · WBS ' +
     reference.wbs + ' · ' + reference.role;
-  const formValid = Boolean(name.trim() && teamId && startDate && date &&
+  const formValid = Boolean(targetModuleId && name.trim() && teamId && startDate && date &&
     startDate <= date && Number(hours) > 0 &&
     Number.isFinite(Number(hours)) && Number(hours) <= 1_000_000);
   const submit = async () => {
@@ -53,7 +54,7 @@ export function QuotationReferenceTaskModal({
     setError('');
     try {
       await create.mutateAsync({
-        projectId: project.id, moduleId,
+        projectId: project.id, moduleId: targetModuleId,
         input: {
           name: name.trim(), teamId, assigneeUserId: assignee || null,
           description: [sourceMarker, reference.description].filter(Boolean).join('\n').slice(0, 2000),
@@ -81,6 +82,12 @@ export function QuotationReferenceTaskModal({
         <p className={styles.help}>La propuesta se conserva como referencia. Solo después de confirmar
           las fechas y el equipo se crea una tarea real con el flujo existente de Kora.
           Puede generar Forecast.</p>
+        <Select label="Fase operativa de destino" required value={targetModuleId}
+          placeholder="Selecciona una fase existente"
+          options={project.modules.map((module) => ({
+            value: module.id, label: module.name,
+          }))}
+          onChange={(event) => setTargetModuleId(event.target.value)} />
         <TextField label="Nombre de la tarea" required value={name}
           maxLength={300} onChange={(e) => setName(e.target.value)} />
         <Select label="Equipo Kora" required value={teamId}
