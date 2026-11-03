@@ -8,6 +8,7 @@ import type {
   TransferApprovedQuotationInput,
   QuotationTransferResult,
   ProjectQuotation,
+  QuotationTaskCatalogEntry,
   QuotationVersion,
   QuotationTransferPreview,
   QuotationCommercialPreflight,
@@ -23,6 +24,9 @@ import { api } from '@/shared/lib/api-client';
 const base = (projectId: string) => '/estimations/projects/' + projectId + '/quotation';
 
 export const quotationApi = {
+  taskTypes(projectId: string): Promise<QuotationTaskCatalogEntry[]> {
+    return api.get<QuotationTaskCatalogEntry[]>(base(projectId) + '/task-types');
+  },
   get(projectId: string): Promise<ProjectQuotation | null> {
     return api.get<ProjectQuotation | null>(base(projectId));
   },
@@ -103,6 +107,7 @@ export const quotationApi = {
 export const quotationKeys = {
   all: ['quotations'] as const,
   project: (projectId: string) => [...quotationKeys.all, projectId] as const,
+  taskTypes: (projectId: string) => [...quotationKeys.project(projectId), 'task-types'] as const,
   reconciliationReviews: (projectId: string, versionId: string) =>
     [...quotationKeys.project(projectId), 'reconciliation-reviews', versionId] as const,
   reconciliationAssessments: (projectId: string, versionId: string) =>
