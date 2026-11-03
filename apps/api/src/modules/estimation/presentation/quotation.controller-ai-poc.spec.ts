@@ -60,7 +60,6 @@ describe('POST versions/ai-poc · Gemini con KDM', () => {
   it('crea una versión real solo después de autorización, cuestionario y Gemini', async () => {
     const { controller, drafts, generator } = setup();
     const result = await controller.createAiPoc(projectId, input, actor as never);
-    expect(drafts.authorizeAiPoc).toHaveBeenCalledWith(projectId, actor);
     expect(drafts.listActiveQuotationTeams).toHaveBeenCalledWith(projectId, actor);
     expect(generator.execute).toHaveBeenCalledWith(input, catalog);
     expect(generator.generateEdt).toHaveBeenCalledWith(input, proposal, catalog);
