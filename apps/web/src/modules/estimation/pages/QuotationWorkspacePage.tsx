@@ -688,7 +688,7 @@ export function QuotationWorkspacePage() {
                 </>
               )}
 
-              {false && <details className={styles.technicalPanel}>
+              <details className={styles.technicalPanel} hidden style={{ display: 'none' }} aria-hidden="true">
                 <summary>Auditoría técnica, EDT original y herramientas de traspaso</summary>
                 {selected?.draft.aiPoc?.edt && (
                   <div id="quotation-edt-reference">
@@ -764,7 +764,7 @@ export function QuotationWorkspacePage() {
                 </Card>
               )}
 
-              </details>}
+              </details>
 
             </section>
 
