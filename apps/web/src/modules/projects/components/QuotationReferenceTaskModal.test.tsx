@@ -44,20 +44,20 @@ describe('Nueva tarea operativa a partir de referencia Gemini', () => {
   it('precarga tarea y HH sin generar ejecución al abrir el modal', () => {
     show();
     expect(screen.getByRole('dialog',{name:'Nueva tarea'})).toBeInTheDocument();
-    expect(screen.getByLabelText('Título de la tarea')).toHaveValue('Conexión con sistema de taller');
-    expect(screen.getByLabelText('HH estimadas')).toHaveValue(35);
+    expect(screen.getByLabelText(/Título de la tarea/)).toHaveValue('Conexión con sistema de taller');
+    expect(screen.getByLabelText(/HH estimadas/)).toHaveValue(35);
     expect(screen.getByLabelText('Bloque de trabajo')).toBeDisabled();
     expect(mocks.create).not.toHaveBeenCalled();
   });
   it('crea una tarea solo con colaborador, ámbito y fechas; preserva trazabilidad EDT', async () => {
     show();
-    fireEvent.change(screen.getByLabelText('Asignado a'),{
+    fireEvent.change(screen.getByLabelText(/Asignado a/),{
       target: { value: teamId + ':' + userId },
     });
     fireEvent.change(screen.getByLabelText('Bloque de trabajo'), {
       target: { value: blockId },
     });
-    fireEvent.change(screen.getByLabelText('Ámbito Kora'), {
+    fireEvent.change(screen.getByLabelText(/Ámbito Kora/), {
       target: { value: 'desarrollo' },
     });
     fireEvent.click(screen.getByRole('button',{name:'Crear tarea'}));
