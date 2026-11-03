@@ -4,7 +4,7 @@ import { effectiveQuotationEdt, type QuotationVersion } from '@kora/contracts';
  * No se puede aceptar una propuesta con HH sin guardar ni perfiles sin equipo. */
 export function quotationAiAcceptanceBlockReason(
   version: QuotationVersion,
-  { editable, dirty, isLatest }: { editable: boolean; dirty: boolean; isLatest: boolean },
+  { editable, dirty }: { editable: boolean; dirty: boolean; isLatest: boolean },
 ): string | null {
   if (!editable || version.status !== 'draft') {
     return 'Esta versión no está disponible para edición.';
@@ -12,7 +12,6 @@ export function quotationAiAcceptanceBlockReason(
   if (version.origin !== 'ai' || version.aiReviewStatus !== 'pending') {
     return 'Esta versión no tiene una propuesta IA pendiente.';
   }
-  if (!isLatest) return 'Solo se puede aceptar la versión más reciente.';
   const aiPoc = version.draft.aiPoc;
   if (!aiPoc?.edt) return 'Falta la EDT original de la propuesta IA.';
   const missing = aiPoc.proposal.roles.filter((role) => {
