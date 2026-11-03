@@ -692,6 +692,60 @@ export class DrizzleQuotationRepository implements QuotationRepository {
     });
   }
 
+  /** Elimina una versión solicitada explícitamente; protege el baseline traspasado.
+   * No renumera otras versiones, ni toca equipos, HH o pagos operativos. */
+  async deleteVersion(projectId: string, versionId: string, revision: number): Promise<boolean> {
+    return this.db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT id FROM projects WHERE id = ${projectId} FOR UPDATE`);
+      const [project] = await tx.select({
+        id: projects.id, status: projects.status, salesStage: projects.salesStage,
+      }).from(projects).where(and(
+        eq(projects.id, projectId), isNull(projects.deletedAt),
+      )).limit(1);
+      if (!project) throw new NotFoundException('Proyecto no encontrado.');
+      const [quotation] = await tx.select({ id: projectQuotations.id })
+        .from(projectQuotations).where(eq(projectQuotations.projectId, projectId)).limit(1);
+      if (!quotation) throw new NotFoundException('Cotización no encontrada.');
+      await tx.execute(sql`SELECT id FROM project_quotations WHERE id = ${quotation.id} FOR UPDATE`);
+      await tx.execute(sql`SELECT id FROM quotation_versions WHERE id = ${versionId} FOR UPDATE`);
+      const [version] = await tx.select({ revision: quotationVersions.revision,
+        id: quotationVersions.id, status: quotationVersions.status,
+      }).from(quotationVersions).where(and(
+        eq(quotationVersions.id, versionId),
+        eq(quotationVersions.quotationId, quotation.id),
+      )).limit(1);
+      if (!version) throw new NotFoundException('La versión no existe en el proyecto.');
+      if (version.revision !== revision)
+        throw new ConflictException('La cotización cambió. Actualiza la lista antes de eliminar.');
+      const [protectedEvent] = await tx.select({ id: quotationEvents.id })
+        .from(quotationEvents).where(and(
+          eq(quotationEvents.versionId, versionId),
+          inArray(quotationEvents.action,
+            ['quotation_transferred', 'planning_baseline_applied']),
+        )).limit(1);
+      if (protectedEvent) {
+        throw new ConflictException(
+          'No se puede eliminar una cotización ya traspasada a la planificación del proyecto.',
+        );
+      }
+      // Los eventos propios de esta versión se eliminan por su FK ON DELETE CASCADE.
+      // El historial de otras versiones sigue intacto.
+      await tx.delete(quotationVersions).where(eq(quotationVersions.id, versionId));
+      if (version.status === 'approved' &&
+          project.status === 'draft' && project.salesStage === 'approved') {
+        const remaining = await tx.select({ status: quotationVersions.status })
+          .from(quotationVersions)
+          .where(eq(quotationVersions.quotationId, quotation.id));
+        if (!remaining.some((row) => row.status === 'approved')) {
+          await tx.update(projects).set({
+            salesStage: remaining.length ? 'quoted' : 'prospect', updatedAt: new Date(),
+          }).where(eq(projects.id, projectId));
+        }
+      }
+      return true;
+    });
+  }
+
   /** Aceptación IA: nunca modifica project_teams, proyectos ni Roadmap. */
   async acceptAiProposal(projectId: string, versionId: string, userId: string,
     input: QuotationRevisionActionInput): Promise<QuotationVersion> {
