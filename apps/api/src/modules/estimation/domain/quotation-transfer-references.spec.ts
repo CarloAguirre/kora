@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { quotationDraftDataSchema, quotationReferenceEdtSchema } from '@kora/contracts';
+import { quotationDraftDataSchema, quotationReferenceEdtSchema, type QuotationDraftData } from '@kora/contracts';
 import { buildQuotationTransferReferences } from './quotation-transfer-references';
 
 const dev = '0777e456-fd76-445e-83f1-afc25061c101';
@@ -40,18 +40,20 @@ describe('Referencias comerciales sin afectar Roadmap', () => {
       }]}],
     });
     const stage = 'KS-0777e456-fd76-445e-83f1-afc25061c105';
-    const draft = quotationDraftDataSchema.parse({
-      mode:'phases',teams,phases:[phase,{name:'QA comercial',startWeek:4,
-        durationWeeks:1,teamHours:[{teamId:qa,hours:5}]}],
-      aiPoc: {source:'kdm_demo',
-        proposal:{},answers:[],dynamicQuestions:[],edt,
-        roleTeamIds:{Backend:dev}},
-      edtCommercialStages:[{code:stage,name:'QA comercial',startWeek:4,durationWeeks:1}],
-      edtCommercialTasks:[{
-        wbs:'KT-0777e456-fd76-445e-83f1-afc25061c106',
-        stageCode:stage,name:'UAT adicional',teamId:qa,hours:5,fixed:false,
-      }],
-    });
+    const draft: QuotationDraftData = {
+      ...quotationDraftDataSchema.parse({
+        mode:'phases',teams,phases:[phase,{name:'QA comercial',startWeek:4,
+          durationWeeks:1,teamHours:[{teamId:qa,hours:5}]}],
+        edtCommercialStages:[{code:stage,name:'QA comercial',startWeek:4,durationWeeks:1}],
+        edtCommercialTasks:[{
+          wbs:'KT-0777e456-fd76-445e-83f1-afc25061c106',
+          stageCode:stage,name:'UAT adicional',teamId:qa,hours:5,fixed:false,
+        }],
+      }),
+      aiPoc: { source:'kdm_demo', proposal:{roles:[]},
+        answers:[],dynamicQuestions:[],edt,
+        roleTeamIds:{Backend:dev} } as unknown as QuotationDraftData['aiPoc'],
+    };
     const view = buildQuotationTransferReferences(draft,[
       {moduleId:one,name:'Desarrollo',totalHours:10},
       {moduleId:two,name:'QA comercial',totalHours:5},
