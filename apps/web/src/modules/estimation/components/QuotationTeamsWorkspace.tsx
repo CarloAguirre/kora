@@ -102,7 +102,7 @@ export function QuotationTeamsWorkspace({
           <span>Equipo</span>
           <span>Nº colab.</span>
           {planned && <><span>Semanas</span><span>HH/sem prom.</span></>}
-          {view === 'team' && !hasEdt && <>
+          {view === 'team' && !planned && <>
             <span>Unidad</span><span>Duración</span><span>hh/sem</span>
             <span>Dedicación</span>
           </>}
@@ -156,7 +156,7 @@ export function QuotationTeamsWorkspace({
                   {weekly ? fmt(weekly.averageHoursPerWeek) : '—'}
                 </strong>
               </>}
-              {view === 'team' && !hasEdt && <>
+              {view === 'team' && !planned && <>
                 <select disabled={!editable || !checked}
                   aria-label={'Unidad de ' + label} value={team?.unit ?? 'week'}
                   onChange={(e) => onEditTeam(teamId, {
