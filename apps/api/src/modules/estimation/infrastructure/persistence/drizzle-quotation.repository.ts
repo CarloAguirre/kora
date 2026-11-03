@@ -1083,6 +1083,29 @@ export class DrizzleQuotationRepository implements QuotationRepository {
          JSON.stringify(savedDraft.edtTaskTypes ?? []) !==
            JSON.stringify(draft.edtTaskTypes ?? []) ||
          savedDraft.analysisProjectionStatus !== draft.analysisProjectionStatus));
+      // Una nueva clasificación comercial debe existir ACTIVA en PostgreSQL.
+      // No se invalidan categorías históricas si el catálogo cambia con el tiempo.
+      const changedTypes = [
+        ...(draft.edtTaskTypes ?? [])
+          .filter((row) => savedDraft.edtTaskTypes?.find((old) =>
+            old.wbs === row.wbs)?.classification !== row.classification)
+          .map((row) => row.classification),
+        ...(draft.edtCommercialTasks ?? [])
+          .filter((row) => savedDraft.edtCommercialTasks?.find((old) =>
+            old.wbs === row.wbs)?.classification !== row.classification)
+          .map((row) => row.classification),
+      ];
+      const uniqueTypes = [...new Set(changedTypes)];
+      if (uniqueTypes.length) {
+        const active = await tx.select({ name: quotationTaskTypes.name })
+          .from(quotationTaskTypes).where(and(
+            inArray(quotationTaskTypes.name, uniqueTypes),
+            eq(quotationTaskTypes.isActive, true),
+          ));
+        if (active.length !== uniqueTypes.length) {
+          throw new BadRequestException('Una tarea utiliza un tipo que no existe o está inactivo en el catálogo Kora.');
+        }
+      }
       const totals = calculateQuotation(draft, input.hourlyRate, input.tax);
       const teamIds = draft.teams.map((team) => team.teamId);
       if (teamIds.length > 0) {
