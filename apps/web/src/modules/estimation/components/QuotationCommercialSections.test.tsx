@@ -46,6 +46,8 @@ describe('Cotización v5 · costos, pagos y supuestos', () => {
     expect(screen.getByText('6,78 UF')).toBeInTheDocument();
     expect(screen.getByText('Plan de pago: 100% de 100%.')).toBeInTheDocument();
     expect(screen.getByText('Supuestos y exclusiones')).toBeInTheDocument();
+    expect(screen.queryByText(/Exclusiones del alcance/)).not.toBeInTheDocument();
+    expect(screen.queryByText('Respuestas del cuestionario IA')).not.toBeInTheDocument();
   });
 
   it('preserva los triggers de fase, porcentaje y periodicidad existentes', () => {
