@@ -27,10 +27,9 @@ const edtDraft = quotationDraftDataSchema.parse({
       projectId: '0777e456-fd76-445e-83f1-afc25061c100',
       provider: 'gemini', sourceMode: 'poc_simulated',
       documentsAnalyzed: 1, summary: 'Propuesta',
-      roles: [
-        { role: 'Desarrollo', unit: 'week', duration: 2,
-          hoursPerUnit: 20, people: 1, totalHours: 40 },
-      ], totalHours: 40, assumptions: [], clarifyingQuestions: [],
+      roles: [{ role: 'Desarrollador Backend', unit: 'week', duration: 2,
+        hoursPerUnit: 20, people: 1, totalHours: 40 }],
+      totalHours: 40, assumptions: [], clarifyingQuestions: [],
     },
     edt: {
       schemaVersion: 'kora.quotation.reference-edt.v2',
@@ -40,124 +39,82 @@ const edtDraft = quotationDraftDataSchema.parse({
         totalHours: 40 }],
       modules: [{ name: 'Portal', totalHours: 40, tasks: [{
         wbs: 'S1.01', name: 'API', description: 'Servicio',
-        role: 'Desarrollo', hours: 40, stageCode: 'S1',
-        roleEffort: [{ role: 'Desarrollo', hours: 40 }],
+        role: 'Desarrollador Backend', hours: 40, stageCode: 'S1',
+        roleEffort: [{ role: 'Desarrollador Backend', hours: 40 }],
       }] }],
     },
   },
 });
 const mappedEdtDraft = quotationDraftDataSchema.parse({
   ...edtDraft, mode: 'phases', teams: [team(dev)],
-  aiPoc: { ...edtDraft.aiPoc!, roleTeamIds: { Desarrollo: dev } },
+  aiPoc: {
+    ...edtDraft.aiPoc!,
+    roleTeamIds: { 'Desarrollador Backend': dev },
+  },
 });
 const renderTeams = (draft: typeof manual, view: 'team' | 'phases' = 'team') =>
   render(<QuotationTeamsWorkspace
     draft={draft} editable teamNames={names} activeTeams={activeTeams}
     view={view} {...handlers}/>);
 
-describe('Switch Equipos · HTML v5', () => {
-  it('es un único switch, con estado seleccionado sin perder HH del borrador', () => {
-    renderTeams(edtDraft, 'phases');
+describe('Equipos · fuente visual prototipo HTML v5', () => {
+  it('presenta un único switch continuo y conserva la EDT al alternarlo', () => {
+    renderTeams(mappedEdtDraft, 'phases');
     const group = screen.getByRole('radiogroup', { name: 'Vista de equipos' });
     expect(group).toBeInTheDocument();
     expect(screen.getByRole('radio', { name: 'Por fases y módulos' }))
       .toHaveAttribute('aria-checked', 'true');
     fireEvent.click(screen.getByRole('radio', { name: 'Por equipo' }));
     expect(handlers.onChangeView).toHaveBeenCalledWith('team');
-    expect(screen.queryByText('Ajustes avanzados de equipos')).not.toBeInTheDocument();
   });
 
-  it('muestra HH derivadas del EDT, editables globalmente, sin capacidad artificial', () => {
+  it('en Por equipo muestra siete columnas y solo equipos del catálogo, nunca perfiles como equipos', () => {
     renderTeams(mappedEdtDraft);
+    expect(screen.getByText('Unidad')).toBeInTheDocument();
+    expect(screen.getByText('Duración')).toBeInTheDocument();
+    expect(screen.getByText('hh/sem')).toBeInTheDocument();
+    expect(screen.getByText('Dedicación')).toBeInTheDocument();
+    expect(screen.getByLabelText('Incluir Desarrollo')).toBeChecked();
+    expect(screen.getByLabelText('Incluir QA')).not.toBeChecked();
+    expect(screen.getByLabelText('Horas totales de Desarrollo')).toHaveValue(40);
+    expect(screen.getByLabelText('Unidad de Desarrollo')).toBeDisabled();
+    expect(screen.queryByText('Desarrollador Backend')).not.toBeInTheDocument();
+    expect(screen.queryByText('Carga semanal por equipo')).not.toBeInTheDocument();
+    const input = screen.getByLabelText('Horas totales de Desarrollo');
+    fireEvent.change(input, { target: { value: '38' } });
+    expect(handlers.onEditGroupHours).not.toHaveBeenCalled();
+    fireEvent.blur(input);
+    expect(handlers.onEditGroupHours).toHaveBeenCalledWith(dev, 38);
+  });
+
+  it('en Por fases y módulos agrupa HH en los equipos reales con tres columnas', () => {
+    renderTeams(mappedEdtDraft, 'phases');
+    expect(screen.getByText('Nº colab.')).toBeInTheDocument();
     expect(screen.getByLabelText('Horas totales de Desarrollo')).toHaveValue(40);
     expect(screen.queryByText('Unidad')).not.toBeInTheDocument();
     expect(screen.queryByText('Duración')).not.toBeInTheDocument();
-    expect(screen.getByText('Semanas')).toBeInTheDocument();
-    expect(screen.getByText('HH/sem equipo')).toBeInTheDocument();
-    expect(screen.getByText('HH/sem/colab.')).toBeInTheDocument();
-    expect(screen.getByLabelText('Carga semanal por colaborador de Desarrollo'))
-      .toHaveTextContent('10');
-    expect(screen.getByText('S1–S2')).toBeInTheDocument();
-    expect(screen.getByText('2 sem. activas')).toBeInTheDocument();
-    expect(screen.getByRole('region', { name: 'Distribución semanal orientativa' }))
-      .toBeInTheDocument();
-    expect(screen.getByRole('columnheader', { name: 'S1' })).toBeInTheDocument();
-    expect(screen.getByRole('columnheader', { name: 'S2' })).toBeInTheDocument();
-    const groupHours = screen.getByLabelText('Horas totales de Desarrollo');
-    fireEvent.change(groupHours, { target: { value: '38' } });
-    expect(handlers.onEditGroupHours).not.toHaveBeenCalled();
-    fireEvent.blur(groupHours);
-    expect(handlers.onEditGroupHours).toHaveBeenCalledWith(dev, 38);
+    expect(screen.queryByText('Carga semanal por equipo')).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Colaboradores de Desarrollo'),
       { target: { value: '3' } });
     expect(handlers.onEditMappedCollaborators).toHaveBeenCalledWith(dev, 3);
   });
 
-  it('separa perfiles pendientes de equipos reales, sin matriz semanal ficticia', () => {
-    renderTeams(edtDraft);
-    expect(screen.getByRole('region', { name: 'Perfiles IA pendientes de asignación' }))
-      .toBeInTheDocument();
-    expect(screen.getByText('Perfiles IA sin equipo Kora')).toBeInTheDocument();
-    expect(screen.queryByLabelText('Horas totales de Desarrollo')).not.toBeInTheDocument();
-    expect(screen.queryByRole('region', { name: 'Distribución semanal orientativa' }))
-      .not.toBeInTheDocument();
-    expect(screen.getByText(/La distribución por equipos se habilitará/))
-      .toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('Colaboradores de Desarrollo'),
-      { target: { value: '3' } });
-    expect(handlers.onEditRoleCollaborators).toHaveBeenCalledWith('Desarrollo', 3);
-  });
-
-  it('pagina ocho semanas sin inventar carga ni perder las semanas restantes', () => {
-    const extended = quotationDraftDataSchema.parse({
-      ...mappedEdtDraft,
-      edtStageSettings: [{
-        stageCode: 'S1', name: 'Portal', startWeek: 1, durationWeeks: 10,
-      }],
-    });
-    renderTeams(extended);
-    expect(screen.getByRole('columnheader', { name: 'S1' })).toBeInTheDocument();
-    expect(screen.getByRole('columnheader', { name: 'S8' })).toBeInTheDocument();
-    expect(screen.queryByRole('columnheader', { name: 'S9' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Semanas anteriores' })).toBeDisabled();
-    fireEvent.click(screen.getByRole('button', { name: 'Semanas siguientes' }));
-    expect(screen.getByRole('columnheader', { name: 'S9' })).toBeInTheDocument();
-    expect(screen.getByRole('columnheader', { name: 'S10' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Semanas siguientes' })).toBeDisabled();
-  });
-
-  it('mantiene el detalle semanal solo en Por equipo, sin duplicarlo en fases', () => {
+  it('no presenta los perfiles huérfanos como equipos y mantiene sus HH trazables', () => {
     renderTeams(edtDraft, 'phases');
-    expect(screen.queryByRole('region', { name: 'Distribución semanal orientativa' }))
-      .not.toBeInTheDocument();
+    expect(screen.getByText('Perfiles IA sin equipo Kora')).toBeInTheDocument();
+    expect(screen.getByText('Desarrollador Backend')).toBeInTheDocument();
+    expect(screen.getByText('40 HH propuestas')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Horas totales de Desarrollo')).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Colaboradores de Desarrollador Backend'),
+      { target: { value: '3' } });
+    expect(handlers.onEditRoleCollaborators).toHaveBeenCalledWith('Desarrollador Backend', 3);
   });
 
-  it('en cotización manual por fases no ofrece capacidad que no determina las HH', () => {
-    const phasesDraft = quotationDraftDataSchema.parse({
-      mode: 'phases', teams: [team(dev)], phases: [{
-        name: 'Construcción', startWeek: 2, durationWeeks: 2,
-        teamHours: [{ teamId: dev, hours: 30 }],
-      }],
-    });
-    renderTeams(phasesDraft);
-    expect(screen.getByText('Semanas')).toBeInTheDocument();
-    expect(screen.getByText('S2–S3')).toBeInTheDocument();
-    expect(screen.queryByText('Dedicación')).not.toBeInTheDocument();
-    expect(screen.queryByText('Unidad')).not.toBeInTheDocument();
-    expect(screen.getByRole('region', { name: 'Distribución semanal orientativa' }))
-      .toBeInTheDocument();
-    expect(screen.getByRole('columnheader', { name: 'S3' })).toBeInTheDocument();
-  });
-
-  it('en una estimación manual, edita colaboradores, unidad, duración y dedicación directamente', () => {
+  it('conserva el modo manual y habilita los controles de capacidad', () => {
     renderTeams(manual);
-    expect(screen.getByText('Unidad')).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Unidad de Desarrollo'),
       { target: { value: 'day' } });
     expect(handlers.onEditTeam).toHaveBeenCalledWith(dev, { unit: 'day' });
-    fireEvent.change(screen.getByLabelText('Duración de Desarrollo'),
-      { target: { value: '4' } });
-    expect(handlers.onEditTeam).toHaveBeenCalledWith(dev, { duration: 4 });
     fireEvent.click(screen.getByLabelText('Incluir QA'));
     expect(handlers.onToggleTeam).toHaveBeenCalledWith(qa, true);
   });
