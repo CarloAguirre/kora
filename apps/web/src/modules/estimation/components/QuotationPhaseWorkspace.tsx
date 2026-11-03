@@ -2,6 +2,7 @@ import type { QuotationDraftData, QuotationReferenceEdt } from '@kora/contracts'
 import { quotationEdtAssignments } from '@kora/contracts';
 import { Card } from '@/shared/components/ui/Card';
 import { quotationTeamColor } from './quotation-team-colors';
+import { QuotationGroupHoursInput } from './QuotationGroupHoursInput';
 import styles from './QuotationPhaseWorkspace.module.css';
 
 type Phase = QuotationDraftData['phases'][number];
@@ -205,12 +206,10 @@ export function QuotationPhaseWorkspace({
                     <label key={row.teamId}>
                       <span><i style={{ background: quotationTeamColor(label) }}/>
                         {label} · HH</span>
-                      <input type="number" min={0} step="0.01" value={row.hours}
+                      <QuotationGroupHoursInput value={row.hours}
                         disabled={!editable}
-                        aria-label={'HH de ' + label + ' para fase ' + (index + 2)}
-                        onChange={(e) => {
-                          const amount = Number(e.target.value);
-                          if (!Number.isFinite(amount) || amount < 0) return;
+                        label={'HH de ' + label + ' para fase ' + (index + 2)}
+                        onCommit={(amount) => {
                           if (edt && onEditGroupHours)
                             onEditGroupHours(row.teamId, amount, stage?.code,
                               edt.schemaVersion === 'kora.quotation.reference-edt.v1'
