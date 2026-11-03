@@ -33,3 +33,14 @@
 .embedded .approval>div{display:grid;gap:3px}
 .embedded .approval>div>strong,.embedded .approval>div>p:not(.warning){display:none}
 .embedded .approval>div>.warning{display:block;margin:0}
+
+
+/* Acciones del resumen de cotización v5, sin documentos ni paneles extra. */
+.v5Actions{display:grid;gap:8px;padding:5px 0 0;min-width:0}
+.v5Actions button{width:100%;height:40px;border-radius:8px;font-size:12.5px;font-weight:700}
+.v5Actions .v5Send{border:1px solid #e1e5ee;background:#fff;color:#14203b}
+.v5Actions .v5Send:hover:not(:disabled){background:#f7f8fb}
+.v5Actions .v5Approve{border:1px solid #10182c;background:#10182c;color:#fff}
+.v5Actions .v5Approve:hover:not(:disabled){background:#26334d}
+.v5Actions button:disabled{opacity:.52;cursor:not-allowed}
+.v5Actions .error{font-size:11px;line-height:1.45;margin:3px 0}
