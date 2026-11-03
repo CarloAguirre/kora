@@ -103,8 +103,10 @@ describe('Cotización HTML v5 · fases y tareas', () => {
 
   it('permite modificar HH por perfil y fase; recalcular se delega a contratos', () => {
     renderEditor();
-    fireEvent.change(screen.getByLabelText('HH de Fullstack para fase 2'),
-      { target: { value: '10' } });
+    const groupHours = screen.getByLabelText('HH de Fullstack para fase 2');
+    fireEvent.change(groupHours, { target: { value: '10' } });
+    expect(callbacks.onEditGroupHours).not.toHaveBeenCalled();
+    fireEvent.blur(groupHours);
     expect(callbacks.onEditGroupHours).toHaveBeenCalledWith(
       'profile:Fullstack', 10, 'T01', undefined);
     fireEvent.change(screen.getByDisplayValue('Portal'),
