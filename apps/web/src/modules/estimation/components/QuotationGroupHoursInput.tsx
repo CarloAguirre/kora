@@ -15,7 +15,10 @@ export function QuotationGroupHoursInput({
 }) {
   const [editing, setEditing] = useState<string | null>(null);
   const cancelled = useRef(false);
+  const committed = useRef(false);
   const commit = () => {
+    if (committed.current) return;
+    committed.current = true;
     const raw = editing;
     setEditing(null);
     if (cancelled.current || raw === null || raw.trim() === '') return;
@@ -31,13 +34,24 @@ export function QuotationGroupHoursInput({
       className={className} aria-label={label}
       title="Aplica la redistribución al salir del campo o pulsar Enter"
       disabled={disabled} value={editing ?? String(value)}
-      onFocus={() => { cancelled.current = false; setEditing(String(value)); }}
-      onChange={(event) => setEditing(event.target.value)}
+      onFocus={() => {
+        cancelled.current = false;
+        committed.current = false;
+        setEditing(String(value));
+      }}
+      onChange={(event) => {
+        committed.current = false;
+        setEditing(event.target.value);
+      }}
       onBlur={commit}
       onKeyDown={(event) => {
-        if (event.key === 'Enter') event.currentTarget.blur();
+        if (event.key === 'Enter') {
+          commit();
+          event.currentTarget.blur();
+        }
         if (event.key === 'Escape') {
           cancelled.current = true;
+          commit();
           event.currentTarget.blur();
         }
       }}
