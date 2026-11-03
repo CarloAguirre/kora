@@ -9,6 +9,41 @@ import { useProjectsList } from '../api/projects.queries';
 /** Tope de la API por página — el gráfico muestra una sola página con los proyectos que pasan los filtros. */
 const CHART_PAGE_SIZE = 200;
 
+// Los nombres del eje X deben verse completos: las etiquetas diagonales con
+// 70 px de alto quedaban recortadas cuando el proyecto tenía un nombre largo.
+const PROJECT_LABEL_MAX_CHARS = 20;
+const PROJECT_BAND_WIDTH = 132;
+const PROJECT_LABEL_LINE_HEIGHT = 15;
+
+function splitProjectName(name: string): string[] {
+  const lines: string[] = [];
+  let current = '';
+
+  for (const word of name.trim().split(/\s+/).filter(Boolean)) {
+    if (current && current.length + word.length + 1 > PROJECT_LABEL_MAX_CHARS) {
+      lines.push(current);
+      current = '';
+    }
+
+    if (word.length > PROJECT_LABEL_MAX_CHARS) {
+      if (current) {
+        lines.push(current);
+        current = '';
+      }
+      for (let offset = 0; offset < word.length; offset += PROJECT_LABEL_MAX_CHARS) {
+        const part = word.slice(offset, offset + PROJECT_LABEL_MAX_CHARS);
+        if (part.length === PROJECT_LABEL_MAX_CHARS) lines.push(part);
+        else current = part;
+      }
+    } else {
+      current = current ? `${current} ${word}` : word;
+    }
+  }
+
+  if (current) lines.push(current);
+  return lines.length ? lines : ['—'];
+}
+
 interface ProjectsSummaryChartProps {
   type: ProjectType;
   clientOptions: readonly { value: string; label: string }[];
@@ -156,6 +191,13 @@ export function ProjectsSummaryChart({ type, clientOptions, showFinalizedToggle 
     [filtered],
   );
 
+  // Reservar altura para todas las líneas y ancho para cada grupo de barras.
+  // El contenedor mantiene scroll horizontal cuando hay muchos proyectos.
+  const axisHeight = Math.max(
+    70,
+    24 + PROJECT_LABEL_LINE_HEIGHT * Math.max(1, ...chartData.map((project) => splitProjectName(project.name).length)),
+  );
+
   const totals = useMemo(
     () =>
       filtered.reduce(
@@ -220,16 +262,14 @@ export function ProjectsSummaryChart({ type, clientOptions, showFinalizedToggle 
 
       <div className={styles.body}>
         <div className={styles.chartArea}>
-          {/* Cada proyecto reserva un ancho fijo y el contenedor scrollea
-              horizontalmente — con muchos proyectos, comprimir todo en el
-              ancho visible vuelve las etiquetas ilegibles (mismo ajuste que
-              la v1 aplicó en fix(proyectos): improve chart readability). */}
+          {/* Mostrar los nombres completos en líneas centradas. Si hay muchos
+              proyectos, el eje y sus barras se desplazan horizontalmente. */}
           <div className={styles.chartScroll}>
-            <div style={{ minWidth: Math.max(chartData.length * 56, 100) }}>
-              <ResponsiveContainer width="100%" height={280}>
+            <div style={{ minWidth: Math.max(chartData.length * PROJECT_BAND_WIDTH, 320) }}>
+              <ResponsiveContainer width="100%" height={240 + axisHeight}>
                 <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--kora-surface-disabled)" vertical={false} />
-                  <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} angle={-35} textAnchor="end" height={70} />
+                  <XAxis dataKey="name" interval={0} tick={<ProjectNameTick />} tickMargin={12} height={axisHeight} />
                   <YAxis tick={{ fontSize: 11 }} />
                   <Tooltip content={<ChartTooltip />} />
                   <Bar dataKey="vendidas" name="HH Vendidas" fill="var(--kora-navy)" radius={[2, 2, 0, 0]} />
@@ -254,6 +294,30 @@ export function ProjectsSummaryChart({ type, clientOptions, showFinalizedToggle 
         </div>
       </div>
     </Card>
+  );
+}
+
+function ProjectNameTick({
+  x,
+  y,
+  payload,
+}: {
+  x?: number;
+  y?: number;
+  payload?: { value?: string };
+}) {
+  if (x == null || y == null || payload?.value == null) return null;
+
+  const name = String(payload.value);
+  return (
+    <text x={x} y={y + 8} fontSize={11} fill="var(--kora-text-muted)" textAnchor="middle">
+      <title>{name}</title>
+      {splitProjectName(name).map((line, index) => (
+        <tspan key={index} x={x} dy={index === 0 ? 0 : PROJECT_LABEL_LINE_HEIGHT}>
+          {line}
+        </tspan>
+      ))}
+    </text>
   );
 }
 
