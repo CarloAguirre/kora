@@ -47,10 +47,18 @@ const draft = quotationDraftDataSchema.parse({
     },
   },
 });
+const mappedDraft = quotationDraftDataSchema.parse({
+  ...draft, mode: 'phases',
+  teams: [
+    { teamId: dev, collaborators: 1, unit: 'week', duration: 2, hoursPerWeek: 40, dedicationPercent: 100 },
+    { teamId: qa, collaborators: 1, unit: 'week', duration: 2, hoursPerWeek: 40, dedicationPercent: 100 },
+  ],
+  aiPoc: { ...draft.aiPoc!, roleTeamIds: { Fullstack: dev, Tester: qa } },
+});
 const callbacks = {
   onEditPhase: vi.fn(), onAddPhase: vi.fn(), onRemovePhase: vi.fn(),
   onEditTaskHours: vi.fn(), onEditTaskFixed: vi.fn(), onEditTaskTeam: vi.fn(),
-  onEditGroupHours: vi.fn(), onEditStage: vi.fn(),
+  onEditGroupHours: vi.fn(), onEditStage: vi.fn(), onOpenRoleMapping: vi.fn(),
 };
 function renderEditor(custom = draft) {
   return render(<QuotationPhaseWorkspace
@@ -74,12 +82,15 @@ describe('Cotización HTML v5 · fases y tareas', () => {
     expect(screen.queryByText(/Fase 1 la crea Kora/)).not.toBeInTheDocument();
   });
 
-  it('muestra grilla de cuatro columnas; equipo seleccionable, HH editable y Fija real', () => {
-    renderEditor();
+  it('muestra grilla de cuatro columnas; solo equipos reales, HH editable y Fija real', () => {
+    renderEditor(mappedDraft);
     expect(screen.getAllByText('Tarea')).toHaveLength(2);
     expect(screen.getAllByText('Equipo')).toHaveLength(2);
     expect(screen.getAllByText('Fija')).toHaveLength(2);
     expect(screen.queryByText('Tipo (catálogo)')).not.toBeInTheDocument();
+    expect(screen.getAllByText('Perfil requerido: Fullstack')).toHaveLength(1);
+    expect(screen.getByRole('option', { name: 'Desarrollo' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: /Perfil IA/ })).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Equipo de T01.01 · Fullstack'),
       { target: { value: dev } });
     expect(callbacks.onEditTaskTeam).toHaveBeenCalledWith('T01.01', 'Fullstack', dev);
@@ -88,6 +99,20 @@ describe('Cotización HTML v5 · fases y tareas', () => {
     fireEvent.change(screen.getByLabelText('HH de T01.01 · Fullstack'),
       { target: { value: '15.5' } });
     expect(callbacks.onEditTaskHours).toHaveBeenCalledWith('T01.01', 'Fullstack', 15.5);
+  });
+
+  it('no presenta perfiles IA como equipos; solicita asociación antes de asignar tareas', () => {
+    renderEditor();
+    expect(screen.getByText('Asigna los perfiles IA a equipos reales de Kora'))
+      .toBeInTheDocument();
+    expect(screen.getByText('Sin equipo · Fullstack · HH')).toBeInTheDocument();
+    const select = screen.getByLabelText('Equipo de T01.01 · Fullstack');
+    expect(select).toBeDisabled();
+    expect(screen.getByRole('option', { name: 'Pendiente · asociar perfil' }))
+      .toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: /Perfil IA/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Asignar equipos Kora' }));
+    expect(callbacks.onOpenRoleMapping).toHaveBeenCalledOnce();
   });
 
   it('bloquea el input HH de las tareas marcadas como Fija', () => {
@@ -101,14 +126,14 @@ describe('Cotización HTML v5 · fases y tareas', () => {
     expect(screen.getByLabelText('HH de T01.01 · Tester')).toBeEnabled();
   });
 
-  it('permite modificar HH por perfil y fase; recalcular se delega a contratos', () => {
-    renderEditor();
-    const groupHours = screen.getByLabelText('HH de Fullstack para fase 2');
+  it('permite modificar HH por equipo Kora y fase; recalcular se delega a contratos', () => {
+    renderEditor(mappedDraft);
+    const groupHours = screen.getByLabelText('HH de Desarrollo para fase 2');
     fireEvent.change(groupHours, { target: { value: '10' } });
     expect(callbacks.onEditGroupHours).not.toHaveBeenCalled();
     fireEvent.blur(groupHours);
     expect(callbacks.onEditGroupHours).toHaveBeenCalledWith(
-      'profile:Fullstack', 10, 'T01', undefined);
+      dev, 10, 'T01', undefined);
     fireEvent.change(screen.getByDisplayValue('Portal'),
       { target: { value: 'Portal postventa' } });
     expect(callbacks.onEditStage).toHaveBeenCalledWith(
