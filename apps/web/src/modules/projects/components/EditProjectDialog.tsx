@@ -658,6 +658,9 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
   const soldHoursChangedAfterHito0 =
     project.hito0At != null && !supportPlan && !estimationDisabled &&
     Number(watch('soldHours')) !== project.soldHours;
+  // Avisar en cuanto cambian las HH, sin esperar a que el usuario intente guardar.
+  const soldHoursChangeReasonMissing =
+    soldHoursChangedAfterHito0 && !watch('soldHoursChangeReason')?.trim();
   /** Finalizado: Estado, etapa de avance y etapa de cada fase quedan fijos (se reabre volviendo a "Proyecto aprobado"). */
   const isFinalized = isDevelopment && tipo === 'finalizado';
   /** Prospecto y Cotización solo pueden estar "No iniciado": el Estado no se elige. */
@@ -797,7 +800,13 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
           <Button variant="outline" onClick={onClose} disabled={isSubmitting}>
             Cancelar
           </Button>
-          <Button type="submit" form="edit-project-form" loading={isSubmitting} loadingText="Guardando…">
+          <Button
+            type="submit"
+            form="edit-project-form"
+            loading={isSubmitting}
+            loadingText="Guardando…"
+            disabled={soldHoursChangeReasonMissing}
+          >
             Guardar cambios
           </Button>
         </>
@@ -1001,8 +1010,16 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
                 id="soldHoursChangeReason"
                 className={styles.textarea}
                 placeholder="Ej. Ampliación de alcance aprobada por el cliente."
+                aria-invalid={soldHoursChangeReasonMissing || Boolean(errors.soldHoursChangeReason)}
+                aria-describedby={soldHoursChangeReasonMissing ? 'sold-hours-change-reason-warning' : undefined}
                 {...register('soldHoursChangeReason')}
               />
+              {soldHoursChangeReasonMissing && (
+                <div id="sold-hours-change-reason-warning" className={styles.warnBox} role="alert">
+                  <AlertIcon size={18} className={styles.alertIcon} />
+                  <span>Debes ingresar un motivo del ajuste de HH vendidas para habilitar «Guardar cambios».</span>
+                </div>
+              )}
               {errors.soldHoursChangeReason && (
                 <p className={styles.hint} role="alert">{errors.soldHoursChangeReason.message}</p>
               )}
