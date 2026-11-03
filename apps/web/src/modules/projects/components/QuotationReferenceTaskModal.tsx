@@ -61,7 +61,7 @@ export function QuotationReferenceTaskModal({
           name: name.trim(), teamId, assigneeUserId: assignee || null,
           description: [sourceMarker, reference.description].filter(Boolean).join('\n').slice(0, 2000),
           estimatedHours: Number(hours),
-          startDate, date, status: 'todo', scope,
+          startDate, date, status: 'todo', scope: scope || undefined,
         },
       });
       onClose();
