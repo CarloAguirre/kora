@@ -18,3 +18,9 @@
 .summary>button{height:40px;border-radius:8px;background:#f5f6f8;color:#10182d;border:1px solid #e1e5ec;font-size:12px}
 .summary>button:disabled{opacity:.6}
 .saved{font-size:10.5px}
+
+
+/* HH Gemini antes de mapear: cifras y colores referenciales, no venta guardada. */
+.roleHint{font-size:11.5px;color:#77718a;margin:2px 0 -5px}
+.aiNotice{border:1px solid #e8ddff;border-radius:9px;background:#f4f0ff;color:#5b21b6}
+.aiNotice span{color:#685480}
