@@ -199,14 +199,14 @@ export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
           previouslyApprovedVersionNumber={data?.versions.find((candidate) =>
             candidate.status === 'approved' && candidate.id !== approving.id)?.versionNumber}
           timing={transferTiming} onTimingChange={setTransferTiming}
-          pending={lifecycle.approveClient.isPending}
+          pending={lifecycle.approveClient.isPending} error={actionError}
           onCancel={() => setApproving(null)}
           onApprove={() => void confirmApproval()} />
       )}
       {transferring && (
         <QuotationTransferDialog project={project} version={transferring} open
           afterApproval={transferFromApproval} pending={lifecycle.transferApproved.isPending}
-          onClose={closeTransfer} onTransfer={() => void confirmTransfer()} />
+          error={actionError} onClose={closeTransfer} onTransfer={() => void confirmTransfer()} />
       )}
       {newOpen && <NewProjectQuotationModal project={project} versions={data?.versions ?? []}
         onClose={() => setNewOpen(false)} />}
