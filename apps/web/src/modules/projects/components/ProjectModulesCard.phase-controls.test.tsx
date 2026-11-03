@@ -11,6 +11,14 @@ const mocks = vi.hoisted(() => ({
   confirm: vi.fn(),
   success: vi.fn(),
   error: vi.fn(),
+  appliedPlan: { versionId: 'version-1', modules: [] as Array<{
+    moduleId: string;
+    tasks: Array<unknown>;
+    relativeTeamBlocks: Array<{
+      teamId: string; hours: number; startWeek: number; durationWeeks: number;
+    }>;
+    totalHours: number;
+  }> },
 }));
 vi.mock('@/modules/client-portal/adapters/project-detail.adapter', () => ({
   roleFromTeamName: () => 'dev',
@@ -23,15 +31,16 @@ vi.mock('@/modules/client-portal/adapters/project-detail.adapter', () => ({
   }),
 }));
 vi.mock('@/modules/client-portal/components/PhaseRoadmap', () => ({
-  PhaseRoadmap: ({ phaseRoadmap, toolbarActions, renderPhaseHeaderName, renderPhaseHeaderActions }: {
+  PhaseRoadmap: ({ phaseRoadmap, toolbarActions, renderPhaseHeaderName, renderPhaseHeaderActions, renderPhaseReferences }: {
     phaseRoadmap: { phases: { id: string }[] };
     toolbarActions?: ReactNode;
     renderPhaseHeaderName?: (phase: { id: string }) => ReactNode;
     renderPhaseHeaderActions?: (phase: { id: string }) => ReactNode;
+    renderPhaseReferences?: (phase: { id: string }) => ReactNode;
   }) => {
     const phase = phaseRoadmap.phases[0]!;
     return <section>{toolbarActions}{renderPhaseHeaderName?.(phase)}
-      {renderPhaseHeaderActions?.(phase)}</section>;
+      {renderPhaseHeaderActions?.(phase)}{renderPhaseReferences?.(phase)}</section>;
   },
 }));
 vi.mock('../api/projects.queries', () => ({
@@ -43,7 +52,7 @@ vi.mock('../api/projects.queries', () => ({
   useUpdateProjectModuleDelivery: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 vi.mock('@/modules/estimation/api/quotation.queries', () => ({
-  useAppliedQuotationPlanning: () => ({ data: { modules: [] } }),
+  useAppliedQuotationPlanning: () => ({ data: mocks.appliedPlan }),
 }));
 vi.mock('@/shared/components/ui/useConfirmAction', () => ({
   useConfirmAction: () => ({ confirm: mocks.confirm, dialog: null }),
@@ -80,6 +89,7 @@ beforeEach(() => {
   mocks.confirm.mockReset().mockResolvedValue(true);
   mocks.success.mockReset();
   mocks.error.mockReset();
+  mocks.appliedPlan.modules = [];
 });
 
 describe('Cabecera de las fases · HTML v5', () => {
@@ -127,5 +137,54 @@ describe('Cabecera de las fases · HTML v5', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Planificar' }));
     expect(screen.getByRole('button', { name: 'Eliminar fase Diseño Backend' })).toBeDisabled();
     expect(mocks.remove).not.toHaveBeenCalled();
+  });
+});
+
+describe('Referencias de bloque de trabajo de la cotización', () => {
+  const seedReference = () => {
+    mocks.appliedPlan.modules = [{
+      moduleId: 'module-1',
+      tasks: [],
+      totalHours: 160,
+      relativeTeamBlocks: [{ teamId: 'team-1', hours: 160, startWeek: 3, durationWeeks: 5 }],
+    }];
+  };
+  const plannedSegment = {
+    id: 'segment-1', teamId: 'team-1', teamName: 'Desarrollo',
+    name: 'Diseño Backend · Desarrollo',
+    startDate: '2026-11-03', endDate: '2026-12-08', members: [],
+  };
+
+  it('ofrece planificar mientras no exista un segmento de ese equipo y fase', () => {
+    seedReference();
+    show();
+    expect(screen.getByRole('button', { name: 'Planificar bloque' })).toBeEnabled();
+    expect(screen.queryByText('Bloque planificado')).not.toBeInTheDocument();
+  });
+
+  it('actualiza el estado a bloque planificado cuando el segmento aparece tras el guardado', () => {
+    seedReference();
+    const view = show();
+    expect(screen.getByRole('button', { name: 'Planificar bloque' })).toBeInTheDocument();
+    view.rerender(
+      <ProjectModulesCard project={{
+        ...project, modules: [{ ...module, segments: [plannedSegment] }],
+      } as unknown as ProjectDetail} hourEntries={[]}
+      teamOptions={[{ value: 'team-1', label: 'Desarrollo' }]} canManage />,
+    );
+    expect(screen.getByText('Bloque planificado')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Planificar bloque' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Editar bloque' })).toBeEnabled();
+  });
+
+  it('identifica un bloque operativo del equipo sin afirmar que es la referencia si fue renombrado', () => {
+    seedReference();
+    show({
+      ...project,
+      modules: [{ ...module, segments: [{ ...plannedSegment, name: 'Trabajo de integración API' }] }],
+    } as unknown as ProjectDetail);
+    expect(screen.getByText('1 bloque operativo existente')).toBeInTheDocument();
+    expect(screen.queryByText('Bloque planificado')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Planificar bloque' })).not.toBeInTheDocument();
   });
 });
