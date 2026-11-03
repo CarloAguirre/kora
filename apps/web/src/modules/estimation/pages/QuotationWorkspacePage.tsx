@@ -12,7 +12,7 @@ import { Select } from '@/shared/components/ui/Select';
 import { Badge } from '@/shared/components/ui/Badge';
 import { Modal } from '@/shared/components/ui/Modal';
 import { TextField } from '@/shared/components/ui/TextField';
-import { useAppliedQuotationPlanning, useCreateQuotationVersion, useProjectQuotation, useSaveQuotationDraft, useQuotationLifecycle } from '../api/quotation.queries';
+import { useAppliedQuotationPlanning, useCreateQuotationVersion, useProjectQuotation, useSaveQuotationDraft, useQuotationLifecycle, useQuotationTaskTypes } from '../api/quotation.queries';
 import { AnalysisEvidenceCard } from '../components/AnalysisEvidenceCard';
 import { QuotationVersionComparison } from '../components/QuotationVersionComparison';
 import { QuotationTransferPreviewCard } from '../components/QuotationTransferPreviewCard';
@@ -57,6 +57,8 @@ export function QuotationWorkspacePage() {
   const createVersion = useCreateQuotationVersion(projectId ?? '');
   const saveDraft = useSaveQuotationDraft(projectId ?? '');
   const lifecycle = useQuotationLifecycle(projectId ?? '');
+  const taskTypesQuery = useQuotationTaskTypes(projectId);
+  const taskTypes = taskTypesQuery.data ?? [];
   const teamQuery = useTeamsList({ page: 1, pageSize: 200, isActive: true, sortField: 'name' }, { enabled: Boolean(projectId) });
 
   const [form, setForm] = useState<Form | null>(null);
@@ -421,7 +423,7 @@ export function QuotationWorkspacePage() {
     }
   };
   const editTaskType = (wbs: string, classification: string) => {
-    if (!editable || !form) return;
+    if (!editable || !form || !taskTypes.some((type) => type.name === classification)) return;
     try {
       applyEdtChanges(withQuotationTaskCatalogType(form.draft, wbs, classification));
     } catch (cause) {
@@ -431,7 +433,7 @@ export function QuotationWorkspacePage() {
   const importTaskExcel = async (stageCode: string, phaseName: string, file: File) => {
     if (!editable || !form) return;
     try {
-      const records = await readQuotationTaskExcel(file, phaseName, activeTeams);
+      const records = await readQuotationTaskExcel(file, phaseName, activeTeams, taskTypes);
       if ((form.draft.edtCommercialTasks?.length ?? 0) + records.length > 240) {
         throw new Error('El borrador admite un máximo de 240 tareas comerciales.');
       }
@@ -645,6 +647,7 @@ export function QuotationWorkspacePage() {
                       teams={teamRows}
                       teamNames={teamById}
                       activeTeams={activeTeams}
+                      taskTypes={taskTypes}
                       edt={effectiveEdt}
                       roleTeamIds={form.draft.aiPoc?.roleTeamIds}
                       editable={editable}
