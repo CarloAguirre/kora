@@ -136,3 +136,13 @@
 .saveDraftAction{background:#5b21b6!important;color:#fff!important;border:1px solid #5b21b6!important;font-size:11.5px;min-height:32px;border-radius:8px}
 .saveDraftAction:hover:not(:disabled){background:#4c1d95!important}
 @media(max-width:980px){.sidebar{position:static;height:auto;max-height:none}.sidebar>div:first-child{max-height:none}}
+
+
+/* Un único acceso secundario al mapeo IA: las tablas técnicas y
+   desplegables inventados no forman parte de la vista principal del v5. */
+.mappingLink{border:0;background:none;color:#6b21a8;font-size:11.5px;
+ font-weight:650;text-decoration:underline;text-underline-offset:3px;
+ justify-self:start;width:max-content;max-width:100%;cursor:pointer;
+ padding:3px 0}
+.mappingLink:hover{color:#4c1d95}
+.mappingLink:focus-visible{outline:2px solid #c4b5fd;outline-offset:3px}
