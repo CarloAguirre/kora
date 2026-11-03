@@ -31,7 +31,11 @@ export function quotationEdtAssignments(draft: Draft): QuotationEdtAssignment[] 
   const edt = effectiveQuotationEdt(draft);
   const overrides = draft.edtTaskSettings ?? [];
   if (!edt) {
-    if (overrides.length || (draft.edtRoleCollaborators?.length ?? 0) > 0) {
+    if (overrides.length || (draft.edtRoleCollaborators?.length ?? 0) > 0 ||
+        (draft.edtCommercialStages?.length ?? 0) > 0 ||
+        (draft.edtCommercialTasks?.length ?? 0) > 0 ||
+        (draft.edtTaskNames?.length ?? 0) > 0 ||
+        (draft.edtTaskTypes?.length ?? 0) > 0) {
       throw new Error('No puedes configurar tareas o perfiles sin una EDT de origen.');
     }
     return [];
