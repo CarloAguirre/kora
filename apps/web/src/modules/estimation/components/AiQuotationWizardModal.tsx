@@ -9,6 +9,7 @@ import type {
 import { projectQuotationPath } from '@/app/router/paths';
 import { Button } from '@/shared/components/ui/Button';
 import { Modal } from '@/shared/components/ui/Modal';
+import { useToast } from '@/shared/components/ui/Toast';
 import { TextField } from '@/shared/components/ui/TextField';
 import {
   useAnalyzeEstimationPoc,
@@ -214,6 +215,8 @@ export function AiQuotationWizardModal({ project, onClose }: {
   const [answers, setAnswers] = useState<AnswerState>({});
   const [assumptions, setAssumptions] = useState<string[]>([]);
   const [error, setError] = useState('');
+  const toast = useToast();
+  const reportError = (message: string) => { setError(message); toast.error(message); };
   const [invalidId, setInvalidId] = useState<string | null>(null);
   const [analysisCompleted, setAnalysisCompleted] = useState(false);
   const questionnaire = useEstimationQuestionnaireDefinition();
@@ -279,7 +282,7 @@ export function AiQuotationWizardModal({ project, onClose }: {
       });
       if (result.provider !== 'gemini' || result.sourceMode !== 'poc_simulated' ||
           result.documentsAnalyzed < 1) {
-        setError('No se obtuvo un análisis real de Gemini sobre el documento KDM.');
+        reportError('No se obtuvo un análisis real de Gemini sobre el documento KDM.');
         return;
       }
       setUnderstanding(result.summary);
@@ -304,20 +307,24 @@ export function AiQuotationWizardModal({ project, onClose }: {
       setAnalysisCompleted(true);
       setStage(1);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'No se pudo analizar el documento KDM.');
+      reportError(reason instanceof Error ? reason.message : 'No se pudo analizar el documento KDM.');
     }
   };
 
   const next = async () => {
     setError('');
     if (stage === 0) {
-      if (questionnaire.isLoading || questionnaire.isError) return;
+      if (questionnaire.isLoading) return;
+      if (questionnaire.isError) {
+        reportError('No fue posible cargar las preguntas fijas. Comprueba tu acceso al cuestionario y vuelve a intentarlo.');
+        return;
+      }
       await analyze();
       return;
     }
     if (stage === 1) {
       if (understanding.trim().length < 20) {
-        setError('Revisa el entendimiento; debe contener al menos 20 caracteres.');
+        reportError('Revisa el entendimiento; debe contener al menos 20 caracteres.');
         return;
       }
       setStage(2);
@@ -327,7 +334,7 @@ export function AiQuotationWizardModal({ project, onClose }: {
       const missing = relevant.find((question) => question.required && !answered(question));
       if (missing) {
         setInvalidId(missing.id);
-        setError('Completa todas las respuestas obligatorias de esta etapa.');
+        reportError('Completa la pregunta obligatoria: ' + missing.question);
         return;
       }
       setInvalidId(null);
@@ -349,7 +356,7 @@ export function AiQuotationWizardModal({ project, onClose }: {
       onClose();
       navigate(projectQuotationPath(project) + '?version=' + created.id);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message :
+      reportError(reason instanceof Error ? reason.message :
         'No se pudo generar y guardar la cotización.');
     }
   };
