@@ -95,6 +95,12 @@ export const quotationApi = {
   create(projectId: string, input: CreateQuotationVersionInput = {}): Promise<QuotationVersion> {
     return api.post<QuotationVersion>(base(projectId) + '/versions', input);
   },
+  deleteVersion(projectId: string, versionId: string, revision: number):
+    Promise<{ deletedVersionId: string }> {
+    return api.delete<{ deletedVersionId: string }>(
+      base(projectId) + '/versions/' + versionId + '?revision=' + revision,
+    );
+  },
   update(projectId: string, versionId: string, input: UpdateQuotationDraftInput): Promise<QuotationVersion> {
     return api.patch<QuotationVersion>(base(projectId) + '/versions/' + versionId, input);
   },
