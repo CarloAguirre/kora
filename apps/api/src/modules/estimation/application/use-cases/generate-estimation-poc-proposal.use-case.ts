@@ -184,7 +184,7 @@ export class GenerateEstimationPocProposalUseCase {
     if (docs.length !== 1 || docs[0]?.name !== 'Requerimiento_KDM.pdf') {
       throw new BadRequestException('No se pudo comprobar el documento KDM de demostración.');
     }
-    const raw = detailResponseSchema.parse(await this.ai.generateStructured({
+    const request = {
       task: 'estimation.poc.reference-edt',
       context: {
         projectId: input.projectId,
@@ -222,8 +222,51 @@ export class GenerateEstimationPocProposalUseCase {
         ...(doc.dataBase64 ? { dataBase64: doc.dataBase64 } : {}),
       })),
       responseJsonSchema: EDT_JSON_SCHEMA,
-    }));
+    };
 
+
+    // Los artefactos generativos no son entradas determinísticas: si Gemini
+    // incumple una condición verificable, le pedimos corregir SU salida una
+    // única vez. Nunca saltamos validaciones ni reemplazamos HH con un fallback.
+    let validationIssue = '';
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const output = await this.ai.generateStructured({
+        ...request,
+        instructions: attempt === 0 ? request.instructions : [
+          request.instructions,
+          'La EDT anterior fue rechazada por las validaciones del servidor.',
+          'Rehaz la EDT desde la fuente original. Corrige exactamente este problema:',
+          validationIssue,
+          'Mantén roles EXACTOS de allowedRoles, WBS/tramos coherentes, HH mayores a 0',
+          'con máximo dos decimales y todas las actividades con fuente rastreable.',
+          'No transformes las HH para igualar una cifra preliminar.',
+        ].join('\n'),
+      });
+      try {
+        return this.buildVerifiedEdt(output, proposal);
+      } catch (error) {
+        if (!(error instanceof BadRequestException) && !(error instanceof z.ZodError)) {
+          throw error;
+        }
+        validationIssue = error instanceof z.ZodError
+          ? error.issues.slice(0, 3).map((issue) =>
+            issue.path.join('.') + ': ' + issue.message).join('; ')
+          : error.message;
+        if (attempt === 1) {
+          throw new BadRequestException(
+            'Gemini devolvió una EDT inconsistente tras el reintento: ' +
+            validationIssue.slice(0, 250),
+          );
+        }
+      }
+    }
+    throw new BadRequestException('Gemini no devolvió una EDT válida.');
+  }
+
+  private buildVerifiedEdt(
+    output: unknown, proposal: EstimationPocProposal,
+  ): QuotationReferenceEdt {
+    const raw = detailResponseSchema.parse(output);
     type Activity = typeof raw.activities[number];
     const roles = new Set(proposal.roles.map((role) => role.role));
     const stages = new Map<string, {
@@ -309,6 +352,7 @@ export class GenerateEstimationPocProposalUseCase {
       reservePercent, reserveHours,
       totalWithReserve: roundHours(totalHours + reserveHours),
     });
+
   }
 
   /** El balance de roles se deriva desde actividades, nunca se impone al EDT. */
