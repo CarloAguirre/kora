@@ -645,6 +645,22 @@ export function QuotationWorkspacePage() {
             </aside>
           </div>
         )}
+        <Modal open={roleMappingOpen && Boolean(selected?.draft.aiPoc)}
+          title="Asignar perfiles a equipos de Kora" wide
+          onClose={() => setRoleMappingOpen(false)}>
+          {selected?.draft.aiPoc && (
+            <AiPocRoleMappingCard
+              key={selected.id + ':' + selected.revision}
+              version={selected} teams={activeTeams}
+              canEdit={editable} hasUnsavedChanges={dirty}
+              onApply={(draft) => {
+                change((current) => ({ ...current, draft }));
+                setRoleMappingOpen(false);
+                setTeamView('phases');
+                setNotice('Perfiles asociados. Guarda el borrador para conservar la distribución.');
+              }}/>
+          )}
+        </Modal>
         {project && newQuotationOpen && (
           <NewProjectQuotationModal project={project} versions={versions} onClose={() => setNewQuotationOpen(false)} />
         )}
