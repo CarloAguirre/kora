@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { projectAnalysisToQuotationDraft } from '../../domain/project-analysis-to-quotation';
 import { QuotationAnalysisIntegrityError, reconcileQuotationAnalysis } from '../../domain/quotation-analysis-integrity';
-import { and, asc, desc, eq, inArray, isNull, hourEntries, projectQuotations, projects, quotationEvents, quotationVersions, sql, teams, projectTeams, projectModules, projectModuleTasks, projectModuleSegments, projectPaymentMilestones, type Database } from '@kora/db';
+import { and, asc, desc, eq, inArray, isNull, hourEntries, projectQuotations, projects, quotationEvents, quotationVersions, sql, teams, quotationTaskTypes, projectTeams, projectModules, projectModuleTasks, projectModuleSegments, projectPaymentMilestones, type Database } from '@kora/db';
 import {
   quotationDraftDataSchema,
   quotationAiPocSnapshotSchema,
@@ -31,6 +31,7 @@ import {
   type SavedQuotationReviewAssessment,
   type QuotationVersion,
   type QuotationTeamCatalogEntry,
+  type QuotationTaskCatalogEntry,
   type UpdateQuotationDraftInput,
 } from '@kora/contracts';
 import { DATABASE } from '../../../../shared/infrastructure/database/database.module';
@@ -89,6 +90,13 @@ export class DrizzleQuotationRepository implements QuotationRepository {
     }).from(teams).where(and(eq(teams.isActive, true), isNull(teams.deletedAt)))
       .orderBy(asc(teams.name));
     return rows.map((row) => ({ ...row, isActive: true }));
+  }
+
+  async listActiveQuotationTaskTypes(): Promise<QuotationTaskCatalogEntry[]> {
+    return this.db.select({ id: quotationTaskTypes.id, name: quotationTaskTypes.name })
+      .from(quotationTaskTypes)
+      .where(eq(quotationTaskTypes.isActive, true))
+      .orderBy(asc(quotationTaskTypes.sortOrder), asc(quotationTaskTypes.name));
   }
 
   /**
