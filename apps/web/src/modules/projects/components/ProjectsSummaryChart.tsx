@@ -9,40 +9,13 @@ import { useProjectsList } from '../api/projects.queries';
 /** Tope de la API por página — el gráfico muestra una sola página con los proyectos que pasan los filtros. */
 const CHART_PAGE_SIZE = 200;
 
-// Los nombres del eje X deben verse completos: las etiquetas diagonales con
-// 70 px de alto quedaban recortadas cuando el proyecto tenía un nombre largo.
-const PROJECT_LABEL_MAX_CHARS = 20;
-const PROJECT_BAND_WIDTH = 132;
-const PROJECT_LABEL_LINE_HEIGHT = 15;
-
-function splitProjectName(name: string): string[] {
-  const lines: string[] = [];
-  let current = '';
-
-  for (const word of name.trim().split(/\s+/).filter(Boolean)) {
-    if (current && current.length + word.length + 1 > PROJECT_LABEL_MAX_CHARS) {
-      lines.push(current);
-      current = '';
-    }
-
-    if (word.length > PROJECT_LABEL_MAX_CHARS) {
-      if (current) {
-        lines.push(current);
-        current = '';
-      }
-      for (let offset = 0; offset < word.length; offset += PROJECT_LABEL_MAX_CHARS) {
-        const part = word.slice(offset, offset + PROJECT_LABEL_MAX_CHARS);
-        if (part.length === PROJECT_LABEL_MAX_CHARS) lines.push(part);
-        else current = part;
-      }
-    } else {
-      current = current ? `${current} ${word}` : word;
-    }
-  }
-
-  if (current) lines.push(current);
-  return lines.length ? lines : ['—'];
-}
+// Mantener la orientación original (-35°). La altura del eje se adapta al
+// nombre más largo para evitar el recorte inferior de las etiquetas SVG.
+const X_AXIS_ANGLE_RADIANS = (35 * Math.PI) / 180;
+const X_AXIS_FONT_SIZE = 11;
+const X_AXIS_MIN_HEIGHT = 70;
+const PROJECT_MIN_WIDTH = 56;
+const estimatedLabelWidth = (name: string) => name.length * X_AXIS_FONT_SIZE * 0.62;
 
 interface ProjectsSummaryChartProps {
   type: ProjectType;
@@ -191,11 +164,20 @@ export function ProjectsSummaryChart({ type, clientOptions, showFinalizedToggle 
     [filtered],
   );
 
-  // Reservar altura para todas las líneas y ancho para cada grupo de barras.
-  // El contenedor mantiene scroll horizontal cuando hay muchos proyectos.
+  // A -35°, la altura necesaria depende de la longitud real de las etiquetas.
+  // Se preservan la fuente, inclinación, separación y tamaño de las barras.
+  const longestLabelWidth = Math.max(0, ...chartData.map((project) => estimatedLabelWidth(project.name)));
   const axisHeight = Math.max(
-    70,
-    24 + PROJECT_LABEL_LINE_HEIGHT * Math.max(1, ...chartData.map((project) => splitProjectName(project.name).length)),
+    X_AXIS_MIN_HEIGHT,
+    Math.ceil(22 + longestLabelWidth * Math.sin(X_AXIS_ANGLE_RADIANS)),
+  );
+
+  // La primera etiqueta se extiende hacia la izquierda por la inclinación:
+  // reservar solo el espacio adicional requerido, sin cortarla en el SVG.
+  const firstLabelWidth = estimatedLabelWidth(chartData[0]?.name ?? '');
+  const firstLabelPadding = Math.max(
+    0,
+    Math.ceil(firstLabelWidth * Math.cos(X_AXIS_ANGLE_RADIANS) - 70),
   );
 
   const totals = useMemo(
@@ -262,14 +244,22 @@ export function ProjectsSummaryChart({ type, clientOptions, showFinalizedToggle 
 
       <div className={styles.body}>
         <div className={styles.chartArea}>
-          {/* Mostrar los nombres completos en líneas centradas. Si hay muchos
-              proyectos, el eje y sus barras se desplazan horizontalmente. */}
+          {/* Mismo gráfico original: etiquetas a -35°, con espacio adaptativo
+              para nombres largos sin recorte y scroll horizontal existente. */}
           <div className={styles.chartScroll}>
-            <div style={{ minWidth: Math.max(chartData.length * PROJECT_BAND_WIDTH, 320) }}>
-              <ResponsiveContainer width="100%" height={240 + axisHeight}>
+            <div style={{ minWidth: Math.max(chartData.length * PROJECT_MIN_WIDTH + firstLabelPadding, 100) }}>
+              <ResponsiveContainer width="100%" height={280 + axisHeight - X_AXIS_MIN_HEIGHT}>
                 <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--kora-surface-disabled)" vertical={false} />
-                  <XAxis dataKey="name" interval={0} tick={<ProjectNameTick />} tickMargin={12} height={axisHeight} />
+                  <XAxis
+                    dataKey="name"
+                    tick={{ fontSize: X_AXIS_FONT_SIZE }}
+                    interval={0}
+                    angle={-35}
+                    textAnchor="end"
+                    height={axisHeight}
+                    padding={{ left: firstLabelPadding }}
+                  />
                   <YAxis tick={{ fontSize: 11 }} />
                   <Tooltip content={<ChartTooltip />} />
                   <Bar dataKey="vendidas" name="HH Vendidas" fill="var(--kora-navy)" radius={[2, 2, 0, 0]} />
@@ -294,30 +284,6 @@ export function ProjectsSummaryChart({ type, clientOptions, showFinalizedToggle 
         </div>
       </div>
     </Card>
-  );
-}
-
-function ProjectNameTick({
-  x,
-  y,
-  payload,
-}: {
-  x?: number;
-  y?: number;
-  payload?: { value?: string };
-}) {
-  if (x == null || y == null || payload?.value == null) return null;
-
-  const name = String(payload.value);
-  return (
-    <text x={x} y={y + 8} fontSize={11} fill="var(--kora-text-muted)" textAnchor="middle">
-      <title>{name}</title>
-      {splitProjectName(name).map((line, index) => (
-        <tspan key={index} x={x} dy={index === 0 ? 0 : PROJECT_LABEL_LINE_HEIGHT}>
-          {line}
-        </tspan>
-      ))}
-    </text>
   );
 }
 
