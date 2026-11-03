@@ -98,6 +98,7 @@ export function QuotationPhaseWorkspace({
           const total = phase.teamHours.reduce((sum, row) => sum + row.hours, 0);
           const tasks = referenceTasksForPhase(phase, edt, mapping, teamNames);
           const taskTotal = tasks.reduce((sum, row) => sum + row.hours, 0);
+          const uniqueTasks = new Set(tasks.map((task) => task.wbs)).size;
           return (
             <section className={styles.phase} key={index} aria-label={'Fase ' + (index + 2)}>
               <div className={styles.phaseHeader}>
@@ -157,8 +158,8 @@ export function QuotationPhaseWorkspace({
                 <details className={styles.tasks}>
                   <summary>
                     <strong>Tareas</strong>
-                    <span>{tasks.length} {tasks.length === 1 ? 'asignación' : 'asignaciones'}
-                      {tasks.length > 0 && ' · ' + hh(taskTotal) + ' HH'}</span>
+                    <span>{uniqueTasks} {uniqueTasks === 1 ? 'tarea' : 'tareas'}
+                      {uniqueTasks > 0 && ' · ' + hh(taskTotal) + ' HH'}</span>
                   </summary>
                   {tasks.length ? (
                     <>
