@@ -73,13 +73,30 @@ export function QuotationCommercialSummary({
 }) {
   if (!version || !draft) return <Card><h2>Resumen comercial</h2><p>Selecciona una versión.</p></Card>;
   const numbers = preview(draft, hourlyRate, tax);
-  const rows: TeamHours[] = numbers.byTeam.filter((row) => row.hours > 0)
+  const edt = draft.aiPoc?.edt;
+  const referenceOnly = Boolean(edt && (draft.mode !== 'phases' || draft.phases.length === 0));
+  // La EDT precede a la asignación comercial: nunca contar sus HH como vendidas
+  // hasta proyectar y guardar los equipos de Kora.
+  const hoursShown = referenceOnly && edt ? edt.totalHours : numbers.totalHours;
+  const commercialRows: TeamHours[] = numbers.byTeam.filter((row) => row.hours > 0)
     .map((row) => {
       const name = teamNames.get(row.teamId) ?? 'Equipo no disponible';
       return { ...row, name, tone: teamTone(name) };
     });
-  const aiHours = version.draft.aiPoc?.proposal.totalHours ?? null;
-  const unmapped = aiHours !== null && numbers.totalHours === 0 && aiHours > 0;
+  const referenceRows: TeamHours[] = (draft.aiPoc?.proposal.roles ?? []).map((role) => ({
+    teamId: 'profile:' + role.role,
+    name: role.role,
+    hours: role.totalHours,
+    tone: teamTone(role.role),
+  })).filter((role) => role.hours > 0);
+  const rows = referenceOnly ? referenceRows : commercialRows;
+  const aiHours = draft.aiPoc?.proposal.totalHours ?? null;
+  const duration = referenceOnly && edt
+    ? edt.schemaVersion === 'kora.quotation.reference-edt.v2'
+      ? Math.max(1, ...(edt.stages ?? []).map((p) => p.startWeek + p.durationWeeks - 1)) +
+        ' semanas · ' + (edt.stages?.length ?? 0) + ' tramos propuestos'
+      : edt.modules.length + ' módulos referenciales'
+    : durationLabel(draft);
   const displayAmount = (amount: number | null) =>
     amount === null ? '—' : fmtMoney(amount) + ' ' + currency;
 
@@ -87,30 +104,38 @@ export function QuotationCommercialSummary({
     <Card>
       <section className={styles.summary} aria-label="Resumen comercial de cotización">
         <div className={styles.topLine}>
-          <span>Horas totales de la cotización</span>
+          <span>{referenceOnly ? 'Horas propuestas por Gemini' : 'Horas totales del proyecto'}</span>
           {dirty && <Badge tone="warning">Sin guardar</Badge>}
         </div>
-        <div className={styles.bigNumber}>{fmt(numbers.totalHours)}<small> HH</small></div>
-        <p className={styles.duration}>{durationLabel(draft)}</p>
-        {unmapped && (
+        <div className={styles.bigNumber}>{fmt(hoursShown)}<small> HH</small></div>
+        <p className={styles.duration}>{duration}</p>
+        {referenceOnly && (
           <div className={styles.aiNotice} role="status">
-            <strong>{fmt(aiHours)} HH propuestas por IA</strong>
-            <span>Pendientes de asignar a equipos. Revisa los perfiles y guarda antes de continuar.</span>
+            <strong>Vista previa · no es el total comercial guardado</strong>
+            <span>{fmt(numbers.totalHours)} HH comerciales. Asigna los perfiles de Gemini a equipos de Kora,
+              aplica la propuesta y guarda la revisión.</span>
           </div>
         )}
+        {!referenceOnly && aiHours !== null && numbers.totalHours === 0 && aiHours > 0 &&
+          <div className={styles.aiNotice} role="status">
+            <strong>{fmt(aiHours)} HH propuestas por IA</strong>
+            <span>Pendientes de asignar a equipos de Kora.</span>
+          </div>}
         {dirty && <p className={styles.draftNotice}>Vista previa. Los importes definitivos se recalculan al guardar.</p>}
         <div className={styles.money}>
-          <div><span>Neto</span><strong>{displayAmount(numbers.netAmount)}</strong></div>
+          <div><span>Neto</span><strong>{displayAmount(referenceOnly ? null : numbers.netAmount)}</strong></div>
           <div><span>{tax === 'exempt' ? 'Total exento' : tax === 'iva19' ? 'Total con IVA' : 'Total con IGV'}</span>
-            <strong>{displayAmount(numbers.totalAmount)}</strong></div>
+            <strong>{displayAmount(referenceOnly ? null : numbers.totalAmount)}</strong></div>
         </div>
-        {hourlyRate === null && numbers.totalHours > 0 && (
+        {hourlyRate === null && hoursShown > 0 && (
           <p className={styles.warning}>Falta el valor HH del proyecto.</p>
         )}
-        <div className={styles.distribution} aria-label="Distribución de horas por equipo">
+        {referenceOnly && <p className={styles.roleHint}>Distribución de HH propuesta por perfil</p>}
+        <div className={styles.distribution}
+          aria-label={referenceOnly ? 'Distribución referencial por perfil' : 'Distribución de horas por equipo'}>
           {rows.length > 0 ? rows.map((row) => (
             <span key={row.teamId} className={styles[row.tone]}
-              style={{ width: (row.hours / numbers.totalHours * 100) + '%' }}
+              style={{ width: (row.hours / hoursShown * 100) + '%' }}
               title={row.name + ': ' + fmt(row.hours) + ' HH'} />
           )) : <span className={styles.emptyBar} />}
         </div>
