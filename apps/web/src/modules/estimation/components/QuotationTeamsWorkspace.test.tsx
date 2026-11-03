@@ -68,6 +68,14 @@ describe('Switch Equipos · HTML v5', () => {
     expect(screen.getByLabelText('Horas totales de Desarrollo')).toHaveValue(40);
     expect(screen.queryByText('Unidad')).not.toBeInTheDocument();
     expect(screen.queryByText('Duración')).not.toBeInTheDocument();
+    expect(screen.getByText('Semanas')).toBeInTheDocument();
+    expect(screen.getByText('HH/sem prom.')).toBeInTheDocument();
+    expect(screen.getByText('S1–S2')).toBeInTheDocument();
+    expect(screen.getByText('2 sem. activas')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Distribución semanal orientativa' }))
+      .toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'S1' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'S2' })).toBeInTheDocument();
     const groupHours = screen.getByLabelText('Horas totales de Desarrollo');
     fireEvent.change(groupHours, { target: { value: '38' } });
     expect(handlers.onEditGroupHours).not.toHaveBeenCalled();
@@ -76,6 +84,30 @@ describe('Switch Equipos · HTML v5', () => {
     fireEvent.change(screen.getByLabelText('Colaboradores de Desarrollo'),
       { target: { value: '3' } });
     expect(handlers.onEditRoleCollaborators).toHaveBeenCalledWith('Desarrollo', 3);
+  });
+
+  it('pagina ocho semanas sin inventar carga ni perder las semanas restantes', () => {
+    const extended = quotationDraftDataSchema.parse({
+      ...edtDraft,
+      edtStageSettings: [{
+        stageCode: 'S1', name: 'Portal', startWeek: 1, durationWeeks: 10,
+      }],
+    });
+    renderTeams(extended);
+    expect(screen.getByRole('columnheader', { name: 'S1' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'S8' })).toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: 'S9' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Semanas anteriores' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Semanas siguientes' }));
+    expect(screen.getByRole('columnheader', { name: 'S9' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'S10' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Semanas siguientes' })).toBeDisabled();
+  });
+
+  it('mantiene el detalle semanal solo en Por equipo, sin duplicarlo en fases', () => {
+    renderTeams(edtDraft, 'phases');
+    expect(screen.queryByRole('region', { name: 'Distribución semanal orientativa' }))
+      .not.toBeInTheDocument();
   });
 
   it('en una estimación manual, edita colaboradores, unidad, duración y dedicación directamente', () => {
