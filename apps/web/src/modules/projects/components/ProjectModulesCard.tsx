@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { createPortal } from 'react-dom';
+import { useMemo, useState, type ReactNode } from 'react';
 import {
   PROJECT_MODULE_DELIVERY_STATUS_LABELS,
   PROJECT_MODULE_STAGES,
@@ -17,6 +16,7 @@ import {
 } from '@kora/contracts';
 import styles from './ProjectModulesCard.module.css';
 import { Card } from '@/shared/components/ui/Card';
+import { Modal } from '@/shared/components/ui/Modal';
 import { Button } from '@/shared/components/ui/Button';
 import { Select } from '@/shared/components/ui/Select';
 import { Avatar } from '@/shared/components/ui/Avatar';
@@ -414,14 +414,6 @@ function SegmentDrawer({
   const toast = useToast();
   const updateDelivery = useUpdateProjectModuleDelivery();
   const [comment, setComment] = useState('');
-  useEffect(() => {
-    const keydown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', keydown);
-    return () => document.removeEventListener('keydown', keydown);
-  }, [onClose]);
-
   const team = project.teams.find((item) => item.teamId === segment.teamId);
   const projected = reference?.relativeTeamBlocks?.filter(
     (block) => block.teamId === segment.teamId,
@@ -447,82 +439,108 @@ function SegmentDrawer({
         ? error.message : 'No se pudo registrar la entrega.');
     }
   };
-  return createPortal(
-    <div className={styles.drawerBackdrop} onMouseDown={onClose}>
-      <aside role="dialog" aria-modal="true"
-        aria-label={'Bloque de trabajo: ' + segment.name}
-        className={styles.drawer} onMouseDown={(event) => event.stopPropagation()}>
-        <div className={styles.drawerScroll}>
-          <p className={styles.drawerPhase}>Fase · {module.name}</p>
-          <SegmentDetail segment={segment} onClose={onClose} />
-          <div className={styles.drawerSection}>
-            <p className={styles.drawerTeam}>
-              <span className={styles.referenceTaskDot}
-                style={{ background: teamColor(segment.teamName) }} />
-              <strong>{segment.teamName}</strong>
-              <span>Líder: {team?.leader?.fullName ?? 'Sin líder asignado'}</span>
-            </p>
-            <div className={styles.drawerFacts}>
-              <span>Fechas <b>{formatDate(segment.startDate)} – {formatDate(segment.endDate)}</b></span>
-              <span>HH estimadas (cotización) <b>{hours ?? '—'}</b></span>
-              <span>HH consumidas del bloque <b>Sin desglose por bloque</b></span>
-            </div>
-            <p className={styles.drawerHint}>
-              Las HH reales se registran en Kora por módulo. No se atribuyen
-              automáticamente a un bloque sin una relación verificable.
-            </p>
-          </div>
-          <div className={styles.drawerSection}>
-            <h4>Entrega de cierre</h4>
-            {delivery ? (
-              <>
-                <div className={styles.drawerDelivery}>
-                  <strong>{delivery.name ?? module.name + ' · ' + segment.teamName}</strong>
-                  <span>Fecha planificada: {formatDate(delivery.estimatedDate)}</span>
-                  <Badge tone={DELIVERY_STATUS_TONE[delivery.status]}>
-                    {PROJECT_MODULE_DELIVERY_STATUS_LABELS[delivery.status]}
-                  </Badge>
-                </div>
-                {delivery.status === 'planned' && onEdit && delivery.assigneeUserId && (
-                  <div className={styles.drawerDeliveryAction}>
-                    <label htmlFor={'delivery-comment-' + delivery.id}>
-                      Comentario obligatorio de entrega
-                    </label>
-                    <textarea id={'delivery-comment-' + delivery.id}
-                      value={comment} maxLength={1000} rows={2}
-                      onChange={(event) => setComment(event.target.value)}
-                      placeholder="Describe la entrega realizada" />
-                    <Button disabled={!comment.trim() || updateDelivery.isPending}
-                      onClick={() => void deliver()}>
-                      Marcar como entregada
-                    </Button>
-                  </div>
-                )}
-              </>
-            ) : (
-              <p className={styles.drawerHint}>
-                No hay una entrega única vinculada a este equipo y fecha.
-                Puedes configurarla desde el editor existente del proyecto.
-              </p>
-            )}
-          </div>
-          <div className={styles.drawerSection}>
-            <h4>Tareas del equipo en esta fase ({teamTasks.length})</h4>
-            {teamTasks.length ? (
-              <ul className={styles.drawerTaskList}>
-                {teamTasks.map((task) => <li key={task.id}>
-                  {task.name} · {task.estimatedHours ?? '—'} HH
-                </li>)}
-              </ul>
-            ) : <p className={styles.drawerHint}>Aún no hay tareas operativas de este equipo.</p>}
-          </div>
-        </div>
-        {(onEdit || onDelete) && <footer className={styles.drawerFooter}>
+  return (
+    <Modal open side title={segment.name}
+      description={'Fase · ' + module.name}
+      headerExtra={<Badge tone={segmentState(segment).tone}>{segmentState(segment).label}</Badge>}
+      onClose={onClose}
+      footer={(onEdit || onDelete) ? (
+        <div className={styles.drawerFooter}>
           {onDelete && <Button variant="outline" onClick={onDelete}>Eliminar bloque</Button>}
           {onEdit && <Button onClick={onEdit}>Editar bloque</Button>}
-        </footer>}
-      </aside>
-    </div>, document.body,
+        </div>
+      ) : undefined}>
+      <div className={styles.drawerScroll}>
+        <p className={styles.drawerTeam}>
+          <span className={styles.referenceTaskDot}
+            style={{ background: teamColor(segment.teamName) }} />
+          <strong>{segment.teamName}</strong>
+          <span>Líder: {team?.leader?.fullName ?? 'Sin líder asignado'}</span>
+        </p>
+        <Facts>
+          <Fact label="Inicio" value={formatDate(segment.startDate)} />
+          <Fact label="Término" value={formatDate(segment.endDate)} />
+          <Fact label="Duración" value={plural(calendarDays(segment.startDate, segment.endDate), 'día')} />
+          <Fact label="Colaboradores" value={segment.members.length ? String(segment.members.length) : 'Sin asignar'} />
+        </Facts>
+        <div className={styles.drawerSection}>
+          <div className={styles.drawerFacts}>
+            <span>Fechas <b>{formatDate(segment.startDate)} – {formatDate(segment.endDate)}</b></span>
+            <span>HH estimadas (cotización) <b>{hours ?? '—'}</b></span>
+            <span>HH consumidas del bloque <b>Sin desglose por bloque</b></span>
+          </div>
+          <p className={styles.drawerHint}>
+            Las HH reales se registran en Kora por módulo. No se atribuyen
+            automáticamente a un bloque sin una relación verificable.
+          </p>
+        </div>
+        {segment.members.length > 0 && (
+          <div className={styles.drawerSection}>
+            <h4>Colaboradores del bloque</h4>
+            <ul className={styles.members}>
+              {segment.members.map((member) => (
+                <li key={member.teamMemberId} className={styles.member}>
+                  <Avatar name={member.fullName} size={30} />
+                  <div className={styles.memberInfo}>
+                    <span className={styles.memberName}>{member.fullName}</span>
+                    <span className={styles.memberMeta}>
+                      {member.dailyPercent != null
+                        ? member.dailyPercent + '% de dedicación diaria'
+                        : 'Sin porcentaje de dedicación'}
+                    </span>
+                  </div>
+                  <span className={styles.memberPercent}>
+                    {member.dailyPercent != null ? member.dailyPercent + '%' : '—'}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        <div className={styles.drawerSection}>
+          <h4>Entrega de cierre</h4>
+          {delivery ? (
+            <>
+              <div className={styles.drawerDelivery}>
+                <strong>{delivery.name ?? module.name + ' · ' + segment.teamName}</strong>
+                <span>Fecha planificada: {formatDate(delivery.estimatedDate)}</span>
+                <Badge tone={DELIVERY_STATUS_TONE[delivery.status]}>
+                  {PROJECT_MODULE_DELIVERY_STATUS_LABELS[delivery.status]}
+                </Badge>
+              </div>
+              {delivery.status === 'planned' && onEdit && delivery.assigneeUserId && (
+                <div className={styles.drawerDeliveryAction}>
+                  <label htmlFor={'delivery-comment-' + delivery.id}>
+                    Comentario obligatorio de entrega
+                  </label>
+                  <textarea id={'delivery-comment-' + delivery.id}
+                    value={comment} maxLength={1000} rows={2}
+                    onChange={(event) => setComment(event.target.value)}
+                    placeholder="Describe la entrega realizada" />
+                  <Button disabled={!comment.trim() || updateDelivery.isPending}
+                    onClick={() => void deliver()}>Marcar como entregada</Button>
+                </div>
+              )}
+            </>
+          ) : (
+            <p className={styles.drawerHint}>
+              No hay una entrega única vinculada a este equipo y fecha.
+              Puedes configurarla desde el editor existente del proyecto.
+            </p>
+          )}
+        </div>
+        <div className={styles.drawerSection}>
+          <h4>Tareas del equipo en esta fase ({teamTasks.length})</h4>
+          {teamTasks.length ? (
+            <ul className={styles.drawerTaskList}>
+              {teamTasks.map((task) => <li key={task.id}>
+                {task.name} · {task.estimatedHours ?? '—'} HH
+              </li>)}
+            </ul>
+          ) : <p className={styles.drawerHint}>Aún no hay tareas operativas de este equipo.</p>}
+        </div>
+      </div>
+    </Modal>
   );
 }
 
@@ -609,50 +627,6 @@ function Description({ text }: { text: string | null }) {
       <span className={styles.factLabel}>Descripción</span>
       <p className={styles.descriptionText}>{text}</p>
     </div>
-  );
-}
-
-function SegmentDetail({ segment, onClose, onEdit }: { segment: ProjectModuleSegment; onClose: () => void; onEdit?: () => void }) {
-  const state = segmentState(segment);
-  const days = calendarDays(segment.startDate, segment.endDate);
-  return (
-    <DetailPanel
-      eyebrow="Tiempo de ejecución"
-      title={segment.name}
-      teamName={segment.teamName}
-      badges={<Badge tone={state.tone}>{state.label}</Badge>}
-      onEdit={onEdit}
-      editLabel="Editar fechas y colaboradores de este tiempo de ejecución"
-      onClose={onClose}
-    >
-      <Facts>
-        <Fact label="Inicio" value={formatDate(segment.startDate)} />
-        <Fact label="Término" value={formatDate(segment.endDate)} />
-        <Fact label="Duración" value={plural(days, 'día')} />
-        <Fact label="Colaboradores" value={segment.members.length > 0 ? String(segment.members.length) : 'Sin asignar'} />
-      </Facts>
-      {segment.members.length > 0 && (
-        <ul className={styles.members}>
-          {segment.members.map((member) => (
-            <li key={member.teamMemberId} className={styles.member}>
-              <Avatar name={member.fullName} size={30} />
-              <div className={styles.memberInfo}>
-                <span className={styles.memberName}>{member.fullName}</span>
-                <span className={styles.memberMeta}>
-                  {member.dailyPercent != null ? `${member.dailyPercent}% de su jornada diaria` : 'Sin % asignado — no carga HH al Forecast'}
-                </span>
-              </div>
-              {member.dailyPercent != null && (
-                <div className={styles.memberLoad} aria-hidden="true">
-                  <span className={styles.memberLoadFill} style={{ width: `${Math.min(member.dailyPercent, 100)}%` }} />
-                </div>
-              )}
-              <span className={styles.memberPercent}>{member.dailyPercent != null ? `${member.dailyPercent}%` : '—'}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </DetailPanel>
   );
 }
 
