@@ -324,6 +324,7 @@ export function TeamReport({ team, currentUserId, memberUserId, onMemberChange }
             members={members}
             rows={pageRows}
             allRows={visibleRows}
+            hasRecentProjects={rows.length > 0}
             loading={isLoading}
             error={
               error instanceof ApiRequestError && error.status === 403
@@ -472,6 +473,7 @@ interface ReportTableProps {
   rows: readonly TeamReportRow[];
   /** Todas las filas filtradas (no solo la página) — base de la fila de totales. */
   allRows: readonly TeamReportRow[];
+  hasRecentProjects: boolean;
   loading: boolean;
   error: string | null;
   sort: SortState<SortField> | null;
@@ -480,7 +482,7 @@ interface ReportTableProps {
   isAccumulated: boolean;
 }
 
-function ReportTable({ team, members, rows, allRows, loading, error, sort, onSort, onClearFilters, isAccumulated }: ReportTableProps) {
+function ReportTable({ team, members, rows, allRows, hasRecentProjects, loading, error, sort, onSort, onClearFilters, isAccumulated }: ReportTableProps) {
   const toast = useToast();
   const updateComment = useUpdateTeamReportComment(team.id);
   const [hovered, setHovered] = useState<{
@@ -594,10 +596,16 @@ function ReportTable({ team, members, rows, allRows, loading, error, sort, onSor
           {!loading && !error && rows.length === 0 && (
             <tr>
               <td colSpan={columnCount} className={styles.stateCell}>
-                No hay proyectos con estos filtros.{' '}
-                <button type="button" className={styles.linkButton} onClick={onClearFilters}>
-                  Limpiar filtros
-                </button>
+                {hasRecentProjects ? (
+                  <>
+                    No hay proyectos con estos filtros.{' '}
+                    <button type="button" className={styles.linkButton} onClick={onClearFilters}>
+                      Limpiar filtros
+                    </button>
+                  </>
+                ) : (
+                  'El equipo no tiene proyectos con HH cargadas en los últimos 10 días.'
+                )}
               </td>
             </tr>
           )}
