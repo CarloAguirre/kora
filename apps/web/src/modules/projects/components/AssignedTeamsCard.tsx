@@ -49,11 +49,14 @@ export function AssignedTeamsCard({
   project,
   teams,
   onViewHours,
+  onManageTeams,
   canOpenTeam = () => true,
 }: {
   project: { id: string; slug?: string | null };
   teams: readonly AssignedTeamSummary[];
   onViewHours: () => void;
+  /** Reutiliza la edición actual de proyecto; no implementa otro gestor de equipos. */
+  onManageTeams?: () => void;
   /** Qué tarjetas llevan a la ficha del equipo — un líder de equipo solo entra a gestionar el suyo; el resto queda informativo. */
   canOpenTeam?: (teamId: string) => boolean;
 }) {
@@ -61,9 +64,14 @@ export function AssignedTeamsCard({
     <Card>
       <div className={styles.header}>
         <h2 className={styles.title}>Equipos Asignados</h2>
-        <Button variant="outlineDark" size="sm" iconLeft={<ClockIcon size={14} />} onClick={onViewHours}>
-          Ver registro de horas
-        </Button>
+        <div className={styles.headerActions}>
+          {onManageTeams && <Button size="sm" variant="outlineDark" onClick={onManageTeams}>
+            Gestionar equipos
+          </Button>}
+          <Button variant="outlineDark" size="sm" iconLeft={<ClockIcon size={14} />} onClick={onViewHours}>
+            Ver registro de horas
+          </Button>
+        </div>
       </div>
 
       {teams.length > 0 ? (
