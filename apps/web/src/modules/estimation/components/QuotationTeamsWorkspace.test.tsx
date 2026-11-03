@@ -68,8 +68,10 @@ describe('Switch Equipos · HTML v5', () => {
     expect(screen.getByLabelText('Horas totales de Desarrollo')).toHaveValue(40);
     expect(screen.queryByText('Unidad')).not.toBeInTheDocument();
     expect(screen.queryByText('Duración')).not.toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('Horas totales de Desarrollo'),
-      { target: { value: '38' } });
+    const groupHours = screen.getByLabelText('Horas totales de Desarrollo');
+    fireEvent.change(groupHours, { target: { value: '38' } });
+    expect(handlers.onEditGroupHours).not.toHaveBeenCalled();
+    fireEvent.blur(groupHours);
     expect(handlers.onEditGroupHours).toHaveBeenCalledWith('profile:Desarrollo', 38);
     fireEvent.change(screen.getByLabelText('Colaboradores de Desarrollo'),
       { target: { value: '3' } });
