@@ -54,7 +54,7 @@ export function buildQuotationTaskTemplate(
   const original = new Uint8Array(XLSX.write(book, { bookType: 'xlsx', type: 'array' }));
   // La versión Community de SheetJS no emite restricciones de lista en el
   // writer; se incorporan mediante el contenedor ZIP OOXML de XLSX.CFB.
-  const cfb = XLSX.CFB.read(original);
+  const cfb = XLSX.CFB.read(original, { type: 'buffer' });
   const location = 'xl/worksheets/sheet1.xml';
   const sheetFile = XLSX.CFB.find(cfb, location);
   if (!sheetFile?.content) throw new Error('No se pudo preparar el XML de la hoja Tareas.');
