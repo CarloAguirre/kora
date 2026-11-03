@@ -54,8 +54,11 @@ export function QuotationTeamsWorkspace({
     role.role, draft.edtRoleCollaborators?.find((item) =>
       item.role === role.role)?.collaborators ?? role.people,
   ]) ?? []);
+  const pendingProfiles = hasEdt
+    ? [...grouped].filter(([key]) => key.startsWith('profile:')) : [];
   const visibleTeams = hasEdt
-    ? [...grouped].map(([teamId, hours]) => ({ teamId, hours }))
+    ? [...grouped].filter(([key]) => !key.startsWith('profile:'))
+        .map(([teamId, hours]) => ({ teamId, hours }))
     : [
         ...draft.teams.map((team) => ({ teamId: team.teamId, hours: 0 })),
         ...activeTeams.filter((team) => !draft.teams.some((row) =>
@@ -202,11 +205,47 @@ export function QuotationTeamsWorkspace({
           );
         })}
         {visibleTeams.length === 0 && <p className={styles.empty}>
-          Selecciona un equipo para comenzar la estimación.
+          {hasEdt
+            ? 'Todavía no hay equipos reales de Kora asociados a las actividades de la EDT.'
+            : 'Selecciona un equipo para comenzar la estimación.'}
         </p>}
       </div>
-      {mappingAction}
-      {planned && weeklyPlan && (
+      {pendingProfiles.length > 0 && (
+        <section className={styles.pendingProfiles} aria-label="Perfiles IA pendientes de asignación">
+          <div>
+            <h3>Perfiles IA sin equipo Kora</h3>
+            <p>Estos perfiles no son equipos. Sus HH siguen en la EDT y no se
+              distribuirán comercialmente hasta asociarlos a equipos existentes.</p>
+          </div>
+          <div className={styles.pendingList}>
+            {pendingProfiles.map(([key, hours]) => {
+              const role = key.slice(8);
+              return <div key={key} className={styles.pendingRole}>
+                <strong>{role}</strong>
+                <span>{fmt(hours)} HH propuestas</span>
+                <label>Colaboradores de referencia
+                  <input type="number" min={1} max={100} value={rolePeople.get(role) ?? 1}
+                    disabled={!editable} aria-label={'Colaboradores de ' + role}
+                    onChange={(e) => {
+                      const count = Number(e.target.value);
+                      if (Number.isInteger(count) && count >= 1 && count <= 100)
+                        onEditRoleCollaborators(role, count);
+                    }}/>
+                </label>
+              </div>;
+            })}
+          </div>
+          {mappingAction}
+        </section>
+      )}
+      {pendingProfiles.length === 0 && mappingAction}
+      {planned && pendingProfiles.length > 0 && (
+        <p className={styles.weeklyUnavailable}>
+          La distribución por equipos se habilitará cuando todos los perfiles IA
+          estén asociados a equipos reales de Kora. Las HH originales se conservan.
+        </p>
+      )}
+      {planned && pendingProfiles.length === 0 && weeklyPlan && (
         <section className={styles.weeklyPanel} aria-label="Distribución semanal orientativa">
           <div className={styles.weeklyHeading}>
             <div>
@@ -272,7 +311,7 @@ export function QuotationTeamsWorkspace({
           </p>
         </section>
       )}
-      {planned && !weeklyPlan && (
+      {planned && pendingProfiles.length === 0 && !weeklyPlan && (
         <p className={styles.weeklyUnavailable}>
           {hasEdt
             ? 'Esta EDT no contiene una planificación semanal completa. No se inventan semanas ni dedicaciones: define las semanas de sus módulos en «Por fases y módulos».'
