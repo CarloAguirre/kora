@@ -50,6 +50,7 @@ vi.mock('@/modules/users/api/users.queries', () => ({
  // Aislar el nuevo widget evita requerir QueryClientProvider y peticiones de red
  // en un test que ya sustituye los demás hooks de datos por mocks.
 vi.mock('@/modules/estimation/api/quotation.queries', () => ({
+  useDeleteQuotationVersion: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useQuotationLifecycle: () => ({
     approveClient: { mutateAsync: vi.fn(), isPending: false },
     transferApproved: { mutateAsync: vi.fn(), isPending: false },
