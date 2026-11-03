@@ -31,8 +31,10 @@ describe('Excel de tareas en cotización', () => {
     const catalog = XLSX.utils.sheet_to_json<unknown[]>(book.Sheets['Tipos catálogo']!, {header: 1});
     expect(catalog.some((row) => row[0] === 'Integración con API')).toBe(true);
     const cfb = XLSX.CFB.read(bytes, { type: 'buffer' });
-    const entry = XLSX.CFB.find(cfb, 'xl/worksheets/sheet1.xml');
-    const xml = new TextDecoder().decode(new Uint8Array(entry!.content!));
+    const index = cfb.FullPaths.findIndex((path) =>
+      path.toLowerCase().endsWith('/xl/worksheets/sheet1.xml'));
+    expect(index).toBeGreaterThanOrEqual(0);
+    const xml = new TextDecoder().decode(new Uint8Array(cfb.FileIndex[index]!.content!));
     expect(xml).toContain('sqref="C2:C201"');
     expect(xml).toContain('<formula1>EquiposKora</formula1>');
     expect(xml).toContain('sqref="D2:D201"');
