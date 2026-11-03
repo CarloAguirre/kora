@@ -50,6 +50,35 @@ describe('QuotationCommercialSummary · fidelidad comercial sin alterar el cálc
     expect(screen.getByRole('button', { name: 'Guardar cambios del borrador' })).toBeDisabled();
   });
 
+  it('muestra las HH y distribución por perfil de una EDT ya guardada sin pedir nueva ejecución IA', () => {
+    const withEdt = quotationVersionSchema.parse({
+      ...version,
+      draft: {
+        ...version.draft,
+        aiPoc: {
+          ...version.draft.aiPoc,
+          edt: {
+            schemaVersion: 'kora.quotation.reference-edt.v1',
+            source: 'kdm_demo', provider: 'gemini', totalHours: 40,
+            modules: [{ name: 'Portal', totalHours: 40,
+              tasks: [{ wbs: '1.1', name: 'Implementar API',
+                description: 'Servicio backend', role: 'Desarrollo', hours: 40 }] }],
+          },
+        },
+      },
+    });
+    render(<QuotationCommercialSummary {...baseProps} version={withEdt}
+      draft={withEdt.draft} />);
+    expect(screen.getByText('Horas propuestas por Gemini')).toBeInTheDocument();
+    expect(screen.getByText('Distribución de HH propuesta por perfil')).toBeInTheDocument();
+    expect(screen.getByText('Vista previa · no es el total comercial guardado')).toBeInTheDocument();
+    expect(screen.getByText(/0 HH comerciales/)).toBeInTheDocument();
+    expect(screen.getByText('Falta el valor HH del proyecto.')).toBeInTheDocument();
+    expect(screen.getByText('40')).toBeInTheDocument();
+    expect(screen.getByText('40 HH')).toBeInTheDocument();
+    expect(screen.getByText('—')).toBeInTheDocument();
+  });
+
   it('muestra el cálculo comercial de vista previa y permite guardarlo', () => {
     const draft: QuotationDraftData = {
       ...version.draft,
