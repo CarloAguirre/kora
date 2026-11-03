@@ -56,6 +56,15 @@ export class AllExceptionsFilter implements ExceptionFilter {
         method: request.method,
         url: request.url,
         code: body.code,
+        // Únicamente en desarrollo y para la estimación: hace visible el
+        // verdadero motivo de HTTP_400 sin exponer respuestas de negocio,
+        // documentos, prompts ni credenciales. El requestId correlaciona
+        // el mismo error que retorna la API.
+        ...(status === HttpStatus.BAD_REQUEST &&
+          process.env.NODE_ENV !== 'production' &&
+          request.url.startsWith('/api/estimations/')
+          ? { reason: body.message.slice(0, 300) }
+          : {}),
       });
     }
 

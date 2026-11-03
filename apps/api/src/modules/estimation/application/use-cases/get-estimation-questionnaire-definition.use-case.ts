@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { EstimationQuestionnaireDefinition } from '@kora/contracts';
 
-const DEFINITION: EstimationQuestionnaireDefinition = {
+export const ESTIMATION_QUESTIONNAIRE_DEFINITION: EstimationQuestionnaireDefinition = {
   maxDynamicFirstRound: 5,
   maxDynamicFollowUp: 2,
   targetMinutesMin: 3,
@@ -106,6 +106,6 @@ const DEFINITION: EstimationQuestionnaireDefinition = {
 @Injectable()
 export class GetEstimationQuestionnaireDefinitionUseCase {
   execute(): EstimationQuestionnaireDefinition {
-    return DEFINITION;
+    return ESTIMATION_QUESTIONNAIRE_DEFINITION;
   }
 }

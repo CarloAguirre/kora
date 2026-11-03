@@ -1,13 +1,13 @@
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { z } from 'zod';
 import { extractDriveFolderId } from '../drive-source-selection';
+import { resolveEstimationQuestionnaireContext, type EstimationInputWithQuestions } from '../resolve-estimation-questionnaire-context';
 import {
   estimationPocAiDraftSchema,
   quotationReferenceEdtSchema,
   type QuotationReferenceEdt,
   estimationPocProposalSchema,
   type EstimationPocProposal,
-  type GenerateEstimationPocInput,
 } from '@kora/contracts';
 import {
   AI_PROVIDER,
@@ -89,27 +89,35 @@ const TEAM_ESTIMATE_RESPONSE_SCHEMA = {
 
 
 /**
- * Una fila = actividad WBS × perfil. Una actividad con 3 perfiles se devuelve
- * en 3 filas con el mismo WBS. Evita tres niveles de arrays en responseSchema
- * (Gemini Flash-Lite rechaza estructuras complejas con INVALID_ARGUMENT).
- * Kora agrupa filas y calcula los totales sin redistribución proporcional.
+ * Tres tablas planas, sin subarrays: tramo, actividad única por WBS y HH
+ * por cruce WBS×perfil. Así no se repiten ni los textos de tareas ni los
+ * periodos de los tramos en cada línea generada por Gemini.
+ *
+ * El esquema ofrecido a Flash-Lite usa solo objetos y arrays de UN nivel,
+ * evitando INVALID_ARGUMENT de estructuras profundamente anidadas.
  */
 const detailResponseSchema = z.object({
   reservePercent: z.number().min(0).max(100),
+  stages: z.array(z.object({
+    code: z.string().trim().min(1).max(40),
+    name: z.string().trim().min(1).max(300),
+    startWeek: z.number().int().min(1).max(520),
+    durationWeeks: z.number().int().min(1).max(520),
+  })).min(1).max(20),
   activities: z.array(z.object({
     wbs: z.string().trim().min(1).max(40),
     stageCode: z.string().trim().min(1).max(40),
-    stageName: z.string().trim().min(1).max(300),
-    startWeek: z.number().int().min(1).max(520),
-    durationWeeks: z.number().int().min(1).max(520),
     module: z.string().trim().min(1).max(300),
     submodule: z.string().trim().max(300),
     name: z.string().trim().min(1).max(300),
     description: z.string().trim().max(3000),
-    role: z.string().trim().min(1).max(120),
-    hours: z.number().positive().max(1000000),
     references: z.string().trim().max(1000),
     classification: z.string().trim().max(40),
+  })).min(1).max(120),
+  roleHours: z.array(z.object({
+    wbs: z.string().trim().min(1).max(40),
+    role: z.string().trim().min(1).max(120),
+    hours: z.number().positive().max(1000000),
   })).min(1).max(240),
 });
 
@@ -117,32 +125,47 @@ const EDT_JSON_SCHEMA = {
   type: 'OBJECT',
   properties: {
     reservePercent: { type: 'NUMBER' },
-    activities: {
+    stages: {
       type: 'ARRAY',
+      description: 'Una única definición para cada tramo cronológico; no repetir en actividades.',
       items: {
         type: 'OBJECT',
         properties: {
-          wbs: { type: 'STRING' },
-          stageCode: { type: 'STRING' },
-          stageName: { type: 'STRING' },
-          startWeek: { type: 'NUMBER' },
-          durationWeeks: { type: 'NUMBER' },
-          module: { type: 'STRING' },
-          submodule: { type: 'STRING' },
-          name: { type: 'STRING' },
-          description: { type: 'STRING' },
-          role: { type: 'STRING' },
-          hours: { type: 'NUMBER' },
-          references: { type: 'STRING' },
-          classification: { type: 'STRING' },
+          code: { type: 'STRING' }, name: { type: 'STRING' },
+          startWeek: { type: 'NUMBER' }, durationWeeks: { type: 'NUMBER' },
         },
-        required: ['wbs', 'stageCode', 'stageName', 'startWeek', 'durationWeeks',
-          'module', 'submodule', 'name', 'description', 'role', 'hours',
-          'references', 'classification'],
+        required: ['code', 'name', 'startWeek', 'durationWeeks'],
+      },
+    },
+    activities: {
+      type: 'ARRAY',
+      description: 'Una actividad por WBS único, sin perfiles ni HH repetidos.',
+      items: {
+        type: 'OBJECT',
+        properties: {
+          wbs: { type: 'STRING' }, stageCode: { type: 'STRING' },
+          module: { type: 'STRING' }, submodule: { type: 'STRING' },
+          name: { type: 'STRING' }, description: { type: 'STRING' },
+          references: { type: 'STRING' }, classification: { type: 'STRING' },
+        },
+        required: ['wbs', 'stageCode', 'module', 'submodule', 'name',
+          'description', 'references', 'classification'],
+      },
+    },
+    roleHours: {
+      type: 'ARRAY',
+      description: 'HH individuales por pareja WBS y perfil. La pareja no debe repetirse.',
+      items: {
+        type: 'OBJECT',
+        properties: {
+          wbs: { type: 'STRING' }, role: { type: 'STRING' },
+          hours: { type: 'NUMBER' },
+        },
+        required: ['wbs', 'role', 'hours'],
       },
     },
   },
-  required: ['reservePercent', 'activities'],
+  required: ['reservePercent', 'stages', 'activities', 'roleHours'],
 } as const;
 
 const BASE_INSTRUCTIONS = [
@@ -150,9 +173,11 @@ const BASE_INSTRUCTIONS = [
   'Esta es una prueba de concepto liviana: estima solo a nivel de equipos/roles.',
   'NO generes EDT, tareas, requerimientos, historias de usuario ni casos de uso.',
   'Propón solo perfiles que estén justificados por los documentos o por una necesidad técnica evidente.',
+  'Usa nombres de rol únicos, sin repetir perfiles con distinta capitalización; duración, horas por unidad y cantidad de personas deben ser mayores que cero.',
   'Para cada rol devuelve unidad (week o day), duración, horas por unidad y cantidad de personas.',
   'No calcules HH totales: Kora realizará esa aritmética de forma determinística.',
   'En source cita el nombre del documento que sustenta la decisión; si no existe evidencia directa, indica que es un supuesto técnico.',
+  'Interpreta decisiones de alcance desde context.resolvedAnswers: incluye la pregunta completa, la opción textual y los supuestos NO CONFIRMADOS. Nunca interpretes D01=yes por su código sin consultar el enunciado.',
   'Cuando falte información, documenta el supuesto en assumptions en vez de inventar funcionalidades.',
   'Los roles habituales pueden incluir Desarrollo, Tech Lead/Líder, QA, Arquitectura, UX/UI, IA, RPA o PMO, pero no es obligatorio incluirlos todos.',
   'Devuelve una propuesta razonable para dimensionamiento inicial comercial, no un compromiso definitivo.',
@@ -172,7 +197,7 @@ export class GenerateEstimationPocProposalUseCase {
    * Tramos semanales son relativos y no representan un cronograma aprobado.
    */
   async generateEdt(
-    input: GenerateEstimationPocInput,
+    input: EstimationInputWithQuestions,
     proposal: EstimationPocProposal,
   ): Promise<QuotationReferenceEdt> {
     if (this.ai.name !== 'gemini' || proposal.provider !== 'gemini' ||
@@ -180,18 +205,24 @@ export class GenerateEstimationPocProposalUseCase {
         extractDriveFolderId(input.driveFolderUrl) !== 'kora-poc-fallback') {
       throw new BadRequestException('EDT KDM solo admite la propuesta Gemini de la misma cotización.');
     }
+    this.validatePreliminaryRoles(proposal.roles);
     const docs = await this.sources.readDriveSources(input.driveFolderUrl);
     if (docs.length !== 1 || docs[0]?.name !== 'Requerimiento_KDM.pdf') {
       throw new BadRequestException('No se pudo comprobar el documento KDM de demostración.');
     }
-    const raw = detailResponseSchema.parse(await this.ai.generateStructured({
+    const request = {
       task: 'estimation.poc.reference-edt',
       context: {
         projectId: input.projectId,
         projectName: input.projectName,
+        clientName: input.clientName,
         provider: 'gemini',
         source: 'kdm_demo',
+        userInstructions: input.instructions,
+        preliminaryAssumptions: proposal.assumptions,
+        unresolvedPreliminaryQuestions: proposal.clarifyingQuestions,
         answers: input.answers,
+        resolvedAnswers: resolveEstimationQuestionnaireContext(input),
         confirmedUnderstanding: 'confirmedUnderstanding' in input ? input.confirmedUnderstanding : null,
         allowedRoles: proposal.roles.map((role) => ({
           role: role.role, people: role.people,
@@ -200,19 +231,25 @@ export class GenerateEstimationPocProposalUseCase {
       },
       instructions: [
         'Genera una EDT comercial DETALLADA basada en los documentos KDM y respuestas, siguiendo la estructura de un EDT profesional.',
-        'Cada fila de activities representa un cruce WBS×perfil; si una misma actividad requiere 2 perfiles, repite el mismo WBS y metadatos con distinto role y hours.',
-        'Estima las horas de ejecución de cada actividad por perfil en base a su complejidad y alcance. No hagas que sumen un total predeterminado.',
+        'Devuelve 3 tablas planas: stages (cada tramo una sola vez), activities (cada WBS una sola vez) y roleHours (cada pareja WBS×perfil una sola vez).',
+        'activities NO contiene role, hours ni la definición del tramo: solo stageCode como clave foránea hacia stages.',
+        'Si una actividad necesita dos perfiles, escribe una sola fila en activities y DOS filas en roleHours con el mismo WBS y distintos role.',
+        'Estima las horas por actividad y perfil en roleHours según su complejidad y alcance. No hagas que sumen un total predeterminado.',
         'Solo utiliza role que coincida EXACTAMENTE con allowedRoles. Cada perfil declarado debe intervenir en al menos una actividad real.',
         'No inventes funciones fuera del alcance: separa explícitamente exclusiones y supuestos en la descripción.',
+        'Respeta las opciones seleccionadas y los supuestos de context.resolvedAnswers al definir actividades/HH; no confundas supuesto pendiente con decisión confirmada.',
+        'Respeta context.userInstructions y distingue context.preliminaryAssumptions de decisiones confirmadas. Las preguntas preliminares sin resolver son incertidumbres, nunca autorizaciones para ampliar el alcance.',
         'Agrupa actividades en módulos funcionales (module), submódulos (submodule) y tramos cronológicos (stageCode, stageName). Un tramo puede abarcar varios módulos y perfiles.',
+        'Cada stageCode de activities debe existir exactamente una vez en stages. Los periodos se definen SOLO en stages, nunca por actividad.',
         'startWeek y durationWeeks son rangos SEMANALES RELATIVOS y estimativos, nunca fechas del proyecto; los tramos pueden solaparse con trabajo paralelo.',
-        'WBS debe ser único por ACTIVIDAD; solo puedes repetirlo cuando varias filas son perfiles distintos de la MISMA actividad.',
-        'Para un WBS repetido, name, description, stageCode, stageName, startWeek, durationWeeks, module, submodule, references y classification deben coincidir.',
+        'WBS es único dentro de activities; repetirlo en activities, incluso con datos idénticos, es un error.',
+        'Cada roleHours debe referir a un WBS existente, su role debe coincidir EXACTAMENTE con allowedRoles y ninguna pareja WBS×role debe duplicarse.',
         'references: códigos o referencias verificables del documento separados por punto y coma; cadena vacía si no existe fuente explícita.',
         'classification: categoría resumida según la evidencia, o cadena vacía si no aplica.',
-        'hours siempre mayores a 0 y con hasta dos decimales. No inventes personas, responsables nominales ni estados de ejecución.',
+        'roleHours.hours siempre mayor a 0 y con hasta dos decimales. Cada actividad debe tener al menos un perfil. No inventes personas, responsables nominales ni estados de ejecución.',
         'reservePercent: solo usa el porcentaje expresamente pedido en el documento o cuestionario; si no aparece, devuelve 0. La reserva no integra las HH base.',
-        'Máximo 20 módulos, 120 actividades WBS únicas, 20 tramos y 240 filas WBS×perfil.',
+        'Máximo 20 módulos, 120 actividades WBS únicas, 20 tramos y 240 filas roleHours.',
+        'Controla el tamaño de salida: para un proyecto de complejidad media busca unas 20 a 45 actividades WBS concretas; no fragmentes tareas triviales. Prioriza cubrir todo el alcance documentado sin exceder los límites de respuesta de Gemini.',
         'Evita entregables genéricos; describe actividades que un desarrollador o QA pueda implementar y revisar.',
         'El EDT de Zurich sirve de patrón de estructura, no de presupuesto para KDM: no reutilices sus horas ni su reserva.',
       ].join('\n'),
@@ -222,79 +259,167 @@ export class GenerateEstimationPocProposalUseCase {
         ...(doc.dataBase64 ? { dataBase64: doc.dataBase64 } : {}),
       })),
       responseJsonSchema: EDT_JSON_SCHEMA,
-    }));
+    };
+
+
+    // Los artefactos generativos no son entradas determinísticas: si Gemini
+    // incumple una condición verificable, le pedimos corregir SU salida una
+    // única vez. Nunca saltamos validaciones ni reemplazamos HH con un fallback.
+    // La cuota gratuita puede ser muy limitada. No gastar una segunda
+    // solicitud a Gemini sin aprobación explícita de configuración.
+    const maxAttempts = process.env.KORA_GEMINI_EDT_MAX_ATTEMPTS === '2' ? 2 : 1;
+    let validationIssue = '';
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const output = await this.ai.generateStructured({
+        ...request,
+        instructions: attempt === 0 ? request.instructions : [
+          request.instructions,
+          'La EDT anterior fue rechazada por las validaciones del servidor.',
+          'Rehaz la EDT desde la fuente original. Corrige exactamente este problema:',
+          validationIssue,
+          'Corrige las tres tablas: stages sin códigos repetidos; activities con un WBS único',
+          'por actividad; roleHours con una sola pareja WBS×perfil, HH > 0 y dos decimales.',
+          'Toda actividad debe referir a un tramo válido y tener HH de al menos un perfil.',
+          'No transformes las HH para igualar una cifra preliminar.',
+        ].join('\n'),
+      });
+      try {
+        return this.buildVerifiedEdt(output, proposal);
+      } catch (error) {
+        if (!(error instanceof BadRequestException) && !(error instanceof z.ZodError)) {
+          throw error;
+        }
+        validationIssue = error instanceof z.ZodError
+          ? error.issues.slice(0, 3).map((issue) =>
+            issue.path.join('.') + ': ' + issue.message).join('; ')
+          : error.message;
+        if (attempt + 1 === maxAttempts) {
+          throw new BadRequestException(
+            (maxAttempts === 1
+              ? 'Gemini devolvió una EDT inconsistente (sin reintento para ahorrar cuota): '
+              : 'Gemini devolvió una EDT inconsistente tras el reintento: ') +
+            validationIssue.slice(0, 250),
+          );
+        }
+      }
+    }
+    throw new BadRequestException('Gemini no devolvió una EDT válida.');
+  }
+
+  /**
+   * Reconciliación referencial estricta: no interpretamos textos diferentes
+   * como la misma actividad ni inferimos HH desde metadatos incompletos.
+   * Cada FK y cada cruce debe existir exactamente una vez.
+   */
+  private buildVerifiedEdt(
+    output: unknown, proposal: EstimationPocProposal,
+  ): QuotationReferenceEdt {
+    const raw = detailResponseSchema.parse(output);
+    const validRoles = new Set(proposal.roles.map((role) => role.role));
+
+    type Stage = {
+      code: string; name: string; startWeek: number;
+      durationWeeks: number; totalHours: number;
+    };
+    const stages = new Map<string, Stage>();
+    for (const row of raw.stages) {
+      if (stages.has(row.code)) {
+        throw new BadRequestException('El tramo ' + row.code +
+          ' está duplicado. Define cada tramo cronológico solo una vez.');
+      }
+      if (row.startWeek + row.durationWeeks - 1 > 520) {
+        throw new BadRequestException(
+          'El tramo ' + row.code +
+          ' supera el horizonte máximo de 520 semanas (inicio + duración).',
+        );
+      }
+      stages.set(row.code, { ...row, totalHours: 0 });
+    }
 
     type Activity = typeof raw.activities[number];
-    const roles = new Set(proposal.roles.map((role) => role.role));
-    const stages = new Map<string, {
-      code: string; name: string; startWeek: number; durationWeeks: number; totalHours: number;
-    }>();
-    const activities = new Map<string, {
-      row: Activity; roleEffort: { role: string; hours: number }[];
-    }>();
+    const activities = new Map<string, Activity>();
     for (const row of raw.activities) {
-      if (!roles.has(row.role) || roundHours(row.hours) !== row.hours) {
-        throw new BadRequestException('La EDT incluye perfiles ajenos o HH con más de dos decimales.');
+      if (activities.has(row.wbs)) {
+        throw new BadRequestException('WBS duplicado en activities: ' +
+          row.wbs + '. Cada actividad debe declararse una sola vez.');
       }
-      const stage = stages.get(row.stageCode);
-      if (stage && (stage.name !== row.stageName ||
-          stage.startWeek !== row.startWeek ||
-          stage.durationWeeks !== row.durationWeeks)) {
-        throw new BadRequestException('El tramo cronológico contiene periodos contradictorios.');
+      if (!stages.has(row.stageCode)) {
+        throw new BadRequestException('La actividad ' + row.wbs +
+          ' referencia el tramo inexistente ' + row.stageCode + '.');
       }
-      if (!stage) {
-        stages.set(row.stageCode, {
-          code: row.stageCode, name: row.stageName,
-          startWeek: row.startWeek, durationWeeks: row.durationWeeks, totalHours: 0,
-        });
+      activities.set(row.wbs, row);
+    }
+
+    const effortByWbs = new Map<string, Array<{ role: string; hours: number }>>();
+    const usedRoles = new Set<string>();
+    for (const item of raw.roleHours) {
+      if (!activities.has(item.wbs)) {
+        throw new BadRequestException('Las HH del perfil ' + item.role +
+          ' referencian un WBS inexistente: ' + item.wbs + '.');
       }
-      const current = activities.get(row.wbs);
-      if (current) {
-        const original = current.row;
-        if (current.roleEffort.some((item) => item.role === row.role) ||
-            ['stageCode', 'stageName', 'startWeek', 'durationWeeks', 'module',
-             'submodule', 'name', 'description', 'references', 'classification']
-              .some((field) => original[field as keyof Activity] !== row[field as keyof Activity])) {
-          throw new BadRequestException('El WBS repetido tiene perfiles duplicados o datos inconsistentes.');
-        }
-        current.roleEffort.push({ role: row.role, hours: row.hours });
-      } else {
-        activities.set(row.wbs, { row, roleEffort: [{ role: row.role, hours: row.hours }] });
+      if (!validRoles.has(item.role)) {
+        throw new BadRequestException('Perfil ajeno a la propuesta: ' +
+          item.role + ' en WBS ' + item.wbs + '.');
+      }
+      if (roundHours(item.hours) !== item.hours) {
+        throw new BadRequestException('Las HH de ' + item.wbs + ' / ' +
+          item.role + ' deben tener como máximo dos decimales.');
+      }
+      const effort = effortByWbs.get(item.wbs) ?? [];
+      if (effort.some((row) => row.role === item.role)) {
+        throw new BadRequestException('HH duplicadas: el perfil ' + item.role +
+          ' aparece dos veces para WBS ' + item.wbs + '.');
+      }
+      effort.push({ role: item.role, hours: item.hours });
+      effortByWbs.set(item.wbs, effort);
+      usedRoles.add(item.role);
+    }
+    for (const role of validRoles) {
+      if (!usedRoles.has(role)) {
+        throw new BadRequestException('La EDT no contiene actividades para el perfil ' + role + '.');
       }
     }
-    if (activities.size > 120 || stages.size > 20 ||
-        proposal.roles.some((role) => !raw.activities.some((row) => row.role === role.role))) {
-      throw new BadRequestException('La EDT no cubre todos los perfiles o excede el límite de actividades.');
-    }
+
     const modulesByName = new Map<string, {
       name: string;
-      tasks: {
+      tasks: Array<{
         wbs: string; name: string; description: string; role: string; hours: number;
         stageCode: string; submodule: string; referenceIds: string[];
-        classification: string; roleEffort: { role: string; hours: number }[];
-      }[];
+        classification: string; roleEffort: Array<{ role: string; hours: number }>;
+      }>;
       totalHours: number;
     }>();
-    for (const [wbs, { row, roleEffort }] of activities) {
+    for (const row of raw.activities) {
+      const effort = effortByWbs.get(row.wbs);
+      if (!effort?.length) {
+        throw new BadRequestException('La actividad ' + row.wbs + ' no tiene HH por perfil.');
+      }
       const key = row.module.toLocaleLowerCase('es');
-      const module = modulesByName.get(key) ?? { name: row.module, tasks: [], totalHours: 0 };
-      const hours = roundHours(roleEffort.reduce((sum, part) => sum + part.hours, 0));
-      const primary = [...roleEffort].sort((a, b) => b.hours - a.hours)[0]!;
+      const module = modulesByName.get(key) ??
+        { name: row.module, tasks: [], totalHours: 0 };
+      const activityHours = roundHours(effort.reduce((sum, part) => sum + part.hours, 0));
+      const primary = [...effort].sort((a, b) => b.hours - a.hours)[0]!;
       module.tasks.push({
-        wbs, name: row.name, description: row.description,
-        role: primary.role, hours, stageCode: row.stageCode,
+        wbs: row.wbs, name: row.name, description: row.description,
+        role: primary.role, hours: activityHours, stageCode: row.stageCode,
         submodule: row.submodule,
-        referenceIds: [...new Set(row.references.split(/[;,]/).map((ref) => ref.trim()).filter(Boolean))],
-        classification: row.classification, roleEffort,
+        referenceIds: [...new Set(row.references.split(/[;,]/)
+          .map((ref) => ref.trim()).filter(Boolean))],
+        classification: row.classification, roleEffort: effort,
       });
-      module.totalHours = roundHours(module.totalHours + hours);
+      module.totalHours = roundHours(module.totalHours + activityHours);
       modulesByName.set(key, module);
       const stage = stages.get(row.stageCode)!;
-      stage.totalHours = roundHours(stage.totalHours + hours);
+      stage.totalHours = roundHours(stage.totalHours + activityHours);
     }
     if (modulesByName.size > 20 ||
         [...modulesByName.values()].some((module) => module.tasks.length > 80)) {
-      throw new BadRequestException('La EDT excede el máximo de módulos o actividades por módulo.');
+      throw new BadRequestException(
+        'La EDT excede el máximo de 20 módulos o 80 actividades por módulo.');
+    }
+    if ([...stages.values()].some((stage) => stage.totalHours <= 0)) {
+      throw new BadRequestException(
+        'Todos los tramos declarados deben tener actividades con HH positivas.');
     }
     const modules = [...modulesByName.values()];
     const totalHours = roundHours(modules.reduce((sum, module) => sum + module.totalHours, 0));
@@ -309,6 +434,42 @@ export class GenerateEstimationPocProposalUseCase {
       reservePercent, reserveHours,
       totalWithReserve: roundHours(totalHours + reserveHours),
     });
+  }
+
+  /**
+   * Las condiciones preliminares se validan ANTES de pedir la EDT.
+   * En especial, un rol duplicado puede llegar del primer Gemini y hará
+   * imposible reconciliar el segundo, por mucho que se regeneren actividades.
+   */
+  private validatePreliminaryRoles(
+    roles: readonly EstimationPocProposal['roles'][number][],
+  ): void {
+    if (roles.length === 0 || roles.length > 12) {
+      throw new BadRequestException(
+        'Gemini propuso una cantidad inválida de perfiles (máximo 12).',
+      );
+    }
+    const seen = new Set<string>();
+    for (const role of roles) {
+      const key = role.role.trim().toLocaleLowerCase('es');
+      if (seen.has(key)) {
+        throw new BadRequestException(
+          'Gemini propuso el perfil duplicado «' + role.role +
+          '». La EDT no se solicitará para ahorrar cuota.',
+        );
+      }
+      seen.add(key);
+      if (!Number.isInteger(role.people) || role.people < 1 || role.people > 100 ||
+          !Number.isFinite(role.duration) || role.duration <= 0 ||
+          !Number.isFinite(role.hoursPerUnit) || role.hoursPerUnit <= 0 ||
+          !Number.isFinite(role.totalHours) || role.totalHours <= 0) {
+        throw new BadRequestException(
+          'El perfil «' + role.role +
+          '» tiene personas, duración o HH preliminares inválidas. ' +
+          'Se detuvo la generación antes de solicitar la EDT.',
+        );
+      }
+    }
   }
 
   /** El balance de roles se deriva desde actividades, nunca se impone al EDT. */
@@ -344,7 +505,7 @@ export class GenerateEstimationPocProposalUseCase {
   }
 
   async execute(
-    input: GenerateEstimationPocInput,
+    input: EstimationInputWithQuestions,
   ): Promise<EstimationPocProposal> {
     const documents =
       this.ai.name === 'poc-ai'
@@ -366,6 +527,7 @@ export class GenerateEstimationPocProposalUseCase {
           clientName: input.clientName,
           estimationLevel: 'team_roles_only',
           answers: input.answers,
+        resolvedAnswers: resolveEstimationQuestionnaireContext(input),
           confirmedUnderstanding: 'confirmedUnderstanding' in input ? input.confirmedUnderstanding : null,
           sourceDocuments: documents.map((document) => ({
             sourceId: document.sourceId,
@@ -397,12 +559,15 @@ export class GenerateEstimationPocProposalUseCase {
       }),
     );
 
-    const roles = draft.roles.map((role) => ({
+    // El esquema inicial permite 0 para compatibilidad con la PoC, pero
+    // una EDT real exige duración, dedicación y colaboradores positivos.
+    // Rechazar aquí evita consumir la segunda llamada Gemini innecesariamente.
+    const preview = draft.roles.map((role) => ({
       ...role,
-      totalHours: roundHours(
-        role.duration * role.hoursPerUnit * role.people,
-      ),
+      totalHours: roundHours(role.duration * role.hoursPerUnit * role.people),
     }));
+    this.validatePreliminaryRoles(preview);
+    const roles = preview;
     const totalHours = roundHours(
       roles.reduce((sum, role) => sum + role.totalHours, 0),
     );
