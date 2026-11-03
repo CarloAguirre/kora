@@ -142,14 +142,14 @@ export function QuotationCommercialLifecycleCard({
           previouslyApprovedVersionNumber={quotation?.versions.find((candidate) =>
             candidate.status === 'approved' && candidate.id !== version.id)?.versionNumber}
           timing={transferTiming} onTimingChange={setTransferTiming}
-          pending={actions.approveClient.isPending}
+          pending={actions.approveClient.isPending} error={error}
           onCancel={() => setApprovalOpen(false)}
           onApprove={() => void approveClient()} />
       )}
       {transferOpen && (
         <QuotationTransferDialog project={project} version={version} open
           afterApproval={transferFromApproval} pending={actions.transferApproved.isPending}
-          onClose={closeTransfer} onTransfer={() => void transfer()} />
+          error={error} onClose={closeTransfer} onTransfer={() => void transfer()} />
       )}
     </>
   );
