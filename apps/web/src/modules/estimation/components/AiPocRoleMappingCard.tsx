@@ -7,6 +7,7 @@ import { Button } from '@/shared/components/ui/Button';
 import { Card } from '@/shared/components/ui/Card';
 import { Select } from '@/shared/components/ui/Select';
 import styles from './AiPocRoleMappingCard.module.css';
+import { suggestedKoraTeamForRole } from './quotation-role-team-suggestions';
 
 export interface ActiveQuotationTeam { id: string; name: string; }
 
@@ -29,7 +30,25 @@ export function AiPocRoleMappingCard({
   const [error, setError] = useState('');
   if (!evidence) return null;
   const { proposal } = evidence;
-  const alreadyMapped = Object.keys(evidence.roleTeamIds).length === proposal.roles.length;
+  const alreadyMapped = proposal.roles.every((role) =>
+    Boolean(evidence.roleTeamIds[role.role]) &&
+    teams.some((team) => team.id === evidence.roleTeamIds[role.role]));
+  const suggestions = proposal.roles.map((role) => ({
+    role: role.role,
+    team: suggestedKoraTeamForRole(role.role, teams),
+  }));
+  const pendingSuggestions = suggestions.filter((item) =>
+    item.team && !teams.some((team) => team.id === mapping[item.role]));
+  const fillSuggestions = () => {
+    setMapping((current) => {
+      const next = { ...current };
+      for (const { role, team } of pendingSuggestions) {
+        if (team) next[role] = team.id;
+      }
+      return next;
+    });
+    setError('');
+  };
   const allMapped = proposal.roles.every((role) =>
     Boolean(mapping[role.role]) && teams.some((team) => team.id === mapping[role.role]),
   );
@@ -54,10 +73,19 @@ export function AiPocRoleMappingCard({
         <strong>{number(proposal.totalHours)} HH propuestas</strong>
       </div>
       <p className={styles.notice}>
-        Se procesó el PDF KDM de demostración, no la documentación de este proyecto.
-        Los roles y HH vienen de Gemini; las asignaciones a equipos requieren confirmación.
-        Esta propuesta permanece en borrador, sin autorización de envío.
+        Los perfiles y HH son la propuesta de Gemini, no equipos creados en Kora.
+        Selecciona un equipo real del catálogo para cada perfil y confirma la distribución.
+        La documentación analizada corresponde a KDM de demostración, no a este proyecto.
       </p>
+      {pendingSuggestions.length > 0 && canEdit && (
+        <div className={styles.suggestionBar}>
+          <span>{pendingSuggestions.length} correspondencia(s) sugerida(s) según el catálogo real.
+            Revísalas antes de aplicarlas.</span>
+          <button type="button" onClick={fillSuggestions}>
+            Completar sugerencias
+          </button>
+        </div>
+      )}
       <div className={styles.rows}>
         {proposal.roles.map((role) => (
           <div key={role.role} className={styles.row}>
@@ -66,6 +94,12 @@ export function AiPocRoleMappingCard({
               <small>{number(role.totalHours)} HH · {role.people} persona(s) ·
                 {' '}{role.duration} {role.unit === 'week' ? 'semanas' : 'días'}</small>
               {role.source && <small>{role.source}</small>}
+              {suggestions.find((item) => item.role === role.role)?.team && (
+                <small className={styles.suggestion}>
+                  Sugerencia: {suggestions.find((item) => item.role === role.role)!.team!.name}
+                  {' '}· confirmar en el selector
+                </small>
+              )}
             </div>
             <Select
               label={'Equipo para ' + role.role}
@@ -92,6 +126,10 @@ export function AiPocRoleMappingCard({
           Aplicar distribución de HH
         </Button>}
       </div>
+      {!allMapped && <p className={styles.pending}>
+        Debes asociar todos los perfiles a equipos activos de Kora antes de aplicar la propuesta.
+        Ningún perfil IA se registra como equipo nuevo.
+      </p>}
       {error && <p role="alert" className={styles.error}>{error}</p>}
     </Card>
   );
