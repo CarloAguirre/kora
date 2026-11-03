@@ -16,7 +16,7 @@ export interface ProjectPaymentMilestoneRecord {
   readonly sortOrder: number;
   readonly triggerType: ProjectPaymentTrigger;
   readonly triggerPhase: ProjectPhase | null;
-  readonly triggerModuleId: string | null;
+  readonly triggerModuleId?: string | null;
   readonly triggerDate: Date | null;
 }
 
@@ -36,7 +36,7 @@ export interface ProjectPaymentMilestoneSchedule {
   readonly sortOrder: number;
   readonly triggerType: ProjectPaymentTrigger;
   readonly triggerPhase: ProjectPhase | null;
-  readonly triggerModuleId: string | null;
+  readonly triggerModuleId?: string | null;
   readonly triggerDate: Date | null;
 }
 
