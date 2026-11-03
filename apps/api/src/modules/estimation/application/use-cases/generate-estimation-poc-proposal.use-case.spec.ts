@@ -265,7 +265,7 @@ describe('GenerateEstimationPocProposalUseCase', () => {
       name: 'gemini',
       generateStructured: async (request) => {
         calls++;
-        if (calls === 2) retryInstructions = request.instructions;
+        if (calls === 2) retryInstructions = request.instructions ?? '';
         return {
           reservePercent: 0,
           activities: [{
