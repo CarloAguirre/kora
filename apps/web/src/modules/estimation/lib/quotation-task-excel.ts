@@ -56,7 +56,7 @@ export function buildQuotationTaskTemplate(
   // writer; se incorporan mediante el contenedor ZIP OOXML de XLSX.CFB.
   const cfb = XLSX.CFB.read(original, { type: 'buffer' });
   const location = 'xl/worksheets/sheet1.xml';
-  const sheetIndex = cfb.FullPaths.findIndex((name) =>
+  const sheetIndex = cfb.FullPaths.findIndex((name: string) =>
     name.toLowerCase().endsWith('/' + location));
   const sheetFile = sheetIndex < 0 ? null : cfb.FileIndex[sheetIndex];
   if (!sheetFile?.content) throw new Error('No se pudo preparar el XML de la hoja Tareas.');
