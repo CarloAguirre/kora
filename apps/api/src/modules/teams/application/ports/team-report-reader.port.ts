@@ -43,6 +43,17 @@ export interface TeamReportReader {
   listPeople(teamId: string, leaderUserId: string | null): Promise<TeamReportPerson[]>;
   /** Proyectos con fila en `project_teams` para el equipo — sin borrados ni cancelados. */
   listProjects(teamId: string): Promise<TeamReportProjectRow[]>;
+  /**
+   * Proyectos con HH > 0 cargadas por personas del equipo en la ventana móvil de
+   * actividad. Se usa `hour_entries.created_at` (fecha de carga, no de trabajo),
+   * con estado pendiente/aprobado. No depende del período del reporte.
+   */
+  findProjectsWithRecentHourEntries(
+    projectIds: string[],
+    userIds: string[],
+    createdSince: Date,
+    createdUntil: Date,
+  ): Promise<Set<string>>;
   /** HH (aprobadas y pendientes) de `userIds` en `projectIds`, hasta `dateTo`, separando lo que cae en el período. */
   sumHours(projectIds: string[], userIds: string[], dateFrom: Date, dateTo: Date): Promise<TeamReportHoursRow[]>;
   listTeamTasks(teamId: string, projectIds: string[]): Promise<TeamReportTaskRow[]>;
