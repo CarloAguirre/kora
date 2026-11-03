@@ -383,7 +383,8 @@ export function QuotationPhaseWorkspace({
           <div className={styles.timeline}>
             {displayPhases.map((phase, index) => {
               const total = phase.teamHours.reduce((sum, row) => sum + row.hours, 0);
-              const stage = edt?.stages?.find((item) => phase.name.startsWith(item.code + ' · '));
+              const stage = edt?.stages?.find((item) => phase.name.startsWith(item.code + ' · ')) ??
+                draft?.edtCommercialStages?.find((item) => phase.name.startsWith(item.code + ' · '));
               const label = stage ? phase.name.slice(stage.code.length + 3) : phase.name;
               return (
                 <div className={styles.timelineRow} key={index}>
