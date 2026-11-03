@@ -53,5 +53,7 @@ describe('Aceptar propuesta IA · motivos de bloqueo', () => {
       .toContain('guarda los cambios');
     expect(quotationAiAcceptanceBlockReason(mapped, { ...state, isLatest: false }))
       .toContain('versión más reciente');
+    expect(quotationAiAcceptanceBlockReason({ ...mapped, totalHours: 39 }, state))
+      .toContain('concilia las HH comerciales');
   });
 });
