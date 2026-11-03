@@ -110,6 +110,23 @@ describe('Switch Equipos · HTML v5', () => {
       .not.toBeInTheDocument();
   });
 
+  it('en cotización manual por fases no ofrece capacidad que no determina las HH', () => {
+    const phasesDraft = quotationDraftDataSchema.parse({
+      mode: 'phases', teams: [team(dev)], phases: [{
+        name: 'Construcción', startWeek: 2, durationWeeks: 2,
+        teamHours: [{ teamId: dev, hours: 30 }],
+      }],
+    });
+    renderTeams(phasesDraft);
+    expect(screen.getByText('Semanas')).toBeInTheDocument();
+    expect(screen.getByText('S2–S3')).toBeInTheDocument();
+    expect(screen.queryByText('Dedicación')).not.toBeInTheDocument();
+    expect(screen.queryByText('Unidad')).not.toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Distribución semanal orientativa' }))
+      .toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'S3' })).toBeInTheDocument();
+  });
+
   it('en una estimación manual, edita colaboradores, unidad, duración y dedicación directamente', () => {
     renderTeams(manual);
     expect(screen.getByText('Unidad')).toBeInTheDocument();
