@@ -3,7 +3,7 @@ import {
   applyQuotationPlanningSchema, generateAiDemoQuotationSchema, createQuotationVersionSchema, updateQuotationDraftSchema, quotationReconciliationReviewSchema, assessQuotationReconciliationSchema,
   quotationRevisionActionSchema, approveClientQuotationSchema, transferApprovedQuotationSchema,
   type QuotationRevisionActionInput, type ApproveClientQuotationInput, type TransferApprovedQuotationInput, type QuotationTransferResult,
-  type ApplyQuotationPlanningInput, type AppliedQuotationPlanning, type GenerateAiDemoQuotationInput, type CreateQuotationVersionInput, type ProjectQuotation, type QuotationVersion, type UpdateQuotationDraftInput, type QuotationTransferPreview, type QuotationTaskCatalogEntry, type QuotationCommercialPreflight, type QuotationCommercialDossier, type QuotationReconciliationReview, type SavedQuotationReconciliationReview, type AssessQuotationReconciliationInput, type SavedQuotationReviewAssessment,
+  type ApplyQuotationPlanningInput, type AppliedQuotationPlanning, type GenerateAiDemoQuotationInput, type CreateQuotationVersionInput, type ProjectQuotation, type QuotationVersion, type UpdateQuotationDraftInput, type QuotationTransferPreview, type QuotationCommercialPreflight, type QuotationCommercialDossier, type QuotationReconciliationReview, type SavedQuotationReconciliationReview, type AssessQuotationReconciliationInput, type SavedQuotationReviewAssessment,
 } from '@kora/contracts';
 import { CurrentUser, type RequestUser } from '../../../shared/presentation/decorators/current-user.decorator';
 import { RequireAnyPermission } from '../../../shared/presentation/decorators/require-permissions.decorator';
@@ -26,13 +26,6 @@ export class QuotationController {
     private readonly generator: GenerateEstimationPocProposalUseCase,
     private readonly questionnaire: GetEstimationQuestionnaireDefinitionUseCase,
   ) {}
-
-  @Get('task-types')
-  @RequireAnyPermission('projects:manage', 'projects:read_assigned')
-  listTaskTypes(@Param('projectId', ParseUUIDPipe) projectId: string,
-    @CurrentUser() actor: RequestUser): Promise<QuotationTaskCatalogEntry[]> {
-    return this.drafts.listActiveTaskTypes(projectId, actor);
-  }
 
   @Get()
   @RequireAnyPermission('projects:manage', 'projects:read_assigned')
