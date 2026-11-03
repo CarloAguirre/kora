@@ -1,8 +1,6 @@
 import type { ReactNode } from 'react';
-import type { QuotationDraftData, QuotationVersion } from '@kora/contracts';
-import { Button } from '@/shared/components/ui/Button';
+import { effectiveQuotationEdt, type QuotationDraftData, type QuotationVersion } from '@kora/contracts';
 import { Card } from '@/shared/components/ui/Card';
-import { Badge } from '@/shared/components/ui/Badge';
 import styles from './QuotationCommercialSummary.module.css';
 
 type TeamHours = { teamId: string; name: string; hours: number; tone: string };
@@ -57,7 +55,7 @@ function durationLabel(draft: QuotationDraftData) {
 }
 
 export function QuotationCommercialSummary({
-  version, draft, hourlyRate, currency, tax, teamNames, editable, dirty, saving, onSave, actions,
+  version, draft, hourlyRate, currency, tax, teamNames, dirty, actions,
 }: {
   version: QuotationVersion | null;
   draft: QuotationDraftData | null;
@@ -73,87 +71,84 @@ export function QuotationCommercialSummary({
 }) {
   if (!version || !draft) return <Card><h2>Resumen comercial</h2><p>Selecciona una versión.</p></Card>;
   const numbers = preview(draft, hourlyRate, tax);
-  const edt = draft.aiPoc?.edt;
+  const edt = draft.aiPoc?.edt ? effectiveQuotationEdt(draft) : null;
   const referenceOnly = Boolean(edt && (draft.mode !== 'phases' || draft.phases.length === 0));
-  // La EDT precede a la asignación comercial: nunca contar sus HH como vendidas
-  // hasta proyectar y guardar los equipos de Kora.
   const hoursShown = referenceOnly && edt ? edt.totalHours : numbers.totalHours;
   const commercialRows: TeamHours[] = numbers.byTeam.filter((row) => row.hours > 0)
     .map((row) => {
       const name = teamNames.get(row.teamId) ?? 'Equipo no disponible';
       return { ...row, name, tone: teamTone(name) };
     });
-  const referenceRows: TeamHours[] = (draft.aiPoc?.proposal.roles ?? []).map((role) => ({
-    teamId: 'profile:' + role.role,
-    name: role.role,
-    hours: role.totalHours,
-    tone: teamTone(role.role),
-  })).filter((role) => role.hours > 0);
+  const roleHours = new Map<string, number>();
+  if (edt) {
+    for (const module of edt.modules) {
+      for (const task of module.tasks) {
+        for (const effort of task.roleEffort ?? [{ role: task.role, hours: task.hours }]) {
+          roleHours.set(effort.role, round((roleHours.get(effort.role) ?? 0) + effort.hours, 2));
+        }
+      }
+    }
+  }
+  const referenceRows: TeamHours[] = [...roleHours].map(([role, hours]) => ({
+    teamId: 'role:' + role, name: role, hours, tone: teamTone(role),
+  })).filter((row) => row.hours > 0);
   const rows = referenceOnly ? referenceRows : commercialRows;
-  const aiHours = draft.aiPoc?.proposal.totalHours ?? null;
   const duration = referenceOnly && edt
     ? edt.schemaVersion === 'kora.quotation.reference-edt.v2'
       ? Math.max(1, ...(edt.stages ?? []).map((p) => p.startWeek + p.durationWeeks - 1)) +
-        ' semanas · ' + (edt.stages?.length ?? 0) + ' tramos propuestos'
-      : edt.modules.length + ' módulos referenciales'
+        ' semanas · ' + (edt.stages?.length ?? 0) + ' fases'
+      : edt.modules.length + ' módulos'
     : durationLabel(draft);
+  const recurringMonthly = draft.costs.filter((cost) => cost.recurrence === 'monthly')
+    .reduce((sum, cost) => sum + cost.amount, 0);
+  const recurringYearly = draft.costs.filter((cost) => cost.recurrence === 'annual')
+    .reduce((sum, cost) => sum + cost.amount, 0);
   const displayAmount = (amount: number | null) =>
-    amount === null ? '—' : fmtMoney(amount) + ' ' + currency;
+    fmtMoney(amount ?? 0) + ' ' + currency;
 
   return (
     <Card>
       <section className={styles.summary} aria-label="Resumen comercial de cotización">
         <div className={styles.topLine}>
-          <span>{referenceOnly ? 'Horas propuestas por Gemini' : 'Horas totales del proyecto'}</span>
-          {dirty && <Badge tone="warning">Sin guardar</Badge>}
+          <span>Horas totales del proyecto</span>
+          {dirty && <span className={styles.unsaved}>Sin guardar</span>}
         </div>
-        <div className={styles.bigNumber}>{fmt(hoursShown)}<small> HH</small></div>
+        <div className={styles.bigNumber}>{fmt(hoursShown)}<small> hh</small></div>
         <p className={styles.duration}>{duration}</p>
-        {referenceOnly && (
-          <div className={styles.aiNotice} role="status">
-            <strong>Vista previa · no es el total comercial guardado</strong>
-            <span>{fmt(numbers.totalHours)} HH comerciales. Asigna los perfiles de Gemini a equipos de Kora,
-              aplica la propuesta y guarda la revisión.</span>
-          </div>
-        )}
-        {!referenceOnly && aiHours !== null && numbers.totalHours === 0 && aiHours > 0 &&
-          <div className={styles.aiNotice} role="status">
-            <strong>{fmt(aiHours)} HH propuestas por IA</strong>
-            <span>Pendientes de asignar a equipos de Kora.</span>
-          </div>}
-        {dirty && <p className={styles.draftNotice}>Vista previa. Los importes definitivos se recalculan al guardar.</p>}
         <div className={styles.money}>
-          <div><span>Neto</span><strong>{displayAmount(referenceOnly ? null : numbers.netAmount)}</strong></div>
-          <div><span>{tax === 'exempt' ? 'Total exento' : tax === 'iva19' ? 'Total con IVA' : 'Total con IGV'}</span>
+          <div><span>Neto</span>
+            <strong>{displayAmount(referenceOnly ? null : numbers.netAmount)}</strong></div>
+          <div><span>{tax === 'exempt' ? 'Total exento' :
+            tax === 'iva19' ? 'Total con IVA' : 'Total con IGV'}</span>
             <strong>{displayAmount(referenceOnly ? null : numbers.totalAmount)}</strong></div>
         </div>
-        {hourlyRate === null && hoursShown > 0 && (
-          <p className={styles.warning}>Falta el valor HH del proyecto.</p>
-        )}
-        {referenceOnly && <p className={styles.roleHint}>Distribución de HH propuesta por perfil</p>}
+        {recurringMonthly > 0 && <p className={styles.recurring}>
+          Recurrentes: + {fmtMoney(recurringMonthly)} {currency} / mes
+        </p>}
+        {recurringYearly > 0 && <p className={styles.recurring}>
+          Recurrentes: + {fmtMoney(recurringYearly)} {currency} / año
+        </p>}
+        {(hourlyRate === null || hourlyRate <= 0) && hoursShown > 0 &&
+          <p className={styles.warning}>Falta el valor HH del proyecto.</p>}
         <div className={styles.distribution}
-          aria-label={referenceOnly ? 'Distribución referencial por perfil' : 'Distribución de horas por equipo'}>
-          {rows.length > 0 ? rows.map((row) => (
+          aria-label={referenceOnly ? 'Distribución referencial por perfil' :
+            'Distribución de horas por equipo'}>
+          {rows.length > 0 ? rows.map((row) =>
             <span key={row.teamId} className={styles[row.tone]}
-              style={{ width: (row.hours / hoursShown * 100) + '%' }}
-              title={row.name + ': ' + fmt(row.hours) + ' HH'} />
-          )) : <span className={styles.emptyBar} />}
+              style={{ width: (row.hours / Math.max(1, hoursShown) * 100) + '%' }}
+              title={row.name + ': ' + fmt(row.hours) + ' hh'} />
+          ) : <span className={styles.emptyBar} />}
         </div>
         <div className={styles.legend}>
           {rows.length > 0 ? rows.map((row) => (
             <div key={row.teamId} className={styles.legendRow}>
-              <span className={styles.name}><span className={styles.dot + ' ' + styles[row.tone]} />{row.name}</span>
-              <strong>{fmt(row.hours)} HH</strong>
+              <span className={styles.name}><span className={styles.dot + ' ' +
+                styles[row.tone]} />{row.name}</span>
+              <strong>{fmt(row.hours)} hh</strong>
             </div>
-          )) : <p>Sin HH distribuidas entre equipos.</p>}
+          )) : <p>Sin HH distribuidas.</p>}
         </div>
-        {editable && <Button onClick={onSave} loading={saving} disabled={!dirty}
-          aria-label="Guardar cambios del borrador">Guardar borrador</Button>}
         {actions}
-        <small className={styles.saved}>
-          {dirty ? 'Los valores mostrados son una vista previa sin guardar.' :
-            'Versión v' + version.versionNumber + ' guardada · revisión ' + version.revision}
-        </small>
       </section>
     </Card>
   );
