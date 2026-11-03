@@ -15,8 +15,8 @@ type TaskRow = {
 const hh = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 2 });
 export { quotationTeamColor } from './quotation-team-colors';
 const nameOf = (key: string, names: ReadonlyMap<string, string>) =>
-  key.startsWith('profile:') ? key.slice('profile:'.length) :
-    names.get(key) ?? 'Equipo sin catálogo';
+  key.startsWith('profile:') ? 'Pendiente · ' + key.slice('profile:'.length) :
+    names.get(key) ?? 'Equipo no disponible';
 
 /** La misma relación WBS×perfil se usa en ambas vistas. No se contabilizan
  * roles dos veces cuando participan en una misma actividad. */
@@ -114,7 +114,7 @@ export function QuotationPhaseWorkspace({
   commercialMode = 'phases', draft, activeTeams = [],
   onEditPhase, onAddPhase, onRemovePhase,
   onEditTaskHours, onEditTaskFixed, onEditTaskTeam, onEditGroupHours,
-  onEditStage,
+  onEditStage, onOpenRoleMapping,
 }: {
   phases: readonly Phase[];
   teams: readonly Team[];
@@ -131,6 +131,7 @@ export function QuotationPhaseWorkspace({
   onEditGroupHours?: (teamKey: string, hours: number, stageCode?: string, module?: string) => void;
   onEditStage?: (stageCode: string,
     patch: { name?: string; startWeek?: number; durationWeeks?: number }) => void;
+  onOpenRoleMapping?: () => void;
   onEditPhase: (index: number, patch: Partial<Phase>) => void;
   onAddPhase: () => void;
   onRemovePhase: (index: number) => void;
@@ -143,12 +144,29 @@ export function QuotationPhaseWorkspace({
     phase.startWeek + phase.durationWeeks - 1));
   const allEdtGroups = Boolean(edt);
   const projectAllowsEdit = editable && Boolean(edt);
+  const unmappedRoles = edt && draft?.aiPoc
+    ? draft.aiPoc.proposal.roles.filter((role) => {
+        const id = draft.aiPoc?.roleTeamIds[role.role];
+        return !id || !activeTeams.some((team) => team.id === id);
+      })
+    : [];
+  const needsRoleMapping = unmappedRoles.length > 0;
   return (
     <Card className={styles.surface}>
       <div className={styles.head}>
         <h2>Fases · Módulos</h2>
         <p>En semanas desde el inicio del proyecto</p>
       </div>
+      {needsRoleMapping && (
+        <div className={styles.mappingNotice} role="status">
+          <div><strong>Asigna los perfiles IA a equipos reales de Kora</strong>
+            <p>{unmappedRoles.length} perfil(es) pendientes. La EDT conserva las actividades y HH,
+              pero sus perfiles no son equipos. Completa la asociación antes de distribuir tareas.</p>
+          </div>
+          {onOpenRoleMapping && <button type="button" disabled={!editable}
+            onClick={onOpenRoleMapping}>Asignar equipos Kora</button>}
+        </div>
+      )}
       <div className={styles.phases}>
         {displayPhases.map((phase, index) => {
           const stage = edt?.stages?.find((item) => phase.name.startsWith(item.code + ' · '));
@@ -205,9 +223,9 @@ export function QuotationPhaseWorkspace({
                   return (
                     <label key={row.teamId}>
                       <span><i style={{ background: quotationTeamColor(label) }}/>
-                        {label} · HH</span>
+                        {row.teamId.startsWith('profile:') ? 'Perfil sin equipo: ' + label.slice(12) : label} · HH</span>
                       <QuotationGroupHoursInput value={row.hours}
-                        disabled={!editable}
+                        disabled={!editable || row.teamId.startsWith('profile:')}
                         label={'HH de ' + label + ' para fase ' + (index + 2)}
                         onCommit={(amount) => {
                           if (edt && onEditGroupHours)
@@ -243,6 +261,7 @@ export function QuotationPhaseWorkspace({
                               {task.name}
                             </div>
                             <small>✦ Propuesta del agente · {task.wbs}</small>
+                            <small className={styles.taskRole}>Perfil requerido: {task.role}</small>
                             {(task.description || task.references.length > 0) &&
                               <details className={styles.taskDescription}>
                                 <summary>Descripción y referencias</summary>
@@ -251,16 +270,18 @@ export function QuotationPhaseWorkspace({
                                   <p>Referencias: {task.references.join(', ')}</p>}
                               </details>}
                           </div>
-                          <select className={styles.teamSelect} disabled={!editable}
+                          <select className={styles.teamSelect} disabled={!editable || needsRoleMapping}
                             aria-label={'Equipo de ' + task.wbs + ' · ' + task.role}
                             value={task.teamId ?? ''}
                             onChange={(e) => onEditTaskTeam?.(
                               task.wbs, task.role, e.target.value || null)}>
-                            <option value="">Perfil IA · {task.role}</option>
+                            <option value="">
+                              {needsRoleMapping ? 'Pendiente · asociar perfil' : 'Usar equipo del perfil'}
+                            </option>
                             {activeTeams.map((team) =>
                               <option key={team.id} value={team.id}>{team.name}</option>)}
                             {task.teamId && !activeTeams.some((t) => t.id === task.teamId) &&
-                              <option value={task.teamId}>{task.team}</option>}
+                              <option value={task.teamId}>{task.team} (no activo)</option>}
                           </select>
                           {editable && onEditTaskHours
                             ? <input className={styles.editableHours} type="number"
@@ -325,7 +346,8 @@ export function QuotationPhaseWorkspace({
                         const name = nameOf(row.teamId, teamNames);
                         return <span key={row.teamId} style={{
                           width: (row.hours / total * 100) + '%',
-                          background: quotationTeamColor(name),
+                          background: row.teamId.startsWith('profile:')
+                            ? '#a0a9b8' : quotationTeamColor(name),
                         }} title={name + ': ' + hh(row.hours) + ' HH'}/>;
                       })}
                     </div>
