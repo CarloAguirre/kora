@@ -117,6 +117,27 @@ describe('Proyección semanal por equipos de la EDT', () => {
       .toEqual(original.rows.map((row) => [...row.weeklyHours.values()]));
   });
 
+  it('también usa las fases comerciales manuales sin recalcular HH por capacidad', () => {
+    const manual = quotationDraftDataSchema.parse({
+      mode: 'phases', teams: [team(dev), team(qa)],
+      phases: [
+        { name: 'Construcción', startWeek: 2, durationWeeks: 2,
+          teamHours: [{ teamId: dev, hours: 20 }] },
+        { name: 'QA', startWeek: 3, durationWeeks: 2,
+          teamHours: [{ teamId: dev, hours: 10 }, { teamId: qa, hours: 8 }] },
+      ],
+    });
+    const plan = quotationTeamWeeklyPlan(manual)!;
+    expect(plan.lastWeek).toBe(4);
+    expect(plan.totalHours).toBe(38);
+    expect([...plan.rows.find((row) => row.teamKey === dev)!.weeklyHours.values()])
+      .toEqual([10, 15, 5]);
+    expect([...plan.weekTotals.values()]).toEqual([10, 19, 9]);
+    expect(quotationTeamWeeklyPlan(quotationDraftDataSchema.parse({
+      mode: 'team', teams: [team(dev)],
+    }))).toBeNull();
+  });
+
   it('no inventa semanas para EDT v1 sin calendario explícito', () => {
     const legacy = quotationDraftDataSchema.parse({
       ...draft,
