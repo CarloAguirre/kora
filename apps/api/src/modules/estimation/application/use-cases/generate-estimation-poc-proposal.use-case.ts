@@ -89,27 +89,35 @@ const TEAM_ESTIMATE_RESPONSE_SCHEMA = {
 
 
 /**
- * Una fila = actividad WBS × perfil. Una actividad con 3 perfiles se devuelve
- * en 3 filas con el mismo WBS. Evita tres niveles de arrays en responseSchema
- * (Gemini Flash-Lite rechaza estructuras complejas con INVALID_ARGUMENT).
- * Kora agrupa filas y calcula los totales sin redistribución proporcional.
+ * Tres tablas planas, sin subarrays: tramo, actividad única por WBS y HH
+ * por cruce WBS×perfil. Así no se repiten ni los textos de tareas ni los
+ * periodos de los tramos en cada línea generada por Gemini.
+ *
+ * El esquema ofrecido a Flash-Lite usa solo objetos y arrays de UN nivel,
+ * evitando INVALID_ARGUMENT de estructuras profundamente anidadas.
  */
 const detailResponseSchema = z.object({
   reservePercent: z.number().min(0).max(100),
+  stages: z.array(z.object({
+    code: z.string().trim().min(1).max(40),
+    name: z.string().trim().min(1).max(300),
+    startWeek: z.number().int().min(1).max(520),
+    durationWeeks: z.number().int().min(1).max(520),
+  })).min(1).max(20),
   activities: z.array(z.object({
     wbs: z.string().trim().min(1).max(40),
     stageCode: z.string().trim().min(1).max(40),
-    stageName: z.string().trim().min(1).max(300),
-    startWeek: z.number().int().min(1).max(520),
-    durationWeeks: z.number().int().min(1).max(520),
     module: z.string().trim().min(1).max(300),
     submodule: z.string().trim().max(300),
     name: z.string().trim().min(1).max(300),
     description: z.string().trim().max(3000),
-    role: z.string().trim().min(1).max(120),
-    hours: z.number().positive().max(1000000),
     references: z.string().trim().max(1000),
     classification: z.string().trim().max(40),
+  })).min(1).max(120),
+  roleHours: z.array(z.object({
+    wbs: z.string().trim().min(1).max(40),
+    role: z.string().trim().min(1).max(120),
+    hours: z.number().positive().max(1000000),
   })).min(1).max(240),
 });
 
@@ -117,32 +125,47 @@ const EDT_JSON_SCHEMA = {
   type: 'OBJECT',
   properties: {
     reservePercent: { type: 'NUMBER' },
-    activities: {
+    stages: {
       type: 'ARRAY',
+      description: 'Una única definición para cada tramo cronológico; no repetir en actividades.',
       items: {
         type: 'OBJECT',
         properties: {
-          wbs: { type: 'STRING' },
-          stageCode: { type: 'STRING' },
-          stageName: { type: 'STRING' },
-          startWeek: { type: 'NUMBER' },
-          durationWeeks: { type: 'NUMBER' },
-          module: { type: 'STRING' },
-          submodule: { type: 'STRING' },
-          name: { type: 'STRING' },
-          description: { type: 'STRING' },
-          role: { type: 'STRING' },
-          hours: { type: 'NUMBER' },
-          references: { type: 'STRING' },
-          classification: { type: 'STRING' },
+          code: { type: 'STRING' }, name: { type: 'STRING' },
+          startWeek: { type: 'NUMBER' }, durationWeeks: { type: 'NUMBER' },
         },
-        required: ['wbs', 'stageCode', 'stageName', 'startWeek', 'durationWeeks',
-          'module', 'submodule', 'name', 'description', 'role', 'hours',
-          'references', 'classification'],
+        required: ['code', 'name', 'startWeek', 'durationWeeks'],
+      },
+    },
+    activities: {
+      type: 'ARRAY',
+      description: 'Una actividad por WBS único, sin perfiles ni HH repetidos.',
+      items: {
+        type: 'OBJECT',
+        properties: {
+          wbs: { type: 'STRING' }, stageCode: { type: 'STRING' },
+          module: { type: 'STRING' }, submodule: { type: 'STRING' },
+          name: { type: 'STRING' }, description: { type: 'STRING' },
+          references: { type: 'STRING' }, classification: { type: 'STRING' },
+        },
+        required: ['wbs', 'stageCode', 'module', 'submodule', 'name',
+          'description', 'references', 'classification'],
+      },
+    },
+    roleHours: {
+      type: 'ARRAY',
+      description: 'HH individuales por pareja WBS y perfil. La pareja no debe repetirse.',
+      items: {
+        type: 'OBJECT',
+        properties: {
+          wbs: { type: 'STRING' }, role: { type: 'STRING' },
+          hours: { type: 'NUMBER' },
+        },
+        required: ['wbs', 'role', 'hours'],
       },
     },
   },
-  required: ['reservePercent', 'activities'],
+  required: ['reservePercent', 'stages', 'activities', 'roleHours'],
 } as const;
 
 const BASE_INSTRUCTIONS = [
@@ -200,20 +223,22 @@ export class GenerateEstimationPocProposalUseCase {
       },
       instructions: [
         'Genera una EDT comercial DETALLADA basada en los documentos KDM y respuestas, siguiendo la estructura de un EDT profesional.',
-        'Cada fila de activities representa un cruce WBS×perfil; si una misma actividad requiere 2 perfiles, repite el mismo WBS y metadatos con distinto role y hours.',
-        'Estima las horas de ejecución de cada actividad por perfil en base a su complejidad y alcance. No hagas que sumen un total predeterminado.',
+        'Devuelve 3 tablas planas: stages (cada tramo una sola vez), activities (cada WBS una sola vez) y roleHours (cada pareja WBS×perfil una sola vez).',
+        'activities NO contiene role, hours ni la definición del tramo: solo stageCode como clave foránea hacia stages.',
+        'Si una actividad necesita dos perfiles, escribe una sola fila en activities y DOS filas en roleHours con el mismo WBS y distintos role.',
+        'Estima las horas por actividad y perfil en roleHours según su complejidad y alcance. No hagas que sumen un total predeterminado.',
         'Solo utiliza role que coincida EXACTAMENTE con allowedRoles. Cada perfil declarado debe intervenir en al menos una actividad real.',
         'No inventes funciones fuera del alcance: separa explícitamente exclusiones y supuestos en la descripción.',
         'Agrupa actividades en módulos funcionales (module), submódulos (submodule) y tramos cronológicos (stageCode, stageName). Un tramo puede abarcar varios módulos y perfiles.',
-        'Para TODAS las filas con el mismo stageCode, repite exactamente los mismos stageName, startWeek y durationWeeks; el tramo define un único periodo compartido por varias actividades y perfiles, no un periodo distinto por WBS.',
+        'Cada stageCode de activities debe existir exactamente una vez en stages. Los periodos se definen SOLO en stages, nunca por actividad.',
         'startWeek y durationWeeks son rangos SEMANALES RELATIVOS y estimativos, nunca fechas del proyecto; los tramos pueden solaparse con trabajo paralelo.',
-        'WBS debe ser único por ACTIVIDAD; solo puedes repetirlo cuando varias filas son perfiles distintos de la MISMA actividad.',
-        'Para un WBS repetido, name, description, stageCode, stageName, startWeek, durationWeeks, module, submodule, references y classification deben coincidir.',
+        'WBS es único dentro de activities; repetirlo en activities, incluso con datos idénticos, es un error.',
+        'Cada roleHours debe referir a un WBS existente, su role debe coincidir EXACTAMENTE con allowedRoles y ninguna pareja WBS×role debe duplicarse.',
         'references: códigos o referencias verificables del documento separados por punto y coma; cadena vacía si no existe fuente explícita.',
         'classification: categoría resumida según la evidencia, o cadena vacía si no aplica.',
-        'hours siempre mayores a 0 y con hasta dos decimales. No inventes personas, responsables nominales ni estados de ejecución.',
+        'roleHours.hours siempre mayor a 0 y con hasta dos decimales. Cada actividad debe tener al menos un perfil. No inventes personas, responsables nominales ni estados de ejecución.',
         'reservePercent: solo usa el porcentaje expresamente pedido en el documento o cuestionario; si no aparece, devuelve 0. La reserva no integra las HH base.',
-        'Máximo 20 módulos, 120 actividades WBS únicas, 20 tramos y 240 filas WBS×perfil.',
+        'Máximo 20 módulos, 120 actividades WBS únicas, 20 tramos y 240 filas roleHours.',
         'Evita entregables genéricos; describe actividades que un desarrollador o QA pueda implementar y revisar.',
         'El EDT de Zurich sirve de patrón de estructura, no de presupuesto para KDM: no reutilices sus horas ni su reserva.',
       ].join('\n'),
@@ -238,8 +263,9 @@ export class GenerateEstimationPocProposalUseCase {
           'La EDT anterior fue rechazada por las validaciones del servidor.',
           'Rehaz la EDT desde la fuente original. Corrige exactamente este problema:',
           validationIssue,
-          'Mantén roles EXACTOS de allowedRoles, WBS/tramos coherentes, HH mayores a 0',
-          'con máximo dos decimales y todas las actividades con fuente rastreable.',
+          'Corrige las tres tablas: stages sin códigos repetidos; activities con un WBS único',
+          'por actividad; roleHours con una sola pareja WBS×perfil, HH > 0 y dos decimales.',
+          'Toda actividad debe referir a un tramo válido y tener HH de al menos un perfil.',
           'No transformes las HH para igualar una cifra preliminar.',
         ].join('\n'),
       });
@@ -264,91 +290,114 @@ export class GenerateEstimationPocProposalUseCase {
     throw new BadRequestException('Gemini no devolvió una EDT válida.');
   }
 
+  /**
+   * Reconciliación referencial estricta: no interpretamos textos diferentes
+   * como la misma actividad ni inferimos HH desde metadatos incompletos.
+   * Cada FK y cada cruce debe existir exactamente una vez.
+   */
   private buildVerifiedEdt(
     output: unknown, proposal: EstimationPocProposal,
   ): QuotationReferenceEdt {
     const raw = detailResponseSchema.parse(output);
+    const validRoles = new Set(proposal.roles.map((role) => role.role));
+
+    type Stage = {
+      code: string; name: string; startWeek: number;
+      durationWeeks: number; totalHours: number;
+    };
+    const stages = new Map<string, Stage>();
+    for (const row of raw.stages) {
+      if (stages.has(row.code)) {
+        throw new BadRequestException('El tramo ' + row.code +
+          ' está duplicado. Define cada tramo cronológico solo una vez.');
+      }
+      stages.set(row.code, { ...row, totalHours: 0 });
+    }
+
     type Activity = typeof raw.activities[number];
-    const roles = new Set(proposal.roles.map((role) => role.role));
-    const stages = new Map<string, {
-      code: string; name: string; startWeek: number; durationWeeks: number; totalHours: number;
-    }>();
-    const activities = new Map<string, {
-      row: Activity; roleEffort: { role: string; hours: number }[];
-    }>();
+    const activities = new Map<string, Activity>();
     for (const row of raw.activities) {
-      if (!roles.has(row.role) || roundHours(row.hours) !== row.hours) {
-        throw new BadRequestException('La EDT incluye perfiles ajenos o HH con más de dos decimales.');
+      if (activities.has(row.wbs)) {
+        throw new BadRequestException('WBS duplicado en activities: ' +
+          row.wbs + '. Cada actividad debe declararse una sola vez.');
       }
-      const stage = stages.get(row.stageCode);
-      if (stage && (stage.name !== row.stageName ||
-          stage.startWeek !== row.startWeek ||
-          stage.durationWeeks !== row.durationWeeks)) {
-        // Mensaje concreto para el reintento. No corregimos periodos ni
-        // descartamos actividades: debe hacerlo Gemini y pasar toda la EDT
-        // por el validador nuevamente.
-        throw new BadRequestException(
-          'El tramo cronológico ' + row.stageCode + ' contiene periodos contradictorios: ' +
-          'la definición inicial usa inicio semana ' + stage.startWeek +
-          ' y duración ' + stage.durationWeeks + ', pero la actividad ' + row.wbs +
-          ' indica inicio semana ' + row.startWeek + ' y duración ' + row.durationWeeks +
-          (stage.name !== row.stageName ? '; también cambia el nombre del tramo.' : '.') +
-          ' Todas las filas del tramo deben compartir nombre, inicio y duración.',
-        );
+      if (!stages.has(row.stageCode)) {
+        throw new BadRequestException('La actividad ' + row.wbs +
+          ' referencia el tramo inexistente ' + row.stageCode + '.');
       }
-      if (!stage) {
-        stages.set(row.stageCode, {
-          code: row.stageCode, name: row.stageName,
-          startWeek: row.startWeek, durationWeeks: row.durationWeeks, totalHours: 0,
-        });
+      activities.set(row.wbs, row);
+    }
+
+    const effortByWbs = new Map<string, Array<{ role: string; hours: number }>>();
+    const usedRoles = new Set<string>();
+    for (const item of raw.roleHours) {
+      if (!activities.has(item.wbs)) {
+        throw new BadRequestException('Las HH del perfil ' + item.role +
+          ' referencian un WBS inexistente: ' + item.wbs + '.');
       }
-      const current = activities.get(row.wbs);
-      if (current) {
-        const original = current.row;
-        if (current.roleEffort.some((item) => item.role === row.role) ||
-            ['stageCode', 'stageName', 'startWeek', 'durationWeeks', 'module',
-             'submodule', 'name', 'description', 'references', 'classification']
-              .some((field) => original[field as keyof Activity] !== row[field as keyof Activity])) {
-          throw new BadRequestException('El WBS repetido tiene perfiles duplicados o datos inconsistentes.');
-        }
-        current.roleEffort.push({ role: row.role, hours: row.hours });
-      } else {
-        activities.set(row.wbs, { row, roleEffort: [{ role: row.role, hours: row.hours }] });
+      if (!validRoles.has(item.role)) {
+        throw new BadRequestException('Perfil ajeno a la propuesta: ' +
+          item.role + ' en WBS ' + item.wbs + '.');
+      }
+      if (roundHours(item.hours) !== item.hours) {
+        throw new BadRequestException('Las HH de ' + item.wbs + ' / ' +
+          item.role + ' deben tener como máximo dos decimales.');
+      }
+      const effort = effortByWbs.get(item.wbs) ?? [];
+      if (effort.some((row) => row.role === item.role)) {
+        throw new BadRequestException('HH duplicadas: el perfil ' + item.role +
+          ' aparece dos veces para WBS ' + item.wbs + '.');
+      }
+      effort.push({ role: item.role, hours: item.hours });
+      effortByWbs.set(item.wbs, effort);
+      usedRoles.add(item.role);
+    }
+    for (const role of validRoles) {
+      if (!usedRoles.has(role)) {
+        throw new BadRequestException('La EDT no contiene actividades para el perfil ' + role + '.');
       }
     }
-    if (activities.size > 120 || stages.size > 20 ||
-        proposal.roles.some((role) => !raw.activities.some((row) => row.role === role.role))) {
-      throw new BadRequestException('La EDT no cubre todos los perfiles o excede el límite de actividades.');
-    }
+
     const modulesByName = new Map<string, {
       name: string;
-      tasks: {
+      tasks: Array<{
         wbs: string; name: string; description: string; role: string; hours: number;
         stageCode: string; submodule: string; referenceIds: string[];
-        classification: string; roleEffort: { role: string; hours: number }[];
-      }[];
+        classification: string; roleEffort: Array<{ role: string; hours: number }>;
+      }>;
       totalHours: number;
     }>();
-    for (const [wbs, { row, roleEffort }] of activities) {
+    for (const row of raw.activities) {
+      const effort = effortByWbs.get(row.wbs);
+      if (!effort?.length) {
+        throw new BadRequestException('La actividad ' + row.wbs + ' no tiene HH por perfil.');
+      }
       const key = row.module.toLocaleLowerCase('es');
-      const module = modulesByName.get(key) ?? { name: row.module, tasks: [], totalHours: 0 };
-      const hours = roundHours(roleEffort.reduce((sum, part) => sum + part.hours, 0));
-      const primary = [...roleEffort].sort((a, b) => b.hours - a.hours)[0]!;
+      const module = modulesByName.get(key) ??
+        { name: row.module, tasks: [], totalHours: 0 };
+      const activityHours = roundHours(effort.reduce((sum, part) => sum + part.hours, 0));
+      const primary = [...effort].sort((a, b) => b.hours - a.hours)[0]!;
       module.tasks.push({
-        wbs, name: row.name, description: row.description,
-        role: primary.role, hours, stageCode: row.stageCode,
+        wbs: row.wbs, name: row.name, description: row.description,
+        role: primary.role, hours: activityHours, stageCode: row.stageCode,
         submodule: row.submodule,
-        referenceIds: [...new Set(row.references.split(/[;,]/).map((ref) => ref.trim()).filter(Boolean))],
-        classification: row.classification, roleEffort,
+        referenceIds: [...new Set(row.references.split(/[;,]/)
+          .map((ref) => ref.trim()).filter(Boolean))],
+        classification: row.classification, roleEffort: effort,
       });
-      module.totalHours = roundHours(module.totalHours + hours);
+      module.totalHours = roundHours(module.totalHours + activityHours);
       modulesByName.set(key, module);
       const stage = stages.get(row.stageCode)!;
-      stage.totalHours = roundHours(stage.totalHours + hours);
+      stage.totalHours = roundHours(stage.totalHours + activityHours);
     }
     if (modulesByName.size > 20 ||
         [...modulesByName.values()].some((module) => module.tasks.length > 80)) {
-      throw new BadRequestException('La EDT excede el máximo de módulos o actividades por módulo.');
+      throw new BadRequestException(
+        'La EDT excede el máximo de 20 módulos o 80 actividades por módulo.');
+    }
+    if ([...stages.values()].some((stage) => stage.totalHours <= 0)) {
+      throw new BadRequestException(
+        'Todos los tramos declarados deben tener actividades con HH positivas.');
     }
     const modules = [...modulesByName.values()];
     const totalHours = roundHours(modules.reduce((sum, module) => sum + module.totalHours, 0));
@@ -363,7 +412,6 @@ export class GenerateEstimationPocProposalUseCase {
       reservePercent, reserveHours,
       totalWithReserve: roundHours(totalHours + reserveHours),
     });
-
   }
 
   /** El balance de roles se deriva desde actividades, nunca se impone al EDT. */
