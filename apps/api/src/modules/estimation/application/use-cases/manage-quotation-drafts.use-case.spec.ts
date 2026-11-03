@@ -202,6 +202,21 @@ describe('ManageQuotationDraftsUseCase', () => {
       .rejects.toBeInstanceOf(ForbiddenException);
   });
 
+  it('eliminar versión: permisos, revisión y resultado independiente de número de versión', async () => {
+    const id = '0777e456-fd76-445e-83f1-afc25061c105';
+    const { useCase, repository } = setup();
+    repository.deleteVersion = vi.fn().mockResolvedValue(true);
+    await expect(useCase.deleteVersion(project.id, id, 3, manager))
+      .resolves.toEqual({ deletedVersionId: id });
+    expect(repository.deleteVersion).toHaveBeenCalledWith(project.id, id, 3);
+    await expect(useCase.deleteVersion(project.id, id, 0, manager))
+      .rejects.toThrow('Revisión de cotización inválida.');
+    await expect(useCase.deleteVersion(project.id, id, 3, {
+      id: manager.id, permissions: ['projects:read_assigned'],
+    })).rejects.toBeInstanceOf(ForbiddenException);
+    expect(repository.deleteVersion).toHaveBeenCalledTimes(1);
+  });
+
   it('solo permite leer planificación aplicada al gerente o líder asignado', async () => {
     const { useCase, repository } = setup();
     const getPlan = vi.fn().mockResolvedValue(null);
