@@ -1,0 +1,6 @@
+.fields { display: grid; gap: 12px; }
+.dates { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
+.help { margin: 0; font-size: 12px; line-height: 1.5; color: var(--kora-text-muted, #667085); }
+.error { margin: 0; color: var(--kora-danger, #b42318); font-size: 12px; }
+@media (max-width: 560px) { .dates { grid-template-columns: 1fr; } }
