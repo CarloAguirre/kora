@@ -69,7 +69,10 @@ describe('Switch Equipos · HTML v5', () => {
     expect(screen.queryByText('Unidad')).not.toBeInTheDocument();
     expect(screen.queryByText('Duración')).not.toBeInTheDocument();
     expect(screen.getByText('Semanas')).toBeInTheDocument();
-    expect(screen.getByText('HH/sem prom.')).toBeInTheDocument();
+    expect(screen.getByText('HH/sem equipo')).toBeInTheDocument();
+    expect(screen.getByText('HH/sem/colab.')).toBeInTheDocument();
+    expect(screen.getByLabelText('Carga semanal por colaborador de Desarrollo'))
+      .toHaveTextContent('20');
     expect(screen.getByText('S1–S2')).toBeInTheDocument();
     expect(screen.getByText('2 sem. activas')).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Distribución semanal orientativa' }))
