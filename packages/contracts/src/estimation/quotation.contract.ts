@@ -127,6 +127,10 @@ export const quotationDraftDataSchema = z.object({
     wbs: z.string().trim().min(1).max(40),
     name: nonEmptyTrimmed(300, 'El nombre de la tarea'),
   })).max(240).optional(),
+  edtTaskTypes: z.array(z.object({
+    wbs: z.string().trim().min(1).max(40),
+    classification: z.string().trim().min(1).max(40),
+  })).max(240).optional(),
   /** Fechas relativas y nombre comercial del tramo, sin mutar las etapas Gemini. */
   edtStageSettings: z.array(z.object({
     stageCode: z.string().trim().min(1).max(40),
