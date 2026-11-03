@@ -173,6 +173,7 @@ const BASE_INSTRUCTIONS = [
   'Esta es una prueba de concepto liviana: estima solo a nivel de equipos/roles.',
   'NO generes EDT, tareas, requerimientos, historias de usuario ni casos de uso.',
   'Propón solo perfiles que estén justificados por los documentos o por una necesidad técnica evidente.',
+  'Usa nombres de rol únicos, sin repetir perfiles con distinta capitalización; duración, horas por unidad y cantidad de personas deben ser mayores que cero.',
   'Para cada rol devuelve unidad (week o day), duración, horas por unidad y cantidad de personas.',
   'No calcules HH totales: Kora realizará esa aritmética de forma determinística.',
   'En source cita el nombre del documento que sustenta la decisión; si no existe evidencia directa, indica que es un supuesto técnico.',
@@ -203,6 +204,7 @@ export class GenerateEstimationPocProposalUseCase {
         extractDriveFolderId(input.driveFolderUrl) !== 'kora-poc-fallback') {
       throw new BadRequestException('EDT KDM solo admite la propuesta Gemini de la misma cotización.');
     }
+    this.validatePreliminaryRoles(proposal.roles);
     const docs = await this.sources.readDriveSources(input.driveFolderUrl);
     if (docs.length !== 1 || docs[0]?.name !== 'Requerimiento_KDM.pdf') {
       throw new BadRequestException('No se pudo comprobar el documento KDM de demostración.');
@@ -254,8 +256,11 @@ export class GenerateEstimationPocProposalUseCase {
     // Los artefactos generativos no son entradas determinísticas: si Gemini
     // incumple una condición verificable, le pedimos corregir SU salida una
     // única vez. Nunca saltamos validaciones ni reemplazamos HH con un fallback.
+    // La cuota gratuita puede ser muy limitada. No gastar una segunda
+    // solicitud a Gemini sin aprobación explícita de configuración.
+    const maxAttempts = process.env.KORA_GEMINI_EDT_MAX_ATTEMPTS === '2' ? 2 : 1;
     let validationIssue = '';
-    for (let attempt = 0; attempt < 2; attempt++) {
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
       const output = await this.ai.generateStructured({
         ...request,
         instructions: attempt === 0 ? request.instructions : [
@@ -279,9 +284,11 @@ export class GenerateEstimationPocProposalUseCase {
           ? error.issues.slice(0, 3).map((issue) =>
             issue.path.join('.') + ': ' + issue.message).join('; ')
           : error.message;
-        if (attempt === 1) {
+        if (attempt + 1 === maxAttempts) {
           throw new BadRequestException(
-            'Gemini devolvió una EDT inconsistente tras el reintento: ' +
+            (maxAttempts === 1
+              ? 'Gemini devolvió una EDT inconsistente (sin reintento para ahorrar cuota): '
+              : 'Gemini devolvió una EDT inconsistente tras el reintento: ') +
             validationIssue.slice(0, 250),
           );
         }
@@ -310,6 +317,12 @@ export class GenerateEstimationPocProposalUseCase {
       if (stages.has(row.code)) {
         throw new BadRequestException('El tramo ' + row.code +
           ' está duplicado. Define cada tramo cronológico solo una vez.');
+      }
+      if (row.startWeek + row.durationWeeks - 1 > 520) {
+        throw new BadRequestException(
+          'El tramo ' + row.code +
+          ' supera el horizonte máximo de 520 semanas (inicio + duración).',
+        );
       }
       stages.set(row.code, { ...row, totalHours: 0 });
     }
@@ -414,6 +427,42 @@ export class GenerateEstimationPocProposalUseCase {
     });
   }
 
+  /**
+   * Las condiciones preliminares se validan ANTES de pedir la EDT.
+   * En especial, un rol duplicado puede llegar del primer Gemini y hará
+   * imposible reconciliar el segundo, por mucho que se regeneren actividades.
+   */
+  private validatePreliminaryRoles(
+    roles: readonly EstimationPocProposal['roles'][number][],
+  ): void {
+    if (roles.length === 0 || roles.length > 12) {
+      throw new BadRequestException(
+        'Gemini propuso una cantidad inválida de perfiles (máximo 12).',
+      );
+    }
+    const seen = new Set<string>();
+    for (const role of roles) {
+      const key = role.role.trim().toLocaleLowerCase('es');
+      if (seen.has(key)) {
+        throw new BadRequestException(
+          'Gemini propuso el perfil duplicado «' + role.role +
+          '». La EDT no se solicitará para ahorrar cuota.',
+        );
+      }
+      seen.add(key);
+      if (!Number.isInteger(role.people) || role.people < 1 || role.people > 100 ||
+          !Number.isFinite(role.duration) || role.duration <= 0 ||
+          !Number.isFinite(role.hoursPerUnit) || role.hoursPerUnit <= 0 ||
+          !Number.isFinite(role.totalHours) || role.totalHours <= 0) {
+        throw new BadRequestException(
+          'El perfil «' + role.role +
+          '» tiene personas, duración o HH preliminares inválidas. ' +
+          'Se detuvo la generación antes de solicitar la EDT.',
+        );
+      }
+    }
+  }
+
   /** El balance de roles se deriva desde actividades, nunca se impone al EDT. */
   reconcileProposalWithEdt(
     preliminary: EstimationPocProposal, edt: QuotationReferenceEdt,
@@ -500,12 +549,15 @@ export class GenerateEstimationPocProposalUseCase {
       }),
     );
 
-    const roles = draft.roles.map((role) => ({
+    // El esquema inicial permite 0 para compatibilidad con la PoC, pero
+    // una EDT real exige duración, dedicación y colaboradores positivos.
+    // Rechazar aquí evita consumir la segunda llamada Gemini innecesariamente.
+    const preview = draft.roles.map((role) => ({
       ...role,
-      totalHours: roundHours(
-        role.duration * role.hoursPerUnit * role.people,
-      ),
+      totalHours: roundHours(role.duration * role.hoursPerUnit * role.people),
     }));
+    this.validatePreliminaryRoles(preview);
+    const roles = preview;
     const totalHours = roundHours(
       roles.reduce((sum, role) => sum + role.totalHours, 0),
     );
