@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ProjectDetail, ProjectQuotation, QuotationVersion } from '@kora/contracts';
 import { QuotationCommercialLifecycleCard } from './QuotationCommercialLifecycleCard';
 
@@ -123,7 +123,9 @@ describe('Ciclo comercial separado · Kora', () => {
   it('la aprobación con traspaso después no altera el proyecto', async () => {
     show({ ...version, status: 'sent', aiReviewStatus: 'accepted' });
     fireEvent.click(screen.getByRole('button', { name: 'Registrar aprobación' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Confirmar aprobación' }));
+    const dialog = screen.getByRole('dialog');
+    fireEvent.click(within(dialog).getByLabelText(/Aprobar y traspasar después/));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Registrar aprobación' }));
     await waitFor(() => expect(mocks.approveClient).toHaveBeenCalledWith({
       versionId: version.id, revision: 3,
     }));
@@ -142,18 +144,25 @@ describe('Ciclo comercial separado · Kora', () => {
     expect(screen.getByRole('button', { name: 'Marcar como enviada' })).toBeEnabled();
     expect(screen.getByText(/No hay envío comercial registrado/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Registrar aprobación' }));
-    expect(screen.getByText(/no hay un envío al cliente registrado/i)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Confirmar aprobación' }));
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText(/no fue marcada como enviada al cliente/i)).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Registrar aprobación' }));
     await waitFor(() => expect(mocks.approveClient).toHaveBeenCalledWith({
       versionId: version.id, revision: 3, confirmWithoutSend: true,
     }));
+    // Aprobar ahora abre el resumen; NO traspasa hasta confirmar por segunda vez.
+    expect(await screen.findByText('Traspasar a la ficha del proyecto')).toBeInTheDocument();
     expect(mocks.transferApproved).not.toHaveBeenCalled();
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Traspasar' }));
+    await waitFor(() => expect(mocks.transferApproved).toHaveBeenCalledWith({
+      versionId: version.id, revision: 6,
+    }));
   });
 
   it('si se cancela la advertencia del borrador, no registra aprobación', () => {
     show({ ...version, aiReviewStatus: 'accepted' });
     fireEvent.click(screen.getByRole('button', { name: 'Registrar aprobación' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Cancelar' }));
     expect(mocks.approveClient).not.toHaveBeenCalled();
   });
 
