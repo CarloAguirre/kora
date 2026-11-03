@@ -136,7 +136,10 @@ function buildTimelineAxis(range: DateRange): TimelineAxis {
  * (mismo cálculo que `ProjectModulesCard` del Roadmap interno) y el clic
  * filtra/atenúa en la fila "Tareas" las que no son de ese ámbito.
  */
-export function PhaseRoadmap({ phaseRoadmap, renderPhaseExtras, renderPhaseReferences, renderSelectionDetail }: PhaseRoadmapProps) {
+export function PhaseRoadmap({
+  phaseRoadmap, renderPhaseExtras, renderPhaseReferences, renderSelectionDetail,
+  toolbarActions, renderPhaseHeaderName, renderPhaseHeaderActions,
+}: PhaseRoadmapProps) {
   /** Fases abiertas — cada una se abre/cierra por separado (varias a la vez); arranca abierta la primera. */
   const [expandedPhaseIds, setExpandedPhaseIds] = useState<ReadonlySet<string>>(
     () => new Set(phaseRoadmap.phases[0] ? [phaseRoadmap.phases[0].id] : []),
@@ -198,6 +201,7 @@ export function PhaseRoadmap({ phaseRoadmap, renderPhaseExtras, renderPhaseRefer
           <Button size="sm" variant="ghost" onClick={onResetRange} disabled={!rangeIsCustom}>
             Restablecer
           </Button>
+          {toolbarActions && <div className={styles.toolbarActions}>{toolbarActions}</div>}
         </div>
       </div>
 
@@ -241,6 +245,8 @@ export function PhaseRoadmap({ phaseRoadmap, renderPhaseExtras, renderPhaseRefer
             renderExtras={renderPhaseExtras}
             renderReferences={renderPhaseReferences}
             renderSelectionDetail={renderSelectionDetail}
+            renderHeaderName={renderPhaseHeaderName}
+            renderHeaderActions={renderPhaseHeaderActions}
           />
         ))}
       </div>
@@ -288,6 +294,10 @@ export interface PhaseRoadmapProps {
   renderPhaseReferences?: (phase: PhaseRoadmapPhase) => ReactNode;
   /** Detalle del ítem seleccionado, sobre "Registros de bitácora relacionados" (Roadmap interno). */
   renderSelectionDetail?: (phase: PhaseRoadmapPhase, selection: PhaseRoadmapSelection, clearSelection: () => void) => ReactNode;
+  /** Extensiones exclusivas de la ficha interna; si se omiten el portal cliente permanece idéntico. */
+  toolbarActions?: ReactNode;
+  renderPhaseHeaderName?: (phase: PhaseRoadmapPhase) => ReactNode;
+  renderPhaseHeaderActions?: (phase: PhaseRoadmapPhase) => ReactNode;
 }
 
 function PhaseCard({
@@ -298,6 +308,8 @@ function PhaseCard({
   renderExtras,
   renderReferences,
   renderSelectionDetail,
+  renderHeaderName,
+  renderHeaderActions,
 }: {
   phase: PhaseRoadmapPhase;
   axis: TimelineAxis;
@@ -306,6 +318,8 @@ function PhaseCard({
   renderExtras?: PhaseRoadmapProps['renderPhaseExtras'];
   renderReferences?: PhaseRoadmapProps['renderPhaseReferences'];
   renderSelectionDetail?: PhaseRoadmapProps['renderSelectionDetail'];
+  renderHeaderName?: PhaseRoadmapProps['renderPhaseHeaderName'];
+  renderHeaderActions?: PhaseRoadmapProps['renderPhaseHeaderActions'];
 }) {
   /** Igual que `zoomByModule` en `ProjectModulesCard` (Roadmap interno): un slider real, no un
       toggle decorativo. Es estado de vista local, no una acción a conectar. */
@@ -380,9 +394,24 @@ function PhaseCard({
         aria-expanded={expanded}
       >
         <span className={styles.phaseBadge}>{phase.badge}</span>
-        <span className={styles.phaseName}>{phase.name}</span>
+        {renderHeaderName ? (
+          <span className={styles.phaseNameControl}
+            onClick={(event) => event.stopPropagation()}
+            onKeyDown={(event) => event.stopPropagation()}>
+            {renderHeaderName(phase)}
+          </span>
+        ) : (
+          <span className={styles.phaseName}>{phase.name}</span>
+        )}
         <StatusPill tone={STATUS_TONE[phase.status]}>{STATUS_LABEL[phase.status]}</StatusPill>
         <span className={styles.phaseHeaderSpacer} />
+        {renderHeaderActions && (
+          <span className={styles.phaseHeaderActions}
+            onClick={(event) => event.stopPropagation()}
+            onKeyDown={(event) => event.stopPropagation()}>
+            {renderHeaderActions(phase)}
+          </span>
+        )}
         {phase.alertLabel && (
           <button
             type="button"
