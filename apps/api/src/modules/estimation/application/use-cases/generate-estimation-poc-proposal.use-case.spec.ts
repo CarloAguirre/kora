@@ -171,220 +171,206 @@ describe('GenerateEstimationPocProposalUseCase', () => {
     expect(result.documentsAnalyzed).toBe(1);
     expect(result.totalHours).toBe(160);
   });
-  it('genera EDT v2 por actividad/perfil, conserva tramos y NO prorratea un total previo', async () => {
-    const projectId = '550e8400-e29b-41d4-a716-446655440000';
-    let requestedTask = '';
-    let requestedSchema: Readonly<Record<string, unknown>> | undefined;
-    const row = (partial: Partial<{
-      wbs: string; stageCode: string; stageName: string; startWeek: number;
-      durationWeeks: number; module: string; submodule: string; name: string;
-      description: string; role: string; hours: number; references: string;
-      classification: string;
-    }>) => ({
-      wbs: 'T01.01', stageCode: 'T01', stageName: 'Análisis',
-      startWeek: 1, durationWeeks: 2, module: 'Portal', submodule: 'API',
-      name: 'Construir API', description: 'Servicio de integración.',
-      role: 'Desarrollo', hours: 12, references: 'R01;R03',
-      classification: 'C', ...partial,
+  const projectId = '550e8400-e29b-41d4-a716-446655440000';
+  const input = {
+    projectId, projectName: 'KDM', clientName: 'Cliente',
+    driveFolderUrl: 'https://drive.google.com/drive/folders/kora-poc-fallback',
+    instructions: null, answers: [],
+  } as const;
+  const sources: DocumentSourceReader = {
+    readDriveSources: async () => [{
+      sourceId: 'kora-poc-requerimiento-kdm',
+      name: 'Requerimiento_KDM.pdf', mimeType: 'application/pdf',
+      path: 'KDM.pdf', text: 'Portal, API y pruebas del documento.',
+    }],
+  };
+  const proposal = (roles: Array<{ role: string; hours: number }>) =>
+    estimationPocProposalSchema.parse({
+      projectId, provider: 'gemini', sourceMode: 'poc_simulated',
+      documentsAnalyzed: 1, summary: 'Estimación preliminar KDM',
+      roles: roles.map(({ role, hours }) => ({
+        role, unit: 'week', duration: 1, hoursPerUnit: hours,
+        people: 1, totalHours: hours,
+      })),
+      totalHours: roles.reduce((sum, row) => sum + row.hours, 0),
+      assumptions: [], clarifyingQuestions: [],
     });
+  const baseDetail = () => ({
+    reservePercent: 10,
+    stages: [
+      { code: 'T01', name: 'Análisis', startWeek: 1, durationWeeks: 2 },
+      { code: 'T02', name: 'Pruebas', startWeek: 3, durationWeeks: 1 },
+    ],
+    activities: [
+      { wbs: 'T01.01', stageCode: 'T01', module: 'Portal', submodule: 'API',
+        name: 'Construir API', description: 'Servicio de integración.',
+        references: 'R01;R03', classification: 'C' },
+      { wbs: 'T01.02', stageCode: 'T01', module: 'Portal', submodule: 'Web',
+        name: 'Frontend', description: 'Interfaz de operación.',
+        references: 'R04', classification: 'C' },
+      { wbs: 'T02.01', stageCode: 'T02', module: 'QA', submodule: 'Regresión',
+        name: 'Verificar flujo', description: 'Pruebas de aceptación.',
+        references: 'R05', classification: 'C' },
+    ],
+    roleHours: [
+      { wbs: 'T01.01', role: 'Desarrollo', hours: 12 },
+      { wbs: 'T01.01', role: 'QA', hours: 3 },
+      { wbs: 'T01.02', role: 'Desarrollo', hours: 40 },
+      { wbs: 'T02.01', role: 'QA', hours: 24 },
+    ],
+  });
+  const createGenerator = (output: (attempt: number, instructions?: string) => unknown) => {
+    let calls = 0;
+    const instructions: string[] = [];
+    const requestedSchemas: Array<Readonly<Record<string, unknown>> | undefined> = [];
     const ai: AiProvider = {
       name: 'gemini',
       generateStructured: async (request) => {
-        requestedTask = request.task;
-        requestedSchema = request.responseJsonSchema;
-        return {
-          reservePercent: 10,
-          activities: [
-            row({ role: 'Desarrollo', hours: 12 }),
-            row({ role: 'QA', hours: 3 }),
-            row({ wbs: 'T01.02', name: 'Frontend', submodule: 'Web',
-              role: 'Desarrollo', hours: 40, references: 'R04' }),
-            row({ wbs: 'T02.01', stageCode: 'T02', stageName: 'Pruebas',
-              startWeek: 3, durationWeeks: 1, module: 'QA', submodule: 'Regresión',
-              name: 'Verificar flujo', role: 'QA', hours: 24, references: 'R05' }),
-          ],
-        };
+        calls++;
+        instructions.push(request.instructions ?? '');
+        requestedSchemas.push(request.responseJsonSchema);
+        return output(calls, request.instructions);
       },
     };
-    const sources: DocumentSourceReader = {
-      readDriveSources: async () => [{
-        sourceId: 'kora-poc-requerimiento-kdm',
-        name: 'Requerimiento_KDM.pdf', mimeType: 'application/pdf',
-        path: 'Demostracion/Requerimiento_KDM.pdf', text: 'API y frontend.',
-      }],
+    return {
+      generator: new GenerateEstimationPocProposalUseCase(ai, sources),
+      calls: () => calls,
+      instructions,
+      requestedSchemas,
     };
-    const proposal = estimationPocProposalSchema.parse({
-      projectId, provider: 'gemini', sourceMode: 'poc_simulated',
-      documentsAnalyzed: 1, summary: 'KDM',
-      roles: [
-        { role: 'Desarrollo', unit: 'week', duration: 1,
-          hoursPerUnit: 50, people: 1, totalHours: 50 },
-        { role: 'QA', unit: 'week', duration: 1,
-          hoursPerUnit: 30, people: 1, totalHours: 30 },
-      ],
-      totalHours: 80, assumptions: [], clarifyingQuestions: [],
-    });
-    const generator = new GenerateEstimationPocProposalUseCase(ai, sources);
-    const output = await generator.generateEdt({
-      projectId, projectName: 'Proyecto', clientName: 'Cliente',
-      driveFolderUrl: 'https://drive.google.com/drive/folders/kora-poc-fallback',
-      instructions: null, answers: [],
-    }, proposal);
-    expect(requestedTask).toBe('estimation.poc.reference-edt');
-    expect(JSON.stringify(requestedSchema)).not.toMatch(/"minItems"|"maxItems"|"minimum"|"maximum"/);
-    expect(output.schemaVersion).toBe('kora.quotation.reference-edt.v2');
-    expect(output.totalHours).toBe(79); // 52 Desarrollo + 27 QA; NO los 80 HH preliminares.
-    expect(output.modules.map((module) => module.totalHours)).toEqual([55, 24]);
-    expect(output.modules[0]?.tasks[0]?.hours).toBe(15);
-    expect(output.modules[0]?.tasks[0]?.roleEffort).toEqual([
+  };
+
+  it('genera EDT v2 desde tablas no redundantes y conserva las HH por actividad/perfil', async () => {
+    const mock = createGenerator(() => baseDetail());
+    const preliminary = proposal([
+      { role: 'Desarrollo', hours: 50 }, { role: 'QA', hours: 30 },
+    ]);
+    const edt = await mock.generator.generateEdt(input, preliminary);
+    expect(mock.calls()).toBe(1);
+    expect(mock.requestedSchemas[0]).toHaveProperty('properties');
+    const jsonSchema = JSON.stringify(mock.requestedSchemas[0]);
+    expect(jsonSchema).not.toMatch(/"minItems"|"maxItems"|"minimum"|"maximum"/);
+    expect(jsonSchema).toContain('"roleHours"');
+    expect(edt.schemaVersion).toBe('kora.quotation.reference-edt.v2');
+    expect(edt.totalHours).toBe(79);
+    expect(edt.modules.map((module) => module.totalHours)).toEqual([55, 24]);
+    expect(edt.modules[0]?.tasks[0]?.hours).toBe(15);
+    expect(edt.modules[0]?.tasks[0]?.roleEffort).toEqual([
       { role: 'Desarrollo', hours: 12 }, { role: 'QA', hours: 3 },
     ]);
-    expect(output.modules[0]?.tasks[0]?.referenceIds).toEqual(['R01', 'R03']);
-    expect(output.stages?.map((stage) => stage.totalHours)).toEqual([55, 24]);
-    expect(output.reservePercent).toBe(10);
-    expect(output.reserveHours).toBe(7.9);
-    expect(output.totalWithReserve).toBe(86.9);
-    const reconciled = generator.reconcileProposalWithEdt(proposal, output);
-    expect(reconciled.totalHours).toBe(79);
+    expect(edt.modules[0]?.tasks[0]?.referenceIds).toEqual(['R01', 'R03']);
+    expect(edt.stages?.map((stage) => stage.totalHours)).toEqual([55, 24]);
+    expect(edt.reserveHours).toBe(7.9);
+    expect(edt.totalWithReserve).toBe(86.9);
+    const reconciled = mock.generator.reconcileProposalWithEdt(preliminary, edt);
     expect(reconciled.roles.map((role) => role.totalHours)).toEqual([52, 27]);
-    expect(proposal.totalHours).toBe(80); // La propuesta preliminar no se altera.
+    expect(preliminary.totalHours).toBe(80);
   });
 
-  it('solicita una corrección a Gemini cuando la primera EDT tiene HH no redondeadas', async () => {
-    const projectId = '550e8400-e29b-41d4-a716-446655440000';
-    const proposal = estimationPocProposalSchema.parse({
-      projectId, provider: 'gemini', sourceMode: 'poc_simulated',
-      documentsAnalyzed: 1, summary: 'Prueba de corrección',
-      roles: [{ role: 'Desarrollo', unit: 'week', duration: 1,
-        hoursPerUnit: 40, people: 1, totalHours: 40 }],
-      totalHours: 40, assumptions: [], clarifyingQuestions: [],
+  it('pide corregir HH de más de dos decimales sin prorratearlas', async () => {
+    const mock = createGenerator((attempt) => {
+      const result = baseDetail();
+      result.roleHours[0]!.hours = attempt === 1 ? 12.123 : 12.12;
+      return result;
     });
-    let calls = 0;
-    let retryInstructions = '';
-    const ai: AiProvider = {
-      name: 'gemini',
-      generateStructured: async (request) => {
-        calls++;
-        if (calls === 2) retryInstructions = request.instructions ?? '';
-        return {
-          reservePercent: 0,
-          activities: [{
-            wbs: 'T01.01', stageCode: 'T01', stageName: 'Implementación',
-            startWeek: 1, durationWeeks: 2, module: 'Portal', submodule: 'Backend',
-            name: 'Servicio', description: 'Crear endpoint',
-            role: 'Desarrollo', hours: calls === 1 ? 14.123 : 14.12,
-            references: 'R01', classification: 'Desarrollo',
-          }],
-        };
-      },
-    };
-    const sources: DocumentSourceReader = {
-      readDriveSources: async () => [{
-        sourceId: 'kora-poc-requerimiento-kdm', name: 'Requerimiento_KDM.pdf',
-        mimeType: 'application/pdf', path: 'KDM.pdf', text: 'Servicio backend.',
-      }],
-    };
-    const result = await new GenerateEstimationPocProposalUseCase(ai, sources).generateEdt({
-      projectId, projectName: 'KDM', clientName: 'Cliente',
-      driveFolderUrl: 'https://drive.google.com/drive/folders/kora-poc-fallback',
-      instructions: null, answers: [],
-    }, proposal);
-    expect(calls).toBe(2);
-    expect(retryInstructions).toMatch(/rechazada por las validaciones/);
-    expect(retryInstructions).toMatch(/dos decimales/);
-    expect(result.totalHours).toBe(14.12);
-    expect(result.modules[0]?.tasks[0]?.roleEffort).toEqual([
-      { role: 'Desarrollo', hours: 14.12 },
-    ]);
+    const edt = await mock.generator.generateEdt(input, proposal([
+      { role: 'Desarrollo', hours: 50 }, { role: 'QA', hours: 30 },
+    ]));
+    expect(mock.calls()).toBe(2);
+    expect(mock.instructions[1]).toMatch(/dos decimales/);
+    expect(edt.modules[0]?.tasks[0]?.roleEffort?.[0]?.hours).toBe(12.12);
+    expect(edt.totalHours).toBe(79.12);
   });
 
-  it('corrige el tramo con semanas contradictorias entre WBS del mismo stageCode', async () => {
-    const projectId = '550e8400-e29b-41d4-a716-446655440000';
-    const proposal = estimationPocProposalSchema.parse({
-      projectId, provider: 'gemini', sourceMode: 'poc_simulated',
-      documentsAnalyzed: 1, summary: 'KDM',
-      roles: [{ role: 'Desarrollo', unit: 'week', duration: 2,
-        hoursPerUnit: 40, people: 1, totalHours: 80 }],
-      totalHours: 80, assumptions: [], clarifyingQuestions: [],
-    });
-    let calls = 0;
-    let retryInstructions = '';
-    const ai: AiProvider = {
-      name: 'gemini',
-      generateStructured: async (request) => {
-        calls++;
-        if (calls === 2) retryInstructions = request.instructions ?? '';
-        const row = (wbs: string, startWeek: number) => ({
-          wbs, stageCode: 'T01', stageName: 'Implementación',
-          startWeek, durationWeeks: 2,
-          module: 'Portal', submodule: 'Backend', name: 'Actividad ' + wbs,
-          description: 'Implementación del alcance documental.',
-          role: 'Desarrollo', hours: 15, references: 'R01', classification: '',
+  it('regenera si Gemini repite un tramo con periodos contradictorios', async () => {
+    const mock = createGenerator((attempt) => {
+      const result = baseDetail();
+      if (attempt === 1) {
+        result.stages.push({
+          code: 'T01', name: 'Análisis',
+          startWeek: 3, durationWeeks: 2,
         });
-        return {
-          reservePercent: 0,
-          activities: [row('T01.01', 1), row('T01.02', calls === 1 ? 3 : 1)],
-        };
-      },
-    };
-    const sources: DocumentSourceReader = {
-      readDriveSources: async () => [{
-        sourceId: 'kora-poc-requerimiento-kdm',
-        name: 'Requerimiento_KDM.pdf', mimeType: 'application/pdf',
-        path: 'KDM.pdf', text: 'Dos actividades de implementación.',
-      }],
-    };
-    const result = await new GenerateEstimationPocProposalUseCase(ai, sources).generateEdt({
-      projectId, projectName: 'KDM', clientName: 'Cliente',
-      driveFolderUrl: 'https://drive.google.com/drive/folders/kora-poc-fallback',
-      instructions: null, answers: [],
-    }, proposal);
-    expect(calls).toBe(2);
-    expect(retryInstructions).toContain('tramo cronológico T01');
-    expect(retryInstructions).toContain('T01.02');
-    expect(retryInstructions).toContain('inicio semana 3');
-    expect(result.stages).toEqual([{
-      code: 'T01', name: 'Implementación',
-      startWeek: 1, durationWeeks: 2, totalHours: 30,
-    }]);
-    expect(result.totalHours).toBe(30);
-    expect(result.modules[0]?.tasks).toHaveLength(2);
-  });
-
-  it('rechaza actividades con roles ajenos a la propuesta y no genera HH inventadas', async () => {
-    const ai: AiProvider = {
-      name: 'gemini',
-      generateStructured: async () => ({
-        reservePercent: 0,
-        activities: [{
-          wbs: 'T01.01', stageCode: 'T01', stageName: 'Levantamiento',
-          startWeek: 1, durationWeeks: 1, module: 'Portal', submodule: 'Web',
-          name: 'Actividad inventada', description: 'Fuera de roles.',
-          role: 'Rol inexistente', hours: 8, references: '',
-          classification: '',
-        }],
-      }),
-    };
-    const reader: DocumentSourceReader = {
-      readDriveSources: async () => [{
-        sourceId: 'kora-poc-requerimiento-kdm', name: 'Requerimiento_KDM.pdf',
-        mimeType: 'application/pdf', path: 'Demo/KDM', text: 'Desarrollo',
-      }],
-    };
-    const projectId = '550e8400-e29b-41d4-a716-446655440000';
-    const proposal = estimationPocProposalSchema.parse({
-      projectId, provider: 'gemini', sourceMode: 'poc_simulated',
-      documentsAnalyzed: 1, summary: 'KDM',
-      roles: [{ role: 'Desarrollo', unit: 'week', duration: 1,
-        hoursPerUnit: 40, people: 1, totalHours: 40 }],
-      totalHours: 40, assumptions: [], clarifyingQuestions: [],
+      }
+      return result;
     });
-    await expect(new GenerateEstimationPocProposalUseCase(ai, reader)
-      .generateEdt({
-        projectId, projectName: 'Proyecto', clientName: 'Cliente',
-        driveFolderUrl: 'https://drive.google.com/drive/folders/kora-poc-fallback',
-        instructions: null, answers: [],
-      }, proposal)).rejects.toThrow(/perfiles ajenos/);
+    const edt = await mock.generator.generateEdt(input, proposal([
+      { role: 'Desarrollo', hours: 50 }, { role: 'QA', hours: 30 },
+    ]));
+    expect(mock.calls()).toBe(2);
+    expect(mock.instructions[1]).toContain('tramo T01');
+    expect(mock.instructions[1]).toContain('duplicado');
+    expect(edt.stages).toHaveLength(2);
+    expect(edt.stages?.[0]?.startWeek).toBe(1);
   });
 
+  it('elimina la causa de WBS repetido por varios perfiles: una sola definición por tarea', async () => {
+    const mock = createGenerator(() => baseDetail());
+    const edt = await mock.generator.generateEdt(input, proposal([
+      { role: 'Desarrollo', hours: 50 }, { role: 'QA', hours: 30 },
+    ]));
+    expect(edt.modules[0]?.tasks).toHaveLength(2);
+    expect(edt.modules[0]?.tasks[0]?.roleEffort).toHaveLength(2);
+    expect(edt.modules[0]?.tasks[0]?.hours).toBe(15);
+  });
+
+  it('nunca agrega dos asignaciones de HH del mismo perfil y WBS', async () => {
+    const mock = createGenerator(() => {
+      const result = baseDetail();
+      result.roleHours.push({ wbs: 'T01.01', role: 'QA', hours: 5 });
+      return result;
+    });
+    await expect(mock.generator.generateEdt(input, proposal([
+      { role: 'Desarrollo', hours: 50 }, { role: 'QA', hours: 30 },
+    ]))).rejects.toThrow(/HH duplicadas.*QA.*T01.01/);
+    expect(mock.calls()).toBe(2);
+  });
+
+  it('nunca fusiona actividades con WBS duplicado', async () => {
+    const mock = createGenerator(() => {
+      const result = baseDetail();
+      result.activities.push({
+        ...result.activities[0]!, name: 'Otra funcionalidad',
+      });
+      return result;
+    });
+    await expect(mock.generator.generateEdt(input, proposal([
+      { role: 'Desarrollo', hours: 50 }, { role: 'QA', hours: 30 },
+    ]))).rejects.toThrow(/WBS duplicado.*T01.01/);
+    expect(mock.calls()).toBe(2);
+  });
+
+  it('rechaza relaciones entre tareas y HH que no tienen respaldo en una actividad', async () => {
+    const mock = createGenerator(() => {
+      const result = baseDetail();
+      result.roleHours.push({ wbs: 'T99.99', role: 'QA', hours: 2 });
+      return result;
+    });
+    await expect(mock.generator.generateEdt(input, proposal([
+      { role: 'Desarrollo', hours: 50 }, { role: 'QA', hours: 30 },
+    ]))).rejects.toThrow(/WBS inexistente: T99.99/);
+  });
+
+  it('rechaza perfiles ajenos a la propuesta; no crea HH ni roles de fallback', async () => {
+    const mock = createGenerator(() => {
+      const result = baseDetail();
+      result.roleHours[0]!.role = 'Rol inexistente';
+      return result;
+    });
+    await expect(mock.generator.generateEdt(input, proposal([
+      { role: 'Desarrollo', hours: 50 }, { role: 'QA', hours: 30 },
+    ]))).rejects.toThrow(/Perfil ajeno.*Rol inexistente/);
+    expect(mock.calls()).toBe(2);
+  });
+
+  it('rechaza etapas inexistentes, en lugar de asignar semanas arbitrarias', async () => {
+    const mock = createGenerator(() => {
+      const result = baseDetail();
+      result.activities[0]!.stageCode = 'T99';
+      return result;
+    });
+    await expect(mock.generator.generateEdt(input, proposal([
+      { role: 'Desarrollo', hours: 50 }, { role: 'QA', hours: 30 },
+    ]))).rejects.toThrow(/tramo inexistente T99/);
+    expect(mock.calls()).toBe(2);
+  });
 });
