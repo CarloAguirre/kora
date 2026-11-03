@@ -1,7 +1,4 @@
 import { z } from 'zod';
-
-/** Catálogo real de tareas disponible en la BD para editor y Excel. */
-export type QuotationTaskCatalogEntry = { id: string; name: string };
 import { estimationAnalysisArtifactSchema } from './analysis-artifact.contract';
 import { quotationReferenceEdtSchema } from './quotation-reference-edt.contract';
 import { estimationPocProposalSchema, submitEstimationAnswerSchema, estimationQuestionSchema } from './estimation.contract';
