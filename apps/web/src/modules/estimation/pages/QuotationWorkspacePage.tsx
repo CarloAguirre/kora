@@ -457,7 +457,17 @@ export function QuotationWorkspacePage() {
     editTeamById(teamId, { collaborators });
   };
   const toggleTeam = (teamId: string, checked: boolean) => {
-    if (!editable || !form?.draft || form.draft.aiPoc?.edt) return;
+    if (!editable || !form?.draft) return;
+    if (form.draft.aiPoc?.edt) {
+      if (!checked && quotationEdtAssignments(form.draft).some((row) => row.teamKey === teamId)) {
+        setError('Reasigna primero las tareas EDT de este equipo desde Por fases y módulos antes de desactivarlo.');
+        return;
+      }
+      const next = checked ? { ...form.draft, teams: [...teamRows, emptyTeam(teamId)] } :
+        { ...form.draft, teams: teamRows.filter((item) => item.teamId !== teamId) };
+      applyEdtChanges(next);
+      return;
+    }
     updateDraft(checked
       ? { teams: [...teamRows, emptyTeam(teamId)] }
       : { teams: teamRows.filter((item) => item.teamId !== teamId),
