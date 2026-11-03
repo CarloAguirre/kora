@@ -522,6 +522,8 @@ export const projectPaymentMilestoneSchema = z.object({
   sortOrder: z.number().int(),
   triggerType: projectPaymentTriggerSchema,
   triggerPhase: projectPhaseSchema.nullable(),
+  /** Módulo comercial cotizado; fase operativa global no equivalente. */
+  triggerModuleId: uuidSchema.nullish(),
   triggerDate: z.iso.date().nullable(),
 });
 export type ProjectPaymentMilestone = z.infer<typeof projectPaymentMilestoneSchema>;
@@ -534,6 +536,7 @@ const paymentMilestoneScheduleShape = {
   sortOrder: z.coerce.number().int().min(0).optional(),
   triggerType: projectPaymentTriggerSchema.default('manual'),
   triggerPhase: projectPhaseSchema.nullish(),
+  triggerModuleId: uuidSchema.nullish(),
   triggerDate: z.iso.date().nullish(),
 };
 
@@ -542,11 +545,12 @@ function refineTrigger(
   data: {
     triggerType?: ProjectPaymentTrigger | undefined;
     triggerPhase?: ProjectPhase | null | undefined;
+    triggerModuleId?: string | null | undefined;
     triggerDate?: string | null | undefined;
   },
   ctx: z.RefinementCtx,
 ): void {
-  if (data.triggerType === 'phase' && !data.triggerPhase) {
+  if (data.triggerType === 'phase' && !data.triggerPhase && !data.triggerModuleId) {
     ctx.addIssue({ code: 'custom', message: 'Selecciona la fase que activa el tramo.', path: ['triggerPhase'] });
   }
   if (data.triggerType === 'date' && !data.triggerDate) {
