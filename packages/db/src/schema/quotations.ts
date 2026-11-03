@@ -1,8 +1,20 @@
 import { sql } from 'drizzle-orm';
-import { check, index, integer, jsonb, numeric, pgTable, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
+import { boolean, check, index, integer, jsonb, numeric, pgTable, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
 import { primaryId, timestamps } from './columns';
 import { projects } from './projects';
 import { users } from './identity';
+
+/** Tipos de tareas de cotización: BD es fuente única para UI y plantilla Excel. */
+export const quotationTaskTypes = pgTable('quotation_task_types', {
+  id: primaryId(),
+  name: varchar('name', { length: 40 }).notNull(),
+  sortOrder: integer('sort_order').notNull().default(0),
+  isActive: boolean('is_active').notNull().default(true),
+  ...timestamps,
+}, (t) => [
+  uniqueIndex('quotation_task_types_name_key').on(sql`lower(btrim(${t.name}))`),
+  index('quotation_task_types_active_sort_idx').on(t.isActive, t.sortOrder),
+]);
 
 /** Una cotización por proyecto. Nunca se materializa en los campos operativos de projects aquí. */
 export const projectQuotations = pgTable('project_quotations', {
