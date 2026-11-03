@@ -1,4 +1,4 @@
-import type { QuotationVersion } from '@kora/contracts';
+import { effectiveQuotationEdt, type QuotationVersion } from '@kora/contracts';
 
 export class InvalidCommercialQuotation extends Error {
   constructor(message: string) { super(message); this.name = 'InvalidCommercialQuotation'; }
@@ -26,6 +26,15 @@ export function assertQuotationReadyForClient(
     throw new InvalidCommercialQuotation(
       'Primero revisa y acepta la propuesta IA, incluidos los ajustes manuales de HH.',
     );
+  }
+  if (version.origin === 'ai' && version.draft.aiPoc?.edt &&
+      version.draft.analysisProjectionStatus === 'synced') {
+    const effective = effectiveQuotationEdt(version.draft);
+    if (!effective || Math.abs(effective.totalHours - version.totalHours) > 0.011) {
+      throw new InvalidCommercialQuotation(
+        'Las HH comerciales deben conciliar con los ajustes de tareas guardados.',
+      );
+    }
   }
   if (version.origin === 'ai' && version.draft.aiPoc?.edt &&
       version.draft.analysisProjectionStatus === 'modified') {
@@ -64,7 +73,7 @@ export function assertAiProposalReadyToAccept(
   if (!names.length || names.some((name) => !aiPoc.roleTeamIds[name]) ||
       Object.keys(aiPoc.roleTeamIds).length !== names.length ||
       (analysisProjectionStatus !== 'modified' &&
-       Math.abs(aiPoc.edt.totalHours - version.totalHours) > 0.011)) {
+       Math.abs((effectiveQuotationEdt(version.draft)?.totalHours ?? 0) - version.totalHours) > 0.011)) {
     throw new InvalidCommercialQuotation('La distribución de HH o perfiles no coincide con el análisis IA.');
   }
 }
