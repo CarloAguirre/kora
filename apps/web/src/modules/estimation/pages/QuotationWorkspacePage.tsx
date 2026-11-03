@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { estimationAnalysisArtifactSchema, isQuotationDraftEligibleProject, quotationDraftDataSchema, effectiveQuotationEdt, projectPocRolesToQuotationDraft, type EstimationAnalysisArtifact, type QuotationDraftData, type QuotationVersion, type UpdateQuotationDraftInput } from '@kora/contracts';
+import { estimationAnalysisArtifactSchema, isQuotationDraftEligibleProject, quotationDraftDataSchema, effectiveQuotationEdt, reconcilePocCommercialDraft, redistributeQuotationEdtHours, withQuotationTaskSetting, withQuotationEdtStageSetting, quotationEdtAssignments, projectPocRolesToQuotationDraft, type EstimationAnalysisArtifact, type QuotationDraftData, type QuotationVersion, type UpdateQuotationDraftInput } from '@kora/contracts';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { useProjectDetail } from '@/modules/projects/api/projects.queries';
@@ -10,7 +10,7 @@ import { Button } from '@/shared/components/ui/Button';
 import { Card } from '@/shared/components/ui/Card';
 import { Select } from '@/shared/components/ui/Select';
 import { Badge } from '@/shared/components/ui/Badge';
-import { SegmentedControl } from '@/shared/components/ui/SegmentedControl';
+import { Modal } from '@/shared/components/ui/Modal';
 import { TextField } from '@/shared/components/ui/TextField';
 import { useAppliedQuotationPlanning, useCreateQuotationVersion, useProjectQuotation, useSaveQuotationDraft, useQuotationLifecycle } from '../api/quotation.queries';
 import { AnalysisEvidenceCard } from '../components/AnalysisEvidenceCard';
@@ -22,6 +22,7 @@ import { QuotationPlanningAcceptanceCard } from '../components/QuotationPlanning
 import { QuotationCommercialLifecycleCard } from '../components/QuotationCommercialLifecycleCard';
 import { QuotationCommercialSummary } from '../components/QuotationCommercialSummary';
 import { QuotationPhaseWorkspace } from '../components/QuotationPhaseWorkspace';
+import { QuotationTeamsWorkspace } from '../components/QuotationTeamsWorkspace';
 import { QuotationCommercialSections } from '../components/QuotationCommercialSections';
 import { NewProjectQuotationModal } from '../components/NewProjectQuotationModal';
 import styles from './QuotationWorkspacePage.module.css';
@@ -57,6 +58,8 @@ export function QuotationWorkspacePage() {
 
   const [form, setForm] = useState<Form | null>(null);
   const [newQuotationOpen, setNewQuotationOpen] = useState(false);
+  const [roleMappingOpen, setRoleMappingOpen] = useState(false);
+  const [teamView, setTeamView] = useState<'team' | 'phases'>('phases');
   const [dirty, setDirty] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -83,6 +86,8 @@ export function QuotationWorkspacePage() {
     setForm(selected ? fromVersion(selected) : null);
     setDirty(false);
     setError('');
+    setTeamView(selected?.draft.aiPoc?.edt || selected?.draft.mode === 'phases'
+      ? 'phases' : 'team');
   }, [selected?.id, selected?.revision]);
 
   const mayWrite = Boolean(project && isQuotationDraftEligibleProject(project));
@@ -213,60 +218,118 @@ export function QuotationWorkspacePage() {
 
   const teamRows = form?.draft.teams ?? [];
   const phaseRows = form?.draft.phases ?? [];
-  const available = activeTeams.filter((team) => !teamRows.some((row) => row.teamId === team.id));
   const effectiveEdt = form?.draft.aiPoc?.edt ? effectiveQuotationEdt(form.draft) : null;
   const aiSnapshot = selected?.draft.aiPoc;
   const aiRolesMapped = Boolean(aiSnapshot && aiSnapshot.proposal.roles.every((role) =>
     Boolean(aiSnapshot.roleTeamIds[role.role]) &&
     teamRows.some((team) => team.teamId === aiSnapshot.roleTeamIds[role.role]),
   ));
-  const editTeam = (index: number, patch: Partial<QuotationDraftData['teams'][number]>) => {
-    if (!form) return;
-    const original = teamRows[index];
-    const changedId = original && patch.teamId && patch.teamId !== original.teamId;
-    updateDraft({
-      teams: teamRows.map((row, position) => position === index ? { ...row, ...patch } : row),
-      ...(changedId ? { phases: phaseRows.map((phase) => ({
-        ...phase,
-        teamHours: phase.teamHours.map((hours) =>
-          hours.teamId === original.teamId ? { ...hours, teamId: patch.teamId as string } : hours),
-      })) } : {}),
-    });
+  const editTeamById = (teamId: string, patch: Partial<QuotationDraftData['teams'][number]>) => {
+    if (!editable || !form) return;
+    const draft = {
+      ...form.draft,
+      teams: form.draft.teams.map((row) =>
+        row.teamId === teamId ? { ...row, ...patch } : row),
+    };
+    change((current) => ({ ...current, draft }));
   };
   const editPhase = (index: number, patch: Partial<QuotationDraftData['phases'][number]>) => {
-    updateDraft({ phases: phaseRows.map((row, position) => position === index ? { ...row, ...patch } : row) });
+    updateDraft({ phases: phaseRows.map((row, position) =>
+      position === index ? { ...row, ...patch } : row) });
   };
-
-  const editEdtHours = (wbs: string, role: string, hours: number) => {
-    if (!editable || !form) return;
+  const applyEdtChanges = (draft: QuotationDraftData) => {
     try {
-      const source = form.draft.aiPoc?.edt;
-      if (!source) return;
-      const task = source.modules.flatMap((module) => module.tasks)
-        .find((item) => item.wbs === wbs);
-      const initial = task?.roleEffort?.find((item) => item.role === role)?.hours ??
-        (task?.role === role ? task.hours : null);
-      if (initial === null || !Number.isFinite(hours) || hours <= 0) return;
-      const edits = (form.draft.edtHourAdjustments ?? []).filter((entry) =>
-        entry.wbs !== wbs || entry.role !== role);
-      if (Math.abs(initial - hours) > 0.0001) edits.push({ wbs, role, hours });
-      const nextDraft: QuotationDraftData = {
-        ...form.draft, edtHourAdjustments: edits,
-        analysisProjectionStatus: 'modified',
-      };
-      effectiveQuotationEdt(nextDraft); // mismo contrato que aplica el backend
-      const roleTeamIds = nextDraft.aiPoc?.roleTeamIds ?? {};
-      const mapped = nextDraft.aiPoc?.proposal.roles.every((item) =>
-        Boolean(roleTeamIds[item.role]) && nextDraft.teams.some(
-          (team) => team.teamId === roleTeamIds[item.role])) ?? false;
-      const projected = mapped && nextDraft.mode === 'phases'
-        ? projectPocRolesToQuotationDraft(nextDraft, roleTeamIds) : nextDraft;
-      change((current) => ({ ...current, draft: projected }));
+      quotationEdtAssignments(draft); // validación del mismo contrato que usa la API
+      const saved = reconcilePocCommercialDraft(draft);
+      change((current) => ({ ...current, draft: saved }));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'HH no válidas para el WBS y perfil.');
+      setError(cause instanceof Error ? cause.message : 'No fue posible conciliar la EDT.');
     }
   };
-
+  const editEdtHours = (wbs: string, role: string, hours: number) => {
+    if (!editable || !form) return;
+    const source = form.draft.aiPoc?.edt;
+    if (!source) return;
+    const original = source.modules.flatMap((module) => module.tasks).find(
+      (task) => task.wbs === wbs);
+    const originalHours = original?.roleEffort?.find(
+      (item) => item.role === role)?.hours ??
+      (original?.role === role ? original.hours : null);
+    if (originalHours === null || !Number.isFinite(hours) || hours <= 0) return;
+    const edits = (form.draft.edtHourAdjustments ?? []).filter(
+      (item) => item.wbs !== wbs || item.role !== role);
+    if (Math.abs(originalHours - hours) > 0.000001)
+      edits.push({ wbs, role, hours });
+    applyEdtChanges({ ...form.draft, edtHourAdjustments: edits });
+  };
+  const adjustEdtGroupHours = (
+    teamKey: string, targetHours: number, stageCode?: string, module?: string,
+  ) => {
+    if (!editable || !form) return;
+    try {
+      applyEdtChanges(redistributeQuotationEdtHours(form.draft, {
+        teamKey, targetHours, stageCode, module,
+      }));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message :
+        'No se pudieron redistribuir las HH de este equipo.');
+    }
+  };
+  const editEdtTaskFixed = (wbs: string, role: string, fixed: boolean) => {
+    if (!editable || !form) return;
+    try {
+      applyEdtChanges(withQuotationTaskSetting(form.draft, wbs, role, { fixed }));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'No se pudo modificar Fija.');
+    }
+  };
+  const editEdtTaskTeam = (wbs: string, role: string, teamId: string | null) => {
+    if (!editable || !form) return;
+    if (teamId && !activeTeams.some((team) => team.id === teamId) &&
+        !form.draft.teams.some((team) => team.teamId === teamId)) {
+      setError('El equipo seleccionado no está disponible.');
+      return;
+    }
+    try {
+      const teams = teamId && !form.draft.teams.some((row) => row.teamId === teamId)
+        ? [...form.draft.teams, emptyTeam(teamId)] : form.draft.teams;
+      const next = withQuotationTaskSetting(
+        { ...form.draft, teams }, wbs, role, { teamId });
+      applyEdtChanges(next);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'No se pudo reasignar la tarea.');
+    }
+  };
+  const editEdtStage = (
+    stageCode: string, patch: { name?: string; startWeek?: number; durationWeeks?: number },
+  ) => {
+    if (!editable || !form) return;
+    try {
+      applyEdtChanges(withQuotationEdtStageSetting(form.draft, stageCode, patch));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'No se pudo actualizar el tramo.');
+    }
+  };
+  const editRoleCollaborators = (role: string, collaborators: number) => {
+    if (!editable || !form) return;
+    const next = [
+      ...(form.draft.edtRoleCollaborators ?? []).filter((item) => item.role !== role),
+      { role, collaborators },
+    ];
+    applyEdtChanges({ ...form.draft, edtRoleCollaborators: next });
+  };
+  const editMappedCollaborators = (teamId: string, collaborators: number) => {
+    editTeamById(teamId, { collaborators });
+  };
+  const toggleTeam = (teamId: string, checked: boolean) => {
+    if (!editable || !form?.draft || form.draft.aiPoc?.edt) return;
+    updateDraft(checked
+      ? { teams: [...teamRows, emptyTeam(teamId)] }
+      : { teams: teamRows.filter((item) => item.teamId !== teamId),
+          phases: phaseRows.map((phase) => ({ ...phase,
+            teamHours: phase.teamHours.filter((item) => item.teamId !== teamId),
+          })) });
+  };
   const acceptAiProposal = async () => {
     if (!selected || !editable || dirty || selected.status !== 'draft' ||
       selected.aiReviewStatus !== 'pending' || !aiRolesMapped ||
