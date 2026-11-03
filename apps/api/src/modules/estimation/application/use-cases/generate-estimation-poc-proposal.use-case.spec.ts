@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { estimationPocProposalSchema } from '@kora/contracts';
 import type { AiProvider } from '../../../ai/application/ports/ai-provider.port';
 import type { DocumentSourceReader } from '../ports/document-source-reader.port';
@@ -7,6 +7,7 @@ import { GoogleDriveDocumentSourceReader } from '../../infrastructure/drive/goog
 import { GenerateEstimationPocProposalUseCase } from './generate-estimation-poc-proposal.use-case';
 
 describe('GenerateEstimationPocProposalUseCase', () => {
+  afterEach(() => vi.unstubAllEnvs());
   it('calcula las HH fuera del proveedor IA', async () => {
     const ai: AiProvider = {
       name: 'poc-ai',
@@ -220,6 +221,9 @@ describe('GenerateEstimationPocProposalUseCase', () => {
     ],
   });
   const createGenerator = (output: (attempt: number, instructions?: string) => unknown) => {
+    // El default de producción ahorra cuota. Los tests de corrección activan
+    // explícitamente el segundo intento y jamás contactan al proveedor real.
+    vi.stubEnv('KORA_GEMINI_EDT_MAX_ATTEMPTS', '2');
     let calls = 0;
     const instructions: string[] = [];
     const requestedSchemas: Array<Readonly<Record<string, unknown>> | undefined> = [];
@@ -301,6 +305,47 @@ describe('GenerateEstimationPocProposalUseCase', () => {
     expect(mock.instructions[1]).toContain('duplicado');
     expect(edt.stages).toHaveLength(2);
     expect(edt.stages?.[0]?.startWeek).toBe(1);
+  });
+
+  it('por defecto NO repite una EDT inválida y preserva la cuota gratuita', async () => {
+    const mock = createGenerator(() => {
+      const data = baseDetail();
+      data.roleHours[0]!.hours = 12.123;
+      return data;
+    });
+    vi.stubEnv('KORA_GEMINI_EDT_MAX_ATTEMPTS', '1');
+    await expect(mock.generator.generateEdt(input, proposal([
+      { role: 'Desarrollo', hours: 50 }, { role: 'QA', hours: 30 },
+    ]))).rejects.toThrow(/sin reintento para ahorrar cuota/);
+    expect(mock.calls()).toBe(1);
+  });
+
+  it('bloquea roles iniciales duplicados ANTES de solicitar Gemini para EDT', async () => {
+    const mock = createGenerator(() => baseDetail());
+    await expect(mock.generator.generateEdt(input, proposal([
+      { role: 'QA', hours: 20 }, { role: 'qa', hours: 20 },
+    ]))).rejects.toThrow(/perfil duplicado/);
+    expect(mock.calls()).toBe(0);
+  });
+
+  it('rechaza duración o HH cero antes de generar la EDT, sin gastar segunda llamada', async () => {
+    const mock = createGenerator(() => baseDetail());
+    const invalid = proposal([{ role: 'Desarrollo', hours: 0 }]);
+    await expect(mock.generator.generateEdt(input, invalid))
+      .rejects.toThrow(/preliminares inválidas/);
+    expect(mock.calls()).toBe(0);
+  });
+
+  it('rechaza un tramo que sobrepasa las 520 semanas antes de guardar la cotización', async () => {
+    const mock = createGenerator(() => {
+      const data = baseDetail();
+      data.stages[0] = { code: 'T01', name: 'Análisis', startWeek: 520, durationWeeks: 2 };
+      return data;
+    });
+    await expect(mock.generator.generateEdt(input, proposal([
+      { role: 'Desarrollo', hours: 50 }, { role: 'QA', hours: 30 },
+    ]))).rejects.toThrow(/horizonte máximo de 520 semanas/);
+    expect(mock.calls()).toBe(2);
   });
 
   it('elimina la causa de WBS repetido por varios perfiles: una sola definición por tarea', async () => {
