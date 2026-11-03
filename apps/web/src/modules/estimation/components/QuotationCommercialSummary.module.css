@@ -24,3 +24,10 @@
 .roleHint{font-size:11.5px;color:#77718a;margin:2px 0 -5px}
 .aiNotice{border:1px solid #e8ddff;border-radius:9px;background:#f4f0ff;color:#5b21b6}
 .aiNotice span{color:#685480}
+
+
+/* Panel lateral HTML v5: solo cifras, leyenda y acciones. */
+.unsaved{font-size:10px;color:#a76920}
+.recurring{color:#778294;font-size:11.5px;margin:0}
+.summary{gap:10px}
+.summary>div:has(> .v5Actions){min-width:0}
