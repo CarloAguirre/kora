@@ -90,6 +90,17 @@ describe('Cotización HTML v5 · fases y tareas', () => {
     expect(callbacks.onEditTaskHours).toHaveBeenCalledWith('T01.01', 'Fullstack', 15.5);
   });
 
+  it('bloquea el input HH de las tareas marcadas como Fija', () => {
+    const fixedDraft = quotationDraftDataSchema.parse({
+      ...draft,
+      edtTaskSettings: [{ wbs: 'T01.01', role: 'Fullstack', fixed: true }],
+    });
+    renderEditor(fixedDraft);
+    expect(screen.getByLabelText('Fija para T01.01 · Fullstack')).toBeChecked();
+    expect(screen.getByLabelText('HH de T01.01 · Fullstack')).toBeDisabled();
+    expect(screen.getByLabelText('HH de T01.01 · Tester')).toBeEnabled();
+  });
+
   it('permite modificar HH por perfil y fase; recalcular se delega a contratos', () => {
     renderEditor();
     fireEvent.change(screen.getByLabelText('HH de Fullstack para fase 2'),
