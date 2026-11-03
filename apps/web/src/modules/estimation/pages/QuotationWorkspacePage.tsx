@@ -214,6 +214,10 @@ export function QuotationWorkspacePage() {
   const teamRows = form?.draft.teams ?? [];
   const phaseRows = form?.draft.phases ?? [];
   const available = activeTeams.filter((team) => !teamRows.some((row) => row.teamId === team.id));
+  const aiRolesMapped = Boolean(selected?.draft.aiPoc?.proposal.roles.every((role) =>
+    selected.draft.aiPoc?.roleTeamIds[role.role] &&
+    teamRows.some((team) => team.teamId === selected.draft.aiPoc?.roleTeamIds[role.role]),
+  ));
   const editTeam = (index: number, patch: Partial<QuotationDraftData['teams'][number]>) => {
     if (!form) return;
     const original = teamRows[index];
@@ -233,7 +237,7 @@ export function QuotationWorkspacePage() {
 
   const acceptAiProposal = async () => {
     if (!selected || !editable || dirty || selected.status !== 'draft' ||
-      selected.aiReviewStatus !== 'pending' || teamRows.length === 0 ||
+      selected.aiReviewStatus !== 'pending' || !aiRolesMapped ||
       selected.id !== versions.at(-1)?.id || lifecycle.acceptAi.isPending) return;
     if (!window.confirm('Aceptar la propuesta de Gemini no aprueba al cliente ni traspasa el proyecto. ¿Confirmas?')) return;
     setError('');
@@ -326,11 +330,11 @@ export function QuotationWorkspacePage() {
                       </div>
                       {selected.draft.aiPoc && (
                         <Button size="sm" className={styles.aiAccept}
-                          disabled={!editable || dirty || teamRows.length === 0 ||
+                          disabled={!editable || dirty || !aiRolesMapped ||
                             selected.id !== versions.at(-1)?.id || lifecycle.acceptAi.isPending}
                           loading={lifecycle.acceptAi.isPending}
-                          title={teamRows.length === 0
-                            ? 'Asigna primero los perfiles a equipos y guarda la versión.'
+                          title={!aiRolesMapped
+                            ? 'Asigna todos los perfiles IA a equipos activos y guarda la versión.'
                             : dirty ? 'Guarda los cambios antes de aceptar la propuesta.' : undefined}
                           onClick={() => void acceptAiProposal()}>
                           Aceptar propuesta
