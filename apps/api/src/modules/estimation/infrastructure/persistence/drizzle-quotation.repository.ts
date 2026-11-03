@@ -36,6 +36,7 @@ import {
 import { DATABASE } from '../../../../shared/infrastructure/database/database.module';
 import { calculateQuotation } from '../../domain/quotation-math';
 import { hasOnlyUntouchedDefaultPaymentMilestones } from '../../domain/default-payment-plan-eligibility';
+import { initialQuotationTransferBlockers } from '../../domain/initial-quotation-transfer-blockers';
 import { InvalidCommercialQuotation, assertQuotationReadyForClient, assertAiProposalReadyToAccept, assertDirectClientApprovalAcknowledged } from '../../domain/quotation-commercial-eligibility';
 import type { QuotationProjectScope, QuotationRepository } from '../../domain/repositories/quotation.repository';
 
@@ -923,13 +924,21 @@ export class DrizzleQuotationRepository implements QuotationRepository {
           tx.select().from(projectPaymentMilestones)
             .where(eq(projectPaymentMilestones.projectId, projectId)),
         ]);
-      if (Number(project.soldHours) !== 0 || Number(project.usedHours) !== 0 ||
-          project.startDate !== null || project.contractAmount !== null ||
-          existingTeams.length || existingModules.length || existingHours.length ||
-          !hasOnlyUntouchedDefaultPaymentMilestones(existingPayments)) {
+      const transferBlockers = initialQuotationTransferBlockers({
+        soldHours: Number(project.soldHours),
+        usedHours: Number(project.usedHours),
+        hasStartDate: project.startDate !== null,
+        hasContractAmount: project.contractAmount !== null,
+        projectTeamCount: existingTeams.length,
+        moduleCount: existingModules.length,
+        hourEntryCount: existingHours.length,
+        hasChangedPaymentPlan: !hasOnlyUntouchedDefaultPaymentMilestones(existingPayments),
+      });
+      if (transferBlockers.length > 0) {
         throw new ConflictException(
-          'El proyecto tiene ejecución, facturación o una planificación previa. ' +
-          'El traspaso histórico requiere conciliación y no se hará automáticamente.',
+          'Traspaso inicial bloqueado: ' + transferBlockers.join('; ') +
+          '. Este proyecto requiere conciliación antes de incorporar otra cotización. ' +
+          'No se modificaron HH, equipos, Roadmap ni pagos existentes.',
         );
       }
       const draft = quotationDraftDataSchema.parse(version.draft);
