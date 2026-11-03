@@ -505,8 +505,9 @@ export function QuotationWorkspacePage() {
                     </details>
                   </Card>
 
-                  {form.draft.mode === 'phases' && (
+                  {(form.draft.mode === 'phases' || form.draft.aiPoc?.edt) && (
                     <QuotationPhaseWorkspace
+                      commercialMode={form.draft.mode}
                       phases={phaseRows}
                       teams={teamRows}
                       teamNames={teamById}
