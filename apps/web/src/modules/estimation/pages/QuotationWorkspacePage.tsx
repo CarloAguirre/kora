@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { estimationAnalysisArtifactSchema, isQuotationDraftEligibleProject, quotationDraftDataSchema, effectiveQuotationEdt, reconcilePocCommercialDraft, projectPocRolesToQuotationDraft, redistributeQuotationEdtHours, withQuotationTaskSetting, withQuotationEdtStageSetting, quotationEdtAssignments, withQuotationCommercialStage, withoutQuotationCommercialStage, withQuotationCommercialTask, withoutQuotationCommercialTask, patchQuotationCommercialTask, withQuotationTaskDisplayName, withQuotationTaskCatalogType, type EstimationAnalysisArtifact, type QuotationDraftData, type QuotationVersion, type UpdateQuotationDraftInput } from '@kora/contracts';
+import { estimationAnalysisArtifactSchema, isQuotationDraftEligibleProject, quotationDraftDataSchema, effectiveQuotationEdt, reconcilePocCommercialDraft, projectPocRolesToQuotationDraft, redistributeQuotationEdtHours, withQuotationTaskSetting, withQuotationEdtStageSetting, quotationEdtAssignments, withQuotationCommercialStage, withoutQuotationCommercialStage, withQuotationCommercialTask, withoutQuotationCommercialTask, patchQuotationCommercialTask, withQuotationTaskDisplayName, type EstimationAnalysisArtifact, type QuotationDraftData, type QuotationVersion, type UpdateQuotationDraftInput } from '@kora/contracts';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { useProjectDetail } from '@/modules/projects/api/projects.queries';
@@ -12,7 +12,7 @@ import { Select } from '@/shared/components/ui/Select';
 import { Badge } from '@/shared/components/ui/Badge';
 import { Modal } from '@/shared/components/ui/Modal';
 import { TextField } from '@/shared/components/ui/TextField';
-import { useAppliedQuotationPlanning, useCreateQuotationVersion, useProjectQuotation, useSaveQuotationDraft, useQuotationLifecycle, useQuotationTaskTypes } from '../api/quotation.queries';
+import { useAppliedQuotationPlanning, useCreateQuotationVersion, useProjectQuotation, useSaveQuotationDraft, useQuotationLifecycle } from '../api/quotation.queries';
 import { AnalysisEvidenceCard } from '../components/AnalysisEvidenceCard';
 import { QuotationVersionComparison } from '../components/QuotationVersionComparison';
 import { QuotationTransferPreviewCard } from '../components/QuotationTransferPreviewCard';
@@ -57,8 +57,6 @@ export function QuotationWorkspacePage() {
   const createVersion = useCreateQuotationVersion(projectId ?? '');
   const saveDraft = useSaveQuotationDraft(projectId ?? '');
   const lifecycle = useQuotationLifecycle(projectId ?? '');
-  const taskTypesQuery = useQuotationTaskTypes(projectId);
-  const taskTypes = taskTypesQuery.data ?? [];
   const teamQuery = useTeamsList({ page: 1, pageSize: 200, isActive: true, sortField: 'name' }, { enabled: Boolean(projectId) });
 
   const [form, setForm] = useState<Form | null>(null);
@@ -399,7 +397,7 @@ export function QuotationWorkspacePage() {
         : [...form.draft.teams, { ...emptyTeam(teamId), duration: 0, hoursPerWeek: 0 }];
       const task = {
         wbs: 'KT-' + crypto.randomUUID(), stageCode, name: 'Nueva tarea',
-        teamId, hours: 8, fixed: false, classification: 'Sin tipo',
+        teamId, hours: 8, fixed: false,
       };
       applyEdtChanges(withQuotationCommercialTask({ ...form.draft, teams }, task));
     } catch (cause) {
@@ -422,18 +420,10 @@ export function QuotationWorkspacePage() {
       setError(cause instanceof Error ? cause.message : 'Nombre de tarea inválido.');
     }
   };
-  const editTaskType = (wbs: string, classification: string) => {
-    if (!editable || !form || !taskTypes.some((type) => type.name === classification)) return;
-    try {
-      applyEdtChanges(withQuotationTaskCatalogType(form.draft, wbs, classification));
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Tipo de tarea inválido.');
-    }
-  };
   const importTaskExcel = async (stageCode: string, phaseName: string, file: File) => {
     if (!editable || !form) return;
     try {
-      const records = await readQuotationTaskExcel(file, phaseName, activeTeams, taskTypes);
+      const records = await readQuotationTaskExcel(file, phaseName, activeTeams);
       if ((form.draft.edtCommercialTasks?.length ?? 0) + records.length > 240) {
         throw new Error('El borrador admite un máximo de 240 tareas comerciales.');
       }
@@ -647,7 +637,6 @@ export function QuotationWorkspacePage() {
                       teams={teamRows}
                       teamNames={teamById}
                       activeTeams={activeTeams}
-                      taskTypes={taskTypes}
                       edt={effectiveEdt}
                       roleTeamIds={form.draft.aiPoc?.roleTeamIds}
                       editable={editable}
@@ -657,7 +646,6 @@ export function QuotationWorkspacePage() {
                       onAddTask={addCommercialTask}
                       onDeleteTask={removeCommercialTask}
                       onEditTaskName={editTaskName}
-                      onEditTaskType={editTaskType}
                       onImportTaskExcel={importTaskExcel}
                       onRemoveCommercialPhase={removeCommercialPhase}
                       onEditGroupHours={adjustEdtGroupHours}
