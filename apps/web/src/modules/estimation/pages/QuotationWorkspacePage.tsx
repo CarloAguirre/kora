@@ -220,13 +220,13 @@ export function QuotationWorkspacePage() {
   const teamRows = form?.draft.teams ?? [];
   const phaseRows = form?.draft.phases ?? [];
   const effectiveEdt = form?.draft.aiPoc?.edt ? effectiveQuotationEdt(form.draft) : null;
-  const aiSnapshot = selected?.draft.aiPoc;
+  const aiSnapshot = form?.draft.aiPoc;
   const aiRolesMapped = Boolean(aiSnapshot && aiSnapshot.proposal.roles.length > 0 &&
-    aiSnapshot.proposal.roles.every((role) =>
-      Boolean(aiSnapshot.roleTeamIds[role.role]) &&
-      selected?.draft.teams.some((team) =>
-        team.teamId === aiSnapshot.roleTeamIds[role.role]),
-    ));
+    aiSnapshot.proposal.roles.every((role) => {
+      const teamId = aiSnapshot.roleTeamIds[role.role];
+      return Boolean(teamId && activeTeams.some((team) => team.id === teamId) &&
+        form?.draft.teams.some((team) => team.teamId === teamId));
+    }));
   const aiAcceptBlockReason = selected ? quotationAiAcceptanceBlockReason(selected, {
     editable, dirty, isLatest: selected.id === versions.at(-1)?.id,
   }) : null;
@@ -492,10 +492,14 @@ export function QuotationWorkspacePage() {
                         adjustEdtGroupHours(teamKey, hours)}
                       onEditRoleCollaborators={editRoleCollaborators}
                       onEditMappedCollaborators={editMappedCollaborators}
-                      mappingAction={selected?.draft.aiPoc && !aiRolesMapped
+                      mappingAction={form.draft.aiPoc
                         ? <button type="button" className={styles.mappingLink}
+                            disabled={dirty}
+                            title={dirty ? 'Guarda el borrador antes de revisar la asignación de perfiles.' : undefined}
                             onClick={() => setRoleMappingOpen(true)}>
-                            ✦ Asignar perfiles a los equipos de Kora
+                            {aiRolesMapped
+                              ? '✦ Revisar correspondencia de perfiles y equipos Kora'
+                              : '✦ Asignar perfiles a los equipos reales de Kora'}
                           </button> : null}
                     />
                   </Card>
@@ -517,6 +521,13 @@ export function QuotationWorkspacePage() {
                       onEditTaskTeam={editEdtTaskTeam}
                       onEditGroupHours={adjustEdtGroupHours}
                       onEditStage={editEdtStage}
+                      onOpenRoleMapping={() => {
+                        if (dirty) {
+                          setError('Guarda el borrador antes de asociar perfiles a equipos.');
+                          return;
+                        }
+                        setRoleMappingOpen(true);
+                      }}
                       onEditPhase={editPhase}
                       onAddPhase={() => updateDraft({ phases: [
                         ...phaseRows, { name: 'Nuevo módulo', startWeek: 1,
