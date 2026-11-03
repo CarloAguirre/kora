@@ -360,46 +360,6 @@ export function QuotationPhaseWorkspace({
                       </button>
                     </div>
                   )}
-                </details>}
-                          </div>
-                          <select className={styles.teamSelect} disabled={!editable || needsRoleMapping}
-                            aria-label={'Equipo de ' + task.wbs + ' · ' + task.role}
-                            value={task.teamId ?? ''}
-                            onChange={(e) => onEditTaskTeam?.(
-                              task.wbs, task.role, e.target.value || null)}>
-                            <option value="">
-                              {needsRoleMapping ? 'Pendiente · asociar perfil' : 'Usar equipo del perfil'}
-                            </option>
-                            {activeTeams.map((team) =>
-                              <option key={team.id} value={team.id}>{team.name}</option>)}
-                            {task.teamId && !activeTeams.some((t) => t.id === task.teamId) &&
-                              <option value={task.teamId}>{task.team} (no activo)</option>}
-                          </select>
-                          {editable && onEditTaskHours
-                            ? <input className={styles.editableHours} type="number"
-                                min="0.01" max="1000000" step="0.01"
-                                disabled={task.fixed}
-                                title={task.fixed ? 'Desmarca Fija para editar las HH de esta tarea.' : undefined}
-                                aria-label={'HH de ' + task.wbs + ' · ' + task.role}
-                                value={task.hours}
-                                onChange={(e) => {
-                                  const next = Number(e.target.value);
-                                  if (Number.isFinite(next) && next > 0)
-                                    onEditTaskHours(task.wbs, task.role, next);
-                                }}/>
-                            : <div className={styles.readonlyInput + ' ' + styles.readonlyHours}>
-                                {hh(task.hours)}
-                              </div>}
-                          <label className={styles.fixedField} title="Protege las HH de esta tarea frente a redistribuciones automáticas">
-                            <input type="checkbox" checked={task.fixed} disabled={!projectAllowsEdit}
-                              aria-label={'Fija para ' + task.wbs + ' · ' + task.role}
-                              onChange={(e) => onEditTaskFixed?.(
-                                task.wbs, task.role, e.target.checked)}/>
-                          </label>
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </details>
               )}
             </section>
