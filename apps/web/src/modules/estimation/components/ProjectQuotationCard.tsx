@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { isQuotationDraftEligibleProject, type ProjectDetail } from '@kora/contracts';
+import { isQuotationDraftEligibleProject, type ProjectDetail, type QuotationVersion } from '@kora/contracts';
 import { projectQuotationPath } from '@/app/router/paths';
 import { useAppliedQuotationPlanning, useDeleteQuotationVersion, useProjectQuotation, useQuotationLifecycle } from '../api/quotation.queries';
 import { Button } from '@/shared/components/ui/Button';
 import { useConfirmAction } from '@/shared/components/ui/useConfirmAction';
 import { NewProjectQuotationModal } from './NewProjectQuotationModal';
+import { QuotationApprovalDialog, QuotationTransferDialog } from './QuotationLifecycleDialogs';
 import styles from './ProjectQuotationCard.module.css';
 
 export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
@@ -16,26 +17,44 @@ export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
   const [actionError, setActionError] = useState('');
   const [actionNotice, setActionNotice] = useState('');
   const [newOpen, setNewOpen] = useState(false);
+  const [approving, setApproving] = useState<QuotationVersion | null>(null);
+  const [transferring, setTransferring] = useState<QuotationVersion | null>(null);
+  const [transferTiming, setTransferTiming] = useState<'now' | 'later'>(
+    project.status === 'draft' ? 'now' : 'later',
+  );
+  const [transferFromApproval, setTransferFromApproval] = useState(false);
+  const [transferRevision, setTransferRevision] = useState<number | null>(null);
   const { confirm, dialog: confirmationDialog } = useConfirmAction();
   const versions = [...(data?.versions ?? [])].sort((a, b) => b.versionNumber - a.versionNumber);
   const eligible = isQuotationDraftEligibleProject(project);
   const transferredVersion = versions.find((version) => version.id === data?.transferredVersionId);
-  const registerApproval = async (versionId: string, revision: number, withoutSend: boolean) => {
+  const registerApproval = (version: QuotationVersion) => {
     setActionError(''); setActionNotice('');
-    if (!await confirm({ title: 'Registrar aprobación del cliente', confirmLabel: 'Confirmar aprobación', description: (withoutSend
-      ? 'ATENCIÓN: no existe registro de envío comercial de este borrador. ' +
-        'Debes confirmar que el cliente lo aprobó explícitamente. '
-      : '') +
-      '¿Confirmas que el cliente aprobó expresamente esta versión? ' +
-      'Las HH del proyecto NO se modificarán hasta el traspaso.' })) return;
+    setTransferTiming(project.status === 'draft' ? 'now' : 'later');
+    setApproving(version);
+  };
+
+  const confirmApproval = async () => {
+    if (!approving) return;
+    setActionError(''); setActionNotice('');
     try {
-      await lifecycle.approveClient.mutateAsync({ versionId, revision,
-        ...(withoutSend ? { confirmWithoutSend: true as const } : {}) });
-      setActionNotice('Aprobación registrada · traspaso pendiente.');
+      const approved = await lifecycle.approveClient.mutateAsync({
+        versionId: approving.id, revision: approving.revision,
+        ...(approving.status === 'draft' ? { confirmWithoutSend: true as const } : {}),
+      });
+      setApproving(null);
+      if (transferTiming === 'now' && project.status === 'draft') {
+        setTransferring(approving);
+        setTransferRevision(approved.revision);
+        setTransferFromApproval(true);
+      } else {
+        setActionNotice('Aprobación registrada · traspaso pendiente.');
+      }
     } catch (e) {
       setActionError(e instanceof Error ? e.message : 'No fue posible registrar la aprobación.');
     }
   };
+
   const removeVersion = async (versionId: string, revision: number,
     versionNumber: number, name: string) => {
     setActionError(''); setActionNotice('');
@@ -47,11 +66,30 @@ export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
       setActionError(e instanceof Error ? e.message : 'No fue posible eliminar la cotización.');
     }
   };
-  const transferNow = async (versionId: string, revision: number) => {
+  const transferNow = (version: QuotationVersion) => {
     setActionError(''); setActionNotice('');
-    if (!await confirm({ title: 'Traspasar cotización al proyecto', description: 'Se transferirán equipos, HH, fases y pagos de una versión aprobada. La operación no reemplazará automáticamente la ejecución existente.', confirmLabel: 'Traspasar' })) return;
+    setTransferFromApproval(false);
+    setTransferRevision(null);
+    setTransferring(version);
+  };
+
+  const closeTransfer = () => {
+    if (transferFromApproval) setActionNotice('Aprobación registrada · traspaso pendiente.');
+    setTransferring(null);
+    setTransferFromApproval(false);
+    setTransferRevision(null);
+  };
+
+  const confirmTransfer = async () => {
+    if (!transferring) return;
+    setActionError(''); setActionNotice('');
     try {
-      await lifecycle.transferApproved.mutateAsync({ versionId, revision });
+      await lifecycle.transferApproved.mutateAsync({
+        versionId: transferring.id, revision: transferRevision ?? transferring.revision,
+      });
+      setTransferring(null);
+      setTransferRevision(null);
+      setTransferFromApproval(false);
       setActionNotice('Traspaso guardado y registrado en el historial.');
     } catch (e) {
       setActionError(e instanceof Error ? e.message : 'No se pudo efectuar el traspaso.');
@@ -105,14 +143,14 @@ export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
                         {eligible && (v.status === 'sent' || v.status === 'draft') &&
                           <Button size="sm" variant="ghost"
                             disabled={lifecycle.approveClient.isPending}
-                            onClick={() => void registerApproval(v.id, v.revision, v.status === 'draft')}>
+                            onClick={() => registerApproval(v)}>
                             Registrar aprobación
                           </Button>}
                         {eligible && v.status === 'approved' &&
                           data?.transferredVersionId !== v.id &&
                           <Button size="sm" variant="ghost"
                             disabled={lifecycle.transferApproved.isPending || project.status !== 'draft'}
-                            onClick={() => void transferNow(v.id, v.revision)}>
+                            onClick={() => transferNow(v)}>
                             Traspasar ahora
                           </Button>}
                         {eligible && data?.transferredVersionId !== v.id && (
@@ -156,6 +194,20 @@ export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
       {actionError && <p role="alert" className={styles.error}>{actionError}</p>}
       {actionNotice && <p role="status" className={styles.helper}>{actionNotice}</p>}
       {confirmationDialog}
+      {approving && (
+        <QuotationApprovalDialog project={project} version={approving}
+          previouslyApprovedVersionNumber={data?.versions.find((candidate) =>
+            candidate.status === 'approved' && candidate.id !== approving.id)?.versionNumber}
+          timing={transferTiming} onTimingChange={setTransferTiming}
+          pending={lifecycle.approveClient.isPending}
+          onCancel={() => setApproving(null)}
+          onApprove={() => void confirmApproval()} />
+      )}
+      {transferring && (
+        <QuotationTransferDialog project={project} version={transferring} open
+          afterApproval={transferFromApproval} pending={lifecycle.transferApproved.isPending}
+          onClose={closeTransfer} onTransfer={() => void confirmTransfer()} />
+      )}
       {newOpen && <NewProjectQuotationModal project={project} versions={data?.versions ?? []}
         onClose={() => setNewOpen(false)} />}
     </section>
