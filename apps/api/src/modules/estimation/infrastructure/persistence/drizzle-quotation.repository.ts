@@ -927,12 +927,16 @@ export class DrizzleQuotationRepository implements QuotationRepository {
           assignedHours: (byTeam.get(team.teamId) ?? 0).toFixed(2),
         });
       }
-      const modules = draft.aiPoc?.edt?.modules.map((module) => ({
-        name: module.name, hours: module.totalHours,
-      })) ?? draft.phases.map((phase) => ({
-        name: phase.name,
-        hours: phase.teamHours.reduce((n, row) => n + row.hours, 0),
-      }));
+      const hasAdditionalTasks = Boolean(draft.edtCommercialTasks?.length ||
+        draft.edtCommercialStages?.length);
+      const modules = draft.aiPoc?.edt && !hasAdditionalTasks
+        ? draft.aiPoc.edt.modules.map((module) => ({
+            name: module.name, hours: module.totalHours,
+          }))
+        : draft.phases.map((phase) => ({
+            name: phase.name,
+            hours: phase.teamHours.reduce((n, row) => n + row.hours, 0),
+          }));
       const moduleHours = modules.reduce((sum, module) => sum + module.hours, 0);
       if (modules.length > 0 && Math.abs(moduleHours - Number(version.totalHours)) > 0.011) {
         throw new ConflictException(
@@ -1055,6 +1059,14 @@ export class DrizzleQuotationRepository implements QuotationRepository {
            JSON.stringify(draft.edtStageSettings ?? []) ||
          JSON.stringify(savedDraft.edtRoleCollaborators ?? []) !==
            JSON.stringify(draft.edtRoleCollaborators ?? []) ||
+         JSON.stringify(savedDraft.edtCommercialStages ?? []) !==
+           JSON.stringify(draft.edtCommercialStages ?? []) ||
+         JSON.stringify(savedDraft.edtCommercialTasks ?? []) !==
+           JSON.stringify(draft.edtCommercialTasks ?? []) ||
+         JSON.stringify(savedDraft.edtTaskNames ?? []) !==
+           JSON.stringify(draft.edtTaskNames ?? []) ||
+         JSON.stringify(savedDraft.edtTaskTypes ?? []) !==
+           JSON.stringify(draft.edtTaskTypes ?? []) ||
          savedDraft.analysisProjectionStatus !== draft.analysisProjectionStatus));
       const totals = calculateQuotation(draft, input.hourlyRate, input.tax);
       const teamIds = draft.teams.map((team) => team.teamId);
