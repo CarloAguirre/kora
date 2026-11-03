@@ -104,7 +104,7 @@ export function QuotationWorkspacePage() {
         // El artefacto conserva el cálculo original; editar el presupuesto
         // requiere conciliarlo antes de usarlo para producir documentos.
         ...((current.draft.analysis || current.draft.aiPoc) && Object.keys(patch).some(
-          (field) => ['mode', 'teams', 'phases', 'costs', 'paymentPlan', 'assumptions', 'exclusions'].includes(field),
+          (field) => ['mode', 'teams', 'phases'].includes(field),
         ) ? { analysisProjectionStatus: 'modified' as const } : {}),
       },
     }));
