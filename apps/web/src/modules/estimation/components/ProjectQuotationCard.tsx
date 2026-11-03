@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { isQuotationDraftEligibleProject, type ProjectDetail } from '@kora/contracts';
 import { projectQuotationPath } from '@/app/router/paths';
-import { useAppliedQuotationPlanning, useProjectQuotation, useQuotationLifecycle } from '../api/quotation.queries';
+import { useAppliedQuotationPlanning, useDeleteQuotationVersion, useProjectQuotation, useQuotationLifecycle } from '../api/quotation.queries';
 import { Button } from '@/shared/components/ui/Button';
 import { NewProjectQuotationModal } from './NewProjectQuotationModal';
 import styles from './ProjectQuotationCard.module.css';
@@ -11,6 +11,7 @@ export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
   const { data, isLoading, error } = useProjectQuotation(project.id);
   const applied = useAppliedQuotationPlanning(project.id);
   const lifecycle = useQuotationLifecycle(project.id);
+  const deleteVersion = useDeleteQuotationVersion(project.id);
   const [actionError, setActionError] = useState('');
   const [actionNotice, setActionNotice] = useState('');
   const [newOpen, setNewOpen] = useState(false);
@@ -31,6 +32,20 @@ export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
       setActionNotice('Aprobación registrada · traspaso pendiente.');
     } catch (e) {
       setActionError(e instanceof Error ? e.message : 'No fue posible registrar la aprobación.');
+    }
+  };
+  const removeVersion = async (versionId: string, revision: number,
+    versionNumber: number, name: string) => {
+    setActionError(''); setActionNotice('');
+    if (!window.confirm(
+      '¿Eliminar definitivamente la cotización v' + versionNumber + ' · ' + name +
+      '? Esta acción no se puede deshacer. No se modificarán otras versiones ni la planificación del proyecto.',
+    )) return;
+    try {
+      await deleteVersion.mutateAsync({ versionId, revision });
+      setActionNotice('Cotización v' + versionNumber + ' eliminada.');
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : 'No fue posible eliminar la cotización.');
     }
   };
   const transferNow = async (versionId: string, revision: number) => {
@@ -90,19 +105,25 @@ export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
                           Abrir en calculadora
                         </Link>
                         {eligible && (v.status === 'sent' || v.status === 'draft') &&
-                          versions[0]?.id === v.id &&
                           <Button size="sm" variant="ghost"
                             disabled={lifecycle.approveClient.isPending}
                             onClick={() => void registerApproval(v.id, v.revision, v.status === 'draft')}>
                             Registrar aprobación
                           </Button>}
-                        {eligible && v.status === 'approved' && versions[0]?.id === v.id &&
+                        {eligible && v.status === 'approved' &&
                           data?.transferredVersionId !== v.id &&
                           <Button size="sm" variant="ghost"
                             disabled={lifecycle.transferApproved.isPending || project.status !== 'draft'}
                             onClick={() => void transferNow(v.id, v.revision)}>
                             Traspasar ahora
                           </Button>}
+                        {eligible && data?.transferredVersionId !== v.id && (
+                          <Button size="sm" variant="ghost"
+                            disabled={deleteVersion.isPending}
+                            onClick={() => void removeVersion(v.id, v.revision, v.versionNumber, v.name)}>
+                            Eliminar
+                          </Button>
+                        )}
                       </div>
                     </td>
                   </tr>
