@@ -344,7 +344,7 @@ export function AiQuotationWizardModal({ project, onClose }: {
         answers: collectAnswers(),
       });
       onClose();
-      navigate(projectQuotationPath(project) + '?version=' + created.id + '&map-ai=1');
+      navigate(projectQuotationPath(project) + '?version=' + created.id);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message :
         'No se pudo generar y guardar la cotización.');
