@@ -314,17 +314,67 @@
 .referenceTasks{flex-basis:100%;border-top:1px solid var(--kora-border,#e4e9ee);padding-top:12px;font-size:12px}.referenceTasks summary{cursor:pointer;font-weight:var(--kora-weight-semibold);color:#0f2a44}.referenceTasks p{color:#637384;line-height:1.5}.referenceTasks ol{display:grid;gap:9px;padding-left:20px}.referenceTasks li{display:grid;gap:3px}.referenceTasks li strong{font-weight:var(--kora-weight-semibold)}.referenceTasks li span,.referenceTasks li small{color:#637384}
 
 
-/* Referencias de cotización inmediatamente DESPUÉS del Gantt, como HTML v5. */
-.commercialReferences { display: grid; gap: 10px; padding: 12px 14px; border-top: 1px solid #e6e8ee; }
+/* Referencias de cotización debajo del Gantt: filas compactas, como el HTML v5.
+   La regla legacy '.referenceTasks li { display: grid }' tiene mayor especificidad
+   que '.referenceTaskRow' y separaba nombre, HH y acción en filas enormes.
+   Estas reglas se acotan a la lista comercial para no alterar otras tareas. */
+.commercialReferences { display: grid; gap: 8px; padding: 10px 14px; border-top: 1px solid #e6e8ee; }
 .commercialReferences details { min-width: 0; font-size: 12px; }
-.commercialReferences summary { cursor: pointer; font-weight: 700; color: #344054; }
-.referenceTaskList { display: grid; gap: 3px; margin: 8px 0 0; padding: 0; list-style: none; }
-.referenceTaskRow, .referenceBlockRow { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-width: 0; padding: 3px 0; }
-.referenceTaskDot { display: inline-block; flex: 0 0 8px; width: 8px; height: 8px; border-radius: 3px; }
-.referenceTaskName { color: #26384d; min-width: 0; overflow-wrap: anywhere; }
-.referenceTaskMeta { color: #667085; }
-.referenceTaskRow button, .referenceBlockRow button { font-size: 12px; padding: 2px 6px; min-height: 24px; text-decoration: underline; }
-.referenceConverted { color: #247748; font-size: 11px; margin-left: 4px; }
+.commercialReferences summary { cursor: pointer; color: #667085; font-weight: 400; }
+.commercialReferences .referenceTasks { padding-top: 8px; border-top: 1px solid #e6e8ee; }
+.referenceTasks .referenceTaskList { display: block; margin: 6px 0 0; padding: 0; list-style: none; }
+.referenceTasks .referenceTaskRow {
+  display: flex;
+  flex-flow: row wrap;
+  align-items: baseline;
+  justify-content: flex-start;
+  column-gap: 4px;
+  row-gap: 0;
+  min-width: 0;
+  min-height: 18px;
+  padding: 0;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.referenceTasks .referenceTaskRow .referenceTaskDot {
+  display: inline-block;
+  flex: 0 0 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: 3px;
+  align-self: baseline;
+}
+.referenceTasks .referenceTaskRow .referenceTaskName {
+  color: #26384d;
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+.referenceTasks .referenceTaskRow .referenceTaskMeta { color: #667085; }
+.referenceTasks .referenceTaskRow button {
+  display: inline-flex;
+  align-items: baseline;
+  flex: 0 0 auto;
+  width: auto;
+  height: auto;
+  min-height: 0;
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+  border-radius: 0;
+  line-height: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.referenceTasks .referenceTaskRow .referenceConverted { color: #247748; font-size: 11px; margin-left: 4px; }
+.referenceBlockList { display: grid; gap: 5px; margin-top: 8px; }
+.referenceBlockRow { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-width: 0; padding: 3px 0; }
+.referenceBlockRow .referenceTaskDot { display: inline-block; flex: 0 0 8px; width: 8px; height: 8px; border-radius: 3px; }
+.referenceBlockRow .referenceTaskName { color: #26384d; min-width: 0; overflow-wrap: anywhere; }
+.referenceBlockRow .referenceTaskMeta { color: #667085; }
+.referenceBlockRow button { font-size: 12px; padding: 2px 6px; min-height: 24px; text-decoration: underline; }
 .referenceBlocks { border-bottom: 1px solid #e6e8ee; padding-bottom: 10px; }
 .referenceBlockList { display: grid; gap: 5px; margin-top: 8px; }
 .drawerBackdrop { position: fixed; inset: 0; z-index: 1100; background: rgba(15, 23, 42, .48); display: flex; justify-content: flex-end; }
