@@ -111,6 +111,7 @@ export function referencePhasesFromEdt(
 export function QuotationPhaseWorkspace({
   phases, teams, teamNames, edt, roleTeamIds, editable,
   commercialMode = 'phases', onEditPhase, onAddPhase, onRemovePhase,
+  onEditTaskHours, adjustedHoursCount = 0,
 }: {
   phases: readonly Phase[];
   teams: readonly Team[];
@@ -119,6 +120,8 @@ export function QuotationPhaseWorkspace({
   roleTeamIds?: Readonly<Record<string, string>>;
   editable: boolean;
   commercialMode?: QuotationDraftData['mode'];
+  adjustedHoursCount?: number;
+  onEditTaskHours?: (wbs: string, role: string, hours: number) => void;
   onEditPhase: (index: number, patch: Partial<Phase>) => void;
   onAddPhase: () => void;
   onRemovePhase: (index: number) => void;
@@ -139,12 +142,16 @@ export function QuotationPhaseWorkspace({
     <Card className={styles.surface}>
       <div className={styles.head}>
         <h2>Fases · Módulos</h2>
-        <p>En semanas desde el inicio · Fase 1 la crea Kora</p>
+        <p title="Según el prototipo, la Fase 1 registra las horas de prospección y cotización, anteriores al Hito 0. Las fases de ejecución comienzan en la Fase 2.">
+          Semanas relativas · Fase 1: levantamiento comercial, antes del Hito 0
+        </p>
       </div>
       {previewOnly && <div className={styles.previewNotice} role="status">
         <strong>✦ Planificación propuesta por Gemini · {hh(edt?.totalHours ?? 0)} HH</strong>
-        <span>Vista de referencia, aún no guardada como distribución comercial.
-          Puedes revisar los módulos, las tareas y el roadmap sin generar otra cotización.</span>
+        <span>{adjustedHoursCount > 0
+          ? adjustedHoursCount + ' ajustes de HH en el borrador. Guarda para conservarlos.'
+          : 'Puedes revisar y ajustar las HH de cada tarea sin generar otra cotización.'}
+          {' '}Las HH pasan al presupuesto comercial al asignar los perfiles a equipos.</span>
         <a href="#quotation-ai-role-review">Asignar perfiles a equipos de Kora y aplicar propuesta</a>
       </div>}
 
@@ -197,7 +204,8 @@ export function QuotationPhaseWorkspace({
                   return (
                     <label key={team.teamId}>
                       <span><i style={{ background: quotationTeamColor(name) }} />{name} · HH</span>
-                      <input type="number" min={0} step="0.01" disabled={!editable || previewOnly}
+                      <input type="number" min={0} step="0.01" disabled={!editable || previewOnly || Boolean(edt)}
+                        title={edt ? 'Las HH por equipo se calculan desde las tareas. Edita las HH por WBS y perfil en el desplegable.' : undefined}
                         aria-label={'HH de ' + name + ' para fase ' + (index + 2)}
                         value={phase.teamHours.find((item) => item.teamId === team.teamId)?.hours ?? 0}
                         onChange={(event) => onEditPhase(index, {
@@ -223,8 +231,9 @@ export function QuotationPhaseWorkspace({
                   {tasks.length ? (
                     <>
                       <p className={styles.hint}>
-                        Desglose original de Gemini, conservado por WBS y perfil. La distribución
-                        comercial se edita arriba; las tareas aún no tienen tipo de catálogo ni indicador «Fija».
+                        Edita las HH por actividad y perfil; la fase y los equipos se recalculan.
+                        La EDT original de Gemini permanece intacta. Tipo de catálogo y «Fija»
+                        quedan como referencias hasta disponer de su contrato comercial.
                       </p>
                       {!previewOnly && Math.abs(taskTotal - total) > 0.011 && (
                         <p role="status" className={styles.mismatch}>
@@ -252,9 +261,21 @@ export function QuotationPhaseWorkspace({
                             <div className={styles.readonlyInput} title="Sin clasificación de catálogo confirmada">
                               {task.classification || 'Por catalogar'}
                             </div>
-                            <div className={styles.readonlyInput + ' ' + styles.readonlyHours}>
-                              {hh(task.hours)}
-                            </div>
+                            {editable && onEditTaskHours
+                              ? <input className={styles.editableHours}
+                                  type="number" min="0.01" max="1000000" step="0.01"
+                                  aria-label={'HH de ' + task.wbs + ' · ' + task.role}
+                                  value={task.hours}
+                                  onChange={(event) => {
+                                    const hours = Number(event.target.value);
+                                    if (Number.isFinite(hours) && hours > 0 && hours <= 1000000 &&
+                                      Math.round(hours * 100) / 100 === hours) {
+                                      onEditTaskHours(task.wbs, task.role, hours);
+                                    }
+                                  }}/>
+                              : <div className={styles.readonlyInput + ' ' + styles.readonlyHours}>
+                                  {hh(task.hours)}
+                                </div>}
                             <label className={styles.fixedField} title="El indicador Fija no existe todavía en el contrato comercial">
                               <input type="checkbox" disabled
                                 aria-label={'Fija no disponible para ' + task.wbs} />
@@ -270,9 +291,9 @@ export function QuotationPhaseWorkspace({
                           </div>
                         ))}
                       </div>
-                      <a className={styles.edtLink} href="#quotation-edt-reference">
-                        Ver EDT detallada de Gemini
-                      </a>
+                      <small className={styles.edtLink}>
+                        Fuente: EDT original preservada en la versión.
+                      </small>
                     </>
                   ) : (
                     <p className={styles.hint}>
