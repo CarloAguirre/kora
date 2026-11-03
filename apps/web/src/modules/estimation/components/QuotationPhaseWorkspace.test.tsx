@@ -79,8 +79,8 @@ describe('Cotización v5 · fases y módulos', () => {
     expect(screen.getByText('15 HH · semanas 1 a 2')).toBeInTheDocument();
     expect(screen.getByText('Roadmap preliminar')).toBeInTheDocument();
     expect(screen.getByLabelText('T01 · Portal de cliente, semanas 1 a 2')).toBeInTheDocument();
-    expect(screen.getByText('Integración SAP')).toBeInTheDocument();
-    expect(screen.getByText(/Propuesta del agente/)).toBeInTheDocument();
+    expect(screen.getAllByText('Integración SAP')).toHaveLength(2);
+    expect(screen.getAllByText(/Propuesta del agente/).length).toBeGreaterThan(0);
     fireEvent.change(screen.getByLabelText('HH de Desarrollo para fase 2'),
       { target: { value: '18' } });
     expect(callbacks.onEditPhase).toHaveBeenCalledWith(0, {
@@ -104,7 +104,9 @@ describe('Cotización v5 · fases y módulos', () => {
     renderEditor();
     fireEvent.click(screen.getAllByRole('button', { name: 'Eliminar' })[0]!);
     expect(callbacks.onRemovePhase).not.toHaveBeenCalled();
-    expect(screen.getByLabelText('Fija no disponible para T01.01')).toBeDisabled();
+    expect(screen.getAllByLabelText('Fija no disponible para T01.01')).toHaveLength(2);
+    expect(screen.getAllByLabelText('Fija no disponible para T01.01').every(
+      (element) => element.hasAttribute('disabled'))).toBe(true);
     expect(screen.queryByRole('button', { name: /Crear tarea operativa/ })).not.toBeInTheDocument();
   });
 });
