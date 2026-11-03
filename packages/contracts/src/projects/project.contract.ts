@@ -941,6 +941,8 @@ export const updateProjectSchema = z.object({
   endDate: z.iso.date().nullish(),
   estimatedDeliveryDate: z.iso.date().nullish(),
   soldHours: z.coerce.number().min(0).optional(),
+  /** Motivo obligatorio al cambiar HH vendidas una vez registrado el Hito 0. No se persiste como columna. */
+  soldHoursChangeReason: z.string().trim().max(2000).optional(),
   supportPlanDescription: z.string().trim().max(2000).optional(),
   supportHours: z.coerce.number().min(0).optional(),
   quotationLink: z.string().trim().max(500).optional(),
