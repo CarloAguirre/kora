@@ -53,6 +53,15 @@ export function projectPocRolesToQuotationDraft(
   }
   const edt = effectiveQuotationEdt(draft);
   const detailed = edt?.schemaVersion === 'kora.quotation.reference-edt.v2';
+  const byProfile = new Map<string, number>();
+  for (const module of edt?.modules ?? []) {
+    for (const task of module.tasks) {
+      for (const effort of task.roleEffort ?? [{ role: task.role, hours: task.hours }]) {
+        byProfile.set(effort.role, Math.round(
+          ((byProfile.get(effort.role) ?? 0) + effort.hours) * 100) / 100);
+      }
+    }
+  }
   const grouped = new Map<string, { hours: number; maxWeeks: number; collaborators: number }>();
   // Los colaboradores por equipo representan perfiles de capacidad sugeridos
   // (nunca responsables nominativos ni asignaciones al proyecto real).
@@ -61,12 +70,7 @@ export function projectPocRolesToQuotationDraft(
     const weeks = Math.max(1, Math.ceil(role.duration / (role.unit === 'day' ? 5 : 1)));
     const current = grouped.get(teamId) ?? { hours: 0, maxWeeks: 1, collaborators: 0 };
     grouped.set(teamId, {
-      hours: current.hours + (edt?.schemaVersion === 'kora.quotation.reference-edt.v2'
-        ? edt.modules.flatMap((module) => module.tasks)
-          .flatMap((task) => task.roleEffort ?? [])
-          .filter((effort) => effort.role === role.role)
-          .reduce((sum, effort) => sum + effort.hours, 0)
-        : role.totalHours),
+      hours: current.hours + (edt ? (byProfile.get(role.role) ?? 0) : role.totalHours),
       maxWeeks: Math.max(weeks, current.maxWeeks),
       collaborators: current.collaborators + role.people,
     });
@@ -101,7 +105,8 @@ export function projectPocRolesToQuotationDraft(
         name: role.role,
         startWeek: 1,
         durationWeeks: Math.max(1, Math.ceil(role.duration / (role.unit === 'day' ? 5 : 1))),
-        teamHours: [{ teamId: roleTeamIds[role.role]!, hours: role.totalHours }],
+        teamHours: [{ teamId: roleTeamIds[role.role]!,
+          hours: edt ? (byProfile.get(role.role) ?? 0) : role.totalHours }],
       }));
   const lastStageWeek = detailed
     ? Math.max(1, ...(edt.stages ?? []).map((stage) => stage.startWeek + stage.durationWeeks - 1))
