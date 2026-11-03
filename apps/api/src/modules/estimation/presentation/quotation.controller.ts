@@ -164,11 +164,14 @@ export class QuotationController {
         'No se generó una propuesta válida con Gemini y el PDF KDM de demostración.',
       );
     }
+    const validIds = new Set(activeTeams.map((team) => team.teamId));
+    if (proposal.roles.some((role) => !role.teamId || !validIds.has(role.teamId))) {
+      throw new BadRequestException('Gemini propuso un perfil sin equipo activo de Kora.');
+    }
     const edt = await this.generator.generateEdt(input, proposal, activeTeams);
     // La EDT detallada determina las HH finales; la primera llamada propone
     // perfiles/capacidad, pero no impone un presupuesto a las actividades.
     const reconciled = this.generator.reconcileProposalWithEdt(proposal, edt);
-    const validIds = new Set(activeTeams.map((team) => team.teamId));
     if (reconciled.roles.some((role) => !role.teamId || !validIds.has(role.teamId))) {
       throw new BadRequestException('La propuesta IA no asignó todos los perfiles a equipos activos de Kora.');
     }
