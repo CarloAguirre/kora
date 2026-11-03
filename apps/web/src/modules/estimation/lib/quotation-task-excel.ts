@@ -1,13 +1,9 @@
 import * as XLSX from 'xlsx';
 
-/** El catálogo de tipos viene literalmente del prototipo Kora v5. */
-export const QUOTATION_TASK_TYPES = [
-  'Sin tipo', 'Diseño de flujo y maquetas', 'Login y registro',
-  'CRUD / mantenedor', 'Pantalla de consulta', 'Integración con API',
-  'Notificaciones', 'Reportería', 'Carga masiva', 'Bot / automatización',
-  'Modelo o agente IA', 'Pruebas funcionales', 'UAT',
-  'Gestión y seguimiento', 'Despliegue', 'Marcha blanca',
-] as const;
+import type { QuotationTaskCatalogEntry } from '@kora/contracts';
+
+/** Nombres, orden y estado vienen del catálogo activo PostgreSQL. */
+export type QuotationTaskType = QuotationTaskCatalogEntry;
 export type QuotationTaskExcelTeam = { id: string; name: string };
 export type ImportedQuotationTask = {
   name: string; teamId: string; classification: string; hours: number;
@@ -19,35 +15,94 @@ const text = (value: unknown) => typeof value === 'string' ? value.trim() :
   typeof value === 'number' ? String(value) : '';
 const round = (value: number) => Math.round(value * 100) / 100;
 
-export function downloadQuotationTaskTemplate(
+const MAX_ROWS = 200;
+
+/** SheetJS incluye CFB para archivos ZIP OOXML; así se evitan dependencias nuevas.
+ * Los dos rangos de validación SON listas nativas de Excel, no textos de ayuda.
+ */
+export function buildQuotationTaskTemplate(
   phaseName: string, teams: readonly QuotationTaskExcelTeam[],
-): void {
+  types: readonly QuotationTaskType[],
+): Uint8Array {
+  if (!teams.length || !types.length) {
+    throw new Error('No hay equipos o tipos activos en Kora para preparar la plantilla.');
+  }
   const book = XLSX.utils.book_new();
   const sheet = XLSX.utils.aoa_to_sheet([
-    HEADERS,
-    [phaseName, '', '', 'Sin tipo', ''],
+    HEADERS, [phaseName, '', '', types[0]!.name, ''],
   ]);
   sheet['!cols'] = [{ wch: 36 }, { wch: 55 }, { wch: 26 }, { wch: 30 }, { wch: 14 }];
   XLSX.utils.book_append_sheet(book, sheet, 'Tareas');
-  const catalog = XLSX.utils.aoa_to_sheet([
+  const teamCatalog = XLSX.utils.aoa_to_sheet([
     ['Equipos activos en Kora', 'ID (referencia)'],
     ...teams.map((team) => [team.name, team.id]),
   ]);
-  catalog['!cols'] = [{ wch: 34 }, { wch: 42 }];
-  XLSX.utils.book_append_sheet(book, catalog, 'Equipos Kora');
-  const types = XLSX.utils.aoa_to_sheet([
-    ['Tipos permitidos (catálogo)'], ...QUOTATION_TASK_TYPES.map((t) => [t]),
+  teamCatalog['!cols'] = [{ wch: 34 }, { wch: 42 }];
+  XLSX.utils.book_append_sheet(book, teamCatalog, 'Equipos Kora');
+  const typeCatalog = XLSX.utils.aoa_to_sheet([
+    ['Tipos activos de cotización'], ...types.map((row) => [row.name]),
   ]);
-  types['!cols'] = [{ wch: 36 }];
-  XLSX.utils.book_append_sheet(book, types, 'Tipos catálogo');
-  XLSX.writeFile(book, 'kora-plantilla-tareas-cotizacion.xlsx');
+  typeCatalog['!cols'] = [{ wch: 36 }];
+  XLSX.utils.book_append_sheet(book, typeCatalog, 'Tipos catálogo');
+
+  // Definiciones Excel: la lista puede estar en otra hoja y sigue actualizando
+  // sus opciones al editar las celdas auxiliares descargadas de la BD.
+  book.Workbook = { Names: [
+    { Name: 'EquiposKora', Ref: "'Equipos Kora'!$A$2:$A$" + (teams.length + 1) },
+    { Name: 'TiposCotizacion', Ref: "'Tipos catálogo'!$A$2:$A$" + (types.length + 1) },
+  ] };
+  const original = new Uint8Array(XLSX.write(book, { bookType: 'xlsx', type: 'array' }));
+  // La versión Community de SheetJS no emite restricciones de lista en el
+  // writer; se incorporan mediante el contenedor ZIP OOXML de XLSX.CFB.
+  const cfb = XLSX.CFB.read(original);
+  const location = 'xl/worksheets/sheet1.xml';
+  const sheetFile = XLSX.CFB.find(cfb, location);
+  if (!sheetFile?.content) throw new Error('No se pudo preparar el XML de la hoja Tareas.');
+  const xml = new TextDecoder().decode(new Uint8Array(sheetFile.content));
+  const validations =
+    '<dataValidations count="2">' +
+      '<dataValidation type="list" allowBlank="1" showDropDown="0" ' +
+        'showErrorMessage="1" errorTitle="Equipo Kora" ' +
+        'error="Selecciona un equipo de la lista." sqref="C2:C' + (MAX_ROWS + 1) + '">' +
+        '<formula1>EquiposKora</formula1></dataValidation>' +
+      '<dataValidation type="list" allowBlank="1" showDropDown="0" ' +
+        'showErrorMessage="1" errorTitle="Tipo de tarea" ' +
+        'error="Selecciona un tipo del catálogo." sqref="D2:D' + (MAX_ROWS + 1) + '">' +
+        '<formula1>TiposCotizacion</formula1></dataValidation>' +
+    '</dataValidations>';
+  if (!xml.includes('</sheetData>')) throw new Error('La hoja Tareas no tiene celdas.');
+  const updated = xml.replace('</sheetData>', '</sheetData>' + validations);
+  XLSX.CFB.utils.cfb_del(cfb, location);
+  XLSX.CFB.utils.cfb_add(cfb, location, new TextEncoder().encode(updated));
+  const packed = XLSX.CFB.write(cfb, { fileType: 'zip', type: 'array' });
+  return new Uint8Array(packed);
+}
+
+export function downloadQuotationTaskTemplate(
+  phaseName: string, teams: readonly QuotationTaskExcelTeam[],
+  types: readonly QuotationTaskType[],
+): void {
+  const content = buildQuotationTaskTemplate(phaseName, teams, types);
+  const blob = new Blob([new Uint8Array(content)], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  });
+  const href = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = href;
+  anchor.download = 'kora-plantilla-tareas-cotizacion.xlsx';
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(href);
 }
 
 /** Lectura REAL de XLSX/CSV. Ante cualquier error no se importará fila alguna. */
 export async function readQuotationTaskExcel(
   file: File, phaseName: string, activeTeams: readonly QuotationTaskExcelTeam[],
+  activeTypes: readonly QuotationTaskType[],
 ): Promise<ImportedQuotationTask[]> {
   if (file.size > 2 * 1024 * 1024) throw new Error('El archivo supera el límite de 2 MB.');
+  if (!activeTeams.length || !activeTypes.length) throw new Error('El catálogo Kora no está disponible.');
   if (!/\.(xlsx|xls|csv)$/i.test(file.name)) throw new Error('Selecciona XLSX, XLS o CSV.');
   const book = XLSX.read(await file.arrayBuffer(), { type: 'array' });
   const sheet = book.Sheets[book.SheetNames[0] ?? ''];
@@ -80,8 +135,8 @@ export async function readQuotationTaskExcel(
         (text(teamCell) || '(vacío)'));
     }
     const classification = text(kindCell) || 'Sin tipo';
-    if (!QUOTATION_TASK_TYPES.some((kind) =>
-      normalize(kind) === normalize(classification))) {
+    if (!activeTypes.some((kind) =>
+      normalize(kind.name) === normalize(classification))) {
       throw new Error('Fila ' + (i + 1) + ': tipo fuera del catálogo.');
     }
     const rawHours = typeof hoursCell === 'number'
@@ -92,8 +147,8 @@ export async function readQuotationTaskExcel(
     }
     result.push({
       name, teamId: matching[0]!.id, hours: rawHours,
-      classification: QUOTATION_TASK_TYPES.find((kind) =>
-        normalize(kind) === normalize(classification)) ?? 'Sin tipo',
+      classification: activeTypes.find((kind) =>
+        normalize(kind.name) === normalize(classification))?.name ?? 'Sin tipo',
     });
   }
   if (!result.length) throw new Error('El archivo no contiene tareas para importar.');
