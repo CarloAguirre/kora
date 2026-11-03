@@ -138,7 +138,7 @@ function buildTimelineAxis(range: DateRange): TimelineAxis {
  */
 export function PhaseRoadmap({
   phaseRoadmap, renderPhaseExtras, renderPhaseReferences, renderSelectionDetail,
-  toolbarActions, renderPhaseHeaderName, renderPhaseHeaderActions,
+  toolbarActions, renderPhaseHeaderName, renderPhaseHeaderActions, borderlessSummary = false,
 }: PhaseRoadmapProps) {
   /** Fases abiertas — cada una se abre/cierra por separado (varias a la vez); arranca abierta la primera. */
   const [expandedPhaseIds, setExpandedPhaseIds] = useState<ReadonlySet<string>>(
@@ -168,7 +168,7 @@ export function PhaseRoadmap({
       {/* Encabezado compacto del prototipo `ficha_proyecto_lider-actualizada.html` (`.roadmap-toolbar`
           + `.roadmap-legend`): chips y rango en un bloque, leyenda en una sola línea con la nota del
           zoom al final. */}
-      <div className={styles.summaryRow}>
+      <div className={[styles.summaryRow, borderlessSummary ? styles.summaryRowBorderless : ''].filter(Boolean).join(' ')}>
         <div className={styles.summaryChips}>
           <span className={styles.summaryChip}>
             <b>{phaseRoadmap.phaseCount}</b> Fases
@@ -296,6 +296,8 @@ export interface PhaseRoadmapProps {
   renderSelectionDetail?: (phase: PhaseRoadmapPhase, selection: PhaseRoadmapSelection, clearSelection: () => void) => ReactNode;
   /** Extensiones exclusivas de la ficha interna; si se omiten el portal cliente permanece idéntico. */
   toolbarActions?: ReactNode;
+  /** Solo en ficha interna: elimina borde de la barra de filtros sin modificar el portal cliente. */
+  borderlessSummary?: boolean;
   renderPhaseHeaderName?: (phase: PhaseRoadmapPhase) => ReactNode;
   renderPhaseHeaderActions?: (phase: PhaseRoadmapPhase) => ReactNode;
 }
