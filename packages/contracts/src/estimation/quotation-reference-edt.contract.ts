@@ -128,7 +128,7 @@ export const appliedQuotationPlanningSchema = z.object({
     moduleId: uuidSchema,
     name: z.string(),
     totalHours: z.number().positive(),
-    tasks: z.array(quotationReferenceTaskSchema),
+    tasks: z.array(quotationReferenceTaskSchema.extend({ teamId: uuidSchema.optional() })),
     /** Referencia comercial sin fechas concretas; no crea tramos de Forecast. */
     relativeTeamBlocks: z.array(z.object({
       teamId: uuidSchema, hours: z.number().nonnegative(),
