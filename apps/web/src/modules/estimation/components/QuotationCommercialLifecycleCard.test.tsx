@@ -102,7 +102,7 @@ describe('Ciclo comercial separado · Kora', () => {
     show();
     expect(screen.getByRole('button', { name: 'Marcar como enviada' })).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: 'Aceptar propuesta IA' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Aceptar propuesta', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: 'Aceptar propuesta' }));
     await waitFor(() => expect(mocks.acceptAi).toHaveBeenCalledWith({
       versionId: version.id, revision: 3,
     }));
