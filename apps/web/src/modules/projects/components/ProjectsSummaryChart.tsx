@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import type { ProjectPeriod, ProjectStatus, ProjectSummary, ProjectType } from '@kora/contracts';
 import styles from './ProjectsSummaryChart.module.css';
@@ -9,11 +9,12 @@ import { useProjectsList } from '../api/projects.queries';
 /** Tope de la API por página — el gráfico muestra una sola página con los proyectos que pasan los filtros. */
 const CHART_PAGE_SIZE = 200;
 
-// Valores originales del gráfico: Recharts ajusta únicamente el espacio
-// adicional que las etiquetas inclinadas necesiten al renderizarse.
+// Respetar las etiquetas originales a -35° y el ancho de 56 px/proyecto.
+// Solo se añade el espacio que realmente necesitan los nombres largos.
 const X_AXIS_MIN_HEIGHT = 70;
 const PROJECT_MIN_WIDTH = 56;
-const LABEL_CLEARANCE = 6;
+const LABEL_ANGLE = (35 * Math.PI) / 180;
+const LABEL_FONT_SIZE = 11;
 
 interface ProjectsSummaryChartProps {
   type: ProjectType;
@@ -162,79 +163,43 @@ export function ProjectsSummaryChart({ type, clientOptions, showFinalizedToggle 
     [filtered],
   );
 
-  const chartContainerRef = useRef<HTMLDivElement>(null);
   const [axisLayout, setAxisLayout] = useState({ extraHeight: 0, leftPadding: 0 });
 
   useEffect(() => {
-    const container = chartContainerRef.current;
-    if (!container) return;
+    // Medir la anchura real del texto con la fuente del gráfico. La lógica
+    // anterior dependía de un selector de ticks SVG que podía devolver vacío,
+    // y entonces dejaba el eje con su altura fija de 70 px.
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    if (!context) return;
+    const fontFamily = getComputedStyle(document.body).fontFamily;
+    context.font = `${LABEL_FONT_SIZE}px ${fontFamily}`;
 
-    let frame: number | null = null;
-    const measure = () => {
-      const svg = container.querySelector<SVGSVGElement>('svg.recharts-surface');
-      const ticks = Array.from(
-        container.querySelectorAll<SVGTextElement>('.recharts-xAxis .recharts-cartesian-axis-tick-value'),
-      );
-      if (!svg || ticks.length === 0) {
-        if (chartData.length === 0) {
-          setAxisLayout((previous) =>
-            previous.extraHeight === 0 && previous.leftPadding === 0
-              ? previous
-              : { extraHeight: 0, leftPadding: 0 },
-          );
-        }
-        return;
-      }
+    const widths = chartData.map((item) => context.measureText(item.name).width);
+    const longest = Math.max(0, ...widths);
+    const first = widths[0] ?? 0;
 
-      // getBoundingClientRect incluye la rotación SVG y la fuente real.
-      // A diferencia de estimar caracteres, mide el espacio efectivamente
-      // ocupado por los nombres, incluyendo los que salen del viewport.
-      const bounds = ticks.map((tick) => tick.getBoundingClientRect()).filter((rect) => rect.height > 0);
-      if (bounds.length === 0) return;
+    // El nombre inclinado extiende su extremo inferior una distancia
+    // sin(35°) * anchura. El margen de 14 px contempla tickMargin y baseline,
+    // sin alterar la altura útil donde se dibujan las barras.
+    const requiredAxisHeight = Math.max(
+      X_AXIS_MIN_HEIGHT,
+      Math.ceil(14 + longest * Math.sin(LABEL_ANGLE)),
+    );
+    // Los nombres se extienden hacia la izquierda del tick. Solo ajustar
+    // si el primero invade el margen disponible junto al eje Y.
+    const requiredLeftPadding = Math.max(
+      0,
+      Math.ceil(first * Math.cos(LABEL_ANGLE) - 72),
+    );
 
-      const surface = svg.getBoundingClientRect();
-      const bottom = Math.max(...bounds.map((rect) => rect.bottom));
-      const left = Math.min(...bounds.map((rect) => rect.left));
-      setAxisLayout((previous) => {
-        const extraHeight = Math.max(
-          0,
-          Math.ceil(previous.extraHeight + bottom + LABEL_CLEARANCE - surface.bottom),
-        );
-        const leftPadding = Math.max(
-          0,
-          Math.ceil(previous.leftPadding + surface.left + LABEL_CLEARANCE - left),
-        );
-        if (Math.abs(extraHeight - previous.extraHeight) < 2 && Math.abs(leftPadding - previous.leftPadding) < 2) {
-          return previous;
-        }
-        return { extraHeight, leftPadding };
-      });
-    };
-
-    const scheduleMeasure = () => {
-      if (typeof requestAnimationFrame !== 'function') return;
-      if (frame !== null) cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => {
-        frame = null;
-        measure();
-      });
-    };
-
-    // ResponsiveContainer calcula su anchura después del primer render.
-    // Observar las etiquetas garantiza la medición también tras cambios
-    // de filtros, de tamaño de ventana o del propio gráfico.
-    const mutations = typeof MutationObserver === 'undefined' ? null : new MutationObserver(scheduleMeasure);
-    mutations?.observe(container, { childList: true, subtree: true, characterData: true });
-    const resizing = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(scheduleMeasure);
-    resizing?.observe(container);
-    scheduleMeasure();
-
-    return () => {
-      if (frame !== null) cancelAnimationFrame(frame);
-      mutations?.disconnect();
-      resizing?.disconnect();
-    };
-  }, [chartData, axisLayout.extraHeight, axisLayout.leftPadding]);
+    setAxisLayout((previous) =>
+      previous.extraHeight === requiredAxisHeight - X_AXIS_MIN_HEIGHT &&
+      previous.leftPadding === requiredLeftPadding
+        ? previous
+        : { extraHeight: requiredAxisHeight - X_AXIS_MIN_HEIGHT, leftPadding: requiredLeftPadding },
+    );
+  }, [chartData]);
 
   const totals = useMemo(
     () =>
@@ -301,8 +266,8 @@ export function ProjectsSummaryChart({ type, clientOptions, showFinalizedToggle 
       <div className={styles.body}>
         <div className={styles.chartArea}>
           {/* Misma inclinación (-35°) y separación original de las barras;
-              el espacio adicional lo determinan las etiquetas renderizadas. */}
-          <div className={styles.chartScroll} ref={chartContainerRef}>
+              solo cambia el área disponible para leer los nombres completos. */}
+          <div className={styles.chartScroll}>
             <div style={{ minWidth: Math.max(chartData.length * PROJECT_MIN_WIDTH, 100) }}>
               <ResponsiveContainer width="100%" height={280 + axisLayout.extraHeight}>
                 <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
