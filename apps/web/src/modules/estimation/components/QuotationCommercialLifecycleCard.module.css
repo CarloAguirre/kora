@@ -44,3 +44,10 @@
 .v5Actions .v5Approve:hover:not(:disabled){background:#26334d}
 .v5Actions button:disabled{opacity:.52;cursor:not-allowed}
 .v5Actions .error{font-size:11px;line-height:1.45;margin:3px 0}
+
+/* Motivos específicos para una acción deshabilitada. */
+.v5Actions .checklist{margin:2px 0 0;border-top:1px solid #e5e9ef;padding:9px 1px 0;
+  font-size:11.5px;line-height:1.45;color:#566178}
+.v5Actions .checklist strong{font-weight:700;color:#25344e}
+.v5Actions .checklist ul{margin:6px 0 0;padding-left:17px;display:grid;gap:4px}
+.v5Actions .checklist li{padding-left:1px}
