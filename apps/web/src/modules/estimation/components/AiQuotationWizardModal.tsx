@@ -381,7 +381,7 @@ export function AiQuotationWizardModal({ project, onClose }: {
             stage === 1 ? editingUnderstanding ? 'Guardar resumen' : 'Editar' : 'Atrás'}
         </Button>
         <Button className={styles.primaryAction} loading={working} disabled={
-          (stage === 0 && (questionnaire.isLoading || questionnaire.isError)) ||
+          (stage === 0 && questionnaire.isLoading) ||
           (stage > 0 && !verifiedAnalysis)
         } onClick={() => void next()}>
           {stage === 0 ? 'Analizar proyecto' : stage === 1 ? 'Está correcto' :
