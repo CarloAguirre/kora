@@ -1,4 +1,4 @@
-import type { CreateQuotationVersionInput, EstimationPocProposal, SubmitEstimationAnswerInput, EstimationQuestion, QuotationReferenceEdt, AppliedQuotationPlanning, ApplyQuotationPlanningInput, QuotationRevisionActionInput, ApproveClientQuotationInput, TransferApprovedQuotationInput, QuotationTransferResult, ProjectQuotation, QuotationVersion, UpdateQuotationDraftInput, QuotationOperationalSnapshot, QuotationReconciliationReview, SavedQuotationReconciliationReview, AssessQuotationReconciliationInput, SavedQuotationReviewAssessment, QuotationTeamCatalogEntry } from '@kora/contracts';
+import type { CreateQuotationVersionInput, EstimationPocProposal, SubmitEstimationAnswerInput, EstimationQuestion, QuotationReferenceEdt, AppliedQuotationPlanning, ApplyQuotationPlanningInput, QuotationRevisionActionInput, ApproveClientQuotationInput, TransferApprovedQuotationInput, QuotationTransferResult, ProjectQuotation, QuotationVersion, UpdateQuotationDraftInput, QuotationOperationalSnapshot, QuotationReconciliationReview, SavedQuotationReconciliationReview, AssessQuotationReconciliationInput, SavedQuotationReviewAssessment, QuotationTeamCatalogEntry, QuotationTaskCatalogEntry } from '@kora/contracts';
 
 export const QUOTATION_REPOSITORY = Symbol('QUOTATION_REPOSITORY');
 
@@ -17,6 +17,7 @@ export interface QuotationRepository {
   getTeamCatalogForQuotation(teamIds: readonly string[]): Promise<QuotationTeamCatalogEntry[]>;
   /** Catálogo íntegro y ACTIVO para que Gemini no invente equipos. */
   listActiveQuotationTeams(): Promise<QuotationTeamCatalogEntry[]>;
+  listActiveQuotationTaskTypes(): Promise<QuotationTaskCatalogEntry[]>;
   listReconciliationReviews(projectId: string, versionId: string): Promise<SavedQuotationReconciliationReview[]>;
   appendReconciliationReview(
     projectId: string, versionId: string, actorId: string,
