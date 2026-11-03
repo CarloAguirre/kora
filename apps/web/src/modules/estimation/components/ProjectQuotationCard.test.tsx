@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import type { ProjectDetail } from '@kora/contracts';
 import { ProjectQuotationCard } from './ProjectQuotationCard';
@@ -11,7 +11,14 @@ const base = {
   status: 'draft' as const, revision: 2,
   createdAt: '2026-11-01T10:00:00.000Z',
   origin: 'manual' as const, totalHours: 40,
-  totalAmount: 80, currency: 'UF' as const,
+  totalAmount: 80, netAmount: 80, currency: 'UF' as const,
+  draft: {
+    mode: 'team' as const,
+    teams: [{ teamId: '0777e456-fd76-445e-83f1-afc25061c103',
+      collaborators: 1, unit: 'week' as const, duration: 1,
+      hoursPerWeek: 40, dedicationPercent: 100 }],
+    phases: [], paymentPlan: [{name: 'Inicio', percent: 100, trigger: 'approval' as const}],
+  },
 };
 const v1 = { ...base, id:'0777e456-fd76-445e-83f1-afc25061c105',
   versionNumber:1, name:'Propuesta original' };
@@ -39,9 +46,10 @@ vi.mock('./NewProjectQuotationModal', () => ({
 const project = {
   id:'0777e456-fd76-445e-83f1-afc25061c101',
   name:'Proyecto', type:'development', status:'draft', salesStage:'quoted',
+  teams:[{teamId:'0777e456-fd76-445e-83f1-afc25061c103',teamName:'Desarrollo'}],
 } as unknown as ProjectDetail;
 beforeEach(() => {
-  mocks.approve.mockReset().mockResolvedValue({});
+  mocks.approve.mockReset().mockResolvedValue({ revision: 3 });
   mocks.transfer.mockReset().mockResolvedValue({});
   mocks.remove.mockReset().mockResolvedValue({ deletedVersionId: v1.id });
 });
@@ -52,10 +60,15 @@ describe('Cotizaciones del proyecto', () => {
     expect(approvals).toHaveLength(2);
     const first = screen.getByText(/v1 · Propuesta original/).closest('tr')!;
     fireEvent.click(first.querySelector('button')!);
-    fireEvent.click(screen.getByRole('button', { name:'Confirmar aprobación' }));
+    expect(within(screen.getByRole('dialog')).getByText(/v1 · Propuesta original/)).toBeInTheDocument();
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name:'Registrar aprobación' }));
     await waitFor(() => expect(mocks.approve).toHaveBeenCalledWith({
       versionId:v1.id,revision:2,confirmWithoutSend:true,
     }));
+    expect(await screen.findByText('Traspasar a la ficha del proyecto')).toBeInTheDocument();
+    expect(mocks.transfer).not.toHaveBeenCalled();
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name:'Dejar pendiente' }));
+    expect(mocks.transfer).not.toHaveBeenCalled();
   });
   it('confirma la eliminación de la versión seleccionada', async () => {
     render(<MemoryRouter><ProjectQuotationCard project={project}/></MemoryRouter>);
