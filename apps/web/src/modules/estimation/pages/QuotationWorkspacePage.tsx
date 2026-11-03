@@ -465,7 +465,13 @@ export function QuotationWorkspacePage() {
       }
       const next = checked ? { ...form.draft, teams: [...teamRows, emptyTeam(teamId)] } :
         { ...form.draft, teams: teamRows.filter((item) => item.teamId !== teamId) };
-      applyEdtChanges(next);
+      // Una selección sin tareas todavía no pertenece a la proyección derivada.
+      // No conciliar aquí: al reasignar actividades por fase sí se calcularán sus HH.
+      quotationEdtAssignments(next);
+      change((current) => ({ ...current, draft: next }));
+      setNotice(checked
+        ? 'Equipo incorporado. Asigna tareas desde Por fases y módulos antes de aprobar.'
+        : 'Equipo sin tareas retirado de esta cotización.');
       return;
     }
     updateDraft(checked
