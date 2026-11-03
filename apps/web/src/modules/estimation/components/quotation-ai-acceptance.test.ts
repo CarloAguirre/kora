@@ -4,12 +4,19 @@ import { quotationAiAcceptanceBlockReason } from './quotation-ai-acceptance';
 
 const teamId = '0777e456-fd76-445e-83f1-afc25061c105';
 const pending = {
-  origin: 'ai', aiReviewStatus: 'pending', status: 'draft',
+  origin: 'ai', aiReviewStatus: 'pending', status: 'draft', totalHours: 40,
   draft: {
     teams: [],
     aiPoc: {
       roleTeamIds: {},
-      edt: { schemaVersion: 'kora.quotation.reference-edt.v2' },
+      edt: {
+        schemaVersion: 'kora.quotation.reference-edt.v1',
+        source: 'kdm_demo', provider: 'gemini', totalHours: 40,
+        modules: [{ name: 'Arquitectura', totalHours: 40, tasks: [{
+          wbs: '1.1', name: 'Diseño', description: 'Arquitectura',
+          role: 'Tech Lead / Arquitecto de Software', hours: 40,
+        }] }],
+      },
       proposal: { roles: [{ role: 'Tech Lead / Arquitecto de Software' }] },
     },
   },
