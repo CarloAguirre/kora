@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { estimationAnalysisArtifactSchema, isQuotationDraftEligibleProject, quotationDraftDataSchema, effectiveQuotationEdt, reconcilePocCommercialDraft, redistributeQuotationEdtHours, withQuotationTaskSetting, withQuotationEdtStageSetting, quotationEdtAssignments, type EstimationAnalysisArtifact, type QuotationDraftData, type QuotationVersion, type UpdateQuotationDraftInput } from '@kora/contracts';
+import { estimationAnalysisArtifactSchema, isQuotationDraftEligibleProject, quotationDraftDataSchema, effectiveQuotationEdt, reconcilePocCommercialDraft, projectPocRolesToQuotationDraft, redistributeQuotationEdtHours, withQuotationTaskSetting, withQuotationEdtStageSetting, quotationEdtAssignments, type EstimationAnalysisArtifact, type QuotationDraftData, type QuotationVersion, type UpdateQuotationDraftInput } from '@kora/contracts';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { useProjectDetail } from '@/modules/projects/api/projects.queries';
@@ -24,6 +24,7 @@ import { QuotationCommercialSummary } from '../components/QuotationCommercialSum
 import { QuotationPhaseWorkspace } from '../components/QuotationPhaseWorkspace';
 import { QuotationTeamsWorkspace } from '../components/QuotationTeamsWorkspace';
 import { quotationAiAcceptanceBlockReason } from '../components/quotation-ai-acceptance';
+import { suggestedKoraTeamForRole } from '../components/quotation-role-team-suggestions';
 import { QuotationCommercialSections } from '../components/QuotationCommercialSections';
 import { NewProjectQuotationModal } from '../components/NewProjectQuotationModal';
 import styles from './QuotationWorkspacePage.module.css';
@@ -94,6 +95,30 @@ export function QuotationWorkspacePage() {
   const mayWrite = Boolean(project && isQuotationDraftEligibleProject(project));
   const editable = Boolean(mayWrite && selected?.status === 'draft' && form &&
     appliedPlan.data?.versionId !== selected?.id && !appliedPlan.isLoading);
+
+  // Compatibilidad con cotizaciones anteriores a la generación con catálogo.
+  // Reutiliza la EDT ya guardada: nunca gasta una nueva llamada Gemini.
+  // Solo vincula si CADA perfil tiene una correspondencia única y no ambigua.
+  useEffect(() => {
+    if (!editable || dirty || !selected?.draft.aiPoc?.edt || !activeTeams.length) return;
+    const evidence = selected.draft.aiPoc;
+    const mapping = { ...evidence.roleTeamIds };
+    if (evidence.proposal.roles.every((role) => Boolean(mapping[role.role]))) return;
+    for (const role of evidence.proposal.roles) {
+      if (mapping[role.role]) continue;
+      const match = suggestedKoraTeamForRole(role.role, activeTeams);
+      if (!match) return; // Ambigüedad: nunca inventar ni asignar un equipo.
+      mapping[role.role] = match.id;
+    }
+    try {
+      const mapped = projectPocRolesToQuotationDraft(selected.draft, mapping);
+      setForm((current) => current ? { ...current, draft: mapped } : current);
+      setDirty(true);
+      setNotice('Se reconocieron los equipos reales para esta EDT existente. Guarda el borrador para conservar la distribución, sin regenerar Gemini.');
+    } catch {
+      // Si no concilia el artefacto histórico, preservar sus HH para revisión.
+    }
+  }, [editable, dirty, selected?.id, selected?.revision, activeTeams]);
 
   const change = (update: (current: Form) => Form) => {
     setForm((current) => current ? update(current) : null);
@@ -492,14 +517,12 @@ export function QuotationWorkspacePage() {
                         adjustEdtGroupHours(teamKey, hours)}
                       onEditRoleCollaborators={editRoleCollaborators}
                       onEditMappedCollaborators={editMappedCollaborators}
-                      mappingAction={form.draft.aiPoc
+                      mappingAction={form.draft.aiPoc && !aiRolesMapped
                         ? <button type="button" className={styles.mappingLink}
                             disabled={dirty}
                             title={dirty ? 'Guarda el borrador antes de revisar la asignación de perfiles.' : undefined}
                             onClick={() => setRoleMappingOpen(true)}>
-                            {aiRolesMapped
-                              ? '✦ Revisar correspondencia de perfiles y equipos Kora'
-                              : '✦ Asignar perfiles a los equipos reales de Kora'}
+                            ✦ Resolver correspondencia pendiente con equipos Kora
                           </button> : null}
                     />
                   </Card>
