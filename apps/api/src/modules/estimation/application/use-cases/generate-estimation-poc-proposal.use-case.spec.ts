@@ -244,6 +244,99 @@ describe('GenerateEstimationPocProposalUseCase', () => {
     };
   };
 
+  it('transmite decisiones humanas, supuestos y exclusiones a AMBOS procesos Gemini', async () => {
+    const contexts: Array<Record<string, unknown>> = [];
+    const ai: AiProvider = {
+      name: 'gemini',
+      generateStructured: async (request) => {
+        contexts.push(request.context as Record<string, unknown>);
+        if (request.task === 'estimation.poc.proposal') {
+          return {
+            summary: 'Propuesta preliminar trazable a KDM.',
+            roles: [
+              { role: 'Desarrollo', unit: 'week', duration: 2,
+                hoursPerUnit: 40, people: 1, source: 'Requerimiento_KDM.pdf' },
+              { role: 'QA', unit: 'week', duration: 1,
+                hoursPerUnit: 40, people: 1, source: 'Requerimiento_KDM.pdf' },
+            ],
+            assumptions: ['Confirmar interfaz final de SAP'],
+            clarifyingQuestions: ['¿Quién habilita la conectividad SAP?'],
+          };
+        }
+        return baseDetail();
+      },
+    };
+    const generator = new GenerateEstimationPocProposalUseCase(ai, sources);
+    const context = {
+      ...input,
+      instructions: 'Excluir soporte de postproducción.',
+      confirmedUnderstanding: 'Entendimiento del alcance confirmado por el usuario.',
+      dynamicQuestions: [{
+        id: 'D01', kind: 'dynamic' as const, category: 'Integración',
+        question: '¿Cómo se mantendrán las equivalencias de Centros de Costo?',
+        reason: 'Dos alternativas de impacto diferente.',
+        impact: 'high' as const, answerType: 'single_choice' as const,
+        options: [
+          { value: 'local', label: 'Mantenedor Local' },
+          { value: 'sap_api', label: 'Sincronización SAP API' },
+        ],
+        required: true, canPrefill: false, confidence: 'high' as const,
+        assumptionIfSkipped: 'Suponer mantenedor local, decisión aún no confirmada.',
+        priorityScore: 90,
+        sourceRefs: [{ sourceId: 'kora-poc-requerimiento-kdm',
+          fileName: 'Requerimiento_KDM.pdf' }],
+        dependsOn: [],
+      }],
+      answers: [
+        { questionId: 'F01', value: 'phase', usedAssumption: false },
+        { questionId: 'D01', value: null, usedAssumption: true },
+      ],
+    };
+    const preliminary = await generator.execute(context);
+    const edt = await generator.generateEdt(context, preliminary);
+    expect(contexts).toHaveLength(2);
+    for (const payload of contexts) {
+      const answers = payload.resolvedAnswers as Array<{
+        questionId: string; question: string; answer: string; usedAssumption: boolean;
+      }>;
+      expect(answers.find((answer) => answer.questionId === 'F01')?.answer)
+        .toBe('Fase específica');
+      const ceCo = answers.find((answer) => answer.questionId === 'D01');
+      expect(ceCo?.question).toContain('Centros de Costo');
+      expect(ceCo?.answer).toContain('SUPUESTO NO CONFIRMADO');
+      expect(ceCo?.usedAssumption).toBe(true);
+    }
+    expect(contexts[1]?.userInstructions).toBe('Excluir soporte de postproducción.');
+    expect(contexts[1]?.preliminaryAssumptions).toEqual(['Confirmar interfaz final de SAP']);
+    expect(contexts[1]?.unresolvedPreliminaryQuestions).toEqual([
+      '¿Quién habilita la conectividad SAP?',
+    ]);
+    expect(edt.totalHours).toBe(79);
+  });
+
+  it('descarta roles duplicados del primer Gemini sin pedir la EDT', async () => {
+    let calls = 0;
+    const ai: AiProvider = {
+      name: 'gemini',
+      generateStructured: async () => {
+        calls++;
+        return {
+          summary: 'Propuesta preliminar duplicada.',
+          roles: [
+            { role: 'Desarrollo', unit: 'week', duration: 2,
+              hoursPerUnit: 40, people: 1 },
+            { role: 'desarrollo', unit: 'week', duration: 2,
+              hoursPerUnit: 40, people: 1 },
+          ],
+          assumptions: [], clarifyingQuestions: [],
+        };
+      },
+    };
+    await expect(new GenerateEstimationPocProposalUseCase(ai, sources)
+      .execute(input)).rejects.toThrow(/perfil duplicado/);
+    expect(calls).toBe(1);
+  });
+
   it('genera EDT v2 desde tablas no redundantes y conserva las HH por actividad/perfil', async () => {
     const mock = createGenerator(() => baseDetail());
     const preliminary = proposal([
