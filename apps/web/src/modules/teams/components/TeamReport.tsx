@@ -214,6 +214,10 @@ export function TeamReport({ team, currentUserId, memberUserId, onMemberChange }
           />
         </div>
       </div>
+      <p className={styles.activityHint}>
+        Solo se muestran proyectos con HH cargadas por integrantes del equipo en los últimos 10 días
+        (aprobadas o pendientes). El período seleccionado determina las HH mostradas, no qué proyectos aparecen.
+      </p>
 
       {report && <DataQualityAlert rows={rows} onShow={showAlertRows} onRequest={() => setRequestOpen(true)} />}
       <RequestReportDataDialog open={requestOpen} teamId={team.id} rows={rows} onClose={() => setRequestOpen(false)} />
