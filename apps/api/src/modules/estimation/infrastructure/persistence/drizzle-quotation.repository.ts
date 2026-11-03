@@ -1023,6 +1023,8 @@ export class DrizzleQuotationRepository implements QuotationRepository {
         currentRow.aiReviewStatus === 'accepted' &&
         (JSON.stringify(savedDraft.teams) !== JSON.stringify(draft.teams) ||
          JSON.stringify(savedDraft.phases) !== JSON.stringify(draft.phases) ||
+         JSON.stringify(savedDraft.edtHourAdjustments ?? []) !==
+           JSON.stringify(draft.edtHourAdjustments ?? []) ||
          savedDraft.analysisProjectionStatus !== draft.analysisProjectionStatus));
       const totals = calculateQuotation(draft, input.hourlyRate, input.tax);
       const teamIds = draft.teams.map((team) => team.teamId);
