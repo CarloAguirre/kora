@@ -5,6 +5,7 @@ import { Card } from '@/shared/components/ui/Card';
 import { Select } from '@/shared/components/ui/Select';
 import { useQuotationLifecycle } from '../api/quotation.queries';
 import styles from './QuotationCommercialLifecycleCard.module.css';
+import { quotationCommercialBlockers } from './quotation-commercial-blockers';
 
 /** Los estados comerciales de la versión no son los estados del proyecto.
  * Aceptar IA no toca el Roadmap; traspasar exige aprobación del cliente. */
@@ -39,8 +40,11 @@ export function QuotationCommercialLifecycleCard({
   const edtMismatch = version.origin === 'ai' &&
     Boolean(version.draft.aiPoc?.edt) &&
     version.draft.analysisProjectionStatus === 'modified';
-  const readyForClient = hasRate && version.totalHours > 0 && hasValidPlan &&
-    !proposalPending && !edtMismatch && version.draft.teams.length > 0;
+  const blockers = quotationCommercialBlockers(version, {
+    dirty: hasUnsavedChanges, latest: isLatest, canOperate,
+    demoProduction: import.meta.env.PROD,
+  });
+  const readyForClient = blockers.length === 0;
 
   const acceptAi = async () => {
     setError(''); setNotice('');
@@ -211,19 +215,23 @@ export function QuotationCommercialLifecycleCard({
         {version.status === 'draft' &&
           <Button variant="outline" className={styles.v5Send}
             disabled={!mayAct || !readyForClient || !isLatest}
-            title={!readyForClient ? 'Requiere HH, tarifa, plan de pago 100% y aceptación IA.' :
-              hasUnsavedChanges ? 'Guarda el borrador antes del envío.' : undefined}
+            title={blockers.length ? blockers.join(' ') : undefined}
             onClick={() => void markSent()}>Marcar como enviada al cliente</Button>}
         {(version.status === 'sent' || version.status === 'draft') &&
           <Button className={styles.v5Approve}
             disabled={!mayAct || !readyForClient || !isLatest}
-            title={!readyForClient ? 'Requiere HH, tarifa, plan de pago 100% y aceptación IA.' :
-              hasUnsavedChanges ? 'Guarda el borrador antes de aprobar.' : undefined}
+            title={blockers.length ? blockers.join(' ') : undefined}
             onClick={() => void approveClient()}>Registrar aprobación del cliente</Button>}
         {version.status === 'approved' && !transferred &&
           <Button className={styles.v5Approve}
             disabled={!mayAct || project.status !== 'draft' || !isLatest}
             onClick={() => void transfer()}>Traspasar al proyecto</Button>}
+        {blockers.length > 0 && (version.status === 'draft' || version.status === 'sent') && (
+          <div className={styles.checklist} role="status" aria-label="Requisitos comerciales pendientes">
+            <strong>Para habilitar envío y aprobación:</strong>
+            <ul>{blockers.map((reason) => <li key={reason}>{reason}</li>)}</ul>
+          </div>
+        )}
         {transferred && <p className={styles.success}>Cotización aprobada y traspasada.</p>}
         {error && <p role="alert" className={styles.error}>{error}</p>}
         {notice && <p role="status" className={styles.success}>{notice}</p>}
