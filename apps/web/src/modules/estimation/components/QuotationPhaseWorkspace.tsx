@@ -222,8 +222,9 @@ export function QuotationPhaseWorkspace({
                   const label = nameOf(row.teamId, teamNames);
                   return (
                     <label key={row.teamId}>
-                      <span><i style={{ background: quotationTeamColor(label) }}/>
-                        {row.teamId.startsWith('profile:') ? 'Perfil sin equipo: ' + label.slice(12) : label} · HH</span>
+                      <span><i style={{ background: row.teamId.startsWith('profile:')
+                          ? '#a0a9b8' : quotationTeamColor(label) }}/>
+                        {row.teamId.startsWith('profile:') ? 'Sin equipo · ' + row.teamId.slice(8) : label} · HH</span>
                       <QuotationGroupHoursInput value={row.hours}
                         disabled={!editable || row.teamId.startsWith('profile:')}
                         label={'HH de ' + label + ' para fase ' + (index + 2)}
