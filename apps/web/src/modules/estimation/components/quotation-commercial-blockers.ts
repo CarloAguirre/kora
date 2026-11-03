@@ -9,13 +9,12 @@ type Available = Pick<QuotationVersion,
  */
 export function quotationCommercialBlockers(
   version: Available,
-  { dirty, latest, canOperate, demoProduction }: {
-    dirty: boolean; latest: boolean; canOperate: boolean; demoProduction?: boolean;
+  { dirty, canOperate, demoProduction }: {
+    dirty: boolean; canOperate: boolean; demoProduction?: boolean;
   },
 ): string[] {
   const result: string[] = [];
   if (!canOperate) result.push('No tienes permisos para realizar esta acción.');
-  if (!latest) result.push('Selecciona la versión más reciente de la cotización.');
   if (dirty) result.push('Guarda los cambios del borrador.');
   if (version.hourlyRate === null || !Number.isFinite(version.hourlyRate) ||
       version.hourlyRate <= 0) result.push('Ingresa y guarda un valor HH mayor que cero.');
