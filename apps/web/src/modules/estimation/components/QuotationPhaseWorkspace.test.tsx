@@ -76,9 +76,9 @@ describe('Cotización HTML v5 · fases y tareas', () => {
 
   it('muestra grilla de cuatro columnas; equipo seleccionable, HH editable y Fija real', () => {
     renderEditor();
-    expect(screen.getByText('Tarea')).toBeInTheDocument();
-    expect(screen.getByText('Equipo')).toBeInTheDocument();
-    expect(screen.getByText('Fija')).toBeInTheDocument();
+    expect(screen.getAllByText('Tarea')).toHaveLength(2);
+    expect(screen.getAllByText('Equipo')).toHaveLength(2);
+    expect(screen.getAllByText('Fija')).toHaveLength(2);
     expect(screen.queryByText('Tipo (catálogo)')).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Equipo de T01.01 · Fullstack'),
       { target: { value: dev } });
