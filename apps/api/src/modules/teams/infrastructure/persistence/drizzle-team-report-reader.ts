@@ -107,6 +107,30 @@ export class DrizzleTeamReportReader implements TeamReportReader {
     }));
   }
 
+  async findProjectsWithRecentHourEntries(
+    projectIds: string[],
+    userIds: string[],
+    createdSince: Date,
+    createdUntil: Date,
+  ): Promise<Set<string>> {
+    if (projectIds.length === 0 || userIds.length === 0) return new Set();
+
+    const rows = await this.database
+      .selectDistinct({ projectId: hourEntries.projectId })
+      .from(hourEntries)
+      .where(
+        and(
+          inArray(hourEntries.projectId, projectIds),
+          inArray(hourEntries.userId, userIds),
+          inArray(hourEntries.status, ['approved', 'pending']),
+          sql`${hourEntries.hours} > 0`,
+          gte(hourEntries.createdAt, createdSince),
+          lte(hourEntries.createdAt, createdUntil),
+        ),
+      );
+    return new Set(rows.map((row) => row.projectId!));
+  }
+
   async sumHours(projectIds: string[], userIds: string[], dateFrom: Date, dateTo: Date): Promise<TeamReportHoursRow[]> {
     if (projectIds.length === 0 || userIds.length === 0) return [];
     // `gte` sobre la columna (no un `Date` crudo en `sql`) para que Drizzle serialice la fecha como `date`.
