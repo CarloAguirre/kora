@@ -150,6 +150,10 @@ export function QuotationPhaseWorkspace({
 
       <div className={styles.phases}>
         {displayPhases.map((phase, index) => {
+          const stageCode = edt?.stages?.find((stage) =>
+            phase.name.startsWith(stage.code + ' · '))?.code;
+          const prefix = stageCode ? stageCode + ' · ' : '';
+          const visibleName = prefix ? phase.name.slice(prefix.length) : phase.name;
           const total = phase.teamHours.reduce((sum, row) => sum + row.hours, 0);
           const tasks = referenceTasksForPhase(phase, edt, mapping, teamNames);
           const taskTotal = tasks.reduce((sum, row) => sum + row.hours, 0);
@@ -170,8 +174,8 @@ export function QuotationPhaseWorkspace({
 
               <div className={styles.phaseFields}>
                 <label>Nombre del módulo
-                  <input value={phase.name} disabled={!editable || previewOnly} maxLength={300}
-                    onChange={(event) => onEditPhase(index, { name: event.target.value })} />
+                  <input value={visibleName} disabled={!editable || previewOnly} maxLength={300}
+                    onChange={(event) => onEditPhase(index, { name: prefix + event.target.value })} />
                 </label>
                 <label>Semana de inicio
                   <input type="number" min={1} max={520} value={phase.startWeek} disabled={!editable || previewOnly}
@@ -298,9 +302,11 @@ export function QuotationPhaseWorkspace({
           <div className={styles.timeline}>
             {displayPhases.map((phase, index) => {
               const total = phase.teamHours.reduce((sum, row) => sum + row.hours, 0);
+              const stage = edt?.stages?.find((item) => phase.name.startsWith(item.code + ' · '));
+              const label = stage ? phase.name.slice(stage.code.length + 3) : phase.name;
               return (
                 <div className={styles.timelineRow} key={index}>
-                  <span title={phase.name}>Fase {index + 2} · {phase.name}</span>
+                  <span title={label}>Fase {index + 2} · {label}</span>
                   <div className={styles.timelineTrack}
                     aria-label={phase.name + ', semanas ' + phase.startWeek +
                       ' a ' + (phase.startWeek + phase.durationWeeks - 1)}>
