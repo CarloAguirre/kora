@@ -11,6 +11,7 @@ import { Card } from '@/shared/components/ui/Card';
 import { Select } from '@/shared/components/ui/Select';
 import { Badge } from '@/shared/components/ui/Badge';
 import { Modal } from '@/shared/components/ui/Modal';
+import { useToast } from '@/shared/components/ui/Toast';
 import { useConfirmAction } from '@/shared/components/ui/useConfirmAction';
 import { TextField } from '@/shared/components/ui/TextField';
 import { useAppliedQuotationPlanning, useCreateQuotationVersion, useProjectQuotation, useSaveQuotationDraft, useQuotationLifecycle } from '../api/quotation.queries';
@@ -66,10 +67,13 @@ export function QuotationWorkspacePage() {
   const [teamView, setTeamView] = useState<'team' | 'phases'>('phases');
   const [dirty, setDirty] = useState(false);
   const [error, setError] = useState('');
+  const toast = useToast();
+  const reportError = (message: string) => { setError(message); toast.error(message); };
   const [notice, setNotice] = useState('');
   const [sampleAnalysis, setSampleAnalysis] = useState<EstimationAnalysisArtifact | null>(null);
   const [sampleTeamMap, setSampleTeamMap] = useState<Record<string, string>>({});
   const [sampleError, setSampleError] = useState('');
+  const reportSampleError = (message: string) => { setSampleError(message); toast.error(message); };
   const [sampleSuccess, setSampleSuccess] = useState('');
   const { confirm, dialog: confirmationDialog } = useConfirmAction();
 
@@ -159,7 +163,7 @@ export function QuotationWorkspacePage() {
       setDirty(false);
       setNotice('Borrador ' + created.name + ' creado.');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo crear la versión.');
+      reportError(err instanceof Error ? err.message : 'No se pudo crear la versión.');
     }
   };
   const save = async () => {
@@ -178,7 +182,7 @@ export function QuotationWorkspacePage() {
       setDirty(false);
       setNotice('Borrador guardado. Revisión ' + saved.revision + '.');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo guardar. Revisa los campos.');
+      reportError(err instanceof Error ? err.message : 'No se pudo guardar. Revisa los campos.');
     }
   };
 
@@ -190,19 +194,19 @@ export function QuotationWorkspacePage() {
     setSampleSuccess('');
     if (!file) return;
     if (file.size > 1_000_000) {
-      setSampleError('El JSON supera el límite de 1 MB para este ejemplo.');
+      reportSampleError('El JSON supera el límite de 1 MB para este ejemplo.');
       return;
     }
     try {
       const json: unknown = JSON.parse(await file.text());
       const validation = estimationAnalysisArtifactSchema.safeParse(json);
       if (!validation.success) {
-        setSampleError('El artefacto no coincide con el esquema o sus totales: ' +
+        reportSampleError('El artefacto no coincide con el esquema o sus totales: ' +
           (validation.error.issues[0]?.message ?? 'JSON inválido.'));
         return;
       }
       if (validation.data.provenance.mode !== 'simulated_fixture') {
-        setSampleError('Este importador acepta solo simulaciones explícitas, no resultados de IA real.');
+        reportSampleError('Este importador acepta solo simulaciones explícitas, no resultados de IA real.');
         return;
       }
       setSampleAnalysis(validation.data);
@@ -217,7 +221,7 @@ export function QuotationWorkspacePage() {
       }
       setSampleTeamMap(suggested);
     } catch {
-      setSampleError('No se pudo interpretar el archivo JSON seleccionado.');
+      reportSampleError('No se pudo interpretar el archivo JSON seleccionado.');
     }
   };
 
@@ -225,7 +229,7 @@ export function QuotationWorkspacePage() {
     if (!sampleAnalysis || !projectId || !mayWrite || createVersion.isPending) return;
     if (dirty && !await confirm({ title: 'Descartar cambios', description: 'Hay cambios sin guardar. ¿Deseas descartarlos?', confirmLabel: 'Descartar', destructive: true })) return;
     if (sampleAnalysis.roles.some((role) => !sampleTeamMap[role.role])) {
-      setSampleError('Asocia todos los perfiles del EDT con equipos activos de Kora.');
+      reportSampleError('Asocia todos los perfiles del EDT con equipos activos de Kora.');
       return;
     }
     if (!await confirm({ title: 'Guardar demostración', description: 'El artefacto corresponde al ejemplo Zurich, no al análisis de este proyecto. ¿Deseas guardar una versión de DEMOSTRACIÓN explícitamente identificada?', confirmLabel: 'Guardar demostración', warning: 'No representa antecedentes reales del proyecto.' })) return;
@@ -241,7 +245,7 @@ export function QuotationWorkspacePage() {
       setSampleSuccess('Versión de demostración creada con trazabilidad y HH verificadas.');
       setNotice('Versión de IA simulada: pendiente de revisión.');
     } catch (err) {
-      setSampleError(err instanceof Error ? err.message : 'No se pudo guardar la simulación.');
+      reportSampleError(err instanceof Error ? err.message : 'No se pudo guardar la simulación.');
     }
   };
 
@@ -277,7 +281,7 @@ export function QuotationWorkspacePage() {
       const saved = reconcilePocCommercialDraft(draft);
       change((current) => ({ ...current, draft: saved }));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'No fue posible conciliar la EDT.');
+      reportError(cause instanceof Error ? cause.message : 'No fue posible conciliar la EDT.');
     }
   };
   const editEdtHours = (wbs: string, role: string, hours: number) => {
@@ -288,7 +292,7 @@ export function QuotationWorkspacePage() {
       try {
         applyEdtChanges(patchQuotationCommercialTask(form.draft, wbs, { hours }));
       } catch (cause) {
-        setError(cause instanceof Error ? cause.message : 'No se pudo actualizar la tarea.');
+        reportError(cause instanceof Error ? cause.message : 'No se pudo actualizar la tarea.');
       }
       return;
     }
@@ -313,7 +317,7 @@ export function QuotationWorkspacePage() {
         teamKey, targetHours, stageCode, module,
       }));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message :
+      reportError(cause instanceof Error ? cause.message :
         'No se pudieron redistribuir las HH de este equipo.');
     }
   };
@@ -322,14 +326,14 @@ export function QuotationWorkspacePage() {
     try {
       applyEdtChanges(withQuotationTaskSetting(form.draft, wbs, role, { fixed }));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'No se pudo modificar Fija.');
+      reportError(cause instanceof Error ? cause.message : 'No se pudo modificar Fija.');
     }
   };
   const editEdtTaskTeam = (wbs: string, role: string, teamId: string | null) => {
     if (!editable || !form) return;
     if (teamId && !activeTeams.some((team) => team.id === teamId) &&
         !form.draft.teams.some((team) => team.teamId === teamId)) {
-      setError('El equipo seleccionado no está disponible.');
+      reportError('El equipo seleccionado no está disponible.');
       return;
     }
     try {
@@ -340,7 +344,7 @@ export function QuotationWorkspacePage() {
         { ...form.draft, teams }, wbs, role, { teamId });
       applyEdtChanges(next);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'No se pudo reasignar la tarea.');
+      reportError(cause instanceof Error ? cause.message : 'No se pudo reasignar la tarea.');
     }
   };
   const editEdtStage = (
@@ -350,7 +354,7 @@ export function QuotationWorkspacePage() {
     try {
       applyEdtChanges(withQuotationEdtStageSetting(form.draft, stageCode, patch));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'No se pudo actualizar el tramo.');
+      reportError(cause instanceof Error ? cause.message : 'No se pudo actualizar el tramo.');
     }
   };
   /** Las nuevas fases y tareas no modifican el artefacto de origen Gemini. */
@@ -374,7 +378,7 @@ export function QuotationWorkspacePage() {
       };
       applyEdtChanges(withQuotationCommercialStage(form.draft, stage));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'No se pudo agregar la fase.');
+      reportError(cause instanceof Error ? cause.message : 'No se pudo agregar la fase.');
     }
   };
   const removeCommercialPhase = (code: string) => {
@@ -382,7 +386,7 @@ export function QuotationWorkspacePage() {
     try {
       applyEdtChanges(withoutQuotationCommercialStage(form.draft, code));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'No se pudo quitar la fase.');
+      reportError(cause instanceof Error ? cause.message : 'No se pudo quitar la fase.');
     }
   };
   const addCommercialTask = (stageCode: string) => {
@@ -390,7 +394,7 @@ export function QuotationWorkspacePage() {
     const teamId = form.draft.phases.find((phase) => phase.name.startsWith(stageCode + ' · '))
       ?.teamHours.find((row) => row.hours > 0)?.teamId ?? activeTeams[0]?.id;
     if (!teamId || !activeTeams.some((team) => team.id === teamId)) {
-      setError('No hay equipos activos de Kora para asignar la tarea.');
+      reportError('No hay equipos activos de Kora para asignar la tarea.');
       return;
     }
     try {
@@ -403,7 +407,7 @@ export function QuotationWorkspacePage() {
       };
       applyEdtChanges(withQuotationCommercialTask({ ...form.draft, teams }, task));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'No se pudo agregar la tarea.');
+      reportError(cause instanceof Error ? cause.message : 'No se pudo agregar la tarea.');
     }
   };
   const removeCommercialTask = (wbs: string) => {
@@ -411,7 +415,7 @@ export function QuotationWorkspacePage() {
     try {
       applyEdtChanges(withoutQuotationCommercialTask(form.draft, wbs));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'No se pudo quitar la tarea.');
+      reportError(cause instanceof Error ? cause.message : 'No se pudo quitar la tarea.');
     }
   };
   const editTaskName = (wbs: string, name: string) => {
@@ -419,7 +423,7 @@ export function QuotationWorkspacePage() {
     try {
       applyEdtChanges(withQuotationTaskDisplayName(form.draft, wbs, name));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Nombre de tarea inválido.');
+      reportError(cause instanceof Error ? cause.message : 'Nombre de tarea inválido.');
     }
   };
   const importTaskExcel = async (stageCode: string, phaseName: string, file: File) => {
@@ -442,7 +446,7 @@ export function QuotationWorkspacePage() {
       applyEdtChanges(next); // operación atómica: sin importación parcial
       setNotice(records.length + ' tareas importadas a la fase. Guarda el borrador para persistirlas.');
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'No se pudo leer el Excel.');
+      reportError(cause instanceof Error ? cause.message : 'No se pudo leer el Excel.');
     }
   };
   const editRoleCollaborators = (role: string, collaborators: number) => {
@@ -460,7 +464,7 @@ export function QuotationWorkspacePage() {
     if (!editable || !form?.draft) return;
     if (form.draft.aiPoc?.edt) {
       if (!checked && quotationEdtAssignments(form.draft).some((row) => row.teamKey === teamId)) {
-        setError('Reasigna primero las tareas EDT de este equipo desde Por fases y módulos antes de desactivarlo.');
+        reportError('Reasigna primero las tareas EDT de este equipo desde Por fases y módulos antes de desactivarlo.');
         return;
       }
       const next = checked ? { ...form.draft, teams: [...teamRows, emptyTeam(teamId)] } :
@@ -482,7 +486,8 @@ export function QuotationWorkspacePage() {
           })) });
   };
   const acceptAiProposal = async () => {
-    if (!selected || aiAcceptBlockReason || lifecycle.acceptAi.isPending) return;
+    if (!selected || lifecycle.acceptAi.isPending) return;
+    if (aiAcceptBlockReason) { reportError(aiAcceptBlockReason); return; }
     if (!await confirm({ title: 'Aceptar propuesta de Gemini', description: 'Aceptar la propuesta no aprueba al cliente ni traspasa el proyecto.', confirmLabel: 'Aceptar propuesta' })) return;
     setError('');
     setNotice('');
@@ -490,7 +495,7 @@ export function QuotationWorkspacePage() {
       await lifecycle.acceptAi.mutateAsync({ versionId: selected.id, revision: selected.revision });
       setNotice('Propuesta IA aceptada. La aprobación del cliente es una acción posterior.');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo aceptar la propuesta de IA.');
+      reportError(err instanceof Error ? err.message : 'No se pudo aceptar la propuesta de IA.');
     }
   };
 
@@ -579,9 +584,8 @@ export function QuotationWorkspacePage() {
                       </div>
                       {selected.draft.aiPoc && (
                         <Button size="sm" className={styles.aiAccept}
-                          disabled={Boolean(aiAcceptBlockReason) || lifecycle.acceptAi.isPending}
+                          disabled={lifecycle.acceptAi.isPending}
                           loading={lifecycle.acceptAi.isPending}
-                          title={aiAcceptBlockReason ?? undefined}
                           onClick={() => void acceptAiProposal()}>
                           Aceptar propuesta
                         </Button>
@@ -670,7 +674,7 @@ export function QuotationWorkspacePage() {
                       onEditStage={editEdtStage}
                       onOpenRoleMapping={() => {
                         if (dirty) {
-                          setError('Guarda el borrador antes de asociar perfiles a equipos.');
+                          reportError('Guarda el borrador antes de asociar perfiles a equipos.');
                           return;
                         }
                         setRoleMappingOpen(true);
@@ -758,7 +762,7 @@ export function QuotationWorkspacePage() {
                       </div>
                       <p className={styles.helper}>La reserva no se suma a la cotización. Tarifa, impuesto y plan comercial requieren revisión humana. Se conserva el artefacto con ERS/EDT para futura generación documental.</p>
                       <Button
-                        disabled={sampleAnalysis.roles.some((role) => !sampleTeamMap[role.role])}
+                        disabled={createVersion.isPending}
                         loading={createVersion.isPending}
                         onClick={() => void saveSimulatedAnalysis()}>
                         Crear versión de IA simulada
