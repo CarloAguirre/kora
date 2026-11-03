@@ -57,3 +57,14 @@
 .axis{display:flex;justify-content:space-between;padding-left:199px;color:#8790a0;font-size:11px}
 @media(max-width:750px){.phaseTeams{grid-template-columns:repeat(2,minmax(0,1fr))}.timelineRow{grid-template-columns:120px minmax(0,1fr)}.axis{padding-left:129px}}
 @media(max-width:510px){.phaseFields{grid-template-columns:1fr 1fr}.phaseFields label:first-child{grid-column:1/-1}.phaseTeams{grid-template-columns:1fr}.timelineRow{grid-template-columns:95px minmax(0,1fr)}.axis{padding-left:104px}}
+
+
+/* El resumen referencial existe antes de confirmar los equipos.
+   Mantenerlo inmediatamente encima de las tarjetas y del roadmap. */
+.previewNotice{display:grid;gap:5px;background:#f1ebff;border:1px solid #e6dbff;
+  border-radius:10px;padding:13px 15px;margin:0 0 2px;font-size:12px;line-height:1.45;color:#6421a6}
+.previewNotice strong{font-size:12.5px;font-weight:750}
+.previewNotice span{color:#6d5a88}
+.previewNotice a{color:#5b21b6;font-weight:750;text-decoration:underline;
+  text-underline-offset:2px;justify-self:start;margin-top:2px}
+.previewNotice a:focus-visible{outline:2px solid #6b21a8;outline-offset:3px}
