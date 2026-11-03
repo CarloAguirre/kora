@@ -6,7 +6,7 @@ type Setting = NonNullable<Draft['edtTaskSettings']>[number];
 export type QuotationEdtAssignment = {
   wbs: string; role: string; module: string; stageCode: string | null;
   name: string; description: string; references: string[];
-  hours: number; originalHours: number; fixed: boolean;
+  hours: number; originalHours: number; fixed: boolean; classification?: string;
   teamKey: string; teamId: string | null;
 };
 const key = (wbs: string, role: string) => JSON.stringify([wbs, role]);
@@ -18,6 +18,8 @@ const fromCents = (value: number) => Math.round(value) / 100;
 export function quotationAssignmentTeamKey(
   draft: Draft, wbs: string, role: string,
 ): string {
+  const added = draft.edtCommercialTasks?.find((item) => item.wbs === wbs);
+  if (added) return added.teamId;
   const task = (draft.edtTaskSettings ?? []).find((item) =>
     item.wbs === wbs && item.role === role);
   return task?.teamId ?? draft.aiPoc?.roleTeamIds[role] ?? 'profile:' + role;
@@ -48,6 +50,34 @@ export function quotationEdtAssignments(draft: Draft): QuotationEdtAssignment[] 
   }
   const settings = new Map<string, Setting>();
   const validTeams = new Set(draft.teams.map((team) => team.teamId));
+  const sourceWbs = new Set([...sourceEffort.keys()].map((id) =>
+    (JSON.parse(id) as [string, string])[0]));
+  const commercialStages = draft.edtCommercialStages ?? [];
+  const commercialTasks = draft.edtCommercialTasks ?? [];
+  const knownStages = new Set<string>(original.stages?.map((stage) => stage.code) ??
+    original.modules.map((module) => 'module:' + module.name));
+  for (const item of commercialStages) {
+    if (knownStages.has(item.code) || item.startWeek + item.durationWeeks - 1 > 520) {
+      throw new Error('La fase comercial está duplicada o fuera del horizonte.');
+    }
+    knownStages.add(item.code);
+  }
+  const commercialWbs = new Set<string>();
+  for (const item of commercialTasks) {
+    if (commercialWbs.has(item.wbs) || sourceWbs.has(item.wbs) ||
+        !knownStages.has(item.stageCode) || !validTeams.has(item.teamId) ||
+        Math.round(item.hours * 100) / 100 !== item.hours) {
+      throw new Error('La tarea añadida tiene WBS, fase, equipo o HH inválidos.');
+    }
+    commercialWbs.add(item.wbs);
+  }
+  const renamed = new Set<string>();
+  for (const edit of draft.edtTaskNames ?? []) {
+    if (renamed.has(edit.wbs) || !sourceWbs.has(edit.wbs)) {
+      throw new Error('El nombre comercial corresponde a un WBS inexistente o duplicado.');
+    }
+    renamed.add(edit.wbs);
+  }
   for (const item of overrides) {
     const id = key(item.wbs, item.role);
     if (!sourceEffort.has(id) || settings.has(id)) {
@@ -60,9 +90,7 @@ export function quotationEdtAssignments(draft: Draft): QuotationEdtAssignment[] 
     }
     settings.set(id, item);
   }
-  const validStages = new Set(edt.schemaVersion === 'kora.quotation.reference-edt.v2'
-    ? (edt.stages ?? []).map((stage) => stage.code)
-    : edt.modules.map((module) => 'module:' + module.name));
+  const validStages = knownStages;
   const seenStages = new Set<string>();
   for (const stage of draft.edtStageSettings ?? []) {
     if (!validStages.has(stage.stageCode) || seenStages.has(stage.stageCode) ||
@@ -86,14 +114,26 @@ export function quotationEdtAssignments(draft: Draft): QuotationEdtAssignment[] 
       const item = settings.get(id);
       rows.push({
         wbs: task.wbs, role: effort.role, module: module.name,
-        stageCode: task.stageCode ?? null, name: task.name,
+        stageCode: task.stageCode ?? null,
+        name: draft.edtTaskNames?.find((item) => item.wbs === task.wbs)?.name ?? task.name,
         description: task.description, references: task.referenceIds ?? [],
         hours: effort.hours, originalHours: sourceEffort.get(id) ?? effort.hours,
-        fixed: item?.fixed ?? false,
+        fixed: item?.fixed ?? false, classification: task.classification,
         teamId: item?.teamId ?? draft.aiPoc?.roleTeamIds[effort.role] ?? null,
         teamKey: quotationAssignmentTeamKey(draft, task.wbs, effort.role),
       });
     }
+  }
+  // Actividades comerciales nuevas: NO se injertan en la evidencia aiPoc.edt.
+  // Tienen identidad propia, equipo Kora obligatorio y HH incluidas en totales.
+  for (const task of commercialTasks) {
+    rows.push({
+      wbs: task.wbs, role: 'Tarea comercial', module: task.stageCode,
+      stageCode: task.stageCode, name: task.name, description: '',
+      references: [], hours: task.hours, originalHours: task.hours,
+      fixed: task.fixed, classification: task.classification,
+      teamId: task.teamId, teamKey: task.teamId,
+    });
   }
   return rows;
 }
@@ -105,6 +145,17 @@ export function withQuotationTaskSetting(
   draft: Draft, wbs: string, role: string,
   changes: { fixed?: boolean; teamId?: string | null },
 ): Draft {
+  const commercial = draft.edtCommercialTasks?.find((item) => item.wbs === wbs);
+  if (commercial) {
+    if (changes.teamId === null) throw new Error('Una tarea comercial requiere equipo Kora.');
+    const next = { ...draft, edtCommercialTasks: draft.edtCommercialTasks!.map((item) =>
+      item.wbs !== wbs ? item : {
+        ...item, ...(changes.fixed !== undefined ? { fixed: changes.fixed } : {}),
+        ...(changes.teamId ? { teamId: changes.teamId } : {}),
+      }) };
+    quotationEdtAssignments(next);
+    return next;
+  }
   const target = quotationEdtAssignments(draft).find((row) =>
     row.wbs === wbs && row.role === role);
   if (!target) throw new Error('No existe la asignación WBS/perfil seleccionada.');
@@ -194,12 +245,19 @@ export function redistributeQuotationEdtHours(
   const retained = (draft.edtHourAdjustments ?? []).filter((item) =>
     !changed.has(key(item.wbs, item.role)));
   for (const row of flexible) {
+    if (row.wbs.startsWith('KT-')) continue;
     const hours = changed.get(key(row.wbs, row.role))!;
     if (cents(hours) !== cents(row.originalHours)) {
       retained.push({ wbs: row.wbs, role: row.role, hours });
     }
   }
-  const next = { ...draft, edtHourAdjustments: retained };
+  const next = {
+    ...draft, edtHourAdjustments: retained,
+    edtCommercialTasks: draft.edtCommercialTasks?.map((item) => {
+      const amount = changed.get(key(item.wbs, 'Tarea comercial'));
+      return amount === undefined ? item : { ...item, hours: amount };
+    }),
+  };
   const updated = quotationEdtAssignments(next);
   const calculated = updated.filter((row) =>
     row.teamKey === teamKey &&
@@ -216,6 +274,20 @@ export function withQuotationEdtStageSetting(
   draft: Draft, stageCode: string,
   patch: Partial<NonNullable<Draft['edtStageSettings']>[number]>,
 ): Draft {
+  const commercial = draft.edtCommercialStages?.find((item) => item.code === stageCode);
+  if (commercial) {
+    const edited = { ...commercial,
+      name: patch.name ?? commercial.name,
+      startWeek: patch.startWeek ?? commercial.startWeek,
+      durationWeeks: patch.durationWeeks ?? commercial.durationWeeks };
+    if (!edited.name.trim() || edited.startWeek + edited.durationWeeks - 1 > 520) {
+      throw new Error('La fase comercial tiene nombre o semanas inválidas.');
+    }
+    const next = { ...draft, edtCommercialStages: draft.edtCommercialStages!.map((item) =>
+      item.code === stageCode ? edited : item) };
+    quotationEdtAssignments(next);
+    return next;
+  }
   const edt = effectiveQuotationEdt(draft);
   if (!edt) throw new Error('La cotización no tiene EDT.');
   const valid = edt.schemaVersion === 'kora.quotation.reference-edt.v2'
@@ -244,3 +316,65 @@ export function withQuotationEdtStageSetting(
   return next;
 }
 
+
+/** Agrega o retira fases y tareas propias del presupuesto, sin tocar la EDT IA. */
+export function withQuotationCommercialStage(
+  draft: Draft, stage: NonNullable<Draft['edtCommercialStages']>[number],
+): Draft {
+  if (!draft.aiPoc?.edt) throw new Error('Primero se requiere una EDT de origen.');
+  const next = { ...draft, edtCommercialStages: [...(draft.edtCommercialStages ?? []), stage] };
+  quotationEdtAssignments(next);
+  return next;
+}
+export function withoutQuotationCommercialStage(draft: Draft, stageCode: string): Draft {
+  if (!draft.edtCommercialStages?.some((stage) => stage.code === stageCode)) {
+    throw new Error('No se puede eliminar una fase de la EDT original de Gemini.');
+  }
+  const next = {
+    ...draft, edtCommercialStages: draft.edtCommercialStages.filter((stage) =>
+      stage.code !== stageCode),
+    edtCommercialTasks: (draft.edtCommercialTasks ?? []).filter((task) =>
+      task.stageCode !== stageCode),
+  };
+  quotationEdtAssignments(next);
+  return next;
+}
+export function withQuotationCommercialTask(
+  draft: Draft, task: NonNullable<Draft['edtCommercialTasks']>[number],
+): Draft {
+  if (!draft.aiPoc?.edt) throw new Error('Primero se requiere una EDT de origen.');
+  const next = { ...draft, edtCommercialTasks: [...(draft.edtCommercialTasks ?? []), task] };
+  quotationEdtAssignments(next);
+  return next;
+}
+export function patchQuotationCommercialTask(
+  draft: Draft, wbs: string,
+  patch: Partial<Pick<NonNullable<Draft['edtCommercialTasks']>[number],
+    'name' | 'teamId' | 'hours' | 'fixed' | 'classification'>>,
+): Draft {
+  if (!draft.edtCommercialTasks?.some((task) => task.wbs === wbs)) {
+    throw new Error('La tarea comercial no existe.');
+  }
+  const next = { ...draft, edtCommercialTasks: draft.edtCommercialTasks.map((task) =>
+    task.wbs === wbs ? { ...task, ...patch } : task) };
+  quotationEdtAssignments(next);
+  return next;
+}
+export function withoutQuotationCommercialTask(draft: Draft, wbs: string): Draft {
+  if (!draft.edtCommercialTasks?.some((task) => task.wbs === wbs)) {
+    throw new Error('No se puede eliminar la tarea original de Gemini.');
+  }
+  const next = { ...draft, edtCommercialTasks: draft.edtCommercialTasks.filter((task) =>
+    task.wbs !== wbs) };
+  quotationEdtAssignments(next);
+  return next;
+}
+export function withQuotationTaskDisplayName(draft: Draft, wbs: string, name: string): Draft {
+  if (!name.trim() || name.length > 300) throw new Error('Nombre de tarea inválido.');
+  if (draft.edtCommercialTasks?.some((task) => task.wbs === wbs))
+    return patchQuotationCommercialTask(draft, wbs, { name: name.trim() });
+  const edits = (draft.edtTaskNames ?? []).filter((item) => item.wbs !== wbs);
+  const next = { ...draft, edtTaskNames: [...edits, { wbs, name: name.trim() }] };
+  quotationEdtAssignments(next);
+  return next;
+}
