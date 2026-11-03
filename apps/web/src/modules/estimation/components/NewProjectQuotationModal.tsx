@@ -5,6 +5,7 @@ import { projectQuotationPath } from '@/app/router/paths';
 import { useProjectsList } from '@/modules/projects/api/projects.queries';
 import { Button } from '@/shared/components/ui/Button';
 import { Modal } from '@/shared/components/ui/Modal';
+import { useToast } from '@/shared/components/ui/Toast';
 import { Select } from '@/shared/components/ui/Select';
 import { useCreateQuotationVersion, useProjectQuotation } from '../api/quotation.queries';
 import { AiQuotationWizardModal } from './AiQuotationWizardModal';
@@ -25,6 +26,8 @@ export function NewProjectQuotationModal({ project, versions, onClose }: {
   const [sourceProjectId, setSourceProjectId] = useState(project.id);
   const [sourceVersionId, setSourceVersionId] = useState('');
   const [error, setError] = useState('');
+  const toast = useToast();
+  const reportError = (message: string) => { setError(message); toast.error(message); };
   const [aiWizardOpen, setAiWizardOpen] = useState(false);
   const create = useCreateQuotationVersion(project.id);
   const otherProjects = useProjectsList({ type: 'development', page: 1, pageSize: 200 },
@@ -41,7 +44,7 @@ export function NewProjectQuotationModal({ project, versions, onClose }: {
       return;
     }
     if (mode === 'copy' && !selectedVersionId) {
-      setError('Elige una cotización de origen para copiar.');
+      reportError('Elige una cotización de origen para copiar.');
       return;
     }
     try {
@@ -52,7 +55,7 @@ export function NewProjectQuotationModal({ project, versions, onClose }: {
       navigate(projectQuotationPath(project) + '?version=' + created.id);
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo crear la versión.');
+      reportError(err instanceof Error ? err.message : 'No se pudo crear la versión.');
     }
   };
 
