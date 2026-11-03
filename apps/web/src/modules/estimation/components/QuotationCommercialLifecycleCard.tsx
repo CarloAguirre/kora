@@ -36,7 +36,6 @@ export function QuotationCommercialLifecycleCard({
   const demo = Boolean(version.draft.aiPoc);
   const planTotal = version.draft.paymentPlan.reduce((sum, row) => sum + row.percent, 0);
   const hasValidPlan = version.draft.paymentPlan.length > 0 && Math.abs(planTotal - 100) < 0.001;
-  const hasRate = version.hourlyRate !== null && version.hourlyRate > 0;
   const edtMismatch = version.origin === 'ai' &&
     Boolean(version.draft.aiPoc?.edt) &&
     version.draft.analysisProjectionStatus === 'modified';
