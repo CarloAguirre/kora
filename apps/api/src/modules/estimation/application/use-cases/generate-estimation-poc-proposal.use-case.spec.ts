@@ -172,6 +172,54 @@ describe('GenerateEstimationPocProposalUseCase', () => {
     expect(result.documentsAnalyzed).toBe(1);
     expect(result.totalHours).toBe(160);
   });
+  it('usa catálogo real en el prompt y rechaza perfiles con IDs ajenos a Kora', async () => {
+    const teamId = '0777e456-fd76-445e-83f1-afc25061c103';
+    const catalog = [{ teamId, name: 'Desarrollo' }];
+    let activeCatalog: unknown = null;
+    let requiredFields: unknown = null;
+    const ai: AiProvider = {
+      name: 'gemini',
+      generateStructured: async (request) => {
+        activeCatalog = (request.context as Record<string, unknown>).activeKoraTeams;
+        const response = request.responseJsonSchema as {
+          properties: { roles: { items: { required: unknown } } };
+        };
+        requiredFields = response.properties.roles.items.required;
+        return {
+          summary: 'Construir la API documentada',
+          roles: [{
+            role: 'Desarrollador Backend', teamId,
+            unit: 'week', duration: 2, hoursPerUnit: 40, people: 1,
+            source: 'Requerimiento_KDM.pdf',
+          }],
+          assumptions: [], clarifyingQuestions: [],
+        };
+      },
+    };
+    const generator = new GenerateEstimationPocProposalUseCase(ai, sources);
+    const result = await generator.execute(input, catalog);
+    expect(activeCatalog).toEqual(catalog);
+    expect(requiredFields).toContain('teamId');
+    expect(result.roles[0]?.teamId).toBe(teamId);
+    expect(result.roles[0]?.role).toBe('Desarrollador Backend');
+    expect(result.totalHours).toBe(80);
+
+    const invalid: AiProvider = {
+      name: 'gemini',
+      generateStructured: async () => ({
+        summary: 'Sin equipo válido',
+        roles: [{
+          role: 'Desarrollador Backend',
+          teamId: '0777e456-fd76-445e-83f1-afc25061c104',
+          unit: 'week', duration: 1, hoursPerUnit: 40, people: 1,
+        }],
+        assumptions: [], clarifyingQuestions: [],
+      }),
+    };
+    await expect(new GenerateEstimationPocProposalUseCase(invalid, sources)
+      .execute(input, catalog)).rejects.toThrow(/equipo activo válido/);
+  });
+
   const projectId = '550e8400-e29b-41d4-a716-446655440000';
   const input = {
     projectId, projectName: 'KDM', clientName: 'Cliente',
