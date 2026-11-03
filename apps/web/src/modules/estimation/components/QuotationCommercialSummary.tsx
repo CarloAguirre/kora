@@ -77,10 +77,14 @@ export function QuotationCommercialSummary({
         (referenceGroupHours.get(row.teamKey) ?? 0) + row.hours, 2));
     }
   }
+  const pendingProfileCount = [...referenceGroupHours.keys()]
+    .filter((key) => key.startsWith('profile:')).length;
   const referenceRows: TeamHours[] = [...referenceGroupHours].map(([teamKey, hours]) => {
-    const name = teamKey.startsWith('profile:') ? teamKey.slice(8) :
-      teamNames.get(teamKey) ?? 'Equipo';
-    return { teamId: teamKey, name, hours, color: quotationTeamColor(name) };
+    const pending = teamKey.startsWith('profile:');
+    const name = pending ? 'Sin equipo Kora · ' + teamKey.slice(8) :
+      teamNames.get(teamKey) ?? 'Equipo no disponible';
+    return { teamId: teamKey, name, hours,
+      color: pending ? '#a0a9b8' : quotationTeamColor(name) };
   }).filter((row) => row.hours > 0);
   const rows = referenceOnly ? referenceRows : commercialRows;
   const duration = referenceOnly && edt
@@ -94,7 +98,7 @@ export function QuotationCommercialSummary({
   const recurringYearly = draft.costs.filter((cost) => cost.recurrence === 'annual')
     .reduce((sum, cost) => sum + cost.amount, 0);
   const displayAmount = (amount: number | null) =>
-    fmtMoney(amount ?? 0) + ' ' + currency;
+    amount === null ? '—' : fmtMoney(amount) + ' ' + currency;
 
   return (
     <Card>
@@ -120,8 +124,14 @@ export function QuotationCommercialSummary({
         </p>}
         {(hourlyRate === null || hourlyRate <= 0) && hoursShown > 0 &&
           <p className={styles.warning}>Falta el valor HH del proyecto.</p>}
+        {referenceOnly && pendingProfileCount > 0 && (
+          <p className={styles.warning}>
+            {pendingProfileCount} perfil(es) IA aún sin equipo Kora.
+            Las HH son referenciales; falta asignarlas a equipos reales.
+          </p>
+        )}
         <div className={styles.distribution}
-          aria-label={referenceOnly ? 'Distribución referencial por perfil' :
+          aria-label={referenceOnly ? 'Distribución referencial de HH, con perfiles pendientes' :
             'Distribución de horas por equipo'}>
           {rows.length > 0 ? rows.map((row) =>
             <span key={row.teamId}
