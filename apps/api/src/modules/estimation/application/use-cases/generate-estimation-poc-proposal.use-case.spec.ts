@@ -229,7 +229,7 @@ describe('GenerateEstimationPocProposalUseCase', () => {
         calls++;
         instructions.push(request.instructions ?? '');
         requestedSchemas.push(request.responseJsonSchema);
-        return output(calls, request.instructions);
+        return output(calls, request.instructions ?? undefined);
       },
     };
     return {
