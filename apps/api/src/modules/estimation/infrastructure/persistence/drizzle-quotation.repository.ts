@@ -82,6 +82,15 @@ export class DrizzleQuotationRepository implements QuotationRepository {
     }));
   }
 
+  /** Para el agente IA: catálogo activo, nunca perfiles o IDs inventados. */
+  async listActiveQuotationTeams(): Promise<QuotationTeamCatalogEntry[]> {
+    const rows = await this.db.select({
+      teamId: teams.id, name: teams.name,
+    }).from(teams).where(and(eq(teams.isActive, true), isNull(teams.deletedAt)))
+      .orderBy(asc(teams.name));
+    return rows.map((row) => ({ ...row, isActive: true }));
+  }
+
   /**
    * Lectura puntual del proyecto operativo para R3. No inserta ni cambia
    * registros y no sigue supuestos sobre traspasos de versiones antiguas.
@@ -322,7 +331,7 @@ export class DrizzleQuotationRepository implements QuotationRepository {
   async createAiPocDraft(projectId: string, userId: string, proposal: EstimationPocProposal,
     answers: readonly SubmitEstimationAnswerInput[],
     dynamicQuestions: readonly EstimationQuestion[], edt: QuotationReferenceEdt,
-    confirmedUnderstanding?: string): Promise<QuotationVersion> {
+    confirmedUnderstanding?: string, roleTeamIds?: Readonly<Record<string, string>>): Promise<QuotationVersion> {
     if (proposal.projectId !== projectId || proposal.provider !== 'gemini' ||
         proposal.sourceMode !== 'poc_simulated' || proposal.documentsAnalyzed < 1 ||
         proposal.totalHours <= 0 || proposal.roles.some((role) => role.totalHours <= 0) ||
@@ -331,13 +340,14 @@ export class DrizzleQuotationRepository implements QuotationRepository {
         edt.source !== 'kdm_demo' || edt.provider !== 'gemini') {
       throw new BadRequestException('Propuesta Gemini KDM inválida o sin trazabilidad documental.');
     }
-    return this.createVersionInternal(projectId, userId, {}, { proposal, answers, dynamicQuestions, edt, confirmedUnderstanding });
+    return this.createVersionInternal(projectId, userId, {}, { proposal, answers, dynamicQuestions, edt, confirmedUnderstanding, roleTeamIds });
   }
 
   private async createVersionInternal(
     projectId: string, userId: string, input: CreateQuotationVersionInput,
     aiPoc?: { proposal: EstimationPocProposal; answers: readonly SubmitEstimationAnswerInput[];
-      dynamicQuestions: readonly EstimationQuestion[]; edt: QuotationReferenceEdt; confirmedUnderstanding?: string },
+      dynamicQuestions: readonly EstimationQuestion[]; edt: QuotationReferenceEdt;
+      confirmedUnderstanding?: string; roleTeamIds?: Readonly<Record<string, string>> },
   ): Promise<QuotationVersion> {
     return this.db.transaction(async (tx) => {
       await tx.insert(projectQuotations).values({ projectId, createdByUserId: userId }).onConflictDoNothing();
@@ -373,9 +383,23 @@ export class DrizzleQuotationRepository implements QuotationRepository {
             source: 'kdm_demo', proposal: aiPoc.proposal,
             answers: aiPoc.answers, dynamicQuestions: aiPoc.dynamicQuestions,
             confirmedUnderstanding: aiPoc.confirmedUnderstanding,
-            edt: aiPoc.edt, roleTeamIds: {},
+            edt: aiPoc.edt, roleTeamIds: aiPoc.roleTeamIds ?? {},
           }),
         });
+        if (aiPoc.roleTeamIds) {
+          const assignedTeamIds = [...new Set(Object.values(aiPoc.roleTeamIds))];
+          const expectedRoles = aiPoc.proposal.roles.map((role) => role.role);
+          if (Object.keys(aiPoc.roleTeamIds).length !== expectedRoles.length ||
+              expectedRoles.some((role) => !aiPoc.roleTeamIds?.[role])) {
+            throw new BadRequestException('La propuesta Gemini contiene perfiles sin equipo Kora.');
+          }
+          const existing = await tx.select({ id: teams.id }).from(teams)
+            .where(and(inArray(teams.id, assignedTeamIds), eq(teams.isActive, true), isNull(teams.deletedAt)));
+          if (existing.length !== assignedTeamIds.length) {
+            throw new BadRequestException('La propuesta Gemini utiliza equipos inexistentes o inactivos.');
+          }
+          draft = projectPocRolesToQuotationDraft(draft, aiPoc.roleTeamIds);
+        }
         origin = 'ai';
         aiReviewStatus = 'pending';
       }
