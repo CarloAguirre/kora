@@ -307,6 +307,16 @@ export class ManageQuotationDraftsUseCase {
     return this.repository.markSent(projectId, versionId, actor.id, input);
   }
 
+  async deleteVersion(
+    projectId: string, versionId: string, revision: number, actor: QuotationActor,
+  ): Promise<{ deletedVersionId: string }> {
+    await this.authorize(projectId, actor, true);
+    if (!Number.isInteger(revision) || revision < 1)
+      throw new BadRequestException('Revisión de cotización inválida.');
+    await this.repository.deleteVersion(projectId, versionId, revision);
+    return { deletedVersionId: versionId };
+  }
+
   async approveClient(projectId: string, versionId: string, actor: QuotationActor,
     input: ApproveClientQuotationInput): Promise<QuotationVersion> {
     await this.authorize(projectId, actor, true);
