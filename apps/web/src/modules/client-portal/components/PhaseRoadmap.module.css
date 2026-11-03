@@ -26,6 +26,11 @@
   border-radius: 14px;
 }
 
+.summaryRowBorderless {
+  border: none;
+  border-radius: 0;
+}
+
 .summaryChips {
   display: flex;
   flex-wrap: wrap;
@@ -182,6 +187,13 @@
 
 .phaseHeader:hover {
   background: #f9fafb;
+}
+
+/* En la ficha del proyecto la fase es un contenedor permanente, no un acordeón. */
+.phaseHeaderStatic,
+.phaseHeaderStatic:hover {
+  cursor: default;
+  background: var(--kora-surface);
 }
 
 .phaseBadge {
@@ -587,4 +599,14 @@ button.ganttBar {
 .relatedBitacoraEmpty {
   font-size: 12.5px;
   color: #93a0ac;
+}
+
+/* Slots internos Kora: se omiten en el portal cliente, que conserva su layout. */
+.toolbarActions { display: inline-flex; align-items: center; gap: 6px; margin-left: 8px; }
+.phaseNameControl { display: inline-flex; align-items: center; min-width: 0; flex: 0 1 300px; }
+.phaseHeaderActions { display: inline-flex; align-items: center; gap: 9px; flex: 0 0 auto; min-width: 0; }
+@media (max-width: 900px) {
+  .phaseHeader { flex-wrap: wrap; }
+  .phaseHeaderActions { flex: 1 1 100%; justify-content: flex-end; }
+  .phaseNameControl { flex: 1 1 150px; }
 }

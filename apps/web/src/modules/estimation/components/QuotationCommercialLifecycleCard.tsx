@@ -2,14 +2,18 @@ import { useState } from 'react';
 import type { ProjectDetail, ProjectQuotation, QuotationVersion } from '@kora/contracts';
 import { Button } from '@/shared/components/ui/Button';
 import { Card } from '@/shared/components/ui/Card';
-import { Select } from '@/shared/components/ui/Select';
+import { useToast } from '@/shared/components/ui/Toast';
+import { useConfirmAction } from '@/shared/components/ui/useConfirmAction';
+import { QuotationApprovalDialog, QuotationTransferDialog } from './QuotationLifecycleDialogs';
 import { useQuotationLifecycle } from '../api/quotation.queries';
 import styles from './QuotationCommercialLifecycleCard.module.css';
+import { quotationCommercialBlockers } from './quotation-commercial-blockers';
 
 /** Los estados comerciales de la versión no son los estados del proyecto.
  * Aceptar IA no toca el Roadmap; traspasar exige aprobación del cliente. */
 export function QuotationCommercialLifecycleCard({
   project, quotation, version, canOperate, hasUnsavedChanges, embedded = false,
+  showAiAcceptance = true,
 }: {
   project: ProjectDetail;
   quotation: ProjectQuotation | null;
@@ -18,13 +22,23 @@ export function QuotationCommercialLifecycleCard({
   hasUnsavedChanges: boolean;
   /** Renderizar acciones dentro del resumen comercial, sin una tarjeta anidada. */
   embedded?: boolean;
+  /** La cabecera v5 ya ofrece aceptar IA; evita duplicar el botón lateral. */
+  showAiAcceptance?: boolean;
 }) {
   const actions = useQuotationLifecycle(project.id);
-  const [transferTiming, setTransferTiming] = useState<'now' | 'later'>('later');
+  const [transferTiming, setTransferTiming] = useState<'now' | 'later'>(
+    project.status === 'draft' ? 'now' : 'later',
+  );
+  const [approvalOpen, setApprovalOpen] = useState(false);
+  const [transferOpen, setTransferOpen] = useState(false);
+  const [transferFromApproval, setTransferFromApproval] = useState(false);
+  const [transferRevision, setTransferRevision] = useState<number | null>(null);
   const [error, setError] = useState('');
+  const toast = useToast();
+  const reportError = (message: string) => { setError(message); toast.error(message); };
   const [notice, setNotice] = useState('');
+  const { confirm, dialog: confirmationDialog } = useConfirmAction();
   const transferred = quotation?.transferredVersionId === version.id;
-  const isLatest = quotation?.versions.at(-1)?.id === version.id;
   const busy = actions.acceptAi.isPending || actions.markSent.isPending ||
     actions.approveClient.isPending || actions.transferApproved.isPending;
   const mayAct = canOperate && !hasUnsavedChanges && !busy;
@@ -32,93 +46,136 @@ export function QuotationCommercialLifecycleCard({
   const demo = Boolean(version.draft.aiPoc);
   const planTotal = version.draft.paymentPlan.reduce((sum, row) => sum + row.percent, 0);
   const hasValidPlan = version.draft.paymentPlan.length > 0 && Math.abs(planTotal - 100) < 0.001;
-  const hasRate = version.hourlyRate !== null && version.hourlyRate > 0;
   const edtMismatch = version.origin === 'ai' &&
     Boolean(version.draft.aiPoc?.edt) &&
     version.draft.analysisProjectionStatus === 'modified';
-  const readyForClient = hasRate && version.totalHours > 0 && hasValidPlan &&
-    !proposalPending && !edtMismatch && version.draft.teams.length > 0;
+  const blockers = quotationCommercialBlockers(version, {
+    dirty: hasUnsavedChanges, canOperate,
+    demoProduction: import.meta.env.PROD,
+  });
+  const readyForClient = blockers.length === 0;
+  const ensureReadyForClient = (): boolean => {
+    if (readyForClient) return true;
+    toast.error('Para enviar o aprobar, resuelve: ' + blockers.join(' '));
+    return false;
+  };
 
   const acceptAi = async () => {
     setError(''); setNotice('');
-    if (!window.confirm(
-      'Aceptar la propuesta IA no aprueba al cliente ni modifica HH, equipos o roadmap. ¿Confirmas?'
-    )) return;
+    if (!mayAct || version.draft.teams.length === 0) {
+      toast.error(hasUnsavedChanges ? 'Guarda los cambios del borrador antes de aceptar la propuesta IA.'
+        : 'Asigna primero las horas y equipos reales de Kora para aceptar la propuesta.');
+      return;
+    }
+    if (!await confirm({ title: 'Aceptar propuesta IA', description: 'Esta acción no aprueba al cliente ni modifica las HH, los equipos o el Roadmap.', confirmLabel: 'Aceptar propuesta' })) return;
     try {
       await actions.acceptAi.mutateAsync({ versionId: version.id, revision: version.revision });
       setNotice('Propuesta IA aceptada para revisión comercial. El proyecto no ha cambiado.');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo aceptar la propuesta.');
+      reportError(err instanceof Error ? err.message : 'No se pudo aceptar la propuesta.');
     }
   };
 
   const markSent = async () => {
     setError(''); setNotice('');
-    if (!window.confirm(
-      'Se registrará que la versión fue enviada al cliente y quedará bloqueada. ' +
-      'Esta acción NO envía correos. ¿Confirmas el envío externo ya realizado?'
-    )) return;
+    if (!ensureReadyForClient()) return;
+    if (!await confirm({ title: 'Registrar envío comercial', description: 'La versión quedará bloqueada. Esta acción NO envía correos: confirma un envío externo ya realizado.', confirmLabel: 'Registrar envío' })) return;
     try {
       await actions.markSent.mutateAsync({ versionId: version.id, revision: version.revision });
       setNotice('Envío registrado. La versión quedó bloqueada.');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo registrar el envío.');
+      reportError(err instanceof Error ? err.message : 'No se pudo registrar el envío.');
     }
+  };
+
+  const openApproval = () => {
+    setError(''); setNotice('');
+    if (!ensureReadyForClient()) return;
+    setTransferTiming(project.status === 'draft' ? 'now' : 'later');
+    setApprovalOpen(true);
   };
 
   const approveClient = async () => {
     setError(''); setNotice('');
-    const initialTransfer = project.status === 'draft' && transferTiming === 'now';
     const withoutSend = version.status === 'draft';
-    if (!window.confirm(
-      (withoutSend
-        ? 'ATENCIÓN: esta versión está en BORRADOR y no hay un envío al cliente registrado. ' +
-          'Debes haber recibido la aprobación explícita del cliente pese a ello. '
-        : '') +
-      'Confirma que el CLIENTE APROBÓ expresamente esta versión. ' +
-      (demo ? 'ATENCIÓN: contiene evidencia KDM de demostración, ajena al proyecto. ' : '') +
-      (initialTransfer
-        ? 'Se intentará traspasar los datos al proyecto tras registrar la aprobación.'
-        : 'El traspaso quedará pendiente; no cambiarán los equipos ni las HH.')
-    )) return;
     try {
       const approved = await actions.approveClient.mutateAsync({
         versionId: version.id, revision: version.revision,
         ...(withoutSend ? { confirmWithoutSend: true as const } : {}),
       });
-      if (!initialTransfer) {
+      setApprovalOpen(false);
+      if (transferTiming === 'now' && project.status === 'draft') {
+        // Igual que el prototipo: registrar aprobación y mostrar el resumen.
+        // NO traspasar sin la segunda confirmación.
+        setTransferRevision(approved.revision);
+        setTransferFromApproval(true);
+        setTransferOpen(true);
+      } else {
         setNotice('Aprobación del cliente registrada. Traspaso pendiente.');
-        return;
-      }
-      try {
-        await actions.transferApproved.mutateAsync({
-          versionId: version.id, revision: approved.revision,
-        });
-        setNotice('Cotización aprobada y traspasada a la planificación inicial.');
-      } catch (err) {
-        setError('La aprobación quedó registrada, pero el traspaso sigue PENDIENTE: ' +
-          (err instanceof Error ? err.message : 'Error de transferencia.'));
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo registrar la aprobación.');
+      reportError(err instanceof Error ? err.message : 'No se pudo registrar la aprobación.');
     }
+  };
+
+  const openTransfer = () => {
+    setError(''); setNotice('');
+    if (hasUnsavedChanges) {
+      toast.error('Guarda los cambios de la cotización antes de traspasarla.');
+      return;
+    }
+    if (project.status !== 'draft') {
+      toast.error('El proyecto ya no está en No iniciado. Se requiere conciliación antes del traspaso.');
+      return;
+    }
+    setTransferRevision(null);
+    setTransferFromApproval(false);
+    setTransferOpen(true);
+  };
+
+  const closeTransfer = () => {
+    setTransferOpen(false);
+    if (transferFromApproval) {
+      setNotice('Aprobación registrada. Traspaso pendiente.');
+    }
+    setTransferFromApproval(false);
+    setTransferRevision(null);
   };
 
   const transfer = async () => {
     setError(''); setNotice('');
-    if (!window.confirm(
-      'Traspasar al proyecto una versión APROBADA: HH vendidas, equipos, fases y plan de pagos. ' +
-      'Solo se permite sin historial operativo ni facturación. ¿Confirmas?'
-    )) return;
     try {
       await actions.transferApproved.mutateAsync({
-        versionId: version.id, revision: version.revision,
+        versionId: version.id, revision: transferRevision ?? version.revision,
       });
+      setTransferOpen(false);
+      setTransferRevision(null);
+      setTransferFromApproval(false);
       setNotice('Traspaso registrado en el historial. La planificación quedó cargada.');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No fue posible traspasar la cotización.');
+      reportError(err instanceof Error ? err.message : 'No fue posible traspasar la cotización.');
     }
   };
+
+  const commercialDialogs = (
+    <>
+      {confirmationDialog}
+      {approvalOpen && (
+        <QuotationApprovalDialog project={project} version={version}
+          previouslyApprovedVersionNumber={quotation?.versions.find((candidate) =>
+            candidate.status === 'approved' && candidate.id !== version.id)?.versionNumber}
+          timing={transferTiming} onTimingChange={setTransferTiming}
+          pending={actions.approveClient.isPending} error={error}
+          onCancel={() => setApprovalOpen(false)}
+          onApprove={() => void approveClient()} />
+      )}
+      {transferOpen && (
+        <QuotationTransferDialog project={project} version={version} open
+          afterApproval={transferFromApproval} pending={actions.transferApproved.isPending}
+          error={error} onClose={closeTransfer} onTransfer={() => void transfer()} />
+      )}
+    </>
+  );
 
   const content = (
     <>
@@ -132,12 +189,11 @@ export function QuotationCommercialLifecycleCard({
         el traspaso son operaciones distintas. Ninguna edición del borrador altera el proyecto.</p>
       {demo && <p className={styles.warning}>La fuente documental es el PDF KDM de prueba.
         No corresponde a los documentos reales de este proyecto.</p>}
-      {proposalPending && version.status === 'draft' && (
+      {showAiAcceptance && proposalPending && version.status === 'draft' && (
         <div className={styles.action}>
           <div><strong>1. Revisión del agente IA</strong>
             <p>Confirma perfiles, HH y cualquier ajuste manual; guarda antes de aceptar.</p></div>
-          <Button disabled={!mayAct || !isLatest ||
-            version.draft.teams.length === 0}
+          <Button disabled={!canOperate || busy}
             onClick={() => void acceptAi()}>Aceptar propuesta IA</Button>
         </div>
       )}
@@ -147,7 +203,7 @@ export function QuotationCommercialLifecycleCard({
         <div className={styles.action}>
           <div><strong>2. Envío comercial</strong>
             <p>Registrar un envío externo y bloquear esta versión.</p></div>
-          <Button variant="outline" disabled={!mayAct || !readyForClient || !isLatest}
+          <Button variant="outline" disabled={!canOperate || busy}
             onClick={() => void markSent()}>Marcar como enviada</Button>
         </div>
       )}
@@ -159,17 +215,9 @@ export function QuotationCommercialLifecycleCard({
               No hay envío comercial registrado. Se solicitará confirmación explícita del
               cliente antes de aprobar directamente el borrador.
             </p>}</div>
-          <Select label="Tipo de traspaso" value={transferTiming}
-            onChange={(event) => setTransferTiming(event.target.value as 'now' | 'later')}
-            options={[
-              { value: 'later', label: 'Aprobar y traspasar después' },
-              { value: 'now', label: 'Aprobar y traspasar ahora' },
-            ]}/>
-          {transferTiming === 'now' && project.status !== 'draft' &&
-            <p className={styles.warning}>Este proyecto no está en No iniciado.
-              Por seguridad, la aprobación quedará pendiente de conciliación y traspaso.</p>}
-          <Button disabled={!mayAct || !readyForClient || !isLatest}
-            onClick={() => void approveClient()}>Registrar aprobación</Button>
+
+          <Button disabled={!canOperate || busy}
+            onClick={openApproval}>Registrar aprobación</Button>
         </div>
       )}
       {version.status === 'approved' && !transferred &&
@@ -177,8 +225,8 @@ export function QuotationCommercialLifecycleCard({
           <div><strong>4. Traspaso pendiente</strong>
             <p>La versión aprobada permanece registrada. El proyecto todavía no ha recibido
               esta planificación.</p></div>
-          <Button disabled={!mayAct || project.status !== 'draft' || !isLatest}
-            onClick={() => void transfer()}>Traspasar ahora</Button>
+          <Button disabled={!canOperate || busy}
+            onClick={openTransfer}>Traspasar ahora</Button>
         </div>}
       {transferred && <p className={styles.success}>
         Versión traspasada. Se registraron equipos, horas y plan de pagos.
@@ -196,5 +244,36 @@ export function QuotationCommercialLifecycleCard({
       {notice && <p role="status" className={styles.success}>{notice}</p>}
     </>
   );
-  return embedded ? <div className={styles.embedded}>{content}</div> : <Card>{content}</Card>;
+  if (embedded) {
+    // Pantalla v5: el panel derecho muestra solo los botones comerciales.
+    // Las validaciones permanecen activas en el backend y en los atributos
+    // disabled/title de cada acción. El traspaso sigue siendo posterior.
+    return (
+      <div className={styles.v5Actions}>
+        {commercialDialogs}
+        {version.status === 'draft' &&
+          <Button variant="outline" className={styles.v5Send}
+            disabled={!canOperate || busy}
+            onClick={() => void markSent()}>Marcar como enviada al cliente</Button>}
+        {(version.status === 'sent' || version.status === 'draft') &&
+          <Button className={styles.v5Approve}
+            disabled={!canOperate || busy}
+            onClick={openApproval}>Registrar aprobación del cliente</Button>}
+        {version.status === 'approved' && !transferred &&
+          <Button className={styles.v5Approve}
+            disabled={!canOperate || busy}
+            onClick={openTransfer}>Traspasar al proyecto</Button>}
+        {blockers.length > 0 && (version.status === 'draft' || version.status === 'sent') && (
+          <div className={styles.checklist} role="status" aria-label="Requisitos comerciales pendientes">
+            <strong>Para habilitar envío y aprobación:</strong>
+            <ul>{blockers.map((reason) => <li key={reason}>{reason}</li>)}</ul>
+          </div>
+        )}
+        {transferred && <p className={styles.success}>Cotización aprobada y traspasada.</p>}
+        {error && <p role="alert" className={styles.error}>{error}</p>}
+        {notice && <p role="status" className={styles.success}>{notice}</p>}
+      </div>
+    );
+  }
+  return <><Card>{content}</Card>{commercialDialogs}</>;
 }

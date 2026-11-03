@@ -5,11 +5,14 @@ import { MemoryRouter } from 'react-router-dom';
 import type { ProjectDetail } from '@kora/contracts';
 import { NewProjectQuotationModal } from './NewProjectQuotationModal';
 
-const mocks = vi.hoisted(() => ({ navigate: vi.fn(), close: vi.fn() }));
+const mocks = vi.hoisted(() => ({ navigate: vi.fn(), close: vi.fn(), toastError: vi.fn() }));
 vi.mock('react-router-dom', async (importOriginal) => {
   const original = await importOriginal<typeof import('react-router-dom')>();
   return { ...original, useNavigate: () => mocks.navigate };
 });
+vi.mock('@/shared/components/ui/Toast', () => ({
+  useToast: () => ({ error: mocks.toastError }),
+}));
 vi.mock('@/shared/components/ui/Modal', () => ({
   Modal: ({ title, children, footer }: {
     title: string; children: ReactNode; footer?: ReactNode;

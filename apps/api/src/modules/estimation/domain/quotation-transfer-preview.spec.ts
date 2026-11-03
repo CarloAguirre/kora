@@ -91,7 +91,7 @@ describe('buildQuotationTransferPreview', () => {
     const result = buildQuotationTransferPreview(v, project(), at);
     expect(result.transferEnabled).toBe(false);
     expect(result.findings.map((f) => f.code)).toEqual(expect.arrayContaining([
-      'R3_NOT_IMPLEMENTED', 'VERSION_NOT_APPROVED', 'AI_NOT_REVIEWED',
+      'TRANSFER_PREVIEW_NOT_AUTHORIZATION', 'VERSION_NOT_APPROVED', 'AI_NOT_REVIEWED',
       'MISSING_RATE', 'PAYMENT_PLAN_INCOMPLETE',
     ]));
   });
@@ -102,7 +102,7 @@ describe('buildQuotationTransferPreview', () => {
       teams: [], moduleCount: 0, taskCount: 0, segmentCount: 0, paymentMilestones: [],
     }), at);
     expect(result.transferEnabled).toBe(false);
-    expect(result.findings.some((f) => f.code === 'R3_NOT_IMPLEMENTED')).toBe(true);
+    expect(result.findings.some((f) => f.code === 'TRANSFER_PREVIEW_NOT_AUTHORIZATION')).toBe(true);
   });
 
   it('no compara montos de distinta moneda', () => {

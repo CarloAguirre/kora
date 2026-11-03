@@ -1,11 +1,10 @@
 import type { ReactNode } from 'react';
-import type { QuotationDraftData, QuotationVersion } from '@kora/contracts';
-import { Button } from '@/shared/components/ui/Button';
+import { effectiveQuotationEdt, quotationEdtAssignments, type QuotationDraftData, type QuotationVersion } from '@kora/contracts';
 import { Card } from '@/shared/components/ui/Card';
-import { Badge } from '@/shared/components/ui/Badge';
+import { quotationTeamColor } from './quotation-team-colors';
 import styles from './QuotationCommercialSummary.module.css';
 
-type TeamHours = { teamId: string; name: string; hours: number; tone: string };
+type TeamHours = { teamId: string; name: string; hours: number; color: string };
 const fmt = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 2 });
 const fmtMoney = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 4 });
 const round = (n: number, places: number) =>
@@ -35,16 +34,6 @@ function preview(draft: QuotationDraftData, rate: number | null, tax: 'iva19' | 
     byTeam,
   };
 }
-function teamTone(name: string) {
-  const normalized = name.toLocaleLowerCase('es');
-  if (normalized.includes('desarrollo') || normalized.includes('dev')) return 'dev';
-  if (normalized.includes('qa') || normalized.includes('calidad')) return 'qa';
-  if (normalized.includes('ux') || normalized.includes('diseño')) return 'ux';
-  if (normalized.includes('pmo') || normalized.includes('gestión')) return 'pmo';
-  if (normalized.includes('rpa') || normalized.includes('automatiza')) return 'rpa';
-  if (normalized.includes('ia') || normalized.includes('inteligencia')) return 'ai';
-  return 'other';
-}
 function durationLabel(draft: QuotationDraftData) {
   if (draft.mode === 'phases') {
     if (draft.phases.length === 0) return 'Sin fases definidas';
@@ -57,7 +46,7 @@ function durationLabel(draft: QuotationDraftData) {
 }
 
 export function QuotationCommercialSummary({
-  version, draft, hourlyRate, currency, tax, teamNames, editable, dirty, saving, onSave, actions,
+  version, draft, hourlyRate, currency, tax, teamNames, dirty, actions,
 }: {
   version: QuotationVersion | null;
   draft: QuotationDraftData | null;
@@ -73,13 +62,41 @@ export function QuotationCommercialSummary({
 }) {
   if (!version || !draft) return <Card><h2>Resumen comercial</h2><p>Selecciona una versión.</p></Card>;
   const numbers = preview(draft, hourlyRate, tax);
-  const rows: TeamHours[] = numbers.byTeam.filter((row) => row.hours > 0)
+  const edt = draft.aiPoc?.edt ? effectiveQuotationEdt(draft) : null;
+  const referenceOnly = Boolean(edt && (draft.mode !== 'phases' || draft.phases.length === 0));
+  const hoursShown = referenceOnly && edt ? edt.totalHours : numbers.totalHours;
+  const commercialRows: TeamHours[] = numbers.byTeam.filter((row) => row.hours > 0)
     .map((row) => {
       const name = teamNames.get(row.teamId) ?? 'Equipo no disponible';
-      return { ...row, name, tone: teamTone(name) };
+      return { ...row, name, color: quotationTeamColor(name) };
     });
-  const aiHours = version.draft.aiPoc?.proposal.totalHours ?? null;
-  const unmapped = aiHours !== null && numbers.totalHours === 0 && aiHours > 0;
+  const referenceGroupHours = new Map<string, number>();
+  if (edt) {
+    for (const row of quotationEdtAssignments(draft)) {
+      referenceGroupHours.set(row.teamKey, round(
+        (referenceGroupHours.get(row.teamKey) ?? 0) + row.hours, 2));
+    }
+  }
+  const pendingProfileCount = [...referenceGroupHours.keys()]
+    .filter((key) => key.startsWith('profile:')).length;
+  const referenceRows: TeamHours[] = [...referenceGroupHours].map(([teamKey, hours]) => {
+    const pending = teamKey.startsWith('profile:');
+    const name = pending ? 'Sin equipo Kora · ' + teamKey.slice(8) :
+      teamNames.get(teamKey) ?? 'Equipo no disponible';
+    return { teamId: teamKey, name, hours,
+      color: pending ? '#a0a9b8' : quotationTeamColor(name) };
+  }).filter((row) => row.hours > 0);
+  const rows = referenceOnly ? referenceRows : commercialRows;
+  const duration = referenceOnly && edt
+    ? edt.schemaVersion === 'kora.quotation.reference-edt.v2'
+      ? Math.max(1, ...(edt.stages ?? []).map((p) => p.startWeek + p.durationWeeks - 1)) +
+        ' semanas · ' + (edt.stages?.length ?? 0) + ' fases'
+      : edt.modules.length + ' módulos'
+    : durationLabel(draft);
+  const recurringMonthly = draft.costs.filter((cost) => cost.recurrence === 'monthly')
+    .reduce((sum, cost) => sum + cost.amount, 0);
+  const recurringYearly = draft.costs.filter((cost) => cost.recurrence === 'annual')
+    .reduce((sum, cost) => sum + cost.amount, 0);
   const displayAmount = (amount: number | null) =>
     amount === null ? '—' : fmtMoney(amount) + ' ' + currency;
 
@@ -87,48 +104,51 @@ export function QuotationCommercialSummary({
     <Card>
       <section className={styles.summary} aria-label="Resumen comercial de cotización">
         <div className={styles.topLine}>
-          <span>Horas totales de la cotización</span>
-          {dirty && <Badge tone="warning">Sin guardar</Badge>}
+          <span>Horas totales del proyecto</span>
+          {dirty && <span className={styles.unsaved}>Sin guardar</span>}
         </div>
-        <div className={styles.bigNumber}>{fmt(numbers.totalHours)}<small> HH</small></div>
-        <p className={styles.duration}>{durationLabel(draft)}</p>
-        {unmapped && (
-          <div className={styles.aiNotice} role="status">
-            <strong>{fmt(aiHours)} HH propuestas por IA</strong>
-            <span>Pendientes de asignar a equipos. Revisa los perfiles y guarda antes de continuar.</span>
-          </div>
-        )}
-        {dirty && <p className={styles.draftNotice}>Vista previa. Los importes definitivos se recalculan al guardar.</p>}
+        <div className={styles.bigNumber}>{fmt(hoursShown)}<small> hh</small></div>
+        <p className={styles.duration}>{duration}</p>
         <div className={styles.money}>
-          <div><span>Neto</span><strong>{displayAmount(numbers.netAmount)}</strong></div>
-          <div><span>{tax === 'exempt' ? 'Total exento' : tax === 'iva19' ? 'Total con IVA' : 'Total con IGV'}</span>
-            <strong>{displayAmount(numbers.totalAmount)}</strong></div>
+          <div><span>Neto</span>
+            <strong>{displayAmount(referenceOnly ? null : numbers.netAmount)}</strong></div>
+          <div><span>{tax === 'exempt' ? 'Total exento' :
+            tax === 'iva19' ? 'Total con IVA' : 'Total con IGV'}</span>
+            <strong>{displayAmount(referenceOnly ? null : numbers.totalAmount)}</strong></div>
         </div>
-        {hourlyRate === null && numbers.totalHours > 0 && (
-          <p className={styles.warning}>Falta el valor HH del proyecto.</p>
+        {recurringMonthly > 0 && <p className={styles.recurring}>
+          Recurrentes: + {fmtMoney(recurringMonthly)} {currency} / mes
+        </p>}
+        {recurringYearly > 0 && <p className={styles.recurring}>
+          Recurrentes: + {fmtMoney(recurringYearly)} {currency} / año
+        </p>}
+        {(hourlyRate === null || hourlyRate <= 0) && hoursShown > 0 &&
+          <p className={styles.warning}>Falta el valor HH del proyecto.</p>}
+        {referenceOnly && pendingProfileCount > 0 && (
+          <p className={styles.warning}>
+            {pendingProfileCount} perfil(es) IA aún sin equipo Kora.
+            Las HH son referenciales; falta asignarlas a equipos reales.
+          </p>
         )}
-        <div className={styles.distribution} aria-label="Distribución de horas por equipo">
-          {rows.length > 0 ? rows.map((row) => (
-            <span key={row.teamId} className={styles[row.tone]}
-              style={{ width: (row.hours / numbers.totalHours * 100) + '%' }}
-              title={row.name + ': ' + fmt(row.hours) + ' HH'} />
-          )) : <span className={styles.emptyBar} />}
+        <div className={styles.distribution}
+          aria-label={referenceOnly ? 'Distribución referencial de HH, con perfiles pendientes' :
+            'Distribución de horas por equipo'}>
+          {rows.length > 0 ? rows.map((row) =>
+            <span key={row.teamId}
+              style={{ width: (row.hours / Math.max(1, hoursShown) * 100) + '%',
+                background: row.color }}
+              title={row.name + ': ' + fmt(row.hours) + ' hh'} />
+          ) : <span className={styles.emptyBar} />}
         </div>
         <div className={styles.legend}>
           {rows.length > 0 ? rows.map((row) => (
             <div key={row.teamId} className={styles.legendRow}>
-              <span className={styles.name}><span className={styles.dot + ' ' + styles[row.tone]} />{row.name}</span>
-              <strong>{fmt(row.hours)} HH</strong>
+              <span className={styles.name}><span className={styles.dot} style={{ background: row.color }} />{row.name}</span>
+              <strong>{fmt(row.hours)} hh</strong>
             </div>
-          )) : <p>Sin HH distribuidas entre equipos.</p>}
+          )) : <p>Sin HH distribuidas.</p>}
         </div>
-        {editable && <Button onClick={onSave} loading={saving} disabled={!dirty}
-          aria-label="Guardar cambios del borrador">Guardar borrador</Button>}
         {actions}
-        <small className={styles.saved}>
-          {dirty ? 'Los valores mostrados son una vista previa sin guardar.' :
-            'Versión v' + version.versionNumber + ' guardada · revisión ' + version.revision}
-        </small>
       </section>
     </Card>
   );

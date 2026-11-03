@@ -36,6 +36,9 @@ import {
 import { DATABASE } from '../../../../shared/infrastructure/database/database.module';
 import { calculateQuotation } from '../../domain/quotation-math';
 import { hasOnlyUntouchedDefaultPaymentMilestones } from '../../domain/default-payment-plan-eligibility';
+import { initialQuotationTransferBlockers } from '../../domain/initial-quotation-transfer-blockers';
+import { hasOnlyCommercialPreparationHours } from '../../domain/commercial-preparation-transfer';
+import { buildQuotationTransferReferences } from '../../domain/quotation-transfer-references';
 import { InvalidCommercialQuotation, assertQuotationReadyForClient, assertAiProposalReadyToAccept, assertDirectClientApprovalAcknowledged } from '../../domain/quotation-commercial-eligibility';
 import type { QuotationProjectScope, QuotationRepository } from '../../domain/repositories/quotation.repository';
 
@@ -80,6 +83,15 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       name: row.name,
       isActive: row.isActive && row.deletedAt === null,
     }));
+  }
+
+  /** Para el agente IA: catálogo activo, nunca perfiles o IDs inventados. */
+  async listActiveQuotationTeams(): Promise<QuotationTeamCatalogEntry[]> {
+    const rows = await this.db.select({
+      teamId: teams.id, name: teams.name,
+    }).from(teams).where(and(eq(teams.isActive, true), isNull(teams.deletedAt)))
+      .orderBy(asc(teams.name));
+    return rows.map((row) => ({ ...row, isActive: true }));
   }
 
   /**
@@ -322,7 +334,7 @@ export class DrizzleQuotationRepository implements QuotationRepository {
   async createAiPocDraft(projectId: string, userId: string, proposal: EstimationPocProposal,
     answers: readonly SubmitEstimationAnswerInput[],
     dynamicQuestions: readonly EstimationQuestion[], edt: QuotationReferenceEdt,
-    confirmedUnderstanding?: string): Promise<QuotationVersion> {
+    confirmedUnderstanding?: string, roleTeamIds?: Readonly<Record<string, string>>): Promise<QuotationVersion> {
     if (proposal.projectId !== projectId || proposal.provider !== 'gemini' ||
         proposal.sourceMode !== 'poc_simulated' || proposal.documentsAnalyzed < 1 ||
         proposal.totalHours <= 0 || proposal.roles.some((role) => role.totalHours <= 0) ||
@@ -331,13 +343,14 @@ export class DrizzleQuotationRepository implements QuotationRepository {
         edt.source !== 'kdm_demo' || edt.provider !== 'gemini') {
       throw new BadRequestException('Propuesta Gemini KDM inválida o sin trazabilidad documental.');
     }
-    return this.createVersionInternal(projectId, userId, {}, { proposal, answers, dynamicQuestions, edt, confirmedUnderstanding });
+    return this.createVersionInternal(projectId, userId, {}, { proposal, answers, dynamicQuestions, edt, confirmedUnderstanding, roleTeamIds });
   }
 
   private async createVersionInternal(
     projectId: string, userId: string, input: CreateQuotationVersionInput,
     aiPoc?: { proposal: EstimationPocProposal; answers: readonly SubmitEstimationAnswerInput[];
-      dynamicQuestions: readonly EstimationQuestion[]; edt: QuotationReferenceEdt; confirmedUnderstanding?: string },
+      dynamicQuestions: readonly EstimationQuestion[]; edt: QuotationReferenceEdt;
+      confirmedUnderstanding?: string; roleTeamIds?: Readonly<Record<string, string>> },
   ): Promise<QuotationVersion> {
     return this.db.transaction(async (tx) => {
       await tx.insert(projectQuotations).values({ projectId, createdByUserId: userId }).onConflictDoNothing();
@@ -373,9 +386,23 @@ export class DrizzleQuotationRepository implements QuotationRepository {
             source: 'kdm_demo', proposal: aiPoc.proposal,
             answers: aiPoc.answers, dynamicQuestions: aiPoc.dynamicQuestions,
             confirmedUnderstanding: aiPoc.confirmedUnderstanding,
-            edt: aiPoc.edt, roleTeamIds: {},
+            edt: aiPoc.edt, roleTeamIds: aiPoc.roleTeamIds ?? {},
           }),
         });
+        if (aiPoc.roleTeamIds) {
+          const assignedTeamIds = [...new Set(Object.values(aiPoc.roleTeamIds))];
+          const expectedRoles = aiPoc.proposal.roles.map((role) => role.role);
+          if (Object.keys(aiPoc.roleTeamIds).length !== expectedRoles.length ||
+              expectedRoles.some((role) => !aiPoc.roleTeamIds?.[role])) {
+            throw new BadRequestException('La propuesta Gemini contiene perfiles sin equipo Kora.');
+          }
+          const existing = await tx.select({ id: teams.id }).from(teams)
+            .where(and(inArray(teams.id, assignedTeamIds), eq(teams.isActive, true), isNull(teams.deletedAt)));
+          if (existing.length !== assignedTeamIds.length) {
+            throw new BadRequestException('La propuesta Gemini utiliza equipos inexistentes o inactivos.');
+          }
+          draft = projectPocRolesToQuotationDraft(draft, aiPoc.roleTeamIds);
+        }
         origin = 'ai';
         aiReviewStatus = 'pending';
       }
@@ -410,7 +437,14 @@ export class DrizzleQuotationRepository implements QuotationRepository {
         if (!source) throw new NotFoundException('La versión no pertenece a la cotización de origen.');
         // Una copia MANUAL desde una propuesta IA no hereda fuentes ni respuestas IA.
         const previous = quotationDraftDataSchema.parse(source.draft);
-        draft = { ...previous, sourceRefs: [], answers: {}, analysis: null, aiPoc: null, analysisProjectionStatus: undefined };
+        draft = {
+          ...previous, sourceRefs: [], answers: {}, analysis: null, aiPoc: null,
+          analysisProjectionStatus: undefined,
+          edtHourAdjustments: undefined, edtTaskSettings: undefined,
+          edtRoleCollaborators: undefined, edtStageSettings: undefined,
+          edtCommercialStages: undefined, edtCommercialTasks: undefined,
+          edtTaskNames: undefined,
+        };
         hourlyRate = source.hourlyRate === null ? null : Number(source.hourlyRate);
         currency = source.currency as typeof currency;
         tax = source.tax as typeof tax;
@@ -455,6 +489,7 @@ export class DrizzleQuotationRepository implements QuotationRepository {
     const versions = await this.db.select({
       id: quotationVersions.id, versionNumber: quotationVersions.versionNumber,
       revision: quotationVersions.revision, draft: quotationVersions.draft,
+      origin: quotationVersions.origin, totalHours: quotationVersions.totalHours,
     }).from(quotationVersions).where(eq(quotationVersions.quotationId, quotation.id));
     if (!versions.length) return null;
     const [event] = await this.db.select().from(quotationEvents)
@@ -465,21 +500,36 @@ export class DrizzleQuotationRepository implements QuotationRepository {
     const version = versions.find((v) => v.id === event.versionId);
     if (!version) return null;
     const metadata = event.metadata as { moduleIds?: string[]; revision?: number; versionRevision?: number };
-    const edt = quotationDraftDataSchema.parse(version.draft).aiPoc?.edt;
-    if (!edt || !metadata.moduleIds || metadata.moduleIds.length !== edt.modules.length) return null;
+    const draft = quotationDraftDataSchema.parse(version.draft);
+    const edt = draft.aiPoc?.edt;
+    if (!metadata.moduleIds) return null;
+    const commercialModules = draft.mode === 'phases' && draft.phases.length
+      ? draft.phases.map((phase) => ({
+          name: phase.name,
+          hours: phase.teamHours.reduce((total, row) => total + row.hours, 0),
+        }))
+      : (edt?.modules ?? []).map((module) => ({
+          name: module.name, hours: module.totalHours,
+        }));
+    const positive = commercialModules.filter((module) => module.hours > 0);
+    if (metadata.moduleIds.length !== positive.length) return null;
+    const references = buildQuotationTransferReferences(draft,
+      positive.map((module, index) => ({
+        moduleId: metadata.moduleIds![index]!,
+        name: module.name, totalHours: module.hours,
+      })));
     return appliedQuotationPlanningSchema.parse({
       projectId, versionId: version.id, versionNumber: version.versionNumber,
       revision: metadata.revision ?? metadata.versionRevision ?? version.revision,
       appliedAt: event.occurredAt.toISOString(),
-      appliedByUserId: event.actorUserId, source: 'kdm_demo',
+      appliedByUserId: event.actorUserId,
+      source: draft.aiPoc?.source ?? (version.origin === 'copy' ? 'copy' : 'manual'),
       status: event.action === 'quotation_transferred'
         ? 'transferred' : 'accepted_for_planning_only',
       commercialApproval: event.action === 'quotation_transferred',
-      totalHours: edt.totalHours,
-      modules: edt.modules.map((module, i) => ({
-        moduleId: metadata.moduleIds![i], name: module.name,
-        totalHours: module.totalHours, tasks: module.tasks,
-      })),
+      totalHours: Number(version.totalHours),
+      modules: references.modules,
+      unassignedTasks: references.unassignedTasks,
     });
   }
 
@@ -661,6 +711,60 @@ export class DrizzleQuotationRepository implements QuotationRepository {
     });
   }
 
+  /** Elimina una versión solicitada explícitamente; protege el baseline traspasado.
+   * No renumera otras versiones, ni toca equipos, HH o pagos operativos. */
+  async deleteVersion(projectId: string, versionId: string, revision: number): Promise<boolean> {
+    return this.db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT id FROM projects WHERE id = ${projectId} FOR UPDATE`);
+      const [project] = await tx.select({
+        id: projects.id, status: projects.status, salesStage: projects.salesStage,
+      }).from(projects).where(and(
+        eq(projects.id, projectId), isNull(projects.deletedAt),
+      )).limit(1);
+      if (!project) throw new NotFoundException('Proyecto no encontrado.');
+      const [quotation] = await tx.select({ id: projectQuotations.id })
+        .from(projectQuotations).where(eq(projectQuotations.projectId, projectId)).limit(1);
+      if (!quotation) throw new NotFoundException('Cotización no encontrada.');
+      await tx.execute(sql`SELECT id FROM project_quotations WHERE id = ${quotation.id} FOR UPDATE`);
+      await tx.execute(sql`SELECT id FROM quotation_versions WHERE id = ${versionId} FOR UPDATE`);
+      const [version] = await tx.select({ revision: quotationVersions.revision,
+        id: quotationVersions.id, status: quotationVersions.status,
+      }).from(quotationVersions).where(and(
+        eq(quotationVersions.id, versionId),
+        eq(quotationVersions.quotationId, quotation.id),
+      )).limit(1);
+      if (!version) throw new NotFoundException('La versión no existe en el proyecto.');
+      if (version.revision !== revision)
+        throw new ConflictException('La cotización cambió. Actualiza la lista antes de eliminar.');
+      const [protectedEvent] = await tx.select({ id: quotationEvents.id })
+        .from(quotationEvents).where(and(
+          eq(quotationEvents.versionId, versionId),
+          inArray(quotationEvents.action,
+            ['quotation_transferred', 'planning_baseline_applied']),
+        )).limit(1);
+      if (protectedEvent) {
+        throw new ConflictException(
+          'No se puede eliminar una cotización ya traspasada a la planificación del proyecto.',
+        );
+      }
+      // Los eventos propios de esta versión se eliminan por su FK ON DELETE CASCADE.
+      // El historial de otras versiones sigue intacto.
+      await tx.delete(quotationVersions).where(eq(quotationVersions.id, versionId));
+      if (version.status === 'approved' &&
+          project.status === 'draft' && project.salesStage === 'approved') {
+        const remaining = await tx.select({ status: quotationVersions.status })
+          .from(quotationVersions)
+          .where(eq(quotationVersions.quotationId, quotation.id));
+        if (!remaining.some((row) => row.status === 'approved')) {
+          await tx.update(projects).set({
+            salesStage: remaining.length ? 'quoted' : 'prospect', updatedAt: new Date(),
+          }).where(eq(projects.id, projectId));
+        }
+      }
+      return true;
+    });
+  }
+
   /** Aceptación IA: nunca modifica project_teams, proyectos ni Roadmap. */
   async acceptAiProposal(projectId: string, versionId: string, userId: string,
     input: QuotationRevisionActionInput): Promise<QuotationVersion> {
@@ -704,13 +808,6 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       if (!current) throw new NotFoundException('Versión no encontrada.');
       if (current.status !== 'draft' || current.revision !== input.revision) {
         throw new ConflictException('Solo se envían borradores en la revisión vigente.');
-      }
-      const [latest] = await tx.select({ id: quotationVersions.id })
-        .from(quotationVersions)
-        .where(eq(quotationVersions.quotationId, current.quotationId))
-        .orderBy(desc(quotationVersions.versionNumber)).limit(1);
-      if (latest?.id !== versionId) {
-        throw new ConflictException('Solo se puede enviar la última versión comercial.');
       }
       validateCommercial(() => assertQuotationReadyForClient(toVersion(current)));
       if (process.env.NODE_ENV === 'production' &&
@@ -760,13 +857,6 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       validateCommercial(() => assertDirectClientApprovalAcknowledged(
         current.status as 'draft' | 'sent', input.confirmWithoutSend,
       ));
-      const [latest] = await tx.select({ id: quotationVersions.id })
-        .from(quotationVersions)
-        .where(eq(quotationVersions.quotationId, quotation.id))
-        .orderBy(desc(quotationVersions.versionNumber)).limit(1);
-      if (latest?.id !== versionId) {
-        throw new ConflictException('No se puede aprobar una versión comercial anterior.');
-      }
       assertQuotationReadyForClient(toVersion(current));
       if (process.env.NODE_ENV === 'production' &&
           quotationDraftDataSchema.parse(current.draft).aiPoc?.source === 'kdm_demo') {
@@ -826,13 +916,6 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       if (version.status !== 'approved' || version.revision !== input.revision) {
         throw new ConflictException('Solo se traspasa la versión aprobada vigente.');
       }
-      const [latestVersion] = await tx.select({ id: quotationVersions.id })
-        .from(quotationVersions)
-        .where(eq(quotationVersions.quotationId, quotation.id))
-        .orderBy(desc(quotationVersions.versionNumber)).limit(1);
-      if (latestVersion?.id !== versionId) {
-        throw new ConflictException('Hay una cotización posterior; revisa cuál es la versión vigente.');
-      }
       validateCommercial(() => assertQuotationReadyForClient(toVersion(version)));
       if (process.env.NODE_ENV === 'production' &&
           quotationDraftDataSchema.parse(version.draft).aiPoc?.source === 'kdm_demo') {
@@ -850,22 +933,50 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       await tx.execute(sql`SELECT id FROM project_payment_milestones WHERE project_id = ${projectId} FOR UPDATE`);
       const [existingTeams, existingModules, existingHours, existingPayments] =
         await Promise.all([
-          tx.select({ id: projectTeams.id }).from(projectTeams)
-            .where(eq(projectTeams.projectId, projectId)).limit(1),
+          tx.select({
+            id: projectTeams.id, teamId: projectTeams.teamId,
+            assignedHours: projectTeams.assignedHours, memberCount: projectTeams.memberCount,
+          }).from(projectTeams).where(eq(projectTeams.projectId, projectId)),
           tx.select({ id: projectModules.id }).from(projectModules)
             .where(eq(projectModules.projectId, projectId)).limit(1),
-          tx.select({ id: hourEntries.id }).from(hourEntries)
-            .where(eq(hourEntries.projectId, projectId)).limit(1),
+          tx.select({
+            id: hourEntries.id, assignment: hourEntries.assignment,
+            moduleId: hourEntries.moduleId, status: hourEntries.status, hours: hourEntries.hours,
+          }).from(hourEntries).where(eq(hourEntries.projectId, projectId)),
           tx.select().from(projectPaymentMilestones)
             .where(eq(projectPaymentMilestones.projectId, projectId)),
         ]);
-      if (Number(project.soldHours) !== 0 || Number(project.usedHours) !== 0 ||
-          project.startDate !== null || project.contractAmount !== null ||
-          existingTeams.length || existingModules.length || existingHours.length ||
-          !hasOnlyUntouchedDefaultPaymentMilestones(existingPayments)) {
+      const transferBlockers = initialQuotationTransferBlockers({
+        soldHours: Number(project.soldHours),
+        usedHours: Number(project.usedHours),
+        hasStartDate: project.startDate !== null,
+        hasContractAmount: project.contractAmount !== null,
+        projectTeamCount: existingTeams.length,
+        moduleCount: existingModules.length,
+        hourEntryCount: existingHours.length,
+        hasChangedPaymentPlan: !hasOnlyUntouchedDefaultPaymentMilestones(existingPayments),
+      });
+      // Caso A: historia comercial de Prospecto, sin fases operativas ni facturas.
+      // Se conservan horas, fechas, miembros y líderes; la nueva cotización
+      // actualiza el presupuesto comercial y registra el valor anterior en auditoría.
+      const commercialPreparationOnly = existingModules.length === 0 &&
+        project.contractAmount === null &&
+        hasOnlyUntouchedDefaultPaymentMilestones(existingPayments) &&
+        hasOnlyCommercialPreparationHours(existingHours, Number(project.usedHours));
+      const unresolvedBlockers = commercialPreparationOnly
+        ? transferBlockers.filter((reason) => !(
+            reason === 'HH vendidas existentes' ||
+            reason === 'HH consumidas existentes' ||
+            reason === 'fecha de inicio definida' ||
+            reason.endsWith(' equipos asignados') ||
+            reason.endsWith(' registros de horas')
+          ))
+        : transferBlockers;
+      if (unresolvedBlockers.length > 0) {
         throw new ConflictException(
-          'El proyecto tiene ejecución, facturación o una planificación previa. ' +
-          'El traspaso histórico requiere conciliación y no se hará automáticamente.',
+          'Traspaso inicial bloqueado: ' + unresolvedBlockers.join('; ') +
+          '. Este proyecto requiere conciliación antes de incorporar otra cotización. ' +
+          'No se modificaron HH, equipos, Roadmap ni pagos existentes.',
         );
       }
       const draft = quotationDraftDataSchema.parse(version.draft);
@@ -901,14 +1012,27 @@ export class DrizzleQuotationRepository implements QuotationRepository {
         await tx.insert(projectTeams).values({
           projectId, teamId: team.teamId, memberCount: team.collaborators,
           assignedHours: (byTeam.get(team.teamId) ?? 0).toFixed(2),
+        }).onConflictDoUpdate({
+          target: [projectTeams.projectId, projectTeams.teamId],
+          set: {
+            assignedHours: (byTeam.get(team.teamId) ?? 0).toFixed(2),
+            memberCount: team.collaborators,
+            updatedAt: new Date(),
+          },
         });
+        // ON CONFLICT no toca leaderUserId ni project_team_members.
       }
-      const modules = draft.aiPoc?.edt?.modules.map((module) => ({
-        name: module.name, hours: module.totalHours,
-      })) ?? draft.phases.map((phase) => ({
-        name: phase.name,
-        hours: phase.teamHours.reduce((n, row) => n + row.hours, 0),
-      }));
+      // Las fases comercialmente aceptadas son la fuente de verdad del
+      // Roadmap inicial y de los hitos. No usar nombres de módulos Gemini que
+      // difieren de los que el usuario editó en el workspace.
+      const modules = draft.mode === 'phases' && draft.phases.length
+        ? draft.phases.map((phase) => ({
+            name: phase.name,
+            hours: phase.teamHours.reduce((n, row) => n + row.hours, 0),
+          }))
+        : (draft.aiPoc?.edt?.modules ?? []).map((module) => ({
+            name: module.name, hours: module.totalHours,
+          }));
       const moduleHours = modules.reduce((sum, module) => sum + module.hours, 0);
       if (modules.length > 0 && Math.abs(moduleHours - Number(version.totalHours)) > 0.011) {
         throw new ConflictException(
@@ -916,6 +1040,8 @@ export class DrizzleQuotationRepository implements QuotationRepository {
         );
       }
       const moduleIds: string[] = [];
+      const moduleIdByPhase = new Map<string, string>();
+      const ambiguousPhaseNames = new Set<string>();
       for (const module of modules) {
         if (module.hours <= 0) continue;
         const [saved] = await tx.insert(projectModules).values({
@@ -924,6 +1050,8 @@ export class DrizzleQuotationRepository implements QuotationRepository {
         }).returning({ id: projectModules.id });
         if (!saved) throw new Error('No se pudo guardar un módulo.');
         moduleIds.push(saved.id);
+        if (moduleIdByPhase.has(module.name)) ambiguousPhaseNames.add(module.name);
+        moduleIdByPhase.set(module.name, saved.id);
       }
       // El plan predeterminado solo se reemplaza si no se facturó ni alteró.
       await tx.delete(projectPaymentMilestones).where(eq(projectPaymentMilestones.projectId, projectId));
@@ -936,10 +1064,14 @@ export class DrizzleQuotationRepository implements QuotationRepository {
           ? Math.round((targetTotal - billed + Number.EPSILON) * 100) / 100
           : Math.round((targetTotal * item.percent / 100 + Number.EPSILON) * 100) / 100;
         if (amount < 0) amount = 0;
-        const phases = ['discovery','development','testing','pilot','closed'];
-        if (item.trigger === 'phase' && (!item.triggerPhase ||
-            !phases.includes(item.triggerPhase))) {
-          throw new BadRequestException('Hito ligado a fase no reconocida por Kora.');
+        const moduleId = item.trigger === 'phase' && item.triggerPhase
+          ? moduleIdByPhase.get(item.triggerPhase) : undefined;
+        if (item.trigger === 'phase' && (!moduleId ||
+            ambiguousPhaseNames.has(item.triggerPhase ?? ''))) {
+          throw new BadRequestException(
+            'El hito «' + item.name + '» no tiene una fase comercial única con HH positivas. ' +
+            'Revisa las fases y su nombre antes del traspaso.',
+          );
         }
         if (item.trigger === 'date' && !item.triggerDate) {
           throw new BadRequestException('Hito por fecha sin fecha definida.');
@@ -948,8 +1080,8 @@ export class DrizzleQuotationRepository implements QuotationRepository {
           projectId, name: item.name, percent: item.percent.toFixed(2),
           amount: amount.toFixed(2), sortOrder: index, status: 'pending',
           triggerType: item.trigger,
-          triggerPhase: item.trigger === 'phase'
-            ? item.triggerPhase as 'discovery'|'development'|'testing'|'pilot'|'closed' : null,
+          triggerPhase: null,
+          triggerModuleId: item.trigger === 'phase' ? moduleId : null,
           triggerDate: item.trigger === 'date'
             ? new Date(item.triggerDate! + 'T00:00:00.000Z') : null,
         });
@@ -970,6 +1102,14 @@ export class DrizzleQuotationRepository implements QuotationRepository {
           totalHours: Number(version.totalHours),
           paymentCount: draft.paymentPlan.length,
           preservedStartDate: true,
+          commercialPreparationOnly,
+          priorCommercialState: {
+            soldHours: Number(project.soldHours),
+            usedHours: Number(project.usedHours),
+            startDate: project.startDate?.toISOString?.().slice(0, 10) ?? null,
+            preexistingTeamIds: existingTeams.map((team) => team.teamId),
+            commercialHourEntries: existingHours.length,
+          },
           source: draft.aiPoc?.source ?? 'manual',
         },
       }).returning();
@@ -1023,6 +1163,20 @@ export class DrizzleQuotationRepository implements QuotationRepository {
         currentRow.aiReviewStatus === 'accepted' &&
         (JSON.stringify(savedDraft.teams) !== JSON.stringify(draft.teams) ||
          JSON.stringify(savedDraft.phases) !== JSON.stringify(draft.phases) ||
+         JSON.stringify(savedDraft.edtHourAdjustments ?? []) !==
+           JSON.stringify(draft.edtHourAdjustments ?? []) ||
+         JSON.stringify(savedDraft.edtTaskSettings ?? []) !==
+           JSON.stringify(draft.edtTaskSettings ?? []) ||
+         JSON.stringify(savedDraft.edtStageSettings ?? []) !==
+           JSON.stringify(draft.edtStageSettings ?? []) ||
+         JSON.stringify(savedDraft.edtRoleCollaborators ?? []) !==
+           JSON.stringify(draft.edtRoleCollaborators ?? []) ||
+         JSON.stringify(savedDraft.edtCommercialStages ?? []) !==
+           JSON.stringify(draft.edtCommercialStages ?? []) ||
+         JSON.stringify(savedDraft.edtCommercialTasks ?? []) !==
+           JSON.stringify(draft.edtCommercialTasks ?? []) ||
+         JSON.stringify(savedDraft.edtTaskNames ?? []) !==
+           JSON.stringify(draft.edtTaskNames ?? []) ||
          savedDraft.analysisProjectionStatus !== draft.analysisProjectionStatus));
       const totals = calculateQuotation(draft, input.hourlyRate, input.tax);
       const teamIds = draft.teams.map((team) => team.teamId);

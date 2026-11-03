@@ -7,7 +7,7 @@ import { estimationQuestionSchema } from '@kora/contracts';
 import { AiQuotationWizardModal } from './AiQuotationWizardModal';
 
 const mocks = vi.hoisted(() => ({
-  analyze: vi.fn(), generate: vi.fn(), onClose: vi.fn(),
+  analyze: vi.fn(), generate: vi.fn(), onClose: vi.fn(), toastError: vi.fn(),
 }));
 const project = {
   id: '0777e456-fd76-445e-83f1-afc25061c101',
@@ -63,6 +63,9 @@ const analysisResult = {
   dynamicQuestions,
 };
 
+vi.mock('@/shared/components/ui/Toast', () => ({
+  useToast: () => ({ error: mocks.toastError }),
+}));
 vi.mock('@/shared/components/ui/Modal', () => ({
   Modal: ({ title, children, footer }: {
     title: string; children: ReactNode; footer?: ReactNode;
@@ -111,6 +114,7 @@ beforeEach(() => {
     id: '0777e456-fd76-445e-83f1-afc25061c109',
   });
   mocks.onClose.mockClear();
+  mocks.toastError.mockReset();
 });
 
 async function analyzeAndConfirm() {
@@ -168,7 +172,8 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
     // No avanza hasta completar F01-F04, pero F05 es opcional.
     fireEvent.click(screen.getByRole('button', { name: 'Continuar' }));
     expect(screen.getByText('Condiciones de la estimación')).toBeInTheDocument();
-    expect(screen.getByText('Completa todas las respuestas obligatorias de esta etapa.')).toBeInTheDocument();
+    expect(screen.getByText('Completa la pregunta obligatoria: ¿Plazo?')).toBeInTheDocument();
+    expect(mocks.toastError).toHaveBeenCalledWith('Completa la pregunta obligatoria: ¿Plazo?');
     answerFixed();
     expect(screen.getByLabelText('UAT')).not.toBeChecked();
     expect(screen.getByLabelText('Ninguna')).toBeChecked();

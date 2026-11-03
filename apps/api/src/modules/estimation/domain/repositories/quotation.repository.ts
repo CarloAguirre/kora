@@ -15,6 +15,8 @@ export interface QuotationRepository {
   getByProjectId(projectId: string): Promise<ProjectQuotation | null>;
   getOperationalSnapshot(projectId: string): Promise<QuotationOperationalSnapshot | null>;
   getTeamCatalogForQuotation(teamIds: readonly string[]): Promise<QuotationTeamCatalogEntry[]>;
+  /** Catálogo íntegro y ACTIVO para que Gemini no invente equipos. */
+  listActiveQuotationTeams(): Promise<QuotationTeamCatalogEntry[]>;
   listReconciliationReviews(projectId: string, versionId: string): Promise<SavedQuotationReconciliationReview[]>;
   appendReconciliationReview(
     projectId: string, versionId: string, actorId: string,
@@ -29,8 +31,9 @@ export interface QuotationRepository {
   createAiPocDraft(projectId: string, userId: string,
     proposal: EstimationPocProposal, answers: readonly SubmitEstimationAnswerInput[],
     dynamicQuestions: readonly EstimationQuestion[], edt: QuotationReferenceEdt,
-    confirmedUnderstanding?: string): Promise<QuotationVersion>;
+    confirmedUnderstanding?: string, roleTeamIds?: Readonly<Record<string, string>>): Promise<QuotationVersion>;
   updateDraft(projectId: string, versionId: string, userId: string, input: UpdateQuotationDraftInput): Promise<QuotationVersion | null>;
+  deleteVersion(projectId: string, versionId: string, revision: number): Promise<boolean>;
   acceptAiProposal(projectId: string, versionId: string, userId: string,
     input: QuotationRevisionActionInput): Promise<QuotationVersion>;
   markSent(projectId: string, versionId: string, userId: string,

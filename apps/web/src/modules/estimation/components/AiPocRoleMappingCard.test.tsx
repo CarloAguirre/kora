@@ -67,6 +67,32 @@ describe('AiPocRoleMappingCard · sistema de diseño Kora', () => {
     expect(draft.aiPoc.proposal.totalHours).toBe(60);
   });
 
+  it('sugiere equipos reales sin guardarlos ni aplicarlos hasta confirmación explícita', () => {
+    const onApply = vi.fn();
+    const realTeams = [
+      { id: teamId, name: 'Desarrollo' },
+      { id: '0777e456-fd76-445e-83f1-afc25061c106', name: 'QA' },
+    ];
+    render(<AiPocRoleMappingCard
+      version={version} teams={realTeams} canEdit hasUnsavedChanges={false}
+      onApply={onApply}/>);
+    expect(screen.getByText('Sugerencia: Desarrollo · confirmar en el selector'))
+      .toBeInTheDocument();
+    expect(screen.getByText('Sugerencia: QA · confirmar en el selector'))
+      .toBeInTheDocument();
+    expect(screen.getByLabelText('Equipo para Desarrollo')).toHaveValue('');
+    expect(screen.getByRole('button', { name: 'Aplicar distribución de HH' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Completar sugerencias' }));
+    expect(onApply).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Equipo para Desarrollo')).toHaveValue(teamId);
+    expect(screen.getByLabelText('Equipo para QA')).toHaveValue(realTeams[1]!.id);
+    fireEvent.click(screen.getByRole('button', { name: 'Aplicar distribución de HH' }));
+    expect(onApply).toHaveBeenCalledOnce();
+    expect(onApply.mock.calls[0]![0].aiPoc.roleTeamIds).toEqual({
+      Desarrollo: teamId, QA: realTeams[1]!.id,
+    });
+  });
+
   it('no permite cambios con formulario sucio ni en versión de consulta', () => {
     const onApply = vi.fn();
     const view = render(<AiPocRoleMappingCard

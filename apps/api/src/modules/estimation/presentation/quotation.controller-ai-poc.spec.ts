@@ -6,6 +6,8 @@ import { GetEstimationQuestionnaireDefinitionUseCase } from '../application/use-
 
 const projectId = '0777e456-fd76-445e-83f1-afc25061c101';
 const at = 'https://drive.google.com/drive/folders/kora-poc-fallback';
+const teamId = '0777e456-fd76-445e-83f1-afc25061c103';
+const catalog = [{ teamId, name: 'Desarrollo', isActive: true }];
 const actor = { id: '0777e456-fd76-445e-83f1-afc25061c104',
   permissions: ['projects:manage'] };
 const input = {
@@ -23,7 +25,7 @@ const proposal = estimationPocProposalSchema.parse({
   projectId, provider: 'gemini', sourceMode: 'poc_simulated',
   documentsAnalyzed: 1, summary: 'Resumen KDM',
   roles: [{
-    role: 'Desarrollo', unit: 'week', duration: 1, hoursPerUnit: 40,
+    role: 'Desarrollo', teamId, unit: 'week', duration: 1, hoursPerUnit: 40,
     people: 1, totalHours: 40, source: 'Requerimiento_KDM.pdf',
   }],
   totalHours: 40, assumptions: [], clarifyingQuestions: [],
@@ -40,6 +42,7 @@ const edt = quotationReferenceEdtSchema.parse({
 function setup() {
   const drafts = {
     authorizeAiPoc: vi.fn().mockResolvedValue(undefined),
+    listActiveQuotationTeams: vi.fn().mockResolvedValue(catalog),
     createAiPocDraft: vi.fn().mockResolvedValue({
       id: '0777e456-fd76-445e-83f1-afc25061c107',
       origin: 'ai', status: 'draft', aiReviewStatus: 'pending',
@@ -57,12 +60,13 @@ describe('POST versions/ai-poc · Gemini con KDM', () => {
   it('crea una versión real solo después de autorización, cuestionario y Gemini', async () => {
     const { controller, drafts, generator } = setup();
     const result = await controller.createAiPoc(projectId, input, actor as never);
-    expect(drafts.authorizeAiPoc).toHaveBeenCalledWith(projectId, actor);
-    expect(generator.execute).toHaveBeenCalledWith(input);
-    expect(generator.generateEdt).toHaveBeenCalledWith(input, proposal);
+    expect(drafts.listActiveQuotationTeams).toHaveBeenCalledWith(projectId, actor);
+    expect(generator.execute).toHaveBeenCalledWith(input, catalog);
+    expect(generator.generateEdt).toHaveBeenCalledWith(input, proposal, catalog);
     expect(generator.reconcileProposalWithEdt).toHaveBeenCalledWith(proposal, edt);
     expect(drafts.createAiPocDraft).toHaveBeenCalledWith(
-      projectId, actor, proposal, input.answers, input.dynamicQuestions, edt, undefined,
+      projectId, actor, proposal, input.answers, input.dynamicQuestions, edt,
+      undefined, { Desarrollo: teamId },
     );
     expect(result).toMatchObject({
       origin: 'ai', status: 'draft', aiReviewStatus: 'pending',
@@ -75,11 +79,11 @@ describe('POST versions/ai-poc · Gemini con KDM', () => {
       'El usuario confirmó portal web con integración SAP opcional y sin app nativa.';
     const enriched = { ...input, confirmedUnderstanding };
     await controller.createAiPoc(projectId, enriched, actor as never);
-    expect(generator.execute).toHaveBeenCalledWith(enriched);
-    expect(generator.generateEdt).toHaveBeenCalledWith(enriched, proposal);
+    expect(generator.execute).toHaveBeenCalledWith(enriched, catalog);
+    expect(generator.generateEdt).toHaveBeenCalledWith(enriched, proposal, catalog);
     expect(drafts.createAiPocDraft).toHaveBeenCalledWith(
       projectId, actor, proposal, input.answers, input.dynamicQuestions,
-      edt, confirmedUnderstanding,
+      edt, confirmedUnderstanding, { Desarrollo: teamId },
     );
   });
 
@@ -107,6 +111,24 @@ describe('POST versions/ai-poc · Gemini con KDM', () => {
       .rejects.toBeInstanceOf(BadRequestException);
     expect(drafts.createAiPocDraft).not.toHaveBeenCalled();
     expect(generator.generateEdt).not.toHaveBeenCalled();
+  });
+
+  it('no crea una versión si Gemini propone un equipo inexistente', async () => {
+    const { controller, drafts, generator } = setup();
+    generator.execute.mockResolvedValueOnce({
+      ...proposal, roles: [{ ...proposal.roles[0], teamId: actor.id }],
+    });
+    await expect(controller.createAiPoc(projectId, input, actor as never))
+      .rejects.toBeInstanceOf(BadRequestException);
+    expect(drafts.createAiPocDraft).not.toHaveBeenCalled();
+  });
+
+  it('no consume Gemini si Kora no tiene equipos activos', async () => {
+    const { controller, drafts, generator } = setup();
+    drafts.listActiveQuotationTeams.mockResolvedValueOnce([]);
+    await expect(controller.createAiPoc(projectId, input, actor as never))
+      .rejects.toBeInstanceOf(BadRequestException);
+    expect(generator.execute).not.toHaveBeenCalled();
   });
 
   it('rechaza preguntas dinámicas que no documenten su origen KDM', async () => {

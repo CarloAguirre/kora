@@ -285,6 +285,8 @@ export type GenerateAiDemoQuotationInput = z.infer<typeof generateAiDemoQuotatio
 
 export const estimationPocRoleDraftSchema = z.object({
   role: nonEmptyTrimmed(120, 'El rol'),
+  /** Equipo real propuesto por Gemini desde el catálogo Kora del servidor. */
+  teamId: uuidSchema.optional(),
   unit: estimationPocRoleUnitSchema,
   duration: z.number().min(0),
   hoursPerUnit: z.number().min(0),

@@ -54,8 +54,8 @@ export function buildQuotationTransferPreview(
   }
 
   const findings: QuotationTransferPreview['findings'] = [
-    { code: 'R3_NOT_IMPLEMENTED', severity: 'blocker',
-      message: 'El traspaso a ejecución no está habilitado. Deben resolverse D04–D06 y validarse el flujo transaccional.' },
+    { code: 'TRANSFER_PREVIEW_NOT_AUTHORIZATION', severity: 'review',
+      message: 'Esta comparación no autoriza el traspaso. Kora admite la aplicación inicial a proyectos sin ejecución; las recotizaciones con historial requieren conciliación explícita.' },
   ];
   if (version.status !== 'approved') findings.push({
     code: 'VERSION_NOT_APPROVED', severity: 'blocker',

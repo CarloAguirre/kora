@@ -9,6 +9,7 @@ import type {
 import { projectQuotationPath } from '@/app/router/paths';
 import { Button } from '@/shared/components/ui/Button';
 import { Modal } from '@/shared/components/ui/Modal';
+import { useToast } from '@/shared/components/ui/Toast';
 import { TextField } from '@/shared/components/ui/TextField';
 import {
   useAnalyzeEstimationPoc,
@@ -214,7 +215,10 @@ export function AiQuotationWizardModal({ project, onClose }: {
   const [answers, setAnswers] = useState<AnswerState>({});
   const [assumptions, setAssumptions] = useState<string[]>([]);
   const [error, setError] = useState('');
+  const toast = useToast();
+  const reportError = (message: string) => { setError(message); toast.error(message); };
   const [invalidId, setInvalidId] = useState<string | null>(null);
+  const [analysisCompleted, setAnalysisCompleted] = useState(false);
   const questionnaire = useEstimationQuestionnaireDefinition();
   const analysis = useAnalyzeEstimationPoc();
   const generate = useGenerateAiDemoQuotationVersion(project.id);
@@ -265,6 +269,7 @@ export function AiQuotationWizardModal({ project, onClose }: {
       }));
 
   const analyze = async () => {
+    setAnalysisCompleted(false);
     setError('');
     setInvalidId(null);
     try {
@@ -277,7 +282,7 @@ export function AiQuotationWizardModal({ project, onClose }: {
       });
       if (result.provider !== 'gemini' || result.sourceMode !== 'poc_simulated' ||
           result.documentsAnalyzed < 1) {
-        setError('No se obtuvo un análisis real de Gemini sobre el documento KDM.');
+        reportError('No se obtuvo un análisis real de Gemini sobre el documento KDM.');
         return;
       }
       setUnderstanding(result.summary);
@@ -299,22 +304,27 @@ export function AiQuotationWizardModal({ project, onClose }: {
       }
       setAnswers(prefilled);
       setAssumptions([]);
+      setAnalysisCompleted(true);
       setStage(1);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'No se pudo analizar el documento KDM.');
+      reportError(reason instanceof Error ? reason.message : 'No se pudo analizar el documento KDM.');
     }
   };
 
   const next = async () => {
     setError('');
     if (stage === 0) {
-      if (questionnaire.isLoading || questionnaire.isError) return;
+      if (questionnaire.isLoading) return;
+      if (questionnaire.isError) {
+        reportError('No fue posible cargar las preguntas fijas. Comprueba tu acceso al cuestionario y vuelve a intentarlo.');
+        return;
+      }
       await analyze();
       return;
     }
     if (stage === 1) {
       if (understanding.trim().length < 20) {
-        setError('Revisa el entendimiento; debe contener al menos 20 caracteres.');
+        reportError('Revisa el entendimiento; debe contener al menos 20 caracteres.');
         return;
       }
       setStage(2);
@@ -324,7 +334,7 @@ export function AiQuotationWizardModal({ project, onClose }: {
       const missing = relevant.find((question) => question.required && !answered(question));
       if (missing) {
         setInvalidId(missing.id);
-        setError('Completa todas las respuestas obligatorias de esta etapa.');
+        reportError('Completa la pregunta obligatoria: ' + missing.question);
         return;
       }
       setInvalidId(null);
@@ -344,9 +354,9 @@ export function AiQuotationWizardModal({ project, onClose }: {
         answers: collectAnswers(),
       });
       onClose();
-      navigate(projectQuotationPath(project) + '?version=' + created.id + '&map-ai=1');
+      navigate(projectQuotationPath(project) + '?version=' + created.id);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message :
+      reportError(reason instanceof Error ? reason.message :
         'No se pudo generar y guardar la cotización.');
     }
   };
@@ -371,7 +381,7 @@ export function AiQuotationWizardModal({ project, onClose }: {
             stage === 1 ? editingUnderstanding ? 'Guardar resumen' : 'Editar' : 'Atrás'}
         </Button>
         <Button className={styles.primaryAction} loading={working} disabled={
-          (stage === 0 && (questionnaire.isLoading || questionnaire.isError)) ||
+          (stage === 0 && questionnaire.isLoading) ||
           (stage > 0 && !verifiedAnalysis)
         } onClick={() => void next()}>
           {stage === 0 ? 'Analizar proyecto' : stage === 1 ? 'Está correcto' :
@@ -414,9 +424,14 @@ export function AiQuotationWizardModal({ project, onClose }: {
               onChange={(event) => setInstructions(event.target.value)}
               placeholder="Ej. Considerar integración SAP, excluir soporte de postproducción..." />
           </details>
-          {analysis.isPending && <p role="status" className={styles.progress}>
-            Gemini está analizando el documento y preparando el entendimiento inicial.
-          </p>}
+          {analysis.isPending && (
+            <ol role="status" aria-label="Progreso verificable del análisis IA" className={styles.analysisMilestones}>
+              <li className={styles.milestoneDone}>✓ Documento KDM seleccionado para su lectura</li>
+              <li className={styles.milestoneDone}>✓ Identificación y datos del proyecto preparados</li>
+              <li className={styles.milestoneActive}>◌ Gemini está analizando los documentos y detectando incertidumbres…</li>
+              <li className={styles.milestonePending}>○ Validar resultados y presentar preguntas</li>
+            </ol>
+          )}
           {questionnaire.isLoading && <p>Cargando condiciones de estimación…</p>}
           {questionnaire.isError && <p role="alert">No fue posible cargar las preguntas fijas.</p>}
         </section>
@@ -428,6 +443,9 @@ export function AiQuotationWizardModal({ project, onClose }: {
           <p className={styles.intro}>
             Confirma que el agente entendió bien el proyecto. Si algo no calza, corrígelo en bloque.
           </p>
+          {analysisCompleted && <p role="status" className={styles.analysisComplete}>
+            ✓ Gemini completó el análisis; el resultado fue validado y sus preguntas están disponibles.
+          </p>}
           {editingUnderstanding ? (
             <>
               <label className={styles.textLabel} htmlFor="kora-understanding">

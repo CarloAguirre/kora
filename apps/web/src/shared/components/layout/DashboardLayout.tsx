@@ -13,9 +13,11 @@ import { TopBar } from './TopBar';
 export interface DashboardLayoutProps {
   title: string;
   children: ReactNode;
+  /** Solo páginas con barra lateral sticky y desplazamiento del contenido. */
+  containedScroll?: boolean;
 }
 
-export function DashboardLayout({ title, children }: DashboardLayoutProps) {
+export function DashboardLayout({ title, children, containedScroll = false }: DashboardLayoutProps) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
@@ -30,7 +32,7 @@ export function DashboardLayout({ title, children }: DashboardLayoutProps) {
         />
       )}
 
-      <div className={styles.main}>
+      <div className={[styles.main, containedScroll ? styles.containedScroll : ''].filter(Boolean).join(' ')}>
         <TopBar title={title} onMenuToggle={() => setMenuOpen((open) => !open)} />
         <main className={styles.content}>{children}</main>
       </div>

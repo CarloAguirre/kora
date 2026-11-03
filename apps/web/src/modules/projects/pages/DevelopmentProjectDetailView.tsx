@@ -359,6 +359,7 @@ export function DevelopmentProjectDetailView({
                   project={project}
                   teams={teamSummaries}
                   onViewHours={() => setTab("bitacora")}
+                  onManageTeams={canManageProject ? onEdit : undefined}
                   canOpenTeam={readOnlyTeamIds ? (teamId) => readOnlyTeamIds.has(teamId) : undefined}
                 />
               </div>

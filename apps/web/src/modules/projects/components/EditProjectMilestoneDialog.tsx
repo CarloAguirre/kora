@@ -25,6 +25,7 @@ interface Draft {
   sortOrder: string;
   triggerType: ProjectPaymentTrigger;
   triggerPhase: ProjectPhase | '';
+  triggerModuleId: string | null;
   triggerDate: string;
   status: ProjectPaymentStatus;
   invoiceNumber: string;
@@ -41,6 +42,7 @@ function toDraft(milestone: ProjectPaymentMilestone): Draft {
     sortOrder: String(milestone.sortOrder),
     triggerType: milestone.triggerType,
     triggerPhase: milestone.triggerPhase ?? '',
+    triggerModuleId: milestone.triggerModuleId ?? null,
     triggerDate: milestone.triggerDate ?? '',
     status: milestone.status,
     invoiceNumber: milestone.invoiceNumber ?? '',
@@ -89,7 +91,7 @@ export function EditProjectMilestoneDialog({ milestone, currency = 'UF', onClose
       setError('Ingresa al menos el nombre y el monto del tramo.');
       return;
     }
-    if (draft.triggerType === 'phase' && !draft.triggerPhase) {
+    if (draft.triggerType === 'phase' && !draft.triggerPhase && !draft.triggerModuleId) {
       setError('Selecciona la fase que activa el tramo.');
       return;
     }
@@ -115,7 +117,9 @@ export function EditProjectMilestoneDialog({ milestone, currency = 'UF', onClose
         amount: Number(draft.amount),
         sortOrder: draft.sortOrder === '' ? undefined : Number(draft.sortOrder),
         triggerType: draft.triggerType,
-        triggerPhase: draft.triggerType === 'phase' ? (draft.triggerPhase as ProjectPhase) : null,
+        triggerPhase: draft.triggerType === 'phase' && draft.triggerPhase ? draft.triggerPhase : null,
+        triggerModuleId: draft.triggerType === 'phase' && !draft.triggerPhase
+          ? draft.triggerModuleId : null,
         triggerDate: draft.triggerType === 'date' ? draft.triggerDate : null,
         // Sin cambio de estado, no se manda: el backend lo recalcula según el hito.
         ...(draft.status !== milestone.status ? { status: draft.status } : {}),
@@ -162,6 +166,10 @@ export function EditProjectMilestoneDialog({ milestone, currency = 'UF', onClose
             onChange={(e) => set('percent', e.target.value)}
           />
           <TextField label={`Monto (${currency})`} type="number" min={0} value={draft.amount} onChange={(e) => set('amount', e.target.value)} />
+          {draft.triggerType === 'phase' && draft.triggerModuleId && !draft.triggerPhase && (
+            <p role="status">Este hito está vinculado a un módulo comercial de la cotización.
+              El vínculo se conservará mientras no selecciones otra fase operativa.</p>
+          )}
           <PaymentTriggerFields
             triggerType={draft.triggerType}
             triggerPhase={draft.triggerPhase}

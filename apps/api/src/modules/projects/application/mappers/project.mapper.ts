@@ -213,6 +213,7 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
     sortOrder: milestone.sortOrder,
     triggerType: milestone.triggerType,
     triggerPhase: milestone.triggerPhase,
+    triggerModuleId: milestone.triggerModuleId,
     triggerDate: milestone.triggerDate?.toISOString().slice(0, 10) ?? null,
   }));
 

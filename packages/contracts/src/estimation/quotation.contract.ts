@@ -86,6 +86,53 @@ export const quotationDraftDataSchema = z.object({
   mode: z.enum(['team', 'phases']).default('team'),
   teams: z.array(quotationTeamDraftSchema).max(100).default([]),
   phases: z.array(quotationPhaseDraftSchema).max(100).default([]),
+  /**
+   * HH manuales por WBS y perfil. La EDT original en aiPoc.edt es inmutable;
+   * esta lista representa solo diferencias revisables del borrador.
+   */
+  edtHourAdjustments: z.array(z.object({
+    wbs: z.string().trim().min(1).max(40),
+    role: z.string().trim().min(1).max(120),
+    hours: z.number().positive().max(1000000),
+  })).max(240).optional(),
+  /** Configuración comercial por asignación WBS×perfil, sin modificar Gemini. */
+  edtTaskSettings: z.array(z.object({
+    wbs: z.string().trim().min(1).max(40),
+    role: z.string().trim().min(1).max(120),
+    teamId: uuidSchema.optional(),
+    fixed: z.boolean().optional(),
+  })).max(240).optional(),
+  /** Dotación estimada antes de asociar el perfil IA a un equipo Kora. */
+  edtRoleCollaborators: z.array(z.object({
+    role: z.string().trim().min(1).max(120),
+    collaborators: z.number().int().min(1).max(100),
+  })).max(100).optional(),
+  /** Capas comerciales añadidas por el usuario. Nunca se mezclan con aiPoc.edt. */
+  edtCommercialStages: z.array(z.object({
+    code: z.string().regex(/^KS-[a-f0-9-]{36}$/),
+    name: nonEmptyTrimmed(300, 'El nombre de la fase'),
+    startWeek: z.number().int().min(1).max(520),
+    durationWeeks: z.number().int().min(1).max(520),
+  })).max(100).optional(),
+  edtCommercialTasks: z.array(z.object({
+    wbs: z.string().regex(/^KT-[a-f0-9-]{36}$/),
+    stageCode: z.string().trim().min(1).max(40),
+    name: nonEmptyTrimmed(300, 'El nombre de la tarea'),
+    teamId: uuidSchema,
+    hours: z.number().positive().max(1000000),
+    fixed: z.boolean().default(false),
+  })).max(240).optional(),
+  edtTaskNames: z.array(z.object({
+    wbs: z.string().trim().min(1).max(40),
+    name: nonEmptyTrimmed(300, 'El nombre de la tarea'),
+  })).max(240).optional(),
+  /** Fechas relativas y nombre comercial del tramo, sin mutar las etapas Gemini. */
+  edtStageSettings: z.array(z.object({
+    stageCode: z.string().trim().min(1).max(40),
+    name: nonEmptyTrimmed(300, 'El nombre del módulo'),
+    startWeek: z.number().int().min(1).max(520),
+    durationWeeks: z.number().int().min(1).max(520),
+  })).max(100).optional(),
   costs: z.array(quotationExternalCostSchema).max(100).default([]),
   paymentPlan: z.array(quotationPaymentItemSchema).max(100).default([]),
   assumptions: z.array(z.string().trim().max(2000)).max(100).default([]),

@@ -17,7 +17,9 @@ import {
   type ListEstimationDriveFilesInput,
   type ResolveEstimationDriveFolderInput,
 } from '@kora/contracts';
-import { RequirePermissions } from '../../../shared/presentation/decorators/require-permissions.decorator';
+import { CurrentUser, type RequestUser } from '../../../shared/presentation/decorators/current-user.decorator';
+import { RequireAnyPermission, RequirePermissions } from '../../../shared/presentation/decorators/require-permissions.decorator';
+import { ManageQuotationDraftsUseCase } from '../application/use-cases/manage-quotation-drafts.use-case';
 import { ZodValidationPipe } from '../../../shared/presentation/pipes/zod-validation.pipe';
 import { AnalyzeEstimationPocUseCase } from '../application/use-cases/analyze-estimation-poc.use-case';
 import { GenerateEstimationPocProposalUseCase } from '../application/use-cases/generate-estimation-poc-proposal.use-case';
@@ -36,20 +38,23 @@ export class EstimationController {
     private readonly listDriveFiles: ListEstimationDriveFilesUseCase,
     private readonly resolveDriveFolder: ResolveEstimationDriveFolderUseCase,
     private readonly inventoryDrive: InventoryEstimationDriveUseCase,
+    private readonly quotationDrafts: ManageQuotationDraftsUseCase,
   ) {}
 
   @Get('questionnaire-definition')
-  @RequirePermissions('projects:manage')
+  @RequireAnyPermission('projects:manage', 'projects:read_assigned')
   definition(): EstimationQuestionnaireDefinition {
     return this.getQuestionnaireDefinition.execute();
   }
 
   @Post('drive/resolve')
-  @RequirePermissions('projects:manage')
-  driveResolve(
+  @RequireAnyPermission('projects:manage', 'projects:read_assigned')
+  async driveResolve(
     @Body(new ZodValidationPipe(resolveEstimationDriveFolderSchema))
     input: ResolveEstimationDriveFolderInput,
+    @CurrentUser() actor: RequestUser,
   ): Promise<EstimationDriveFolderResolution> {
+    await this.quotationDrafts.authorizeAiPoc(input.projectId, actor);
     return this.resolveDriveFolder.execute(input);
   }
 
@@ -72,10 +77,12 @@ export class EstimationController {
   }
 
   @Post('poc/analyze')
-  @RequirePermissions('projects:manage')
-  analyze(
+  @RequireAnyPermission('projects:manage', 'projects:read_assigned')
+  async analyze(
     @Body(new ZodValidationPipe(analyzeEstimationPocSchema)) input: AnalyzeEstimationPocInput,
+    @CurrentUser() actor: RequestUser,
   ): Promise<EstimationPocAnalysis> {
+    await this.quotationDrafts.authorizeAiPoc(input.projectId, actor);
     return this.analyzePoc.execute(input);
   }
 
@@ -85,10 +92,12 @@ export class EstimationController {
    * pantalla no permite enviar answers=[] ni IDs no definidos.
    */
   @Post('poc/proposal-answered')
-  @RequirePermissions('projects:manage')
-  proposalAnswered(
+  @RequireAnyPermission('projects:manage', 'projects:read_assigned')
+  async proposalAnswered(
     @Body(new ZodValidationPipe(generateEstimationPocSchema)) input: GenerateEstimationPocInput,
+    @CurrentUser() actor: RequestUser,
   ): Promise<EstimationPocProposal> {
+    await this.quotationDrafts.authorizeAiPoc(input.projectId, actor);
     validateFixedQuestionnaireAnswers(this.getQuestionnaireDefinition.execute(), input.answers);
     return this.generatePocProposal.execute(input);
   }
@@ -98,10 +107,12 @@ export class EstimationController {
    * respuestas del cuestionario. Las HH se calculan determinísticamente.
    */
   @Post('poc/proposal')
-  @RequirePermissions('projects:manage')
-  proposal(
+  @RequireAnyPermission('projects:manage', 'projects:read_assigned')
+  async proposal(
     @Body(new ZodValidationPipe(generateEstimationPocSchema)) input: GenerateEstimationPocInput,
+    @CurrentUser() actor: RequestUser,
   ): Promise<EstimationPocProposal> {
+    await this.quotationDrafts.authorizeAiPoc(input.projectId, actor);
     return this.generatePocProposal.execute(input);
   }
 }
