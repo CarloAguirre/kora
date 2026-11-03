@@ -254,18 +254,25 @@ export class ManageQuotationDraftsUseCase {
     await this.authorize(projectId, actor, true);
   }
 
+  /** Consultar el catálogo solo DESPUÉS de autorizar el proyecto. */
+  async listActiveQuotationTeams(projectId: string, actor: QuotationActor): Promise<QuotationTeamCatalogEntry[]> {
+    await this.authorizeAiPoc(projectId, actor);
+    return this.repository.listActiveQuotationTeams();
+  }
+
   async createAiPocDraft(
     projectId: string, actor: QuotationActor, proposal: EstimationPocProposal,
     answers: readonly SubmitEstimationAnswerInput[],
     dynamicQuestions: readonly EstimationQuestion[], edt: QuotationReferenceEdt,
     confirmedUnderstanding?: string,
+    roleTeamIds?: Readonly<Record<string, string>>,
   ): Promise<QuotationVersion> {
     await this.authorizeAiPoc(projectId, actor);
     if (proposal.projectId !== projectId || proposal.provider !== 'gemini' ||
         proposal.sourceMode !== 'poc_simulated') {
       throw new BadRequestException('El proyecto y el origen de la propuesta IA no coinciden.');
     }
-    return this.repository.createAiPocDraft(projectId, actor.id, proposal, answers, dynamicQuestions, edt, confirmedUnderstanding);
+    return this.repository.createAiPocDraft(projectId, actor.id, proposal, answers, dynamicQuestions, edt, confirmedUnderstanding, roleTeamIds);
   }
 
   /** Aceptación del baseline técnico KDM: NO es aprobación del cliente ni
