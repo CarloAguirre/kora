@@ -69,6 +69,7 @@ function renderEditor(custom = draft) {
     phases={custom.phases} teams={custom.teams} edt={edt}
     draft={custom} teamNames={teams} roleTeamIds={custom.aiPoc?.roleTeamIds}
     activeTeams={[{ id: dev, name: 'Desarrollo' }, { id: qa, name: 'QA' }]}
+    taskTypes={['Sin tipo', 'Integración con API', 'Pruebas funcionales'].map((name, i) => ({ id: String(i), name }))}
     editable commercialMode={custom.mode}
     {...callbacks}/>);
 }
