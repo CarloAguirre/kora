@@ -33,6 +33,7 @@ export interface QuotationRepository {
     dynamicQuestions: readonly EstimationQuestion[], edt: QuotationReferenceEdt,
     confirmedUnderstanding?: string, roleTeamIds?: Readonly<Record<string, string>>): Promise<QuotationVersion>;
   updateDraft(projectId: string, versionId: string, userId: string, input: UpdateQuotationDraftInput): Promise<QuotationVersion | null>;
+  deleteVersion(projectId: string, versionId: string, revision: number): Promise<boolean>;
   acceptAiProposal(projectId: string, versionId: string, userId: string,
     input: QuotationRevisionActionInput): Promise<QuotationVersion>;
   markSent(projectId: string, versionId: string, userId: string,
