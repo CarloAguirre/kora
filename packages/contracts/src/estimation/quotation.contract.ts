@@ -86,6 +86,15 @@ export const quotationDraftDataSchema = z.object({
   mode: z.enum(['team', 'phases']).default('team'),
   teams: z.array(quotationTeamDraftSchema).max(100).default([]),
   phases: z.array(quotationPhaseDraftSchema).max(100).default([]),
+  /**
+   * HH manuales por WBS y perfil. La EDT original en aiPoc.edt es inmutable;
+   * esta lista representa solo diferencias revisables del borrador.
+   */
+  edtHourAdjustments: z.array(z.object({
+    wbs: z.string().trim().min(1).max(40),
+    role: z.string().trim().min(1).max(120),
+    hours: z.number().positive().max(1000000),
+  })).max(240).default([]),
   costs: z.array(quotationExternalCostSchema).max(100).default([]),
   paymentPlan: z.array(quotationPaymentItemSchema).max(100).default([]),
   assumptions: z.array(z.string().trim().max(2000)).max(100).default([]),
