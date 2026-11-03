@@ -6,7 +6,7 @@ import {
   withQuotationTaskSetting, withQuotationEdtStageSetting,
   withQuotationCommercialStage, withQuotationCommercialTask,
   patchQuotationCommercialTask, withoutQuotationCommercialTask,
-  withQuotationTaskDisplayName, withQuotationTaskCatalogType,
+  withQuotationTaskDisplayName,
 } from './quotation-edt-task-planning';
 import {
   projectPocRolesToQuotationDraft, reconcilePocCommercialDraft,
@@ -202,7 +202,7 @@ describe('EDT comercial: equipos, tareas Fija y redistribución por centésimos'
     const task = {
       wbs: 'KT-0777e456-fd76-445e-83f1-afc25061c105',
       stageCode: addedStage.code, name: 'Informe ejecutivo',
-      teamId: qa, hours: 12, classification: 'Reportería', fixed: false,
+      teamId: qa, hours: 12, fixed: false,
     };
     const withStage = withQuotationCommercialStage(mapped, addedStage);
     const withTask = withQuotationCommercialTask(withStage, task);
@@ -216,13 +216,10 @@ describe('EDT comercial: equipos, tareas Fija y redistribución por centésimos'
     expect(() => validatePocDraftIntegrity(mapped, next)).not.toThrow();
 
     const renamed = withQuotationTaskDisplayName(next, 'T01.01', 'API revisada');
-    const classified = withQuotationTaskCatalogType(renamed, 'T01.01', 'Integración con API');
-    expect(quotationEdtAssignments(classified).find((row) =>
+    expect(quotationEdtAssignments(renamed).find((row) =>
       row.wbs === 'T01.01')?.name).toBe('API revisada');
-    expect(quotationEdtAssignments(classified).find((row) =>
-      row.wbs === 'T01.01')?.classification).toBe('Integración con API');
-    expect(classified.aiPoc?.edt).toEqual(unchangedEvidence);
-    expect(() => validatePocDraftIntegrity(next, reconcilePocCommercialDraft(classified)))
+    expect(renamed.aiPoc?.edt).toEqual(unchangedEvidence);
+    expect(() => validatePocDraftIntegrity(next, reconcilePocCommercialDraft(renamed)))
       .not.toThrow();
   });
 
@@ -231,7 +228,6 @@ describe('EDT comercial: equipos, tareas Fija y redistribución por centésimos'
     const task = {
       wbs: 'KT-0777e456-fd76-445e-83f1-afc25061c105', stageCode: 'T01',
       name: 'Validación extra', teamId: dev, hours: 8, fixed: false,
-      classification: 'Pruebas funcionales',
     };
     const added = withQuotationCommercialTask(mapped, task);
     const adjusted = patchQuotationCommercialTask(added, task.wbs, { hours: 9.5 });
