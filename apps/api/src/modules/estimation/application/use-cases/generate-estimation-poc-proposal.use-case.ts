@@ -9,6 +9,9 @@ import {
   estimationPocProposalSchema,
   type EstimationPocProposal,
 } from '@kora/contracts';
+
+/** IDs y nombres leídos del catálogo activo en PostgreSQL; no son perfiles IA. */
+type KoraActiveTeam = { teamId: string; name: string };
 import {
   AI_PROVIDER,
   type AiProvider,
@@ -199,6 +202,7 @@ export class GenerateEstimationPocProposalUseCase {
   async generateEdt(
     input: EstimationInputWithQuestions,
     proposal: EstimationPocProposal,
+    activeKoraTeams?: readonly KoraActiveTeam[],
   ): Promise<QuotationReferenceEdt> {
     if (this.ai.name !== 'gemini' || proposal.provider !== 'gemini' ||
         proposal.projectId !== input.projectId ||
@@ -225,9 +229,10 @@ export class GenerateEstimationPocProposalUseCase {
         resolvedAnswers: resolveEstimationQuestionnaireContext(input),
         confirmedUnderstanding: 'confirmedUnderstanding' in input ? input.confirmedUnderstanding : null,
         allowedRoles: proposal.roles.map((role) => ({
-          role: role.role, people: role.people,
+          role: role.role, teamId: role.teamId ?? null, people: role.people,
           estimatedDuration: role.duration, unit: role.unit,
         })),
+        ...(activeKoraTeams ? { activeKoraTeams } : {}),
       },
       instructions: [
         'Genera una EDT comercial DETALLADA basada en los documentos KDM y respuestas, siguiendo la estructura de un EDT profesional.',
@@ -506,7 +511,11 @@ export class GenerateEstimationPocProposalUseCase {
 
   async execute(
     input: EstimationInputWithQuestions,
+    activeKoraTeams?: readonly KoraActiveTeam[],
   ): Promise<EstimationPocProposal> {
+    if (activeKoraTeams && activeKoraTeams.length === 0) {
+      throw new BadRequestException('Kora no tiene equipos activos disponibles para estimar.');
+    }
     const documents =
       this.ai.name === 'poc-ai'
         ? []
@@ -526,6 +535,7 @@ export class GenerateEstimationPocProposalUseCase {
           projectName: input.projectName,
           clientName: input.clientName,
           estimationLevel: 'team_roles_only',
+          ...(activeKoraTeams ? { activeKoraTeams } : {}),
           answers: input.answers,
         resolvedAnswers: resolveEstimationQuestionnaireContext(input),
           confirmedUnderstanding: 'confirmedUnderstanding' in input ? input.confirmedUnderstanding : null,
@@ -538,6 +548,13 @@ export class GenerateEstimationPocProposalUseCase {
         },
         instructions: [
           BASE_INSTRUCTIONS,
+          ...(activeKoraTeams ? [
+            'Los únicos equipos permitidos son los de context.activeKoraTeams, leídos del catálogo real de Kora.',
+            'Cada perfil profesional debe indicar teamId, que debe coincidir EXACTAMENTE con un ID del catálogo.',
+            'Puedes proponer varios perfiles profesionales para el mismo equipo, sin crear equipos nuevos.',
+            'No conviertas cargos (Tech Lead, Backend, Project Manager, QA Engineer) en nombres de equipos.',
+            'Si ningún equipo activo es apropiado para un perfil necesario, no inventes un ID; explica la limitación.',
+          ] : []),
           'confirmedUnderstanding' in input && input.confirmedUnderstanding
             ? `Entendimiento corregido y confirmado por el usuario (dar prioridad frente a inferencias del documento):\n${input.confirmedUnderstanding}`
             : '',
@@ -555,9 +572,32 @@ export class GenerateEstimationPocProposalUseCase {
             ? { dataBase64: document.dataBase64 }
             : {}),
         })),
-        responseJsonSchema: TEAM_ESTIMATE_RESPONSE_SCHEMA,
+        responseJsonSchema: activeKoraTeams ? {
+          ...TEAM_ESTIMATE_RESPONSE_SCHEMA,
+          properties: {
+            ...TEAM_ESTIMATE_RESPONSE_SCHEMA.properties,
+            roles: {
+              ...TEAM_ESTIMATE_RESPONSE_SCHEMA.properties.roles,
+              items: {
+                ...TEAM_ESTIMATE_RESPONSE_SCHEMA.properties.roles.items,
+                properties: {
+                  ...TEAM_ESTIMATE_RESPONSE_SCHEMA.properties.roles.items.properties,
+                  teamId: { type: 'STRING', description: 'UUID exacto de context.activeKoraTeams' },
+                },
+                required: [...TEAM_ESTIMATE_RESPONSE_SCHEMA.properties.roles.items.required, 'teamId'],
+              },
+            },
+          },
+        } : TEAM_ESTIMATE_RESPONSE_SCHEMA,
       }),
     );
+    if (activeKoraTeams) {
+      const allowed = new Set(activeKoraTeams.map((team) => team.teamId));
+      const invalid = draft.roles.find((role) => !role.teamId || !allowed.has(role.teamId));
+      if (invalid) {
+        throw new BadRequestException('Gemini propuso un perfil sin equipo activo válido de Kora: ' + invalid.role);
+      }
+    }
 
     // El esquema inicial permite 0 para compatibilidad con la PoC, pero
     // una EDT real exige duración, dedicación y colaboradores positivos.
