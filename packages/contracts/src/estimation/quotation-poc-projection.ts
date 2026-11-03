@@ -1,3 +1,4 @@
+import { effectiveQuotationEdt } from './quotation-edt-adjustments';
 import {
   quotationDraftDataSchema,
   quotationAiPocSnapshotSchema,
@@ -50,7 +51,7 @@ export function projectPocRolesToQuotationDraft(
   if (Object.keys(roleTeamIds).some((role) => !names.has(role))) {
     throw new Error('El mapeo incluye perfiles que no pertenecen a la propuesta original.');
   }
-  const edt = aiPoc.edt;
+  const edt = effectiveQuotationEdt(draft);
   const detailed = edt?.schemaVersion === 'kora.quotation.reference-edt.v2';
   const grouped = new Map<string, { hours: number; maxWeeks: number; collaborators: number }>();
   // Los colaboradores por equipo representan perfiles de capacidad sugeridos
@@ -60,7 +61,12 @@ export function projectPocRolesToQuotationDraft(
     const weeks = Math.max(1, Math.ceil(role.duration / (role.unit === 'day' ? 5 : 1)));
     const current = grouped.get(teamId) ?? { hours: 0, maxWeeks: 1, collaborators: 0 };
     grouped.set(teamId, {
-      hours: current.hours + role.totalHours,
+      hours: current.hours + (edt?.schemaVersion === 'kora.quotation.reference-edt.v2'
+        ? edt.modules.flatMap((module) => module.tasks)
+          .flatMap((task) => task.roleEffort ?? [])
+          .filter((effort) => effort.role === role.role)
+          .reduce((sum, effort) => sum + effort.hours, 0)
+        : role.totalHours),
       maxWeeks: Math.max(weeks, current.maxWeeks),
       collaborators: current.collaborators + role.people,
     });
@@ -127,7 +133,7 @@ export function projectPocRolesToQuotationDraft(
   });
   const calculated = projection.phases.reduce((sum, phase) =>
     sum + phase.teamHours.reduce((acc, item) => acc + item.hours, 0), 0);
-  if (Math.abs(calculated - aiPoc.proposal.totalHours) > 0.011) {
+  if (Math.abs(calculated - (edt?.totalHours ?? aiPoc.proposal.totalHours)) > 0.011) {
     throw new Error('La proyección de roles no conserva el total HH de Gemini.');
   }
   return projection;
@@ -156,12 +162,13 @@ export function validatePocDraftIntegrity(
       previous.aiPoc.source !== next.aiPoc.source) {
     throw new Error('La evidencia original de IA no puede borrarse ni reemplazarse.');
   }
+  effectiveQuotationEdt(next); // valida únicamente overrides permitidos WBS×rol
   const mappingChanged = !sameJson(
     previous.aiPoc.roleTeamIds, next.aiPoc.roleTeamIds,
   );
   if (mappingChanged) {
     const projected = projectPocRolesToQuotationDraft(
-      previous, next.aiPoc.roleTeamIds,
+      next, next.aiPoc.roleTeamIds,
     );
     if (!sameJson(projected.teams, next.teams) ||
         !sameJson(projected.phases, next.phases) ||
@@ -171,7 +178,7 @@ export function validatePocDraftIntegrity(
   } else if (Object.keys(next.aiPoc.roleTeamIds).length > 0 &&
       next.analysisProjectionStatus === 'synced') {
     const projected = projectPocRolesToQuotationDraft(
-      previous, next.aiPoc.roleTeamIds,
+      next, next.aiPoc.roleTeamIds,
     );
     if (!sameJson(projected.teams, next.teams) ||
         !sameJson(projected.phases, next.phases) || next.mode !== 'phases') {
