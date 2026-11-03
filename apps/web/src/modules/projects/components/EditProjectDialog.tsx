@@ -652,10 +652,12 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
   const totalTeamHours = teamsValue.reduce((sum, team) => sum + (Number(team.assignedHours) || 0), 0);
   /** Hito 0 manual: activar a mano (sin factura) un proyecto Aprobado que seguía "No iniciado" — exige motivo (ver `ChangeProjectStatusUseCase`). */
   const isManualHito0 = isDevelopment && tipo === 'aprobado' && project.status === 'draft' && estado === 'active';
-  /** Con Hito 0 registrado (el proyecto ya se activó, aunque después se haya detenido o finalizado) las HH vendidas quedan fijas. */
-  const soldHoursLocked = isDevelopment && project.hito0At != null;
   /** En Prospecto la estimación aún no se completa: fechas y horas se ingresan al pasar a Cotización (prototipo: `renderEstimacion()`). */
   const estimationDisabled = isDevelopment && tipo === 'prospecto';
+  /** Hito 0 permite corregir HH vendidas; el motivo es obligatorio si su valor realmente cambia. */
+  const soldHoursChangedAfterHito0 =
+    project.hito0At != null && !supportPlan && !estimationDisabled &&
+    Number(watch('soldHours')) !== project.soldHours;
   /** Finalizado: Estado, etapa de avance y etapa de cada fase quedan fijos (se reabre volviendo a "Proyecto aprobado"). */
   const isFinalized = isDevelopment && tipo === 'finalizado';
   /** Prospecto y Cotización solo pueden estar "No iniciado": el Estado no se elige. */
@@ -695,6 +697,15 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
     }
     if (isManualHito0 && !manualActivationReason.trim()) {
       setServerError('Escribe el motivo o la referencia de la activación (ej. contrato firmado, orden de compra).');
+      return;
+    }
+    if (
+      project.hito0At != null &&
+      values.soldHours !== undefined &&
+      values.soldHours !== project.soldHours &&
+      !values.soldHoursChangeReason?.trim()
+    ) {
+      setError('soldHoursChangeReason', { message: 'Indica el motivo del ajuste de HH vendidas.' });
       return;
     }
     // En Prospecto el plan de pago no se edita (ver `estimationDisabled`); aunque se haya tocado antes de volver a Prospecto, no se manda.
@@ -975,15 +986,29 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
                 label={hoursLabel}
                 type="number"
                 min={0}
-                // Desde el Hito 0 corren las horas vendidas: quedan fijas (`SoldHoursLockedAfterHito0Error`).
-                // Deshabilitado, react-hook-form no lo envía y `UpdateProjectUseCase` no toca `soldHours`.
-                disabled={soldHoursLocked || estimationDisabled}
-                helperText={soldHoursLocked ? 'No editable desde que el proyecto se activó (Hito 0).' : undefined}
+                disabled={estimationDisabled}
                 errorText={errors.soldHours?.message}
                 {...register('soldHours')}
               />
             )}
           </div>
+          {soldHoursChangedAfterHito0 && (
+            <div className={styles.field}>
+              <label className={styles.label} htmlFor="soldHoursChangeReason">
+                Motivo del ajuste de HH vendidas
+              </label>
+              <textarea
+                id="soldHoursChangeReason"
+                className={styles.textarea}
+                placeholder="Ej. Ampliación de alcance aprobada por el cliente."
+                {...register('soldHoursChangeReason')}
+              />
+              {errors.soldHoursChangeReason && (
+                <p className={styles.hint} role="alert">{errors.soldHoursChangeReason.message}</p>
+              )}
+              <p className={styles.hint}>El valor anterior, el nuevo y este motivo quedarán registrados en la bitácora.</p>
+            </div>
+          )}
 
           {project.canAuthorizeOvertime && (
             <div>
@@ -1693,6 +1718,7 @@ function toFormValues(project: ProjectDetail): ProjectFormValues {
     endDate: project.endDate,
     estimatedDeliveryDate: project.estimatedDeliveryDate,
     soldHours: project.soldHours,
+    soldHoursChangeReason: '',
     supportPlanDescription: project.supportPlanDescription ?? '',
     supportHours: project.supportHours,
     quotationLink: project.quotationLink ?? '',
