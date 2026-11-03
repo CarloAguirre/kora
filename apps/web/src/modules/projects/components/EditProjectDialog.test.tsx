@@ -149,6 +149,7 @@ function buildProject(overrides: Partial<ProjectDetail> = {}): ProjectDetail {
 describe('EditProjectDialog', () => {
   beforeEach(() => {
     useUsersListMock.mockReturnValue({ data: { items: [] } });
+    mutateAsync.mockClear();
   });
 
   it('precarga el formulario con los datos actuales del proyecto', () => {
@@ -156,6 +157,51 @@ describe('EditProjectDialog', () => {
 
     expect(screen.getByLabelText(/Nombre del proyecto/)).toHaveValue('Proyecto de prueba');
     expect(screen.getByLabelText('HH vendidas')).toHaveValue(500);
+  });
+
+  it('permite editar HH vendidas después de Hito 0 y pide motivo al cambiarlas', async () => {
+    const user = userEvent.setup();
+    renderDialog({
+      open: true,
+      project: buildProject({
+        hito0At: '2026-10-01T00:00:00.000Z',
+        commercialManager: { id: '22222222-2222-4222-8222-222222222222', fullName: 'Rodrigo Viveros' },
+      }),
+      onClose: vi.fn(),
+      onSuccess: vi.fn(),
+      isManagement: true,
+    });
+
+    const soldHours = screen.getByLabelText('HH vendidas');
+    expect(soldHours).toBeEnabled();
+    expect(screen.queryByLabelText('Motivo del ajuste de HH vendidas')).not.toBeInTheDocument();
+    await user.clear(soldHours);
+    await user.type(soldHours, '750');
+    const reason = screen.getByLabelText('Motivo del ajuste de HH vendidas');
+    fireEvent.submit(document.getElementById('edit-project-form') as HTMLFormElement);
+    expect(await screen.findByText('Indica el motivo del ajuste de HH vendidas.')).toBeInTheDocument();
+    expect(mutateAsync).not.toHaveBeenCalled();
+
+    await user.type(reason, 'Ampliación de alcance aprobada');
+    fireEvent.submit(document.getElementById('edit-project-form') as HTMLFormElement);
+    await waitFor(() =>
+      expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({
+        projectId: 'project-1',
+        input: expect.objectContaining({ soldHours: 750, soldHoursChangeReason: 'Ampliación de alcance aprobada' }),
+      })),
+    );
+  });
+
+  it('no exige motivo si las HH vendidas permanecen iguales después de Hito 0', () => {
+    renderDialog({
+      open: true,
+      project: buildProject({ hito0At: '2026-10-01T00:00:00.000Z' }),
+      onClose: vi.fn(),
+      onSuccess: vi.fn(),
+      isManagement: true,
+    });
+    expect(screen.getByLabelText('HH vendidas')).toBeEnabled();
+    expect(screen.queryByLabelText('Motivo del ajuste de HH vendidas')).not.toBeInTheDocument();
   });
 
   it('bloquea "Líder Kabeli a cargo" cuando el actor no puede reasignar el proyecto (solo Gerencia/PMO puede)', () => {
