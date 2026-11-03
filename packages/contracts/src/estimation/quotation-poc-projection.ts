@@ -150,7 +150,10 @@ export function validatePocDraftIntegrity(
   if (!previous.aiPoc && next.aiPoc) {
     throw new Error('No se puede introducir un análisis IA ajeno al borrador.');
   }
-  if (!previous.aiPoc) return;
+  if (!previous.aiPoc) {
+    effectiveQuotationEdt(next); // sin fuente IA tampoco se permiten HH inventadas
+    return;
+  }
   if (!next.aiPoc ||
       !sameJson(previous.aiPoc.proposal, next.aiPoc.proposal) ||
       !sameJson(previous.aiPoc.answers, next.aiPoc.answers) ||
