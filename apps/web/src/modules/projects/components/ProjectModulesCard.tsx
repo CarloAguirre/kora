@@ -492,7 +492,7 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
       )}
       <PhaseRoadmap phaseRoadmap={phaseRoadmap} renderPhaseExtras={renderPhaseExtras}
         renderPhaseReferences={renderPhaseReferences} renderSelectionDetail={renderSelectionDetail}
-        renderPhaseHeaderName={renderPhaseHeaderName}
+        renderPhaseHeaderName={canManage && planningMode ? renderPhaseHeaderName : undefined}
         renderPhaseHeaderActions={renderPhaseHeaderActions}
         toolbarActions={canManage ? (
           <div className={styles.roadmapModeSwitch} role="group" aria-label="Modo del Roadmap">
