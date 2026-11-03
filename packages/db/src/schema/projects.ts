@@ -448,6 +448,8 @@ export const projectPaymentMilestones = pgTable('project_payment_milestones', {
   triggerType: projectPaymentTriggerEnum('trigger_type').notNull().default('manual'),
   /** Solo con `trigger_type = 'phase'`: al entrar el proyecto a esta fase (o a una posterior) el tramo queda por facturar. */
   triggerPhase: projectPhaseEnum('trigger_phase'),
+  /** Fase comercial concreta del módulo cotizado; nunca se convierte artificialmente en project_phase. */
+  triggerModuleId: uuid('trigger_module_id').references(() => projectModules.id, { onDelete: 'set null' }),
   /** Solo con `trigger_type = 'date'`: desde esta fecha el tramo queda por facturar. */
   triggerDate: date('trigger_date', { mode: 'date' }),
   ...timestamps,
