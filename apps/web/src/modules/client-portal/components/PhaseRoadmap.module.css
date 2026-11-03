@@ -189,6 +189,13 @@
   background: #f9fafb;
 }
 
+/* En la ficha del proyecto la fase es un contenedor permanente, no un acordeón. */
+.phaseHeaderStatic,
+.phaseHeaderStatic:hover {
+  cursor: default;
+  background: var(--kora-surface);
+}
+
 .phaseBadge {
   display: flex;
   align-items: center;
