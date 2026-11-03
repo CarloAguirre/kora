@@ -503,13 +503,14 @@ export class DrizzleQuotationRepository implements QuotationRepository {
     const draft = quotationDraftDataSchema.parse(version.draft);
     const edt = draft.aiPoc?.edt;
     if (!metadata.moduleIds) return null;
-    const commercialModules = edt &&
-      !(draft.edtCommercialTasks?.length || draft.edtCommercialStages?.length)
-      ? edt.modules.map((module) => ({ name: module.name, hours: module.totalHours }))
-      : draft.phases.map((phase) => ({
-        name: phase.name,
-        hours: phase.teamHours.reduce((total, row) => total + row.hours, 0),
-      }));
+    const commercialModules = draft.mode === 'phases' && draft.phases.length
+      ? draft.phases.map((phase) => ({
+          name: phase.name,
+          hours: phase.teamHours.reduce((total, row) => total + row.hours, 0),
+        }))
+      : (edt?.modules ?? []).map((module) => ({
+          name: module.name, hours: module.totalHours,
+        }));
     const positive = commercialModules.filter((module) => module.hours > 0);
     if (metadata.moduleIds.length !== positive.length) return null;
     const references = buildQuotationTransferReferences(draft,
