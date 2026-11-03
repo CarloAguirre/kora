@@ -101,7 +101,8 @@ export function QuotationTeamsWorkspace({
         <div className={styles.columns + ' ' + columns}>
           <span>Equipo</span>
           <span>Nº colab.</span>
-          {planned && <><span>Semanas</span><span>HH/sem prom.</span></>}
+          {planned && <><span>Semanas</span><span>HH/sem equipo</span>
+            <span>HH/sem/colab.</span></>}
           {view === 'team' && !planned && <>
             <span>Unidad</span><span>Duración</span><span>hh/sem</span>
             <span>Dedicación</span>
@@ -154,6 +155,11 @@ export function QuotationTeamsWorkspace({
                 </div>
                 <strong className={styles.weekAverage} title="HH totales divididas por semanas activas; no es una capacidad contratada">
                   {weekly ? fmt(weekly.averageHoursPerWeek) : '—'}
+                </strong>
+                <strong className={styles.weekAverage}
+                  aria-label={'Carga semanal por colaborador de ' + label}
+                  title="Promedio semanal del equipo dividido por la dotación indicada; no modifica las HH WBS">
+                  {weekly && people > 0 ? fmt(weekly.averageHoursPerWeek / people) : '—'}
                 </strong>
               </>}
               {view === 'team' && !planned && <>
