@@ -28,6 +28,7 @@ export interface PaymentPlanItemDraft {
   amount: string;
   triggerType: ProjectPaymentTrigger;
   triggerPhase: ProjectPhase | '';
+  triggerModuleId?: string | null;
   triggerDate: string;
   /** Solo filas guardadas: una facturada/pagada no se edita ni se quita desde acá. */
   status?: ProjectPaymentStatus;
@@ -73,6 +74,7 @@ export function paymentPlanFromProject(project: Pick<ProjectDetail, 'contractAmo
         amount: String(milestone.amount),
         triggerType: milestone.triggerType,
         triggerPhase: milestone.triggerPhase ?? '',
+        triggerModuleId: milestone.triggerModuleId ?? null,
         triggerDate: milestone.triggerDate ?? '',
         status: milestone.status,
         isOverdue: milestone.isOverdue,
@@ -90,7 +92,8 @@ export function validatePaymentPlan(plan: PaymentPlanDraft): string | null {
     if (item.percent !== '' && (Number(item.percent) < 0 || Number(item.percent) > 100)) {
       return `El porcentaje de ${label} debe estar entre 0 y 100.`;
     }
-    if (item.triggerType === 'phase' && !item.triggerPhase) return `Selecciona la fase que activa ${label}.`;
+    if (item.triggerType === 'phase' && !item.triggerPhase && !item.triggerModuleId)
+      return `Selecciona la fase que activa ${label}.`;
     if (item.triggerType === 'date' && !item.triggerDate) return `Indica la fecha de cobro de ${label}.`;
   }
   return null;
@@ -113,6 +116,8 @@ export function paymentPlanPayload(plan: PaymentPlanDraft): {
       sortOrder: index,
       triggerType: item.triggerType,
       triggerPhase: item.triggerType === 'phase' && item.triggerPhase ? item.triggerPhase : null,
+      triggerModuleId: item.triggerType === 'phase' && !item.triggerPhase
+        ? (item.triggerModuleId ?? null) : null,
       triggerDate: item.triggerType === 'date' && item.triggerDate ? item.triggerDate : null,
     })),
   };
@@ -279,6 +284,7 @@ export function PaymentPlanEditor({ value, onChange, disabled }: PaymentPlanEdit
                   {paymentTriggerLabel({
                     triggerType: item.triggerType,
                     triggerPhase: item.triggerPhase || null,
+                    triggerModuleId: item.triggerModuleId ?? null,
                     triggerDate: item.triggerDate || null,
                   })}
                 </span>
@@ -322,9 +328,15 @@ export function PaymentPlanEditor({ value, onChange, disabled }: PaymentPlanEdit
                   triggerType={item.triggerType}
                   triggerPhase={item.triggerPhase}
                   triggerDate={item.triggerDate}
-                  onChange={(patch) => updateItem(item.key, patch)}
+                  onChange={(patch) => updateItem(item.key, {
+                    ...patch,
+                    ...((patch.triggerPhase || (patch.triggerType && patch.triggerType !== 'phase'))
+                      ? { triggerModuleId: null } : {}),
+                  })}
                   disabled={disabled}
                 />
+                {item.triggerType === 'phase' && item.triggerModuleId && !item.triggerPhase &&
+                  <span className={styles.noValue}>Vinculado a módulo comercial</span>}
                 {item.triggerType !== 'phase' && item.triggerType !== 'date' && <span className={styles.noValue}>—</span>}
                 <Button
                   type="button"
