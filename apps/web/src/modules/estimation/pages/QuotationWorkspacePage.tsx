@@ -472,165 +472,48 @@ export function QuotationWorkspacePage() {
                    </Card>
 
                   <Card>
-                    <div className={styles.teamsHeading}>
-                      <div><h2>Equipos</h2><p>Las HH se suman según la modalidad de estimación. Los líderes se asignan en Kora.</p></div>
-                      {editable
-                        ? <SegmentedControl aria-label="Modalidad de estimación"
-                            options={[{ value: 'team', label: 'Por equipo' }, { value: 'phases', label: 'Por fases y módulos' }]}
-                            value={form.draft.mode}
-                            onChange={(mode) => updateDraft({ mode: mode as QuotationDraftData['mode'] })} />
-                        : <span className={styles.readonlyMode}>{form.draft.mode === 'team' ? 'Por equipo' : 'Por fases y módulos'}</span>}
-                    </div>
-                    {form.draft.mode === 'phases' && phaseRows.length === 0 && teamRows.length > 0 && (
-                      <p className={styles.modeNotice} role="status">
-                        No hay fases configuradas. Esta modalidad calcula HH desde las fases,
-                        no desde la duración de cada equipo; agrega una fase para distribuirlas.
-                      </p>
-                    )}
-                    <div className={styles.teamOverview}>
-                      <div className={styles.teamColumns}>
-                        <span>Equipo</span><span>N° colab.</span><span>Horas</span>
-                      </div>
-                      {teamRows.map((team, index) => {
-                        const name = teamById.get(team.teamId) ?? 'Equipo no disponible';
-                        const hours = form.draft.mode === 'team'
-                          ? team.collaborators * (team.unit === 'day' ? team.duration / 5 : team.duration) *
-                            team.hoursPerWeek * team.dedicationPercent / 100
-                          : phaseRows.reduce((sum, phase) =>
-                            sum + (phase.teamHours.find((row) => row.teamId === team.teamId)?.hours ?? 0), 0);
-                        const category = name.toLocaleLowerCase('es');
-                        const color = category.includes('desarrollo') || category.includes('dev') ? 'var(--kora-orange)'
-                          : category.includes('qa') ? 'var(--kora-blue-link)'
-                          : category.includes('ux') || category.includes('diseño') ? 'var(--kora-success)'
-                          : category.includes('pmo') ? 'var(--kora-text-muted)'
-                          : category.includes('rpa') ? 'var(--kora-cyan)' : 'var(--kora-blue-400)';
-                        return (
-                          <div className={styles.teamLine} key={team.teamId}>
-                            <label className={styles.teamLabel}>
-                              <input type="checkbox" checked disabled={!editable}
-                                aria-label={'Incluir ' + name}
-                                onChange={() => updateDraft({
-                                  teams: teamRows.filter((_, i) => i !== index),
-                                  phases: phaseRows.map((p) => ({
-                                    ...p, teamHours: p.teamHours.filter((h) => h.teamId !== team.teamId),
-                                  })),
-                                })} />
-                              <span className={styles.teamDot} style={{ background: color }} aria-hidden="true" />
-                              <strong>{name}</strong>
-                            </label>
-                            <input className={styles.collabInput} aria-label={'Colaboradores de ' + name}
-                              type="number" min={1} max={100} disabled={!editable} value={team.collaborators}
-                              onChange={(event) => editTeam(index, { collaborators: numeric(event.target.value) })} />
-                            <strong className={styles.teamHours}>{money(hours)} HH</strong>
-                          </div>
-                        );
-                      })}
-                      {available.filter((team) => ['desarrollo', 'pmo', 'qa', 'rpa', 'ux', 'diseño', 'inteligencia', 'ia']
-                        .some((keyword) => team.name.toLocaleLowerCase('es').includes(keyword))).slice(0, 8)
-                        .map((team) => {
-                          const name = team.name.toLocaleLowerCase('es');
-                          const color = name.includes('desarrollo') ? 'var(--kora-orange)'
-                            : name.includes('qa') ? 'var(--kora-blue-link)'
-                            : name.includes('ux') || name.includes('diseño') ? 'var(--kora-success)'
-                            : name.includes('pmo') ? 'var(--kora-text-muted)'
-                            : name.includes('rpa') ? 'var(--kora-cyan)' : 'var(--kora-blue-400)';
-                          return (
-                            <div key={team.id} className={styles.teamLine + ' ' + styles.inactiveTeam}>
-                              <label className={styles.teamLabel}>
-                                <input type="checkbox" checked={false} disabled={!editable}
-                                  aria-label={'Incluir ' + team.name}
-                                  onChange={() => updateDraft({ teams: [...teamRows, emptyTeam(team.id)] })} />
-                                <span className={styles.teamDot} style={{ background: color }} aria-hidden="true" />
-                                <strong>{team.name}</strong>
-                              </label>
-                              <input className={styles.collabInput} type="number" value={1} disabled
-                                aria-label={'Colaboradores de ' + team.name} />
-                              <strong className={styles.teamHours}>—</strong>
-                            </div>
-                          );
-                        })}
-                      {teamRows.length === 0 && available.length === 0 && (
-                        <p className={styles.emptyTeams}>Todavía no hay HH distribuidas. Agrega equipos activos para comenzar.</p>
-                      )}
-                      {teamRows.length === 0 && available.length > 0 &&
-                        !form.draft.aiPoc && (
-                          <p className={styles.emptyTeams}>Selecciona un equipo para comenzar a distribuir las HH.</p>
-                        )}
-                    </div>
-                    {editable && available.length > 0 && (
-                      <details className={styles.addTeams}>
-                        <summary>+ Agregar equipo de Kora</summary>
-                        <div className={styles.availableTeams}>
-                          {available.map((team) => (
-                            <Button size="sm" variant="outline" key={team.id}
-                              onClick={() => updateDraft({ teams: [...teamRows, emptyTeam(team.id)] })}>
-                              + {team.name}
-                            </Button>
-                          ))}
-                        </div>
-                      </details>
-                    )}
-                    <details className={styles.advanced}>
-                      <summary>Ajustes avanzados de equipos · duración, unidad y dedicación</summary>
-                      <p className={styles.helper}>Horas por equipo = colaboradores × duración × HH semanales × dedicación. En modalidad por fases, las HH se toman de las fases.</p>
-<div className={styles.tableWrap}>
-                      <table className={styles.table}>
-                        <thead><tr><th>Equipo</th><th>Personas</th><th>Unidad</th><th>Duración</th><th>HH/sem.</th><th>Dedicación %</th><th></th></tr></thead>
-                        <tbody>
-                          {teamRows.map((team, index) => (
-                            <tr key={team.teamId}>
-                              <td><Select value={team.teamId} disabled={!editable}
-                                options={[{ value: team.teamId, label: teamById.get(team.teamId) ?? 'Equipo no disponible' }, ...available.map((t) => ({ value: t.id, label: t.name }))]}
-                                onChange={(e) => editTeam(index, { teamId: e.target.value })} /></td>
-                              <td><input aria-label="Personas" type="number" min={1} max={100} disabled={!editable}
-                                value={team.collaborators} onChange={(e) => editTeam(index, { collaborators: numeric(e.target.value) })} /></td>
-                              <td><Select value={team.unit} disabled={!editable}
-                                options={[{ value: 'week', label: 'Semanas' }, { value: 'day', label: 'Días' }]}
-                                onChange={(e) => editTeam(index, { unit: e.target.value as 'week' | 'day' })} /></td>
-                              <td><input aria-label="Duración" type="number" min={0} disabled={!editable}
-                                value={team.duration} onChange={(e) => editTeam(index, { duration: numeric(e.target.value) })} /></td>
-                              <td><input aria-label="Horas semanales" type="number" min={0} disabled={!editable}
-                                value={team.hoursPerWeek} onChange={(e) => editTeam(index, { hoursPerWeek: numeric(e.target.value) })} /></td>
-                              <td><input aria-label="Dedicación porcentual" type="number" min={0} max={100} disabled={!editable}
-                                value={team.dedicationPercent} onChange={(e) => editTeam(index, { dedicationPercent: numeric(e.target.value) })} /></td>
-                              <td>{editable && <Button variant="ghost" size="sm"
-                                onClick={() => updateDraft({ teams: teamRows.filter((_, i) => i !== index),
-                                  phases: phaseRows.map((p) => ({ ...p, teamHours: p.teamHours.filter((h) => h.teamId !== team.teamId) })) })}>Quitar</Button>}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                    </details>
-                    {selected?.draft.aiPoc && (
-                      <details id="quotation-ai-role-review" className={styles.mappingDisclosure}>
-                        <summary>✦ Asignar perfiles de Gemini a los equipos de Kora</summary>
-                        <AiPocRoleMappingCard
-                          key={selected.id + ':' + selected.revision}
-                          version={selected}
-                          teams={activeTeams}
-                          canEdit={editable}
-                          hasUnsavedChanges={dirty}
-                          onApply={(draft) => {
-                            change((current) => ({ ...current, draft }));
-                            setNotice('Distribución aplicada. Guarda el borrador para conservar las HH.');
-                          }}
-                        />
-                      </details>
-                    )}
+                    <QuotationTeamsWorkspace
+                      draft={form.draft}
+                      editable={editable}
+                      teamNames={teamById}
+                      activeTeams={activeTeams}
+                      view={teamView}
+                      onChangeView={(view) => {
+                        setTeamView(view);
+                        // En una EDT las tareas son la fuente de HH. Este switch
+                        // cambia la vista, nunca la modalidad del cálculo.
+                        if (!form.draft.aiPoc?.edt) updateDraft({ mode: view });
+                      }}
+                      onEditTeam={editTeamById}
+                      onToggleTeam={toggleTeam}
+                      onEditGroupHours={(teamKey, hours) =>
+                        adjustEdtGroupHours(teamKey, hours)}
+                      onEditRoleCollaborators={editRoleCollaborators}
+                      onEditMappedCollaborators={editMappedCollaborators}
+                      mappingAction={selected?.draft.aiPoc && !aiRolesMapped
+                        ? <button type="button" className={styles.mappingLink}
+                            onClick={() => setRoleMappingOpen(true)}>
+                            ✦ Asignar perfiles a los equipos de Kora
+                          </button> : null}
+                    />
                   </Card>
 
                   {(form.draft.mode === 'phases' || form.draft.aiPoc?.edt) && (
                     <QuotationPhaseWorkspace
                       commercialMode={form.draft.mode}
+                      draft={form.draft}
                       phases={phaseRows}
                       teams={teamRows}
                       teamNames={teamById}
+                      activeTeams={activeTeams}
                       edt={effectiveEdt}
                       roleTeamIds={form.draft.aiPoc?.roleTeamIds}
                       editable={editable}
-                      adjustedHoursCount={form.draft.edtHourAdjustments?.length ?? 0}
                       onEditTaskHours={editEdtHours}
+                      onEditTaskFixed={editEdtTaskFixed}
+                      onEditTaskTeam={editEdtTaskTeam}
+                      onEditGroupHours={adjustEdtGroupHours}
+                      onEditStage={editEdtStage}
                       onEditPhase={editPhase}
                       onAddPhase={() => updateDraft({ phases: [
                         ...phaseRows, { name: 'Nuevo módulo', startWeek: 1,
