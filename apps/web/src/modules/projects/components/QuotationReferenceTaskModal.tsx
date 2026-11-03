@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { projectTeamPath } from '@/app/router/paths';
 import {
   PROJECT_MODULE_TASK_SCOPES,
   PROJECT_MODULE_TASK_SCOPE_LABELS,
@@ -37,18 +39,18 @@ export function QuotationReferenceTaskModal({
   const [startDate, setStartDate] = useState('');
   const [date, setDate] = useState('');
   const [hours, setHours] = useState(String(reference.hours));
-  const [scope, setScope] = useState<ProjectModuleTaskScope>('desarrollo');
+  const [scope, setScope] = useState<ProjectModuleTaskScope | ''>('');
   const [error, setError] = useState('');
   const members = project.members.filter((member) =>
     member.teamId === teamId && member.userStatus === 'active');
   const sourceMarker = 'Referencia cotización ' + versionId + ' · WBS ' +
     reference.wbs + ' · ' + reference.role;
-  const formValid = Boolean(targetModuleId && name.trim() && teamId && startDate && date &&
+  const formValid = Boolean(targetModuleId && name.trim() && teamId && assignee && scope && startDate && date &&
     startDate <= date && Number(hours) > 0 &&
     Number.isFinite(Number(hours)) && Number(hours) <= 1_000_000);
   const submit = async () => {
     if (!formValid) {
-      setError('Selecciona un equipo y define nombre, fechas válidas y HH antes de crear la tarea.');
+      setError('Selecciona fase, equipo, colaborador, ámbito, fechas válidas y HH antes de crear la tarea.');
       return;
     }
     setError('');
@@ -96,13 +98,25 @@ export function QuotationReferenceTaskModal({
             value: team.teamId, label: team.teamName,
           }))}
           onChange={(e) => {setTeamId(e.target.value);setAssignee('');}} />
-        <Select label="Colaborador (opcional)" value={assignee}
+        <Select label="Asignado a" required value={assignee}
           placeholder="Sin asignar todavía"
           options={members.map((member) => ({
             value: member.userId, label: member.fullName,
           }))}
           onChange={(e) => setAssignee(e.target.value)} />
-        <Select label="Ámbito" value={scope}
+        {teamId && members.length === 0 && project.teams.some((team) => team.teamId === teamId) && (
+          <p className={styles.help}>
+            No hay colaboradores asignados a este equipo en el proyecto.
+            {' '}
+            <Link to={projectTeamPath(project, {
+              id: teamId,
+              slug: project.teams.find((team) => team.teamId === teamId)?.teamSlug,
+            })}>Gestionar colaboradores del equipo</Link>
+            {' '}antes de crear la tarea.
+          </p>
+        )}
+        <Select label="Ámbito" required value={scope}
+          placeholder="Selecciona un ámbito"
           options={PROJECT_MODULE_TASK_SCOPES.map((value) => ({
             value, label: PROJECT_MODULE_TASK_SCOPE_LABELS[value],
           }))}
