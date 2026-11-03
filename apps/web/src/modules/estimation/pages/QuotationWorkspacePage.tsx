@@ -11,6 +11,7 @@ import { Card } from '@/shared/components/ui/Card';
 import { Select } from '@/shared/components/ui/Select';
 import { Badge } from '@/shared/components/ui/Badge';
 import { Modal } from '@/shared/components/ui/Modal';
+import { useConfirmAction } from '@/shared/components/ui/useConfirmAction';
 import { TextField } from '@/shared/components/ui/TextField';
 import { useAppliedQuotationPlanning, useCreateQuotationVersion, useProjectQuotation, useSaveQuotationDraft, useQuotationLifecycle } from '../api/quotation.queries';
 import { AnalysisEvidenceCard } from '../components/AnalysisEvidenceCard';
@@ -70,6 +71,7 @@ export function QuotationWorkspacePage() {
   const [sampleTeamMap, setSampleTeamMap] = useState<Record<string, string>>({});
   const [sampleError, setSampleError] = useState('');
   const [sampleSuccess, setSampleSuccess] = useState('');
+  const { confirm, dialog: confirmationDialog } = useConfirmAction();
 
   const quotation = quotationQuery.data;
   const versions = quotation?.versions ?? [];
@@ -140,14 +142,14 @@ export function QuotationWorkspacePage() {
         ) ? { analysisProjectionStatus: 'modified' as const } : {}),
       },
     }));
-  const selectVersion = (id: string) => {
-    if (dirty && !window.confirm('Hay cambios sin guardar. ¿Deseas descartarlos?')) return;
+  const selectVersion = async (id: string) => {
+    if (dirty && !await confirm({ title: 'Descartar cambios', description: 'Hay cambios sin guardar. ¿Deseas descartarlos?', confirmLabel: 'Descartar', destructive: true })) return;
     setParams({ version: id });
     setNotice('');
   };
   const newVersion = async (sourceVersionId?: string) => {
     if (!projectId || !mayWrite || createVersion.isPending) return;
-    if (dirty && !window.confirm('Hay cambios sin guardar. ¿Deseas descartarlos?')) return;
+    if (dirty && !await confirm({ title: 'Descartar cambios', description: 'Hay cambios sin guardar. ¿Deseas descartarlos?', confirmLabel: 'Descartar', destructive: true })) return;
     setError('');
     setNotice('');
     try {
@@ -221,12 +223,12 @@ export function QuotationWorkspacePage() {
 
   const saveSimulatedAnalysis = async () => {
     if (!sampleAnalysis || !projectId || !mayWrite || createVersion.isPending) return;
-    if (dirty && !window.confirm('Hay cambios sin guardar. ¿Deseas descartarlos?')) return;
+    if (dirty && !await confirm({ title: 'Descartar cambios', description: 'Hay cambios sin guardar. ¿Deseas descartarlos?', confirmLabel: 'Descartar', destructive: true })) return;
     if (sampleAnalysis.roles.some((role) => !sampleTeamMap[role.role])) {
       setSampleError('Asocia todos los perfiles del EDT con equipos activos de Kora.');
       return;
     }
-    if (!window.confirm('El artefacto corresponde al ejemplo Zurich, no al análisis de este proyecto. ¿Deseas guardar una versión de DEMOSTRACIÓN explícitamente identificada?')) return;
+    if (!await confirm({ title: 'Guardar demostración', description: 'El artefacto corresponde al ejemplo Zurich, no al análisis de este proyecto. ¿Deseas guardar una versión de DEMOSTRACIÓN explícitamente identificada?', confirmLabel: 'Guardar demostración', warning: 'No representa antecedentes reales del proyecto.' })) return;
     setSampleError('');
     setSampleSuccess('');
     try {
@@ -465,7 +467,7 @@ export function QuotationWorkspacePage() {
   };
   const acceptAiProposal = async () => {
     if (!selected || aiAcceptBlockReason || lifecycle.acceptAi.isPending) return;
-    if (!window.confirm('Aceptar la propuesta de Gemini no aprueba al cliente ni traspasa el proyecto. ¿Confirmas?')) return;
+    if (!await confirm({ title: 'Aceptar propuesta de Gemini', description: 'Aceptar la propuesta no aprueba al cliente ni traspasa el proyecto.', confirmLabel: 'Aceptar propuesta' })) return;
     setError('');
     setNotice('');
     try {
@@ -512,7 +514,7 @@ export function QuotationWorkspacePage() {
                 </div>
                 <div className={styles.versions}>
                   {versions.map((version) => (
-                    <button key={version.id} type="button" onClick={() => selectVersion(version.id)}
+                    <button key={version.id} type="button" onClick={() => void selectVersion(version.id)}
                       aria-label={'Abrir versión ' + version.versionNumber}
                       aria-pressed={selected?.id === version.id} title={version.name}
                       className={[styles.version, selected?.id === version.id ? styles.selected : ''].join(' ')}>
@@ -523,10 +525,10 @@ export function QuotationWorkspacePage() {
                     <button type="button" className={styles.textAction} disabled={createVersion.isPending}
                       onClick={() => void newVersion(selected?.id)}>+ Nueva versión</button>
                     <button type="button" className={styles.textAction + ' ' + styles.aiAction}
-                      onClick={() => {
-                        if (dirty && !window.confirm('Hay cambios sin guardar. ¿Deseas descartarlos?')) return;
+                      onClick={() => void (async () => {
+                        if (dirty && !await confirm({ title: 'Descartar cambios', description: 'Hay cambios sin guardar. ¿Deseas descartarlos?', confirmLabel: 'Descartar', destructive: true })) return;
                         setNewQuotationOpen(true);
-                      }}>✦ Nueva versión con IA</button>
+                      })()}>✦ Nueva versión con IA</button>
                     <button type="button" className={styles.textAction} disabled={createVersion.isPending}
                       onClick={() => void newVersion()}>En blanco</button>
                     {editable && dirty &&
@@ -801,6 +803,7 @@ export function QuotationWorkspacePage() {
               }}/>
           )}
         </Modal>
+        {confirmationDialog}
         {project && newQuotationOpen && (
           <NewProjectQuotationModal project={project} versions={versions} onClose={() => setNewQuotationOpen(false)} />
         )}
