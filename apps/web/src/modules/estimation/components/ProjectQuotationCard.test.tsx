@@ -44,7 +44,6 @@ beforeEach(() => {
   mocks.approve.mockReset().mockResolvedValue({});
   mocks.transfer.mockReset().mockResolvedValue({});
   mocks.remove.mockReset().mockResolvedValue({ deletedVersionId: v1.id });
-  vi.spyOn(window,'confirm').mockReturnValue(true);
 });
 describe('Cotizaciones del proyecto', () => {
   it('permite aprobar la versión 1 aun cuando existe la versión 2', async () => {
@@ -53,6 +52,7 @@ describe('Cotizaciones del proyecto', () => {
     expect(approvals).toHaveLength(2);
     const first = screen.getByText(/v1 · Propuesta original/).closest('tr')!;
     fireEvent.click(first.querySelector('button')!);
+    fireEvent.click(screen.getByRole('button', { name:'Confirmar aprobación' }));
     await waitFor(() => expect(mocks.approve).toHaveBeenCalledWith({
       versionId:v1.id,revision:2,confirmWithoutSend:true,
     }));
@@ -62,15 +62,16 @@ describe('Cotizaciones del proyecto', () => {
     const buttons=screen.getAllByRole('button',{name:'Eliminar'});
     expect(buttons).toHaveLength(2);
     fireEvent.click(buttons[1]!);
+    fireEvent.click(screen.getByRole('button', { name:'Eliminar cotización' }));
     await waitFor(() => expect(mocks.remove).toHaveBeenCalledWith({
       versionId:v1.id,revision:2,
     }));
-    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('v1 · Propuesta original'));
+    expect(screen.queryByText(/Eliminar cotización v1/)).not.toBeInTheDocument();
   });
   it('no elimina si el usuario cancela la confirmación', () => {
-    vi.mocked(window.confirm).mockReturnValueOnce(false);
     render(<MemoryRouter><ProjectQuotationCard project={project}/></MemoryRouter>);
     fireEvent.click(screen.getAllByRole('button',{name:'Eliminar'})[0]!);
+    fireEvent.click(screen.getByRole('button', { name:'Cancelar' }));
     expect(mocks.remove).not.toHaveBeenCalled();
   });
 });
