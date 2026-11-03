@@ -397,6 +397,135 @@ function Meta({ label, value }: { label: string; value: string }) {
   );
 }
 
+/** El Gantt de Kora mantiene su selección y sus fechas; la vista interna
+ * presenta los bloques existentes en el lateral como el prototipo v5.
+ * No infiere consumo por bloque: los registros horarios solo indican módulo. */
+function SegmentDrawer({
+  project, module, segment, reference, onClose, onEdit, onDelete,
+}: {
+  project: ProjectDetail;
+  module: ProjectModule;
+  segment: ProjectModuleSegment;
+  reference?: AppliedQuotationPlanning['modules'][number];
+  onClose: () => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
+}) {
+  const toast = useToast();
+  const updateDelivery = useUpdateProjectModuleDelivery();
+  const [comment, setComment] = useState('');
+  useEffect(() => {
+    const keydown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', keydown);
+    return () => document.removeEventListener('keydown', keydown);
+  }, [onClose]);
+
+  const team = project.teams.find((item) => item.teamId === segment.teamId);
+  const projected = reference?.relativeTeamBlocks?.filter(
+    (block) => block.teamId === segment.teamId,
+  ) ?? [];
+  const hours = projected.length === 1 ? projected[0]!.hours : null;
+  // Solo asociamos una entrega si hay correspondencia ÚNICA de equipo y
+  // fecha final. No se crean entregas ficticias para bloques sin planificación.
+  const deliveries = module.deliveries.filter((delivery) =>
+    delivery.teamId === segment.teamId && delivery.estimatedDate === segment.endDate);
+  const delivery = deliveries.length === 1 ? deliveries[0]! : null;
+  const teamTasks = module.tasks.filter((task) => task.teamId === segment.teamId);
+  const deliver = async () => {
+    if (!delivery || delivery.status !== 'planned' || !comment.trim()) return;
+    try {
+      await updateDelivery.mutateAsync({
+        projectId: project.id, moduleId: module.id, deliveryId: delivery.id,
+        input: { status: 'delivered', comment: comment.trim() },
+      });
+      toast.success('Entrega marcada como realizada; queda pendiente de aprobación.');
+      onClose();
+    } catch (error) {
+      toast.error(error instanceof ApiRequestError
+        ? error.message : 'No se pudo registrar la entrega.');
+    }
+  };
+  return createPortal(
+    <div className={styles.drawerBackdrop} onMouseDown={onClose}>
+      <aside role="dialog" aria-modal="true"
+        aria-label={'Bloque de trabajo: ' + segment.name}
+        className={styles.drawer} onMouseDown={(event) => event.stopPropagation()}>
+        <div className={styles.drawerScroll}>
+          <p className={styles.drawerPhase}>Fase · {module.name}</p>
+          <SegmentDetail segment={segment} onClose={onClose} />
+          <div className={styles.drawerSection}>
+            <p className={styles.drawerTeam}>
+              <span className={styles.referenceTaskDot}
+                style={{ background: teamColor(segment.teamName) }} />
+              <strong>{segment.teamName}</strong>
+              <span>Líder: {team?.leader?.fullName ?? 'Sin líder asignado'}</span>
+            </p>
+            <div className={styles.drawerFacts}>
+              <span>Fechas <b>{formatDate(segment.startDate)} – {formatDate(segment.endDate)}</b></span>
+              <span>HH estimadas (cotización) <b>{hours ?? '—'}</b></span>
+              <span>HH consumidas del bloque <b>Sin desglose por bloque</b></span>
+            </div>
+            <p className={styles.drawerHint}>
+              Las HH reales se registran en Kora por módulo. No se atribuyen
+              automáticamente a un bloque sin una relación verificable.
+            </p>
+          </div>
+          <div className={styles.drawerSection}>
+            <h4>Entrega de cierre</h4>
+            {delivery ? (
+              <>
+                <div className={styles.drawerDelivery}>
+                  <strong>{delivery.name ?? module.name + ' · ' + segment.teamName}</strong>
+                  <span>Fecha planificada: {formatDate(delivery.estimatedDate)}</span>
+                  <Badge tone={DELIVERY_STATUS_TONE[delivery.status]}>
+                    {PROJECT_MODULE_DELIVERY_STATUS_LABELS[delivery.status]}
+                  </Badge>
+                </div>
+                {delivery.status === 'planned' && onEdit && delivery.assigneeUserId && (
+                  <div className={styles.drawerDeliveryAction}>
+                    <label htmlFor={'delivery-comment-' + delivery.id}>
+                      Comentario obligatorio de entrega
+                    </label>
+                    <textarea id={'delivery-comment-' + delivery.id}
+                      value={comment} maxLength={1000} rows={2}
+                      onChange={(event) => setComment(event.target.value)}
+                      placeholder="Describe la entrega realizada" />
+                    <Button disabled={!comment.trim() || updateDelivery.isPending}
+                      onClick={() => void deliver()}>
+                      Marcar como entregada
+                    </Button>
+                  </div>
+                )}
+              </>
+            ) : (
+              <p className={styles.drawerHint}>
+                No hay una entrega única vinculada a este equipo y fecha.
+                Puedes configurarla desde el editor existente del proyecto.
+              </p>
+            )}
+          </div>
+          <div className={styles.drawerSection}>
+            <h4>Tareas del equipo en esta fase ({teamTasks.length})</h4>
+            {teamTasks.length ? (
+              <ul className={styles.drawerTaskList}>
+                {teamTasks.map((task) => <li key={task.id}>
+                  {task.name} · {task.estimatedHours ?? '—'} HH
+                </li>)}
+              </ul>
+            ) : <p className={styles.drawerHint}>Aún no hay tareas operativas de este equipo.</p>}
+          </div>
+        </div>
+        {(onEdit || onDelete) && <footer className={styles.drawerFooter}>
+          {onDelete && <Button variant="outline" onClick={onDelete}>Eliminar bloque</Button>}
+          {onEdit && <Button onClick={onEdit}>Editar bloque</Button>}
+        </footer>}
+      </aside>
+    </div>, document.body,
+  );
+}
+
 /**
  * Tarjeta de detalle del ítem seleccionado en el Roadmap: cabecera (tipo, nombre, equipo y estado,
  * con sus acciones), una fila de datos clave y, si hay, la descripción aparte.
