@@ -540,6 +540,22 @@ export function QuotationWorkspacePage() {
                       </table>
                     </div>
                     </details>
+                    {selected?.draft.aiPoc && (
+                      <details id="quotation-ai-role-review" className={styles.mappingDisclosure}>
+                        <summary>✦ Asignar perfiles de Gemini a los equipos de Kora</summary>
+                        <AiPocRoleMappingCard
+                          key={selected.id + ':' + selected.revision}
+                          version={selected}
+                          teams={activeTeams}
+                          canEdit={editable}
+                          hasUnsavedChanges={dirty}
+                          onApply={(draft) => {
+                            change((current) => ({ ...current, draft }));
+                            setNotice('Distribución aplicada. Guarda el borrador para conservar las HH.');
+                          }}
+                        />
+                      </details>
+                    )}
                   </Card>
 
                   {(form.draft.mode === 'phases' || form.draft.aiPoc?.edt) && (
@@ -564,35 +580,6 @@ export function QuotationWorkspacePage() {
                     />
                   )}
 
-                  <div id="quotation-ai-role-review" className={styles.aiRoleReview}>
-              {selected?.draft.aiPoc && form && (
-                <AiPocRoleMappingCard
-                  key={selected.id + ':' + selected.revision}
-                  version={selected}
-                  teams={activeTeams}
-                  canEdit={editable}
-                  hasUnsavedChanges={dirty}
-                  onApply={(draft) => {
-                    change((current) => ({ ...current, draft }));
-                    setNotice('Proyección de HH aplicada. Guarda el borrador para persistir la distribución.');
-                  }}
-                />
-              )}
-
-
-                  </div>
-                  <div className={styles.edtView} id="quotation-edt-reference">
-              {selected?.draft.aiPoc?.edt && projectId && (
-                <QuotationPlanningAcceptanceCard
-                  key={selected.id + ':' + selected.revision}
-                  version={selected}
-                  teamNames={teamById}
-                  roleTeamIds={form?.draft.aiPoc?.roleTeamIds}
-                />
-              )}
-
-
-                  </div>
                   <QuotationCommercialSections
                     version={selected}
                     draft={form.draft}
@@ -604,6 +591,17 @@ export function QuotationWorkspacePage() {
                 </>
               )}
 
+              <details className={styles.technicalPanel}>
+                <summary>Auditoría técnica, EDT original y herramientas de traspaso</summary>
+                {selected?.draft.aiPoc?.edt && (
+                  <div id="quotation-edt-reference">
+                    <QuotationPlanningAcceptanceCard
+                      key={selected.id + ':' + selected.revision}
+                      version={selected} teamNames={teamById}
+                      roleTeamIds={form?.draft.aiPoc?.roleTeamIds}
+                    />
+                  </div>
+                )}
               {versions.length > 1 && (
                 <QuotationVersionComparison versions={versions} teamNames={teamById} />
               )}
@@ -668,6 +666,8 @@ export function QuotationWorkspacePage() {
                   {sampleSuccess && <p className={styles.success} role="status">{sampleSuccess}</p>}
                 </Card>
               )}
+
+              </details>
 
             </section>
 
