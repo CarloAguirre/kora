@@ -368,12 +368,23 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
           <details className={styles.referenceBlocks}>
             <summary>
               {reference.relativeTeamBlocks.length} bloques por equipo de referencia
-              {' · '}{reference.totalHours} HH · semanas relativas, sin fechas asignadas
+              {' · '}{reference.relativeTeamBlocks.filter((block) =>
+                module.segments.some((segment) => segment.teamId === block.teamId)).length}
+              {' equipos con bloque operativo · '}{reference.totalHours} HH · semanas de referencia
             </summary>
             <div className={styles.referenceBlockList}>
               {reference.relativeTeamBlocks.map((block) => {
                 const team = teamOptions.find((option) => option.value === block.teamId);
                 const teamLabel = team?.label ?? 'Equipo no disponible';
+                const proposedName = module.name + ' · ' + teamLabel;
+                // Una referencia comercial es un único bloque por equipo y fase.
+                // El segmento no tiene FK hacia esa referencia: coincidencia exacta
+                // de nombre/equipo confirma el bloque sugerido; si el usuario lo
+                // renombró, solo afirmamos que el equipo ya tiene bloques operativos.
+                const teamSegments = module.segments.filter((segment) => segment.teamId === block.teamId);
+                const matchingSegment = teamSegments.find((segment) =>
+                  segment.name.trim().toLocaleLowerCase('es-CL') ===
+                  proposedName.trim().toLocaleLowerCase('es-CL'));
                 return (
                   <div key={block.teamId} className={styles.referenceBlockRow}>
                     <span className={styles.referenceTaskDot}
@@ -383,13 +394,28 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
                       {block.hours} HH · semanas {block.startWeek} a
                       {' '}{block.startWeek + block.durationWeeks - 1}
                     </span>
-                    {canManage && team && (
+                    {matchingSegment ? (
+                      <span className={styles.referenceConverted}>Bloque planificado</span>
+                    ) : teamSegments.length > 0 ? (
+                      <span className={styles.referenceConverted}>
+                        {teamSegments.length} {teamSegments.length === 1 ? 'bloque operativo existente' : 'bloques operativos existentes'}
+                      </span>
+                    ) : canManage && team ? (
                       <Button variant="ghost" size="sm"
                         onClick={() => setPlanningBlock({
                           moduleId: module.id, teamId: block.teamId,
-                          name: module.name + ' · ' + teamLabel,
+                          name: proposedName,
                         })}>
                         Planificar bloque
+                      </Button>
+                    ) : null}
+                    {canManage && teamSegments.length === 1 && (
+                      <Button variant="ghost" size="sm"
+                        onClick={() => setEditingSegment({
+                          moduleId: module.id,
+                          segment: teamSegments[0]!,
+                        })}>
+                        Editar bloque
                       </Button>
                     )}
                   </div>
