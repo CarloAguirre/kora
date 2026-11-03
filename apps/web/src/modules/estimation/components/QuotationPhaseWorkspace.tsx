@@ -123,7 +123,7 @@ export function QuotationPhaseWorkspace({
   onEditPhase, onAddPhase, onRemovePhase,
   onEditTaskHours, onEditTaskFixed, onEditTaskTeam, onEditGroupHours,
   onEditStage, onOpenRoleMapping,
-  onAddTask, onDeleteTask, onEditTaskName
+  onAddTask, onDeleteTask, onEditTaskName,
   onImportTaskExcel, onRemoveCommercialPhase,
 }: {
   phases: readonly Phase[];
