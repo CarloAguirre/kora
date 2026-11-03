@@ -312,3 +312,37 @@
 
 /* EDT de referencia, dentro de las fases reales, sin fechas de tareas inventadas. */
 .referenceTasks{flex-basis:100%;border-top:1px solid var(--kora-border,#e4e9ee);padding-top:12px;font-size:12px}.referenceTasks summary{cursor:pointer;font-weight:var(--kora-weight-semibold);color:#0f2a44}.referenceTasks p{color:#637384;line-height:1.5}.referenceTasks ol{display:grid;gap:9px;padding-left:20px}.referenceTasks li{display:grid;gap:3px}.referenceTasks li strong{font-weight:var(--kora-weight-semibold)}.referenceTasks li span,.referenceTasks li small{color:#637384}
+
+
+/* Referencias de cotización inmediatamente DESPUÉS del Gantt, como HTML v5. */
+.commercialReferences { display: grid; gap: 10px; padding: 12px 14px; border-top: 1px solid #e6e8ee; }
+.commercialReferences details { min-width: 0; font-size: 12px; }
+.commercialReferences summary { cursor: pointer; font-weight: 700; color: #344054; }
+.referenceTaskList { display: grid; gap: 3px; margin: 8px 0 0; padding: 0; list-style: none; }
+.referenceTaskRow, .referenceBlockRow { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-width: 0; padding: 3px 0; }
+.referenceTaskDot { display: inline-block; flex: 0 0 8px; width: 8px; height: 8px; border-radius: 3px; }
+.referenceTaskName { color: #26384d; min-width: 0; overflow-wrap: anywhere; }
+.referenceTaskMeta { color: #667085; }
+.referenceTaskRow button, .referenceBlockRow button { font-size: 12px; padding: 2px 6px; min-height: 24px; text-decoration: underline; }
+.referenceConverted { color: #247748; font-size: 11px; margin-left: 4px; }
+.referenceBlocks { border-bottom: 1px solid #e6e8ee; padding-bottom: 10px; }
+.referenceBlockList { display: grid; gap: 5px; margin-top: 8px; }
+.drawerBackdrop { position: fixed; inset: 0; z-index: 1100; background: rgba(15, 23, 42, .48); display: flex; justify-content: flex-end; }
+.drawer { width: min(520px, 100%); min-height: 0; height: 100%; background: #fff; box-shadow: -8px 0 24px rgba(0, 0, 0, .12); display: flex; flex-direction: column; }
+.drawerScroll { flex: 1; overflow-y: auto; padding: 16px; display: grid; gap: 14px; align-content: start; }
+.drawerPhase { margin: 0; font-size: 11px; color: #6b7280; }
+.drawerSection { display: grid; gap: 10px; border-top: 1px solid #e9edf2; padding-top: 16px; }
+.drawerSection h4 { margin: 0; font-size: 13px; font-weight: 700; }
+.drawerTeam { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; margin: 0; font-size: 12px; }
+.drawerTeam span:last-child { color: #667085; }
+.drawerFacts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; padding: 12px; background: #f7f8fa; border-radius: 10px; }
+.drawerFacts span { display: grid; gap: 5px; color: #667085; font-size: 11px; }
+.drawerFacts b { color: #17263f; font-size: 12px; overflow-wrap: anywhere; }
+.drawerHint { color: #667085; font-size: 12px; line-height: 1.5; margin: 0; }
+.drawerDelivery { display: grid; gap: 5px; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px; font-size: 12px; }
+.drawerDelivery > span { color: #667085; }
+.drawerDeliveryAction { display: grid; gap: 7px; font-size: 12px; }
+.drawerDeliveryAction textarea { border: 1px solid #d0d5dd; border-radius: 8px; padding: 8px; font: inherit; }
+.drawerTaskList { padding-left: 16px; font-size: 12px; line-height: 1.6; }
+.drawerFooter { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; border-top: 1px solid #e5e7eb; padding: 14px 16px; background: #fff; }
+@media (max-width: 580px) { .drawerFacts { grid-template-columns: 1fr; } }
