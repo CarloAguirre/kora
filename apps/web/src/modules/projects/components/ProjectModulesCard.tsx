@@ -493,7 +493,7 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
           </details>
         </Card>
       )}
-      <PhaseRoadmap phaseRoadmap={phaseRoadmap} renderPhaseExtras={renderPhaseExtras}
+      <PhaseRoadmap borderlessSummary phaseRoadmap={phaseRoadmap} renderPhaseExtras={renderPhaseExtras}
         renderPhaseReferences={renderPhaseReferences} renderSelectionDetail={renderSelectionDetail}
         renderPhaseHeaderName={canManage && planningMode ? renderPhaseHeaderName : undefined}
         renderPhaseHeaderActions={renderPhaseHeaderActions}
