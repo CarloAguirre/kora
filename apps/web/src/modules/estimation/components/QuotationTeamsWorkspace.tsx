@@ -47,8 +47,8 @@ export function QuotationTeamsWorkspace({
   const visibleWeeks = weeklyPlan ? Array.from({
     length: Math.min(WEEK_PAGE_SIZE, weeklyPlan.lastWeek - firstVisibleWeek + 1),
   }, (_, index) => firstVisibleWeek + index) : [];
-  const largestWeeklyLoad = Math.max(1, ...weeklyPlan?.rows.flatMap((row) =>
-    [...row.weeklyHours.values()]) ?? []);
+  const largestWeeklyLoad = Math.max(1, ...(weeklyPlan?.rows.flatMap((row) =>
+    [...row.weeklyHours.values()]) ?? []));
 
   const rolePeople = new Map(draft.aiPoc?.proposal.roles.map((role) => [
     role.role, draft.edtRoleCollaborators?.find((item) =>
