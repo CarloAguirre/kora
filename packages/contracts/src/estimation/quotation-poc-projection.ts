@@ -172,8 +172,10 @@ export function reconcilePocCommercialDraft(draft: QuotationDraftData): Quotatio
     teams: projected.teams.map((team) => {
       const current = oldTeams.get(team.teamId);
       return current ? { ...team, collaborators: current.collaborators,
-        unit: current.unit, duration: current.duration,
-        hoursPerWeek: current.hoursPerWeek,
+        unit: current.unit,
+        duration: current.duration > 0 ? current.duration : team.duration,
+        hoursPerWeek: current.hoursPerWeek > 0
+          ? current.hoursPerWeek : team.hoursPerWeek,
         dedicationPercent: current.dedicationPercent } : team;
     }),
     phases: projected.phases.map((phase) => {
