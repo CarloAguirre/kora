@@ -253,7 +253,7 @@ export function validatePocDraftIntegrity(
   if (mappingComplete && next.analysisProjectionStatus === 'synced') {
     const projected = projectPocRolesToQuotationDraft(next, selected);
     if (!commercialProjectionMatches(projected, next)) {
-      throw new Error('Las HH por fase y equipo no concilian con las tareas WBS. ' +
+      throw new Error('Las HH cambiaron: la proyección por fase y equipo no concilia con las tareas WBS. ' +
         'Redistribuye desde las tareas antes de guardar.');
     }
   } else if (mappingChanged) {
