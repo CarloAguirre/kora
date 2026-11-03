@@ -238,31 +238,30 @@ export function QuotationWorkspacePage() {
   };
 
   const editEdtHours = (wbs: string, role: string, hours: number) => {
-    if (!editable) return;
+    if (!editable || !form) return;
     try {
-      change((current) => {
-        const source = current.draft.aiPoc?.edt;
-        if (!source) return current;
-        const task = source.modules.flatMap((module) => module.tasks)
-          .find((item) => item.wbs === wbs);
-        const initial = task?.roleEffort?.find((item) => item.role === role)?.hours ??
-          (task?.role === role ? task.hours : null);
-        if (initial === null || !Number.isFinite(hours) || hours <= 0) return current;
-        const edits = (current.draft.edtHourAdjustments ?? []).filter((entry) =>
-          entry.wbs !== wbs || entry.role !== role);
-        if (Math.abs(initial - hours) > 0.0001) edits.push({ wbs, role, hours });
-        const nextDraft: QuotationDraftData = {
-          ...current.draft, edtHourAdjustments: edits,
-          analysisProjectionStatus: 'modified',
-        };
-        const roleTeamIds = nextDraft.aiPoc?.roleTeamIds ?? {};
-        const mapped = nextDraft.aiPoc?.proposal.roles.every((item) =>
-          Boolean(roleTeamIds[item.role]) && nextDraft.teams.some(
-            (team) => team.teamId === roleTeamIds[item.role])) ?? false;
-        const projected = mapped && nextDraft.mode === 'phases'
-          ? projectPocRolesToQuotationDraft(nextDraft, roleTeamIds) : nextDraft;
-        return { ...current, draft: projected };
-      });
+      const source = form.draft.aiPoc?.edt;
+      if (!source) return;
+      const task = source.modules.flatMap((module) => module.tasks)
+        .find((item) => item.wbs === wbs);
+      const initial = task?.roleEffort?.find((item) => item.role === role)?.hours ??
+        (task?.role === role ? task.hours : null);
+      if (initial === null || !Number.isFinite(hours) || hours <= 0) return;
+      const edits = (form.draft.edtHourAdjustments ?? []).filter((entry) =>
+        entry.wbs !== wbs || entry.role !== role);
+      if (Math.abs(initial - hours) > 0.0001) edits.push({ wbs, role, hours });
+      const nextDraft: QuotationDraftData = {
+        ...form.draft, edtHourAdjustments: edits,
+        analysisProjectionStatus: 'modified',
+      };
+      effectiveQuotationEdt(nextDraft); // mismo contrato que aplica el backend
+      const roleTeamIds = nextDraft.aiPoc?.roleTeamIds ?? {};
+      const mapped = nextDraft.aiPoc?.proposal.roles.every((item) =>
+        Boolean(roleTeamIds[item.role]) && nextDraft.teams.some(
+          (team) => team.teamId === roleTeamIds[item.role])) ?? false;
+      const projected = mapped && nextDraft.mode === 'phases'
+        ? projectPocRolesToQuotationDraft(nextDraft, roleTeamIds) : nextDraft;
+      change((current) => ({ ...current, draft: projected }));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'HH no válidas para el WBS y perfil.');
     }
