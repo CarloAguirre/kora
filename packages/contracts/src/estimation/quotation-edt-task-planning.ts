@@ -6,7 +6,7 @@ type Setting = NonNullable<Draft['edtTaskSettings']>[number];
 export type QuotationEdtAssignment = {
   wbs: string; role: string; module: string; stageCode: string | null;
   name: string; description: string; references: string[];
-  hours: number; originalHours: number; fixed: boolean; classification?: string;
+  hours: number; originalHours: number; fixed: boolean;
   teamKey: string; teamId: string | null;
 };
 const key = (wbs: string, role: string) => JSON.stringify([wbs, role]);
@@ -35,7 +35,7 @@ export function quotationEdtAssignments(draft: Draft): QuotationEdtAssignment[] 
         (draft.edtCommercialStages?.length ?? 0) > 0 ||
         (draft.edtCommercialTasks?.length ?? 0) > 0 ||
         (draft.edtTaskNames?.length ?? 0) > 0 ||
-        (draft.edtTaskTypes?.length ?? 0) > 0) {
+        false) {
       throw new Error('No puedes configurar tareas o perfiles sin una EDT de origen.');
     }
     return [];
@@ -74,13 +74,6 @@ export function quotationEdtAssignments(draft: Draft): QuotationEdtAssignment[] 
       throw new Error('La tarea añadida tiene WBS, fase, equipo o HH inválidos.');
     }
     commercialWbs.add(item.wbs);
-  }
-  const typed = new Set<string>();
-  for (const edit of draft.edtTaskTypes ?? []) {
-    if (typed.has(edit.wbs) || !sourceWbs.has(edit.wbs)) {
-      throw new Error('Tipo comercial con WBS inexistente o duplicado.');
-    }
-    typed.add(edit.wbs);
   }
   const renamed = new Set<string>();
   for (const edit of draft.edtTaskNames ?? []) {
@@ -130,8 +123,6 @@ export function quotationEdtAssignments(draft: Draft): QuotationEdtAssignment[] 
         description: task.description, references: task.referenceIds ?? [],
         hours: effort.hours, originalHours: sourceEffort.get(id) ?? effort.hours,
         fixed: item?.fixed ?? false,
-        classification: draft.edtTaskTypes?.find((edit) =>
-          edit.wbs === task.wbs)?.classification ?? task.classification,
         teamId: item?.teamId ?? draft.aiPoc?.roleTeamIds[effort.role] ?? null,
         teamKey: quotationAssignmentTeamKey(draft, task.wbs, effort.role),
       });
@@ -144,7 +135,7 @@ export function quotationEdtAssignments(draft: Draft): QuotationEdtAssignment[] 
       wbs: task.wbs, role: 'Tarea comercial', module: task.stageCode,
       stageCode: task.stageCode, name: task.name, description: '',
       references: [], hours: task.hours, originalHours: task.hours,
-      fixed: task.fixed, classification: task.classification,
+      fixed: task.fixed,
       teamId: task.teamId, teamKey: task.teamId,
     });
   }
@@ -363,7 +354,7 @@ export function withQuotationCommercialTask(
 export function patchQuotationCommercialTask(
   draft: Draft, wbs: string,
   patch: Partial<Pick<NonNullable<Draft['edtCommercialTasks']>[number],
-    'name' | 'teamId' | 'hours' | 'fixed' | 'classification'>>,
+    'name' | 'teamId' | 'hours' | 'fixed'>>,
 ): Draft {
   if (!draft.edtCommercialTasks?.some((task) => task.wbs === wbs)) {
     throw new Error('La tarea comercial no existe.');
@@ -379,19 +370,6 @@ export function withoutQuotationCommercialTask(draft: Draft, wbs: string): Draft
   }
   const next = { ...draft, edtCommercialTasks: draft.edtCommercialTasks.filter((task) =>
     task.wbs !== wbs) };
-  quotationEdtAssignments(next);
-  return next;
-}
-export function withQuotationTaskCatalogType(
-  draft: Draft, wbs: string, classification: string,
-): Draft {
-  if (!classification.trim() || classification.length > 40) {
-    throw new Error('Tipo de tarea inválido.');
-  }
-  if (draft.edtCommercialTasks?.some((task) => task.wbs === wbs))
-    return patchQuotationCommercialTask(draft, wbs, { classification });
-  const edits = (draft.edtTaskTypes ?? []).filter((item) => item.wbs !== wbs);
-  const next = { ...draft, edtTaskTypes: [...edits, { wbs, classification }] };
   quotationEdtAssignments(next);
   return next;
 }
