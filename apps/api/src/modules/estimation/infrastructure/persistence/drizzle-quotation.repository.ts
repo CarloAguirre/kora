@@ -37,6 +37,7 @@ import { DATABASE } from '../../../../shared/infrastructure/database/database.mo
 import { calculateQuotation } from '../../domain/quotation-math';
 import { hasOnlyUntouchedDefaultPaymentMilestones } from '../../domain/default-payment-plan-eligibility';
 import { initialQuotationTransferBlockers } from '../../domain/initial-quotation-transfer-blockers';
+import { buildQuotationTransferReferences } from '../../domain/quotation-transfer-references';
 import { InvalidCommercialQuotation, assertQuotationReadyForClient, assertAiProposalReadyToAccept, assertDirectClientApprovalAcknowledged } from '../../domain/quotation-commercial-eligibility';
 import type { QuotationProjectScope, QuotationRepository } from '../../domain/repositories/quotation.repository';
 
@@ -487,6 +488,7 @@ export class DrizzleQuotationRepository implements QuotationRepository {
     const versions = await this.db.select({
       id: quotationVersions.id, versionNumber: quotationVersions.versionNumber,
       revision: quotationVersions.revision, draft: quotationVersions.draft,
+      origin: quotationVersions.origin, totalHours: quotationVersions.totalHours,
     }).from(quotationVersions).where(eq(quotationVersions.quotationId, quotation.id));
     if (!versions.length) return null;
     const [event] = await this.db.select().from(quotationEvents)
@@ -497,21 +499,35 @@ export class DrizzleQuotationRepository implements QuotationRepository {
     const version = versions.find((v) => v.id === event.versionId);
     if (!version) return null;
     const metadata = event.metadata as { moduleIds?: string[]; revision?: number; versionRevision?: number };
-    const edt = quotationDraftDataSchema.parse(version.draft).aiPoc?.edt;
-    if (!edt || !metadata.moduleIds || metadata.moduleIds.length !== edt.modules.length) return null;
+    const draft = quotationDraftDataSchema.parse(version.draft);
+    const edt = draft.aiPoc?.edt;
+    if (!metadata.moduleIds) return null;
+    const commercialModules = edt &&
+      !(draft.edtCommercialTasks?.length || draft.edtCommercialStages?.length)
+      ? edt.modules.map((module) => ({ name: module.name, hours: module.totalHours }))
+      : draft.phases.map((phase) => ({
+        name: phase.name,
+        hours: phase.teamHours.reduce((total, row) => total + row.hours, 0),
+      }));
+    const positive = commercialModules.filter((module) => module.hours > 0);
+    if (metadata.moduleIds.length !== positive.length) return null;
+    const references = buildQuotationTransferReferences(draft,
+      positive.map((module, index) => ({
+        moduleId: metadata.moduleIds![index]!,
+        name: module.name, totalHours: module.hours,
+      })));
     return appliedQuotationPlanningSchema.parse({
       projectId, versionId: version.id, versionNumber: version.versionNumber,
       revision: metadata.revision ?? metadata.versionRevision ?? version.revision,
       appliedAt: event.occurredAt.toISOString(),
-      appliedByUserId: event.actorUserId, source: 'kdm_demo',
+      appliedByUserId: event.actorUserId,
+      source: draft.aiPoc?.source ?? (version.origin === 'copy' ? 'copy' : 'manual'),
       status: event.action === 'quotation_transferred'
         ? 'transferred' : 'accepted_for_planning_only',
       commercialApproval: event.action === 'quotation_transferred',
-      totalHours: edt.totalHours,
-      modules: edt.modules.map((module, i) => ({
-        moduleId: metadata.moduleIds![i], name: module.name,
-        totalHours: module.totalHours, tasks: module.tasks,
-      })),
+      totalHours: Number(version.totalHours),
+      modules: references.modules,
+      unassignedTasks: references.unassignedTasks,
     });
   }
 
