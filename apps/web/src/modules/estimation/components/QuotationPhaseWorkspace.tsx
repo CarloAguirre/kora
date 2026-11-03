@@ -214,7 +214,7 @@ export function QuotationPhaseWorkspace({
                           if (edt && onEditGroupHours)
                             onEditGroupHours(row.teamId, amount, stage?.code,
                               edt.schemaVersion === 'kora.quotation.reference-edt.v1'
-                                ? phase.name : undefined);
+                                ? edt.modules[index]?.name : undefined);
                           else onEditPhase(index, {
                             teamHours: [
                               ...phase.teamHours.filter((item) => item.teamId !== row.teamId),
