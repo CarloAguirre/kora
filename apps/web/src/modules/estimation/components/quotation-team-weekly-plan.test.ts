@@ -105,6 +105,18 @@ describe('Proyección semanal por equipos de la EDT', () => {
     expect([...plan.weekTotals.values()]).toEqual([20, 30, 10]);
   });
 
+  it('cambiar colaboradores no recalcula las HH provenientes de actividades WBS', () => {
+    const changed = quotationDraftDataSchema.parse({
+      ...draft,
+      teams: [{ ...team(dev), collaborators: 4 }, { ...team(qa), collaborators: 2 }],
+    });
+    const original = quotationTeamWeeklyPlan(draft)!;
+    const planned = quotationTeamWeeklyPlan(changed)!;
+    expect(planned.totalHours).toBe(original.totalHours);
+    expect(planned.rows.map((row) => [...row.weeklyHours.values()]))
+      .toEqual(original.rows.map((row) => [...row.weeklyHours.values()]));
+  });
+
   it('no inventa semanas para EDT v1 sin calendario explícito', () => {
     const legacy = quotationDraftDataSchema.parse({
       ...draft,
