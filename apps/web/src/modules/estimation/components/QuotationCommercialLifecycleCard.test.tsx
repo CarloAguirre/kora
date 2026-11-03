@@ -55,6 +55,26 @@ const show = (v = version, proj = project, unsaved = false) =>
     version={v} canOperate hasUnsavedChanges={unsaved}/>);
 
 describe('Ciclo comercial separado · Kora', () => {
+  it('en resumen v5 solo muestra los dos botones comerciales y conserva sus guards', () => {
+    render(<QuotationCommercialLifecycleCard project={project} quotation={quotation}
+      version={{ ...version, aiReviewStatus: 'accepted' }} canOperate
+      hasUnsavedChanges={false} embedded showAiAcceptance={false} />);
+    expect(screen.getByRole('button', { name: 'Marcar como enviada al cliente' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Registrar aprobación del cliente' })).toBeEnabled();
+    expect(screen.queryByText('Ciclo comercial de la cotización')).not.toBeInTheDocument();
+    expect(screen.queryByText('Opciones de aprobación y traspaso')).not.toBeInTheDocument();
+    expect(screen.queryByText('La fuente documental es el PDF KDM de prueba.'))
+      .not.toBeInTheDocument();
+  });
+
+  it('resumen v5 bloquea envío y aprobación mientras haya cambios sin guardar', () => {
+    render(<QuotationCommercialLifecycleCard project={project} quotation={quotation}
+      version={{ ...version, aiReviewStatus: 'accepted' }} canOperate
+      hasUnsavedChanges embedded showAiAcceptance={false} />);
+    expect(screen.getByRole('button', { name: 'Marcar como enviada al cliente' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Registrar aprobación del cliente' })).toBeDisabled();
+  });
+
   it('aceptar IA nunca invoca traspaso o aprobación de cliente', async () => {
     show();
     expect(screen.getByRole('button', { name: 'Marcar como enviada' })).toBeDisabled();
