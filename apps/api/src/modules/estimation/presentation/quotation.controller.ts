@@ -151,21 +151,33 @@ export class QuotationController {
     validateQuestionnaireAnswers(
       this.questionnaire.execute(), input.answers, input.dynamicQuestions,
     );
-    await this.drafts.authorizeAiPoc(projectId, actor);
-    const proposal = await this.generator.execute(input);
+    // Usar el catálogo real activo, leído en backend tras comprobar permisos.
+    // Ninguna identidad de equipo proviene de un nombre libre de Gemini.
+    const activeTeams = await this.drafts.listActiveQuotationTeams(projectId, actor);
+    if (!activeTeams.length) {
+      throw new BadRequestException('No existen equipos activos en Kora para generar la cotización.');
+    }
+    const proposal = await this.generator.execute(input, activeTeams);
     if (proposal.provider !== 'gemini' || proposal.sourceMode !== 'poc_simulated' ||
         proposal.documentsAnalyzed < 1) {
       throw new BadRequestException(
         'No se generó una propuesta válida con Gemini y el PDF KDM de demostración.',
       );
     }
-    const edt = await this.generator.generateEdt(input, proposal);
+    const edt = await this.generator.generateEdt(input, proposal, activeTeams);
     // La EDT detallada determina las HH finales; la primera llamada propone
     // perfiles/capacidad, pero no impone un presupuesto a las actividades.
     const reconciled = this.generator.reconcileProposalWithEdt(proposal, edt);
+    const validIds = new Set(activeTeams.map((team) => team.teamId));
+    if (reconciled.roles.some((role) => !role.teamId || !validIds.has(role.teamId))) {
+      throw new BadRequestException('La propuesta IA no asignó todos los perfiles a equipos activos de Kora.');
+    }
+    const roleTeamIds = Object.fromEntries(
+      reconciled.roles.map((role) => [role.role, role.teamId!]),
+    );
     return this.drafts.createAiPocDraft(
       projectId, actor, reconciled, input.answers, input.dynamicQuestions, edt,
-      input.confirmedUnderstanding,
+      input.confirmedUnderstanding, roleTeamIds,
     );
   }
 
