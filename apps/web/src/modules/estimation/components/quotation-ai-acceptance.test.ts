@@ -60,7 +60,7 @@ describe('Aceptar propuesta IA · motivos de bloqueo', () => {
       draft: { ...mapped.draft, edtCommercialTasks: [{
         wbs: 'KT-0777e456-fd76-445e-83f1-afc25061c105',
         stageCode: 'module:Arquitectura', name: 'Cierre',
-        teamId, hours: 12, fixed: false, classification: 'Gestión y seguimiento',
+        teamId, hours: 12, fixed: false,
       }] },
     } as QuotationVersion;
     expect(quotationAiAcceptanceBlockReason(addedTask, state)).toBeNull();
