@@ -644,7 +644,7 @@ export function QuotationWorkspacePage() {
                     project={project} version={selected}
                     quotation={quotation ?? null}
                     canOperate={mayWrite} hasUnsavedChanges={dirty}
-                    embedded
+                    embedded showAiAcceptance={false}
                   />
                 ) : null}
               />
