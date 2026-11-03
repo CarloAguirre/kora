@@ -74,7 +74,7 @@ export function QuotationTeamsWorkspace({
       <p className={styles.caption}>
         {view === 'team'
           ? hasEdt
-            ? 'Las HH provienen de las actividades de la EDT; colaboradores y capacidad son referenciales y no multiplican sus HH.'
+            ? 'Las HH provienen de las tareas EDT. Dotación, unidad, duración, hh/semana y dedicación son referencias editables; sus cambios no multiplican ni sustituyen las HH de la EDT.'
             : 'Horas = colaboradores × duración × hh/semana × dedicación.'
           : 'Las horas de cada equipo se suman desde las fases.'}
         {' '}Los líderes de equipo se asignan en Kora.
@@ -93,14 +93,16 @@ export function QuotationTeamsWorkspace({
           const team = draft.teams.find((t) => t.teamId === teamId);
           const people = team?.collaborators ?? 1;
           const label = teamName(teamId, teamNames);
-          const checked = Boolean(team) && (!hasEdt || getHours(teamId) > 0);
+          const checked = Boolean(team);
           return (
             <div className={styles.line + ' ' + columns +
               (!checked ? ' ' + styles.inactive : '')} key={teamId}>
               <label className={styles.name}>
                 <input type="checkbox" checked={checked}
-                  disabled={!editable || hasEdt}
-                  title={hasEdt ? 'Las tareas se reasignan desde el desglose por fase.' : undefined}
+                  disabled={!editable}
+                  title={hasEdt && getHours(teamId) > 0
+                    ? 'Para desactivar un equipo con HH, reasigna primero sus tareas en el desglose por fase.'
+                    : undefined}
                   aria-label={'Incluir ' + label}
                   onChange={(e) => onToggleTeam(teamId, e.target.checked)}/>
                 <i style={{ background: quotationTeamColor(label) }} aria-hidden="true"/>
@@ -119,7 +121,7 @@ export function QuotationTeamsWorkspace({
                   else onEditTeam(teamId, { collaborators: count });
                 }}/>
               {view === 'team' && <>
-                <select disabled={!editable || !checked || hasEdt}
+                <select disabled={!editable || !checked}
                   aria-label={'Unidad de ' + label} value={team?.unit ?? 'week'}
                   onChange={(e) => onEditTeam(teamId, {
                     unit: e.target.value as Team['unit'],
@@ -128,20 +130,20 @@ export function QuotationTeamsWorkspace({
                   <option value="day">Días</option>
                 </select>
                 <input className={styles.number} type="number" min={0} max={520}
-                  disabled={!editable || !checked || hasEdt}
+                  disabled={!editable || !checked}
                   aria-label={'Duración de ' + label} value={team?.duration ?? 0}
                   onChange={(e) => onEditTeam(teamId, {
                     duration: Math.max(0, Number(e.target.value) || 0),
                   })}/>
                 <input className={styles.number} type="number" min={0} max={168}
-                  disabled={!editable || !checked || hasEdt}
+                  disabled={!editable || !checked}
                   aria-label={'Horas semanales de ' + label}
                   value={team?.hoursPerWeek ?? 40}
                   onChange={(e) => onEditTeam(teamId, {
                     hoursPerWeek: Math.max(0, Number(e.target.value) || 0),
                   })}/>
                 <input className={styles.number} type="number" min={0} max={100}
-                  disabled={!editable || !checked || hasEdt}
+                  disabled={!editable || !checked}
                   aria-label={'Dedicación de ' + label}
                   value={team?.dedicationPercent ?? 100}
                   onChange={(e) => onEditTeam(teamId, {
