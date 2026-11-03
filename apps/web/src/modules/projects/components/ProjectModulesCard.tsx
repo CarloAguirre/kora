@@ -26,7 +26,7 @@ import { ApiRequestError } from '@/shared/lib/api-client';
 import { PhaseRoadmap, type PhaseRoadmapSelection } from '@/modules/client-portal/components/PhaseRoadmap';
 import { roleFromTeamName, toPhaseRoadmap } from '@/modules/client-portal/adapters/project-detail.adapter';
 import { PHASE_ROADMAP_ROLE_COLORS } from '@/modules/client-portal/types';
-import { useUpdateProjectModule, useUpdateProjectModuleSegment } from '../api/projects.queries';
+import { useCreateProjectModuleSegment, useUpdateProjectModule, useUpdateProjectModuleSegment } from '../api/projects.queries';
 import { QuotationReferenceTaskModal } from './QuotationReferenceTaskModal';
 import { useAppliedQuotationPlanning } from '@/modules/estimation/api/quotation.queries';
 import {
@@ -103,12 +103,14 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
   const toast = useToast();
   const updateModule = useUpdateProjectModule();
   const updateSegment = useUpdateProjectModuleSegment();
+  const createSegment = useCreateProjectModuleSegment();
   const appliedPlanning = useAppliedQuotationPlanning(project.id);
   const phaseRoadmap = useMemo(() => toPhaseRoadmap(project), [project]);
   const modulesById = useMemo(() => new Map(project.modules.map((module) => [module.id, module])), [project.modules]);
 
   /** Tiempo de ejecución que se está editando (`null` = modal cerrado). */
   const [editingSegment, setEditingSegment] = useState<{ moduleId: string; segment: ProjectModuleSegment } | null>(null);
+  const [planningBlock, setPlanningBlock] = useState<{ moduleId: string; teamId: string; name: string } | null>(null);
   const [creatingFromReference, setCreatingFromReference] = useState<{
     moduleId: string | null;
     task: AppliedQuotationPlanning['modules'][number]['tasks'][number];
@@ -116,8 +118,10 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
   // Estable mientras el modal está abierto: `ExecutionSegmentModal` reinicia su formulario cuando cambia `initialValues`,
   // y un refetch del proyecto (re-render de esta tarjeta) no debe borrar lo que se está escribiendo.
   const segmentModalInitialValues = useMemo<ExecutionSegmentModalValues>(
-    () => (editingSegment ? segmentToModalValues(editingSegment.segment) : EMPTY_EXECUTION_SEGMENT_MODAL_VALUES),
-    [editingSegment],
+    () => editingSegment ? segmentToModalValues(editingSegment.segment) : planningBlock
+      ? { ...EMPTY_EXECUTION_SEGMENT_MODAL_VALUES, teamId: planningBlock.teamId, name: planningBlock.name }
+      : EMPTY_EXECUTION_SEGMENT_MODAL_VALUES,
+    [editingSegment, planningBlock],
   );
   // El equipo actual del tramo siempre es elegible, aunque ya no figure entre los equipos del proyecto.
   const segmentModalTeamOptions = useMemo(() => {
@@ -126,18 +130,29 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
   }, [editingSegment, teamOptions]);
 
   const onConfirmSegmentEdit = async (values: ExecutionSegmentModalValues) => {
-    if (!editingSegment) return;
+    if (!editingSegment && !planningBlock) return;
     try {
-      await updateSegment.mutateAsync({
-        projectId: project.id,
-        moduleId: editingSegment.moduleId,
-        segmentId: editingSegment.segment.id,
-        input: toSegmentInput(values),
-      });
+      if (editingSegment) {
+        await updateSegment.mutateAsync({
+          projectId: project.id,
+          moduleId: editingSegment.moduleId,
+          segmentId: editingSegment.segment.id,
+          input: toSegmentInput(values),
+        });
+      } else if (planningBlock) {
+        // La cotización informa semanas relativas. Solo aquí el usuario elige
+        // fechas reales; desde entonces el bloque aparece en el Gantt de Kora.
+        await createSegment.mutateAsync({
+          projectId: project.id,
+          moduleId: planningBlock.moduleId,
+          input: toSegmentInput(values),
+        });
+      }
       setEditingSegment(null);
-      toast.success('Tiempo de ejecución actualizado.');
+      setPlanningBlock(null);
+      toast.success(editingSegment ? 'Bloque actualizado.' : 'Bloque planificado en el Roadmap.');
     } catch (error) {
-      toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo guardar el tiempo de ejecución.');
+      toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo guardar el bloque.');
     }
   };
 
@@ -330,13 +345,13 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
         />
       )}
       <ExecutionSegmentModal
-        open={editingSegment !== null}
-        mode="edit"
+        open={editingSegment !== null || planningBlock !== null}
+        mode={editingSegment ? 'edit' : 'create'}
         teamOptions={segmentModalTeamOptions}
         initialValues={segmentModalInitialValues}
         segmentId={editingSegment?.segment.id ?? null}
-        submitting={updateSegment.isPending}
-        onCancel={() => setEditingSegment(null)}
+        submitting={updateSegment.isPending || createSegment.isPending}
+        onCancel={() => { setEditingSegment(null); setPlanningBlock(null); }}
         onConfirm={(values) => void onConfirmSegmentEdit(values)}
       />
     </>
