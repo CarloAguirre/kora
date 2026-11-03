@@ -13,7 +13,8 @@ describe('HH de encabezado · redistribución atómica', () => {
     fireEvent.change(input, { target: { value: '39.98' } });
     expect(onCommit).not.toHaveBeenCalled();
     fireEvent.blur(input);
-    expect(onCommit).toHaveBeenCalledExactlyOnceWith(39.98);
+    expect(onCommit).toHaveBeenCalledTimes(1);
+    expect(onCommit).toHaveBeenCalledWith(39.98);
   });
 
   it('permite escribir un número completo antes de redistribuir, también con Enter', () => {
@@ -27,7 +28,8 @@ describe('HH de encabezado · redistribución atómica', () => {
     fireEvent.change(input, { target: { value: '39.5' } });
     expect(onCommit).not.toHaveBeenCalled();
     fireEvent.keyDown(input, { key: 'Enter' });
-    expect(onCommit).toHaveBeenCalledExactlyOnceWith(39.5);
+    expect(onCommit).toHaveBeenCalledTimes(1);
+    expect(onCommit).toHaveBeenCalledWith(39.5);
   });
 
   it('Escape cancela y dejar el campo vacío no crea un total cero accidental', () => {
