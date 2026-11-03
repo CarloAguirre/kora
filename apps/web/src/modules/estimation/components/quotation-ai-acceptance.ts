@@ -30,7 +30,8 @@ export function quotationAiAcceptanceBlockReason(
   }
   if (!dirty && missing.length === 0 &&
       version.draft.analysisProjectionStatus !== 'modified' &&
-      Math.abs((effectiveQuotationEdt(version.draft)?.totalHours ?? 0) -
+      Math.abs((effectiveQuotationEdt(version.draft)?.totalHours ?? 0) +
+        (version.draft.edtCommercialTasks ?? []).reduce((sum, task) => sum + task.hours, 0) -
         version.totalHours) > 0.011) {
     requirements.push('concilia las HH comerciales con la EDT guardada');
   }
