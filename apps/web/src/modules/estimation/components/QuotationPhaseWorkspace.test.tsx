@@ -59,6 +59,10 @@ const callbacks = {
   onEditPhase: vi.fn(), onAddPhase: vi.fn(), onRemovePhase: vi.fn(),
   onEditTaskHours: vi.fn(), onEditTaskFixed: vi.fn(), onEditTaskTeam: vi.fn(),
   onEditGroupHours: vi.fn(), onEditStage: vi.fn(), onOpenRoleMapping: vi.fn(),
+  onAddTask: vi.fn(), onDeleteTask: vi.fn(),
+  onEditTaskName: vi.fn(), onEditTaskType: vi.fn(),
+  onImportTaskExcel: vi.fn().mockResolvedValue(undefined),
+  onRemoveCommercialPhase: vi.fn(),
 };
 function renderEditor(custom = draft) {
   return render(<QuotationPhaseWorkspace
@@ -87,8 +91,9 @@ describe('Cotización HTML v5 · fases y tareas', () => {
     expect(screen.getAllByText('Tarea')).toHaveLength(2);
     expect(screen.getAllByText('Equipo')).toHaveLength(2);
     expect(screen.getAllByText('Fija')).toHaveLength(2);
-    expect(screen.queryByText('Tipo (catálogo)')).not.toBeInTheDocument();
-    expect(screen.getAllByText('Perfil requerido: Fullstack')).toHaveLength(1);
+    expect(screen.getAllByText('Tipo (catálogo)')).toHaveLength(2);
+    expect(screen.queryByText('Perfil requerido: Fullstack')).not.toBeInTheDocument();
+    expect(screen.queryByText('Descripción y referencias')).not.toBeInTheDocument();
     expect(screen.getAllByRole('option', { name: 'Desarrollo' }).length).toBeGreaterThan(0);
     expect(screen.queryByRole('option', { name: /Perfil IA/ })).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Equipo de T01.01 · Fullstack'),
@@ -153,6 +158,50 @@ describe('Cotización HTML v5 · fases y tareas', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Eliminar' }));
     expect(callbacks.onRemovePhase).not.toHaveBeenCalled();
     vi.restoreAllMocks();
+  });
+
+  it('muestra añadir tarea, Excel y plantilla dentro de cada fase EDT', () => {
+    renderEditor(mappedDraft);
+    expect(screen.getAllByRole('button', { name: '+ Agregar tarea' })).toHaveLength(2);
+    expect(screen.getAllByText('Importar Excel')).toHaveLength(2);
+    expect(screen.getAllByRole('button', { name: 'Ver plantilla' })).toHaveLength(2);
+    fireEvent.click(screen.getAllByRole('button', { name: '+ Agregar tarea' })[0]!);
+    expect(callbacks.onAddTask).toHaveBeenCalledWith('T01');
+    expect(screen.getByRole('button', { name: '+ Agregar fase / módulo' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '+ Agregar fase / módulo' }));
+    expect(callbacks.onAddPhase).toHaveBeenCalledOnce();
+  });
+
+  it('permite cambiar el nombre y tipo de tarea, sin mostrar metadatos Gemini', () => {
+    renderEditor(mappedDraft);
+    const name = screen.getByLabelText('Tarea T01.01 · Fullstack');
+    fireEvent.change(name, { target: { value: 'Integración revisada' } });
+    fireEvent.blur(name);
+    expect(callbacks.onEditTaskName).toHaveBeenCalledWith('T01.01', 'Integración revisada');
+    fireEvent.change(screen.getByLabelText('Tipo de T01.01 · Fullstack'),
+      { target: { value: 'Integración con API' } });
+    expect(callbacks.onEditTaskType).toHaveBeenCalledWith('T01.01', 'Integración con API');
+    expect(screen.queryByText(/Propuesta del agente/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Descripción y referencias/)).not.toBeInTheDocument();
+  });
+
+  it('muestra una fase comercial nueva con su tarea sin perder los originales', () => {
+    const extraPhase = { code: 'KS-0777e456-fd76-445e-83f1-afc25061c103',
+      name: 'Control', startWeek: 5, durationWeeks: 2 };
+    const extraTask = { wbs: 'KT-0777e456-fd76-445e-83f1-afc25061c105',
+      stageCode: extraPhase.code, name: 'Control de entregas',
+      teamId: qa, hours: 12, fixed: false, classification: 'Pruebas funcionales' };
+    const composed = quotationDraftDataSchema.parse({
+      ...mappedDraft, edtCommercialStages: [extraPhase], edtCommercialTasks: [extraTask],
+    });
+    const phases = referencePhasesFromEdt(edt, composed.aiPoc?.roleTeamIds ?? {}, teams, composed);
+    expect(phases).toHaveLength(3);
+    expect(phases[2]?.teamHours).toEqual([{ teamId: qa, hours: 12 }]);
+    renderEditor(composed);
+    expect(screen.getByText('Fase 4')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Control de entregas')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Quitar tarea ' + extraTask.wbs }));
+    expect(callbacks.onDeleteTask).toHaveBeenCalledWith(extraTask.wbs);
   });
 
   it('mantiene HH por perfil y WBS al representar un mismo trabajo multiperfil', () => {
