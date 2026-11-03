@@ -9,7 +9,7 @@ import styles from './QuotationPhaseWorkspace.module.css';
 type Phase = QuotationDraftData['phases'][number];
 type Team = QuotationDraftData['teams'][number];
 type TaskRow = {
-  wbs: string; name: string; module: string; description: string;
+  wbs: string; name: string; module: string; stageCode?: string | null; description: string;
   role: string; team: string; teamKey: string; teamId: string | null;
   fixed: boolean; hours: number; references: string[]; classification?: string;
 };
@@ -53,7 +53,8 @@ export function referenceTasksForPhase(
       const teamId = mapping[effort.role] ?? null;
       rows.push({
         wbs: task.wbs, role: effort.role, name: task.name, module: module.name,
-        description: task.description, hours: effort.hours, references: task.referenceIds ?? [],
+        description: task.description, stageCode: task.stageCode ?? null,
+        hours: effort.hours, references: task.referenceIds ?? [],
         classification: task.classification,
         teamId, teamKey: teamId ?? 'profile:' + effort.role, fixed: false,
         team: teamId ? nameOf(teamId, teamNames) : effort.role,
