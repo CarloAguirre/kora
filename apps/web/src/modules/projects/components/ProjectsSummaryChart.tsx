@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import type { ProjectPeriod, ProjectStatus, ProjectSummary, ProjectType } from '@kora/contracts';
 import styles from './ProjectsSummaryChart.module.css';
@@ -9,13 +9,11 @@ import { useProjectsList } from '../api/projects.queries';
 /** Tope de la API por página — el gráfico muestra una sola página con los proyectos que pasan los filtros. */
 const CHART_PAGE_SIZE = 200;
 
-// Mantener la orientación original (-35°). La altura del eje se adapta al
-// nombre más largo para evitar el recorte inferior de las etiquetas SVG.
-const X_AXIS_ANGLE_RADIANS = (35 * Math.PI) / 180;
-const X_AXIS_FONT_SIZE = 11;
+// Valores originales del gráfico: Recharts ajusta únicamente el espacio
+// adicional que las etiquetas inclinadas necesiten al renderizarse.
 const X_AXIS_MIN_HEIGHT = 70;
 const PROJECT_MIN_WIDTH = 56;
-const estimatedLabelWidth = (name: string) => name.length * X_AXIS_FONT_SIZE * 0.62;
+const LABEL_CLEARANCE = 6;
 
 interface ProjectsSummaryChartProps {
   type: ProjectType;
@@ -164,21 +162,79 @@ export function ProjectsSummaryChart({ type, clientOptions, showFinalizedToggle 
     [filtered],
   );
 
-  // A -35°, la altura necesaria depende de la longitud real de las etiquetas.
-  // Se preservan la fuente, inclinación, separación y tamaño de las barras.
-  const longestLabelWidth = Math.max(0, ...chartData.map((project) => estimatedLabelWidth(project.name)));
-  const axisHeight = Math.max(
-    X_AXIS_MIN_HEIGHT,
-    Math.ceil(22 + longestLabelWidth * Math.sin(X_AXIS_ANGLE_RADIANS)),
-  );
+  const chartContainerRef = useRef<HTMLDivElement>(null);
+  const [axisLayout, setAxisLayout] = useState({ extraHeight: 0, leftPadding: 0 });
 
-  // La primera etiqueta se extiende hacia la izquierda por la inclinación:
-  // reservar solo el espacio adicional requerido, sin cortarla en el SVG.
-  const firstLabelWidth = estimatedLabelWidth(chartData[0]?.name ?? '');
-  const firstLabelPadding = Math.max(
-    0,
-    Math.ceil(firstLabelWidth * Math.cos(X_AXIS_ANGLE_RADIANS) - 70),
-  );
+  useEffect(() => {
+    const container = chartContainerRef.current;
+    if (!container) return;
+
+    let frame: number | null = null;
+    const measure = () => {
+      const svg = container.querySelector<SVGSVGElement>('svg.recharts-surface');
+      const ticks = Array.from(
+        container.querySelectorAll<SVGTextElement>('.recharts-xAxis .recharts-cartesian-axis-tick-value'),
+      );
+      if (!svg || ticks.length === 0) {
+        if (chartData.length === 0) {
+          setAxisLayout((previous) =>
+            previous.extraHeight === 0 && previous.leftPadding === 0
+              ? previous
+              : { extraHeight: 0, leftPadding: 0 },
+          );
+        }
+        return;
+      }
+
+      // getBoundingClientRect incluye la rotación SVG y la fuente real.
+      // A diferencia de estimar caracteres, mide el espacio efectivamente
+      // ocupado por los nombres, incluyendo los que salen del viewport.
+      const bounds = ticks.map((tick) => tick.getBoundingClientRect()).filter((rect) => rect.height > 0);
+      if (bounds.length === 0) return;
+
+      const surface = svg.getBoundingClientRect();
+      const bottom = Math.max(...bounds.map((rect) => rect.bottom));
+      const left = Math.min(...bounds.map((rect) => rect.left));
+      setAxisLayout((previous) => {
+        const extraHeight = Math.max(
+          0,
+          Math.ceil(previous.extraHeight + bottom + LABEL_CLEARANCE - surface.bottom),
+        );
+        const leftPadding = Math.max(
+          0,
+          Math.ceil(previous.leftPadding + surface.left + LABEL_CLEARANCE - left),
+        );
+        if (Math.abs(extraHeight - previous.extraHeight) < 2 && Math.abs(leftPadding - previous.leftPadding) < 2) {
+          return previous;
+        }
+        return { extraHeight, leftPadding };
+      });
+    };
+
+    const scheduleMeasure = () => {
+      if (typeof requestAnimationFrame !== 'function') return;
+      if (frame !== null) cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        frame = null;
+        measure();
+      });
+    };
+
+    // ResponsiveContainer calcula su anchura después del primer render.
+    // Observar las etiquetas garantiza la medición también tras cambios
+    // de filtros, de tamaño de ventana o del propio gráfico.
+    const mutations = typeof MutationObserver === 'undefined' ? null : new MutationObserver(scheduleMeasure);
+    mutations?.observe(container, { childList: true, subtree: true, characterData: true });
+    const resizing = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(scheduleMeasure);
+    resizing?.observe(container);
+    scheduleMeasure();
+
+    return () => {
+      if (frame !== null) cancelAnimationFrame(frame);
+      mutations?.disconnect();
+      resizing?.disconnect();
+    };
+  }, [chartData, axisLayout.extraHeight, axisLayout.leftPadding]);
 
   const totals = useMemo(
     () =>
@@ -244,21 +300,21 @@ export function ProjectsSummaryChart({ type, clientOptions, showFinalizedToggle 
 
       <div className={styles.body}>
         <div className={styles.chartArea}>
-          {/* Mismo gráfico original: etiquetas a -35°, con espacio adaptativo
-              para nombres largos sin recorte y scroll horizontal existente. */}
-          <div className={styles.chartScroll}>
-            <div style={{ minWidth: Math.max(chartData.length * PROJECT_MIN_WIDTH + firstLabelPadding, 100) }}>
-              <ResponsiveContainer width="100%" height={280 + axisHeight - X_AXIS_MIN_HEIGHT}>
+          {/* Misma inclinación (-35°) y separación original de las barras;
+              el espacio adicional lo determinan las etiquetas renderizadas. */}
+          <div className={styles.chartScroll} ref={chartContainerRef}>
+            <div style={{ minWidth: Math.max(chartData.length * PROJECT_MIN_WIDTH, 100) }}>
+              <ResponsiveContainer width="100%" height={280 + axisLayout.extraHeight}>
                 <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--kora-surface-disabled)" vertical={false} />
                   <XAxis
                     dataKey="name"
-                    tick={{ fontSize: X_AXIS_FONT_SIZE }}
+                    tick={{ fontSize: 11 }}
                     interval={0}
                     angle={-35}
                     textAnchor="end"
-                    height={axisHeight}
-                    padding={{ left: firstLabelPadding }}
+                    height={X_AXIS_MIN_HEIGHT + axisLayout.extraHeight}
+                    padding={{ left: axisLayout.leftPadding }}
                   />
                   <YAxis tick={{ fontSize: 11 }} />
                   <Tooltip content={<ChartTooltip />} />
