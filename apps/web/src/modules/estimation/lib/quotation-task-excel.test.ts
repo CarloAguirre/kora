@@ -31,7 +31,7 @@ describe('Excel de tareas en cotización', () => {
     const catalog = XLSX.utils.sheet_to_json<unknown[]>(book.Sheets['Tipos catálogo']!, {header: 1});
     expect(catalog.some((row) => row[0] === 'Integración con API')).toBe(true);
     const cfb = XLSX.CFB.read(bytes, { type: 'buffer' });
-    const index = cfb.FullPaths.findIndex((path) =>
+    const index = cfb.FullPaths.findIndex((path: string) =>
       path.toLowerCase().endsWith('/xl/worksheets/sheet1.xml'));
     expect(index).toBeGreaterThanOrEqual(0);
     const xml = new TextDecoder().decode(new Uint8Array(cfb.FileIndex[index]!.content!));
