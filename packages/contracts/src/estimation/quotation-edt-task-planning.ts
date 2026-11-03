@@ -60,6 +60,17 @@ export function quotationEdtAssignments(draft: Draft): QuotationEdtAssignment[] 
     }
     settings.set(id, item);
   }
+  const validStages = new Set(edt.schemaVersion === 'kora.quotation.reference-edt.v2'
+    ? (edt.stages ?? []).map((stage) => stage.code)
+    : edt.modules.map((module) => 'module:' + module.name));
+  const seenStages = new Set<string>();
+  for (const stage of draft.edtStageSettings ?? []) {
+    if (!validStages.has(stage.stageCode) || seenStages.has(stage.stageCode) ||
+        stage.startWeek + stage.durationWeeks - 1 > 520) {
+      throw new Error('La edición de etapa contiene un tramo inexistente, duplicado o fuera de 520 semanas.');
+    }
+    seenStages.add(stage.stageCode);
+  }
   const roles = new Set(draft.aiPoc?.proposal.roles.map((role) => role.role) ?? []);
   const staffing = new Set<string>();
   for (const item of draft.edtRoleCollaborators ?? []) {
@@ -198,3 +209,38 @@ export function redistributeQuotationEdtHours(
   if (calculated !== target) throw new Error('Las HH redistribuidas no concilian.');
   return next;
 }
+
+/** Edita nombre y semanas SIN alterar las fechas originales de Gemini.
+ * Rechaza periodos fuera del horizonte y etapas inexistentes. */
+export function withQuotationEdtStageSetting(
+  draft: Draft, stageCode: string,
+  patch: Partial<NonNullable<Draft['edtStageSettings']>[number]>,
+): Draft {
+  const edt = effectiveQuotationEdt(draft);
+  if (!edt) throw new Error('La cotización no tiene EDT.');
+  const valid = edt.schemaVersion === 'kora.quotation.reference-edt.v2'
+    ? edt.stages?.find((stage) => stage.code === stageCode)
+    : edt.modules.find((module) => 'module:' + module.name === stageCode);
+  if (!valid) throw new Error('El tramo solicitado no existe.');
+  const initial = edt.schemaVersion === 'kora.quotation.reference-edt.v2'
+    ? edt.stages?.find((stage) => stage.code === stageCode) : undefined;
+  const previous = (draft.edtStageSettings ?? []).find((row) => row.stageCode === stageCode);
+  const value = {
+    stageCode,
+    name: patch.name ?? previous?.name ?? ('name' in valid ? valid.name : stageCode),
+    startWeek: patch.startWeek ?? previous?.startWeek ?? initial?.startWeek ?? 1,
+    durationWeeks: patch.durationWeeks ?? previous?.durationWeeks ?? initial?.durationWeeks ?? 1,
+  };
+  if (!value.name.trim() || value.name.length > 300 ||
+      !Number.isInteger(value.startWeek) || !Number.isInteger(value.durationWeeks) ||
+      value.startWeek < 1 || value.durationWeeks < 1 ||
+      value.startWeek + value.durationWeeks - 1 > 520) {
+    throw new Error('El nombre o las semanas del tramo son inválidos.');
+  }
+  const others = (draft.edtStageSettings ?? []).filter(
+    (row) => row.stageCode !== stageCode);
+  const next = { ...draft, edtStageSettings: [...others, value] };
+  quotationEdtAssignments(next);
+  return next;
+}
+
