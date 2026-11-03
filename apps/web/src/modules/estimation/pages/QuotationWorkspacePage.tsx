@@ -567,7 +567,7 @@ export function QuotationWorkspacePage() {
                       edt={effectiveEdt}
                       roleTeamIds={form.draft.aiPoc?.roleTeamIds}
                       editable={editable}
-                      adjustedHoursCount={form.draft.edtHourAdjustments.length}
+                      adjustedHoursCount={form.draft.edtHourAdjustments?.length ?? 0}
                       onEditTaskHours={editEdtHours}
                       onEditPhase={editPhase}
                       onAddPhase={() => updateDraft({ phases: [
