@@ -1,4 +1,5 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import {
   PROJECT_MODULE_DELIVERY_STATUS_LABELS,
   PROJECT_MODULE_STAGES,
@@ -26,7 +27,8 @@ import { ApiRequestError } from '@/shared/lib/api-client';
 import { PhaseRoadmap, type PhaseRoadmapSelection } from '@/modules/client-portal/components/PhaseRoadmap';
 import { roleFromTeamName, toPhaseRoadmap } from '@/modules/client-portal/adapters/project-detail.adapter';
 import { PHASE_ROADMAP_ROLE_COLORS } from '@/modules/client-portal/types';
-import { useCreateProjectModuleSegment, useUpdateProjectModule, useUpdateProjectModuleSegment } from '../api/projects.queries';
+import { useCreateProjectModuleSegment, useDeleteProjectModuleSegment, useUpdateProjectModule, useUpdateProjectModuleDelivery, useUpdateProjectModuleSegment } from '../api/projects.queries';
+import { useConfirmAction } from '@/shared/components/ui/useConfirmAction';
 import { QuotationReferenceTaskModal } from './QuotationReferenceTaskModal';
 import { useAppliedQuotationPlanning } from '@/modules/estimation/api/quotation.queries';
 import {
@@ -104,6 +106,8 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
   const updateModule = useUpdateProjectModule();
   const updateSegment = useUpdateProjectModuleSegment();
   const createSegment = useCreateProjectModuleSegment();
+  const deleteSegment = useDeleteProjectModuleSegment();
+  const { confirm, dialog: confirmationDialog } = useConfirmAction();
   const appliedPlanning = useAppliedQuotationPlanning(project.id);
   const phaseRoadmap = useMemo(() => toPhaseRoadmap(project), [project]);
   const modulesById = useMemo(() => new Map(project.modules.map((module) => [module.id, module])), [project.modules]);
@@ -153,6 +157,24 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
       toast.success(editingSegment ? 'Bloque actualizado.' : 'Bloque planificado en el Roadmap.');
     } catch (error) {
       toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo guardar el bloque.');
+    }
+  };
+
+  const onDeleteSegment = async (
+    moduleId: string, segment: ProjectModuleSegment, close: () => void,
+  ) => {
+    if (!await confirm({
+      title: 'Eliminar bloque de trabajo',
+      description: '¿Eliminar «' + segment.name +
+        '»? Se eliminará únicamente este bloque operativo. Las tareas EDT de referencia se conservarán.',
+      confirmLabel: 'Eliminar bloque', destructive: true,
+    })) return;
+    try {
+      await deleteSegment.mutateAsync({ projectId: project.id, moduleId, segmentId: segment.id });
+      close();
+      toast.success('Bloque eliminado. Las referencias comerciales se conservaron.');
+    } catch (error) {
+      toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo eliminar el bloque.');
     }
   };
 
@@ -286,10 +308,17 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
     if (selection.kind === 'segment') {
       const segment = module.segments.find((s) => s.id === selection.id);
       return segment ? (
-        <SegmentDetail
+        <SegmentDrawer
+          project={project}
+          module={module}
           segment={segment}
+          reference={appliedPlanning.data?.modules.find((entry) => entry.moduleId === module.id)}
           onClose={close}
-          onEdit={canManage ? () => setEditingSegment({ moduleId: module.id, segment }) : undefined}
+          onEdit={canManage ? () => {
+            setEditingSegment({ moduleId: module.id, segment });
+            close();
+          } : undefined}
+          onDelete={canManage ? () => void onDeleteSegment(module.id, segment, close) : undefined}
         />
       ) : null;
     }
@@ -344,6 +373,7 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
           onClose={() => setCreatingFromReference(null)}
         />
       )}
+      {confirmationDialog}
       <ExecutionSegmentModal
         open={editingSegment !== null || planningBlock !== null}
         mode={editingSegment ? 'edit' : 'create'}
