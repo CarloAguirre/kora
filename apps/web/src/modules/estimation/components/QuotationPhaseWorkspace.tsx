@@ -48,7 +48,7 @@ export function referenceTasksForPhase(
   for (const module of edt.modules) {
     for (const task of module.tasks) {
       if (stage ? task.stageCode !== stage.code :
-        !isLegacy || phase.name !== task.role) continue;
+        !isLegacy || (phase.name !== module.name && phase.name !== task.role)) continue;
       const efforts = task.roleEffort ?? [{ role: task.role, hours: task.hours }];
       for (const part of efforts) {
         result.push({
