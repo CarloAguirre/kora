@@ -46,7 +46,6 @@ beforeEach(() => {
   mocks.markSent.mockResolvedValue({ ...version, status: 'sent', revision: 5 });
   mocks.approveClient.mockResolvedValue({ ...version, status: 'approved', revision: 6 });
   mocks.transferApproved.mockResolvedValue({ versionId: version.id });
-  vi.spyOn(window, 'confirm').mockReturnValue(true);
 });
 afterEach(() => vi.restoreAllMocks());
 
@@ -103,6 +102,7 @@ describe('Ciclo comercial separado · Kora', () => {
     show();
     expect(screen.getByRole('button', { name: 'Marcar como enviada' })).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: 'Aceptar propuesta IA' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Aceptar propuesta', exact: true }));
     await waitFor(() => expect(mocks.acceptAi).toHaveBeenCalledWith({
       versionId: version.id, revision: 3,
     }));
@@ -113,17 +113,17 @@ describe('Ciclo comercial separado · Kora', () => {
   it('una versión revisada puede marcarse enviada y se registra sin correo', async () => {
     show({ ...version, aiReviewStatus: 'accepted' });
     fireEvent.click(screen.getByRole('button', { name: 'Marcar como enviada' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar envío' }));
     await waitFor(() => expect(mocks.markSent).toHaveBeenCalledWith({
       versionId: version.id, revision: 3,
     }));
-    expect(window.confirm).toHaveBeenCalledWith(
-      expect.stringContaining('NO envía correos'),
-    );
+    expect(screen.queryByText('Registrar envío comercial')).toBeInTheDocument();
   });
 
   it('la aprobación con traspaso después no altera el proyecto', async () => {
     show({ ...version, status: 'sent', aiReviewStatus: 'accepted' });
     fireEvent.click(screen.getByRole('button', { name: 'Registrar aprobación' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar aprobación' }));
     await waitFor(() => expect(mocks.approveClient).toHaveBeenCalledWith({
       versionId: version.id, revision: 3,
     }));
@@ -145,16 +145,14 @@ describe('Ciclo comercial separado · Kora', () => {
     await waitFor(() => expect(mocks.approveClient).toHaveBeenCalledWith({
       versionId: version.id, revision: 3, confirmWithoutSend: true,
     }));
-    expect(window.confirm).toHaveBeenCalledWith(
-      expect.stringContaining('no hay un envío al cliente registrado'),
-    );
+    expect(screen.getByText(/no hay un envío al cliente registrado/i)).toBeInTheDocument();
     expect(mocks.transferApproved).not.toHaveBeenCalled();
   });
 
   it('si se cancela la advertencia del borrador, no registra aprobación', () => {
-    vi.mocked(window.confirm).mockReturnValueOnce(false);
     show({ ...version, aiReviewStatus: 'accepted' });
     fireEvent.click(screen.getByRole('button', { name: 'Registrar aprobación' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
     expect(mocks.approveClient).not.toHaveBeenCalled();
   });
 
