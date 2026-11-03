@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { estimationAnalysisArtifactSchema, isQuotationDraftEligibleProject, quotationDraftDataSchema, type EstimationAnalysisArtifact, type QuotationDraftData, type QuotationVersion, type UpdateQuotationDraftInput } from '@kora/contracts';
+import { estimationAnalysisArtifactSchema, isQuotationDraftEligibleProject, quotationDraftDataSchema, effectiveQuotationEdt, projectPocRolesToQuotationDraft, type EstimationAnalysisArtifact, type QuotationDraftData, type QuotationVersion, type UpdateQuotationDraftInput } from '@kora/contracts';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { useProjectDetail } from '@/modules/projects/api/projects.queries';
@@ -214,6 +214,7 @@ export function QuotationWorkspacePage() {
   const teamRows = form?.draft.teams ?? [];
   const phaseRows = form?.draft.phases ?? [];
   const available = activeTeams.filter((team) => !teamRows.some((row) => row.teamId === team.id));
+  const effectiveEdt = form?.draft.aiPoc?.edt ? effectiveQuotationEdt(form.draft) : null;
   const aiSnapshot = selected?.draft.aiPoc;
   const aiRolesMapped = Boolean(aiSnapshot && aiSnapshot.proposal.roles.every((role) =>
     Boolean(aiSnapshot.roleTeamIds[role.role]) &&
@@ -236,6 +237,37 @@ export function QuotationWorkspacePage() {
     updateDraft({ phases: phaseRows.map((row, position) => position === index ? { ...row, ...patch } : row) });
   };
 
+  const editEdtHours = (wbs: string, role: string, hours: number) => {
+    if (!editable) return;
+    try {
+      change((current) => {
+        const source = current.draft.aiPoc?.edt;
+        if (!source) return current;
+        const task = source.modules.flatMap((module) => module.tasks)
+          .find((item) => item.wbs === wbs);
+        const initial = task?.roleEffort?.find((item) => item.role === role)?.hours ??
+          (task?.role === role ? task.hours : null);
+        if (initial === null || !Number.isFinite(hours) || hours <= 0) return current;
+        const edits = current.draft.edtHourAdjustments.filter((entry) =>
+          entry.wbs !== wbs || entry.role !== role);
+        if (Math.abs(initial - hours) > 0.0001) edits.push({ wbs, role, hours });
+        const nextDraft: QuotationDraftData = {
+          ...current.draft, edtHourAdjustments: edits,
+          analysisProjectionStatus: 'modified',
+        };
+        const roleTeamIds = nextDraft.aiPoc?.roleTeamIds ?? {};
+        const mapped = nextDraft.aiPoc?.proposal.roles.every((item) =>
+          Boolean(roleTeamIds[item.role]) && nextDraft.teams.some(
+            (team) => team.teamId === roleTeamIds[item.role])) ?? false;
+        const projected = mapped && nextDraft.mode === 'phases'
+          ? projectPocRolesToQuotationDraft(nextDraft, roleTeamIds) : nextDraft;
+        return { ...current, draft: projected };
+      });
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'HH no válidas para el WBS y perfil.');
+    }
+  };
+
   const acceptAiProposal = async () => {
     if (!selected || !editable || dirty || selected.status !== 'draft' ||
       selected.aiReviewStatus !== 'pending' || !aiRolesMapped ||
@@ -252,7 +284,7 @@ export function QuotationWorkspacePage() {
   };
 
   return (
-    <DashboardLayout title="Proyectos">
+    <DashboardLayout title="Proyectos" containedScroll>
       <main className={styles.page}>
         {project && <h1 className={styles.projectTitle}>{project.name}</h1>}
         <nav className={styles.breadcrumb} aria-label="Navegación de cotización">
@@ -304,6 +336,11 @@ export function QuotationWorkspacePage() {
                       }}>✦ Nueva versión con IA</button>
                     <button type="button" className={styles.textAction} disabled={createVersion.isPending}
                       onClick={() => void newVersion()}>En blanco</button>
+                    {editable && dirty &&
+                      <Button size="sm" className={styles.saveDraftAction}
+                        loading={saveDraft.isPending} onClick={() => void save()}>
+                        Guardar borrador
+                      </Button>}
                   </>}
                 </div>
                 {selected && form && <>
@@ -511,9 +548,11 @@ export function QuotationWorkspacePage() {
                       phases={phaseRows}
                       teams={teamRows}
                       teamNames={teamById}
-                      edt={form.draft.aiPoc?.edt}
+                      edt={effectiveEdt}
                       roleTeamIds={form.draft.aiPoc?.roleTeamIds}
                       editable={editable}
+                      adjustedHoursCount={form.draft.edtHourAdjustments.length}
+                      onEditTaskHours={editEdtHours}
                       onEditPhase={editPhase}
                       onAddPhase={() => updateDraft({ phases: [
                         ...phaseRows, { name: 'Nuevo módulo', startWeek: 1,
