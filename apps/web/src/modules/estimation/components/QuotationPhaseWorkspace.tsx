@@ -37,7 +37,9 @@ export function referenceTasksForPhase(
         setting.stageCode.startsWith('module:') &&
         setting.name === phase.name)?.stageCode.slice(7);
       return edt.schemaVersion === 'kora.quotation.reference-edt.v1' &&
-        (task.module === (originalName ?? phase.name) || task.role === phase.name);
+        (task.module === (originalName ?? phase.name) ||
+         task.stageCode === 'module:' + (originalName ?? phase.name) ||
+         task.role === phase.name);
     })
     .map((task) => ({
       ...task, team: nameOf(task.teamKey, teamNames),
@@ -73,13 +75,11 @@ export function referencePhasesFromEdt(
   const entries = [...(v2 ? (edt.stages ?? []).map((s) => ({
     code: s.code, name: s.name, startWeek: s.startWeek,
     durationWeeks: s.durationWeeks,
-    match: (row: TaskRow) => row.wbs.length >= 0 && Boolean(
-      edt.modules.some((m) => m.tasks.some((t) =>
-        t.wbs === row.wbs && t.stageCode === s.code)),
-    ),
+    match: (row: TaskRow) => row.stageCode === s.code,
   })) : edt.modules.map((m) => ({
     code: 'module:' + m.name, name: m.name, startWeek: 1, durationWeeks: 1,
-    match: (row: TaskRow) => row.module === m.name,
+    match: (row: TaskRow) => row.module === m.name ||
+      row.stageCode === 'module:' + m.name,
   }))), ...(draft?.edtCommercialStages ?? []).map((s) => ({
     code: s.code, name: s.name, startWeek: s.startWeek,
     durationWeeks: s.durationWeeks,
