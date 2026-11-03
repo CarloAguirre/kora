@@ -33,7 +33,8 @@ describe('Aceptar propuesta IA · motivos de bloqueo', () => {
       ...pending,
       draft: {
         ...pending.draft,
-        teams: [{ teamId }],
+        teams: [{ teamId, collaborators: 1, unit: 'week' as const,
+          duration: 1, hoursPerWeek: 40, dedicationPercent: 100 }],
         aiPoc: {
           ...pending.draft.aiPoc!,
           roleTeamIds: { 'Tech Lead / Arquitecto de Software': teamId },
