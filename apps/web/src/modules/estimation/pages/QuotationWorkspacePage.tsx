@@ -12,7 +12,7 @@ import { Select } from '@/shared/components/ui/Select';
 import { Badge } from '@/shared/components/ui/Badge';
 import { SegmentedControl } from '@/shared/components/ui/SegmentedControl';
 import { TextField } from '@/shared/components/ui/TextField';
-import { useAppliedQuotationPlanning, useCreateQuotationVersion, useProjectQuotation, useSaveQuotationDraft } from '../api/quotation.queries';
+import { useAppliedQuotationPlanning, useCreateQuotationVersion, useProjectQuotation, useSaveQuotationDraft, useQuotationLifecycle } from '../api/quotation.queries';
 import { AnalysisEvidenceCard } from '../components/AnalysisEvidenceCard';
 import { QuotationVersionComparison } from '../components/QuotationVersionComparison';
 import { QuotationTransferPreviewCard } from '../components/QuotationTransferPreviewCard';
@@ -21,6 +21,8 @@ import { AiPocRoleMappingCard } from '../components/AiPocRoleMappingCard';
 import { QuotationPlanningAcceptanceCard } from '../components/QuotationPlanningAcceptanceCard';
 import { QuotationCommercialLifecycleCard } from '../components/QuotationCommercialLifecycleCard';
 import { QuotationCommercialSummary } from '../components/QuotationCommercialSummary';
+import { QuotationPhaseWorkspace } from '../components/QuotationPhaseWorkspace';
+import { QuotationCommercialSections } from '../components/QuotationCommercialSections';
 import { NewProjectQuotationModal } from '../components/NewProjectQuotationModal';
 import styles from './QuotationWorkspacePage.module.css';
 
@@ -50,6 +52,7 @@ export function QuotationWorkspacePage() {
   const appliedPlan = useAppliedQuotationPlanning(projectId);
   const createVersion = useCreateQuotationVersion(projectId ?? '');
   const saveDraft = useSaveQuotationDraft(projectId ?? '');
+  const lifecycle = useQuotationLifecycle(projectId ?? '');
   const teamQuery = useTeamsList({ page: 1, pageSize: 200, isActive: true, sortField: 'name' }, { enabled: Boolean(projectId) });
 
   const [form, setForm] = useState<Form | null>(null);
@@ -211,7 +214,6 @@ export function QuotationWorkspacePage() {
   const teamRows = form?.draft.teams ?? [];
   const phaseRows = form?.draft.phases ?? [];
   const available = activeTeams.filter((team) => !teamRows.some((row) => row.teamId === team.id));
-  const usedPercent = (form?.draft.paymentPlan ?? []).reduce((sum, payment) => sum + payment.percent, 0);
   const editTeam = (index: number, patch: Partial<QuotationDraftData['teams'][number]>) => {
     if (!form) return;
     const original = teamRows[index];
@@ -229,9 +231,25 @@ export function QuotationWorkspacePage() {
     updateDraft({ phases: phaseRows.map((row, position) => position === index ? { ...row, ...patch } : row) });
   };
 
+  const acceptAiProposal = async () => {
+    if (!selected || !editable || dirty || selected.status !== 'draft' ||
+      selected.aiReviewStatus !== 'pending' || teamRows.length === 0 ||
+      selected.id !== versions.at(-1)?.id || lifecycle.acceptAi.isPending) return;
+    if (!window.confirm('Aceptar la propuesta de Gemini no aprueba al cliente ni traspasa el proyecto. ¿Confirmas?')) return;
+    setError('');
+    setNotice('');
+    try {
+      await lifecycle.acceptAi.mutateAsync({ versionId: selected.id, revision: selected.revision });
+      setNotice('Propuesta IA aceptada. La aprobación del cliente es una acción posterior.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo aceptar la propuesta de IA.');
+    }
+  };
+
   return (
-    <DashboardLayout title="Cotizaciones">
+    <DashboardLayout title="Proyectos">
       <main className={styles.page}>
+        {project && <h1 className={styles.projectTitle}>{project.name}</h1>}
         <nav className={styles.breadcrumb} aria-label="Navegación de cotización">
           <Link to={project ? '/proyectos/' + project.slug : '/proyectos'}>‹ Volver a la ficha del proyecto</Link>
           <Link className={styles.listLink} to="/calculadora">Ver todas las cotizaciones</Link>
@@ -256,8 +274,7 @@ export function QuotationWorkspacePage() {
               <Card>
                 <div className={styles.identityHeading}>
                   <div>
-                    <h1>Cotización · {project?.client?.companyName ?? project?.name ?? 'Proyecto'}</h1>
-                    <p>{project?.name} · Versión comercial independiente del proyecto operativo</p>
+                    <h2>Cotización · {project?.client?.companyName ?? project?.name ?? 'Proyecto'}</h2>
                   </div>
                   <Badge tone={selected?.status === 'approved' ? 'success' : selected?.status === 'sent' ? 'info' : 'neutral'}>
                     {selected?.status === 'approved' ? 'Aprobada' : selected?.status === 'sent' ? 'Enviada' : 'Cotización'}
@@ -308,9 +325,16 @@ export function QuotationWorkspacePage() {
                           Revisa perfiles y HH antes de aceptar. La IA no define el valor HH comercial.</p>
                       </div>
                       {selected.draft.aiPoc && (
-                        <Button size="sm" variant="secondary" onClick={() =>
-                          document.getElementById('quotation-ai-role-review')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                        }>Revisar propuesta</Button>
+                        <Button size="sm" className={styles.aiAccept}
+                          disabled={!editable || dirty || teamRows.length === 0 ||
+                            selected.id !== versions.at(-1)?.id || lifecycle.acceptAi.isPending}
+                          loading={lifecycle.acceptAi.isPending}
+                          title={teamRows.length === 0
+                            ? 'Asigna primero los perfiles a equipos y guarda la versión.'
+                            : dirty ? 'Guarda los cambios antes de aceptar la propuesta.' : undefined}
+                          onClick={() => void acceptAiProposal()}>
+                          Aceptar propuesta
+                        </Button>
                       )}
                     </div>
                   )}
@@ -477,49 +501,23 @@ export function QuotationWorkspacePage() {
                   </Card>
 
                   {form.draft.mode === 'phases' && (
-                  <Card>
-                    <div className={styles.cardTitle}>
-                      <div><h2>Fases · Módulos</h2><p>En semanas desde el inicio. Las HH por fase reemplazan, no se suman, al cálculo por equipo.</p></div>
-                    </div>
-                    {form.draft.mode === 'phases' && (
-                      <>
-                        <div className={styles.cardTitle}>
-                          <h3>Fases</h3>
-                          {editable && <Button size="sm" variant="outline"
-                            onClick={() => updateDraft({ phases: [...phaseRows, { name: 'Nueva fase', startWeek: 1, durationWeeks: 1, teamHours: [] }] })}>Añadir fase</Button>}
-                        </div>
-                        {phaseRows.map((phase, index) => (
-                          <div className={styles.subcard} key={index}>
-                            <div className={styles.grid}>
-                              <TextField label="Fase" value={phase.name} disabled={!editable}
-                                onChange={(e) => editPhase(index, { name: e.target.value })} />
-                              <TextField label="Semana inicio" type="number" min={1} disabled={!editable} value={phase.startWeek}
-                                onChange={(e) => editPhase(index, { startWeek: numeric(e.target.value) })} />
-                              <TextField label="Duración (semanas)" type="number" min={1} disabled={!editable} value={phase.durationWeeks}
-                                onChange={(e) => editPhase(index, { durationWeeks: numeric(e.target.value) })} />
-                            </div>
-                            <div className={styles.phaseHours}>
-                              {teamRows.map((team) => (
-                                <label key={team.teamId}>
-                                  <span>{teamById.get(team.teamId) ?? team.teamId} · HH fase</span>
-                                  <input type="number" min={0} disabled={!editable}
-                                    value={phase.teamHours.find((h) => h.teamId === team.teamId)?.hours ?? 0}
-                                    onChange={(e) => editPhase(index, { teamHours: [
-                                      ...phase.teamHours.filter((h) => h.teamId !== team.teamId),
-                                      { teamId: team.teamId, hours: numeric(e.target.value) },
-                                    ] })} />
-                                </label>
-                              ))}
-                            </div>
-                            {editable && <Button variant="ghost" size="sm"
-                              onClick={() => updateDraft({ phases: phaseRows.filter((_, i) => i !== index) })}>Quitar fase</Button>}
-                          </div>
-                        ))}
-                      </>
-                    )}
-                  
-                  </Card>
-                )}
+                    <QuotationPhaseWorkspace
+                      phases={phaseRows}
+                      teams={teamRows}
+                      teamNames={teamById}
+                      edt={form.draft.aiPoc?.edt}
+                      roleTeamIds={form.draft.aiPoc?.roleTeamIds}
+                      editable={editable}
+                      onEditPhase={editPhase}
+                      onAddPhase={() => updateDraft({ phases: [
+                        ...phaseRows, { name: 'Nuevo módulo', startWeek: 1,
+                          durationWeeks: 1, teamHours: [] },
+                      ] })}
+                      onRemovePhase={(index) => updateDraft({
+                        phases: phaseRows.filter((_, position) => position !== index),
+                      })}
+                    />
+                  )}
 
                   <div id="quotation-ai-role-review" className={styles.aiRoleReview}>
               {selected?.draft.aiPoc && form && (
@@ -550,79 +548,14 @@ export function QuotationWorkspacePage() {
 
 
                   </div>
-                  <Card>
-                    <div className={styles.cardTitle}><div><h2>Costos externos</h2><p>Los recurrentes se registran aparte; no inflan el neto inicial.</p></div>
-                      {editable && <Button size="sm" variant="outline" onClick={() => updateDraft({ costs: [
-                        ...form.draft.costs, { description: 'Nuevo costo', amount: 0, recurrence: 'once' },
-                      ] })}>Añadir costo</Button>}
-                    </div>
-                    {form.draft.costs.map((cost, index) => (
-                      <div className={styles.inlineRow} key={index}>
-                        <TextField label="Descripción" value={cost.description} disabled={!editable}
-                          onChange={(e) => updateDraft({ costs: form.draft.costs.map((c, i) => i === index ? { ...c, description: e.target.value } : c) })} />
-                        <TextField label="Monto" type="number" min={0} step="0.01" value={cost.amount} disabled={!editable}
-                          onChange={(e) => updateDraft({ costs: form.draft.costs.map((c, i) => i === index ? { ...c, amount: numeric(e.target.value) } : c) })} />
-                        <Select label="Periodicidad" value={cost.recurrence} disabled={!editable}
-                          options={[{ value: 'once', label: 'Único' }, { value: 'monthly', label: 'Mensual' }, { value: 'annual', label: 'Anual' }]}
-                          onChange={(e) => updateDraft({ costs: form.draft.costs.map((c, i) => i === index ? { ...c, recurrence: e.target.value as typeof c.recurrence } : c) })} />
-                        {editable && <Button size="sm" variant="ghost" onClick={() => updateDraft({ costs: form.draft.costs.filter((_, i) => i !== index) })}>Quitar</Button>}
-                      </div>
-                    ))}
-                  </Card>
-
-                  <Card>
-                    <div className={styles.cardTitle}>
-                      <div><h2>Plan de pago</h2><p>Para enviar o aprobar se exigirá que los hitos sumen exactamente 100%.</p></div>
-                      {editable && <Button size="sm" variant="outline"
-                        onClick={() => updateDraft({ paymentPlan: [...form.draft.paymentPlan, { name: 'Nuevo hito', percent: 0, trigger: 'approval' }] })}>Añadir hito</Button>}
-                    </div>
-                    {form.draft.paymentPlan.map((payment, index) => (
-                      <div key={index}>
-                      <div className={styles.inlineRow}>
-                        <TextField label="Hito" value={payment.name} disabled={!editable}
-                          onChange={(e) => updateDraft({ paymentPlan: form.draft.paymentPlan.map((p, i) => i === index ? { ...p, name: e.target.value } : p) })} />
-                        <TextField label="%" type="number" min={0} max={100} step="0.01" value={payment.percent} disabled={!editable}
-                          onChange={(e) => updateDraft({ paymentPlan: form.draft.paymentPlan.map((p, i) => i === index ? { ...p, percent: numeric(e.target.value) } : p) })} />
-                        <Select label="Disparador" value={payment.trigger} disabled={!editable}
-                          options={[{ value: 'approval', label: 'Aprobación' }, { value: 'phase', label: 'Fase' }, { value: 'date', label: 'Fecha' }]}
-                          onChange={(e) => updateDraft({ paymentPlan: form.draft.paymentPlan.map((p, i) => i === index ? { ...p, trigger: e.target.value as typeof p.trigger } : p) })} />
-                        {editable && <Button variant="ghost" size="sm"
-                          onClick={() => updateDraft({ paymentPlan: form.draft.paymentPlan.filter((_, i) => i !== index) })}>Quitar</Button>}
-                      </div>
-                      {payment.trigger === 'phase' && (
-                        <div className={styles.paymentDetail} key={'phase-' + index}>
-                          <Select label="Fase disparadora" disabled={!editable}
-                            value={payment.triggerPhase ?? ''}
-                            placeholder="Seleccionar fase"
-                            options={phaseRows.map((phase) => ({ value: phase.name, label: phase.name }))}
-                            onChange={(e) => updateDraft({ paymentPlan: form.draft.paymentPlan.map((p, i) =>
-                              i === index ? { ...p, triggerPhase: e.target.value || null } : p) })} />
-                        </div>
-                      )}
-                      {payment.trigger === 'date' && (
-                        <div className={styles.paymentDetail} key={'date-' + index}>
-                          <TextField label="Fecha disparadora" type="date" value={payment.triggerDate ?? ''}
-                            disabled={!editable} onChange={(e) => updateDraft({ paymentPlan: form.draft.paymentPlan.map((p, i) =>
-                              i === index ? { ...p, triggerDate: e.target.value || null } : p) })} />
-                        </div>
-                      )}
-                      </div>
-                    ))}
-                    <p className={styles.helper}>Porcentaje configurado: {money(usedPercent)}% {usedPercent === 100 ? '· Completo' : '· Pendiente de completar'}</p>
-                    <p className={styles.helper}>Puedes registrar fecha o fase como referencia comercial. La ejecución y validación del plan de pago se habilitarán recién en R3.</p>
-                  </Card>
-
-                  <Card>
-                    <h2>Supuestos y exclusiones</h2>
-                    <label className={styles.longField}>Supuestos (uno por línea)
-                      <textarea disabled={!editable} value={form.draft.assumptions.join('\n')}
-                        onChange={(e) => updateDraft({ assumptions: e.target.value.split('\n').slice(0, 100) })} />
-                    </label>
-                    <label className={styles.longField}>Exclusiones (una por línea)
-                      <textarea disabled={!editable} value={form.draft.exclusions.join('\n')}
-                        onChange={(e) => updateDraft({ exclusions: e.target.value.split('\n').slice(0, 100) })} />
-                    </label>
-                  </Card>
+                  <QuotationCommercialSections
+                    version={selected}
+                    draft={form.draft}
+                    rate={form.hourlyRate}
+                    currency={form.currency}
+                    editable={editable}
+                    onDraftChange={updateDraft}
+                  />
                 </>
               )}
 
