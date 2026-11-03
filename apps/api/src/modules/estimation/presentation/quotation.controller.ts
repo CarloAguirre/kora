@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
 import {
   applyQuotationPlanningSchema, generateAiDemoQuotationSchema, createQuotationVersionSchema, updateQuotationDraftSchema, quotationReconciliationReviewSchema, assessQuotationReconciliationSchema,
   quotationRevisionActionSchema, approveClientQuotationSchema, transferApprovedQuotationSchema,
@@ -237,6 +237,17 @@ export class QuotationController {
     @CurrentUser() actor: RequestUser,
   ): Promise<QuotationTransferResult> {
     return this.drafts.transferApproved(projectId, versionId, actor, input);
+  }
+
+  @Delete('versions/:versionId')
+  @RequireAnyPermission('projects:manage', 'projects:read_assigned')
+  deleteVersion(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('versionId', ParseUUIDPipe) versionId: string,
+    @Query('revision', ParseIntPipe) revision: number,
+    @CurrentUser() actor: RequestUser,
+  ): Promise<{ deletedVersionId: string }> {
+    return this.drafts.deleteVersion(projectId, versionId, revision, actor);
   }
 
   @Patch('versions/:versionId')
