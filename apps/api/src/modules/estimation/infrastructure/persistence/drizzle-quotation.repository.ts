@@ -440,7 +440,7 @@ export class DrizzleQuotationRepository implements QuotationRepository {
           edtHourAdjustments: undefined, edtTaskSettings: undefined,
           edtRoleCollaborators: undefined, edtStageSettings: undefined,
           edtCommercialStages: undefined, edtCommercialTasks: undefined,
-          edtTaskNames: undefined, edtTaskTypes: undefined,
+          edtTaskNames: undefined,
         };
         hourlyRate = source.hourlyRate === null ? null : Number(source.hourlyRate);
         currency = source.currency as typeof currency;
