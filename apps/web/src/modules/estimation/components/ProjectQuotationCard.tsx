@@ -4,6 +4,7 @@ import { isQuotationDraftEligibleProject, type ProjectDetail } from '@kora/contr
 import { projectQuotationPath } from '@/app/router/paths';
 import { useAppliedQuotationPlanning, useDeleteQuotationVersion, useProjectQuotation, useQuotationLifecycle } from '../api/quotation.queries';
 import { Button } from '@/shared/components/ui/Button';
+import { useConfirmAction } from '@/shared/components/ui/useConfirmAction';
 import { NewProjectQuotationModal } from './NewProjectQuotationModal';
 import styles from './ProjectQuotationCard.module.css';
 
@@ -15,17 +16,18 @@ export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
   const [actionError, setActionError] = useState('');
   const [actionNotice, setActionNotice] = useState('');
   const [newOpen, setNewOpen] = useState(false);
+  const { confirm, dialog: confirmationDialog } = useConfirmAction();
   const versions = [...(data?.versions ?? [])].sort((a, b) => b.versionNumber - a.versionNumber);
   const eligible = isQuotationDraftEligibleProject(project);
   const transferredVersion = versions.find((version) => version.id === data?.transferredVersionId);
   const registerApproval = async (versionId: string, revision: number, withoutSend: boolean) => {
     setActionError(''); setActionNotice('');
-    if (!window.confirm((withoutSend
+    if (!await confirm({ title: 'Registrar aprobación del cliente', confirmLabel: 'Confirmar aprobación', description: (withoutSend
       ? 'ATENCIÓN: no existe registro de envío comercial de este borrador. ' +
         'Debes confirmar que el cliente lo aprobó explícitamente. '
       : '') +
       '¿Confirmas que el cliente aprobó expresamente esta versión? ' +
-      'Las HH del proyecto NO se modificarán hasta el traspaso.')) return;
+      'Las HH del proyecto NO se modificarán hasta el traspaso.' })) return;
     try {
       await lifecycle.approveClient.mutateAsync({ versionId, revision,
         ...(withoutSend ? { confirmWithoutSend: true as const } : {}) });
@@ -37,10 +39,7 @@ export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
   const removeVersion = async (versionId: string, revision: number,
     versionNumber: number, name: string) => {
     setActionError(''); setActionNotice('');
-    if (!window.confirm(
-      '¿Eliminar definitivamente la cotización v' + versionNumber + ' · ' + name +
-      '? Esta acción no se puede deshacer. No se modificarán otras versiones ni la planificación del proyecto.',
-    )) return;
+    if (!await confirm({ title: 'Eliminar cotización v' + versionNumber, description: '¿Eliminar definitivamente la cotización «' + name + '»? Esta acción no se puede deshacer. No se modificarán otras versiones ni la planificación del proyecto.', confirmLabel: 'Eliminar cotización', destructive: true })) return;
     try {
       await deleteVersion.mutateAsync({ versionId, revision });
       setActionNotice('Cotización v' + versionNumber + ' eliminada.');
@@ -50,8 +49,7 @@ export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
   };
   const transferNow = async (versionId: string, revision: number) => {
     setActionError(''); setActionNotice('');
-    if (!window.confirm('Esta acción traspasará equipos, HH, fases y pagos de una versión aprobada. ' +
-      'Solo continúa si el proyecto no tiene ejecución ni facturación. ¿Confirmas?')) return;
+    if (!await confirm({ title: 'Traspasar cotización al proyecto', description: 'Se transferirán equipos, HH, fases y pagos de una versión aprobada. La operación no reemplazará automáticamente la ejecución existente.', confirmLabel: 'Traspasar' })) return;
     try {
       await lifecycle.transferApproved.mutateAsync({ versionId, revision });
       setActionNotice('Traspaso guardado y registrado en el historial.');
@@ -157,6 +155,7 @@ export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
         )}
       {actionError && <p role="alert" className={styles.error}>{actionError}</p>}
       {actionNotice && <p role="status" className={styles.helper}>{actionNotice}</p>}
+      {confirmationDialog}
       {newOpen && <NewProjectQuotationModal project={project} versions={data?.versions ?? []}
         onClose={() => setNewOpen(false)} />}
     </section>
