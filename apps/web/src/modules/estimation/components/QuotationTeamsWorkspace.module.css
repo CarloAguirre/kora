@@ -37,3 +37,51 @@
  box-shadow:0 1px 4px rgba(24,35,55,.10);font-weight:650}
 .header :global([role="radio"]:hover){background:#fff}
 @media(max-width:520px){.header :global([role="radio"]){padding:7px 9px;font-size:11px}}
+
+/* Propuesta con EDT: semanas y carga derivadas, nunca capacidad artificial. */
+.plannedColumns{grid-template-columns:minmax(175px,1.8fr) 86px minmax(123px,1.1fr) 102px 106px}
+.teamLabel{display:flex;flex-direction:column;gap:3px;min-width:0}
+.teamLabel small{font-size:10px;font-weight:500;color:#8751b6}
+.weekRange{display:flex;flex-direction:column;gap:3px;min-width:0;font-variant-numeric:tabular-nums}
+.weekRange strong{font-size:12px;font-weight:650;color:#1d2b43}
+.weekRange small{font-size:10px;color:#8791a3;white-space:nowrap}
+.weekAverage{text-align:right;color:#22344e;font-size:12.5px;font-weight:650;
+ font-variant-numeric:tabular-nums}
+.weeklyPanel{border-top:1px solid #e8eaf0;padding-top:15px;display:grid;gap:12px;min-width:0}
+.weeklyHeading{display:flex;align-items:flex-start;justify-content:space-between;
+ gap:14px;flex-wrap:wrap}
+.weeklyHeading h3{margin:0 0 4px;font-size:13px;font-weight:750;color:#16223a}
+.weeklyHeading p,.weeklyFootnote{margin:0;color:#778396;font-size:11px;line-height:1.55}
+.weekPager{display:flex;align-items:center;gap:8px;white-space:nowrap;font-size:11px;
+ font-weight:650;color:#475569;font-variant-numeric:tabular-nums}
+.weekPager button{width:29px;height:29px;border:1px solid #e1e5ed;border-radius:8px;
+ background:#fff;color:#34435c;font-size:20px;line-height:1;cursor:pointer}
+.weekPager button:hover:not(:disabled){background:#f2edfb;border-color:#c7b3f1}
+.weekPager button:disabled{color:#c0c8d4;background:#f9fafc;cursor:not-allowed}
+.weeklyScroll{overflow-x:auto;max-width:100%;border:1px solid #e5e9f1;border-radius:10px}
+.weeklyTable{width:100%;min-width:700px;table-layout:fixed;border-collapse:collapse;
+ font-size:11px;font-variant-numeric:tabular-nums;color:#34445c}
+.weeklyTable th:first-child{width:155px;text-align:left}
+.weeklyTable th:last-child{width:82px}
+.weeklyTable th,.weeklyTable td{padding:10px 7px;border-bottom:1px solid #e9ecf2;
+ text-align:right;vertical-align:middle}
+.weeklyTable thead th{background:#f7f8fb;color:#6d7890;font-weight:650}
+.weeklyTable tbody th{font-weight:650;color:#273650}
+.weeklyTable tbody tr:last-child th,.weeklyTable tbody tr:last-child td{border-bottom:1px solid #dfe4ed}
+.weeklyTable tfoot th,.weeklyTable tfoot td{background:#f7f8fb;font-weight:750;
+ color:#1e2a41;border-bottom:0}
+.weekTeam{display:flex;align-items:center;gap:7px;min-width:0;text-align:left;
+ overflow-wrap:anywhere}
+.weekTeam i{width:9px;height:9px;flex:none;border-radius:3px}
+.weekValue{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+.weekValue strong{font-size:11px;font-weight:600}
+.weekBar{display:block;height:4px;max-width:100%;border-radius:3px;opacity:.85}
+.noHours{color:#b9c1ce}
+.weekTotal{font-weight:750;color:#17223a;background:#fcfcfe}
+.weeklyFootnote{font-size:10.5px}
+.weeklyUnavailable{margin:0;border:1px solid #e6e2f2;background:#f9f7fe;
+ border-radius:8px;padding:11px 12px;font-size:11px;line-height:1.6;color:#685783}
+@media(max-width:800px){
+ .plannedColumns{min-width:640px}
+ .weeklyTable{min-width:700px}
+}
