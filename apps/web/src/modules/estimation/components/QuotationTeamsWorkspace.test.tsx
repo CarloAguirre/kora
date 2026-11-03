@@ -77,7 +77,9 @@ describe('Equipos · fuente visual prototipo HTML v5', () => {
     expect(screen.getByLabelText('Incluir Desarrollo')).toBeChecked();
     expect(screen.getByLabelText('Incluir QA')).not.toBeChecked();
     expect(screen.getByLabelText('Horas totales de Desarrollo')).toHaveValue(40);
-    expect(screen.getByLabelText('Unidad de Desarrollo')).toBeDisabled();
+    expect(screen.getByLabelText('Unidad de Desarrollo')).toBeEnabled();
+    fireEvent.change(screen.getByLabelText('Duración de Desarrollo'), { target: { value: '5' } });
+    expect(handlers.onEditTeam).toHaveBeenCalledWith(dev, { duration: 5 });
     expect(screen.queryByText('Desarrollador Backend')).not.toBeInTheDocument();
     expect(screen.queryByText('Carga semanal por equipo')).not.toBeInTheDocument();
     const input = screen.getByLabelText('Horas totales de Desarrollo');
