@@ -214,9 +214,10 @@ export function QuotationWorkspacePage() {
   const teamRows = form?.draft.teams ?? [];
   const phaseRows = form?.draft.phases ?? [];
   const available = activeTeams.filter((team) => !teamRows.some((row) => row.teamId === team.id));
-  const aiRolesMapped = Boolean(selected?.draft.aiPoc?.proposal.roles.every((role) =>
-    selected.draft.aiPoc?.roleTeamIds[role.role] &&
-    teamRows.some((team) => team.teamId === selected.draft.aiPoc?.roleTeamIds[role.role]),
+  const aiSnapshot = selected?.draft.aiPoc;
+  const aiRolesMapped = Boolean(aiSnapshot && aiSnapshot.proposal.roles.every((role) =>
+    Boolean(aiSnapshot.roleTeamIds[role.role]) &&
+    teamRows.some((team) => team.teamId === aiSnapshot.roleTeamIds[role.role]),
   ));
   const editTeam = (index: number, patch: Partial<QuotationDraftData['teams'][number]>) => {
     if (!form) return;
