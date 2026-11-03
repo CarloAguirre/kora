@@ -6,6 +6,7 @@ import {
   PROJECT_MODULE_TASK_SCOPE_LABELS,
   PROJECT_MODULE_TASK_STATUS_LABELS,
   type HourEntrySummary,
+  type AppliedQuotationPlanning,
   type ProjectDetail,
   type ProjectModule,
   type ProjectModuleDelivery,
@@ -26,6 +27,7 @@ import { PhaseRoadmap, type PhaseRoadmapSelection } from '@/modules/client-porta
 import { roleFromTeamName, toPhaseRoadmap } from '@/modules/client-portal/adapters/project-detail.adapter';
 import { PHASE_ROADMAP_ROLE_COLORS } from '@/modules/client-portal/types';
 import { useUpdateProjectModule, useUpdateProjectModuleSegment } from '../api/projects.queries';
+import { QuotationReferenceTaskModal } from './QuotationReferenceTaskModal';
 import { useAppliedQuotationPlanning } from '@/modules/estimation/api/quotation.queries';
 import {
   EMPTY_EXECUTION_SEGMENT_MODAL_VALUES,
@@ -107,6 +109,10 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
 
   /** Tiempo de ejecución que se está editando (`null` = modal cerrado). */
   const [editingSegment, setEditingSegment] = useState<{ moduleId: string; segment: ProjectModuleSegment } | null>(null);
+  const [creatingFromReference, setCreatingFromReference] = useState<{
+    moduleId: string;
+    task: AppliedQuotationPlanning['modules'][number]['tasks'][number];
+  } | null>(null);
   // Estable mientras el modal está abierto: `ExecutionSegmentModal` reinicia su formulario cuando cambia `initialValues`,
   // y un refetch del proyecto (re-render de esta tarjeta) no debe borrar lo que se está escribiendo.
   const segmentModalInitialValues = useMemo<ExecutionSegmentModalValues>(
@@ -201,6 +207,15 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
                     <strong>{task.wbs} · {task.name}</strong>
                     <span>{task.role} · {task.hours} HH</span>
                     {task.description && <small>{task.description}</small>}
+                    {canManage && (module.tasks.some((existing) =>
+                      existing.description?.includes(
+                        'Referencia cotización ' + appliedPlanning.data?.versionId +
+                        ' · WBS ' + task.wbs + ' · ' + task.role,
+                      )) ? <small>Ya convertida en tarea operativa</small> :
+                        <Button variant="ghost" size="sm"
+                          onClick={() => setCreatingFromReference({ moduleId: module.id, task })}>
+                          Crear tarea
+                        </Button>)}
                   </li>
                 ))}
               </ol>
@@ -254,6 +269,17 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
         </Card>
       )}
       <PhaseRoadmap phaseRoadmap={phaseRoadmap} renderPhaseExtras={renderPhaseExtras} renderSelectionDetail={renderSelectionDetail} />
+      {creatingFromReference && appliedPlanning.data && (
+        <QuotationReferenceTaskModal
+          key={creatingFromReference.task.wbs + ':' + creatingFromReference.task.role}
+          project={project}
+          moduleId={creatingFromReference.moduleId}
+          versionId={appliedPlanning.data.versionId}
+          versionNumber={appliedPlanning.data.versionNumber}
+          reference={creatingFromReference.task}
+          onClose={() => setCreatingFromReference(null)}
+        />
+      )}
       <ExecutionSegmentModal
         open={editingSegment !== null}
         mode="edit"
