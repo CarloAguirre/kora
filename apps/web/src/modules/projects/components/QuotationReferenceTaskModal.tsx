@@ -33,6 +33,9 @@ export function QuotationReferenceTaskModal({
   const initialTeamId = reference.teamId && project.teams.some((t) =>
     t.teamId === reference.teamId) ? reference.teamId : '';
   const [name, setName] = useState(reference.name);
+  const [description, setDescription] = useState(reference.description ?? '');
+  const [blockId, setBlockId] = useState('');
+  const [status, setStatus] = useState<'todo' | 'in_progress'>('todo');
   const [targetModuleId, setTargetModuleId] = useState(moduleId ?? '');
   const [teamId, setTeamId] = useState(initialTeamId);
   const [assignee, setAssignee] = useState('');
@@ -41,16 +44,20 @@ export function QuotationReferenceTaskModal({
   const [hours, setHours] = useState(String(reference.hours));
   const [scope, setScope] = useState<ProjectModuleTaskScope | ''>('');
   const [error, setError] = useState('');
-  const members = project.members.filter((member) =>
-    member.teamId === teamId && member.userStatus === 'active');
+  const members = project.members.filter((member) => member.userStatus === 'active');
+  const eligibleBlocks = project.modules.find((module) => module.id === targetModuleId)
+    ?.segments.filter((segment) => segment.teamId === teamId) ?? [];
+  const selectedBlock = eligibleBlocks.find((segment) => segment.id === blockId);
+  const chosenDatesFitBlock = !selectedBlock ||
+    (startDate >= selectedBlock.startDate && date <= selectedBlock.endDate);
   const sourceMarker = 'Referencia cotización ' + versionId + ' · WBS ' +
     reference.wbs + ' · ' + reference.role;
   const formValid = Boolean(targetModuleId && name.trim() && teamId && assignee && scope && startDate && date &&
-    startDate <= date && Number(hours) > 0 &&
+    startDate <= date && chosenDatesFitBlock && Number(hours) > 0 &&
     Number.isFinite(Number(hours)) && Number(hours) <= 1_000_000);
   const submit = async () => {
     if (!formValid) {
-      setError('Selecciona fase, equipo, colaborador, ámbito, fechas válidas y HH antes de crear la tarea.');
+      setError('Selecciona fase, colaborador, ámbito y fechas válidas. Si eliges un bloque, las fechas deben quedar dentro de él.');
       return;
     }
     setError('');
@@ -59,9 +66,12 @@ export function QuotationReferenceTaskModal({
         projectId: project.id, moduleId: targetModuleId,
         input: {
           name: name.trim(), teamId, assigneeUserId: assignee || null,
-          description: [sourceMarker, reference.description].filter(Boolean).join('\n').slice(0, 2000),
+          description: [sourceMarker,
+            ...(selectedBlock ? ['Bloque de trabajo: ' + selectedBlock.name + ' · ID ' + selectedBlock.id] : []),
+            description.trim(),
+          ].filter(Boolean).join('\n').slice(0, 2000),
           estimatedHours: Number(hours),
-          startDate, date, status: 'todo', scope: scope || undefined,
+          startDate, date, status, scope: scope || undefined,
         },
       });
       onClose();
@@ -70,7 +80,7 @@ export function QuotationReferenceTaskModal({
     }
   };
   return (
-    <Modal open title="Crear tarea desde cotización"
+    <Modal open title="Nueva tarea"
       description={'Referencia EDT · v' + versionNumber + ' · ' + reference.wbs}
       onClose={onClose} dismissible={!create.isPending}
       footer={<div className={styles.actions}>
@@ -81,55 +91,88 @@ export function QuotationReferenceTaskModal({
         </Button>
       </div>}>
       <div className={styles.fields}>
-        <p className={styles.help}>La propuesta se conserva como referencia. Solo después de confirmar
-          las fechas y el equipo se crea una tarea real con el flujo existente de Kora.
-          Puede generar Forecast.</p>
-        <Select label="Fase operativa de destino" required value={targetModuleId}
-          placeholder="Selecciona una fase existente"
+        <TextField label="Título de la tarea" required value={name}
+          maxLength={300} onChange={(event) => setName(event.target.value)} />
+        <div className={styles.field}>
+          <label htmlFor={'description-' + reference.wbs}>Descripción</label>
+          <textarea id={'description-' + reference.wbs}
+            placeholder="Qué incluye esta tarea" value={description}
+            rows={3} maxLength={1800}
+            onChange={(event) => setDescription(event.target.value)} />
+        </div>
+        <Select label="Asignado a" required value={assignee && teamId ? teamId + ':' + assignee : ''}
+          placeholder="Seleccionar persona…"
+          options={members.map((member) => ({
+            value: member.teamId + ':' + member.userId,
+            label: member.fullName + ' · ' +
+              (project.teams.find((team) => team.teamId === member.teamId)?.teamName ?? 'Equipo Kora'),
+          }))}
+          onChange={(event) => {
+            const selected = members.find((member) =>
+              member.teamId + ':' + member.userId === event.target.value);
+            setAssignee(selected?.userId ?? '');
+            setTeamId(selected?.teamId ?? '');
+            setBlockId('');
+          }} />
+        <p className={styles.help}>Solo puedes asignar colaboradores reales de este proyecto.</p>
+        {initialTeamId && !members.some((member) => member.teamId === initialTeamId) && (
+          <p className={styles.help}>
+            El equipo propuesto todavía no tiene colaboradores en este proyecto.
+            {' '}
+            <Link to={projectTeamPath(project, {
+              id: initialTeamId,
+              slug: project.teams.find((team) => team.teamId === initialTeamId)?.teamSlug,
+            })}>Gestionar colaboradores del equipo</Link>
+          </p>
+        )}
+        <Select label="Módulo relacionado" required value={targetModuleId}
+          placeholder="Seleccionar fase"
           options={project.modules.map((module) => ({
             value: module.id, label: module.name,
           }))}
-          onChange={(event) => setTargetModuleId(event.target.value)} />
-        <TextField label="Nombre de la tarea" required value={name}
-          maxLength={300} onChange={(e) => setName(e.target.value)} />
-        <Select label="Equipo Kora" required value={teamId}
-          placeholder="Selecciona un equipo"
-          options={project.teams.map((team) => ({
-            value: team.teamId, label: team.teamName,
+          onChange={(event) => { setTargetModuleId(event.target.value); setBlockId(''); }} />
+        <Select label="Bloque de trabajo" value={blockId}
+          disabled={!assignee || eligibleBlocks.length === 0}
+          placeholder={!assignee ? 'Elige primero a quién se asigna' :
+            eligibleBlocks.length === 0 ? 'Sin bloques planificados' : 'Sin bloque específico'}
+          options={eligibleBlocks.map((segment) => ({
+            value: segment.id, label: segment.name + ' (' + segment.startDate + ' – ' + segment.endDate + ')',
           }))}
-          onChange={(e) => {setTeamId(e.target.value);setAssignee('');}} />
-        <Select label="Asignado a" required value={assignee}
-          placeholder="Sin asignar todavía"
-          options={members.map((member) => ({
-            value: member.userId, label: member.fullName,
-          }))}
-          onChange={(e) => setAssignee(e.target.value)} />
-        {teamId && members.length === 0 && project.teams.some((team) => team.teamId === teamId) && (
-          <p className={styles.help}>
-            No hay colaboradores asignados a este equipo en el proyecto.
-            {' '}
-            <Link to={projectTeamPath(project, {
-              id: teamId,
-              slug: project.teams.find((team) => team.teamId === teamId)?.teamSlug,
-            })}>Gestionar colaboradores del equipo</Link>
-            {' '}antes de crear la tarea.
-          </p>
-        )}
-        <Select label="Ámbito" required value={scope}
+          onChange={(event) => {
+            setBlockId(event.target.value);
+            const block = eligibleBlocks.find((entry) => entry.id === event.target.value);
+            if (block) { setStartDate(block.startDate); setDate(block.endDate); }
+          }} />
+        <div className={styles.dates}>
+          <Select label="Estado" value={status}
+            options={[{ value: 'todo', label: 'Pendiente' }, { value: 'in_progress', label: 'En curso' }]}
+            onChange={(event) => setStatus(event.target.value as 'todo' | 'in_progress')} />
+          <TextField label="HH estimadas" type="number" step="0.01" min="0.01"
+            required value={hours} onChange={(event) => setHours(event.target.value)} />
+        </div>
+        <Select label="Ámbito Kora" required value={scope}
           placeholder="Selecciona un ámbito"
           options={PROJECT_MODULE_TASK_SCOPES.map((value) => ({
             value, label: PROJECT_MODULE_TASK_SCOPE_LABELS[value],
           }))}
-          onChange={(e) => setScope(e.target.value as ProjectModuleTaskScope)} />
-        <TextField label="HH estimadas" type="number" step="0.01" min="0.01"
-          required value={hours} onChange={(e) => setHours(e.target.value)} />
+          onChange={(event) => setScope(event.target.value as ProjectModuleTaskScope)} />
         <div className={styles.dates}>
           <TextField label="Fecha de inicio" type="date" required
-            value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+            value={startDate} onChange={(event) => setStartDate(event.target.value)} />
           <TextField label="Fecha límite" type="date" required
             min={startDate || undefined} value={date}
-            onChange={(e) => setDate(e.target.value)} />
+            onChange={(event) => setDate(event.target.value)} />
         </div>
+        {selectedBlock && !chosenDatesFitBlock && (
+          <p role="alert" className={styles.error}>
+            Las fechas deben estar dentro del bloque seleccionado:
+            {' '}{selectedBlock.startDate} a {selectedBlock.endDate}.
+          </p>
+        )}
+        {blockId && <p className={styles.help}>
+          El bloque se identifica en la descripción de la tarea; Kora no dispone
+          todavía de una relación estructural tarea–bloque.
+        </p>}
         {error && <p role="alert" className={styles.error}>{error}</p>}
       </div>
     </Modal>
