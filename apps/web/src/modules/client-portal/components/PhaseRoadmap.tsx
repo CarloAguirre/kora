@@ -136,7 +136,7 @@ function buildTimelineAxis(range: DateRange): TimelineAxis {
  * (mismo cálculo que `ProjectModulesCard` del Roadmap interno) y el clic
  * filtra/atenúa en la fila "Tareas" las que no son de ese ámbito.
  */
-export function PhaseRoadmap({ phaseRoadmap, renderPhaseExtras, renderSelectionDetail }: PhaseRoadmapProps) {
+export function PhaseRoadmap({ phaseRoadmap, renderPhaseExtras, renderPhaseReferences, renderSelectionDetail }: PhaseRoadmapProps) {
   /** Fases abiertas — cada una se abre/cierra por separado (varias a la vez); arranca abierta la primera. */
   const [expandedPhaseIds, setExpandedPhaseIds] = useState<ReadonlySet<string>>(
     () => new Set(phaseRoadmap.phases[0] ? [phaseRoadmap.phases[0].id] : []),
@@ -239,6 +239,7 @@ export function PhaseRoadmap({ phaseRoadmap, renderPhaseExtras, renderSelectionD
             expanded={expandedPhaseIds.has(phase.id)}
             onToggle={() => togglePhase(phase.id)}
             renderExtras={renderPhaseExtras}
+            renderReferences={renderPhaseReferences}
             renderSelectionDetail={renderSelectionDetail}
           />
         ))}
@@ -283,6 +284,8 @@ export interface PhaseRoadmapProps {
   phaseRoadmap: ProjectPhaseRoadmap;
   /** Contenido extra dentro de cada fase, bajo "Resumen de avance" (p.ej. la etapa editable del Roadmap interno). */
   renderPhaseExtras?: (phase: PhaseRoadmapPhase) => ReactNode;
+  /** Referencias EDT en la fase, después del Gantt. Solo vista interna; portal cliente no cambia. */
+  renderPhaseReferences?: (phase: PhaseRoadmapPhase) => ReactNode;
   /** Detalle del ítem seleccionado, sobre "Registros de bitácora relacionados" (Roadmap interno). */
   renderSelectionDetail?: (phase: PhaseRoadmapPhase, selection: PhaseRoadmapSelection, clearSelection: () => void) => ReactNode;
 }
@@ -293,6 +296,7 @@ function PhaseCard({
   expanded,
   onToggle,
   renderExtras,
+  renderReferences,
   renderSelectionDetail,
 }: {
   phase: PhaseRoadmapPhase;
@@ -300,6 +304,7 @@ function PhaseCard({
   expanded: boolean;
   onToggle: () => void;
   renderExtras?: PhaseRoadmapProps['renderPhaseExtras'];
+  renderReferences?: PhaseRoadmapProps['renderPhaseReferences'];
   renderSelectionDetail?: PhaseRoadmapProps['renderSelectionDetail'];
 }) {
   /** Igual que `zoomByModule` en `ProjectModulesCard` (Roadmap interno): un slider real, no un
@@ -603,6 +608,8 @@ function PhaseCard({
               </div>
             </div>
           </div>
+
+          {renderReferences?.(phase)}
 
           {selectedRelated && renderSelectionDetail?.(phase, selectedRelated, () => setSelectedRelated(null))}
 
