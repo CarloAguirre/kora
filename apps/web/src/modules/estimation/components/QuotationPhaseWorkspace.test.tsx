@@ -135,13 +135,24 @@ describe('Cotización v5 · fases y módulos', () => {
     expect(callbacks.onEditPhase).toHaveBeenCalledWith(0, {
       name: 'T01 · Portal posventa',
     });
-    fireEvent.change(screen.getByLabelText('HH de Desarrollo para fase 2'),
-      { target: { value: '18' } });
-    expect(callbacks.onEditPhase).toHaveBeenCalledWith(0, {
-      teamHours: [{ teamId: qaId, hours: 3 }, { teamId: devId, hours: 18 }],
-    });
+    expect(screen.getByLabelText('HH de Desarrollo para fase 2')).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: '+ Agregar fase / módulo' }));
     expect(callbacks.onAddPhase).toHaveBeenCalledOnce();
+  });
+
+  it('permite ajustar HH por WBS y perfil dentro del desplegable, sin editar la evidencia original', () => {
+    const onEditTaskHours = vi.fn();
+    render(<QuotationPhaseWorkspace
+      phases={[]} teams={[]} edt={edt}
+      commercialMode="team" teamNames={teamNames} roleTeamIds={{}}
+      editable onEditTaskHours={onEditTaskHours}
+      onEditPhase={callbacks.onEditPhase}
+      onAddPhase={callbacks.onAddPhase} onRemovePhase={callbacks.onRemovePhase} />);
+    fireEvent.change(screen.getByLabelText('HH de T01.01 · Fullstack'),
+      { target: { value: '18.5' } });
+    expect(onEditTaskHours).toHaveBeenCalledWith('T01.01', 'Fullstack', 18.5);
+    expect(edt.modules[0]?.tasks[0]?.roleEffort?.[0]?.hours).toBe(12);
+    expect(screen.getByLabelText('HH de Fullstack para fase 2')).toBeDisabled();
   });
 
   it('alerta si la fase comercial ya no concilia con las tareas IA', () => {
