@@ -66,4 +66,34 @@ describe('Referencias comerciales sin afectar Roadmap', () => {
     });
     expect(view.unassignedTasks).toEqual([]);
   });
+  it('asocia una fase S1 · del traspaso a su etapa EDT sin dejar tareas huérfanas', () => {
+    const edt = quotationReferenceEdtSchema.parse({
+      schemaVersion:'kora.quotation.reference-edt.v2', source:'kdm_demo', provider:'gemini',
+      totalHours:10, reservePercent:0, reserveHours:0, totalWithReserve:10,
+      stages:[{code:'S1',name:'Diseño y Arquitectura UI/UX',startWeek:1,durationWeeks:2,totalHours:10}],
+      modules:[{name:'Componentes de experiencia', totalHours:10, tasks:[{
+        wbs:'S1.01',name:'Diseñar flujos',role:'UX',description:'',
+        hours:10,stageCode:'S1',roleEffort:[{role:'UX',hours:10}],
+      }]}],
+    });
+    const draft: QuotationDraftData = {
+      ...quotationDraftDataSchema.parse({mode:'phases',teams,
+        phases:[{...phase,name:'S1 · Diseño y Arquitectura UI/UX'}]}),
+      aiPoc:{source:'kdm_demo',proposal:{roles:[]},answers:[],dynamicQuestions:[],
+        edt,roleTeamIds:{UX:dev}} as unknown as QuotationDraftData['aiPoc'],
+    };
+    const result=buildQuotationTransferReferences(draft,[
+      {moduleId:one,name:'S1 · Diseño y Arquitectura UI/UX',totalHours:10},
+    ]);
+    expect(result.modules[0]?.tasks.map(t=>t.wbs)).toEqual(['S1.01']);
+    expect(result.unassignedTasks).toEqual([]);
+  });
+  it('no asigna una tarea a dos fases ambiguas', () => {
+    const draft = quotationDraftDataSchema.parse({mode:'phases',teams,phases:[phase]});
+    const result=buildQuotationTransferReferences(draft,[
+      {moduleId:one,name:'Desarrollo',totalHours:8},
+      {moduleId:two,name:'Desarrollo',totalHours:8},
+    ]);
+    expect(result.modules.every(module=>module.tasks.length===0)).toBe(true);
+  });
 });
