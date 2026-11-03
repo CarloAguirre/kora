@@ -92,7 +92,7 @@ describe('Cotización v5 · fases y módulos', () => {
     expect(screen.getByText('Roadmap preliminar')).toBeInTheDocument();
     expect(screen.getByLabelText('T01 · Portal de cliente, semanas 1 a 2')).toBeInTheDocument();
     expect(screen.getAllByText('Integración SAP')).toHaveLength(2);
-    expect(screen.getByDisplayValue('T01 · Portal de cliente')).toBeDisabled();
+    expect(screen.getByDisplayValue('Portal de cliente')).toBeDisabled();
     expect(screen.getByLabelText('HH de Fullstack para fase 2')).toBeDisabled();
     expect(screen.getByRole('link', { name: /Asignar perfiles a equipos/ }))
       .toHaveAttribute('href', '#quotation-ai-role-review');
@@ -130,6 +130,11 @@ describe('Cotización v5 · fases y módulos', () => {
     expect(screen.getByLabelText('T01 · Portal de cliente, semanas 1 a 2')).toBeInTheDocument();
     expect(screen.getAllByText('Integración SAP')).toHaveLength(2);
     expect(screen.getAllByText(/Propuesta del agente/).length).toBeGreaterThan(0);
+    fireEvent.change(screen.getByDisplayValue('Portal de cliente'),
+      { target: { value: 'Portal posventa' } });
+    expect(callbacks.onEditPhase).toHaveBeenCalledWith(0, {
+      name: 'T01 · Portal posventa',
+    });
     fireEvent.change(screen.getByLabelText('HH de Desarrollo para fase 2'),
       { target: { value: '18' } });
     expect(callbacks.onEditPhase).toHaveBeenCalledWith(0, {
