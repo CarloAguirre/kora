@@ -3,6 +3,7 @@ import type { ProjectDetail, ProjectQuotation, QuotationVersion } from '@kora/co
 import { Button } from '@/shared/components/ui/Button';
 import { Card } from '@/shared/components/ui/Card';
 import { Select } from '@/shared/components/ui/Select';
+import { useConfirmAction } from '@/shared/components/ui/useConfirmAction';
 import { useQuotationLifecycle } from '../api/quotation.queries';
 import styles from './QuotationCommercialLifecycleCard.module.css';
 import { quotationCommercialBlockers } from './quotation-commercial-blockers';
@@ -27,6 +28,7 @@ export function QuotationCommercialLifecycleCard({
   const [transferTiming, setTransferTiming] = useState<'now' | 'later'>('later');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const { confirm, dialog: confirmationDialog } = useConfirmAction();
   const transferred = quotation?.transferredVersionId === version.id;
   const busy = actions.acceptAi.isPending || actions.markSent.isPending ||
     actions.approveClient.isPending || actions.transferApproved.isPending;
@@ -46,9 +48,7 @@ export function QuotationCommercialLifecycleCard({
 
   const acceptAi = async () => {
     setError(''); setNotice('');
-    if (!window.confirm(
-      'Aceptar la propuesta IA no aprueba al cliente ni modifica HH, equipos o roadmap. ¿Confirmas?'
-    )) return;
+    if (!await confirm({ title: 'Aceptar propuesta IA', description: 'Esta acción no aprueba al cliente ni modifica las HH, los equipos o el Roadmap.', confirmLabel: 'Aceptar propuesta' })) return;
     try {
       await actions.acceptAi.mutateAsync({ versionId: version.id, revision: version.revision });
       setNotice('Propuesta IA aceptada para revisión comercial. El proyecto no ha cambiado.');
@@ -59,10 +59,7 @@ export function QuotationCommercialLifecycleCard({
 
   const markSent = async () => {
     setError(''); setNotice('');
-    if (!window.confirm(
-      'Se registrará que la versión fue enviada al cliente y quedará bloqueada. ' +
-      'Esta acción NO envía correos. ¿Confirmas el envío externo ya realizado?'
-    )) return;
+    if (!await confirm({ title: 'Registrar envío comercial', description: 'La versión quedará bloqueada. Esta acción NO envía correos: confirma un envío externo ya realizado.', confirmLabel: 'Registrar envío' })) return;
     try {
       await actions.markSent.mutateAsync({ versionId: version.id, revision: version.revision });
       setNotice('Envío registrado. La versión quedó bloqueada.');
@@ -75,7 +72,7 @@ export function QuotationCommercialLifecycleCard({
     setError(''); setNotice('');
     const initialTransfer = project.status === 'draft' && transferTiming === 'now';
     const withoutSend = version.status === 'draft';
-    if (!window.confirm(
+    if (!await confirm({ title: 'Registrar aprobación del cliente', confirmLabel: 'Confirmar aprobación', description:
       (withoutSend
         ? 'ATENCIÓN: esta versión está en BORRADOR y no hay un envío al cliente registrado. ' +
           'Debes haber recibido la aprobación explícita del cliente pese a ello. '
@@ -85,7 +82,7 @@ export function QuotationCommercialLifecycleCard({
       (initialTransfer
         ? 'Se intentará traspasar los datos al proyecto tras registrar la aprobación.'
         : 'El traspaso quedará pendiente; no cambiarán los equipos ni las HH.')
-    )) return;
+    })) return;
     try {
       const approved = await actions.approveClient.mutateAsync({
         versionId: version.id, revision: version.revision,
@@ -111,10 +108,7 @@ export function QuotationCommercialLifecycleCard({
 
   const transfer = async () => {
     setError(''); setNotice('');
-    if (!window.confirm(
-      'Traspasar al proyecto una versión APROBADA: HH vendidas, equipos, fases y plan de pagos. ' +
-      'Solo se permite sin historial operativo ni facturación. ¿Confirmas?'
-    )) return;
+    if (!await confirm({ title: 'Traspasar cotización aprobada', description: 'Se transferirán HH vendidas, equipos, fases y plan de pagos. La información operativa preexistente está protegida y puede requerir conciliación.', confirmLabel: 'Traspasar cotización' })) return;
     try {
       await actions.transferApproved.mutateAsync({
         versionId: version.id, revision: version.revision,
@@ -210,6 +204,7 @@ export function QuotationCommercialLifecycleCard({
     // disabled/title de cada acción. El traspaso sigue siendo posterior.
     return (
       <div className={styles.v5Actions}>
+        {confirmationDialog}
         {version.status === 'draft' &&
           <Button variant="outline" className={styles.v5Send}
             disabled={!mayAct || !readyForClient}
@@ -236,5 +231,5 @@ export function QuotationCommercialLifecycleCard({
       </div>
     );
   }
-  return <Card>{content}</Card>;
+  return <><Card>{content}</Card>{confirmationDialog}</>;
 }
