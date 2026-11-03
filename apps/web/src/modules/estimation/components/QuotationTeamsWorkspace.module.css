@@ -25,3 +25,15 @@
 .empty{color:#7b8496;font-size:12px;padding:12px 8px}
 @media(max-width:700px){.compactColumns{grid-template-columns:minmax(150px,1fr) 85px 85px}
  .detailedColumns{min-width:760px}.name{font-size:11.5px}}
+
+/* Switch v5: una sola pista continua con una selección blanca elevada;
+   no botones independientes ni fondo azul oscuro. */
+.header :global([role="radiogroup"]){display:flex;gap:2px;flex-wrap:nowrap;
+ background:#edf0f5;border-radius:11px;padding:3px}
+.header :global([role="radio"]){border:0;border-radius:8px;background:transparent;
+ color:#64748b;padding:8px 13px;font-weight:500;font-size:12px;
+ line-height:1.3;white-space:nowrap;box-shadow:none}
+.header :global([role="radio"][aria-checked="true"]){background:#fff;color:#11192f;
+ box-shadow:0 1px 4px rgba(24,35,55,.10);font-weight:650}
+.header :global([role="radio"]:hover){background:#fff}
+@media(max-width:520px){.header :global([role="radio"]){padding:7px 9px;font-size:11px}}
