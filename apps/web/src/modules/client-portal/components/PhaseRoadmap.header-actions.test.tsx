@@ -22,6 +22,30 @@ const phaseRoadmap: ProjectPhaseRoadmap = {
   }],
 };
 
+describe('Fases permanentes · vista interna v5', () => {
+  it('mantiene visible el Gantt y no permite colapsar la fase desde su cabecera', () => {
+    render(<PhaseRoadmap phaseRoadmap={phaseRoadmap} alwaysExpanded
+      renderPhaseReferences={() => (
+        <details aria-label="Tareas de cotización">
+          <summary>Tareas de referencia de la cotización</summary>
+          <p>Tarea propuesta de Gemini</p>
+        </details>
+      )} />);
+    const header = screen.getByText('FASE 2').parentElement;
+    expect(header).not.toHaveAttribute('role', 'button');
+    expect(header).not.toHaveAttribute('aria-expanded');
+    expect(screen.getByText('Resumen de avance')).toBeInTheDocument();
+    expect(screen.getByText('Semanas')).toBeInTheDocument();
+    expect(screen.getByText('Días')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Desarrollo Backend'));
+    expect(screen.getByText('Resumen de avance')).toBeInTheDocument();
+    const details = screen.getByText('Tareas de referencia de la cotización').closest('details');
+    expect(details).not.toHaveAttribute('open');
+    fireEvent.click(screen.getByText('Tareas de referencia de la cotización'));
+    expect(details).toHaveAttribute('open');
+  });
+});
+
 describe('Extensiones de cabecera en Roadmap compartido', () => {
   it('mantiene el nombre y encabezado del portal cliente cuando no hay acciones internas', () => {
     render(<PhaseRoadmap phaseRoadmap={phaseRoadmap} />);
