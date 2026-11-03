@@ -205,6 +205,7 @@ export class GenerateEstimationPocProposalUseCase {
         'Solo utiliza role que coincida EXACTAMENTE con allowedRoles. Cada perfil declarado debe intervenir en al menos una actividad real.',
         'No inventes funciones fuera del alcance: separa explícitamente exclusiones y supuestos en la descripción.',
         'Agrupa actividades en módulos funcionales (module), submódulos (submodule) y tramos cronológicos (stageCode, stageName). Un tramo puede abarcar varios módulos y perfiles.',
+        'Para TODAS las filas con el mismo stageCode, repite exactamente los mismos stageName, startWeek y durationWeeks; el tramo define un único periodo compartido por varias actividades y perfiles, no un periodo distinto por WBS.',
         'startWeek y durationWeeks son rangos SEMANALES RELATIVOS y estimativos, nunca fechas del proyecto; los tramos pueden solaparse con trabajo paralelo.',
         'WBS debe ser único por ACTIVIDAD; solo puedes repetirlo cuando varias filas son perfiles distintos de la MISMA actividad.',
         'Para un WBS repetido, name, description, stageCode, stageName, startWeek, durationWeeks, module, submodule, references y classification deben coincidir.',
@@ -283,7 +284,17 @@ export class GenerateEstimationPocProposalUseCase {
       if (stage && (stage.name !== row.stageName ||
           stage.startWeek !== row.startWeek ||
           stage.durationWeeks !== row.durationWeeks)) {
-        throw new BadRequestException('El tramo cronológico contiene periodos contradictorios.');
+        // Mensaje concreto para el reintento. No corregimos periodos ni
+        // descartamos actividades: debe hacerlo Gemini y pasar toda la EDT
+        // por el validador nuevamente.
+        throw new BadRequestException(
+          'El tramo cronológico ' + row.stageCode + ' contiene periodos contradictorios: ' +
+          'la definición inicial usa inicio semana ' + stage.startWeek +
+          ' y duración ' + stage.durationWeeks + ', pero la actividad ' + row.wbs +
+          ' indica inicio semana ' + row.startWeek + ' y duración ' + row.durationWeeks +
+          (stage.name !== row.stageName ? '; también cambia el nombre del tramo.' : '.') +
+          ' Todas las filas del tramo deben compartir nombre, inicio y duración.',
+        );
       }
       if (!stage) {
         stages.set(row.stageCode, {
