@@ -434,7 +434,14 @@ export class DrizzleQuotationRepository implements QuotationRepository {
         if (!source) throw new NotFoundException('La versión no pertenece a la cotización de origen.');
         // Una copia MANUAL desde una propuesta IA no hereda fuentes ni respuestas IA.
         const previous = quotationDraftDataSchema.parse(source.draft);
-        draft = { ...previous, sourceRefs: [], answers: {}, analysis: null, aiPoc: null, analysisProjectionStatus: undefined };
+        draft = {
+          ...previous, sourceRefs: [], answers: {}, analysis: null, aiPoc: null,
+          analysisProjectionStatus: undefined,
+          edtHourAdjustments: undefined, edtTaskSettings: undefined,
+          edtRoleCollaborators: undefined, edtStageSettings: undefined,
+          edtCommercialStages: undefined, edtCommercialTasks: undefined,
+          edtTaskNames: undefined, edtTaskTypes: undefined,
+        };
         hourlyRate = source.hourlyRate === null ? null : Number(source.hourlyRate);
         currency = source.currency as typeof currency;
         tax = source.tax as typeof tax;
