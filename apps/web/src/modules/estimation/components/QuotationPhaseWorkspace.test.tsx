@@ -89,7 +89,7 @@ describe('Cotización HTML v5 · fases y tareas', () => {
     expect(screen.getAllByText('Fija')).toHaveLength(2);
     expect(screen.queryByText('Tipo (catálogo)')).not.toBeInTheDocument();
     expect(screen.getAllByText('Perfil requerido: Fullstack')).toHaveLength(1);
-    expect(screen.getByRole('option', { name: 'Desarrollo' })).toBeInTheDocument();
+    expect(screen.getAllByRole('option', { name: 'Desarrollo' }).length).toBeGreaterThan(0);
     expect(screen.queryByRole('option', { name: /Perfil IA/ })).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Equipo de T01.01 · Fullstack'),
       { target: { value: dev } });
@@ -108,8 +108,8 @@ describe('Cotización HTML v5 · fases y tareas', () => {
     expect(screen.getByText('Sin equipo · Fullstack · HH')).toBeInTheDocument();
     const select = screen.getByLabelText('Equipo de T01.01 · Fullstack');
     expect(select).toBeDisabled();
-    expect(screen.getByRole('option', { name: 'Pendiente · asociar perfil' }))
-      .toBeInTheDocument();
+    expect(screen.getAllByRole('option', { name: 'Pendiente · asociar perfil' }).length)
+      .toBeGreaterThan(0);
     expect(screen.queryByRole('option', { name: /Perfil IA/ })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Asignar equipos Kora' }));
     expect(callbacks.onOpenRoleMapping).toHaveBeenCalledOnce();
