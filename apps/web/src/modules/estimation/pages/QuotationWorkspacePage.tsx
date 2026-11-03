@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { estimationAnalysisArtifactSchema, isQuotationDraftEligibleProject, quotationDraftDataSchema, effectiveQuotationEdt, reconcilePocCommercialDraft, projectPocRolesToQuotationDraft, redistributeQuotationEdtHours, withQuotationTaskSetting, withQuotationEdtStageSetting, quotationEdtAssignments, type EstimationAnalysisArtifact, type QuotationDraftData, type QuotationVersion, type UpdateQuotationDraftInput } from '@kora/contracts';
+import { estimationAnalysisArtifactSchema, isQuotationDraftEligibleProject, quotationDraftDataSchema, effectiveQuotationEdt, reconcilePocCommercialDraft, projectPocRolesToQuotationDraft, redistributeQuotationEdtHours, withQuotationTaskSetting, withQuotationEdtStageSetting, quotationEdtAssignments, withQuotationCommercialStage, withoutQuotationCommercialStage, withQuotationCommercialTask, withoutQuotationCommercialTask, patchQuotationCommercialTask, withQuotationTaskDisplayName, withQuotationTaskCatalogType, type EstimationAnalysisArtifact, type QuotationDraftData, type QuotationVersion, type UpdateQuotationDraftInput } from '@kora/contracts';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { useProjectDetail } from '@/modules/projects/api/projects.queries';
@@ -24,6 +24,7 @@ import { QuotationCommercialSummary } from '../components/QuotationCommercialSum
 import { QuotationPhaseWorkspace } from '../components/QuotationPhaseWorkspace';
 import { QuotationTeamsWorkspace } from '../components/QuotationTeamsWorkspace';
 import { quotationAiAcceptanceBlockReason } from '../components/quotation-ai-acceptance';
+import { readQuotationTaskExcel } from '../lib/quotation-task-excel';
 import { suggestedKoraTeamForRole } from '../components/quotation-role-team-suggestions';
 import { QuotationCommercialSections } from '../components/QuotationCommercialSections';
 import { NewProjectQuotationModal } from '../components/NewProjectQuotationModal';
@@ -281,6 +282,14 @@ export function QuotationWorkspacePage() {
     if (!editable || !form) return;
     const source = form.draft.aiPoc?.edt;
     if (!source) return;
+    if (wbs.startsWith('KT-')) {
+      try {
+        applyEdtChanges(patchQuotationCommercialTask(form.draft, wbs, { hours }));
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : 'No se pudo actualizar la tarea.');
+      }
+      return;
+    }
     const original = source.modules.flatMap((module) => module.tasks).find(
       (task) => task.wbs === wbs);
     const originalHours = original?.roleEffort?.find(
@@ -340,6 +349,106 @@ export function QuotationWorkspacePage() {
       applyEdtChanges(withQuotationEdtStageSetting(form.draft, stageCode, patch));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'No se pudo actualizar el tramo.');
+    }
+  };
+  /** Las nuevas fases y tareas no modifican el artefacto de origen Gemini. */
+  const addPhase = () => {
+    if (!editable || !form) return;
+    if (!form.draft.aiPoc?.edt) {
+      updateDraft({ phases: [...phaseRows, {
+        name: 'Nuevo módulo', startWeek: 1, durationWeeks: 2, teamHours: [],
+      }] });
+      return;
+    }
+    try {
+      const previous = [...(form.draft.aiPoc.edt.stages ?? []),
+        ...(form.draft.edtCommercialStages ?? [])];
+      const last = Math.max(0, ...previous.map((stage) =>
+        stage.startWeek + stage.durationWeeks - 1));
+      if (last >= 520) throw new Error('El calendario ya alcanzó la semana 520.');
+      const stage = {
+        code: 'KS-' + crypto.randomUUID(), name: 'Nuevo módulo',
+        startWeek: last + 1, durationWeeks: Math.min(2, 520 - last),
+      };
+      applyEdtChanges(withQuotationCommercialStage(form.draft, stage));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'No se pudo agregar la fase.');
+    }
+  };
+  const removeCommercialPhase = (code: string) => {
+    if (!editable || !form) return;
+    try {
+      applyEdtChanges(withoutQuotationCommercialStage(form.draft, code));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'No se pudo quitar la fase.');
+    }
+  };
+  const addCommercialTask = (stageCode: string) => {
+    if (!editable || !form) return;
+    const teamId = form.draft.phases.find((phase) => phase.name.startsWith(stageCode + ' · '))
+      ?.teamHours.find((row) => row.hours > 0)?.teamId ?? activeTeams[0]?.id;
+    if (!teamId || !activeTeams.some((team) => team.id === teamId)) {
+      setError('No hay equipos activos de Kora para asignar la tarea.');
+      return;
+    }
+    try {
+      const teams = form.draft.teams.some((team) => team.teamId === teamId)
+        ? form.draft.teams
+        : [...form.draft.teams, { ...emptyTeam(teamId), duration: 0, hoursPerWeek: 0 }];
+      const task = {
+        wbs: 'KT-' + crypto.randomUUID(), stageCode, name: 'Nueva tarea',
+        teamId, hours: 8, fixed: false, classification: 'Sin tipo',
+      };
+      applyEdtChanges(withQuotationCommercialTask({ ...form.draft, teams }, task));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'No se pudo agregar la tarea.');
+    }
+  };
+  const removeCommercialTask = (wbs: string) => {
+    if (!editable || !form) return;
+    try {
+      applyEdtChanges(withoutQuotationCommercialTask(form.draft, wbs));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'No se pudo quitar la tarea.');
+    }
+  };
+  const editTaskName = (wbs: string, name: string) => {
+    if (!editable || !form) return;
+    try {
+      applyEdtChanges(withQuotationTaskDisplayName(form.draft, wbs, name));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Nombre de tarea inválido.');
+    }
+  };
+  const editTaskType = (wbs: string, classification: string) => {
+    if (!editable || !form) return;
+    try {
+      applyEdtChanges(withQuotationTaskCatalogType(form.draft, wbs, classification));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Tipo de tarea inválido.');
+    }
+  };
+  const importTaskExcel = async (stageCode: string, phaseName: string, file: File) => {
+    if (!editable || !form) return;
+    try {
+      const records = await readQuotationTaskExcel(file, phaseName, activeTeams);
+      if ((form.draft.edtCommercialTasks?.length ?? 0) + records.length > 240) {
+        throw new Error('El borrador admite un máximo de 240 tareas comerciales.');
+      }
+      let next = form.draft;
+      for (const record of records) {
+        if (!next.teams.some((team) => team.teamId === record.teamId)) {
+          next = { ...next, teams: [...next.teams,
+            { ...emptyTeam(record.teamId), duration: 0, hoursPerWeek: 0 }] };
+        }
+        next = withQuotationCommercialTask(next, {
+          wbs: 'KT-' + crypto.randomUUID(), stageCode, ...record, fixed: false,
+        });
+      }
+      applyEdtChanges(next); // operación atómica: sin importación parcial
+      setNotice(records.length + ' tareas importadas a la fase. Guarda el borrador para persistirlas.');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'No se pudo leer el Excel.');
     }
   };
   const editRoleCollaborators = (role: string, collaborators: number) => {
@@ -542,6 +651,12 @@ export function QuotationWorkspacePage() {
                       onEditTaskHours={editEdtHours}
                       onEditTaskFixed={editEdtTaskFixed}
                       onEditTaskTeam={editEdtTaskTeam}
+                      onAddTask={addCommercialTask}
+                      onDeleteTask={removeCommercialTask}
+                      onEditTaskName={editTaskName}
+                      onEditTaskType={editTaskType}
+                      onImportTaskExcel={importTaskExcel}
+                      onRemoveCommercialPhase={removeCommercialPhase}
                       onEditGroupHours={adjustEdtGroupHours}
                       onEditStage={editEdtStage}
                       onOpenRoleMapping={() => {
@@ -552,10 +667,7 @@ export function QuotationWorkspacePage() {
                         setRoleMappingOpen(true);
                       }}
                       onEditPhase={editPhase}
-                      onAddPhase={() => updateDraft({ phases: [
-                        ...phaseRows, { name: 'Nuevo módulo', startWeek: 1,
-                          durationWeeks: 1, teamHours: [] },
-                      ] })}
+                      onAddPhase={addPhase}
                       onRemovePhase={(index) => updateDraft({
                         phases: phaseRows.filter((_, position) => position !== index),
                       })}
