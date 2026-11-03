@@ -4,6 +4,9 @@ import { effectiveQuotationEdt } from './quotation-edt-adjustments';
 import {
   quotationEdtAssignments, redistributeQuotationEdtHours,
   withQuotationTaskSetting, withQuotationEdtStageSetting,
+  withQuotationCommercialStage, withQuotationCommercialTask,
+  patchQuotationCommercialTask, withoutQuotationCommercialTask,
+  withQuotationTaskDisplayName, withQuotationTaskCatalogType,
 } from './quotation-edt-task-planning';
 import {
   projectPocRolesToQuotationDraft, reconcilePocCommercialDraft,
@@ -189,4 +192,66 @@ describe('EDT comercial: equipos, tareas Fija y redistribución por centésimos'
     expect(entries.filter((row) => row.role === 'QA')
       .reduce((sum, row) => sum + Math.round(row.hours * 100), 0)).toBe(2000);
   });
+  it('agrega fases y tareas propias con HH comerciales sin reescribir Gemini', () => {
+    const mapped = projectPocRolesToQuotationDraft(source(), { Desarrollo: dev, QA: qa });
+    const unchangedEvidence = structuredClone(mapped.aiPoc?.edt);
+    const addedStage = {
+      code: 'KS-0777e456-fd76-445e-83f1-afc25061c104',
+      name: 'Entrega', startWeek: 4, durationWeeks: 2,
+    };
+    const task = {
+      wbs: 'KT-0777e456-fd76-445e-83f1-afc25061c105',
+      stageCode: addedStage.code, name: 'Informe ejecutivo',
+      teamId: qa, hours: 12, classification: 'Reportería', fixed: false,
+    };
+    const withStage = withQuotationCommercialStage(mapped, addedStage);
+    const withTask = withQuotationCommercialTask(withStage, task);
+    const next = reconcilePocCommercialDraft(withTask);
+    expect(next.phases).toHaveLength(3);
+    expect(next.phases[2]?.name).toContain('Entrega');
+    expect(next.phases[2]?.teamHours).toEqual([{ teamId: qa, hours: 12 }]);
+    expect(next.phases.reduce((sum, phase) =>
+      sum + phase.teamHours.reduce((h, row) => h + row.hours, 0), 0)).toBe(72);
+    expect(next.aiPoc?.edt).toEqual(unchangedEvidence);
+    expect(() => validatePocDraftIntegrity(mapped, next)).not.toThrow();
+
+    const renamed = withQuotationTaskDisplayName(next, 'T01.01', 'API revisada');
+    const classified = withQuotationTaskCatalogType(renamed, 'T01.01', 'Integración con API');
+    expect(quotationEdtAssignments(classified).find((row) =>
+      row.wbs === 'T01.01')?.name).toBe('API revisada');
+    expect(quotationEdtAssignments(classified).find((row) =>
+      row.wbs === 'T01.01')?.classification).toBe('Integración con API');
+    expect(classified.aiPoc?.edt).toEqual(unchangedEvidence);
+    expect(() => validatePocDraftIntegrity(next, reconcilePocCommercialDraft(classified)))
+      .not.toThrow();
+  });
+
+  it('edita y elimina solamente una tarea añadida, protege fijas y evita HH inventadas', () => {
+    const mapped = projectPocRolesToQuotationDraft(source(), { Desarrollo: dev, QA: qa });
+    const task = {
+      wbs: 'KT-0777e456-fd76-445e-83f1-afc25061c105', stageCode: 'T01',
+      name: 'Validación extra', teamId: dev, hours: 8, fixed: false,
+      classification: 'Pruebas funcionales',
+    };
+    const added = withQuotationCommercialTask(mapped, task);
+    const adjusted = patchQuotationCommercialTask(added, task.wbs, { hours: 9.5 });
+    expect(reconcilePocCommercialDraft(adjusted).phases[0]?.teamHours
+      .find((row) => row.teamId === dev)?.hours).toBe(39.5);
+    const fixed = withQuotationTaskSetting(adjusted, task.wbs, 'Tarea comercial',
+      { fixed: true });
+    const redistributed = redistributeQuotationEdtHours(fixed, {
+      teamKey: dev, stageCode: 'T01', targetHours: 40,
+    });
+    expect(quotationEdtAssignments(redistributed).find((row) =>
+      row.wbs === task.wbs)?.hours).toBe(9.5);
+    expect(quotationEdtAssignments(redistributed).filter((row) =>
+      row.teamId === dev && row.stageCode === 'T01')
+      .reduce((sum, row) => sum + row.hours, 0)).toBe(40);
+    const removed = withoutQuotationCommercialTask(adjusted, task.wbs);
+    expect(reconcilePocCommercialDraft(removed).phases.reduce((sum, phase) =>
+      sum + phase.teamHours.reduce((h, row) => h + row.hours, 0), 0)).toBe(60);
+    expect(() => withoutQuotationCommercialTask(adjusted, 'T01.01'))
+      .toThrow(/original/);
+  });
+
 });
