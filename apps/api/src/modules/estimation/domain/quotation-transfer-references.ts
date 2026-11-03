@@ -31,6 +31,7 @@ export function buildQuotationTransferReferences(
     const task = {
       wbs: row.wbs, name: row.name, description: row.description,
       role: row.role, hours: row.hours,
+      ...(row.teamId ? { teamId: row.teamId } : {}),
       ...(row.stageCode ? { stageCode: row.stageCode } : {}),
       ...(row.references.length ? { referenceIds: row.references } : {}),
     };
