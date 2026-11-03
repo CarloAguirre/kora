@@ -292,7 +292,8 @@ export function QuotationWorkspacePage() {
     }
     try {
       const teams = teamId && !form.draft.teams.some((row) => row.teamId === teamId)
-        ? [...form.draft.teams, emptyTeam(teamId)] : form.draft.teams;
+        ? [...form.draft.teams, { ...emptyTeam(teamId), duration: 0, hoursPerWeek: 0 }]
+        : form.draft.teams;
       const next = withQuotationTaskSetting(
         { ...form.draft, teams }, wbs, role, { teamId });
       applyEdtChanges(next);
