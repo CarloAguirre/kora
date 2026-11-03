@@ -3,6 +3,10 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { quotationDraftDataSchema, quotationVersionSchema } from '@kora/contracts';
 import { QuotationCommercialSections } from './QuotationCommercialSections';
 
+vi.mock('../api/estimation.queries', () => ({
+  useEstimationQuestionnaireDefinition: () => ({ data: { fixedQuestions: [] } }),
+}));
+
 const teamId = '0777e456-fd76-445e-83f1-afc25061c103';
 const draft = quotationDraftDataSchema.parse({
   mode: 'phases',
