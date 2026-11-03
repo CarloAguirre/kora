@@ -5,6 +5,10 @@ import { QuotationCommercialLifecycleCard } from './QuotationCommercialLifecycle
 
 const mocks = vi.hoisted(() => ({
   acceptAi: vi.fn(), markSent: vi.fn(), approveClient: vi.fn(), transferApproved: vi.fn(),
+  toastError: vi.fn(),
+}));
+vi.mock('@/shared/components/ui/Toast', () => ({
+  useToast: () => ({ error: mocks.toastError }),
 }));
 vi.mock('../api/quotation.queries', () => ({
   useQuotationLifecycle: () => ({
@@ -76,7 +80,10 @@ describe('Ciclo comercial separado · Kora', () => {
     render(<QuotationCommercialLifecycleCard project={project} quotation={quotation}
       version={version} canOperate hasUnsavedChanges={false}
       embedded showAiAcceptance={false}/>);
-    expect(screen.getByRole('button', { name: 'Registrar aprobación del cliente' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Registrar aprobación del cliente' })).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar aprobación del cliente' }));
+    expect(mocks.toastError).toHaveBeenCalledWith(expect.stringContaining('Acepta la propuesta IA'));
+    expect(mocks.approveClient).not.toHaveBeenCalled();
     const notice = screen.getByRole('status', { name: 'Requisitos comerciales pendientes' });
     expect(notice).toHaveTextContent('Acepta la propuesta IA en el bloque violeta');
     expect(notice).not.toHaveTextContent('Completa el plan de pago');
@@ -100,13 +107,16 @@ describe('Ciclo comercial separado · Kora', () => {
     render(<QuotationCommercialLifecycleCard project={project} quotation={quotation}
       version={{ ...version, aiReviewStatus: 'accepted' }} canOperate
       hasUnsavedChanges embedded showAiAcceptance={false} />);
-    expect(screen.getByRole('button', { name: 'Marcar como enviada al cliente' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Registrar aprobación del cliente' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Marcar como enviada al cliente' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Registrar aprobación del cliente' })).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar aprobación del cliente' }));
+    expect(mocks.toastError).toHaveBeenCalledWith(expect.stringContaining('Guarda los cambios'));
+    expect(mocks.approveClient).not.toHaveBeenCalled();
   });
 
   it('aceptar IA nunca invoca traspaso o aprobación de cliente', async () => {
     show();
-    expect(screen.getByRole('button', { name: 'Marcar como enviada' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Marcar como enviada' })).toBeEnabled();
     fireEvent.click(screen.getByRole('button', { name: 'Aceptar propuesta IA' }));
     fireEvent.click(screen.getByRole('button', { name: 'Aceptar propuesta' }));
     await waitFor(() => expect(mocks.acceptAi).toHaveBeenCalledWith({
@@ -141,7 +151,10 @@ describe('Ciclo comercial separado · Kora', () => {
   it('versión aprobada muestra traspaso pendiente, bloqueado si ya está Activo', () => {
     show({ ...version, status: 'approved', aiReviewStatus: 'accepted' },
       { ...project, status: 'active' });
-    expect(screen.getByRole('button', { name: 'Traspasar ahora' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Traspasar ahora' })).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Traspasar ahora' }));
+    expect(mocks.toastError).toHaveBeenCalledWith(expect.stringContaining('requiere conciliación'));
+    expect(mocks.transferApproved).not.toHaveBeenCalled();
     expect(screen.getByText(/La versión aprobada permanece registrada/)).toBeInTheDocument();
   });
 
@@ -174,7 +187,10 @@ describe('Ciclo comercial separado · Kora', () => {
 
   it('no permite acciones comerciales con cambios sin guardar', () => {
     show({ ...version, status: 'sent', aiReviewStatus: 'accepted' }, project, true);
-    expect(screen.getByRole('button', { name: 'Registrar aprobación' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Registrar aprobación' })).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar aprobación' }));
+    expect(mocks.toastError).toHaveBeenCalledWith(expect.stringContaining('Guarda los cambios'));
+    expect(mocks.approveClient).not.toHaveBeenCalled();
   });
 
   it('no permite enviar cuando la EDT ya no concuerda con las HH ajustadas', () => {
@@ -192,7 +208,10 @@ describe('Ciclo comercial separado · Kora', () => {
         analysisProjectionStatus: 'modified',
       },
     });
-    expect(screen.getByRole('button', { name: 'Marcar como enviada' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Marcar como enviada' })).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Marcar como enviada' }));
+    expect(mocks.toastError).toHaveBeenCalledWith(expect.stringContaining('Concilia la EDT'));
+    expect(mocks.markSent).not.toHaveBeenCalled();
     expect(screen.getByText(/Concilia la EDT antes de registrar un envío/)).toBeInTheDocument();
   });
 });
