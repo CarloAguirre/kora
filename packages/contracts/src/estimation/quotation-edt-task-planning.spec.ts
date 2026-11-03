@@ -1,0 +1,173 @@
+import { describe, expect, it } from 'vitest';
+import { quotationDraftDataSchema } from './quotation.contract';
+import { effectiveQuotationEdt } from './quotation-edt-adjustments';
+import {
+  quotationEdtAssignments, redistributeQuotationEdtHours,
+  withQuotationTaskSetting, withQuotationEdtStageSetting,
+} from './quotation-edt-task-planning';
+import {
+  projectPocRolesToQuotationDraft, reconcilePocCommercialDraft,
+  validatePocDraftIntegrity,
+} from './quotation-poc-projection';
+
+const dev = '0777e456-fd76-445e-83f1-afc25061c101';
+const qa = '0777e456-fd76-445e-83f1-afc25061c102';
+const ux = '0777e456-fd76-445e-83f1-afc25061c103';
+const emptyTeam = (teamId: string) => ({
+  teamId, collaborators: 1, unit: 'week' as const,
+  duration: 2, hoursPerWeek: 40, dedicationPercent: 100,
+});
+const source = () => quotationDraftDataSchema.parse({
+  mode: 'team',
+  teams: [],
+  aiPoc: {
+    source: 'kdm_demo',
+    answers: [], dynamicQuestions: [],
+    roleTeamIds: {},
+    proposal: {
+      projectId: '0777e456-fd76-445e-83f1-afc25061c100',
+      provider: 'gemini', sourceMode: 'poc_simulated',
+      documentsAnalyzed: 1, summary: 'Portal con integración y QA',
+      roles: [
+        { role: 'Desarrollo', unit: 'week', duration: 1,
+          hoursPerUnit: 40, people: 1, totalHours: 40 },
+        { role: 'QA', unit: 'week', duration: 1,
+          hoursPerUnit: 20, people: 1, totalHours: 20 },
+      ],
+      totalHours: 60, assumptions: [], clarifyingQuestions: [],
+    },
+    edt: {
+      schemaVersion: 'kora.quotation.reference-edt.v2',
+      source: 'kdm_demo', provider: 'gemini',
+      totalHours: 60, reservePercent: 10, reserveHours: 6, totalWithReserve: 66,
+      stages: [
+        { code: 'T01', name: 'Implementación', startWeek: 1,
+          durationWeeks: 2, totalHours: 40 },
+        { code: 'T02', name: 'Pruebas', startWeek: 3,
+          durationWeeks: 1, totalHours: 20 },
+      ],
+      modules: [
+        { name: 'Portal', totalHours: 40, tasks: [
+          { wbs: 'T01.01', name: 'API', description: 'REST',
+            role: 'Desarrollo', hours: 20, stageCode: 'T01',
+            roleEffort: [{ role: 'Desarrollo', hours: 10 },
+              { role: 'QA', hours: 10 }] },
+          { wbs: 'T01.02', name: 'Frontend', description: 'UI',
+            role: 'Desarrollo', hours: 20, stageCode: 'T01',
+            roleEffort: [{ role: 'Desarrollo', hours: 20 }] },
+        ] },
+        { name: 'Cierre', totalHours: 20, tasks: [
+          { wbs: 'T02.01', name: 'Regresión', description: 'UAT',
+            role: 'QA', hours: 10, stageCode: 'T02',
+            roleEffort: [{ role: 'QA', hours: 10 }] },
+          { wbs: 'T02.02', name: 'Ajustes', description: 'Parches',
+            role: 'Desarrollo', hours: 10, stageCode: 'T02',
+            roleEffort: [{ role: 'Desarrollo', hours: 10 }] },
+        ] },
+      ],
+    },
+  },
+});
+
+describe('EDT comercial: equipos, tareas Fija y redistribución por centésimos', () => {
+  it('redistribuye la diferencia exacta entre tareas no fijas, preservando Fija y otros tramos', () => {
+    const draft = withQuotationTaskSetting(source(), 'T01.01', 'Desarrollo', { fixed: true });
+    const updated = redistributeQuotationEdtHours(draft, {
+      teamKey: 'profile:Desarrollo', stageCode: 'T01', targetHours: 25,
+    });
+    const rows = quotationEdtAssignments(updated);
+    expect(rows.find((r) => r.wbs === 'T01.01' && r.role === 'Desarrollo')?.hours).toBe(10);
+    expect(rows.find((r) => r.wbs === 'T01.02' && r.role === 'Desarrollo')?.hours).toBe(15);
+    expect(rows.find((r) => r.wbs === 'T02.02' && r.role === 'Desarrollo')?.hours).toBe(10);
+    expect(effectiveQuotationEdt(updated)?.totalHours).toBe(55);
+    expect(source().aiPoc?.edt?.totalHours).toBe(60);
+  });
+
+  it('resta en partes iguales, asigna el centésimo sobrante en orden estable', () => {
+    const revised = redistributeQuotationEdtHours(source(), {
+      teamKey: 'profile:Desarrollo', stageCode: 'T01', targetHours: 21.01,
+    });
+    const rows = quotationEdtAssignments(revised).filter((r) =>
+      r.stageCode === 'T01' && r.role === 'Desarrollo');
+    expect(rows.map((row) => row.hours)).toEqual([5.5, 15.51]);
+    expect(rows.reduce((sum, row) => sum + Math.round(row.hours * 100), 0))
+      .toBe(2101);
+  });
+
+  it('no cambia ninguna tarea cuando todas son fijas; rechaza un total imposible', () => {
+    let draft = source();
+    draft = withQuotationTaskSetting(draft, 'T01.01', 'Desarrollo', { fixed: true });
+    draft = withQuotationTaskSetting(draft, 'T01.02', 'Desarrollo', { fixed: true });
+    expect(() => redistributeQuotationEdtHours(draft, {
+      teamKey: 'profile:Desarrollo', stageCode: 'T01', targetHours: 5,
+    })).toThrow(/No hay tareas editables/);
+    const partiallyFixed = withQuotationTaskSetting(source(),
+      'T01.01', 'Desarrollo', { fixed: true });
+    expect(() => redistributeQuotationEdtHours(partiallyFixed, {
+      teamKey: 'profile:Desarrollo', stageCode: 'T01', targetHours: 10,
+    })).toThrow(/menores que las tareas fijas/);
+    expect(effectiveQuotationEdt(draft)?.totalHours).toBe(60);
+  });
+
+  it('conserva HH al cambiar de equipo y recalcula todos los subtotales tras el mapeo', () => {
+    const mapped = projectPocRolesToQuotationDraft(source(), {
+      Desarrollo: dev, QA: qa,
+    });
+    const withExtra = { ...mapped, teams: [...mapped.teams, emptyTeam(ux)] };
+    const moved = withQuotationTaskSetting(withExtra, 'T01.01', 'Desarrollo', {
+      teamId: ux, fixed: true,
+    });
+    const reconciled = reconcilePocCommercialDraft(moved);
+    const first = reconciled.phases[0]!;
+    expect(first.teamHours.find((r) => r.teamId === ux)?.hours).toBe(10);
+    expect(first.teamHours.find((r) => r.teamId === dev)?.hours).toBe(20);
+    expect(first.teamHours.find((r) => r.teamId === qa)?.hours).toBe(10);
+    expect(reconciled.phases.reduce((sum, phase) => sum +
+      phase.teamHours.reduce((s, row) => s + row.hours, 0), 0)).toBe(60);
+    expect(() => validatePocDraftIntegrity(mapped, reconciled)).not.toThrow();
+    expect(source().aiPoc?.edt?.totalHours).toBe(60);
+  });
+
+  it('permite editar semanas y nombre comercial sin alterar el tramo original', () => {
+    const first = withQuotationEdtStageSetting(source(), 'T01', {
+      name: 'Integración ERP', startWeek: 4, durationWeeks: 3,
+    });
+    const mapped = projectPocRolesToQuotationDraft(first, { Desarrollo: dev, QA: qa });
+    expect(mapped.phases[0]).toMatchObject({
+      name: 'T01 · Integración ERP', startWeek: 4, durationWeeks: 3,
+    });
+    expect(first.aiPoc?.edt?.stages?.[0]).toMatchObject({
+      name: 'Implementación', startWeek: 1, durationWeeks: 2,
+    });
+    expect(() => withQuotationEdtStageSetting(first, 'T01',
+      { startWeek: 520, durationWeeks: 2 })).toThrow(/semanas/);
+  });
+
+  it('rechaza WBS inventado, equipos ajenos, roles duplicados y precisión inválida', () => {
+    const baseline = source();
+    expect(() => withQuotationTaskSetting(baseline,
+      'NO-EXISTE', 'QA', { fixed: true })).toThrow(/No existe/);
+    expect(() => withQuotationTaskSetting(baseline,
+      'T01.01', 'QA', { teamId: ux })).toThrow(/no pertenece/);
+    expect(() => quotationEdtAssignments({
+      ...baseline, edtTaskSettings: [
+        { wbs: 'T01.01', role: 'QA', fixed: true },
+        { wbs: 'T01.01', role: 'QA', fixed: true },
+      ],
+    })).toThrow(/duplicado/);
+    expect(() => redistributeQuotationEdtHours(baseline, {
+      teamKey: 'profile:Desarrollo', targetHours: 10.123,
+    })).toThrow(/máximo dos decimales/);
+  });
+
+  it('reparte globalmente en modo Por equipo afectando todas las fases, no otros perfiles', () => {
+    const revised = redistributeQuotationEdtHours(source(), {
+      teamKey: 'profile:Desarrollo', targetHours: 34,
+    });
+    const entries = quotationEdtAssignments(revised);
+    expect(entries.filter((row) => row.role === 'Desarrollo')
+      .reduce((sum, row) => sum + Math.round(row.hours * 100), 0)).toBe(3400);
+    expect(entries.filter((row) => row.role === 'QA')
+      .reduce((sum, row) => sum + Math.round(row.hours * 100), 0)).toBe(2000);
+  });
+});
