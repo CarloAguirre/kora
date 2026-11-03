@@ -10,6 +10,7 @@ import styles from './QuotationCommercialLifecycleCard.module.css';
  * Aceptar IA no toca el Roadmap; traspasar exige aprobación del cliente. */
 export function QuotationCommercialLifecycleCard({
   project, quotation, version, canOperate, hasUnsavedChanges, embedded = false,
+  showAiAcceptance = true,
 }: {
   project: ProjectDetail;
   quotation: ProjectQuotation | null;
@@ -18,6 +19,8 @@ export function QuotationCommercialLifecycleCard({
   hasUnsavedChanges: boolean;
   /** Renderizar acciones dentro del resumen comercial, sin una tarjeta anidada. */
   embedded?: boolean;
+  /** La cabecera v5 ya ofrece aceptar IA; evita duplicar el botón lateral. */
+  showAiAcceptance?: boolean;
 }) {
   const actions = useQuotationLifecycle(project.id);
   const [transferTiming, setTransferTiming] = useState<'now' | 'later'>('later');
@@ -132,7 +135,7 @@ export function QuotationCommercialLifecycleCard({
         el traspaso son operaciones distintas. Ninguna edición del borrador altera el proyecto.</p>
       {demo && <p className={styles.warning}>La fuente documental es el PDF KDM de prueba.
         No corresponde a los documentos reales de este proyecto.</p>}
-      {proposalPending && version.status === 'draft' && (
+      {showAiAcceptance && proposalPending && version.status === 'draft' && (
         <div className={styles.action}>
           <div><strong>1. Revisión del agente IA</strong>
             <p>Confirma perfiles, HH y cualquier ajuste manual; guarda antes de aceptar.</p></div>
@@ -159,12 +162,15 @@ export function QuotationCommercialLifecycleCard({
               No hay envío comercial registrado. Se solicitará confirmación explícita del
               cliente antes de aprobar directamente el borrador.
             </p>}</div>
-          <Select label="Tipo de traspaso" value={transferTiming}
-            onChange={(event) => setTransferTiming(event.target.value as 'now' | 'later')}
-            options={[
-              { value: 'later', label: 'Aprobar y traspasar después' },
-              { value: 'now', label: 'Aprobar y traspasar ahora' },
-            ]}/>
+          <details className={styles.transferTiming}>
+            <summary>Opciones de aprobación y traspaso</summary>
+            <Select label="Tipo de traspaso" value={transferTiming}
+              onChange={(event) => setTransferTiming(event.target.value as 'now' | 'later')}
+              options={[
+                { value: 'later', label: 'Aprobar y traspasar después' },
+                { value: 'now', label: 'Aprobar y traspasar ahora' },
+              ]}/>
+          </details>
           {transferTiming === 'now' && project.status !== 'draft' &&
             <p className={styles.warning}>Este proyecto no está en No iniciado.
               Por seguridad, la aprobación quedará pendiente de conciliación y traspaso.</p>}
