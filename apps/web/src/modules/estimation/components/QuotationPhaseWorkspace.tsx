@@ -68,9 +68,49 @@ export function referenceTasksForPhase(
   return result;
 }
 
+/** El preview se obtiene exclusivamente de la EDT guardada. No crea fases ni
+ * reemplaza la asignación real por equipos: no hay escrituras ni llamadas IA. */
+export function referencePhasesFromEdt(
+  edt: QuotationReferenceEdt,
+  mapping: Readonly<Record<string, string>>,
+  teamNames: ReadonlyMap<string, string>,
+): Phase[] {
+  const isV2 = edt.schemaVersion === 'kora.quotation.reference-edt.v2';
+  const entries = isV2
+    ? (edt.stages ?? []).map((stage) => ({
+      name: stage.code + ' · ' + stage.name,
+      startWeek: stage.startWeek,
+      durationWeeks: stage.durationWeeks,
+      tasks: edt.modules.flatMap((module) => module.tasks)
+        .filter((task) => task.stageCode === stage.code),
+    }))
+    : edt.modules.map((module) => ({
+      name: module.name,
+      startWeek: 1,
+      durationWeeks: 1,
+      tasks: module.tasks,
+    }));
+  return entries.map((entry) => {
+    const byRoleOrTeam = new Map<string, number>();
+    for (const task of entry.tasks) {
+      for (const effort of task.roleEffort ?? [{ role: task.role, hours: task.hours }]) {
+        const teamId = mapping[effort.role];
+        const key = teamId && teamNames.has(teamId) ? teamId : 'profile:' + effort.role;
+        byRoleOrTeam.set(key, Math.round(((byRoleOrTeam.get(key) ?? 0) + effort.hours) * 100) / 100);
+      }
+    }
+    return {
+      name: entry.name,
+      startWeek: entry.startWeek,
+      durationWeeks: entry.durationWeeks,
+      teamHours: [...byRoleOrTeam].map(([teamId, hours]) => ({ teamId, hours })),
+    };
+  });
+}
+
 export function QuotationPhaseWorkspace({
   phases, teams, teamNames, edt, roleTeamIds, editable,
-  onEditPhase, onAddPhase, onRemovePhase,
+  commercialMode = 'phases', onEditPhase, onAddPhase, onRemovePhase,
 }: {
   phases: readonly Phase[];
   teams: readonly Team[];
@@ -78,12 +118,21 @@ export function QuotationPhaseWorkspace({
   edt?: QuotationReferenceEdt | null;
   roleTeamIds?: Readonly<Record<string, string>>;
   editable: boolean;
+  commercialMode?: QuotationDraftData['mode'];
   onEditPhase: (index: number, patch: Partial<Phase>) => void;
   onAddPhase: () => void;
   onRemovePhase: (index: number) => void;
 }) {
   const mapping = roleTeamIds ?? {};
-  const maxWeek = Math.max(1, ...phases.map((phase) =>
+  // Una cotización IA recién creada conserva la EDT, pero aún no tiene
+  // fases comerciales. Renderizar la evidencia antes de mapear perfiles.
+  const previewOnly = Boolean(edt && (phases.length === 0 || commercialMode !== 'phases'));
+  const displayPhases = previewOnly && edt
+    ? referencePhasesFromEdt(edt, mapping, teamNames) : phases;
+  const nameOf = (teamId: string) => teamId.startsWith('profile:')
+    ? teamId.slice('profile:'.length)
+    : teamNames.get(teamId) ?? 'Equipo no disponible';
+  const maxWeek = Math.max(1, ...displayPhases.map((phase) =>
     phase.startWeek + phase.durationWeeks - 1));
 
   return (
@@ -92,9 +141,15 @@ export function QuotationPhaseWorkspace({
         <h2>Fases · Módulos</h2>
         <p>En semanas desde el inicio · Fase 1 la crea Kora</p>
       </div>
+      {previewOnly && <div className={styles.previewNotice} role="status">
+        <strong>✦ Planificación propuesta por Gemini · {hh(edt?.totalHours ?? 0)} HH</strong>
+        <span>Vista de referencia, aún no guardada como distribución comercial.
+          Puedes revisar los módulos, las tareas y el roadmap sin generar otra cotización.</span>
+        <a href="#quotation-ai-role-review">Asignar perfiles a equipos de Kora y aplicar propuesta</a>
+      </div>}
 
       <div className={styles.phases}>
-        {phases.map((phase, index) => {
+        {displayPhases.map((phase, index) => {
           const total = phase.teamHours.reduce((sum, row) => sum + row.hours, 0);
           const tasks = referenceTasksForPhase(phase, edt, mapping, teamNames);
           const taskTotal = tasks.reduce((sum, row) => sum + row.hours, 0);
@@ -106,7 +161,7 @@ export function QuotationPhaseWorkspace({
                 <span className={styles.phaseDescription}>
                   {hh(total)} HH · semanas {phase.startWeek} a {phase.startWeek + phase.durationWeeks - 1}
                 </span>
-                {editable && <button className={styles.remove} type="button"
+                {editable && !previewOnly && <button className={styles.remove} type="button"
                   onClick={() => {
                     if (window.confirm('¿Eliminar esta fase comercial y sus HH distribuidas?'))
                       onRemovePhase(index);
@@ -115,17 +170,17 @@ export function QuotationPhaseWorkspace({
 
               <div className={styles.phaseFields}>
                 <label>Nombre del módulo
-                  <input value={phase.name} disabled={!editable} maxLength={300}
+                  <input value={phase.name} disabled={!editable || previewOnly} maxLength={300}
                     onChange={(event) => onEditPhase(index, { name: event.target.value })} />
                 </label>
                 <label>Semana de inicio
-                  <input type="number" min={1} max={520} value={phase.startWeek} disabled={!editable}
+                  <input type="number" min={1} max={520} value={phase.startWeek} disabled={!editable || previewOnly}
                     onChange={(event) => onEditPhase(index, {
                       startWeek: Math.max(1, Number(event.target.value) || 1),
                     })} />
                 </label>
                 <label>Duración (semanas)
-                  <input type="number" min={1} max={520} value={phase.durationWeeks} disabled={!editable}
+                  <input type="number" min={1} max={520} value={phase.durationWeeks} disabled={!editable || previewOnly}
                     onChange={(event) => onEditPhase(index, {
                       durationWeeks: Math.max(1, Number(event.target.value) || 1),
                     })} />
@@ -133,12 +188,12 @@ export function QuotationPhaseWorkspace({
               </div>
 
               <div className={styles.phaseTeams}>
-                {teams.map((team) => {
-                  const name = teamNames.get(team.teamId) ?? 'Equipo no disponible';
+                {(previewOnly ? phase.teamHours.map((item) => ({ teamId: item.teamId })) : teams).map((team) => {
+                  const name = nameOf(team.teamId);
                   return (
                     <label key={team.teamId}>
                       <span><i style={{ background: quotationTeamColor(name) }} />{name} · HH</span>
-                      <input type="number" min={0} step="0.01" disabled={!editable}
+                      <input type="number" min={0} step="0.01" disabled={!editable || previewOnly}
                         aria-label={'HH de ' + name + ' para fase ' + (index + 2)}
                         value={phase.teamHours.find((item) => item.teamId === team.teamId)?.hours ?? 0}
                         onChange={(event) => onEditPhase(index, {
@@ -150,7 +205,7 @@ export function QuotationPhaseWorkspace({
                     </label>
                   );
                 })}
-                {teams.length === 0 &&
+                {!previewOnly && teams.length === 0 &&
                   <p className={styles.empty}>Asigna equipos antes de distribuir las HH por módulo.</p>}
               </div>
 
@@ -167,7 +222,7 @@ export function QuotationPhaseWorkspace({
                         Desglose original de Gemini, conservado por WBS y perfil. La distribución
                         comercial se edita arriba; las tareas aún no tienen tipo de catálogo ni indicador «Fija».
                       </p>
-                      {Math.abs(taskTotal - total) > 0.011 && (
+                      {!previewOnly && Math.abs(taskTotal - total) > 0.011 && (
                         <p role="status" className={styles.mismatch}>
                           La fase comercial suma {hh(total)} HH y la EDT de referencia {hh(taskTotal)} HH.
                           Revisa la conciliación antes de aprobar.
@@ -226,22 +281,22 @@ export function QuotationPhaseWorkspace({
             </section>
           );
         })}
-        {phases.length === 0 &&
-          <p className={styles.empty}>Aún no hay fases configuradas para esta versión.</p>}
+        {displayPhases.length === 0 &&
+          <p className={styles.empty}>No hay tramos cronológicos en esta versión.</p>}
       </div>
 
-      {editable && <button className={styles.add} type="button" onClick={onAddPhase}>
+      {editable && !previewOnly && <button className={styles.add} type="button" onClick={onAddPhase}>
         + Agregar fase / módulo
       </button>}
 
-      {phases.length > 0 && (
+      {displayPhases.length > 0 && (
         <section className={styles.roadmap} aria-labelledby="quotation-roadmap-title">
           <div className={styles.head}>
             <h3 id="quotation-roadmap-title">Roadmap preliminar</h3>
             <p>Las fechas se fijan con la fecha de inicio del proyecto</p>
           </div>
           <div className={styles.timeline}>
-            {phases.map((phase, index) => {
+            {displayPhases.map((phase, index) => {
               const total = phase.teamHours.reduce((sum, row) => sum + row.hours, 0);
               return (
                 <div className={styles.timelineRow} key={index}>
@@ -254,7 +309,7 @@ export function QuotationPhaseWorkspace({
                       width: (phase.durationWeeks / maxWeek * 100) + '%',
                     }}>
                       {total > 0 && phase.teamHours.filter((item) => item.hours > 0).map((item) => {
-                        const name = teamNames.get(item.teamId) ?? 'Equipo';
+                        const name = nameOf(item.teamId);
                         return <span key={item.teamId}
                           style={{ width: (item.hours / total * 100) + '%',
                             background: quotationTeamColor(name) }}
