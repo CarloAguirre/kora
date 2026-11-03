@@ -1,177 +1,128 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
-import { quotationReferenceEdtSchema, type QuotationDraftData } from '@kora/contracts';
+import { quotationDraftDataSchema, quotationReferenceEdtSchema } from '@kora/contracts';
 import { QuotationPhaseWorkspace, referenceTasksForPhase, referencePhasesFromEdt } from './QuotationPhaseWorkspace';
 
-const devId = '0777e456-fd76-445e-83f1-afc25061c103';
-const qaId = '0777e456-fd76-445e-83f1-afc25061c104';
-const teams: QuotationDraftData['teams'] = [
-  { teamId: devId, collaborators: 2, unit: 'week', duration: 2,
-    hoursPerWeek: 40, dedicationPercent: 100 },
-  { teamId: qaId, collaborators: 1, unit: 'week', duration: 1,
-    hoursPerWeek: 40, dedicationPercent: 100 },
-];
-const teamNames = new Map([[devId, 'Desarrollo'], [qaId, 'QA']]);
-const mapping = { Fullstack: devId, Tester: qaId };
-const phases: QuotationDraftData['phases'] = [
-  { name: 'T01 · Portal de cliente', startWeek: 1, durationWeeks: 2,
-    teamHours: [{ teamId: devId, hours: 12 }, { teamId: qaId, hours: 3 }] },
-  { name: 'T02 · Entrega', startWeek: 3, durationWeeks: 1,
-    teamHours: [{ teamId: qaId, hours: 8 }] },
-];
+const dev = '0777e456-fd76-445e-83f1-afc25061c103';
+const qa = '0777e456-fd76-445e-83f1-afc25061c104';
+const teams = new Map([[dev, 'Desarrollo'], [qa, 'QA']]);
 const edt = quotationReferenceEdtSchema.parse({
   schemaVersion: 'kora.quotation.reference-edt.v2',
-  source: 'kdm_demo', provider: 'gemini', totalHours: 23,
-  reservePercent: 0, reserveHours: 0, totalWithReserve: 23,
+  source: 'kdm_demo', provider: 'gemini',
+  totalHours: 23, reservePercent: 0, reserveHours: 0, totalWithReserve: 23,
   stages: [
-    { code: 'T01', name: 'Portal de cliente', startWeek: 1,
-      durationWeeks: 2, totalHours: 15 },
-    { code: 'T02', name: 'Entrega', startWeek: 3,
-      durationWeeks: 1, totalHours: 8 },
+    { code: 'T01', name: 'Portal', startWeek: 1, durationWeeks: 2, totalHours: 15 },
+    { code: 'T02', name: 'Pruebas', startWeek: 3, durationWeeks: 1, totalHours: 8 },
   ],
   modules: [
-    { name: 'Portal', totalHours: 15, tasks: [
-      { wbs: 'T01.01', name: 'Integración SAP', description: 'Servicio SOAP Facele.',
-        role: 'Fullstack', hours: 15, stageCode: 'T01', classification: 'Integración',
-        referenceIds: ['R09'],
-        roleEffort: [
-          { role: 'Fullstack', hours: 12 },
-          { role: 'Tester', hours: 3 },
-        ],
-      },
-    ] },
-    { name: 'QA', totalHours: 8, tasks: [
-      { wbs: 'T02.01', name: 'Validar entregables', description: 'UAT.',
-        role: 'Tester', hours: 8, stageCode: 'T02',
-        roleEffort: [{ role: 'Tester', hours: 8 }],
-      },
-    ] },
+    { name: 'Portal', totalHours: 15, tasks: [{
+      wbs: 'T01.01', name: 'Integración SAP', description: 'Servicio SOAP',
+      role: 'Fullstack', hours: 15, stageCode: 'T01',
+      roleEffort: [{ role: 'Fullstack', hours: 12 }, { role: 'Tester', hours: 3 }],
+      referenceIds: ['R09'],
+    }] },
+    { name: 'QA', totalHours: 8, tasks: [{
+      wbs: 'T02.01', name: 'UAT', description: 'Pruebas',
+      role: 'Tester', hours: 8, stageCode: 'T02',
+      roleEffort: [{ role: 'Tester', hours: 8 }],
+    }] },
   ],
+});
+const draft = quotationDraftDataSchema.parse({
+  mode: 'team',
+  teams: [],
+  aiPoc: {
+    source: 'kdm_demo', edt, roleTeamIds: {}, answers: [],
+    proposal: {
+      projectId: '0777e456-fd76-445e-83f1-afc25061c101',
+      provider: 'gemini', sourceMode: 'poc_simulated',
+      documentsAnalyzed: 1, summary: 'Propuesta',
+      roles: [
+        { role: 'Fullstack', unit: 'week', duration: 2,
+          hoursPerUnit: 12, people: 1, totalHours: 24 },
+        { role: 'Tester', unit: 'week', duration: 1,
+          hoursPerUnit: 11, people: 1, totalHours: 11 },
+      ],
+      totalHours: 35, assumptions: [], clarifyingQuestions: [],
+    },
+  },
 });
 const callbacks = {
   onEditPhase: vi.fn(), onAddPhase: vi.fn(), onRemovePhase: vi.fn(),
+  onEditTaskHours: vi.fn(), onEditTaskFixed: vi.fn(), onEditTaskTeam: vi.fn(),
+  onEditGroupHours: vi.fn(), onEditStage: vi.fn(),
 };
-const renderEditor = (customPhases: QuotationDraftData['phases'] = phases) =>
-  render(<QuotationPhaseWorkspace
-    phases={customPhases} teams={teams} edt={edt}
-    teamNames={teamNames} roleTeamIds={mapping}
-    editable onEditPhase={callbacks.onEditPhase}
-    onAddPhase={callbacks.onAddPhase} onRemovePhase={callbacks.onRemovePhase} />);
+function renderEditor(custom = draft) {
+  return render(<QuotationPhaseWorkspace
+    phases={custom.phases} teams={custom.teams} edt={edt}
+    draft={custom} teamNames={teams} roleTeamIds={custom.aiPoc?.roleTeamIds}
+    activeTeams={[{ id: dev, name: 'Desarrollo' }, { id: qa, name: 'QA' }]}
+    editable commercialMode={custom.mode}
+    {...callbacks}/>);
+}
+afterEach(() => vi.clearAllMocks());
 
-afterEach(() => { vi.restoreAllMocks(); vi.clearAllMocks(); });
-
-describe('Cotización v5 · fases y módulos', () => {
-  it('conserva WBS×perfil sin duplicar HH dentro del módulo y usa el equipo real', () => {
-    const rows = referenceTasksForPhase(phases[0]!, edt, mapping, teamNames);
-    expect(rows).toHaveLength(2);
-    expect(rows.map((row) => row.team)).toEqual(['Desarrollo', 'QA']);
-    expect(rows.map((row) => row.hours)).toEqual([12, 3]);
-    expect(rows.reduce((sum, row) => sum + row.hours, 0)).toBe(15);
-    expect(rows[0]?.wbs).toBe('T01.01');
-    expect(rows[0]?.references).toEqual(['R09']);
-  });
-
-  it('muestra los tramos, tareas y roadmap de Gemini antes de aplicar equipos a la cotización', () => {
-    const reference = referencePhasesFromEdt(edt, {}, teamNames);
-    expect(reference).toHaveLength(2);
-    expect(reference[0]?.name).toBe('T01 · Portal de cliente');
-    expect(reference[0]?.teamHours).toEqual([
-      { teamId: 'profile:Fullstack', hours: 12 },
-      { teamId: 'profile:Tester', hours: 3 },
-    ]);
-    expect(reference.flatMap((phase) => phase.teamHours)
-      .reduce((sum, row) => sum + row.hours, 0)).toBe(edt.totalHours);
-    render(<QuotationPhaseWorkspace
-      phases={[]} teams={[]} edt={edt}
-      commercialMode="team" teamNames={teamNames} roleTeamIds={{}}
-      editable onEditPhase={callbacks.onEditPhase}
-      onAddPhase={callbacks.onAddPhase} onRemovePhase={callbacks.onRemovePhase} />);
-    expect(screen.getByText(/Planificación propuesta por Gemini/)).toHaveTextContent('23 HH');
-    expect(screen.getByText('Fase 2')).toBeInTheDocument();
-    expect(screen.getByText('Fase 3')).toBeInTheDocument();
-    expect(screen.getByText('Roadmap preliminar')).toBeInTheDocument();
-    expect(screen.getByLabelText('T01 · Portal de cliente, semanas 1 a 2')).toBeInTheDocument();
-    expect(screen.getAllByText('Integración SAP')).toHaveLength(2);
-    expect(screen.getByDisplayValue('Portal de cliente')).toBeDisabled();
-    expect(screen.getByLabelText('HH de Fullstack para fase 2')).toBeDisabled();
-    expect(screen.getByRole('link', { name: /Asignar perfiles a equipos/ }))
-      .toHaveAttribute('href', '#quotation-ai-role-review');
-    expect(screen.queryByText('Aún no hay fases configuradas para esta versión.'))
-      .not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Agregar fase \/ módulo/ }))
-      .not.toBeInTheDocument();
-    expect(callbacks.onEditPhase).not.toHaveBeenCalled();
-    expect(callbacks.onAddPhase).not.toHaveBeenCalled();
-  });
-
-  it('representa módulos de EDT v1 sin tramos y conserva sus tareas', () => {
-    const legacy = quotationReferenceEdtSchema.parse({
-      schemaVersion: 'kora.quotation.reference-edt.v1', provider: 'gemini',
-      source: 'kdm_demo', totalHours: 12,
-      modules: [{ name: 'Módulo autenticación', totalHours: 12,
-        tasks: [{ wbs: '1.1', name: 'Inicio de sesión',
-          description: 'Formulario', role: 'Fullstack', hours: 12 }] }],
-    });
-    const reference = referencePhasesFromEdt(legacy, {}, teamNames);
-    expect(reference).toHaveLength(1);
-    expect(reference[0]?.teamHours).toEqual([{ teamId: 'profile:Fullstack', hours: 12 }]);
-    const tasks = referenceTasksForPhase(reference[0]!, legacy, {}, teamNames);
-    expect(tasks).toHaveLength(1);
-    expect(tasks[0]?.name).toBe('Inicio de sesión');
-  });
-
-  it('representa las tarjetas, tareas, roadmap y conserva las HH comerciales editables', () => {
+describe('Cotización HTML v5 · fases y tareas', () => {
+  it('muestra módulos y roadmap aun sin fases comerciales ni equipos mapeados', () => {
     renderEditor();
     expect(screen.getByText('Fases · Módulos')).toBeInTheDocument();
     expect(screen.getByText('Fase 2')).toBeInTheDocument();
     expect(screen.getByText('Fase 3')).toBeInTheDocument();
-    expect(screen.getByText('15 HH · semanas 1 a 2')).toBeInTheDocument();
     expect(screen.getByText('Roadmap preliminar')).toBeInTheDocument();
-    expect(screen.getByLabelText('T01 · Portal de cliente, semanas 1 a 2')).toBeInTheDocument();
-    expect(screen.getAllByText('Integración SAP')).toHaveLength(2);
-    expect(screen.getAllByText(/Propuesta del agente/).length).toBeGreaterThan(0);
-    fireEvent.change(screen.getByDisplayValue('Portal de cliente'),
-      { target: { value: 'Portal posventa' } });
-    expect(callbacks.onEditPhase).toHaveBeenCalledWith(0, {
-      name: 'T01 · Portal posventa',
-    });
-    expect(screen.getByLabelText('HH de Desarrollo para fase 2')).toBeDisabled();
-    fireEvent.click(screen.getByRole('button', { name: '+ Agregar fase / módulo' }));
-    expect(callbacks.onAddPhase).toHaveBeenCalledOnce();
+    expect(screen.getByText('15 HH · semanas 1 a 2')).toBeInTheDocument();
+    expect(screen.queryByText(/Planificación propuesta por Gemini/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Fase 1 la crea Kora/)).not.toBeInTheDocument();
   });
 
-  it('permite ajustar HH por WBS y perfil dentro del desplegable, sin editar la evidencia original', () => {
-    const onEditTaskHours = vi.fn();
-    render(<QuotationPhaseWorkspace
-      phases={[]} teams={[]} edt={edt}
-      commercialMode="team" teamNames={teamNames} roleTeamIds={{}}
-      editable onEditTaskHours={onEditTaskHours}
-      onEditPhase={callbacks.onEditPhase}
-      onAddPhase={callbacks.onAddPhase} onRemovePhase={callbacks.onRemovePhase} />);
-    fireEvent.change(screen.getByLabelText('HH de T01.01 · Fullstack'),
-      { target: { value: '18.5' } });
-    expect(onEditTaskHours).toHaveBeenCalledWith('T01.01', 'Fullstack', 18.5);
-    expect(edt.modules[0]?.tasks[0]?.roleEffort?.[0]?.hours).toBe(12);
-    expect(screen.getByLabelText('HH de Fullstack para fase 2')).toBeDisabled();
-  });
-
-  it('alerta si la fase comercial ya no concilia con las tareas IA', () => {
-    const changed = [
-      { ...phases[0]!, teamHours: [{ teamId: devId, hours: 20 }] },
-    ];
-    renderEditor(changed);
-    expect(screen.getByText(/La fase comercial suma/)).toBeInTheDocument();
-    expect(screen.getByText(/EDT de referencia 15 HH/)).toBeInTheDocument();
-  });
-
-  it('no elimina fases sin confirmación explícita y no crea tareas ejecutables', () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(false);
+  it('muestra grilla de cuatro columnas; equipo seleccionable, HH editable y Fija real', () => {
     renderEditor();
-    fireEvent.click(screen.getAllByRole('button', { name: 'Eliminar' })[0]!);
+    expect(screen.getByText('Tarea')).toBeInTheDocument();
+    expect(screen.getByText('Equipo')).toBeInTheDocument();
+    expect(screen.getByText('Fija')).toBeInTheDocument();
+    expect(screen.queryByText('Tipo (catálogo)')).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Equipo de T01.01 · Fullstack'),
+      { target: { value: dev } });
+    expect(callbacks.onEditTaskTeam).toHaveBeenCalledWith('T01.01', 'Fullstack', dev);
+    fireEvent.click(screen.getByLabelText('Fija para T01.01 · Fullstack'));
+    expect(callbacks.onEditTaskFixed).toHaveBeenCalledWith('T01.01', 'Fullstack', true);
+    fireEvent.change(screen.getByLabelText('HH de T01.01 · Fullstack'),
+      { target: { value: '15.5' } });
+    expect(callbacks.onEditTaskHours).toHaveBeenCalledWith('T01.01', 'Fullstack', 15.5);
+  });
+
+  it('permite modificar HH por perfil y fase; recalcular se delega a contratos', () => {
+    renderEditor();
+    fireEvent.change(screen.getByLabelText('HH de Fullstack para fase 2'),
+      { target: { value: '10' } });
+    expect(callbacks.onEditGroupHours).toHaveBeenCalledWith(
+      'profile:Fullstack', 10, 'T01', undefined);
+    fireEvent.change(screen.getByDisplayValue('Portal'),
+      { target: { value: 'Portal postventa' } });
+    expect(callbacks.onEditStage).toHaveBeenCalledWith(
+      'T01', { name: 'Portal postventa' });
+  });
+
+  it('agrega y elimina módulos manuales sin EDT, conservando acciones históricas', () => {
+    const manual = quotationDraftDataSchema.parse({ mode: 'phases',
+      phases: [{ name: 'Producción', startWeek: 1, durationWeeks: 2, teamHours: [] }] });
+    render(<QuotationPhaseWorkspace
+      phases={manual.phases} teams={[]} editable teamNames={teams}
+      onEditPhase={callbacks.onEditPhase}
+      onAddPhase={callbacks.onAddPhase} onRemovePhase={callbacks.onRemovePhase}/>);
+    fireEvent.click(screen.getByRole('button', { name: /Agregar fase/ }));
+    expect(callbacks.onAddPhase).toHaveBeenCalledOnce();
+    vi.spyOn(window, 'confirm').mockReturnValue(false);
+    fireEvent.click(screen.getByRole('button', { name: 'Eliminar' }));
     expect(callbacks.onRemovePhase).not.toHaveBeenCalled();
-    expect(screen.getAllByLabelText('Fija no disponible para T01.01')).toHaveLength(2);
-    expect(screen.getAllByLabelText('Fija no disponible para T01.01').every(
-      (element) => element.hasAttribute('disabled'))).toBe(true);
-    expect(screen.queryByRole('button', { name: /Crear tarea operativa/ })).not.toBeInTheDocument();
+    vi.restoreAllMocks();
+  });
+
+  it('mantiene HH por perfil y WBS al representar un mismo trabajo multiperfil', () => {
+    const stages = referencePhasesFromEdt(edt, {}, teams, draft);
+    expect(stages).toHaveLength(2);
+    const rows = referenceTasksForPhase(stages[0]!, edt, {}, teams, draft);
+    expect(rows).toHaveLength(2);
+    expect(rows.map((row) => row.hours)).toEqual([12, 3]);
+    expect(rows.reduce((sum, row) => sum + row.hours, 0)).toBe(15);
   });
 });
