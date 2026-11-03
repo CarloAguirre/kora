@@ -250,6 +250,54 @@ describe('GenerateEstimationPocProposalUseCase', () => {
     expect(proposal.totalHours).toBe(80); // La propuesta preliminar no se altera.
   });
 
+  it('solicita una corrección a Gemini cuando la primera EDT tiene HH no redondeadas', async () => {
+    const projectId = '550e8400-e29b-41d4-a716-446655440000';
+    const proposal = estimationPocProposalSchema.parse({
+      projectId, provider: 'gemini', sourceMode: 'poc_simulated',
+      documentsAnalyzed: 1, summary: 'Prueba de corrección',
+      roles: [{ role: 'Desarrollo', unit: 'week', duration: 1,
+        hoursPerUnit: 40, people: 1, totalHours: 40 }],
+      totalHours: 40, assumptions: [], clarifyingQuestions: [],
+    });
+    let calls = 0;
+    let retryInstructions = '';
+    const ai: AiProvider = {
+      name: 'gemini',
+      generateStructured: async (request) => {
+        calls++;
+        if (calls === 2) retryInstructions = request.instructions;
+        return {
+          reservePercent: 0,
+          activities: [{
+            wbs: 'T01.01', stageCode: 'T01', stageName: 'Implementación',
+            startWeek: 1, durationWeeks: 2, module: 'Portal', submodule: 'Backend',
+            name: 'Servicio', description: 'Crear endpoint',
+            role: 'Desarrollo', hours: calls === 1 ? 14.123 : 14.12,
+            references: 'R01', classification: 'Desarrollo',
+          }],
+        };
+      },
+    };
+    const sources: DocumentSourceReader = {
+      readDriveSources: async () => [{
+        sourceId: 'kora-poc-requerimiento-kdm', name: 'Requerimiento_KDM.pdf',
+        mimeType: 'application/pdf', path: 'KDM.pdf', text: 'Servicio backend.',
+      }],
+    };
+    const result = await new GenerateEstimationPocProposalUseCase(ai, sources).generateEdt({
+      projectId, projectName: 'KDM', clientName: 'Cliente',
+      driveFolderUrl: 'https://drive.google.com/drive/folders/kora-poc-fallback',
+      instructions: null, answers: [],
+    }, proposal);
+    expect(calls).toBe(2);
+    expect(retryInstructions).toMatch(/rechazada por las validaciones/);
+    expect(retryInstructions).toMatch(/dos decimales/);
+    expect(result.totalHours).toBe(14.12);
+    expect(result.modules[0]?.tasks[0]?.roleEffort).toEqual([
+      { role: 'Desarrollo', hours: 14.12 },
+    ]);
+  });
+
   it('rechaza actividades con roles ajenos a la propuesta y no genera HH inventadas', async () => {
     const ai: AiProvider = {
       name: 'gemini',
