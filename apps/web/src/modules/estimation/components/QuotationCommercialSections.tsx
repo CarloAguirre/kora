@@ -62,7 +62,9 @@ export function QuotationCommercialSections({
       (row, i) => i === index ? { ...row, ...patch } : row,
     ) });
   const answers = version.draft.aiPoc?.answers ?? [];
-  const questionnaire = useEstimationQuestionnaireDefinition(answers.length > 0);
+  // Material histórico preservado en draft; la interfaz v5 no muestra estos desplegables.
+  const showExtraDetails = false;
+  const questionnaire = useEstimationQuestionnaireDefinition(false);
 
   return (
     <>
@@ -198,15 +200,15 @@ export function QuotationCommercialSections({
           onChange={(event) => onDraftChange({
             assumptions: event.target.value.split('\n').slice(0, 100),
           })} />
-        <details className={styles.details}>
+        {showExtraDetails && <details className={styles.details}>
           <summary>Exclusiones del alcance ({draft.exclusions.filter(Boolean).length})</summary>
           <textarea className={styles.notes} aria-label="Exclusiones de la cotización"
             disabled={!editable} value={draft.exclusions.join('\n')}
             onChange={(event) => onDraftChange({
               exclusions: event.target.value.split('\n').slice(0, 100),
             })} />
-        </details>
-        {answers.length > 0 &&
+        </details>}
+        {showExtraDetails && answers.length > 0 &&
           <details className={styles.details}>
             <summary>Respuestas del cuestionario IA</summary>
             <dl className={styles.answers}>
