@@ -94,7 +94,7 @@ export const quotationDraftDataSchema = z.object({
     wbs: z.string().trim().min(1).max(40),
     role: z.string().trim().min(1).max(120),
     hours: z.number().positive().max(1000000),
-  })).max(240).default([]),
+  })).max(240).optional(),
   costs: z.array(quotationExternalCostSchema).max(100).default([]),
   paymentPlan: z.array(quotationPaymentItemSchema).max(100).default([]),
   assumptions: z.array(z.string().trim().max(2000)).max(100).default([]),
