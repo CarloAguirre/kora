@@ -83,6 +83,25 @@ describe('EDT comercial: equipos, tareas Fija y redistribución por centésimos'
     expect(source().aiPoc?.edt?.totalHours).toBe(60);
   });
 
+  it('al reducir 1 HH entre dos tareas flexibles, descuenta 0,5 HH a cada una', () => {
+    const revised = redistributeQuotationEdtHours(source(), {
+      teamKey: 'profile:Desarrollo', stageCode: 'T01', targetHours: 29,
+    });
+    const rows = quotationEdtAssignments(revised).filter((row) =>
+      row.stageCode === 'T01' && row.role === 'Desarrollo');
+    expect(rows.map((row) => row.hours)).toEqual([9.5, 19.5]);
+    expect(effectiveQuotationEdt(revised)?.totalHours).toBe(59);
+  });
+
+  it('descuenta dos centésimos de dos tareas, uno de cada una', () => {
+    const revised = redistributeQuotationEdtHours(source(), {
+      teamKey: 'profile:Desarrollo', stageCode: 'T01', targetHours: 29.98,
+    });
+    const rows = quotationEdtAssignments(revised).filter((row) =>
+      row.stageCode === 'T01' && row.role === 'Desarrollo');
+    expect(rows.map((row) => row.hours)).toEqual([9.99, 19.99]);
+  });
+
   it('resta en partes iguales, asigna el centésimo sobrante en orden estable', () => {
     const revised = redistributeQuotationEdtHours(source(), {
       teamKey: 'profile:Desarrollo', stageCode: 'T01', targetHours: 21.01,
