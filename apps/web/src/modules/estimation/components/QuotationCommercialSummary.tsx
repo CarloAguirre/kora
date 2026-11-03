@@ -1,9 +1,10 @@
 import type { ReactNode } from 'react';
 import { effectiveQuotationEdt, type QuotationDraftData, type QuotationVersion } from '@kora/contracts';
 import { Card } from '@/shared/components/ui/Card';
+import { quotationTeamColor } from './quotation-team-colors';
 import styles from './QuotationCommercialSummary.module.css';
 
-type TeamHours = { teamId: string; name: string; hours: number; tone: string };
+type TeamHours = { teamId: string; name: string; hours: number; color: string };
 const fmt = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 2 });
 const fmtMoney = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 4 });
 const round = (n: number, places: number) =>
@@ -32,16 +33,6 @@ function preview(draft: QuotationDraftData, rate: number | null, tax: 'iva19' | 
     totalAmount: round(netAmount * (tax === 'iva19' ? 1.19 : tax === 'igv18' ? 1.18 : 1), 4),
     byTeam,
   };
-}
-function teamTone(name: string) {
-  const normalized = name.toLocaleLowerCase('es');
-  if (normalized.includes('desarrollo') || normalized.includes('dev')) return 'dev';
-  if (normalized.includes('qa') || normalized.includes('calidad')) return 'qa';
-  if (normalized.includes('ux') || normalized.includes('diseño')) return 'ux';
-  if (normalized.includes('pmo') || normalized.includes('gestión')) return 'pmo';
-  if (normalized.includes('rpa') || normalized.includes('automatiza')) return 'rpa';
-  if (normalized.includes('ia') || normalized.includes('inteligencia')) return 'ai';
-  return 'other';
 }
 function durationLabel(draft: QuotationDraftData) {
   if (draft.mode === 'phases') {
@@ -77,7 +68,7 @@ export function QuotationCommercialSummary({
   const commercialRows: TeamHours[] = numbers.byTeam.filter((row) => row.hours > 0)
     .map((row) => {
       const name = teamNames.get(row.teamId) ?? 'Equipo no disponible';
-      return { ...row, name, tone: teamTone(name) };
+      return { ...row, name, color: quotationTeamColor(name) };
     });
   const roleHours = new Map<string, number>();
   if (edt) {
@@ -90,7 +81,7 @@ export function QuotationCommercialSummary({
     }
   }
   const referenceRows: TeamHours[] = [...roleHours].map(([role, hours]) => ({
-    teamId: 'role:' + role, name: role, hours, tone: teamTone(role),
+    teamId: 'role:' + role, name: role, hours, color: quotationTeamColor(role),
   })).filter((row) => row.hours > 0);
   const rows = referenceOnly ? referenceRows : commercialRows;
   const duration = referenceOnly && edt
@@ -134,16 +125,16 @@ export function QuotationCommercialSummary({
           aria-label={referenceOnly ? 'Distribución referencial por perfil' :
             'Distribución de horas por equipo'}>
           {rows.length > 0 ? rows.map((row) =>
-            <span key={row.teamId} className={styles[row.tone]}
-              style={{ width: (row.hours / Math.max(1, hoursShown) * 100) + '%' }}
+            <span key={row.teamId}
+              style={{ width: (row.hours / Math.max(1, hoursShown) * 100) + '%',
+                background: row.color }}
               title={row.name + ': ' + fmt(row.hours) + ' hh'} />
           ) : <span className={styles.emptyBar} />}
         </div>
         <div className={styles.legend}>
           {rows.length > 0 ? rows.map((row) => (
             <div key={row.teamId} className={styles.legendRow}>
-              <span className={styles.name}><span className={styles.dot + ' ' +
-                styles[row.tone]} />{row.name}</span>
+              <span className={styles.name}><span className={styles.dot} style={{ background: row.color }} />{row.name}</span>
               <strong>{fmt(row.hours)} hh</strong>
             </div>
           )) : <p>Sin HH distribuidas.</p>}
