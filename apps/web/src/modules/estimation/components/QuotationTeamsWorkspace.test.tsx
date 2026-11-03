@@ -65,7 +65,7 @@ describe('Switch Equipos · HTML v5', () => {
 
   it('muestra HH derivadas del EDT, editables globalmente, sin capacidad artificial', () => {
     renderTeams(edtDraft);
-    expect(screen.getByText('40')).toBeInTheDocument();
+    expect(screen.getByLabelText('Horas totales de Desarrollo')).toHaveValue(40);
     expect(screen.queryByText('Unidad')).not.toBeInTheDocument();
     expect(screen.queryByText('Duración')).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Horas totales de Desarrollo'),
