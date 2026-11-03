@@ -3,6 +3,7 @@ import { quotationEdtAssignments } from '@kora/contracts';
 import { Card } from '@/shared/components/ui/Card';
 import { quotationTeamColor } from './quotation-team-colors';
 import { QuotationGroupHoursInput } from './QuotationGroupHoursInput';
+import { downloadQuotationTaskTemplate, QUOTATION_TASK_TYPES } from '../lib/quotation-task-excel';
 import styles from './QuotationPhaseWorkspace.module.css';
 
 type Phase = QuotationDraftData['phases'][number];
@@ -10,7 +11,7 @@ type Team = QuotationDraftData['teams'][number];
 type TaskRow = {
   wbs: string; name: string; module: string; description: string;
   role: string; team: string; teamKey: string; teamId: string | null;
-  fixed: boolean; hours: number; references: string[];
+  fixed: boolean; hours: number; references: string[]; classification?: string;
 };
 const hh = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 2 });
 export { quotationTeamColor } from './quotation-team-colors';
@@ -27,7 +28,8 @@ export function referenceTasksForPhase(
   draft?: QuotationDraftData,
 ): TaskRow[] {
   if (!edt) return [];
-  const stage = edt.stages?.find((item) => phase.name.startsWith(item.code + ' · '));
+  const stage = edt.stages?.find((item) => phase.name.startsWith(item.code + ' · ')) ??
+    draft?.edtCommercialStages?.find((item) => phase.name.startsWith(item.code + ' · '));
   if (draft) return quotationEdtAssignments(draft)
     .filter((task) => {
       if (stage) return task.stageCode === stage.code;
@@ -50,6 +52,7 @@ export function referenceTasksForPhase(
       rows.push({
         wbs: task.wbs, role: effort.role, name: task.name, module: module.name,
         description: task.description, hours: effort.hours, references: task.referenceIds ?? [],
+        classification: task.classification,
         teamId, teamKey: teamId ?? 'profile:' + effort.role, fixed: false,
         team: teamId ? nameOf(teamId, teamNames) : effort.role,
       });
@@ -67,7 +70,7 @@ export function referencePhasesFromEdt(
   draft?: QuotationDraftData,
 ): Phase[] {
   const v2 = edt.schemaVersion === 'kora.quotation.reference-edt.v2';
-  const entries = v2 ? (edt.stages ?? []).map((s) => ({
+  const entries = [...(v2 ? (edt.stages ?? []).map((s) => ({
     code: s.code, name: s.name, startWeek: s.startWeek,
     durationWeeks: s.durationWeeks,
     match: (row: TaskRow) => row.wbs.length >= 0 && Boolean(
@@ -77,7 +80,11 @@ export function referencePhasesFromEdt(
   })) : edt.modules.map((m) => ({
     code: 'module:' + m.name, name: m.name, startWeek: 1, durationWeeks: 1,
     match: (row: TaskRow) => row.module === m.name,
-  }));
+  }))), ...(draft?.edtCommercialStages ?? []).map((s) => ({
+    code: s.code, name: s.name, startWeek: s.startWeek,
+    durationWeeks: s.durationWeeks,
+    match: (row: TaskRow) => row.stageCode === s.code,
+  }))];
   const all = draft
     ? quotationEdtAssignments(draft).map((row) => ({
         ...row, team: nameOf(row.teamKey, teamNames),
@@ -115,6 +122,8 @@ export function QuotationPhaseWorkspace({
   onEditPhase, onAddPhase, onRemovePhase,
   onEditTaskHours, onEditTaskFixed, onEditTaskTeam, onEditGroupHours,
   onEditStage, onOpenRoleMapping,
+  onAddTask, onDeleteTask, onEditTaskName, onEditTaskType,
+  onImportTaskExcel, onRemoveCommercialPhase,
 }: {
   phases: readonly Phase[];
   teams: readonly Team[];
@@ -132,6 +141,12 @@ export function QuotationPhaseWorkspace({
   onEditStage?: (stageCode: string,
     patch: { name?: string; startWeek?: number; durationWeeks?: number }) => void;
   onOpenRoleMapping?: () => void;
+  onAddTask?: (stageCode: string) => void;
+  onDeleteTask?: (wbs: string) => void;
+  onEditTaskName?: (wbs: string, name: string) => void;
+  onEditTaskType?: (wbs: string, classification: string) => void;
+  onImportTaskExcel?: (stageCode: string, phaseName: string, file: File) => Promise<void>;
+  onRemoveCommercialPhase?: (stageCode: string) => void;
   onEditPhase: (index: number, patch: Partial<Phase>) => void;
   onAddPhase: () => void;
   onRemovePhase: (index: number) => void;
@@ -142,7 +157,6 @@ export function QuotationPhaseWorkspace({
     : phases;
   const maxWeek = Math.max(1, ...displayPhases.map((phase) =>
     phase.startWeek + phase.durationWeeks - 1));
-  const allEdtGroups = Boolean(edt);
   const projectAllowsEdit = editable && Boolean(edt);
   const unmappedRoles = edt && draft?.aiPoc
     ? draft.aiPoc.proposal.roles.filter((role) => {
@@ -169,7 +183,8 @@ export function QuotationPhaseWorkspace({
       )}
       <div className={styles.phases}>
         {displayPhases.map((phase, index) => {
-          const stage = edt?.stages?.find((item) => phase.name.startsWith(item.code + ' · '));
+          const stage = edt?.stages?.find((item) => phase.name.startsWith(item.code + ' · ')) ??
+            draft?.edtCommercialStages?.find((item) => phase.name.startsWith(item.code + ' · '));
           const stageCode = stage?.code ?? (edt?.schemaVersion === 'kora.quotation.reference-edt.v1'
             ? 'module:' + (edt.modules[index]?.name ?? phase.name) : undefined);
           const prefix = stage ? stage.code + ' · ' : '';
@@ -191,10 +206,14 @@ export function QuotationPhaseWorkspace({
                 <span className={styles.phaseDescription}>
                   {hh(total)} HH · semanas {phase.startWeek} a {phase.startWeek + phase.durationWeeks - 1}
                 </span>
-                {!edt && editable && <button type="button" className={styles.remove}
-                  onClick={() => window.confirm('¿Eliminar esta fase?') && onRemovePhase(index)}>
-                  Eliminar
-                </button>}
+                {editable && (!edt || stageCode?.startsWith('KS-')) && (
+                  <button type="button" className={styles.remove}
+                    onClick={() => {
+                      if (!window.confirm('¿Eliminar esta fase y sus tareas comerciales?')) return;
+                      if (stageCode?.startsWith('KS-')) onRemoveCommercialPhase?.(stageCode);
+                      else onRemovePhase(index);
+                    }}>Eliminar</button>
+                )}
               </div>
               <div className={styles.phaseFields}>
                 <label>Nombre del módulo
@@ -253,23 +272,95 @@ export function QuotationPhaseWorkspace({
                   {tasks.length > 0 && (
                     <div className={styles.tableScroll}>
                       <div className={styles.tasksHeader}>
-                        <span>Tarea</span><span>Equipo</span><span>HH</span><span>Fija</span>
+                        <span>Tarea</span><span>Equipo</span>
+                        <span>Tipo (catálogo)</span><span>HH</span><span>Fija</span><span/>
                       </div>
                       {tasks.map((task) => (
                         <div className={styles.taskRow} key={task.wbs + ':' + task.role}>
-                          <div className={styles.taskName}>
-                            <div className={styles.readonlyInput} title={task.description}>
-                              {task.name}
-                            </div>
-                            <small>✦ Propuesta del agente · {task.wbs}</small>
-                            <small className={styles.taskRole}>Perfil requerido: {task.role}</small>
-                            {(task.description || task.references.length > 0) &&
-                              <details className={styles.taskDescription}>
-                                <summary>Descripción y referencias</summary>
-                                {task.description && <p>{task.description}</p>}
-                                {task.references.length > 0 &&
-                                  <p>Referencias: {task.references.join(', ')}</p>}
-                              </details>}
+                          <input className={styles.taskText} type="text"
+                            aria-label={'Tarea ' + task.wbs + ' · ' + task.role}
+                            key={task.wbs + ':' + task.role + ':' + task.name}
+                            defaultValue={task.name} maxLength={300}
+                            disabled={!editable}
+                            onBlur={(e) => {
+                              const name = e.target.value.trim();
+                              if (name && name !== task.name) onEditTaskName?.(task.wbs, name);
+                            }}/>
+                          <select className={styles.teamSelect} disabled={!editable || needsRoleMapping}
+                            aria-label={'Equipo de ' + task.wbs + ' · ' + task.role}
+                            value={task.teamId ?? ''}
+                            onChange={(e) => onEditTaskTeam?.(
+                              task.wbs, task.role, e.target.value || null)}>
+                            <option value="">
+                              {needsRoleMapping ? 'Pendiente · asociar perfil' : 'Seleccionar equipo'}
+                            </option>
+                            {activeTeams.map((team) =>
+                              <option key={team.id} value={team.id}>{team.name}</option>)}
+                            {task.teamId && !activeTeams.some((t) => t.id === task.teamId) &&
+                              <option value={task.teamId}>{task.team} (no activo)</option>}
+                          </select>
+                          <select className={styles.teamSelect} disabled={!editable}
+                            aria-label={'Tipo de ' + task.wbs + ' · ' + task.role}
+                            value={QUOTATION_TASK_TYPES.includes(task.classification as typeof QUOTATION_TASK_TYPES[number])
+                              ? task.classification : 'Sin tipo'}
+                            onChange={(e) => onEditTaskType?.(task.wbs, e.target.value)}>
+                            {QUOTATION_TASK_TYPES.map((type) =>
+                              <option key={type} value={type}>{type}</option>)}
+                          </select>
+                          {editable && onEditTaskHours
+                            ? <input className={styles.editableHours} type="number"
+                                min="0.01" max="1000000" step="0.01"
+                                disabled={task.fixed}
+                                title={task.fixed ? 'Desmarca Fija para editar las HH.' : undefined}
+                                aria-label={'HH de ' + task.wbs + ' · ' + task.role}
+                                value={task.hours}
+                                onChange={(e) => {
+                                  const next = Number(e.target.value);
+                                  if (Number.isFinite(next) && next > 0)
+                                    onEditTaskHours(task.wbs, task.role, next);
+                                }}/>
+                            : <div className={styles.readonlyInput + ' ' + styles.readonlyHours}>
+                                {hh(task.hours)}
+                              </div>}
+                          <label className={styles.fixedField}
+                            title="Una tarea fija no cambia al redistribuir horas">
+                            <input type="checkbox" checked={task.fixed} disabled={!projectAllowsEdit}
+                              aria-label={'Fija para ' + task.wbs + ' · ' + task.role}
+                              onChange={(e) => onEditTaskFixed?.(
+                                task.wbs, task.role, e.target.checked)}/>
+                          </label>
+                          {task.wbs.startsWith('KT-') && editable
+                            ? <button type="button" className={styles.deleteTask}
+                                aria-label={'Quitar tarea ' + task.wbs}
+                                title="Quitar tarea añadida (no altera Gemini)"
+                                onClick={() => onDeleteTask?.(task.wbs)}>×</button>
+                            : <span className={styles.noDelete} title="Tarea original conservada como evidencia"/>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {editable && edt && stageCode && onAddTask && (
+                    <div className={styles.addRow}>
+                      <button type="button" className={styles.add} onClick={() => onAddTask(stageCode)}>
+                        + Agregar tarea
+                      </button>
+                      <label className={styles.add + ' ' + styles.importAction}>
+                        Importar Excel
+                        <input type="file" accept=".xlsx,.xls,.csv" hidden
+                          aria-label={'Importar Excel en fase ' + (index + 2)}
+                          onChange={(event) => {
+                            const file = event.target.files?.[0];
+                            event.target.value = '';
+                            if (file) void onImportTaskExcel?.(stageCode, visibleName, file);
+                          }}/>
+                      </label>
+                      <button type="button" className={styles.templateLink}
+                        onClick={() => downloadQuotationTaskTemplate(visibleName, activeTeams)}>
+                        Ver plantilla
+                      </button>
+                    </div>
+                  )}
+                </details>}
                           </div>
                           <select className={styles.teamSelect} disabled={!editable || needsRoleMapping}
                             aria-label={'Equipo de ' + task.wbs + ' · ' + task.role}
@@ -317,7 +408,7 @@ export function QuotationPhaseWorkspace({
         {displayPhases.length === 0 &&
           <p className={styles.empty}>Todavía no hay fases definidas.</p>}
       </div>
-      {editable && !allEdtGroups && (
+      {editable && (
         <button className={styles.add} type="button" onClick={onAddPhase}>
           + Agregar fase / módulo
         </button>
