@@ -2,16 +2,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ApplyQuotationPlanningInput, GenerateAiDemoQuotationInput, CreateQuotationVersionInput, UpdateQuotationDraftInput, QuotationReconciliationReview, AssessQuotationReconciliationInput } from '@kora/contracts';
 import { quotationApi, quotationKeys } from './quotation.api';
 
-export function useQuotationTaskTypes(projectId: string | null) {
-  return useQuery({
-    queryKey: quotationKeys.taskTypes(projectId ?? ''),
-    queryFn: () => quotationApi.taskTypes(projectId as string),
-    enabled: Boolean(projectId),
-    staleTime: 60_000,
-    retry: false,
-  });
-}
-
 export function useProjectQuotation(projectId: string | null, enabled = true) {
   return useQuery({
     queryKey: quotationKeys.project(projectId ?? ''),
