@@ -55,5 +55,14 @@ describe('Aceptar propuesta IA · motivos de bloqueo', () => {
       .toContain('versión más reciente');
     expect(quotationAiAcceptanceBlockReason({ ...mapped, totalHours: 39 }, state))
       .toContain('concilia las HH comerciales');
+    const addedTask = {
+      ...mapped, totalHours: 52,
+      draft: { ...mapped.draft, edtCommercialTasks: [{
+        wbs: 'KT-0777e456-fd76-445e-83f1-afc25061c105',
+        stageCode: 'module:Arquitectura', name: 'Cierre',
+        teamId, hours: 12, fixed: false, classification: 'Gestión y seguimiento',
+      }] },
+    } as QuotationVersion;
+    expect(quotationAiAcceptanceBlockReason(addedTask, state)).toBeNull();
   });
 });
