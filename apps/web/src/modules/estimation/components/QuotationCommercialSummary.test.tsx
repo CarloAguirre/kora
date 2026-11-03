@@ -76,7 +76,7 @@ describe('QuotationCommercialSummary · fidelidad comercial sin alterar el cálc
     expect(screen.getByText('Falta el valor HH del proyecto.')).toBeInTheDocument();
     expect(screen.getByText('40')).toBeInTheDocument();
     expect(screen.getByText('40 HH')).toBeInTheDocument();
-    expect(screen.getByText('—')).toBeInTheDocument();
+    expect(screen.getAllByText('—')).toHaveLength(2);
   });
 
   it('muestra el cálculo comercial de vista previa y permite guardarlo', () => {
