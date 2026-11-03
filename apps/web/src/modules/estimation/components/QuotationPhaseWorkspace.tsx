@@ -152,7 +152,9 @@ export function QuotationPhaseWorkspace({
           ? adjustedHoursCount + ' ajustes de HH en el borrador. Guarda para conservarlos.'
           : 'Puedes revisar y ajustar las HH de cada tarea sin generar otra cotización.'}
           {' '}Las HH pasan al presupuesto comercial al asignar los perfiles a equipos.</span>
-        <a href="#quotation-ai-role-review">Asignar perfiles a equipos de Kora y aplicar propuesta</a>
+        <a href="#quotation-ai-role-review" onClick={() =>
+          document.getElementById('quotation-ai-role-review')?.setAttribute('open', '')}>
+          Asignar perfiles a equipos de Kora y aplicar propuesta</a>
       </div>}
 
       <div className={styles.phases}>
