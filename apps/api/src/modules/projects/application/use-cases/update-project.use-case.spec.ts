@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { UpdateProjectUseCase } from './update-project.use-case';
 import { Project } from '../../domain/entities/project.entity';
-import { CannotReassignProjectLeaderError, SoldHoursLockedAfterHito0Error } from '../../domain/errors/project.errors';
+import { CannotReassignProjectLeaderError, SoldHoursChangeReasonRequiredError } from '../../domain/errors/project.errors';
 import type { ProjectRepository } from '../../domain/repositories/project.repository';
 import type { ProjectTeamRepository } from '../../domain/repositories/project-team.repository';
 import type { ProjectClientReader } from '../ports/project-client-reader.port';
@@ -58,7 +58,7 @@ function buildUseCase(leaderUserId: string | null, project: Project = buildProje
     paymentMilestones,
     paymentTriggers,
   );
-  return { useCase, projects };
+  return { useCase, projects, changeLog };
 }
 
 /**
@@ -156,7 +156,7 @@ describe('UpdateProjectUseCase — primaryContactId', () => {
   });
 });
 
-/** Desde el Hito 0 corren las horas vendidas: quedan fijas aunque el proyecto después se detenga o finalice. */
+/** Las HH vendidas tras Hito 0 se pueden ajustar con motivo y trazabilidad. */
 describe('UpdateProjectUseCase — HH vendidas tras el Hito 0', () => {
   const PMO = { actor: { userId: 'pmo-1', email: 'pmo@kabeli.cl' }, actorPermissions: ['projects:manage'] as const };
 
@@ -174,13 +174,49 @@ describe('UpdateProjectUseCase — HH vendidas tras el Hito 0', () => {
     return project;
   }
 
-  it('rechaza cambiar las HH vendidas de un proyecto con Hito 0', async () => {
+  it('exige motivo cuando cambian las HH vendidas tras Hito 0', async () => {
     const { useCase, projects } = buildUseCase(null, activatedProject());
 
     const result = await useCase.execute({ projectId: 'project-1', data: { soldHours: 1200 }, ...PMO });
 
-    expect(result.isErr() && result.error).toBeInstanceOf(SoldHoursLockedAfterHito0Error);
+    expect(result.isErr() && result.error).toBeInstanceOf(SoldHoursChangeReasonRequiredError);
     expect(projects.save).not.toHaveBeenCalled();
+  });
+
+  it('rechaza también un motivo vacío tras Hito 0', async () => {
+    const { useCase, projects } = buildUseCase(null, activatedProject());
+    const result = await useCase.execute({
+      projectId: 'project-1',
+      data: { soldHours: 1200, soldHoursChangeReason: '   ' },
+      ...PMO,
+    });
+    expect(result.isErr() && result.error).toBeInstanceOf(SoldHoursChangeReasonRequiredError);
+    expect(projects.save).not.toHaveBeenCalled();
+  });
+
+  it('permite ajustar HH tras Hito 0 y registra antes, después, motivo y autor en bitácora', async () => {
+    const { useCase, projects, changeLog } = buildUseCase(null, activatedProject());
+
+    const result = await useCase.execute({
+      projectId: 'project-1',
+      data: { soldHours: 1200, soldHoursChangeReason: '  Ampliación aprobada  ' },
+      ...PMO,
+    });
+
+    expect(result.isOk()).toBe(true);
+    const saved = (projects.save as ReturnType<typeof vi.fn>).mock.calls[0]![0] as Project;
+    expect(saved.toSnapshot().soldHours).toBe(1200);
+    expect(changeLog.record).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({
+          projectId: 'project-1',
+          message: 'HH vendidas actualizadas de 1000 a 1200 después del Hito 0. Motivo: Ampliación aprobada',
+        }),
+      ]),
+      'pmo-1',
+      NOW,
+      expect.anything(),
+    );
   });
 
   it('permite reenviar las mismas HH vendidas sin cambiarlas', async () => {
