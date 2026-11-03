@@ -107,6 +107,13 @@ export const quotationDraftDataSchema = z.object({
     role: z.string().trim().min(1).max(120),
     collaborators: z.number().int().min(1).max(100),
   })).max(100).optional(),
+  /** Fechas relativas y nombre comercial del tramo, sin mutar las etapas Gemini. */
+  edtStageSettings: z.array(z.object({
+    stageCode: z.string().trim().min(1).max(40),
+    name: nonEmptyTrimmed(300, 'El nombre del módulo'),
+    startWeek: z.number().int().min(1).max(520),
+    durationWeeks: z.number().int().min(1).max(520),
+  })).max(100).optional(),
   costs: z.array(quotationExternalCostSchema).max(100).default([]),
   paymentPlan: z.array(quotationPaymentItemSchema).max(100).default([]),
   assumptions: z.array(z.string().trim().max(2000)).max(100).default([]),
