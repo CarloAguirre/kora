@@ -98,10 +98,11 @@ export function projectPocRolesToQuotationDraft(
         if (Math.abs(total - stage.totalHours) > 0.011) {
           throw new Error('Las HH del tramo no concilian con sus tareas.');
         }
+        const edited = draft.edtStageSettings?.find((item) => item.stageCode === stage.code);
         return {
-          name: stage.code + ' · ' + stage.name,
-          startWeek: stage.startWeek,
-          durationWeeks: stage.durationWeeks,
+          name: stage.code + ' · ' + (edited?.name ?? stage.name),
+          startWeek: edited?.startWeek ?? stage.startWeek,
+          durationWeeks: edited?.durationWeeks ?? stage.durationWeeks,
           teamHours: [...byTeam].map(([teamId, hours]) => ({ teamId, hours })),
         };
       })
@@ -222,7 +223,7 @@ export function validatePocDraftIntegrity(
     throw new Error('No se puede introducir un análisis IA ajeno al borrador.');
   }
   if (!previous.aiPoc) {
-    effectiveQuotationEdt(next); // sin fuente IA tampoco se permiten HH inventadas
+    quotationEdtAssignments(next); // no permitir metadatos IA sin una EDT real
     return;
   }
   if (!next.aiPoc ||
