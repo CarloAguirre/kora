@@ -221,8 +221,9 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
   /** Nunca borrar fases con ejecución, entregas ni referencias EDT.
    * El endpoint de Kora verifica la autorización y restricciones definitivas. */
   const onDeletePhase = async (module: ProjectModule) => {
-    if (module.segments.length || module.tasks.length || module.deliveries.length) {
-      toast.error('No se puede eliminar esta fase: primero resuelve sus bloques, tareas y entregas.');
+    if (module.segments.length || module.tasks.length || module.deliveries.length ||
+        module.blockerCount > 0 || hourEntries.some((entry) => entry.module?.id === module.id)) {
+      toast.error('No se puede eliminar esta fase: tiene bloques, tareas, entregas o historial de horas/incidencias.');
       return;
     }
     const reference = appliedPlanning.data?.modules.find((item) => item.moduleId === module.id);
@@ -279,7 +280,9 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
     const expected = module.progress.expected;
     const percent = (value: number | null) => value === null ? '—' : value + '%';
     const hasDependencies = module.segments.length > 0 || module.tasks.length > 0 ||
-      module.deliveries.length > 0 || Boolean(appliedPlanning.data?.modules.some((item) =>
+      module.deliveries.length > 0 || module.blockerCount > 0 ||
+      hourEntries.some((entry) => entry.module?.id === module.id) ||
+      Boolean(appliedPlanning.data?.modules.some((item) =>
         item.moduleId === module.id && (item.tasks.length || item.relativeTeamBlocks?.length)));
     return (
       <div className={styles.phaseHeadingActions}>
@@ -306,7 +309,7 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
             <Button variant="ghost" size="sm" className={styles.phaseDeleteButton}
               disabled={deleteModule.isPending || hasDependencies}
               title={hasDependencies
-                ? 'Primero resuelve los bloques, tareas, entregas o referencias EDT de esta fase.'
+                ? 'La fase tiene bloques, tareas, entregas, horas, incidencias o referencias EDT que deben conservarse.'
                 : 'Eliminar fase'}
               aria-label={'Eliminar fase ' + module.name}
               onClick={() => void onDeletePhase(module)}>🗑</Button>
