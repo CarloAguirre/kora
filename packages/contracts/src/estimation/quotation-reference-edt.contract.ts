@@ -120,7 +120,7 @@ export const appliedQuotationPlanningSchema = z.object({
   revision: z.number().int().positive(),
   appliedAt: z.string().datetime(),
   appliedByUserId: uuidSchema.nullable(),
-  source: z.literal('kdm_demo'),
+  source: z.enum(['kdm_demo', 'manual', 'copy']),
   status: z.enum(['accepted_for_planning_only', 'transferred']),
   commercialApproval: z.boolean(),
   totalHours: z.number().positive(),
@@ -129,6 +129,14 @@ export const appliedQuotationPlanningSchema = z.object({
     name: z.string(),
     totalHours: z.number().positive(),
     tasks: z.array(quotationReferenceTaskSchema),
+    /** Referencia comercial sin fechas concretas; no crea tramos de Forecast. */
+    relativeTeamBlocks: z.array(z.object({
+      teamId: uuidSchema, hours: z.number().nonnegative(),
+      startWeek: z.number().int().positive(),
+      durationWeeks: z.number().int().positive(),
+    })).optional(),
   })),
+  /** Referencias cuyo módulo de ejecución no es inequívoco, para revisión humana. */
+  unassignedTasks: z.array(quotationReferenceTaskSchema).optional(),
 });
 export type AppliedQuotationPlanning = z.infer<typeof appliedQuotationPlanningSchema>;
