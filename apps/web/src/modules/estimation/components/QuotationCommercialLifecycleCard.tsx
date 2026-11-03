@@ -202,5 +202,33 @@ export function QuotationCommercialLifecycleCard({
       {notice && <p role="status" className={styles.success}>{notice}</p>}
     </>
   );
-  return embedded ? <div className={styles.embedded}>{content}</div> : <Card>{content}</Card>;
+  if (embedded) {
+    // Pantalla v5: el panel derecho muestra solo los botones comerciales.
+    // Las validaciones permanecen activas en el backend y en los atributos
+    // disabled/title de cada acción. El traspaso sigue siendo posterior.
+    return (
+      <div className={styles.v5Actions}>
+        {version.status === 'draft' &&
+          <Button variant="outline" className={styles.v5Send}
+            disabled={!mayAct || !readyForClient || !isLatest}
+            title={!readyForClient ? 'Requiere HH, tarifa, plan de pago 100% y aceptación IA.' :
+              hasUnsavedChanges ? 'Guarda el borrador antes del envío.' : undefined}
+            onClick={() => void markSent()}>Marcar como enviada al cliente</Button>}
+        {(version.status === 'sent' || version.status === 'draft') &&
+          <Button className={styles.v5Approve}
+            disabled={!mayAct || !readyForClient || !isLatest}
+            title={!readyForClient ? 'Requiere HH, tarifa, plan de pago 100% y aceptación IA.' :
+              hasUnsavedChanges ? 'Guarda el borrador antes de aprobar.' : undefined}
+            onClick={() => void approveClient()}>Registrar aprobación del cliente</Button>}
+        {version.status === 'approved' && !transferred &&
+          <Button className={styles.v5Approve}
+            disabled={!mayAct || project.status !== 'draft' || !isLatest}
+            onClick={() => void transfer()}>Traspasar al proyecto</Button>}
+        {transferred && <p className={styles.success}>Cotización aprobada y traspasada.</p>}
+        {error && <p role="alert" className={styles.error}>{error}</p>}
+        {notice && <p role="status" className={styles.success}>{notice}</p>}
+      </div>
+    );
+  }
+  return <Card>{content}</Card>;
 }
