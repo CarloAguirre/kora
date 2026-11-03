@@ -298,6 +298,59 @@ describe('GenerateEstimationPocProposalUseCase', () => {
     ]);
   });
 
+  it('corrige el tramo con semanas contradictorias entre WBS del mismo stageCode', async () => {
+    const projectId = '550e8400-e29b-41d4-a716-446655440000';
+    const proposal = estimationPocProposalSchema.parse({
+      projectId, provider: 'gemini', sourceMode: 'poc_simulated',
+      documentsAnalyzed: 1, summary: 'KDM',
+      roles: [{ role: 'Desarrollo', unit: 'week', duration: 2,
+        hoursPerUnit: 40, people: 1, totalHours: 80 }],
+      totalHours: 80, assumptions: [], clarifyingQuestions: [],
+    });
+    let calls = 0;
+    let retryInstructions = '';
+    const ai: AiProvider = {
+      name: 'gemini',
+      generateStructured: async (request) => {
+        calls++;
+        if (calls === 2) retryInstructions = request.instructions ?? '';
+        const row = (wbs: string, startWeek: number) => ({
+          wbs, stageCode: 'T01', stageName: 'Implementación',
+          startWeek, durationWeeks: 2,
+          module: 'Portal', submodule: 'Backend', name: 'Actividad ' + wbs,
+          description: 'Implementación del alcance documental.',
+          role: 'Desarrollo', hours: 15, references: 'R01', classification: '',
+        });
+        return {
+          reservePercent: 0,
+          activities: [row('T01.01', 1), row('T01.02', calls === 1 ? 3 : 1)],
+        };
+      },
+    };
+    const sources: DocumentSourceReader = {
+      readDriveSources: async () => [{
+        sourceId: 'kora-poc-requerimiento-kdm',
+        name: 'Requerimiento_KDM.pdf', mimeType: 'application/pdf',
+        path: 'KDM.pdf', text: 'Dos actividades de implementación.',
+      }],
+    };
+    const result = await new GenerateEstimationPocProposalUseCase(ai, sources).generateEdt({
+      projectId, projectName: 'KDM', clientName: 'Cliente',
+      driveFolderUrl: 'https://drive.google.com/drive/folders/kora-poc-fallback',
+      instructions: null, answers: [],
+    }, proposal);
+    expect(calls).toBe(2);
+    expect(retryInstructions).toContain('tramo cronológico T01');
+    expect(retryInstructions).toContain('T01.02');
+    expect(retryInstructions).toContain('inicio semana 3');
+    expect(result.stages).toEqual([{
+      code: 'T01', name: 'Implementación',
+      startWeek: 1, durationWeeks: 2, totalHours: 30,
+    }]);
+    expect(result.totalHours).toBe(30);
+    expect(result.modules[0]?.tasks).toHaveLength(2);
+  });
+
   it('rechaza actividades con roles ajenos a la propuesta y no genera HH inventadas', async () => {
     const ai: AiProvider = {
       name: 'gemini',
