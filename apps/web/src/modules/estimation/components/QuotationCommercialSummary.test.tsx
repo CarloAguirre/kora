@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { quotationVersionSchema, type QuotationDraftData } from '@kora/contracts';
 import { QuotationCommercialSummary } from './QuotationCommercialSummary';
 
@@ -45,9 +45,10 @@ const baseProps = {
 describe('QuotationCommercialSummary · fidelidad comercial sin alterar el cálculo', () => {
   it('distingue HH de Gemini de las HH aún no distribuidas', () => {
     render(<QuotationCommercialSummary {...baseProps} draft={version.draft} />);
-    expect(screen.getByText('40 HH propuestas por IA')).toBeInTheDocument();
-    expect(screen.getByText('Sin HH distribuidas entre equipos.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Guardar cambios del borrador' })).toBeDisabled();
+    expect(screen.getByText('Horas totales del proyecto')).toBeInTheDocument();
+    expect(screen.getByText('Sin HH distribuidas.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Guardar cambios del borrador' }))
+      .not.toBeInTheDocument();
   });
 
   it('muestra las HH y distribución por perfil de una EDT ya guardada sin pedir nueva ejecución IA', () => {
@@ -69,14 +70,12 @@ describe('QuotationCommercialSummary · fidelidad comercial sin alterar el cálc
     });
     render(<QuotationCommercialSummary {...baseProps} version={withEdt}
       draft={withEdt.draft} />);
-    expect(screen.getByText('Horas propuestas por Gemini')).toBeInTheDocument();
-    expect(screen.getByText('Distribución de HH propuesta por perfil')).toBeInTheDocument();
-    expect(screen.getByText('Vista previa · no es el total comercial guardado')).toBeInTheDocument();
-    expect(screen.getByText(/0 HH comerciales/)).toBeInTheDocument();
+    expect(screen.getByText('Horas totales del proyecto')).toBeInTheDocument();
     expect(screen.getByText('Falta el valor HH del proyecto.')).toBeInTheDocument();
     expect(screen.getByText('40')).toBeInTheDocument();
-    expect(screen.getByText('40 HH')).toBeInTheDocument();
-    expect(screen.getAllByText('—')).toHaveLength(2);
+    expect(screen.getByText('40 hh')).toBeInTheDocument();
+    expect(screen.getAllByText('0 UF')).toHaveLength(2);
+    expect(screen.queryByText(/Vista previa/)).not.toBeInTheDocument();
   });
 
   it('muestra el cálculo comercial de vista previa y permite guardarlo', () => {
@@ -92,8 +91,9 @@ describe('QuotationCommercialSummary · fidelidad comercial sin alterar el cálc
     expect(screen.getByText('99,2 UF')).toBeInTheDocument();
     expect(screen.getByText('118,048 UF')).toBeInTheDocument();
     expect(screen.getByText('Sin guardar')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios del borrador' }));
-    expect(onSave).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('button', { name: 'Guardar cambios del borrador' }))
+      .not.toBeInTheDocument();
+    expect(onSave).not.toHaveBeenCalled();
   });
 
   it('en modo fases solo contabiliza HH de equipos incluidos sin duplicarlas', () => {
