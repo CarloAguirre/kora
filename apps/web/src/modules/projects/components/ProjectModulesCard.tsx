@@ -110,7 +110,7 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
   /** Tiempo de ejecución que se está editando (`null` = modal cerrado). */
   const [editingSegment, setEditingSegment] = useState<{ moduleId: string; segment: ProjectModuleSegment } | null>(null);
   const [creatingFromReference, setCreatingFromReference] = useState<{
-    moduleId: string;
+    moduleId: string | null;
     task: AppliedQuotationPlanning['modules'][number]['tasks'][number];
   } | null>(null);
   // Estable mientras el modal está abierto: `ExecutionSegmentModal` reinicia su formulario cuando cambia `initialValues`,
@@ -262,6 +262,16 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
                 <li key={task.wbs + ':' + task.role}>
                   <strong>{task.wbs} · {task.name}</strong>
                   <span>{task.role} · {task.hours} HH</span>
+                  {canManage && (project.modules.some((module) =>
+                    module.tasks.some((existing) =>
+                      existing.description?.includes(
+                        'Referencia cotización ' + appliedPlanning.data?.versionId +
+                        ' · WBS ' + task.wbs + ' · ' + task.role,
+                      ))) ? <small>Ya convertida en tarea operativa</small> :
+                    <Button variant="ghost" size="sm"
+                      onClick={() => setCreatingFromReference({ moduleId: null, task })}>
+                      Elegir fase y crear tarea
+                    </Button>)}
                 </li>
               ))}
             </ol>
