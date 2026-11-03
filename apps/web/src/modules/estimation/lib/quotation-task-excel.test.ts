@@ -9,10 +9,13 @@ const teams = [
 function fileWithRows(rows: unknown[][]): File {
   const book = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet(rows), 'Tareas');
-  const contents = XLSX.write(book, { bookType: 'xlsx', type: 'array' }) as Uint8Array;
+  // SheetJS puede devolver ArrayBuffer (no Uint8Array) con type=array.
+  const raw = XLSX.write(book, { bookType: 'xlsx', type: 'array' }) as ArrayBuffer | Uint8Array;
+  const bytes = new Uint8Array(raw);
+  const contents = bytes.slice().buffer as ArrayBuffer;
   return {
-    name: 'cotizacion.xlsx', size: contents.byteLength,
-    arrayBuffer: async () => contents.buffer,
+    name: 'cotizacion.xlsx', size: bytes.byteLength,
+    arrayBuffer: async () => contents,
   } as File;
 }
 const headers = ['Fase', 'Tarea', 'Equipo', 'Tipo (catálogo)', 'Horas'];
