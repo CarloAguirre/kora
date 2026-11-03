@@ -173,16 +173,30 @@ describe('EditProjectDialog', () => {
     });
 
     const soldHours = screen.getByLabelText('HH vendidas');
+    const save = screen.getByRole('button', { name: 'Guardar cambios' });
     expect(soldHours).toBeEnabled();
+    expect(save).toBeEnabled();
     expect(screen.queryByLabelText('Motivo del ajuste de HH vendidas')).not.toBeInTheDocument();
+
     await user.clear(soldHours);
     await user.type(soldHours, '750');
     const reason = screen.getByLabelText('Motivo del ajuste de HH vendidas');
-    fireEvent.submit(document.getElementById('edit-project-form') as HTMLFormElement);
-    expect(await screen.findByText('Indica el motivo del ajuste de HH vendidas.')).toBeInTheDocument();
+    expect(save).toBeDisabled();
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Debes ingresar un motivo del ajuste de HH vendidas para habilitar «Guardar cambios».',
+    );
+    expect(reason).toHaveAttribute('aria-invalid', 'true');
     expect(mutateAsync).not.toHaveBeenCalled();
 
+    // Solo espacios no satisfacen la obligación de dejar un motivo.
+    await user.type(reason, '   ');
+    expect(save).toBeDisabled();
+
     await user.type(reason, 'Ampliación de alcance aprobada');
+    expect(save).toBeEnabled();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(reason).toHaveAttribute('aria-invalid', 'false');
+    // jsdom no envía formularios desde botones externos por el atributo form.
     fireEvent.submit(document.getElementById('edit-project-form') as HTMLFormElement);
     await waitFor(() =>
       expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({
@@ -202,6 +216,29 @@ describe('EditProjectDialog', () => {
     });
     expect(screen.getByLabelText('HH vendidas')).toBeEnabled();
     expect(screen.queryByLabelText('Motivo del ajuste de HH vendidas')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeEnabled();
+  });
+
+  it('reactiva Guardar si las HH vendidas vuelven a su valor anterior', async () => {
+    const user = userEvent.setup();
+    renderDialog({
+      open: true,
+      project: buildProject({ hito0At: '2026-10-01T00:00:00.000Z' }),
+      onClose: vi.fn(),
+      onSuccess: vi.fn(),
+      isManagement: true,
+    });
+    const soldHours = screen.getByLabelText('HH vendidas');
+    const save = screen.getByRole('button', { name: 'Guardar cambios' });
+    await user.clear(soldHours);
+    await user.type(soldHours, '750');
+    expect(save).toBeDisabled();
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    await user.clear(soldHours);
+    await user.type(soldHours, '500');
+    expect(save).toBeEnabled();
+    expect(screen.queryByLabelText('Motivo del ajuste de HH vendidas')).not.toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('bloquea "Líder Kabeli a cargo" cuando el actor no puede reasignar el proyecto (solo Gerencia/PMO puede)', () => {
