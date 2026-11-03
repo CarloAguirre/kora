@@ -139,6 +139,7 @@ function buildTimelineAxis(range: DateRange): TimelineAxis {
 export function PhaseRoadmap({
   phaseRoadmap, renderPhaseExtras, renderPhaseReferences, renderSelectionDetail,
   toolbarActions, renderPhaseHeaderName, renderPhaseHeaderActions, borderlessSummary = false,
+  alwaysExpanded = false,
 }: PhaseRoadmapProps) {
   /** Fases abiertas — cada una se abre/cierra por separado (varias a la vez); arranca abierta la primera. */
   const [expandedPhaseIds, setExpandedPhaseIds] = useState<ReadonlySet<string>>(
@@ -240,8 +241,9 @@ export function PhaseRoadmap({
             key={phase.id}
             phase={phase}
             axis={axis}
-            expanded={expandedPhaseIds.has(phase.id)}
-            onToggle={() => togglePhase(phase.id)}
+            expanded={alwaysExpanded || expandedPhaseIds.has(phase.id)}
+            onToggle={() => { if (!alwaysExpanded) togglePhase(phase.id); }}
+            staticHeader={alwaysExpanded}
             renderExtras={renderPhaseExtras}
             renderReferences={renderPhaseReferences}
             renderSelectionDetail={renderSelectionDetail}
@@ -298,6 +300,8 @@ export interface PhaseRoadmapProps {
   toolbarActions?: ReactNode;
   /** Solo en ficha interna: elimina borde de la barra de filtros sin modificar el portal cliente. */
   borderlessSummary?: boolean;
+  /** La ficha interna v5 mantiene todas las fases y su Gantt visibles; solo los detalles interiores colapsan. */
+  alwaysExpanded?: boolean;
   renderPhaseHeaderName?: (phase: PhaseRoadmapPhase) => ReactNode;
   renderPhaseHeaderActions?: (phase: PhaseRoadmapPhase) => ReactNode;
 }
@@ -312,6 +316,7 @@ function PhaseCard({
   renderSelectionDetail,
   renderHeaderName,
   renderHeaderActions,
+  staticHeader = false,
 }: {
   phase: PhaseRoadmapPhase;
   axis: TimelineAxis;
@@ -322,6 +327,7 @@ function PhaseCard({
   renderSelectionDetail?: PhaseRoadmapProps['renderSelectionDetail'];
   renderHeaderName?: PhaseRoadmapProps['renderPhaseHeaderName'];
   renderHeaderActions?: PhaseRoadmapProps['renderPhaseHeaderActions'];
+  staticHeader?: boolean;
 }) {
   /** Igual que `zoomByModule` en `ProjectModulesCard` (Roadmap interno): un slider real, no un
       toggle decorativo. Es estado de vista local, no una acción a conectar. */
@@ -384,16 +390,16 @@ function PhaseCard({
   return (
     <div className={styles.phaseCard}>
       <div
-        role="button"
-        tabIndex={0}
-        className={styles.phaseHeader}
-        onClick={onToggle}
-        onKeyDown={(event) => {
+        role={staticHeader ? undefined : 'button'}
+        tabIndex={staticHeader ? undefined : 0}
+        className={[styles.phaseHeader, staticHeader ? styles.phaseHeaderStatic : ''].filter(Boolean).join(' ')}
+        onClick={staticHeader ? undefined : onToggle}
+        onKeyDown={staticHeader ? undefined : (event) => {
           if (event.key !== 'Enter' && event.key !== ' ') return;
           event.preventDefault();
           onToggle();
         }}
-        aria-expanded={expanded}
+        aria-expanded={staticHeader ? undefined : expanded}
       >
         <span className={styles.phaseBadge}>{phase.badge}</span>
         {renderHeaderName ? (
@@ -421,13 +427,13 @@ function PhaseCard({
             onClick={(event) => {
               event.stopPropagation();
               toggleSelection({ kind: 'incident' });
-              if (!expanded) onToggle();
+              if (!expanded && !staticHeader) onToggle();
             }}
           >
             ⚑ {phase.alertLabel}
           </button>
         )}
-        {expanded ? <ChevronDownIcon size={16} /> : <ChevronRightIcon size={16} />}
+        {!staticHeader && (expanded ? <ChevronDownIcon size={16} /> : <ChevronRightIcon size={16} />)}
       </div>
 
       {expanded && (
