@@ -736,13 +736,6 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       if (current.status !== 'draft' || current.revision !== input.revision) {
         throw new ConflictException('Solo se envían borradores en la revisión vigente.');
       }
-      const [latest] = await tx.select({ id: quotationVersions.id })
-        .from(quotationVersions)
-        .where(eq(quotationVersions.quotationId, current.quotationId))
-        .orderBy(desc(quotationVersions.versionNumber)).limit(1);
-      if (latest?.id !== versionId) {
-        throw new ConflictException('Solo se puede enviar la última versión comercial.');
-      }
       validateCommercial(() => assertQuotationReadyForClient(toVersion(current)));
       if (process.env.NODE_ENV === 'production' &&
           quotationDraftDataSchema.parse(current.draft).aiPoc?.source === 'kdm_demo') {
@@ -791,13 +784,6 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       validateCommercial(() => assertDirectClientApprovalAcknowledged(
         current.status as 'draft' | 'sent', input.confirmWithoutSend,
       ));
-      const [latest] = await tx.select({ id: quotationVersions.id })
-        .from(quotationVersions)
-        .where(eq(quotationVersions.quotationId, quotation.id))
-        .orderBy(desc(quotationVersions.versionNumber)).limit(1);
-      if (latest?.id !== versionId) {
-        throw new ConflictException('No se puede aprobar una versión comercial anterior.');
-      }
       assertQuotationReadyForClient(toVersion(current));
       if (process.env.NODE_ENV === 'production' &&
           quotationDraftDataSchema.parse(current.draft).aiPoc?.source === 'kdm_demo') {
@@ -856,13 +842,6 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       if (!version) throw new NotFoundException('Versión no encontrada.');
       if (version.status !== 'approved' || version.revision !== input.revision) {
         throw new ConflictException('Solo se traspasa la versión aprobada vigente.');
-      }
-      const [latestVersion] = await tx.select({ id: quotationVersions.id })
-        .from(quotationVersions)
-        .where(eq(quotationVersions.quotationId, quotation.id))
-        .orderBy(desc(quotationVersions.versionNumber)).limit(1);
-      if (latestVersion?.id !== versionId) {
-        throw new ConflictException('Hay una cotización posterior; revisa cuál es la versión vigente.');
       }
       validateCommercial(() => assertQuotationReadyForClient(toVersion(version)));
       if (process.env.NODE_ENV === 'production' &&
