@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { quotationDraftDataSchema } from './quotation.contract';
+import { effectiveQuotationEdt } from './quotation-edt-adjustments';
 import {
   projectPocRolesToQuotationDraft,
   validatePocDraftIntegrity,
@@ -132,6 +133,80 @@ describe('Proyección IA Gemini KDM a cotización', () => {
     expect(result.aiPoc?.proposal.totalHours).toBe(80);
     expect(() => validatePocDraftIntegrity(detailed, result)).not.toThrow();
     expect(edt.totalWithReserve).toBe(88); // No se suma a las HH base.
+  });
+
+  it('guarda HH humanas por WBS×perfil, recalcula fases y conserva la EDT original', () => {
+    const source = original();
+    const originalEdt = {
+      schemaVersion: 'kora.quotation.reference-edt.v2' as const,
+      source: 'kdm_demo' as const, provider: 'gemini' as const,
+      totalHours: 80, reservePercent: 10, reserveHours: 8, totalWithReserve: 88,
+      stages: [{ code: 'S1', name: 'Implementación', startWeek: 1,
+        durationWeeks: 2, totalHours: 80 }],
+      modules: [{ name: 'Portal', totalHours: 80, tasks: [{
+        wbs: 'S1.01', name: 'Integración', description: 'Backend y pruebas',
+        role: 'Desarrollo', hours: 80, stageCode: 'S1',
+        roleEffort: [
+          { role: 'Desarrollo', hours: 40 }, { role: 'QA', hours: 40 },
+        ],
+      }] }],
+    };
+    const draft = quotationDraftDataSchema.parse({
+      ...source, aiPoc: { ...source.aiPoc, edt: originalEdt },
+      edtHourAdjustments: [{ wbs: 'S1.01', role: 'Desarrollo', hours: 50 }],
+    });
+    const effective = effectiveQuotationEdt(draft)!;
+    expect(effective.totalHours).toBe(90);
+    expect(effective.stages?.[0]?.totalHours).toBe(90);
+    expect(effective.modules[0]?.tasks[0]?.roleEffort).toEqual([
+      { role: 'Desarrollo', hours: 50 }, { role: 'QA', hours: 40 },
+    ]);
+    expect(effective.reserveHours).toBe(9);
+    expect(effective.totalWithReserve).toBe(99);
+    expect(draft.aiPoc?.edt).toEqual(originalEdt); // evidencia Gemini inmutable
+    const mapped = projectPocRolesToQuotationDraft(draft, {
+      Desarrollo: t1, QA: t2,
+    });
+    expect(mapped.analysisProjectionStatus).toBe('synced');
+    expect(mapped.phases[0]?.teamHours).toEqual([
+      { teamId: t1, hours: 50 }, { teamId: t2, hours: 40 },
+    ]);
+    expect(() => validatePocDraftIntegrity(draft, mapped)).not.toThrow();
+    const more = projectPocRolesToQuotationDraft({
+      ...mapped,
+      edtHourAdjustments: [{ wbs: 'S1.01', role: 'Desarrollo', hours: 60 }],
+    }, { Desarrollo: t1, QA: t2 });
+    expect(() => validatePocDraftIntegrity(mapped, more)).not.toThrow();
+    expect(more.phases[0]?.teamHours[0]?.hours).toBe(60);
+    expect(more.aiPoc?.edt?.totalHours).toBe(80);
+  });
+
+  it('rechaza HH inventadas y ajustes duplicados antes de persistir', () => {
+    const source = original();
+    const edt = {
+      schemaVersion: 'kora.quotation.reference-edt.v1' as const,
+      source: 'kdm_demo' as const, provider: 'gemini' as const,
+      totalHours: 20,
+      modules: [{ name: 'Portal', totalHours: 20, tasks: [{
+        wbs: '01.01', name: 'Login', description: 'Auth',
+        role: 'Desarrollo', hours: 20,
+      }] }],
+    };
+    const base = quotationDraftDataSchema.parse({
+      ...source, aiPoc: { ...source.aiPoc, edt },
+    });
+    for (const overrides of [
+      [{ wbs: '99.99', role: 'Desarrollo', hours: 10 }],
+      [{ wbs: '01.01', role: 'QA', hours: 10 }],
+      [{ wbs: '01.01', role: 'Desarrollo', hours: 10 },
+        { wbs: '01.01', role: 'Desarrollo', hours: 11 }],
+      [{ wbs: '01.01', role: 'Desarrollo', hours: 0 }],
+      [{ wbs: '01.01', role: 'Desarrollo', hours: 1.234 }],
+    ]) {
+      expect(() => validatePocDraftIntegrity(base, {
+        ...base, edtHourAdjustments: overrides,
+      })).toThrow();
+    }
   });
 
   it('impide borrar evidencia IA o reemplazar fuentes en una versión ya guardada', () => {
