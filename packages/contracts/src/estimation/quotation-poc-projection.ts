@@ -209,7 +209,8 @@ export function reconcilePocCommercialDraft(draft: QuotationDraftData): Quotatio
     phases: projected.phases.map((phase) => {
       const code = phase.name.split(' · ')[0];
       const old = oldPhases.get(code);
-      if (draft.edtStageSettings?.some((stage) => stage.stageCode === code)) {
+      if (draft.edtStageSettings?.some((stage) => stage.stageCode === code) ||
+          draft.edtCommercialStages?.some((stage) => stage.code === code)) {
         return phase; // decisión más reciente del editor de etapas
       }
       return old ? { ...phase, name: old.name,
