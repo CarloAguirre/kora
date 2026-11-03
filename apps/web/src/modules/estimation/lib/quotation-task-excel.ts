@@ -56,7 +56,9 @@ export function buildQuotationTaskTemplate(
   // writer; se incorporan mediante el contenedor ZIP OOXML de XLSX.CFB.
   const cfb = XLSX.CFB.read(original, { type: 'buffer' });
   const location = 'xl/worksheets/sheet1.xml';
-  const sheetFile = XLSX.CFB.find(cfb, location);
+  const sheetIndex = cfb.FullPaths.findIndex((name) =>
+    name.toLowerCase().endsWith('/' + location));
+  const sheetFile = sheetIndex < 0 ? null : cfb.FileIndex[sheetIndex];
   if (!sheetFile?.content) throw new Error('No se pudo preparar el XML de la hoja Tareas.');
   const xml = new TextDecoder().decode(new Uint8Array(sheetFile.content));
   const validations =
@@ -72,8 +74,9 @@ export function buildQuotationTaskTemplate(
     '</dataValidations>';
   if (!xml.includes('</sheetData>')) throw new Error('La hoja Tareas no tiene celdas.');
   const updated = xml.replace('</sheetData>', '</sheetData>' + validations);
-  XLSX.CFB.utils.cfb_del(cfb, location);
-  XLSX.CFB.utils.cfb_add(cfb, location, new TextEncoder().encode(updated));
+  // Modificar la entrada existente evita inconsistencias con rutas ZIP relativas.
+  sheetFile.content = new TextEncoder().encode(updated);
+  sheetFile.size = sheetFile.content.length;
   const packed = XLSX.CFB.write(cfb, { fileType: 'zip', type: 'array' });
   return new Uint8Array(packed);
 }
