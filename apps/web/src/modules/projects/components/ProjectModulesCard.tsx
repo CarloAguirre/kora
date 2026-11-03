@@ -27,7 +27,7 @@ import { ApiRequestError } from '@/shared/lib/api-client';
 import { PhaseRoadmap, type PhaseRoadmapSelection } from '@/modules/client-portal/components/PhaseRoadmap';
 import { roleFromTeamName, toPhaseRoadmap } from '@/modules/client-portal/adapters/project-detail.adapter';
 import { PHASE_ROADMAP_ROLE_COLORS } from '@/modules/client-portal/types';
-import { useCreateProjectModuleSegment, useDeleteProjectModuleSegment, useUpdateProjectModule, useUpdateProjectModuleDelivery, useUpdateProjectModuleSegment } from '../api/projects.queries';
+import { useCreateProjectModuleSegment, useDeleteProjectModule, useDeleteProjectModuleSegment, useUpdateProjectModule, useUpdateProjectModuleDelivery, useUpdateProjectModuleSegment } from '../api/projects.queries';
 import { useConfirmAction } from '@/shared/components/ui/useConfirmAction';
 import { QuotationReferenceTaskModal } from './QuotationReferenceTaskModal';
 import { useAppliedQuotationPlanning } from '@/modules/estimation/api/quotation.queries';
@@ -104,6 +104,7 @@ interface ProjectModulesCardProps {
 export function ProjectModulesCard({ project, hourEntries, teamOptions, canManage }: ProjectModulesCardProps) {
   const toast = useToast();
   const updateModule = useUpdateProjectModule();
+  const deleteModule = useDeleteProjectModule();
   const updateSegment = useUpdateProjectModuleSegment();
   const createSegment = useCreateProjectModuleSegment();
   const deleteSegment = useDeleteProjectModuleSegment();
@@ -115,6 +116,8 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
   /** Tiempo de ejecución que se está editando (`null` = modal cerrado). */
   const [editingSegment, setEditingSegment] = useState<{ moduleId: string; segment: ProjectModuleSegment } | null>(null);
   const [planningBlock, setPlanningBlock] = useState<{ moduleId: string; teamId: string; name: string } | null>(null);
+  const [planningMode, setPlanningMode] = useState(false);
+  const [phaseNameDrafts, setPhaseNameDrafts] = useState<Record<string, string>>({});
   const [creatingFromReference, setCreatingFromReference] = useState<{
     moduleId: string | null;
     task: AppliedQuotationPlanning['modules'][number]['tasks'][number];
@@ -184,6 +187,133 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
     } catch (error) {
       toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo actualizar la etapa.');
     }
+  };
+
+  const onRenamePhase = async (module: ProjectModule, rawName: string) => {
+    const name = rawName.trim();
+    if (!name) {
+      setPhaseNameDrafts((current) => ({ ...current, [module.id]: module.name }));
+      toast.error('El nombre de la fase no puede estar vacío.');
+      return;
+    }
+    if (name === module.name) return;
+    try {
+      await updateModule.mutateAsync({ projectId: project.id, moduleId: module.id, input: { name } });
+      toast.success('Fase renombrada.');
+    } catch (error) {
+      setPhaseNameDrafts((current) => ({ ...current, [module.id]: module.name }));
+      toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo renombrar la fase.');
+    }
+  };
+
+  const onAddPhaseBlock = (module: ProjectModule) => {
+    if (teamOptions.length === 0) {
+      toast.error('Primero asigna un equipo real al proyecto antes de crear un bloque de trabajo.');
+      return;
+    }
+    setPlanningBlock({
+      moduleId: module.id,
+      teamId: teamOptions[0]?.value ?? '',
+      name: '',
+    });
+  };
+
+  /** Nunca borrar fases con ejecución, entregas ni referencias EDT.
+   * El endpoint de Kora verifica la autorización y restricciones definitivas. */
+  const onDeletePhase = async (module: ProjectModule) => {
+    if (module.segments.length || module.tasks.length || module.deliveries.length) {
+      toast.error('No se puede eliminar esta fase: primero resuelve sus bloques, tareas y entregas.');
+      return;
+    }
+    const reference = appliedPlanning.data?.modules.find((item) => item.moduleId === module.id);
+    if (reference && (reference.tasks.length || reference.relativeTeamBlocks?.length)) {
+      toast.error('Esta fase tiene referencias EDT de la cotización. No se eliminará sin conciliarlas.');
+      return;
+    }
+    if (!await confirm({
+      title: 'Eliminar fase',
+      description: '¿Eliminar definitivamente «' + module.name +
+        '»? Esta acción no se puede deshacer. Solo se permite sin bloques, tareas ni entregas.',
+      confirmLabel: 'Eliminar fase',
+      destructive: true,
+    })) return;
+    try {
+      await deleteModule.mutateAsync({ projectId: project.id, moduleId: module.id });
+      toast.success('Fase eliminada.');
+    } catch (error) {
+      toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo eliminar la fase.');
+    }
+  };
+
+  const renderPhaseHeaderName = (phase: { id: string }) => {
+    const module = modulesById.get(phase.id);
+    if (!module) return null;
+    if (!canManage || !planningMode) return <strong className={styles.headerPhaseName}>{module.name}</strong>;
+    return (
+      <input
+        aria-label={'Nombre de la fase ' + module.name}
+        className={styles.headerPhaseInput}
+        value={phaseNameDrafts[module.id] ?? module.name}
+        maxLength={300}
+        disabled={updateModule.isPending}
+        onChange={(event) => setPhaseNameDrafts((current) => ({
+          ...current, [module.id]: event.target.value,
+        }))}
+        onBlur={(event) => void onRenamePhase(module, event.currentTarget.value)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') event.currentTarget.blur();
+          if (event.key === 'Escape') {
+            event.currentTarget.value = module.name;
+            setPhaseNameDrafts((current) => ({ ...current, [module.id]: module.name }));
+            event.currentTarget.blur();
+          }
+        }}
+      />
+    );
+  };
+
+  const renderPhaseHeaderActions = (phase: { id: string }) => {
+    const module = modulesById.get(phase.id);
+    if (!module) return null;
+    const actual = module.progress.actual;
+    const expected = module.progress.expected;
+    const percent = (value: number | null) => value === null ? '—' : value + '%';
+    const hasDependencies = module.segments.length > 0 || module.tasks.length > 0 ||
+      module.deliveries.length > 0 || Boolean(appliedPlanning.data?.modules.some((item) =>
+        item.moduleId === module.id && (item.tasks.length || item.relativeTeamBlocks?.length)));
+    return (
+      <div className={styles.phaseHeadingActions}>
+        <span className={styles.phaseHeadingMeta}>
+          {module.estimatedStartDate && module.estimatedEndDate
+            ? formatDate(module.estimatedStartDate) + ' → ' + formatDate(module.estimatedEndDate)
+            : 'Sin fechas'},
+          {' '}{module.estimatedHours == null ? '—' : module.estimatedHours} HH
+        </span>
+        <span className={styles.phaseHeadingProgress}
+          title="Avances automáticos del Roadmap de Kora, no porcentajes editables manualmente.">
+          <span className={styles.phaseHeadingBar} aria-hidden="true">
+            <span className={styles.phaseHeadingReal}
+              style={{ width: (actual == null ? 0 : Math.min(100, Math.max(0, actual))) + '%' }} />
+            {expected != null && <i className={styles.phaseHeadingMarker}
+              style={{ left: Math.min(100, Math.max(0, expected)) + '%' }} />}
+          </span>
+          <span>{percent(actual)} real · {percent(expected)} plan</span>
+        </span>
+        {canManage && planningMode && (
+          <>
+            <Button variant="outline" size="sm" className={styles.phaseAddBlock}
+              onClick={() => onAddPhaseBlock(module)}>+ Bloque de trabajo</Button>
+            <Button variant="ghost" size="sm" className={styles.phaseDeleteButton}
+              disabled={deleteModule.isPending || hasDependencies}
+              title={hasDependencies
+                ? 'Primero resuelve los bloques, tareas, entregas o referencias EDT de esta fase.'
+                : 'Eliminar fase'}
+              aria-label={'Eliminar fase ' + module.name}
+              onClick={() => void onDeletePhase(module)}>🗑</Button>
+          </>
+        )}
+      </div>
+    );
   };
 
   if (project.modules.length === 0) {
@@ -361,7 +491,17 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
         </Card>
       )}
       <PhaseRoadmap phaseRoadmap={phaseRoadmap} renderPhaseExtras={renderPhaseExtras}
-        renderPhaseReferences={renderPhaseReferences} renderSelectionDetail={renderSelectionDetail} />
+        renderPhaseReferences={renderPhaseReferences} renderSelectionDetail={renderSelectionDetail}
+        renderPhaseHeaderName={renderPhaseHeaderName}
+        renderPhaseHeaderActions={renderPhaseHeaderActions}
+        toolbarActions={canManage ? (
+          <div className={styles.roadmapModeSwitch} role="group" aria-label="Modo del Roadmap">
+            <Button size="sm" variant={!planningMode ? 'secondary' : 'ghost'}
+              aria-pressed={!planningMode} onClick={() => setPlanningMode(false)}>Ver</Button>
+            <Button size="sm" variant={planningMode ? 'secondary' : 'ghost'}
+              aria-pressed={planningMode} onClick={() => setPlanningMode(true)}>Planificar</Button>
+          </div>
+        ) : undefined} />
       {creatingFromReference && appliedPlanning.data && (
         <QuotationReferenceTaskModal
           key={creatingFromReference.task.wbs + ':' + creatingFromReference.task.role}
