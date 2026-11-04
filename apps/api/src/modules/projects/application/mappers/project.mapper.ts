@@ -95,6 +95,7 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
     activity: member.activity,
     assignedHours: member.assignedHours,
     consumedHours: member.consumedHours,
+    blockedAt: member.blockedAt?.toISOString() ?? null,
   }));
 
   const teams: ProjectTeamDto[] = source.teams.map((team) => ({
@@ -241,8 +242,8 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
       : null,
     soldHours: Number(snapshot.soldHours),
     usedHours: Number(snapshot.usedHours),
-    assignedMemberCount: members.length,
-    plannedHours: members.reduce((sum, member) => sum + member.assignedHours, 0),
+    assignedMemberCount: members.filter((member) => !member.blockedAt).length,
+    plannedHours: members.filter((member) => !member.blockedAt).reduce((sum, member) => sum + member.assignedHours, 0),
     startDate: snapshot.startDate?.toISOString().slice(0, 10) ?? null,
     endDate: snapshot.endDate?.toISOString().slice(0, 10) ?? null,
     estimatedDeliveryDate: snapshot.estimatedDeliveryDate?.toISOString().slice(0, 10) ?? null,
