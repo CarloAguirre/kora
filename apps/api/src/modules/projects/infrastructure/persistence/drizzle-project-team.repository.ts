@@ -44,7 +44,7 @@ export class DrizzleProjectTeamRepository implements ProjectTeamRepository {
         teamId: projectTeams.teamId,
         teamSlug: teams.slug,
         teamName: teams.name,
-        leaderUserId: projectTeams.leaderUserId,
+        leaderUserId: sql<string | null>`coalesce(${projectTeams.leaderUserId}, ${teams.leaderUserId})`,
         leaderFirstName: users.firstName,
         leaderLastName: users.lastName,
         assignedHours: projectTeams.assignedHours,
@@ -53,7 +53,7 @@ export class DrizzleProjectTeamRepository implements ProjectTeamRepository {
       })
       .from(projectTeams)
       .innerJoin(teams, eq(teams.id, projectTeams.teamId))
-      .leftJoin(users, eq(users.id, projectTeams.leaderUserId))
+      .leftJoin(users, sql`${users.id} = coalesce(${projectTeams.leaderUserId}, ${teams.leaderUserId})`)
       .leftJoin(
         projectTeamMembers,
         and(
