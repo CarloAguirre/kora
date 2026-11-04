@@ -6,6 +6,7 @@ import {
   PROJECT_MODULE_TASK_SCOPE_LABELS,
   PROJECT_MODULE_TASK_STATUS_LABELS,
   type CreateProjectModuleSegmentInput,
+  type UpdateProjectModuleSegmentInput,
   type HourEntrySummary,
   type AppliedQuotationPlanning,
   type ProjectDetail,
@@ -34,7 +35,8 @@ import { useConfirmAction } from '@/shared/components/ui/useConfirmAction';
 import { QuotationReferenceTaskModal } from './QuotationReferenceTaskModal';
 import { ExecutionTaskModal } from './ExecutionTaskModal';
 import { DuplicateTaskModal } from './DuplicateTaskModal';
-import { NewWorkBlockModal } from './NewWorkBlockModal';
+import { NewWorkBlockModal, type WorkBlockFormInput } from './NewWorkBlockModal';
+import { AssignBlockTasksModal } from './AssignBlockTasksModal';
 import { NewOperationalTaskModal } from './NewOperationalTaskModal';
 import { ReferenceBlockDrawer } from './ReferenceBlockDrawer';
 import { useAppliedQuotationPlanning } from '@/modules/estimation/api/quotation.queries';
@@ -129,6 +131,12 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
 
   /** Tiempo de ejecución que se está editando (`null` = modal cerrado). */
   const [editingSegment, setEditingSegment] = useState<{ moduleId: string; segment: ProjectModuleSegment } | null>(null);
+  const [editingForecastSegment, setEditingForecastSegment] = useState<{
+    moduleId: string; segment: ProjectModuleSegment;
+  } | null>(null);
+  const [assigningTasks, setAssigningTasks] = useState<{
+    moduleId: string; teamId: string; focusKey?: string;
+  } | null>(null);
   const [planningBlock, setPlanningBlock] = useState<{
     moduleId: string; teamId: string; name: string; estimatedHours?: number | null;
   } | null>(null);
@@ -149,44 +157,75 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
   // Estable mientras el modal está abierto: `ExecutionSegmentModal` reinicia su formulario cuando cambia `initialValues`,
   // y un refetch del proyecto (re-render de esta tarjeta) no debe borrar lo que se está escribiendo.
   const segmentModalInitialValues = useMemo<ExecutionSegmentModalValues>(
-    () => editingSegment ? segmentToModalValues(editingSegment.segment) : EMPTY_EXECUTION_SEGMENT_MODAL_VALUES,
-    [editingSegment],
+    () => editingForecastSegment ? segmentToModalValues(editingForecastSegment.segment) : EMPTY_EXECUTION_SEGMENT_MODAL_VALUES,
+    [editingForecastSegment],
   );
   // El equipo actual del tramo siempre es elegible, aunque ya no figure entre los equipos del proyecto.
   const segmentModalTeamOptions = useMemo(() => {
-    if (!editingSegment || teamOptions.some((option) => option.value === editingSegment.segment.teamId)) return [...teamOptions];
-    return [{ value: editingSegment.segment.teamId, label: editingSegment.segment.teamName }, ...teamOptions];
-  }, [editingSegment, teamOptions]);
+    if (!editingForecastSegment || teamOptions.some((option) => option.value === editingForecastSegment.segment.teamId)) return [...teamOptions];
+    return [{ value: editingForecastSegment.segment.teamId, label: editingForecastSegment.segment.teamName }, ...teamOptions];
+  }, [editingForecastSegment, teamOptions]);
 
   const onConfirmSegmentEdit = async (values: ExecutionSegmentModalValues) => {
-    if (!editingSegment) return;
+    if (!editingForecastSegment) return;
     try {
       await updateSegment.mutateAsync({
         projectId: project.id,
-        moduleId: editingSegment.moduleId,
-        segmentId: editingSegment.segment.id,
+        moduleId: editingForecastSegment.moduleId,
+        segmentId: editingForecastSegment.segment.id,
         input: toSegmentInput(values),
       });
-      setEditingSegment(null);
+      setEditingForecastSegment(null);
       toast.success('Bloque actualizado.');
     } catch (error) {
       toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo guardar el bloque.');
     }
   };
 
-  const onCreateWorkBlock = async (input: CreateProjectModuleSegmentInput) => {
+  const onCreateWorkBlock = async (input: WorkBlockFormInput) => {
     if (!planningBlock) return;
+    const { closingDelivery, ...data } = input;
+    const createInput: CreateProjectModuleSegmentInput = {
+      ...data, members: [], ...(closingDelivery ? { closingDelivery } : {}),
+    };
     try {
-      // El backend crea bloque + entrega opcional en una sola transacción.
       await createSegment.mutateAsync({
-        projectId: project.id,
-        moduleId: planningBlock.moduleId,
-        input,
+        projectId: project.id, moduleId: planningBlock.moduleId, input: createInput,
       });
       setPlanningBlock(null);
       toast.success('Bloque de trabajo creado.');
     } catch (error) {
       toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo crear el bloque.');
+    }
+  };
+
+  const onEditWorkBlock = async (input: WorkBlockFormInput) => {
+    if (!editingSegment) return;
+    const updateInput: UpdateProjectModuleSegmentInput = input;
+    try {
+      await updateSegment.mutateAsync({
+        projectId: project.id, moduleId: editingSegment.moduleId,
+        segmentId: editingSegment.segment.id, input: updateInput,
+      });
+      setEditingSegment(null);
+      toast.success('Bloque de trabajo actualizado.');
+    } catch (error) {
+      toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo actualizar el bloque.');
+    }
+  };
+
+  const changeClosure = async (
+    moduleId: string, segment: ProjectModuleSegment, action: 'close' | 'reopen', close: () => void,
+  ) => {
+    try {
+      await updateSegment.mutateAsync({
+        projectId: project.id, moduleId, segmentId: segment.id,
+        input: { closureAction: action },
+      });
+      close();
+      toast.success(action === 'reopen' ? 'Bloque reabierto.' : 'Bloque cerrado.');
+    } catch (error) {
+      toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo cambiar el cierre.');
     }
   };
 
