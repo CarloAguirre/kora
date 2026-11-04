@@ -298,6 +298,25 @@ export const projectModules = pgTable('project_modules', {
   ...timestamps,
 });
 
+/** Exclusión operativa de una referencia EDT (no modifica la cotización de origen).
+ * Se identifica por versión de cotización, fase, WBS y rol, no por el texto visible.
+ */
+export const projectRoadmapReferenceExclusions = pgTable('project_roadmap_reference_exclusions', {
+  id: primaryId(),
+  projectId: uuid('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
+  moduleId: uuid('module_id').notNull().references(() => projectModules.id, { onDelete: 'cascade' }),
+  versionId: uuid('version_id').notNull(),
+  wbs: varchar('wbs', { length: 160 }).notNull(),
+  role: varchar('role', { length: 160 }).notNull(),
+  actorUserId: uuid('actor_user_id').references(() => users.id, { onDelete: 'set null' }),
+  createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex('roadmap_ref_exclusion_identity_key').on(
+    table.moduleId, table.versionId, table.wbs, table.role,
+  ),
+  index('roadmap_ref_exclusion_project_idx').on(table.projectId),
+]);
+
 /** Entrega estimada de un módulo — hace de hito "Entrega a cliente" (no existe un concepto de hito genérico separado). */
 export const projectModuleDeliveries = pgTable('project_module_deliveries', {
   id: primaryId(),
