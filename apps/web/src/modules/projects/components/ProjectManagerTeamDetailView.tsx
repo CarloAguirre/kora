@@ -29,7 +29,7 @@ interface Props {
 export function ProjectManagerTeamDetailView({ project, projectId, teamId }: Props) {
   const [showCalculation, setShowCalculation] = useState(false);
   const team = project.teams.find((item) => item.teamId === teamId);
-  const members = project.members.filter((item) => item.teamId === teamId);
+  const members = project.members.filter((item) => item.teamId === teamId && !item.blockedAt);
   const modules = useMemo(() => project.modules.map((module) => ({
     ...module,
     tasks: module.tasks.filter((task) => task.teamId === teamId),
@@ -37,7 +37,8 @@ export function ProjectManagerTeamDetailView({ project, projectId, teamId }: Pro
   })), [project.modules, teamId]);
   const tasks = modules.flatMap((module) => module.tasks);
   const segments = modules.flatMap((module) => module.segments);
-  const used = members.reduce((sum, member) => sum + member.consumedHours, 0);
+  const used = project.members.filter((item) => item.teamId === teamId)
+    .reduce((sum, member) => sum + member.consumedHours, 0);
   const assigned = team?.assignedHours ?? members.reduce((sum, member) => sum + member.assignedHours, 0);
   const perMemberAllocated = members.reduce((sum, member) => sum + member.assignedHours, 0);
   const remaining = Math.max(0, assigned - perMemberAllocated);
