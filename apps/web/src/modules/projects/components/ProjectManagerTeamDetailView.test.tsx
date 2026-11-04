@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import type { ProjectDetail } from '@kora/contracts';
 import { ProjectManagerTeamDetailView } from './ProjectManagerTeamDetailView';
 
@@ -32,7 +32,9 @@ describe('Ficha existente del equipo — enriquecimiento PMO/PM', () => {
     expect(screen.getByText('Abarca Motores')).toBeInTheDocument();
     expect(screen.getByText('Rodrigo Viveros')).toBeInTheDocument();
     expect(screen.getByText(/Líder: Eduardo Aranda/)).toBeInTheDocument();
-    expect(screen.getAllByText('679').length).toBeGreaterThan(0);
+    const assignedHoursKpi = screen.getByText('HH asignadas').closest('div');
+    expect(assignedHoursKpi).not.toBeNull();
+    expect(within(assignedHoursKpi!).getByText('679')).toBeInTheDocument();
     expect(screen.getByText('Agendamiento de mantenciones: 1 tarea espera asignación')).toBeInTheDocument();
     expect(screen.getByLabelText('Tareas del equipo')).toBeInTheDocument();
     expect(screen.getByLabelText('Entregas del equipo')).toBeInTheDocument();
