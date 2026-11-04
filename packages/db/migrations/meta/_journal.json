@@ -351,6 +351,13 @@
       "when": 1793742000000,
       "tag": "0049_quotation_payment_module_trigger",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1793750000000,
+      "tag": "0050_project_segment_estimated_hours",
+      "breakpoints": true
     }
   ]
 }

@@ -36,6 +36,7 @@ export interface ProjectModuleSegmentRecord {
   readonly name: string;
   readonly startDate: Date;
   readonly endDate: Date;
+  readonly estimatedHours: number | null;
   readonly members: readonly ProjectModuleSegmentMemberRecord[];
 }
 
@@ -96,6 +97,7 @@ export interface CreateProjectModuleSegmentInput {
   readonly name: string;
   readonly startDate: Date;
   readonly endDate: Date;
+  readonly estimatedHours: number | null;
 }
 
 export interface UpdateProjectModuleSegmentInput {
@@ -103,6 +105,7 @@ export interface UpdateProjectModuleSegmentInput {
   readonly name?: string;
   readonly startDate?: Date;
   readonly endDate?: Date;
+  readonly estimatedHours?: number | null;
 }
 
 export interface ProjectModuleSegmentMemberInput {
