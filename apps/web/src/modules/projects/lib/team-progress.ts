@@ -15,6 +15,8 @@ export interface TeamBlockProgress {
   readonly estimatedHours: number;
   readonly actualHours: number;
   readonly expectedHours: number;
+  /** HH aprobadas imputadas por la FK real de cada bloque. */
+  readonly consumedHours: number;
   readonly actualPercent: number;
   readonly expectedPercent: number;
   readonly coveragePercent: number;
@@ -31,6 +33,8 @@ export interface TeamPhaseProgress {
   readonly estimatedHours: number;
   readonly actualHours: number;
   readonly expectedHours: number;
+  /** HH aprobadas imputadas por la FK real de cada bloque. */
+  readonly consumedHours: number;
   readonly actualPercent: number;
   readonly expectedPercent: number;
   /** Diferencia en puntos porcentuales del avance TOTAL del equipo. */
@@ -119,6 +123,7 @@ function blockDetail(
     estimatedHours,
     actualHours,
     expectedHours,
+    consumedHours: block.consumedHours ?? 0,
     actualPercent: percent(actualHours, estimatedHours),
     expectedPercent: percent(expectedHours, estimatedHours),
     coveragePercent: percent(assignedTasksHours, estimatedHours),
@@ -162,9 +167,10 @@ export function calculateTeamProgress(
     const estimatedHours = blocks.reduce((sum, block) => sum + block.estimatedHours, 0);
     const actualHours = blocks.reduce((sum, block) => sum + block.actualHours, 0);
     const expectedHours = blocks.reduce((sum, block) => sum + block.expectedHours, 0);
+    const consumedHoursInBlocks = blocks.reduce((sum, block) => sum + block.consumedHours, 0);
     phases.push({
       id: module.id, number: index + 1, name: module.name,
-      estimatedHours, actualHours, expectedHours,
+      estimatedHours, actualHours, expectedHours, consumedHours: consumedHoursInBlocks,
       actualPercent: percent(actualHours, estimatedHours),
       expectedPercent: percent(expectedHours, estimatedHours),
       gapPoints: 0,
