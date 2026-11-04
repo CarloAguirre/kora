@@ -406,8 +406,8 @@ export function useUpdateProjectModuleTask() {
 export function useDeleteProjectModuleTask() {
   const invalidate = useInvalidateProjectsAndForecast();
   return useMutation({
-    mutationFn: ({ projectId, moduleId, taskId }: { projectId: string; moduleId: string; taskId: string }) =>
-      projectsApi.deleteModuleTask(projectId, moduleId, taskId),
+    mutationFn: ({ projectId, moduleId, taskId, cancel }: { projectId: string; moduleId: string; taskId: string; cancel?: boolean }) =>
+      projectsApi.deleteModuleTask(projectId, moduleId, taskId, cancel),
     onSuccess: () => invalidate(),
   });
 }
