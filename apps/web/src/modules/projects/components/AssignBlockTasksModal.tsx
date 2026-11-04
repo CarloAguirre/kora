@@ -64,10 +64,9 @@ export function AssignBlockTasksModal({
   const selected = rows.filter((row) => row.assignee && !saved.has(row.key));
   const eligible = selected.length > 0 && selected.every((row) => {
     const linked = module.segments.find((item) => item.id === (blockId || row.segmentId));
-    return row.hours > 0 && row.startDate && row.date && row.startDate <= row.date &&
-      (row.kind !== 'reference' || Boolean(blockId || row.segmentId)) &&
-      (!linked || (linked.teamId === teamId &&
-        row.startDate >= linked.startDate && row.date <= linked.endDate));
+    return Boolean(linked && linked.teamId === teamId && row.hours > 0 &&
+      row.startDate && row.date && row.startDate <= row.date &&
+      row.startDate >= linked.startDate && row.date <= linked.endDate);
   });
   const formatIso = (date: string) => date ? date.slice(8, 10) + '-' + date.slice(5, 7) +
     '-' + date.slice(0, 4) : '—';
@@ -158,8 +157,8 @@ export function AssignBlockTasksModal({
           Aplicar
         </Button>
       </div>
-      {referenceTasks.length > 0 && blocks.length === 0 && <p role="alert" className={styles.warning}>
-        Primero planifica un bloque de trabajo para este equipo. Las tareas de la EDT
+      {rows.length > 0 && blocks.length === 0 && <p role="alert" className={styles.warning}>
+        Primero planifica un bloque de trabajo para este equipo. Las tareas operativas
         deben tener un bloque y fechas reales antes de ser asignadas.
       </p>}
       {members.length === 0 && <p role="alert" className={styles.warning}>
