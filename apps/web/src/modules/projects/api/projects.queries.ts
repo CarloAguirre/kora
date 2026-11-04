@@ -59,12 +59,15 @@ export function useProjectPhases(projectId: string | null) {
 function useInvalidateProjects() {
   const queryClient = useQueryClient();
   return () => {
-    queryClient.invalidateQueries({ queryKey: projectKeys.all });
+    // Devolver la promesa permite que una mutación de inicio espere el GET del
+    // detalle activo: ese GET materializa los bloques de la cotización en API.
+    const projectRefresh = queryClient.invalidateQueries({ queryKey: projectKeys.all });
     // El Dashboard resume proyectos/soporte: sin esto quedaba desactualizado
     // hasta que el usuario recargaba la página a mano.
     queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     // La campanita del Líder PM avisa fechas y HH asignadas por completar.
-    queryClient.invalidateQueries({ queryKey: ['notifications', 'reminders'] });
+    void queryClient.invalidateQueries({ queryKey: ['notifications', 'reminders'] });
+    return projectRefresh;
   };
 }
 
@@ -112,7 +115,10 @@ export function useChangeProjectStatus() {
   return useMutation({
     mutationFn: ({ projectId, input }: { projectId: string; input: ChangeProjectStatusInput }) =>
       projectsApi.changeStatus(projectId, input),
-    onSuccess: () => invalidate(),
+    // React Query espera esta promesa antes de resolver mutateAsync. Al activar
+    // un proyecto, la lectura refetch materializa y devuelve el calendario
+    // antes de cerrar EditProjectDialog, sin recargar la página.
+    onSuccess: async () => { await invalidate(); },
   });
 }
 
