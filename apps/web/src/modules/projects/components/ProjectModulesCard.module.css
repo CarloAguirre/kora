@@ -581,7 +581,8 @@
 /* Tres acciones (editar, duplicar, eliminar) en la tabla operativa. */
 /* La tabla v5.02 mantiene solamente editar y eliminar en la última columna.
    Duplicar sigue disponible dentro del modal de edición. */
-.operationalTaskTable th:last-child { width: 90px; min-width: 90px; }
+/* Tres iconos para tareas asignadas; sin recortar acciones ni texto de otras columnas. */
+.operationalTaskTable th:last-child { width: 118px; min-width: 118px; }
 .operationalTaskTable td:last-child { padding-right: 6px; }
 .operationalTaskActions .taskIconAction + .taskIconAction { margin-left: 6px; }
 .addTaskButton {
