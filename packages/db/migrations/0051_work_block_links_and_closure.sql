@@ -15,9 +15,9 @@ CREATE INDEX "project_module_tasks_segment_idx" ON "project_module_tasks"("segme
 --> statement-breakpoint
 -- Solo vinculamos tareas que contienen un ID exacto, perteneciente a la MISMA fase y equipo.
 WITH parsed AS (
-  SELECT t.id AS task_id, (substring(t.description FROM '· ID ([0-9a-fA-F-]{36})'))::uuid AS target_id
+  SELECT t.id AS task_id, (substring(t.description FROM 'Bloque de trabajo: [^[:cntrl:]]* · ID ([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})'))::uuid AS target_id
   FROM "project_module_tasks" t
-  WHERE t.description ~ '· ID [0-9a-fA-F-]{36}'
+  WHERE t.description ~ 'Bloque de trabajo: [^[:cntrl:]]* · ID [0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
 )
 UPDATE "project_module_tasks" t SET "segment_id" = s.id
 FROM parsed p
