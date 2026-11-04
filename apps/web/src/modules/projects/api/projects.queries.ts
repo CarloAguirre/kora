@@ -64,7 +64,7 @@ function useInvalidateProjects() {
     const projectRefresh = queryClient.invalidateQueries({ queryKey: projectKeys.all });
     // El Dashboard resume proyectos/soporte: sin esto quedaba desactualizado
     // hasta que el usuario recargaba la página a mano.
-    queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     // La campanita del Líder PM avisa fechas y HH asignadas por completar.
     void queryClient.invalidateQueries({ queryKey: ['notifications', 'reminders'] });
     return projectRefresh;
