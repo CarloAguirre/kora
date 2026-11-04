@@ -133,7 +133,11 @@ describe('Materializar cronograma de cotización aprobada (sin segunda aprobaci�
     });
     expect(fx.persistedEvents).toHaveLength(1);
     expect(fx.persistedEvents[0]?.action).toBe('roadmap_calendar_materialized');
+    // Simula que el PM eliminó voluntariamente el segmento tras el arranque.
+    // La siguiente lectura no debe reintroducirlo.
+    fx.segments.splice(0);
     expect(await fx.calendar.ensure(projectId)).toBe(false);
+    expect(fx.segments).toHaveLength(0);
     expect(fx.inserts.filter((item) => item.table === projectModuleSegments)).toHaveLength(1);
     expect(fx.inserts.filter((item) => item.table === projectModuleDeliveries)).toHaveLength(1);
   });
