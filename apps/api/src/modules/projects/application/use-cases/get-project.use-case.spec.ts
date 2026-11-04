@@ -36,6 +36,7 @@ function buildUseCase(projects: FakeProjectRepository) {
     NEVER_USED as ProjectActivityReader,
     new FixedClock(),
     NEVER_USED as PaymentMilestoneTriggerService,
+    NEVER_USED,
   );
 }
 
