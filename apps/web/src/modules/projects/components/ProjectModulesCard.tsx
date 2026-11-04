@@ -519,7 +519,7 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
   const operationalCounts = project.modules.reduce((total, module) => {
     const reference = appliedPlanning.data?.modules.find((entry) => entry.moduleId === module.id);
     total.tasks += module.tasks.length +
-      (reference?.tasks.filter((task) => !referenceIsConverted(module, task)).length ?? 0);
+      (reference?.tasks.filter((task) => referenceIsPending(module, task)).length ?? 0);
     total.blocks += module.segments.length + getOperationalRows({ id: module.id }).length;
     return total;
   }, { tasks: 0, blocks: 0 });
@@ -553,7 +553,7 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
     const module = modulesById.get(phase.id);
     if (!module) return null;
     const commercial = appliedPlanning.data?.modules.find((entry) => entry.moduleId === module.id);
-    const references = commercial?.tasks.filter((task) => !referenceIsConverted(module, task)) ?? [];
+    const references = commercial?.tasks.filter((task) => referenceIsPending(module, task)) ?? [];
     const unassignedActual = module.tasks.filter((task) => !task.assigneeUserId);
     const pending = [
       ...unassignedActual.map((task) => ({
@@ -675,7 +675,9 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
       const block = commercial?.relativeTeamBlocks?.find((entry) => entry.teamId === selection.id);
       return block && commercial && appliedPlanning.data ? (
         <ReferenceBlockDrawer project={project} module={module}
-          block={block} reference={commercial} versionId={appliedPlanning.data.versionId}
+          block={block} reference={{ ...commercial,
+            tasks: commercial.tasks.filter((task) => referenceIsPending(module, task)),
+          }} versionId={appliedPlanning.data.versionId}
           onClose={close}
           onPlan={canManage ? () => {
             setPlanningBlock({ moduleId: module.id, teamId: block.teamId,
@@ -801,6 +803,7 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
           versionId={appliedPlanning.data.versionId}
           versionNumber={appliedPlanning.data.versionNumber}
           reference={creatingFromReference.task}
+          mode={creatingFromReference.mode ?? 'create'}
           onClose={() => setCreatingFromReference(null)}
         />
       )}
@@ -811,7 +814,7 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
           teamId={assigningTasks.teamId}
           referenceTasks={(appliedPlanning.data.modules.find((item) => item.moduleId === assigningTasks.moduleId)
             ?.tasks ?? []).filter((task) => task.teamId === assigningTasks.teamId &&
-              !referenceIsConverted(modulesById.get(assigningTasks.moduleId)!, task))}
+              referenceIsPending(modulesById.get(assigningTasks.moduleId)!, task))}
           versionId={appliedPlanning.data.versionId}
           focusKey={assigningTasks.focusKey}
           onClose={() => setAssigningTasks(null)}
