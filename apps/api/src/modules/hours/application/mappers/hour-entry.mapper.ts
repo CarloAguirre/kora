@@ -10,6 +10,7 @@ export function toHourEntrySummary(item: HourEntryListItem): HourEntrySummary {
     user: { id: item.userId, fullName: item.userFullName },
     project: item.projectId ? { id: item.projectId, name: item.projectName ?? '' } : null,
     module: item.moduleId ? { id: item.moduleId, name: item.moduleName ?? '' } : null,
+    segment: item.segmentId ? { id: item.segmentId, name: item.segmentName ?? '' } : null,
     team: item.teamId ? { id: item.teamId, name: item.teamName ?? '' } : null,
     assignment: item.assignment,
     category: item.category,
@@ -45,6 +46,7 @@ export interface HourEntryDetailSource {
   readonly owner: HourEntryUserReference | null;
   readonly project: HourEntryProjectReference | null;
   readonly module: { id: string; name: string } | null;
+  readonly segment?: { id: string; name: string } | null;
   readonly designatedApprover: HourEntryUserReference | null;
   readonly decisionBy: HourEntryUserReference | null;
   readonly team: { id: string; name: string } | null;
@@ -59,6 +61,7 @@ export function toHourEntryDetail(source: HourEntryDetailSource): HourEntryDetai
     user: { id: snapshot.userId, fullName: source.owner?.fullName ?? '' },
     project: snapshot.projectId ? { id: snapshot.projectId, name: source.project?.name ?? '' } : null,
     module: snapshot.moduleId ? { id: snapshot.moduleId, name: source.module?.name ?? '' } : null,
+    segment: snapshot.segmentId && source.segment ? source.segment : null,
     team: source.team,
     assignment: snapshot.assignment,
     category: snapshot.category,
