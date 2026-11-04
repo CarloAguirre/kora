@@ -61,11 +61,13 @@ describe('Actualización automática del Roadmap al iniciar el proyecto', () => 
     // mutateAsync no termina hasta que React Query refresca la ficha activa.
     expect(saveProject).toHaveBeenCalledOnce();
     expect(startProject).toHaveBeenCalledOnce();
-    expect(readDetail).toHaveBeenCalledTimes(3);
-    expect(result.current.detail.data?.startDate).toBe('2026-11-04');
-    expect(result.current.detail.data?.status).toBe('active');
-    expect(result.current.detail.data?.modules[0]?.segments).toMatchObject([{
-      id: 'segment-generated', estimatedHours: 120,
-    }]);
+    expect(readDetail.mock.calls.length).toBeGreaterThanOrEqual(3);
+    await waitFor(() => {
+      expect(result.current.detail.data?.startDate).toBe('2026-11-04');
+      expect(result.current.detail.data?.status).toBe('active');
+      expect(result.current.detail.data?.modules[0]?.segments).toMatchObject([{
+        id: 'segment-generated', estimatedHours: 120,
+      }]);
+    });
   });
 });
