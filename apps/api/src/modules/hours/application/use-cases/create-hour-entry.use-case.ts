@@ -75,7 +75,7 @@ export class CreateHourEntryUseCase implements UseCase<CreateHourEntryCommand, {
     }
 
     if (data.projectId && data.assignment === 'Proyecto' && !data.moduleId &&
-      await this.projects.hasWorkBlocks(data.projectId)) {
+      await this.projects.hasAttributableWorkBlocks(data.projectId, ownerId)) {
       return err(new HourEntrySegmentRequiredError());
     }
     if (data.segmentId && !data.moduleId) {
@@ -89,7 +89,11 @@ export class CreateHourEntryUseCase implements UseCase<CreateHourEntryCommand, {
         if (!selected || !await this.projects.isUserOnSegmentTeam(
           selected.projectId, selected.teamId, ownerId,
         )) return err(new InvalidHourEntrySegmentError());
-      } else if (segments.length > 0 && data.assignment === 'Proyecto') {
+      } else if (data.assignment === 'Proyecto' && (await Promise.all(
+        segments.map((segment) => this.projects.isUserOnSegmentTeam(
+          segment.projectId, segment.teamId, ownerId,
+        )),
+      )).some(Boolean)) {
         return err(new HourEntrySegmentRequiredError());
       }
     }
