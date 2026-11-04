@@ -98,6 +98,10 @@ export class UpdateProjectModuleTaskUseCase
 
     const task = module.tasks.find((t) => t.id === command.taskId);
     if (!task) return err(new ProjectModuleTaskNotFoundError(command.taskId));
+    if (task.cancelledAt) return err(new ForbiddenError(
+      'La tarea cancelada solo se conserva para auditoría y no puede editarse.',
+      'PROJECT_TASK_CANCELLED',
+    ));
 
     const canManage =
       command.actorPermissions.includes('projects:manage') || project.leaderUserId === command.actor.userId;
