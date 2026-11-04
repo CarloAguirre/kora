@@ -96,7 +96,13 @@ export function SegmentDrawer({
 
   const canMarkDelivered = delivery?.status === 'planned' && Boolean(onEdit) &&
     Boolean(delivery.canManage) && Boolean(delivery.assigneeUserId);
-  const canAddTask = Boolean(onAddTask) && !segment.closedAt && !closedByDelivery;
+  // El backend puede fijar closedAt al aprobar todas las tareas aunque una
+  // entrega siga planificada. Mientras falte presentarla, el panel permanece
+  // en estado "Entrega vencida" y permite agregar trabajo como el prototipo.
+  const canAddTask = Boolean(onAddTask) && !closedByDelivery &&
+    (delivery?.status === 'planned' || !segment.closedAt);
+  const canReopen = Boolean(segment.closedAt) && Boolean(onChangeClosure) &&
+    (!delivery || delivery.status === 'approved');
   const canCloseManually = !segment.closedAt && !delivery && tasks.length > 0 &&
     tasks.every((task) => task.status === 'done') && Boolean(onChangeClosure);
   const pendingReferences = reference?.tasks.some((task) =>
@@ -223,8 +229,8 @@ export function SegmentDrawer({
               dateFull(segment.closedAt) + '.'
             : 'Este bloque no tiene entrega de cierre. Puedes registrarla desde «Editar bloque».'}
         </p>}
-        {segment.closedAt && onChangeClosure && <Button size="sm" variant="outline"
-          onClick={() => onChangeClosure('reopen')}>Reabrir bloque</Button>}
+        {canReopen && <Button size="sm" variant="outline"
+          onClick={() => onChangeClosure?.('reopen')}>Reabrir bloque</Button>}
         {canCloseManually && <Button size="sm" variant="outline"
           onClick={() => onChangeClosure?.('close')}>Cerrar bloque</Button>}
       </section>
