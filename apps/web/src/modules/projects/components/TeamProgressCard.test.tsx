@@ -73,6 +73,31 @@ describe('Avance del equipo — fidelización del desplegable V5', () => {
     expect(screen.queryByText('Qué explica la diferencia')).not.toBeInTheDocument();
   });
 
+  it('distingue un bloque sin HH definidas de un bloque planificado con cero avances', () => {
+    const noPlan = {
+      ...progress,
+      hasPlan: false, plannedHours: 0, actualHours: 0, expectedHours: 0,
+      actualPercent: null, expectedPercent: null,
+      unplannedBlockCount: 1,
+      phases: [{
+        ...progress.phases[0]!,
+        estimatedHours: 0, actualHours: 0, expectedHours: 0,
+        actualPercent: 0, expectedPercent: 0,
+        blocks: [{
+          ...progress.phases[0]!.blocks[0]!,
+          estimatedHours: 0, actualHours: 0, expectedHours: 0,
+          actualPercent: 0, expectedPercent: 0,
+        }],
+      }],
+    } satisfies TeamProgress;
+    render(<TeamProgressCard progress={noPlan} teamName="Desarrollo" />);
+    fireEvent.click(screen.getByRole('button', { name: '¿Cómo se calcula este avance?' }));
+    expect(screen.getByText(/el equipo tiene 180 HH asignadas/)).toBeInTheDocument();
+    expect(screen.getByText('Faltan HH estimadas para calcular el avance del bloque')).toBeInTheDocument();
+    expect(screen.getByText('HH del bloque sin definir')).toBeInTheDocument();
+    expect(screen.getAllByText('—').length).toBeGreaterThan(0);
+  });
+
   it('sin plan no muestra porcentajes como si existiese una fecha definida', () => {
     render(<TeamProgressCard progress={{
       ...progress, hasPlan: false, plannedHours: 0, actualHours: 0,
@@ -80,6 +105,6 @@ describe('Avance del equipo — fidelización del desplegable V5', () => {
       phases: [],
     }} teamName="QA" />);
     expect(screen.getByText('Sin plan')).toBeInTheDocument();
-    expect(screen.getByText('Sin bloques con HH planificadas para este equipo.')).toBeInTheDocument();
+    expect(screen.getByText(/Sin HH definidas en los bloques de ejecución/)).toBeInTheDocument();
   });
 });
