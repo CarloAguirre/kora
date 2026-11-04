@@ -948,3 +948,14 @@ button.ganttBar {
   .operationalWrapper .summaryChip { padding: 7px 9px; font-size: 12px; }
   .operationalWrapper .operationalLegend { gap: 10px 14px; }
 }
+
+/* Nombre, periodo y HH agrupados a la izquierda; avance alineado a la derecha. */
+.operationalPhaseHeader .phaseNameControl {
+  flex: 1 1 420px;
+  max-width: none;
+  min-width: 0;
+}
+.operationalPhaseHeader .phaseHeaderSpacer { flex: 1 1 0; }
+@media (max-width: 900px) {
+  .operationalPhaseHeader .phaseNameControl { flex: 1 1 220px; }
+}
