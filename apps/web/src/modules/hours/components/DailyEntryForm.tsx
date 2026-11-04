@@ -469,7 +469,7 @@ export function DailyEntryBlockFields({
             </div>
           )}
 
-          {needsProject && block.moduleId && (selectedModule?.segments.length ?? 0) > 0 && (
+          {needsProject && block.moduleId && availableSegments.length > 0 && (
             <div className={styles.row}>
               <Select
                 label="Bloque de trabajo"
