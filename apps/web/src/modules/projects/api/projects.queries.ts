@@ -9,6 +9,7 @@ import type {
   CreateProjectModuleInput,
   CreateProjectModuleSegmentInput,
   CreateProjectModuleTaskInput,
+  ExcludeRoadmapReferenceInput,
   CreateProjectPaymentMilestoneInput,
   IssueProjectPaymentMilestoneInvoiceInput,
   ListProjectsQuery,
@@ -336,6 +337,35 @@ export function useDeleteProjectModuleSegment() {
       segmentId: string;
     }) => projectsApi.deleteModuleSegment(projectId, moduleId, segmentId),
     onSuccess: () => invalidate(),
+  });
+}
+
+/** Referencias EDT excluidas solo del Roadmap operativo (no de la cotización). */
+export function useRoadmapReferenceExclusions(projectId: string) {
+  return useQuery({
+    queryKey: [...projectKeys.detail(projectId), 'roadmap-reference-exclusions'],
+    queryFn: () => projectsApi.listRoadmapReferenceExclusions(projectId),
+    enabled: Boolean(projectId),
+  });
+}
+
+export function useExcludeRoadmapReference() {
+  const invalidate = useInvalidateProjects();
+  return useMutation({
+    mutationFn: ({ projectId, moduleId, input }: {
+      projectId: string; moduleId: string; input: ExcludeRoadmapReferenceInput;
+    }) => projectsApi.excludeRoadmapReference(projectId, moduleId, input),
+    onSuccess: invalidate,
+  });
+}
+
+export function useRestoreRoadmapReference() {
+  const invalidate = useInvalidateProjects();
+  return useMutation({
+    mutationFn: ({ projectId, moduleId, input }: {
+      projectId: string; moduleId: string; input: ExcludeRoadmapReferenceInput;
+    }) => projectsApi.restoreRoadmapReference(projectId, moduleId, input),
+    onSuccess: invalidate,
   });
 }
 
