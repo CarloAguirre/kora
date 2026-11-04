@@ -102,7 +102,7 @@ describe('Avance global por los mismos bloques que el avance del equipo', () => 
         task('done-rpa', teamRpa, 'rpa-2', 'done', 40),
         task('cancelled-rpa', teamRpa, 'rpa-2', 'done', 50, '2026-10-10T00:00:00Z'),
         task('wrong-team', teamQa, 'rpa-2', 'done', 25),
-        task('orphan', teamRpa, null, 'done', 60),
+        task('orphan', teamRpa, 'missing-block', 'done', 60),
         task('unapproved', teamPmo, 'pmo-2', 'in_review', 12),
       ] } : module),
     };
