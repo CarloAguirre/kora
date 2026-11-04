@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { CLOCK, UNIT_OF_WORK, err, ok, type ApplicationError, type Clock, type Result, type UnitOfWork } from '@kora/core';
+import { CLOCK, UNIT_OF_WORK, ForbiddenError, err, ok, type ApplicationError, type Clock, type Result, type UnitOfWork } from '@kora/core';
 import type { Permission } from '@kora/contracts';
 import {
   CannotManageProjectError,
@@ -57,6 +57,14 @@ export class DeleteProjectModuleSegmentUseCase
       return err(new CannotManageProjectError());
     }
 
+    // No convertir una entrega o tarea vigente en huérfana al borrar el bloque.
+    if (module.tasks.some((task) => task.segmentId === command.segmentId) ||
+      module.deliveries.some((delivery) => delivery.segmentId === command.segmentId)) {
+      return err(new ForbiddenError(
+        'Desvincula las tareas y la entrega de cierre antes de eliminar este bloque.',
+        'PROJECT_SEGMENT_HAS_DEPENDENCIES',
+      ));
+    }
     // Las filas del tramo se van en cascada; las tareas que cubría vuelven a sumar en el Forecast.
     await this.unitOfWork.run(async (tx) => {
       await this.modules.removeSegment(command.segmentId, tx);
