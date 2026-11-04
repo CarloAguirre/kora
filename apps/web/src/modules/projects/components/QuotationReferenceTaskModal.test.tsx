@@ -46,7 +46,7 @@ describe('Nueva tarea operativa a partir de referencia Gemini', () => {
     expect(screen.getByRole('dialog',{name:'Nueva tarea'})).toBeInTheDocument();
     expect(screen.getByLabelText(/Título de la tarea/)).toHaveValue('Conexión con sistema de taller');
     expect(screen.getByLabelText(/HH estimadas/)).toHaveValue(35);
-    expect(screen.getByLabelText('Bloque de trabajo')).toBeDisabled();
+    expect(screen.getByLabelText(/Bloque de trabajo/)).toBeDisabled();
     expect(mocks.create).not.toHaveBeenCalled();
   });
   it('no permite convertir una referencia sin bloque aunque ya tenga responsable, ámbito y fechas', () => {
@@ -72,7 +72,7 @@ describe('Nueva tarea operativa a partir de referencia Gemini', () => {
     fireEvent.change(screen.getByLabelText(/Asignado a/),{
       target: { value: teamId + ':' + userId },
     });
-    fireEvent.change(screen.getByLabelText('Bloque de trabajo'), {
+    fireEvent.change(screen.getByLabelText(/Bloque de trabajo/), {
       target: { value: blockId },
     });
     fireEvent.change(screen.getByLabelText(/Ámbito Kora/), {
@@ -97,7 +97,7 @@ describe('Nueva tarea operativa a partir de referencia Gemini', () => {
       versionNumber={1} reference={reference} onClose={mocks.onClose}
     /></MemoryRouter>);
     expect(screen.getByRole('dialog', { name: 'Editar tarea' })).toBeInTheDocument();
-    expect(screen.getByLabelText('Bloque de trabajo')).toHaveValue(blockId);
+    expect(screen.getByLabelText(/Bloque de trabajo/)).toHaveValue(blockId);
     expect(screen.getByLabelText(/Fecha de inicio/)).toHaveValue('2026-11-10');
     expect(screen.getByLabelText(/Fecha límite/)).toHaveValue('2026-11-20');
     expect(screen.getByLabelText(/HH estimadas/)).toHaveValue(35);
