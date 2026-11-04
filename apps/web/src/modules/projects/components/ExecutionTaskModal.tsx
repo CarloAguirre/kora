@@ -46,8 +46,13 @@ export function ExecutionTaskModal({
   const [date, setDate] = useState(task.date);
 
   const module = project.modules.find((item) => item.id === moduleId);
+  // El equipo es independiente del colaborador: el PM puede corregir tareas
+  // heredadas mal clasificadas aunque el equipo destino aún no tenga personas.
+  const teamOptions = project.teams
+    .filter((team) => !allowedTeamId || team.teamId === allowedTeamId)
+    .map((team) => ({ value: team.teamId, label: team.teamName }));
   const members = project.members.filter((member) => member.userStatus === 'active' && !member.blockedAt &&
-    (!allowedTeamId || member.teamId === allowedTeamId));
+    member.teamId === teamId && (!allowedTeamId || member.teamId === allowedTeamId));
   const assigneeOptions = members.map((member) => ({
     value: member.teamId + ':' + member.userId,
     label: member.fullName + ' · ' + member.teamName,
@@ -64,6 +69,8 @@ export function ExecutionTaskModal({
   const hours = Number(estimatedHours);
   const valid = Boolean(name.trim() && Number.isFinite(hours) && hours > 0 &&
     startDate && date && startDate <= date && datesFitBlock &&
+    // Toda referencia comercial que se edita debe quedar atribuida a un bloque real.
+    (original.marker.length === 0 || chosenBlock) &&
     description.length <= 1800);
   const save = async () => {
     if (!valid) {
@@ -116,14 +123,22 @@ export function ExecutionTaskModal({
         <textarea id={'task-description-' + task.id} rows={3} maxLength={1800}
           value={description} onChange={(event) => setDescription(event.target.value)} />
       </div>
+      <Select label="Equipo responsable" required value={teamId}
+        options={teamOptions} disabled={Boolean(allowedTeamId)}
+        placeholder="Seleccionar equipo"
+        onChange={(event) => {
+          setTeamId(event.target.value);
+          setAssignee('');
+          setBlockId('');
+          // Cambiar de equipo invalida la aprobación de la asignación anterior.
+          setStatus('todo');
+        }} />
       <Select label="Asignado a" placeholder="Sin asignar"
         value={selectedAssignment} options={assigneeOptions}
         onChange={(event) => {
           const member = members.find((item) =>
             item.teamId + ':' + item.userId === event.target.value);
           setAssignee(member?.userId ?? '');
-          setTeamId(member?.teamId ?? task.teamId ?? '');
-          setBlockId('');
           // Reasignar no conserva la aprobación de la persona anterior.
           if ((member?.userId ?? null) !== (task.assigneeUserId ?? null)) setStatus('todo');
         }} />
@@ -131,8 +146,9 @@ export function ExecutionTaskModal({
       <Select label="Módulo relacionado" value={moduleId} disabled
         options={[{ value: moduleId, label: module?.name ?? 'Módulo actual' }]}
         helperText="Las tareas existentes no se mueven entre módulos desde este formulario." />
-      <Select label="Bloque de trabajo" value={chosenBlock?.id ?? ''}
-        placeholder={blocks.length ? 'Sin bloque específico' : 'Sin bloque planificado'}
+      <Select label="Bloque de trabajo" required={original.marker.length > 0}
+        value={chosenBlock?.id ?? ''}
+        placeholder={blocks.length ? 'Seleccionar bloque' : 'Sin bloque planificado'}
         options={blocks.map((segment) => ({
           value: segment.id,
           label: segment.name + ' (' + segment.startDate + ' – ' + segment.endDate + ')',
@@ -142,6 +158,9 @@ export function ExecutionTaskModal({
           const block = blocks.find((entry) => entry.id === event.target.value);
           if (block) { setStartDate(block.startDate); setDate(block.endDate); }
         }} />
+      {original.marker.length > 0 && blocks.length === 0 && <p role="alert" className={styles.error}>
+        Para esta tarea de cotización debes planificar un bloque del equipo responsable antes de guardarla.
+      </p>}
       {original.marker.length > 0 && <p className={styles.help}>
         Viene de la cotización. Al elegir a quién se asigna pasa a Pendiente.
       </p>}
