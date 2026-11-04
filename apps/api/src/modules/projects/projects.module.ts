@@ -33,6 +33,7 @@ import { DeleteProjectModuleSegmentUseCase } from './application/use-cases/delet
 import { CreateProjectModuleTaskUseCase } from './application/use-cases/create-project-module-task.use-case';
 import { UpdateProjectModuleTaskUseCase } from './application/use-cases/update-project-module-task.use-case';
 import { DeleteProjectModuleTaskUseCase } from './application/use-cases/delete-project-module-task.use-case';
+import { ProjectRoadmapReferenceExclusionsService } from './application/services/project-roadmap-reference-exclusions.service';
 import { CreateProjectPaymentMilestoneUseCase } from './application/use-cases/create-project-payment-milestone.use-case';
 import { UpdateProjectPaymentMilestoneUseCase } from './application/use-cases/update-project-payment-milestone.use-case';
 import { DeleteProjectPaymentMilestoneUseCase } from './application/use-cases/delete-project-payment-milestone.use-case';
@@ -116,6 +117,7 @@ import { DrizzleForecastSourceStore } from './infrastructure/services/drizzle-fo
     CreateProjectModuleTaskUseCase,
     UpdateProjectModuleTaskUseCase,
     DeleteProjectModuleTaskUseCase,
+    ProjectRoadmapReferenceExclusionsService,
     CreateProjectPaymentMilestoneUseCase,
     UpdateProjectPaymentMilestoneUseCase,
     DeleteProjectPaymentMilestoneUseCase,
