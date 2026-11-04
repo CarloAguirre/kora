@@ -8,6 +8,8 @@ import {
   ProjectOvertimeNotAllowedError,
   ProjectStoppedError,
   ReferencedModuleNotFoundError,
+  InvalidHourEntrySegmentError,
+  HourEntrySegmentRequiredError,
   ReferencedProjectNotFoundError,
 } from '../../domain/errors/hour-entry.errors';
 import { HOUR_ENTRY_REPOSITORY, type HourEntryRepository } from '../../domain/repositories/hour-entry.repository';
@@ -80,6 +82,29 @@ export class UpdateHourEntryUseCase implements UseCase<UpdateHourEntryCommand, v
       if (module.projectId !== projectId) return err(new ModuleNotInProjectError());
     }
 
+    const previousSegmentId = entry.toSnapshot().segmentId ?? null;
+    const selectedSegmentId = data.segmentId === undefined
+      ? (data.moduleId !== undefined && data.moduleId !== entry.toSnapshot().moduleId
+        ? null : previousSegmentId)
+      : data.segmentId;
+    if (selectedSegmentId && !moduleId) {
+      return err(new InvalidHourEntrySegmentError('Selecciona la fase antes de elegir un bloque.'));
+    }
+    if (moduleId) {
+      const segments = await this.projects.findSegmentsForModule(moduleId);
+      if (selectedSegmentId) {
+        const selected = segments.find((segment) =>
+          segment.id === selectedSegmentId && segment.projectId === projectId);
+        if (!selected || !await this.projects.isUserOnSegmentTeam(
+          selected.projectId, selected.teamId, entry.userId,
+        )) return err(new InvalidHourEntrySegmentError());
+      } else if (segments.length > 0 &&
+        (data.segmentId !== undefined || (data.moduleId !== undefined &&
+          data.moduleId !== entry.toSnapshot().moduleId))) {
+        return err(new HourEntrySegmentRequiredError());
+      }
+    }
+
     const owner = await this.users.findById(entry.userId);
     // Horas extra siempre exigen aprobación de líder, aunque el rol del dueño no la requiera.
     const ownerRequiresApproval = owner?.role === 'collaborator' || isOvertime;
@@ -89,6 +114,7 @@ export class UpdateHourEntryUseCase implements UseCase<UpdateHourEntryCommand, v
         assignment: data.assignment,
         projectId: data.projectId === undefined ? undefined : data.projectId,
         moduleId: data.moduleId === undefined ? undefined : data.moduleId,
+        segmentId: selectedSegmentId,
         category: data.category,
         description: data.description,
         hours: data.hours,
