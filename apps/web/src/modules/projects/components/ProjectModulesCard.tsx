@@ -372,7 +372,8 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
   const renderPhaseHeaderName = (phase: { id: string }) => {
     const module = modulesById.get(phase.id);
     if (!module) return null;
-    return <span className={styles.phaseHeadingIdentity}>
+    return <span className={[styles.phaseHeadingIdentity,
+      planningMode && canManage ? styles.phaseHeadingIdentityPlanning : ''].filter(Boolean).join(' ')}>
       {!canManage || !planningMode
         ? <strong className={styles.headerPhaseName}>{module.name}</strong>
         : <input
