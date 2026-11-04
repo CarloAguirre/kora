@@ -67,3 +67,72 @@ describe('GetProjectUseCase — resolución por id o slug', () => {
     expect(projects.findById).not.toHaveBeenCalled();
   });
 });
+
+
+/**
+ * Regresión: la estimación ya asignó el equipo a project_teams pero no tiene
+ * líder específico. El repositorio resuelve su líder orgánico y el endpoint
+ * debe autorizarlo sin agregarlo como colaborador.
+ */
+describe('GetProjectUseCase — lectura del líder de un equipo aprobado', () => {
+  it('autoriza al líder efectivo incluso sin colaboradores asignados al proyecto', async () => {
+    const actorUserId = 'leader-team-1';
+    const project = {
+      id: '11111111-1111-4111-8111-111111111111',
+      isDeleted: false,
+      pendingManagementApproval: null,
+      toSnapshot: () => ({
+        id: '11111111-1111-4111-8111-111111111111',
+        name: 'Proyecto traspasado',
+        slug: 'proyecto-traspasado',
+        type: 'development',
+        status: 'draft',
+        salesStage: 'approved',
+        phase: 'development',
+        soldHours: 100,
+        usedHours: 0,
+        leaderUserId: 'project-pm',
+        developerUserId: null,
+        commercialManagerUserId: null,
+        primaryContactId: null,
+        clientId: null,
+        hito0At: null,
+        createdAt: new Date('2026-11-01T12:00:00.000Z'),
+        updatedAt: new Date('2026-11-01T12:00:00.000Z'),
+      }),
+    };
+    const projects = {
+      findById: vi.fn().mockResolvedValue(project),
+      isProjectLeaderOrTeamLeaderOfMember: vi.fn().mockResolvedValue(true),
+    };
+    const u = new GetProjectUseCase(
+      projects as unknown as ProjectRepository,
+      { listForProject: vi.fn().mockResolvedValue([]) } as unknown as ProjectTeamMemberRepository,
+      { findByProject: vi.fn().mockResolvedValue([{
+        id: 'link-1', teamId: 'team-1', teamName: 'Desarrollo',
+        teamSlug: 'desarrollo',
+        leaderUserId: actorUserId, leaderName: 'Líder orgánico',
+        assignedHours: 100, memberCount: 0, maxMembers: 2,
+      }]) } as unknown as ProjectTeamRepository,
+      { listForProject: vi.fn().mockResolvedValue([]) } as unknown as ProjectObservationRepository,
+      { listForProject: vi.fn().mockResolvedValue([]) } as unknown as ProjectModuleRepository,
+      { listForProject: vi.fn().mockResolvedValue([]) } as unknown as ProjectPaymentMilestoneRepository,
+      { findById: vi.fn().mockResolvedValue(null) } as unknown as ProjectUserReader,
+      { findById: vi.fn().mockResolvedValue(null) } as unknown as ProjectClientReader,
+      { findById: vi.fn().mockResolvedValue(null) } as unknown as ProjectContactReader,
+      {
+        maxApprovedEntryDateForProject: vi.fn().mockResolvedValue(null),
+        sumApprovedHoursBeforeDateForProject: vi.fn().mockResolvedValue(0),
+      } as unknown as ProjectHourEntryReader,
+      { lastActivityAtByUser: vi.fn().mockResolvedValue(null) } as unknown as ProjectActivityReader,
+      new FixedClock(),
+      { promoteAndNotify: vi.fn().mockResolvedValue(undefined) } as unknown as PaymentMilestoneTriggerService,
+      { ensure: vi.fn().mockResolvedValue(false) },
+    );
+    const result = await u.execute({
+      projectId: project.id, actorUserId, actorPermissions: ['projects:read_assigned'],
+    });
+    expect(result.isOk()).toBe(true);
+    if (result.isOk()) expect(result.value.teams[0]?.leader?.id).toBe(actorUserId);
+  });
+});
