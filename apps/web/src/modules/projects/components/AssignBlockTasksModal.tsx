@@ -124,7 +124,7 @@ export function AssignBlockTasksModal({
     if (errors.length) setError('Se completaron ' + nextSaved.size + ' tareas. ' + errors.join(' · '));
     else onClose();
   };
-  return <Modal open title={'Asignar tareas · ' + module.name}
+  return <Modal open wide className={styles.assignmentDialog} title={'Asignar tareas · ' + module.name}
     description={(team?.teamName ?? 'Equipo') +
       '. Las HH se conservan; elige colaboradores y fechas. Las filas sin asignar quedan pendientes.'}
     onClose={onClose} dismissible={!pending}
