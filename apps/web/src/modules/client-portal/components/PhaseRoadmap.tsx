@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import styles from './PhaseRoadmap.module.css';
 import { Button } from '@/shared/components/ui/Button';
 import { TextField } from '@/shared/components/ui/TextField';
@@ -161,6 +161,18 @@ export function PhaseRoadmap({
     });
   const [rangeDraft, setRangeDraft] = useState({ from: phaseRoadmap.rangeStartDate, to: phaseRoadmap.rangeEndDate });
   const [appliedRange, setAppliedRange] = useState({ from: phaseRoadmap.rangeStartDate, to: phaseRoadmap.rangeEndDate });
+  const previousAutoRange = useRef({ from: phaseRoadmap.rangeStartDate, to: phaseRoadmap.rangeEndDate });
+  // La cotización se carga después del proyecto. Recalcular el rango por defecto
+  // cuando llegan sus propuestas, sin reemplazar un rango elegido manualmente.
+  useEffect(() => {
+    const previous = previousAutoRange.current;
+    const next = { from: phaseRoadmap.rangeStartDate, to: phaseRoadmap.rangeEndDate };
+    setAppliedRange((current) =>
+      current.from === previous.from && current.to === previous.to ? next : current);
+    setRangeDraft((current) =>
+      current.from === previous.from && current.to === previous.to ? next : current);
+    previousAutoRange.current = next;
+  }, [phaseRoadmap.rangeStartDate, phaseRoadmap.rangeEndDate]);
 
   const axis = useMemo(() => buildTimelineAxis({ min: toDate(appliedRange.from), max: toDate(appliedRange.to) }), [appliedRange]);
 
@@ -364,6 +376,9 @@ export interface OperationalRoadmapRow {
   role: keyof typeof PHASE_ROADMAP_ROLE_LABELS;
   label: string;
   hours: number;
+  /** Proyección SOLO de lectura desde project.startDate y las semanas de la cotización. */
+  proposedStartDate?: string;
+  proposedEndDate?: string;
 }
 
 export interface PhaseRoadmapProps {
@@ -385,7 +400,7 @@ export interface PhaseRoadmapProps {
   operationalTaskCount?: number;
   operationalBlockCount?: number;
   onPlanOperationalRow?: (phase: PhaseRoadmapPhase, row: OperationalRoadmapRow) => void;
-  /** Bloques de cotización aún sin tramo operativo ni fechas; no se dibujan como barras ficticias. */
+  /** Referencias de cotización: pueden tener fechas PROYECTADAS, nunca segmentos reales ficticios. */
   operationalRows?: (phase: PhaseRoadmapPhase) => readonly OperationalRoadmapRow[];
   /** HH y avance comprobables de cada bloque operativo; no se inventan porcentajes. */
   operationalMetrics?: (phase: PhaseRoadmapPhase, task: PhaseRoadmapTask) => { hours: number | null; progress: number | null };
@@ -789,7 +804,8 @@ function OperationalPhaseCard({
   const [zoom, setZoom] = useState(0);
   const choose = (selection: PhaseRoadmapSelection) =>
     setSelected((current) => sameSelection(current, selection) ? null : selection);
-  const hasDatedRows = phase.tasks.length > 0;
+  const hasDatedRows = phase.tasks.length > 0 ||
+    placeholderRows.some((row) => Boolean(row.proposedStartDate && row.proposedEndDate));
   const hasOtherDatedItems = phase.deliveries.length > 0 || phase.taskItems.length > 0;
   const relatedEntries = selected?.kind === 'incident'
     ? phase.relatedBitacora.filter((entry) => entry.kind === 'attention')
@@ -918,14 +934,38 @@ function OperationalPhaseCard({
                     {PHASE_ROADMAP_ROLE_LABELS[row.role]}
                   </span>
                   <span className={styles.operationalLabelText}>
-                    {row.label}<small>{row.hours} HH de referencia · sin fechas</small>
+                    {row.label}<small>{row.hours} HH de referencia ·
+                      {row.proposedStartDate && row.proposedEndDate
+                        ? ' fechas propuestas' : ' sin fechas'}</small>
                   </span>
                 </button>
                 <div className={styles.operationalNoDates}>
-                  <button type="button" className={styles.operationalOpenReference}
+                  {row.proposedStartDate && row.proposedEndDate ? <>
+                    <div className={styles.operationalReferenceTrack}>
+                      {(() => {
+                        const geometry = barGeometry({
+                          role: row.role, scope: 'desarrollo', label: row.label,
+                          startDate: row.proposedStartDate!, endDate: row.proposedEndDate!,
+                        }, axis.range);
+                        return geometry && <button type="button"
+                          className={styles.operationalProposedBar}
+                          aria-label={'Ver propuesta de bloque ' + row.label}
+                          title={'Fechas propuestas: ' + row.proposedStartDate + ' → ' + row.proposedEndDate}
+                          style={{ left: geometry.leftPercent + '%',
+                            width: geometry.widthPercent + '%' }}
+                          onClick={() => choose(selection)} />;
+                      })()}
+                      <button type="button" className={styles.operationalOpenReference}
+                        aria-label={'Fechas propuestas de ' + row.label}
+                        onClick={() => choose(selection)}>
+                        Propuesta: {row.proposedStartDate.slice(8, 10)}-{row.proposedStartDate.slice(5, 7)}-{row.proposedStartDate.slice(0, 4)}
+                        {' → '}{row.proposedEndDate.slice(8, 10)}-{row.proposedEndDate.slice(5, 7)}-{row.proposedEndDate.slice(0, 4)}
+                      </button>
+                    </div>
+                  </> : <button type="button" className={styles.operationalOpenReference}
                     onClick={() => choose(selection)}>
-                    Sin fechas: se calculan al definir el inicio del proyecto
-                  </button>
+                    Sin fechas: define el inicio del proyecto para ver la propuesta
+                  </button>}
                   {onPlanRow && <button type="button" onClick={() => onPlanRow(phase, row)}>
                     Planificar bloque
                   </button>}
