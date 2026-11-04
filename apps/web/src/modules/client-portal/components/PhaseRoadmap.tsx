@@ -315,7 +315,7 @@ function barGeometry(task: PhaseRoadmapTask, range: DateRange) {
  * viene) identifica el ítem real — lo usa el Roadmap interno para su detalle.
  */
 export type PhaseRoadmapSelection =
-  | { kind: 'segment' | 'task' | 'delivery'; id?: string; label: string }
+  | { kind: 'segment' | 'task' | 'delivery' | 'reference-block'; id?: string; label: string }
   | { kind: 'incident' };
 
 const sameSelection = (a: PhaseRoadmapSelection | null, b: PhaseRoadmapSelection) => {
@@ -798,8 +798,9 @@ function OperationalPhaseCard({
               };
               const isSelected = sameSelection(selected, selection);
               return <div key={task.id ?? index} className={styles.operationalLine}>
-                <span className={styles.operationalBlockLabel}
-                  title={task.label}>
+                <button type="button" className={styles.operationalBlockLabel}
+                  title={task.label} aria-label={'Abrir bloque ' + task.label}
+                  onClick={() => choose(selection)}>
                   <span className={styles.operationalRole}
                     style={{ background: OPERATIONAL_ROLE_COLORS[task.role] }}>
                     {PHASE_ROADMAP_ROLE_LABELS[task.role]}
@@ -807,7 +808,7 @@ function OperationalPhaseCard({
                   <span className={styles.operationalLabelText}>{task.label}
                     {metrics && <small>{metrics.hours == null ? 'HH sin definir' : metrics.hours + ' HH'} · {metrics.progress == null ? 'avance sin definir' : metrics.progress + '% de avance'}</small>}
                   </span>
-                </span>
+                </button>
                 <div className={styles.operationalTrack}>
                   {axis.weekLines.map((percent, idx) =>
                     <span key={idx} className={styles.operationalGridLine}
@@ -828,9 +829,18 @@ function OperationalPhaseCard({
                 </div>
               </div>;
             })}
-            {placeholderRows.map((row) => (
-              <div key={row.id} className={styles.operationalLine}>
-                <span className={styles.operationalBlockLabel} title={row.label}>
+            {placeholderRows.map((row) => {
+              const selection: PhaseRoadmapSelection = {
+                kind: 'reference-block', id: row.id, label: row.label,
+              };
+              const isSelected = sameSelection(selected, selection);
+              return <div key={row.id} className={[
+                styles.operationalLine, styles.operationalReferenceRow,
+                isSelected ? styles.operationalReferenceSelected : '',
+              ].filter(Boolean).join(' ')}>
+                <button type="button" className={styles.operationalBlockLabel}
+                  title={row.label} aria-label={'Abrir bloque ' + row.label}
+                  onClick={() => choose(selection)}>
                   <span className={styles.operationalRole}
                     style={{ background: OPERATIONAL_ROLE_COLORS[row.role] }}>
                     {PHASE_ROADMAP_ROLE_LABELS[row.role]}
@@ -838,15 +848,18 @@ function OperationalPhaseCard({
                   <span className={styles.operationalLabelText}>
                     {row.label}<small>{row.hours} HH de referencia · sin fechas</small>
                   </span>
-                </span>
+                </button>
                 <div className={styles.operationalNoDates}>
-                  <span>Sin fechas: pendiente de planificar el bloque de trabajo</span>
+                  <button type="button" className={styles.operationalOpenReference}
+                    onClick={() => choose(selection)}>
+                    Sin fechas: se calculan al definir el inicio del proyecto
+                  </button>
                   {onPlanRow && <button type="button" onClick={() => onPlanRow(phase, row)}>
                     Planificar bloque
                   </button>}
                 </div>
-              </div>
-            ))}
+              </div>;
+            })}
           </div>
         )}
         {hasOtherDatedItems && (

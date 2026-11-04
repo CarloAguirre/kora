@@ -91,13 +91,31 @@ describe('Roadmap operativo · diseño aprobado v5.02', () => {
     expect(screen.getByText('18')).toBeInTheDocument();
     expect(screen.getByText('4')).toBeInTheDocument();
     expect(screen.getByText('PMO')).toBeInTheDocument();
-    expect(screen.getByText('Sin fechas: pendiente de planificar el bloque de trabajo')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Abrir bloque/ })).not.toBeInTheDocument();
+    expect(screen.getByText('Sin fechas: se calculan al definir el inicio del proyecto')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Abrir bloque Coordinación' })).toBeInTheDocument();
     expect(screen.queryByText('Resumen de avance')).not.toBeInTheDocument();
     expect(screen.queryByText('Rango visible:')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Planificar bloque' }));
     expect(plan).toHaveBeenCalledOnce();
     expect(screen.getByText('Tareas 18, 0 aprobadas')).toBeInTheDocument();
+  });
+
+  it('abre el detalle de un bloque sin fechas desde el nombre o la zona temporal', () => {
+    render(<PhaseRoadmap phaseRoadmap={phaseRoadmap} operationalView
+      operationalRows={() => [{ id: 'team-pmo', role: 'pmo', label: 'Coordinación', hours: 36 }]}
+      renderSelectionDetail={(_phase, selection, clear) =>
+        <div>Detalle: {selection.kind}
+          <button type="button" onClick={clear}>Cerrar detalle</button>
+        </div>
+      } />);
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir bloque Coordinación' }));
+    expect(screen.getByText('Detalle: reference-block')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar detalle' }));
+    expect(screen.queryByText('Detalle: reference-block')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {
+      name: 'Sin fechas: se calculan al definir el inicio del proyecto',
+    }));
+    expect(screen.getByText('Detalle: reference-block')).toBeInTheDocument();
   });
 
   it('reutiliza las barras reales y permite seleccionar su detalle sin colapsar el cronograma', () => {

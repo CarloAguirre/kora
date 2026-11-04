@@ -694,6 +694,12 @@ button.ganttBar {
 }
 .operationalBlockLabel {
   display: flex;
+  text-align: left;
+  width: 100%;
+  background: transparent;
+  border: 0;
+  font: inherit;
+  cursor: pointer;
   align-items: center;
   gap: 8px;
   min-width: 0;
@@ -852,3 +858,27 @@ button.ganttBar {
 }
 .operationalFooter > button:hover { background: #f8fafc; }
 .operationalFooter > button:focus-visible { outline: 2px solid #0f1729; outline-offset: -3px; }
+
+/* Las filas con referencias EDT se abren desde el nombre o la zona de fechas.
+   Controles separados evitan anidar botones y conservan navegación por teclado. */
+.operationalReferenceRow { transition: background-color .15s ease; }
+.operationalReferenceRow:hover { background: #f7f9fd; }
+.operationalReferenceSelected { background: #eef3ff; }
+.operationalReferenceRow:focus-within { outline: 2px solid #8ca9d4; outline-offset: -2px; }
+.operationalBlockLabel:focus-visible, .operationalOpenReference:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: -2px;
+  border-radius: 4px;
+}
+.operationalOpenReference {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+.operationalReferenceRow:hover .operationalOpenReference { color: #244e91; }
