@@ -301,6 +301,7 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
     reset(toFormValues(project));
     setTipo(deriveTipo(project.salesStage, project.status));
     setEstado(project.status);
+    setManualActivationReason('');
     setAllowsOvertime(project.allowsOvertime);
     setIsInternal(project.isInternal);
     setServerError(null);
