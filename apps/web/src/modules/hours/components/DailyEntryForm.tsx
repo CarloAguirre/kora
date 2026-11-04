@@ -341,6 +341,7 @@ export function DailyEntryBlockFields({
   onRemove,
   onToggleExpand,
   onAdjustHours,
+  ownerUserId,
 }: {
   block: DailyBlock;
   index: number;
@@ -354,6 +355,7 @@ export function DailyEntryBlockFields({
   onRemove: () => void;
   onToggleExpand: () => void;
   onAdjustHours: (delta: number) => void;
+  ownerUserId?: string;
 }) {
   const needsProject = PROJECT_REQUIRING_ASSIGNMENTS.has(block.assignment as HourEntryAssignment);
   const showApproverInRow = block.assignment !== '' && !needsProject && (isCollaborator || block.isOvertime);
@@ -363,9 +365,9 @@ export function DailyEntryBlockFields({
   const selectedModule = projectDetail?.modules.find((m) => m.id === block.moduleId);
   const { user } = useAuth();
   const allowedTeamIds = new Set([
-    ...(projectDetail?.members ?? []).filter((member) => member.userId === user?.id && !member.blockedAt)
+    ...(projectDetail?.members ?? []).filter((member) => member.userId === (ownerUserId ?? user?.id) && !member.blockedAt)
       .map((member) => member.teamId),
-    ...(projectDetail?.teams ?? []).filter((team) => team.leader?.id === user?.id)
+    ...(projectDetail?.teams ?? []).filter((team) => team.leader?.id === (ownerUserId ?? user?.id))
       .map((team) => team.teamId),
   ]);
   const availableSegments = (selectedModule?.segments ?? [])
