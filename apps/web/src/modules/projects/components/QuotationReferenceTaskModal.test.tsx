@@ -49,6 +49,24 @@ describe('Nueva tarea operativa a partir de referencia Gemini', () => {
     expect(screen.getByLabelText('Bloque de trabajo')).toBeDisabled();
     expect(mocks.create).not.toHaveBeenCalled();
   });
+  it('no permite convertir una referencia sin bloque aunque ya tenga responsable, ámbito y fechas', () => {
+    show();
+    fireEvent.change(screen.getByLabelText(/Asignado a/), {
+      target: { value: teamId + ':' + userId },
+    });
+    fireEvent.change(screen.getByLabelText(/Ámbito Kora/), {
+      target: { value: 'desarrollo' },
+    });
+    fireEvent.change(screen.getByLabelText(/Fecha de inicio/), {
+      target: { value: '2026-11-10' },
+    });
+    fireEvent.change(screen.getByLabelText(/Fecha límite/), {
+      target: { value: '2026-11-20' },
+    });
+    expect(screen.getByRole('button', { name: 'Crear tarea' })).toBeDisabled();
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
+
   it('crea una tarea solo con colaborador, ámbito y fechas; preserva trazabilidad EDT', async () => {
     show();
     fireEvent.change(screen.getByLabelText(/Asignado a/),{
