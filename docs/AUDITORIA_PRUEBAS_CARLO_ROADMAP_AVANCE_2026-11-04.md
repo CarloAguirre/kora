@@ -29,7 +29,8 @@ Fecha: 2026-11-04. Evidencia: salidas de cuatro consultas `SELECT` ejecutadas po
 - La suite `team-progress.spec.ts` no era descubierta por `vitest.config.ts` (solo `*.test.ts[x]`); se renombró a `team-progress.test.ts`.
 - Formularios nuevos de tarea operativa y conversión desde referencia requieren seleccionar un bloque del mismo equipo/fase; asignación masiva tampoco puede dejar una tarea fuera de un bloque.
 - En **Editar tarea**, el PM puede cambiar el **equipo responsable** aunque el equipo destino no tenga colaboradores; luego vincula el bloque y puede dejar la persona sin asignar. Si existe `allowedTeamId`, el selector de equipo permanece bloqueado. La edición de una tarea originada en cotización exige un bloque válido.
-- Se agregaron pruebas para el guard de conversión y la reasignación de tarea histórica.
+- Se agregaron pruebas para el guard de conversión, la creación de tareas con bloque y la reasignación de tarea histórica.
+- El contador de tareas sin bloque del Avance del equipo ahora incluye tareas de fases en las que el equipo **no tiene ningún bloque** (situación real de la referencia de 160 HH); antes se omitían al saltar la fase completa.
 
 ## Conciliación de datos pendiente (sin UPDATE automático)
 
