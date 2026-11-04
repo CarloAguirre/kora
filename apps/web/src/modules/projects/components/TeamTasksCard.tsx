@@ -81,6 +81,7 @@ export interface TeamTasksCardProps {
   project: ProjectDetail;
   projectId: string;
   teamId: string;
+  managerView?: boolean;
 }
 
 /**
@@ -91,7 +92,7 @@ export interface TeamTasksCardProps {
  * equipos asignados — en ese caso conserva la vista de administrador, pero
  * sigue pudiendo crear/editar las tareas de su propio equipo.
  */
-export function TeamTasksCard({ project, projectId, teamId }: TeamTasksCardProps) {
+export function TeamTasksCard({ project, projectId, teamId, managerView = false }: TeamTasksCardProps) {
   const toast = useToast();
   const { user } = useAuth();
   const { can } = usePermissions();
@@ -123,12 +124,11 @@ export function TeamTasksCard({ project, projectId, teamId }: TeamTasksCardProps
     );
   }, [project, teamId]);
 
-  const filteredTasks = teamTasks.filter((task) =>
-    taskFilter === 'all' || (taskFilter === 'unassigned'
-      ? !task.assigneeUserId : task.status === taskFilter && Boolean(task.assigneeUserId)));
-  const taskTabCount = (filter: TaskFilter) => teamTasks.filter((task) =>
+  const matchesFilter = (task: (typeof teamTasks)[number], filter: TaskFilter) =>
     filter === 'all' || (filter === 'unassigned' ? !task.assigneeUserId :
-      task.status === filter && Boolean(task.assigneeUserId))).length;
+      task.status === filter && (!managerView || Boolean(task.assigneeUserId)));
+  const filteredTasks = teamTasks.filter((task) => matchesFilter(task, taskFilter));
+  const taskTabCount = (filter: TaskFilter) => teamTasks.filter((task) => matchesFilter(task, filter)).length;
   const { pageItems, pagination } = usePaginatedItems(filteredTasks);
 
   const openNewTaskModal = () => {
@@ -359,9 +359,10 @@ export function TeamTasksCard({ project, projectId, teamId }: TeamTasksCardProps
           )}
         </div>
 
-        <Tabs tabs={TASK_TABS.map((tab) => ({
-          ...tab, label: `${tab.label} ${taskTabCount(tab.id)}`,
-        }))} activeId={taskFilter} onSelect={(id) => setTaskFilter(id as TaskFilter)} />
+        <Tabs tabs={(managerView ? TASK_TABS : TASK_TABS.filter((tab) => tab.id !== 'unassigned'))
+          .map((tab) => ({
+            ...tab, label: managerView ? `${tab.label} ${taskTabCount(tab.id)}` : tab.label,
+          }))} activeId={taskFilter} onSelect={(id) => setTaskFilter(id as TaskFilter)} />
 
         <DataTable
           columns={[
@@ -384,8 +385,9 @@ export function TeamTasksCard({ project, projectId, teamId }: TeamTasksCardProps
               key: 'status',
               header: 'Estado',
               render: (task) => (
-                <span className={[styles.badge, styles[TASK_STATUS_BADGE_CLASS[task.status]]].join(' ')}>
-                  {task.assigneeUserId ? PROJECT_MODULE_TASK_STATUS_LABELS[task.status] : 'Por asignar'}
+                <span className={[styles.badge, managerView && !task.assigneeUserId
+                  ? styles.badgeUnassigned : styles[TASK_STATUS_BADGE_CLASS[task.status]]].join(' ')}>
+                  {managerView && !task.assigneeUserId ? 'Por asignar' : PROJECT_MODULE_TASK_STATUS_LABELS[task.status]}
                 </span>
               ),
             },
