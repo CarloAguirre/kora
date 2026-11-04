@@ -58,6 +58,11 @@ const calendarDays = (start: string, end: string) =>
 
 /** Color del equipo — el mismo que el Roadmap (`PHASE_ROADMAP_ROLE_COLORS`, Figma), no el de `getTeamStyle`. */
 const teamColor = (teamName: string | null) => PHASE_ROADMAP_ROLE_COLORS[roleFromTeamName(teamName)];
+/** Paleta de los chips del Roadmap operativo v5.02. No modifica el portal cliente. */
+const operationalTeamColor = (teamName: string | null) => ({
+  dev: '#ea7a1f', pmo: '#64748b', qa: '#3b82f6',
+  ux: '#22a55a', ia: '#e0526b', rpa: '#14a3a0',
+})[roleFromTeamName(teamName)];
 
 const TASK_STATUS_TONE: Record<ProjectModuleTask['status'], BadgeTone> = {
   todo: 'neutral',
@@ -533,7 +538,7 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
         const firstReference = references.find((task) => task.teamId === id);
         return <div className={styles.awaitingAssignment} key={id || 'unmapped'}>
           <span className={styles.awaitingBadge}
-            style={{ background: teamColor(teamName) }} aria-hidden="true">
+            style={{ background: operationalTeamColor(teamName) }} aria-hidden="true">
             {teamName.slice(0, 3).toUpperCase()}
           </span>
           <div className={styles.awaitingText}>
@@ -561,7 +566,15 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
                 <tr key={task.id}>
                   <td className={styles.operationalTaskTitle}>{task.name}</td>
                   <td>{task.assigneeName || 'Sin asignar'}</td>
-                  <td>{task.teamName || '—'}</td>
+                  <td>{(() => {
+                    const linked = module.segments.find((segment) =>
+                      task.description?.includes('Bloque de trabajo: ' + segment.name + ' · ID ' + segment.id));
+                    return linked ? <>
+                      <span className={styles.operationalTeamDot}
+                        style={{ background: operationalTeamColor(linked.teamName) }} />
+                      {linked.name}
+                    </> : <span className={styles.unlinkedBlock}>Sin bloque vinculado</span>;
+                  })()}</td>
                   <td><span className={[styles.taskState, task.assigneeUserId ? styles.taskStateAssigned : ''].join(' ')}>
                     {task.assigneeUserId ? PROJECT_MODULE_TASK_STATUS_LABELS[task.status] : 'Por asignar'}
                   </span></td>
@@ -578,8 +591,8 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
                     <small>Referencia EDT · pendiente de crear como tarea de Kora</small>
                   </td>
                   <td>Sin asignar</td>
-                  <td>{teamName}</td>
-                  <td><span className={styles.taskState}>Por asignar</span></td>
+                  <td><span className={styles.unlinkedBlock}>Pendiente de planificar</span></td>
+                  <td><span className={styles.taskState} title={'Equipo: ' + teamName}>Por asignar</span></td>
                   <td>{reference.hours} / —</td>
                   <td>—</td>
                   <td>{canManage ? <Button size="sm" variant="ghost"
