@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { UpdateProjectUseCase } from './update-project.use-case';
 import { Project } from '../../domain/entities/project.entity';
-import { CannotReassignProjectLeaderError, SoldHoursLockedAfterHito0Error } from '../../domain/errors/project.errors';
+import { CannotReassignProjectLeaderError, SoldHoursLockedAfterHito0Error, ProjectTeamHasRoadmapBlocksError } from '../../domain/errors/project.errors';
 import type { ProjectRepository } from '../../domain/repositories/project.repository';
 import type { ProjectTeamRepository } from '../../domain/repositories/project-team.repository';
+import type { ProjectModuleRepository } from '../../domain/repositories/project-module.repository';
 import type { ProjectClientReader } from '../ports/project-client-reader.port';
 import type { ProjectUserReader } from '../ports/project-user-reader.port';
 import type { AuditRecorder } from '../../../../shared/application/ports/audit-recorder.port';
@@ -33,7 +34,12 @@ function buildUseCase(leaderUserId: string | null, project: Project = buildProje
     nameIsTakenByAnother: vi.fn().mockResolvedValue(false),
     save: vi.fn().mockResolvedValue(undefined),
   } as unknown as ProjectRepository;
-  const projectTeams = { findByProject: vi.fn().mockResolvedValue([]) } as unknown as ProjectTeamRepository;
+  const projectTeams = {
+    findByProject: vi.fn().mockResolvedValue([]),
+    save: vi.fn().mockResolvedValue(undefined),
+    remove: vi.fn().mockResolvedValue(undefined),
+  } as unknown as ProjectTeamRepository;
+  const modules = { listForProject: vi.fn().mockResolvedValue([]) } as unknown as ProjectModuleRepository;
   const clients = {} as ProjectClientReader;
   const users = { findManyByIds: vi.fn().mockResolvedValue([]) } as unknown as ProjectUserReader;
   const audit = { record: vi.fn().mockResolvedValue(undefined) } as unknown as AuditRecorder;
@@ -57,8 +63,9 @@ function buildUseCase(leaderUserId: string | null, project: Project = buildProje
     new FixedClock(NOW),
     paymentMilestones,
     paymentTriggers,
+    modules,
   );
-  return { useCase, projects };
+  return { useCase, projects, projectTeams, modules };
 }
 
 /**
@@ -199,5 +206,43 @@ describe('UpdateProjectUseCase — HH vendidas tras el Hito 0', () => {
     expect(result.isOk()).toBe(true);
     const saved = (projects.save as ReturnType<typeof vi.fn>).mock.calls[0]![0] as Project;
     expect(saved.toSnapshot().soldHours).toBe(1200);
+  });
+});
+
+describe('UpdateProjectUseCase — equipos con bloques', () => {
+  const actor = { userId: 'leader-1', email: 'leader@kora.cl' };
+  const actorPermissions = ['projects:read_assigned'] as const;
+  const team = {
+    id: 'project-team-1', teamId: 'team-1', teamName: 'Desarrollo',
+    teamSlug: 'desarrollo', leaderUserId: 'leader-1', leaderName: 'Líder',
+    assignedHours: 200, memberCount: 0, maxMembers: 2,
+  };
+
+  it('rechaza quitar un equipo mientras tenga bloques operativos', async () => {
+    const { useCase, projects, projectTeams, modules } = buildUseCase('leader-1');
+    vi.mocked(projectTeams.findByProject).mockResolvedValue([team]);
+    vi.mocked(modules.listForProject).mockResolvedValue([{
+      segments: [{ id: 'segment-1', teamId: 'team-1' }],
+    }] as never);
+
+    const result = await useCase.execute({
+      projectId: 'project-1', data: { teams: [] }, actor, actorPermissions,
+    });
+    expect(result.isErr()).toBe(true);
+    expect(result.isErr() && result.error).toBeInstanceOf(ProjectTeamHasRoadmapBlocksError);
+    expect(projects.save).not.toHaveBeenCalled();
+    expect(projectTeams.remove).not.toHaveBeenCalled();
+  });
+
+  it('permite quitar el equipo sin bloques de trabajo', async () => {
+    const { useCase, projectTeams, modules } = buildUseCase('leader-1');
+    vi.mocked(projectTeams.findByProject).mockResolvedValue([team]);
+    vi.mocked(modules.listForProject).mockResolvedValue([]);
+
+    const result = await useCase.execute({
+      projectId: 'project-1', data: { teams: [] }, actor, actorPermissions,
+    });
+    expect(result.isOk()).toBe(true);
+    expect(projectTeams.remove).toHaveBeenCalledWith('project-1', 'team-1', expect.anything());
   });
 });
