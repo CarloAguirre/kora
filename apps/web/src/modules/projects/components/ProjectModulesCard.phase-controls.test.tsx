@@ -266,28 +266,20 @@ describe('Referencias de bloque de trabajo de la cotización', () => {
     startDate: '2026-11-03', endDate: '2026-12-08', members: [],
   };
 
-  it('proyecta fechas de la cotización tras definir inicio y las precarga al planificar', () => {
+  it('muestra fechas definitivas de un segmento materializado tras Hito 0', () => {
     seedReference();
-    show({ ...project, startDate: '2026-11-05' } as unknown as ProjectDetail);
-    expect(screen.getByText('19-11-2026 → 23-12-2026, 120 HH · propuesta')).toBeInTheDocument();
-    expect(screen.getByTestId('dates-propuesta')).toHaveTextContent(
-      '2026-11-19 → 2026-12-23',
-    );
-    expect(screen.getByTestId('roadmap-date-range')).toHaveTextContent('2026-12-30');
-    fireEvent.click(screen.getByRole('button', { name: 'Planificar bloque' }));
-    expect(screen.getByRole('dialog', { name: 'Nuevo bloque de trabajo' })).toBeInTheDocument();
-    expect(screen.getByRole('textbox', { name: /Nombre del bloque/ }))
-      .toHaveValue('Diseño Backend · Desarrollo');
-    expect(screen.getByLabelText(/Fecha de inicio/)).toHaveValue('2026-11-19');
-    expect(screen.getByLabelText(/Fecha de fin/)).toHaveValue('2026-12-23');
-    expect(screen.getByLabelText(/HH estimadas/)).toHaveValue(160);
+    show({ ...project, status: 'active', startDate: '2026-11-05',
+      modules: [{ ...module, segments: [plannedSegment] }],
+    } as unknown as ProjectDetail);
+    expect(screen.getByText('03-11-2026 → 08-12-2026, 120 HH')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Planificar bloque' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/propuesta/i)).not.toBeInTheDocument();
   });
 
-  it('no crea fechas comerciales si el proyecto todavía carece de inicio', () => {
+  it('una fase sin bloques antes de Hito 0 aún no muestra fechas operativas', () => {
     seedReference();
     show();
     expect(screen.getByText('Sin fechas, 120 HH')).toBeInTheDocument();
-    expect(screen.queryByTestId('dates-propuesta')).not.toBeInTheDocument();
   });
 
   it('ofrece planificar mientras no exista un segmento de ese equipo y fase', () => {
@@ -299,13 +291,13 @@ describe('Referencias de bloque de trabajo de la cotización', () => {
   });
 
 
-  it('el lateral distingue una propuesta fechada del bloque operativo no creado', () => {
+  it('el lateral de la referencia previa al inicio no solicita otra aprobación', () => {
     seedReference();
-    show({ ...project, startDate: '2026-11-05' } as unknown as ProjectDetail);
+    show();
     fireEvent.click(screen.getByRole('button', { name: 'Abrir bloque Diseño Backend · Desarrollo' }));
-    expect(screen.getByText('Fechas propuestas')).toBeInTheDocument();
-    expect(screen.getByText('19-11-2026 → 23-12-2026')).toBeInTheDocument();
-    expect(screen.getByText(/Confírmala mediante «Planificar bloque»/)).toBeInTheDocument();
+    expect(screen.getByText('Sin bloque operativo')).toBeInTheDocument();
+    expect(screen.getByText(/se generarán automáticamente los bloques/)).toBeInTheDocument();
+    expect(screen.queryByText(/Confírmala mediante/)).not.toBeInTheDocument();
     expect(mocks.createSegment).not.toHaveBeenCalled();
   });
 
@@ -314,7 +306,7 @@ describe('Referencias de bloque de trabajo de la cotización', () => {
     show();
     fireEvent.click(screen.getByRole('button', { name: 'Abrir bloque Diseño Backend · Desarrollo' }));
     expect(screen.getByRole('dialog', { name: 'Diseño Backend' })).toBeInTheDocument();
-    expect(screen.getByText(/Las semanas del presupuesto son relativas/)).toBeInTheDocument();
+    expect(screen.getByText(/se generarán automáticamente los bloques/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Planificar bloque' })).toBeEnabled();
     expect(mocks.createSegment).not.toHaveBeenCalled();
   });
