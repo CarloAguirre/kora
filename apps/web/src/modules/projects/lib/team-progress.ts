@@ -1,4 +1,4 @@
-import type { ProjectDetail, ProjectModuleTask, ProjectModuleSegment } from '@kora/contracts';
+import type { ProjectDetail, ProjectModule, ProjectModuleTask, ProjectModuleSegment } from '@kora/contracts';
 
 /**
  * Progreso propio de un equipo. El denominador son las HH de sus bloques
@@ -104,6 +104,23 @@ function belongsToBlock(
   return blocksInTeamPhase.length === 1;
 }
 
+/** Mismo vínculo que usa el avance del equipo: no cuenta canceladas ni tareas de otros equipos. */
+export function getLinkedBlockTasks(
+  module: Pick<ProjectModule, 'segments' | 'tasks'>, block: ProjectModuleSegment,
+): ProjectModuleTask[] {
+  const teamBlocks = module.segments.filter((item) => item.teamId === block.teamId);
+  return module.tasks.filter((task) =>
+    task.teamId === block.teamId && !task.cancelledAt && belongsToBlock(task, block, teamBlocks));
+}
+
+/** Métrica del Roadmap: sin presupuesto operativo no se publica un porcentaje artificial. */
+export function roadmapBlockMetrics(
+  block: TeamBlockProgress | undefined,
+): { hours: number | null; progress: number | null } {
+  if (!block || block.estimatedHours <= 0) return { hours: null, progress: null };
+  return { hours: block.estimatedHours, progress: block.actualPercent };
+}
+
 function blockDetail(
   block: ProjectModuleSegment, tasks: readonly ProjectModuleTask[], isDelivered: boolean, today: string,
 ): TeamBlockProgress {
@@ -155,7 +172,7 @@ export function calculateTeamProgress(
     const matched = new Set<string>();
     const blocks = teamBlocks.map((block) => {
       if (!validHours(block.estimatedHours)) unplannedBlockCount++;
-      const linkedTasks = tasks.filter((task) => belongsToBlock(task, block, teamBlocks));
+      const linkedTasks = getLinkedBlockTasks(module, block);
       linkedTasks.forEach((task) => matched.add(task.id));
       const approvedDelivery = module.deliveries.some(
         (delivery) => delivery.segmentId === block.id && delivery.status === 'approved',
@@ -199,4 +216,23 @@ export function calculateTeamProgress(
         ? Math.max(0, Math.round(100 * (phase.expectedHours - phase.actualHours) / plannedHours)) : 0,
     })),
   };
+}
+
+/**
+ * Un único índice por bloque para Roadmap y drawer operativo. Los porcentajes
+ * provienen de calculateTeamProgress, no de tareas aprobadas / tareas cargadas.
+ */
+export function indexTeamBlockProgress(
+  project: Pick<ProjectDetail, 'modules' | 'teams' | 'members' | 'status' | 'stopsClock'>,
+  today = currentChileDate(),
+): ReadonlyMap<string, TeamBlockProgress> {
+  const teamIds = new Set(project.modules.flatMap((module) =>
+    module.segments.map((segment) => segment.teamId)));
+  const blocks = new Map<string, TeamBlockProgress>();
+  for (const teamId of teamIds) {
+    for (const phase of calculateTeamProgress(project, teamId, today).phases) {
+      for (const block of phase.blocks) blocks.set(block.id, block);
+    }
+  }
+  return blocks;
 }
