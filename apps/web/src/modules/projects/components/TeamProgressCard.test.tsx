@@ -12,24 +12,24 @@ const progress: TeamProgress = {
   phases: [
     {
       id: 'phase-1', number: 1, name: 'Mejoras y correcciones',
-      estimatedHours: 100, actualHours: 16, expectedHours: 46,
+      estimatedHours: 100, actualHours: 16, expectedHours: 46, consumedHours: 61,
       actualPercent: 16, expectedPercent: 46, gapPoints: 17,
       pendingApprovalCount: 2, overdueCount: 1, unassignedCount: 0,
       blocks: [{
         id: 'block-1', name: 'Mejoras y correcciones Desarrollo',
-        estimatedHours: 100, actualHours: 16, expectedHours: 46,
+        estimatedHours: 100, actualHours: 16, expectedHours: 46, consumedHours: 61,
         actualPercent: 16, expectedPercent: 46, coveragePercent: 80,
         isClosed: false, pendingApprovalCount: 2, overdueCount: 1, unassignedCount: 0,
       }],
     },
     {
       id: 'phase-2', number: 2, name: 'Calculadora de estimaciones',
-      estimatedHours: 80, actualHours: 0, expectedHours: 43,
+      estimatedHours: 80, actualHours: 0, expectedHours: 43, consumedHours: 16,
       actualPercent: 0, expectedPercent: 54, gapPoints: 24,
       pendingApprovalCount: 1, overdueCount: 0, unassignedCount: 0,
       blocks: [{
         id: 'block-2', name: 'Calculadora Desarrollo',
-        estimatedHours: 80, actualHours: 0, expectedHours: 43,
+        estimatedHours: 80, actualHours: 0, expectedHours: 43, consumedHours: 16,
         actualPercent: 0, expectedPercent: 54, coveragePercent: 100,
         isClosed: false, pendingApprovalCount: 1, overdueCount: 0, unassignedCount: 0,
       }],
@@ -65,7 +65,9 @@ describe('Avance del equipo — fidelización del desplegable V5', () => {
     expect(within(table).getByText('Fase 1: Mejoras y correcciones')).toBeInTheDocument();
     expect(within(table).getByText('Mejoras y correcciones Desarrollo')).toBeInTheDocument();
     expect(within(table).getByText('Calculadora Desarrollo')).toBeInTheDocument();
-    expect(screen.getByText(/no lo distribuye entre bloques sin evidencia/)).toBeInTheDocument();
+    expect(screen.getAllByText('61 HH').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('16 HH').length).toBeGreaterThan(0);
+    expect(screen.getByText(/no se asignan artificialmente/)).toBeInTheDocument();
     fireEvent.click(toggle);
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByText('Qué explica la diferencia')).not.toBeInTheDocument();
