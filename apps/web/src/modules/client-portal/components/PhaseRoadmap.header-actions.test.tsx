@@ -234,7 +234,7 @@ describe('Cronograma operativo simplificado', () => {
     expect(screen.queryByRole('button', { name: 'Abrir entrega Entrega QA' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Abrir tarea Validar interfaz' })).not.toBeInTheDocument();
     expect(screen.getByText('Tareas operativas visibles')).toBeInTheDocument();
-    expect(screen.getByText('Opciones de cronograma · rango de fechas')).toBeInTheDocument();
+    expect(screen.queryByText('Opciones de cronograma · rango de fechas')).not.toBeInTheDocument();
     expect(screen.getByText('Desarrollo Backend')).toBeInTheDocument();
   });
 });
