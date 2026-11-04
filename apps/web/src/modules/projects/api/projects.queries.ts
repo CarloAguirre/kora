@@ -78,9 +78,11 @@ function useInvalidateProjects() {
 function useInvalidateProjectsAndForecast() {
   const queryClient = useQueryClient();
   const invalidateProjects = useInvalidateProjects();
-  return () => {
-    invalidateProjects();
-    queryClient.invalidateQueries({ queryKey: ['forecast'] });
+  return async () => {
+    // No resolver mutateAsync hasta que el proyecto activo tenga sus nuevos
+    // bloques. De lo contrario "Agregar tarea" podía abrir con modules stale.
+    await invalidateProjects();
+    void queryClient.invalidateQueries({ queryKey: ['forecast'] });
   };
 }
 
