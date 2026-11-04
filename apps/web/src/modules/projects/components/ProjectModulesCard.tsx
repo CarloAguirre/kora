@@ -800,7 +800,11 @@ function SegmentDrawer({
   // fecha final. No se crean entregas ficticias para bloques sin planificación.
   const deliveries = module.deliveries.filter((delivery) =>
     delivery.teamId === segment.teamId && delivery.estimatedDate === segment.endDate);
-  const delivery = deliveries.length === 1 ? deliveries[0]! : null;
+  // Dos bloques del mismo equipo con igual fin NO tienen una relación
+  // inequívoca con una entrega: no afirmar un vínculo solo por la fecha.
+  const candidateSegments = module.segments.filter((item) =>
+    item.teamId === segment.teamId && item.endDate === segment.endDate);
+  const delivery = deliveries.length === 1 && candidateSegments.length === 1 ? deliveries[0]! : null;
   const sameTeamSegments = module.segments.filter((entry) => entry.teamId === segment.teamId);
   const teamTasks = module.tasks.filter((task) => task.teamId === segment.teamId &&
     (task.description?.includes(' · ID ' + segment.id) ||
