@@ -129,3 +129,46 @@ WHERE table_schema = 'public'
   )
 ORDER BY table_name, column_name;
 ```
+
+## 5. Bloque de origen de la EDT visible antes de asignar tareas
+
+Solicitud: en el Roadmap, la tabla `Tareas` mostraba
+«Pendiente de planificar» en la columna **Bloque de trabajo** para
+referencias de la cotización que aún no tenían colaborador asignado,
+aunque la EDT comercial ya identificaba su fase y equipo.
+
+Se corrigió la presentación en `ProjectModulesCard.tsx`:
+
+- Una referencia `AppliedQuotationPlanning.modules[].tasks[]` con
+  `teamId` muestra **`nombre de fase · nombre de equipo`** como
+  **bloque comercial de origen** y conserva «Sin asignar» y
+  «Por asignar» en sus columnas respectivas.
+- Se utiliza la atribución original por fase/equipo de la versión de
+  cotización, no el colaborador ni una fecha operacional inventados.
+  Las referencias de la EDT no traen `segmentId` de PostgreSQL;
+  el enlace con el segmento operativo se establece posteriormente al
+  convertir o asignar la tarea.
+- Para tareas ya convertidas que conservan el marcador
+  `Referencia cotización <versionId> · WBS <wbs> · <rol>` pero todavía
+  no tienen `segmentId`, se recupera ese **origen comercial**. Si
+  existe `segmentId` efectivo, se sigue priorizando su nombre de
+  bloque operativo; no se sobrescribe.
+- Una referencia sin equipo de origen no se asocia por conjetura:
+  aparece «Sin bloque de origen identificado».
+- No se crean ni modifican tareas, bloques, asignaciones o datos de
+  PostgreSQL. No hay migraciones.
+
+Pruebas incorporadas en
+`apps/web/src/modules/projects/components/ProjectModulesCard.phase-controls.test.tsx`:
+dos tareas de una fase para UX-UI y Desarrollo sin colaborador,
+una tarea convertida sin `segmentId` y una referencia sin `teamId`.
+
+Validación mínima:
+
+```powershell
+git fetch kora
+git switch feature/calculadora-roadmap-diseno-v5-02
+git pull --ff-only kora feature/calculadora-roadmap-diseno-v5-02
+pnpm --filter @kora/web typecheck
+pnpm --filter @kora/web exec vitest run src/modules/projects/components/ProjectModulesCard.phase-controls.test.tsx
+```
