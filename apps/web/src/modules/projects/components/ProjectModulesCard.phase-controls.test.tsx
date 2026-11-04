@@ -148,11 +148,54 @@ describe('Cabecera de las fases · HTML v5', () => {
     }));
   });
 
-  it('reutiliza el modal de bloques operativos para agregar bloque de trabajo', () => {
+  it('abre el formulario completo para un nuevo bloque con HH y entrega de cierre', async () => {
     show();
     fireEvent.click(screen.getByRole('button', { name: 'Planificar' }));
     fireEvent.click(screen.getByRole('button', { name: '+ Bloque de trabajo' }));
     expect(screen.getByRole('dialog', { name: 'Nuevo bloque de trabajo' })).toBeInTheDocument();
+    expect(screen.getByText(/160 HH asignadas, 0 HH ya en otros bloques/)).toBeInTheDocument();
+    fireEvent.change(screen.getByRole('textbox', { name: /Nombre del bloque/ }),
+      { target: { value: 'Diseño UX' } });
+    fireEvent.change(screen.getByLabelText(/Fecha de inicio/),
+      { target: { value: '2026-11-05' } });
+    fireEvent.change(screen.getByLabelText(/Fecha de fin/),
+      { target: { value: '2026-11-20' } });
+    fireEvent.change(screen.getByRole('spinbutton', { name: /HH estimadas/ }),
+      { target: { value: '60' } });
+    fireEvent.change(screen.getByRole('textbox', { name: /Nombre de la entrega/ }),
+      { target: { value: 'Diseños revisados' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Crear bloque de trabajo' }));
+    await waitFor(() => expect(mocks.createSegment).toHaveBeenCalledWith({
+      projectId: 'project-1', moduleId: 'module-1',
+      input: {
+        teamId: 'team-1', name: 'Diseño UX',
+        startDate: '2026-11-05', endDate: '2026-11-20', estimatedHours: 60,
+        members: [], closingDelivery: { name: 'Diseños revisados' },
+      },
+    }));
+  });
+
+  it('permite crear un bloque explícitamente sin entrega de cierre', async () => {
+    show();
+    fireEvent.click(screen.getByRole('button', { name: 'Planificar' }));
+    fireEvent.click(screen.getByRole('button', { name: '+ Bloque de trabajo' }));
+    fireEvent.change(screen.getByRole('textbox', { name: /Nombre del bloque/ }),
+      { target: { value: 'Correcciones' } });
+    fireEvent.change(screen.getByLabelText(/Fecha de inicio/),
+      { target: { value: '2026-11-10' } });
+    fireEvent.change(screen.getByLabelText(/Fecha de fin/),
+      { target: { value: '2026-11-15' } });
+    fireEvent.change(screen.getByRole('spinbutton', { name: /HH estimadas/ }),
+      { target: { value: '24' } });
+    fireEvent.click(screen.getByRole('checkbox', { name: /Este bloque no tiene entrega/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Crear bloque de trabajo' }));
+    await waitFor(() => expect(mocks.createSegment).toHaveBeenCalledWith({
+      projectId: 'project-1', moduleId: 'module-1',
+      input: {
+        teamId: 'team-1', name: 'Correcciones',
+        startDate: '2026-11-10', endDate: '2026-11-15', estimatedHours: 24, members: [],
+      },
+    }));
   });
 
   it('solicita confirmación y elimina solo una fase vacía', async () => {
@@ -280,6 +323,8 @@ describe('Fidelidad del Roadmap v5.02 · acciones y estructura', () => {
       teamName: 'Desarrollo' };
     show({ ...project, modules: [{ ...module, tasks: [task] }] } as unknown as ProjectDetail);
     expect(screen.queryByRole('columnheader', { name: 'Acción' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Eliminar tarea Diseñar interfaz' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Duplicar tarea Diseñar interfaz' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Editar tarea Diseñar interfaz' }));
     expect(screen.getByRole('dialog', { name: 'Editar tarea' })).toBeInTheDocument();
     fireEvent.change(screen.getByRole('textbox', { name: 'Título de la tarea' }),
@@ -292,6 +337,46 @@ describe('Fidelidad del Roadmap v5.02 · acciones y estructura', () => {
         startDate: '2026-11-04', date: '2026-11-15', estimatedHours: 20 },
     }));
   });
+  it('confirma antes de borrar, utiliza Volver y presenta notificación al eliminar', async () => {
+    const task = { id: 'task-1', name: 'Acompañamiento UAT', status: 'todo',
+      startDate: '2026-11-04', date: '2026-11-15', estimatedHours: 12,
+      teamId: 'team-1', assigneeUserId: null, assigneeName: null, description: null };
+    show({ ...project, modules: [{ ...module, tasks: [task] }] } as unknown as ProjectDetail);
+    fireEvent.click(screen.getByRole('button', { name: 'Eliminar tarea Acompañamiento UAT' }));
+    await waitFor(() => expect(mocks.confirm).toHaveBeenCalledWith(expect.objectContaining({
+      title: 'Eliminar tarea', confirmLabel: 'Eliminar tarea',
+      cancelLabel: 'Volver', confirmVariant: 'secondary',
+    })));
+    await waitFor(() => expect(mocks.removeTask).toHaveBeenCalledWith({
+      projectId: 'project-1', moduleId: 'module-1', taskId: 'task-1',
+    }));
+    expect(mocks.success).toHaveBeenCalledWith('Tarea eliminada.');
+  });
+
+  it('crea una tarea desde el pie de la tabla sin cambiar el plan comercial', async () => {
+    show();
+    fireEvent.click(screen.getByRole('button', { name: '+ Agregar tarea' }));
+    expect(screen.getByRole('dialog', { name: 'Nueva tarea' })).toBeInTheDocument();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Título de la tarea' }),
+      { target: { value: 'Revisar integración' } });
+    fireEvent.change(screen.getByRole('spinbutton', { name: /HH estimadas/ }),
+      { target: { value: '16' } });
+    fireEvent.change(screen.getByLabelText(/Fecha de inicio/),
+      { target: { value: '2026-11-05' } });
+    fireEvent.change(screen.getByLabelText(/Fecha límite/),
+      { target: { value: '2026-11-12' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Crear tarea' }));
+    await waitFor(() => expect(mocks.createTask).toHaveBeenCalledWith({
+      projectId: 'project-1', moduleId: 'module-1',
+      input: {
+        name: 'Revisar integración', description: null,
+        teamId: 'team-1', assigneeUserId: null, scope: 'desarrollo',
+        status: 'todo', estimatedHours: 16,
+        startDate: '2026-11-05', date: '2026-11-12',
+      },
+    }));
+  });
+
   it('abre el formulario para duplicar sin copiar estado ni horas consumidas', async () => {
     const task = { id: 'task-1', name: 'Diseñar interfaz', status: 'done',
       startDate: '2026-11-04', date: '2026-11-15', estimatedHours: 20,
