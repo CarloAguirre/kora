@@ -34,6 +34,7 @@ const toMemberCandidate = (member: ProjectTeamMember) => ({ value: member.userId
 
 const TASK_TABS = [
   { id: 'all', label: 'Todas' },
+  { id: 'unassigned', label: 'Por asignar' },
   { id: 'todo', label: 'Pendientes' },
   { id: 'in_progress', label: 'En curso' },
   { id: 'in_review', label: 'Completadas' },
@@ -111,7 +112,8 @@ export function TeamTasksCard({ project, projectId, teamId }: TeamTasksCardProps
     return { teamId, teamName, leaderId, members };
   }, [project, teamId]);
 
-  const canManageTeam = can('projects:manage') || (user !== null && team.leaderId === user.id);
+  const canManageTeam = can('projects:manage') ||
+    (user !== null && (team.leaderId === user.id || project.leader?.id === user.id));
 
   const teamTasks = useMemo(() => {
     return project.modules.flatMap((module) =>
@@ -121,7 +123,12 @@ export function TeamTasksCard({ project, projectId, teamId }: TeamTasksCardProps
     );
   }, [project, teamId]);
 
-  const filteredTasks = teamTasks.filter((task) => taskFilter === 'all' || task.status === taskFilter);
+  const filteredTasks = teamTasks.filter((task) =>
+    taskFilter === 'all' || (taskFilter === 'unassigned'
+      ? !task.assigneeUserId : task.status === taskFilter && Boolean(task.assigneeUserId)));
+  const taskTabCount = (filter: TaskFilter) => teamTasks.filter((task) =>
+    filter === 'all' || (filter === 'unassigned' ? !task.assigneeUserId :
+      task.status === filter && Boolean(task.assigneeUserId))).length;
   const { pageItems, pagination } = usePaginatedItems(filteredTasks);
 
   const openNewTaskModal = () => {
@@ -352,7 +359,9 @@ export function TeamTasksCard({ project, projectId, teamId }: TeamTasksCardProps
           )}
         </div>
 
-        <Tabs tabs={[...TASK_TABS]} activeId={taskFilter} onSelect={(id) => setTaskFilter(id as TaskFilter)} />
+        <Tabs tabs={TASK_TABS.map((tab) => ({
+          ...tab, label: `${tab.label} ${taskTabCount(tab.id)}`,
+        }))} activeId={taskFilter} onSelect={(id) => setTaskFilter(id as TaskFilter)} />
 
         <DataTable
           columns={[
@@ -369,14 +378,14 @@ export function TeamTasksCard({ project, projectId, teamId }: TeamTasksCardProps
                 </span>
               ),
             },
-            { key: 'assignee', header: 'Colaborador', render: (task) => task.assigneeName ?? '—' },
+            { key: 'assignee', header: 'Colaborador', render: (task) => task.assigneeName ?? 'Sin asignar' },
             { key: 'module', header: 'Módulo', render: (task) => task.moduleName },
             {
               key: 'status',
               header: 'Estado',
               render: (task) => (
                 <span className={[styles.badge, styles[TASK_STATUS_BADGE_CLASS[task.status]]].join(' ')}>
-                  {PROJECT_MODULE_TASK_STATUS_LABELS[task.status]}
+                  {task.assigneeUserId ? PROJECT_MODULE_TASK_STATUS_LABELS[task.status] : 'Por asignar'}
                 </span>
               ),
             },
