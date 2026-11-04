@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { ProjectDetail } from '@kora/contracts';
+import type { ProjectDetail, ProjectModuleTask } from '@kora/contracts';
 import { calculateProjectExecutionProgress } from './project-execution-progress';
 
 const today = '2026-11-04';
@@ -13,9 +13,14 @@ const segment = (id: string, teamId: string, name: string, estimatedHours: numbe
   estimatedHours, closedAt, consumedHours: 0, members: [],
 });
 const task = (id: string, teamId: string, segmentId: string | null,
-  status: 'todo' | 'done' | 'in_review', estimatedHours: number, cancelledAt: string | null = null) => ({
-  id, teamId, segmentId, status, estimatedHours, cancelledAt,
-  date: '2026-10-15', assigneeUserId: null, description: null,
+  status: 'todo' | 'done' | 'in_review', estimatedHours: number, cancelledAt: string | null = null): ProjectModuleTask => ({
+  id, teamId, teamName: teamId.replace('team-', '').toUpperCase(),
+  segmentId, segmentName: null,
+  assigneeUserId: null, assigneeName: null,
+  name: id, description: null,
+  startDate: '2026-10-15', date: '2026-10-15',
+  status, scope: 'desarrollo', estimatedHours,
+  completedAt: null, cancelledAt, rejectionReason: null,
 });
 
 function fixture(): ProjectDetail {
