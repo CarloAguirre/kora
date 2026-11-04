@@ -13,6 +13,7 @@ import {
   type ProjectModuleRepository,
 } from '../../domain/repositories/project-module.repository';
 import { ForecastSourceSyncService } from '../services/forecast-source-sync.service';
+import { ProjectProgressRecalculator } from '../services/project-progress-recalculator';
 import {
   AUDIT_RECORDER,
   type AuditRecorder,
@@ -39,6 +40,7 @@ export class CreateProjectModuleSegmentUseCase
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
     @Inject(CLOCK) private readonly clock: Clock,
     @Inject(UNIT_OF_WORK) private readonly unitOfWork: UnitOfWork,
+    private readonly progress: ProjectProgressRecalculator,
   ) {}
 
   async execute(
@@ -92,6 +94,7 @@ export class CreateProjectModuleSegmentUseCase
       }
       await this.modules.replaceSegmentMembers(segmentId, members, now, tx);
       await this.forecastSync.syncSegment(project, command.moduleId, segmentId, now, tx);
+      await this.progress.recalculate(project.id, tx);
       return segmentId;
     });
 
