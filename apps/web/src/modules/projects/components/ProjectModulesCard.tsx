@@ -669,7 +669,7 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
         } : undefined}
         renderPhaseExtras={renderPhaseExtras}
         renderPhaseReferences={(phase) => <>{renderOperationalContent(phase)}
-          {planningMode && <details className={styles.legacyReferences}>
+          {planningMode && <details className={styles.legacyReferences} open>
             <summary>Referencias comerciales y planificación manual</summary>
             {renderPhaseReferences(phase)}
           </details>}</>}
