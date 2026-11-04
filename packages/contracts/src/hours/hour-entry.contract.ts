@@ -45,7 +45,7 @@ export const hourEntrySummarySchema = z.object({
   /** Fase/módulo contra la que se imputó la hora, si se eligió una. */
   module: z.object({ id: uuidSchema, name: z.string() }).nullable(),
   /** Bloque explícitamente seleccionado. NULL = aún no atribuido a un bloque. */
-  segment: z.object({ id: uuidSchema, name: z.string() }).nullable(),
+  segment: z.object({ id: uuidSchema, name: z.string() }).nullable().optional(),
   assignment: z.string().nullable(),
   category: z.string(),
   description: z.string(),
