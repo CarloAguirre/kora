@@ -943,20 +943,40 @@ function SegmentDrawer({
         </p>
         <Facts>
           <Fact label="Inicio" value={formatDate(segment.startDate)} />
-          <Fact label="Término" value={formatDate(segment.endDate)} />
+          <Fact label="Cierre planificado" value={formatDate(segment.endDate)} />
           <Fact label="Duración" value={plural(calendarDays(segment.startDate, segment.endDate), 'día')} />
           <Fact label="Colaboradores" value={segment.members.length ? String(segment.members.length) : 'Sin asignar'} />
         </Facts>
         <div className={styles.drawerSection}>
           <div className={styles.drawerFacts}>
             <span>Fechas <b>{formatDate(segment.startDate)} – {formatDate(segment.endDate)}</b></span>
-            <span>HH estimadas (cotización) <b>{hours ?? '—'}</b></span>
+            <span>HH estimadas <b>{hours ?? '—'}</b></span>
             <span>HH consumidas del bloque <b>Sin desglose por bloque</b></span>
           </div>
           <p className={styles.drawerHint}>
             Las HH reales se registran en Kora por módulo. No se atribuyen
             automáticamente a un bloque sin una relación verificable.
           </p>
+        </div>
+        <div className={styles.drawerSection}>
+          <h4>Avance</h4>
+          <div className={styles.drawerProgressBar} role="progressbar"
+            aria-label="Tareas aprobadas del bloque" aria-valuemin={0} aria-valuemax={100}
+            aria-valuenow={progress}>
+            <span style={{ width: progress + '%' }} />
+          </div>
+          <p className={styles.drawerHint}>
+            {progress}% real · {approvedTasks.length} de {teamTasks.length} tareas aprobadas.
+            {segment.closedAt ? ' Cerrado el ' + formatDate(segment.closedAt.slice(0, 10)) + '.'
+              : ' Cierre planificado: ' + formatDate(segment.endDate) + '.'}
+          </p>
+          {segment.closedAt && onChangeClosure && <Button variant="outline"
+            onClick={() => onChangeClosure('reopen')}>Reabrir bloque</Button>}
+          {!segment.closedAt && !delivery && onChangeClosure &&
+            teamTasks.every((task) => task.status === 'done') &&
+            <Button variant="outline" onClick={() => onChangeClosure('close')}>
+              Cerrar bloque manualmente
+            </Button>}
         </div>
         {segment.members.length > 0 && (
           <div className={styles.drawerSection}>
