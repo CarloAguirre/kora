@@ -1005,3 +1005,37 @@ button.ganttBar {
   .operationalPhaseHeader:has(.phaseHeadingIdentityPlanning) .phaseHeaderSpacer { flex: 0 1 2px; }
   .operationalPhaseHeader:has(.phaseHeadingIdentityPlanning) .phaseHeaderActions { margin-left: auto; }
 }
+
+/* Proyección comercial desde el inicio del proyecto: visualmente distinta
+ * del bloque operativo. No contiene % real, entrega ni hitos de cierre. */
+.operationalReferenceTrack {
+  flex: 1 1 240px;
+  position: relative;
+  min-height: 38px;
+  display: flex;
+  flex-direction: column;
+  justify-content: end;
+  gap: 2px;
+}
+.operationalProposedBar {
+  position: absolute;
+  top: 3px;
+  height: 10px;
+  min-width: 4px;
+  border: 1px dashed #7791b8;
+  border-radius: 5px;
+  background: repeating-linear-gradient(
+    -45deg, #dfe8f6, #dfe8f6 6px, #bcd1ee 6px, #bcd1ee 12px
+  );
+  cursor: pointer;
+}
+.operationalNoDates:has(.operationalProposedBar) {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.operationalNoDates .operationalReferenceTrack .operationalOpenReference {
+  white-space: nowrap;
+  font-size: 11px;
+}
