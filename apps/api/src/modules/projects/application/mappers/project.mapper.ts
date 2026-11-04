@@ -198,6 +198,7 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
       status: task.status,
       scope: task.scope,
       completedAt: task.completedAt?.toISOString() ?? null,
+      cancelledAt: task.cancelledAt?.toISOString() ?? null,
       rejectionReason: task.rejectionReason,
     })),
     blockerCount: module.blockerCount,
