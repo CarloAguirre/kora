@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type {
@@ -20,7 +21,7 @@ vi.mock('@/shared/components/ui/Toast', () => ({
 }));
 vi.mock('@/shared/components/ui/Modal', () => ({
   Modal: ({ children, title, eyebrow, footer, side, compactSide }: {
-    children: React.ReactNode; title: string; eyebrow?: string; footer?: React.ReactNode;
+    children: ReactNode; title: string; eyebrow?: string; footer?: ReactNode;
     side?: boolean; compactSide?: boolean;
   }) => <aside role="dialog" aria-label={title}
     data-layout={side && compactSide ? 'compact-side' : 'other'}>
@@ -64,7 +65,7 @@ const project = {
     teamId: segment.teamId, teamName: 'RPA',
     leader: { fullName: 'José Aponte' },
   }],
-} as ProjectDetail;
+} as unknown as ProjectDetail;
 
 const progress = {
   id: segment.id, name: segment.name, estimatedHours: 360,
@@ -173,7 +174,8 @@ describe('Bloque operativo: fidelidad de los tres estados v5.02', () => {
     expect(screen.queryByText('Entrega aprobada')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Marcar como entregada' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Reabrir bloque' }));
-    expect(onChangeClosure).toHaveBeenCalledExactlyOnceWith('reopen');
+    expect(onChangeClosure).toHaveBeenCalledOnce();
+    expect(onChangeClosure).toHaveBeenCalledWith('reopen');
   });
 
   it('una entrega presentada espera aprobación; no se declara cerrada por entrega', () => {
