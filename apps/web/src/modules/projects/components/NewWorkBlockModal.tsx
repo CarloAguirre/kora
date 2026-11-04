@@ -38,7 +38,13 @@ export function NewWorkBlockModal({
 }: NewWorkBlockModalProps) {
   const [teamId, setTeamId] = useState(initialSegment?.teamId || initialTeamId || teamOptions[0]?.value || '');
   const [name, setName] = useState(initialSegment?.name ?? initialName);
-  const [startDate, setStartDate] = useState(initialSegment?.startDate ?? '');
+  const [startDate, setStartDate] = useState(() => {
+    if (initialSegment) return initialSegment.startDate;
+    const now = new Date();
+    // Fecha del usuario (no ISO UTC): evita que se adelante/atrase un día en Chile.
+    return [now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0'),
+      String(now.getDate()).padStart(2, '0')].join('-');
+  });
   const [endDate, setEndDate] = useState(initialSegment?.endDate ?? '');
   const [hours, setHours] = useState(initialSegment?.estimatedHours != null
     ? String(initialSegment.estimatedHours) : initialEstimatedHours == null ? '' : String(initialEstimatedHours));
