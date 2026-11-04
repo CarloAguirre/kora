@@ -127,8 +127,10 @@ export function QuotationReferenceTaskModal({
             const selected = members.find((member) =>
               member.teamId + ':' + member.userId === event.target.value);
             setAssignee(selected?.userId ?? '');
-            setTeamId(selected?.teamId ?? '');
-            setBlockId('');
+            const nextTeamId = selected?.teamId ?? initialTeamId;
+            setTeamId(nextTeamId);
+            if (nextTeamId !== teamId) setBlockId('');
+            if (!selected) setStatus('todo');
           }} />
         <p className={styles.help}>Solo puedes asignar colaboradores reales de este proyecto.
           {mode === 'edit' && ' Si aún no hay responsable, puedes guardar la tarea por asignar.'}
@@ -163,8 +165,10 @@ export function QuotationReferenceTaskModal({
           }} />
         <div className={styles.dates}>
           <Select label="Estado" value={status}
-            options={[{ value: 'todo', label: assignee ? 'Pendiente' : 'Por asignar' },
-              { value: 'in_progress', label: 'En curso' }]}
+            options={[
+              { value: 'todo', label: assignee ? 'Pendiente' : 'Por asignar' },
+              ...(assignee ? [{ value: 'in_progress', label: 'En curso' }] : []),
+            ]}
             onChange={(event) => setStatus(event.target.value as 'todo' | 'in_progress')} />
           <TextField label="HH estimadas" type="number" step="0.01" min="0.01"
             required value={hours} onChange={(event) => setHours(event.target.value)} />
