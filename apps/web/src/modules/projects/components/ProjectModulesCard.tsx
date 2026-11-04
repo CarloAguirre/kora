@@ -648,13 +648,21 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
                   <td><span className={styles.taskState} title={'Equipo: ' + teamName}>Por asignar</span></td>
                   <td>{reference.hours} / —</td>
                   <td>—</td>
-                  <td className={styles.operationalTaskActions}>{canManage && <Button size="sm" variant="ghost"
-                    onClick={() => setAssigningTasks({
-                      moduleId: module.id, teamId: reference.teamId ?? '',
-                      focusKey: 'ref:' + reference.wbs + ':' + reference.role,
-                    })}>
-                    Asignar tarea
-                  </Button>}</td>
+                  <td className={styles.operationalTaskActions}>
+                    {canManage && <>
+                      <button type="button" className={styles.taskIconAction}
+                        aria-label={'Editar tarea ' + reference.name} title="Editar tarea"
+                        onClick={() => setCreatingFromReference({
+                          moduleId: module.id, task: reference, mode: 'edit',
+                        })}><PencilIcon size={15} /></button>
+                      <button type="button" className={styles.taskIconAction}
+                        aria-label={'Eliminar tarea ' + reference.name} title="Eliminar tarea"
+                        disabled={excludeRoadmapReference.isPending}
+                        onClick={() => void onDiscardReference(module, reference)}>
+                        <TrashIcon size={15} />
+                      </button>
+                    </>}
+                  </td>
                 </tr>;
               })}
             </tbody>
