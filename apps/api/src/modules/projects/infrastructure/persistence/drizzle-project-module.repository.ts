@@ -128,12 +128,14 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
     const mappedTaskRows = taskRows.map(toTaskRow);
     const blockerCountByModule = new Map(blockerRows.map((r) => [r.moduleId, r.value]));
     const membersBySegment = await loadSegmentMembers(db, segmentRows.map((s) => s.id));
+    const consumedBySegment = await loadSegmentConsumption(db, segmentRows.map((s) => s.id));
     return moduleRows.map((row) =>
       toRecord(
         row,
         deliveryRows.filter((d) => d.moduleId === row.id),
         segmentRows.filter((s) => s.moduleId === row.id),
         membersBySegment,
+        consumedBySegment,
         mappedTaskRows,
         blockerCountByModule.get(row.id) ?? 0,
       ),
@@ -273,7 +275,9 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
     ]);
 
     const membersBySegment = await loadSegmentMembers(db, segmentRows.map((s) => s.id));
-    return toRecord(row, deliveryRows, segmentRows, membersBySegment, taskRows.map(toTaskRow), blockerRows[0]?.value ?? 0);
+    const consumedBySegment = await loadSegmentConsumption(db, segmentRows.map((s) => s.id));
+    return toRecord(row, deliveryRows, segmentRows, membersBySegment, consumedBySegment,
+      taskRows.map(toTaskRow), blockerRows[0]?.value ?? 0);
   }
 
   async create(input: CreateProjectModuleInput, now: Date, context?: TransactionContext): Promise<string> {
@@ -734,11 +738,31 @@ async function loadSegmentMembers(
   return bySegment;
 }
 
+/**
+ * Agregación por FK real hour_entries.segment_id: solo aprobadas, sin join
+ * por nombre o fechas. Ejecutada una vez para los segmentos visibles.
+ */
+async function loadSegmentConsumption(
+  db: Database,
+  segmentIds: readonly string[],
+): Promise<Map<string, number>> {
+  if (segmentIds.length === 0) return new Map();
+  const rows = await db.select({
+    segmentId: hourEntries.segmentId,
+    total: sql<string>`coalesce(sum(${hourEntries.hours}), 0)`,
+  }).from(hourEntries)
+    .where(and(inArray(hourEntries.segmentId, [...segmentIds]), eq(hourEntries.status, 'approved')))
+    .groupBy(hourEntries.segmentId);
+  return new Map(rows.flatMap((row) => row.segmentId
+    ? [[row.segmentId, Number(row.total)] as const] : []));
+}
+
 function toRecord(
   row: ModuleRow,
   deliveryRows: DeliveryRow[],
   segmentRows: SegmentRow[],
   membersBySegment: ReadonlyMap<string, ProjectModuleSegmentMemberRecord[]>,
+  consumedBySegment: ReadonlyMap<string, number>,
   taskRows: ProjectModuleTaskRecord[],
   blockerCount: number,
 ): ProjectModuleRecord {
@@ -775,6 +799,7 @@ function toRecord(
       startDate: s.startDate,
       endDate: s.endDate,
       estimatedHours: s.estimatedHours !== null ? Number(s.estimatedHours) : null,
+      consumedHours: consumedBySegment.get(s.id) ?? 0,
       members: membersBySegment.get(s.id) ?? [],
     })),
     tasks: taskRows.filter((t) => t.moduleId === row.id),
