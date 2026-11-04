@@ -706,9 +706,11 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
           }} versionId={appliedPlanning.data.versionId}
           onClose={close}
           onPlan={canManage ? () => {
+            const proposal = proposedBlockPeriod(project.startDate, block.startWeek, block.durationWeeks);
             setPlanningBlock({ moduleId: module.id, teamId: block.teamId,
               name: module.name + ' · ' + (teamOptions.find((item) =>
-                item.value === block.teamId)?.label ?? 'Equipo'), estimatedHours: block.hours });
+                item.value === block.teamId)?.label ?? 'Equipo'), estimatedHours: block.hours,
+              initialStartDate: proposal?.startDate, initialEndDate: proposal?.endDate });
             close();
           } : undefined}
           onCreateReference={canManage ? (task) => {
@@ -899,6 +901,8 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
           initialTeamId={planningBlock.teamId}
           initialName={planningBlock.name}
           initialEstimatedHours={planningBlock.estimatedHours}
+          initialStartDate={planningBlock.initialStartDate}
+          initialEndDate={planningBlock.initialEndDate}
           submitting={createSegment.isPending}
           onCancel={() => setPlanningBlock(null)}
           onConfirm={(input) => void onCreateWorkBlock(input)}
