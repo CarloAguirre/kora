@@ -36,6 +36,8 @@ import { DeleteProjectModuleTaskUseCase } from './application/use-cases/delete-p
 import { ProjectRoadmapReferenceExclusionsService } from './application/services/project-roadmap-reference-exclusions.service';
 import { ROADMAP_REFERENCE_EXCLUSION_STORE } from './application/ports/roadmap-reference-exclusion-store.port';
 import { DrizzleRoadmapReferenceExclusionStore } from './infrastructure/persistence/drizzle-roadmap-reference-exclusion.store';
+import { APPROVED_PROJECT_CALENDAR } from './application/ports/approved-project-calendar.port';
+import { DrizzleApprovedProjectCalendar } from './infrastructure/persistence/drizzle-approved-project-calendar';
 import { CreateProjectPaymentMilestoneUseCase } from './application/use-cases/create-project-payment-milestone.use-case';
 import { UpdateProjectPaymentMilestoneUseCase } from './application/use-cases/update-project-payment-milestone.use-case';
 import { DeleteProjectPaymentMilestoneUseCase } from './application/use-cases/delete-project-payment-milestone.use-case';
@@ -121,6 +123,7 @@ import { DrizzleForecastSourceStore } from './infrastructure/services/drizzle-fo
     DeleteProjectModuleTaskUseCase,
     ProjectRoadmapReferenceExclusionsService,
     { provide: ROADMAP_REFERENCE_EXCLUSION_STORE, useClass: DrizzleRoadmapReferenceExclusionStore },
+    { provide: APPROVED_PROJECT_CALENDAR, useClass: DrizzleApprovedProjectCalendar },
     CreateProjectPaymentMilestoneUseCase,
     UpdateProjectPaymentMilestoneUseCase,
     DeleteProjectPaymentMilestoneUseCase,
