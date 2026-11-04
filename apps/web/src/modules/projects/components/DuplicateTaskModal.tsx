@@ -31,6 +31,10 @@ export function DuplicateTaskModal({
   const create = useCreateProjectModuleTask();
   const toast = useToast();
   const module = project.modules.find((item) => item.id === moduleId);
+  const linkedBlock = module?.segments.find((segment) =>
+    segment.id === task.segmentId ||
+    (!task.segmentId && task.description?.includes('Bloque de trabajo: ' + segment.name + ' · ID ' + segment.id)));
+  const shortDate = (iso: string) => iso.slice(8, 10) + '-' + iso.slice(5, 7) + '-' + iso.slice(0, 4);
   const [name, setName] = useState(() => nextName(task.name, module?.tasks.map((t) => t.name) ?? []));
   const [assigneeValue, setAssigneeValue] = useState('');
   const [hours, setHours] = useState(String(task.estimatedHours ?? ''));
@@ -72,8 +76,10 @@ export function DuplicateTaskModal({
         onClick={() => void submit()}>Duplicar tarea</Button>
     </div>}>
     <div className={styles.form}>
-      <p className={styles.help}>Se copian la descripción, el módulo, el bloque de trabajo y las fechas
-        ({task.startDate} → {task.date}). Solo elige a quién asignarla y sus horas.</p>
+      <p className={styles.help}>Se copian la descripción, el módulo,
+        {linkedBlock ? ' el bloque de trabajo (' + linkedBlock.name + ')' : ' el bloque de trabajo original'}
+        {' '}y las fechas ({shortDate(task.startDate)} → {shortDate(task.date)}).
+        Solo elige a quién asignarla y sus horas.</p>
       <TextField label="Título de la tarea" required maxLength={300}
         value={name} onChange={(event) => setName(event.target.value)} />
       <div className={styles.twoColumns}>
