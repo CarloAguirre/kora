@@ -397,7 +397,7 @@ describe('Fidelidad del Roadmap v5.02 · acciones y estructura', () => {
       name: 'Nuevo bloque de trabajo',
     })).toBeInTheDocument());
     expect(screen.queryByRole('dialog', { name: 'Nueva fase' })).not.toBeInTheDocument();
-    expect(screen.getByText(/Fase: Nueva integración/)).toBeInTheDocument();
+    expect(screen.getByText(/Fase 2: Nueva integración/)).toBeInTheDocument();
     expect(mocks.success).toHaveBeenCalledWith('Fase creada. Ahora agrega su primer bloque de trabajo.');
   });
 
