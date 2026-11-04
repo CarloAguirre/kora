@@ -64,6 +64,8 @@ se añadió una suite para navegación de la campanita al equipo.
 git fetch kora
 git switch feature/calculadora-roadmap-diseno-v5-02
 git pull --ff-only kora feature/calculadora-roadmap-diseno-v5-02
+# El contrato de /reminders/me cambió: recompilarlo antes de validar consumidores.
+pnpm --filter @kora/contracts build
 pnpm --filter @kora/contracts typecheck
 pnpm --filter @kora/api typecheck
 pnpm --filter @kora/web typecheck
