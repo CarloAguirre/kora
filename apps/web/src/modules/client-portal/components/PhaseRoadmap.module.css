@@ -753,8 +753,9 @@ button.ganttBar {
   top: 12px;
   height: 20px;
   min-width: 7px;
-  border: 1px solid currentColor;
+  border: 0;
   border-radius: 5px;
+  opacity: 1;
   cursor: pointer;
 }
 .operationalBarSelected { outline: 2px solid #0f1729; outline-offset: 2px; }
@@ -841,3 +842,13 @@ button.ganttBar {
 @media (max-width:760px) {
   .operationalEventRow { grid-template-columns: minmax(125px,35%) minmax(0,1fr); }
 }
+
+/* Acceso a Agregar fase al final del Roadmap, como en el HTML v5.02. */
+.operationalFooter { border: 1px dashed #c3d2eb; border-radius: 13px; overflow: hidden; }
+.operationalFooter > button {
+  display: block; width: 100%; min-height: 50px; border: 0;
+  background: #fff; color: #0f1729; cursor: pointer; font: inherit;
+  font-size: 13.5px; font-weight: 600; text-align: center;
+}
+.operationalFooter > button:hover { background: #f8fafc; }
+.operationalFooter > button:focus-visible { outline: 2px solid #0f1729; outline-offset: -3px; }
