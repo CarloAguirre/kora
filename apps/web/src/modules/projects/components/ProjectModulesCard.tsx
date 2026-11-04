@@ -488,13 +488,12 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
     const module = modulesById.get(phase.id);
     const segment = module?.segments.find((item) => item.id === row.id);
     if (!module || !segment) return { hours: null, progress: null };
-    const teamSegments = module.segments.filter((item) => item.teamId === segment.teamId);
     const directTasks = module.tasks.filter((task) =>
       task.segmentId === segment.id ||
       (!task.segmentId && task.description?.includes(' · ID ' + segment.id)));
     // Sin FK tarea-bloque solo atribuimos tareas de equipo si tiene un único bloque.
-    const tasks = directTasks.length > 0 ? directTasks
-      : teamSegments.length === 1 ? module.tasks.filter((task) => task.teamId === segment.teamId) : [];
+    // El mismo equipo puede trabajar en otros bloques: solo asociar por FK o marcador ID exacto.
+    const tasks = directTasks;
     const taskHours = tasks.reduce((sum, task) => sum + (task.estimatedHours ?? 0), 0);
     const ref = appliedPlanning.data?.modules.find((item) => item.moduleId === phase.id)
       ?.relativeTeamBlocks?.find((item) => item.teamId === segment.teamId);
@@ -897,12 +896,9 @@ function SegmentDrawer({
   const hours = segment.estimatedHours ?? (projected.length === 1 ? projected[0]!.hours : null);
   // Vínculo real. La migración 0051 solo asocia entregas antiguas inequívocas.
   const delivery = module.deliveries.find((item) => item.segmentId === segment.id) ?? null;
-  const sameTeamSegments = module.segments.filter((entry) => entry.teamId === segment.teamId);
   const teamTasks = module.tasks.filter((task) => task.teamId === segment.teamId &&
     (task.segmentId === segment.id ||
-      (!task.segmentId && (task.description?.includes(' · ID ' + segment.id) ||
-        (sameTeamSegments.length === 1 &&
-          !task.description?.includes('Bloque de trabajo: '))))));
+      (!task.segmentId && task.description?.includes(' · ID ' + segment.id))));
   const taskHours = teamTasks.reduce((sum, task) => sum + (task.estimatedHours ?? 0), 0);
   const approvedTasks = teamTasks.filter((task) => task.status === 'done');
   const approvedHours = approvedTasks.reduce((sum, task) => sum + (task.estimatedHours ?? 0), 0);
