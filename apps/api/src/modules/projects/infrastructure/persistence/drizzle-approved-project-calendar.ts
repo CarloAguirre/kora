@@ -7,6 +7,7 @@ import {
 } from '@kora/db';
 import { approvedCalendarPeriod, quotationDraftDataSchema } from '@kora/contracts';
 import { DATABASE } from '../../../../shared/infrastructure/database/database.module';
+import { buildQuotationTransferReferences } from '../../../estimation/domain/quotation-transfer-references';
 import type { ApprovedProjectCalendar } from '../../application/ports/approved-project-calendar.port';
 
 type Period = { startDate: string; endDate: string };
@@ -64,15 +65,29 @@ export class DrizzleApprovedProjectCalendar implements ApprovedProjectCalendar {
       }
       const moduleIds = rawIds as string[];
       const draft = quotationDraftDataSchema.parse(source.draft);
-      // Son exactamente las fases que originaron los IDs del traspaso.
-      // Para EDT sin calendario de fases NO se fabrican duraciones.
-      if (draft.mode !== 'phases' || draft.phases.length === 0) return false;
-      const phases = draft.phases.filter((phase) =>
-        phase.teamHours.reduce((sum, row) => sum + row.hours, 0) > 0);
-      if (phases.length !== moduleIds.length) {
+      // La IDENTIDAD de fases es la misma que al traspasar: no se mapean
+      // bloques por el nombre editable del proyecto. El helper es también
+      // la fuente de los bloques referenciales mostrados por el frontend.
+      const commercialModules = draft.mode === 'phases' && draft.phases.length
+        ? draft.phases.map((phase) => ({
+            name: phase.name, hours: phase.teamHours.reduce((n, row) => n + row.hours, 0),
+          }))
+        : (draft.aiPoc?.edt?.modules ?? []).map((module) => ({
+            name: module.name, hours: module.totalHours,
+          }));
+      const positive = commercialModules.filter((module) => module.hours > 0);
+      if (positive.length !== moduleIds.length) {
         throw new Error('La cotización transferida y sus fases no coinciden; se preserva el Roadmap existente.');
       }
       if (!moduleIds.length) return false;
+      const references = buildQuotationTransferReferences(draft,
+        positive.map((module, index) => ({
+          moduleId: moduleIds[index]!, name: module.name, totalHours: module.hours,
+        })));
+      if (!references.modules.some((module) => module.relativeTeamBlocks.length > 0)) {
+        // Una EDT sin calendario comercial explícito no genera fechas ficticias.
+        return false;
+      }
 
       const moduleRows = await tx.select({
         id: projectModules.id, name: projectModules.name,
@@ -105,17 +120,17 @@ export class DrizzleApprovedProjectCalendar implements ApprovedProjectCalendar {
 
       const startIso = project.startDate.toISOString().slice(0, 10);
       let generated = 0;
-      for (const [index, phase] of phases.entries()) {
-        const moduleId = moduleIds[index]!;
+      for (const reference of references.modules) {
+        const moduleId = reference.moduleId;
         const module = moduleById.get(moduleId);
         // Una fase eliminada o un equipo retirado nunca se reconstruyen.
         if (!module) continue;
-        const period = approvedCalendarPeriod(startIso, phase.startWeek, phase.durationWeeks);
-        if (!period) throw new Error('La cotización aprobada contiene semanas inválidas.');
-        for (const effort of phase.teamHours) {
+        for (const effort of reference.relativeTeamBlocks) {
           if (effort.hours <= 0 || !nameByTeam.has(effort.teamId)) continue;
           const key = moduleId + ':' + effort.teamId;
-          if (existing.has(key)) continue; // conservar bloques creados o editados
+          if (existing.has(key)) continue; // conserva bloques creados/editados
+          const period = approvedCalendarPeriod(startIso, effort.startWeek, effort.durationWeeks);
+          if (!period) throw new Error('La cotización aprobada contiene semanas inválidas.');
           const now = new Date();
           const [segment] = await tx.insert(projectModuleSegments).values({
             moduleId, teamId: effort.teamId, name: module.name,
