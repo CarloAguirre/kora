@@ -63,8 +63,8 @@ function PhaseRows({ phase }: { phase: ProjectExecutionPhase }) {
 /**
  * Ficha interna de proyecto: suma las HH de los mismos bloques operativos
  * utilizados por Avance del equipo y por las barras del Roadmap.
- * Nunca usa project.progress, que mide tareas y entregas de las fases
- * mediante otra fórmula y puede marcar avance antes de crear los bloques.
+ * Se alimenta directamente del detalle por bloques para mostrar las causas.
+ * El backend ahora usa el mismo criterio operacional para project.progress.
  */
 export function ProjectExecutionProgressCard({ progress }: { readonly progress: ProjectExecutionProgress }) {
   const [expanded, setExpanded] = useState(false);
