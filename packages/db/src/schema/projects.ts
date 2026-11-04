@@ -257,6 +257,7 @@ export const projectTeamMembers = pgTable(
     activity: text('activity'),
     assignedHours: numeric('assigned_hours', { precision: 10, scale: 2 }).notNull().default('0'),
     consumedHours: numeric('consumed_hours', { precision: 10, scale: 2 }).notNull().default('0'),
+    blockedAt: timestamp('blocked_at', { withTimezone: true, mode: 'date' }),
     ...timestamps,
   },
   (table) => [
@@ -398,6 +399,7 @@ export const projectModuleTasks = pgTable('project_module_tasks', {
   status: projectModuleTaskStatusEnum('status').notNull().default('todo'),
   scope: projectModuleTaskScopeEnum('scope').notNull().default('desarrollo'),
   completedAt: timestamp('completed_at', { withTimezone: true, mode: 'date' }),
+  cancelledAt: timestamp('cancelled_at', { withTimezone: true, mode: 'date' }),
   /** Motivo del último rechazo del líder — se limpia al aprobar o al volver a marcarla en revisión. */
   rejectionReason: text('rejection_reason'),
   ...timestamps,
