@@ -206,7 +206,7 @@ export function ProjectTeamsManagementCard({ project, catalog }: Props) {
                       patchDraft(draft.teamId, { leaderUserId: nextId });
                       void persist(draftsRef.current);
                     }}>
-                    <option value="">Sin asignar</option>
+                    <option value="">Líder del catálogo (sin override)</option>
                     {draft.leaderUserId && !leaderOptions.some((person) => person.id === draft.leaderUserId) &&
                       <option value={draft.leaderUserId}>{leaderName}</option>}
                     {leaderOptions.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}
