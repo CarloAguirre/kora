@@ -146,9 +146,10 @@ export class CreateProjectModuleTaskUseCase
         now,
         tx,
       );
-      await this.progress.recalculate(project.id, tx);
       await this.forecastSync.syncTask(project, command.moduleId, taskId, now, tx);
       if (segment) await this.modules.refreshSegmentClosure(segment.id, now, tx);
+      // El caché global debe reflejar el cierre calculado de los bloques.
+      await this.progress.recalculate(project.id, tx);
       return taskId;
     });
 
