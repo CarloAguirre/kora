@@ -619,7 +619,7 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
                       const sourceTeamName = project.teams.find((team) =>
                         team.teamId === sourceTeamId)?.teamName ??
                         teamOptions.find((team) => team.value === sourceTeamId)?.label ??
-                        source.role;
+                        source?.role ?? 'Equipo';
                       return <span title="Bloque de origen de la cotización; falta vincular el segmento operativo">
                         <span className={styles.operationalTeamDot}
                           style={{ background: operationalTeamColor(sourceTeamName) }} />
