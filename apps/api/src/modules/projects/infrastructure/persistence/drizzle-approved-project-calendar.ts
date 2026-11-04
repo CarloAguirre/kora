@@ -30,13 +30,13 @@ export class DrizzleApprovedProjectCalendar implements ApprovedProjectCalendar {
     return this.db.transaction(async (tx) => {
       await tx.execute(sql`SELECT id FROM projects WHERE id = ${projectId} FOR UPDATE`);
       const [project] = await tx.select({
-        id: projects.id, startDate: projects.startDate,
+        id: projects.id, startDate: projects.startDate, hito0At: projects.hito0At,
         status: projects.status, type: projects.type,
       }).from(projects).where(and(
         eq(projects.id, projectId), isNull(projects.deletedAt),
       )).limit(1);
       if (!project || project.type !== 'development' || project.status !== 'active' ||
-          !project.startDate) return false;
+          !(project.startDate || project.hito0At)) return false;
 
       const [source] = await tx.select({
         versionId: quotationVersions.id,
@@ -118,7 +118,9 @@ export class DrizzleApprovedProjectCalendar implements ApprovedProjectCalendar {
         bounds.set(segment.moduleId, list);
       }
 
-      const startIso = project.startDate.toISOString().slice(0, 10);
+      // Hito 0 es el inicio real cuando el proyecto se activó sin start_date.
+      // Nunca se reescribe una fecha de inicio explícita del PM.
+      const startIso = (project.startDate ?? project.hito0At)!.toISOString().slice(0, 10);
       let generated = 0;
       for (const reference of references.modules) {
         const moduleId = reference.moduleId;
