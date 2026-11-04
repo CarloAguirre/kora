@@ -993,3 +993,15 @@ button.ganttBar {
   border-radius: 7px;
   background: #fff;
 }
+
+/* Header compacto de planificación: dar prioridad al nombre, sin limitarlo a 300px. */
+@media (min-width: 1131px) {
+  .operationalPhaseHeader .phaseNameControl:has(.phaseHeadingIdentityPlanning) {
+    flex: 1 1 auto;
+    max-width: none;
+    width: auto;
+    min-width: 0;
+  }
+  .operationalPhaseHeader:has(.phaseHeadingIdentityPlanning) .phaseHeaderSpacer { flex: 0 1 2px; }
+  .operationalPhaseHeader:has(.phaseHeadingIdentityPlanning) .phaseHeaderActions { margin-left: auto; }
+}
