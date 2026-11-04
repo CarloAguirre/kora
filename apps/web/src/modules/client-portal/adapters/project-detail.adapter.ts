@@ -84,6 +84,7 @@ function formatDateTime(isoDateTime: string): string {
 
 export function roleFromTeamName(teamName: string | null): PhaseRoadmapRole {
   const sigla = getTeamStyle(teamName ?? '').sigla.toUpperCase();
+  if (sigla === 'PMO') return 'pmo';
   if (sigla === 'QA') return 'qa';
   if (sigla === 'IA') return 'ia';
   if (sigla === 'UX') return 'ux';
