@@ -2,7 +2,6 @@ import { useMemo, useState, type ReactNode } from 'react';
 import {
   PROJECT_MODULE_DELIVERY_STATUS_LABELS,
   PROJECT_MODULE_STAGES,
-  PROJECT_MODULE_STAGE_LABELS,
   PROJECT_MODULE_TASK_SCOPE_LABELS,
   PROJECT_MODULE_TASK_STATUS_LABELS,
   type HourEntrySummary,
@@ -17,6 +16,7 @@ import {
 import styles from './ProjectModulesCard.module.css';
 import { Card } from '@/shared/components/ui/Card';
 import { Modal } from '@/shared/components/ui/Modal';
+import { TextField } from '@/shared/components/ui/TextField';
 import { Button } from '@/shared/components/ui/Button';
 import { Select } from '@/shared/components/ui/Select';
 import { Avatar } from '@/shared/components/ui/Avatar';
@@ -27,7 +27,7 @@ import { ApiRequestError } from '@/shared/lib/api-client';
 import { PhaseRoadmap, type PhaseRoadmapSelection, type OperationalRoadmapRow } from '@/modules/client-portal/components/PhaseRoadmap';
 import { roleFromTeamName, toPhaseRoadmap } from '@/modules/client-portal/adapters/project-detail.adapter';
 import { PHASE_ROADMAP_ROLE_COLORS } from '@/modules/client-portal/types';
-import { useCreateProjectModuleSegment, useDeleteProjectModule, useDeleteProjectModuleSegment, useUpdateProjectModule, useUpdateProjectModuleDelivery, useUpdateProjectModuleSegment } from '../api/projects.queries';
+import { useCreateProjectModule, useCreateProjectModuleSegment, useDeleteProjectModule, useDeleteProjectModuleSegment, useUpdateProjectModule, useUpdateProjectModuleDelivery, useUpdateProjectModuleSegment } from '../api/projects.queries';
 import { useConfirmAction } from '@/shared/components/ui/useConfirmAction';
 import { QuotationReferenceTaskModal } from './QuotationReferenceTaskModal';
 import { useAppliedQuotationPlanning } from '@/modules/estimation/api/quotation.queries';
@@ -108,6 +108,7 @@ interface ProjectModulesCardProps {
  */
 export function ProjectModulesCard({ project, hourEntries, teamOptions, canManage }: ProjectModulesCardProps) {
   const toast = useToast();
+  const createModule = useCreateProjectModule();
   const updateModule = useUpdateProjectModule();
   const deleteModule = useDeleteProjectModule();
   const updateSegment = useUpdateProjectModuleSegment();
@@ -122,6 +123,11 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
   const [editingSegment, setEditingSegment] = useState<{ moduleId: string; segment: ProjectModuleSegment } | null>(null);
   const [planningBlock, setPlanningBlock] = useState<{ moduleId: string; teamId: string; name: string } | null>(null);
   const [planningMode, setPlanningMode] = useState(false);
+  const [addingPhase, setAddingPhase] = useState(false);
+  const [newPhase, setNewPhase] = useState({
+    name: '', initialStage: 'discovery' as ProjectModuleStage, estimatedHours: '',
+    estimatedStartDate: '', estimatedEndDate: '',
+  });
   const [phaseNameDrafts, setPhaseNameDrafts] = useState<Record<string, string>>({});
   const [creatingFromReference, setCreatingFromReference] = useState<{
     moduleId: string | null;
@@ -186,11 +192,32 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
     }
   };
 
-  const onChangeStage = async (moduleId: string, currentStage: ProjectModuleStage) => {
+  const onCreatePhase = async () => {
+    const name = newPhase.name.trim();
+    const estimatedHours = Number(newPhase.estimatedHours);
+    if (!name) return toast.error('Escribe el nombre de la fase.');
+    if (!newPhase.estimatedHours.trim() || !Number.isFinite(estimatedHours) || estimatedHours <= 0) {
+      return toast.error('Ingresa HH estimadas mayores a cero.');
+    }
+    if (newPhase.estimatedStartDate && newPhase.estimatedEndDate &&
+        newPhase.estimatedStartDate > newPhase.estimatedEndDate) {
+      return toast.error('La fecha de término no puede ser anterior al inicio.');
+    }
     try {
-      await updateModule.mutateAsync({ projectId: project.id, moduleId, input: { currentStage } });
+      await createModule.mutateAsync({
+        projectId: project.id,
+        input: {
+          name, initialStage: newPhase.initialStage, estimatedHours,
+          ...(newPhase.estimatedStartDate ? { estimatedStartDate: newPhase.estimatedStartDate } : {}),
+          ...(newPhase.estimatedEndDate ? { estimatedEndDate: newPhase.estimatedEndDate } : {}),
+        },
+      });
+      setAddingPhase(false);
+      setNewPhase({ name: '', initialStage: 'discovery', estimatedHours: '',
+        estimatedStartDate: '', estimatedEndDate: '' });
+      toast.success('Fase agregada al proyecto.');
     } catch (error) {
-      toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo actualizar la etapa.');
+      toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo agregar la fase.');
     }
   };
 
@@ -332,140 +359,6 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
     );
   }
 
-  const renderPhaseExtras = (phase: { id: string }) => {
-    const module = modulesById.get(phase.id);
-    if (!module) return null;
-    return (
-      <div className={styles.moduleFields}>
-        <Select
-          className={styles.moduleStageField}
-          label="Etapa actual"
-          options={STAGE_OPTIONS}
-          value={module.currentStage}
-          disabled={!canManage}
-          onChange={(event) => void onChangeStage(module.id, event.target.value as ProjectModuleStage)}
-        />
-        <Meta label="Etapa inicial" value={PROJECT_MODULE_STAGE_LABELS[module.initialStage]} />
-        <Meta label="Horas estimadas" value={module.estimatedHours != null ? `${module.estimatedHours} hh` : 'Sin definir'} />
-        <Meta label="Fechas estimadas" value={`${formatDate(module.estimatedStartDate)} — ${formatDate(module.estimatedEndDate)}`} />
-        {module.progress.actual != null && (
-          <Meta label="Avance real · esperado" value={`${module.progress.actual}% · ${module.progress.expected ?? 0}%`} />
-        )}
-      </div>
-    );
-  };
-
-  /** Las referencias vienen DESPUÉS del cronograma, como en el HTML v5.
-   * Nunca convertimos semanas relativas en fechas operativas sin planificar. */
-  const renderPhaseReferences = (phase: { id: string }) => {
-    const module = modulesById.get(phase.id);
-    if (!module) return null;
-    const reference = appliedPlanning.data?.modules.find((entry) => entry.moduleId === module.id);
-    if (!reference || (!reference.tasks.length && !reference.relativeTeamBlocks?.length)) return null;
-    const versionId = appliedPlanning.data!.versionId;
-    const converted = (task: typeof reference.tasks[number]) =>
-      module.tasks.some((existing) => existing.description?.includes(
-        'Referencia cotización ' + versionId + ' · WBS ' + task.wbs + ' · ' + task.role,
-      ));
-    return (
-      <div className={styles.commercialReferences}>
-        {!!reference.relativeTeamBlocks?.length && (
-          <details className={styles.referenceBlocks}>
-            <summary>
-              {reference.relativeTeamBlocks.length} bloques por equipo de referencia
-              {' · '}{reference.relativeTeamBlocks.filter((block) =>
-                module.segments.some((segment) => segment.teamId === block.teamId)).length}
-              {' equipos con bloque operativo · '}{reference.totalHours} HH · semanas de referencia
-            </summary>
-            <div className={styles.referenceBlockList}>
-              {reference.relativeTeamBlocks.map((block) => {
-                const team = teamOptions.find((option) => option.value === block.teamId);
-                const teamLabel = team?.label ?? 'Equipo no disponible';
-                const proposedName = module.name + ' · ' + teamLabel;
-                // Una referencia comercial es un único bloque por equipo y fase.
-                // El segmento no tiene FK hacia esa referencia: coincidencia exacta
-                // de nombre/equipo confirma el bloque sugerido; si el usuario lo
-                // renombró, solo afirmamos que el equipo ya tiene bloques operativos.
-                const teamSegments = module.segments.filter((segment) => segment.teamId === block.teamId);
-                const matchingSegment = teamSegments.find((segment) =>
-                  segment.name.trim().toLocaleLowerCase('es-CL') ===
-                  proposedName.trim().toLocaleLowerCase('es-CL'));
-                return (
-                  <div key={block.teamId} className={styles.referenceBlockRow}>
-                    <span className={styles.referenceTaskDot}
-                      style={{ background: teamColor(teamLabel) }} aria-hidden="true" />
-                    <span className={styles.referenceTaskName}>{teamLabel}</span>
-                    <span className={styles.referenceTaskMeta}>
-                      {block.hours} HH · semanas {block.startWeek} a
-                      {' '}{block.startWeek + block.durationWeeks - 1}
-                    </span>
-                    {matchingSegment ? (
-                      <span className={styles.referenceConverted}>Bloque planificado</span>
-                    ) : teamSegments.length > 0 ? (
-                      <span className={styles.referenceConverted}>
-                        {teamSegments.length} {teamSegments.length === 1 ? 'bloque operativo existente' : 'bloques operativos existentes'}
-                      </span>
-                    ) : canManage && team ? (
-                      <Button variant="ghost" size="sm"
-                        onClick={() => setPlanningBlock({
-                          moduleId: module.id, teamId: block.teamId,
-                          name: proposedName,
-                        })}>
-                        Planificar bloque
-                      </Button>
-                    ) : null}
-                    {canManage && teamSegments.length === 1 && (
-                      <Button variant="ghost" size="sm"
-                        onClick={() => setEditingSegment({
-                          moduleId: module.id,
-                          segment: teamSegments[0]!,
-                        })}>
-                        Editar bloque
-                      </Button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </details>
-        )}
-        {reference.tasks.length > 0 && (
-          <details className={styles.referenceTasks} open>
-            <summary>
-              {reference.tasks.length} tareas de referencia de la cotización
-              {' '}(sin fechas ni asignados)
-            </summary>
-            <ul className={styles.referenceTaskList}>
-              {reference.tasks.map((task) => {
-                const team = teamOptions.find((option) => option.value === task.teamId);
-                const teamLabel = team?.label ?? task.role;
-                return (
-                  <li key={task.wbs + ':' + task.role} className={styles.referenceTaskRow}>
-                    <span className={styles.referenceTaskDot}
-                      style={{ background: teamColor(teamLabel) }} aria-hidden="true" />
-                    <span className={styles.referenceTaskName}>{task.name}</span>
-                    <span className={styles.referenceTaskMeta}>
-                      · {teamLabel} · {task.hours} HH
-                    </span>
-                    {converted(task) ? (
-                      <span className={styles.referenceConverted}>Tarea creada</span>
-                    ) : canManage ? (
-                      <Button variant="ghost" size="sm"
-                        onClick={() => setCreatingFromReference({ moduleId: module.id, task })}>
-                        Crear tarea
-                      </Button>
-                    ) : null}
-                  </li>
-                );
-              })}
-            </ul>
-          </details>
-        )}
-      </div>
-    );
-  };
-
-
   /** En v5.02 los bloques/HH de la cotización siguen siendo referencias hasta
    * crear el segmento real. No asignamos fechas, responsables ni estados falsos. */
   const referenceIsConverted = (
@@ -503,6 +396,30 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
     total.blocks += module.segments.length + getOperationalRows({ id: module.id }).length;
     return total;
   }, { tasks: 0, blocks: 0 });
+
+  const getOperationalMetrics = (phase: { id: string }, row: { id: string }) => {
+    const module = modulesById.get(phase.id);
+    const segment = module?.segments.find((item) => item.id === row.id);
+    if (!module || !segment) return { hours: null, progress: null };
+    const teamSegments = module.segments.filter((item) => item.teamId === segment.teamId);
+    const directTasks = module.tasks.filter((task) =>
+      task.description?.includes(' · ID ' + segment.id));
+    // Sin FK tarea-bloque solo atribuimos tareas de equipo si tiene un único bloque.
+    const tasks = directTasks.length > 0 ? directTasks
+      : teamSegments.length === 1 ? module.tasks.filter((task) => task.teamId === segment.teamId) : [];
+    const taskHours = tasks.reduce((sum, task) => sum + (task.estimatedHours ?? 0), 0);
+    const ref = appliedPlanning.data?.modules.find((item) => item.moduleId === phase.id)
+      ?.relativeTeamBlocks?.find((item) => item.teamId === segment.teamId);
+    const hours = taskHours > 0 ? taskHours
+      : teamSegments.length === 1 ? ref?.hours ?? null : null;
+    const doneHours = tasks.filter((task) => task.status === 'done')
+      .reduce((sum, task) => sum + (task.estimatedHours ?? 0), 0);
+    const progress = tasks.length
+      ? Math.round(100 * (taskHours > 0 ? doneHours / taskHours
+        : tasks.filter((task) => task.status === 'done').length / tasks.length))
+      : null;
+    return { hours, progress };
+  };
 
   const renderOperationalContent = (phase: { id: string }) => {
     const module = modulesById.get(phase.id);
@@ -560,7 +477,7 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
         {count ? <div className={styles.operationalTaskScroll}>
           <table className={styles.operationalTaskTable}>
             <thead><tr><th>Tarea</th><th>Asignada a</th><th>Bloque de trabajo</th>
-              <th>Estado</th><th>HH est. / reales</th><th>Fecha límite</th><th>Acción</th></tr></thead>
+              <th>Estado</th><th>HH est. / reales</th><th>Fecha límite</th><th aria-label="Acciones" /></tr></thead>
             <tbody>
               {module.tasks.map((task) => (
                 <tr key={task.id}>
@@ -670,6 +587,9 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
       <PhaseRoadmap alwaysExpanded operationalView borderlessSummary phaseRoadmap={phaseRoadmap}
         operationalTaskCount={operationalCounts.tasks} operationalBlockCount={operationalCounts.blocks}
         operationalRows={getOperationalRows}
+        operationalMetrics={getOperationalMetrics}
+        operationalFooter={canManage ? <button type="button" className={styles.addPhaseButton}
+          onClick={() => setAddingPhase(true)}>+ Agregar fase</button> : undefined}
         onPlanOperationalRow={canManage && planningMode ? (phase, row) => {
           const module = modulesById.get(phase.id);
           const reference = appliedPlanning.data?.modules.find((item) => item.moduleId === phase.id)
@@ -680,21 +600,16 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
               (teamOptions.find((item) => item.value === reference.teamId)?.label ?? 'Equipo'),
           });
         } : undefined}
-        renderPhaseExtras={renderPhaseExtras}
-        renderPhaseReferences={(phase) => <>{renderOperationalContent(phase)}
-          {planningMode && <details className={styles.legacyReferences} open>
-            <summary>Referencias comerciales y planificación manual</summary>
-            {renderPhaseReferences(phase)}
-          </details>}</>}
+        renderPhaseReferences={renderOperationalContent}
         renderSelectionDetail={renderSelectionDetail}
         renderPhaseHeaderName={canManage && planningMode ? renderPhaseHeaderName : undefined}
         renderPhaseHeaderActions={renderPhaseHeaderActions}
         toolbarActions={canManage ? (
           <div className={styles.roadmapModeSwitch} role="group" aria-label="Modo del Roadmap">
-            <Button size="sm" variant={!planningMode ? 'secondary' : 'ghost'}
-              aria-pressed={!planningMode} onClick={() => setPlanningMode(false)}>Ver</Button>
-            <Button size="sm" variant={planningMode ? 'secondary' : 'ghost'}
-              aria-pressed={planningMode} onClick={() => setPlanningMode(true)}>Planificar</Button>
+            <Button size="sm" variant="ghost" aria-pressed={!planningMode}
+              onClick={() => setPlanningMode(false)}>Ver</Button>
+            <Button size="sm" variant="ghost" aria-pressed={planningMode}
+              onClick={() => setPlanningMode(true)}>Planificar</Button>
           </div>
         ) : undefined} />
       {creatingFromReference && appliedPlanning.data && (
@@ -709,6 +624,38 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
         />
       )}
       {confirmationDialog}
+      <Modal open={addingPhase} title="Agregar fase" onClose={() => setAddingPhase(false)}
+        dismissible={!createModule.isPending}
+        footer={<>
+          <Button variant="outline" onClick={() => setAddingPhase(false)}
+            disabled={createModule.isPending}>Cancelar</Button>
+          <Button onClick={() => void onCreatePhase()} loading={createModule.isPending}
+            disabled={!newPhase.name.trim() || !(Number(newPhase.estimatedHours) > 0)}>
+            Agregar fase
+          </Button>
+        </>}>
+        <div className={styles.phaseCreationForm}>
+          <TextField label="Nombre de la fase" value={newPhase.name}
+            onChange={(event) => setNewPhase((current) => ({ ...current, name: event.target.value }))} />
+          <Select label="Etapa inicial" value={newPhase.initialStage} options={STAGE_OPTIONS}
+            onChange={(event) => setNewPhase((current) =>
+              ({ ...current, initialStage: event.target.value as ProjectModuleStage }))} />
+          <TextField label="Horas estimadas" type="number" min={0.01} step={0.01}
+            value={newPhase.estimatedHours}
+            onChange={(event) => setNewPhase((current) =>
+              ({ ...current, estimatedHours: event.target.value }))} />
+          <div className={styles.phaseCreationDates}>
+            <TextField label="Inicio estimado (opcional)" type="date"
+              value={newPhase.estimatedStartDate}
+              onChange={(event) => setNewPhase((current) =>
+                ({ ...current, estimatedStartDate: event.target.value }))} />
+            <TextField label="Fin estimado (opcional)" type="date"
+              value={newPhase.estimatedEndDate}
+              onChange={(event) => setNewPhase((current) =>
+                ({ ...current, estimatedEndDate: event.target.value }))} />
+          </div>
+        </div>
+      </Modal>
       <ExecutionSegmentModal
         open={editingSegment !== null || planningBlock !== null}
         mode={editingSegment ? 'edit' : 'create'}
@@ -720,15 +667,6 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
         onConfirm={(values) => void onConfirmSegmentEdit(values)}
       />
     </>
-  );
-}
-
-function Meta({ label, value }: { label: string; value: string }) {
-  return (
-    <span className={styles.moduleMeta}>
-      <b className={styles.moduleMetaLabel}>{label}</b>
-      {value}
-    </span>
   );
 }
 
