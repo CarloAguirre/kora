@@ -442,9 +442,9 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
     await db.execute(sql`
       UPDATE project_module_segments AS segment
       SET closed_at = CASE
-        WHEN EXISTS (SELECT 1 FROM project_module_tasks AS task WHERE task.segment_id = segment.id)
+        WHEN EXISTS (SELECT 1 FROM project_module_tasks AS task WHERE task.segment_id = segment.id AND task.cancelled_at IS NULL)
           AND NOT EXISTS (SELECT 1 FROM project_module_tasks AS task
-            WHERE task.segment_id = segment.id AND task.status <> 'done')
+            WHERE task.segment_id = segment.id AND task.cancelled_at IS NULL AND task.status <> 'done')
         THEN COALESCE(segment.closed_at, ${now}::timestamptz)
         ELSE NULL
       END, updated_at = ${now}
