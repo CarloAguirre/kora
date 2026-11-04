@@ -105,6 +105,7 @@ export class DrizzleLedProjectReader implements LedProjectReader {
           where ${projectTeamMembers.projectId} = ${projectTeams.projectId}
             and ${projectTeamMembers.teamId} = ${projectTeams.teamId}
             and ${projectTeamMembers.blockedAt} is null
+            and ${teamMembers.leftAt} is null
             and ${users.status} = 'active'
         )`,
       ))
