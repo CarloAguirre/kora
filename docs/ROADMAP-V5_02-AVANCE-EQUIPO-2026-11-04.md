@@ -76,7 +76,7 @@ registros históricos sin segmento. No se introduce esa migración aquí.
 
 ## Pruebas añadidas
 
-- `team-progress.spec.ts`: 180 HH en dos bloques, 16 HH aprobadas,
+- `team-progress.test.ts`: 180 HH en dos bloques, 16 HH aprobadas,
   9% real / 50% esperado en el día de prueba; 77/180 = 43% consumo;
   entregas aprobadas vs presentadas, bloque cerrado, cancelaciones,
   usuario bloqueado, equipo ajeno, sin plan, proyecto pausado y tareas
@@ -97,7 +97,7 @@ pnpm --filter @kora/core build
 pnpm --filter @kora/db build
 
 pnpm --filter @kora/web typecheck
-pnpm --filter @kora/web exec vitest run src/modules/projects/lib/team-progress.spec.ts src/modules/projects/components/TeamProgressCard.test.tsx src/modules/projects/components/ProjectManagerTeamDetailView.test.tsx
+pnpm --filter @kora/web exec vitest run src/modules/projects/lib/team-progress.test.ts src/modules/projects/components/TeamProgressCard.test.tsx src/modules/projects/components/ProjectManagerTeamDetailView.test.tsx
 pnpm --filter @kora/web build
 ```
 
