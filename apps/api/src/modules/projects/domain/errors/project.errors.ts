@@ -77,6 +77,17 @@ export class ProjectTeamMaxMembersBelowAssignedError extends ValidationError {
   }
 }
 
+/** Impide quitar un equipo aún vinculado al cronograma operativo. */
+export class ProjectTeamHasRoadmapBlocksError extends ConflictError {
+  constructor(teamName: string, blockCount: number) {
+    super(
+      `El equipo "${teamName}" tiene ${blockCount} bloque(s) en el Roadmap. Elimínalos antes de quitar el equipo del proyecto.`,
+      'PROJECT_TEAM_HAS_ROADMAP_BLOCKS',
+      { details: { blockCount } },
+    );
+  }
+}
+
 export class InvalidTeamMemberAssignmentError extends ValidationError {
   constructor() {
     super('La persona indicada no es un miembro de equipo activo.', 'PROJECT_INVALID_TEAM_MEMBER');
