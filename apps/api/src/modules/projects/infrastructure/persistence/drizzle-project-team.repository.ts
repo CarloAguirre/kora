@@ -88,7 +88,7 @@ export class DrizzleProjectTeamRepository implements ProjectTeamRepository {
     const rows = await db
       .select({ id: teams.id })
       .from(teams)
-      .leftJoin(projectTeams, and(eq(projectTeams.teamId, teams.id), eq(projectTeams.projectId, projectId)))
+      .innerJoin(projectTeams, and(eq(projectTeams.teamId, teams.id), eq(projectTeams.projectId, projectId)))
       .where(
         and(
           eq(teams.id, teamId),
