@@ -18,6 +18,7 @@ function ProgressMiniTrack({ real, planned }: { real: number; planned: number })
 }
 
 function BlockNote({ block }: { block: TeamBlockProgress }) {
+  if (block.estimatedHours <= 0) return <>Faltan HH estimadas para calcular el avance del bloque</>;
   if (block.isClosed) return <>100% real: bloque cerrado con su entrega aprobada o cierre registrado</>;
   return <>
     {percent(block.actualPercent)} real, {percent(block.expectedPercent)} según plan;
@@ -64,7 +65,7 @@ export function TeamProgressCard({ progress, teamName }: Props) {
         <div>
           <b>del trabajo del equipo completado</b>
           <small>{!progress.hasPlan
-            ? 'Sin bloques con HH planificadas para este equipo.'
+            ? 'Sin HH definidas en los bloques de ejecución. Las HH asignadas al equipo no se han perdido.'
             : 'A la fecha el plan contemplaba un ' + percent(expected) + ' de avance.'}</small>
         </div>
       </div>
@@ -114,7 +115,9 @@ export function TeamProgressCard({ progress, teamName }: Props) {
             </p>
           ) : (
             <p className={styles.lead}>Aún no se pueden calcular los porcentajes:
-              configura las HH estimadas y las fechas de los bloques del equipo en el Roadmap.</p>
+              el equipo tiene {hours(progress.assignedHours)} HH asignadas, pero faltan
+              las HH estimadas de sus bloques de ejecución en el Roadmap. El presupuesto
+              comercial no se sustituye ni se distribuye automáticamente entre bloques.</p>
           )}
 
           <div className={styles.methodology}>
@@ -211,15 +214,19 @@ function FragmentPhase({ phase }: { phase: TeamProgress['phases'][number] }) {
   return <>
     <tr className={styles.phaseRow}>
       <td><b>Fase {phase.number}: {phase.name}</b></td>
-      <td>{hours(phase.estimatedHours)}</td>
-      <td><ProgressMiniTrack real={phase.actualPercent} planned={phase.expectedPercent} /></td>
-      <td>{percent(phase.actualPercent)} real, {percent(phase.expectedPercent)} según plan</td>
+      <td>{phase.estimatedHours > 0 ? hours(phase.estimatedHours) : '—'}</td>
+      <td>{phase.estimatedHours > 0
+        ? <ProgressMiniTrack real={phase.actualPercent} planned={phase.expectedPercent} /> : 'Sin plan'}</td>
+      <td>{phase.estimatedHours > 0
+        ? percent(phase.actualPercent) + ' real, ' + percent(phase.expectedPercent) + ' según plan'
+        : 'HH del bloque sin definir'}</td>
       <td title="Suma de HH aprobadas imputadas a bloques de la fase">{hours(phase.consumedHours)} HH</td>
     </tr>
     {phase.blocks.map((block) => <tr key={block.id}>
       <td><span className={styles.blockLabel}><span className={styles.blockDot} />{block.name}</span></td>
-      <td>{hours(block.estimatedHours)}</td>
-      <td><ProgressMiniTrack real={block.actualPercent} planned={block.expectedPercent} /></td>
+      <td>{block.estimatedHours > 0 ? hours(block.estimatedHours) : '—'}</td>
+      <td>{block.estimatedHours > 0
+        ? <ProgressMiniTrack real={block.actualPercent} planned={block.expectedPercent} /> : 'Sin plan'}</td>
       <td><BlockNote block={block} /></td>
       <td title="Suma de HH aprobadas imputadas a este bloque">{hours(block.consumedHours)} HH</td>
     </tr>)}
