@@ -759,6 +759,19 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
           onClose={() => setCreatingFromReference(null)}
         />
       )}
+      {assigningTasks && appliedPlanning.data && modulesById.get(assigningTasks.moduleId) && (
+        <AssignBlockTasksModal
+          key={assigningTasks.moduleId + ':' + assigningTasks.teamId + ':' + (assigningTasks.focusKey ?? '')}
+          project={project} module={modulesById.get(assigningTasks.moduleId)!}
+          teamId={assigningTasks.teamId}
+          referenceTasks={(appliedPlanning.data.modules.find((item) => item.moduleId === assigningTasks.moduleId)
+            ?.tasks ?? []).filter((task) => task.teamId === assigningTasks.teamId &&
+              !referenceIsConverted(modulesById.get(assigningTasks.moduleId)!, task))}
+          versionId={appliedPlanning.data.versionId}
+          focusKey={assigningTasks.focusKey}
+          onClose={() => setAssigningTasks(null)}
+        />
+      )}
       {confirmationDialog}
       {addingTaskModuleId && <NewOperationalTaskModal
         key={addingTaskModuleId} project={project} moduleId={addingTaskModuleId}
@@ -819,14 +832,29 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
           onConfirm={(input) => void onCreateWorkBlock(input)}
         />
       )}
+      {editingSegment && modulesById.get(editingSegment.moduleId) && (
+        <NewWorkBlockModal
+          mode="edit"
+          key={'edit:' + editingSegment.segment.id}
+          project={project}
+          module={modulesById.get(editingSegment.moduleId)!}
+          teamOptions={teamOptions}
+          initialSegment={editingSegment.segment}
+          initialDelivery={modulesById.get(editingSegment.moduleId)!.deliveries.find(
+            (delivery) => delivery.segmentId === editingSegment.segment.id)}
+          submitting={updateSegment.isPending}
+          onCancel={() => setEditingSegment(null)}
+          onConfirm={(input) => void onEditWorkBlock(input)}
+        />
+      )}
       <ExecutionSegmentModal
-        open={editingSegment !== null}
+        open={editingForecastSegment !== null}
         mode="edit"
         teamOptions={segmentModalTeamOptions}
         initialValues={segmentModalInitialValues}
-        segmentId={editingSegment?.segment.id ?? null}
+        segmentId={editingForecastSegment?.segment.id ?? null}
         submitting={updateSegment.isPending}
-        onCancel={() => setEditingSegment(null)}
+        onCancel={() => setEditingForecastSegment(null)}
         onConfirm={(values) => void onConfirmSegmentEdit(values)}
       />
     </>
