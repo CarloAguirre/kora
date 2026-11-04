@@ -138,7 +138,7 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
   } | null>(null);
   const [planningMode, setPlanningMode] = useState(false);
   const [addingPhase, setAddingPhase] = useState(false);
-  const [addingTaskModuleId, setAddingTaskModuleId] = useState<string | null>(null);
+  const [addingTask, setAddingTask] = useState<{ moduleId: string; segmentId?: string } | null>(null);
   const [editingTask, setEditingTask] = useState<{ moduleId: string; task: ProjectModuleTask } | null>(null);
   const [duplicatingTask, setDuplicatingTask] = useState<{ moduleId: string; task: ProjectModuleTask } | null>(null);
   const [newPhaseName, setNewPhaseName] = useState('');
@@ -678,7 +678,7 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
           </table>
         </div> : <p className={styles.noOperationalTasks}>Sin tareas registradas en esta fase.</p>}
         {canManage && <button type="button" className={styles.addTaskButton}
-          onClick={() => setAddingTaskModuleId(module.id)}>+ Agregar tarea</button>}
+          onClick={() => setAddingTask({ moduleId: module.id })}>+ Agregar tarea</button>}
       </details>
     </div>;
   };
@@ -739,7 +739,9 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
             setDuplicatingTask({ moduleId: module.id, task }); close();
           } : undefined}
           onDeleteTask={canManage ? (task) => { void onRemoveTask(module, task); close(); } : undefined}
-          onAddTask={canManage ? () => { setAddingTaskModuleId(module.id); close(); } : undefined}
+          onAddTask={canManage ? () => {
+            setAddingTask({ moduleId: module.id, segmentId: segment.id }); close();
+          } : undefined}
           onAssignTasks={canManage ? () => {
             setAssigningTasks({ moduleId: module.id, teamId: segment.teamId });
             close();
@@ -843,9 +845,11 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
         />
       )}
       {confirmationDialog}
-      {addingTaskModuleId && <NewOperationalTaskModal
-        key={addingTaskModuleId} project={project} moduleId={addingTaskModuleId}
-        onClose={() => setAddingTaskModuleId(null)} />}
+      {addingTask && <NewOperationalTaskModal
+        key={addingTask.moduleId + ':' + (addingTask.segmentId ?? '')}
+        project={project} moduleId={addingTask.moduleId}
+        initialSegmentId={addingTask.segmentId}
+        onClose={() => setAddingTask(null)} />}
       {editingTask && <ExecutionTaskModal
         key={editingTask.task.id} project={project} moduleId={editingTask.moduleId}
         task={editingTask.task} onClose={() => setEditingTask(null)}
