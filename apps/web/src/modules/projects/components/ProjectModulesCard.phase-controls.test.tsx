@@ -6,7 +6,10 @@ import { ProjectModulesCard } from './ProjectModulesCard';
 
 const mocks = vi.hoisted(() => ({
   update: vi.fn(),
+  create: vi.fn(),
   remove: vi.fn(),
+  updateTask: vi.fn(),
+  removeTask: vi.fn(),
   createSegment: vi.fn(),
   confirm: vi.fn(),
   success: vi.fn(),
@@ -31,25 +34,37 @@ vi.mock('@/modules/client-portal/adapters/project-detail.adapter', () => ({
   }),
 }));
 vi.mock('@/modules/client-portal/components/PhaseRoadmap', () => ({
-  PhaseRoadmap: ({ phaseRoadmap, toolbarActions, renderPhaseHeaderName, renderPhaseHeaderActions, renderPhaseReferences }: {
+  PhaseRoadmap: ({ phaseRoadmap, toolbarActions, renderPhaseHeaderName,
+    renderPhaseHeaderActions, renderPhaseReferences, operationalRows, onPlanOperationalRow, operationalFooter }: {
     phaseRoadmap: { phases: { id: string }[] };
     toolbarActions?: ReactNode;
     renderPhaseHeaderName?: (phase: { id: string }) => ReactNode;
     renderPhaseHeaderActions?: (phase: { id: string }) => ReactNode;
     renderPhaseReferences?: (phase: { id: string }) => ReactNode;
+    operationalRows?: (phase: { id: string }) => Array<{ id: string; label: string; hours: number }>;
+    onPlanOperationalRow?: (phase: { id: string }, row: { id: string; label: string; hours: number }) => void;
+    operationalFooter?: ReactNode;
   }) => {
     const phase = phaseRoadmap.phases[0]!;
     return <section>{toolbarActions}{renderPhaseHeaderName?.(phase)}
-      {renderPhaseHeaderActions?.(phase)}{renderPhaseReferences?.(phase)}</section>;
+      {renderPhaseHeaderActions?.(phase)}
+      {operationalRows?.(phase).map((row) => <div key={row.id}>{row.label}
+        {onPlanOperationalRow && <button type="button"
+          onClick={() => onPlanOperationalRow(phase, row)}>Planificar bloque</button>}
+      </div>)}
+      {renderPhaseReferences?.(phase)}{operationalFooter}</section>;
   },
 }));
 vi.mock('../api/projects.queries', () => ({
+  useCreateProjectModule: () => ({ mutateAsync: mocks.create, isPending: false }),
   useUpdateProjectModule: () => ({ mutateAsync: mocks.update, isPending: false }),
   useDeleteProjectModule: () => ({ mutateAsync: mocks.remove, isPending: false }),
   useUpdateProjectModuleSegment: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useCreateProjectModuleSegment: () => ({ mutateAsync: mocks.createSegment, isPending: false }),
   useDeleteProjectModuleSegment: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateProjectModuleDelivery: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useUpdateProjectModuleTask: () => ({ mutateAsync: mocks.updateTask, isPending: false }),
+  useDeleteProjectModuleTask: () => ({ mutateAsync: mocks.removeTask, isPending: false }),
 }));
 vi.mock('@/modules/estimation/api/quotation.queries', () => ({
   useAppliedQuotationPlanning: () => ({ data: mocks.appliedPlan }),
@@ -87,6 +102,9 @@ const show = (p: ProjectDetail = project) => render(
 
 beforeEach(() => {
   mocks.update.mockReset().mockResolvedValue(undefined);
+  mocks.create.mockReset().mockResolvedValue(undefined);
+  mocks.updateTask.mockReset().mockResolvedValue(undefined);
+  mocks.removeTask.mockReset().mockResolvedValue(undefined);
   mocks.remove.mockReset().mockResolvedValue(undefined);
   mocks.createSegment.mockReset().mockResolvedValue(undefined);
   mocks.confirm.mockReset().mockResolvedValue(true);
@@ -177,9 +195,8 @@ describe('Referencias de bloque de trabajo de la cotización', () => {
       } as unknown as ProjectDetail} hourEntries={[]}
       teamOptions={[{ value: 'team-1', label: 'Desarrollo' }]} canManage />,
     );
-    expect(screen.getByText('Bloque planificado')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Planificar bloque' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Editar bloque' })).toBeEnabled();
+    expect(screen.getByText('Tareas')).toBeInTheDocument();
   });
 
   it('identifica un bloque operativo del equipo sin afirmar que es la referencia si fue renombrado', () => {
@@ -189,7 +206,6 @@ describe('Referencias de bloque de trabajo de la cotización', () => {
       modules: [{ ...module, segments: [{ ...plannedSegment, name: 'Trabajo de integración API' }] }],
     } as unknown as ProjectDetail);
     fireEvent.click(screen.getByRole('button', { name: 'Planificar' }));
-    expect(screen.getByText('1 bloque operativo existente')).toBeInTheDocument();
     expect(screen.queryByText('Bloque planificado')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Planificar bloque' })).not.toBeInTheDocument();
   });
@@ -209,9 +225,47 @@ describe('Traspaso de cotización · vista operativa v5.02', () => {
     expect(screen.getByText('Diseño Backend: 1 tarea espera asignación')).toBeInTheDocument();
     expect(screen.getByText(/No hay colaboradores activos de este equipo/)).toBeInTheDocument();
     expect(screen.getByText('Conexión con taller')).toBeInTheDocument();
-    expect(screen.getByText('Referencia EDT · pendiente de crear como tarea de Kora')).toBeInTheDocument();
+    expect(screen.getByTitle('Referencia de cotización pendiente de crear como tarea operativa')).toBeInTheDocument();
     expect(screen.getByText('Tareas')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Crear tarea' })).toBeEnabled();
     expect(mocks.createSegment).not.toHaveBeenCalled();
+  });
+});
+
+describe('Fidelidad del Roadmap v5.02 · acciones y estructura', () => {
+  it('muestra Agregar fase al final sin los desplegables descartados', async () => {
+    show();
+    expect(screen.queryByText('Referencias comerciales y planificación manual')).not.toBeInTheDocument();
+    expect(screen.queryByText('Etapa y datos de la fase')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '+ Agregar fase' }));
+    expect(screen.getByRole('dialog', { name: 'Agregar fase' })).toBeInTheDocument();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Nombre de la fase' }),
+      { target: { value: 'Nueva integración' } });
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Horas estimadas' }),
+      { target: { value: '80' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Agregar fase' }));
+    await waitFor(() => expect(mocks.create).toHaveBeenCalledWith({
+      projectId: 'project-1',
+      input: { name: 'Nueva integración', initialStage: 'discovery', estimatedHours: 80 },
+    }));
+  });
+
+  it('deja de presentar la columna Acción y usa los iconos reales en tareas existentes', async () => {
+    const task = { id: 'task-1', name: 'Diseñar interfaz', status: 'todo',
+      startDate: '2026-11-04', date: '2026-11-15', estimatedHours: 20,
+      assigneeUserId: null, assigneeName: null, description: null, teamId: 'team-1',
+      teamName: 'Desarrollo' };
+    show({ ...project, modules: [{ ...module, tasks: [task] }] } as unknown as ProjectDetail);
+    expect(screen.queryByRole('columnheader', { name: 'Acción' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Editar tarea Diseñar interfaz' }));
+    expect(screen.getByRole('dialog', { name: 'Editar tarea' })).toBeInTheDocument();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Nombre de la tarea' }),
+      { target: { value: 'Diseñar interfaz principal' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    await waitFor(() => expect(mocks.updateTask).toHaveBeenCalledWith({
+      projectId: 'project-1', moduleId: 'module-1', taskId: 'task-1',
+      input: { name: 'Diseñar interfaz principal', startDate: '2026-11-04',
+        date: '2026-11-15', estimatedHours: 20 },
+    }));
   });
 });
