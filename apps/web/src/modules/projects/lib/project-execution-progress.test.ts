@@ -71,6 +71,7 @@ describe('Avance global por los mismos bloques que el avance del equipo', () => 
     expect(progress.actualPercent).toBe(76);
     expect(progress.expectedPercent).toBe(100);
     expect(progress.blocksCount).toBe(6);
+    expect(progress.taskCount).toBe(6);
     expect(progress.phases.map((phase) => phase.actualHours)).toEqual([464, 0]);
     expect(progress.laggingBlocks.map((block) => [block.id, block.gapPoints]))
       .toEqual([['rpa-2', 17], ['qa-2', 5], ['pmo-2', 2]]);
