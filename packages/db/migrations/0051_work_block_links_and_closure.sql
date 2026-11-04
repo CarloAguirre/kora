@@ -1,17 +1,63 @@
 -- Relaciones explícitas con el bloque y fecha REAL de cierre. Los antiguos permanecen NULL.
+-- Este proyecto puede encontrar columnas antiguas creadas fuera del journal de Drizzle.
+-- No sobrescribir vínculos existentes. Verificamos FKs incluso cuando la columna existe.
 ALTER TABLE "project_module_segments"
-  ADD COLUMN "closed_at" timestamptz;
+  ADD COLUMN IF NOT EXISTS "closed_at" timestamptz;
 --> statement-breakpoint
 ALTER TABLE "project_module_deliveries"
-  ADD COLUMN "segment_id" uuid REFERENCES "project_module_segments"("id") ON DELETE SET NULL;
+  ADD COLUMN IF NOT EXISTS "segment_id" uuid;
 --> statement-breakpoint
 ALTER TABLE "project_module_tasks"
-  ADD COLUMN "segment_id" uuid REFERENCES "project_module_segments"("id") ON DELETE SET NULL;
+  ADD COLUMN IF NOT EXISTS "segment_id" uuid;
 --> statement-breakpoint
-CREATE UNIQUE INDEX "project_module_deliveries_one_closure_per_segment"
+-- La columna preexistente puede no tener FK: verificar por tabla, columna y destino,
+-- no solo por nombre de la constraint (que puede variar entre entornos).
+DO $
+DECLARE existing_action "char";
+BEGIN
+  SELECT con.confdeltype INTO existing_action
+  FROM pg_constraint con
+  JOIN pg_attribute attr
+    ON attr.attrelid = con.conrelid AND attr.attname = 'segment_id'
+  WHERE con.conrelid = 'project_module_deliveries'::regclass
+    AND con.confrelid = 'project_module_segments'::regclass
+    AND con.contype = 'f'
+    AND con.conkey = ARRAY[attr.attnum]::smallint[]
+  LIMIT 1;
+  IF existing_action IS NULL THEN
+    ALTER TABLE "project_module_deliveries"
+      ADD CONSTRAINT "project_module_deliveries_segment_id_project_module_segments_id_fk"
+      FOREIGN KEY ("segment_id") REFERENCES "project_module_segments"("id") ON DELETE SET NULL;
+  ELSIF existing_action <> 'n' THEN
+    RAISE EXCEPTION 'project_module_deliveries.segment_id: se encontró FK con ON DELETE distinto de SET NULL';
+  END IF;
+END $;
+--> statement-breakpoint
+DO $
+DECLARE existing_action "char";
+BEGIN
+  SELECT con.confdeltype INTO existing_action
+  FROM pg_constraint con
+  JOIN pg_attribute attr
+    ON attr.attrelid = con.conrelid AND attr.attname = 'segment_id'
+  WHERE con.conrelid = 'project_module_tasks'::regclass
+    AND con.confrelid = 'project_module_segments'::regclass
+    AND con.contype = 'f'
+    AND con.conkey = ARRAY[attr.attnum]::smallint[]
+  LIMIT 1;
+  IF existing_action IS NULL THEN
+    ALTER TABLE "project_module_tasks"
+      ADD CONSTRAINT "project_module_tasks_segment_id_project_module_segments_id_fk"
+      FOREIGN KEY ("segment_id") REFERENCES "project_module_segments"("id") ON DELETE SET NULL;
+  ELSIF existing_action <> 'n' THEN
+    RAISE EXCEPTION 'project_module_tasks.segment_id: se encontró FK con ON DELETE distinto de SET NULL';
+  END IF;
+END $;
+--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "project_module_deliveries_one_closure_per_segment"
   ON "project_module_deliveries"("segment_id") WHERE "segment_id" IS NOT NULL;
 --> statement-breakpoint
-CREATE INDEX "project_module_tasks_segment_idx" ON "project_module_tasks"("segment_id");
+CREATE INDEX IF NOT EXISTS "project_module_tasks_segment_idx" ON "project_module_tasks"("segment_id");
 --> statement-breakpoint
 -- Solo vinculamos tareas que contienen un ID exacto, perteneciente a la MISMA fase y equipo.
 WITH parsed AS (
@@ -22,7 +68,8 @@ WITH parsed AS (
 UPDATE "project_module_tasks" t SET "segment_id" = s.id
 FROM parsed p
 JOIN "project_module_segments" s ON s.id = p.target_id
-WHERE t.id = p.task_id AND t.module_id = s.module_id AND t.team_id = s.team_id;
+WHERE t.id = p.task_id AND t.module_id = s.module_id AND t.team_id = s.team_id
+  AND t.segment_id IS NULL;
 --> statement-breakpoint
 -- En entregas históricas, vincular solo cuando el equipo+fecha apunta a un único
 -- bloque Y a una única entrega. Coincidencias múltiples quedan sin atribuir.
@@ -42,7 +89,7 @@ WITH candidates AS (
 )
 UPDATE "project_module_deliveries" d SET "segment_id" = c.segment_id
 FROM candidates c JOIN unique_deliveries u ON u.id = c.delivery_id
-WHERE d.id = c.delivery_id AND c.matches = 1;
+WHERE d.id = c.delivery_id AND c.matches = 1 AND d.segment_id IS NULL;
 --> statement-breakpoint
 -- Un único bloque del equipo, dentro de cuyas fechas cae completamente la tarea:
 -- recuperamos la relación antigua sin basarnos en títulos ni inventar fechas.
