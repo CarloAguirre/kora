@@ -163,17 +163,18 @@ export function QuotationReferenceTaskModal({
           }} />
         <div className={styles.dates}>
           <Select label="Estado" value={status}
-            options={[{ value: 'todo', label: 'Pendiente' }, { value: 'in_progress', label: 'En curso' }]}
+            options={[{ value: 'todo', label: assignee ? 'Pendiente' : 'Por asignar' },
+              { value: 'in_progress', label: 'En curso' }]}
             onChange={(event) => setStatus(event.target.value as 'todo' | 'in_progress')} />
           <TextField label="HH estimadas" type="number" step="0.01" min="0.01"
             required value={hours} onChange={(event) => setHours(event.target.value)} />
         </div>
-        <Select label="Ámbito Kora" required value={scope}
+        {mode === 'create' && <Select label="Ámbito Kora" required value={scope}
           placeholder="Selecciona un ámbito"
           options={PROJECT_MODULE_TASK_SCOPES.map((value) => ({
             value, label: PROJECT_MODULE_TASK_SCOPE_LABELS[value],
           }))}
-          onChange={(event) => setScope(event.target.value as ProjectModuleTaskScope)} />
+          onChange={(event) => setScope(event.target.value as ProjectModuleTaskScope)} />}
         <div className={styles.dates}>
           <TextField label="Fecha de inicio" type="date" required
             value={startDate} onChange={(event) => setStartDate(event.target.value)} />
