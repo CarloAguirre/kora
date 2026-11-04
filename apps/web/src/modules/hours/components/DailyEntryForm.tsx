@@ -39,6 +39,7 @@ export interface DailyBlock {
   assignment: HourEntryAssignment | '';
   projectId: string;
   moduleId: string;
+  segmentId?: string;
   category: string;
   hours: string;
   description: string;
@@ -55,6 +56,7 @@ const createEmptyBlock = (): DailyBlock => ({
   assignment: '',
   projectId: '',
   moduleId: '',
+  segmentId: '',
   category: '',
   hours: '',
   description: '',
@@ -212,6 +214,7 @@ export function DailyEntryForm({
           assignment: block.assignment as HourEntryAssignment,
           projectId: needsProject ? block.projectId : undefined,
           moduleId: needsProject && block.moduleId ? block.moduleId : undefined,
+          segmentId: needsProject && block.moduleId && block.segmentId ? block.segmentId : undefined,
           category: block.category || undefined,
           description: block.description || undefined,
           hours: Number(block.hours),
@@ -358,6 +361,15 @@ export function DailyEntryBlockFields({
   const overtimeDisabled = needsProject && !selectedProject?.allowsOvertime;
   const { data: projectDetail } = useProjectDetail(needsProject && block.projectId ? block.projectId : null);
   const selectedModule = projectDetail?.modules.find((m) => m.id === block.moduleId);
+  const { user } = useAuth();
+  const allowedTeamIds = new Set([
+    ...(projectDetail?.members ?? []).filter((member) => member.userId === user?.id && !member.blockedAt)
+      .map((member) => member.teamId),
+    ...(projectDetail?.teams ?? []).filter((team) => team.leader?.id === user?.id)
+      .map((team) => team.teamId),
+  ]);
+  const availableSegments = (selectedModule?.segments ?? [])
+    .filter((segment) => allowedTeamIds.has(segment.teamId));
 
   return (
     <div className={styles.block}>
@@ -406,6 +418,7 @@ export function DailyEntryBlockFields({
                   assignment: event.target.value as HourEntryAssignment,
                   projectId: needsProjectNext ? block.projectId : '',
                   moduleId: needsProjectNext ? block.moduleId : '',
+                  segmentId: needsProjectNext ? block.segmentId : '',
                   designatedApproverUserId: needsProjectNext ? '' : block.designatedApproverUserId,
                 });
               }}
@@ -431,6 +444,7 @@ export function DailyEntryBlockFields({
                   onUpdate({
                     projectId: nextProjectId,
                     moduleId: '',
+                    segmentId: '',
                     isOvertime: nextProject?.allowsOvertime ? block.isOvertime : false,
                   });
                 }}
@@ -445,11 +459,31 @@ export function DailyEntryBlockFields({
                 placeholder="Seleccionar módulo (opcional)"
                 options={(projectDetail?.modules ?? []).map((module) => ({ value: module.id, label: module.name }))}
                 value={block.moduleId}
-                onChange={(event) => onUpdate({ moduleId: event.target.value })}
+                onChange={(event) => onUpdate({ moduleId: event.target.value, segmentId: '' })}
               />
               {selectedModule && (
                 <span className={styles.stepperLabel}>Etapa: {PROJECT_MODULE_STAGE_LABELS[selectedModule.currentStage]}</span>
               )}
+            </div>
+          )}
+
+          {needsProject && block.moduleId && (selectedModule?.segments.length ?? 0) > 0 && (
+            <div className={styles.row}>
+              <Select
+                label="Bloque de trabajo"
+                required
+                placeholder="Seleccionar bloque de trabajo..."
+                options={availableSegments.map((segment) => ({
+                  value: segment.id, label: segment.name + ' (' + segment.startDate + ' → ' + segment.endDate + ')',
+                }))}
+                value={block.segmentId ?? ''}
+                onChange={(event) => onUpdate({ segmentId: event.target.value })}
+              />
+              <span className={styles.stepperLabel}>
+                {availableSegments.length === 0
+                  ? 'No tienes bloques de este módulo asignados a tu equipo. Consulta al líder.'
+                  : 'Las HH aprobadas se sumarán a este bloque en el Roadmap.'}
+              </span>
             </div>
           )}
 
