@@ -52,6 +52,7 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
       db
         .select({
           id: projectModuleDeliveries.id,
+          segmentId: projectModuleDeliveries.segmentId,
           moduleId: projectModuleDeliveries.moduleId,
           teamId: projectModuleDeliveries.teamId,
           teamName: teams.name,
@@ -73,6 +74,7 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
       db
         .select({
           id: projectModuleSegments.id,
+          closedAt: projectModuleSegments.closedAt,
           moduleId: projectModuleSegments.moduleId,
           teamId: projectModuleSegments.teamId,
           teamName: teams.name,
@@ -89,6 +91,7 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
       db
         .select({
           id: projectModuleTasks.id,
+          segmentId: projectModuleTasks.segmentId,
           moduleId: projectModuleTasks.moduleId,
           teamId: projectModuleTasks.teamId,
           teamName: teams.name,
@@ -200,6 +203,7 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
       db
         .select({
           id: projectModuleDeliveries.id,
+          segmentId: projectModuleDeliveries.segmentId,
           moduleId: projectModuleDeliveries.moduleId,
           teamId: projectModuleDeliveries.teamId,
           teamName: teams.name,
@@ -220,6 +224,7 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
       db
         .select({
           id: projectModuleSegments.id,
+          closedAt: projectModuleSegments.closedAt,
           moduleId: projectModuleSegments.moduleId,
           teamId: projectModuleSegments.teamId,
           teamName: teams.name,
@@ -235,6 +240,7 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
       db
         .select({
           id: projectModuleTasks.id,
+          segmentId: projectModuleTasks.segmentId,
           moduleId: projectModuleTasks.moduleId,
           teamId: projectModuleTasks.teamId,
           teamName: teams.name,
@@ -328,6 +334,7 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
       .insert(projectModuleDeliveries)
       .values({
         moduleId: input.moduleId,
+        segmentId: input.segmentId ?? null,
         teamId: input.teamId,
         name: input.name,
         description: input.description,
@@ -354,6 +361,7 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
     await db
       .update(projectModuleDeliveries)
       .set({
+        ...(input.segmentId !== undefined ? { segmentId: input.segmentId } : {}),
         ...(input.teamId !== undefined ? { teamId: input.teamId } : {}),
         ...(input.name !== undefined ? { name: input.name } : {}),
         ...(input.description !== undefined ? { description: input.description } : {}),
@@ -414,6 +422,7 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
         ...(input.endDate !== undefined ? { endDate: input.endDate } : {}),
         ...(input.estimatedHours !== undefined
           ? { estimatedHours: input.estimatedHours?.toString() ?? null } : {}),
+        ...(input.closedAt !== undefined ? { closedAt: input.closedAt } : {}),
         updatedAt: now,
       })
       .where(eq(projectModuleSegments.id, id));
@@ -422,6 +431,21 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
   async removeSegment(id: string, context?: TransactionContext): Promise<void> {
     const db = resolveDb(this.database, context);
     await db.delete(projectModuleSegments).where(eq(projectModuleSegments.id, id));
+  }
+
+  async refreshSegmentClosure(segmentId: string, now: Date, context?: TransactionContext): Promise<void> {
+    const db = resolveDb(this.database, context);
+    await db.execute(sql`
+      UPDATE project_module_segments AS segment
+      SET closed_at = CASE
+        WHEN EXISTS (SELECT 1 FROM project_module_tasks AS task WHERE task.segment_id = segment.id)
+          AND NOT EXISTS (SELECT 1 FROM project_module_tasks AS task
+            WHERE task.segment_id = segment.id AND task.status <> 'done')
+        THEN COALESCE(segment.closed_at, ${now}::timestamptz)
+        ELSE NULL
+      END, updated_at = ${now}
+      WHERE segment.id = ${segmentId}::uuid
+    `);
   }
 
   async replaceSegmentMembers(
@@ -451,6 +475,7 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
       .insert(projectModuleTasks)
       .values({
         moduleId: input.moduleId,
+        segmentId: input.segmentId ?? null,
         teamId: input.teamId,
         assigneeUserId: input.assigneeUserId,
         name: input.name,
@@ -481,6 +506,7 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
     await db
       .update(projectModuleTasks)
       .set({
+        ...(input.segmentId !== undefined ? { segmentId: input.segmentId } : {}),
         ...(input.teamId !== undefined ? { teamId: input.teamId } : {}),
         ...(input.assigneeUserId !== undefined ? { assigneeUserId: input.assigneeUserId } : {}),
         ...(input.name !== undefined ? { name: input.name } : {}),
@@ -573,6 +599,7 @@ interface ModuleRow {
 
 interface DeliveryRow {
   id: string;
+  segmentId: string | null;
   moduleId: string;
   teamId: string | null;
   teamName: string | null;
@@ -588,6 +615,7 @@ interface DeliveryRow {
 
 interface SegmentRow {
   id: string;
+  closedAt: Date | null;
   moduleId: string;
   teamId: string;
   teamName: string;
@@ -599,6 +627,7 @@ interface SegmentRow {
 
 interface RawTaskRow {
   id: string;
+  segmentId: string | null;
   moduleId: string;
   teamId: string | null;
   teamName: string | null;
@@ -619,6 +648,7 @@ interface RawTaskRow {
 function toTaskRow(row: RawTaskRow): ProjectModuleTaskRecord {
   return {
     id: row.id,
+    segmentId: row.segmentId,
     moduleId: row.moduleId,
     teamId: row.teamId,
     teamName: row.teamName,
@@ -690,6 +720,7 @@ function toRecord(
     estimatedEndDate: row.estimatedEndDate,
     deliveries: deliveryRows.map((d) => ({
       id: d.id,
+      segmentId: d.segmentId,
       moduleId: d.moduleId,
       teamId: d.teamId,
       teamName: d.teamName,
@@ -703,6 +734,7 @@ function toRecord(
     })),
     segments: segmentRows.map((s) => ({
       id: s.id,
+      closedAt: s.closedAt,
       moduleId: s.moduleId,
       teamId: s.teamId,
       teamName: s.teamName,

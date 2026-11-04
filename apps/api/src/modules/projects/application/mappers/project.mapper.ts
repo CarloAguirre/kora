@@ -155,6 +155,7 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
     estimatedEndDate: module.estimatedEndDate?.toISOString().slice(0, 10) ?? null,
     deliveries: module.deliveries.map((delivery) => ({
       id: delivery.id,
+      segmentId: delivery.segmentId ?? null,
       teamId: delivery.teamId,
       teamName: delivery.teamName,
       name: delivery.name,
@@ -168,6 +169,7 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
     })),
     segments: module.segments.map((segment) => ({
       id: segment.id,
+      closedAt: segment.closedAt?.toISOString() ?? null,
       teamId: segment.teamId,
       teamName: segment.teamName,
       name: segment.name,
@@ -182,6 +184,7 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
     })),
     tasks: module.tasks.map((task) => ({
       id: task.id,
+      segmentId: task.segmentId ?? null,
       teamId: task.teamId,
       teamName: task.teamName,
       assigneeUserId: task.assigneeUserId,

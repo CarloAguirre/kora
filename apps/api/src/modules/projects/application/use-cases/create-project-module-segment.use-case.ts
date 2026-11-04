@@ -82,6 +82,7 @@ export class CreateProjectModuleSegmentUseCase
       if (command.data.closingDelivery) {
         await this.modules.addDelivery({
           moduleId: command.moduleId,
+          segmentId,
           teamId: command.data.teamId,
           name: command.data.closingDelivery.name,
           description: command.data.closingDelivery.description ?? null,
