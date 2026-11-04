@@ -4,6 +4,7 @@ import {
   asc,
   count,
   eq,
+  sql,
   hourEntries,
   inArray,
   projectModuleDeliveries,

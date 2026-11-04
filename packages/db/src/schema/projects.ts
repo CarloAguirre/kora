@@ -310,7 +310,7 @@ export const projectModuleDeliveries = pgTable('project_module_deliveries', {
   name: varchar('name', { length: 300 }),
   description: text('description'),
   /** Identidad del bloque que cierra; NULL en entregas de fase independientes. */
-  segmentId: uuid('segment_id'),
+  segmentId: uuid('segment_id').references(() => projectModuleSegments.id, { onDelete: 'set null' }),
   /** Colaborador del equipo responsable a quien se le asignó esta entrega — `null` ⇔ "Sin asignar". */
   assigneeUserId: uuid('assignee_user_id').references(() => users.id, { onDelete: 'set null' }),
   estimatedDate: date('estimated_date', { mode: 'date' }).notNull(),
