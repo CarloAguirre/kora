@@ -90,7 +90,7 @@ try {
 pnpm --filter @kora/api typecheck
 pnpm --filter @kora/web typecheck
 pnpm --filter @kora/api exec vitest run src/modules/hours/application/use-cases/create-hour-entry.use-case.spec.ts src/modules/hours/application/mappers/hour-entry.mapper.spec.ts src/modules/hours/domain/entities/hour-entry.entity.spec.ts src/test/architecture.spec.ts
-pnpm --filter @kora/web exec vitest run src/modules/hours/components/DailyEntryForm.segment-validation.test.ts src/modules/projects/lib/team-progress.spec.ts src/modules/projects/components/TeamProgressCard.test.tsx src/modules/projects/components/QuotationReferenceTaskModal.test.tsx
+pnpm --filter @kora/web exec vitest run src/modules/hours/components/DailyEntryForm.segment-validation.test.ts src/modules/projects/lib/team-progress.test.ts src/modules/projects/components/TeamProgressCard.test.tsx src/modules/projects/components/QuotationReferenceTaskModal.test.tsx
 pnpm --filter @kora/api build
 pnpm --filter @kora/web build
 ```
