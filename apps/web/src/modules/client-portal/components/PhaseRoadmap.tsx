@@ -736,8 +736,8 @@ function PhaseCard({
  * las referencias sin fechas nunca reciben posiciones ni barras inventadas.
  */
 function OperationalPhaseCard({
-  phase, axis, placeholderRows, onPlanRow, renderHeaderName, renderHeaderActions,
-  renderReferences, renderExtras, renderSelectionDetail,
+  phase, axis, placeholderRows, onPlanRow, getMetrics, renderHeaderName, renderHeaderActions,
+  renderReferences, renderSelectionDetail,
 }: {
   phase: PhaseRoadmapPhase;
   axis: TimelineAxis;
