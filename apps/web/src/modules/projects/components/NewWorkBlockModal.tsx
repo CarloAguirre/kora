@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { ProjectDetail, ProjectModule, ProjectModuleSegment, ProjectModuleDelivery } from '@kora/contracts';
+import type { ProjectDetail, ProjectModuleSegment, ProjectModuleDelivery } from '@kora/contracts';
 import { Modal } from '@/shared/components/ui/Modal';
 import { Button } from '@/shared/components/ui/Button';
 import { TextField } from '@/shared/components/ui/TextField';
@@ -20,7 +20,8 @@ export interface NewWorkBlockModalProps {
   initialSegment?: ProjectModuleSegment;
   initialDelivery?: ProjectModuleDelivery | null;
   project: ProjectDetail;
-  module: ProjectModule;
+  /** El formulario solo necesita el identificador y el nombre de la fase. */
+  module: { id: string; name: string };
   teamOptions: ReadonlyArray<{ value: string; label: string }>;
   initialTeamId?: string;
   initialName?: string;
