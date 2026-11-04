@@ -35,6 +35,7 @@ import { DuplicateTaskModal } from './DuplicateTaskModal';
 import { NewWorkBlockModal, type WorkBlockFormInput } from './NewWorkBlockModal';
 import { AssignBlockTasksModal } from './AssignBlockTasksModal';
 import { NewOperationalTaskModal } from './NewOperationalTaskModal';
+import { SegmentDrawer } from './SegmentDrawer';
 import { ReferenceBlockDrawer } from './ReferenceBlockDrawer';
 import { useAppliedQuotationPlanning } from '@/modules/estimation/api/quotation.queries';
 import { getLinkedBlockTasks, indexTeamBlockProgress, roadmapBlockMetrics, type TeamBlockProgress } from '../lib/team-progress';
@@ -746,6 +747,8 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
           onDuplicateTask={canManage ? (task) => {
             setDuplicatingTask({ moduleId: module.id, task }); close();
           } : undefined}
+          onDeleteTask={canManage ? (task) => { void onRemoveTask(module, task); close(); } : undefined}
+          onAddTask={canManage ? () => { setAddingTaskModuleId(module.id); close(); } : undefined}
           onAssignTasks={canManage ? () => {
             setAssigningTasks({ moduleId: module.id, teamId: segment.teamId });
             close();
@@ -926,194 +929,6 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
         onConfirm={(values) => void onConfirmSegmentEdit(values)}
       />
     </>
-  );
-}
-
-/** El Gantt mantiene su selección y fechas. El consumo del drawer proviene
- * únicamente de HH aprobadas atribuidas al bloque mediante segment_id. */
-function SegmentDrawer({
-  project, module, segment, reference, blockProgress, onClose, onEdit, onDelete,
-  onEditMembers, onChangeClosure, onAssignTasks,
-  onEditTask, onDuplicateTask,
-}: {
-  project: ProjectDetail;
-  module: ProjectModule;
-  segment: ProjectModuleSegment;
-  reference?: AppliedQuotationPlanning['modules'][number];
-  blockProgress?: TeamBlockProgress;
-  onClose: () => void;
-  onEdit?: () => void;
-  onDelete?: () => void;
-  onEditMembers?: () => void;
-  onChangeClosure?: (action: 'close' | 'reopen') => void;
-  onAssignTasks?: () => void;
-  onEditTask?: (task: ProjectModuleTask) => void;
-  onDuplicateTask?: (task: ProjectModuleTask) => void;
-}) {
-  const toast = useToast();
-  const updateDelivery = useUpdateProjectModuleDelivery();
-  const { data: holidays } = useHolidays({ dateFrom: segment.startDate, dateTo: segment.endDate });
-  const days = countBusinessDays(segment.startDate, segment.endDate, new Set((holidays ?? []).map((holiday) => holiday.date)));
-  const [comment, setComment] = useState('');
-  const team = project.teams.find((item) => item.teamId === segment.teamId);
-  const { hours, progress } = roadmapBlockMetrics(blockProgress);
-  const delivery = module.deliveries.find((item) => item.segmentId === segment.id) ?? null;
-  const teamTasks = getLinkedBlockTasks(module, segment);
-  const approvedTasks = teamTasks.filter((task) => task.status === 'done');
-  const deliver = async () => {
-    if (!delivery || delivery.status !== 'planned' || !comment.trim()) return;
-    try {
-      await updateDelivery.mutateAsync({
-        projectId: project.id, moduleId: module.id, deliveryId: delivery.id,
-        input: { status: 'delivered', comment: comment.trim() },
-      });
-      toast.success('Entrega marcada como realizada; queda pendiente de aprobación.');
-      onClose();
-    } catch (error) {
-      toast.error(error instanceof ApiRequestError
-        ? error.message : 'No se pudo registrar la entrega.');
-    }
-  };
-  return (
-    <Modal open side title={segment.name}
-      description={'Fase · ' + module.name}
-      headerExtra={<Badge tone={segmentState(segment).tone}>{segmentState(segment).label}</Badge>}
-      onClose={onClose}
-      footer={(onEdit || onDelete || onEditMembers) ? (
-        <div className={styles.drawerFooter}>
-          {onDelete && <Button variant="outline" onClick={onDelete}>Eliminar bloque</Button>}
-          {onEditMembers && <Button variant="outline" onClick={onEditMembers}>Colaboradores / Forecast</Button>}
-          {onEdit && <Button onClick={onEdit}>Editar bloque</Button>}
-        </div>
-      ) : undefined}>
-      <div className={styles.drawerScroll}>
-        <p className={styles.drawerTeam}>
-          <span className={styles.referenceTaskDot}
-            style={{ background: teamColor(segment.teamName) }} />
-          <strong>{segment.teamName}</strong>
-          <span>Líder: {team?.leader?.fullName ?? 'Sin líder asignado'}</span>
-        </p>
-        <Facts>
-          <Fact label="Inicio" value={formatDate(segment.startDate)} />
-          <Fact label="Cierre planificado" value={formatDate(segment.endDate)} />
-          <Fact label="Duración" value={`${plural(days, 'día')} ${days === 1 ? 'hábil' : 'hábiles'}`} />
-          <Fact label="Colaboradores" value={segment.members.length ? String(segment.members.length) : 'Sin asignar'} />
-        </Facts>
-        <div className={styles.drawerSection}>
-          <div className={styles.drawerFacts}>
-            <span>Fechas <b>{formatDate(segment.startDate)} – {formatDate(segment.endDate)}</b></span>
-            <span>HH estimadas <b>{hours ?? '—'}</b></span>
-            <span>HH consumidas del bloque <b>{(segment.consumedHours ?? 0).toLocaleString('es-CL', { maximumFractionDigits: 1 })} HH</b></span>
-          </div>
-          <p className={styles.drawerHint}>
-            Solo se muestran HH aprobadas vinculadas expresamente al bloque.
-            El histórico sin bloque permanece en el consumo general del equipo.
-          </p>
-        </div>
-        <div className={styles.drawerSection}>
-          <h4>Avance</h4>
-          <div className={styles.drawerProgressBar} role="progressbar"
-            aria-label="Tareas aprobadas del bloque" aria-valuemin={0} aria-valuemax={100}
-            aria-valuenow={progress ?? undefined}>
-            <span style={{ width: (progress ?? 0) + '%' }} />
-          </div>
-          <p className={styles.drawerHint}>
-            {progress === null ? 'Sin HH operativas planificadas' : progress + '% real'} · {approvedTasks.length} de {teamTasks.length} tareas aprobadas.
-            {segment.closedAt ? ' Cerrado el ' + formatDate(segment.closedAt.slice(0, 10)) + '.'
-              : ' Cierre planificado: ' + formatDate(segment.endDate) + '.'}
-          </p>
-          {segment.closedAt && onChangeClosure && <Button variant="outline"
-            onClick={() => onChangeClosure('reopen')}>Reabrir bloque</Button>}
-          {!segment.closedAt && !delivery && onChangeClosure &&
-            teamTasks.every((task) => task.status === 'done') &&
-            <Button variant="outline" onClick={() => onChangeClosure('close')}>
-              Cerrar bloque manualmente
-            </Button>}
-        </div>
-        {segment.members.length > 0 && (
-          <div className={styles.drawerSection}>
-            <h4>Colaboradores del bloque</h4>
-            <ul className={styles.members}>
-              {segment.members.map((member) => (
-                <li key={member.teamMemberId} className={styles.member}>
-                  <Avatar name={member.fullName} size={30} />
-                  <div className={styles.memberInfo}>
-                    <span className={styles.memberName}>{member.fullName}</span>
-                    <span className={styles.memberMeta}>
-                      {member.dailyPercent != null
-                        ? member.dailyPercent + '% de dedicación diaria'
-                        : 'Sin porcentaje de dedicación'}
-                    </span>
-                  </div>
-                  <span className={styles.memberPercent}>
-                    {member.dailyPercent != null ? member.dailyPercent + '%' : '—'}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-        <div className={styles.drawerSection}>
-          <h4>Entrega de cierre</h4>
-          {delivery ? (
-            <>
-              <div className={styles.drawerDelivery}>
-                <strong>{delivery.name ?? module.name + ' · ' + segment.teamName}</strong>
-                <span>Fecha planificada: {formatDate(delivery.estimatedDate)}</span>
-                {segment.closedAt && <span>Cierre real: {formatDate(segment.closedAt.slice(0, 10))}</span>}
-                <Badge tone={DELIVERY_STATUS_TONE[delivery.status]}>
-                  {PROJECT_MODULE_DELIVERY_STATUS_LABELS[delivery.status]}
-                </Badge>
-              </div>
-              {delivery.status === 'planned' && onEdit && delivery.assigneeUserId && (
-                <div className={styles.drawerDeliveryAction}>
-                  <label htmlFor={'delivery-comment-' + delivery.id}>
-                    Comentario obligatorio de entrega
-                  </label>
-                  <textarea id={'delivery-comment-' + delivery.id}
-                    value={comment} maxLength={1000} rows={2}
-                    onChange={(event) => setComment(event.target.value)}
-                    placeholder="Describe la entrega realizada" />
-                  <Button disabled={!comment.trim() || updateDelivery.isPending}
-                    onClick={() => void deliver()}>Marcar como entregada</Button>
-                </div>
-              )}
-            </>
-          ) : (
-            <p className={styles.drawerHint}>
-              Este bloque no tiene entrega de cierre vinculada. Puedes añadirla desde
-              «Editar bloque», con fecha planificada igual a su fecha final.
-            </p>
-          )}
-        </div>
-        <div className={styles.drawerSection}>
-          <div className={styles.drawerTaskHeading}>
-            <h4>Tareas ({teamTasks.length})</h4>
-            {onAssignTasks && reference?.tasks.some((task) =>
-              task.teamId === segment.teamId &&
-              !teamTasks.some((saved) => saved.description?.includes(
-                ' · WBS ' + task.wbs + ' · ' + task.role))) && (
-              <Button size="sm" variant="outline" onClick={onAssignTasks}>Asignar tareas</Button>
-            )}
-          </div>
-          {teamTasks.length ? (
-            <ul className={styles.drawerTaskList}>
-              {teamTasks.map((task) => <li key={task.id} className={styles.drawerTaskRow}>
-                <div><strong>{task.name}</strong>
-                  <small>{task.assigneeName ?? 'Sin asignar'} · {task.estimatedHours ?? '—'} HH est. · {formatDate(task.date)}</small>
-                </div>
-                {onEditTask && <button type="button" className={styles.taskIconAction}
-                  aria-label={'Editar tarea ' + task.name} title="Editar tarea"
-                  onClick={() => onEditTask(task)}><PencilIcon size={15} /></button>}
-                {onDuplicateTask && <button type="button" className={styles.taskIconAction}
-                  aria-label={'Duplicar tarea ' + task.name} title="Duplicar para otra persona"
-                  onClick={() => onDuplicateTask(task)}>Duplicar</button>}
-              </li>)}
-            </ul>
-          ) : <p className={styles.drawerHint}>Aún no hay tareas operativas de este equipo.</p>}
-        </div>
-      </div>
-    </Modal>
   );
 }
 
