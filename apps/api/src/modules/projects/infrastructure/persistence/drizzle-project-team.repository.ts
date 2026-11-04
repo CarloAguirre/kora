@@ -63,7 +63,7 @@ export class DrizzleProjectTeamRepository implements ProjectTeamRepository {
         ),
       )
       .where(eq(projectTeams.projectId, projectId))
-      .groupBy(projectTeams.id, teams.slug, teams.name, users.firstName, users.lastName);
+      .groupBy(projectTeams.id, teams.id, teams.slug, teams.name, users.firstName, users.lastName);
 
     return rows.map((row) => ({
       id: row.id,
