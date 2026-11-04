@@ -842,43 +842,34 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
       {duplicatingTask && <DuplicateTaskModal
         key={duplicatingTask.task.id} project={project} moduleId={duplicatingTask.moduleId}
         task={duplicatingTask.task} onClose={() => setDuplicatingTask(null)} />}
-      <Modal open={addingPhase} title="Agregar fase" onClose={() => setAddingPhase(false)}
+      <Modal open={addingPhase} title="Nueva fase"
+        className={styles.phaseCreationModal}
+        description="La etapa macro del plan. Después le agregas bloques de trabajo por equipo."
+        onClose={() => setAddingPhase(false)}
         dismissible={!createModule.isPending}
         footer={<>
           <Button variant="outline" onClick={() => setAddingPhase(false)}
             disabled={createModule.isPending}>Cancelar</Button>
           <Button onClick={() => void onCreatePhase()} loading={createModule.isPending}
-            disabled={!newPhase.name.trim() || !(Number(newPhase.estimatedHours) > 0)}>
-            Agregar fase
+            disabled={!newPhaseName.trim()}>
+            Crear fase
           </Button>
         </>}>
         <div className={styles.phaseCreationForm}>
-          <TextField label="Nombre de la fase" value={newPhase.name}
-            onChange={(event) => setNewPhase((current) => ({ ...current, name: event.target.value }))} />
-          <Select label="Etapa inicial" value={newPhase.initialStage} options={STAGE_OPTIONS}
-            onChange={(event) => setNewPhase((current) =>
-              ({ ...current, initialStage: event.target.value as ProjectModuleStage }))} />
-          <TextField label="Horas estimadas" type="number" min={0.01} step={0.01}
-            value={newPhase.estimatedHours}
-            onChange={(event) => setNewPhase((current) =>
-              ({ ...current, estimatedHours: event.target.value }))} />
-          <div className={styles.phaseCreationDates}>
-            <TextField label="Inicio estimado (opcional)" type="date"
-              value={newPhase.estimatedStartDate}
-              onChange={(event) => setNewPhase((current) =>
-                ({ ...current, estimatedStartDate: event.target.value }))} />
-            <TextField label="Fin estimado (opcional)" type="date"
-              value={newPhase.estimatedEndDate}
-              onChange={(event) => setNewPhase((current) =>
-                ({ ...current, estimatedEndDate: event.target.value }))} />
-          </div>
+          <TextField label="Nombre de la fase" required maxLength={300}
+            placeholder="Ej. Calculadora de estimaciones" value={newPhaseName}
+            onChange={(event) => setNewPhaseName(event.target.value)} />
         </div>
       </Modal>
-      {planningBlock && modulesById.get(planningBlock.moduleId) && (
+      {planningBlock && (modulesById.get(planningBlock.moduleId) || planningBlock.phaseName) && (
         <NewWorkBlockModal
           key={planningBlock.moduleId + ':' + planningBlock.teamId}
           project={project}
-          module={modulesById.get(planningBlock.moduleId)!}
+          module={modulesById.get(planningBlock.moduleId) ?? ({
+            id: planningBlock.moduleId,
+            name: planningBlock.phaseName!,
+            segments: [], tasks: [], deliveries: [],
+          } as ProjectModule)}
           teamOptions={teamOptions}
           initialTeamId={planningBlock.teamId}
           initialName={planningBlock.name}
