@@ -250,6 +250,7 @@ function toPhaseRoadmapPhase(
       label: segment.name,
       startDate: segment.startDate,
       endDate: segment.endDate,
+      closedAt: segment.closedAt ?? null,
     })),
     deliveries: module.deliveries.map(
       (delivery): PhaseRoadmapDelivery => ({

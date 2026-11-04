@@ -223,6 +223,8 @@ export interface PhaseRoadmapTask {
   readonly label: string;
   readonly startDate: string;
   readonly endDate: string;
+  /** Fecha real de cierre del bloque (ISO), no su fecha planificada. */
+  readonly closedAt?: string | null;
 }
 
 export type PhaseRoadmapDeliveryState = 'delivered' | 'committed' | 'delayed';

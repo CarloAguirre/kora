@@ -851,17 +851,39 @@ function OperationalPhaseCard({
                       style={{ left: percent + '%' }} />)}
                   {axis.todayPercent !== null && <span className={styles.operationalToday}
                     style={{ left: axis.todayPercent + '%' }} />}
-                  {geometry && <button type="button"
-                    className={[styles.operationalBar, isSelected ? styles.operationalBarSelected : ''].join(' ')}
-                    aria-label={'Abrir bloque ' + task.label}
-                    aria-pressed={isSelected}
-                    style={{
-                      left: geometry.leftPercent + '%',
-                      width: geometry.widthPercent + '%',
-                      background: OPERATIONAL_ROLE_COLORS[task.role],
-                    }}
-                    title={task.label + ' · ' + formatShortDate(task.startDate) + ' a ' + formatShortDate(task.endDate)}
-                    onClick={() => choose(selection)} />}
+                  {geometry && <>
+                    <button type="button"
+                      className={[styles.operationalBar, isSelected ? styles.operationalBarSelected : ''].join(' ')}
+                      aria-label={'Abrir bloque ' + task.label}
+                      aria-pressed={isSelected}
+                      style={{
+                        left: geometry.leftPercent + '%',
+                        width: geometry.widthPercent + '%',
+                        background: OPERATIONAL_ROLE_COLORS[task.role],
+                      }}
+                      title={task.label + ' · ' + formatShortDate(task.startDate) + ' a ' + formatShortDate(task.endDate)}
+                      onClick={() => choose(selection)}>
+                      {metrics?.progress != null && <span className={styles.operationalBarProgress}
+                        style={{ width: Math.min(100, Math.max(0, metrics.progress)) + '%' }} />}
+                    </button>
+                    {(() => {
+                      const closed = Boolean(task.closedAt);
+                      const markerDate = closed ? task.closedAt!.slice(0, 10) : task.endDate;
+                      const position = percentOf(toDate(markerDate), axis.range);
+                      if (position < 0 || position > 100) return null;
+                      const late = !closed && toDate(task.endDate) < startOfToday();
+                      return <button type="button"
+                        aria-label={(closed ? 'Cierre real ' : late ? 'Cierre vencido ' : 'Cierre planificado ') + task.label}
+                        title={(closed ? 'Cerrado realmente el ' : 'Cierre planificado para el ') +
+                          formatShortDate(markerDate)}
+                        className={styles.operationalClosureMarker}
+                        style={{ left: Math.max(0.6, Math.min(99.4, position)) + '%' }}
+                        onClick={() => choose(selection)}>
+                        <DiamondIcon size={16} className={closed ? styles.legendDiamondDone :
+                          late ? styles.legendDiamondDelayed : styles.legendDiamondPlanned} />
+                      </button>;
+                    })()}
+                  </>}
                 </div>
               </div>;
             })}
