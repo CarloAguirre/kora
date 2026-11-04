@@ -33,6 +33,7 @@ interface TeamMemberDraftRow {
   assignedHours: string;
   consumedHours: number;
   isNew: boolean;
+  pendingBlock: boolean;
 }
 
 /**
@@ -72,13 +73,14 @@ export function TeamLeaderProjectView({
 
   const team = useMemo(() => {
     const teamRow = project.teams.find((t) => t.teamId === teamId);
-    const members = project.members.filter((m) => m.teamId === teamId);
+    const historicalMembers = project.members.filter((m) => m.teamId === teamId);
+    const members = historicalMembers.filter((m) => !m.blockedAt);
     const teamName = teamRow?.teamName ?? members[0]?.teamName ?? 'Equipo';
     const leaderId = teamRow?.leader?.id ?? null;
     const leaderName = teamRow?.leader?.fullName ?? null;
     const maxMembers = teamRow?.maxMembers || null;
     const assignedHours = teamRow?.assignedHours ?? members.reduce((sum, m) => sum + m.assignedHours, 0);
-    const consumedHours = members.reduce((sum, m) => sum + m.consumedHours, 0);
+    const consumedHours = historicalMembers.reduce((sum, m) => sum + m.consumedHours, 0);
     return { teamId, teamName, leaderId, leaderName, maxMembers, assignedHours, consumedHours, members };
   }, [project, teamId]);
   const { pageItems: pagedMembers, pagination: membersPagination } = usePaginatedItems(team.members);
@@ -102,20 +104,22 @@ export function TeamLeaderProjectView({
         assignedHours: String(m.assignedHours),
         consumedHours: m.consumedHours,
         isNew: false,
+        pendingBlock: false,
       })),
     );
     setTeamModalOpen(true);
   };
 
-  const draftTotalAssigned = teamDraft.reduce((sum, row) => sum + (Number(row.assignedHours) || 0), 0);
+  const activeDraft = teamDraft.filter((row) => !row.pendingBlock);
+  const draftTotalAssigned = activeDraft.reduce((sum, row) => sum + (Number(row.assignedHours) || 0), 0);
   const draftTotalConsumed = teamDraft.reduce((sum, row) => sum + row.consumedHours, 0);
   const draftOverBudget = team.assignedHours > 0 && draftTotalAssigned > team.assignedHours;
-  const usedTeamMemberIds = new Set(teamDraft.map((row) => row.teamMemberId));
+  const usedTeamMemberIds = new Set(activeDraft.map((row) => row.teamMemberId));
   // Todo el equipo, no solo quienes no estaban asignados: si en el borrador se
   // quita o reemplaza a alguien, vuelve a quedar disponible para otra fila.
   const poolLeft = availableMembers.filter((m) => !usedTeamMemberIds.has(m.id));
   // Cupos libres según el `N° colaboradores` definido en el proyecto (nulo = sin tope).
-  const slotsLeft = team.maxMembers != null ? Math.max(0, team.maxMembers - teamDraft.length) : Infinity;
+  const slotsLeft = team.maxMembers != null ? Math.max(0, team.maxMembers - activeDraft.length) : Infinity;
   const addableCount = Math.min(poolLeft.length, slotsLeft);
 
   const updateDraftRow = (key: string, patch: Partial<TeamMemberDraftRow>) => {
@@ -136,12 +140,14 @@ export function TeamLeaderProjectView({
         assignedHours: '0',
         consumedHours: 0,
         isNew: true,
+        pendingBlock: false,
       },
     ]);
   };
 
   const removeDraftRow = (key: string) => {
-    setTeamDraft((prev) => prev.filter((row) => row.key !== key));
+    setTeamDraft((prev) => prev.map((row) => row.key === key ?
+      { ...row, pendingBlock: true } : row));
   };
 
   const onSaveTeamModal = async () => {
@@ -155,7 +161,7 @@ export function TeamLeaderProjectView({
       const isReplaced = (row: TeamMemberDraftRow) =>
         !row.isNew && team.members.find((m) => m.id === row.assignmentId)?.teamMemberId !== row.teamMemberId;
       const keptAssignmentIds = new Set(
-        teamDraft.filter((row) => !row.isNew && !isReplaced(row)).map((row) => row.assignmentId),
+        teamDraft.filter((row) => !row.isNew && !row.pendingBlock && !isReplaced(row)).map((row) => row.assignmentId),
       );
       for (const member of team.members) {
         if (!keptAssignmentIds.has(member.id)) {
@@ -163,6 +169,7 @@ export function TeamLeaderProjectView({
         }
       }
       for (const row of teamDraft) {
+        if (row.pendingBlock) continue;
         if (row.isNew || isReplaced(row)) {
           await assignMember.mutateAsync({
             projectId,
@@ -182,7 +189,7 @@ export function TeamLeaderProjectView({
           });
         }
       }
-      toast.success('Se actualizó el equipo.');
+      toast.success('Se actualizó el equipo. Las tareas abiertas de los colaboradores bloqueados quedaron por asignar.');
       setTeamModalOpen(false);
     } catch (error) {
       toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo guardar los cambios del equipo.');
@@ -358,7 +365,7 @@ export function TeamLeaderProjectView({
             </div>
             <div className={styles.equipoStat}>
               <span className={styles.equipoStatLabel}>Colaboradores</span>
-              <span className={styles.equipoStatValue}>{teamDraft.length}</span>
+              <span className={styles.equipoStatValue}>{activeDraft.length} de {team.maxMembers ?? 'sin límite'} cupos</span>
             </div>
           </div>
 
@@ -388,7 +395,12 @@ export function TeamLeaderProjectView({
               <tbody>
                 {teamDraft.map((row) => {
                   const locked = !row.isNew && row.consumedHours > 0;
-                  const pct = team.assignedHours > 0 ? Math.round(((Number(row.assignedHours) || 0) / team.assignedHours) * 100) : 0;
+                  const pendingTasks = project.modules.flatMap((module) => module.tasks).filter(
+                    (task) => task.teamId === teamId &&
+                      task.assigneeUserId === team.members.find((member) => member.id === row.assignmentId)?.userId &&
+                      !task.cancelledAt && ['todo', 'in_progress'].includes(task.status),
+                  ).length;
+                  const pct = team.assignedHours > 0 ? Math.round(((row.pendingBlock ? 0 : (Number(row.assignedHours) || 0)) / team.assignedHours) * 100) : 0;
                   // Quien sigue en esta fila + quienes nadie más ocupa. La persona
                   // actual se agrega a mano si ya no figura en el catálogo del
                   // equipo, para que el Select no quede en blanco.
@@ -401,9 +413,9 @@ export function TeamLeaderProjectView({
                       .map((m) => ({ value: m.id, label: m.fullName })),
                   ];
                   return (
-                    <tr key={row.key}>
+                    <tr key={row.key} className={row.pendingBlock ? styles.rowPendingBlock : undefined}>
                       <td>
-                        {!locked ? (
+                        {!locked && !row.pendingBlock ? (
                           <Select
                             options={rowOptions}
                             value={row.teamMemberId}
@@ -419,9 +431,14 @@ export function TeamLeaderProjectView({
                         ) : (
                           <span className={styles.modalLockedText}>{row.fullName}</span>
                         )}
+                        {row.pendingBlock && <small className={styles.blockMessage}>
+                          Se bloqueará al guardar. {formatHours(row.consumedHours)} HH quedan registradas;
+                          {pendingTasks} {pendingTasks === 1 ? 'tarea abierta pasa' : 'tareas abiertas pasan'} a Por asignar.
+                        </small>}
                       </td>
                       <td>
                         <TextField
+                          disabled={row.pendingBlock}
                           value={row.activity}
                           placeholder="Actividad"
                           onChange={(event) => updateDraftRow(row.key, { activity: event.target.value })}
@@ -431,6 +448,7 @@ export function TeamLeaderProjectView({
                         <TextField
                           type="number"
                           min={row.consumedHours}
+                          disabled={row.pendingBlock}
                           value={row.assignedHours}
                           onChange={(event) =>
                             updateDraftRow(row.key, { assignedHours: event.target.value.replace(/^0+(?=\d)/, '') })
@@ -440,21 +458,16 @@ export function TeamLeaderProjectView({
                       <td className={styles.modalReadonlyCell}>{row.consumedHours}</td>
                       <td className={styles.modalReadonlyCell}>{pct}%</td>
                       <td>
-                        {locked ? (
-                          <span
-                            className={styles.warnIcon}
-                            title={`No se puede quitar: ya registró ${row.consumedHours} hh consumidas. Solo se puede modificar horas y actividad.`}
-                          >
-                            <AlertIcon size={16} />
-                          </span>
+                        {row.pendingBlock ? (
+                          <button type="button" className={styles.blockUndo}
+                            onClick={() => updateDraftRow(row.key, { pendingBlock: false })}>
+                            Deshacer
+                          </button>
                         ) : (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            aria-label={`Quitar a ${row.fullName}`}
-                            onClick={() => removeDraftRow(row.key)}
-                          >
-                            <TrashIcon size={16} />
+                          <Button variant="outline" size="sm"
+                            aria-label={`Bloquear a ${row.fullName}`}
+                            onClick={() => removeDraftRow(row.key)}>
+                            <TrashIcon size={13} /> Bloquear
                           </Button>
                         )}
                       </td>
