@@ -1,0 +1,23 @@
+.root { min-width: 0; width: 100%; }
+.planDescription {
+  font-size: 11px;
+  line-height: 1.5;
+  color: #687994;
+  margin: 0 0 12px;
+}
+.blockName {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  color: #39536b;
+}
+.teamDot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  display: inline-block;
+  border-radius: 2px;
+}
+@media (max-width: 640px) {
+  .planDescription { margin-top: 6px; }
+}
