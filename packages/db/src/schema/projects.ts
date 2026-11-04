@@ -309,6 +309,8 @@ export const projectModuleDeliveries = pgTable('project_module_deliveries', {
   /** Nullable por entregas creadas antes de este campo — las nuevas siempre lo piden (ver `addProjectModuleDeliverySchema`). */
   name: varchar('name', { length: 300 }),
   description: text('description'),
+  /** Identidad del bloque que cierra; NULL en entregas de fase independientes. */
+  segmentId: uuid('segment_id'),
   /** Colaborador del equipo responsable a quien se le asignó esta entrega — `null` ⇔ "Sin asignar". */
   assigneeUserId: uuid('assignee_user_id').references(() => users.id, { onDelete: 'set null' }),
   estimatedDate: date('estimated_date', { mode: 'date' }).notNull(),
@@ -331,6 +333,7 @@ export const projectModuleSegments = pgTable('project_module_segments', {
   startDate: date('start_date', { mode: 'date' }).notNull(),
   endDate: date('end_date', { mode: 'date' }).notNull(),
   estimatedHours: numeric('estimated_hours', { precision: 10, scale: 2 }),
+  closedAt: timestamp('closed_at', { withTimezone: true, mode: 'date' }),
   ...timestamps,
 });
 
@@ -361,6 +364,7 @@ export const projectModuleSegmentMembers = pgTable(
 /** Tarea puntual (una fecha) de una fase/módulo, por equipo y opcionalmente asignada a una persona — marcador en el Roadmap y base de "Mis tareas". */
 export const projectModuleTasks = pgTable('project_module_tasks', {
   id: primaryId(),
+  segmentId: uuid('segment_id').references(() => projectModuleSegments.id, { onDelete: 'set null' }),
   moduleId: uuid('module_id')
     .notNull()
     .references(() => projectModules.id, { onDelete: 'cascade' }),

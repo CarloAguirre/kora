@@ -358,6 +358,13 @@
       "when": 1793750000000,
       "tag": "0050_project_segment_estimated_hours",
       "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1793822400000,
+      "tag": "0051_work_block_links_and_closure",
+      "breakpoints": true
     }
   ]
 }

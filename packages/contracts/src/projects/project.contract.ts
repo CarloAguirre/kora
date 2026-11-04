@@ -158,6 +158,8 @@ export const PROJECT_MODULE_DELIVERY_ALLOWED_TRANSITIONS: Readonly<
 
 export const projectModuleDeliverySchema = z.object({
   id: uuidSchema,
+  /** Entrega de cierre de un bloque. NULL en entregas independientes históricas. */
+  segmentId: uuidSchema.nullable().optional(),
   teamId: uuidSchema.nullable(),
   teamName: z.string().nullable(),
   /** Nulo en entregas creadas antes de este campo. */
@@ -224,6 +226,8 @@ export type ProjectModuleSegmentMember = z.infer<typeof projectModuleSegmentMemb
 /** Tramo de trabajo de un equipo dentro de una fase/módulo — con su propio rango de fechas (Roadmap). */
 export const projectModuleSegmentSchema = z.object({
   id: uuidSchema,
+  /** Se fija al aprobarse la última tarea vinculada o al cerrar manualmente. */
+  closedAt: isoDateTimeSchema.nullable().optional(),
   teamId: uuidSchema,
   teamName: z.string(),
   name: z.string(),
@@ -265,7 +269,11 @@ export const createProjectModuleSegmentSchema = z.object({
 });
 export type CreateProjectModuleSegmentInput = z.infer<typeof createProjectModuleSegmentSchema>;
 
-export const updateProjectModuleSegmentSchema = createProjectModuleSegmentSchema.omit({ closingDelivery: true }).partial();
+export const updateProjectModuleSegmentSchema = createProjectModuleSegmentSchema.partial().extend({
+  /** Null elimina una entrega planificada (no aprobada); omitirla no la modifica. */
+  closingDelivery: createProjectModuleSegmentSchema.shape.closingDelivery.unwrap().nullable().optional(),
+  closureAction: z.enum(['close', 'reopen']).optional(),
+});
 export type UpdateProjectModuleSegmentInput = z.infer<typeof updateProjectModuleSegmentSchema>;
 
 /** HH estimadas de una tarea o fase — obligatorias y mayores a 0 en altas y ediciones (las antiguas pueden venir nulas). */
@@ -276,6 +284,8 @@ const estimatedHoursSchema = z.coerce
 /** Tarea puntual (una fecha) de una fase/módulo, por equipo y opcionalmente asignada a una persona — marcador en el Roadmap y base de "Mis tareas". */
 export const projectModuleTaskSchema = z.object({
   id: uuidSchema,
+  /** Relación verificable con el bloque operativo; las tareas antiguas pueden no tenerla. */
+  segmentId: uuidSchema.nullable().optional(),
   teamId: uuidSchema.nullable(),
   teamName: z.string().nullable(),
   assigneeUserId: uuidSchema.nullable(),
@@ -294,6 +304,7 @@ export const projectModuleTaskSchema = z.object({
 export type ProjectModuleTask = z.infer<typeof projectModuleTaskSchema>;
 
 export const createProjectModuleTaskSchema = z.object({
+  segmentId: uuidSchema.nullish(),
   teamId: uuidSchema.nullish(),
   assigneeUserId: uuidSchema.nullish(),
   name: nonEmptyTrimmed(300, 'El nombre de la tarea'),

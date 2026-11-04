@@ -8,6 +8,7 @@ import type {
 
 export interface ProjectModuleDeliveryRecord {
   readonly id: string;
+  readonly segmentId?: string | null;
   readonly moduleId: string;
   readonly teamId: string | null;
   readonly teamName: string | null;
@@ -30,6 +31,7 @@ export interface ProjectModuleSegmentMemberRecord {
 
 export interface ProjectModuleSegmentRecord {
   readonly id: string;
+  readonly closedAt?: Date | null;
   readonly moduleId: string;
   readonly teamId: string;
   readonly teamName: string;
@@ -42,6 +44,7 @@ export interface ProjectModuleSegmentRecord {
 
 export interface ProjectModuleTaskRecord {
   readonly id: string;
+  readonly segmentId?: string | null;
   readonly moduleId: string;
   readonly teamId: string | null;
   readonly teamName: string | null;
@@ -101,6 +104,7 @@ export interface CreateProjectModuleSegmentInput {
 }
 
 export interface UpdateProjectModuleSegmentInput {
+  readonly closedAt?: Date | null;
   readonly teamId?: string;
   readonly name?: string;
   readonly startDate?: Date;
@@ -115,6 +119,7 @@ export interface ProjectModuleSegmentMemberInput {
 
 export interface CreateProjectModuleTaskInput {
   readonly moduleId: string;
+  readonly segmentId?: string | null;
   readonly teamId: string | null;
   readonly assigneeUserId: string | null;
   readonly name: string;
@@ -127,6 +132,7 @@ export interface CreateProjectModuleTaskInput {
 }
 
 export interface UpdateProjectModuleTaskInput {
+  readonly segmentId?: string | null;
   readonly teamId?: string | null;
   readonly assigneeUserId?: string | null;
   readonly name?: string;
@@ -142,6 +148,7 @@ export interface UpdateProjectModuleTaskInput {
 
 export interface CreateProjectModuleDeliveryInput {
   readonly moduleId: string;
+  readonly segmentId?: string | null;
   readonly teamId: string | null;
   readonly name: string;
   readonly description: string | null;
@@ -150,6 +157,7 @@ export interface CreateProjectModuleDeliveryInput {
 }
 
 export interface UpdateProjectModuleDeliveryInput {
+  readonly segmentId?: string | null;
   readonly teamId?: string | null;
   readonly name?: string;
   readonly description?: string | null;
@@ -226,6 +234,8 @@ export interface ProjectModuleRepository {
     context?: TransactionContext,
   ): Promise<void>;
   removeSegment(id: string, context?: TransactionContext): Promise<void>;
+  /** Reconciliar cierre real después de un cambio de aprobación de tarea, sin inferir fechas. */
+  refreshSegmentClosure(segmentId: string, now: Date, context?: TransactionContext): Promise<void>;
   /** Reemplaza todos los colaboradores del tramo por `members`. */
   replaceSegmentMembers(
     segmentId: string,
