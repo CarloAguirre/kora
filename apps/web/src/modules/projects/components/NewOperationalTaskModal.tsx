@@ -55,7 +55,7 @@ export function NewOperationalTaskModal({
       await create.mutateAsync({
         projectId: project.id, moduleId,
         input: {
-          teamId,
+          teamId, segmentId: blockId || null,
           name: name.trim(),
           description: fullDescription || null,
           assigneeUserId: assignee || null,

@@ -65,7 +65,8 @@ export function QuotationReferenceTaskModal({
       await create.mutateAsync({
         projectId: project.id, moduleId: targetModuleId,
         input: {
-          name: name.trim(), teamId, assigneeUserId: assignee || null,
+          name: name.trim(), teamId, segmentId: blockId || null,
+          assigneeUserId: assignee || null,
           description: [sourceMarker,
             ...(selectedBlock ? ['Bloque de trabajo: ' + selectedBlock.name + ' · ID ' + selectedBlock.id] : []),
             description.trim(),

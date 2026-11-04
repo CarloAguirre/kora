@@ -38,7 +38,7 @@ export function ExecutionTaskModal({
   const [description, setDescription] = useState(original.content);
   const [assignee, setAssignee] = useState(task.assigneeUserId ?? '');
   const [teamId, setTeamId] = useState(task.teamId ?? '');
-  const [blockId, setBlockId] = useState(original.blockId);
+  const [blockId, setBlockId] = useState(task.segmentId ?? original.blockId);
   const [status, setStatus] = useState(task.status);
   const [estimatedHours, setEstimatedHours] = useState(String(task.estimatedHours ?? ''));
   const [startDate, setStartDate] = useState(task.startDate);
@@ -81,7 +81,8 @@ export function ExecutionTaskModal({
         projectId: project.id, moduleId, taskId: task.id,
         input: {
           name: name.trim(), description: newDescription || null,
-          teamId: teamId || null, assigneeUserId: assignee || null,
+          teamId: teamId || null, segmentId: blockId || null,
+          assigneeUserId: assignee || null,
           status, estimatedHours: hours, startDate, date,
         },
       });

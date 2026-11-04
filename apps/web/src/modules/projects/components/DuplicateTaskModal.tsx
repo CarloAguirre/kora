@@ -51,7 +51,8 @@ export function DuplicateTaskModal({
         input: {
           name: name.trim(),
           description: task.description,
-          teamId: selected.teamId, assigneeUserId: selected.userId,
+          teamId: selected.teamId, segmentId: task.segmentId ?? null,
+          assigneeUserId: selected.userId,
           scope: task.scope, status: 'todo',
           estimatedHours: effort, startDate: task.startDate, date: task.date,
         },
