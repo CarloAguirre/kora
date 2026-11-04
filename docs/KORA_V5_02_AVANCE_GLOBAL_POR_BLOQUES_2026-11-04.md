@@ -125,5 +125,38 @@ pnpm --filter @kora/web exec vitest run src/modules/projects/lib/project-executi
 pnpm --filter @kora/web build
 ```
 
-Cambios limitados al frontend y documentación: **sin migraciones, UPDATE
-ni modificaciones de PostgreSQL**. Validación local pendiente de ejecutar.
+Las correcciones posteriores de la misma rama también actualizaron el API
+para alinear `project.progress` y la persistencia del avance. Este ajuste
+específico de visualización no requiere migraciones ni `UPDATE` manual
+en PostgreSQL. Validación local pendiente de ejecutar.
+
+## Refinamiento visual: proyecto recién iniciado (04-11-2026)
+
+Caso observado: proyecto `prueba-dev-2`, **1.003 HH de bloques vs
+1.000 HH vendidas**, por una fase operativa adicional de 3 HH. El avance
+global indica **0% real y 1% esperado**, pero «Qué explica la diferencia»
+no aparecía porque el agregador redondeaba cada brecha individual a
+puntos enteros (cada aporte menor a 0,5 puntos se volvía 0).
+
+- `project-execution-progress.ts` conserva el aporte porcentual de cada
+  bloque con precisión decimal. Solo se redondea para presentarlo
+  (por ejemplo **−0,43 pts**), y ordena las causas por brecha real.
+  Esto evita mostrar «No hay bloques atrasados» cuando el proyecto sí
+  está por debajo de la planificación.
+- `ProjectExecutionProgressCard` inicia con la sección explicativa
+  **cerrada**, con un chevrón SVG centrado. Se sustituyó también el
+  glifo del panel de equipo, reutilizando su estilo común.
+- La alerta anterior «Las HH de bloques no coinciden con la estimación
+  comercial; revisa el Roadmap» era **demasiado genérica** para una fase
+  agregada después de la cotización. Ahora se distingue:
+  - falta de HH comerciales por distribuir en bloques: **advertencia real**;
+  - más HH operativas que vendidas: **nota informativa neutral** de la
+    diferencia exacta, sin considerar que los datos están corruptos.
+- La diferencia **no modifica las HH vendidas ni el contrato**.
+  El porcentaje de avance sigue basado en las HH de bloques.
+- Se actualizaron las pruebas del panel, del agregador y de integración
+  para el despliegue cerrado, el desfase de 3 HH y los aportes menores
+  a un punto porcentual.
+
+No hay migraciones ni modificación directa de datos por estos cambios.
+Ejecutar localmente el `typecheck` y las pruebas para validar el HEAD nuevo.
