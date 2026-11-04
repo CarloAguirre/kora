@@ -35,7 +35,7 @@ import { ExecutionTaskModal } from './ExecutionTaskModal';
 import { DuplicateTaskModal } from './DuplicateTaskModal';
 import { NewWorkBlockModal, type WorkBlockFormInput } from './NewWorkBlockModal';
 import { AssignBlockTasksModal } from './AssignBlockTasksModal';
-import { proposedBlockPeriod, displayProposedDate } from '../lib/quotation-relative-dates';
+import { proposedBlockPeriod, shiftIsoDays } from '../lib/quotation-relative-dates';
 import { NewOperationalTaskModal } from './NewOperationalTaskModal';
 import { ReferenceBlockDrawer } from './ReferenceBlockDrawer';
 import { useAppliedQuotationPlanning } from '@/modules/estimation/api/quotation.queries';
@@ -128,6 +128,25 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
   const roadmapExclusions = useRoadmapReferenceExclusions(project.id);
   const excludeRoadmapReference = useExcludeRoadmapReference();
   const phaseRoadmap = useMemo(() => toPhaseRoadmap(project), [project]);
+  const roadmapWithProposals = useMemo(() => {
+    if (!project.startDate || !appliedPlanning.data) return phaseRoadmap;
+    const proposed = appliedPlanning.data.modules.flatMap((reference) => {
+      const module = project.modules.find((entry) => entry.id === reference.moduleId);
+      return (reference.relativeTeamBlocks ?? [])
+        .filter((block) => module && !module.segments.some((segment) => segment.teamId === block.teamId))
+        .map((block) => proposedBlockPeriod(project.startDate, block.startWeek, block.durationWeeks))
+        .filter((period): period is NonNullable<typeof period> => period !== null);
+    });
+    if (!proposed.length) return phaseRoadmap;
+    const allStarts = [phaseRoadmap.rangeStartDate, ...proposed.map((period) =>
+      shiftIsoDays(period.startDate, -7))].filter(Boolean).sort();
+    const allEnds = [phaseRoadmap.rangeEndDate, ...proposed.map((period) =>
+      shiftIsoDays(period.endDate, 7))].filter(Boolean).sort();
+    return {
+      ...phaseRoadmap, rangeStartDate: allStarts[0]!,
+      rangeEndDate: allEnds[allEnds.length - 1]!,
+    };
+  }, [phaseRoadmap, project.startDate, project.modules, appliedPlanning.data]);
   const modulesById = useMemo(() => new Map(project.modules.map((module) => [module.id, module])), [project.modules]);
 
   /** Tiempo de ejecución que se está editando (`null` = modal cerrado). */
@@ -793,7 +812,7 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
           </details>
         </Card>
       )}
-      <PhaseRoadmap alwaysExpanded operationalView borderlessSummary phaseRoadmap={phaseRoadmap}
+      <PhaseRoadmap alwaysExpanded operationalView borderlessSummary phaseRoadmap={roadmapWithProposals}
         operationalTaskCount={operationalCounts.tasks} operationalBlockCount={operationalCounts.blocks}
         operationalPresaleHours={project.prospectPhaseHours}
         operationalRows={getOperationalRows}
