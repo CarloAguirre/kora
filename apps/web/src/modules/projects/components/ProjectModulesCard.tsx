@@ -490,7 +490,8 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
     if (!module || !segment) return { hours: null, progress: null };
     const teamSegments = module.segments.filter((item) => item.teamId === segment.teamId);
     const directTasks = module.tasks.filter((task) =>
-      task.description?.includes(' · ID ' + segment.id));
+      task.segmentId === segment.id ||
+      (!task.segmentId && task.description?.includes(' · ID ' + segment.id)));
     // Sin FK tarea-bloque solo atribuimos tareas de equipo si tiene un único bloque.
     const tasks = directTasks.length > 0 ? directTasks
       : teamSegments.length === 1 ? module.tasks.filter((task) => task.teamId === segment.teamId) : [];
@@ -572,7 +573,9 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
                   <td>{task.assigneeName || 'Sin asignar'}</td>
                   <td>{(() => {
                     const linked = module.segments.find((segment) =>
-                      task.description?.includes('Bloque de trabajo: ' + segment.name + ' · ID ' + segment.id));
+                      task.segmentId === segment.id ||
+                      (!task.segmentId && task.description?.includes(
+                        'Bloque de trabajo: ' + segment.name + ' · ID ' + segment.id)));
                     return linked ? <>
                       <span className={styles.operationalTeamDot}
                         style={{ background: operationalTeamColor(linked.teamName) }} />
@@ -675,8 +678,9 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
           onDuplicateTask={canManage ? (task) => {
             setDuplicatingTask({ moduleId: module.id, task }); close();
           } : undefined}
-          onCreateReference={canManage ? (task) => {
-            setCreatingFromReference({ moduleId: module.id, task }); close();
+          onAssignTasks={canManage ? () => {
+            setAssigningTasks({ moduleId: module.id, teamId: segment.teamId });
+            close();
           } : undefined}
         />
       ) : null;
