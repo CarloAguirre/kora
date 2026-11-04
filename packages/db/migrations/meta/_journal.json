@@ -372,6 +372,13 @@
       "when": 1793862000000,
       "tag": "0052_roadmap_reference_exclusions",
       "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1793894400000,
+      "tag": "0053_project_member_block_and_task_cancel",
+      "breakpoints": true
     }
   ]
 }
