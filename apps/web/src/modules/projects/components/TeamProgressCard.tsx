@@ -113,7 +113,12 @@ export function TeamProgressCard({ progress, teamName }: Props) {
       <div className={styles.explainer}>
         <button type="button" className={styles.toggle} aria-expanded={expanded}
           aria-controls={descriptionId} onClick={() => setExpanded((value) => !value)}>
-          <span className={styles.chevron} aria-hidden="true">{expanded ? '⌄' : '›'}</span>
+          <span className={styles.chevron} aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none"
+              stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d={expanded ? 'm6 9 6 6 6-6' : 'm9 6 6 6-6 6'} />
+            </svg>
+          </span>
           ¿Cómo se calcula este avance?
         </button>
         {expanded && <div id={descriptionId} className={styles.explanation}>
