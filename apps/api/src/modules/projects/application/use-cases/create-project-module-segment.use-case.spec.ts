@@ -3,6 +3,7 @@ import { CreateProjectModuleSegmentUseCase } from './create-project-module-segme
 import type { ProjectRepository } from '../../domain/repositories/project.repository';
 import type { ProjectModuleRepository } from '../../domain/repositories/project-module.repository';
 import type { ForecastSourceSyncService } from '../services/forecast-source-sync.service';
+import type { ProjectProgressRecalculator } from '../services/project-progress-recalculator';
 import type { AuditRecorder } from '../../../../shared/application/ports/audit-recorder.port';
 import { FixedClock, PassthroughUnitOfWork } from '../../../../test/fakes';
 
@@ -21,8 +22,9 @@ function fixture() {
     syncSegment: vi.fn().mockResolvedValue(undefined),
   } as unknown as ForecastSourceSyncService;
   const audit = { record: vi.fn().mockResolvedValue(undefined) } as unknown as AuditRecorder;
+  const progress = { recalculate: vi.fn().mockResolvedValue(undefined) } as unknown as ProjectProgressRecalculator;
   const useCase = new CreateProjectModuleSegmentUseCase(
-    projects, modules, forecast, audit, new FixedClock(), new PassthroughUnitOfWork(),
+    projects, modules, forecast, audit, new FixedClock(), new PassthroughUnitOfWork(), progress,
   );
   return { useCase, modules, forecast, audit };
 }
