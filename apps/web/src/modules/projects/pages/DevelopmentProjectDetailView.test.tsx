@@ -279,7 +279,7 @@ describe('DevelopmentProjectDetailView — equipos PM/PMO', () => {
     const desarrollo = within(getTeamCard('Desarrollo'));
     expect(desarrollo.getByText('400 hrs')).toBeInTheDocument();
     expect(desarrollo.getByText('474 hrs')).toBeInTheDocument();
-    expect(desarrollo.getByText('Sobre presupuesto')).toBeInTheDocument();
+    expect(desarrollo.getByText(/Sobre presupuesto/)).toBeInTheDocument();
   });
 
   it('cada card conserva el enlace profundo al equipo dentro del proyecto', () => {
