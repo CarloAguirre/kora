@@ -1,7 +1,11 @@
 import { ForbiddenException, Injectable, NotFoundException, Inject } from '@nestjs/common';
-import type { ExcludeRoadmapReferenceInput, RoadmapReferenceExclusion } from '@kora/contracts';
+import type { ExcludeRoadmapReferenceInput, Permission, RoadmapReferenceExclusion } from '@kora/contracts';
 import { ROADMAP_REFERENCE_EXCLUSION_STORE, type RoadmapReferenceExclusionStore } from '../ports/roadmap-reference-exclusion-store.port';
-import type { RequestUser } from '../../../../shared/presentation/decorators/current-user.decorator';
+/** Actor mínimo de aplicación, sin dependencia de la capa HTTP/presentación. */
+interface RoadmapReferenceActor {
+  readonly id: string;
+  readonly permissions: readonly Permission[];
+}
 import { unwrapOrThrow } from '../../../../shared/presentation/unwrap-result';
 import { GetProjectUseCase } from '../use-cases/get-project.use-case';
 
@@ -15,20 +19,20 @@ export class ProjectRoadmapReferenceExclusionsService {
     private readonly getProject: GetProjectUseCase,
   ) {}
 
-  private async access(projectId: string, actor: RequestUser) {
+  private async access(projectId: string, actor: RoadmapReferenceActor) {
     return unwrapOrThrow(await this.getProject.execute({
       projectId, actorUserId: actor.id, actorPermissions: actor.permissions,
     }));
   }
 
-  async list(projectId: string, actor: RequestUser): Promise<RoadmapReferenceExclusion[]> {
+  async list(projectId: string, actor: RoadmapReferenceActor): Promise<RoadmapReferenceExclusion[]> {
     const project = await this.access(projectId, actor);
     return this.store.list(project.id);
   }
 
   async suppress(
     projectId: string, moduleId: string,
-    input: ExcludeRoadmapReferenceInput, actor: RequestUser,
+    input: ExcludeRoadmapReferenceInput, actor: RoadmapReferenceActor,
   ): Promise<void> {
     const project = await this.access(projectId, actor);
     if (!actor.permissions.includes('projects:manage') && project.leader?.id !== actor.id) {
@@ -44,7 +48,7 @@ export class ProjectRoadmapReferenceExclusionsService {
 
   async restore(
     projectId: string, moduleId: string,
-    input: ExcludeRoadmapReferenceInput, actor: RequestUser,
+    input: ExcludeRoadmapReferenceInput, actor: RoadmapReferenceActor,
   ): Promise<void> {
     const project = await this.access(projectId, actor);
     if (!actor.permissions.includes('projects:manage') && project.leader?.id !== actor.id) {
