@@ -75,3 +75,52 @@ describe('Extensiones de cabecera en Roadmap compartido', () => {
     expect(header).toHaveAttribute('aria-expanded', 'true');
   });
 });
+
+
+describe('Roadmap operativo · diseño aprobado v5.02', () => {
+  it('mantiene la fase abierta y muestra referencias sin inventar una barra ni fechas', () => {
+    const plan = vi.fn();
+    render(<PhaseRoadmap phaseRoadmap={phaseRoadmap}
+      operationalView operationalTaskCount={18} operationalBlockCount={4}
+      operationalRows={() => [{ id: 'team-pmo', role: 'pmo', label: 'Coordinación', hours: 36 }]}
+      onPlanOperationalRow={plan}
+      renderPhaseReferences={() => (
+        <details open><summary>Tareas 18, 0 aprobadas</summary><div>Por asignar</div></details>
+      )}
+    />);
+    expect(screen.getByText('18')).toBeInTheDocument();
+    expect(screen.getByText('4')).toBeInTheDocument();
+    expect(screen.getByText('PMO')).toBeInTheDocument();
+    expect(screen.getByText('Sin fechas: pendiente de planificar el bloque de trabajo')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Abrir bloque/ })).not.toBeInTheDocument();
+    expect(screen.queryByText('Resumen de avance')).not.toBeInTheDocument();
+    expect(screen.queryByText('Rango visible:')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Planificar bloque' }));
+    expect(plan).toHaveBeenCalledOnce();
+    expect(screen.getByText('Tareas 18, 0 aprobadas')).toBeInTheDocument();
+  });
+
+  it('reutiliza las barras reales y permite seleccionar su detalle sin colapsar el cronograma', () => {
+    const withSegment: ProjectPhaseRoadmap = {
+      ...phaseRoadmap,
+      phases: [{
+        ...phaseRoadmap.phases[0]!,
+        tasks: [{ id: 'segment-01', role: 'dev', scope: 'desarrollo',
+          label: 'Desarrollo backend', startDate: '2026-11-03', endDate: '2026-11-20' }],
+      }],
+    };
+    render(<PhaseRoadmap phaseRoadmap={withSegment} operationalView
+      renderSelectionDetail={(_phase, selection, clear) => (
+        <div>Bloque seleccionado: {selection.label}
+          <button type="button" onClick={clear}>Cerrar detalle</button>
+        </div>
+      )} />);
+    const bar = screen.getByRole('button', { name: 'Abrir bloque Desarrollo backend' });
+    expect(bar).toBeInTheDocument();
+    fireEvent.click(bar);
+    expect(screen.getByText('Bloque seleccionado: Desarrollo backend')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar detalle' }));
+    expect(screen.queryByText('Bloque seleccionado: Desarrollo backend')).not.toBeInTheDocument();
+    expect(bar).toBeInTheDocument();
+  });
+});
