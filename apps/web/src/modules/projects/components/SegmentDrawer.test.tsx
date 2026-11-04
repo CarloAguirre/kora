@@ -133,13 +133,16 @@ describe('Bloque operativo: fidelidad de los tres estados v5.02', () => {
   it('entrega vencida: mantiene estado rojo aun con avance de tareas en 100%', async () => {
     const onAddTask = vi.fn();
     const onDeleteTask = vi.fn();
-    const overdue = { ...segment, teamId: 'team-rpa', closedAt: null } as ProjectModuleSegment;
+    // Un cierre automático por tareas aprobadas NO salda la entrega pendiente.
+    const overdue = { ...segment } as ProjectModuleSegment;
     const { props } = show({
       segment: overdue, deliveries: [delivery('planned')],
-      onAddTask, onDeleteTask,
+      onAddTask, onDeleteTask, onChangeClosure: vi.fn(),
     });
     const dialog = screen.getByRole('dialog');
     expect(within(dialog).getByLabelText('Estado: Entrega vencida')).toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: 'Reabrir bloque' }))
+      .not.toBeInTheDocument();
     expect(within(dialog).getByText('Fecha planificada: 16-10-2026 (vencida)'))
       .toBeInTheDocument();
     expect(within(dialog).getByRole('progressbar', { name: 'Avance real del bloque' }))
