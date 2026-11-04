@@ -91,7 +91,7 @@ describe('Roadmap operativo · diseño aprobado v5.02', () => {
     expect(screen.getByText('18')).toBeInTheDocument();
     expect(screen.getByText('4')).toBeInTheDocument();
     expect(screen.getByText('PMO')).toBeInTheDocument();
-    expect(screen.getByText('Sin fechas: define el inicio del proyecto para ver la propuesta')).toBeInTheDocument();
+    expect(screen.getByText('Se generará al iniciar el proyecto desde la cotización aprobada.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Abrir bloque Coordinación' })).toBeInTheDocument();
     expect(screen.queryByText('Resumen de avance')).not.toBeInTheDocument();
     expect(screen.queryByText('Rango visible:')).not.toBeInTheDocument();
@@ -100,22 +100,24 @@ describe('Roadmap operativo · diseño aprobado v5.02', () => {
     expect(screen.getByText('Tareas 18, 0 aprobadas')).toBeInTheDocument();
   });
 
-  it('al disponer de inicio muestra fechas propuestas, no la etiqueta Sin fechas', () => {
-    render(<PhaseRoadmap phaseRoadmap={{
-      ...phaseRoadmap,
-      rangeStartDate: '2026-10-29',
-      rangeEndDate: '2026-12-30',
-    }} operationalView
-      operationalRows={() => [{
-        id: 'team-qa', role: 'qa', label: 'Aseguramiento QA', hours: 140,
-        proposedStartDate: '2026-11-05', proposedEndDate: '2026-11-18',
-      }]} />);
-    expect(screen.getByRole('button', { name: 'Ver propuesta de bloque Aseguramiento QA' }))
+  it('dibuja barras definitivas cuando el segmento ya está persistido', () => {
+    const withBlock = {
+      ...phaseRoadmap, phases: [{
+        ...phaseRoadmap.phases[0]!,
+        tasks: [{
+          id: 'segment-1', role: 'qa' as const, scope: 'qa' as const,
+          label: 'Aseguramiento QA',
+          startDate: '2026-11-05', endDate: '2026-11-18',
+        }],
+      }],
+    };
+    render(<PhaseRoadmap phaseRoadmap={withBlock} operationalView />);
+    expect(screen.getByRole('button', { name: 'Abrir bloque Aseguramiento QA' }))
       .toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Fechas propuestas de Aseguramiento QA' }))
-      .toHaveTextContent('Propuesta: 05-11-2026 → 18-11-2026');
-    expect(screen.queryByText(/Sin fechas: se calculan al definir/)).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Planificar bloque' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cierre planificado Aseguramiento QA' }))
+      .toBeInTheDocument();
+    expect(screen.queryByText(/fechas propuestas/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Sin fechas:/)).not.toBeInTheDocument();
   });
 
   it('abre el detalle de un bloque sin fechas desde el nombre o la zona temporal', () => {
@@ -131,7 +133,7 @@ describe('Roadmap operativo · diseño aprobado v5.02', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Cerrar detalle' }));
     expect(screen.queryByText('Detalle: reference-block')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', {
-      name: 'Sin fechas: define el inicio del proyecto para ver la propuesta',
+      name: 'Se generará al iniciar el proyecto desde la cotización aprobada.',
     }));
     expect(screen.getByText('Detalle: reference-block')).toBeInTheDocument();
   });
