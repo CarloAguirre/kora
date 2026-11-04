@@ -109,6 +109,12 @@ export class UpdateProjectModuleTaskUseCase
       const isTeamLeader =
         task.teamId != null &&
         (await this.projectTeams.isTeamLeaderForProject(project.id, task.teamId, command.actor.userId));
+      if (isTeamLeader && command.data.teamId !== undefined && command.data.teamId !== task.teamId &&
+        (!command.data.teamId || !await this.projectTeams.isTeamLeaderForProject(
+          project.id, command.data.teamId, command.actor.userId,
+        ))) {
+        return err(new ForbiddenError('No lideras el equipo de destino de esta tarea.', 'PROJECT_TEAM_NOT_LED'));
+      }
       if (!isTeamLeader) {
         if (task.assigneeUserId !== command.actor.userId) {
           return err(new ForbiddenError('No tienes acceso a esta tarea.', 'PROJECT_MODULE_TASK_NOT_ASSIGNEE'));
