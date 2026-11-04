@@ -87,6 +87,10 @@ export class UpdateHourEntryUseCase implements UseCase<UpdateHourEntryCommand, v
       ? (data.moduleId !== undefined && data.moduleId !== entry.toSnapshot().moduleId
         ? null : previousSegmentId)
       : data.segmentId;
+    if (projectId && !moduleId && data.projectId !== undefined &&
+      await this.projects.hasWorkBlocks(projectId)) {
+      return err(new HourEntrySegmentRequiredError());
+    }
     if (selectedSegmentId && !moduleId) {
       return err(new InvalidHourEntrySegmentError('Selecciona la fase antes de elegir un bloque.'));
     }
