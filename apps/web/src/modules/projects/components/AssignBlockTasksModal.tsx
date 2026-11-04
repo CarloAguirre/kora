@@ -126,7 +126,12 @@ export function AssignBlockTasksModal({
   };
   return <Modal open wide className={styles.assignmentDialog} title={'Asignar tareas · ' + module.name}
     description={(team?.teamName ?? 'Equipo') +
-      '. Las HH se conservan; elige colaboradores y fechas. Las filas sin asignar quedan pendientes.'}
+      '. Las tareas conservan sus HH estimadas; ' +
+      (blocks.length === 1
+        ? 'las fechas vienen propuestas según el bloque (' + formatIso(blocks[0]!.startDate) +
+          ' → ' + formatIso(blocks[0]!.endDate) + ').'
+        : 'elige el bloque y las fechas de ejecución.') +
+      ' Las que dejes sin asignar quedan Por asignar.'}
     onClose={onClose} dismissible={!pending}
     footer={<div className={styles.footer}>
       <span>{saved.size} de {rows.length} asignadas</span>
