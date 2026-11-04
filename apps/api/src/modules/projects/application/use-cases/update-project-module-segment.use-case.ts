@@ -88,6 +88,13 @@ export class UpdateProjectModuleSegmentUseCase
       ));
     }
     const closingDelivery = module.deliveries.find((delivery) => delivery.segmentId === segment.id);
+    if (nextTeamId !== segment.teamId && closingDelivery &&
+      closingDelivery.status !== 'planned') {
+      return err(new ForbiddenError(
+        'Una entrega ya presentada o aprobada no puede cambiar de equipo.',
+        'PROJECT_SEGMENT_DELIVERY_TEAM_LOCKED',
+      ));
+    }
     if (command.data.closingDelivery === null &&
       closingDelivery && closingDelivery.status !== 'planned') {
       return err(new ForbiddenError(
@@ -129,6 +136,7 @@ export class UpdateProjectModuleSegmentUseCase
             description: command.data.closingDelivery.description ?? null,
             estimatedDate: new Date(nextEndDate),
             teamId: nextTeamId,
+            ...(nextTeamId !== segment.teamId ? { assigneeUserId: null } : {}),
           }, now, tx);
         } else {
           await this.modules.addDelivery({
@@ -142,6 +150,7 @@ export class UpdateProjectModuleSegmentUseCase
         (command.data.endDate !== undefined || command.data.teamId !== undefined)) {
         await this.modules.updateDelivery(closingDelivery.id, {
           estimatedDate: new Date(nextEndDate), teamId: nextTeamId,
+          ...(nextTeamId !== segment.teamId ? { assigneeUserId: null } : {}),
         }, now, tx);
       }
       if (members) await this.modules.replaceSegmentMembers(command.segmentId, members, now, tx);
