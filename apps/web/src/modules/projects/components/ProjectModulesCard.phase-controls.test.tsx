@@ -37,7 +37,7 @@ vi.mock('@/modules/client-portal/adapters/project-detail.adapter', () => ({
 vi.mock('@/modules/client-portal/components/PhaseRoadmap', () => ({
   PhaseRoadmap: ({ phaseRoadmap, toolbarActions, renderPhaseHeaderName,
     renderPhaseHeaderActions, renderPhaseReferences, operationalRows, onPlanOperationalRow, operationalFooter,
-    renderSelectionDetail }: {
+    renderSelectionDetail, operationalPresaleHours }: {
     phaseRoadmap: { phases: { id: string }[] };
     toolbarActions?: ReactNode;
     renderPhaseHeaderName?: (phase: { id: string }) => ReactNode;
@@ -46,12 +46,15 @@ vi.mock('@/modules/client-portal/components/PhaseRoadmap', () => ({
     operationalRows?: (phase: { id: string }) => Array<{ id: string; label: string; hours: number }>;
     onPlanOperationalRow?: (phase: { id: string }, row: { id: string; label: string; hours: number }) => void;
     operationalFooter?: ReactNode;
+    operationalPresaleHours?: number | null;
     renderSelectionDetail?: (phase: { id: string },
       selection: { kind: 'reference-block'; id: string; label: string }, close: () => void) => ReactNode;
   }) => {
     const phase = phaseRoadmap.phases[0]!;
     const [selection, setSelection] = useState<{ kind: 'reference-block'; id: string; label: string } | null>(null);
-    return <section>{toolbarActions}{renderPhaseHeaderName?.(phase)}
+    return <section>
+      {operationalPresaleHours != null && <output data-testid="presale-hours">{operationalPresaleHours}</output>}
+      {toolbarActions}{renderPhaseHeaderName?.(phase)}
       {renderPhaseHeaderActions?.(phase)}
       {operationalRows?.(phase).map((row) => <div key={row.id}>{row.label}
         <button type="button" onClick={() => setSelection({
@@ -126,6 +129,18 @@ beforeEach(() => {
 });
 
 describe('Cabecera de las fases · HTML v5', () => {
+  it('la cabecera de fase muestra periodo, HH reales y preventa del contrato', () => {
+    show({ ...project, prospectPhaseHours: 18,
+      modules: [{ ...module, estimatedHours: null, segments: [{
+        id: 'segment-1', teamId: 'team-1', teamName: 'Desarrollo', name: 'Diseño UX',
+        startDate: '2026-09-07', endDate: '2026-10-16', estimatedHours: 464,
+        members: [],
+      }] }],
+    } as unknown as ProjectDetail);
+    expect(screen.getByText('07-09-2026 → 16-10-2026, 464 HH')).toBeInTheDocument();
+    expect(screen.getByTestId('presale-hours')).toHaveTextContent('18');
+  });
+
   it('muestra avance real y plan automático, y habilita Planificar sin afectar la vista', () => {
     show();
     expect(screen.getByText('25% real · 40% plan')).toBeInTheDocument();
