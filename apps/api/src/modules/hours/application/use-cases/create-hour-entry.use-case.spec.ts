@@ -24,6 +24,7 @@ function setup() {
     findModuleById: vi.fn().mockResolvedValue({
       id: 'module-1', name: 'Fase', projectId: 'project-1',
     }),
+    hasWorkBlocks: vi.fn().mockResolvedValue(false),
     findSegmentsForModule: vi.fn().mockResolvedValue([
       { id: 'segment-1', moduleId: 'module-1', projectId: 'project-1', teamId: 'team-1', name: 'Bloque' },
     ]),
