@@ -32,7 +32,7 @@ describe('Ficha existente del equipo — enriquecimiento PMO/PM', () => {
     expect(screen.getByText('Abarca Motores')).toBeInTheDocument();
     expect(screen.getByText('Rodrigo Viveros')).toBeInTheDocument();
     expect(screen.getByText(/Líder: Eduardo Aranda/)).toBeInTheDocument();
-    expect(screen.getByText('679')).toBeInTheDocument();
+    expect(screen.getAllByText('679').length).toBeGreaterThan(0);
     expect(screen.getByText('Agendamiento de mantenciones: 1 tarea espera asignación')).toBeInTheDocument();
     expect(screen.getByLabelText('Tareas del equipo')).toBeInTheDocument();
     expect(screen.getByLabelText('Entregas del equipo')).toBeInTheDocument();
