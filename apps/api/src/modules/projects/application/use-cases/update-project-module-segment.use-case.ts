@@ -95,6 +95,16 @@ export class UpdateProjectModuleSegmentUseCase
         'PROJECT_SEGMENT_DELIVERY_TEAM_LOCKED',
       ));
     }
+    if (closingDelivery && closingDelivery.status !== 'planned' &&
+      ((command.data.closingDelivery && (
+        closingDelivery.name !== command.data.closingDelivery.name ||
+        (closingDelivery.description ?? '') !== (command.data.closingDelivery.description ?? '')
+      )) || nextEndDate !== closingDelivery.estimatedDate.toISOString().slice(0, 10))) {
+      return err(new ForbiddenError(
+        'Una entrega presentada o aprobada no permite alterar nombre, descripción ni fecha planificada.',
+        'PROJECT_SEGMENT_DELIVERY_LOCKED',
+      ));
+    }
     if (command.data.closingDelivery === null &&
       closingDelivery && closingDelivery.status !== 'planned') {
       return err(new ForbiddenError(
