@@ -10,22 +10,19 @@ import {
 } from '@kora/contracts';
 
 /**
- * Avance real del proyecto — ver `projectProgressSchema` en los contratos. Función pura: la usan la
- * ficha, el listado, el dashboard y `ProjectProgressRecalculator`, para que todas las pantallas
- * muestren el mismo número.
+ * Avance del proyecto (projectProgressSchema): ficha, listados, Dashboard y
+ * ProjectProgressRecalculator comparten esta función pura.
  *
- * Por fase, tareas y entregas son ítems del plan:
- * - Peso de una tarea = sus HH estimadas. Las entregas (no tienen HH) y las tareas antiguas sin HH
- *   pesan el promedio de las tareas que sí tienen en la misma fase; si ninguna tiene, se reparten por
- *   igual las HH de la fase entre tareas y entregas (o pesan 1 si la fase tampoco tiene) — avance
- *   "por cantidad". Una fase con HH pero sin tareas (solo entregas) no reparte: cada entrega pesa 1.
- * - Base = el mayor entre la suma de pesos de sus ítems y las HH estimadas de la fase: las HH de la
- *   fase todavía sin ítems cuentan en la base, pero no en el real ni en el esperado.
- * - Real = peso de las tareas Aprobadas (`done`) y entregas Aprobadas (`approved`) / base. Esperado =
- *   peso de los ítems con fecha límite ≤ hoy / base. Una fase cerrada a mano (`closed`) cuenta 100%
- *   en ambos.
+ * En Kora V5.02 la fuente operacional es project_module_segments:
+ * - Denominador = HH propias de los bloques (NO HH vendidas/de fase).
+ * - Real = HH estimadas de tareas aprobadas por bloque, capadas al presupuesto,
+ *   o 100% al aprobar la entrega/cerrar explícitamente el segmento.
+ * - Esperado = distribución lineal por días calendario entre inicio y fin.
+ * - Consumo de HH = costo independiente del avance, no lo determina.
  *
- * El proyecto suma las fases (no promedia porcentajes), así cada fase pesa según su tamaño.
+ * El cálculo anterior ponderado por ítems de fase subsiste ÚNICAMENTE para
+ * invocaciones legacy que no suministren la propiedad segments. Los lectores
+ * del proyecto real entregan siempre segments, incluso [] cuando no hay plan.
  */
 
 export interface ProgressTaskInput {
