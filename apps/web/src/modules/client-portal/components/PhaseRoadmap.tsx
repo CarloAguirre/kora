@@ -903,11 +903,9 @@ function OperationalPhaseCard({
   renderSelectionDetail?: PhaseRoadmapProps['renderSelectionDetail'];
 }) {
   const [selected, setSelected] = useState<PhaseRoadmapSelection | null>(null);
-  const [zoom, setZoom] = useState(0);
   const choose = (selection: PhaseRoadmapSelection) =>
     setSelected((current) => sameSelection(current, selection) ? null : selection);
   const hasDatedRows = phase.tasks.length > 0;
-  const hasOtherDatedItems = phase.deliveries.length > 0 || phase.taskItems.length > 0;
   const relatedEntries = selected?.kind === 'incident'
     ? phase.relatedBitacora.filter((entry) => entry.kind === 'attention')
     : selected && 'label' in selected
@@ -1051,66 +1049,6 @@ function OperationalPhaseCard({
               </div>;
             })}
           </div>
-        )}
-        {hasOtherDatedItems && (
-          <details className={styles.operationalOtherEvents}>
-            <summary>Entregas y tareas en el cronograma
-              {' · '}{phase.deliveries.length} entregas, {phase.taskItems.length} tareas</summary>
-            <div className={styles.operationalZoomRow}>
-              <span>Semanas</span>
-              <input type="range" min={0} max={100} value={zoom}
-                onChange={(event) => setZoom(Number(event.target.value))}
-                aria-label="Zoom de entregas y tareas" />
-              <span>Días</span>
-            </div>
-            <div className={styles.operationalEventViewport}>
-              <div className={styles.operationalEventTrack} style={{ width: scrollWidthPercent(zoom) + '%' }}>
-                {phase.deliveries.map((delivery, index) => {
-                  const selection: PhaseRoadmapSelection = {
-                    kind: 'delivery', id: delivery.id, label: delivery.label,
-                  };
-                  const position = percentOf(toDate(delivery.date), axis.range);
-                  return <div key={delivery.id ?? index} className={styles.operationalEventRow}>
-                    <span className={styles.operationalEventTitle}>Entrega · {delivery.label}</span>
-                    <div className={styles.operationalEventAxis}>
-                      {position >= 0 && position <= 100 && <button type="button"
-                        aria-label={'Abrir entrega ' + delivery.label}
-                        className={styles.operationalEventMarker}
-                        style={{ left: position + '%' }}
-                        onClick={() => choose(selection)}>
-                        <DiamondIcon size={17} className={
-                          delivery.state === 'delivered' ? styles.legendDiamondDone :
-                          delivery.state === 'delayed' ? styles.legendDiamondDelayed : styles.legendDiamondCommitted
-                        } />
-                      </button>}
-                    </div>
-                  </div>;
-                })}
-                {phase.taskItems.map((task, index) => {
-                  const selection: PhaseRoadmapSelection = {
-                    kind: 'task', id: task.id, label: task.label,
-                  };
-                  const position = percentOf(toDate(task.date), axis.range);
-                  return <div key={task.id ?? index} className={styles.operationalEventRow}>
-                    <span className={styles.operationalEventTitle}>Tarea · {task.label}</span>
-                    <div className={styles.operationalEventAxis}>
-                      {position >= 0 && position <= 100 && <button type="button"
-                        aria-label={'Abrir tarea ' + task.label}
-                        className={styles.operationalEventMarker}
-                        style={{ left: position + '%' }}
-                        onClick={() => choose(selection)}>
-                        {task.state === 'done' ? <span className={styles.legendCheck}>✓</span> :
-                          <span className={[
-                            styles.legendDot, styles.legendTaskMark,
-                            task.state === 'delayed' ? styles.taskDotDelayed : styles.taskDotUpcoming,
-                          ].join(' ')} />}
-                      </button>}
-                    </div>
-                  </div>;
-                })}
-              </div>
-            </div>
-          </details>
         )}
         {renderReferences?.(phase)}
         {selected && renderSelectionDetail?.(phase, selected, () => setSelected(null))}
