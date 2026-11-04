@@ -40,9 +40,20 @@ export class ProjectsModuleHourEntryProjectReader implements HourEntryProjectRea
     }));
   }
 
-  async hasWorkBlocks(projectId: string): Promise<boolean> {
-    const modules = await this.modules.listForProject(projectId);
-    return modules.some((module) => module.segments.length > 0);
+  async hasAttributableWorkBlocks(projectId: string, userId: string): Promise<boolean> {
+    const [modules, members, teams] = await Promise.all([
+      this.modules.listForProject(projectId),
+      this.members.listForProject(projectId),
+      this.projectTeams.findByProject(projectId),
+    ]);
+    const participatingTeams = new Set([
+      ...members.filter((member) => member.userId === userId && !member.blockedAt)
+        .map((member) => member.teamId),
+      ...teams.filter((team) => team.leaderUserId === userId)
+        .map((team) => team.teamId),
+    ]);
+    return modules.some((module) =>
+      module.segments.some((segment) => participatingTeams.has(segment.teamId)));
   }
 
   async isUserOnSegmentTeam(projectId: string, teamId: string, userId: string): Promise<boolean> {
