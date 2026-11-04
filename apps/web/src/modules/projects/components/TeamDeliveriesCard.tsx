@@ -114,7 +114,7 @@ export function TeamDeliveriesCard({ project, projectId, teamId, managerView = f
               title={delivery.assigneeUserId ? 'Marcar como terminada para aprobación' : 'Primero asigna un colaborador a la entrega'}
               onClick={() => setActionTarget({ ...item,
                 action: delivery.assigneeUserId ? 'complete' : 'assign',
-              })}>Marcar como entregada</Button>;
+              })}>{delivery.assigneeUserId ? 'Marcar como entregada' : 'Asignar responsable'}</Button>;
           } },
         ]} items={pageItems} getRowKey={(item) => item.delivery.id}
           emptyMessage="Sin entregas en este filtro." />
