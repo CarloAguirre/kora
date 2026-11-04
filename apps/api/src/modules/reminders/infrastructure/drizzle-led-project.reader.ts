@@ -86,6 +86,7 @@ export class DrizzleLedProjectReader implements LedProjectReader {
       .where(and(
         sql`coalesce(${projectTeams.leaderUserId}, ${teams.leaderUserId}) = ${userId}`,
         isNull(projects.deletedAt),
+        eq(teams.isActive, true),
         eq(projects.type, 'development'),
         notInArray(projects.status, ['cancelled', 'finished']),
         sql`coalesce(${projectTeams.assignedHours}, 0) > 0`,
