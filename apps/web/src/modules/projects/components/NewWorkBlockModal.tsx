@@ -52,6 +52,10 @@ export function NewWorkBlockModal({
   const [deliveryName, setDeliveryName] = useState(initialDelivery?.name ?? '');
   const [deliveryDescription, setDeliveryDescription] = useState(initialDelivery?.description ?? '');
 
+  // Al terminar de crear una fase, el refetch puede seguir en curso.
+  // Para la descripción usamos la posición siguiente sin inventar una fase persistida.
+  const existingPhaseIndex = project.modules.findIndex((entry) => entry.id === module.id);
+  const phaseNumber = existingPhaseIndex >= 0 ? existingPhaseIndex + 1 : project.modules.length + 1;
   const team = project.teams.find((entry) => entry.teamId === teamId);
   const priorBlocks = project.modules.flatMap((entry) => entry.segments)
     .filter((segment) => segment.teamId === teamId && segment.id !== initialSegment?.id);
@@ -82,7 +86,7 @@ export function NewWorkBlockModal({
   };
 
   return <Modal open title={mode === 'edit' ? 'Editar bloque de trabajo' : 'Nuevo bloque de trabajo'}
-    description={'Fase: ' + module.name +
+    description={'Fase ' + phaseNumber + ': ' + module.name +
       '. Un bloque es el periodo en que un equipo trabaja en esta fase, y cierra con una entrega.'}
     onClose={onCancel} dismissible={!submitting}
     footer={<div className={styles.footer}>
