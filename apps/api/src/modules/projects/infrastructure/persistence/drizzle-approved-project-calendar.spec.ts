@@ -16,10 +16,12 @@ function fixture(options: {
   transferred?: boolean;
   existingSegment?: boolean;
   existingDates?: boolean;
+  hitoOnly?: boolean;
 } = {}) {
   const project = {
     id: projectId, type: 'development', status: options.active === false ? 'draft' : 'active',
-    startDate: new Date('2026-11-05T00:00:00.000Z'),
+    startDate: options.hitoOnly ? null : new Date('2026-11-05T00:00:00.000Z'),
+    hito0At: options.hitoOnly ? new Date('2026-11-10T00:00:00.000Z') : null,
   };
   const draft = {
     mode: 'phases', teams: [{
@@ -134,6 +136,19 @@ describe('Materializar cronograma de cotización aprobada (sin segunda aprobaci�
     expect(await fx.calendar.ensure(projectId)).toBe(false);
     expect(fx.inserts.filter((item) => item.table === projectModuleSegments)).toHaveLength(1);
     expect(fx.inserts.filter((item) => item.table === projectModuleDeliveries)).toHaveLength(1);
+  });
+
+  it('si el PM no definió start_date toma Hito 0, sin escribir una fecha artificial al proyecto', async () => {
+    const fx = fixture({ hitoOnly: true });
+    expect(await fx.calendar.ensure(projectId)).toBe(true);
+    expect(fx.inserts.find((item) => item.table === projectModuleSegments)?.value)
+      .toMatchObject({
+        startDate: new Date('2026-11-24T00:00:00.000Z'),
+        endDate: new Date('2026-12-28T00:00:00.000Z'),
+      });
+    expect(fx.persistedEvents[0]?.metadata).toMatchObject({ startDate: '2026-11-10' });
+    expect(fx.tx.update).toHaveBeenCalledWith(projectModules);
+    expect(fx.tx.update).not.toHaveBeenCalledWith(projects);
   });
 
   it('respeta las fechas editadas y los segmentos creados por el PM', async () => {
