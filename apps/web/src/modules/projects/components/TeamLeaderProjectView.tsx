@@ -10,7 +10,8 @@ import { DataTable } from '@/shared/components/ui/DataTable';
 import { Pagination, usePaginatedItems } from '@/shared/components/ui/Pagination';
 import { useToast } from '@/shared/components/ui/Toast';
 import { PencilIcon, TrashIcon } from '@/shared/components/icons/Icons';
-import { ProjectTimeline } from './ProjectTimeline';
+import { calculateTeamProgress } from '../lib/team-progress';
+import { TeamProgressCard } from './TeamProgressCard';
 import { TeamTasksCard } from './TeamTasksCard';
 import { TeamDeliveriesCard } from './TeamDeliveriesCard';
 import deliveryModalStyles from './DeliveryModal.module.css';
@@ -84,6 +85,10 @@ export function TeamLeaderProjectView({
     return { teamId, teamName, leaderId, leaderName, maxMembers, assignedHours, consumedHours, members };
   }, [project, teamId]);
   const { pageItems: pagedMembers, pagination: membersPagination } = usePaginatedItems(team.members);
+  const teamProgress = useMemo(() => calculateTeamProgress(project, teamId), [project, teamId]);
+  const teamDeliveryDate = project.modules.flatMap((module) => module.segments)
+    .filter((segment) => segment.teamId === teamId)
+    .map((segment) => segment.endDate).sort().at(-1) ?? project.estimatedDeliveryDate;
 
   const canManageTeam = can('projects:manage') || (user !== null && team.leaderId === user.id);
 
@@ -236,13 +241,13 @@ export function TeamLeaderProjectView({
         </Card>
         <Card className={styles.kpiCard}>
           <span className={styles.kpiLabel}>Fecha de entrega estimada</span>
-          <span className={styles.kpiValue}>{project.estimatedDeliveryDate ? formatDate(project.estimatedDeliveryDate) : '—'}</span>
+          <span className={styles.kpiValue}>{teamDeliveryDate ? formatDate(teamDeliveryDate) : '—'}</span>
         </Card>
         <Card className={styles.kpiCard}>
           <span className={styles.kpiLabel}>Avance real / esperado</span>
           <span className={styles.kpiValue}>
-            {project.progress.actual != null
-              ? `${project.progress.actual}% / ${project.progress.expected ?? 0}%`
+            {teamProgress.hasPlan
+              ? (teamProgress.actualPercent ?? 0) + '% / ' + (teamProgress.expectedPercent ?? 0) + '%'
               : 'Sin plan cargado'}
           </span>
         </Card>
@@ -312,16 +317,7 @@ export function TeamLeaderProjectView({
         </div>
       </Card>
 
-      <Card>
-        <p className={styles.sectionTitle}>Avance del proyecto</p>
-        <div style={{ marginTop: 'var(--kora-space-4)' }}>
-          <ProjectTimeline
-            progress={project.progress}
-            startDate={project.startDate}
-            endDate={project.estimatedDeliveryDate ?? project.endDate}
-          />
-        </div>
-      </Card>
+      <TeamProgressCard progress={teamProgress} teamName={team.teamName} />
 
       <TeamTasksCard project={project} projectId={projectId} teamId={teamId} />
       <TeamDeliveriesCard project={project} projectId={projectId} teamId={teamId} />
