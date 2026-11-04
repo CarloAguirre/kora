@@ -52,7 +52,7 @@ describe('CreateProjectModuleSegmentUseCase — bloque y entrega de cierre', () 
       moduleId: 'module-1', name: 'Diseño UX', estimatedHours: 60,
     }), expect.any(Date), expect.anything());
     expect(modules.addDelivery).toHaveBeenCalledWith(expect.objectContaining({
-      moduleId: 'module-1', teamId: 'team-1',
+      moduleId: 'module-1', segmentId: 'segment-1', teamId: 'team-1',
       name: 'Diseños revisados', description: 'Flujos y pantallas',
       assigneeUserId: null, estimatedDate: new Date('2026-11-20'),
     }), expect.any(Date), expect.anything());
