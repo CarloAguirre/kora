@@ -25,6 +25,8 @@ export interface NewWorkBlockModalProps {
   initialTeamId?: string;
   initialName?: string;
   initialEstimatedHours?: number | null;
+  initialStartDate?: string;
+  initialEndDate?: string;
   submitting: boolean;
   onCancel: () => void;
   onConfirm: (input: WorkBlockFormInput) => void;
@@ -34,18 +36,20 @@ export interface NewWorkBlockModalProps {
  * Las HH pertenecen al bloque, no se imputan al avance ni al consumo real de la fase. */
 export function NewWorkBlockModal({
   project, module, teamOptions, initialTeamId, initialName = '', initialEstimatedHours,
-  initialSegment, initialDelivery, mode = 'create', submitting, onCancel, onConfirm,
+  initialStartDate, initialEndDate, initialSegment, initialDelivery,
+  mode = 'create', submitting, onCancel, onConfirm,
 }: NewWorkBlockModalProps) {
   const [teamId, setTeamId] = useState(initialSegment?.teamId || initialTeamId || teamOptions[0]?.value || '');
   const [name, setName] = useState(initialSegment?.name ?? initialName);
   const [startDate, setStartDate] = useState(() => {
     if (initialSegment) return initialSegment.startDate;
+    if (initialStartDate) return initialStartDate;
     const now = new Date();
     // Fecha del usuario (no ISO UTC): evita que se adelante/atrase un día en Chile.
     return [now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0'),
       String(now.getDate()).padStart(2, '0')].join('-');
   });
-  const [endDate, setEndDate] = useState(initialSegment?.endDate ?? '');
+  const [endDate, setEndDate] = useState(initialSegment?.endDate ?? initialEndDate ?? '');
   const [hours, setHours] = useState(initialSegment?.estimatedHours != null
     ? String(initialSegment.estimatedHours) : initialEstimatedHours == null ? '' : String(initialEstimatedHours));
   const [withoutDelivery, setWithoutDelivery] = useState(mode === 'edit' && !initialDelivery);
