@@ -131,6 +131,8 @@ export function calculateProjectExecutionProgress(
     paused: project.status === 'on_hold' && project.stopsClock,
     unplannedBlockCount, unlinkedTaskCount,
     blocksCount: project.modules.reduce((count, module) => count + module.segments.length, 0),
+    taskCount: project.modules.reduce((count, module) =>
+      count + module.tasks.filter((task) => !task.cancelledAt).length, 0),
     phases,
     laggingBlocks: phases.flatMap((phase) => phase.blocks
       .filter((block) => block.gapPoints > 0)
