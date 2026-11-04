@@ -80,8 +80,8 @@ describe('Nueva tarea operativa a partir de referencia Gemini', () => {
     /></MemoryRouter>);
     expect(screen.getByRole('dialog', { name: 'Editar tarea' })).toBeInTheDocument();
     expect(screen.getByLabelText('Bloque de trabajo')).toHaveValue(blockId);
-    expect(screen.getByLabelText('Fecha de inicio')).toHaveValue('2026-11-10');
-    expect(screen.getByLabelText('Fecha límite')).toHaveValue('2026-11-20');
+    expect(screen.getByLabelText(/Fecha de inicio/)).toHaveValue('2026-11-10');
+    expect(screen.getByLabelText(/Fecha límite/)).toHaveValue('2026-11-20');
     expect(screen.getByLabelText(/HH estimadas/)).toHaveValue(35);
     expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeEnabled();
     fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
