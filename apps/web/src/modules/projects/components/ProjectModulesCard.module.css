@@ -625,3 +625,18 @@
   background: #e6ecf3;
 }
 .drawerProgressBar > span { display: block; height: 100%; background: #a8da44; border-radius: inherit; }
+
+/* Planificar v5: nombre editable + período + HH en la misma línea, como prototipo. */
+.phaseHeadingIdentityPlanning { display: flex; flex-wrap: nowrap; width: 100%; gap: 12px; }
+.phaseHeadingIdentityPlanning .headerPhaseInput {
+  width: clamp(235px, 23vw, 300px);
+  flex: 0 1 300px;
+  min-width: 190px;
+  height: 38px;
+  font-size: 15px;
+}
+.phaseHeadingIdentityPlanning .phaseHeadingMeta { flex: 0 0 auto; white-space: nowrap; }
+@media (max-width: 1130px) {
+  .phaseHeadingIdentityPlanning { flex-wrap: wrap; }
+  .phaseHeadingIdentityPlanning .phaseHeadingMeta { white-space: normal; }
+}
