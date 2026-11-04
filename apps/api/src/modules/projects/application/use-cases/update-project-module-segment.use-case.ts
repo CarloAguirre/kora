@@ -15,6 +15,7 @@ import {
   type ProjectModuleSegmentMemberInput,
 } from '../../domain/repositories/project-module.repository';
 import { ForecastSourceSyncService } from '../services/forecast-source-sync.service';
+import { ProjectProgressRecalculator } from '../services/project-progress-recalculator';
 import {
   AUDIT_RECORDER,
   type AuditRecorder,
@@ -41,6 +42,7 @@ export class UpdateProjectModuleSegmentUseCase
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
     @Inject(CLOCK) private readonly clock: Clock,
     @Inject(UNIT_OF_WORK) private readonly unitOfWork: UnitOfWork,
+    private readonly progress: ProjectProgressRecalculator,
   ) {}
 
   async execute(command: UpdateProjectModuleSegmentCommand): Promise<Result<void, ApplicationError>> {
@@ -165,6 +167,7 @@ export class UpdateProjectModuleSegmentUseCase
       }
       if (members) await this.modules.replaceSegmentMembers(command.segmentId, members, now, tx);
       await this.forecastSync.syncSegment(project, command.moduleId, command.segmentId, now, tx);
+      await this.progress.recalculate(project.id, tx);
     });
 
     await this.audit.record({
