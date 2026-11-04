@@ -17,7 +17,7 @@ const progress: ProjectExecutionProgress = {
   hasPlan: true, plannedHours: 607, actualHours: 464, expectedHours: 607,
   actualPercent: 76, expectedPercent: 100, soldHours: 606.5,
   usedHours: 273.5, consumptionPercent: 45,
-  unplannedBlockCount: 0, unlinkedTaskCount: 0, blocksCount: 6, paused: false,
+  unplannedBlockCount: 0, unlinkedTaskCount: 0, blocksCount: 6, taskCount: 6, paused: false,
   phases: [{
     id: 'phase-1', number: 1, name: 'Bot de conciliación',
     estimatedHours: 464, commercialHours: 464, actualHours: 464, expectedHours: 464,
