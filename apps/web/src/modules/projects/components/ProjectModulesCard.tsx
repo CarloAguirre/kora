@@ -1008,6 +1008,7 @@ function SegmentDrawer({
               <div className={styles.drawerDelivery}>
                 <strong>{delivery.name ?? module.name + ' · ' + segment.teamName}</strong>
                 <span>Fecha planificada: {formatDate(delivery.estimatedDate)}</span>
+                {segment.closedAt && <span>Cierre real: {formatDate(segment.closedAt.slice(0, 10))}</span>}
                 <Badge tone={DELIVERY_STATUS_TONE[delivery.status]}>
                   {PROJECT_MODULE_DELIVERY_STATUS_LABELS[delivery.status]}
                 </Badge>
@@ -1028,24 +1029,19 @@ function SegmentDrawer({
             </>
           ) : (
             <p className={styles.drawerHint}>
-              No hay una entrega única vinculada a este equipo y fecha.
-              Puedes configurarla desde el editor existente del proyecto.
+              Este bloque no tiene entrega de cierre vinculada. Puedes añadirla desde
+              «Editar bloque», con fecha planificada igual a su fecha final.
             </p>
           )}
         </div>
         <div className={styles.drawerSection}>
           <div className={styles.drawerTaskHeading}>
             <h4>Tareas ({teamTasks.length})</h4>
-            {onCreateReference && reference?.tasks.some((task) =>
+            {onAssignTasks && reference?.tasks.some((task) =>
               task.teamId === segment.teamId &&
               !teamTasks.some((saved) => saved.description?.includes(
                 ' · WBS ' + task.wbs + ' · ' + task.role))) && (
-              <Button size="sm" variant="outline" onClick={() => {
-                const task = reference.tasks.find((item) => item.teamId === segment.teamId &&
-                  !teamTasks.some((saved) => saved.description?.includes(
-                    ' · WBS ' + item.wbs + ' · ' + item.role)));
-                if (task) onCreateReference(task);
-              }}>+ Agregar tarea</Button>
+              <Button size="sm" variant="outline" onClick={onAssignTasks}>Asignar tareas</Button>
             )}
           </div>
           {teamTasks.length ? (
