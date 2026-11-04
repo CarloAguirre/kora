@@ -29,7 +29,7 @@ function fixture(options?: {
         segments: [
           { id: 'block-1', teamId, name: 'Mejoras y correcciones Desarrollo',
             startDate: '2026-11-01', endDate: '2026-11-10',
-            estimatedHours: 100, closedAt: options?.closed ? '2026-11-04T20:00:00Z' : null },
+            estimatedHours: 100, consumedHours: 61, closedAt: options?.closed ? '2026-11-04T20:00:00Z' : null },
           ...(options?.secondBlock ? [{ id: 'block-1-extra', teamId, name: 'Otro bloque',
             startDate: '2026-11-01', endDate: '2026-11-10', estimatedHours: 20, closedAt: null }] : []),
         ],
@@ -50,7 +50,7 @@ function fixture(options?: {
       {
         id: 'module-2', name: 'Calculadora de estimaciones',
         segments: [{ id: 'block-2', teamId, name: 'Calculadora Desarrollo',
-          startDate: '2026-11-01', endDate: '2026-11-10', estimatedHours: 80, closedAt: null }],
+          startDate: '2026-11-01', endDate: '2026-11-10', estimatedHours: 80, consumedHours: 16, closedAt: null }],
         deliveries: [],
         tasks: [{ id: 'task-calc', segmentId: 'block-2', teamId, status: 'in_progress',
           estimatedHours: 80, date: '2026-11-08', assigneeUserId: 'person-2' }],
@@ -70,6 +70,10 @@ describe('Avance del equipo — fechas, aprobaciones y horas reales', () => {
     expect(result.expectedPercent).toBe(50);
     expect(result.consumedHours).toBe(77);
     expect(result.consumptionPercent).toBe(43);
+    expect(result.phases[0]?.consumedHours).toBe(61);
+    expect(result.phases[0]?.blocks[0]?.consumedHours).toBe(61);
+    expect(result.phases[1]?.consumedHours).toBe(16);
+    expect(result.phases[1]?.blocks[0]?.consumedHours).toBe(16);
     expect(result.phases.map((phase) => phase.name))
       .toEqual(['Mejoras y correcciones', 'Calculadora de estimaciones']);
     expect(result.phases[0]?.pendingApprovalCount).toBe(1);
