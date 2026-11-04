@@ -214,7 +214,7 @@ columnas ni ejecutar `drizzle-kit push` para sortear el incidente.
 
 Una cotización **aprobada por el cliente, revisada por el PM y traspasada al
 proyecto** YA tiene un calendario comercial aprobado. Al iniciar el proyecto
-(`status=active` y `projects.start_date`), Kora debe convertir sus fases,
+(`status=active` y fecha explícita `projects.start_date` o, si falta, fecha de `hito0_at`), Kora debe convertir sus fases,
 semanas y HH en **bloques operativos REALES**, con barras cronológicas definitivas.
 No corresponde hablar de «fechas propuestas», pedir otra aprobación ni dejar la
 planificación esperando que el usuario vuelva a ingresarla. Las fechas de cada
@@ -228,7 +228,7 @@ reglas existentes.
   Solo lee cotizaciones con evento `quotation_transferred` y metadata
   `moduleIds` (IDs de fases creadas por la operación aprobada). Para cada
   referencia `relativeTeamBlocks` de ese snapshot, convierte
-  `startWeek/durationWeeks` a fechas ISO utilizando
+  `startWeek/durationWeeks` a fechas ISO desde `start_date` (con fallback a `hito0_at`) utilizando
   `approvedCalendarPeriod` de `@kora/contracts` (semana 1 = fecha inicial;
   7 días calendario por semana; fin inclusivo).
 - Materializa dentro de **una misma transacción**:
