@@ -35,7 +35,6 @@ import { ExecutionTaskModal } from './ExecutionTaskModal';
 import { DuplicateTaskModal } from './DuplicateTaskModal';
 import { NewWorkBlockModal, type WorkBlockFormInput } from './NewWorkBlockModal';
 import { AssignBlockTasksModal } from './AssignBlockTasksModal';
-import { proposedBlockPeriod, shiftIsoDays } from '../lib/quotation-relative-dates';
 import { NewOperationalTaskModal } from './NewOperationalTaskModal';
 import { ReferenceBlockDrawer } from './ReferenceBlockDrawer';
 import { useAppliedQuotationPlanning } from '@/modules/estimation/api/quotation.queries';
@@ -128,25 +127,6 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
   const roadmapExclusions = useRoadmapReferenceExclusions(project.id);
   const excludeRoadmapReference = useExcludeRoadmapReference();
   const phaseRoadmap = useMemo(() => toPhaseRoadmap(project), [project]);
-  const roadmapWithProposals = useMemo(() => {
-    if (!project.startDate || !appliedPlanning.data) return phaseRoadmap;
-    const proposed = appliedPlanning.data.modules.flatMap((reference) => {
-      const module = project.modules.find((entry) => entry.id === reference.moduleId);
-      return (reference.relativeTeamBlocks ?? [])
-        .filter((block) => module && !module.segments.some((segment) => segment.teamId === block.teamId))
-        .map((block) => proposedBlockPeriod(project.startDate, block.startWeek, block.durationWeeks))
-        .filter((period): period is NonNullable<typeof period> => period !== null);
-    });
-    if (!proposed.length) return phaseRoadmap;
-    const allStarts = [phaseRoadmap.rangeStartDate, ...proposed.map((period) =>
-      shiftIsoDays(period.startDate, -7))].filter(Boolean).sort();
-    const allEnds = [phaseRoadmap.rangeEndDate, ...proposed.map((period) =>
-      shiftIsoDays(period.endDate, 7))].filter(Boolean).sort();
-    return {
-      ...phaseRoadmap, rangeStartDate: allStarts[0]!,
-      rangeEndDate: allEnds[allEnds.length - 1]!,
-    };
-  }, [phaseRoadmap, project.startDate, project.modules, appliedPlanning.data]);
   const modulesById = useMemo(() => new Map(project.modules.map((module) => [module.id, module])), [project.modules]);
 
   /** Tiempo de ejecución que se está editando (`null` = modal cerrado). */
@@ -374,17 +354,8 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
   const phaseHeaderMeta = (module: ProjectModule) => {
     const starts = module.segments.map((segment) => segment.startDate).sort();
     const ends = module.segments.map((segment) => segment.endDate).sort();
-    // La cotización conserva semanas relativas; una vez que hay inicio real
-    // presentamos su propuesta, NO un bloque/entrega operativa ya confirmados.
-    const proposed = appliedPlanning.data?.modules.find((item) => item.moduleId === module.id)
-      ?.relativeTeamBlocks?.map((block) => proposedBlockPeriod(
-        project.startDate, block.startWeek, block.durationWeeks,
-      )).filter((period): period is NonNullable<typeof period> => period !== null) ?? [];
-    const proposedStarts = proposed.map((period) => period.startDate).sort();
-    const proposedEnds = proposed.map((period) => period.endDate).sort();
-    const start = starts[0] ?? module.estimatedStartDate ?? proposedStarts[0] ?? null;
-    const end = ends[ends.length - 1] ?? module.estimatedEndDate ??
-      proposedEnds[proposedEnds.length - 1] ?? null;
+    const start = starts[0] ?? module.estimatedStartDate;
+    const end = ends[ends.length - 1] ?? module.estimatedEndDate;
     const segmentHoursKnown = module.segments.length > 0 &&
       module.segments.every((segment) => segment.estimatedHours != null);
     const hours = module.estimatedHours ??
@@ -392,12 +363,10 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
         segmentHoursKnown ? module.segments.reduce((sum, segment) =>
           sum + (segment.estimatedHours ?? 0), 0) : null);
     const asDayMonthYear = (iso: string) => iso.slice(8, 10) + '-' + iso.slice(5, 7) + '-' + iso.slice(0, 4);
-    const isCommercialProposal = module.segments.length === 0 &&
-      !module.estimatedStartDate && !module.estimatedEndDate && proposed.length > 0;
     return (start && end ? asDayMonthYear(start) + ' → ' + asDayMonthYear(end) : 'Sin fechas') +
       ', ' + (hours == null ? '—' : new Intl.NumberFormat('es-CL', {
         maximumFractionDigits: 2,
-      }).format(hours)) + ' HH' + (isCommercialProposal ? ' · propuesta' : '');
+      }).format(hours)) + ' HH';
   };
 
   const renderPhaseHeaderName = (phase: { id: string }) => {
@@ -532,17 +501,14 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
       .map((block) => {
         const teamName = project.teams.find((team) => team.teamId === block.teamId)?.teamName ??
           teamOptions.find((team) => team.value === block.teamId)?.label ?? 'Equipo por vincular';
-        const proposal = proposedBlockPeriod(
-          project.startDate, block.startWeek, block.durationWeeks,
-        );
         return {
           id: block.teamId,
           label: module.name + ' · ' + teamName,
           role: roleFromTeamName(teamName),
           hours: block.hours,
-          ...(proposal ? {
-            proposedStartDate: proposal.startDate, proposedEndDate: proposal.endDate,
-          } : {}),
+          missingBlockMessage: project.status === 'active' && project.startDate
+            ? 'No se generó este bloque operativo: revisa el calendario traspasado.'
+            : 'Se generará automáticamente al iniciar el proyecto.',
         };
       });
   };
@@ -726,11 +692,9 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
           }} versionId={appliedPlanning.data.versionId}
           onClose={close}
           onPlan={canManage ? () => {
-            const proposal = proposedBlockPeriod(project.startDate, block.startWeek, block.durationWeeks);
             setPlanningBlock({ moduleId: module.id, teamId: block.teamId,
               name: module.name + ' · ' + (teamOptions.find((item) =>
-                item.value === block.teamId)?.label ?? 'Equipo'), estimatedHours: block.hours,
-              initialStartDate: proposal?.startDate, initialEndDate: proposal?.endDate });
+                item.value === block.teamId)?.label ?? 'Equipo'), estimatedHours: block.hours });
             close();
           } : undefined}
           onCreateReference={canManage ? (task) => {
@@ -813,7 +777,7 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
           </details>
         </Card>
       )}
-      <PhaseRoadmap alwaysExpanded operationalView borderlessSummary phaseRoadmap={roadmapWithProposals}
+      <PhaseRoadmap alwaysExpanded operationalView borderlessSummary phaseRoadmap={phaseRoadmap}
         operationalTaskCount={operationalCounts.tasks} operationalBlockCount={operationalCounts.blocks}
         operationalPresaleHours={project.prospectPhaseHours}
         operationalRows={getOperationalRows}
@@ -825,16 +789,11 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
           const reference = appliedPlanning.data?.modules.find((item) => item.moduleId === phase.id)
             ?.relativeTeamBlocks?.find((block) => block.teamId === row.id);
           if (module && reference) {
-            const proposal = proposedBlockPeriod(
-              project.startDate, reference.startWeek, reference.durationWeeks,
-            );
             setPlanningBlock({
               moduleId: module.id, teamId: reference.teamId,
               name: module.name + ' · ' +
                 (teamOptions.find((item) => item.value === reference.teamId)?.label ?? 'Equipo'),
               estimatedHours: reference.hours,
-              initialStartDate: proposal?.startDate,
-              initialEndDate: proposal?.endDate,
             });
           }
         } : undefined}
