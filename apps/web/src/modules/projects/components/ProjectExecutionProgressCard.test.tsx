@@ -54,7 +54,9 @@ describe('Avance del proyecto — mismo desglose que el equipo', () => {
     render(<ProjectExecutionProgressCard progress={progress} />);
     expect(screen.getByRole('heading', { name: 'Avance del proyecto' })).toBeInTheDocument();
     expect(screen.getByText('Atrasado')).toBeInTheDocument();
-    expect(screen.getByText('76%')).toBeInTheDocument();
+    // El mismo 76% aparece en la cifra principal y en su explicación.
+    // Verificamos el indicador principal, sin depender de la unicidad del texto.
+    expect(screen.getByText('76%', { selector: 'strong' })).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Avance real 76%; plan a la fecha 100%' }))
       .toBeInTheDocument();
     expect(screen.getByText(/607 HH planificadas frente a 606,5 HH vendidas/))
