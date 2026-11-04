@@ -776,8 +776,8 @@ button.ganttBar {
 }
 
 
-/* Funciones preservadas del Roadmap anterior: controles secundarios discretos. */
-.operationalDateOptions,
+/* Los filtros globales de fecha antiguos se retiraron de la vista operativa.
+   El portal cliente conserva sus propios controles, sin modificar sus estilos. */
 .operationalOtherEvents,
 .operationalPhaseExtras {
   border-top: 1px dashed #e7eaf0;
@@ -785,16 +785,11 @@ button.ganttBar {
   color: #657487;
   font-size: 12px;
 }
-.operationalDateOptions > summary,
 .operationalOtherEvents > summary,
 .operationalPhaseExtras > summary {
   padding: 3px 0;
   cursor: pointer;
   font-size: 12px;
-}
-.operationalDateOptions > .filterRow {
-  padding: 10px 4px;
-  justify-content: flex-start;
 }
 .operationalZoomRow {
   display: flex;
@@ -936,11 +931,6 @@ button.ganttBar {
   font-size: 12px;
   line-height: 1.5;
 }
-.operationalWrapper .operationalDateOptions {
-  margin-top: 0;
-  font-size: 11px;
-}
-.operationalWrapper .operationalDateOptions > summary { color: #77879c; }
 @media (max-width: 700px) {
   .operationalWrapper .summaryRow { align-items: stretch; }
   .operationalWrapper .summaryChips { gap: 6px; }
