@@ -64,7 +64,7 @@ export class DrizzleLedProjectReader implements LedProjectReader {
    * Pendiente operativo por equipo y proyecto. No se escribe una notificación
    * cada vez que se consulta: la campanita muestra el pendiente mientras
    * exista un traspaso válido y no haya colaboradores activos, y lo oculta
-   * en cuanto el líder incorpora su primera persona.
+   * al completar la dotación definida por el PM (o agregar una persona si no hay cupos).
    *
    * Se usa líder efectivo (override del proyecto o líder orgánico del equipo)
    * y se comprueba un evento real quotation_transferred, no salesStage editable.
@@ -98,8 +98,10 @@ export class DrizzleLedProjectReader implements LedProjectReader {
           where ${projectQuotations.projectId} = ${projects.id}
             and ${quotationEvents.action} = 'quotation_transferred'
         )`,
-        sql`not exists (
-          select 1 from ${projectTeamMembers}
+        // Si el PM definió N colaboradores, el pendiente permanece mientras
+        // haya menos de N activos; sin cupos definidos basta incorporar uno.
+        sql`(
+          select count(distinct ${teamMembers.userId}) from ${projectTeamMembers}
           join ${teamMembers} on ${teamMembers.id} = ${projectTeamMembers.teamMemberId}
           join ${users} on ${users.id} = ${teamMembers.userId}
           where ${projectTeamMembers.projectId} = ${projectTeams.projectId}
@@ -107,7 +109,7 @@ export class DrizzleLedProjectReader implements LedProjectReader {
             and ${projectTeamMembers.blockedAt} is null
             and ${teamMembers.leftAt} is null
             and ${users.status} = 'active'
-        )`,
+        ) < coalesce(nullif(${projectTeams.memberCount}, 0), 1)`,
       ))
       .orderBy(asc(projects.name), asc(teams.name));
   }
