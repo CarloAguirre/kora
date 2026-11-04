@@ -211,7 +211,11 @@ function buildProject(): ProjectDetail {
   };
 }
 
-function renderView(permissions: Permission[] = ['projects:manage'], pendingApprovals: { groups: unknown[] } = { groups: [] }) {
+function renderView(
+  permissions: Permission[] = ['projects:manage'],
+  pendingApprovals: { groups: unknown[] } = { groups: [] },
+  projectOverride: ProjectDetail = buildProject(),
+) {
   useProjectPendingApprovalsMock.mockReturnValue({ data: pendingApprovals });
   const auth: AuthContextValue = {
     user: {
@@ -237,7 +241,7 @@ function renderView(permissions: Permission[] = ['projects:manage'], pendingAppr
     <MemoryRouter>
       <AuthContext.Provider value={auth}>
         <ToastProvider>
-          <DevelopmentProjectDetailView project={buildProject()} projectId="project-1" />
+          <DevelopmentProjectDetailView project={projectOverride} projectId="project-1" />
         </ToastProvider>
       </AuthContext.Provider>
     </MemoryRouter>,
@@ -260,6 +264,40 @@ describe('Cotizaciones integradas en ficha Kora', () => {
     expect(screen.getByText('Este proyecto aún no tiene cotización')).toBeInTheDocument();
     // Una etapa comercial aprobada activa puede recotizarse sin sobrescribir el plan.
     expect(screen.getByRole('button', { name: '+ Nueva cotización' })).toBeEnabled();
+  });
+});
+
+describe('Avance del proyecto — misma fuente operativa que el Roadmap', () => {
+  it('no toma el 100% antiguo del backend si las tareas del bloque aún no están aprobadas', () => {
+    const old = buildProject();
+    const viewProject = {
+      ...old,
+      // project.progress usa otra fórmula (por fases/ítems), por eso no puede
+      // determinar el porcentaje que aquí muestra el Roadmap por segmentos.
+      progress: { ...old.progress, actual: 100, expected: 100 },
+      modules: [{
+        id: 'phase-operativa', name: 'Diseño UX',
+        estimatedHours: 100,
+        segments: [{
+          id: 'block-operativo', teamId: 'team-dev', teamName: 'Desarrollo',
+          name: 'Diseño UX', startDate: '2026-01-01', endDate: '2026-02-01',
+          estimatedHours: 100, consumedHours: 12, members: [],
+        }],
+        deliveries: [],
+        tasks: [{
+          id: 'task-pending', teamId: 'team-dev', segmentId: 'block-operativo',
+          assigneeUserId: null, cancelledAt: null, estimatedHours: 100,
+          status: 'todo', date: '2026-01-30', description: null,
+        }],
+      }],
+    } as unknown as ProjectDetail;
+    renderView(['projects:manage'], { groups: [] }, viewProject);
+    expect(screen.getByRole('heading', { name: 'Avance del proyecto' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Avance real 0%; plan a la fecha 100%' }))
+      .toBeInTheDocument();
+    expect(screen.getByText('Fase 1: Diseño UX')).toBeInTheDocument();
+    expect(screen.getByText(/Las HH de bloques no coinciden con la estimación comercial/))
+      .toBeInTheDocument();
   });
 });
 
