@@ -19,9 +19,10 @@ function MiniTrack({ real, expected }: { real: number; expected: number }) {
 
 function BlockExplanation({ block }: { block: ProjectExecutionBlock }) {
   if (block.estimatedHours <= 0) return <>HH del bloque sin definir</>;
-  if (block.isClosed) return <> {block.closedAt
-    ? 'Cerrado el ' + date(block.closedAt)
-    : 'Completado mediante entrega aprobada'}</>;
+  if (block.isClosed) return <>{block.approvedDelivery
+    ? 'Cerrado por entrega aprobada' + (block.closedAt ? ' el ' + date(block.closedAt) : '')
+    : block.closedAt ? 'Cerrado el ' + date(block.closedAt)
+      : 'Bloque completado'}</>;
   return <> {hours(block.actualHours)} HH en tareas aprobadas;
     {' '}{percent(block.coveragePercent)} del bloque desglosado en tareas</>;
 }
@@ -44,7 +45,8 @@ function PhaseRows({ phase }: { phase: ProjectExecutionPhase }) {
       return <tr key={block.id}>
         <td><span className={styles.blockName}>
           <span className={styles.teamDot} style={{ backgroundColor: teamStyle.color }} />
-          {block.name} · {block.teamName}
+          {block.name.toLocaleLowerCase('es').includes(block.teamName.toLocaleLowerCase('es'))
+            ? block.name : block.name + ' · ' + block.teamName}
         </span></td>
         <td>{block.estimatedHours > 0 ? hours(block.estimatedHours) : '—'}</td>
         <td>{block.estimatedHours > 0
