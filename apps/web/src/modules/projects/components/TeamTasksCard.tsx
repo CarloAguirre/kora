@@ -125,7 +125,7 @@ export function TeamTasksCard({ project, projectId, teamId, managerView = false 
   const teamTasks = useMemo(() => {
     return project.modules.flatMap((module) =>
       module.tasks
-        .filter((task) => task.teamId === teamId)
+        .filter((task) => task.teamId === teamId && !task.cancelledAt)
         .map((task) => ({
           ...task, moduleId: module.id, moduleName: module.name,
           blockName: module.segments.find((segment) => segment.id === task.segmentId)?.name ??
