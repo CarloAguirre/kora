@@ -319,6 +319,9 @@ function ViewEntryDetail({ entry, onClose }: { entry: HourEntrySummary; onClose:
             )}
           </div>
 
+          {entry.segment && (
+            <TextField label="Bloque de trabajo" disabled readOnly value={entry.segment.name} />
+          )}
           <TextField label="Actividad" disabled readOnly value={entry.category} />
 
           <div className={styles.row}>
