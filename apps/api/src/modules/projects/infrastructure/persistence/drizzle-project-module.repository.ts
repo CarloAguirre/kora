@@ -108,6 +108,7 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
           status: projectModuleTasks.status,
           scope: projectModuleTasks.scope,
           completedAt: projectModuleTasks.completedAt,
+          cancelledAt: projectModuleTasks.cancelledAt,
           rejectionReason: projectModuleTasks.rejectionReason,
         })
         .from(projectModuleTasks)
@@ -167,7 +168,7 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
         })
         .from(projectModuleTasks)
         .innerJoin(projectModules, eq(projectModules.id, projectModuleTasks.moduleId))
-        .where(inArray(projectModules.projectId, [...projectIds])),
+        .where(and(inArray(projectModules.projectId, [...projectIds]), sql`${projectModuleTasks.cancelledAt} is null`)),
     ]);
 
     const tasksByModule = new Map<string, ProjectModuleProgressInputRecord['tasks'][number][]>();
@@ -257,6 +258,7 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
           status: projectModuleTasks.status,
           scope: projectModuleTasks.scope,
           completedAt: projectModuleTasks.completedAt,
+          cancelledAt: projectModuleTasks.cancelledAt,
           rejectionReason: projectModuleTasks.rejectionReason,
         })
         .from(projectModuleTasks)
@@ -521,6 +523,7 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
         ...(input.status !== undefined ? { status: input.status } : {}),
         ...(input.scope !== undefined ? { scope: input.scope } : {}),
         ...(input.completedAt !== undefined ? { completedAt: input.completedAt } : {}),
+        ...(input.cancelledAt !== undefined ? { cancelledAt: input.cancelledAt } : {}),
         ...(input.rejectionReason !== undefined ? { rejectionReason: input.rejectionReason } : {}),
         updatedAt: now,
       })
@@ -533,6 +536,24 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
   }, context?: TransactionContext): Promise<void> {
     const db = resolveDb(this.database, context);
     await db.insert(projectRoadmapReferenceExclusions).values(input).onConflictDoNothing();
+  }
+
+  async cancelTask(id: string, now: Date, context?: TransactionContext): Promise<void> {
+    const db = resolveDb(this.database, context);
+    await db.update(projectModuleTasks).set({
+      cancelledAt: now, updatedAt: now,
+    }).where(eq(projectModuleTasks.id, id));
+  }
+
+  async hasTaskUserHours(projectId: string, moduleId: string, userId: string, context?: TransactionContext): Promise<boolean> {
+    const db = resolveDb(this.database, context);
+    const records = await db.select({ id: hourEntries.id }).from(hourEntries)
+      .where(and(eq(hourEntries.projectId, projectId), eq(hourEntries.moduleId, moduleId),
+        eq(hourEntries.userId, userId)))
+      .limit(1);
+    // Registro por módulo y usuario: conservador, no atribuye las HH a una tarea
+    // porque hour_entries no dispone de FK task_id.
+    return records.length > 0;
   }
 
   async removeTask(id: string, context?: TransactionContext): Promise<void> {
@@ -652,6 +673,7 @@ interface RawTaskRow {
   status: ProjectModuleTaskRecord['status'];
   scope: ProjectModuleTaskRecord['scope'];
   completedAt: Date | null;
+  cancelledAt: Date | null;
   rejectionReason: string | null;
 }
 
@@ -672,6 +694,7 @@ function toTaskRow(row: RawTaskRow): ProjectModuleTaskRecord {
     status: row.status,
     scope: row.scope,
     completedAt: row.completedAt,
+    cancelledAt: row.cancelledAt,
     rejectionReason: row.rejectionReason,
   };
 }
