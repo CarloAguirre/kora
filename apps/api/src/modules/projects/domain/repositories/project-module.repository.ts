@@ -39,6 +39,8 @@ export interface ProjectModuleSegmentRecord {
   readonly startDate: Date;
   readonly endDate: Date;
   readonly estimatedHours: number | null;
+  /** HH aprobadas imputadas explícitamente al bloque, no estimadas ni distribuidas. */
+  readonly consumedHours?: number;
   readonly members: readonly ProjectModuleSegmentMemberRecord[];
 }
 
