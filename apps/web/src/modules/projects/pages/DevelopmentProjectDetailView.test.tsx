@@ -295,9 +295,16 @@ describe('Avance del proyecto — misma fuente operativa que el Roadmap', () => 
     expect(screen.getByRole('heading', { name: 'Avance del proyecto' })).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Avance real 0%; plan a la fecha 100%' }))
       .toBeInTheDocument();
+    const toggle = screen.getByRole('button', { name: /Cómo se calcula este avance/i });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText('Fase 1: Diseño UX')).not.toBeInTheDocument();
+    fireEvent.click(toggle);
     expect(screen.getByText('Fase 1: Diseño UX')).toBeInTheDocument();
-    expect(screen.getByText(/Las HH de bloques no coinciden con la estimación comercial/))
-      .toBeInTheDocument();
+    // El plan operativo puede diferir del contrato sin que sea un error
+    // automático. Se informa la diferencia, sin alertar por falsa incoherencia.
+    expect(screen.getByText(/La diferencia no cambia el contrato/)).toBeInTheDocument();
+    expect(screen.queryByText(/Las HH de bloques no coinciden con la estimación comercial/))
+      .not.toBeInTheDocument();
   });
 });
 
