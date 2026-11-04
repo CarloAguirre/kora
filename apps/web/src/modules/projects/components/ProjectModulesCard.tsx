@@ -511,9 +511,11 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
           label: module.name + ' · ' + teamName,
           role: roleFromTeamName(teamName),
           hours: block.hours,
-          missingBlockMessage: project.status === 'active' && project.startDate
-            ? 'No se generó este bloque operativo: revisa el calendario traspasado.'
-            : 'Se generará automáticamente al iniciar el proyecto.',
+          missingBlockMessage: appliedPlanning.data?.status === 'accepted_for_planning_only'
+            ? 'La estimación aún es planificación preliminar: falta aprobación comercial y traspaso.'
+            : project.status === 'active' && (project.startDate || project.hito0At)
+              ? 'Bloque de cotización traspasada pendiente de materializar. Revisa el evento del calendario.'
+              : 'Se generará automáticamente al iniciar el proyecto.',
         };
       });
   };
