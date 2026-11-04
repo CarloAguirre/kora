@@ -871,7 +871,8 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
  * No infiere consumo por bloque: los registros horarios solo indican módulo. */
 function SegmentDrawer({
   project, module, segment, reference, onClose, onEdit, onDelete,
-  onEditTask, onDuplicateTask, onCreateReference,
+  onEditMembers, onChangeClosure, onAssignTasks,
+  onEditTask, onDuplicateTask,
 }: {
   project: ProjectDetail;
   module: ProjectModule;
@@ -880,9 +881,11 @@ function SegmentDrawer({
   onClose: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
+  onEditMembers?: () => void;
+  onChangeClosure?: (action: 'close' | 'reopen') => void;
+  onAssignTasks?: () => void;
   onEditTask?: (task: ProjectModuleTask) => void;
   onDuplicateTask?: (task: ProjectModuleTask) => void;
-  onCreateReference?: (task: AppliedQuotationPlanning['modules'][number]['tasks'][number]) => void;
 }) {
   const toast = useToast();
   const updateDelivery = useUpdateProjectModuleDelivery();
@@ -892,20 +895,19 @@ function SegmentDrawer({
     (block) => block.teamId === segment.teamId,
   ) ?? [];
   const hours = segment.estimatedHours ?? (projected.length === 1 ? projected[0]!.hours : null);
-  // Solo asociamos una entrega si hay correspondencia ÚNICA de equipo y
-  // fecha final. No se crean entregas ficticias para bloques sin planificación.
-  const deliveries = module.deliveries.filter((delivery) =>
-    delivery.teamId === segment.teamId && delivery.estimatedDate === segment.endDate);
-  // Dos bloques del mismo equipo con igual fin NO tienen una relación
-  // inequívoca con una entrega: no afirmar un vínculo solo por la fecha.
-  const candidateSegments = module.segments.filter((item) =>
-    item.teamId === segment.teamId && item.endDate === segment.endDate);
-  const delivery = deliveries.length === 1 && candidateSegments.length === 1 ? deliveries[0]! : null;
+  // Vínculo real. La migración 0051 solo asocia entregas antiguas inequívocas.
+  const delivery = module.deliveries.find((item) => item.segmentId === segment.id) ?? null;
   const sameTeamSegments = module.segments.filter((entry) => entry.teamId === segment.teamId);
   const teamTasks = module.tasks.filter((task) => task.teamId === segment.teamId &&
-    (task.description?.includes(' · ID ' + segment.id) ||
-      (sameTeamSegments.length === 1 &&
-        !task.description?.includes('Bloque de trabajo: '))));
+    (task.segmentId === segment.id ||
+      (!task.segmentId && (task.description?.includes(' · ID ' + segment.id) ||
+        (sameTeamSegments.length === 1 &&
+          !task.description?.includes('Bloque de trabajo: '))))));
+  const taskHours = teamTasks.reduce((sum, task) => sum + (task.estimatedHours ?? 0), 0);
+  const approvedTasks = teamTasks.filter((task) => task.status === 'done');
+  const approvedHours = approvedTasks.reduce((sum, task) => sum + (task.estimatedHours ?? 0), 0);
+  const progress = teamTasks.length
+    ? Math.round(100 * (taskHours ? approvedHours / taskHours : approvedTasks.length / teamTasks.length)) : 0;
   const deliver = async () => {
     if (!delivery || delivery.status !== 'planned' || !comment.trim()) return;
     try {
