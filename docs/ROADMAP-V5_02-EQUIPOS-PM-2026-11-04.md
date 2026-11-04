@@ -98,3 +98,32 @@ pnpm test
 
 **Sin migración nueva.** El usuario/CI debe correr los comandos para
 confirmar typecheck, tests y builds; ningún resultado se presume exitoso.
+
+## Corrección postintegración — errores reportados en PowerShell (04-11-2026)
+
+En la primera integración de la sección, el usuario ejecutó compilación,
+typecheck y tests. Se observaron estos resultados:
+
+- `@kora/api`: 17 pruebas satisfactorias (6 arquitectura y 11 en
+  `update-project.use-case.spec.ts`).
+- `@kora/web`: TS6133 por `Select` sin uso en `ProjectModulesCard`;
+  TS2352 por un objeto referencial convertido mediante cast a `ProjectModule`.
+- Dos tests web fallaron por selectores demasiado estrictos, no por los datos
+  calculados: «Sobre presupuesto» tiene un marcador visual al principio;
+  las 679 HH aparecen en más de una ubicación.
+
+### Solución
+
+1. `ProjectModulesCard`: eliminado import de `Select` sin uso.
+2. `NewWorkBlockModal`: el tipo `module` ahora declara únicamente `id` y
+   `name`, que son los únicos campos leídos por el formulario. Eliminado
+   el cast inseguro del módulo referencial en `ProjectModulesCard`.
+3. Test `DevelopmentProjectDetailView`: aserción textual que admite el
+   marcador visual de estado.
+4. Test `ProjectManagerTeamDetailView`: localiza el KPI «HH asignadas»
+   y verifica 679 dentro de esa tarjeta, aunque otros componentes tengan
+   el mismo número.
+
+No se cambiaron reglas de negocio, endpoints, esquemas de BD ni migraciones.
+El resultado definitivo exige repetir los comandos de typecheck y tests
+sobre el último commit.
