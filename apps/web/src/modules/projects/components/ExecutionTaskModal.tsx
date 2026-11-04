@@ -121,6 +121,8 @@ export function ExecutionTaskModal({
           setAssignee(member?.userId ?? '');
           setTeamId(member?.teamId ?? task.teamId ?? '');
           setBlockId('');
+          // Reasignar no conserva la aprobación de la persona anterior.
+          if ((member?.userId ?? null) !== (task.assigneeUserId ?? null)) setStatus('todo');
         }} />
       <p className={styles.help}>Solo puedes asignar colaboradores del proyecto. Si está vacío, la tarea continúa por asignar.</p>
       <Select label="Módulo relacionado" value={moduleId} disabled

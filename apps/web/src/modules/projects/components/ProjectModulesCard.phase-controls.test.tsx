@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ProjectDetail } from '@kora/contracts';
@@ -36,7 +36,8 @@ vi.mock('@/modules/client-portal/adapters/project-detail.adapter', () => ({
 }));
 vi.mock('@/modules/client-portal/components/PhaseRoadmap', () => ({
   PhaseRoadmap: ({ phaseRoadmap, toolbarActions, renderPhaseHeaderName,
-    renderPhaseHeaderActions, renderPhaseReferences, operationalRows, onPlanOperationalRow, operationalFooter }: {
+    renderPhaseHeaderActions, renderPhaseReferences, operationalRows, onPlanOperationalRow, operationalFooter,
+    renderSelectionDetail }: {
     phaseRoadmap: { phases: { id: string }[] };
     toolbarActions?: ReactNode;
     renderPhaseHeaderName?: (phase: { id: string }) => ReactNode;
@@ -45,15 +46,23 @@ vi.mock('@/modules/client-portal/components/PhaseRoadmap', () => ({
     operationalRows?: (phase: { id: string }) => Array<{ id: string; label: string; hours: number }>;
     onPlanOperationalRow?: (phase: { id: string }, row: { id: string; label: string; hours: number }) => void;
     operationalFooter?: ReactNode;
+    renderSelectionDetail?: (phase: { id: string },
+      selection: { kind: 'reference-block'; id: string; label: string }, close: () => void) => ReactNode;
   }) => {
     const phase = phaseRoadmap.phases[0]!;
+    const [selection, setSelection] = useState<{ kind: 'reference-block'; id: string; label: string } | null>(null);
     return <section>{toolbarActions}{renderPhaseHeaderName?.(phase)}
       {renderPhaseHeaderActions?.(phase)}
       {operationalRows?.(phase).map((row) => <div key={row.id}>{row.label}
+        <button type="button" onClick={() => setSelection({
+          kind: 'reference-block', id: row.id, label: row.label,
+        })}>Abrir bloque {row.label}</button>
         {onPlanOperationalRow && <button type="button"
           onClick={() => onPlanOperationalRow(phase, row)}>Planificar bloque</button>}
       </div>)}
-      {renderPhaseReferences?.(phase)}{operationalFooter}</section>;
+      {renderPhaseReferences?.(phase)}
+      {selection && renderSelectionDetail?.(phase, selection, () => setSelection(null))}
+      {operationalFooter}</section>;
   },
 }));
 vi.mock('../api/projects.queries', () => ({
@@ -185,6 +194,17 @@ describe('Referencias de bloque de trabajo de la cotización', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Planificar' }));
     expect(screen.getByRole('button', { name: 'Planificar bloque' })).toBeEnabled();
     expect(screen.queryByText('Bloque planificado')).not.toBeInTheDocument();
+  });
+
+
+  it('abre el panel lateral del bloque EDT referencial al seleccionarlo', () => {
+    seedReference();
+    show();
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir bloque Diseño Backend · Desarrollo' }));
+    expect(screen.getByRole('dialog', { name: 'Diseño Backend' })).toBeInTheDocument();
+    expect(screen.getByText(/Las semanas del presupuesto son relativas/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Planificar bloque' })).toBeEnabled();
+    expect(mocks.createSegment).not.toHaveBeenCalled();
   });
 
   it('actualiza el estado a bloque planificado cuando el segmento aparece tras el guardado', () => {
