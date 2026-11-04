@@ -13,7 +13,6 @@ import { useToast } from '@/shared/components/ui/Toast';
 import { PencilIcon, TrashIcon } from '@/shared/components/icons/Icons';
 import { calculateTeamProgress } from '../lib/team-progress';
 import { TeamProgressCard } from './TeamProgressCard';
-import { ProjectTimeline } from './ProjectTimeline';
 import { TeamTasksCard } from './TeamTasksCard';
 import { TeamDeliveriesCard } from './TeamDeliveriesCard';
 import deliveryModalStyles from './DeliveryModal.module.css';
@@ -328,13 +327,6 @@ export function TeamLeaderProjectView({
       </Card>
 
       <TeamProgressCard progress={teamProgress} teamName={team.teamName} />
-      <Card>
-        <p className={styles.sectionTitle}>Avance del proyecto</p>
-        <div style={{ marginTop: 'var(--kora-space-4)' }}>
-          <ProjectTimeline progress={project.progress} />
-        </div>
-      </Card>
-
       <TeamTasksCard project={project} projectId={projectId} teamId={teamId} />
       <TeamDeliveriesCard project={project} projectId={projectId} teamId={teamId} />
 
