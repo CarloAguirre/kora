@@ -15,6 +15,7 @@ import type { ProjectDetail } from "@kora/contracts";
 import { useMemo, useState } from "react";
 import { useResolveProjectManagementApproval } from "../api/projects.queries";
 import { AssignedTeamsCard, type AssignedTeamSummary } from "../components/AssignedTeamsCard";
+import { ProjectTeamsManagementCard } from "../components/ProjectTeamsManagementCard";
 import { BitacoraCard } from "../components/BitacoraCard";
 import { BitacoraMiniCard } from "../components/BitacoraMiniCard";
 import { ProjectExtrasTab } from "../components/ProjectExtrasTab";
@@ -355,13 +356,16 @@ export function DevelopmentProjectDetailView({
               <div className={styles.colLeft}>
                 <TeamHoursSummaryChart teams={teamSummaries} />
 
-                <AssignedTeamsCard
-                  project={project}
-                  teams={teamSummaries}
-                  onViewHours={() => setTab("bitacora")}
-                  onManageTeams={canManageProject ? onEdit : undefined}
-                  canOpenTeam={readOnlyTeamIds ? (teamId) => readOnlyTeamIds.has(teamId) : undefined}
-                />
+                {canManageProject ? (
+                  <ProjectTeamsManagementCard project={project} catalog={teamsCatalog?.items ?? []} />
+                ) : (
+                  <AssignedTeamsCard
+                    project={project}
+                    teams={teamSummaries}
+                    onViewHours={() => setTab("bitacora")}
+                    canOpenTeam={readOnlyTeamIds ? (teamId) => readOnlyTeamIds.has(teamId) : undefined}
+                  />
+                )}
               </div>
 
               <div className={styles.colRight}>
