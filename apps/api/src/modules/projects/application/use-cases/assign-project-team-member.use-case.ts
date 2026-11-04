@@ -69,7 +69,7 @@ export class AssignProjectTeamMemberUseCase
     }
 
     const existing = await this.members.findByProjectAndTeamMember(projectId, data.teamMemberId);
-    if (existing) return err(new ProjectTeamMemberAlreadyAssignedError());
+    if (existing && !existing.blockedAt) return err(new ProjectTeamMemberAlreadyAssignedError());
 
     // `N° colaboradores` del proyecto es el tope de personas del equipo; nulo o 0 (dato viejo) = sin tope.
     const projectTeam = (await this.projectTeams.findByProject(projectId)).find((team) => team.teamId === teamId);
@@ -77,11 +77,14 @@ export class AssignProjectTeamMemberUseCase
       return err(new ProjectTeamMemberLimitReachedError(projectTeam.teamName, projectTeam.maxMembers));
     }
 
-    const id = await this.members.assign({
+    const id = existing?.blockedAt ? existing.id : await this.members.assign({
       projectId,
       teamMemberId: data.teamMemberId,
       activity: data.activity || null,
       assignedHours: data.assignedHours,
+    });
+    if (existing?.blockedAt) await this.members.reactivate(existing.id, {
+      activity: data.activity || null, assignedHours: data.assignedHours,
     });
 
     await this.audit.record({
