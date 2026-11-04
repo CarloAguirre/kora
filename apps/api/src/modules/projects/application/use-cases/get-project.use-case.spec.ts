@@ -136,3 +136,65 @@ describe('GetProjectUseCase — lectura del líder de un equipo aprobado', () =>
     if (result.isOk()) expect(result.value.teams[0]?.leader?.id).toBe(actorUserId);
   });
 });
+
+describe('GetProjectUseCase — calendario traspasado al iniciar', () => {
+  it('activa la materialización aun si la etapa comercial cambió después del traspaso', async () => {
+    const projectId = '11111111-1111-4111-8111-111111111121';
+    const project = {
+      id: projectId,
+      isDeleted: false,
+      pendingManagementApproval: null,
+      toSnapshot: () => ({
+        id: projectId,
+        name: 'Proyecto aprobado y traspasado',
+        slug: 'proyecto-aprobado',
+        type: 'development',
+        status: 'active',
+        // El evento quotation_transferred del calendario, y no esta columna
+        // editable, es lo que acredita el traspaso.
+        salesStage: 'quoted',
+        phase: 'development',
+        soldHours: 200,
+        usedHours: 0,
+        leaderUserId: 'project-pm',
+        developerUserId: null,
+        commercialManagerUserId: null,
+        primaryContactId: null,
+        clientId: null,
+        hito0At: new Date('2026-11-04T12:00:00.000Z'),
+        startDate: '2026-11-05',
+        createdAt: new Date('2026-11-01T12:00:00.000Z'),
+        updatedAt: new Date('2026-11-04T12:00:00.000Z'),
+      }),
+    };
+    const ensure = vi.fn().mockResolvedValue(true);
+    const modules = { listForProject: vi.fn().mockResolvedValue([]) };
+    const useCase = new GetProjectUseCase(
+      { findById: vi.fn().mockResolvedValue(project),
+        isProjectLeaderOrTeamLeaderOfMember: vi.fn().mockResolvedValue(false),
+      } as unknown as ProjectRepository,
+      { listForProject: vi.fn().mockResolvedValue([]) } as unknown as ProjectTeamMemberRepository,
+      { findByProject: vi.fn().mockResolvedValue([]) } as unknown as ProjectTeamRepository,
+      { listForProject: vi.fn().mockResolvedValue([]) } as unknown as ProjectObservationRepository,
+      modules as unknown as ProjectModuleRepository,
+      { listForProject: vi.fn().mockResolvedValue([]) } as unknown as ProjectPaymentMilestoneRepository,
+      { findById: vi.fn().mockResolvedValue(null) } as unknown as ProjectUserReader,
+      { findById: vi.fn().mockResolvedValue(null) } as unknown as ProjectClientReader,
+      { findById: vi.fn().mockResolvedValue(null) } as unknown as ProjectContactReader,
+      { maxApprovedEntryDateForProject: vi.fn().mockResolvedValue(null),
+        sumApprovedHoursBeforeDateForProject: vi.fn().mockResolvedValue(0),
+      } as unknown as ProjectHourEntryReader,
+      { lastActivityAtByUser: vi.fn().mockResolvedValue(null) } as unknown as ProjectActivityReader,
+      new FixedClock(),
+      { promoteAndNotify: vi.fn().mockResolvedValue(undefined) } as unknown as PaymentMilestoneTriggerService,
+      { ensure },
+    );
+    const result = await useCase.execute({
+      projectId, actorUserId: 'project-pm', actorPermissions: ['projects:read'],
+    });
+    expect(result.isOk()).toBe(true);
+    expect(ensure).toHaveBeenCalledExactlyOnceWith(projectId);
+    // El GET devuelve el calendario ya materializado y no el snapshot obsoleto.
+    expect(modules.listForProject).toHaveBeenCalledTimes(2);
+  });
+});
