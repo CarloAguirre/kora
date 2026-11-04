@@ -26,7 +26,7 @@ function fixture() {
   const useCase = new CreateProjectModuleSegmentUseCase(
     projects, modules, forecast, audit, new FixedClock(), new PassthroughUnitOfWork(), progress,
   );
-  return { useCase, modules, forecast, audit };
+  return { useCase, modules, forecast, audit, progress };
 }
 
 const command = {
@@ -42,7 +42,7 @@ const command = {
 
 describe('CreateProjectModuleSegmentUseCase — bloque y entrega de cierre', () => {
   it('guarda HH propias del bloque y la entrega de cierre con la misma transacción', async () => {
-    const { useCase, modules, audit } = fixture();
+    const { useCase, modules, audit, progress } = fixture();
     const result = await useCase.execute({
       ...command,
       data: { ...command.data, closingDelivery: {
@@ -64,6 +64,7 @@ describe('CreateProjectModuleSegmentUseCase — bloque y entrega de cierre', () 
     expect(audit.record).toHaveBeenCalledWith(expect.objectContaining({
       metadata: expect.objectContaining({ createdClosingDelivery: true }),
     }));
+    expect(progress.recalculate).toHaveBeenCalledWith('project-1', segmentsTx);
   });
 
   it('sin entrega de cierre registra solamente el bloque', async () => {
