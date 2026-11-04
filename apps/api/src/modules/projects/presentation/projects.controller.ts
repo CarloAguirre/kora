@@ -8,6 +8,7 @@ import {
   createProjectModuleSchema,
   createProjectModuleSegmentSchema,
   createProjectModuleTaskSchema,
+  excludeRoadmapReferenceSchema,
   createProjectPaymentMilestoneSchema,
   createProjectSchema,
   issueProjectPaymentMilestoneInvoiceSchema,
@@ -34,6 +35,8 @@ import {
   type CreateProjectModuleInput,
   type CreateProjectModuleSegmentInput,
   type CreateProjectModuleTaskInput,
+  type ExcludeRoadmapReferenceInput,
+  type RoadmapReferenceExclusion,
   type CreateProjectPaymentMilestoneInput,
   type IssueProjectPaymentMilestoneInvoiceInput,
   type ListProjectsQuery,
@@ -86,6 +89,7 @@ import { DeleteProjectModuleSegmentUseCase } from '../application/use-cases/dele
 import { CreateProjectModuleTaskUseCase } from '../application/use-cases/create-project-module-task.use-case';
 import { UpdateProjectModuleTaskUseCase } from '../application/use-cases/update-project-module-task.use-case';
 import { DeleteProjectModuleTaskUseCase } from '../application/use-cases/delete-project-module-task.use-case';
+import { ProjectRoadmapReferenceExclusionsService } from '../application/services/project-roadmap-reference-exclusions.service';
 import { CreateProjectPaymentMilestoneUseCase } from '../application/use-cases/create-project-payment-milestone.use-case';
 import { UpdateProjectPaymentMilestoneUseCase } from '../application/use-cases/update-project-payment-milestone.use-case';
 import { DeleteProjectPaymentMilestoneUseCase } from '../application/use-cases/delete-project-payment-milestone.use-case';
@@ -126,6 +130,7 @@ export class ProjectsController {
     private readonly createModuleTask: CreateProjectModuleTaskUseCase,
     private readonly updateModuleTask: UpdateProjectModuleTaskUseCase,
     private readonly deleteModuleTask: DeleteProjectModuleTaskUseCase,
+    private readonly roadmapExclusions: ProjectRoadmapReferenceExclusionsService,
     private readonly createPaymentMilestone: CreateProjectPaymentMilestoneUseCase,
     private readonly updatePaymentMilestone: UpdateProjectPaymentMilestoneUseCase,
     private readonly deletePaymentMilestone: DeleteProjectPaymentMilestoneUseCase,
@@ -623,6 +628,37 @@ export class ProjectsController {
         actorPermissions: actor.permissions,
       }),
     );
+  }
+
+  /** Excluir referencias del Roadmap sin borrar actividades de la cotización original. */
+  @Get(':id/roadmap-reference-exclusions')
+  @RequireAnyPermission('projects:read', 'projects:read_assigned')
+  async listRoadmapReferenceExclusions(
+    @Param('id') projectId: string, @CurrentUser() actor: RequestUser,
+  ): Promise<RoadmapReferenceExclusion[]> {
+    return this.roadmapExclusions.list(projectId, actor);
+  }
+
+  @Post(':id/modules/:moduleId/roadmap-reference-exclusions')
+  @RequireAnyPermission('projects:manage', 'projects:read_assigned')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async excludeRoadmapReference(
+    @Param('id') projectId: string, @Param('moduleId') moduleId: string,
+    @Body(new ZodValidationPipe(excludeRoadmapReferenceSchema)) body: ExcludeRoadmapReferenceInput,
+    @CurrentUser() actor: RequestUser,
+  ): Promise<void> {
+    await this.roadmapExclusions.suppress(projectId, moduleId, body, actor);
+  }
+
+  @Post(':id/modules/:moduleId/roadmap-reference-exclusions/restore')
+  @RequireAnyPermission('projects:manage', 'projects:read_assigned')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async restoreRoadmapReference(
+    @Param('id') projectId: string, @Param('moduleId') moduleId: string,
+    @Body(new ZodValidationPipe(excludeRoadmapReferenceSchema)) body: ExcludeRoadmapReferenceInput,
+    @CurrentUser() actor: RequestUser,
+  ): Promise<void> {
+    await this.roadmapExclusions.restore(projectId, moduleId, body, actor);
   }
 
   /** Sin `projects:manage`, solo quien lidera el equipo de la tarea (ver `CreateProjectModuleTaskUseCase`). */
