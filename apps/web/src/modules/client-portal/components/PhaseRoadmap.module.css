@@ -959,3 +959,37 @@ button.ganttBar {
 @media (max-width: 900px) {
   .operationalPhaseHeader .phaseNameControl { flex: 1 1 220px; }
 }
+
+/* Hitos asociados al bloque REAL, no a una fecha deducida desde otra entrega. */
+.operationalBarProgress {
+  display: block;
+  height: 4px;
+  position: absolute;
+  top: 0;
+  left: 0;
+  border-radius: 5px 0 0 0;
+  background: #b5e54b;
+  pointer-events: none;
+}
+.operationalClosureMarker {
+  position: absolute;
+  top: 11px;
+  transform: translateX(-50%);
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 23px;
+  width: 23px;
+  padding: 2px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.operationalClosureMarker svg { flex: none; stroke-width: 2.4; }
+.operationalClosureMarker:hover,
+.operationalClosureMarker:focus-visible {
+  outline: 2px solid #9fb1cf;
+  border-radius: 7px;
+  background: #fff;
+}
