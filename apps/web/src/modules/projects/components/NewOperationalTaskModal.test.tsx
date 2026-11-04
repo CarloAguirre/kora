@@ -51,16 +51,16 @@ describe('Nueva tarea operativa vinculada a bloque', () => {
   it('impide crear una tarea sin bloque, aunque tenga nombre y HH', () => {
     render(<NewOperationalTaskModal project={project} moduleId={moduleId}
       onClose={mocks.onClose} />);
-    fireEvent.change(screen.getByLabelText('Título de la tarea'), {
+    fireEvent.change(screen.getByLabelText(/Título de la tarea/), {
       target: { value: 'Crear interfaz PWA' },
     });
-    fireEvent.change(screen.getByLabelText('HH estimadas'), {
+    fireEvent.change(screen.getByLabelText(/HH estimadas/), {
       target: { value: '20' },
     });
-    fireEvent.change(screen.getByLabelText('Fecha de inicio'), {
+    fireEvent.change(screen.getByLabelText(/Fecha de inicio/), {
       target: { value: '2026-11-05' },
     });
-    fireEvent.change(screen.getByLabelText('Fecha límite'), {
+    fireEvent.change(screen.getByLabelText(/Fecha límite/), {
       target: { value: '2026-11-15' },
     });
     expect(screen.getByRole('button', { name: 'Crear tarea' })).toBeDisabled();
@@ -70,10 +70,10 @@ describe('Nueva tarea operativa vinculada a bloque', () => {
   it('registra explícitamente el segmento seleccionado', async () => {
     render(<NewOperationalTaskModal project={project} moduleId={moduleId}
       onClose={mocks.onClose} />);
-    fireEvent.change(screen.getByLabelText('Título de la tarea'), {
+    fireEvent.change(screen.getByLabelText(/Título de la tarea/), {
       target: { value: 'Crear interfaz PWA' },
     });
-    fireEvent.change(screen.getByLabelText('HH estimadas'), {
+    fireEvent.change(screen.getByLabelText(/HH estimadas/), {
       target: { value: '20' },
     });
     fireEvent.change(screen.getByLabelText(/Bloque de trabajo/), {
