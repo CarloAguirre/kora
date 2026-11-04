@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ProjectDetail } from '@kora/contracts';
-import { calculateTeamProgress } from './team-progress';
+import { calculateTeamProgress, getLinkedBlockTasks, indexTeamBlockProgress, roadmapBlockMetrics } from './team-progress';
 
 const teamId = 'team-1';
 const otherTeamId = 'team-2';
@@ -132,5 +132,58 @@ describe('Avance del equipo — fechas, aprobaciones y horas reales', () => {
     expect(result.unlinkedTaskCount).toBe(1);
     expect(result.actualHours).toBe(16);
     expect(result.phases[0]?.blocks[1]?.actualHours).toBe(0);
+  });
+});
+
+describe('Roadmap y Avance del equipo — misma fuente por bloque', () => {
+  it('usa HH del bloque como denominador en vez de HH de tareas ya desglosadas', () => {
+    const project = fixture();
+    const indexed = indexTeamBlockProgress(project, today);
+    expect(roadmapBlockMetrics(indexed.get('block-1'))).toEqual({ hours: 100, progress: 16 });
+    expect(roadmapBlockMetrics(indexed.get('block-2'))).toEqual({ hours: 80, progress: 0 });
+    expect(indexed.get('block-1')?.consumedHours).toBe(61);
+  });
+
+  it('mantiene 100% para cierres/entregas aprobadas y excluye tareas canceladas', () => {
+    const closed = indexTeamBlockProgress(fixture({ closed: true }), today);
+    const delivered = indexTeamBlockProgress(fixture({ deliveryStatus: 'approved' }), today);
+    const cancelled = indexTeamBlockProgress(fixture({ cancelApproved: true }), today);
+    expect(roadmapBlockMetrics(closed.get('block-1')).progress).toBe(100);
+    expect(roadmapBlockMetrics(delivered.get('block-1')).progress).toBe(100);
+    expect(roadmapBlockMetrics(cancelled.get('block-1')).progress).toBe(0);
+  });
+
+  it('no muestra avance ni HH operativas ficticias en un bloque sin plan', () => {
+    const project = fixture();
+    const noPlan = {
+      ...project,
+      modules: project.modules.map((module, index) =>
+        index === 0
+          ? { ...module, segments: module.segments.map((block) => ({ ...block, estimatedHours: null })) }
+          : module),
+    } as typeof project;
+    expect(roadmapBlockMetrics(indexTeamBlockProgress(noPlan, today).get('block-1')))
+      .toEqual({ hours: null, progress: null });
+    expect(roadmapBlockMetrics(undefined)).toEqual({ hours: null, progress: null });
+  });
+
+  it('el drawer vincula solo tareas del equipo y no replica tareas legacy entre bloques', () => {
+    const project = fixture();
+    const module = project.modules[0]!;
+    const legacy = {
+      ...module.tasks[0]!,
+      id: 'legacy-done', segmentId: null, description: null, status: 'done',
+    };
+    const unique = { ...module, tasks: [...module.tasks, legacy] };
+    expect(getLinkedBlockTasks(unique, module.segments[0]!).map((task) => task.id))
+      .toContain('legacy-done');
+    expect(getLinkedBlockTasks(unique, module.segments[0]!).map((task) => task.id))
+      .not.toContain('other-team-task');
+    const multiple = {
+      ...unique,
+      segments: [...module.segments, { ...module.segments[0]!, id: 'another-block' }],
+    };
+    expect(getLinkedBlockTasks(multiple, module.segments[0]!).map((task) => task.id))
+      .not.toContain('legacy-done');
   });
 });
