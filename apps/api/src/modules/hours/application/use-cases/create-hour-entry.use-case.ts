@@ -74,6 +74,10 @@ export class CreateHourEntryUseCase implements UseCase<CreateHourEntryCommand, {
       if (module.projectId !== data.projectId) return err(new ModuleNotInProjectError());
     }
 
+    if (data.projectId && data.assignment === 'Proyecto' && !data.moduleId &&
+      await this.projects.hasWorkBlocks(data.projectId)) {
+      return err(new HourEntrySegmentRequiredError());
+    }
     if (data.segmentId && !data.moduleId) {
       return err(new InvalidHourEntrySegmentError('Selecciona la fase antes de elegir un bloque.'));
     }
