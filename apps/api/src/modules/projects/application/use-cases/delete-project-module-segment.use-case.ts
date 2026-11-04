@@ -18,6 +18,7 @@ import {
 } from '../../../../shared/application/ports/audit-recorder.port';
 import type { ActorContext, UseCase } from '../../../../shared/application/use-case';
 import { ForecastSourceSyncService } from '../services/forecast-source-sync.service';
+import { ProjectProgressRecalculator } from '../services/project-progress-recalculator';
 
 export interface DeleteProjectModuleSegmentCommand {
   readonly projectId: string;
@@ -38,6 +39,7 @@ export class DeleteProjectModuleSegmentUseCase
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
     @Inject(CLOCK) private readonly clock: Clock,
     @Inject(UNIT_OF_WORK) private readonly unitOfWork: UnitOfWork,
+    private readonly progress: ProjectProgressRecalculator,
   ) {}
 
   async execute(command: DeleteProjectModuleSegmentCommand): Promise<Result<void, ApplicationError>> {
@@ -69,6 +71,7 @@ export class DeleteProjectModuleSegmentUseCase
     await this.unitOfWork.run(async (tx) => {
       await this.modules.removeSegment(command.segmentId, tx);
       await this.forecastSync.syncModuleTasks(project, command.moduleId, this.clock.now(), tx);
+      await this.progress.recalculate(project.id, tx);
     });
 
     await this.audit.record({
