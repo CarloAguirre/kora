@@ -12,6 +12,7 @@ import type { ProjectContactReader } from '../ports/project-contact-reader.port'
 import type { ProjectHourEntryReader } from '../ports/project-hour-entry-reader.port';
 import type { ProjectActivityReader } from '../ports/project-activity-reader.port';
 import type { PaymentMilestoneTriggerService } from '../services/payment-milestone-trigger.service';
+import type { ProjectProgressRecalculator } from '../services/project-progress-recalculator';
 import { FixedClock } from '../../../../test/fakes';
 
 class FakeProjectRepository implements Partial<ProjectRepository> {
@@ -37,6 +38,7 @@ function buildUseCase(projects: FakeProjectRepository) {
     new FixedClock(),
     NEVER_USED as PaymentMilestoneTriggerService,
     NEVER_USED,
+    NEVER_USED as ProjectProgressRecalculator,
   );
 }
 
@@ -128,6 +130,7 @@ describe('GetProjectUseCase — lectura del líder de un equipo aprobado', () =>
       new FixedClock(),
       { promoteAndNotify: vi.fn().mockResolvedValue(undefined) } as unknown as PaymentMilestoneTriggerService,
       { ensure: vi.fn().mockResolvedValue(false) },
+      { recalculate: vi.fn() } as unknown as ProjectProgressRecalculator,
     );
     const result = await u.execute({
       projectId: project.id, actorUserId, actorPermissions: ['projects:read_assigned'],
@@ -168,6 +171,7 @@ describe('GetProjectUseCase — calendario traspasado al iniciar', () => {
       }),
     };
     const ensure = vi.fn().mockResolvedValue(true);
+    const recalculate = vi.fn().mockResolvedValue(undefined);
     const modules = { listForProject: vi.fn().mockResolvedValue([]) };
     const useCase = new GetProjectUseCase(
       { findById: vi.fn().mockResolvedValue(project),
@@ -188,6 +192,7 @@ describe('GetProjectUseCase — calendario traspasado al iniciar', () => {
       new FixedClock(),
       { promoteAndNotify: vi.fn().mockResolvedValue(undefined) } as unknown as PaymentMilestoneTriggerService,
       { ensure },
+      { recalculate } as unknown as ProjectProgressRecalculator,
     );
     const result = await useCase.execute({
       projectId, actorUserId: 'project-pm', actorPermissions: ['projects:read'],
@@ -195,6 +200,8 @@ describe('GetProjectUseCase — calendario traspasado al iniciar', () => {
     expect(result.isOk()).toBe(true);
     expect(ensure).toHaveBeenCalledOnce();
     expect(ensure).toHaveBeenCalledWith(projectId);
+    expect(recalculate).toHaveBeenCalledOnce();
+    expect(recalculate).toHaveBeenCalledWith(projectId);
     // El GET devuelve el calendario ya materializado y no el snapshot obsoleto.
     expect(modules.listForProject).toHaveBeenCalledTimes(2);
   });
