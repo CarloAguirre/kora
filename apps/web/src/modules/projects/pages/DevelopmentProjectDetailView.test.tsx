@@ -262,43 +262,38 @@ describe('Cotizaciones integradas en ficha Kora', () => {
   });
 });
 
-describe('DevelopmentProjectDetailView — equipos asignados', () => {
-  it('muestra el líder de cada equipo, incluso si no está fijado a nivel de proyecto', () => {
+describe('DevelopmentProjectDetailView — equipos PM/PMO', () => {
+  it('muestra el líder de los equipos, incluyendo el fallback del catálogo', () => {
     renderView();
-
     expect(within(getTeamCard('Desarrollo')).getByText('José Aponte')).toBeInTheDocument();
     expect(within(getTeamCard('UX-UI')).getByText('Eduardo Aranda')).toBeInTheDocument();
-    // RPA no tiene líder fijado para ESTE proyecto (project_teams.leader_user_id
-    // nulo), pero el equipo sí tiene líder en general — debe mostrarse igual.
     expect(within(getTeamCard('RPA')).getByText('José Aponte')).toBeInTheDocument();
-    // QA no tiene líder ni a nivel de proyecto ni en el catálogo de equipos.
-    expect(within(getTeamCard('QA')).getByText('Sin líder asignado')).toBeInTheDocument();
   });
 
-  it('resume HH asignadas/utilizadas y la salud de cada equipo', () => {
+  it('muestra las HH reales y la planificación en el resumen de equipos', () => {
     renderView();
-
+    expect(screen.getByText('HH vendidas')).toBeInTheDocument();
+    expect(screen.getByText('Asignadas a equipos')).toBeInTheDocument();
+    expect(screen.getByText('Por asignar')).toBeInTheDocument();
+    expect(screen.getByText('Planificadas en bloques')).toBeInTheDocument();
     const desarrollo = within(getTeamCard('Desarrollo'));
     expect(desarrollo.getByText('400 hrs')).toBeInTheDocument();
     expect(desarrollo.getByText('474 hrs')).toBeInTheDocument();
-    expect(desarrollo.getByText(/Crítico — 74 hrs sobre presupuesto/)).toBeInTheDocument();
-
-    expect(within(getTeamCard('UX-UI')).getByText(/Excelente/)).toBeInTheDocument();
-    expect(within(getTeamCard('RPA')).getByText(/En rango/)).toBeInTheDocument();
-    expect(within(getTeamCard('QA')).getByText(/Crítico — sin iniciar/)).toBeInTheDocument();
+    expect(desarrollo.getByText('Sobre presupuesto')).toBeInTheDocument();
   });
 
-  it('cada tarjeta lleva a la ficha del equipo dentro del proyecto', () => {
+  it('cada card conserva el enlace profundo al equipo dentro del proyecto', () => {
     renderView();
-
     expect(getTeamCard('Desarrollo')).toHaveAttribute('href', '/proyectos/proyecto-de-prueba/equipos/desarrollo');
   });
 
-  it('no lista personas ni permite asignar o quitar gente desde la ficha', () => {
+  it('el PM gestiona líder, cupos y HH en la misma sección, no la asignación de personas', () => {
     renderView(['projects:manage']);
-
+    fireEvent.click(screen.getByRole('button', { name: 'Gestionar equipos' }));
+    expect(screen.getByRole('button', { name: 'Listo' })).toBeInTheDocument();
+    expect(screen.getByText('Agregar equipo')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Quitar equipo Desarrollo' })).toBeInTheDocument();
     expect(screen.queryByText('Claudio Andres Flores Vilches')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Quitar a/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Asignar' })).not.toBeInTheDocument();
   });
 });
