@@ -416,3 +416,116 @@
   .phaseHeadingActions { flex-wrap: wrap; justify-content: flex-end; gap: 7px; }
   .phaseHeadingProgress { min-width: 106px; }
 }
+
+
+/* Roadmap v5.02: avisos de equipo + tareas operativas, debajo del cronograma. */
+.operationalContent { display: grid; gap: 10px; }
+.awaitingAssignment {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid #ddd1fa;
+  border-radius: 10px;
+  background: #f4efff;
+}
+.awaitingBadge {
+  min-width: 31px;
+  height: 26px;
+  border-radius: 5px;
+  padding: 0 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 9.5px;
+  font-weight: 800;
+}
+.awaitingText {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+  color: #4b3d75;
+  font-size: 12.5px;
+}
+.awaitingText strong { color: #15243a; font-size: 13px; font-weight: 650; }
+.awaitingAssignment > button {
+  flex: none;
+  min-height: 30px;
+  background: #0f1729;
+  color: #fff;
+}
+.operationalTasks {
+  border-top: 1px dashed #e4e8f0;
+  padding-top: 12px;
+}
+.operationalTasks > summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: #24344f;
+  padding: 3px 0 8px;
+  list-style: revert;
+}
+.operationalTaskScroll { width: 100%; overflow-x: auto; }
+.operationalTaskTable {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+  table-layout: auto;
+}
+.operationalTaskTable th {
+  padding: 9px 10px;
+  background: #f7f8fa;
+  border-bottom: 1px solid #e5e9f0;
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  text-align: left;
+}
+.operationalTaskTable td {
+  padding: 9px 10px;
+  border-bottom: 1px solid #e9edf2;
+  vertical-align: middle;
+  font-size: 12px;
+  color: #4b5563;
+}
+.operationalTaskTable tr:last-child td { border-bottom: none; }
+.operationalTaskTable td:nth-child(5),
+.operationalTaskTable td:nth-child(6) { white-space: nowrap; }
+.operationalTaskTitle {
+  min-width: 190px;
+  color: #0f2a44 !important;
+  font-weight: 650;
+}
+.operationalTaskTitle small {
+  display: block;
+  margin-top: 3px;
+  color: #7b8794;
+  font-weight: 400;
+  font-size: 10.5px;
+}
+.taskState {
+  display: inline-flex;
+  padding: 5px 9px;
+  white-space: nowrap;
+  color: #6d28d9;
+  background: #ede9fe;
+  border-radius: 999px;
+  font-size: 11px;
+}
+.taskStateAssigned { color: #334155; background: #e9edf2; }
+.noOperationalTasks { color: #667085; font-size: 12px; }
+.legacyReferences {
+  border-top: 1px solid #e5e8ef;
+  padding-top: 10px;
+  font-size: 12px;
+  color: #64748b;
+}
+.legacyReferences > summary { cursor: pointer; }
+@media (max-width: 760px) {
+  .awaitingAssignment { flex-wrap: wrap; }
+  .awaitingAssignment > button { margin-left: 40px; }
+}
