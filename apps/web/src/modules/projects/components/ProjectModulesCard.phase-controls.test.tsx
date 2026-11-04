@@ -367,14 +367,38 @@ describe('Traspaso de cotización · vista operativa v5.02', () => {
     expect(screen.queryByRole('button', { name: 'Asignar tarea' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Editar tarea Conexión con taller' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Eliminar tarea Conexión con taller' })).toBeEnabled();
-    expect(screen.getByRole('button', { name: 'Asignar tareas' })).toBeEnabled();
+    // Sin colaboradores activos la tarjeta morada NO ofrece una acción inviable.
+    expect(screen.queryByRole('button', { name: 'Asignar tareas' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Editar tarea Conexión con taller' }));
     expect(screen.getByRole('dialog', { name: 'Editar tarea' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Asignar tareas' }));
-    expect(screen.getByRole('dialog', { name: 'Asignar tareas · Diseño Backend' })).toBeInTheDocument();
-    expect(screen.getAllByText('Conexión con taller').length).toBeGreaterThan(0);
     expect(mocks.createSegment).not.toHaveBeenCalled();
+  });
+  it('muestra Asignar tareas solo cuando existe un colaborador activo y no bloqueado', () => {
+    mocks.appliedPlan.modules = [{
+      moduleId: 'module-1',
+      tasks: [{ wbs: 'WBS-02', role: 'Desarrollador', name: 'Integrar API',
+        hours: 12, teamId: 'team-1' }],
+      totalHours: 12,
+      relativeTeamBlocks: [],
+    }];
+    const member = {
+      id: 'assignment-1', userId: 'user-1', teamId: 'team-1',
+      fullName: 'Colaborador activo', userStatus: 'active', blockedAt: null,
+    };
+    const { rerender } = show({ ...project, members: [
+      { ...member, blockedAt: '2026-11-01T00:00:00.000Z' },
+    ] } as unknown as ProjectDetail);
+    expect(screen.queryByRole('button', { name: 'Asignar tareas' })).not.toBeInTheDocument();
+    rerender(<MemoryRouter><ProjectModulesCard
+      project={{ ...project, members: [member] } as unknown as ProjectDetail}
+      hourEntries={[]} teamOptions={[{ value: 'team-1', label: 'Desarrollo' }]}
+      canManage /></MemoryRouter>);
+    expect(screen.queryByText(/No hay colaboradores activos de este equipo/)).not.toBeInTheDocument();
+    const assign = screen.getByRole('button', { name: 'Asignar tareas' });
+    expect(assign).toBeEnabled();
+    fireEvent.click(assign);
+    expect(screen.getByRole('dialog', { name: 'Asignar tareas · Diseño Backend' })).toBeInTheDocument();
   });
 });
 
