@@ -137,7 +137,7 @@ export function AssignBlockTasksModal({
       </div>
     </div>}>
     <div className={styles.body}>
-      {blocks.length > 0 && <Select label="Bloque de trabajo" value={blockId}
+      {blocks.length > 1 && <Select label="Bloque de trabajo" value={blockId}
         placeholder={blocks.length === 1 ? 'Bloque existente' : 'Elegir bloque'}
         options={blocks.map((entry) => ({ value: entry.id, label: entry.name +
           ' (' + formatIso(entry.startDate) + ' → ' + formatIso(entry.endDate) + ')' }))}
