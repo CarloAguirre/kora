@@ -29,12 +29,13 @@ import { TicketDetailModal } from '../components/TicketDetailModal';
 import { useDeleteTicket, useTicketLinkableClients, useTicketsList } from '../api/tickets.queries';
 import { ticketsApi } from '../api/tickets.api';
 import { exportTicketHistory } from '../lib/ticket-history-export';
+import { formatTicketReportDate } from '../lib/ticket-history-dates';
 import { useUsersList } from '@/modules/users/api/users.queries';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { ApiRequestError } from '@/shared/lib/api-client';
 
-const formatDate = (value: string) => new Date(value).toLocaleDateString('es-CL');
+const formatDate = formatTicketReportDate;
 
 /**
  * Listado histórico de tickets — réplica de `HistorialTickets/index.tsx` (v1):
