@@ -51,3 +51,18 @@ El caso `applyPlanningBaseline` de `drizzle-quotation.repository.ts` valida las 
 ## Validación de la integración recibida
 
 La salida adjunta muestra 7 tests fallidos, 18 aprobados y build web completado con aviso de tamaño de bundle. El contenido está recortado a la parte final; los fallos visibles corresponden a búsqueda literal de la etiqueta obligatoria Bloque de trabajo. Los tests nuevos se ajustaron a etiquetas con asterisco requerido. También se clarificó que los bloques sin estimación tienen HH sin definir, no presupuesto real cero. Pendiente repetir los checks sobre el HEAD actualizado.
+
+## Conciliación visual entre ficha del proyecto y vista UX-UI
+
+Evidencia adicional proporcionada: `/proyectos/pruebas-carlo`, `/proyectos/pruebas-carlo/equipos/ux-ui` y SELECT de `project_modules.estimated_hours`.
+
+- S1 UX: 120 HH de fase, 2 bloques existentes con `estimated_hours=NULL`.
+- S2 Backend: 480 HH de fase, 0 bloques.
+- S3 Frontend: 160 HH de fase, 1 bloque con `estimated_hours=NULL`.
+- S4 QA: 140 HH de fase, 0 bloques.
+- **Total comercial persistido en fases: 900 HH.** La ficha por equipo lee 120 HH asignadas a UX-UI, pero el avance operativo no dispone de denominador para sus 2 bloques; esto no significa pérdida de HH.
+- La fase del Roadmap refleja `project_modules.estimated_hours`; los bloques y el avance del equipo reflejan `project_module_segments.estimated_hours`. No se deben sumar los 2 HH de una tarea incompleta ni duplicar 120 HH en ambos bloques UX.
+- Cambio de interfaz en esta rama: el encabezado del Roadmap distingue `HH de fase` de `bloques sin HH`, y el panel del equipo muestra explícitamente `Presupuesto asignado` contra `HH definidas en bloques`. No hay migración, backfill ni modificación de la fórmula de avance.
+- Importante: `DrizzleApprovedProjectCalendar.ensure` preserva cualquier bloque preexistente del mismo equipo/fase; **iniciar el proyecto no rellenará automáticamente los HH NULL de los 2 bloques UX**. Deben distribuirse de forma explícita o implementarse un flujo de conciliación aprobado. No inventar prorrateos basados en fechas sin autorización.
+
+Validación: ejecutar `pnpm --filter @kora/web typecheck` y `pnpm --filter @kora/web exec vitest run src/modules/projects/components/TeamProgressCard.test.tsx` localmente. No se afirma PASS desde GitHub.
