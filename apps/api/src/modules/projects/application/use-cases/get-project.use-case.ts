@@ -143,9 +143,12 @@ export class GetProjectUseCase implements UseCase<GetProjectCommand, ProjectDeta
     // proyecto iniciado se materializan las semanas comerciales como bloques
     // operativos reales. Esta operación es transaccional, idempotente y
     // preserva toda edición previa; NO exige una segunda aprobación.
-    const generated = snapshot.status === 'active' &&
-      (snapshot.startDate || snapshot.hito0At) &&
-      snapshot.salesStage === 'approved'
+    // El evento de traspaso registrado en la BD es la autorización real del
+    // calendario. No repetir aquí el filtro salesStage: una edición posterior
+    // de la ficha comercial no debe ocultar un traspaso aprobado y persistido.
+    // ensure() comprueba el evento quotation_transferred y la fecha de inicio.
+    const generated = snapshot.type === 'development' && snapshot.status === 'active' &&
+      Boolean(snapshot.startDate || snapshot.hito0At)
       ? await this.approvedCalendar.ensure(project.id) : false;
     const currentModules = generated
       ? await this.modules.listForProject(project.id)
