@@ -1,8 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import {
   PROJECT_MODULE_DELIVERY_STATUS_LABELS,
-  PROJECT_MODULE_STAGES,
-  PROJECT_MODULE_STAGE_LABELS,
   PROJECT_MODULE_TASK_SCOPE_LABELS,
   PROJECT_MODULE_TASK_STATUS_LABELS,
   type CreateProjectModuleSegmentInput,
@@ -13,7 +11,6 @@ import {
   type ProjectModule,
   type ProjectModuleDelivery,
   type ProjectModuleSegment,
-  type ProjectModuleStage,
   type ProjectModuleTask,
 } from '@kora/contracts';
 import styles from './ProjectModulesCard.module.css';
@@ -49,7 +46,6 @@ import {
   type ExecutionSegmentModalValues,
 } from './ExecutionSegmentModal';
 
-const STAGE_OPTIONS = PROJECT_MODULE_STAGES.map((stage) => ({ value: stage, label: PROJECT_MODULE_STAGE_LABELS[stage] }));
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 const formatDate = (value: string | null) =>
@@ -143,16 +139,15 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
   } | null>(null);
   const [planningBlock, setPlanningBlock] = useState<{
     moduleId: string; teamId: string; name: string; estimatedHours?: number | null;
+    /** Fase recién creada: permite mostrar el modal sin esperar el refetch del proyecto. */
+    phaseName?: string;
   } | null>(null);
   const [planningMode, setPlanningMode] = useState(false);
   const [addingPhase, setAddingPhase] = useState(false);
   const [addingTaskModuleId, setAddingTaskModuleId] = useState<string | null>(null);
   const [editingTask, setEditingTask] = useState<{ moduleId: string; task: ProjectModuleTask } | null>(null);
   const [duplicatingTask, setDuplicatingTask] = useState<{ moduleId: string; task: ProjectModuleTask } | null>(null);
-  const [newPhase, setNewPhase] = useState({
-    name: '', initialStage: 'discovery' as ProjectModuleStage, estimatedHours: '',
-    estimatedStartDate: '', estimatedEndDate: '',
-  });
+  const [newPhaseName, setNewPhaseName] = useState('');
   const [phaseNameDrafts, setPhaseNameDrafts] = useState<Record<string, string>>({});
   const [creatingFromReference, setCreatingFromReference] = useState<{
     moduleId: string | null;
@@ -268,30 +263,29 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
     }
   };
 
+  /** Primero se crea la fase macro SIN HH ficticias; después se planifica
+   * su primer bloque con fechas y HH reales, como el prototipo v5. */
   const onCreatePhase = async () => {
-    const name = newPhase.name.trim();
-    const estimatedHours = Number(newPhase.estimatedHours);
+    const name = newPhaseName.trim();
     if (!name) return toast.error('Escribe el nombre de la fase.');
-    if (!newPhase.estimatedHours.trim() || !Number.isFinite(estimatedHours) || estimatedHours <= 0) {
-      return toast.error('Ingresa HH estimadas mayores a cero.');
-    }
-    if (newPhase.estimatedStartDate && newPhase.estimatedEndDate &&
-        newPhase.estimatedStartDate > newPhase.estimatedEndDate) {
-      return toast.error('La fecha de término no puede ser anterior al inicio.');
-    }
     try {
-      await createModule.mutateAsync({
+      const created = await createModule.mutateAsync({
         projectId: project.id,
-        input: {
-          name, initialStage: newPhase.initialStage, estimatedHours,
-          ...(newPhase.estimatedStartDate ? { estimatedStartDate: newPhase.estimatedStartDate } : {}),
-          ...(newPhase.estimatedEndDate ? { estimatedEndDate: newPhase.estimatedEndDate } : {}),
-        },
+        input: { name, initialStage: 'discovery' },
       });
       setAddingPhase(false);
-      setNewPhase({ name: '', initialStage: 'discovery', estimatedHours: '',
-        estimatedStartDate: '', estimatedEndDate: '' });
-      toast.success('Fase agregada al proyecto.');
+      setNewPhaseName('');
+      if (teamOptions.length > 0) {
+        setPlanningBlock({
+          moduleId: created.id,
+          phaseName: name,
+          teamId: teamOptions[0]!.value,
+          name: '',
+        });
+        toast.success('Fase creada. Ahora agrega su primer bloque de trabajo.');
+      } else {
+        toast.success('Fase creada. Asigna un equipo al proyecto para planificar su primer bloque.');
+      }
     } catch (error) {
       toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo agregar la fase.');
     }
@@ -364,8 +358,9 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
     const segmentHoursKnown = module.segments.length > 0 &&
       module.segments.every((segment) => segment.estimatedHours != null);
     const hours = module.estimatedHours ??
-      (segmentHoursKnown ? module.segments.reduce((sum, segment) =>
-        sum + (segment.estimatedHours ?? 0), 0) : null);
+      (module.segments.length === 0 && module.tasks.length === 0 ? 0 :
+        segmentHoursKnown ? module.segments.reduce((sum, segment) =>
+          sum + (segment.estimatedHours ?? 0), 0) : null);
     const asDayMonthYear = (iso: string) => iso.slice(8, 10) + '-' + iso.slice(5, 7) + '-' + iso.slice(0, 4);
     return (start && end ? asDayMonthYear(start) + ' → ' + asDayMonthYear(end) : 'Sin fechas') +
       ', ' + (hours == null ? '—' : new Intl.NumberFormat('es-CL', {
