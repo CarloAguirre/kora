@@ -37,7 +37,7 @@ export function AssignBlockTasksModal({
   const update = useUpdateProjectModuleTask();
   const team = project.teams.find((entry) => entry.teamId === teamId);
   const members = project.members.filter((member) =>
-    member.teamId === teamId && member.userStatus === 'active');
+    member.teamId === teamId && member.userStatus === 'active' && !member.blockedAt);
   const blocks = module.segments.filter((segment) => segment.teamId === teamId);
   const [blockId, setBlockId] = useState(blocks.length === 1 ? blocks[0]!.id : '');
   const block = blocks.find((entry) => entry.id === blockId);
