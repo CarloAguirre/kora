@@ -328,8 +328,13 @@ function toRoadmapStep(stage: ProjectModule['currentStage']): RoadmapStep {
 
 function toRoadmapPhase(module: ProjectModule, index: number): ClientRoadmapPhase {
   const status = phaseStatus(module);
-  const start = module.estimatedStartDate;
-  const end = module.estimatedEndDate;
+  // Los segmentos son el calendario definitivo y EDITABLE. Si el PM cambia
+  // sus fechas, la vista cliente debe reflejarlo sin utilizar el snapshot
+  // inicial de fechas estimadas de la fase.
+  const blockStarts = module.segments.map((segment) => segment.startDate).sort();
+  const blockEnds = module.segments.map((segment) => segment.endDate).sort();
+  const start = blockStarts[0] ?? module.estimatedStartDate;
+  const end = blockEnds[blockEnds.length - 1] ?? module.estimatedEndDate;
 
   const months: string[] = [];
   if (start && end) {
