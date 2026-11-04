@@ -18,7 +18,6 @@ import { Card } from '@/shared/components/ui/Card';
 import { Modal } from '@/shared/components/ui/Modal';
 import { TextField } from '@/shared/components/ui/TextField';
 import { Button } from '@/shared/components/ui/Button';
-import { Select } from '@/shared/components/ui/Select';
 import { Avatar } from '@/shared/components/ui/Avatar';
 import { Badge, type BadgeTone } from '@/shared/components/ui/Badge';
 import { CloseIcon, CopyIcon, PencilIcon, TrashIcon } from '@/shared/components/icons/Icons';
@@ -871,11 +870,10 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
         <NewWorkBlockModal
           key={planningBlock.moduleId + ':' + planningBlock.teamId}
           project={project}
-          module={modulesById.get(planningBlock.moduleId) ?? ({
+          module={modulesById.get(planningBlock.moduleId) ?? {
             id: planningBlock.moduleId,
             name: planningBlock.phaseName!,
-            segments: [], tasks: [], deliveries: [],
-          } as ProjectModule)}
+          }}
           teamOptions={teamOptions}
           initialTeamId={planningBlock.teamId}
           initialName={planningBlock.name}
