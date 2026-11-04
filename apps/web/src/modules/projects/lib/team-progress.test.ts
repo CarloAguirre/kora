@@ -103,6 +103,28 @@ describe('Avance del equipo — fechas, aprobaciones y horas reales', () => {
     expect(result.phases[0]?.pendingApprovalCount).toBe(1);
   });
 
+  it('cuenta tareas huérfanas cuando la fase no tiene bloques del equipo', () => {
+    const project = fixture();
+    const original = project.modules[0]!;
+    const orphanModule = {
+      ...original,
+      id: 'module-outside-ux-blocks',
+      segments: [],
+      deliveries: [],
+      tasks: [{
+        ...original.tasks[0]!, id: 'quotation-unlinked', segmentId: null,
+        teamId, description: null, status: 'todo' as const,
+        estimatedHours: 160, cancelledAt: null,
+      }],
+    };
+    const result = calculateTeamProgress({
+      ...project, modules: [...project.modules, orphanModule],
+    }, teamId, today);
+    expect(result.unlinkedTaskCount).toBe(1);
+    expect(result.plannedHours).toBe(180);
+    expect(result.actualHours).toBe(16);
+  });
+
   it('sin bloques no inventa un 0% esperado ni real', () => {
     const project = fixture();
     const empty = { ...project, modules: [] };
