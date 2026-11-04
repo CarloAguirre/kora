@@ -77,7 +77,7 @@ export function ProjectTeamsManagementCard({ project, catalog }: Props) {
   const plannedHours = project.modules.flatMap((module) => module.segments)
     .reduce((sum, segment) => sum + (segment.estimatedHours ?? 0), 0);
   const unassigned = Math.max(0, project.soldHours - totalAssigned);
-  const teamMembers = (id: string) => project.members.filter((member) => member.teamId === id);
+  const teamMembers = (id: string) => project.members.filter((member) => member.teamId === id && !member.blockedAt);
   const updateAvailable = !busy && !updateProject.isPending;
 
   const persist = async (next = draftsRef.current) => {
@@ -159,7 +159,8 @@ export function ProjectTeamsManagementCard({ project, catalog }: Props) {
           const name = original?.teamName ?? catalogTeam?.name ?? 'Equipo';
           const style = getTeamStyle(name);
           const members = teamMembers(draft.teamId);
-          const consumed = members.reduce((sum, member) => sum + member.consumedHours, 0);
+          const consumed = project.members.filter((member) => member.teamId === draft.teamId)
+            .reduce((sum, member) => sum + member.consumedHours, 0);
           const inBlocks = blockHours(draft.teamId);
           const leader = original?.leader ?? catalogTeam?.leader;
           const selectedLeader = leaderOptions.find((person) => person.id === draft.leaderUserId);
