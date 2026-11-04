@@ -4,7 +4,6 @@ import { Button } from '@/shared/components/ui/Button';
 import { Badge } from '@/shared/components/ui/Badge';
 import { PencilIcon } from '@/shared/components/icons/Icons';
 import styles from './ProjectModulesCard.module.css';
-import { displayProposedDate, proposedBlockPeriod } from '../lib/quotation-relative-dates';
 
 type CommercialModule = AppliedQuotationPlanning['modules'][number];
 type CommercialBlock = NonNullable<CommercialModule['relativeTeamBlocks']>[number];
@@ -28,10 +27,7 @@ export function ReferenceBlockDrawer({
   onEditTask?: (task: ProjectModuleTask) => void;
   onDuplicateTask?: (task: ProjectModuleTask) => void;
 }) {
-  const proposed = proposedBlockPeriod(project.startDate, block.startWeek, block.durationWeeks);
-  const proposedLabel = proposed
-    ? displayProposedDate(proposed.startDate) + ' → ' + displayProposedDate(proposed.endDate)
-    : null;
+  const alreadyStarted = project.status === 'active' && Boolean(project.startDate);
   const team = project.teams.find((entry) => entry.teamId === block.teamId);
   const teamName = team?.teamName ?? 'Equipo pendiente de vinculación';
   const tasks = reference.tasks.filter((task) => task.teamId === block.teamId);
@@ -44,7 +40,7 @@ export function ReferenceBlockDrawer({
     member.teamId === block.teamId && member.userStatus === 'active');
 
   return <Modal open side title={module.name} description={'Fase · ' + module.name}
-    headerExtra={<Badge tone="neutral">{proposed ? 'Fechas propuestas' : 'Sin fechas'}</Badge>}
+    headerExtra={<Badge tone="neutral">Sin bloque operativo</Badge>}
     onClose={onClose} footer={onPlan ? <div className={styles.drawerFooter}>
       <Button onClick={onPlan}>Planificar bloque</Button>
     </div> : undefined}>
@@ -55,16 +51,14 @@ export function ReferenceBlockDrawer({
         <span>Líder: {team?.leader?.fullName ?? 'Sin líder asignado'}</span>
       </p>
       <div className={styles.drawerFacts}>
-        <span>Fechas <b>{proposedLabel ?? 'Por definir'}</b></span>
+        <span>Fechas <b>Por definir</b></span>
         <span>HH estimadas <b>{block.hours}</b></span>
         <span>HH consumidas <b>Sin desglose por bloque</b></span>
       </div>
       <p className={styles.drawerHint}>
-        {proposedLabel
-          ? 'Propuesta calculada a partir del inicio del proyecto y las semanas de la cotización: ' +
-            proposedLabel + '. Confírmala mediante «Planificar bloque». Todavía no existe un segmento operativo.'
-          : 'Define el inicio del proyecto para calcular las fechas propuestas. Las semanas del ' +
-            'presupuesto son relativas; aún no existe un segmento operativo.'}
+        {alreadyStarted
+          ? 'Este equipo todavía no tiene un bloque operativo. Revisa los equipos vinculados y el calendario de la cotización transferida.'
+          : 'Al iniciar el proyecto se generarán automáticamente los bloques y las fechas definitivas del calendario aprobado, sin una segunda aprobación.'}
       </p>
       <div className={styles.drawerSection}>
         <h4>Avance</h4>
