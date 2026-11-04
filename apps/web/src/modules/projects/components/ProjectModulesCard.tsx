@@ -927,9 +927,10 @@ function SegmentDrawer({
       description={'Fase · ' + module.name}
       headerExtra={<Badge tone={segmentState(segment).tone}>{segmentState(segment).label}</Badge>}
       onClose={onClose}
-      footer={(onEdit || onDelete) ? (
+      footer={(onEdit || onDelete || onEditMembers) ? (
         <div className={styles.drawerFooter}>
           {onDelete && <Button variant="outline" onClick={onDelete}>Eliminar bloque</Button>}
+          {onEditMembers && <Button variant="outline" onClick={onEditMembers}>Colaboradores / Forecast</Button>}
           {onEdit && <Button onClick={onEdit}>Editar bloque</Button>}
         </div>
       ) : undefined}>
