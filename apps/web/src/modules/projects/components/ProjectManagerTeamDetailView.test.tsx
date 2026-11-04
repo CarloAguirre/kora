@@ -20,6 +20,7 @@ const project = {
     assignedHours: 679, maxMembers: 2 }],
   members: [],
   modules: [{ id: 'module-1', name: 'Agendamiento de mantenciones',
+    deliveries: [],
     segments: [{ id: 'segment-1', teamId, name: 'Agendamiento',
       startDate: '2026-11-04', endDate: '2027-01-03', estimatedHours: 679 }],
     tasks: [{ id: 'task-1', teamId, name: 'Conexión con taller', assigneeUserId: null,
