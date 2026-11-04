@@ -58,6 +58,7 @@ export interface ProjectModuleTaskRecord {
   readonly status: ProjectModuleTaskStatus;
   readonly scope: ProjectModuleTaskScope;
   readonly completedAt: Date | null;
+  readonly cancelledAt: Date | null;
   readonly rejectionReason: string | null;
 }
 
@@ -246,6 +247,8 @@ export interface ProjectModuleRepository {
   addTask(input: CreateProjectModuleTaskInput, now: Date, context?: TransactionContext): Promise<string>;
   updateTask(id: string, input: UpdateProjectModuleTaskInput, now: Date, context?: TransactionContext): Promise<void>;
   removeTask(id: string, context?: TransactionContext): Promise<void>;
+  cancelTask(id: string, now: Date, context?: TransactionContext): Promise<void>;
+  hasTaskUserHours(projectId: string, moduleId: string, userId: string, context?: TransactionContext): Promise<boolean>;
   /** Persistir en el mismo commit que el borrado de tarea una referencia de cotización oculta. */
   excludeQuotationReference(input: {
     projectId: string; moduleId: string; versionId: string;
