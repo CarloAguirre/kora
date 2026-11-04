@@ -67,11 +67,11 @@ describe('Edición de tarea histórica sin bloque operativo', () => {
       task={task} onClose={mocks.onClose} onDuplicate={vi.fn()} />);
 
     expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeDisabled();
-    fireEvent.change(screen.getByLabelText('Equipo responsable'), {
+    fireEvent.change(screen.getByLabelText(/Equipo responsable/), {
       target: { value: devTeamId },
     });
     expect(screen.getByLabelText('Asignado a')).toHaveValue('');
-    fireEvent.change(screen.getByLabelText('Bloque de trabajo'), {
+    fireEvent.change(screen.getByLabelText(/Bloque de trabajo/), {
       target: { value: devBlockId },
     });
     expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeEnabled();
@@ -92,7 +92,7 @@ describe('Edición de tarea histórica sin bloque operativo', () => {
     render(<ExecutionTaskModal project={project} moduleId={moduleId}
       task={task} allowedTeamId={uxTeamId}
       onClose={mocks.onClose} onDuplicate={vi.fn()} />);
-    expect(screen.getByLabelText('Equipo responsable')).toBeDisabled();
-    expect(screen.getByLabelText('Equipo responsable')).toHaveValue(uxTeamId);
+    expect(screen.getByLabelText(/Equipo responsable/)).toBeDisabled();
+    expect(screen.getByLabelText(/Equipo responsable/)).toHaveValue(uxTeamId);
   });
 });
