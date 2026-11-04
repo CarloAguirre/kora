@@ -30,6 +30,9 @@ horas de un bloque por nombre, por fecha o por pertenencia al equipo.
 4. Formularios `Registro diario`, `Registro semanal` y
    `Editar registro`: selección de fase y bloque, filtrada por equipo
    activo/líder. Al cambiar de proyecto/fase se limpia el segmento.
+   La validación del registro diario también deshabilita el envío
+   si falta fase/bloque cuando el usuario participa en el Roadmap,
+   sin impedir HH generales fuera de esos equipos.
    El modo lectura muestra el nombre del bloque cuando corresponde.
 5. `DrizzleProjectModuleRepository`: suma `SUM(hour_entries.hours)`
    agrupado **exclusivamente** por FK `segment_id`, con `status=approved`.
@@ -87,7 +90,7 @@ try {
 pnpm --filter @kora/api typecheck
 pnpm --filter @kora/web typecheck
 pnpm --filter @kora/api exec vitest run src/modules/hours/application/use-cases/create-hour-entry.use-case.spec.ts src/modules/hours/application/mappers/hour-entry.mapper.spec.ts src/modules/hours/domain/entities/hour-entry.entity.spec.ts src/test/architecture.spec.ts
-pnpm --filter @kora/web exec vitest run src/modules/projects/lib/team-progress.spec.ts src/modules/projects/components/TeamProgressCard.test.tsx
+pnpm --filter @kora/web exec vitest run src/modules/hours/components/DailyEntryForm.segment-validation.test.ts src/modules/projects/lib/team-progress.spec.ts src/modules/projects/components/TeamProgressCard.test.tsx src/modules/projects/components/QuotationReferenceTaskModal.test.tsx
 pnpm --filter @kora/api build
 pnpm --filter @kora/web build
 ```
