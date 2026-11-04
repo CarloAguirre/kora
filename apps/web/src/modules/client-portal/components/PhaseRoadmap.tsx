@@ -16,6 +16,12 @@ import {
   type ProjectPhaseRoadmap,
 } from '../types';
 
+/** Paleta entregada por diseño v5.02, exclusiva de la vista interna. */
+const OPERATIONAL_ROLE_COLORS: Record<keyof typeof PHASE_ROADMAP_ROLE_LABELS, string> = {
+  dev: '#ea7a1f', pmo: '#64748b', qa: '#3b82f6',
+  ux: '#22a55a', ia: '#e0526b', rpa: '#14a3a0',
+};
+
 const STATUS_LABEL: Readonly<Record<PhaseRoadmapPhase['status'], string>> = {
   finished: 'Finalizado',
   in_progress: 'En Proceso',
@@ -140,7 +146,7 @@ export function PhaseRoadmap({
   phaseRoadmap, renderPhaseExtras, renderPhaseReferences, renderSelectionDetail,
   toolbarActions, renderPhaseHeaderName, renderPhaseHeaderActions, borderlessSummary = false,
   alwaysExpanded = false,
-  operationalView = false, operationalTaskCount, operationalBlockCount, operationalRows,
+  operationalView = false, operationalTaskCount, operationalBlockCount, operationalRows, onPlanOperationalRow,
 }: PhaseRoadmapProps) {
   /** Fases abiertas — cada una se abre/cierra por separado (varias a la vez); arranca abierta la primera. */
   const [expandedPhaseIds, setExpandedPhaseIds] = useState<ReadonlySet<string>>(
@@ -242,6 +248,7 @@ export function PhaseRoadmap({
         {phaseRoadmap.phases.map((phase) => operationalView ? (
           <OperationalPhaseCard key={phase.id} phase={phase} axis={axis}
             placeholderRows={operationalRows?.(phase) ?? []}
+            onPlanRow={onPlanOperationalRow}
             renderHeaderName={renderPhaseHeaderName}
             renderHeaderActions={renderPhaseHeaderActions}
             renderReferences={renderPhaseReferences}
@@ -323,6 +330,7 @@ export interface PhaseRoadmapProps {
   operationalView?: boolean;
   operationalTaskCount?: number;
   operationalBlockCount?: number;
+  onPlanOperationalRow?: (phase: PhaseRoadmapPhase, row: OperationalRoadmapRow) => void;
   /** Bloques de cotización aún sin tramo operativo ni fechas; no se dibujan como barras ficticias. */
   operationalRows?: (phase: PhaseRoadmapPhase) => readonly OperationalRoadmapRow[];
   renderPhaseHeaderName?: (phase: PhaseRoadmapPhase) => ReactNode;
@@ -704,12 +712,13 @@ function PhaseCard({
  * las referencias sin fechas nunca reciben posiciones ni barras inventadas.
  */
 function OperationalPhaseCard({
-  phase, axis, placeholderRows, renderHeaderName, renderHeaderActions,
+  phase, axis, placeholderRows, onPlanRow, renderHeaderName, renderHeaderActions,
   renderReferences, renderSelectionDetail,
 }: {
   phase: PhaseRoadmapPhase;
   axis: TimelineAxis;
   placeholderRows: readonly OperationalRoadmapRow[];
+  onPlanRow?: PhaseRoadmapProps['onPlanOperationalRow'];
   renderHeaderName?: PhaseRoadmapProps['renderPhaseHeaderName'];
   renderHeaderActions?: PhaseRoadmapProps['renderPhaseHeaderActions'];
   renderReferences?: PhaseRoadmapProps['renderPhaseReferences'];
@@ -757,7 +766,7 @@ function OperationalPhaseCard({
                 <span className={styles.operationalBlockLabel}
                   title={task.label}>
                   <span className={styles.operationalRole}
-                    style={{ background: PHASE_ROADMAP_ROLE_COLORS[task.role] }}>
+                    style={{ background: OPERATIONAL_ROLE_COLORS[task.role] }}>
                     {PHASE_ROADMAP_ROLE_LABELS[task.role]}
                   </span>
                   <span className={styles.operationalLabelText}>{task.label}</span>
@@ -775,7 +784,7 @@ function OperationalPhaseCard({
                     style={{
                       left: geometry.leftPercent + '%',
                       width: geometry.widthPercent + '%',
-                      background: PHASE_ROADMAP_ROLE_COLORS[task.role],
+                      background: OPERATIONAL_ROLE_COLORS[task.role],
                       opacity: toDate(task.startDate) > today ? 0.45 : 1,
                     }}
                     title={task.label + ' · ' + formatShortDate(task.startDate) + ' a ' + formatShortDate(task.endDate)}
@@ -787,7 +796,7 @@ function OperationalPhaseCard({
               <div key={row.id} className={styles.operationalLine}>
                 <span className={styles.operationalBlockLabel} title={row.label}>
                   <span className={styles.operationalRole}
-                    style={{ background: PHASE_ROADMAP_ROLE_COLORS[row.role] }}>
+                    style={{ background: OPERATIONAL_ROLE_COLORS[row.role] }}>
                     {PHASE_ROADMAP_ROLE_LABELS[row.role]}
                   </span>
                   <span className={styles.operationalLabelText}>
@@ -795,7 +804,10 @@ function OperationalPhaseCard({
                   </span>
                 </span>
                 <div className={styles.operationalNoDates}>
-                  Sin fechas: pendiente de planificar el bloque de trabajo
+                  <span>Sin fechas: pendiente de planificar el bloque de trabajo</span>
+                  {onPlanRow && <button type="button" onClick={() => onPlanRow(phase, row)}>
+                    Planificar bloque
+                  </button>}
                 </div>
               </div>
             ))}
