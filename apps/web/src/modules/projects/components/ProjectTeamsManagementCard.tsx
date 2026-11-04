@@ -163,7 +163,9 @@ export function ProjectTeamsManagementCard({ project, catalog }: Props) {
           const inBlocks = blockHours(draft.teamId);
           const leader = original?.leader ?? catalogTeam?.leader;
           const selectedLeader = leaderOptions.find((person) => person.id === draft.leaderUserId);
-          const leaderName = selectedLeader?.name ?? (draft.leaderUserId === leader?.id ? leader?.fullName : null) ?? 'Sin líder asignado';
+          const leaderName = draft.leaderUserId
+            ? (selectedLeader?.name ?? (draft.leaderUserId === leader?.id ? leader?.fullName : null) ?? 'Sin líder asignado')
+            : (leader?.fullName ?? 'Sin líder asignado');
           const assignmentLeft = Math.max(0, draft.assignedHours - inBlocks);
           const health = consumed > draft.assignedHours ? 'Sobre presupuesto'
             : assignmentLeft > 0 ? `${hours(assignmentLeft)} HH pendientes de planificar` : 'Excelente';
