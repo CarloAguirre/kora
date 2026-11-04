@@ -73,4 +73,25 @@ describe('Nueva tarea operativa a partir de referencia Gemini', () => {
     });
     expect(mocks.onClose).toHaveBeenCalledOnce();
   });
+  it('lápiz abre Editar tarea, precarga bloque y permite guardarla por asignar', async () => {
+    render(<MemoryRouter><QuotationReferenceTaskModal
+      mode="edit" project={project} moduleId={moduleId} versionId={versionId}
+      versionNumber={1} reference={reference} onClose={mocks.onClose}
+    /></MemoryRouter>);
+    expect(screen.getByRole('dialog', { name: 'Editar tarea' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Bloque de trabajo')).toHaveValue(blockId);
+    expect(screen.getByLabelText('Fecha de inicio')).toHaveValue('2026-11-10');
+    expect(screen.getByLabelText('Fecha límite')).toHaveValue('2026-11-20');
+    expect(screen.getByLabelText(/HH estimadas/)).toHaveValue(35);
+    expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    await waitFor(() => expect(mocks.create).toHaveBeenCalledWith({
+      projectId, moduleId, input: expect.objectContaining({
+        name: 'Conexión con sistema de taller', estimatedHours: 35,
+        assigneeUserId: null, segmentId: blockId, status: 'todo',
+        startDate: '2026-11-10', date: '2026-11-20',
+      }),
+    }));
+  });
+
 });
