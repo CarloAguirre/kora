@@ -162,7 +162,7 @@ describe('GetProjectUseCase — calendario traspasado al iniciar', () => {
         primaryContactId: null,
         clientId: null,
         hito0At: new Date('2026-11-04T12:00:00.000Z'),
-        startDate: '2026-11-05',
+        startDate: new Date('2026-11-05T00:00:00.000Z'),
         createdAt: new Date('2026-11-01T12:00:00.000Z'),
         updatedAt: new Date('2026-11-04T12:00:00.000Z'),
       }),
