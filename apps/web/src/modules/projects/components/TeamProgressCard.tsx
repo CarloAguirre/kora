@@ -32,8 +32,9 @@ interface Props {
 
 /**
  * El indicador se calcula con la misma fuente de datos del Roadmap operativo.
- * No intenta inferir HH consumidas por bloque: los registros históricos de
- * horas se asocian a módulo, no a project_module_segments.
+ * Solo muestra consumos que llegan atribuidos a un segmento explícito.
+ * Las horas históricas sin segmentId permanecen en el total del equipo,
+ * pero nunca se distribuyen entre bloques por inferencia.
  */
 export function TeamProgressCard({ progress, teamName }: Props) {
   const [expanded, setExpanded] = useState(false);
