@@ -43,7 +43,7 @@ const command = {
 describe('Eliminar tarea EDT sin reintroducir la referencia comercial', () => {
   it('persiste exclusión de la referencia del Roadmap en la misma transacción que el borrado', async () => {
     const { modules, useCase } = fixture(
-      'Referencia cotización ' + versionId + ' · WBS 1.2 · QA\\nCasos de prueba',
+      'Referencia cotización ' + versionId + ' · WBS 1.2 · QA\nCasos de prueba',
     );
     const result = await useCase.execute(command);
     expect(result.isOk()).toBe(true);
