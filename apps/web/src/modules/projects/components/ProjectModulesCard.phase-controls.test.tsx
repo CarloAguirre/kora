@@ -76,7 +76,10 @@ const module = {
   estimatedHours: 120, estimatedStartDate: null, estimatedEndDate: null,
   segments: [], deliveries: [], tasks: [], blockerCount: 0,
 };
-const project = { id: 'project-1', modules: [module] } as unknown as ProjectDetail;
+const project = { id: 'project-1', modules: [module], teams: [{
+  teamId: 'team-1', teamName: 'Desarrollo', leader: null, memberCount: 0,
+  maxMembers: 2, assignedHours: 160,
+}], members: [] } as unknown as ProjectDetail;
 const show = (p: ProjectDetail = project) => render(
   <ProjectModulesCard project={p} hourEntries={[]}
     teamOptions={[{ value: 'team-1', label: 'Desarrollo' }]} canManage />,
@@ -158,6 +161,7 @@ describe('Referencias de bloque de trabajo de la cotización', () => {
   it('ofrece planificar mientras no exista un segmento de ese equipo y fase', () => {
     seedReference();
     show();
+    fireEvent.click(screen.getByRole('button', { name: 'Planificar' }));
     expect(screen.getByRole('button', { name: 'Planificar bloque' })).toBeEnabled();
     expect(screen.queryByText('Bloque planificado')).not.toBeInTheDocument();
   });
@@ -165,6 +169,7 @@ describe('Referencias de bloque de trabajo de la cotización', () => {
   it('actualiza el estado a bloque planificado cuando el segmento aparece tras el guardado', () => {
     seedReference();
     const view = show();
+    fireEvent.click(screen.getByRole('button', { name: 'Planificar' }));
     expect(screen.getByRole('button', { name: 'Planificar bloque' })).toBeInTheDocument();
     view.rerender(
       <ProjectModulesCard project={{
@@ -183,6 +188,7 @@ describe('Referencias de bloque de trabajo de la cotización', () => {
       ...project,
       modules: [{ ...module, segments: [{ ...plannedSegment, name: 'Trabajo de integración API' }] }],
     } as unknown as ProjectDetail);
+    fireEvent.click(screen.getByRole('button', { name: 'Planificar' }));
     expect(screen.getByText('1 bloque operativo existente')).toBeInTheDocument();
     expect(screen.queryByText('Bloque planificado')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Planificar bloque' })).not.toBeInTheDocument();
