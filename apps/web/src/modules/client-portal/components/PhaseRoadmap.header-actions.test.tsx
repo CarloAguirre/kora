@@ -111,7 +111,7 @@ describe('Roadmap operativo · diseño aprobado v5.02', () => {
     };
     render(<PhaseRoadmap phaseRoadmap={withSegment} operationalView
       renderSelectionDetail={(_phase, selection, clear) => (
-        <div>Bloque seleccionado: {selection.label}
+        <div>Bloque seleccionado: {'label' in selection ? selection.label : 'Incidente'}
           <button type="button" onClick={clear}>Cerrar detalle</button>
         </div>
       )} />);
