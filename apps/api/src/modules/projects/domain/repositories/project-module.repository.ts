@@ -144,6 +144,7 @@ export interface UpdateProjectModuleTaskInput {
   readonly status?: ProjectModuleTaskStatus;
   readonly scope?: ProjectModuleTaskScope;
   readonly completedAt?: Date | null;
+  readonly cancelledAt?: Date | null;
   readonly rejectionReason?: string | null;
 }
 
