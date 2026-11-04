@@ -150,8 +150,9 @@ export function QuotationReferenceTaskModal({
           }))}
           onChange={(event) => { setTargetModuleId(event.target.value); setBlockId(''); }} />
         <Select label="Bloque de trabajo" value={blockId}
-          disabled={eligibleBlocks.length === 0}
-          placeholder={eligibleBlocks.length === 0 ? 'Sin bloques planificados' : 'Sin bloque específico'}
+          disabled={eligibleBlocks.length === 0 || (mode === 'create' && !assignee)}
+          placeholder={eligibleBlocks.length === 0 ? 'Sin bloques planificados' :
+            mode === 'create' && !assignee ? 'Elige primero a quién se asigna' : 'Sin bloque específico'}
           options={eligibleBlocks.map((segment) => ({
             value: segment.id, label: segment.name + ' (' + segment.startDate + ' – ' + segment.endDate + ')',
           }))}
