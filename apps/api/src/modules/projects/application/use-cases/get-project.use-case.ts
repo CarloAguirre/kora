@@ -3,6 +3,7 @@ import { CLOCK, ForbiddenError, err, ok, type ApplicationError, type Clock, type
 import { isUuid } from '@kora/core';
 import type { Permission, ProjectDetail } from '@kora/contracts';
 import { PaymentMilestoneTriggerService } from '../services/payment-milestone-trigger.service';
+import { ProjectProgressRecalculator } from '../services/project-progress-recalculator';
 import { ProjectNotFoundError } from '../../domain/errors/project.errors';
 import { PROJECT_REPOSITORY, type ProjectRepository } from '../../domain/repositories/project.repository';
 import {
@@ -62,6 +63,7 @@ export class GetProjectUseCase implements UseCase<GetProjectCommand, ProjectDeta
     @Inject(CLOCK) private readonly clock: Clock,
     private readonly paymentTriggers: PaymentMilestoneTriggerService,
     @Inject(APPROVED_PROJECT_CALENDAR) private readonly approvedCalendar: ApprovedProjectCalendar,
+    private readonly progress: ProjectProgressRecalculator,
   ) {}
 
   async execute(command: GetProjectCommand): Promise<Result<ProjectDetail, ApplicationError>> {
@@ -150,6 +152,12 @@ export class GetProjectUseCase implements UseCase<GetProjectCommand, ProjectDeta
     const generated = snapshot.type === 'development' && snapshot.status === 'active' &&
       Boolean(snapshot.startDate || snapshot.hito0At)
       ? await this.approvedCalendar.ensure(project.id) : false;
+    if (generated) {
+      // El calendario traspasado puede crear los primeros bloques sin pasar
+      // por un caso de uso de edición; sincronizar el caché usado por la
+      // ordenación de proyectos desde la primera materialización.
+      await this.progress.recalculate(project.id);
+    }
     const currentModules = generated
       ? await this.modules.listForProject(project.id)
       : projectModules;
