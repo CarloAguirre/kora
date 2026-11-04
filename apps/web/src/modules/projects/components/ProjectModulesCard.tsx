@@ -24,7 +24,7 @@ import { Button } from '@/shared/components/ui/Button';
 import { Select } from '@/shared/components/ui/Select';
 import { Avatar } from '@/shared/components/ui/Avatar';
 import { Badge, type BadgeTone } from '@/shared/components/ui/Badge';
-import { CloseIcon, PencilIcon, TrashIcon } from '@/shared/components/icons/Icons';
+import { CloseIcon, CopyIcon, PencilIcon, TrashIcon } from '@/shared/components/icons/Icons';
 import { useToast } from '@/shared/components/ui/Toast';
 import { ApiRequestError } from '@/shared/lib/api-client';
 import { PhaseRoadmap, type PhaseRoadmapSelection, type OperationalRoadmapRow } from '@/modules/client-portal/components/PhaseRoadmap';
@@ -631,6 +631,11 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
                       <button type="button" className={styles.taskIconAction}
                         aria-label={'Editar tarea ' + task.name} title="Editar tarea"
                         onClick={() => setEditingTask({ moduleId: module.id, task })}><PencilIcon size={15} /></button>
+                      {task.assigneeUserId && <button type="button" className={styles.taskIconAction}
+                        aria-label={'Duplicar tarea ' + task.name} title="Duplicar para otra persona"
+                        onClick={() => setDuplicatingTask({ moduleId: module.id, task })}>
+                        <CopyIcon size={15} />
+                      </button>}
                       <button type="button" className={styles.taskIconAction}
                         aria-label={'Eliminar tarea ' + task.name} title="Eliminar tarea"
                         onClick={() => void onRemoveTask(module, task)}><TrashIcon size={15} /></button>
