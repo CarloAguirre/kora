@@ -21,7 +21,7 @@ function fixture(options: {
   const project = {
     id: projectId, type: 'development', status: options.active === false ? 'draft' : 'active',
     startDate: options.hitoOnly ? null : new Date('2026-11-05T00:00:00.000Z'),
-    hito0At: options.hitoOnly ? new Date('2026-11-10T00:00:00.000Z') : null,
+    hito0At: options.hitoOnly ? new Date('2026-11-11T02:00:00.000Z') : null,
   };
   const draft = {
     mode: 'phases', teams: [{
