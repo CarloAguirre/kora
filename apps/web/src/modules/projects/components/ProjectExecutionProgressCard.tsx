@@ -79,7 +79,9 @@ export function ProjectExecutionProgressCard({ progress }: { readonly progress: 
   const planningDescription = !progress.hasPlan ? 'Sin HH definidas en los bloques de trabajo.' :
     'Plan actual: ' + progress.phases.length + (progress.phases.length === 1 ? ' fase, ' : ' fases, ') +
     progress.blocksCount + (progress.blocksCount === 1 ? ' bloque' : ' bloques') +
-    ' de trabajo, con ' + hours(progress.plannedHours) + ' HH planificadas' +
+    ' de trabajo y ' + progress.taskCount + (progress.taskCount === 1
+      ? ' tarea operativa, con ' : ' tareas operativas, con ') +
+    hours(progress.plannedHours) + ' HH planificadas' +
     (soldMatch ? ', igual a las HH vendidas.' :
       ' frente a ' + hours(progress.soldHours) + ' HH vendidas.');
 
