@@ -43,3 +43,29 @@ WITH candidates AS (
 UPDATE "project_module_deliveries" d SET "segment_id" = c.segment_id
 FROM candidates c JOIN unique_deliveries u ON u.id = c.delivery_id
 WHERE d.id = c.delivery_id AND c.matches = 1;
+--> statement-breakpoint
+-- Un único bloque del equipo, dentro de cuyas fechas cae completamente la tarea:
+-- recuperamos la relación antigua sin basarnos en títulos ni inventar fechas.
+WITH unambiguous AS (
+  SELECT t.id AS task_id, MIN(s.id::text)::uuid AS segment_id
+  FROM "project_module_tasks" t
+  JOIN "project_module_segments" s ON s.module_id = t.module_id
+    AND s.team_id = t.team_id AND t.start_date >= s.start_date AND t.date <= s.end_date
+  WHERE t.segment_id IS NULL
+  GROUP BY t.id
+  HAVING COUNT(*) = 1
+)
+UPDATE "project_module_tasks" t SET "segment_id" = u.segment_id
+FROM unambiguous u WHERE t.id = u.task_id AND t.segment_id IS NULL;
+--> statement-breakpoint
+-- Si todas las tareas ya estaban aprobadas y guardan su instante real,
+-- recuperamos el cierre real del último visto bueno; no usamos updated_at.
+WITH approved AS (
+  SELECT segment_id, MAX(completed_at) AS actual_close,
+    COUNT(*) AS total,
+    COUNT(*) FILTER (WHERE status = 'done' AND completed_at IS NOT NULL) AS accepted
+  FROM "project_module_tasks" WHERE segment_id IS NOT NULL GROUP BY segment_id
+)
+UPDATE "project_module_segments" s SET closed_at = a.actual_close
+FROM approved a WHERE s.id = a.segment_id AND a.total > 0
+  AND a.total = a.accepted AND s.closed_at IS NULL;
