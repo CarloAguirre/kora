@@ -1,3 +1,5 @@
+import { approvedCalendarPeriod } from '@kora/contracts';
+
 /** Calendario referencial de una cotización transferida.
  * La semana 1 empieza en project.startDate; cada semana comercial ocupa
  * siete días calendario. NO genera ni persiste bloques, entregas o Forecast.
@@ -20,12 +22,9 @@ export function proposedBlockPeriod(
   startWeek: number,
   durationWeeks: number,
 ): ProposedBlockPeriod | null {
-  if (!projectStartDate || !/^\d{4}-\d{2}-\d{2}$/.test(projectStartDate) ||
-      !Number.isInteger(startWeek) || !Number.isInteger(durationWeeks) ||
-      startWeek < 1 || durationWeeks < 1 || startWeek + durationWeeks - 1 > 520) return null;
-  const startDate = shiftIsoDays(projectStartDate, (startWeek - 1) * 7);
-  const endDate = shiftIsoDays(projectStartDate, (startWeek + durationWeeks - 1) * 7 - 1);
-  return { startDate, endDate };
+  return projectStartDate
+    ? approvedCalendarPeriod(projectStartDate, startWeek, durationWeeks)
+    : null;
 }
 
 /** Ej. "05-11-2026", sin conversión horaria del navegador. */
