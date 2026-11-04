@@ -34,7 +34,7 @@ export function NewOperationalTaskModal({
   const blocks = module?.segments.filter((entry) => entry.teamId === teamId) ?? [];
   const block = blocks.find((entry) => entry.id === blockId);
   const memberOptions = project.members.filter((member) =>
-    member.teamId === teamId && member.userStatus === 'active').map((member) => ({
+    member.teamId === teamId && member.userStatus === 'active' && !member.blockedAt).map((member) => ({
     value: member.userId, label: member.fullName,
   }));
   const numericHours = Number(hours);
