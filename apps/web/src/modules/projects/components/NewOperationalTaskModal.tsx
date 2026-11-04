@@ -13,24 +13,27 @@ import { useCreateProjectModuleTask } from '../api/projects.queries';
 import styles from './ExecutionTaskModal.module.css';
 
 export function NewOperationalTaskModal({
-  project, moduleId, onClose,
+  project, moduleId, initialSegmentId, onClose,
 }: {
   project: ProjectDetail;
   moduleId: string;
+  /** Preselección solo cuando se abrió desde el detalle de un bloque. */
+  initialSegmentId?: string;
   onClose: () => void;
 }) {
   const create = useCreateProjectModuleTask();
   const toast = useToast();
   const module = project.modules.find((item) => item.id === moduleId);
+  const initialBlock = module?.segments.find((entry) => entry.id === initialSegmentId);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [teamId, setTeamId] = useState(project.teams[0]?.teamId ?? '');
+  const [teamId, setTeamId] = useState(initialBlock?.teamId ?? project.teams[0]?.teamId ?? '');
   const [assignee, setAssignee] = useState('');
-  const [blockId, setBlockId] = useState('');
+  const [blockId, setBlockId] = useState(initialBlock?.id ?? '');
   const [scope, setScope] = useState<ProjectModuleTaskScope>('desarrollo');
   const [hours, setHours] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [date, setDate] = useState('');
+  const [startDate, setStartDate] = useState(initialBlock?.startDate ?? '');
+  const [date, setDate] = useState(initialBlock?.endDate ?? '');
   const blocks = module?.segments.filter((entry) => entry.teamId === teamId) ?? [];
   const block = blocks.find((entry) => entry.id === blockId);
   const memberOptions = project.members.filter((member) =>
