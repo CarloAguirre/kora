@@ -5,6 +5,7 @@ import {
   PROJECT_MODULE_STAGE_LABELS,
   PROJECT_MODULE_TASK_SCOPE_LABELS,
   PROJECT_MODULE_TASK_STATUS_LABELS,
+  type CreateProjectModuleSegmentInput,
   type HourEntrySummary,
   type AppliedQuotationPlanning,
   type ProjectDetail,
@@ -22,7 +23,7 @@ import { Button } from '@/shared/components/ui/Button';
 import { Select } from '@/shared/components/ui/Select';
 import { Avatar } from '@/shared/components/ui/Avatar';
 import { Badge, type BadgeTone } from '@/shared/components/ui/Badge';
-import { CloseIcon, CopyIcon, PencilIcon, TrashIcon } from '@/shared/components/icons/Icons';
+import { CloseIcon, PencilIcon, TrashIcon } from '@/shared/components/icons/Icons';
 import { useToast } from '@/shared/components/ui/Toast';
 import { ApiRequestError } from '@/shared/lib/api-client';
 import { PhaseRoadmap, type PhaseRoadmapSelection, type OperationalRoadmapRow } from '@/modules/client-portal/components/PhaseRoadmap';
@@ -33,6 +34,7 @@ import { useConfirmAction } from '@/shared/components/ui/useConfirmAction';
 import { QuotationReferenceTaskModal } from './QuotationReferenceTaskModal';
 import { ExecutionTaskModal } from './ExecutionTaskModal';
 import { DuplicateTaskModal } from './DuplicateTaskModal';
+import { NewWorkBlockModal } from './NewWorkBlockModal';
 import { ReferenceBlockDrawer } from './ReferenceBlockDrawer';
 import { useAppliedQuotationPlanning } from '@/modules/estimation/api/quotation.queries';
 import {
@@ -126,7 +128,9 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
 
   /** Tiempo de ejecución que se está editando (`null` = modal cerrado). */
   const [editingSegment, setEditingSegment] = useState<{ moduleId: string; segment: ProjectModuleSegment } | null>(null);
-  const [planningBlock, setPlanningBlock] = useState<{ moduleId: string; teamId: string; name: string } | null>(null);
+  const [planningBlock, setPlanningBlock] = useState<{
+    moduleId: string; teamId: string; name: string; estimatedHours?: number | null;
+  } | null>(null);
   const [planningMode, setPlanningMode] = useState(false);
   const [addingPhase, setAddingPhase] = useState(false);
   const [editingTask, setEditingTask] = useState<{ moduleId: string; task: ProjectModuleTask } | null>(null);
@@ -143,10 +147,8 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
   // Estable mientras el modal está abierto: `ExecutionSegmentModal` reinicia su formulario cuando cambia `initialValues`,
   // y un refetch del proyecto (re-render de esta tarjeta) no debe borrar lo que se está escribiendo.
   const segmentModalInitialValues = useMemo<ExecutionSegmentModalValues>(
-    () => editingSegment ? segmentToModalValues(editingSegment.segment) : planningBlock
-      ? { ...EMPTY_EXECUTION_SEGMENT_MODAL_VALUES, teamId: planningBlock.teamId, name: planningBlock.name }
-      : EMPTY_EXECUTION_SEGMENT_MODAL_VALUES,
-    [editingSegment, planningBlock],
+    () => editingSegment ? segmentToModalValues(editingSegment.segment) : EMPTY_EXECUTION_SEGMENT_MODAL_VALUES,
+    [editingSegment],
   );
   // El equipo actual del tramo siempre es elegible, aunque ya no figure entre los equipos del proyecto.
   const segmentModalTeamOptions = useMemo(() => {
@@ -155,29 +157,34 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
   }, [editingSegment, teamOptions]);
 
   const onConfirmSegmentEdit = async (values: ExecutionSegmentModalValues) => {
-    if (!editingSegment && !planningBlock) return;
+    if (!editingSegment) return;
     try {
-      if (editingSegment) {
-        await updateSegment.mutateAsync({
-          projectId: project.id,
-          moduleId: editingSegment.moduleId,
-          segmentId: editingSegment.segment.id,
-          input: toSegmentInput(values),
-        });
-      } else if (planningBlock) {
-        // La cotización informa semanas relativas. Solo aquí el usuario elige
-        // fechas reales; desde entonces el bloque aparece en el Gantt de Kora.
-        await createSegment.mutateAsync({
-          projectId: project.id,
-          moduleId: planningBlock.moduleId,
-          input: toSegmentInput(values),
-        });
-      }
+      await updateSegment.mutateAsync({
+        projectId: project.id,
+        moduleId: editingSegment.moduleId,
+        segmentId: editingSegment.segment.id,
+        input: toSegmentInput(values),
+      });
       setEditingSegment(null);
-      setPlanningBlock(null);
-      toast.success(editingSegment ? 'Bloque actualizado.' : 'Bloque planificado en el Roadmap.');
+      toast.success('Bloque actualizado.');
     } catch (error) {
       toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo guardar el bloque.');
+    }
+  };
+
+  const onCreateWorkBlock = async (input: CreateProjectModuleSegmentInput) => {
+    if (!planningBlock) return;
+    try {
+      // El backend crea bloque + entrega opcional en una sola transacción.
+      await createSegment.mutateAsync({
+        projectId: project.id,
+        moduleId: planningBlock.moduleId,
+        input,
+      });
+      setPlanningBlock(null);
+      toast.success('Bloque de trabajo creado.');
+    } catch (error) {
+      toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo crear el bloque.');
     }
   };
 
@@ -202,8 +209,10 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
   const onRemoveTask = async (module: ProjectModule, task: ProjectModuleTask) => {
     if (!await confirm({
       title: 'Eliminar tarea',
-      description: '¿Eliminar «' + task.name + '» del proyecto? Se mantendrá la referencia de cotización si existe.',
-      confirmLabel: 'Eliminar tarea', destructive: true,
+      description: 'Se eliminará «' + task.name + '», ' +
+        (task.assigneeName ? 'asignada a ' + task.assigneeName + '.' : 'sin asignar.') +
+        ' Las referencias de cotización, si existen, se conservan.',
+      confirmLabel: 'Eliminar tarea', cancelLabel: 'Volver',
     })) return;
     try {
       await deleteTask.mutateAsync({ projectId: project.id, moduleId: module.id, taskId: task.id });
@@ -432,7 +441,7 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
     const ref = appliedPlanning.data?.modules.find((item) => item.moduleId === phase.id)
       ?.relativeTeamBlocks?.find((item) => item.teamId === segment.teamId);
     const hours = taskHours > 0 ? taskHours
-      : teamSegments.length === 1 ? ref?.hours ?? null : null;
+      : segment.estimatedHours ?? (teamSegments.length === 1 ? ref?.hours ?? null : null);
     const doneHours = tasks.filter((task) => task.status === 'done')
       .reduce((sum, task) => sum + (task.estimatedHours ?? 0), 0);
     const progress = tasks.length
@@ -524,9 +533,6 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
                         aria-label={'Editar tarea ' + task.name} title="Editar tarea"
                         onClick={() => setEditingTask({ moduleId: module.id, task })}><PencilIcon size={15} /></button>
                       <button type="button" className={styles.taskIconAction}
-                        aria-label={'Duplicar tarea ' + task.name} title="Duplicar para otra persona"
-                        onClick={() => setDuplicatingTask({ moduleId: module.id, task })}><CopyIcon size={15} /></button>
-                      <button type="button" className={styles.taskIconAction}
                         aria-label={'Eliminar tarea ' + task.name} title="Eliminar tarea"
                         onClick={() => void onRemoveTask(module, task)}><TrashIcon size={15} /></button>
                     </>}
@@ -570,7 +576,7 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
           onPlan={canManage ? () => {
             setPlanningBlock({ moduleId: module.id, teamId: block.teamId,
               name: module.name + ' · ' + (teamOptions.find((item) =>
-                item.value === block.teamId)?.label ?? 'Equipo') });
+                item.value === block.teamId)?.label ?? 'Equipo'), estimatedHours: block.hours });
             close();
           } : undefined}
           onCreateReference={canManage ? (task) => {
@@ -660,6 +666,7 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
             moduleId: module.id, teamId: reference.teamId,
             name: module.name + ' · ' +
               (teamOptions.find((item) => item.value === reference.teamId)?.label ?? 'Equipo'),
+            estimatedHours: reference.hours,
           });
         } : undefined}
         renderPhaseReferences={renderOperationalContent}
@@ -728,14 +735,28 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
           </div>
         </div>
       </Modal>
+      {planningBlock && modulesById.get(planningBlock.moduleId) && (
+        <NewWorkBlockModal
+          key={planningBlock.moduleId + ':' + planningBlock.teamId}
+          project={project}
+          module={modulesById.get(planningBlock.moduleId)!}
+          teamOptions={teamOptions}
+          initialTeamId={planningBlock.teamId}
+          initialName={planningBlock.name}
+          initialEstimatedHours={planningBlock.estimatedHours}
+          submitting={createSegment.isPending}
+          onCancel={() => setPlanningBlock(null)}
+          onConfirm={(input) => void onCreateWorkBlock(input)}
+        />
+      )}
       <ExecutionSegmentModal
-        open={editingSegment !== null || planningBlock !== null}
-        mode={editingSegment ? 'edit' : 'create'}
+        open={editingSegment !== null}
+        mode="edit"
         teamOptions={segmentModalTeamOptions}
         initialValues={segmentModalInitialValues}
         segmentId={editingSegment?.segment.id ?? null}
-        submitting={updateSegment.isPending || createSegment.isPending}
-        onCancel={() => { setEditingSegment(null); setPlanningBlock(null); }}
+        submitting={updateSegment.isPending}
+        onCancel={() => setEditingSegment(null)}
         onConfirm={(values) => void onConfirmSegmentEdit(values)}
       />
     </>
@@ -767,7 +788,7 @@ function SegmentDrawer({
   const projected = reference?.relativeTeamBlocks?.filter(
     (block) => block.teamId === segment.teamId,
   ) ?? [];
-  const hours = projected.length === 1 ? projected[0]!.hours : null;
+  const hours = segment.estimatedHours ?? (projected.length === 1 ? projected[0]!.hours : null);
   // Solo asociamos una entrega si hay correspondencia ÚNICA de equipo y
   // fecha final. No se crean entregas ficticias para bloques sin planificación.
   const deliveries = module.deliveries.filter((delivery) =>
