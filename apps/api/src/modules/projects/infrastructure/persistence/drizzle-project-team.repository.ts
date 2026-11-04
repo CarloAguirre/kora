@@ -59,6 +59,7 @@ export class DrizzleProjectTeamRepository implements ProjectTeamRepository {
         and(
           eq(projectTeamMembers.projectId, projectTeams.projectId),
           eq(projectTeamMembers.teamId, projectTeams.teamId),
+          sql`${projectTeamMembers.blockedAt} is null`,
         ),
       )
       .where(eq(projectTeams.projectId, projectId))
