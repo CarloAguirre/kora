@@ -8,6 +8,8 @@ const hours = (value: number) => value.toLocaleString('es-CL', { maximumFraction
 const percent = (value: number) => value.toLocaleString('es-CL') + '%';
 const date = (value: string) => value.slice(8, 10) + '-' + value.slice(5, 7) + '-' + value.slice(0, 4);
 const sameHours = (a: number, b: number) => Math.abs(a - b) < 0.01;
+const differencePoints = (value: number) => value > 0 && value < 0.01
+  ? '<0,01' : value.toLocaleString('es-CL', { maximumFractionDigits: 2 });
 
 function MiniTrack({ real, expected }: { real: number; expected: number }) {
   return <div className={shared.miniTrack} role="img"
@@ -65,7 +67,7 @@ function PhaseRows({ phase }: { phase: ProjectExecutionPhase }) {
  * mediante otra fórmula y puede marcar avance antes de crear los bloques.
  */
 export function ProjectExecutionProgressCard({ progress }: { readonly progress: ProjectExecutionProgress }) {
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
   const explanationId = useId();
   const actual = progress.actualPercent ?? 0;
   const expected = progress.expectedPercent ?? 0;
@@ -73,8 +75,11 @@ export function ProjectExecutionProgressCard({ progress }: { readonly progress: 
   const state = !progress.hasPlan ? 'Sin plan' : progress.paused ? 'Pausado' :
     actual < expected ? 'Atrasado' : actual > expected ? 'Adelantado' : 'Al día';
 
-  const phaseTotalsMatch = useMemo(() => progress.phases.every((phase) =>
-    sameHours(phase.estimatedHours, phase.commercialHours)), [progress.phases]);
+  // Una fase nueva o ampliada después de vender el proyecto no significa
+  // pérdida de HH. Alertar solo cuando falte distribuir parte de una fase
+  // comercial entre bloques; mostrar el desfase de venta por separado.
+  const incompleteCommercialPhases = useMemo(() => progress.phases.filter((phase) =>
+    phase.commercialHours > phase.estimatedHours + 0.01), [progress.phases]);
   const soldMatch = sameHours(progress.plannedHours, progress.soldHours);
   const planningDescription = !progress.hasPlan ? 'Sin HH definidas en los bloques de trabajo.' :
     'Plan actual: ' + progress.phases.length + (progress.phases.length === 1 ? ' fase, ' : ' fases, ') +
@@ -125,7 +130,12 @@ export function ProjectExecutionProgressCard({ progress }: { readonly progress: 
     <div className={shared.explainer}>
       <button type="button" className={shared.toggle} aria-expanded={expanded}
         aria-controls={explanationId} onClick={() => setExpanded((value) => !value)}>
-        <span className={shared.chevron} aria-hidden="true">{expanded ? '⌄' : '›'}</span>
+        <span className={shared.chevron} aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none"
+            stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d={expanded ? 'm6 9 6 6 6-6' : 'm9 6 6 6-6 6'} />
+          </svg>
+        </span>
         ¿Cómo se calcula este avance?
       </button>
       {expanded && <div id={explanationId} className={shared.explanation}>
@@ -165,7 +175,7 @@ export function ProjectExecutionProgressCard({ progress }: { readonly progress: 
               <span className={shared.teamIcon} style={{ background: team.color }}>{team.sigla}</span>
               <div>
                 <b>{block.teamName} · {block.phaseName} <span className={shared.negative}>
-                  −{block.gapPoints} pts</span></b>
+                  −{differencePoints(block.gapPoints)} pts</span></b>
                 <p>Debería ir en {percent(block.expectedPercent)} y va en
                   {' '}{percent(block.actualPercent)}
                   {explanations.length > 0 ? '; ' + explanations.join(', ') : ''}.</p>
@@ -194,13 +204,21 @@ export function ProjectExecutionProgressCard({ progress }: { readonly progress: 
             <p className={shared.empty}>El proyecto todavía no tiene fases operativas.</p>}
         </div>
         {(progress.unplannedBlockCount > 0 || progress.unlinkedTaskCount > 0 ||
-          !phaseTotalsMatch || !soldMatch) && <p className={shared.caution}>
+          incompleteCommercialPhases.length > 0) && <p className={shared.caution}>
           {progress.unplannedBlockCount > 0
             ? progress.unplannedBlockCount + ' bloque(s) sin HH estimadas. ' : ''}
-          {!phaseTotalsMatch || !soldMatch
-            ? 'Las HH de bloques no coinciden con la estimación comercial; revisa el Roadmap. ' : ''}
+          {incompleteCommercialPhases.length > 0
+            ? 'Faltan HH de la estimación comercial por distribuir en ' +
+              incompleteCommercialPhases.length + ' fase(s); revisa sus bloques. ' : ''}
           {progress.unlinkedTaskCount > 0
             ? progress.unlinkedTaskCount + ' tarea(s) sin bloque inequívoco; no generan avance.' : ''}
+        </p>}
+        {progress.soldHours > 0 && !soldMatch && <p className={styles.commercialNote}>
+          El plan operativo contempla {hours(Math.abs(progress.plannedHours - progress.soldHours))} HH
+          {' '}{progress.plannedHours > progress.soldHours ? 'adicionales a' : 'menos que las'}
+          {progress.plannedHours > progress.soldHours ? ' las' : ''}
+          {' '}HH vendidas ({hours(progress.soldHours)} HH).
+          La diferencia no cambia el contrato ni altera el cálculo del avance operativo.
         </p>}
         <p className={shared.note}>Las HH consumidas por bloque son registros aprobados
           atribuidos expresamente a ese segmento. El historial sin vínculo se conserva
