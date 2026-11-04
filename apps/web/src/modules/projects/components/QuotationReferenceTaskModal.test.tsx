@@ -67,7 +67,7 @@ describe('Nueva tarea operativa a partir de referencia Gemini', () => {
     expect(mocks.create).not.toHaveBeenCalled();
   });
 
-  it('crea una tarea solo con colaborador, ámbito y fechas; preserva trazabilidad EDT', async () => {
+  it('crea una tarea con bloque, colaborador, ámbito y fechas; preserva trazabilidad EDT', async () => {
     show();
     fireEvent.change(screen.getByLabelText(/Asignado a/),{
       target: { value: teamId + ':' + userId },
