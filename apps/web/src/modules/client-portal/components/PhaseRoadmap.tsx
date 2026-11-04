@@ -147,6 +147,7 @@ export function PhaseRoadmap({
   toolbarActions, renderPhaseHeaderName, renderPhaseHeaderActions, borderlessSummary = false,
   alwaysExpanded = false,
   operationalView = false, operationalTaskCount, operationalBlockCount, operationalRows, onPlanOperationalRow,
+  operationalMetrics, operationalFooter,
 }: PhaseRoadmapProps) {
   /** Fases abiertas — cada una se abre/cierra por separado (varias a la vez); arranca abierta la primera. */
   const [expandedPhaseIds, setExpandedPhaseIds] = useState<ReadonlySet<string>>(
@@ -266,10 +267,10 @@ export function PhaseRoadmap({
           <OperationalPhaseCard key={phase.id} phase={phase} axis={axis}
             placeholderRows={operationalRows?.(phase) ?? []}
             onPlanRow={onPlanOperationalRow}
+            getMetrics={operationalMetrics}
             renderHeaderName={renderPhaseHeaderName}
             renderHeaderActions={renderPhaseHeaderActions}
             renderReferences={renderPhaseReferences}
-            renderExtras={renderPhaseExtras}
             renderSelectionDetail={renderSelectionDetail} />
         ) : (
           <PhaseCard
@@ -287,6 +288,7 @@ export function PhaseRoadmap({
           />
         ))}
       </div>
+      {operationalView && operationalFooter && <div className={styles.operationalFooter}>{operationalFooter}</div>}
     </div>
   );
 }
@@ -351,6 +353,10 @@ export interface PhaseRoadmapProps {
   onPlanOperationalRow?: (phase: PhaseRoadmapPhase, row: OperationalRoadmapRow) => void;
   /** Bloques de cotización aún sin tramo operativo ni fechas; no se dibujan como barras ficticias. */
   operationalRows?: (phase: PhaseRoadmapPhase) => readonly OperationalRoadmapRow[];
+  /** HH y avance comprobables de cada bloque operativo; no se inventan porcentajes. */
+  operationalMetrics?: (phase: PhaseRoadmapPhase, task: PhaseRoadmapTask) => { hours: number | null; progress: number | null };
+  /** Acción al final de las fases, exclusiva de la ficha interna. */
+  operationalFooter?: ReactNode;
   renderPhaseHeaderName?: (phase: PhaseRoadmapPhase) => ReactNode;
   renderPhaseHeaderActions?: (phase: PhaseRoadmapPhase) => ReactNode;
 }
@@ -737,10 +743,10 @@ function OperationalPhaseCard({
   axis: TimelineAxis;
   placeholderRows: readonly OperationalRoadmapRow[];
   onPlanRow?: PhaseRoadmapProps['onPlanOperationalRow'];
+  getMetrics?: PhaseRoadmapProps['operationalMetrics'];
   renderHeaderName?: PhaseRoadmapProps['renderPhaseHeaderName'];
   renderHeaderActions?: PhaseRoadmapProps['renderPhaseHeaderActions'];
   renderReferences?: PhaseRoadmapProps['renderPhaseReferences'];
-  renderExtras?: PhaseRoadmapProps['renderPhaseExtras'];
   renderSelectionDetail?: PhaseRoadmapProps['renderSelectionDetail'];
 }) {
   const [selected, setSelected] = useState<PhaseRoadmapSelection | null>(null);
@@ -749,7 +755,6 @@ function OperationalPhaseCard({
     setSelected((current) => sameSelection(current, selection) ? null : selection);
   const hasDatedRows = phase.tasks.length > 0;
   const hasOtherDatedItems = phase.deliveries.length > 0 || phase.taskItems.length > 0;
-  const today = startOfToday();
   const relatedEntries = selected?.kind === 'incident'
     ? phase.relatedBitacora.filter((entry) => entry.kind === 'attention')
     : selected && 'label' in selected
@@ -787,6 +792,7 @@ function OperationalPhaseCard({
             )}
             {phase.tasks.map((task, index) => {
               const geometry = barGeometry(task, axis.range);
+              const metrics = getMetrics?.(phase, task);
               const selection: PhaseRoadmapSelection = {
                 kind: 'segment', id: task.id, label: task.label,
               };
@@ -798,7 +804,9 @@ function OperationalPhaseCard({
                     style={{ background: OPERATIONAL_ROLE_COLORS[task.role] }}>
                     {PHASE_ROADMAP_ROLE_LABELS[task.role]}
                   </span>
-                  <span className={styles.operationalLabelText}>{task.label}</span>
+                  <span className={styles.operationalLabelText}>{task.label}
+                    {metrics && <small>{metrics.hours == null ? 'HH sin definir' : metrics.hours + ' HH'} · {metrics.progress == null ? 'avance sin definir' : metrics.progress + '% de avance'}</small>}
+                  </span>
                 </span>
                 <div className={styles.operationalTrack}>
                   {axis.weekLines.map((percent, idx) =>
@@ -814,7 +822,6 @@ function OperationalPhaseCard({
                       left: geometry.leftPercent + '%',
                       width: geometry.widthPercent + '%',
                       background: OPERATIONAL_ROLE_COLORS[task.role],
-                      opacity: toDate(task.startDate) > today ? 0.45 : 1,
                     }}
                     title={task.label + ' · ' + formatShortDate(task.startDate) + ' a ' + formatShortDate(task.endDate)}
                     onClick={() => choose(selection)} />}
@@ -903,10 +910,6 @@ function OperationalPhaseCard({
           </details>
         )}
         {renderReferences?.(phase)}
-        {renderExtras && <details className={styles.operationalPhaseExtras}>
-          <summary>Etapa y datos de la fase</summary>
-          {renderExtras(phase)}
-        </details>}
         {selected && renderSelectionDetail?.(phase, selected, () => setSelected(null))}
         {selected && phase.relatedBitacora.length > 0 && (
           <div className={styles.relatedBitacora}>
