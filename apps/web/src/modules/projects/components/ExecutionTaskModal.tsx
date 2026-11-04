@@ -45,7 +45,7 @@ export function ExecutionTaskModal({
   const [date, setDate] = useState(task.date);
 
   const module = project.modules.find((item) => item.id === moduleId);
-  const members = project.members.filter((member) => member.userStatus === 'active');
+  const members = project.members.filter((member) => member.userStatus === 'active' && !member.blockedAt);
   const assigneeOptions = members.map((member) => ({
     value: member.teamId + ':' + member.userId,
     label: member.fullName + ' · ' + member.teamName,
