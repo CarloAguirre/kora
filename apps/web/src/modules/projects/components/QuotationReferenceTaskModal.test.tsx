@@ -65,7 +65,7 @@ describe('Nueva tarea operativa a partir de referencia Gemini', () => {
     expect(mocks.create).toHaveBeenCalledWith({
       projectId, moduleId,
       input: expect.objectContaining({
-        teamId, assigneeUserId:userId, name:'Conexión con sistema de taller',
+        teamId, segmentId: blockId, assigneeUserId:userId, name:'Conexión con sistema de taller',
         estimatedHours:35, startDate:'2026-11-10', date:'2026-11-20',
         scope:'desarrollo', status:'todo',
         description:expect.stringContaining('Referencia cotización ' + versionId),
