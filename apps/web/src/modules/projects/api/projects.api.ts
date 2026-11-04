@@ -8,6 +8,8 @@ import type {
   CreateProjectModuleInput,
   CreateProjectModuleSegmentInput,
   CreateProjectModuleTaskInput,
+  ExcludeRoadmapReferenceInput,
+  RoadmapReferenceExclusion,
   CreateProjectPaymentMilestoneInput,
   IssueProjectPaymentMilestoneInvoiceInput,
   ListProjectsQuery,
@@ -137,6 +139,15 @@ export const projectsApi = {
   },
   deleteModuleSegment(projectId: string, moduleId: string, segmentId: string): Promise<void> {
     return api.delete<void>(`/projects/${projectId}/modules/${moduleId}/segments/${segmentId}`);
+  },
+  listRoadmapReferenceExclusions(projectId: string): Promise<RoadmapReferenceExclusion[]> {
+    return api.get<RoadmapReferenceExclusion[]>(`/projects/${projectId}/roadmap-reference-exclusions`);
+  },
+  excludeRoadmapReference(projectId: string, moduleId: string, input: ExcludeRoadmapReferenceInput): Promise<void> {
+    return api.post<void>(`/projects/${projectId}/modules/${moduleId}/roadmap-reference-exclusions`, input);
+  },
+  restoreRoadmapReference(projectId: string, moduleId: string, input: ExcludeRoadmapReferenceInput): Promise<void> {
+    return api.post<void>(`/projects/${projectId}/modules/${moduleId}/roadmap-reference-exclusions/restore`, input);
   },
   createModuleTask(projectId: string, moduleId: string, input: CreateProjectModuleTaskInput): Promise<{ id: string }> {
     return api.post<{ id: string }>(`/projects/${projectId}/modules/${moduleId}/tasks`, input);
