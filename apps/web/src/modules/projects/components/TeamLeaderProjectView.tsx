@@ -9,7 +9,7 @@ import { Modal } from '@/shared/components/ui/Modal';
 import { DataTable } from '@/shared/components/ui/DataTable';
 import { Pagination, usePaginatedItems } from '@/shared/components/ui/Pagination';
 import { useToast } from '@/shared/components/ui/Toast';
-import { AlertIcon, PencilIcon, TrashIcon } from '@/shared/components/icons/Icons';
+import { PencilIcon, TrashIcon } from '@/shared/components/icons/Icons';
 import { ProjectTimeline } from './ProjectTimeline';
 import { TeamTasksCard } from './TeamTasksCard';
 import { TeamDeliveriesCard } from './TeamDeliveriesCard';
