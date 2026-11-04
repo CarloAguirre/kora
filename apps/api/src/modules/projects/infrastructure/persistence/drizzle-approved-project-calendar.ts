@@ -84,7 +84,7 @@ export class DrizzleApprovedProjectCalendar implements ApprovedProjectCalendar {
         positive.map((module, index) => ({
           moduleId: moduleIds[index]!, name: module.name, totalHours: module.hours,
         })));
-      if (!references.modules.some((module) => module.relativeTeamBlocks.length > 0)) {
+      if (!references.modules.some((module) => (module.relativeTeamBlocks?.length ?? 0) > 0)) {
         // Una EDT sin calendario comercial explícito no genera fechas ficticias.
         return false;
       }
@@ -133,7 +133,7 @@ export class DrizzleApprovedProjectCalendar implements ApprovedProjectCalendar {
         const module = moduleById.get(moduleId);
         // Una fase eliminada o un equipo retirado nunca se reconstruyen.
         if (!module) continue;
-        for (const effort of reference.relativeTeamBlocks) {
+        for (const effort of reference.relativeTeamBlocks ?? []) {
           if (effort.hours <= 0 || !nameByTeam.has(effort.teamId)) continue;
           const key = moduleId + ':' + effort.teamId;
           if (existing.has(key)) continue; // conserva bloques creados/editados
