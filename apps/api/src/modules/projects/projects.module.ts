@@ -152,6 +152,8 @@ import { DrizzleForecastSourceStore } from './infrastructure/services/drizzle-fo
   exports: [
     PROJECT_REPOSITORY,
     PROJECT_MODULE_REPOSITORY,
+    PROJECT_TEAM_MEMBER_REPOSITORY,
+    PROJECT_TEAM_REPOSITORY,
     PROJECT_PAYMENT_MILESTONE_REPOSITORY,
     ForecastSourceSyncService,
     PaymentMilestoneTriggerService,
