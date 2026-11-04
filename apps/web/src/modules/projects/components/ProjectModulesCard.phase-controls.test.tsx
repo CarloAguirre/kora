@@ -402,6 +402,77 @@ describe('Traspaso de cotización · vista operativa v5.02', () => {
   });
 });
 
+describe('Bloque de origen en la tabla de tareas por asignar', () => {
+  const quotationTasks = [{
+    wbs: 'WBS-UX', role: 'Diseñador UX', name: 'Diseño de interfaz PWA y Backoffice',
+    hours: 120, teamId: 'team-ux',
+  }, {
+    wbs: 'WBS-DEV', role: 'Desarrollador', name: 'Arquitectura de seguridad',
+    hours: 40, teamId: 'team-1',
+  }];
+  const setup = () => {
+    mocks.appliedPlan.modules = [{
+      moduleId: 'module-1', totalHours: 160,
+      tasks: quotationTasks,
+      relativeTeamBlocks: [
+        { teamId: 'team-ux', hours: 120, startWeek: 1, durationWeeks: 4 },
+        { teamId: 'team-1', hours: 40, startWeek: 1, durationWeeks: 4 },
+      ],
+    }];
+    return { ...project, teams: [
+      ...project.teams,
+      { teamId: 'team-ux', teamName: 'UX-UI', leader: null, memberCount: 0,
+        maxMembers: null, assignedHours: 120 },
+    ] };
+  };
+
+  it('muestra el bloque comercial de origen aun sin colaboradores ni tareas operativas', () => {
+    const seeded = setup();
+    show(seeded as unknown as ProjectDetail);
+    const uxRow = screen.getByText('Diseño de interfaz PWA y Backoffice').closest('tr')!;
+    const devRow = screen.getByText('Arquitectura de seguridad').closest('tr')!;
+    expect(within(uxRow).getByTitle(/Bloque de origen de la estimación comercial/))
+      .toHaveTextContent('Diseño Backend · UX-UI');
+    expect(within(devRow).getByTitle(/Bloque de origen de la estimación comercial/))
+      .toHaveTextContent('Diseño Backend · Desarrollo');
+    expect(within(uxRow).getByText('Sin asignar')).toBeInTheDocument();
+    expect(within(uxRow).getByText('Por asignar')).toBeInTheDocument();
+    expect(screen.queryByText('Pendiente de planificar')).not.toBeInTheDocument();
+    expect(mocks.createTask).not.toHaveBeenCalled();
+    expect(mocks.createSegment).not.toHaveBeenCalled();
+  });
+
+  it('conserva la etiqueta comercial aunque el bloque todavía no tenga segmentId', () => {
+    const seeded = setup();
+    show({
+      ...seeded,
+      modules: [{ ...module, tasks: [{
+        id: 'task-converted', name: quotationTasks[0]!.name, teamId: 'team-ux',
+        segmentId: null, assigneeUserId: null, assigneeName: null,
+        status: 'todo', description:
+          'Referencia cotización version-1 · WBS WBS-UX · Diseñador UX',
+        estimatedHours: 120, date: null, startDate: null,
+      }] }],
+    } as unknown as ProjectDetail);
+    const row = screen.getByText('Diseño de interfaz PWA y Backoffice').closest('tr')!;
+    expect(within(row).getByTitle(/Bloque de origen de la cotización/))
+      .toHaveTextContent('Diseño Backend · UX-UI');
+    expect(within(row).getByText('Por asignar')).toBeInTheDocument();
+    expect(screen.queryByText('Pendiente de planificar')).not.toBeInTheDocument();
+  });
+
+  it('no atribuye un bloque a una referencia de EDT sin equipo de origen', () => {
+    setup();
+    mocks.appliedPlan.modules[0]!.tasks = [{
+      wbs: 'WBS-00', role: 'Diseñador UX', name: 'Tarea sin equipo', hours: 8,
+    }];
+    show();
+    const row = screen.getByText('Tarea sin equipo').closest('tr')!;
+    expect(within(row).getByText('Sin bloque de origen identificado')).toBeInTheDocument();
+    expect(within(row).getByText('Por asignar')).toBeInTheDocument();
+  });
+});
+
 describe('Acciones reales para referencias EDT antes de convertirlas', () => {
   const seed = () => {
     mocks.appliedPlan.modules = [{
