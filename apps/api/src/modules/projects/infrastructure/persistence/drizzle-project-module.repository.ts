@@ -165,7 +165,7 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
     if (projectIds.length === 0) return byProject;
     const db = resolveDb(this.database, context);
 
-    const [moduleRows, taskRows, deliveryRows] = await Promise.all([
+    const [moduleRows, taskRows, deliveryRows, segmentRows] = await Promise.all([
       db
         .select({
           id: projectModules.id,
@@ -178,6 +178,9 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
       db
         .select({
           moduleId: projectModuleTasks.moduleId,
+          segmentId: projectModuleTasks.segmentId,
+          teamId: projectModuleTasks.teamId,
+          description: projectModuleTasks.description,
           estimatedHours: projectModuleTasks.estimatedHours,
           status: projectModuleTasks.status,
           date: projectModuleTasks.date,
@@ -189,18 +192,32 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
       db
         .select({
           moduleId: projectModuleDeliveries.moduleId,
+          segmentId: projectModuleDeliveries.segmentId,
           status: projectModuleDeliveries.status,
           estimatedDate: projectModuleDeliveries.estimatedDate,
         })
         .from(projectModuleDeliveries)
         .innerJoin(projectModules, eq(projectModules.id, projectModuleDeliveries.moduleId))
         .where(inArray(projectModules.projectId, [...projectIds])),
+      db
+        .select({
+          moduleId: projectModuleSegments.moduleId,
+          id: projectModuleSegments.id,
+          teamId: projectModuleSegments.teamId,
+          estimatedHours: projectModuleSegments.estimatedHours,
+          startDate: projectModuleSegments.startDate,
+          endDate: projectModuleSegments.endDate,
+          closedAt: projectModuleSegments.closedAt,
+        })
+        .from(projectModuleSegments)
+        .innerJoin(projectModules, eq(projectModules.id, projectModuleSegments.moduleId))
+        .where(inArray(projectModules.projectId, [...projectIds])),
     ]);
 
     const deliveriesByModule = new Map<string, ProjectModuleProgressInputRecord['deliveries'][number][]>();
     for (const row of deliveryRows) {
       const list = deliveriesByModule.get(row.moduleId) ?? [];
-      list.push({ status: row.status, estimatedDate: row.estimatedDate });
+      list.push({ segmentId: row.segmentId, status: row.status, estimatedDate: row.estimatedDate });
       deliveriesByModule.set(row.moduleId, list);
     }
 
@@ -208,6 +225,9 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
     for (const row of taskRows) {
       const list = tasksByModule.get(row.moduleId) ?? [];
       list.push({
+        segmentId: row.segmentId,
+        teamId: row.teamId,
+        description: row.description,
         estimatedHours: row.estimatedHours != null ? Number(row.estimatedHours) : null,
         status: row.status,
         date: row.date,
@@ -216,11 +236,23 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
       tasksByModule.set(row.moduleId, list);
     }
 
+    const segmentsByModule = new Map<string, ProjectModuleProgressInputRecord['segments'][number][]>();
+    for (const row of segmentRows) {
+      const list = segmentsByModule.get(row.moduleId) ?? [];
+      list.push({
+        id: row.id, teamId: row.teamId,
+        estimatedHours: row.estimatedHours != null ? Number(row.estimatedHours) : null,
+        startDate: row.startDate, endDate: row.endDate, closedAt: row.closedAt,
+      });
+      segmentsByModule.set(row.moduleId, list);
+    }
+
     for (const row of moduleRows) {
       const list = byProject.get(row.projectId) ?? [];
       list.push({
         estimatedHours: row.estimatedHours != null ? Number(row.estimatedHours) : null,
         currentStage: row.currentStage,
+        segments: segmentsByModule.get(row.id) ?? [],
         tasks: tasksByModule.get(row.id) ?? [],
         deliveries: deliveriesByModule.get(row.id) ?? [],
       });
