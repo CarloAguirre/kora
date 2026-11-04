@@ -149,6 +149,52 @@ describe('Roadmap operativo · diseño aprobado v5.02', () => {
 });
 
 
+
+describe('Hitos verificables del bloque operativo', () => {
+  const build = (closedAt: string | null, endDate = '2026-11-20'): ProjectPhaseRoadmap => ({
+    ...phaseRoadmap,
+    phases: [{
+      ...phaseRoadmap.phases[0]!,
+      tasks: [{
+        id: 'segment-qa', role: 'qa', scope: 'qa',
+        label: 'Revisión QA', startDate: '2026-11-01', endDate, closedAt,
+      }],
+    }],
+  });
+
+  it('presenta el cierre planificado como diamante sobre la línea del bloque', () => {
+    render(<PhaseRoadmap phaseRoadmap={build(null)} operationalView
+      operationalMetrics={() => ({ hours: 80, progress: 50 })} />);
+    expect(screen.getByRole('button', { name: 'Cierre planificado Revisión QA' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Cierre real Revisión QA' })).not.toBeInTheDocument();
+  });
+
+  it('conserva planificación y cierre real cuando sus fechas son diferentes', () => {
+    render(<PhaseRoadmap phaseRoadmap={build('2026-11-10T18:00:00Z')} operationalView
+      operationalMetrics={() => ({ hours: 80, progress: 100 })} />);
+    expect(screen.getByRole('button', { name: 'Cierre planificado Revisión QA' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cierre real Revisión QA' })).toBeInTheDocument();
+  });
+
+  it('cuando cierra el mismo día no superpone dos diamantes', () => {
+    render(<PhaseRoadmap phaseRoadmap={build('2026-11-20T14:20:00Z')} operationalView />);
+    expect(screen.getByRole('button', { name: 'Cierre real Revisión QA' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Cierre planificado Revisión QA' })).not.toBeInTheDocument();
+  });
+
+  it('una fecha pasada sin cierre registrado se representa como vencida', () => {
+    const historical = build(null, '2000-11-20');
+    render(<PhaseRoadmap phaseRoadmap={{
+      ...historical, rangeStartDate: '2000-11-01', rangeEndDate: '2000-12-01',
+      phases: [{
+        ...historical.phases[0]!,
+        tasks: [{ ...historical.phases[0]!.tasks[0]!, startDate: '2000-11-01' }],
+      }],
+    }} operationalView />);
+    expect(screen.getByRole('button', { name: 'Cierre vencido Revisión QA' })).toBeInTheDocument();
+  });
+});
+
 describe('Controles históricos preservados en vista operativa', () => {
   it('permite abrir tareas y entregas fechadas sin mostrar el acordeón de etapa descartado', () => {
     const roadmap: ProjectPhaseRoadmap = {
