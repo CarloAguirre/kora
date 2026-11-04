@@ -372,6 +372,8 @@ export function DailyEntryBlockFields({
   ]);
   const availableSegments = (selectedModule?.segments ?? [])
     .filter((segment) => allowedTeamIds.has(segment.teamId));
+  const requiresPhase = (projectDetail?.modules ?? [])
+    .some((module) => module.segments.some((segment) => allowedTeamIds.has(segment.teamId)));
 
   return (
     <div className={styles.block}>
@@ -457,8 +459,9 @@ export function DailyEntryBlockFields({
           {needsProject && block.projectId && (projectDetail?.modules.length ?? 0) > 0 && (
             <div className={styles.row}>
               <Select
-                label="Módulo"
-                placeholder="Seleccionar módulo (opcional)"
+                label="Fase / Módulo"
+                required={requiresPhase}
+                placeholder={requiresPhase ? 'Seleccionar fase para imputar HH...' : 'Seleccionar fase (opcional)'}
                 options={(projectDetail?.modules ?? []).map((module) => ({ value: module.id, label: module.name }))}
                 value={block.moduleId}
                 onChange={(event) => onUpdate({ moduleId: event.target.value, segmentId: '' })}
