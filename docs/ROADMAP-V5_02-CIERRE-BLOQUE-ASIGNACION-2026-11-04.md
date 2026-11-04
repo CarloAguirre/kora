@@ -139,3 +139,71 @@ pnpm test
 ```
 
 Validación manual: abrir Planificar → «+ Agregar fase» → nombre «Cierre» → Crear fase → toast → modal «Nuevo bloque de trabajo» con fase N, equipo, nombre, inicio sugerido, HH y entrega. Cancelar el bloque debe conservar la fase creada. En otra fase, probar duplicar desde la fila de una tarea asignada y comprobar que nueva tarea pasa a `todo` sin duplicar aprobaciones.
+
+## Diagnóstico y reintento de migración 0051 (columna preexistente)
+
+Incidencia: un PostgreSQL ya contiene `project_module_deliveries.segment_id`,
+pero Drizzle sigue intentando ejecutar `0051_work_block_links_and_closure`
+porque no figura como migración aplicada. El primer `ADD COLUMN` sin guarda
+provocaba PostgreSQL `42701 duplicate_column`. La existencia de la columna
+no demuestra por sí sola que toda 0051 esté instalada.
+
+Corrección: `0051` ahora utiliza `ADD COLUMN IF NOT EXISTS` para
+`project_module_segments.closed_at`, `project_module_deliveries.segment_id`
+y `project_module_tasks.segment_id`. Comprueba las claves foráneas por columna
+y tabla de destino, y exige `ON DELETE SET NULL`. Crea índices con
+`IF NOT EXISTS` y ejecuta el backfill histórico **solo sobre relaciones nulas**,
+sin pisar vínculos ya registrados. Ante una FK incompatible o datos que
+impidan la restricción de unicidad, detiene la migración para revisión,
+sin borrar/alterar registros manualmente.
+
+`DATABASE_URL` no se importa implícitamente desde `apps/api/.env`:
+la base de destino debe seleccionarse explícitamente y respaldarse antes de
+migrar. Desde la raíz del repositorio en PowerShell:
+
+```powershell
+git fetch kora
+git switch feature/calculadora-roadmap-diseno-v5-02
+git pull --ff-only kora feature/calculadora-roadmap-diseno-v5-02
+
+$line = Get-Content .\apps\api\.env |
+  Where-Object { $_ -match '^\s*DATABASE_URL\s*=' } |
+  Select-Object -First 1
+if (-not $line) { throw "Falta DATABASE_URL en apps/api/.env" }
+$env:DATABASE_URL = ($line -split '=', 2)[1].Trim().Trim('"').Trim("'")
+try {
+  # Confirmar que apunta a la base LOCAL y que existe respaldo antes de ejecutar.
+  pnpm db:migrate
+  if ($LASTEXITCODE -ne 0) { throw "No se completaron las migraciones." }
+} finally {
+  Remove-Item Env:DATABASE_URL -ErrorAction SilentlyContinue
+}
+```
+
+Si vuelve a fallar, inspeccionar la base objetivo con consultas de **solo lectura**:
+
+```sql
+SELECT table_name, column_name, data_type
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND (
+    (table_name = 'project_module_segments' AND column_name = 'closed_at')
+    OR (table_name IN ('project_module_tasks', 'project_module_deliveries')
+        AND column_name = 'segment_id')
+  )
+ORDER BY table_name;
+
+SELECT c.conrelid::regclass AS tabla, c.conname,
+       pg_get_constraintdef(c.oid) AS definicion
+FROM pg_constraint c
+WHERE c.conrelid IN ('public.project_module_tasks'::regclass,
+                     'public.project_module_deliveries'::regclass)
+  AND c.contype = 'f'
+ORDER BY 1, 2;
+
+SELECT id, created_at FROM drizzle.__drizzle_migrations
+ORDER BY created_at DESC LIMIT 5;
+```
+
+No insertar registros en `drizzle.__drizzle_migrations`, no eliminar
+columnas ni ejecutar `drizzle-kit push` para sortear el incidente.
