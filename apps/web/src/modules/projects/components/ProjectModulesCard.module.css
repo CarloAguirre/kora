@@ -398,8 +398,20 @@
 @media (max-width: 580px) { .drawerFacts { grid-template-columns: 1fr; } }
 
 /* Cabecera de fase en modo Ver/Planificar, fiel al HTML v5; solo Roadmap interno. */
-.roadmapModeSwitch { display: inline-flex; align-items: center; gap: 3px; padding: 3px; border-radius: 8px; background: #eef1f6; white-space: nowrap; }
-.roadmapModeSwitch button { border-radius: 7px; padding: 6px 11px; min-height: 30px; font-size: 12px; }
+.roadmapModeSwitch {
+  display: inline-flex; align-items: center; gap: 3px; padding: 3px;
+  border-radius: 10px; background: #eef0f5; white-space: nowrap;
+}
+.roadmapModeSwitch button {
+  border: 1px solid transparent; border-radius: 8px;
+  padding: 6px 14px; min-height: 31px; font-size: 12px;
+  font-weight: 500; background: transparent; color: #475569; box-shadow: none;
+}
+.roadmapModeSwitch button[aria-pressed="true"] {
+  background: #fff; color: #0f1729; border-color: #dfe4ed;
+  box-shadow: 0 1px 3px rgba(15,23,41,.12); font-weight: 600;
+}
+.roadmapModeSwitch button:focus-visible { outline: 2px solid #61738a; outline-offset: 1px; }
 .headerPhaseName { font-size: 13px; font-weight: 650; color: #142039; overflow-wrap: anywhere; }
 .headerPhaseInput { width: min(260px, 100%); min-width: 130px; height: 32px; padding: 5px 9px; border: 1px solid #bfcbe0; border-radius: 7px; font-size: 13px; font-weight: 500; color: #142039; background: white; }
 .headerPhaseInput:focus { outline: 2px solid #bfd8ff; outline-offset: 1px; }
@@ -495,6 +507,8 @@
 .operationalTaskTable tr:last-child td { border-bottom: none; }
 .operationalTaskTable td:nth-child(5),
 .operationalTaskTable td:nth-child(6) { white-space: nowrap; }
+.operationalTaskTable th:last-child { width: 84px; }
+.operationalTaskTable td:last-child { text-align: right; white-space: nowrap; }
 .operationalTaskTitle {
   min-width: 190px;
   color: #0f2a44 !important;
@@ -540,3 +554,7 @@
   margin-right: 5px;
 }
 .unlinkedBlock { font-size: 11.5px; color: #7b8794; }
+
+.phaseCreationForm { display: grid; gap: 14px; }
+.phaseCreationDates { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 580px) { .phaseCreationDates { grid-template-columns: 1fr; } }
