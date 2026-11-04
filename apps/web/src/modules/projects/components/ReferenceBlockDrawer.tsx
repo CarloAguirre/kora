@@ -84,7 +84,7 @@ export function ReferenceBlockDrawer({
         <div className={styles.drawerTaskHeading}>
           <h4>Tareas ({pending.length + savedTasks.length})</h4>
           {onCreateReference && pending.length > 0 && <Button variant="outline" size="sm"
-            onClick={() => onCreateReference(pending[0]!)}>+ Agregar tarea</Button>}
+            onClick={() => onCreateReference(pending[0]!)}>Asignar tareas</Button>}
         </div>
         <ul className={styles.drawerTaskList}>
           {savedTasks.map((task) => <li className={styles.drawerTaskRow} key={task.id}>
@@ -104,7 +104,7 @@ export function ReferenceBlockDrawer({
               <small>Sin asignar · {task.hours} HH est. · Referencia EDT, sin fechas</small>
             </div>
             {onCreateReference && <Button size="sm" variant="ghost"
-              onClick={() => onCreateReference(task)}>Crear tarea</Button>}
+              onClick={() => onCreateReference(task)}>Asignar tarea</Button>}
           </li>)}
         </ul>
       </div>

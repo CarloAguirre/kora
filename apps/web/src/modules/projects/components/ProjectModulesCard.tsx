@@ -645,7 +645,8 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
             close();
           } : undefined}
           onCreateReference={canManage ? (task) => {
-            setCreatingFromReference({ moduleId: module.id, task });
+            setAssigningTasks({ moduleId: module.id, teamId: block.teamId,
+              focusKey: 'ref:' + task.wbs + ':' + task.role });
             close();
           } : undefined}
           onEditTask={canManage ? (task) => { setEditingTask({ moduleId: module.id, task }); close(); } : undefined}
