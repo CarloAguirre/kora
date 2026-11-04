@@ -35,6 +35,7 @@ export interface DeleteProjectModuleTaskCommand {
   readonly projectId: string;
   readonly moduleId: string;
   readonly taskId: string;
+  readonly forceCancel?: boolean;
   readonly actor: ActorContext;
   readonly actorPermissions: readonly Permission[];
 }
@@ -80,7 +81,7 @@ export class DeleteProjectModuleTaskUseCase
     // deliberadamente conservadora. Si existe actividad o estado aprobado,
     // la tarea se CANCELA lógicamente, sin borrar horas ni trazabilidad.
     if (task.cancelledAt) return ok(undefined);
-    const preserve = task.status === 'done' || task.status === 'in_review' ||
+    const preserve = command.forceCancel === true || task.status === 'done' || task.status === 'in_review' ||
       (task.assigneeUserId !== null &&
         await this.modules.hasTaskUserHours(project.id, command.moduleId, task.assigneeUserId));
 
