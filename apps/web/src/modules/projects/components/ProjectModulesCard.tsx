@@ -38,9 +38,7 @@ import { NewOperationalTaskModal } from './NewOperationalTaskModal';
 import { SegmentDrawer } from './SegmentDrawer';
 import { ReferenceBlockDrawer } from './ReferenceBlockDrawer';
 import { useAppliedQuotationPlanning } from '@/modules/estimation/api/quotation.queries';
-import { getLinkedBlockTasks, indexTeamBlockProgress, roadmapBlockMetrics, type TeamBlockProgress } from '../lib/team-progress';
-import { useHolidays } from '@/modules/hours/api/hours.queries';
-import { countBusinessDays } from '../lib/business-days';
+import { indexTeamBlockProgress, roadmapBlockMetrics } from '../lib/team-progress';
 import {
   EMPTY_EXECUTION_SEGMENT_MODAL_VALUES,
   ExecutionSegmentModal,
@@ -88,13 +86,6 @@ const deliveryDelayDays = (delivery: ProjectModuleDelivery) => {
   if (delivery.status !== 'planned') return 0;
   return Math.max(0, Math.round((today().getTime() - parseDate(delivery.estimatedDate).getTime()) / DAY_MS));
 };
-
-function segmentState(segment: ProjectModuleSegment): { label: string; tone: BadgeTone } {
-  if (segment.closedAt) return { label: 'Cerrado', tone: 'success' };
-  if (parseDate(segment.endDate) < today()) return { label: 'Vencido', tone: 'warning' };
-  if (parseDate(segment.startDate) <= today()) return { label: 'En curso', tone: 'info' };
-  return { label: 'Próximo', tone: 'neutral' };
-}
 
 interface ProjectModulesCardProps {
   project: ProjectDetail;
