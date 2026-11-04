@@ -37,6 +37,7 @@ import { AssignBlockTasksModal } from './AssignBlockTasksModal';
 import { NewOperationalTaskModal } from './NewOperationalTaskModal';
 import { ReferenceBlockDrawer } from './ReferenceBlockDrawer';
 import { useAppliedQuotationPlanning } from '@/modules/estimation/api/quotation.queries';
+import { getLinkedBlockTasks, indexTeamBlockProgress, roadmapBlockMetrics, type TeamBlockProgress } from '../lib/team-progress';
 import {
   EMPTY_EXECUTION_SEGMENT_MODAL_VALUES,
   ExecutionSegmentModal,
@@ -127,6 +128,7 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
   const excludeRoadmapReference = useExcludeRoadmapReference();
   const phaseRoadmap = useMemo(() => toPhaseRoadmap(project), [project]);
   const modulesById = useMemo(() => new Map(project.modules.map((module) => [module.id, module])), [project.modules]);
+  const blockProgressById = useMemo(() => indexTeamBlockProgress(project), [project]);
 
   /** Tiempo de ejecución que se está editando (`null` = modal cerrado). */
   const [editingSegment, setEditingSegment] = useState<{ moduleId: string; segment: ProjectModuleSegment } | null>(null);
@@ -522,29 +524,10 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
     return total;
   }, { tasks: 0, blocks: 0 });
 
+  /** Roadmap y Avance del equipo presentan el mismo avance operativo por bloque. */
   const getOperationalMetrics = (phase: { id: string }, row: { id?: string }) => {
-    const module = modulesById.get(phase.id);
-    const segment = module?.segments.find((item) => item.id === row.id);
-    if (!module || !segment) return { hours: null, progress: null };
-    const directTasks = module.tasks.filter((task) =>
-      task.segmentId === segment.id ||
-      (!task.segmentId && task.description?.includes(' · ID ' + segment.id)));
-    // Sin FK tarea-bloque solo atribuimos tareas de equipo si tiene un único bloque.
-    // El mismo equipo puede trabajar en otros bloques: solo asociar por FK o marcador ID exacto.
-    const tasks = directTasks;
-    const taskHours = tasks.reduce((sum, task) => sum + (task.estimatedHours ?? 0), 0);
-    const ref = appliedPlanning.data?.modules.find((item) => item.moduleId === phase.id)
-      ?.relativeTeamBlocks?.find((item) => item.teamId === segment.teamId);
-    const hours = segment.estimatedHours ?? (taskHours > 0 ? taskHours :
-      module.segments.filter((item) => item.teamId === segment.teamId).length === 1
-        ? ref?.hours ?? null : null);
-    const doneHours = tasks.filter((task) => task.status === 'done')
-      .reduce((sum, task) => sum + (task.estimatedHours ?? 0), 0);
-    const progress = tasks.length
-      ? Math.round(100 * (taskHours > 0 ? doneHours / taskHours
-        : tasks.filter((task) => task.status === 'done').length / tasks.length))
-      : null;
-    return { hours, progress };
+    const segment = modulesById.get(phase.id)?.segments.find((item) => item.id === row.id);
+    return roadmapBlockMetrics(segment ? blockProgressById.get(segment.id) : undefined);
   };
 
   const renderOperationalContent = (phase: { id: string }) => {
@@ -716,6 +699,7 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
           module={module}
           segment={segment}
           reference={appliedPlanning.data?.modules.find((entry) => entry.moduleId === module.id)}
+          blockProgress={blockProgressById.get(segment.id)}
           onClose={close}
           onEdit={canManage ? () => {
             setEditingSegment({ moduleId: module.id, segment });
@@ -914,11 +898,10 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
   );
 }
 
-/** El Gantt de Kora mantiene su selección y sus fechas; la vista interna
- * presenta los bloques existentes en el lateral como el prototipo v5.
- * No infiere consumo por bloque: los registros horarios solo indican módulo. */
+/** El Gantt mantiene su selección y fechas. El consumo del drawer proviene
+ * únicamente de HH aprobadas atribuidas al bloque mediante segment_id. */
 function SegmentDrawer({
-  project, module, segment, reference, onClose, onEdit, onDelete,
+  project, module, segment, reference, blockProgress, onClose, onEdit, onDelete,
   onEditMembers, onChangeClosure, onAssignTasks,
   onEditTask, onDuplicateTask,
 }: {
@@ -926,6 +909,7 @@ function SegmentDrawer({
   module: ProjectModule;
   segment: ProjectModuleSegment;
   reference?: AppliedQuotationPlanning['modules'][number];
+  blockProgress?: TeamBlockProgress;
   onClose: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
@@ -939,20 +923,10 @@ function SegmentDrawer({
   const updateDelivery = useUpdateProjectModuleDelivery();
   const [comment, setComment] = useState('');
   const team = project.teams.find((item) => item.teamId === segment.teamId);
-  const projected = reference?.relativeTeamBlocks?.filter(
-    (block) => block.teamId === segment.teamId,
-  ) ?? [];
-  const hours = segment.estimatedHours ?? (projected.length === 1 ? projected[0]!.hours : null);
-  // Vínculo real. La migración 0051 solo asocia entregas antiguas inequívocas.
+  const { hours, progress } = roadmapBlockMetrics(blockProgress);
   const delivery = module.deliveries.find((item) => item.segmentId === segment.id) ?? null;
-  const teamTasks = module.tasks.filter((task) => task.teamId === segment.teamId &&
-    (task.segmentId === segment.id ||
-      (!task.segmentId && task.description?.includes(' · ID ' + segment.id))));
-  const taskHours = teamTasks.reduce((sum, task) => sum + (task.estimatedHours ?? 0), 0);
+  const teamTasks = getLinkedBlockTasks(module, segment);
   const approvedTasks = teamTasks.filter((task) => task.status === 'done');
-  const approvedHours = approvedTasks.reduce((sum, task) => sum + (task.estimatedHours ?? 0), 0);
-  const progress = teamTasks.length
-    ? Math.round(100 * (taskHours ? approvedHours / taskHours : approvedTasks.length / teamTasks.length)) : 0;
   const deliver = async () => {
     if (!delivery || delivery.status !== 'planned' || !comment.trim()) return;
     try {
@@ -996,22 +970,22 @@ function SegmentDrawer({
           <div className={styles.drawerFacts}>
             <span>Fechas <b>{formatDate(segment.startDate)} – {formatDate(segment.endDate)}</b></span>
             <span>HH estimadas <b>{hours ?? '—'}</b></span>
-            <span>HH consumidas del bloque <b>Sin desglose por bloque</b></span>
+            <span>HH consumidas del bloque <b>{(segment.consumedHours ?? 0).toLocaleString('es-CL', { maximumFractionDigits: 1 })} HH</b></span>
           </div>
           <p className={styles.drawerHint}>
-            Las HH reales se registran en Kora por módulo. No se atribuyen
-            automáticamente a un bloque sin una relación verificable.
+            Solo se muestran HH aprobadas vinculadas expresamente al bloque.
+            El histórico sin bloque permanece en el consumo general del equipo.
           </p>
         </div>
         <div className={styles.drawerSection}>
           <h4>Avance</h4>
           <div className={styles.drawerProgressBar} role="progressbar"
             aria-label="Tareas aprobadas del bloque" aria-valuemin={0} aria-valuemax={100}
-            aria-valuenow={progress}>
-            <span style={{ width: progress + '%' }} />
+            aria-valuenow={progress ?? undefined}>
+            <span style={{ width: (progress ?? 0) + '%' }} />
           </div>
           <p className={styles.drawerHint}>
-            {progress}% real · {approvedTasks.length} de {teamTasks.length} tareas aprobadas.
+            {progress === null ? 'Sin HH operativas planificadas' : progress + '% real'} · {approvedTasks.length} de {teamTasks.length} tareas aprobadas.
             {segment.closedAt ? ' Cerrado el ' + formatDate(segment.closedAt.slice(0, 10)) + '.'
               : ' Cierre planificado: ' + formatDate(segment.endDate) + '.'}
           </p>
