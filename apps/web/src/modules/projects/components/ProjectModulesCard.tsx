@@ -497,8 +497,9 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
     const taskHours = tasks.reduce((sum, task) => sum + (task.estimatedHours ?? 0), 0);
     const ref = appliedPlanning.data?.modules.find((item) => item.moduleId === phase.id)
       ?.relativeTeamBlocks?.find((item) => item.teamId === segment.teamId);
-    const hours = taskHours > 0 ? taskHours
-      : segment.estimatedHours ?? (teamSegments.length === 1 ? ref?.hours ?? null : null);
+    const hours = segment.estimatedHours ?? (taskHours > 0 ? taskHours :
+      module.segments.filter((item) => item.teamId === segment.teamId).length === 1
+        ? ref?.hours ?? null : null);
     const doneHours = tasks.filter((task) => task.status === 'done')
       .reduce((sum, task) => sum + (task.estimatedHours ?? 0), 0);
     const progress = tasks.length
