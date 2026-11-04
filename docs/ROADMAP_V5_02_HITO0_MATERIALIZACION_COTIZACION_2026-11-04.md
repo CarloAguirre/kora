@@ -102,3 +102,43 @@ pnpm --filter @kora/web exec vitest run src/modules/projects/components/ProjectM
 Para comprobar la persistencia real, reiniciar la API local (no basta
 con refrescar la web), abrir el detalle del proyecto y verificar que
 `project_module_segments` tenga fechas y HH por bloque.
+
+## Ajuste posterior: sin recargar y limpieza visual (04-11-2026)
+
+Tras confirmar en la UI que recargar el navegador mostraba correctamente los
+bloques creados al activar un proyecto, se resolvió la sincronización de React
+Query: `useInvalidateProjects` ahora devuelve la promesa de
+`queryClient.invalidateQueries({ queryKey: projectKeys.all })`, y
+`useChangeProjectStatus` espera esa promesa en `onSuccess`.
+En `EditProjectDialog`, el guardado de datos (incluyendo fecha inicial) y
+el cambio de estado son operaciones secuenciales. El segundo `mutateAsync`
+ahora termina cuando la consulta activa del proyecto ya se actualizó con
+los módulos que devolvió `GetProjectUseCase`. No se agrega polling ni se
+utiliza recarga forzada.
+
+La sección interna `Entregas y tareas en el cronograma · N entregas,
+M tareas` fue retirada de `OperationalPhaseCard` en `PhaseRoadmap.tsx`.
+No se quitó la información de tareas, ni los diamantes de cierre sobre
+las barras; el portal cliente sigue utilizando su Roadmap independiente.
+
+Los avisos morados del Roadmap que describen pendientes de asignación
+ocultan `Asignar tareas` mientras ese equipo no tenga miembros con
+`userStatus === 'active'` y `blockedAt` vacío. Cuando haya un miembro
+elegible, aparece el botón habitual.
+
+Pruebas de regresión añadidas/actualizadas:
+- `apps/web/src/modules/projects/api/projects.queries.test.tsx`:
+  secuencia fecha + activación y actualización del mismo observador activo
+  sin desmontarlo o recargar la página.
+- `apps/web/src/modules/client-portal/components/PhaseRoadmap.header-actions.test.tsx`:
+  ausencia del subcronograma operativo, conservación del resto.
+- `apps/web/src/modules/projects/components/ProjectModulesCard.phase-controls.test.tsx`:
+  botón ausente sin dotación o con colaborador bloqueado y presente al
+  existir colaborador activo.
+
+Validación local pendiente:
+```powershell
+pnpm --filter @kora/web typecheck
+pnpm --filter @kora/web exec vitest run src/modules/projects/api/projects.queries.test.tsx src/modules/client-portal/components/PhaseRoadmap.header-actions.test.tsx src/modules/projects/components/ProjectModulesCard.phase-controls.test.tsx
+```
+No hay cambios de esquema ni migraciones; no se alteró PostgreSQL.
