@@ -347,24 +347,6 @@ export function PhaseRoadmap({
         ))}
       </div>
       {operationalView && operationalFooter && <div className={styles.operationalFooter}>{operationalFooter}</div>}
-      {operationalView && (
-        <details className={styles.operationalDateOptions}>
-          <summary>Opciones de cronograma · rango de fechas</summary>
-          <div className={styles.filterRow}>
-            <TextField className={styles.rangeDateField} type="date" value={rangeDraft.from}
-              onChange={(event) => setRangeDraft((current) => ({ ...current, from: event.target.value }))} />
-            <span>–</span>
-            <TextField className={styles.rangeDateField} type="date" value={rangeDraft.to}
-              onChange={(event) => setRangeDraft((current) => ({ ...current, to: event.target.value }))} />
-            <Button size="sm" variant="ghost" disabled={!rangeDraftIsValid}
-              onClick={() => setAppliedRange(rangeDraft)}>Aplicar</Button>
-            <Button size="sm" variant="ghost" disabled={!rangeIsCustom} onClick={onResetRange}>
-              Restablecer
-            </Button>
-          </div>
-        </details>
-      )}
-
     </div>
   );
 }
