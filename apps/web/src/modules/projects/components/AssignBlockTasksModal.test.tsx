@@ -36,7 +36,13 @@ describe('Asignación masiva de EDT y tareas operativas', () => {
     const onClose = vi.fn();
     render(<AssignBlockTasksModal project={project} module={module}
       teamId="team-qa" referenceTasks={[reference]} versionId="version-1" onClose={onClose} />);
-    expect(screen.getByRole('dialog', { name: 'Asignar tareas · Aseguramiento QA' })).toBeInTheDocument();
+    const dialog = screen.getByRole('dialog', { name: 'Asignar tareas · Aseguramiento QA' });
+    expect(dialog).toBeInTheDocument();
+    expect(dialog.className).toContain('wide');
+    expect(screen.getByRole('columnheader', { name: 'Fecha de inicio' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Fecha límite' })).toBeInTheDocument();
+    // Cuando hay un solo bloque, no ocupa espacio adicional con un selector redundante.
+    expect(screen.queryByRole('combobox', { name: 'Bloque de trabajo' })).not.toBeInTheDocument();
     expect(screen.getByText('Casos de prueba')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Aplicar' }));
     expect(screen.getByRole('combobox', { name: 'Asignado a Casos de prueba' }))
