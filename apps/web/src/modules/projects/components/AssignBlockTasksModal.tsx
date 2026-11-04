@@ -65,6 +65,7 @@ export function AssignBlockTasksModal({
   const eligible = selected.length > 0 && selected.every((row) => {
     const linked = module.segments.find((item) => item.id === (blockId || row.segmentId));
     return row.hours > 0 && row.startDate && row.date && row.startDate <= row.date &&
+      (row.kind !== 'reference' || Boolean(blockId || row.segmentId)) &&
       (!linked || (linked.teamId === teamId &&
         row.startDate >= linked.startDate && row.date <= linked.endDate));
   });
@@ -157,6 +158,10 @@ export function AssignBlockTasksModal({
           Aplicar
         </Button>
       </div>
+      {referenceTasks.length > 0 && blocks.length === 0 && <p role="alert" className={styles.warning}>
+        Primero planifica un bloque de trabajo para este equipo. Las tareas de la EDT
+        deben tener un bloque y fechas reales antes de ser asignadas.
+      </p>}
       {members.length === 0 && <p role="alert" className={styles.warning}>
         Este equipo aún no tiene colaboradores activos asignados al proyecto.
       </p>}
