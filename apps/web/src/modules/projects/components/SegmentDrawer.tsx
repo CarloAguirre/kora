@@ -118,7 +118,7 @@ export function SegmentDrawer({
     }
   };
 
-  return <Modal open side className={styles.drawer} title={segment.name}
+  return <Modal open side compactSide className={styles.drawer} title={segment.name}
     eyebrow={'Fase ' + (project.modules.findIndex((item) => item.id === module.id) + 1) +
       ': ' + module.name}
     onClose={onClose}
