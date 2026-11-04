@@ -24,8 +24,8 @@ const hours = (overrides: Partial<TicketDailyHours> = {}): TicketDailyHours => (
 describe('exportación del historial de tickets', () => {
   it('usa fechas reales de Excel y la misma fecha de reporte chilena en ambas hojas', () => {
     const workbook = buildTicketHistoryWorkbook([ticket()], [hours()]);
-    const detail = workbook.Sheets['Detalle por día'];
-    const summary = workbook.Sheets['Resumen por ticket'];
+    const detail = workbook.Sheets['Detalle por día']!;
+    const summary = workbook.Sheets['Resumen por ticket']!;
 
     // 01:30 UTC del 4/11 todavía es 3/11 en Chile (horario de verano).
     expect(ticketReportDay('2026-11-04T01:30:00.000Z')).toBe('2026-11-03');
@@ -44,8 +44,8 @@ describe('exportación del historial de tickets', () => {
 
   it('explicita las HH sin detalle sin inventar fechas ni responsables', () => {
     const workbook = buildTicketHistoryWorkbook([ticket()], [hours()]);
-    const detail = workbook.Sheets['Detalle por día'];
-    const summary = workbook.Sheets['Resumen por ticket'];
+    const detail = workbook.Sheets['Detalle por día']!;
+    const summary = workbook.Sheets['Resumen por ticket']!;
 
     expect(detail['M2']?.v).toBe(8);
     expect(detail['N2']?.v).toBe('Solicitud aprobada');
@@ -61,8 +61,8 @@ describe('exportación del historial de tickets', () => {
 
   it('no oculta inconsistencias cuando el detalle excede el total del ticket', () => {
     const workbook = buildTicketHistoryWorkbook([ticket({ usedHours: 5 })], [hours()]);
-    const detail = workbook.Sheets['Detalle por día'];
-    const summary = workbook.Sheets['Resumen por ticket'];
+    const detail = workbook.Sheets['Detalle por día']!;
+    const summary = workbook.Sheets['Resumen por ticket']!;
     expect(detail['!ref']).toBe('A1:O2'); // no se crea saldo artificial negativo
     expect(summary['O2']?.v).toBe(8);
     expect(summary['P2']?.v).toBe(0);
@@ -79,8 +79,8 @@ describe('exportación del historial de tickets', () => {
       hours({ hours: 4 }),
       hours({ date: '2026-11-03', hours: 8 }),
     ]);
-    const summary = workbook.Sheets['Resumen por ticket'];
-    const detail = workbook.Sheets['Detalle por día'];
+    const summary = workbook.Sheets['Resumen por ticket']!;
+    const detail = workbook.Sheets['Detalle por día']!;
     expect(summary['N2']?.v).toBe(12);
     expect(summary['O2']?.v).toBe(12);
     expect(summary['P2']?.v).toBe(0);
