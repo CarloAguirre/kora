@@ -285,7 +285,7 @@ describe('Fidelidad del Roadmap v5.02 · acciones y estructura', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Editar tarea Diseñar interfaz' }));
     fireEvent.click(screen.getByRole('button', { name: 'Duplicar para otra persona' }));
     expect(screen.getByRole('dialog', { name: 'Duplicar para otra persona' })).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('Asignado a'), { target: { value: 'team-1:user-2' } });
+    fireEvent.change(screen.getByRole('combobox', { name: /Asignado a/ }), { target: { value: 'team-1:user-2' } });
     fireEvent.click(screen.getByRole('button', { name: 'Duplicar tarea' }));
     await waitFor(() => expect(mocks.createTask).toHaveBeenCalledWith({
       projectId: 'project-1', moduleId: 'module-1',
