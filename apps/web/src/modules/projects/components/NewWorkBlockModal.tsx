@@ -1,12 +1,24 @@
 import { useState } from 'react';
-import type { CreateProjectModuleSegmentInput, ProjectDetail, ProjectModule } from '@kora/contracts';
+import type { ProjectDetail, ProjectModule, ProjectModuleSegment, ProjectModuleDelivery } from '@kora/contracts';
 import { Modal } from '@/shared/components/ui/Modal';
 import { Button } from '@/shared/components/ui/Button';
 import { TextField } from '@/shared/components/ui/TextField';
 import { Select } from '@/shared/components/ui/Select';
 import styles from './NewWorkBlockModal.module.css';
 
+export interface WorkBlockFormInput {
+  teamId: string;
+  name: string;
+  startDate: string;
+  endDate: string;
+  estimatedHours: number;
+  closingDelivery: { name: string; description?: string } | null;
+}
+
 export interface NewWorkBlockModalProps {
+  mode?: 'create' | 'edit';
+  initialSegment?: ProjectModuleSegment;
+  initialDelivery?: ProjectModuleDelivery | null;
   project: ProjectDetail;
   module: ProjectModule;
   teamOptions: ReadonlyArray<{ value: string; label: string }>;
@@ -15,27 +27,28 @@ export interface NewWorkBlockModalProps {
   initialEstimatedHours?: number | null;
   submitting: boolean;
   onCancel: () => void;
-  onConfirm: (input: CreateProjectModuleSegmentInput) => void;
+  onConfirm: (input: WorkBlockFormInput) => void;
 }
 
 /** El formulario crea el bloque y, si se solicita, su entrega en una sola transacción.
  * Las HH pertenecen al bloque, no se imputan al avance ni al consumo real de la fase. */
 export function NewWorkBlockModal({
   project, module, teamOptions, initialTeamId, initialName = '', initialEstimatedHours,
-  submitting, onCancel, onConfirm,
+  initialSegment, initialDelivery, mode = 'create', submitting, onCancel, onConfirm,
 }: NewWorkBlockModalProps) {
-  const [teamId, setTeamId] = useState(initialTeamId || teamOptions[0]?.value || '');
-  const [name, setName] = useState(initialName);
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [hours, setHours] = useState(initialEstimatedHours == null ? '' : String(initialEstimatedHours));
-  const [withoutDelivery, setWithoutDelivery] = useState(false);
-  const [deliveryName, setDeliveryName] = useState('');
-  const [deliveryDescription, setDeliveryDescription] = useState('');
+  const [teamId, setTeamId] = useState(initialSegment?.teamId || initialTeamId || teamOptions[0]?.value || '');
+  const [name, setName] = useState(initialSegment?.name ?? initialName);
+  const [startDate, setStartDate] = useState(initialSegment?.startDate ?? '');
+  const [endDate, setEndDate] = useState(initialSegment?.endDate ?? '');
+  const [hours, setHours] = useState(initialSegment?.estimatedHours != null
+    ? String(initialSegment.estimatedHours) : initialEstimatedHours == null ? '' : String(initialEstimatedHours));
+  const [withoutDelivery, setWithoutDelivery] = useState(mode === 'edit' && !initialDelivery);
+  const [deliveryName, setDeliveryName] = useState(initialDelivery?.name ?? '');
+  const [deliveryDescription, setDeliveryDescription] = useState(initialDelivery?.description ?? '');
 
   const team = project.teams.find((entry) => entry.teamId === teamId);
   const priorBlocks = project.modules.flatMap((entry) => entry.segments)
-    .filter((segment) => segment.teamId === teamId);
+    .filter((segment) => segment.teamId === teamId && segment.id !== initialSegment?.id);
   const alreadyAllocated = priorBlocks.reduce((sum, segment) => sum + (segment.estimatedHours ?? 0), 0);
   const missingEstimates = priorBlocks.some((segment) => segment.estimatedHours === null);
   const budget = team?.assignedHours ?? null;
@@ -55,21 +68,22 @@ export function NewWorkBlockModal({
       startDate,
       endDate,
       estimatedHours: numericHours,
-      members: [],
-      ...(!withoutDelivery ? { closingDelivery: {
+      closingDelivery: withoutDelivery ? null : {
         name: deliveryName.trim(),
         ...(deliveryDescription.trim() ? { description: deliveryDescription.trim() } : {}),
-      } } : {}),
+      },
     });
   };
 
-  return <Modal open title="Nuevo bloque de trabajo"
+  return <Modal open title={mode === 'edit' ? 'Editar bloque de trabajo' : 'Nuevo bloque de trabajo'}
     description={'Fase: ' + module.name +
       '. Un bloque es el periodo en que un equipo trabaja en esta fase, y cierra con una entrega.'}
     onClose={onCancel} dismissible={!submitting}
     footer={<div className={styles.footer}>
       <Button variant="outline" disabled={submitting} onClick={onCancel}>Cancelar</Button>
-      <Button disabled={!valid} loading={submitting} onClick={submit}>Crear bloque de trabajo</Button>
+      <Button disabled={!valid} loading={submitting} onClick={submit}>
+        {mode === 'edit' ? 'Guardar cambios' : 'Crear bloque de trabajo'}
+      </Button>
     </div>}>
     <div className={styles.form}>
       <Select label="Equipo" required value={teamId}
