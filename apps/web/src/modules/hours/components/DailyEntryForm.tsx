@@ -40,6 +40,9 @@ export interface DailyBlock {
   projectId: string;
   moduleId: string;
   segmentId?: string;
+  /** Solo estado visual: lo informa el detalle del proyecto para validar antes de enviar. */
+  roadmapNeedsPhase?: boolean;
+  roadmapNeedsSegment?: boolean;
   category: string;
   hours: string;
   description: string;
@@ -92,6 +95,10 @@ export function validateDailyBlock(
   if (hours > 24) return 'No puede registrar más de 24 horas en un día.';
   const needsProject = PROJECT_REQUIRING_ASSIGNMENTS.has(block.assignment);
   if (needsProject && !block.projectId) return 'Selecciona un proyecto para esta asignación.';
+  if (block.assignment === 'Proyecto' && block.roadmapNeedsPhase && !block.moduleId)
+    return 'Selecciona una fase y su bloque de trabajo para imputar estas horas.';
+  if (block.assignment === 'Proyecto' && block.roadmapNeedsSegment && !block.segmentId)
+    return 'Selecciona el bloque al que corresponden estas HH.';
   if (needsProject && block.isOvertime && !overtimeAlreadyGranted) {
     const project = projects.find((p) => p.id === block.projectId);
     if (!project?.allowsOvertime) return 'Este proyecto no tiene autorizadas horas extra.';
@@ -374,6 +381,17 @@ export function DailyEntryBlockFields({
     .filter((segment) => allowedTeamIds.has(segment.teamId));
   const requiresPhase = (projectDetail?.modules ?? [])
     .some((module) => module.segments.some((segment) => allowedTeamIds.has(segment.teamId)));
+
+  // La obligatoriedad depende de los equipos REALES del autor en este proyecto.
+  // La capa de API conserva la misma regla y vuelve a comprobarla al guardar.
+  useEffect(() => {
+    const roadmapNeedsPhase = Boolean(needsProject && block.projectId && requiresPhase);
+    const roadmapNeedsSegment = Boolean(needsProject && block.moduleId && availableSegments.length > 0);
+    if (block.roadmapNeedsPhase !== roadmapNeedsPhase || block.roadmapNeedsSegment !== roadmapNeedsSegment) {
+      onUpdate({ roadmapNeedsPhase, roadmapNeedsSegment });
+    }
+  }, [needsProject, block.projectId, block.moduleId, block.roadmapNeedsPhase,
+    block.roadmapNeedsSegment, requiresPhase, availableSegments.length, onUpdate]);
 
   return (
     <div className={styles.block}>
