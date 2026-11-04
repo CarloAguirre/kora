@@ -121,7 +121,8 @@ describe('Avance del proyecto — mismo desglose que el equipo', () => {
     expect(screen.getByText('Qué explica la diferencia')).toBeInTheDocument();
     expect(screen.getByText('−0,43 pts')).toBeInTheDocument();
     expect(screen.getByText('−0,14 pts')).toBeInTheDocument();
-    expect(screen.getByText(/3 HH/)).toBeInTheDocument();
+    expect(screen.getByText(/El plan operativo contempla 3 HH adicionales/))
+      .toBeInTheDocument();
     expect(screen.getByText(/La diferencia no cambia el contrato/)).toBeInTheDocument();
     expect(screen.queryByText(/Las HH de bloques no coinciden con la estimación comercial/))
       .not.toBeInTheDocument();
