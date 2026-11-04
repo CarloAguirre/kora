@@ -440,7 +440,7 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
     return total;
   }, { tasks: 0, blocks: 0 });
 
-  const getOperationalMetrics = (phase: { id: string }, row: { id: string }) => {
+  const getOperationalMetrics = (phase: { id: string }, row: { id?: string }) => {
     const module = modulesById.get(phase.id);
     const segment = module?.segments.find((item) => item.id === row.id);
     if (!module || !segment) return { hours: null, progress: null };
