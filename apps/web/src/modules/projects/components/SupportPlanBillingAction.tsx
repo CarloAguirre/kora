@@ -3,11 +3,10 @@ import { SUPPORT_PLAN_ALERT_LABELS, type MarkSupportInvoiceIssuedInput, type Sup
 import styles from './SupportPlanBillingAction.module.css';
 import { Card } from '@/shared/components/ui/Card';
 import { Button } from '@/shared/components/ui/Button';
-import { TextField } from '@/shared/components/ui/TextField';
-import { FileField } from '@/shared/components/ui/FileField';
 import { AlertIcon, CheckIcon, TriangleAlertIcon } from '@/shared/components/icons/Icons';
 import { ApiRequestError } from '@/shared/lib/api-client';
 import { formatMoney } from '@/shared/lib/format-money';
+import { SupportInvoiceSplitFields, useSupportInvoiceSplit } from './SupportInvoiceSplitFields';
 
 const formatDate = (value: string | null) => (value ? new Date(`${value}T00:00:00`).toLocaleDateString('es-CL') : '—');
 const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 2 });
@@ -22,7 +21,7 @@ function alertDescription(alert: SupportPlanAlert): string {
         ? `El cupo de horas acumuladas vence en ${alert.daysUntilExpiry} día${alert.daysUntilExpiry === 1 ? '' : 's'} si no se usa.`
         : 'El cupo de horas acumuladas está por vencer.';
     case 'last_period_overage':
-      return 'Es el último período del contrato — el excedente de horas se cobra como hora extra en vez de pasar al próximo período.';
+      return 'Este mes se superaron las HH incluidas — el excedente se cobra como hora extra en la factura del mes.';
   }
 }
 
@@ -44,9 +43,7 @@ export interface SupportPlanBillingActionProps {
  */
 export function SupportPlanBillingAction({ plan, canManageBilling, onIssue }: SupportPlanBillingActionProps) {
   const [formOpen, setFormOpen] = useState(false);
-  const [folio, setFolio] = useState('');
-  const [invoicedAt, setInvoicedAt] = useState('');
-  const [attachmentName, setAttachmentName] = useState<string | null>(null);
+  const split = useSupportInvoiceSplit(plan.currentAmountUf);
   const [error, setError] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
 
@@ -56,22 +53,21 @@ export function SupportPlanBillingAction({ plan, canManageBilling, onIssue }: Su
   const deviatedHours = hasDeviatedAlert ? Math.max(0, plan.usedHours - plan.contractedHours) : null;
 
   const openForm = () => {
-    setFolio('');
-    setInvoicedAt(new Date().toISOString().slice(0, 10));
-    setAttachmentName(null);
+    split.reset();
     setError(null);
     setFormOpen(true);
   };
 
   const submit = async () => {
-    if (!folio.trim() || !invoicedAt) {
-      setError('Ingresa el folio y la fecha de emisión.');
+    const problem = split.validate();
+    if (problem) {
+      setError(problem);
       return;
     }
     setError(null);
     setRunning(true);
     try {
-      await onIssue({ folio: folio.trim(), invoicedAt, attachmentName: attachmentName ?? undefined });
+      await onIssue({ invoices: split.toInput() });
       setFormOpen(false);
     } catch (caught) {
       setError(caught instanceof ApiRequestError ? caught.message : 'No se pudo registrar la factura. Inténtalo de nuevo.');
@@ -82,7 +78,8 @@ export function SupportPlanBillingAction({ plan, canManageBilling, onIssue }: Su
 
   if (!isToInvoice) {
     if (hasAlerts) {
-      const lastInvoice = [...plan.invoices].sort((a, b) => b.periodKey.localeCompare(a.periodKey))[0];
+      const lastPeriodKey = plan.invoices.reduce<string | null>((latest, i) => (latest === null || i.periodKey > latest ? i.periodKey : latest), null);
+      const lastInvoices = plan.invoices.filter((i) => i.periodKey === lastPeriodKey).sort((a, b) => a.position - b.position);
       return (
         <Card className={styles.resolvedCard}>
           <CheckIcon size={17} className={styles.resolvedIcon} />
@@ -93,19 +90,28 @@ export function SupportPlanBillingAction({ plan, canManageBilling, onIssue }: Su
                 <p className={styles.alertText}>{alertDescription(alert)}</p>
               </div>
             ))}
-            {lastInvoice && (
+            {lastInvoices.length === 1 && (
               <p className={styles.resolvedNote}>
-                Registrada — Folio {lastInvoice.folio}, emitida el {formatDate(lastInvoice.invoicedAt)}
+                Registrada — Folio {lastInvoices[0]!.folio}, emitida el {formatDate(lastInvoices[0]!.invoicedAt)}
+              </p>
+            )}
+            {lastInvoices.length > 1 && (
+              <p className={styles.resolvedNote}>
+                Registrada en {lastInvoices.length} facturas — Folios {lastInvoices.map((i) => i.folio).join(', ')}
               </p>
             )}
           </div>
         </Card>
       );
     }
+    const nextPeriod = plan.billingPeriods.find((period) => period.status === 'upcoming');
     return (
       <Card>
         {plan.currentBillingStatus === 'invoiced' && (
-          <p className={styles.hint}>Ya se registró la factura de este período — para marcarla como pagada, usa el historial de arriba.</p>
+          <p className={styles.hint}>
+            Ya se registró la factura de este período — para marcarla como pagada (o cada una, si se dividió en varias), usa el historial de arriba.
+            {nextPeriod && ` La del mes siguiente se registra desde el ${formatDate(nextPeriod.startDate)}, en "Meses del contrato".`}
+          </p>
         )}
         {plan.currentBillingStatus === null && <p className={styles.hint}>No hay nada por facturar en el período en curso.</p>}
       </Card>
@@ -131,10 +137,8 @@ export function SupportPlanBillingAction({ plan, canManageBilling, onIssue }: Su
         {canManageBilling && !formOpen && <Button onClick={openForm}>Marcar como facturado</Button>}
 
         {formOpen && (
-          <div className={styles.inlineForm}>
-            <TextField label="N° de documento (folio)" placeholder="Ej: 27846" value={folio} onChange={(e) => setFolio(e.target.value)} autoFocus />
-            <TextField label="Fecha de emisión" type="date" value={invoicedAt} onChange={(e) => setInvoicedAt(e.target.value)} />
-            <FileField label="Adjuntar PDF (opcional)" fileName={attachmentName} onChange={setAttachmentName} accept="application/pdf" />
+          <div className={[styles.inlineForm, split.isSplit ? styles.inlineFormWide : ''].join(' ')}>
+            <SupportInvoiceSplitFields split={split} currency={plan.currency} disabled={running} />
 
             {error && (
               <div className={styles.formAlert} role="alert">

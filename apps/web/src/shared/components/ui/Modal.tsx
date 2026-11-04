@@ -21,7 +21,7 @@ export interface ModalProps {
   children: ReactNode;
   footer?: ReactNode;
   wide?: boolean;
-  /** Impide cerrar con Escape o clic fuera; para operaciones en curso. */
+  /** Impide cerrar con Escape o el botón de cierre; para operaciones en curso. */
   dismissible?: boolean;
   /** Contenido adicional junto al botón de cierre, p. ej. un contador de horas. */
   headerExtra?: ReactNode;
@@ -77,18 +77,13 @@ export function Modal({
     return () => dialog.removeEventListener('cancel', handleCancel);
   }, [dismissible, onClose]);
 
-  const handleBackdropClick = (event: React.MouseEvent<HTMLDialogElement>) => {
-    if (!dismissible) return;
-    // Un clic sobre el propio <dialog> (y no sobre su contenido) es un clic en
-    // el fondo: el contenido está en elementos hijos.
-    if (event.target === dialogRef.current) onClose();
-  };
-
+  // A propósito no se cierra con un clic en el fondo: un clic accidental fuera
+  // del diálogo hacía perder lo escrito en el formulario. Se cierra con el
+  // botón de cierre (o Escape).
   return (
     <dialog
       ref={dialogRef}
       className={[styles.dialog, wide ? styles.wide : '', side ? styles.side : '', className].filter(Boolean).join(' ')}
-      onClick={handleBackdropClick}
       aria-labelledby={titleId}
     >
       <header className={styles.header}>

@@ -27,3 +27,4 @@ export * from './estimation/quotation-poc-projection';
 export * from './estimation/quotation-edt-adjustments';
 export * from './estimation/quotation-edt-task-planning';
 export * from './estimation/quotation-reference-edt.contract';
+export * from './language/language.contract';

@@ -7,7 +7,7 @@
   padding: 4px 0;
 }
 
-/* Etapa editable + datos de la fase, bajo "Resumen de avance". */
+/* Datos de la fase (etapa, horas, fechas, avance), bajo "Resumen de avance". */
 .moduleFields {
   display: flex;
   flex-wrap: wrap;
@@ -16,10 +16,6 @@
   padding: 12px 14px;
   border-radius: 12px;
   background: #f8fafc;
-}
-
-.moduleStageField {
-  min-width: 200px;
 }
 
 .moduleMeta {

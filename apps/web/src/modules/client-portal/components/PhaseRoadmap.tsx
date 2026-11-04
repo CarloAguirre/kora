@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import styles from './PhaseRoadmap.module.css';
 import { Button } from '@/shared/components/ui/Button';
+import { DropdownMenu } from '@/shared/components/ui/DropdownMenu';
 import { TextField } from '@/shared/components/ui/TextField';
 import { ChevronDownIcon, ChevronRightIcon, DiamondIcon } from '@/shared/components/icons/Icons';
 import { StatusPill, type StatusPillTone } from './StatusPill';
@@ -8,11 +9,10 @@ import { BitacoraEntryRow } from './ProjectBitacora';
 import {
   PHASE_ROADMAP_ROLE_COLORS,
   PHASE_ROADMAP_ROLE_LABELS,
-  PHASE_ROADMAP_TASK_SCOPES,
-  PHASE_ROADMAP_TASK_SCOPE_LABELS,
+  type PhaseRoadmapDeliveryState,
   type PhaseRoadmapPhase,
   type PhaseRoadmapTask,
-  type PhaseRoadmapTaskScope,
+  type PhaseRoadmapTaskItemState,
   type ProjectPhaseRoadmap,
 } from '../types';
 
@@ -40,6 +40,8 @@ const MONTH_LABELS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'S
 const scrollWidthPercent = (zoom: number) => 100 + zoom * 3;
 /** Sobre este valor del zoom aparecen la cuadrícula y las etiquetas por día. */
 const DETAIL_ZOOM_THRESHOLD = 35;
+/** Ancho mínimo (% de la pista) de un bloque de mes para mostrar su nombre. */
+const MIN_MONTH_LABEL_PERCENT = 6;
 
 const toDate = (isoDate: string) => new Date(`${isoDate}T00:00:00`);
 
@@ -121,6 +123,27 @@ function buildTimelineAxis(range: DateRange): TimelineAxis {
   return { range, months, weekLines, dayLines, dayTicks, todayPercent };
 }
 
+const shiftDays = (date: Date, days: number) => new Date(date.getFullYear(), date.getMonth(), date.getDate() + days);
+
+/**
+ * Rango propio de una fase: de su primer a su último tramo/entrega/tarea, con una semana de margen y
+ * al menos 4 semanas de ancho. Con la escala del proyecto completo una fase corta (p.ej. dos semanas
+ * de pruebas al final) quedaba comprimida en una esquina y había que desplazarse para encontrarla.
+ * `null` si la fase no tiene nada con fecha.
+ */
+function phaseRange(phase: PhaseRoadmapPhase): DateRange | null {
+  const dates = [
+    ...phase.tasks.flatMap((task) => [task.startDate, task.endDate]),
+    ...phase.deliveries.map((delivery) => delivery.date),
+    ...phase.taskItems.map((taskItem) => taskItem.date),
+  ].sort();
+  if (dates.length === 0) return null;
+  const min = shiftDays(toDate(dates[0]!), -7);
+  const max = shiftDays(toDate(dates[dates.length - 1]!), 7);
+  const minimumMax = shiftDays(min, 28);
+  return { min, max: max < minimumMax ? minimumMax : max };
+}
+
 /**
  * "Roadmap por Fases" — reemplaza el Gantt fijo de 3 módulos × 4 tareas
  * (`ProjectGanttChart`, ya borrado) por un acordeón de fases del proyecto
@@ -130,17 +153,12 @@ function buildTimelineAxis(range: DateRange): TimelineAxis {
  *
  * El calendario es de fechas reales, no de posiciones fijas: barras,
  * marcadores, meses, cuadrícula y línea de HOY se calculan como % del rango
- * visible, igual que el prototipo `ficha_proyecto_lider`. Por eso el filtro
- * "Rango visible" y el zoom Semanas/Días sí cambian la vista (el zoom ensancha
- * la pista y sobre 35 revela la cuadrícula y las etiquetas por día). Solo la
+ * visible, igual que el prototipo `ficha_proyecto_lider`. Cada fase abre en su
+ * propio rango de fechas (`phaseRange`); el filtro "Rango visible" aplicado a
+ * mano lo reemplaza para todas, y el zoom Semanas/Días ensancha la pista (sobre
+ * 35 revela la cuadrícula y las etiquetas por día). Solo la
  * columna de pistas hace scroll horizontal: los nombres de cada fila quedan
  * siempre visibles a la izquierda.
- *
- * Los chips de "Resumen de avance" mantienen la píldora navy sólida del
- * Figma, pero están conectados a las tareas reales de la fase (`taskItems`,
- * cada una con su `scope`): el tooltip muestra el % completado por ámbito
- * (mismo cálculo que `ProjectModulesCard` del Roadmap interno) y el clic
- * filtra/atenúa en la fila "Tareas" las que no son de ese ámbito.
  */
 export function PhaseRoadmap({
   phaseRoadmap, renderPhaseExtras, renderPhaseReferences, renderSelectionDetail,
@@ -178,6 +196,18 @@ export function PhaseRoadmap({
 
   const rangeDraftIsValid = toDate(rangeDraft.from) < toDate(rangeDraft.to);
   const rangeIsCustom = appliedRange.from !== phaseRoadmap.rangeStartDate || appliedRange.to !== phaseRoadmap.rangeEndDate;
+
+  /** Sin un "Rango visible" aplicado a mano, cada fase abre en su propio rango (`phaseRange`); con uno, todas usan ese. */
+  const axisByPhase = useMemo(
+    () =>
+      new Map(
+        phaseRoadmap.phases.map((phase) => {
+          const range = rangeIsCustom ? null : phaseRange(phase);
+          return [phase.id, range ? buildTimelineAxis(range) : axis];
+        }),
+      ),
+    [phaseRoadmap.phases, rangeIsCustom, axis],
+  );
 
   const onResetRange = () => {
     setRangeDraft({ from: phaseRoadmap.rangeStartDate, to: phaseRoadmap.rangeEndDate });
@@ -304,7 +334,7 @@ export function PhaseRoadmap({
           <PhaseCard
             key={phase.id}
             phase={phase}
-            axis={axis}
+            axis={axisByPhase.get(phase.id) ?? axis}
             expanded={alwaysExpanded || expandedPhaseIds.has(phase.id)}
             onToggle={() => { if (!alwaysExpanded) togglePhase(phase.id); }}
             staticHeader={alwaysExpanded}
@@ -349,6 +379,163 @@ function barGeometry(task: PhaseRoadmapTask, range: DateRange) {
   return { leftPercent, widthPercent: Math.max(rightPercent - leftPercent, 0.8) };
 }
 
+const DELIVERY_STATE_LABEL: Readonly<Record<PhaseRoadmapDeliveryState, string>> = {
+  delivered: 'Realizada',
+  committed: 'Comprometida',
+  delayed: 'Atrasada',
+};
+
+const TASK_ITEM_STATE_LABEL: Readonly<Record<PhaseRoadmapTaskItemState, string>> = {
+  done: 'Terminada',
+  upcoming: 'Próxima',
+  delayed: 'Atrasada',
+};
+
+/** Mayor = más urgente: un grupo de marcadores muestra el símbolo del más urgente, así un atraso no queda escondido. */
+const DELIVERY_URGENCY: Readonly<Record<PhaseRoadmapDeliveryState, number>> = { delivered: 0, committed: 1, delayed: 2 };
+const TASK_ITEM_URGENCY: Readonly<Record<PhaseRoadmapTaskItemState, number>> = { done: 0, upcoming: 1, delayed: 2 };
+
+const deliverySymbol = (state: PhaseRoadmapDeliveryState) => (
+  <DiamondIcon
+    size={18}
+    className={
+      state === 'delivered'
+        ? styles.legendDiamondDone
+        : state === 'delayed'
+          ? styles.legendDiamondDelayed
+          : styles.legendDiamondCommitted
+    }
+  />
+);
+
+/** Terminada = el mismo ✓ que la leyenda (y que las tareas terminadas del Roadmap interno). */
+const taskItemSymbol = (state: PhaseRoadmapTaskItemState) =>
+  state === 'done' ? (
+    <span className={[styles.legendCheck, styles.markerTaskMark].join(' ')}>✓</span>
+  ) : (
+    <span
+      className={[styles.legendDot, styles.markerTaskMark, state === 'delayed' ? styles.taskDotDelayed : styles.taskDotUpcoming].join(' ')}
+    />
+  );
+
+/** Una entrega o tarea puntual de la fila "Entregas"/"Tareas", ya con su símbolo resuelto. */
+interface TimelineMarker {
+  readonly key: string;
+  readonly label: string;
+  /** ISO `YYYY-MM-DD`. */
+  readonly date: string;
+  readonly urgency: number;
+  readonly symbol: ReactNode;
+  readonly stateLabel: string;
+  readonly selection: PhaseRoadmapSelection;
+}
+
+/**
+ * Fila de marcadores de una fase. Los que caen el mismo día se dibujan como un solo marcador
+ * con contador ("2 entregas (8 Oct)") que abre la lista para elegir uno — antes se dibujaban
+ * todos en el mismo punto, encimados e ilegibles, y solo el de arriba se podía clicar.
+ */
+function MarkerTrackRow({
+  markers,
+  range,
+  variant,
+  pluralNoun,
+  showLabels,
+  selected,
+  onSelect,
+}: {
+  markers: readonly TimelineMarker[];
+  range: DateRange;
+  variant: 'delivery' | 'task';
+  /** "entregas" / "tareas" — etiqueta de un grupo. */
+  pluralNoun: string;
+  showLabels: boolean;
+  selected: PhaseRoadmapSelection | null;
+  onSelect: (selection: PhaseRoadmapSelection) => void;
+}) {
+  const groups = new Map<string, TimelineMarker[]>();
+  for (const marker of markers) groups.set(marker.date, [...(groups.get(marker.date) ?? []), marker]);
+  const visibleGroups = [...groups]
+    .map(([date, items]) => ({ date, items, leftPercent: percentOf(toDate(date), range) }))
+    .filter(({ leftPercent }) => leftPercent >= 0 && leftPercent <= 100);
+  const itemClassName = (isSelected: boolean) =>
+    [styles.markerItem, variant === 'task' ? styles.markerItemTask : '', isSelected ? styles.markerItemHighlighted : ''].join(' ');
+
+  return (
+    <div className={styles.trackRow}>
+      {visibleGroups.map(({ date, items, leftPercent }) => {
+        if (items.length === 1) {
+          const marker = items[0]!;
+          return (
+            <button
+              key={marker.key}
+              type="button"
+              className={itemClassName(sameSelection(selected, marker.selection))}
+              style={{ left: `${leftPercent}%` }}
+              title={`${marker.label} · ${formatShortDate(date)}`}
+              onClick={() => onSelect(marker.selection)}
+            >
+              {marker.symbol}
+              {showLabels && (
+                <span className={styles.markerLabel}>
+                  {marker.label} ({formatShortDate(date)})
+                </span>
+              )}
+            </button>
+          );
+        }
+
+        const lead = items.reduce((current, marker) => (marker.urgency > current.urgency ? marker : current));
+        const isSelected = items.some((marker) => sameSelection(selected, marker.selection));
+        return (
+          <div
+            key={date}
+            className={[
+              styles.markerGroup,
+              variant === 'task' ? styles.markerItemTask : '',
+              isSelected ? styles.markerGroupHighlighted : '',
+            ].join(' ')}
+            style={{ left: `${leftPercent}%` }}
+          >
+            <DropdownMenu
+              align="left"
+              trigger={({ onClick, open }) => (
+                <button
+                  type="button"
+                  aria-haspopup="menu"
+                  aria-expanded={open}
+                  className={itemClassName(isSelected)}
+                  title={`${items.map((marker) => marker.label).join(' · ')} · ${formatShortDate(date)}`}
+                  onClick={onClick}
+                >
+                  <span className={styles.markerSymbol}>
+                    {lead.symbol}
+                    <span className={styles.markerCount}>{items.length}</span>
+                  </span>
+                  {showLabels && (
+                    <span className={styles.markerLabel}>
+                      {items.length} {pluralNoun} ({formatShortDate(date)})
+                    </span>
+                  )}
+                  {showLabels && <ChevronDownIcon size={12} className={styles.markerChevron} />}
+                </button>
+              )}
+              items={items.map((marker) => ({
+                key: marker.key,
+                label: marker.label,
+                icon: marker.symbol,
+                hint: marker.stateLabel,
+                active: sameSelection(selected, marker.selection),
+                onSelect: () => onSelect(marker.selection),
+              }))}
+            />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 /**
  * Qué tramo/entrega/tarea/incidente está seleccionado dentro de una fase — decide
  * qué se muestra en "Registros de bitácora relacionados" (antes se mostraban
@@ -382,7 +569,7 @@ export interface OperationalRoadmapRow {
 
 export interface PhaseRoadmapProps {
   phaseRoadmap: ProjectPhaseRoadmap;
-  /** Contenido extra dentro de cada fase, bajo "Resumen de avance" (p.ej. la etapa editable del Roadmap interno). */
+  /** Contenido extra dentro de cada fase, bajo el zoom (p.ej. los datos de la fase del Roadmap interno). */
   renderPhaseExtras?: (phase: PhaseRoadmapPhase) => ReactNode;
   /** Referencias EDT en la fase, después del Gantt. Solo vista interna; portal cliente no cambia. */
   renderPhaseReferences?: (phase: PhaseRoadmapPhase) => ReactNode;
@@ -435,8 +622,9 @@ function PhaseCard({
   staticHeader?: boolean;
 }) {
   /** Igual que `zoomByModule` en `ProjectModulesCard` (Roadmap interno): un slider real, no un
-      toggle decorativo. Es estado de vista local, no una acción a conectar. */
-  const [zoom, setZoom] = useState(15);
+      toggle decorativo. Es estado de vista local, no una acción a conectar. Arranca en 0: con el
+      rango propio de la fase (`phaseRange`) la fase entera cabe sin desplazarse. */
+  const [zoom, setZoom] = useState(0);
   const today = startOfToday();
   /** Por debajo de este zoom la pista no ensancha lo suficiente (`scrollWidthPercent`)
    *  para separar tareas cercanas entre sí: sus etiquetas se solapan y quedan
@@ -469,28 +657,24 @@ function PhaseCard({
     return latest ? [latest] : [];
   }, [phase.relatedBitacora, selectedRelated]);
 
-  /** Chips de "Resumen de avance": % de avance por ámbito ponderado por HH
-   *  (`phase.scopeProgress`, del backend; sin él, % de tareas aprobadas) — clic
-   *  filtra/atenúa en la fila "Tareas" las que no son de ese ámbito. */
-  const [activeScope, setActiveScope] = useState<PhaseRoadmapTaskScope | null>(null);
-
-  const scopeStats = useMemo(() => {
-    const stats = new Map<PhaseRoadmapTaskScope, { total: number; done: number }>();
-    for (const item of phase.taskItems) {
-      const entry = stats.get(item.scope) ?? { total: 0, done: 0 };
-      entry.total += 1;
-      if (item.state === 'done') entry.done += 1;
-      stats.set(item.scope, entry);
-    }
-    return stats;
-  }, [phase.taskItems]);
-
-  const visibleDeliveries = phase.deliveries
-    .map((delivery) => ({ delivery, leftPercent: percentOf(toDate(delivery.date), axis.range) }))
-    .filter(({ leftPercent }) => leftPercent >= 0 && leftPercent <= 100);
-  const visibleTaskItems = phase.taskItems
-    .map((taskItem) => ({ taskItem, leftPercent: percentOf(toDate(taskItem.date), axis.range) }))
-    .filter(({ leftPercent }) => leftPercent >= 0 && leftPercent <= 100);
+  const deliveryMarkers: TimelineMarker[] = phase.deliveries.map((delivery, index) => ({
+    key: delivery.id ?? `delivery-${index}`,
+    label: delivery.label,
+    date: delivery.date,
+    urgency: DELIVERY_URGENCY[delivery.state],
+    symbol: deliverySymbol(delivery.state),
+    stateLabel: DELIVERY_STATE_LABEL[delivery.state],
+    selection: { kind: 'delivery', id: delivery.id, label: delivery.label },
+  }));
+  const taskItemMarkers: TimelineMarker[] = phase.taskItems.map((taskItem, index) => ({
+    key: taskItem.id ?? `task-${index}`,
+    label: taskItem.label,
+    date: taskItem.date,
+    urgency: TASK_ITEM_URGENCY[taskItem.state],
+    symbol: taskItemSymbol(taskItem.state),
+    stateLabel: TASK_ITEM_STATE_LABEL[taskItem.state],
+    selection: { kind: 'task', id: taskItem.id, label: taskItem.label },
+  }));
 
   return (
     <div className={styles.phaseCard}>
@@ -544,34 +728,6 @@ function PhaseCard({
       {expanded && (
         <div className={styles.phaseBody}>
           <div className={styles.summaryOfProgressRow}>
-            <span className={styles.summaryOfProgressLabel}>Resumen de avance</span>
-            <div className={styles.stageChips}>
-              {PHASE_ROADMAP_TASK_SCOPES.map((scope) => {
-                const stats = scopeStats.get(scope);
-                const percent =
-                  phase.scopeProgress !== undefined
-                    ? phase.scopeProgress[scope]
-                    : stats && stats.total > 0
-                      ? Math.round((stats.done / stats.total) * 100)
-                      : null;
-                const title =
-                  percent !== null
-                    ? `${PHASE_ROADMAP_TASK_SCOPE_LABELS[scope]}: ${percent}% (${stats?.done ?? 0}/${stats?.total ?? 0} aprobadas)`
-                    : `${PHASE_ROADMAP_TASK_SCOPE_LABELS[scope]}: sin tareas registradas`;
-                return (
-                  <button
-                    key={scope}
-                    type="button"
-                    className={[styles.stageChip, activeScope === scope ? styles.stageChipActive : ''].join(' ')}
-                    title={title}
-                    onClick={() => setActiveScope((current) => (current === scope ? null : scope))}
-                  >
-                    {PHASE_ROADMAP_TASK_SCOPE_LABELS[scope]}
-                    {percent !== null && <span className={styles.stageChipPercent}>{percent}%</span>}
-                  </button>
-                );
-              })}
-            </div>
             <div className={styles.zoomRow}>
               <span>Semanas</span>
               <input
@@ -613,7 +769,8 @@ function PhaseCard({
                       className={styles.ganttMonth}
                       style={{ left: `${month.leftPercent}%`, width: `${month.widthPercent}%` }}
                     >
-                      {MONTH_LABELS[month.monthIndex]}
+                      {/* Un mes que apenas asoma en el borde (p.ej. el rango parte el 30) no lleva nombre: se encimaba con el siguiente. */}
+                      {month.widthPercent >= MIN_MONTH_LABEL_PERCENT && MONTH_LABELS[month.monthIndex]}
                     </span>
                   ))}
                   {axis.dayTicks.map((tick, index) => (
@@ -671,81 +828,27 @@ function PhaseCard({
                 })}
 
                 {phase.deliveries.length > 0 && (
-                  <div className={styles.trackRow}>
-                    {visibleDeliveries.map(({ delivery, leftPercent }, index) => {
-                      const selection: PhaseRoadmapSelection = { kind: 'delivery', id: delivery.id, label: delivery.label };
-                      const isSelected = sameSelection(selectedRelated, selection);
-                      return (
-                        <button
-                          key={delivery.id ?? index}
-                          type="button"
-                          className={[styles.markerItem, isSelected ? styles.markerItemHighlighted : ''].join(' ')}
-                          style={{ left: `${leftPercent}%` }}
-                          title={`${delivery.label} · ${formatShortDate(delivery.date)}`}
-                          onClick={() => toggleSelection(selection)}
-                        >
-                          <DiamondIcon
-                            size={18}
-                            className={
-                              delivery.state === 'delivered'
-                                ? styles.legendDiamondDone
-                                : delivery.state === 'delayed'
-                                  ? styles.legendDiamondDelayed
-                                  : styles.legendDiamondCommitted
-                            }
-                          />
-                          {!isFullPeriodView && (
-                            <span className={styles.markerLabel}>
-                              {delivery.label} ({formatShortDate(delivery.date)})
-                            </span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <MarkerTrackRow
+                    markers={deliveryMarkers}
+                    range={axis.range}
+                    variant="delivery"
+                    pluralNoun="entregas"
+                    showLabels={!isFullPeriodView}
+                    selected={selectedRelated}
+                    onSelect={toggleSelection}
+                  />
                 )}
 
                 {phase.taskItems.length > 0 && (
-                  <div className={styles.trackRow}>
-                    {visibleTaskItems.map(({ taskItem, leftPercent }, index) => {
-                      const selection: PhaseRoadmapSelection = { kind: 'task', id: taskItem.id, label: taskItem.label };
-                      const isSelected = sameSelection(selectedRelated, selection);
-                      const isDimmed = activeScope !== null && taskItem.scope !== activeScope;
-                      return (
-                        <button
-                          key={taskItem.id ?? index}
-                          type="button"
-                          className={[
-                            styles.markerItem,
-                            styles.markerItemTask,
-                            isSelected ? styles.markerItemHighlighted : '',
-                            isDimmed ? styles.markerItemDimmed : '',
-                          ].join(' ')}
-                          style={{ left: `${leftPercent}%` }}
-                          title={`${taskItem.label} · ${formatShortDate(taskItem.date)}`}
-                          onClick={() => toggleSelection(selection)}
-                        >
-                          {/* Terminada = el mismo ✓ que la leyenda (y que las tareas terminadas del Roadmap interno). */}
-                          {taskItem.state === 'done' ? (
-                            <span className={[styles.legendCheck, styles.markerTaskMark].join(' ')}>✓</span>
-                          ) : (
-                            <span
-                              className={[
-                                styles.legendDot,
-                                styles.markerTaskMark,
-                                taskItem.state === 'delayed' ? styles.taskDotDelayed : styles.taskDotUpcoming,
-                              ].join(' ')}
-                            />
-                          )}
-                          {!isFullPeriodView && (
-                            <span className={styles.markerLabel}>
-                              {taskItem.label} ({formatShortDate(taskItem.date)})
-                            </span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <MarkerTrackRow
+                    markers={taskItemMarkers}
+                    range={axis.range}
+                    variant="task"
+                    pluralNoun="tareas"
+                    showLabels={!isFullPeriodView}
+                    selected={selectedRelated}
+                    onSelect={toggleSelection}
+                  />
                 )}
               </div>
             </div>

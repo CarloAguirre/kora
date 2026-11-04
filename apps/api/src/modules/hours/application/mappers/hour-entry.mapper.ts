@@ -45,7 +45,7 @@ export interface HourEntryDetailSource {
   readonly entry: HourEntry;
   readonly owner: HourEntryUserReference | null;
   readonly project: HourEntryProjectReference | null;
-  readonly module: { id: string; name: string } | null;
+  readonly module: { id: string; name: string; segments: readonly { id: string; name: string }[] } | null;
   readonly segment?: { id: string; name: string } | null;
   readonly designatedApprover: HourEntryUserReference | null;
   readonly decisionBy: HourEntryUserReference | null;
@@ -61,7 +61,9 @@ export function toHourEntryDetail(source: HourEntryDetailSource): HourEntryDetai
     user: { id: snapshot.userId, fullName: source.owner?.fullName ?? '' },
     project: snapshot.projectId ? { id: snapshot.projectId, name: source.project?.name ?? '' } : null,
     module: snapshot.moduleId ? { id: snapshot.moduleId, name: source.module?.name ?? '' } : null,
-    segment: snapshot.segmentId && source.segment ? source.segment : null,
+    segment: snapshot.segmentId
+      ? { id: snapshot.segmentId, name: source.segment?.name ?? source.module?.segments.find((s) => s.id === snapshot.segmentId)?.name ?? '' }
+      : null,
     team: source.team,
     assignment: snapshot.assignment,
     category: snapshot.category,

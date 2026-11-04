@@ -27,7 +27,8 @@ const mocks = vi.hoisted(() => ({
     totalHours: number;
   }> },
 }));
-vi.mock('@/modules/client-portal/adapters/project-detail.adapter', () => ({
+vi.mock('@/modules/client-portal/adapters/project-detail.adapter', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@/modules/client-portal/adapters/project-detail.adapter')>(),
   roleFromTeamName: () => 'dev',
   toPhaseRoadmap: () => ({
     phaseCount: 1, teamSegmentCount: 0, plannedDeliveryCount: 0,
@@ -494,13 +495,24 @@ describe('Fidelidad del Roadmap v5.02 · acciones y estructura', () => {
   });
 
   it('crea una tarea desde el pie de la tabla sin cambiar el plan comercial', async () => {
-    show();
+    show({
+      ...project,
+      modules: [{
+        ...module,
+        segments: [{
+          id: 'segment-1', teamId: 'team-1', teamName: 'Desarrollo', name: 'Bloque operativo',
+          startDate: '2026-11-01', endDate: '2026-11-30', estimatedHours: 120, members: [],
+        }],
+      }],
+    } as unknown as ProjectDetail);
     fireEvent.click(screen.getByRole('button', { name: '+ Agregar tarea' }));
     expect(screen.getByRole('dialog', { name: 'Nueva tarea' })).toBeInTheDocument();
     fireEvent.change(screen.getByRole('textbox', { name: 'Título de la tarea' }),
       { target: { value: 'Revisar integración' } });
     fireEvent.change(screen.getByRole('spinbutton', { name: /HH estimadas/ }),
       { target: { value: '16' } });
+    fireEvent.change(screen.getByRole('combobox', { name: /Bloque de trabajo/ }),
+      { target: { value: 'segment-1' } });
     fireEvent.change(screen.getByLabelText(/Fecha de inicio/),
       { target: { value: '2026-11-05' } });
     fireEvent.change(screen.getByLabelText(/Fecha límite/),
@@ -509,8 +521,8 @@ describe('Fidelidad del Roadmap v5.02 · acciones y estructura', () => {
     await waitFor(() => expect(mocks.createTask).toHaveBeenCalledWith({
       projectId: 'project-1', moduleId: 'module-1',
       input: {
-        name: 'Revisar integración', description: null,
-        teamId: 'team-1', segmentId: null, assigneeUserId: null, scope: 'desarrollo',
+        name: 'Revisar integración', description: 'Bloque de trabajo: Bloque operativo · ID segment-1',
+        teamId: 'team-1', segmentId: 'segment-1', assigneeUserId: null, scope: 'desarrollo',
         status: 'todo', estimatedHours: 16,
         startDate: '2026-11-05', date: '2026-11-12',
       },

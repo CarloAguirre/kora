@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, inArray, ne, supportMonthlyPeriods, supportPlanProjects, supportPlans, type Database } from '@kora/db';
+import { and, desc, eq, inArray, ne, sql, supportMonthlyPeriods, supportPlanProjects, supportPlans, type Database } from '@kora/db';
 import type { TransactionContext } from '@kora/core';
 import type { SupportPlan } from '../../domain/entities/support-plan.entity';
 import type {
@@ -129,7 +129,13 @@ export class DrizzleSupportPlanRepository implements SupportPlanRepository {
 
   async listForClient(clientId: string, context?: TransactionContext): Promise<SupportPlanRecord[]> {
     const db = resolveDb(this.database, context);
-    const rows = await db.select().from(supportPlans).where(eq(supportPlans.clientId, clientId));
+    // Vigentes primero y, dentro de cada grupo, el más reciente: un proyecto de soporte puede tener contratos
+    // terminados y quien busque "el contrato del proyecto" en esta lista debe dar con el activo.
+    const rows = await db
+      .select()
+      .from(supportPlans)
+      .where(eq(supportPlans.clientId, clientId))
+      .orderBy(sql`case when ${supportPlans.status} = 'active' then 0 else 1 end`, desc(supportPlans.createdAt));
     return rows.map((row) => toRecord(row as SupportPlanRow));
   }
 

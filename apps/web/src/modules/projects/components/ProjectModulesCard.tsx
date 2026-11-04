@@ -1,6 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import {
   PROJECT_MODULE_DELIVERY_STATUS_LABELS,
+  PROJECT_MODULE_STAGE_LABELS,
   PROJECT_MODULE_TASK_SCOPE_LABELS,
   PROJECT_MODULE_TASK_STATUS_LABELS,
   type CreateProjectModuleSegmentInput,
@@ -24,7 +25,7 @@ import { CloseIcon, CopyIcon, PencilIcon, TrashIcon } from '@/shared/components/
 import { useToast } from '@/shared/components/ui/Toast';
 import { ApiRequestError } from '@/shared/lib/api-client';
 import { PhaseRoadmap, type PhaseRoadmapSelection, type OperationalRoadmapRow } from '@/modules/client-portal/components/PhaseRoadmap';
-import { roleFromTeamName, toPhaseRoadmap } from '@/modules/client-portal/adapters/project-detail.adapter';
+import { roleFromTeamName, toPhaseRoadmap, toRoadmapPhase } from '@/modules/client-portal/adapters/project-detail.adapter';
 import { PHASE_ROADMAP_ROLE_COLORS } from '@/modules/client-portal/types';
 import { useCreateProjectModule, useCreateProjectModuleSegment, useDeleteProjectModule, useDeleteProjectModuleSegment, useDeleteProjectModuleTask, useUpdateProjectModule, useUpdateProjectModuleDelivery, useUpdateProjectModuleSegment } from '../api/projects.queries';
 import { useConfirmAction } from '@/shared/components/ui/useConfirmAction';
@@ -38,6 +39,9 @@ import { NewOperationalTaskModal } from './NewOperationalTaskModal';
 import { ReferenceBlockDrawer } from './ReferenceBlockDrawer';
 import { useAppliedQuotationPlanning } from '@/modules/estimation/api/quotation.queries';
 import { getLinkedBlockTasks, indexTeamBlockProgress, roadmapBlockMetrics, type TeamBlockProgress } from '../lib/team-progress';
+import { PhaseProgressBar } from '@/modules/client-portal/components/PhaseProgressBar';
+import { useHolidays } from '@/modules/hours/api/hours.queries';
+import { countBusinessDays } from '../lib/business-days';
 import {
   EMPTY_EXECUTION_SEGMENT_MODAL_VALUES,
   ExecutionSegmentModal,
@@ -58,9 +62,6 @@ const today = () => {
 };
 const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`;
 
-/** Días corridos entre dos fechas ISO, inclusive. */
-const calendarDays = (start: string, end: string) =>
-  Math.round((parseDate(end).getTime() - parseDate(start).getTime()) / DAY_MS) + 1;
 
 /** Color del equipo — el mismo que el Roadmap (`PHASE_ROADMAP_ROLE_COLORS`, Figma), no el de `getTeamStyle`. */
 const teamColor = (teamName: string | null) => PHASE_ROADMAP_ROLE_COLORS[roleFromTeamName(teamName)];
@@ -108,10 +109,11 @@ interface ProjectModulesCardProps {
 /**
  * Roadmap interno del proyecto — el MISMO "Roadmap por Fases" del portal de cliente
  * (`PhaseRoadmap` + `toPhaseRoadmap`), para que ambas vistas se vean idénticas (el del cliente es
- * el fiel al Figma). Lo propio de la vista interna entra por sus slots: la etapa editable de cada
- * fase y el detalle del ítem seleccionado (tramo con lápiz para editarlo sin pasar por "Editar
- * proyecto", tarea, entrega o incidentes). Crear/quitar fases y entregas sigue en "Editar
- * proyecto"; aprobar/rechazar tareas, en la vista de líder de equipo.
+ * el fiel al Figma). Lo propio de la vista interna entra por sus slots: los datos de cada fase y el
+ * detalle del ítem seleccionado (tramo con lápiz para editarlo sin pasar por "Editar proyecto",
+ * tarea, entrega o incidentes). La etapa actual se muestra pero no se cambia acá — un select que
+ * guardaba al elegir hacía fácil cambiarla sin querer —; se cambia en "Editar proyecto", igual que
+ * crear/quitar fases y entregas. Aprobar/rechazar tareas, en la vista de líder de equipo.
  */
 export function ProjectModulesCard({ project, hourEntries, teamOptions, canManage }: ProjectModulesCardProps) {
   const toast = useToast();
@@ -555,6 +557,16 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
     const count = module.tasks.length + references.length;
     const approved = module.tasks.filter((task) => task.status === 'done').length;
     return <div className={styles.operationalContent}>
+      <PhaseProgressBar phase={toRoadmapPhase(module, project.modules.indexOf(module))} embedded />
+      <div className={styles.moduleFields}>
+        <Fact label="Etapa actual" value={PROJECT_MODULE_STAGE_LABELS[module.currentStage]} />
+        <Fact label="Etapa inicial" value={PROJECT_MODULE_STAGE_LABELS[module.initialStage]} />
+        <Fact label="Horas estimadas" value={module.estimatedHours != null ? `${module.estimatedHours} hh` : 'Sin definir'} />
+        <Fact label="Fechas estimadas" value={`${formatDate(module.estimatedStartDate)} — ${formatDate(module.estimatedEndDate)}`} />
+        {module.progress.actual != null && (
+          <Fact label="Avance real · esperado" value={`${module.progress.actual}% · ${module.progress.expected ?? 0}%`} />
+        )}
+      </div>
       {Array.from(groups, ([id, group]) => {
         const team = project.teams.find((entry) => entry.teamId === id);
         const teamName = team?.teamName ?? teamOptions.find((entry) => entry.value === id)?.label ??
@@ -921,6 +933,8 @@ function SegmentDrawer({
 }) {
   const toast = useToast();
   const updateDelivery = useUpdateProjectModuleDelivery();
+  const { data: holidays } = useHolidays({ dateFrom: segment.startDate, dateTo: segment.endDate });
+  const days = countBusinessDays(segment.startDate, segment.endDate, new Set((holidays ?? []).map((holiday) => holiday.date)));
   const [comment, setComment] = useState('');
   const team = project.teams.find((item) => item.teamId === segment.teamId);
   const { hours, progress } = roadmapBlockMetrics(blockProgress);
@@ -963,7 +977,7 @@ function SegmentDrawer({
         <Facts>
           <Fact label="Inicio" value={formatDate(segment.startDate)} />
           <Fact label="Cierre planificado" value={formatDate(segment.endDate)} />
-          <Fact label="Duración" value={plural(calendarDays(segment.startDate, segment.endDate), 'día')} />
+          <Fact label="Duración" value={`${plural(days, 'día')} ${days === 1 ? 'hábil' : 'hábiles'}`} />
           <Fact label="Colaboradores" value={segment.members.length ? String(segment.members.length) : 'Sin asignar'} />
         </Facts>
         <div className={styles.drawerSection}>

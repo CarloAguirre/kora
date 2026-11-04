@@ -44,6 +44,7 @@ import {
   type MarkProjectPaymentMilestonePaidInput,
   type ProjectBillingSettings,
   type ProjectDetail,
+  type ProjectPhaseOption,
   type ResolveProjectObservationInput,
   type SetProjectOvertimeAuthorizationInput,
   type UpdateProjectBillingSettingsInput,
@@ -67,6 +68,7 @@ import { UpdateProjectUseCase } from '../application/use-cases/update-project.us
 import { UpdateProjectExtrasUseCase } from '../application/use-cases/update-project-extras.use-case';
 import { ListProjectsUseCase } from '../application/use-cases/list-projects.use-case';
 import { GetProjectUseCase } from '../application/use-cases/get-project.use-case';
+import { ListProjectPhasesUseCase } from '../application/use-cases/list-project-phases.use-case';
 import { ChangeProjectStatusUseCase } from '../application/use-cases/change-project-status.use-case';
 import { SetProjectOvertimeAuthorizationUseCase } from '../application/use-cases/set-project-overtime-authorization.use-case';
 import { DeleteProjectUseCase } from '../application/use-cases/delete-project.use-case';
@@ -108,6 +110,7 @@ export class ProjectsController {
     private readonly updateProjectExtras: UpdateProjectExtrasUseCase,
     private readonly listProjects: ListProjectsUseCase,
     private readonly getProject: GetProjectUseCase,
+    private readonly listProjectPhases: ListProjectPhasesUseCase,
     private readonly changeStatus: ChangeProjectStatusUseCase,
     private readonly setOvertimeAuthorization: SetProjectOvertimeAuthorizationUseCase,
     private readonly deleteProject: DeleteProjectUseCase,
@@ -188,6 +191,15 @@ export class ProjectsController {
   async detail(@Param('id') id: string, @CurrentUser() actor: RequestUser): Promise<ProjectDetail> {
     return unwrapOrThrow(
       await this.getProject.execute({ projectId: id, actorUserId: actor.id, actorPermissions: actor.permissions }),
+    );
+  }
+
+  /** Igual que la lista: `hours:register` basta — es el selector de Fase/Tiempo de ejecución del registro de horas. */
+  @Get(':id/phases')
+  @RequireAnyPermission('projects:read', 'projects:read_assigned', 'hours:register')
+  async phases(@Param('id') id: string, @CurrentUser() actor: RequestUser): Promise<ProjectPhaseOption[]> {
+    return unwrapOrThrow(
+      await this.listProjectPhases.execute({ projectId: id, actorUserId: actor.id, actorPermissions: actor.permissions }),
     );
   }
 

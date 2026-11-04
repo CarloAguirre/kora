@@ -7,6 +7,7 @@ import { UpdateProjectUseCase } from './application/use-cases/update-project.use
 import { UpdateProjectExtrasUseCase } from './application/use-cases/update-project-extras.use-case';
 import { ListProjectsUseCase } from './application/use-cases/list-projects.use-case';
 import { GetProjectUseCase } from './application/use-cases/get-project.use-case';
+import { ListProjectPhasesUseCase } from './application/use-cases/list-project-phases.use-case';
 import { ChangeProjectStatusUseCase } from './application/use-cases/change-project-status.use-case';
 import { SetProjectOvertimeAuthorizationUseCase } from './application/use-cases/set-project-overtime-authorization.use-case';
 import { DeleteProjectUseCase } from './application/use-cases/delete-project.use-case';
@@ -77,6 +78,8 @@ import { DrizzleProjectHourEntryReader } from './infrastructure/services/drizzle
 import { DrizzleProjectActivityReader } from './infrastructure/services/drizzle-project-activity-reader';
 import { DrizzleProjectTeamMemberValidator } from './infrastructure/services/drizzle-project-team-member-validator';
 import { DrizzleForecastSourceStore } from './infrastructure/services/drizzle-forecast-source-store';
+import { SUPPORT_CONTRACT_STATUS_READER } from './application/ports/support-contract-status-reader.port';
+import { DrizzleSupportContractStatusReader } from './infrastructure/services/drizzle-support-contract-status-reader';
 
 /**
  * Composición del módulo de proyectos.
@@ -95,6 +98,7 @@ import { DrizzleForecastSourceStore } from './infrastructure/services/drizzle-fo
     UpdateProjectExtrasUseCase,
     ListProjectsUseCase,
     GetProjectUseCase,
+    ListProjectPhasesUseCase,
     ChangeProjectStatusUseCase,
     SetProjectOvertimeAuthorizationUseCase,
     DeleteProjectUseCase,
@@ -148,6 +152,7 @@ import { DrizzleForecastSourceStore } from './infrastructure/services/drizzle-fo
     { provide: PROJECT_ACTIVITY_READER, useClass: DrizzleProjectActivityReader },
     { provide: PROJECT_TEAM_MEMBER_VALIDATOR, useClass: DrizzleProjectTeamMemberValidator },
     { provide: FORECAST_SOURCE_STORE, useClass: DrizzleForecastSourceStore },
+    { provide: SUPPORT_CONTRACT_STATUS_READER, useClass: DrizzleSupportContractStatusReader },
   ],
   exports: [
     PROJECT_REPOSITORY,

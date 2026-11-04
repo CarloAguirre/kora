@@ -49,8 +49,10 @@ export function toProjectSummary(item: ProjectListItem, progress: ProjectProgres
     endDate: item.endDate?.toISOString().slice(0, 10) ?? null,
     progress,
     supportPlanDescription: item.supportPlanDescription,
+    supportPlanType: item.supportPlanType,
     supportHours: item.supportHours,
     allowsOvertime: item.allowsOvertime,
+    isInternal: item.isInternal,
     createdAt: item.createdAt.toISOString(),
   };
 }
@@ -107,6 +109,7 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
     assignedHours: team.assignedHours,
     memberCount: team.memberCount,
     maxMembers: team.maxMembers,
+    leaderConsumedHours: team.leaderConsumedHours,
   }));
 
   const observations: ProjectObservationDto[] = source.observations.map((observation) => ({
@@ -158,16 +161,18 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
     estimatedEndDate: module.estimatedEndDate?.toISOString().slice(0, 10) ?? null,
     deliveries: module.deliveries.map((delivery) => ({
       id: delivery.id,
-      segmentId: delivery.segmentId ?? null,
       teamId: delivery.teamId,
       teamName: delivery.teamName,
       name: delivery.name,
       description: delivery.description,
       assigneeUserId: delivery.assigneeUserId,
       assigneeName: delivery.assigneeName,
+      segmentId: delivery.segmentId,
+      segmentName: delivery.segmentName,
       estimatedDate: delivery.estimatedDate.toISOString().slice(0, 10),
       status: delivery.status,
       rejectionReason: delivery.rejectionReason,
+      createdAt: delivery.createdAt.toISOString(),
       canManage: source.canManagePendings || (delivery.teamId !== null && source.ledTeamIds.has(delivery.teamId)),
     })),
     segments: module.segments.map((segment) => ({
@@ -188,11 +193,12 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
     })),
     tasks: module.tasks.map((task) => ({
       id: task.id,
-      segmentId: task.segmentId ?? null,
       teamId: task.teamId,
       teamName: task.teamName,
       assigneeUserId: task.assigneeUserId,
       assigneeName: task.assigneeName,
+      segmentId: task.segmentId,
+      segmentName: task.segmentName,
       name: task.name,
       description: task.description,
       startDate: task.startDate.toISOString().slice(0, 10),
@@ -258,6 +264,7 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
     supportHours: Number(snapshot.supportHours),
     overtimeRateUf: Number(snapshot.overtimeRateUf),
     allowsOvertime: snapshot.allowsOvertime,
+    isInternal: snapshot.isInternal,
     canAuthorizeOvertime: source.canAuthorizeOvertime,
     quotationLink: snapshot.quotationLink,
     contractLink: snapshot.contractLink,

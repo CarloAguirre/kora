@@ -19,10 +19,6 @@
   color: var(--kora-navy);
 }
 
-.weekSelect {
-  min-width: 200px;
-}
-
 .empty {
   color: var(--kora-text-disabled);
 }

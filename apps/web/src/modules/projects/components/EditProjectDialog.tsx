@@ -10,26 +10,45 @@ import {
   PROJECT_PHASES,
   PROJECT_PHASE_LABELS,
   PROJECT_STATUS_LABELS,
+  SUPPORT_PLAN_CURRENCIES,
+  SUPPORT_PLAN_CURRENCY_LABELS,
+  SUPPORT_PLAN_TYPE_LABELS,
+  SUPPORT_SURPLUS_POLICIES,
+  SUPPORT_SURPLUS_POLICY_LABELS,
   updateProjectSchema,
   type CreateProjectModuleInput,
   type ProjectDetail,
   type ProjectModule,
+  type ProjectModuleStage,
   type ProjectModuleDelivery,
   type ProjectModuleSegment,
   type ProjectSalesStage,
   type ProjectStatus,
+  type SupportPlanCurrency,
+  type SupportPlanType,
+  type SupportSurplusPolicy,
   type UpdateProjectInput,
   type UpdateProjectModuleInput,
+  type UpdateSupportPlanInput,
 } from '@kora/contracts';
 import styles from './EditProjectDialog.module.css';
 import deliveryModalStyles from './DeliveryModal.module.css';
 import { Modal } from '@/shared/components/ui/Modal';
 import { Button } from '@/shared/components/ui/Button';
 import { TextField } from '@/shared/components/ui/TextField';
+import { MoneyField } from '@/shared/components/ui/MoneyField';
 import { Select } from '@/shared/components/ui/Select';
 import { Combobox } from '@/shared/components/ui/Combobox';
+import { SegmentedControl } from '@/shared/components/ui/SegmentedControl';
 import { AlertIcon, PlusIcon, TrashIcon, CloseIcon } from '@/shared/components/icons/Icons';
-import { DeliveryModal, EMPTY_DELIVERY_MODAL_VALUES, type DeliveryModalValues } from './DeliveryModal';
+import {
+  DeliveryModal,
+  EMPTY_DELIVERY_MODAL_VALUES,
+  draftSegmentKey,
+  resolveDraftSegmentId,
+  toDeliverySegmentOption,
+  type DeliveryModalValues,
+} from './DeliveryModal';
 import { SupportSlaNote } from './SupportSlaNote';
 import {
   ExecutionSegmentModal,
@@ -61,8 +80,10 @@ import { assignableOptions } from '@/modules/users/lib/assignable-options';
 import { useTeamsList } from '@/modules/teams/api/teams.queries';
 import { useToast } from '@/shared/components/ui/Toast';
 import { ApiRequestError } from '@/shared/lib/api-client';
+import { formatMoney } from '@/shared/lib/format-money';
 import {
   PaymentPlanEditor,
+  missingApprovalBillingData,
   paymentPlanFromProject,
   paymentPlanPayload,
   validatePaymentPlan,
@@ -73,6 +94,27 @@ type ProjectFormValues = z.input<typeof updateProjectSchema>;
 
 const PHASE_OPTIONS = PROJECT_PHASES.map((phase) => ({ value: phase, label: PROJECT_PHASE_LABELS[phase] }));
 const MODULE_STAGE_OPTIONS = PROJECT_MODULE_STAGES.map((stage) => ({ value: stage, label: PROJECT_MODULE_STAGE_LABELS[stage] }));
+/** Mismo orden que en `NewProjectPage` (Bolsa/Mensual/A demanda). */
+const SUPPORT_PLAN_TYPE_OPTIONS = (['bundle', 'monthly', 'on_demand'] as const).map((planType) => ({
+  value: planType,
+  label: SUPPORT_PLAN_TYPE_LABELS[planType],
+}));
+const SUPPORT_SURPLUS_POLICY_OPTIONS = SUPPORT_SURPLUS_POLICIES.map((policy) => ({
+  value: policy,
+  label: SUPPORT_SURPLUS_POLICY_LABELS[policy],
+}));
+const SUPPORT_CURRENCY_OPTIONS = SUPPORT_PLAN_CURRENCIES.map((currency) => ({ value: currency, label: SUPPORT_PLAN_CURRENCY_LABELS[currency] }));
+
+/** Lo que se edita del contrato de soporte desde la ficha del proyecto. */
+interface SupportPlanDraft {
+  planType: SupportPlanType;
+  surplusPolicy: SupportSurplusPolicy | null;
+  contractedHours: number;
+  /** Valor de la hora y de la hora extra, como texto del input (para no perder "0," mientras se escribe). En la moneda de `currency`. */
+  planValueUf: string;
+  extraHourValueUf: string;
+  currency: SupportPlanCurrency;
+}
 
 /** `2026-05-08` → `08-05-2026` — mismo formato que el resto de la ficha de proyecto. */
 function formatDeliveryDate(isoDate: string): string {
@@ -148,7 +190,7 @@ function deriveTipo(salesStage: ProjectSalesStage | null, status: ProjectStatus)
 
 const TIPO_OPTIONS: Array<{ value: ProjectTipo; label: string }> = [
   { value: 'prospecto', label: 'Prospecto' },
-  { value: 'cotizacion', label: 'En cotización' },
+  { value: 'cotizacion', label: 'Cotización' },
   { value: 'aprobado', label: 'Proyecto aprobado' },
   { value: 'finalizado', label: 'Proyecto finalizado' },
 ];
@@ -163,13 +205,14 @@ const TIPO_TO_SALES_STAGE: Record<ProjectTipo, ProjectSalesStage | null> = {
 
 /**
  * Mismo criterio que `STATUS_OPTIONS_APPROVED`/`STATUS_OPTIONS_NOT_APPROVED` de `NewProjectPage`:
- * antes de Aprobado solo No iniciado o Detenido; Aprobado arranca "No iniciado" y pasa a Activo
- * por Hito 0 (factura del primer tramo, o manual con motivo).
+ * Prospecto y Cotización siempre son "No iniciado" (el Estado queda bloqueado); Aprobado arranca
+ * "No iniciado" y pasa a Activo por Hito 0 (factura del primer tramo, o manual con motivo).
+ * Finalizar no es un Estado: se elige "Proyecto finalizado" en Tipo de proyecto.
  */
 const ESTADO_OPTIONS_BY_TIPO: Record<ProjectTipo, ProjectStatus[]> = {
-  prospecto: ['draft', 'on_hold'],
-  cotizacion: ['draft', 'on_hold'],
-  aprobado: ['draft', 'active', 'on_hold', 'finished'],
+  prospecto: ['draft'],
+  cotizacion: ['draft'],
+  aprobado: ['draft', 'active', 'on_hold'],
   finalizado: ['finished'],
 };
 
@@ -181,12 +224,8 @@ const ESTADO_DEFAULT_BY_TIPO: Record<ProjectTipo, ProjectStatus> = {
   finalizado: 'finished',
 };
 
-/** Antes de Aprobado, `draft` es "sin estado" y se muestra "—" (prototipo: `estadosDisponibles()` → ['—','Detenido']); "No iniciado" solo existe desde Aprobado. */
-const SIN_ESTADO_LABEL = '—';
-
 function estadoLabel(tipo: ProjectTipo, status: ProjectStatus, currentStatus: ProjectStatus): string {
   if (status === 'active' && tipo === 'aprobado' && currentStatus === 'draft') return 'Activo (activación manual)';
-  if (status === 'draft' && (tipo === 'prospecto' || tipo === 'cotizacion')) return SIN_ESTADO_LABEL;
   return PROJECT_STATUS_LABELS[status];
 }
 
@@ -197,8 +236,8 @@ export interface EditProjectDialogProps {
   onSuccess: (message: string) => void;
   /**
    * Gerencia/PMO (`projects:manage`). Sin él, el propio líder no puede reasignar el proyecto a otro
-   * líder (campo bloqueado) ni pasarlo a Activo (la opción no se ofrece). El backend exige lo mismo
-   * (`CannotReassignProjectLeaderError`, `CannotActivateProjectError`).
+   * líder (campo bloqueado) — el backend exige lo mismo (`CannotReassignProjectLeaderError`). Pasar a
+   * Activo sí lo puede hacer el líder del proyecto: el diálogo solo se abre para él o Gerencia/PMO.
    */
   isManagement: boolean;
 }
@@ -236,6 +275,11 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
   const [estado, setEstado] = useState<ProjectStatus>(project.status);
   const [manualActivationReason, setManualActivationReason] = useState('');
   const [allowsOvertime, setAllowsOvertime] = useState(project.allowsOvertime);
+  /** Interno: sin plan de pago ni facturación — solo Gerencia/PMO lo cambia (`CannotChangeProjectInternalFlagError`). */
+  const [isInternal, setIsInternal] = useState(project.isInternal);
+  /** Se intentó guardar con el aviso de facturación pendiente: el aviso pasa a error y se lleva a la vista. */
+  const [approvalBillingBlocked, setApprovalBillingBlocked] = useState(false);
+  const approvalBillingRef = useRef<HTMLDivElement>(null);
 
   const {
     register,
@@ -259,11 +303,14 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
     setTipo(deriveTipo(project.salesStage, project.status));
     setEstado(project.status);
     setAllowsOvertime(project.allowsOvertime);
+    setIsInternal(project.isInternal);
     setServerError(null);
     setPaymentPlan(paymentPlanFromProject(project));
     setPaymentPlanDirty(false);
     setPaymentPlanError(null);
     setCoveredProjectIds(null);
+    setPlanDraft(null);
+    setApprovalBillingBlocked(false);
   }, [open, project, reset]);
 
   const clientId = watch('clientId') ?? '';
@@ -289,7 +336,8 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
   // Mismo criterio que la sección equivalente de `NewProjectPage`: 1 = "Único", 2+ = "Consolidado".
   const savedClientId = project.client?.id ?? null;
   const { data: clientSupportPlans } = useSupportPlansForClient(open && !isDevelopment ? savedClientId : null);
-  const supportPlan = clientSupportPlans?.find((plan) => plan.projectId === project.id) ?? null;
+  // Solo el contrato vigente: el proyecto puede arrastrar contratos terminados y editar uno de esos no cambia nada visible.
+  const supportPlan = clientSupportPlans?.find((plan) => plan.projectId === project.id && plan.status === 'active') ?? null;
   const { data: supportPlanDetail } = useSupportPlanDetail(supportPlan?.id ?? null);
   const updateSupportPlan = useUpdateSupportPlan(supportPlan?.id ?? '', savedClientId ?? undefined);
   const { data: finishedProjects } = useProjectsList(
@@ -306,6 +354,48 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
     ...(finishedProjects?.items ?? []).map((candidate) => ({ id: candidate.id, name: candidate.name, status: candidate.status })),
     ...savedCoveredProjects.filter((linked) => !finishedProjects?.items.some((candidate) => candidate.id === linked.id)),
   ];
+
+  // Tipo de soporte, política de excedente y HH del plan viven en el contrato (`support_plans`), no en el
+  // proyecto: son la lógica de venta por tipo de paquete (períodos mensuales, saldo acumulable, bolsa).
+  /** `null` = sin tocar: se muestra lo guardado y no se manda nada al contrato. */
+  const [planDraft, setPlanDraft] = useState<SupportPlanDraft | null>(null);
+  // Del detalle y no del listado: el valor de la hora extra solo viene en el detalle — partir sin él lo mandaría en 0 al guardar.
+  const savedPlanDraft: SupportPlanDraft | null =
+    supportPlan && supportPlanDetail
+      ? {
+          planType: supportPlanDetail.planType,
+          surplusPolicy: supportPlanDetail.surplusPolicy,
+          contractedHours: supportPlanDetail.contractedHours,
+          planValueUf: String(supportPlanDetail.planValueUf),
+          extraHourValueUf: String(supportPlanDetail.extraHourValueUf),
+          currency: supportPlanDetail.currency,
+        }
+      : null;
+  const currentPlanDraft = planDraft ?? savedPlanDraft;
+  const editPlanDraft = (patch: Partial<SupportPlanDraft>) => {
+    if (!currentPlanDraft) return;
+    const next = { ...currentPlanDraft, ...patch };
+    // Mensual necesita política de excedente; Bolsa y A demanda no la usan.
+    if (next.planType === 'monthly' && !next.surplusPolicy) next.surplusPolicy = 'accumulate';
+    if (next.planType !== 'monthly') next.surplusPolicy = null;
+    if (next.planType === 'on_demand') next.contractedHours = 0;
+    setPlanDraft(next);
+  };
+
+  // Las HH mensuales son las del plan; el saldo acumulado de meses anteriores se suma aparte en cada
+  // período (`reusedBalanceHours`). Se muestra el desglose del mes en curso para que no se confundan.
+  const currentPeriod = supportPlanDetail?.summary.currentPeriod ?? null;
+  const currentPeriodBreakdown =
+    currentPeriod && currentPlanDraft?.planType === 'monthly' && savedPlanDraft?.planType === 'monthly'
+      ? `Este mes: ${formatPlanHours(currentPeriod.planHours)} h del plan + ${formatPlanHours(currentPeriod.priorSurplusHours)} h acumuladas de meses anteriores = ${formatPlanHours(currentPeriod.capacityHours)} h disponibles.`
+      : null;
+
+  // Facturación cobra HH × valor hora (la bolsa una vez, el mensual cada mes): se muestra el monto resultante para que no se lea como cuota.
+  const planHourValue = Number(currentPlanDraft?.planValueUf) || 0;
+  const planChargeHint =
+    currentPlanDraft && currentPlanDraft.planType !== 'on_demand' && currentPlanDraft.contractedHours > 0 && planHourValue > 0
+      ? `${currentPlanDraft.planType === 'bundle' ? 'Monto de la bolsa' : 'Cuota mensual'}: ${formatPlanHours(currentPlanDraft.contractedHours)} HH × ${formatMoney(planHourValue, currentPlanDraft.currency)} = ${formatMoney(currentPlanDraft.contractedHours * planHourValue, currentPlanDraft.currency)}.`
+      : undefined;
 
   const toggleCoveredProject = (projectId: string) =>
     setCoveredProjectIds(
@@ -341,6 +431,7 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
       name: delivery.name ?? '',
       description: delivery.description ?? '',
       estimatedDate: delivery.estimatedDate,
+      segmentId: delivery.segmentId ?? '',
     };
   })();
 
@@ -362,6 +453,7 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
       name: values.name.trim(),
       description: values.description.trim() || undefined,
       teamId: values.teamId || undefined,
+      segmentId: values.segmentId || null,
       estimatedDate: values.estimatedDate,
     };
     try {
@@ -380,6 +472,15 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
   // acá y recién se crean apenas responde `createModule`.
   const [newModuleSegments, setNewModuleSegments] = useState<SegmentDraft[]>([]);
   const nextNewModuleSegmentId = useRef(1);
+
+  // Tiempos de ejecución de la fase de la entrega — los del módulo en borrador aún no tienen id.
+  const deliveryModalSegmentOptions = !deliveryModal
+    ? []
+    : deliveryModal.kind === 'existing'
+      ? (project.modules.find((m) => m.id === deliveryModal.moduleId)?.segments ?? []).map((segment) =>
+          toDeliverySegmentOption(segment.id, segment),
+        )
+      : newModuleSegments.map((segment) => toDeliverySegmentOption(draftSegmentKey(segment.localId), segment));
 
   const removeNewModuleSegment = (localId: number) => {
     setNewModuleSegments((prev) => prev.filter((segment) => segment.localId !== localId));
@@ -466,6 +567,21 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
   const onCreateModule = newModuleForm.handleSubmit(async (values) => {
     try {
       const module = await createModule.mutateAsync({ projectId: project.id, input: values });
+      // Primero los tramos: las entregas del borrador los referencian por su clave local.
+      const pendingSegments = newModuleSegments.filter(
+        (segment) => segment.teamId && segment.name.trim() && segment.startDate && segment.endDate,
+      );
+      const segmentIdsByDraftKey = new Map(
+        await Promise.all(
+          pendingSegments.map(
+            async (segment) =>
+              [
+                draftSegmentKey(segment.localId),
+                (await createSegment.mutateAsync({ projectId: project.id, moduleId: module.id, input: toSegmentInput(segment) })).id,
+              ] as const,
+          ),
+        ),
+      );
       const pendingDeliveries = newModuleDeliveries.filter((delivery) => delivery.estimatedDate && delivery.name.trim());
       if (pendingDeliveries.length > 0) {
         await Promise.all(
@@ -477,22 +593,9 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
                 name: delivery.name.trim(),
                 description: delivery.description.trim() || undefined,
                 teamId: delivery.teamId || undefined,
+                segmentId: resolveDraftSegmentId(delivery.segmentId, segmentIdsByDraftKey),
                 estimatedDate: delivery.estimatedDate,
               },
-            }),
-          ),
-        );
-      }
-      const pendingSegments = newModuleSegments.filter(
-        (segment) => segment.teamId && segment.name.trim() && segment.startDate && segment.endDate,
-      );
-      if (pendingSegments.length > 0) {
-        await Promise.all(
-          pendingSegments.map((segment) =>
-            createSegment.mutateAsync({
-              projectId: project.id,
-              moduleId: module.id,
-              input: toSegmentInput(segment),
             }),
           ),
         );
@@ -545,26 +648,42 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
     if (next !== module.estimatedEndDate) void onSaveModuleField(module.id, { estimatedEndDate: next });
   };
 
-  /** Pasar a Activo es solo de Gerencia/PMO; si el proyecto ya está activo se mantiene la opción para que el select muestre su valor actual. */
-  const estadoOptions = ESTADO_OPTIONS_BY_TIPO[tipo].filter(
-    (status) => status !== 'active' || isManagement || project.status === 'active',
-  );
+  const estadoOptions = ESTADO_OPTIONS_BY_TIPO[tipo];
   const totalTeamHours = teamsValue.reduce((sum, team) => sum + (Number(team.assignedHours) || 0), 0);
   /** Hito 0 manual: activar a mano (sin factura) un proyecto Aprobado que seguía "No iniciado" — exige motivo (ver `ChangeProjectStatusUseCase`). */
   const isManualHito0 = isDevelopment && tipo === 'aprobado' && project.status === 'draft' && estado === 'active';
-  /** Con Hito 0 registrado (el proyecto ya se activó, aunque después se haya detenido o finalizado) las HH vendidas quedan fijas. */
-  const soldHoursLocked = isDevelopment && project.hito0At != null;
   /** En Prospecto la estimación aún no se completa: fechas y horas se ingresan al pasar a Cotización (prototipo: `renderEstimacion()`). */
   const estimationDisabled = isDevelopment && tipo === 'prospecto';
+  /** Hito 0 permite corregir HH vendidas; el motivo es obligatorio si su valor realmente cambia. */
+  const soldHoursChangedAfterHito0 =
+    project.hito0At != null && !supportPlan && !estimationDisabled &&
+    Number(watch('soldHours')) !== project.soldHours;
+  // Avisar en cuanto cambian las HH, sin esperar a que el usuario intente guardar.
+  const soldHoursChangeReasonMissing =
+    soldHoursChangedAfterHito0 && !watch('soldHoursChangeReason')?.trim();
+  /** Finalizado: Estado, etapa de avance y etapa de cada fase quedan fijos (se reabre volviendo a "Proyecto aprobado"). */
+  const isFinalized = isDevelopment && tipo === 'finalizado';
+  /** Prospecto y Cotización solo pueden estar "No iniciado": el Estado no se elige. */
+  const estadoLocked = isFinalized || tipo === 'prospecto' || tipo === 'cotizacion';
+  /** La etapa de avance solo corresponde a proyectos Activos — Prospecto, Cotización y Aprobado No iniciado o Detenido la tienen bloqueada (igual que al crear). */
+  const phaseEnabled = estado === 'active';
   /** Antes de Aprobado son horas estimadas para la cotización; al aprobarse quedan como horas vendidas. */
   const hoursLabel = isDevelopment && (tipo === 'prospecto' || tipo === 'cotizacion') ? 'HH estimadas' : 'HH vendidas';
+  /** Al pasar a Aprobado el plan de pago debe tener montos — se avisa apenas se elige el tipo y bloquea el guardado. */
+  const approvalBillingIssue =
+    isDevelopment && !isInternal && tipo === 'aprobado' && project.salesStage !== 'approved'
+      ? missingApprovalBillingData(paymentPlan)
+      : null;
 
   const handleTipoChange = (nextTipo: ProjectTipo) => {
     setTipo(nextTipo);
     const mappedSalesStage = TIPO_TO_SALES_STAGE[nextTipo];
     if (mappedSalesStage) setValue('salesStage', mappedSalesStage, { shouldValidate: true });
     const options = ESTADO_OPTIONS_BY_TIPO[nextTipo];
-    if (!options.includes(estado)) setEstado(ESTADO_DEFAULT_BY_TIPO[nextTipo]);
+    if (options.includes(estado)) return;
+    // Reabrir un finalizado que ya pasó el Hito 0 lo deja Activo, no "No iniciado".
+    const reopensActive = nextTipo === 'aprobado' && project.hito0At != null;
+    setEstado(reopensActive ? 'active' : ESTADO_DEFAULT_BY_TIPO[nextTipo]);
   };
 
   const toggleTeam = (teamId: string) => {
@@ -583,21 +702,52 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
       setServerError('Escribe el motivo o la referencia de la activación (ej. contrato firmado, orden de compra).');
       return;
     }
+    if (
+      project.hito0At != null &&
+      values.soldHours !== undefined &&
+      values.soldHours !== project.soldHours &&
+      !values.soldHoursChangeReason?.trim()
+    ) {
+      setError('soldHoursChangeReason', { message: 'Indica el motivo del ajuste de HH vendidas.' });
+      return;
+    }
     // En Prospecto el plan de pago no se edita (ver `estimationDisabled`); aunque se haya tocado antes de volver a Prospecto, no se manda.
-    const sendPaymentPlan = isDevelopment && paymentPlanDirty && !estimationDisabled;
+    // Un proyecto interno no se cobra: su plan de pago no se edita ni se manda.
+    const sendPaymentPlan = isDevelopment && paymentPlanDirty && !estimationDisabled && !isInternal;
+    if (approvalBillingIssue) {
+      setApprovalBillingBlocked(true);
+      approvalBillingRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
     if (sendPaymentPlan) {
       const planError = validatePaymentPlan(paymentPlan);
       setPaymentPlanError(planError);
       if (planError) return;
     }
+    // Con contrato de soporte, las HH del proyecto son las del plan: se editan en "Contrato de soporte" y el backend las
+    // sincroniza al guardar el contrato — mandarlas acá dejaría HH vendidas y bolsa desalineadas.
+    const baseValues = supportPlan ? { ...values, soldHours: undefined, supportHours: undefined } : values;
+    const projectValues = isDevelopment && isInternal !== project.isInternal ? { ...baseValues, isInternal } : baseValues;
     try {
       await updateProject.mutateAsync({
         projectId: project.id,
-        input: sendPaymentPlan ? { ...values, ...paymentPlanPayload(paymentPlan) } : values,
+        input: sendPaymentPlan ? { ...projectValues, ...paymentPlanPayload(paymentPlan) } : projectValues,
       });
       await applyPendingRemovals();
-      if (supportPlan && coveredProjectIds && !sameIds(coveredProjectIds, savedCoveredProjects.map((linked) => linked.id))) {
-        await updateSupportPlan.mutateAsync({ developmentProjectIds: coveredProjectIds });
+      if (supportPlan) {
+        const planInput: UpdateSupportPlanInput = {};
+        if (coveredProjectIds && !sameIds(coveredProjectIds, savedCoveredProjects.map((linked) => linked.id))) {
+          planInput.developmentProjectIds = coveredProjectIds;
+        }
+        if (planDraft && savedPlanDraft && !samePlanDraft(planDraft, savedPlanDraft)) {
+          planInput.planType = planDraft.planType;
+          planInput.surplusPolicy = planDraft.surplusPolicy;
+          planInput.contractedHours = planDraft.contractedHours;
+          planInput.planValueUf = Number(planDraft.planValueUf) || 0;
+          planInput.extraHourValueUf = Number(planDraft.extraHourValueUf) || 0;
+          planInput.currency = planDraft.currency;
+        }
+        if (Object.keys(planInput).length > 0) await updateSupportPlan.mutateAsync(planInput);
       }
       if (isDevelopment && estado !== project.status) {
         await changeStatus.mutateAsync({
@@ -650,7 +800,13 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
           <Button variant="outline" onClick={onClose} disabled={isSubmitting}>
             Cancelar
           </Button>
-          <Button type="submit" form="edit-project-form" loading={isSubmitting} loadingText="Guardando…">
+          <Button
+            type="submit"
+            form="edit-project-form"
+            loading={isSubmitting}
+            loadingText="Guardando…"
+            disabled={soldHoursChangeReasonMissing}
+          >
             Guardar cambios
           </Button>
         </>
@@ -717,15 +873,48 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
                 label="Estado"
                 options={estadoOptions.map((status) => ({ value: status, label: estadoLabel(tipo, status, project.status) }))}
                 value={estado}
-                disabled={tipo === 'finalizado'}
+                disabled={estadoLocked}
                 onChange={(event) => setEstado(event.target.value as ProjectStatus)}
               />
               <Select
                 label="Etapa de avance"
                 placeholder="Sin definir"
                 options={PHASE_OPTIONS}
+                helperText={phaseEnabled || isFinalized ? undefined : 'Solo para proyectos activos.'}
+                // Deshabilitado, react-hook-form no lo envía y la etapa guardada se mantiene.
+                disabled={!phaseEnabled}
                 {...register('phase', { setValueAs: emptyToNull })}
               />
+            </div>
+          )}
+
+          {isDevelopment && (
+            <div>
+              <label className={styles.checkboxLabel}>
+                <input
+                  type="checkbox"
+                  checked={isInternal}
+                  disabled={!isManagement}
+                  onChange={(e) => setIsInternal(e.target.checked)}
+                />
+                Proyecto interno
+              </label>
+              <p className={styles.hint}>
+                {isManagement
+                  ? 'Proyecto de la propia empresa: no lleva monto ni plan de pago, no aparece en Facturación y no envía correos de cobro.'
+                  : 'Solo Gerencia/PMO puede marcar o desmarcar un proyecto como interno.'}
+              </p>
+            </div>
+          )}
+
+          {approvalBillingIssue && (
+            <div
+              ref={approvalBillingRef}
+              className={approvalBillingBlocked ? styles.alert : styles.warnBox}
+              role={approvalBillingBlocked ? 'alert' : 'status'}
+            >
+              <AlertIcon size={18} className={styles.alertIcon} />
+              <span>{approvalBillingIssue}</span>
             </div>
           )}
         </div>
@@ -770,8 +959,11 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
               />
             </div>
             <p className={styles.hint}>
-              Aún no hay factura del primer tramo. Al activarlo manualmente queda como Hito 0 de origen manual,
-              comienzan a correr las horas y el motivo queda registrado en la bitácora.
+              {isInternal
+                ? 'Un proyecto interno no tiene facturas: se activa siempre de forma manual.'
+                : 'Aún no hay factura del primer tramo.'}{' '}
+              Al activarlo manualmente queda como Hito 0 de origen manual, comienzan a correr las horas y el motivo
+              queda registrado en la bitácora.
             </p>
           </div>
         )}
@@ -797,29 +989,42 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
               disabled={estimationDisabled}
               {...register('endDate', { setValueAs: emptyToNull })}
             />
-            <TextField
-              label={hoursLabel}
-              type="number"
-              min={0}
-              // Desde el Hito 0 corren las horas vendidas: quedan fijas (`SoldHoursLockedAfterHito0Error`).
-              // Deshabilitado, react-hook-form no lo envía y `UpdateProjectUseCase` no toca `soldHours`.
-              disabled={soldHoursLocked || estimationDisabled}
-              helperText={soldHoursLocked ? 'No editable desde que el proyecto se activó (Hito 0).' : undefined}
-              errorText={errors.soldHours?.message}
-              {...register('soldHours')}
-            />
+            {/* En soporte con contrato, las HH se editan una sola vez en "Contrato de soporte" (bolsa / HH mensuales). */}
+            {!supportPlan && (
+              <TextField
+                label={hoursLabel}
+                type="number"
+                min={0}
+                disabled={estimationDisabled}
+                errorText={errors.soldHours?.message}
+                {...register('soldHours')}
+              />
+            )}
           </div>
-
-          {!isDevelopment && (
-            <TextField label="Horas de soporte" type="number" min={0} {...register('supportHours')} />
-          )}
-
-          {!isDevelopment && (
-            <TextField
-              label="Plan de soporte"
-              placeholder="Ej: Mensual, Bolsa de horas…"
-              {...register('supportPlanDescription')}
-            />
+          {soldHoursChangedAfterHito0 && (
+            <div className={styles.field}>
+              <label className={styles.label} htmlFor="soldHoursChangeReason">
+                Motivo del ajuste de HH vendidas
+              </label>
+              <textarea
+                id="soldHoursChangeReason"
+                className={styles.textarea}
+                placeholder="Ej. Ampliación de alcance aprobada por el cliente."
+                aria-invalid={soldHoursChangeReasonMissing || Boolean(errors.soldHoursChangeReason)}
+                aria-describedby={soldHoursChangeReasonMissing ? 'sold-hours-change-reason-warning' : undefined}
+                {...register('soldHoursChangeReason')}
+              />
+              {soldHoursChangeReasonMissing && (
+                <div id="sold-hours-change-reason-warning" className={styles.warnBox} role="alert">
+                  <AlertIcon size={18} className={styles.alertIcon} />
+                  <span>Debes ingresar un motivo del ajuste de HH vendidas para habilitar «Guardar cambios».</span>
+                </div>
+              )}
+              {errors.soldHoursChangeReason && (
+                <p className={styles.hint} role="alert">{errors.soldHoursChangeReason.message}</p>
+              )}
+              <p className={styles.hint}>El valor anterior, el nuevo y este motivo quedarán registrados en la bitácora.</p>
+            </div>
           )}
 
           {project.canAuthorizeOvertime && (
@@ -853,6 +1058,69 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
             </div>
           )}
         </div>
+
+        {!isDevelopment && currentPlanDraft && (
+          <div className={styles.section}>
+            <h3 className={styles.sectionTitle}>Contrato de soporte</h3>
+            <div className={styles.field}>
+              <span className={styles.label}>Tipo de soporte</span>
+              <SegmentedControl
+                aria-label="Tipo de soporte"
+                options={SUPPORT_PLAN_TYPE_OPTIONS}
+                value={currentPlanDraft.planType}
+                onChange={(value) => editPlanDraft({ planType: value as SupportPlanType })}
+              />
+            </div>
+            {currentPlanDraft.planType === 'monthly' && (
+              <div className={styles.field}>
+                <span className={styles.label}>Política de excedente</span>
+                <SegmentedControl
+                  aria-label="Política de excedente"
+                  options={SUPPORT_SURPLUS_POLICY_OPTIONS}
+                  value={currentPlanDraft.surplusPolicy ?? ''}
+                  onChange={(value) => editPlanDraft({ surplusPolicy: value as SupportSurplusPolicy })}
+                />
+              </div>
+            )}
+            {currentPlanDraft.planType !== 'on_demand' && (
+              <TextField
+                label={currentPlanDraft.planType === 'bundle' ? 'Cantidad de HH de la bolsa' : 'Cantidad de HH mensuales'}
+                type="number"
+                min={0}
+                step="any"
+                value={String(currentPlanDraft.contractedHours)}
+                onChange={(event) => editPlanDraft({ contractedHours: Number(event.target.value) || 0 })}
+                helperText={currentPeriodBreakdown ?? undefined}
+              />
+            )}
+            {/* Mismos campos que al crear (`NewProjectPage`): una sola moneda para ambos valores. */}
+            <div className={styles.row}>
+              <MoneyField
+                label="Valor de la hora"
+                currency={currentPlanDraft.currency}
+                onCurrencyChange={(value) => editPlanDraft({ currency: value as SupportPlanCurrency })}
+                currencyOptions={SUPPORT_CURRENCY_OPTIONS}
+                step="0.01"
+                min={0}
+                value={currentPlanDraft.planValueUf}
+                onChange={(event) => editPlanDraft({ planValueUf: event.target.value })}
+              />
+              {currentPlanDraft.planType !== 'on_demand' && (
+                <MoneyField
+                  label="Valor de horas extra"
+                  currency={currentPlanDraft.currency}
+                  onCurrencyChange={(value) => editPlanDraft({ currency: value as SupportPlanCurrency })}
+                  currencyOptions={SUPPORT_CURRENCY_OPTIONS}
+                  step="0.01"
+                  min={0}
+                  value={currentPlanDraft.extraHourValueUf}
+                  onChange={(event) => editPlanDraft({ extraHourValueUf: event.target.value })}
+                />
+              )}
+            </div>
+            {planChargeHint && <p className={styles.hint}>{planChargeHint}</p>}
+          </div>
+        )}
 
         {!isDevelopment && (
           <div className={styles.section}>
@@ -889,7 +1157,7 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
           </div>
         )}
 
-        {isDevelopment && (
+        {isDevelopment && !isInternal && (
           <div className={styles.section}>
             <h3 className={styles.sectionTitle}>Plan de pago</h3>
             <p className={styles.hint}>
@@ -953,7 +1221,12 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
                         label="Líder"
                         placeholder="Sin asignar"
                         options={assignableOptions(teamLeaderCandidates, (user) => ({ value: user.id, label: user.fullName, status: user.status }), teamsValue[index]?.leaderUserId)}
-                        {...register(`teams.${index}.leaderUserId`, { setValueAs: emptyToNull })}
+                        // Controlado por la misma razón que "Líder Kabeli a cargo": si los candidatos cargan
+                        // después del `reset()`, un `<select>` no controlado queda en "Sin asignar".
+                        value={teamsValue[index]?.leaderUserId ?? ''}
+                        onChange={(event) =>
+                          setValue(`teams.${index}.leaderUserId`, event.target.value || null, { shouldDirty: true })
+                        }
                       />
                       <TextField label="N° colaboradores" type="number" min={0} {...register(`teams.${index}.memberCount`)} />
                       <TextField label="Horas estimadas" type="number" min={0} {...register(`teams.${index}.assignedHours`)} />
@@ -1020,6 +1293,16 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
                             value={moduleDraft(module).name}
                             onChange={(event) => setModuleDraftField(module, { name: event.target.value })}
                             onBlur={() => onBlurModuleName(module)}
+                          />
+                          {/* Único lugar donde se cambia — en el Roadmap la etapa solo se muestra (ver `ProjectModulesCard`). */}
+                          <Select
+                            label="Etapa actual"
+                            options={MODULE_STAGE_OPTIONS}
+                            value={module.currentStage}
+                            disabled={isFinalized}
+                            onChange={(event) =>
+                              void onSaveModuleField(module.id, { currentStage: event.target.value as ProjectModuleStage })
+                            }
                           />
                           <TextField
                             label="Horas estimadas"
@@ -1145,6 +1428,7 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
                                   </span>
                                   <span className={deliveryModalStyles.listMeta}>
                                     {formatDeliveryDate(delivery.estimatedDate)} · {PROJECT_MODULE_DELIVERY_STATUS_LABELS[delivery.status]}
+                                    {delivery.segmentName ? ` · ${delivery.segmentName}` : ''}
                                     {delivery.description ? ` · ${delivery.description}` : ''}
                                   </span>
                                   {deliveryRemoved && <span className={deliveryModalStyles.pendingRemovalNote}>Se quitará al guardar</span>}
@@ -1416,6 +1700,7 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
       open={deliveryModal !== null}
       mode={deliveryModal?.delivery ? 'edit' : 'create'}
       teamOptions={deliveryModalTeamOptions}
+      segmentOptions={deliveryModalSegmentOptions}
       initialValues={deliveryModalInitialValues}
       submitting={addDelivery.isPending || updateDelivery.isPending}
       onCancel={() => setDeliveryModal(null)}
@@ -1450,6 +1735,7 @@ function toFormValues(project: ProjectDetail): ProjectFormValues {
     endDate: project.endDate,
     estimatedDeliveryDate: project.estimatedDeliveryDate,
     soldHours: project.soldHours,
+    soldHoursChangeReason: '',
     supportPlanDescription: project.supportPlanDescription ?? '',
     supportHours: project.supportHours,
     quotationLink: project.quotationLink ?? '',
@@ -1466,6 +1752,21 @@ function toFormValues(project: ProjectDetail): ProjectFormValues {
       assignedHours: team.assignedHours ?? undefined,
     })),
   };
+}
+
+function formatPlanHours(value: number): string {
+  return value.toLocaleString('es-CL', { maximumFractionDigits: 2 });
+}
+
+function samePlanDraft(a: SupportPlanDraft, b: SupportPlanDraft): boolean {
+  return (
+    a.planType === b.planType &&
+    a.surplusPolicy === b.surplusPolicy &&
+    a.contractedHours === b.contractedHours &&
+    Number(a.planValueUf) === Number(b.planValueUf) &&
+    Number(a.extraHourValueUf) === Number(b.extraHourValueUf) &&
+    a.currency === b.currency
+  );
 }
 
 function sameIds(a: readonly string[], b: readonly string[]): boolean {

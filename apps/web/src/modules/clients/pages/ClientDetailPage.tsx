@@ -358,9 +358,10 @@ export function ClientDetailPage() {
         clientId={client.id}
         onClose={() => setEditing(false)}
         onSuccess={(message) => {
+          // Se queda en la ficha: la mutación invalida el detalle y la página
+          // se refresca con lo guardado.
           toast.success(message);
           setEditing(false);
-          void navigate('/clientes');
         }}
       />
     </DashboardLayout>

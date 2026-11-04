@@ -11,6 +11,8 @@ function buildItem(overrides: Partial<HourEntryListItem> = {}): HourEntryListIte
     projectName: null,
     moduleId: null,
     moduleName: null,
+    segmentId: null,
+    segmentName: null,
     teamId: null,
     teamName: null,
     assignment: 'Vacaciones',

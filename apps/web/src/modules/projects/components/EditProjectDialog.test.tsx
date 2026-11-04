@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { ProjectDetail } from '@kora/contracts';
+import { SUPPORT_SURPLUS_POLICY_LABELS, type ProjectDetail } from '@kora/contracts';
 import { EditProjectDialog, type EditProjectDialogProps } from './EditProjectDialog';
 import { ToastProvider } from '@/shared/components/ui/Toast';
 
@@ -33,10 +33,14 @@ vi.mock('../api/projects.queries', () => ({
   useProjectsList: () => ({ data: { items: [] } }),
 }));
 
+const updateSupportPlanMutateAsync = vi.fn().mockResolvedValue(undefined);
+const supportPlansForClientMock = vi.fn(() => ({ data: [] as unknown[] }));
+const supportPlanDetailMock = vi.fn(() => ({ data: undefined as unknown }));
+
 vi.mock('../api/support-plan.queries', () => ({
-  useSupportPlansForClient: () => ({ data: [] }),
-  useSupportPlanDetail: () => ({ data: undefined }),
-  useUpdateSupportPlan: () => ({ mutateAsync: vi.fn() }),
+  useSupportPlansForClient: () => supportPlansForClientMock(),
+  useSupportPlanDetail: () => supportPlanDetailMock(),
+  useUpdateSupportPlan: () => ({ mutateAsync: updateSupportPlanMutateAsync }),
 }));
 
 vi.mock('@/modules/clients/api/clients.queries', () => ({
@@ -54,6 +58,10 @@ vi.mock('@/modules/users/api/users.queries', () => ({
 vi.mock('@/modules/forecast/api/forecast.queries', () => ({
   useForecastLoadPreview: () => ({ data: undefined }),
   useCheckForecastOverload: () => async () => [],
+}));
+
+vi.mock('@/modules/hours/api/hours.queries', () => ({
+  useHolidays: () => ({ data: [] }),
 }));
 
 vi.mock('@/modules/teams/api/teams.queries', () => ({
@@ -83,6 +91,7 @@ function buildProject(overrides: Partial<ProjectDetail> = {}): ProjectDetail {
     supportPlanDescription: null,
     supportHours: 0,
     allowsOvertime: false,
+    isInternal: false,
     createdAt: '2026-01-01T00:00:00.000Z',
     developer: null,
     commercialManager: null,
@@ -140,6 +149,7 @@ function buildProject(overrides: Partial<ProjectDetail> = {}): ProjectDetail {
 describe('EditProjectDialog', () => {
   beforeEach(() => {
     useUsersListMock.mockReturnValue({ data: { items: [] } });
+    mutateAsync.mockClear();
   });
 
   it('precarga el formulario con los datos actuales del proyecto', () => {
@@ -147,6 +157,88 @@ describe('EditProjectDialog', () => {
 
     expect(screen.getByLabelText(/Nombre del proyecto/)).toHaveValue('Proyecto de prueba');
     expect(screen.getByLabelText('HH vendidas')).toHaveValue(500);
+  });
+
+  it('permite editar HH vendidas después de Hito 0 y pide motivo al cambiarlas', async () => {
+    const user = userEvent.setup();
+    renderDialog({
+      open: true,
+      project: buildProject({
+        hito0At: '2026-10-01T00:00:00.000Z',
+        commercialManager: { id: '22222222-2222-4222-8222-222222222222', fullName: 'Rodrigo Viveros' },
+      }),
+      onClose: vi.fn(),
+      onSuccess: vi.fn(),
+      isManagement: true,
+    });
+
+    const soldHours = screen.getByLabelText('HH vendidas');
+    const save = screen.getByRole('button', { name: 'Guardar cambios' });
+    expect(soldHours).toBeEnabled();
+    expect(save).toBeEnabled();
+    expect(screen.queryByLabelText('Motivo del ajuste de HH vendidas')).not.toBeInTheDocument();
+
+    await user.clear(soldHours);
+    await user.type(soldHours, '750');
+    const reason = screen.getByLabelText('Motivo del ajuste de HH vendidas');
+    expect(save).toBeDisabled();
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Debes ingresar un motivo del ajuste de HH vendidas para habilitar «Guardar cambios».',
+    );
+    expect(reason).toHaveAttribute('aria-invalid', 'true');
+    expect(mutateAsync).not.toHaveBeenCalled();
+
+    // Solo espacios no satisfacen la obligación de dejar un motivo.
+    await user.type(reason, '   ');
+    expect(save).toBeDisabled();
+
+    await user.type(reason, 'Ampliación de alcance aprobada');
+    expect(save).toBeEnabled();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(reason).toHaveAttribute('aria-invalid', 'false');
+    // jsdom no envía formularios desde botones externos por el atributo form.
+    fireEvent.submit(document.getElementById('edit-project-form') as HTMLFormElement);
+    await waitFor(() =>
+      expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({
+        projectId: 'project-1',
+        input: expect.objectContaining({ soldHours: 750, soldHoursChangeReason: 'Ampliación de alcance aprobada' }),
+      })),
+    );
+  });
+
+  it('no exige motivo si las HH vendidas permanecen iguales después de Hito 0', () => {
+    renderDialog({
+      open: true,
+      project: buildProject({ hito0At: '2026-10-01T00:00:00.000Z' }),
+      onClose: vi.fn(),
+      onSuccess: vi.fn(),
+      isManagement: true,
+    });
+    expect(screen.getByLabelText('HH vendidas')).toBeEnabled();
+    expect(screen.queryByLabelText('Motivo del ajuste de HH vendidas')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeEnabled();
+  });
+
+  it('reactiva Guardar si las HH vendidas vuelven a su valor anterior', async () => {
+    const user = userEvent.setup();
+    renderDialog({
+      open: true,
+      project: buildProject({ hito0At: '2026-10-01T00:00:00.000Z' }),
+      onClose: vi.fn(),
+      onSuccess: vi.fn(),
+      isManagement: true,
+    });
+    const soldHours = screen.getByLabelText('HH vendidas');
+    const save = screen.getByRole('button', { name: 'Guardar cambios' });
+    await user.clear(soldHours);
+    await user.type(soldHours, '750');
+    expect(save).toBeDisabled();
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    await user.clear(soldHours);
+    await user.type(soldHours, '500');
+    expect(save).toBeEnabled();
+    expect(screen.queryByLabelText('Motivo del ajuste de HH vendidas')).not.toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('bloquea "Líder Kabeli a cargo" cuando el actor no puede reasignar el proyecto (solo Gerencia/PMO puede)', () => {
@@ -205,7 +297,7 @@ describe('EditProjectDialog', () => {
     expect(screen.getByLabelText(/Responsable comercial/)).toBeInTheDocument();
   });
 
-  it.each(['prospect', 'quoted'] as const)('en %s el Estado solo ofrece "—" (sin estado) y Detenido, sin "No iniciado"', (salesStage) => {
+  it.each(['prospect', 'quoted'] as const)('en %s el Estado queda fijo en "No iniciado" y bloqueado', (salesStage) => {
     renderDialog({
       open: true,
       project: buildProject({ salesStage, status: 'draft', phase: null }),
@@ -216,11 +308,12 @@ describe('EditProjectDialog', () => {
 
     const estado = screen.getByLabelText('Estado') as HTMLSelectElement;
     const labels = Array.from(estado.options).map((option) => option.textContent);
-    expect(labels).toEqual(['—', 'Detenido']);
+    expect(labels).toEqual(['No iniciado']);
     expect(estado).toHaveValue('draft');
+    expect(estado).toBeDisabled();
   });
 
-  it('no ofrece "Activo" en el Estado a quien no es Gerencia/PMO (el líder no puede activar el proyecto)', () => {
+  it('ofrece la activación manual también al líder del proyecto (sin Gerencia/PMO)', () => {
     renderDialog({
       open: true,
       project: buildProject({ salesStage: 'approved', status: 'draft' }),
@@ -230,7 +323,7 @@ describe('EditProjectDialog', () => {
     });
 
     const estado = screen.getByLabelText('Estado') as HTMLSelectElement;
-    expect(Array.from(estado.options).map((option) => option.value)).not.toContain('active');
+    expect(Array.from(estado.options).map((option) => option.textContent)).toContain('Activo (activación manual)');
   });
 
   it('ofrece la activación manual a Gerencia/PMO', () => {
@@ -264,8 +357,12 @@ describe('EditProjectDialog', () => {
       isManagement: true,
     });
 
-    expect(screen.getByLabelText('Horas de soporte')).toBeInTheDocument();
-    expect(screen.getByLabelText('Plan de soporte')).toBeInTheDocument();
+    // Las horas del plan (mensuales / bolsa) se editan en el contrato de soporte, no aquí.
+    expect(screen.queryByLabelText('Horas de soporte')).not.toBeInTheDocument();
+    // Las HH vendidas son `soldHours` también en soporte (fijas; lo que avanza son las consumidas).
+    expect(screen.getByLabelText('HH vendidas')).toHaveValue(500);
+    // El tipo de soporte sale del contrato (`plan_type`); ya no es un texto libre editable aquí.
+    expect(screen.queryByLabelText('Plan de soporte')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Tipo de proyecto')).not.toBeInTheDocument();
   });
 
@@ -298,4 +395,125 @@ describe('EditProjectDialog', () => {
     );
     expect(onSuccess).toHaveBeenCalledWith('Se actualizaron los datos de Proyecto renombrado.');
   });
+
+  it('al marcar "Proyecto interno" oculta el plan de pago y manda el flag al guardar', async () => {
+    const user = userEvent.setup();
+    renderDialog({
+      open: true,
+      project: buildProject({ commercialManager: { id: '22222222-2222-4222-8222-222222222222', fullName: 'Rodrigo Riveros' } }),
+      onClose: vi.fn(),
+      onSuccess: vi.fn(),
+      isManagement: true,
+    });
+
+    expect(screen.getByRole('heading', { name: 'Plan de pago' })).toBeInTheDocument();
+    await user.click(screen.getByLabelText('Proyecto interno'));
+    expect(screen.queryByRole('heading', { name: 'Plan de pago' })).not.toBeInTheDocument();
+
+    fireEvent.submit(document.getElementById('edit-project-form') as HTMLFormElement);
+
+    await waitFor(() =>
+      expect(mutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({ projectId: 'project-1', input: expect.objectContaining({ isInternal: true }) }),
+      ),
+    );
+  });
+
+  it('solo Gerencia/PMO puede cambiar "Proyecto interno"', () => {
+    renderDialog({ open: true, project: buildProject(), onClose: vi.fn(), onSuccess: vi.fn(), isManagement: false });
+
+    expect(screen.getByLabelText('Proyecto interno')).toBeDisabled();
+    expect(screen.getByText('Solo Gerencia/PMO puede marcar o desmarcar un proyecto como interno.')).toBeInTheDocument();
+  });
+
+  it('muestra el tipo de soporte del contrato vigente y guarda el cambio en el contrato', async () => {
+    supportPlansForClientMock.mockReturnValue({
+      data: [
+        // Un contrato terminado del mismo proyecto no debe ser el que se edita.
+        { id: 'plan-0', projectId: 'project-1', status: 'ended', planType: 'bundle', surplusPolicy: null, contractedHours: 0 },
+        { id: 'plan-1', projectId: 'project-1', status: 'active', planType: 'monthly', surplusPolicy: 'accumulate', contractedHours: 10 },
+      ],
+    });
+    supportPlanDetailMock.mockReturnValue({ data: activeMonthlyPlanDetail });
+    const user = userEvent.setup();
+    renderDialog({
+      open: true,
+      project: buildProject({ type: 'support', salesStage: null, phase: null }),
+      onClose: vi.fn(),
+      onSuccess: vi.fn(),
+      isManagement: true,
+    });
+
+    expect(screen.getByRole('radio', { name: 'Mensual' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('radio', { name: SUPPORT_SURPLUS_POLICY_LABELS.accumulate })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByLabelText('Cantidad de HH mensuales')).toHaveValue(10);
+    // Las HH del contenedor son las del plan: no hay un segundo campo "HH vendidas" que pueda contradecirlas.
+    expect(screen.queryByLabelText('HH vendidas')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('radio', { name: 'Bolsa' }));
+    // La política de excedente es solo de los planes mensuales.
+    expect(screen.queryByRole('radiogroup', { name: 'Política de excedente' })).not.toBeInTheDocument();
+    const bundleHours = screen.getByLabelText('Cantidad de HH de la bolsa');
+    await user.clear(bundleHours);
+    await user.type(bundleHours, '40');
+    fireEvent.submit(document.getElementById('edit-project-form') as HTMLFormElement);
+
+    await waitFor(() =>
+      expect(updateSupportPlanMutateAsync).toHaveBeenCalledWith({
+        planType: 'bundle',
+        surplusPolicy: null,
+        contractedHours: 40,
+        planValueUf: 0.6,
+        extraHourValueUf: 1.1,
+        currency: 'UF',
+      }),
+    );
+    const projectInput = mutateAsync.mock.calls.at(-1)?.[0].input;
+    expect(projectInput.soldHours).toBeUndefined();
+    expect(projectInput.supportHours).toBeUndefined();
+    supportPlansForClientMock.mockReturnValue({ data: [] });
+    supportPlanDetailMock.mockReturnValue({ data: undefined });
+  });
+
+  it('edita el valor de la hora del contrato y muestra la cuota que se facturará', async () => {
+    supportPlansForClientMock.mockReturnValue({
+      data: [{ id: 'plan-1', projectId: 'project-1', status: 'active', planType: 'monthly', surplusPolicy: 'accumulate', contractedHours: 10 }],
+    });
+    supportPlanDetailMock.mockReturnValue({ data: activeMonthlyPlanDetail });
+    const user = userEvent.setup();
+    renderDialog({
+      open: true,
+      project: buildProject({ type: 'support', salesStage: null, phase: null }),
+      onClose: vi.fn(),
+      onSuccess: vi.fn(),
+      isManagement: true,
+    });
+
+    const hourValue = screen.getByLabelText('Valor de la hora');
+    expect(hourValue).toHaveValue(0.6);
+    expect(screen.getByLabelText('Valor de horas extra')).toHaveValue(1.1);
+    await user.clear(hourValue);
+    await user.type(hourValue, '1.5');
+    expect(screen.getByText(/Cuota mensual: 10 HH ×/)).toBeInTheDocument();
+    fireEvent.submit(document.getElementById('edit-project-form') as HTMLFormElement);
+
+    await waitFor(() =>
+      expect(updateSupportPlanMutateAsync).toHaveBeenCalledWith(expect.objectContaining({ planValueUf: 1.5, extraHourValueUf: 1.1, currency: 'UF' })),
+    );
+    supportPlansForClientMock.mockReturnValue({ data: [] });
+    supportPlanDetailMock.mockReturnValue({ data: undefined });
+  });
 });
+
+/** Solo los campos del detalle que lee el diálogo. */
+const activeMonthlyPlanDetail = {
+  id: 'plan-1',
+  planType: 'monthly',
+  surplusPolicy: 'accumulate',
+  contractedHours: 10,
+  planValueUf: 0.6,
+  extraHourValueUf: 1.1,
+  currency: 'UF',
+  linkedProjects: [],
+  summary: { currentPeriod: null },
+};

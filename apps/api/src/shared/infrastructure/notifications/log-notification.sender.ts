@@ -9,6 +9,7 @@ import type {
   ProjectInvoiceBlockedNotification,
   ProjectPaymentMilestoneReadyNotification,
   ProjectReactivatedFromHoldNotification,
+  SupportBillingDigestNotification,
   TeamReportDataRequestEmail,
   UserInvitation,
 } from '../../application/ports/notification.port';
@@ -109,6 +110,14 @@ export class LogNotificationSender implements NotificationSender {
       to: notification.recipientEmail,
       items: notification.items.length,
       hours: notification.items.reduce((sum, item) => sum + item.hours, 0),
+    });
+  }
+
+  async sendSupportBillingDigest(notification: SupportBillingDigestNotification): Promise<void> {
+    this.logger.info('[notificación] Resumen de soportes por cobrar', {
+      to: notification.recipientEmail,
+      month: notification.monthLabel,
+      items: notification.items.map((item) => `${item.clientName} · ${item.contractType} · ${item.usedHours}h`),
     });
   }
 

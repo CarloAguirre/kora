@@ -17,6 +17,7 @@ import type {
   MarkProjectPaymentMilestonePaidInput,
   ProjectBillingSettings,
   ProjectDetail,
+  ProjectPhaseOption,
   ResolveProjectObservationInput,
   SetProjectOvertimeAuthorizationInput,
   UpdateProjectBillingSettingsInput,
@@ -43,6 +44,7 @@ export const projectsApi = {
       phase: query.phase,
       salesStage: query.salesStage,
       quotationStatus: query.quotationStatus,
+      kind: query.kind,
       clientId: query.clientId,
       clientIds: query.clientIds,
       period: query.period?.map((period) => `${period.from}..${period.to}`),
@@ -55,6 +57,9 @@ export const projectsApi = {
   },
   detail(projectId: string): Promise<ProjectDetail> {
     return api.get<ProjectDetail>(`/projects/${projectId}`);
+  },
+  phases(projectId: string): Promise<ProjectPhaseOption[]> {
+    return api.get<ProjectPhaseOption[]>(`/projects/${projectId}/phases`);
   },
   create(input: CreateProjectInput): Promise<{ id: string }> {
     return api.post<{ id: string }>('/projects', input);
@@ -210,5 +215,7 @@ export const projectKeys = {
   list: (query: Partial<ListProjectsQuery>) => [...projectKeys.lists(), query] as const,
   details: () => [...projectKeys.all, 'detail'] as const,
   detail: (projectId: string) => [...projectKeys.details(), projectId] as const,
+  /** Bajo `detail(projectId)`: invalidar la ficha también refresca las fases. */
+  phases: (projectId: string) => [...projectKeys.detail(projectId), 'phases'] as const,
   billingSettings: () => [...projectKeys.all, 'billing-settings'] as const,
 };

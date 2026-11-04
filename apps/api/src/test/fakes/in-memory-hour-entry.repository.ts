@@ -5,8 +5,10 @@ import type {
   HourEntryListItem,
   HourEntryRepository,
   HourEntrySortableField,
-  OvertimeHoursByProjectAndUser,
+  HourEntrySummary,
+  OvertimeHoursByDayProjectAndUser,
   OvertimeHoursByUser,
+  OvertimeReportScope,
 } from '../../modules/hours/domain/repositories/hour-entry.repository';
 
 /**
@@ -37,8 +39,28 @@ export class InMemoryHourEntryRepository implements HourEntryRepository {
     page: PageRequest,
     sort: SortRequest<HourEntrySortableField>,
   ): Promise<Page<HourEntryListItem>> {
-    const matches = this.items
+    const matches = this.filter(filters).sort((a, b) => {
+      const direction = sort.direction === 'asc' ? 1 : -1;
+      const av = a[sort.field];
+      const bv = b[sort.field];
+      if (av instanceof Date && bv instanceof Date) return (av.getTime() - bv.getTime()) * direction;
+      return String(av).localeCompare(String(bv)) * direction;
+    });
+
+    const start = (page.page - 1) * page.pageSize;
+    return buildPage(matches.slice(start, start + page.pageSize), matches.length, page);
+  }
+
+  /** `leaderScopeUserId` no se simula (es SQL puro): los tests que lo usan siembran solo filas dentro del alcance. */
+  async summarize(filters: HourEntryFilters): Promise<HourEntrySummary> {
+    const matches = this.filter(filters);
+    return { entries: matches.length, hours: matches.reduce((sum, item) => sum + item.hours, 0) };
+  }
+
+  private filter(filters: HourEntryFilters): HourEntryListItem[] {
+    return this.items
       .filter((item) => (filters.projectId ? item.projectId === filters.projectId : true))
+      .filter((item) => (filters.excludeUserId ? item.userId !== filters.excludeUserId : true))
       .filter((item) => (filters.status ? item.status === filters.status : true))
       .filter((item) => (filters.dateFrom ? item.date >= filters.dateFrom : true))
       .filter((item) => (filters.dateTo ? item.date <= filters.dateTo : true))
@@ -47,17 +69,7 @@ export class InMemoryHourEntryRepository implements HourEntryRepository {
         filters.search
           ? item.userFullName.toLowerCase().includes(filters.search.toLowerCase())
           : true,
-      )
-      .sort((a, b) => {
-        const direction = sort.direction === 'asc' ? 1 : -1;
-        const av = a[sort.field];
-        const bv = b[sort.field];
-        if (av instanceof Date && bv instanceof Date) return (av.getTime() - bv.getTime()) * direction;
-        return String(av).localeCompare(String(bv)) * direction;
-      });
-
-    const start = (page.page - 1) * page.pageSize;
-    return buildPage(matches.slice(start, start + page.pageSize), matches.length, page);
+      );
   }
 
   async save(): Promise<void> {
@@ -108,18 +120,22 @@ export class InMemoryHourEntryRepository implements HourEntryRepository {
     return [...byUser.values()].sort((a, b) => b.approvedHours + b.pendingHours - (a.approvedHours + a.pendingHours));
   }
 
-  async sumOvertimeHoursByProjectAndUser(
+  /** `leaderScopeUserId` no se simula (es SQL puro), igual que en `summarize()`. */
+  async sumOvertimeHoursByDayProjectAndUser(
     dateFrom: Date,
     dateTo: Date,
-  ): Promise<OvertimeHoursByProjectAndUser[]> {
-    const rows = new Map<string, OvertimeHoursByProjectAndUser>();
+    scope: OvertimeReportScope = {},
+  ): Promise<OvertimeHoursByDayProjectAndUser[]> {
+    const rows = new Map<string, OvertimeHoursByDayProjectAndUser>();
     for (const item of this.items) {
-      if (item.projectId === null || item.projectType === null || !item.isOvertime || item.status === 'rejected') continue;
+      if (!item.isOvertime || item.status === 'rejected') continue;
       if (item.date.getTime() < dateFrom.getTime() || item.date.getTime() > dateTo.getTime()) continue;
-      const key = `${item.projectId}:${item.userId}`;
+      if (scope.excludeUserId && item.userId === scope.excludeUserId) continue;
+      const key = `${item.date.getTime()}:${item.projectId}:${item.userId}`;
       const existing = rows.get(key) ?? {
+        date: item.date,
         projectId: item.projectId,
-        projectName: item.projectName ?? '',
+        projectName: item.projectName,
         projectType: item.projectType,
         leaderUserId: null,
         leaderFullName: null,
@@ -137,11 +153,15 @@ export class InMemoryHourEntryRepository implements HourEntryRepository {
     return [...rows.values()];
   }
 
-  async sumRegularHoursForUserAndDate(userId: string, date: Date): Promise<number> {
+  async sumRegularHoursForUserAndDate(userId: string, date: Date, excludeEntryId?: string): Promise<number> {
     return this.items
       .filter(
         (item) =>
-          item.userId === userId && item.date.getTime() === date.getTime() && !item.isOvertime && item.status !== 'rejected',
+          item.userId === userId &&
+          item.date.getTime() === date.getTime() &&
+          !item.isOvertime &&
+          item.status !== 'rejected' &&
+          item.id !== excludeEntryId,
       )
       .reduce((sum, item) => sum + item.hours, 0);
   }

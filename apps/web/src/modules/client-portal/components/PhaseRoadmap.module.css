@@ -21,9 +21,6 @@
   align-items: center;
   justify-content: space-between;
   gap: 14px;
-  padding: 16px 20px;
-  border: 1px solid #e4e9ee;
-  border-radius: 14px;
 }
 
 .summaryRowBorderless {
@@ -71,9 +68,6 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 18px;
-  padding: 14px 18px;
-  border: 1px solid #e4e9ee;
-  border-radius: 14px;
 }
 
 .legendItem {
@@ -253,51 +247,6 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 14px;
-}
-
-.summaryOfProgressLabel {
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.6px;
-  text-transform: uppercase;
-  color: #93a0ac;
-  white-space: nowrap;
-}
-
-/* Chips de ámbito (Diseño/Desarrollo/QA Funcional/Rev. Cliente) — Figma
-   (node 9669:31017) los pinta como píldoras navy sólidas de ancho fijo al
-   contenido, no como una barra de progreso segmentada por %. */
-.stageChips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.stageChip {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 14px;
-  border: none;
-  border-radius: 8px;
-  background: #0f2a44;
-  color: var(--kora-surface);
-  font-size: 12.5px;
-  font-weight: var(--kora-weight-semibold);
-  cursor: pointer;
-}
-
-/* Ámbito seleccionado — filtra/atenúa la fila "Tareas" que no son de ese ámbito. */
-.stageChipActive {
-  background: #4c7ef3;
-}
-
-.stageChipPercent {
-  padding: 1px 6px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.18);
-  font-size: 11px;
-  font-weight: 800;
 }
 
 /* Zoom Semanas/Días — slider real con estado de vista local (como
@@ -557,9 +506,59 @@ button.ganttBar {
   transform: translate(calc(-1 * var(--marker-half) - 11px), -50%);
 }
 
-/* Tarea fuera del ámbito seleccionado en los chips de "Resumen de avance". */
-.markerItemDimmed {
-  opacity: 0.35;
+/* Varias entregas/tareas el mismo día (`MarkerTrackRow` en PhaseRoadmap.tsx): el
+   contenedor del `DropdownMenu` toma el posicionamiento que `.markerItem` tiene
+   cuando va suelto, y el botón de adentro queda en flujo. `--marker-half` viene
+   de `.markerItemTask` en las tareas. */
+.markerGroup {
+  position: absolute;
+  top: 50%;
+  transform: translate(calc(-1 * var(--marker-half, 9px)), -50%);
+  z-index: 6;
+}
+
+.markerGroupHighlighted {
+  transform: translate(calc(-1 * var(--marker-half, 9px) - 11px), -50%);
+}
+
+.markerGroup .markerItem {
+  position: static;
+  transform: none;
+}
+
+.markerSymbol {
+  position: relative;
+  display: inline-flex;
+}
+
+/* Contador del grupo, sobre la esquina del símbolo. */
+.markerCount {
+  position: absolute;
+  top: -7px;
+  right: -9px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #ffffff;
+  border-radius: 999px;
+  background: #2f5fd0;
+  color: #ffffff;
+  font-size: 9px;
+  font-weight: var(--kora-weight-bold);
+  line-height: 1;
+}
+
+.markerGroup .markerItem .markerSymbol + .markerLabel {
+  margin-left: 4px;
+}
+
+.markerChevron {
+  flex: none;
+  color: #5d6b7a;
 }
 
 .relatedBitacora {

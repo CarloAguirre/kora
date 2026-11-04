@@ -2,7 +2,7 @@ import { sql } from 'drizzle-orm';
 import { boolean, date, numeric, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
 import { primaryId, timestamps } from './columns';
 import { users } from './identity';
-import { projectModules, projectModuleSegments, projects } from './projects';
+import { projectModuleSegments, projectModules, projects } from './projects';
 
 /**
  * Ver docs/DECISION-M4-HORAS.md.

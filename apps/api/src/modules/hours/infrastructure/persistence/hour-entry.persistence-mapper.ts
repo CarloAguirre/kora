@@ -7,7 +7,7 @@ export interface HourEntryRow {
   userId: string;
   projectId: string | null;
   moduleId: string | null;
-  segmentId?: string | null;
+  segmentId: string | null;
   assignment: string | null;
   category: string;
   description: string;
@@ -32,7 +32,7 @@ export function toDomain(row: HourEntryRow): HourEntry {
     userId: row.userId,
     projectId: row.projectId,
     moduleId: row.moduleId,
-    segmentId: row.segmentId ?? null,
+    segmentId: row.segmentId,
     assignment: row.assignment,
     category: row.category,
     description: row.description,
@@ -59,7 +59,7 @@ export function toPersistence(entry: HourEntry) {
     userId: snapshot.userId,
     projectId: snapshot.projectId,
     moduleId: snapshot.moduleId,
-    segmentId: snapshot.segmentId ?? null,
+    segmentId: snapshot.segmentId,
     assignment: snapshot.assignment,
     category: snapshot.category,
     description: snapshot.description,

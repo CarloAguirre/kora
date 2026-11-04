@@ -47,6 +47,15 @@ export function useProjectDetail(projectId: string | null) {
   });
 }
 
+/** Fases y tiempos de ejecución — no exige ver la ficha, solo registrar horas en el proyecto. */
+export function useProjectPhases(projectId: string | null) {
+  return useQuery({
+    queryKey: projectKeys.phases(projectId ?? ''),
+    queryFn: () => projectsApi.phases(projectId as string),
+    enabled: Boolean(projectId),
+  });
+}
+
 function useInvalidateProjects() {
   const queryClient = useQueryClient();
   return () => {
@@ -54,6 +63,8 @@ function useInvalidateProjects() {
     // El Dashboard resume proyectos/soporte: sin esto quedaba desactualizado
     // hasta que el usuario recargaba la página a mano.
     queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    // La campanita del Líder PM avisa fechas y HH asignadas por completar.
+    queryClient.invalidateQueries({ queryKey: ['notifications', 'reminders'] });
   };
 }
 

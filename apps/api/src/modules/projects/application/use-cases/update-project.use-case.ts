@@ -11,6 +11,7 @@ import {
 } from '@kora/core';
 import type { Permission, UpdateProjectInput } from '@kora/contracts';
 import {
+  CannotChangeProjectInternalFlagError,
   CannotManageProjectError,
   CannotReassignProjectLeaderError,
   ProjectNameAlreadyInUseError,
@@ -18,7 +19,7 @@ import {
   ProjectTeamMaxMembersBelowAssignedError,
   ProjectTeamHasRoadmapBlocksError,
   ReferencedClientNotFoundError,
-  SoldHoursLockedAfterHito0Error,
+  SoldHoursChangeReasonRequiredError,
 } from '../../domain/errors/project.errors';
 import { PROJECT_REPOSITORY, type ProjectRepository } from '../../domain/repositories/project.repository';
 import { PROJECT_TEAM_REPOSITORY, type ProjectTeamRepository } from '../../domain/repositories/project-team.repository';
@@ -85,9 +86,14 @@ export class UpdateProjectUseCase implements UseCase<UpdateProjectCommand, void,
       return err(new CannotReassignProjectLeaderError());
     }
 
-    /** Mismo criterio no-op que `leaderUserId`: reenviar el mismo valor sin tocarlo se deja pasar. */
+    if (!hasFullManage && data.isInternal !== undefined && data.isInternal !== project.isInternal) {
+      return err(new CannotChangeProjectInternalFlagError());
+    }
+
+    // Hito 0 ya no bloquea el ajuste de HH vendidas. Como cambia los indicadores
+    // de consumo/desviación, exigir un motivo solo cuando hay un cambio real.
     if (project.hito0At && data.soldHours !== undefined && data.soldHours !== project.toSnapshot().soldHours) {
-      return err(new SoldHoursLockedAfterHito0Error());
+      if (!data.soldHoursChangeReason?.trim()) return err(new SoldHoursChangeReasonRequiredError());
     }
 
     if (data.teams) {
@@ -190,6 +196,7 @@ export class UpdateProjectUseCase implements UseCase<UpdateProjectCommand, void,
         ...(data.qaFailedTests !== undefined ? { qaFailedTests: data.qaFailedTests } : {}),
         ...(data.contractAmount !== undefined ? { contractAmount: data.contractAmount ?? null } : {}),
         ...(data.contractCurrency !== undefined ? { contractCurrency: data.contractCurrency } : {}),
+        ...(data.isInternal !== undefined ? { isInternal: data.isInternal } : {}),
       },
       now,
     );
@@ -222,7 +229,9 @@ export class UpdateProjectUseCase implements UseCase<UpdateProjectCommand, void,
     if (before.soldHours !== after.soldHours) {
       changeEntries.push({
         projectId: project.id,
-        message: `HH vendidas actualizadas de ${before.soldHours} a ${after.soldHours}.`,
+        message: project.hito0At
+          ? `HH vendidas actualizadas de ${before.soldHours} a ${after.soldHours} después del Hito 0. Motivo: ${data.soldHoursChangeReason!.trim()}`
+          : `HH vendidas actualizadas de ${before.soldHours} a ${after.soldHours}.`,
       });
     }
 
@@ -240,6 +249,15 @@ export class UpdateProjectUseCase implements UseCase<UpdateProjectCommand, void,
       });
     }
 
+    if (before.isInternal !== after.isInternal) {
+      changeEntries.push({
+        projectId: project.id,
+        message: after.isInternal
+          ? 'Proyecto marcado como interno: sin facturación ni avisos de cobro.'
+          : 'Proyecto desmarcado como interno: vuelve a tener plan de pago y facturación.',
+      });
+    }
+
     if (before.estimatedDeliveryDate?.getTime() !== after.estimatedDeliveryDate?.getTime()) {
       changeEntries.push({
         projectId: project.id,
@@ -251,7 +269,8 @@ export class UpdateProjectUseCase implements UseCase<UpdateProjectCommand, void,
     try {
       await this.unitOfWork.run(async (tx) => {
         await this.projects.save(project, tx);
-        if (project.type === 'development') {
+        // Un proyecto interno no se cobra: su plan de pago (si quedó de antes) no se toca ni se promueve.
+        if (project.type === 'development' && !project.isInternal) {
           if (data.paymentMilestones) {
             await syncPaymentPlan(
               this.paymentMilestones,

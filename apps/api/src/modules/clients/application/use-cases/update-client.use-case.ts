@@ -78,6 +78,7 @@ export class UpdateClientUseCase implements UseCase<UpdateClientCommand, void, A
         taxId,
         ...(data.website !== undefined ? { website: data.website || null } : {}),
         ...(data.address !== undefined ? { address: data.address || null } : {}),
+        ...(data.logoDataUrl !== undefined ? { logoDataUrl: data.logoDataUrl } : {}),
         ...(data.countryId !== undefined ? { countryId: data.countryId } : {}),
         ...(data.comunaId !== undefined ? { comunaId: data.comunaId } : {}),
         ...(data.industryId !== undefined ? { industryId: data.industryId } : {}),

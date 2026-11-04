@@ -45,6 +45,18 @@ export class ProjectAlreadyDeletedError extends ConflictError {
   }
 }
 
+export class ActiveSupportContractMustBeClosedError extends ConflictError {
+  constructor() {
+    super('Cierra el contrato de soporte antes de marcar el proyecto como terminado.', 'PROJECT_SUPPORT_ACTIVE_CONTRACT');
+  }
+}
+
+export class SupportContractRequiredForStatusError extends ConflictError {
+  constructor(message: string) {
+    super(message, 'PROJECT_SUPPORT_CONTRACT_REQUIRED');
+  }
+}
+
 export class ProjectTeamMemberNotFoundError extends NotFoundError {
   constructor(identifier: string) {
     super('Miembro asignado', identifier, 'PROJECT_TEAM_MEMBER_NOT_FOUND');
@@ -172,6 +184,13 @@ export class ProjectModuleTaskNotFoundError extends NotFoundError {
   }
 }
 
+/** Una tarea/entrega solo puede apuntar a un tiempo de ejecución de su misma fase. */
+export class SegmentNotInModuleError extends ValidationError {
+  constructor() {
+    super('El tiempo de ejecución elegido no pertenece a esta fase.', 'PROJECT_MODULE_SEGMENT_NOT_IN_MODULE');
+  }
+}
+
 export class InvalidTaskDatesError extends ValidationError {
   constructor() {
     super('La fecha de inicio no puede ser posterior a la fecha límite.', 'PROJECT_MODULE_TASK_INVALID_DATES');
@@ -262,15 +281,12 @@ export class CannotReassignProjectLeaderError extends ForbiddenError {
   }
 }
 
-/**
- * Desde el Hito 0 corren las horas vendidas: quedan fijas aunque el proyecto después se detenga o
- * finalice. Ver `UpdateProjectUseCase`.
- */
-export class SoldHoursLockedAfterHito0Error extends ConflictError {
+/** Corregir HH vendidas después de Hito 0 requiere dejar evidencia del motivo en bitácora. */
+export class SoldHoursChangeReasonRequiredError extends ValidationError {
   constructor() {
     super(
-      'Las HH vendidas no se pueden modificar desde que el proyecto se activó (Hito 0).',
-      'PROJECT_SOLD_HOURS_LOCKED',
+      'Indica el motivo del ajuste de HH vendidas para este proyecto, que ya pasó por Hito 0.',
+      'PROJECT_SOLD_HOURS_CHANGE_REASON_REQUIRED',
     );
   }
 }
@@ -316,6 +332,20 @@ export class ProjectPaymentMilestoneAlreadyPaidError extends ConflictError {
 export class ProjectManagementApprovalNotPendingError extends ConflictError {
   constructor() {
     super('Este proyecto no tiene una aprobación de Gerencia pendiente.', 'PROJECT_MANAGEMENT_APPROVAL_NOT_PENDING');
+  }
+}
+
+/** Marcar/desmarcar un proyecto como interno lo saca/devuelve de Facturación — decisión de Gerencia/PMO, no del líder. */
+export class CannotChangeProjectInternalFlagError extends ForbiddenError {
+  constructor() {
+    super('Solo Gerencia/PMO puede marcar o desmarcar un proyecto como interno.', 'PROJECT_CANNOT_CHANGE_INTERNAL_FLAG');
+  }
+}
+
+/** Un proyecto interno no se cobra: no tiene tramos de pago que crear ni facturar. */
+export class ProjectIsInternalError extends ValidationError {
+  constructor() {
+    super('Este proyecto es interno: no tiene plan de pago ni facturación.', 'PROJECT_IS_INTERNAL');
   }
 }
 

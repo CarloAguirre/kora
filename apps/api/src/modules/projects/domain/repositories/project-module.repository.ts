@@ -8,7 +8,6 @@ import type {
 
 export interface ProjectModuleDeliveryRecord {
   readonly id: string;
-  readonly segmentId?: string | null;
   readonly moduleId: string;
   readonly teamId: string | null;
   readonly teamName: string | null;
@@ -16,9 +15,13 @@ export interface ProjectModuleDeliveryRecord {
   readonly description: string | null;
   readonly assigneeUserId: string | null;
   readonly assigneeName: string | null;
+  /** Tiempo de ejecución (tramo) de la misma fase — `null` ⇔ sin tramo. */
+  readonly segmentId: string | null;
+  readonly segmentName: string | null;
   readonly estimatedDate: Date;
   readonly status: ProjectModuleDeliveryStatus;
   readonly rejectionReason: string | null;
+  readonly createdAt: Date;
 }
 
 export interface ProjectModuleSegmentMemberRecord {
@@ -46,12 +49,14 @@ export interface ProjectModuleSegmentRecord {
 
 export interface ProjectModuleTaskRecord {
   readonly id: string;
-  readonly segmentId?: string | null;
   readonly moduleId: string;
   readonly teamId: string | null;
   readonly teamName: string | null;
   readonly assigneeUserId: string | null;
   readonly assigneeName: string | null;
+  /** Tiempo de ejecución (tramo) de la misma fase — `null` ⇔ sin tramo. */
+  readonly segmentId: string | null;
+  readonly segmentName: string | null;
   readonly name: string;
   readonly description: string | null;
   readonly startDate: Date;
@@ -122,9 +127,9 @@ export interface ProjectModuleSegmentMemberInput {
 
 export interface CreateProjectModuleTaskInput {
   readonly moduleId: string;
-  readonly segmentId?: string | null;
   readonly teamId: string | null;
   readonly assigneeUserId: string | null;
+  readonly segmentId: string | null;
   readonly name: string;
   readonly description: string | null;
   readonly startDate: Date;
@@ -135,9 +140,9 @@ export interface CreateProjectModuleTaskInput {
 }
 
 export interface UpdateProjectModuleTaskInput {
-  readonly segmentId?: string | null;
   readonly teamId?: string | null;
   readonly assigneeUserId?: string | null;
+  readonly segmentId?: string | null;
   readonly name?: string;
   readonly description?: string | null;
   readonly startDate?: Date;
@@ -152,20 +157,20 @@ export interface UpdateProjectModuleTaskInput {
 
 export interface CreateProjectModuleDeliveryInput {
   readonly moduleId: string;
-  readonly segmentId?: string | null;
   readonly teamId: string | null;
   readonly name: string;
   readonly description: string | null;
   readonly assigneeUserId: string | null;
+  readonly segmentId: string | null;
   readonly estimatedDate: Date;
 }
 
 export interface UpdateProjectModuleDeliveryInput {
-  readonly segmentId?: string | null;
   readonly teamId?: string | null;
   readonly name?: string;
   readonly description?: string | null;
   readonly assigneeUserId?: string | null;
+  readonly segmentId?: string | null;
   readonly status?: ProjectModuleDeliveryStatus;
   readonly estimatedDate?: Date;
   readonly rejectionReason?: string | null;
@@ -209,11 +214,15 @@ export interface ProjectModuleProgressInputRecord {
     readonly date: Date;
     readonly scope: ProjectModuleTaskScope;
   }[];
+  readonly deliveries: readonly {
+    readonly status: ProjectModuleDeliveryStatus;
+    readonly estimatedDate: Date;
+  }[];
 }
 
 export interface ProjectModuleRepository {
   listForProject(projectId: string, context?: TransactionContext): Promise<ProjectModuleRecord[]>;
-  /** Fases (con sus tareas) de varios proyectos a la vez, por `projectId` — listado y dashboard. */
+  /** Fases (con sus tareas y entregas) de varios proyectos a la vez, por `projectId` — listado y dashboard. */
   listProgressInputsForProjects(
     projectIds: readonly string[],
     context?: TransactionContext,

@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import { PROJECT_PHASE_LABELS, PROJECT_STATUS_LABELS, type ProjectDetail } from '@kora/contracts';
+import { supportProjectStatusLabel } from '../lib/projects-list-search';
 import styles from './TeamLeaderProjectView.module.css';
 import { Button } from '@/shared/components/ui/Button';
 import { Card } from '@/shared/components/ui/Card';
@@ -12,6 +13,7 @@ import { useToast } from '@/shared/components/ui/Toast';
 import { PencilIcon, TrashIcon } from '@/shared/components/icons/Icons';
 import { calculateTeamProgress } from '../lib/team-progress';
 import { TeamProgressCard } from './TeamProgressCard';
+import { ProjectTimeline } from './ProjectTimeline';
 import { TeamTasksCard } from './TeamTasksCard';
 import { TeamDeliveriesCard } from './TeamDeliveriesCard';
 import deliveryModalStyles from './DeliveryModal.module.css';
@@ -24,6 +26,8 @@ import { getTeamStyle } from '../utils/team-style';
 
 const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 2 });
 const formatDate = (value: string) => new Date(`${value}T00:00:00`).toLocaleDateString('es-CL');
+/** Entrega estimada: proyectos antiguos/seed no la tienen propia y caen a la fecha de fin. */
+const formatOptionalDate = (value: string | null) => (value ? formatDate(value) : '—');
 
 interface TeamMemberDraftRow {
   key: string;
@@ -81,7 +85,7 @@ export function TeamLeaderProjectView({
     const leaderName = teamRow?.leader?.fullName ?? null;
     const maxMembers = teamRow?.maxMembers || null;
     const assignedHours = teamRow?.assignedHours ?? members.reduce((sum, m) => sum + m.assignedHours, 0);
-    const consumedHours = historicalMembers.reduce((sum, m) => sum + m.consumedHours, 0);
+    const consumedHours = historicalMembers.reduce((sum, m) => sum + m.consumedHours, 0) + (teamRow?.leaderConsumedHours ?? 0);
     return { teamId, teamName, leaderId, leaderName, maxMembers, assignedHours, consumedHours, members };
   }, [project, teamId]);
   const { pageItems: pagedMembers, pagination: membersPagination } = usePaginatedItems(team.members);
@@ -216,12 +220,18 @@ export function TeamLeaderProjectView({
             <span className={styles.infoValue}>{project.commercialManager?.fullName ?? '—'}</span>
           </div>
           <div>
+            <span className={styles.infoLabel}>Líder - PM Responsable</span>
+            <span className={styles.infoValue}>{project.leader?.fullName ?? '—'}</span>
+          </div>
+          <div>
             <span className={styles.infoLabel}>Fecha de inicio</span>
             <span className={styles.infoValue}>{project.startDate ? formatDate(project.startDate) : '—'}</span>
           </div>
           <div>
             <span className={styles.infoLabel}>Estado del proyecto</span>
-            <span className={styles.chip}>{PROJECT_STATUS_LABELS[project.status]}</span>
+            <span className={styles.chip}>
+              {project.type === 'support' ? supportProjectStatusLabel(project.status) : PROJECT_STATUS_LABELS[project.status]}
+            </span>
           </div>
           <div>
             <span className={styles.infoLabel}>Etapa de avance</span>
@@ -241,7 +251,7 @@ export function TeamLeaderProjectView({
         </Card>
         <Card className={styles.kpiCard}>
           <span className={styles.kpiLabel}>Fecha de entrega estimada</span>
-          <span className={styles.kpiValue}>{teamDeliveryDate ? formatDate(teamDeliveryDate) : '—'}</span>
+          <span className={styles.kpiValue}>{formatOptionalDate(teamDeliveryDate ?? project.endDate)}</span>
         </Card>
         <Card className={styles.kpiCard}>
           <span className={styles.kpiLabel}>Avance real / esperado</span>
@@ -318,6 +328,12 @@ export function TeamLeaderProjectView({
       </Card>
 
       <TeamProgressCard progress={teamProgress} teamName={team.teamName} />
+      <Card>
+        <p className={styles.sectionTitle}>Avance del proyecto</p>
+        <div style={{ marginTop: 'var(--kora-space-4)' }}>
+          <ProjectTimeline progress={project.progress} />
+        </div>
+      </Card>
 
       <TeamTasksCard project={project} projectId={projectId} teamId={teamId} />
       <TeamDeliveriesCard project={project} projectId={projectId} teamId={teamId} />

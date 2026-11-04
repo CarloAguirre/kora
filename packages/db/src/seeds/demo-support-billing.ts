@@ -208,7 +208,7 @@ export async function seedDemoSupportBilling(db: Database, today: Date = new Dat
       startDate: monthStart(-2),
       endDate: monthStart(10),
       contractedHours: '10',
-      planValueUf: '8',
+      planValueUf: '0.8',
       extraHourValueUf: '1.1',
     },
     {
@@ -220,7 +220,7 @@ export async function seedDemoSupportBilling(db: Database, today: Date = new Dat
       startDate: monthStart(-2),
       endDate: monthStart(10),
       contractedHours: '15',
-      planValueUf: '12',
+      planValueUf: '0.8',
       extraHourValueUf: '1.1',
     },
     {
@@ -233,7 +233,7 @@ export async function seedDemoSupportBilling(db: Database, today: Date = new Dat
       startDate: monthStart(-2),
       endDate: monthStart(10),
       contractedHours: '10',
-      planValueUf: '8',
+      planValueUf: '0.8',
       extraHourValueUf: '1.1',
     },
     {
@@ -247,7 +247,7 @@ export async function seedDemoSupportBilling(db: Database, today: Date = new Dat
       // Termina justo con el período en curso → es el último, y su exceso se cobra como horas extra.
       endDate: monthStart(1),
       contractedHours: '10',
-      planValueUf: '6',
+      planValueUf: '0.6',
       extraHourValueUf: '1.1',
     },
   ];

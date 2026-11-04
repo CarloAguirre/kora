@@ -61,11 +61,19 @@ import { ClientFormDialog } from '@/modules/clients/components/ClientFormDialog'
 import {
   PaymentPlanEditor,
   defaultPaymentPlan,
+  missingApprovalBillingData,
   paymentPlanPayload,
   validatePaymentPlan,
   type PaymentPlanDraft,
 } from '../components/PaymentPlanEditor';
-import { DeliveryModal, EMPTY_DELIVERY_MODAL_VALUES, type DeliveryModalValues } from '../components/DeliveryModal';
+import {
+  DeliveryModal,
+  EMPTY_DELIVERY_MODAL_VALUES,
+  draftSegmentKey,
+  resolveDraftSegmentId,
+  toDeliverySegmentOption,
+  type DeliveryModalValues,
+} from '../components/DeliveryModal';
 import deliveryModalStyles from '../components/DeliveryModal.module.css';
 import { SUPPORT_SLA_TARGET_HOURS, SupportSlaNote } from '../components/SupportSlaNote';
 import {
@@ -94,17 +102,16 @@ const PHASE_OPTIONS = PROJECT_PHASES.map((phase) => ({ value: phase, label: PROJ
 /**
  * Opciones de "Estado" al crear — dependen de la etapa comercial, mismo criterio que
  * `estadosDisponibles()` del prototipo de referencia (KORA · Definiciones de tipos, estados,
- * activación y horas de proyecto): Aprobado habilita los 3 estados operativos; antes de Aprobado
- * solo "—" (sin estado) o Detenido. El placeholder del Select es "No iniciado" en Aprobado y "—"
- * antes (valor vacío → sin `status`, y el backend asigna `draft` por defecto a todo proyecto de desarrollo).
+ * activación y horas de proyecto): Aprobado habilita los 3 estados operativos; Prospecto y
+ * Cotización siempre quedan "No iniciado" y el Select se bloquea. El placeholder es "No iniciado"
+ * (valor vacío → sin `status`, y el backend asigna `draft` por defecto a todo proyecto de desarrollo).
  */
-const STATUS_PLACEHOLDER_APPROVED = PROJECT_STATUS_LABELS.draft;
-const STATUS_PLACEHOLDER_NOT_APPROVED = '—';
+const STATUS_PLACEHOLDER = PROJECT_STATUS_LABELS.draft;
 const STATUS_OPTIONS_APPROVED = [
   { value: 'active', label: 'Activo (activación manual)' },
   { value: 'on_hold', label: PROJECT_STATUS_LABELS.on_hold },
 ];
-const STATUS_OPTIONS_NOT_APPROVED = [{ value: 'on_hold', label: PROJECT_STATUS_LABELS.on_hold }];
+const STATUS_OPTIONS_NOT_APPROVED: typeof STATUS_OPTIONS_APPROVED = [];
 
 /** Soporte no cambia: "Configuración de soporte" en el mismo índice donde Desarrollo tenía "Fases · Módulos". */
 const STEPS_SUPPORT = [
@@ -182,6 +189,8 @@ interface DeliveryDraft {
   teamId: string;
   estimatedDate: string;
   description: string;
+  /** Clave local del tramo (`draftSegmentKey`) — se traduce al id real al crear la fase. */
+  segmentId: string;
 }
 interface SegmentDraft extends ExecutionSegmentModalValues {
   localId: number;
@@ -330,6 +339,7 @@ export function NewProjectPage() {
   const type = watch('type') as ProjectType;
   const salesStage = watch('salesStage');
   const status = watch('status');
+  const isInternal = type === 'development' && Boolean(watch('isInternal'));
   const leaderUserId = watch('leaderUserId');
   const commercialManagerUserId = watch('commercialManagerUserId');
   const soldHours = watch('soldHours');
@@ -376,7 +386,6 @@ export function NewProjectPage() {
   const equiposEnabled = type === 'development' && isApproved;
   /** Opciones de "Estado" al crear — ver `STATUS_OPTIONS_APPROVED`/`STATUS_OPTIONS_NOT_APPROVED`. */
   const statusOptions = isApproved ? STATUS_OPTIONS_APPROVED : STATUS_OPTIONS_NOT_APPROVED;
-  const statusPlaceholder = isApproved ? STATUS_PLACEHOLDER_APPROVED : STATUS_PLACEHOLDER_NOT_APPROVED;
 
   const isSupport = type === 'support';
   const isSupportMonthly = isSupport && supportPlanType === 'monthly';
@@ -558,9 +567,20 @@ export function NewProjectPage() {
     const draft = moduleDrafts.find((m) => m.localId === deliveryModal.moduleLocalId);
     const delivery = draft?.deliveries.find((d) => d.localId === deliveryModal.deliveryLocalId);
     return delivery
-      ? { teamId: delivery.teamId, name: delivery.name, description: delivery.description, estimatedDate: delivery.estimatedDate }
+      ? {
+          teamId: delivery.teamId,
+          name: delivery.name,
+          description: delivery.description,
+          estimatedDate: delivery.estimatedDate,
+          segmentId: delivery.segmentId,
+        }
       : EMPTY_DELIVERY_MODAL_VALUES;
   })();
+
+  // Los tramos del wizard todavía no tienen id: la entrega los referencia por su clave local.
+  const deliveryModalSegmentOptions = (
+    moduleDrafts.find((m) => m.localId === deliveryModal?.moduleLocalId)?.segments ?? []
+  ).map((segment) => toDeliverySegmentOption(draftSegmentKey(segment.localId), segment));
 
   const onConfirmDeliveryModal = (values: DeliveryModalValues) => {
     if (!deliveryModal) return;
@@ -634,9 +654,11 @@ export function NewProjectPage() {
   };
 
   /** Deja "Estimación" (no existe en Prospecto) — sin equipos/fases (Cotización, o el usuario eligió omitirlo) va directo a Resumen. */
-  /** El plan de pago vive en Estimación: se valida al dejar ese paso. */
+  /** El plan de pago vive en Estimación: se valida al dejar ese paso. Aprobado además exige los montos (datos de facturación). */
   const paymentPlanIsValid = () => {
-    const error = validatePaymentPlan(paymentPlan);
+    // Un proyecto interno no se cobra: no hay plan de pago que validar.
+    if (isInternal) return true;
+    const error = (isApproved ? missingApprovalBillingData(paymentPlan) : null) ?? validatePaymentPlan(paymentPlan);
     setPaymentPlanError(error);
     return error === null;
   };
@@ -731,7 +753,9 @@ export function NewProjectPage() {
       // limpian por si se llenaron con otra etapa comercial antes de volver a Prospecto.
       const developmentValues = isProspecto
         ? { ...values, startDate: undefined, estimatedDeliveryDate: undefined, soldHours: 0 }
-        : { ...values, ...paymentPlanPayload(paymentPlan) };
+        : isInternal
+          ? values
+          : { ...values, ...paymentPlanPayload(paymentPlan) };
       const result = await createProject.mutateAsync(isManualHito0 ? { ...developmentValues, status: 'draft' } : developmentValues);
 
       if (values.type === 'development') {
@@ -768,6 +792,21 @@ export function NewProjectPage() {
                 estimatedEndDate: draft.estimatedEndDate || undefined,
               };
               const module = await createModule.mutateAsync({ projectId: result.id, input });
+              // Primero los tramos: las entregas del borrador los referencian por su clave local.
+              const pendingSegments = draft.segments.filter(
+                (segment) => segment.teamId && segment.name.trim() && segment.startDate && segment.endDate,
+              );
+              const segmentIdsByDraftKey = new Map(
+                await Promise.all(
+                  pendingSegments.map(
+                    async (segment) =>
+                      [
+                        draftSegmentKey(segment.localId),
+                        (await createSegment.mutateAsync({ projectId: result.id, moduleId: module.id, input: toSegmentInput(segment) })).id,
+                      ] as const,
+                  ),
+                ),
+              );
               const pendingDeliveries = draft.deliveries.filter((delivery) => delivery.estimatedDate && delivery.name.trim());
               if (pendingDeliveries.length > 0) {
                 await Promise.all(
@@ -779,22 +818,9 @@ export function NewProjectPage() {
                         name: delivery.name.trim(),
                         description: delivery.description.trim() || undefined,
                         teamId: delivery.teamId || undefined,
+                        segmentId: resolveDraftSegmentId(delivery.segmentId, segmentIdsByDraftKey),
                         estimatedDate: delivery.estimatedDate,
                       },
-                    }),
-                  ),
-                );
-              }
-              const pendingSegments = draft.segments.filter(
-                (segment) => segment.teamId && segment.name.trim() && segment.startDate && segment.endDate,
-              );
-              if (pendingSegments.length > 0) {
-                await Promise.all(
-                  pendingSegments.map((segment) =>
-                    createSegment.mutateAsync({
-                      projectId: result.id,
-                      moduleId: module.id,
-                      input: toSegmentInput(segment),
                     }),
                   ),
                 );
@@ -851,7 +877,11 @@ export function NewProjectPage() {
                     aria-label="Tipo de proyecto"
                     options={TYPE_OPTIONS}
                     value={type}
-                    onChange={(value) => setValue('type', value as ProjectType, { shouldValidate: true })}
+                    onChange={(value) => {
+                      setValue('type', value as ProjectType, { shouldValidate: true });
+                      // Solo un proyecto de desarrollo puede ser interno (ver `createProjectSchema`).
+                      if (value !== 'development') setValue('isInternal', false);
+                    }}
                     fullWidth
                   />
                 </div>
@@ -907,7 +937,7 @@ export function NewProjectPage() {
                       <div className={styles.section} style={{ paddingTop: 'var(--kora-space-3)' }}>
                         <TextField label="Nombre" value={contactName} onChange={(event) => setContactName(event.target.value)} />
                         <TextField label="Cargo" value={contactPosition} onChange={(event) => setContactPosition(event.target.value)} />
-                        <TextField label="Teléfono" value={contactPhone} onChange={(event) => setContactPhone(event.target.value)} />
+                        <TextField label="Teléfono" spellCheck={false} value={contactPhone} onChange={(event) => setContactPhone(event.target.value)} />
                         <TextField
                           label="Correo electrónico"
                           type="email"
@@ -940,8 +970,9 @@ export function NewProjectPage() {
                     />
                     <Select
                       label="Estado"
-                      placeholder={statusPlaceholder}
+                      placeholder={STATUS_PLACEHOLDER}
                       options={statusOptions}
+                      disabled={!isApproved}
                       {...register('status', { setValueAs: emptyToUndefined })}
                       onChange={(event) => {
                         register('status', { setValueAs: emptyToUndefined }).onChange(event);
@@ -979,6 +1010,19 @@ export function NewProjectPage() {
                     />
                   )}
                 </div>
+
+                {type === 'development' && (
+                  <div>
+                    <label className={styles.checkboxLine}>
+                      <input type="checkbox" {...register('isInternal')} />
+                      Proyecto interno
+                    </label>
+                    <p className={styles.hint} style={{ marginTop: 'var(--kora-space-1)' }}>
+                      Proyecto de la propia empresa: no lleva monto ni plan de pago, no aparece en Facturación y no envía
+                      correos de cobro.
+                    </p>
+                  </div>
+                )}
               </Section>
 
               {type === 'development' && status === 'on_hold' && (
@@ -1013,8 +1057,9 @@ export function NewProjectPage() {
                 <div className={`${styles.subCard} ${styles.subCardActivo}`}>
                   <p className={styles.subCardTitle}>Activación manual · Hito 0 (kickoff)</p>
                   <p className={styles.subCardSub}>
-                    Lo normal es que el proyecto se active solo al marcar la primera factura como facturada. Usa esta
-                    opción cuando hay un respaldo sin factura, por ejemplo un contrato firmado o una orden de compra.
+                    {isInternal
+                      ? 'Un proyecto interno no tiene facturas: se activa siempre de forma manual. Indica desde cuándo y por qué.'
+                      : 'Lo normal es que el proyecto se active solo al marcar la primera factura como facturada. Usa esta opción cuando hay un respaldo sin factura, por ejemplo un contrato firmado o una orden de compra.'}
                   </p>
                   <div className={styles.row}>
                     <TextField
@@ -1045,8 +1090,8 @@ export function NewProjectPage() {
                     {estadoExtraErrors.motivoActivacion && <p className={styles.fieldError}>{estadoExtraErrors.motivoActivacion}</p>}
                   </div>
                   <p className={styles.hint}>
-                    Queda registrado en la bitácora quién activó el proyecto, cuándo y por qué. Cuando llegue la primera
-                    factura, se asocia a este Hito 0 sin cambiar el estado.
+                    Queda registrado en la bitácora quién activó el proyecto, cuándo y por qué.
+                    {!isInternal && ' Cuando llegue la primera factura, se asocia a este Hito 0 sin cambiar el estado.'}
                   </p>
                 </div>
               )}
@@ -1143,6 +1188,7 @@ export function NewProjectPage() {
                 </div>
               </Section>
 
+              {!isInternal && (
               <Section title="Plan de pago">
                 <p className={styles.hint}>
                   Tramos en que se cobra el proyecto. Cada tramo queda <b>Por facturar</b> cuando se cumple su hito y se
@@ -1162,14 +1208,16 @@ export function NewProjectPage() {
                   </div>
                 )}
               </Section>
+              )}
 
               <Section title="Registro de horas">
                 <div className={styles.warnBox}>
                   <InfoIcon size={16} />
                   <div>
                     Desde que se crea el proyecto, los colaboradores pueden cargar horas (por ejemplo, maquetas o
-                    estimaciones pedidas en Prospecto). Todas las horas registradas antes de la fecha de emisión de la
-                    primera factura quedan en la fase <b>Prospecto/Cotización</b>, que suma al proyecto vendido.
+                    estimaciones pedidas en Prospecto). Todas las horas registradas antes de{' '}
+                    {isInternal ? 'la activación (Hito 0)' : 'la fecha de emisión de la primera factura'} quedan en la fase{' '}
+                    <b>Prospecto/Cotización</b>, que suma al proyecto vendido.
                   </div>
                 </div>
               </Section>
@@ -1178,7 +1226,12 @@ export function NewProjectPage() {
                 <div className={styles.infoBox}>
                   <InfoIcon size={16} />
                   <div>
-                    <b>Con fechas, horas vendidas y líder asignado ya puedes crear el proyecto.</b> Equipos y fases son
+                    <b>
+                      {isInternal
+                        ? 'Con fechas, horas vendidas y líder asignado ya puedes crear el proyecto.'
+                        : 'Con fechas, horas vendidas, el monto de cada tramo del plan de pago y líder asignado ya puedes crear el proyecto.'}
+                    </b>{' '}
+                    Equipos y fases son
                     opcionales: si los dejas vacíos, los completa {leaderLabel || 'el líder del proyecto'} cuando entre
                     al proyecto.
                   </div>
@@ -1312,7 +1365,7 @@ export function NewProjectPage() {
                   <Section title="Fases · Módulos">
                     <p className={styles.hint} style={{ marginTop: 0 }}>
                       Unidades de entrega del proyecto — cada una recorre las etapas del sistema (Levantamiento →
-                      Desarrollo → Producción → Marcha blanca → Finalizado) de forma independiente.
+                      Desarrollo → Pruebas → Marcha blanca → Finalizado) de forma independiente.
                     </p>
 
                     <div className={styles.phaseCardLocked}>
@@ -1760,7 +1813,8 @@ export function NewProjectPage() {
                   <h3 className={styles.summaryCardTitle}>Datos del proyecto</h3>
                   <SummaryItem label="Nombre del proyecto" value={watch('name')} />
                   <SummaryItem label="Etapa comercial" value={salesStage ? PROJECT_SALES_STAGE_LABELS[salesStage] : undefined} />
-                  <SummaryItem label="Estado" value={status ? PROJECT_STATUS_LABELS[status] : statusPlaceholder} />
+                  <SummaryItem label="Estado" value={status ? PROJECT_STATUS_LABELS[status] : STATUS_PLACEHOLDER} />
+                  {isInternal && <SummaryItem label="Proyecto interno" value="Sí — sin facturación" />}
                   <SummaryItem label="Líder" value={leaderLabel} />
                   <SummaryItem
                     label="Responsable comercial"
@@ -1780,7 +1834,7 @@ export function NewProjectPage() {
                   </div>
                 )}
 
-                {!isProspecto && (
+                {!isProspecto && !isInternal && (
                   <div className={styles.summaryCard}>
                     <h3 className={styles.summaryCardTitle}>Plan de pago</h3>
                     <SummaryItem
@@ -1857,14 +1911,28 @@ export function NewProjectPage() {
                   {!isApproved && status !== 'on_hold' && (
                     <>
                       <li>Los colaboradores ya pueden registrar horas; quedan en la fase Prospecto/Cotización.</li>
+                      {!isInternal && (
                       <li>
                         No se pueden asociar facturas mientras el proyecto no sea Aprobado. Si Finanzas intenta subir
                         una, se bloquea la carga y se notifica a Gerencia y al líder PMO para que actualicen el tipo y
                         completen los datos.
                       </li>
+                      )}
                     </>
                   )}
-                  {isApproved && (!status || status === 'draft') && (
+                  {isInternal && (
+                    <li>
+                      Es un proyecto <b>interno</b>: no tiene plan de pago, no aparece en Facturación y no se envían
+                      correos de cobro.
+                    </li>
+                  )}
+                  {isApproved && (!status || status === 'draft') && isInternal && (
+                    <li>
+                      Queda <b>No iniciado</b> hasta que Gerencia o el líder PMO lo activen manualmente (no hay factura
+                      que lo active).
+                    </li>
+                  )}
+                  {isApproved && (!status || status === 'draft') && !isInternal && (
                     <>
                       <li>
                         Pasará a <b>Activo</b> automáticamente cuando Finanzas marque la primera factura como
@@ -1877,11 +1945,11 @@ export function NewProjectPage() {
                   {isApproved && status === 'active' && (
                     <li>
                       Queda <b>Activo</b> desde el {fechaActivacion || 'hoy'} (Hito 0 manual · {respaldoActivacion}). Las
-                      horas vendidas corren desde esa fecha. Cuando llegue la primera factura, se asocia a este Hito 0
-                      sin cambiar el estado.
+                      horas vendidas corren desde esa fecha.
+                      {!isInternal && ' Cuando llegue la primera factura, se asocia a este Hito 0 sin cambiar el estado.'}
                     </li>
                   )}
-                  {isApproved && status === 'on_hold' && (
+                  {isApproved && status === 'on_hold' && !isInternal && (
                     <li>Si llega la primera factura mientras está Detenido, se pide confirmación para reactivarlo a Activo.</li>
                   )}
                 </ul>
@@ -1915,6 +1983,7 @@ export function NewProjectPage() {
           value: field.teamId,
           label: teams?.items.find((team) => team.id === field.teamId)?.name ?? field.teamId,
         }))}
+        segmentOptions={deliveryModalSegmentOptions}
         initialValues={deliveryModalInitialValues}
         onCancel={() => setDeliveryModal(null)}
         onConfirm={onConfirmDeliveryModal}

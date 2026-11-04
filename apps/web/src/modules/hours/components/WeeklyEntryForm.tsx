@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   HOUR_ENTRY_ASSIGNMENTS,
   PROJECT_REQUIRING_ASSIGNMENTS,
+  hourEntryRequiresApproval,
   type CreateHourEntryInput,
   type HourEntryAssignment,
 } from '@kora/contracts';
@@ -16,7 +17,9 @@ import { useProjectDetail, useProjectsList } from '@/modules/projects/api/projec
 import { getProjectOptionLabel } from '@/modules/projects/lib/project-option-label';
 import { useUsersList } from '@/modules/users/api/users.queries';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
+import { HOUR_ENTRY_PROJECT_STATUSES } from '../lib/selectable-project-statuses';
 import { ApiRequestError } from '@/shared/lib/api-client';
+import { overflowByBlock } from './DailyEntryForm';
 
 /** Proyecto primero: es la asignación más común y el resto confundía al elegir. */
 const ASSIGNMENT_OPTIONS = [...HOUR_ENTRY_ASSIGNMENTS]
@@ -25,6 +28,7 @@ const ASSIGNMENT_OPTIONS = [...HOUR_ENTRY_ASSIGNMENTS]
 const WEEKDAY_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie'];
 const WEEKLY_CAP_HOURS = 40;
 const DAILY_CAP_HOURS = 8;
+const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 2 });
 const MIN_DESCRIPTION_LENGTH = 5;
 
 function mondayOf(dateStr: string): Date {
@@ -55,7 +59,8 @@ function formatRange(monday: Date): string {
  * Registro semanal — un proyecto/asignación, horas lunes a viernes en un
  * envío. Equivalente a la pestaña "Registro semanal" de `RegistroHHModal` en
  * la v1; cada día con horas &gt; 0 se guarda como un `hour_entries`
- * independiente para esa fecha.
+ * independiente para esa fecha. Lo que un día pase de 8h normales (contando lo
+ * ya registrado) lo deja el backend como horas extra; aquí solo se avisa.
  */
 export function WeeklyEntryForm({
   onClose,
@@ -70,11 +75,13 @@ export function WeeklyEntryForm({
   const { user } = useAuth();
   const createEntry = useCreateHourEntry();
   // El PMO puede registrar horas en cualquier proyecto; el resto solo en los que tiene asignados.
+  // Solo proyectos No iniciados o Activos (ver `HOUR_ENTRY_PROJECT_STATUSES`).
   const { data: projects } = useProjectsList({
     page: 1,
     pageSize: 200,
     sortField: 'name',
     assignedToUserId: user?.role === 'pmo' ? undefined : user?.id,
+    status: HOUR_ENTRY_PROJECT_STATUSES,
   });
   const { data: leaders } = useUsersList({ page: 1, pageSize: 200, sortField: 'firstName', role: 'leader' });
 
@@ -82,6 +89,7 @@ export function WeeklyEntryForm({
   const [assignment, setAssignment] = useState<HourEntryAssignment | ''>('');
   const [projectId, setProjectId] = useState('');
   const [moduleId, setModuleId] = useState('');
+  /** Tiempo de ejecución de la fase elegida — vacío ⇔ sin tramo. */
   const [segmentId, setSegmentId] = useState('');
   const [category, setCategory] = useState('');
   const [description, setDescription] = useState('');
@@ -93,10 +101,6 @@ export function WeeklyEntryForm({
   const [submitting, setSubmitting] = useState(false);
 
   const needsProject = PROJECT_REQUIRING_ASSIGNMENTS.has(assignment as HourEntryAssignment);
-  // Horas de proyecto se aprueban por acceso al proyecto, no por aprobador
-  // designado (docs/DECISION-M4-HORAS.md) — el backend rechaza ambos a la vez.
-  const needsApprover = !needsProject && assignment !== '' && (user?.role === 'collaborator' || isOvertime);
-  const showApproverInRow = needsApprover;
   const selectedProject = needsProject ? (projects?.items ?? []).find((p) => p.id === projectId) : undefined;
   const { data: projectDetail } = useProjectDetail(needsProject && projectId ? projectId : null);
   const selectedModule = projectDetail?.modules.find((m) => m.id === moduleId);
@@ -125,6 +129,28 @@ export function WeeklyEntryForm({
   const existingWeekHours = (entriesThisWeek?.items ?? [])
     .filter((e) => e.status !== 'rejected')
     .reduce((sum, e) => sum + e.hours, 0);
+  /** Horas que cada día (lun–vie) dejará como horas extra por pasar de la jornada (ver `overflowByBlock`). */
+  const dayOverflow = dayHours.map((value, index) => {
+    if (isOvertime) return 0;
+    const date = new Date(monday);
+    date.setDate(date.getDate() + index);
+    const iso = toIsoDate(date);
+    const existingRegular = (entriesThisWeek?.items ?? [])
+      .filter((e) => e.date === iso && e.status !== 'rejected' && !e.isOvertime)
+      .reduce((sum, e) => sum + e.hours, 0);
+    return overflowByBlock(existingRegular, [Number(value) || 0])[0] ?? 0;
+  });
+  const overflowDays = dayOverflow.flatMap((hours, index) => (hours > 0 ? [{ label: WEEKDAY_LABELS[index]!, hours }] : []));
+  // Horas de proyecto se aprueban por acceso al proyecto, no por aprobador
+  // designado (docs/DECISION-M4-HORAS.md) — el backend rechaza ambos a la vez.
+  // Sin proyecto, las horas extra (marcadas o por exceso) exigen aprobador,
+  // salvo las de un líder, que se autoaprueban.
+  const overtimeNeedsApproval = hourEntryRequiresApproval(user?.role, true);
+  const needsApprover =
+    !needsProject &&
+    assignment !== '' &&
+    (user?.role === 'collaborator' || (overtimeNeedsApproval && (isOvertime || overflowDays.length > 0)));
+  const showApproverInRow = needsApprover;
   const holidayDayIndexes = new Set(
     (holidaysThisWeek ?? []).map((h) => Math.round((new Date(`${h.date}T00:00:00`).getTime() - monday.getTime()) / 86_400_000)),
   );
@@ -170,6 +196,7 @@ export function WeeklyEntryForm({
       return 'Selecciona el bloque al que corresponden estas HH.';
     if (needsApprover && !designatedApproverUserId) return 'Selecciona a quién aprueba estas horas.';
     if (needsProject && isOvertime && overtimeDisabled) return 'Este proyecto no tiene autorizadas horas extra.';
+    if (!category.trim()) return 'Indica la actividad realizada.';
     if (description.trim().length > 0 && description.trim().length < MIN_DESCRIPTION_LENGTH) {
       return `La descripción debe tener al menos ${MIN_DESCRIPTION_LENGTH} caracteres.`;
     }
@@ -198,8 +225,8 @@ export function WeeklyEntryForm({
           assignment: assignment as HourEntryAssignment,
           projectId: needsProject ? projectId : undefined,
           moduleId: needsProject && moduleId ? moduleId : undefined,
-          segmentId: needsProject && segmentId ? segmentId : undefined,
-          category: category || undefined,
+          segmentId: needsProject && moduleId && segmentId ? segmentId : undefined,
+          category: category.trim(),
           description: description || undefined,
           hours: day.hours,
           date: toIsoDate(date),
@@ -243,6 +270,17 @@ export function WeeklyEntryForm({
         </div>
       </div>
 
+      {overflowDays.length > 0 && (
+        <div className={styles.noticeWarning} role="status">
+          <AlertIcon size={16} />
+          <span>
+            Superas la jornada de {DAILY_CAP_HOURS}h (contando lo ya registrado):{' '}
+            {overflowDays.map((day) => `${day.label} ${formatHours(day.hours)}h`).join(', ')} quedarán como horas extra
+            {overtimeNeedsApproval ? ', pendientes de aprobación.' : '.'}
+          </span>
+        </div>
+      )}
+
       {holidayDayIndexes.size > 0 && (
         <div className={styles.noticeWarning} role="status">
           <AlertIcon size={16} />
@@ -264,6 +302,8 @@ export function WeeklyEntryForm({
               setDesignatedApproverUserId('');
             } else {
               setProjectId('');
+              setModuleId('');
+              setSegmentId('');
             }
           }}
         />
@@ -314,7 +354,7 @@ export function WeeklyEntryForm({
       )}
 
       <div className={styles.row}>
-        <TextField label="Actividad" placeholder="Ej: Diseño webapp" value={category} onChange={(event) => setCategory(event.target.value)} />
+        <TextField label="Actividad" required placeholder="Ej: Diseño webapp" value={category} onChange={(event) => setCategory(event.target.value)} />
         <div className={styles.overtimeField}>
           <span className={styles.stepperLabel}>Horas Extra</span>
           <label
@@ -332,6 +372,7 @@ export function WeeklyEntryForm({
             <span className={styles.overtimeState}>{isOvertime ? 'Marcada' : 'No marcada'}</span>
           </label>
           {isOvertime ? (
+            overtimeNeedsApproval &&
             <span className={styles.overtimeHelp}>
               {needsProject
                 ? 'Quedará pendiente de aprobación del líder del proyecto.'

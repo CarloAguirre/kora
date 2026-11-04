@@ -38,6 +38,28 @@ export const PROJECT_QUOTATION_LIST_STATUSES = [
 ] as const;
 export const projectQuotationListStatusSchema = z.enum(PROJECT_QUOTATION_LIST_STATUSES);
 export type ProjectQuotationListStatus = z.infer<typeof projectQuotationListStatusSchema>;
+/**
+ * "Tipo de proyecto" de desarrollo — capa sobre `salesStage` + `status` (mismo criterio que el
+ * selector del diálogo de edición): `finished` es el estado Finalizado; el resto sale de
+ * `salesStage` (sin `salesStage` cuenta como prospecto). Filtro y columna "Tipo" del listado.
+ */
+export const PROJECT_KINDS = ['prospect', 'quoted', 'approved', 'finished'] as const;
+export const projectKindSchema = z.enum(PROJECT_KINDS);
+export type ProjectKind = z.infer<typeof projectKindSchema>;
+
+export const PROJECT_KIND_LABELS: Readonly<Record<ProjectKind, string>> = {
+  prospect: 'Prospecto',
+  quoted: 'Cotización',
+  approved: 'Aprobado',
+  finished: 'Finalizado',
+};
+
+export function projectKindOf(project: { salesStage: ProjectSalesStage | null; status: ProjectStatus }): ProjectKind {
+  if (project.status === 'finished') return 'finished';
+  if (project.salesStage === 'approved') return 'approved';
+  if (project.salesStage === 'quoted') return 'quoted';
+  return 'prospect';
+}
 
 export const PROJECT_STATUSES = ['draft', 'active', 'on_hold', 'finished', 'cancelled'] as const;
 export const projectStatusSchema = z.enum(PROJECT_STATUSES);
@@ -57,7 +79,7 @@ export type ProjectPhase = z.infer<typeof projectPhaseSchema>;
 
 export const PROJECT_PHASE_LABELS: Readonly<Record<ProjectPhase, string>> = {
   discovery: 'Levantamiento',
-  development: 'En desarrollo',
+  development: 'Desarrollo',
   testing: 'Pruebas',
   pilot: 'Marcha blanca',
   closed: 'Finalizado',
@@ -112,8 +134,10 @@ export const projectTeamSchema = z.object({
   assignedHours: z.number().nullable(),
   memberCount: z.number().int(),
   maxMembers: z.number().int().nullable(),
+  /** HH aprobadas del líder que no es miembro asignado del proyecto — suman al consumo del equipo (ver `ProjectTeamRecord`). */
+  leaderConsumedHours: z.number(),
 });
-export type ProjectTeam = z.infer<typeof projectTeamSchema>;
+export type ProjectTeam =z.infer<typeof projectTeamSchema>;
 
 /** Catálogo propio de la etapa del módulo/fase — independiente de `projectPhaseSchema` (avance del proyecto completo). */
 export const PROJECT_MODULE_STAGES = ['discovery', 'development', 'production', 'pilot', 'closed'] as const;
@@ -123,7 +147,7 @@ export type ProjectModuleStage = z.infer<typeof projectModuleStageSchema>;
 export const PROJECT_MODULE_STAGE_LABELS: Readonly<Record<ProjectModuleStage, string>> = {
   discovery: 'Levantamiento',
   development: 'Desarrollo',
-  production: 'Producción',
+  production: 'Pruebas',
   pilot: 'Marcha blanca',
   closed: 'Finalizado',
 };
@@ -159,8 +183,6 @@ export const PROJECT_MODULE_DELIVERY_ALLOWED_TRANSITIONS: Readonly<
 
 export const projectModuleDeliverySchema = z.object({
   id: uuidSchema,
-  /** Entrega de cierre de un bloque. NULL en entregas independientes históricas. */
-  segmentId: uuidSchema.nullable().optional(),
   teamId: uuidSchema.nullable(),
   teamName: z.string().nullable(),
   /** Nulo en entregas creadas antes de este campo. */
@@ -169,10 +191,15 @@ export const projectModuleDeliverySchema = z.object({
   /** Colaborador del equipo responsable a quien se le asignó esta entrega — `null` ⇔ "Sin asignar". */
   assigneeUserId: uuidSchema.nullable(),
   assigneeName: z.string().nullable(),
+  /** Tiempo de ejecución (tramo) de la misma fase al que pertenece — `null` ⇔ sin tramo. */
+  segmentId: uuidSchema.nullable(),
+  segmentName: z.string().nullable(),
   estimatedDate: z.string(),
   status: projectModuleDeliveryStatusSchema,
   /** Motivo del último rechazo del líder — se limpia al aprobar o al volver a marcarla entregada. */
   rejectionReason: z.string().nullable(),
+  /** Cuándo se agregó la entrega al proyecto (ISO) — fecha de su fila en la bitácora; la agendada es `estimatedDate`. */
+  createdAt: z.string(),
   /**
    * ¿Quien consulta puede gestionarla (asignar, aprobar, rechazar, revertir, editar)? Líder del proyecto,
    * PMO/admin o líder del equipo responsable — mismo criterio que `UpdateProjectModuleDeliveryUseCase`.
@@ -299,12 +326,13 @@ export type RoadmapReferenceExclusion = z.infer<typeof roadmapReferenceExclusion
 
 export const projectModuleTaskSchema = z.object({
   id: uuidSchema,
-  /** Relación verificable con el bloque operativo; las tareas antiguas pueden no tenerla. */
-  segmentId: uuidSchema.nullable().optional(),
   teamId: uuidSchema.nullable(),
   teamName: z.string().nullable(),
   assigneeUserId: uuidSchema.nullable(),
   assigneeName: z.string().nullable(),
+  /** Tiempo de ejecución (tramo) de la misma fase al que pertenece — `null` ⇔ sin tramo. */
+  segmentId: uuidSchema.nullable(),
+  segmentName: z.string().nullable(),
   name: z.string(),
   description: z.string().nullable(),
   startDate: z.string(),
@@ -320,9 +348,10 @@ export const projectModuleTaskSchema = z.object({
 export type ProjectModuleTask = z.infer<typeof projectModuleTaskSchema>;
 
 export const createProjectModuleTaskSchema = z.object({
-  segmentId: uuidSchema.nullish(),
   teamId: uuidSchema.nullish(),
   assigneeUserId: uuidSchema.nullish(),
+  /** Tiempo de ejecución de la misma fase — opcional; `null` lo quita. */
+  segmentId: uuidSchema.nullish(),
   name: nonEmptyTrimmed(300, 'El nombre de la tarea'),
   description: z.string().trim().max(2000).nullish(),
   /** Obligatorio: el Forecast reparte las HH estimadas entre el inicio y la fecha límite. */
@@ -373,6 +402,16 @@ export const projectModuleSchema = z.object({
 });
 export type ProjectModule = z.infer<typeof projectModuleSchema>;
 
+/**
+ * Fase con sus tiempos de ejecución, sin el resto de la ficha — selector de
+ * Fase/Tiempo de ejecución del registro de horas, que usa quien registra
+ * horas aunque no pueda ver el detalle del proyecto (`GET /projects/:id/phases`).
+ */
+export const projectPhaseOptionSchema = projectModuleSchema.pick({ id: true, name: true, currentStage: true }).extend({
+  segments: z.array(projectModuleSegmentSchema.pick({ id: true, teamName: true, name: true, startDate: true, endDate: true })),
+});
+export type ProjectPhaseOption = z.infer<typeof projectPhaseOptionSchema>;
+
 export const createProjectModuleSchema = z.object({
   name: nonEmptyTrimmed(300, 'El nombre del módulo'),
   initialStage: projectModuleStageSchema,
@@ -398,6 +437,8 @@ export const addProjectModuleDeliverySchema = z.object({
   estimatedDate: z.iso.date(),
   teamId: uuidSchema.nullish(),
   assigneeUserId: uuidSchema.nullish(),
+  /** Tiempo de ejecución de la misma fase — opcional. */
+  segmentId: uuidSchema.nullish(),
 });
 export type AddProjectModuleDeliveryInput = z.infer<typeof addProjectModuleDeliverySchema>;
 
@@ -407,6 +448,8 @@ export const updateProjectModuleDeliverySchema = z.object({
   status: projectModuleDeliveryStatusSchema.optional(),
   teamId: uuidSchema.nullish(),
   assigneeUserId: uuidSchema.nullish(),
+  /** Tiempo de ejecución de la misma fase — `null` lo quita. */
+  segmentId: uuidSchema.nullish(),
   estimatedDate: z.iso.date().optional(),
   /** Solo quien aprueba/rechaza puede enviarlo — obligatorio al rechazar, se limpia (`null`) en cualquier otra transición. */
   rejectionReason: z.string().trim().max(1000).nullish(),
@@ -687,22 +730,23 @@ export function projectDelayLevel(delay: number | null): ProjectDelayLevel {
 /**
  * Avance del proyecto — tres números que responden preguntas distintas y nunca se infieren uno del
  * otro: cuánto se hizo (`actual`), cuánto debería estar hecho hoy (`expected`) y cuánto costó
- * (`consumption`). Se calcula desde las tareas de sus fases, ponderadas por HH estimadas; solo las
- * tareas Aprobadas (`done`) suman al real. La base es, por fase, el mayor entre la suma de HH de sus
- * tareas y las HH estimadas de la fase — así un plan cargado a medias no marca 100%.
+ * (`consumption`). Se calcula desde las tareas y entregas de sus fases, ponderadas por HH estimadas
+ * (una entrega pesa como una tarea promedio de su fase); solo las tareas y entregas Aprobadas suman al
+ * real. La base es, por fase, el mayor entre la suma de pesos de sus ítems y las HH estimadas de la
+ * fase — así un plan cargado a medias no marca 100%.
  */
 export const projectProgressSchema = z.object({
-  /** % de la base en tareas Aprobadas. `null` = sin plan cargado (ninguna fase con tareas). */
+  /** % de la base en tareas y entregas Aprobadas. `null` = sin plan cargado (ninguna fase con tareas ni entregas). */
   actual: z.number().int().nullable(),
-  /** % de la base en tareas cuya fecha límite ya pasó. `null` junto con `actual`. */
+  /** % de la base en tareas y entregas cuya fecha ya pasó. `null` junto con `actual`. */
   expected: z.number().int().nullable(),
   /** HH aprobadas / HH vendidas, en %. Puede superar 100. `null` sin HH vendidas. */
   consumption: z.number().int().nullable(),
   /** `expected − actual`, en puntos. `null` sin plan, o con el proyecto detenido y el reloj pausado. */
   delay: z.number().int().nullable(),
-  /** HH de tareas cargadas / HH estimadas de las fases, en %. `null` si ninguna fase tiene HH estimadas. */
+  /** HH de tareas y entregas cargadas / HH estimadas de las fases, en %. `null` si ninguna fase tiene HH estimadas. */
   planCoverage: z.number().int().nullable(),
-  /** Alguna fase no tiene HH estimadas en ninguna tarea: su parte se calculó por cantidad de tareas. */
+  /** Alguna fase con plan no tiene HH estimadas en ninguna tarea: su parte se calculó por cantidad de tareas y entregas. */
   estimatedByCount: z.boolean(),
 });
 export type ProjectProgress = z.infer<typeof projectProgressSchema>;
@@ -732,14 +776,23 @@ export const projectSummarySchema = z.object({
   endDate: z.string().nullable(),
   progress: projectProgressSchema,
   supportPlanDescription: z.string().nullable(),
+  /**
+   * Tipo del contrato de soporte del proyecto (`support_plans.plan_type`, el vigente o el más reciente) —
+   * es lo que se muestra como "Tipo de Soporte". Mismos valores que `supportPlanTypeSchema` (no se importa:
+   * `support-plan.contract` ya importa este archivo). `null` si no es soporte o no tiene contrato.
+   */
+  supportPlanType: z.enum(['monthly', 'bundle', 'on_demand']).nullable(),
   supportHours: z.number(),
   /** Habilitado por el líder del proyecto/equipo — sin esto, las horas cargadas contra este proyecto no pueden marcarse como horas extra. */
   allowsOvertime: z.boolean(),
+  /** Proyecto interno (de la propia empresa): sin facturación, montos ni correos de cobro — ver `projects.is_internal`. */
+  isInternal: z.boolean(),
   createdAt: isoDateTimeSchema,
 });
 export type ProjectSummary = z.infer<typeof projectSummarySchema>;
 
-export const projectDetailSchema = projectSummarySchema.extend({
+// La ficha de soporte toma el tipo del contrato de `useSupportPlanSummary`, así que el detalle no lo trae.
+export const projectDetailSchema = projectSummarySchema.omit({ supportPlanType: true }).extend({
   developer: z.object({ id: uuidSchema, fullName: z.string() }).nullable(),
   /** Contacto principal DE ESTE PROYECTO (v1: `proyecto.id_contacto`) — puede diferir del contacto general del cliente. */
   primaryContact: clientContactSchema.nullable(),
@@ -854,6 +907,8 @@ export const createProjectSchema = z
     contractLink: z.string().trim().max(500).optional(),
     additionalLinks: z.string().trim().max(500).optional(),
     teams: z.array(createProjectTeamAssignmentSchema).max(20).default([]),
+    /** Proyecto interno — solo `type='development'`. Sin plan de pago ni monto: se ignoran `contractAmount`/`paymentMilestones`. */
+    isInternal: z.boolean().default(false),
     contractAmount: z.coerce.number().min(0).nullish(),
     contractCurrency: projectContractCurrencySchema.optional(),
     /** Plan de pago — solo `type='development'`. Sin valor: el cronograma mínimo Inicio 50% + Marcha blanca 50%. */
@@ -904,6 +959,10 @@ export const createProjectSchema = z
       path: ['commercialManagerUserId'],
     },
   )
+  .refine((data) => data.type === 'development' || !data.isInternal, {
+    message: 'Solo un proyecto de desarrollo puede ser interno.',
+    path: ['isInternal'],
+  })
   .refine((data) => data.type !== 'support' || data.supportPlanType, {
     message: 'Los proyectos de soporte requieren un tipo de contrato.',
     path: ['supportPlanType'],
@@ -925,6 +984,8 @@ export const updateProjectSchema = z.object({
   endDate: z.iso.date().nullish(),
   estimatedDeliveryDate: z.iso.date().nullish(),
   soldHours: z.coerce.number().min(0).optional(),
+  /** Motivo obligatorio al cambiar HH vendidas una vez registrado el Hito 0. No se persiste como columna. */
+  soldHoursChangeReason: z.string().trim().max(2000).optional(),
   supportPlanDescription: z.string().trim().max(2000).optional(),
   supportHours: z.coerce.number().min(0).optional(),
   quotationLink: z.string().trim().max(500).optional(),
@@ -955,6 +1016,8 @@ export const updateProjectSchema = z.object({
   periodReportAchievements: z.array(z.string().trim().max(500)).max(20).nullish(),
   /** Agregar/quitar equipos y editar líder/colaboradores/horas de los ya asignados — la lista reemplaza a la actual. */
   teams: z.array(createProjectTeamAssignmentSchema).max(20).optional(),
+  /** Marcar interno no borra el plan de pago: sus tramos quedan guardados pero fuera de Facturación y sin avisos, y vuelven si se desmarca. */
+  isInternal: z.boolean().optional(),
   contractAmount: z.coerce.number().min(0).nullish(),
   contractCurrency: projectContractCurrencySchema.optional(),
   /** Plan de pago completo — la lista reemplaza a la actual (ver `projectPaymentPlanItemSchema`). */
@@ -1047,6 +1110,8 @@ export const projectSortFieldSchema = z.enum([
   'status',
   'salesStage',
   'quotationStatus',
+  'stage',
+  'kind',
   'priority',
   'createdAt',
   'client',
@@ -1080,6 +1145,8 @@ export const listProjectsQuerySchema = paginationQuerySchema.extend({
   phase: arrayQueryParam(projectPhaseSchema),
   salesStage: arrayQueryParam(projectSalesStageSchema),
   quotationStatus: arrayQueryParam(projectQuotationListStatusSchema),
+  /** "Tipo de proyecto" (filtro Tipo de proyecto de la tab Desarrollo) — ver `PROJECT_KINDS`. */
+  kind: arrayQueryParam(projectKindSchema),
   /** Acepta id o slug: la ficha de cliente filtra por el `clientId` de la URL, que ahora es el slug del cliente — se resuelve a UUID en `ListProjectsUseCase`. */
   clientId: z.string().optional(),
   /** Varios clientes por UUID (filtro Cliente del gráfico resumen). */

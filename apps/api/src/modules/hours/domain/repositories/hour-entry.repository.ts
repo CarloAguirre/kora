@@ -8,7 +8,10 @@ export interface HourEntryFilters {
   readonly search?: string | undefined;
   /** Acota a autores con membresía activa en este equipo. */
   readonly teamId?: string | undefined;
+  /** Deja fuera a los autores con membresía activa en algún equipo activo que lidera este usuario (mismo criterio que el selector de equipos de `/horas/aprobaciones`). */
+  readonly outsideTeamsLedByUserId?: string | undefined;
   readonly projectId?: string | undefined;
+  readonly projectIds?: readonly string[] | undefined;
   readonly status?: HourEntryStatus | undefined;
   readonly dateFrom?: Date | undefined;
   readonly dateTo?: Date | undefined;
@@ -28,6 +31,13 @@ export interface HourEntryFilters {
    * `hours:read_team`; no se combinan.
    */
   readonly leaderScopeUserId?: string | undefined;
+  /** Deja fuera los registros de este autor — p.ej. los propios al contar "horas por aprobar", que decide otro. */
+  readonly excludeUserId?: string | undefined;
+}
+
+export interface HourEntrySummary {
+  readonly entries: number;
+  readonly hours: number;
 }
 
 export type HourEntrySortableField = 'date' | 'createdAt' | 'status' | 'hours';
@@ -40,8 +50,8 @@ export interface HourEntryListItem {
   readonly projectName: string | null;
   readonly moduleId: string | null;
   readonly moduleName: string | null;
-  readonly segmentId?: string | null;
-  readonly segmentName?: string | null;
+  readonly segmentId: string | null;
+  readonly segmentName: string | null;
   /** Equipo activo del autor al momento de listar — no es histórico, refleja la membresía actual. */
   readonly teamId: string | null;
   readonly teamName: string | null;
@@ -81,11 +91,12 @@ export interface OvertimeHoursByUser {
   readonly pendingHours: number;
 }
 
-/** Horas extra no rechazadas de un autor en un proyecto, con el líder del proyecto. */
-export interface OvertimeHoursByProjectAndUser {
-  readonly projectId: string;
-  readonly projectName: string;
-  readonly projectType: ProjectType;
+/** Horas extra no rechazadas de un autor en un proyecto (o sin proyecto: `projectId` `null`) y un día, con el líder del proyecto. */
+export interface OvertimeHoursByDayProjectAndUser {
+  readonly date: Date;
+  readonly projectId: string | null;
+  readonly projectName: string | null;
+  readonly projectType: ProjectType | null;
   readonly leaderUserId: string | null;
   readonly leaderFullName: string | null;
   readonly userId: string;
@@ -93,6 +104,9 @@ export interface OvertimeHoursByProjectAndUser {
   readonly approvedHours: number;
   readonly pendingHours: number;
 }
+
+/** Acota el reporte de horas extra — mismo significado que en `HourEntryFilters`. Vacío = todas. */
+export type OvertimeReportScope = Pick<HourEntryFilters, 'leaderScopeUserId' | 'excludeUserId'>;
 
 export interface HourEntryRepository {
   findById(id: string, context?: TransactionContext): Promise<HourEntry | null>;
@@ -104,6 +118,9 @@ export interface HourEntryRepository {
     sort: SortRequest<HourEntrySortableField>,
     context?: TransactionContext,
   ): Promise<Page<HourEntryListItem>>;
+
+  /** Cuántos registros calzan con `filters` y cuántas horas suman — agregación en SQL, sin paginar. */
+  summarize(filters: HourEntryFilters, context?: TransactionContext): Promise<HourEntrySummary>;
 
   save(entry: HourEntry, context?: TransactionContext): Promise<void>;
 
@@ -139,18 +156,31 @@ export interface HourEntryRepository {
   ): Promise<OvertimeHoursByUser[]>;
 
   /**
-   * Horas extra (no rechazadas) por proyecto × autor, en todos los proyectos
-   * (soporte y desarrollo) y un rango de fechas — alimenta "Horas Extras" de
-   * Administración. Agregación en SQL.
+   * Horas extra (no rechazadas) por día × proyecto × autor, en todos los
+   * proyectos (soporte y desarrollo) y sin proyecto (una fila por día y autor
+   * con `projectId` `null`), en un rango de fechas — alimenta "Horas
+   * Extras" de Administración y la del Dashboard del líder (con `scope`).
+   * Agregación en SQL, ordenado por fecha, proyecto y autor.
    */
-  sumOvertimeHoursByProjectAndUser(
+  sumOvertimeHoursByDayProjectAndUser(
     dateFrom: Date,
     dateTo: Date,
+    scope?: OvertimeReportScope,
     context?: TransactionContext,
-  ): Promise<OvertimeHoursByProjectAndUser[]>;
+  ): Promise<OvertimeHoursByDayProjectAndUser[]>;
 
-  /** Horas normales (no extra) y no rechazadas que `userId` ya tiene registradas para `date` (cualquier asignación/proyecto) — decide qué parte de una solicitud de HH de ticket cabe en la jornada de 8h y cuál queda como horas extra (ver `CreateTicketHhRequestUseCase`). */
-  sumRegularHoursForUserAndDate(userId: string, date: Date, context?: TransactionContext): Promise<number>;
+  /**
+   * Horas normales (no extra) y no rechazadas que `userId` ya tiene registradas
+   * para `date` (cualquier asignación/proyecto), sin contar `excludeEntryId` (el
+   * registro que se está editando) — decide qué parte de un registro cabe en la
+   * jornada de 8h y cuál queda como horas extra (ver `splitByDailyCap`).
+   */
+  sumRegularHoursForUserAndDate(
+    userId: string,
+    date: Date,
+    excludeEntryId?: string,
+    context?: TransactionContext,
+  ): Promise<number>;
 }
 
 export const HOUR_ENTRY_REPOSITORY = Symbol('HourEntryRepository');

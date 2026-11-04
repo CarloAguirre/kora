@@ -159,14 +159,14 @@ export function ForecastKpis({ members }: { members: readonly ForecastCapacityMe
         icon={<TriangleAlertIcon size={14} />}
         label="Sin asignación"
         value={kpis.underAssigned}
-        sub={`${kpis.freeHours} hrs. sin asignar en el período`}
+        sub={`${formatHours(kpis.freeHours)} hrs. sin asignar en el período`}
       />
       <KpiCard
         size="lg"
         tone="success"
         label="Disponibilidad"
         value={`${kpis.availability}%`}
-        sub={`De ${kpis.totalCapacity} hrs. de capacidad total`}
+        sub={`De ${formatHours(kpis.totalCapacity)} hrs. de capacidad total`}
       />
     </div>
   );
@@ -241,7 +241,7 @@ export function ForecastPlanningSection({
       <h3 className={styles.sectionTitle}>Capacidad y Planificación</h3>
 
       <div className={styles.banner}>
-        Disponibilidad global del equipo durante el período: <strong>{totalFreeHours} horas libres</strong>
+        Disponibilidad global del equipo durante el período: <strong>{formatHours(totalFreeHours)} horas libres</strong>
       </div>
 
       <div className={styles.searchRow}>

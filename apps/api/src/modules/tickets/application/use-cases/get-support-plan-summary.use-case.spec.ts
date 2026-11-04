@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { GetSupportPlanSummaryUseCase } from './get-support-plan-summary.use-case';
-import type { SupportPlanRepository } from '../../domain/repositories/support-plan.repository';
+import type { SupportPlanRecord, SupportPlanRepository } from '../../domain/repositories/support-plan.repository';
 import type { TicketProjectReader, TicketProjectReference } from '../ports/ticket-project-reader.port';
 import type { SupportPlanSummaryBuilder } from '../services/support-plan-summary-builder';
 import { FixedClock } from '../../../../test/fakes';
@@ -59,5 +59,28 @@ describe('GetSupportPlanSummaryUseCase — resolución de slug en projectId', ()
 
     expect(result.isOk() && result.value).toBeNull();
     expect(plans.findActiveForProjectOrLinked).not.toHaveBeenCalled();
+  });
+
+  it('incluye el id del contrato activo para poder cerrarlo desde la ficha', async () => {
+    const plans = new FakeSupportPlanRepository();
+    plans.findActiveForProjectOrLinked.mockResolvedValue({ id: 'plan-uuid-1' } as SupportPlanRecord);
+    const projects = new FakeProjectReader(
+      new Map([['soporte-casa-andina', { id: 'project-uuid-1', name: 'Soporte Casa Andina', status: 'active', type: 'support', clientId: 'client-uuid-1' }]]),
+    );
+    const summaryBuilder = {
+      resolveLinkedProjectIds: vi.fn().mockResolvedValue([]),
+      build: vi.fn().mockResolvedValue({ planType: 'monthly', contractedHours: 50 }),
+    } as unknown as SupportPlanSummaryBuilder;
+    const useCase = new GetSupportPlanSummaryUseCase(
+      plans as unknown as SupportPlanRepository,
+      projects as unknown as TicketProjectReader,
+      summaryBuilder,
+      new FixedClock(NOW),
+    );
+
+    const result = await useCase.execute({ projectId: 'soporte-casa-andina' });
+
+    expect(result.isOk() && result.value).toMatchObject({ planId: 'plan-uuid-1', planType: 'monthly', contractedHours: 50 });
+    expect(summaryBuilder.build).toHaveBeenCalledWith(expect.objectContaining({ id: 'plan-uuid-1' }), [], NOW);
   });
 });

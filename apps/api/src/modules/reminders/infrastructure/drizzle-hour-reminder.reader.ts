@@ -7,6 +7,7 @@ import {
   projects,
   projectTeams,
   rolePermissions,
+  roles,
   teamMembers,
   teams,
   ticketHhRequests,
@@ -55,6 +56,17 @@ export class DrizzleHourReminderReader implements HourReminderReader {
       ...toRecipient(row),
       firstEntryDate: row.firstEntryDate ? toIsoDate(row.firstEntryDate) : null,
     }));
+  }
+
+  async findFirstEntryDate(userId: string): Promise<string | null> {
+    const firstEntries = this.db
+      .select({ date: hourEntries.date })
+      .from(hourEntries)
+      .where(eq(hourEntries.userId, userId))
+      .unionAll(this.db.select({ date: ticketHhRequests.date }).from(ticketHhRequests).where(eq(ticketHhRequests.userId, userId)))
+      .as('first_entries');
+    const rows = await this.db.select({ date: min(firstEntries.date) }).from(firstEntries);
+    return rows[0]?.date ? toIsoDate(rows[0].date) : null;
   }
 
   async sumDailyHours(userIds: readonly string[], from: string, to: string): Promise<DailyHours[]> {
@@ -173,6 +185,15 @@ export class DrizzleHourReminderReader implements HourReminderReader {
       .select({ userId: users.id, email: users.email, firstName: users.firstName, lastName: users.lastName })
       .from(users)
       .where(and(inArray(users.id, [...userIds]), isActiveUser));
+    return rows.map(toRecipient);
+  }
+
+  async findActiveAdminTierUsers(): Promise<ReminderRecipient[]> {
+    const rows = await this.db
+      .select({ userId: users.id, email: users.email, firstName: users.firstName, lastName: users.lastName })
+      .from(users)
+      .innerJoin(roles, eq(roles.id, users.roleId))
+      .where(and(eq(roles.isAdminTier, true), isActiveUser));
     return rows.map(toRecipient);
   }
 }

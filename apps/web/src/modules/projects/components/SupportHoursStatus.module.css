@@ -1,0 +1,108 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-4);
+  flex: 1;
+}
+
+.headline {
+  display: flex;
+  align-items: baseline;
+  gap: var(--kora-space-2);
+  flex-wrap: wrap;
+}
+
+.headlineValue {
+  font-size: var(--kora-text-title);
+  font-weight: var(--kora-weight-semibold);
+  line-height: 1;
+  color: var(--kora-navy);
+}
+
+.headlineLabel {
+  font-size: var(--kora-text-sm);
+  color: var(--kora-text-muted);
+}
+
+.meterBlock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-2);
+}
+
+/* Riel en un paso claro de la misma rampa que el relleno, para que el estado se lea en toda la barra. */
+.track {
+  height: 10px;
+  border-radius: var(--kora-radius-pill);
+  background: var(--kora-lime-hover);
+  overflow: hidden;
+}
+
+.fill {
+  height: 100%;
+  min-width: 6px;
+  border-radius: var(--kora-radius-pill);
+}
+
+.fillOk {
+  background: var(--kora-lime-mid);
+}
+
+.fillWarning {
+  background: var(--kora-warning);
+}
+
+.fillDanger {
+  background: var(--kora-danger);
+}
+
+.scale {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--kora-space-2);
+  font-size: var(--kora-text-xs);
+  color: var(--kora-text-muted);
+}
+
+.overage {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-1);
+  margin: 0;
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-semibold);
+  color: var(--kora-danger);
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--kora-space-3) var(--kora-space-4);
+  margin: 0;
+  padding-top: var(--kora-space-3);
+  border-top: 1px solid var(--kora-border-subtle);
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.stat dt {
+  font-size: var(--kora-text-xs);
+  color: var(--kora-text-muted);
+}
+
+.stat dd {
+  margin: 0;
+  font-size: var(--kora-text-base);
+  font-weight: var(--kora-weight-semibold);
+  color: var(--kora-navy);
+}
+
+.note {
+  margin: 0;
+  font-size: var(--kora-text-sm);
+  color: var(--kora-text-muted);
+}

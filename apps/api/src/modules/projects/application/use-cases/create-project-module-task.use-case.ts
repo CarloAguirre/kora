@@ -16,6 +16,7 @@ import {
   ProjectAssigneeDisabledError,
   ProjectModuleNotFoundError,
   ProjectNotFoundError,
+  SegmentNotInModuleError,
 } from '../../domain/errors/project.errors';
 import { PROJECT_REPOSITORY, type ProjectRepository } from '../../domain/repositories/project.repository';
 import {
@@ -89,9 +90,11 @@ export class CreateProjectModuleTaskUseCase
     }
 
     if (command.data.startDate > command.data.date) return err(new InvalidTaskDatesError());
+    const segmentId = command.data.segmentId ?? null;
     const segment = command.data.segmentId
       ? module.segments.find((item) => item.id === command.data.segmentId) : undefined;
-    if (command.data.segmentId && (!segment ||
+    if (segmentId && !segment) return err(new SegmentNotInModuleError());
+    if (segment && (
       segment.teamId !== command.data.teamId ||
       command.data.startDate < segment.startDate.toISOString().slice(0, 10) ||
       command.data.date > segment.endDate.toISOString().slice(0, 10))) {
@@ -116,9 +119,9 @@ export class CreateProjectModuleTaskUseCase
       const taskId = await this.modules.addTask(
         {
           moduleId: command.moduleId,
-          segmentId: command.data.segmentId ?? null,
           teamId: command.data.teamId ?? null,
           assigneeUserId,
+          segmentId,
           name: command.data.name,
           description: command.data.description ?? null,
           startDate: new Date(command.data.startDate),

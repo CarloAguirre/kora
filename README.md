@@ -59,6 +59,13 @@ ejemplo, `pnpm clients && pnpm verify-clients`).
 > En PowerShell, las variables van antes del comando:
 > `$env:DATABASE_URL="postgres://..."; pnpm migrate`
 
+El journal conserva las migraciones de `master` y de calculadora, incluso cuando
+comparten prefijo numérico; no se deben renombrar ni eliminar las ya aplicadas.
+Si una base recibió migraciones de ambas ramas por separado, revisa sus hashes
+en `drizzle.__drizzle_migrations` y el esquema antes de migrar: Drizzle decide
+lo pendiente por fecha y puede omitir cambios anteriores a la última registrada.
+No borres el historial ni vuelvas a ejecutar SQL sin comprobar qué falta.
+
 ### 3. Variables de entorno de la API
 
 ```sh

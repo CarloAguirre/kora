@@ -87,6 +87,7 @@ export class ListProjectsUseCase implements UseCase<ListProjectsQueryCommand, Pa
         quotationStatus: query.quotationStatus,
         quotationViewerUserId: query.quotationStatus?.length && !actorPermissions.includes('projects:manage')
           ? actor.userId : undefined,
+        kind: query.kind,
         clientId: client?.id,
         clientIds: query.clientIds,
         periods: query.period,

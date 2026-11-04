@@ -113,7 +113,8 @@ export function DevelopmentProjectDetailView({
         teamName: team.teamName,
         leaderName: leader?.fullName ?? null,
         assignedHours: team.assignedHours ?? 0,
-        consumedHours: 0,
+        // Líder que no es miembro asignado: sus horas van a su equipo, no a "Sin equipo".
+        consumedHours: team.leaderConsumedHours,
       });
     }
 
@@ -146,6 +147,21 @@ export function DevelopmentProjectDetailView({
   );
 
   const remainingHours = project.soldHours - project.usedHours;
+
+  /**
+   * HH aprobadas de gente que no está en `project_team_members` ni lidera un
+   * equipo del proyecto (p.ej. el líder del proyecto que carga horas sin estar
+   * asignado). `project.usedHours` las cuenta y el desglose por equipo no, así que
+   * "HH Utilizadas" del gráfico no cuadraba con "HH consumidas" de arriba. Cada
+   * persona se cuenta una vez aunque esté en dos equipos — sus horas no guardan
+   * equipo. Las del líder de equipo no asignado ya vienen en `leaderConsumedHours`.
+   */
+  const unassignedHours = useMemo(() => {
+    const consumedByUser = new Map(project.members.map((member) => [member.userId, member.consumedHours]));
+    const attributedToMembers = [...consumedByUser.values()].reduce((sum, hours) => sum + hours, 0);
+    const attributedToLeaders = project.teams.reduce((sum, team) => sum + team.leaderConsumedHours, 0);
+    return Math.max(0, project.usedHours - attributedToMembers - attributedToLeaders);
+  }, [project]);
 
   const projectDocuments: ProjectDocument[] = [
     project.quotationLink
@@ -250,10 +266,12 @@ export function DevelopmentProjectDetailView({
         <ProjectInfoBar
           clientName={project.client?.companyName ?? "Sin cliente"}
           leaderName={project.leader?.fullName ?? "—"}
+          commercialManagerName={project.commercialManager?.fullName ?? "—"}
           dateRange={`${formatDate(project.startDate)} - ${formatDate(project.endDate)}`}
           salesStage={project.salesStage}
           status={project.status}
           phase={project.phase}
+          isInternal={project.isInternal}
           documents={projectDocuments}
         />
         {onEdit && (
@@ -273,11 +291,7 @@ export function DevelopmentProjectDetailView({
       <Card>
         <p className={styles.sectionTitle}>Avance del proyecto</p>
         <div style={{ marginTop: "var(--kora-space-4)" }}>
-          <ProjectTimeline
-            progress={project.progress}
-            startDate={project.startDate}
-            endDate={project.estimatedDeliveryDate ?? project.endDate}
-          />
+          <ProjectTimeline progress={project.progress} />
         </div>
 
         <div className={styles.metricsDivider} />
@@ -295,7 +309,8 @@ export function DevelopmentProjectDetailView({
               <CalendarIcon size={12} className={styles.iconBlue} /> Entrega estimada
             </span>
             <span className={styles.kpiValue} style={{ fontSize: "var(--kora-text-lg)" }}>
-              {formatDate(project.estimatedDeliveryDate)}
+              {/* Proyectos antiguos/seed no tienen entrega estimada propia: cae a la fecha de fin, como el avance antes. */}
+              {formatDate(project.estimatedDeliveryDate ?? project.endDate)}
             </span>
           </div>
           <div className={styles.metricItem}>
@@ -354,7 +369,7 @@ export function DevelopmentProjectDetailView({
           {tab === "resumen" && (
             <div className={styles.layout}>
               <div className={styles.colLeft}>
-                <TeamHoursSummaryChart teams={teamSummaries} />
+                <TeamHoursSummaryChart teams={teamSummaries} unassignedHours={unassignedHours} />
 
                 {canManageProject ? (
                   <ProjectTeamsManagementCard project={project} catalog={teamsCatalog?.items ?? []} />

@@ -184,6 +184,11 @@ export const projects = pgTable(
     contractAmount: numeric('contract_amount', { precision: 14, scale: 2 }),
     /** Moneda en que se cobran todos los tramos de pago del proyecto. */
     contractCurrency: projectContractCurrencyEnum('contract_currency').notNull().default('UF'),
+    /**
+     * Proyecto interno de la propia empresa (no se le cobra a nadie): sin monto de contrato ni plan de pago,
+     * fuera del libro de Facturación y sin correos de facturación. Se activa siempre a mano (no hay factura que dispare el Hito 0).
+     */
+    isInternal: boolean('is_internal').notNull().default(false),
 
     /** Hito 0 quedó pausado esperando que Gerencia (admin/pmo) active el proyecto a mano — ver `project_billing_settings`. */
     pendingManagementApproval: boolean('pending_management_approval').notNull().default(false),

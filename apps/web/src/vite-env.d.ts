@@ -11,6 +11,15 @@ declare const __APP_VERSION__: string;
  * pero devuelve `undefined` en tiempo de ejecución. Un tipado exacto por
  * archivo requeriría un generador; para este tamaño de proyecto no compensa.
  */
+/**
+ * Build CommonJS de `hunspell-asm` (ver `shared/spellcheck/engine.ts` para el
+ * porqué). Expone lo mismo que la entrada principal, pero esa ruta no trae
+ * tipos propios.
+ */
+declare module 'hunspell-asm/dist/cjs/index.js' {
+  export * from 'hunspell-asm';
+}
+
 declare module '*.module.css' {
   const classes: Readonly<Record<string, string>>;
   export default classes;

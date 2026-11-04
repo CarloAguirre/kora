@@ -20,6 +20,7 @@ import {
   projectTeams,
   projects,
   sql,
+  supportPlans,
   teamMembers,
   teams,
   users,
@@ -61,6 +62,18 @@ const quotationStatusSql = sql<
   order by qv.version_number desc
   limit 1
 ), 'none')`;
+type SupportPlanType = ProjectListItem['supportPlanType'];
+
+/**
+ * Tipo del contrato de soporte del proyecto: el vigente o, si no hay, el más reciente. Es la fuente
+ * del "Tipo de Soporte" (no el texto libre `support_plan_description` heredado de la v1).
+ */
+const supportPlanTypeOfProject = sql<SupportPlanType>`(
+  select ${supportPlans.planType} from ${supportPlans}
+  where ${supportPlans.projectId} = ${projects.id}
+  order by (${supportPlans.status} = 'active') desc, ${supportPlans.startDate} desc
+  limit 1
+)`;
 
 @Injectable()
 export class DrizzleProjectRepository implements ProjectRepository {
@@ -152,8 +165,10 @@ export class DrizzleProjectRepository implements ProjectRepository {
           endDate: projects.endDate,
           stopsClock: projects.stopsClock,
           supportPlanDescription: projects.supportPlanDescription,
+          supportPlanType: supportPlanTypeOfProject,
           supportHours: projects.supportHours,
           allowsOvertime: projects.allowsOvertime,
+          isInternal: projects.isInternal,
           createdAt: projects.createdAt,
         })
         .from(projects)
@@ -195,8 +210,10 @@ export class DrizzleProjectRepository implements ProjectRepository {
       endDate: row.endDate,
       stopsClock: row.stopsClock,
       supportPlanDescription: row.supportPlanDescription,
+      supportPlanType: row.supportPlanType,
       supportHours: Number(row.supportHours),
       allowsOvertime: row.allowsOvertime,
+      isInternal: row.isInternal,
       createdAt: row.createdAt,
     }));
 
@@ -273,6 +290,12 @@ export class DrizzleProjectRepository implements ProjectRepository {
    * de un equipo asignado al proyecto (caso raro, pero no se descarta).
    * `memberUserId === null` (p.ej. un ticket sin responsable) no tiene equipo
    * que consultar: siempre vacío, sin ir a la base de datos.
+   *
+   * Acotado a proyectos `development`: uno de Soporte no tiene equipo fijo —
+   * el equipo que aparece ahí (si hay) es el que ejecuta, no un reemplazo del
+   * líder a cargo. Sin este filtro, un Soporte con equipo asignado le quitaba
+   * la aprobación de horas al líder del proyecto en favor del líder de ese
+   * equipo, que nadie esperaba viendo la ficha del proyecto.
    */
   private async findTeamLeadersForMemberOnProject(db: Database, projectId: string, memberUserId: string | null) {
     if (memberUserId === null) return [];
@@ -280,6 +303,7 @@ export class DrizzleProjectRepository implements ProjectRepository {
     return db
       .select({ id: users.id, firstName: users.firstName, lastName: users.lastName })
       .from(projectTeams)
+      .innerJoin(projects, and(eq(projects.id, projectTeams.projectId), eq(projects.type, 'development')))
       .innerJoin(teams, eq(teams.id, projectTeams.teamId))
       .innerJoin(users, sql`${users.id} = coalesce(${projectTeams.leaderUserId}, ${teams.leaderUserId})`)
       .innerJoin(
@@ -297,8 +321,10 @@ export class DrizzleProjectRepository implements ProjectRepository {
    * `findApproverCandidatesForMember`/`GetProjectPendingApprovalsUseCase`).
    * El líder de proyecto solo recupera la potestad de decidir cuando no hay
    * líder de equipo resoluble (ni override de proyecto ni líder orgánico del
-   * equipo), incluido `memberUserId === null` — ver docs/DECISION-M4-HORAS.md.
-   * Usado por Horas (dueño del registro) y Tickets (responsable del ticket).
+   * equipo) o el proyecto es de Soporte (sin equipo fijo, ver
+   * `findTeamLeadersForMemberOnProject`), incluido `memberUserId === null` —
+   * ver docs/DECISION-M4-HORAS.md. Usado por Horas (dueño del registro) y
+   * Tickets (responsable del ticket).
    */
   async isProjectLeaderOrTeamLeaderOfMember(
     projectId: string,
@@ -356,6 +382,17 @@ export class DrizzleProjectRepository implements ProjectRepository {
     if (filters.quotationStatus?.length) conditions.push(inArray(quotationStatusSql, [...filters.quotationStatus]));
     if (filters.quotationViewerUserId) {
       conditions.push(eq(projects.leaderUserId, filters.quotationViewerUserId));
+    }
+    if (filters.kind?.length) {
+      // Mismo criterio que `deriveTipo` del diálogo de edición: Finalizado manda sobre la etapa comercial.
+      const notFinished = sql`${projects.status} <> 'finished'`;
+      const byKind = {
+        finished: sql`${projects.status} = 'finished'`,
+        approved: sql`(${notFinished} and ${projects.salesStage} = 'approved')`,
+        quoted: sql`(${notFinished} and ${projects.salesStage} = 'quoted')`,
+        prospect: sql`(${notFinished} and (${projects.salesStage} = 'prospect' or ${projects.salesStage} is null))`,
+      };
+      conditions.push(or(...filters.kind.map((kind) => byKind[kind])));
     }
     if (filters.clientId) conditions.push(eq(projects.clientId, filters.clientId));
     if (filters.clientIds?.length) conditions.push(inArray(projects.clientId, [...filters.clientIds]));
@@ -467,23 +504,62 @@ export class DrizzleProjectRepository implements ProjectRepository {
       return [sql`${projects.actualProgress} ${sqlDirection} nulls last`, asc(projects.id)];
     }
 
+    if (sort.field === 'stage') {
+      // Orden de ciclo de vida de la columna "Etapa": en desarrollo es la fase (Levantamiento → … → Finalizado,
+      // sin fase al final); en soporte la etapa es el estado (Activo / Inactivo / Terminado).
+      const rank = sql`case
+        when ${projects.type} = 'support' then case ${projects.status}
+          when 'active' then 1 when 'finished' then 3 else 2 end
+        else case ${projects.phase}
+          when 'discovery' then 1 when 'development' then 2 when 'testing' then 3 when 'pilot' then 4 when 'closed' then 5 end
+      end`;
+      return [sql`${rank} ${sqlDirection} nulls last`, asc(projects.id)];
+    }
+
+    if (sort.field === 'kind') {
+      // Mismo criterio que `projectKindOf`: Prospecto → Cotización → Aprobado → Finalizado.
+      const rank = sql`case
+        when ${projects.status} = 'finished' then 4
+        when ${projects.salesStage} = 'approved' then 3
+        when ${projects.salesStage} = 'quoted' then 2
+        else 1
+      end`;
+      return [sql`${rank} ${sqlDirection}`, asc(projects.id)];
+    }
+
     if (sort.field === 'supportPlan') {
-      return [sql`${projects.supportPlanDescription} ${sqlDirection} nulls last`, asc(projects.id)];
+      // Por la etiqueta visible (A demanda / Bolsa / Mensual), no por el valor interno del enum.
+      const label = sql`case ${supportPlanTypeOfProject} when 'on_demand' then 'A demanda' when 'bundle' then 'Bolsa' when 'monthly' then 'Mensual' end`;
+      return [sql`${label} ${sqlDirection} nulls last`, asc(projects.id)];
     }
 
     // Restantes = vendidas menos consumidas (mínimo 0) y desviadas = el exceso
-    // de consumidas sobre vendidas (mínimo 0) — desarrollo usa `soldHours`,
-    // soporte usa `supportHours`, así que se elige según el tipo de proyecto
-    // de cada fila en vez de asumir que la consulta ya viene filtrada por uno.
-    const soldHoursByType = sql`case when ${projects.type} = 'support' then ${projects.supportHours} else ${projects.soldHours} end`;
+    // de consumidas sobre vendidas (mínimo 0). Vendidas es `soldHours` también en
+    // soporte (como `hh_vendidas` en la v1): es fijo y solo avanzan las consumidas;
+    // `supportHours` son las horas del plan, no las vendidas.
+    // En soportes "A demanda" no hay tope de horas: vendidas, restantes y desviadas no aplican
+    // (la tabla muestra "No aplica"), así que se ordenan como null y quedan al final.
+    const unlessOnDemand = (value: ReturnType<typeof sql>) =>
+      sql`case when ${supportPlanTypeOfProject} = 'on_demand' then null else ${value} end`;
+
+    if (sort.field === 'soldHours') {
+      return [sql`${unlessOnDemand(sql`${projects.soldHours}`)} ${sqlDirection} nulls last`, asc(projects.id)];
+    }
 
     if (sort.field === 'remainingHours') {
-      return [sql`greatest(${soldHoursByType} - ${projects.usedHours}, 0) ${sqlDirection}`, asc(projects.id)];
+      return [
+        sql`${unlessOnDemand(sql`greatest(${projects.soldHours} - ${projects.usedHours}, 0)`)} ${sqlDirection} nulls last`,
+        asc(projects.id),
+      ];
     }
 
     if (sort.field === 'deviationHours') {
       // Empates (p. ej. todos los sin desviación) quedan del más nuevo al más antiguo.
-      return [sql`greatest(${projects.usedHours} - ${soldHoursByType}, 0) ${sqlDirection}`, desc(projects.createdAt), asc(projects.id)];
+      return [
+        sql`${unlessOnDemand(sql`greatest(${projects.usedHours} - ${projects.soldHours}, 0)`)} ${sqlDirection} nulls last`,
+        desc(projects.createdAt),
+        asc(projects.id),
+      ];
     }
 
     const column =
@@ -491,13 +567,11 @@ export class DrizzleProjectRepository implements ProjectRepository {
         ? projects.name
         : sort.field === 'status'
           ? projects.status
-          : sort.field === 'soldHours'
-            ? projects.soldHours
-            : sort.field === 'usedHours'
-              ? projects.usedHours
-              : sort.field === 'supportHours'
-                ? projects.supportHours
-                : projects.createdAt;
+          : sort.field === 'usedHours'
+            ? projects.usedHours
+            : sort.field === 'supportHours'
+              ? projects.supportHours
+              : projects.createdAt;
     return [direction(column), asc(projects.id)];
   }
 }

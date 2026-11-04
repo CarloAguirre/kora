@@ -1,6 +1,5 @@
 import {
   PROJECT_MODULE_DELIVERY_STATUS_LABELS,
-  projectDelayLevel,
   type HourEntryStatus,
   type HourEntrySummary,
   type ProjectDetail,
@@ -11,22 +10,28 @@ import {
   type ProjectObservation,
 } from '@kora/contracts';
 import { getTeamStyle } from '@/modules/projects/utils/team-style';
-import { toBitacoraRows, type BitacoraRow } from '@/modules/projects/lib/bitacora-row';
+import {
+  rowFilterDate,
+  rowIsDeliveryOrTask,
+  rowIsIncident,
+  toBitacoraRows,
+  type BitacoraRow,
+} from '@/modules/projects/lib/bitacora-row';
 import { entryTitle, EVENT_STATUS_LABEL } from '@/modules/projects/lib/hour-entry-log';
-import { lifecycleHealth } from './portal-list.adapter';
+import { projectHealth } from './portal-list.adapter';
 import type {
   ClientBitacoraEntry,
   ClientBitacoraEntryKind,
   ClientBitacoraStatusTone,
   ClientProjectBilling,
   ClientProjectDetail,
-  ClientProjectHealth,
   ClientRoadmapPhase,
   PhaseRoadmapDelivery,
   PhaseRoadmapDeliveryState,
   PhaseRoadmapPhase,
   PhaseRoadmapRole,
   PhaseRoadmapTaskItem,
+  PhaseRoadmapTaskScope,
   ProjectPhaseRoadmap,
   RoadmapStep,
 } from '../types';
@@ -91,6 +96,18 @@ export function roleFromTeamName(teamName: string | null): PhaseRoadmapRole {
   if (sigla === 'RPA') return 'rpa';
   return 'dev';
 }
+
+/** Los tramos no guardan ámbito propio (solo el equipo), así que se deriva del rol: UX → Diseño,
+ *  QA → QA Funcional y el resto → Desarrollo. Ningún tramo cae en "Rev. Cliente". Es lo que
+ *  permite que los chips de "Resumen de avance" también filtren las barras del Gantt. */
+const SCOPE_BY_ROLE: Readonly<Record<PhaseRoadmapRole, PhaseRoadmapTaskScope>> = {
+  pmo: 'desarrollo',
+  ux: 'diseno',
+  qa: 'qa',
+  dev: 'desarrollo',
+  ia: 'desarrollo',
+  rpa: 'desarrollo',
+};
 
 /**
  * Mismo criterio que `phaseVisualStatus` de `ProjectModulesCard`: "finished" es 100% la decisión
@@ -158,7 +175,13 @@ function toBitacoraEntry(observation: ProjectObservation, moduleBadgeByModuleId:
     description: observation.message,
     statusLabel: OBSERVATION_STATUS_LABELS[status] ?? 'Registrado',
     statusTone: OBSERVATION_STATUS_TONES[status] ?? 'info',
+    ...filterFields({ kind: observation.type, observation }),
   };
+}
+
+/** Mismo criterio que los filtros Tipo/Desde/Hasta de la Bitácora interna (`BitacoraCard`). */
+function filterFields(row: BitacoraRow): Pick<ClientBitacoraEntry, 'isIncident' | 'isDeliveryOrTask' | 'filterDate'> {
+  return { isIncident: rowIsIncident(row), isDeliveryOrTask: rowIsDeliveryOrTask(row), filterDate: rowFilterDate(row) };
 }
 
 const EVENT_STATUS_TONES: Record<HourEntryStatus, ClientBitacoraStatusTone> = {
@@ -203,6 +226,7 @@ function rowToBitacoraEntry(row: BitacoraRow, moduleBadgeByModuleId: ReadonlyMap
       description,
       statusLabel: EVENT_STATUS_LABEL[entry.status],
       statusTone: EVENT_STATUS_TONES[entry.status],
+      ...filterFields(row),
     };
   }
   if (row.kind === 'entrega') {
@@ -217,6 +241,7 @@ function rowToBitacoraEntry(row: BitacoraRow, moduleBadgeByModuleId: ReadonlyMap
       description: deliveryLabel(delivery),
       statusLabel: CLIENT_DELIVERY_STATUS_LABELS[delivery.status],
       statusTone: DELIVERY_STATUS_TONES[delivery.status],
+      ...filterFields(row),
     };
   }
   return toBitacoraEntry(row.observation, moduleBadgeByModuleId);
@@ -243,15 +268,18 @@ function toPhaseRoadmapPhase(
     name: module.name,
     status: phaseStatus(module),
     alertLabel,
-    tasks: module.segments.map((segment) => ({
-      id: segment.id,
-      role: roleFromTeamName(segment.teamName),
-      scope: 'desarrollo',
-      label: segment.name,
-      startDate: segment.startDate,
-      endDate: segment.endDate,
-      closedAt: segment.closedAt ?? null,
-    })),
+    tasks: module.segments.map((segment) => {
+      const role = roleFromTeamName(segment.teamName);
+      return {
+        id: segment.id,
+        role,
+        scope: SCOPE_BY_ROLE[role],
+        label: segment.name,
+        startDate: segment.startDate,
+        endDate: segment.endDate,
+        closedAt: segment.closedAt ?? null,
+      };
+    }),
     deliveries: module.deliveries.map(
       (delivery): PhaseRoadmapDelivery => ({
         id: delivery.id,
@@ -326,7 +354,7 @@ function toRoadmapStep(stage: ProjectModule['currentStage']): RoadmapStep {
   return stage === 'closed' ? 'finished' : stage;
 }
 
-function toRoadmapPhase(module: ProjectModule, index: number): ClientRoadmapPhase {
+export function toRoadmapPhase(module: ProjectModule, index: number): ClientRoadmapPhase {
   const status = phaseStatus(module);
   // Los segmentos son el calendario definitivo y EDITABLE. Si el PM cambia
   // sus fechas, la vista cliente debe reflejarlo sin utilizar el snapshot
@@ -400,13 +428,6 @@ function toBilling(project: ProjectDetail): ClientProjectBilling {
   };
 }
 
-function health(project: ProjectDetail): ClientProjectHealth {
-  const lifecycle = lifecycleHealth(project);
-  if (lifecycle) return lifecycle;
-  // Mismo umbral que el dashboard y el listado interno (`PROJECT_PROGRESS_DELAY_ALERT`).
-  return projectDelayLevel(project.progress.delay) === 'on_track' ? 'active' : 'at_risk';
-}
-
 function tag(project: ProjectDetail): string {
   const teamNames = new Set<string>();
   for (const module of project.modules) {
@@ -457,7 +478,7 @@ export function toClientProjectDetail(project: ProjectDetail, hourEntries: reado
     id: project.id,
     slug: project.slug,
     name: project.name,
-    health: health(project),
+    health: projectHealth(project),
     tag: tag(project),
     company: {
       name: project.client?.companyName ?? '—',

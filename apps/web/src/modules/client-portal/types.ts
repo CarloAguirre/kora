@@ -15,31 +15,34 @@ export interface ClientCompanyInfo {
   readonly name: string;
   readonly contactName: string;
   readonly contactPosition: string;
+  /** Logo cargado en la ficha del cliente (data URL); sin él se muestra un ícono neutro. */
+  readonly logoUrl?: string | null;
 }
 
 /**
- * Estado visual del proyecto para el cliente: combina el ciclo de vida real
- * (`ProjectStatus` en `@kora/contracts`) con una señal de riesgo/salud que hoy
- * no existe como campo propio en el proyecto — de ahí que sea un tipo aparte
+ * Estado del proyecto para el cliente: el ciclo de vida real (`ProjectStatus`
+ * en `@kora/contracts`) más la etapa comercial — de ahí que sea un tipo aparte
  * y no un alias de `ProjectStatus`. `prospect`/`quoted` vienen de la etapa
  * comercial (`salesStage`) y `not_started` de `status: 'draft'`: sin ellos,
  * un proyecto aún no vendido o no iniciado se le mostraba al cliente "Activo".
  */
-export type ClientProjectHealth = 'prospect' | 'quoted' | 'not_started' | 'active' | 'at_risk' | 'finished';
+export type ClientProjectHealth = 'prospect' | 'quoted' | 'not_started' | 'active' | 'on_hold' | 'finished' | 'cancelled';
 
 export interface ClientProjectRow {
   readonly id: string;
   readonly slug?: string | null;
   readonly name: string;
-  /** "Desarrollo" / "Soporte" — `ProjectSummary` no trae equipos ni cantidad de fases para esta fila de lista, a diferencia de `ClientProjectDetail`. */
-  readonly typeLabel: string;
-  readonly kabeliOwnerName: string;
-  readonly clientOwnerName: string;
+  /** Líder del proyecto (`ProjectSummary.leader`) — columna "Líder Kabeli". */
+  readonly leaderName: string;
   readonly startDate: string;
   readonly endDate: string | null;
+  /** Fechas ISO sin formatear, para ordenar la tabla (`startDate`/`endDate` vienen como dd-mm-aaaa). */
+  readonly startDateIso: string | null;
+  readonly endDateIso: string | null;
   readonly health: ClientProjectHealth;
   readonly stageLabel: string;
-  readonly stageProgressPercent: number;
+  /** Avance real (`progress.actual`); `null` = sin plan cargado. */
+  readonly progressPercent: number | null;
 }
 
 export interface ClientSupportContractRow {
@@ -50,6 +53,8 @@ export interface ClientSupportContractRow {
   readonly kabeliOwnerName: string;
   readonly startDate: string;
   readonly endDate: string | null;
+  readonly startDateIso: string | null;
+  readonly endDateIso: string | null;
   readonly contractedHours: number | null;
   readonly consumedHours: number | null;
   readonly hourValueUf: number | null;
@@ -136,7 +141,7 @@ export interface SupportContractDetail {
  * Figma) — NO es el mismo concepto que `ProjectPhase` de `@kora/contracts`:
  * ese describe la etapa vigente de TODO el proyecto, mientras que esto es el
  * mini-pipeline que recorre cada fase individual (p.ej. "Fase 2" pasa por
- * Levantamiento → Desarrollo → Producción → Marcha blanca → Finalizado).
+ * Levantamiento → Desarrollo → Pruebas → Marcha blanca → Finalizado).
  * Se mantiene como tipo propio para no forzar un calce que no existe.
  */
 export const ROADMAP_STEPS = ['discovery', 'development', 'production', 'pilot', 'finished'] as const;
@@ -145,7 +150,7 @@ export type RoadmapStep = (typeof ROADMAP_STEPS)[number];
 export const ROADMAP_STEP_LABELS: Readonly<Record<RoadmapStep, string>> = {
   discovery: 'Levantamiento',
   development: 'Desarrollo',
-  production: 'Producción',
+  production: 'Pruebas',
   pilot: 'Marcha blanca',
   finished: 'Finalizado',
 };
@@ -305,6 +310,12 @@ export interface ClientBitacoraEntry {
   readonly statusTone: ClientBitacoraStatusTone;
   /** Cajita de confirmación bajo la descripción (Figma: "✓ Aprobado por Camila Reyes el 15-06-2026 09:15") — no todas las entradas la tienen. */
   readonly secondaryNote?: string;
+  /** Filtro "Incidentes" — registro tipo Incidente u hora con bloqueo (igual que la Bitácora interna). */
+  readonly isIncident: boolean;
+  /** Filtro "Entregas y tareas" — la entrega en sí o un registro de cambio sobre una entrega/tarea. */
+  readonly isDeliveryOrTask: boolean;
+  /** `YYYY-MM-DD` contra el que se comparan los filtros Desde/Hasta. */
+  readonly filterDate: string;
 }
 
 /**

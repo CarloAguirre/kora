@@ -2,34 +2,13 @@ import { useMemo, useState } from 'react';
 import type { HourEntrySummary } from '@kora/contracts';
 import styles from './RecentHistoryCard.module.css';
 import { Card } from '@/shared/components/ui/Card';
-import { WeekRangePicker } from '@/shared/components/ui/WeekRangePicker';
+import { PeriodRangeFilter, weekPeriod, type PeriodRange } from '@/shared/components/ui/PeriodRangeFilter';
 import { DEFAULT_PAGE_SIZE, Pagination } from '@/shared/components/ui/Pagination';
 import { DataTable, type Column } from '@/shared/components/ui/DataTable';
 import { HourEntryStatusBadge } from '@/modules/hours/components/HourEntryStatusBadge';
 import { useHourEntriesList } from '@/modules/hours/api/hours.queries';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
-
-function mondayOf(date: Date): Date {
-  const result = new Date(date);
-  const day = result.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  result.setDate(result.getDate() + diff);
-  result.setHours(0, 0, 0, 0);
-  return result;
-}
-
-function addDays(date: Date, days: number): Date {
-  const result = new Date(date);
-  result.setDate(result.getDate() + days);
-  return result;
-}
-
-function toIsoDate(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
+import { resolvedApprover } from '@/modules/hours/lib/approver';
 
 function formatDate(isoDate: string): string {
   const date = new Date(`${isoDate}T00:00:00`);
@@ -47,15 +26,14 @@ interface RecentHistoryCardProps {
  * "Historial Reciente" del propio `collaborator` en el Dashboard — réplica del
  * card homónimo de `ColaboradorDashboard` (v1): sus propios registros de la
  * semana seleccionada, de solo lectura (editar/eliminar vive en `/horas`, ver
- * `DECISION-M7-DASHBOARD.md`).
+ * `DECISION-M7-DASHBOARD.md`). Además de la semana (compartida con el resto
+ * del Dashboard) admite un rango de fechas libre, p. ej. para ver un mes.
  */
 export function RecentHistoryCard({ weekStart, onWeekStartChange }: RecentHistoryCardProps) {
   const { user } = useAuth();
-  const selectedMonday = useMemo(
-    () => mondayOf(weekStart ? new Date(`${weekStart}T00:00:00`) : new Date()),
-    [weekStart],
-  );
-  const selectedSunday = useMemo(() => addDays(selectedMonday, 6), [selectedMonday]);
+  // `null` = modo semana, que sale de `weekStart` (compartido con el Dashboard); el rango es propio del card.
+  const [range, setRange] = useState<PeriodRange | null>(null);
+  const period = useMemo(() => range ?? weekPeriod(weekStart), [range, weekStart]);
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
@@ -64,8 +42,8 @@ export function RecentHistoryCard({ weekStart, onWeekStartChange }: RecentHistor
     user
       ? {
           userId: user.id,
-          dateFrom: toIsoDate(selectedMonday),
-          dateTo: toIsoDate(selectedSunday),
+          dateFrom: period.dateFrom || undefined,
+          dateTo: period.dateTo || undefined,
           page,
           pageSize,
           sortField: 'date',
@@ -81,7 +59,7 @@ export function RecentHistoryCard({ weekStart, onWeekStartChange }: RecentHistor
       key: 'approver',
       header: 'Aprobador',
       render: (e) => {
-        const names = e.designatedApprover ? [e.designatedApprover.fullName] : e.projectApprovers.map((a) => a.fullName);
+        const names = e.project ? e.projectApprovers.map((a) => a.fullName) : (resolvedApprover(e) ? [resolvedApprover(e)!.fullName] : []);
         return names.length > 0 ? names.join(', ') : <span className={styles.empty}>—</span>;
       },
     },
@@ -95,15 +73,17 @@ export function RecentHistoryCard({ weekStart, onWeekStartChange }: RecentHistor
     <Card className={styles.card}>
       <div className={styles.header}>
         <h3 className={styles.title}>Historial Reciente</h3>
-        <WeekRangePicker
-          label=""
-          className={styles.weekSelect}
-          periodStart={toIsoDate(selectedMonday)}
-          periodEnd={toIsoDate(addDays(selectedMonday, 4))}
-          displayPeriodEnd={toIsoDate(selectedSunday)}
-          onChange={({ periodStart }) => {
+        <PeriodRangeFilter
+          showLabels={false}
+          value={period}
+          onChange={(next) => {
             setPage(1);
-            onWeekStartChange(periodStart);
+            if (next.mode === 'week') {
+              setRange(null);
+              onWeekStartChange(next.dateFrom);
+            } else {
+              setRange(next);
+            }
           }}
         />
       </div>
@@ -115,7 +95,7 @@ export function RecentHistoryCard({ weekStart, onWeekStartChange }: RecentHistor
         getRowKey={(entry) => entry.id}
         loading={isLoading}
         error={error ? 'No se pudo cargar el historial de horas.' : null}
-        emptyMessage="No hay registros en esta semana."
+        emptyMessage={period.mode === 'week' ? 'No hay registros en esta semana.' : 'No hay registros en este período.'}
       />
 
       {data && (

@@ -9,15 +9,19 @@ export interface GetHoursCapacityReportCommand {
   readonly query: ListCapacityReportQuery;
 }
 
-/** Suficiente para traer todas las horas aprobadas de un mes de una organización de este tamaño. */
-const MONTH_ENTRIES_PAGE_SIZE = 20_000;
+/** Suficiente para traer todas las horas aprobadas del rango (hasta un año) de una organización de este tamaño. */
+const RANGE_ENTRIES_PAGE_SIZE = 50_000;
 
 /**
  * Reporte "Capacity" de Administración — ver la v1 `Usuarios/index.tsx`
  * (pestaña `capacity`, líneas 646-797) y `src/utils/capacityHHType.ts`.
  *
  * Solo se llama con `hours:read_all` ya verificado por el controlador — por
- * eso pide todas las horas aprobadas del mes sin `visibleToUserIds`.
+ * eso pide todas las horas aprobadas del rango sin `visibleToUserIds`.
+ *
+ * El % de dedicación sigue siendo mensual: por cada persona y mes, horas del
+ * mes dentro del rango sobre los días hábiles de ese mes que caen en el rango.
+ * Con un rango de mes completo, es exactamente el cálculo de la v1.
  *
  * Las horas extra no cuentan para Capacity (ni filas ni % de dedicación): la
  * capacidad se mide sobre la jornada normal, y las extra tienen su propio
@@ -32,28 +36,44 @@ export class GetHoursCapacityReportUseCase implements UseCase<GetHoursCapacityRe
 
   async execute(command: GetHoursCapacityReportCommand): Promise<Result<Page<CapacityReportRow>, never>> {
     const { query } = command;
-    const monthStart = monthStartOf(query.periodStart);
-    const monthEnd = monthEndOf(monthStart);
+    const rangeStart = parseIsoDate(query.dateFrom);
+    const rangeEnd = parseIsoDate(query.dateTo);
 
-    const [monthPage, holidayRows] = await Promise.all([
+    const [rangePage, holidayRows] = await Promise.all([
       this.hourEntries.search(
-        { status: 'approved', dateFrom: monthStart, dateTo: monthEnd, visibleToUserIds: undefined },
-        { page: 1, pageSize: MONTH_ENTRIES_PAGE_SIZE },
+        { status: 'approved', dateFrom: rangeStart, dateTo: rangeEnd, visibleToUserIds: undefined },
+        { page: 1, pageSize: RANGE_ENTRIES_PAGE_SIZE },
         { field: 'date', direction: 'desc' },
       ),
-      this.holidays.list(toIsoDate(monthStart), toIsoDate(monthEnd)),
+      this.holidays.list(query.dateFrom, query.dateTo),
     ]);
 
     const holidayDates = new Set(holidayRows.map((h) => h.date));
-    const laborHours = countBusinessDays(monthStart, monthEnd, holidayDates) * 8;
-    const regularItems = monthPage.items.filter((item) => !item.isOvertime);
+    const regularItems = rangePage.items.filter((item) => !item.isOvertime);
+
+    // Días hábiles por mes, recortados al rango pedido.
+    const laborHoursByMonth = new Map<string, number>();
+    for (const monthKey of monthKeysBetween(rangeStart, rangeEnd)) {
+      const monthStart = parseIsoDate(`${monthKey}-01`);
+      const from = monthStart > rangeStart ? monthStart : rangeStart;
+      const monthEnd = monthEndOf(monthStart);
+      const to = monthEnd < rangeEnd ? monthEnd : rangeEnd;
+      laborHoursByMonth.set(monthKey, countBusinessDays(from, to, holidayDates) * 8);
+    }
 
     const monthlyHoursByUser = new Map<string, number>();
     for (const item of regularItems) {
-      monthlyHoursByUser.set(item.userId, (monthlyHoursByUser.get(item.userId) ?? 0) + item.hours);
+      const key = userMonthKey(item);
+      monthlyHoursByUser.set(key, (monthlyHoursByUser.get(key) ?? 0) + item.hours);
     }
 
-    const rows = regularItems.map((item) => toCapacityReportRow(item, laborHours, monthlyHoursByUser.get(item.userId) ?? 0));
+    const rows = regularItems.map((item) =>
+      toCapacityReportRow(
+        item,
+        laborHoursByMonth.get(toIsoDate(item.date).slice(0, 7)) ?? 0,
+        monthlyHoursByUser.get(userMonthKey(item)) ?? 0,
+      ),
+    );
 
     const term = query.search?.trim().toLowerCase();
     const filtered = term
@@ -111,11 +131,27 @@ function sortRows(
   });
 }
 
-function monthStartOf(iso: string): Date {
+function parseIsoDate(iso: string): Date {
   const parts = iso.split('-').map(Number);
   const year = parts[0] ?? 1970;
   const month = parts[1] ?? 1;
-  return new Date(Date.UTC(year, month - 1, 1));
+  const day = parts[2] ?? 1;
+  return new Date(Date.UTC(year, month - 1, day));
+}
+
+/** `yyyy-mm` de cada mes que toca el rango, en orden. */
+function monthKeysBetween(start: Date, end: Date): string[] {
+  const keys: string[] = [];
+  const current = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), 1));
+  while (current <= end) {
+    keys.push(toIsoDate(current).slice(0, 7));
+    current.setUTCMonth(current.getUTCMonth() + 1);
+  }
+  return keys;
+}
+
+function userMonthKey(item: HourEntryListItem): string {
+  return `${item.userId}:${toIsoDate(item.date).slice(0, 7)}`;
 }
 
 function monthEndOf(monthStart: Date): Date {

@@ -5,6 +5,7 @@ import type { TeamReportProjectRow, TeamReportReader } from '../ports/team-repor
 import type { TeamUserReader } from '../ports/team-user-reader.port';
 import type { CreateNotificationInput, NotificationInbox } from '../../../notifications/application/ports/notification-inbox.port';
 import { RequestTeamReportDataUseCase } from './request-team-report-data.use-case';
+import { GetTeamReportUseCase } from './get-team-report.use-case';
 
 const TEAM_ID = '11111111-1111-4111-8111-111111111111';
 const LEADER_A = { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', fullName: 'José Aponte' };
@@ -18,6 +19,7 @@ function project(id: string, overrides: Partial<TeamReportProjectRow> = {}): Tea
     slug: `proyecto-${id}`,
     client: { id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', companyName: 'Goldfields' },
     status: 'active',
+    salesStage: 'approved',
     startDate: '2026-06-01',
     endDate: '2026-09-30',
     assignedHours: 100,
@@ -29,7 +31,14 @@ function project(id: string, overrides: Partial<TeamReportProjectRow> = {}): Tea
   };
 }
 
-function setup(projects: TeamReportProjectRow[], { isLeader = true, projectsWithHours = projects.map((p) => p.projectId) } = {}) {
+function setup(
+  projects: TeamReportProjectRow[],
+  {
+    isLeader = true,
+    projectsWithHours = projects.map((p) => p.projectId),
+    projectsWithPendingHoursOnly = [] as string[],
+  } = {},
+) {
   const created: CreateNotificationInput[] = [];
   const teams = {
     findById: vi.fn().mockResolvedValue({ id: TEAM_ID, name: 'UX-UI', isDeleted: false, leaderUserId: ACTOR.userId }),
@@ -38,8 +47,8 @@ function setup(projects: TeamReportProjectRow[], { isLeader = true, projectsWith
   const reports = {
     listProjects: vi.fn().mockResolvedValue(projects),
     listPeople: vi.fn().mockResolvedValue([{ id: ACTOR.userId, fullName: 'Eduardo Aranda' }]),
-    sumHours: vi.fn().mockResolvedValue(
-      projectsWithHours.map((projectId) => ({
+    sumHours: vi.fn().mockResolvedValue([
+      ...projectsWithHours.map((projectId) => ({
         projectId,
         userId: ACTOR.userId,
         periodApproved: 0,
@@ -47,7 +56,15 @@ function setup(projects: TeamReportProjectRow[], { isLeader = true, projectsWith
         accumulatedApproved: 8,
         accumulatedPending: 0,
       })),
-    ),
+      ...projectsWithPendingHoursOnly.map((projectId) => ({
+        projectId,
+        userId: ACTOR.userId,
+        periodApproved: 0,
+        periodPending: 3,
+        accumulatedApproved: 0,
+        accumulatedPending: 3,
+      })),
+    ]),
     markDataRequested: vi.fn().mockResolvedValue(undefined),
   };
   const users = { findById: vi.fn().mockResolvedValue({ id: ACTOR.userId, fullName: 'Eduardo Aranda' }) };
@@ -101,15 +118,31 @@ describe('RequestTeamReportDataUseCase', () => {
     expect(created[0]!.data.items.map((item) => item.projectId)).toEqual(['1']);
   });
 
-  it('no pide HH asignadas si el equipo todavía no incurrió horas en el proyecto', async () => {
-    const { useCase, created } = setup([project('1', { assignedHours: 0, startDate: null }), project('2', { assignedHours: 0 })], {
-      projectsWithHours: [],
+  it('solo pide datos de proyectos —no prospectos— donde el equipo registró horas, aprobadas o por aprobar', async () => {
+    const { useCase, created, reports } = setup(
+      [
+        project('1', { startDate: null }),
+        project('2', { startDate: null, assignedHours: 0, salesStage: 'prospect' }),
+        project('3', { assignedHours: 0, startDate: null }),
+        project('4', { assignedHours: 0 }),
+      ],
+      { projectsWithHours: ['1', '2'], projectsWithPendingHoursOnly: ['4'] },
+    );
+
+    const result = await useCase.execute({
+      teamId: TEAM_ID,
+      projectIds: ['1', '2', '3', '4'],
+      note: undefined,
+      actor: ACTOR,
+      actorPermissions: [],
     });
 
-    const result = await useCase.execute({ teamId: TEAM_ID, projectIds: ['1', '2'], note: undefined, actor: ACTOR, actorPermissions: [] });
-
-    expect(result.unwrap()).toEqual({ notifiedLeaders: 1, requestedProjects: 1 });
-    expect(created[0]!.data.items[0]!.missing).toEqual(['dates']);
+    expect(result.unwrap()).toEqual({ notifiedLeaders: 1, requestedProjects: 2 });
+    expect(created[0]!.data.items.map((item) => [item.projectId, item.missing])).toEqual([
+      ['1', ['dates']],
+      ['4', ['assigned_hours']],
+    ]);
+    expect(reports.markDataRequested).toHaveBeenCalledWith(TEAM_ID, ['1', '4'], new Date('2026-10-16T15:00:00.000Z'));
   });
 
   it('rechaza a quien no lidera el equipo ni gestiona proyectos', async () => {
@@ -119,5 +152,97 @@ describe('RequestTeamReportDataUseCase', () => {
 
     expect(result.isErr()).toBe(true);
     expect(created).toHaveLength(0);
+  });
+});
+
+
+describe('GetTeamReportUseCase — actividad reciente del equipo', () => {
+  const now = new Date('2026-11-03T16:00:00.000Z');
+  const recentProject = project('reciente');
+  const historicalProject = project('historico');
+  const permissions = ['projects:read'] as const;
+
+  function reportSetup(recentProjects: string[], people = [{ id: ACTOR.userId, fullName: 'Eduardo Aranda' }]) {
+    const teams = {
+      findById: vi.fn().mockResolvedValue({ id: TEAM_ID, name: 'UX-UI', isDeleted: false, leaderUserId: ACTOR.userId }),
+      isLeaderOfTeam: vi.fn().mockResolvedValue(true),
+    };
+    const reports = {
+      listPeople: vi.fn().mockResolvedValue(people),
+      listProjects: vi.fn().mockResolvedValue([recentProject, historicalProject]),
+      findProjectsWithRecentHourEntries: vi.fn().mockResolvedValue(new Set(recentProjects)),
+      sumHours: vi.fn().mockResolvedValue([
+        { projectId: 'reciente', userId: ACTOR.userId, periodApproved: 4, periodPending: 2, accumulatedApproved: 12, accumulatedPending: 2 },
+      ]),
+      listTeamTasks: vi.fn().mockResolvedValue([{ projectId: 'reciente', total: 1, approved: 0 }]),
+      listProjectsWithApprovedDelivery: vi.fn().mockResolvedValue(new Set<string>()),
+    };
+    const useCase = new GetTeamReportUseCase(
+      teams as unknown as TeamRepository,
+      reports as unknown as TeamReportReader,
+      new FixedClock(now),
+    );
+    return { useCase, reports };
+  }
+
+  it('conserva solo proyectos con horas recientemente cargadas y calcula sus HH en el período solicitado', async () => {
+    const { useCase, reports } = reportSetup(['reciente']);
+    const result = await useCase.execute({
+      teamId: TEAM_ID,
+      dateFrom: '2026-01-01',
+      dateTo: '2026-11-03',
+      actor: ACTOR,
+      actorPermissions: permissions,
+    });
+
+    expect(result.isOk()).toBe(true);
+    const data = result.unwrap();
+    expect(data.projects.map((p) => p.projectId)).toEqual(['reciente']);
+    expect(data.projects[0]?.hours[0]?.periodApproved).toBe(4);
+    expect(reports.findProjectsWithRecentHourEntries).toHaveBeenCalledWith(
+      ['reciente', 'historico'],
+      [ACTOR.userId],
+      new Date('2026-10-24T16:00:00.000Z'),
+      now,
+    );
+    expect(reports.sumHours).toHaveBeenCalledWith(
+      ['reciente'],
+      [ACTOR.userId],
+      new Date('2026-01-01T00:00:00.000Z'),
+      new Date('2026-11-03T00:00:00.000Z'),
+    );
+    expect(reports.listTeamTasks).toHaveBeenCalledWith(TEAM_ID, ['reciente']);
+    expect(reports.listProjectsWithApprovedDelivery).toHaveBeenCalledWith(TEAM_ID, ['reciente']);
+  });
+
+  it('no muestra proyectos meramente vinculados si nadie del equipo registró HH en 10 días', async () => {
+    const { useCase, reports } = reportSetup([]);
+    const result = await useCase.execute({
+      teamId: TEAM_ID,
+      dateFrom: '2026-09-01',
+      dateTo: '2026-09-30',
+      actor: ACTOR,
+      actorPermissions: permissions,
+    });
+    expect(result.unwrap().projects).toEqual([]);
+    expect(reports.sumHours).toHaveBeenCalledWith(
+      [], [ACTOR.userId], new Date('2026-09-01T00:00:00.000Z'), new Date('2026-09-30T00:00:00.000Z'),
+    );
+  });
+
+  it('sin miembros actuales no atribuye automáticamente al equipo horas de otros usuarios', async () => {
+    const { useCase, reports } = reportSetup([], []);
+    const result = await useCase.execute({
+      teamId: TEAM_ID,
+      dateFrom: '2026-01-01',
+      dateTo: '2026-11-03',
+      actor: ACTOR,
+      actorPermissions: permissions,
+    });
+    expect(result.unwrap().projects).toHaveLength(0);
+    expect(reports.findProjectsWithRecentHourEntries).toHaveBeenCalledWith(
+      ['reciente', 'historico'], [],
+      new Date('2026-10-24T16:00:00.000Z'), now,
+    );
   });
 });

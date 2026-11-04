@@ -11,6 +11,7 @@ import { ProjectManagerTeamDetailView } from '../components/ProjectManagerTeamDe
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { useProjectDetail } from '../api/projects.queries';
 import { projectPath, projectTeamPath } from '@/app/router/paths';
+import { PROJECTS_LIST_PATH, RESTORE_PROJECTS_LIST_STATE } from '../lib/projects-list-search';
 
 /**
  * Deep link a un equipo puntual dentro de un proyecto. Dos entradas:
@@ -34,7 +35,7 @@ export function ProjectTeamDetailPage() {
   if (error) {
     return (
       <DashboardLayout title="Equipo">
-        <PageLoadError error={error} subject="este proyecto" backLabel="Volver a proyectos" onBack={() => void navigate('/proyectos')} />
+        <PageLoadError error={error} subject="este proyecto" backLabel="Volver a proyectos" onBack={() => void navigate(PROJECTS_LIST_PATH, { state: RESTORE_PROJECTS_LIST_STATE })} />
       </DashboardLayout>
     );
   }

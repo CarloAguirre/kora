@@ -3,12 +3,14 @@ import { CLOCK, err, ok, type ApplicationError, type Clock, type Result } from '
 import { PROJECT_STATUS_LABELS, type ChangeProjectStatusInput, type Permission } from '@kora/contracts';
 import {
   CannotManageProjectError,
-  CannotActivateProjectError,
   ProjectQuotationTransferRequiredError,
   ManualHito0ReasonRequiredError,
   ProjectNotFoundError,
+  ActiveSupportContractMustBeClosedError,
+  SupportContractRequiredForStatusError,
 } from '../../domain/errors/project.errors';
 import { PROJECT_REPOSITORY, type ProjectRepository } from '../../domain/repositories/project.repository';
+import { SUPPORT_CONTRACT_STATUS_READER, type SupportContractStatusReader } from '../ports/support-contract-status-reader.port';
 import {
   AUDIT_RECORDER,
   type AuditRecorder,
@@ -34,6 +36,7 @@ export class ChangeProjectStatusUseCase
     private readonly changeLog: ProjectChangeLogRecorder,
     @Inject(CLOCK) private readonly clock: Clock,
     private readonly paymentTriggers: PaymentMilestoneTriggerService,
+    @Inject(SUPPORT_CONTRACT_STATUS_READER) private readonly supportContracts: SupportContractStatusReader,
   ) {}
 
   async execute(command: ChangeProjectStatusCommand): Promise<Result<void, ApplicationError>> {
@@ -47,9 +50,21 @@ export class ChangeProjectStatusUseCase
     const previousStatus = project.status;
     if (previousStatus === command.data.status) return ok(undefined);
 
-    /** Pasar a Activo (sea Hito 0 manual o reactivar tras Detenido) es de Gerencia/PMO, no del líder por sí solo. */
-    if (command.data.status === 'active' && !command.actorPermissions.includes('projects:manage')) {
-      return err(new CannotActivateProjectError());
+    if (project.type === 'support') {
+      const statuses = await this.supportContracts.statusesForProject(project.id);
+      const hasActiveContract = statuses.includes('active');
+      if (command.data.status === 'finished') {
+        if (hasActiveContract) return err(new ActiveSupportContractMustBeClosedError());
+        if (!statuses.includes('ended')) {
+          return err(new SupportContractRequiredForStatusError('Solo un soporte con contrato cerrado puede marcarse como terminado.'));
+        }
+      }
+      if (command.data.status === 'active' && !hasActiveContract) {
+        return err(new SupportContractRequiredForStatusError('Se necesita un contrato activo para activar este soporte.'));
+      }
+      if (previousStatus === 'finished' && !hasActiveContract) {
+        return err(new SupportContractRequiredForStatusError('Se necesita un contrato activo para reabrir un soporte terminado.'));
+      }
     }
 
     if (previousStatus === 'draft' && command.data.status === 'active' &&
@@ -61,8 +76,8 @@ export class ChangeProjectStatusUseCase
 
     /**
      * Hito 0 manual (sin factura): activar a mano un proyecto `development`
-     * `aprobado` que seguía "No iniciado" — con motivo/referencia obligatorio
-     * (contrato firmado, OC, etc).
+     * `aprobado` que seguía "No iniciado" — Gerencia/PMO o el líder del proyecto
+     * (mismo control de arriba), con motivo/referencia obligatorio (contrato firmado, OC, etc).
      */
     const isManualHito0 =
       previousStatus === 'draft' && command.data.status === 'active' && project.type === 'development' && project.salesStage === 'approved';

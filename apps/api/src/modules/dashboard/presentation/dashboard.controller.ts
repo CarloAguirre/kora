@@ -6,7 +6,7 @@ import {
   type DashboardSummary,
 } from '@kora/contracts';
 import { CurrentUser, type RequestUser } from '../../../shared/presentation/decorators/current-user.decorator';
-import { RequirePermissions } from '../../../shared/presentation/decorators/require-permissions.decorator';
+import { RequireAnyPermission } from '../../../shared/presentation/decorators/require-permissions.decorator';
 import { ZodValidationPipe } from '../../../shared/presentation/pipes/zod-validation.pipe';
 import { unwrapOrThrow } from '../../../shared/presentation/unwrap-result';
 import { GetDashboardSummaryUseCase } from '../application/use-cases/get-dashboard-summary.use-case';
@@ -32,12 +32,19 @@ export class DashboardController {
     );
   }
 
-  /** "Horas extra por proyecto" — vista general del PMO/admin, exportable. */
+  /** "Horas extra por proyecto" — vista general del PMO/admin, o de las personas a cargo para un líder. Exportable. */
   @Get('overtime-report')
-  @RequirePermissions('hours:read_all')
+  @RequireAnyPermission('hours:read_all', 'hours:read_team')
   async overtimeReport(
+    @CurrentUser() user: RequestUser,
     @Query(new ZodValidationPipe(dashboardOvertimeReportQuerySchema)) query: DashboardOvertimeReportQuery,
   ): Promise<DashboardOvertimeReport> {
-    return unwrapOrThrow(await this.getOvertimeReport.execute({ query }));
+    return unwrapOrThrow(
+      await this.getOvertimeReport.execute({
+        query,
+        actor: { userId: user.id, email: user.email },
+        actorPermissions: user.permissions,
+      }),
+    );
   }
 }

@@ -66,6 +66,13 @@ export class HourEntryNotEditableError extends ConflictError {
   }
 }
 
+/** Fuera del mes en curso el registro ya se reportó/facturó: no se edita ni se elimina. */
+export class HourEntryOutsideCurrentMonthError extends ConflictError {
+  constructor() {
+    super('Solo se pueden editar o eliminar registros del mes en curso.', 'HOUR_ENTRY_OUTSIDE_CURRENT_MONTH');
+  }
+}
+
 export class RejectionReasonRequiredError extends ValidationError {
   constructor() {
     super('Indica el motivo del rechazo.', 'HOUR_ENTRY_REJECTION_REASON_REQUIRED');
@@ -103,9 +110,22 @@ export class HourEntrySegmentRequiredError extends ValidationError {
   }
 }
 
+export class SegmentNotInModuleError extends DomainError {
+  constructor() {
+    super('HOUR_ENTRY_SEGMENT_NOT_IN_MODULE', 'El tiempo de ejecución elegido no pertenece a esta fase.');
+  }
+}
+
 export class ProjectStoppedError extends ConflictError {
   constructor() {
     super('No se pueden registrar horas en un proyecto detenido.', 'HOUR_ENTRY_PROJECT_STOPPED');
+  }
+}
+
+/** Proyecto finalizado o cancelado: ya no admite horas nuevas. */
+export class ProjectClosedError extends ConflictError {
+  constructor() {
+    super('No se pueden registrar horas en un proyecto finalizado.', 'HOUR_ENTRY_PROJECT_CLOSED');
   }
 }
 

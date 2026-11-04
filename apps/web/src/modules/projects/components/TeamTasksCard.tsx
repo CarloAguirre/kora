@@ -62,6 +62,8 @@ interface TaskDraft {
   description: string;
   assigneeUserId: string;
   moduleId: string;
+  /** Tiempo de ejecución de la fase elegida — vacío ⇔ sin tramo. */
+  segmentId: string;
   status: ProjectModuleTaskStatus;
   estimatedHours: string;
   startDate: string;
@@ -73,6 +75,7 @@ const EMPTY_TASK_DRAFT: TaskDraft = {
   description: '',
   assigneeUserId: '',
   moduleId: '',
+  segmentId: '',
   status: 'todo',
   estimatedHours: '',
   startDate: '',
@@ -151,6 +154,11 @@ export function TeamTasksCard({ project, projectId, teamId, managerView = false 
     setExecutionEdit({ moduleId, taskId: task.id });
   };
 
+  // Tiempos de ejecución de ESTE equipo en la fase elegida — la tarea es del equipo.
+  const segmentOptions = (project.modules.find((m) => m.id === taskDraft.moduleId)?.segments ?? [])
+    .filter((segment) => segment.teamId === teamId)
+    .map((segment) => ({ value: segment.id, label: `${segment.name} (${formatDate(segment.startDate)} → ${formatDate(segment.endDate)})` }));
+
   // Fechas ISO (yyyy-mm-dd): la comparación de strings respeta el orden cronológico.
   const startDateError =
     taskDraft.startDate && taskDraft.date && taskDraft.startDate > taskDraft.date
@@ -206,6 +214,7 @@ export function TeamTasksCard({ project, projectId, teamId, managerView = false 
             name: taskDraft.name,
             description: taskDraft.description || undefined,
             assigneeUserId: taskDraft.assigneeUserId || undefined,
+            segmentId: taskDraft.segmentId || null,
             startDate: taskDraft.startDate,
             date: taskDraft.date,
             estimatedHours: Number(taskDraft.estimatedHours),
@@ -222,6 +231,7 @@ export function TeamTasksCard({ project, projectId, teamId, managerView = false 
             name: taskDraft.name,
             description: taskDraft.description || undefined,
             assigneeUserId: taskDraft.assigneeUserId || undefined,
+            segmentId: taskDraft.segmentId || undefined,
             startDate: taskDraft.startDate,
             date: taskDraft.date,
             estimatedHours: Number(taskDraft.estimatedHours),
@@ -369,6 +379,10 @@ export function TeamTasksCard({ project, projectId, teamId, managerView = false 
                 onSelect: () => setReassignTarget({ moduleId: task.moduleId, taskId: task.id }),
               },
             ];
+    // Mismo criterio que el clic en el nombre: una tarea en revisión se resuelve con Aprobar/Rechazar.
+    if (task.status !== 'in_review') {
+      items.unshift({ key: 'editar', label: 'Editar', onSelect: () => openEditTaskModal(task.moduleId, task) });
+    }
     items.push({
       key: 'eliminar',
       label: 'Eliminar',
@@ -411,8 +425,14 @@ export function TeamTasksCard({ project, projectId, teamId, managerView = false 
               ),
             },
             { key: 'assignee', header: 'Colaborador', render: (task) => task.assigneeName ?? 'Sin asignar' },
-            { key: 'module', header: 'Módulo', render: (task) => managerView && task.blockName
-              ? `${task.moduleName} · ${task.blockName}` : task.moduleName },
+            {
+              key: 'module',
+              header: 'Módulo',
+              render: (task) => {
+                const blockName = task.segmentName ?? (managerView ? task.blockName : null);
+                return blockName ? `${task.moduleName} · ${blockName}` : task.moduleName;
+              },
+            },
             {
               key: 'status',
               header: 'Estado',
@@ -498,7 +518,16 @@ export function TeamTasksCard({ project, projectId, teamId, managerView = false 
             options={project.modules.map((m) => ({ value: m.id, label: m.name }))}
             value={taskDraft.moduleId}
             disabled={Boolean(editingTaskId)}
-            onChange={(event) => setTaskDraft((prev) => ({ ...prev, moduleId: event.target.value }))}
+            // Los tramos son de la fase: si cambia la fase, el elegido deja de aplicar.
+            onChange={(event) => setTaskDraft((prev) => ({ ...prev, moduleId: event.target.value, segmentId: '' }))}
+          />
+          <Select
+            label="Tiempo de ejecución"
+            placeholder={segmentOptions.length > 0 ? 'Sin tiempo de ejecución' : 'La fase no tiene tiempos de ejecución de este equipo'}
+            options={segmentOptions}
+            value={taskDraft.segmentId}
+            disabled={segmentOptions.length === 0}
+            onChange={(event) => setTaskDraft((prev) => ({ ...prev, segmentId: event.target.value }))}
           />
           <div className={styles.row2}>
             <Select
@@ -565,6 +594,7 @@ export function TeamTasksCard({ project, projectId, teamId, managerView = false 
                 { label: 'Tarea', value: reviewingTask.name },
                 { label: 'Colaborador', value: reviewingTask.assigneeName ?? 'Sin asignar' },
                 { label: 'Módulo', value: reviewingTask.moduleName },
+                { label: 'Tiempo de ejecución', value: reviewingTask.segmentName ?? '—' },
                 { label: 'HH estimadas', value: reviewingTask.estimatedHours != null ? `${reviewingTask.estimatedHours} hh` : '—' },
                 { label: 'Fecha límite', value: formatDate(reviewingTask.date) },
               ]

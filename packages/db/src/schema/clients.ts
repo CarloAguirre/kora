@@ -1,5 +1,5 @@
 import { relations, sql } from 'drizzle-orm';
-import { date, integer, pgEnum, pgTable, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
+import { date, integer, pgEnum, pgTable, text, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
 import { primaryId, softDelete, timestamps } from './columns';
 import { businessSectors, comunas, countries, industries } from './catalogs';
 import { users } from './identity';
@@ -29,6 +29,13 @@ export const clients = pgTable(
     taxId: varchar('tax_id', { length: 50 }).notNull(),
     website: varchar('website', { length: 255 }),
     address: varchar('address', { length: 300 }),
+    /**
+     * Logo como data URL (`data:image/png;base64,…`). El front lo reduce a un
+     * tamaño chico antes de enviarlo, así que cabe holgado en la fila — el
+     * proyecto no tiene almacenamiento de archivos y el logo se muestra
+     * siempre junto al detalle del cliente.
+     */
+    logoDataUrl: text('logo_data_url'),
 
     countryId: uuid('country_id').references(() => countries.id, { onDelete: 'set null' }),
     comunaId: uuid('comuna_id').references(() => comunas.id, { onDelete: 'set null' }),

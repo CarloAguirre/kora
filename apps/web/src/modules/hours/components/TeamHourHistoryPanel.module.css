@@ -89,6 +89,14 @@
   gap: var(--kora-space-1);
 }
 
-.dangerAction {
-  color: var(--kora-danger);
+.rejectForm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-4);
+}
+
+.rejectActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--kora-space-3);
 }

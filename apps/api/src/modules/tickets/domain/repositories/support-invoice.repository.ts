@@ -10,6 +10,8 @@ export interface CreateSupportInvoiceInput {
   /** Moneda del contrato al momento de facturar — se congela junto con el monto, igual criterio. */
   readonly currency: SupportPlanCurrency;
   readonly hoursBilled: number | null;
+  /** Orden dentro de las facturas del período (0 = la primera). */
+  readonly position: number;
   readonly folio: string;
   readonly invoicedAt: Date;
   readonly dueAt: Date | null;
@@ -24,6 +26,7 @@ export interface SupportInvoiceRecord {
   readonly amountUf: number;
   readonly currency: SupportPlanCurrency;
   readonly hoursBilled: number | null;
+  readonly position: number;
   readonly folio: string;
   readonly invoicedAt: Date;
   readonly dueAt: Date | null;
@@ -33,14 +36,18 @@ export interface SupportInvoiceRecord {
 }
 
 /**
- * Una fila es un hecho consumado: que exista para `(planId, periodKey)` YA
- * significa "facturado". No hay `update` de estado de facturación — solo
- * `create` (al facturar) y `markPaid` (al registrar el pago). Ver el
- * comentario de la tabla en `packages/db/src/schema/tickets.ts`.
+ * Una fila es un hecho consumado: que exista alguna para `(planId, periodKey)`
+ * YA significa "facturado" (el total del período puede estar dividido en
+ * varias filas). No hay `update` de estado de facturación — solo
+ * `createMany` (al facturar), `markPaid` (al registrar el pago de una
+ * factura) y `removeMany` (al anular las facturas mal emitidas de un período,
+ * ver `VoidSupportInvoiceUseCase`). Ver el comentario de la tabla en
+ * `packages/db/src/schema/tickets.ts`.
  */
 export interface SupportInvoiceRepository {
   findById(id: string, context?: TransactionContext): Promise<SupportInvoiceRecord | null>;
-  findByPlanAndPeriod(planId: string, periodKey: string, context?: TransactionContext): Promise<SupportInvoiceRecord | null>;
+  /** Las facturas de un período, ordenadas por `position` — vacío si el período no se facturó. */
+  listByPlanAndPeriod(planId: string, periodKey: string, context?: TransactionContext): Promise<SupportInvoiceRecord[]>;
   listForPlan(planId: string, context?: TransactionContext): Promise<SupportInvoiceRecord[]>;
   /** `listForPlan` de varios planes en una sola consulta — evita el N+1 del panel de Facturación. */
   listForPlans(planIds: readonly string[], context?: TransactionContext): Promise<SupportInvoiceRecord[]>;
@@ -53,8 +60,11 @@ export interface SupportInvoiceRepository {
   /** Suma de `hours_billed` de las facturas previas de un plan — para no volver a cobrar el mismo excedente en un contrato `bundle`. */
   sumHoursBilledForPlan(planId: string, context?: TransactionContext): Promise<number>;
 
-  create(input: CreateSupportInvoiceInput, context?: TransactionContext): Promise<void>;
+  /** Las facturas en que se dividió el total de un período, en una sola inserción. */
+  createMany(inputs: readonly CreateSupportInvoiceInput[], context?: TransactionContext): Promise<void>;
   markPaid(id: string, paidAt: Date, context?: TransactionContext): Promise<void>;
+  /** Borra las filas — si son todas las del período, vuelve a quedar "por facturar"; los tickets enlazados quedan sin factura (`on delete set null`). */
+  removeMany(ids: readonly string[], context?: TransactionContext): Promise<void>;
 }
 
 export const SUPPORT_INVOICE_REPOSITORY = Symbol('SupportInvoiceRepository');

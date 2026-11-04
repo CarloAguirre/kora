@@ -96,6 +96,26 @@ export interface PendingHoursDigestNotification {
   readonly items: readonly PendingHoursDigestItem[];
 }
 
+export interface SupportBillingDigestItem {
+  readonly clientName: string;
+  readonly planName: string;
+  /** Ya redactado: "Mensual · acumulado", "Mensual · con vencimiento", "Bolsa", "A demanda". */
+  readonly contractType: string;
+  /** HH aprobadas del contrato en el mes que termina. */
+  readonly usedHours: number;
+  /** HH del mes aún por aprobar — no entran en `usedHours` ni en el cobro hasta que se aprueben. */
+  readonly pendingHours: number;
+}
+
+/** Resumen de fin de mes (último día hábil) a admin/PMO: los contratos de soporte activos que hay que cobrar. */
+export interface SupportBillingDigestNotification {
+  readonly recipientEmail: string;
+  readonly recipientFirstName: string;
+  /** "octubre de 2026". */
+  readonly monthLabel: string;
+  readonly items: readonly SupportBillingDigestItem[];
+}
+
 /**
  * Correo de respaldo de "Pedir datos a los Líderes PM" (Reporte de equipo): sale
  * cuando el Líder PM no abrió la notificación en Kora dentro de 48 h.
@@ -125,6 +145,7 @@ export interface NotificationSender {
   sendProjectPaymentMilestoneReady(notification: ProjectPaymentMilestoneReadyNotification): Promise<void>;
   sendMissingHoursReminder(notification: MissingHoursReminderNotification): Promise<void>;
   sendPendingHoursDigest(notification: PendingHoursDigestNotification): Promise<void>;
+  sendSupportBillingDigest(notification: SupportBillingDigestNotification): Promise<void>;
   sendTeamReportDataRequest(notification: TeamReportDataRequestEmail): Promise<void>;
 }
 

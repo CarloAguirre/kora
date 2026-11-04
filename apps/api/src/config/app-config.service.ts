@@ -32,6 +32,11 @@ export interface HttpSettings {
   readonly corsOrigins: readonly string[];
 }
 
+export interface LanguageToolSettings {
+  /** Servidor LanguageTool propio para la revisión gramatical; `null` la deshabilita. */
+  readonly url: string | null;
+}
+
 export interface HourReminderSettings {
   /** Si las tareas programadas de recordatorios de horas corren (la ejecución manual desde la API no depende de esto). */
   readonly enabled: boolean;
@@ -144,6 +149,10 @@ export class AppConfigService {
       redirectTo: this.config.get('MAIL_REDIRECT_TO', { infer: true }) ?? null,
       webAppUrl: this.config.get('WEB_APP_URL', { infer: true }).replace(/\/+$/, ''),
     };
+  }
+
+  get languageTool(): LanguageToolSettings {
+    return { url: this.config.get('LANGUAGETOOL_URL', { infer: true }) ?? null };
   }
 
   get hourReminders(): HourReminderSettings {
