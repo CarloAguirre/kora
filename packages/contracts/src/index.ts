@@ -6,6 +6,7 @@ export * from './clients/client.contract';
 export * from './teams/team.contract';
 export * from './notifications/notification.contract';
 export * from './projects/project.contract';
+export * from './projects/approved-calendar';
 export * from './hours/hour-entry.contract';
 export * from './tickets/ticket.contract';
 export * from './tickets/ticket-hh-request.contract';
