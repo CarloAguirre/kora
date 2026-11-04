@@ -78,6 +78,7 @@ export class DeleteProjectModuleTaskUseCase
     // la misma transacción.
     await this.unitOfWork.run(async (tx) => {
       await this.modules.removeTask(command.taskId, tx);
+      if (task.segmentId) await this.modules.refreshSegmentClosure(task.segmentId, this.clock.now(), tx);
       await this.progress.recalculate(project.id, tx);
       await this.changeLog.record(
         [

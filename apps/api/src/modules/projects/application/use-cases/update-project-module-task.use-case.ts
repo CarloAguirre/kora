@@ -124,6 +124,17 @@ export class UpdateProjectModuleTaskUseCase
     const nextStart = command.data.startDate !== undefined ? new Date(command.data.startDate) : task.startDate;
     const nextDate = command.data.date !== undefined ? new Date(command.data.date) : task.date;
     if (nextStart > nextDate) return err(new InvalidTaskDatesError());
+    const targetSegmentId = command.data.segmentId !== undefined
+      ? command.data.segmentId : task.segmentId ?? null;
+    const targetTeamId = command.data.teamId !== undefined ? command.data.teamId : task.teamId;
+    const segment = targetSegmentId ? module.segments.find((item) => item.id === targetSegmentId) : undefined;
+    if (targetSegmentId && (!segment || targetTeamId !== segment.teamId ||
+      nextStart < segment.startDate || nextDate > segment.endDate)) {
+      return err(new ForbiddenError(
+        'La tarea debe respetar el equipo, módulo y las fechas del bloque vinculado.',
+        'PROJECT_TASK_INVALID_SEGMENT',
+      ));
+    }
 
     // Solo se valida si el colaborador cambia: editar una tarea vieja de alguien ya deshabilitado sigue permitido.
     const nextAssigneeUserId = command.data.assigneeUserId;
@@ -163,6 +174,7 @@ export class UpdateProjectModuleTaskUseCase
       await this.modules.updateTask(
         command.taskId,
         {
+          ...(command.data.segmentId !== undefined ? { segmentId: command.data.segmentId ?? null } : {}),
           ...(command.data.teamId !== undefined ? { teamId: command.data.teamId ?? null } : {}),
           ...(command.data.assigneeUserId !== undefined ? { assigneeUserId: command.data.assigneeUserId ?? null } : {}),
           ...(command.data.name !== undefined ? { name: command.data.name } : {}),
@@ -190,6 +202,11 @@ export class UpdateProjectModuleTaskUseCase
       }
       await this.progress.recalculate(project.id, tx);
       await this.forecastSync.syncTask(project, command.moduleId, command.taskId, now, tx);
+      // Reconciliar también el bloque anterior si la tarea se movió de segmento.
+      const affected = new Set([task.segmentId, targetSegmentId].filter(
+        (id): id is string => Boolean(id),
+      ));
+      for (const id of affected) await this.modules.refreshSegmentClosure(id, now, tx);
     });
 
     await this.audit.record({

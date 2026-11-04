@@ -89,6 +89,17 @@ export class CreateProjectModuleTaskUseCase
     }
 
     if (command.data.startDate > command.data.date) return err(new InvalidTaskDatesError());
+    const segment = command.data.segmentId
+      ? module.segments.find((item) => item.id === command.data.segmentId) : undefined;
+    if (command.data.segmentId && (!segment ||
+      segment.teamId !== command.data.teamId ||
+      command.data.startDate < segment.startDate.toISOString().slice(0, 10) ||
+      command.data.date > segment.endDate.toISOString().slice(0, 10))) {
+      return err(new ForbiddenError(
+        'La tarea debe pertenecer a un bloque de la misma fase y equipo, dentro de sus fechas.',
+        'PROJECT_TASK_INVALID_SEGMENT',
+      ));
+    }
 
     const now = this.clock.now();
     const assigneeUserId = command.data.assigneeUserId ?? null;
@@ -103,6 +114,7 @@ export class CreateProjectModuleTaskUseCase
       const taskId = await this.modules.addTask(
         {
           moduleId: command.moduleId,
+          segmentId: command.data.segmentId ?? null,
           teamId: command.data.teamId ?? null,
           assigneeUserId,
           name: command.data.name,
@@ -131,6 +143,7 @@ export class CreateProjectModuleTaskUseCase
       );
       await this.progress.recalculate(project.id, tx);
       await this.forecastSync.syncTask(project, command.moduleId, taskId, now, tx);
+      if (segment) await this.modules.refreshSegmentClosure(segment.id, now, tx);
       return taskId;
     });
 
