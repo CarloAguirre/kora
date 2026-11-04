@@ -38,7 +38,7 @@ export function DuplicateTaskModal({
   const [name, setName] = useState(() => nextName(task.name, module?.tasks.map((t) => t.name) ?? []));
   const [assigneeValue, setAssigneeValue] = useState('');
   const [hours, setHours] = useState(String(task.estimatedHours ?? ''));
-  const members = project.members.filter((member) => member.userStatus === 'active' &&
+  const members = project.members.filter((member) => member.userStatus === 'active' && !member.blockedAt &&
     (!task.teamId || member.teamId === task.teamId));
   const selected = members.find((member) =>
     member.teamId + ':' + member.userId === assigneeValue);
