@@ -379,6 +379,13 @@
       "when": 1793894400000,
       "tag": "0053_project_member_block_and_task_cancel",
       "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1793894401000,
+      "tag": "0054_hour_entry_segment_attribution",
+      "breakpoints": true
     }
   ]
 }
