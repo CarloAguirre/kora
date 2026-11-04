@@ -111,3 +111,31 @@ Comprobar con dos escenarios: (a) fase que ya tiene tareas operativas con dates/
 (b) fase con tareas aún referenciales procedentes de una versión de cotización aplicada.
 En ambos, el lápiz abre «Editar tarea» y el basurero confirma «Eliminar tarea»;
 no deben regresar filas eliminadas tras refrescar la página.
+
+## Ajuste adicional — duplicación, creación de fases y arquitectura (04-11-2026)
+
+- Tabla: a toda tarea **persistida con responsable asignado** (`assigneeUserId` presente), sin importar si está Pendiente, En curso, En revisión o Aprobada, se le muestra el icono «Duplicar tarea» entre lápiz y basurero. Abre el `DuplicateTaskModal` ya existente con título, persona y HH. Crea una nueva tarea `todo` sin copiar aprobaciones ni consumo de horas y preserva bloque/fechas/alcance. Las referencias EDT y tareas sin responsable siguen con dos iconos.
+- Botón «+ Agregar fase»: modal **«Nueva fase»** de un solo campo obligatorio «Nombre de la fase», texto de ayuda «La etapa macro del plan. Después le agregas bloques de trabajo por equipo.», y acciones «Cancelar / Crear fase».
+- Contrato de alta de módulo: `estimatedHours` opcional al crear; el caso de uso guarda `null` cuando todavía no hay estimación. No se inventan HH ni fechas. Las altas de otros flujos que envían HH conservan su comportamiento.
+- Al confirmar `createModule` se utiliza el ID retornado para abrir inmediatamente «Nuevo bloque de trabajo» de la fase creada. Se presenta el toast **«Fase creada. Ahora agrega su primer bloque de trabajo.»**. Si la consulta del proyecto aún no trae la fase recién creada, el modal usa solo el ID y nombre retornados (sin inventar un registro de ejecución); al refrescar se muestra el registro persistido. Si el proyecto no tiene equipo disponible, se informa y no se abre un formulario inusable.
+- `NewWorkBlockModal`: el encabezado identifica «Fase N: nombre», y para creación nueva propone la fecha local de hoy como inicio; la fecha final sigue pendiente.
+- Corrección de `architecture.spec.ts`: `ProjectRoadmapReferenceExclusionsService` dejó de importar `@kora/db` (y tipos de presentación HTTP). Se inyecta el puerto `ROADMAP_REFERENCE_EXCLUSION_STORE`; el adaptador `DrizzleRoadmapReferenceExclusionStore` se ubica exclusivamente en `infrastructure/persistence`, registrado en `ProjectsModule`. No se desactivaron tests ni reglas arquitectónicas.
+- **No hay migraciones nuevas en este ajuste:** se mantienen las migraciones `0051` y `0052` de los commits anteriores, que deben aplicarse si aún no estaban en el entorno.
+
+### Verificación sugerida
+```powershell
+pnpm --filter @kora/contracts build
+pnpm --filter @kora/core build
+pnpm --filter @kora/db build
+pnpm --filter @kora/api typecheck
+pnpm --filter @kora/web typecheck
+
+pnpm --filter @kora/api exec vitest run src/test/architecture.spec.ts src/modules/projects/application/services/project-roadmap-reference-exclusions.service.spec.ts src/modules/projects/application/use-cases/create-project-module.use-case.spec.ts
+pnpm --filter @kora/web exec vitest run src/modules/projects/components/ProjectModulesCard.phase-controls.test.tsx src/modules/projects/components/NewWorkBlockModal.test.tsx
+
+pnpm --filter @kora/api build
+pnpm --filter @kora/web build
+pnpm test
+```
+
+Validación manual: abrir Planificar → «+ Agregar fase» → nombre «Cierre» → Crear fase → toast → modal «Nuevo bloque de trabajo» con fase N, equipo, nombre, inicio sugerido, HH y entrega. Cancelar el bloque debe conservar la fase creada. En otra fase, probar duplicar desde la fila de una tarea asignada y comprobar que nueva tarea pasa a `todo` sin duplicar aprobaciones.
