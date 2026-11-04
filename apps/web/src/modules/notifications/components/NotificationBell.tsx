@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { TEAM_REPORT_MISSING_FIELD_LABELS, type LeaderReminders, type Notification } from '@kora/contracts';
 import styles from './NotificationBell.module.css';
 import { BellIcon, CircleCheckIcon, ClockIcon, FolderOpenIcon } from '@/shared/components/icons/Icons';
-import { projectPath } from '@/app/router/paths';
+import { projectPath, projectTeamPath } from '@/app/router/paths';
 import { useLeaderReminders, useMarkNotificationsRead, useNotifications } from '../api/notifications.queries';
 
 /** Cuántos proyectos se listan por notificación antes de "Ver los N restantes". */
@@ -60,7 +60,11 @@ export function NotificationBell() {
   const approvals = reminders?.pendingApprovals ?? { entries: 0, hours: 0 };
   const missingDays = reminders?.missingHourDays ?? [];
   const projectsMissingData = reminders?.projectsMissingData ?? [];
-  const pendingCount = [approvals.entries > 0, missingDays.length > 0, projectsMissingData.length > 0].filter(Boolean).length;
+  const teamsAwaitingStaffing = reminders?.teamsAwaitingStaffing ?? [];
+  const pendingCount = [
+    approvals.entries > 0, missingDays.length > 0,
+    projectsMissingData.length > 0, teamsAwaitingStaffing.length > 0,
+  ].filter(Boolean).length;
   // Cada pendiente cuenta como un aviso mientras siga sin resolverse.
   const badgeCount = unread + pendingCount;
   const close = () => setOpen(false);
@@ -135,6 +139,31 @@ export function NotificationBell() {
                         .join(' · ')}
                       {missingDays.length > DAYS_SHOWN && ` y ${missingDays.length - DAYS_SHOWN} más`}
                     </p>
+                  </ReminderItem>
+                )}
+                {teamsAwaitingStaffing.length > 0 && (
+                  <ReminderItem
+                    icon={<FolderOpenIcon size={16} />}
+                    title={`${plural(teamsAwaitingStaffing.length, 'equipo', 'equipos')} pendiente${teamsAwaitingStaffing.length === 1 ? '' : 's'} de asignar colaboradores`}
+                  >
+                    <ExpandableList
+                      items={teamsAwaitingStaffing.map((item) => ({
+                        key: item.projectId + ':' + item.teamId,
+                        content: (
+                          <Link
+                            to={projectTeamPath(
+                              { id: item.projectId, slug: item.projectSlug },
+                              { id: item.teamId, slug: item.teamSlug },
+                            )}
+                            className={styles.projectLink}
+                            onClick={close}
+                          >
+                            {item.clientName ? item.clientName + ' — ' : ''}
+                            {item.projectName} · {item.teamName}: asignar colaboradores
+                          </Link>
+                        ),
+                      }))}
+                    />
                   </ReminderItem>
                 )}
                 {projectsMissingData.length > 0 && (
