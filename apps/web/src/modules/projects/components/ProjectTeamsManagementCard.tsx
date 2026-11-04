@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import type { CreateProjectTeamAssignmentInput, ProjectDetail } from '@kora/contracts';
 import { projectTeamPath } from '@/app/router/paths';
 import { Button } from '@/shared/components/ui/Button';
+import { TrashIcon } from '@/shared/components/icons/Icons';
 import { Card } from '@/shared/components/ui/Card';
 import { Modal } from '@/shared/components/ui/Modal';
 import { useToast } from '@/shared/components/ui/Toast';
@@ -167,11 +168,12 @@ export function ProjectTeamsManagementCard({ project, catalog }: Props) {
           const health = consumed > draft.assignedHours ? 'Sobre presupuesto'
             : assignmentLeft > 0 ? `${hours(assignmentLeft)} HH pendientes de planificar` : 'Excelente';
           const content = <>
+            <span className="srOnly">Equipo {name}</span>
             <div className={styles.teamTitle}>
               <span className={styles.avatar} style={{ background: style.color }}>{style.sigla}</span>
               <strong>{name}</strong>
             </div>
-            <p className={styles.leader}>Líder de equipo · {leaderName}</p>
+            <p className={styles.leader}>Líder de equipo · <strong>{leaderName}</strong></p>
             <div className={styles.stats}>
               <div><span>Asignadas</span><b>{hours(draft.assignedHours)} hrs</b></div>
               <div><span>En bloques</span><b>{hours(inBlocks)} hrs</b></div>
@@ -192,7 +194,7 @@ export function ProjectTeamsManagementCard({ project, catalog }: Props) {
                 </div>
                 <button type="button" className={styles.trash} disabled={!updateAvailable}
                   aria-label={`Quitar equipo ${name}`} title="Quitar equipo"
-                  onClick={() => setRemoving(draft.teamId)}>♧</button>
+                  onClick={() => setRemoving(draft.teamId)}><TrashIcon size={14} /></button>
               </div>
               <div className={styles.fields}>
                 <label>Líder
