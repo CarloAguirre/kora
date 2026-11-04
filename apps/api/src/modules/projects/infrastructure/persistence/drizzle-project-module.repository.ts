@@ -481,17 +481,27 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
 
   async refreshSegmentClosure(segmentId: string, now: Date, context?: TransactionContext): Promise<void> {
     const db = resolveDb(this.database, context);
-    await db.execute(sql`
-      UPDATE project_module_segments AS segment
-      SET closed_at = CASE
-        WHEN EXISTS (SELECT 1 FROM project_module_tasks AS task WHERE task.segment_id = segment.id AND task.cancelled_at IS NULL)
-          AND NOT EXISTS (SELECT 1 FROM project_module_tasks AS task
-            WHERE task.segment_id = segment.id AND task.cancelled_at IS NULL AND task.status <> 'done')
-        THEN COALESCE(segment.closed_at, ${now}::timestamptz)
-        ELSE NULL
-      END, updated_at = ${now}
-      WHERE segment.id = ${segmentId}::uuid
-    `);
+    // La sentencia UPDATE ... SET con subconsultas correlacionadas contra su
+    // alias destino fallaba en PostgreSQL y revertía la transacción de alta
+    // de la tarea. Contar primero y actualizar después, dentro del MISMO tx,
+    // evita depender del alcance del alias UPDATE.
+    const [counts] = await db.select({
+      active: sql<number>`count(*) filter (where ${projectModuleTasks.cancelledAt} is null)`,
+      pending: sql<number>`count(*) filter (
+        where ${projectModuleTasks.cancelledAt} is null
+          and ${projectModuleTasks.status} <> 'done'
+      )`,
+    })
+      .from(projectModuleTasks)
+      .where(eq(projectModuleTasks.segmentId, segmentId));
+    const allApproved = Number(counts?.active ?? 0) > 0 && Number(counts?.pending ?? 0) === 0;
+    await db.update(projectModuleSegments)
+      .set({
+        closedAt: allApproved
+          ? sql`coalesce(${projectModuleSegments.closedAt}, ${now})` : null,
+        updatedAt: now,
+      })
+      .where(eq(projectModuleSegments.id, segmentId));
   }
 
   async replaceSegmentMembers(
