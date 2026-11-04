@@ -540,7 +540,6 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
           'Equipo sin vincular';
         const members = project.members.filter((member) =>
           member.teamId === id && member.userStatus === 'active');
-        const firstReference = references.find((task) => task.teamId === id);
         return <div className={styles.awaitingAssignment} key={id || 'unmapped'}>
           <span className={styles.awaitingBadge}
             style={{ background: operationalTeamColor(teamName) }} aria-hidden="true">
