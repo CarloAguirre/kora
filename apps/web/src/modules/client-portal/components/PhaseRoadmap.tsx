@@ -868,20 +868,34 @@ function OperationalPhaseCard({
                     </button>
                     {(() => {
                       const closed = Boolean(task.closedAt);
-                      const markerDate = closed ? task.closedAt!.slice(0, 10) : task.endDate;
-                      const position = percentOf(toDate(markerDate), axis.range);
-                      if (position < 0 || position > 100) return null;
-                      const late = !closed && toDate(task.endDate) < startOfToday();
-                      return <button type="button"
-                        aria-label={(closed ? 'Cierre real ' : late ? 'Cierre vencido ' : 'Cierre planificado ') + task.label}
-                        title={(closed ? 'Cerrado realmente el ' : 'Cierre planificado para el ') +
-                          formatShortDate(markerDate)}
-                        className={styles.operationalClosureMarker}
-                        style={{ left: Math.max(0.6, Math.min(99.4, position)) + '%' }}
-                        onClick={() => choose(selection)}>
-                        <DiamondIcon size={16} className={closed ? styles.legendDiamondDone :
-                          late ? styles.legendDiamondDelayed : styles.legendDiamondPlanned} />
-                      </button>;
+                      const plannedPosition = percentOf(toDate(task.endDate), axis.range);
+                      const actualDate = task.closedAt?.slice(0, 10);
+                      const actualPosition = actualDate
+                        ? percentOf(toDate(actualDate), axis.range) : null;
+                      const sameDay = actualDate === task.endDate;
+                      const overdue = !closed && toDate(task.endDate) < startOfToday();
+                      const planned = plannedPosition >= 0 && plannedPosition <= 100;
+                      const actual = actualPosition !== null &&
+                        actualPosition >= 0 && actualPosition <= 100;
+                      return <>
+                        {planned && (!closed || !sameDay) && <button type="button"
+                          aria-label={(overdue ? 'Cierre vencido ' : 'Cierre planificado ') + task.label}
+                          title={'Cierre planificado: ' + formatShortDate(task.endDate)}
+                          className={styles.operationalClosureMarker}
+                          style={{ left: Math.max(0.6, Math.min(99.4, plannedPosition)) + '%' }}
+                          onClick={() => choose(selection)}>
+                          <DiamondIcon size={16} className={overdue
+                            ? styles.legendDiamondDelayed : styles.legendDiamondPlanned} />
+                        </button>}
+                        {closed && actual && <button type="button"
+                          aria-label={'Cierre real ' + task.label}
+                          title={'Cierre real: ' + formatShortDate(actualDate!)}
+                          className={styles.operationalClosureMarker}
+                          style={{ left: Math.max(0.6, Math.min(99.4, actualPosition)) + '%' }}
+                          onClick={() => choose(selection)}>
+                          <DiamondIcon size={16} className={styles.legendDiamondDone} />
+                        </button>}
+                      </>;
                     })()}
                   </>}
                 </div>
