@@ -41,3 +41,13 @@ Fecha: 2026-11-04. Evidencia: salidas de cuatro consultas `SELECT` ejecutadas po
 5. Ejecutar las pruebas y `typecheck` del web en el repositorio local. No se afirma PASS sin el resultado real.
 
 **Seguridad:** no hay migraciones ni modificación de filas de PostgreSQL en este conjunto de correcciones. Las tareas históricas se preservan para que una persona autorizada las concilie.
+
+## Verificación del traspaso comercial y las HH
+
+La captura recibida es del prototipo local `kora-proyectos-v5_02.html` (607 HH: PMO 36, QA 110, RPA 461), no de las tablas reales de `pruebas-carlo` (900 HH: Desarrollo 640, QA 140, UX-UI 120).
+
+El caso `applyPlanningBaseline` de `drizzle-quotation.repository.ts` valida las sumas EDT y guarda horas en `project_teams` y `project_modules`, pero no crea tareas ni bloques de ejecución. El traspaso de cotización cliente-aprobada guarda presupuestos comerciales; `drizzle-approved-project-calendar.ts` materializa nuevos segmentos con `estimatedHours = effort.hours` al iniciar el proyecto, preservando los segmentos previos del PM. En estado `draft`, esa materialización no ocurre. Los segmentos creados por operación permiten HH opcionales, que quedan en NULL si no se definen. La suma de tareas operativas solo puede determinar un presupuesto completo si se confirma que el desglose de ese bloque está terminado.
+
+## Validación de la integración recibida
+
+La salida adjunta muestra 7 tests fallidos, 18 aprobados y build web completado con aviso de tamaño de bundle. El contenido está recortado a la parte final; los fallos visibles corresponden a búsqueda literal de la etiqueta obligatoria Bloque de trabajo. Los tests nuevos se ajustaron a etiquetas con asterisco requerido. También se clarificó que los bloques sin estimación tienen HH sin definir, no presupuesto real cero. Pendiente repetir los checks sobre el HEAD actualizado.
