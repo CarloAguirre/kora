@@ -125,7 +125,7 @@ const inputHasInlinePlanningClass = () =>
 
 beforeEach(() => {
   mocks.update.mockReset().mockResolvedValue(undefined);
-  mocks.create.mockReset().mockResolvedValue(undefined);
+  mocks.create.mockReset().mockResolvedValue({ id: 'module-new' });
   mocks.updateTask.mockReset().mockResolvedValue(undefined);
   mocks.createTask.mockReset().mockResolvedValue(undefined);
   mocks.removeTask.mockReset().mockResolvedValue(undefined);
@@ -378,16 +378,27 @@ describe('Fidelidad del Roadmap v5.02 · acciones y estructura', () => {
     expect(screen.queryByText('Referencias comerciales y planificación manual')).not.toBeInTheDocument();
     expect(screen.queryByText('Etapa y datos de la fase')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '+ Agregar fase' }));
-    expect(screen.getByRole('dialog', { name: 'Agregar fase' })).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Nueva fase' })).toBeInTheDocument();
+    expect(screen.getByText('La etapa macro del plan. Después le agregas bloques de trabajo por equipo.'))
+      .toBeInTheDocument();
+    expect(screen.queryByRole('spinbutton', { name: 'Horas estimadas' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Etapa inicial')).not.toBeInTheDocument();
+    const create = screen.getByRole('button', { name: 'Crear fase' });
+    expect(create).toBeDisabled();
     fireEvent.change(screen.getByRole('textbox', { name: 'Nombre de la fase' }),
       { target: { value: 'Nueva integración' } });
-    fireEvent.change(screen.getByRole('spinbutton', { name: 'Horas estimadas' }),
-      { target: { value: '80' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Agregar fase' }));
+    expect(create).toBeEnabled();
+    fireEvent.click(create);
     await waitFor(() => expect(mocks.create).toHaveBeenCalledWith({
       projectId: 'project-1',
-      input: { name: 'Nueva integración', initialStage: 'discovery', estimatedHours: 80 },
+      input: { name: 'Nueva integración', initialStage: 'discovery' },
     }));
+    await waitFor(() => expect(screen.getByRole('dialog', {
+      name: 'Nuevo bloque de trabajo',
+    })).toBeInTheDocument());
+    expect(screen.queryByRole('dialog', { name: 'Nueva fase' })).not.toBeInTheDocument();
+    expect(screen.getByText(/Fase: Nueva integración/)).toBeInTheDocument();
+    expect(mocks.success).toHaveBeenCalledWith('Fase creada. Ahora agrega su primer bloque de trabajo.');
   });
 
   it('deja de presentar la columna Acción y usa los iconos reales en tareas existentes', async () => {
@@ -411,6 +422,27 @@ describe('Fidelidad del Roadmap v5.02 · acciones y estructura', () => {
         startDate: '2026-11-04', date: '2026-11-15', estimatedHours: 20 },
     }));
   });
+  it.each(['todo', 'in_progress', 'done'] as const)(
+    'muestra duplicar directamente para una tarea asignada en estado %s', (status) => {
+      const task = { id: 'task-1', name: 'Diseñar interfaz', status,
+        startDate: '2026-11-04', date: '2026-11-15', estimatedHours: 20,
+        scope: 'diseno', description: 'Diseño validado', teamId: 'team-1',
+        segmentId: null, assigneeUserId: 'user-1', assigneeName: 'Persona original',
+        teamName: 'Desarrollo' };
+      const member = (userId: string, fullName: string) => ({
+        userId, fullName, teamId: 'team-1', teamName: 'Desarrollo', userStatus: 'active',
+      });
+      show({ ...project, members: [member('user-1', 'Persona original'),
+        member('user-2', 'Persona nueva')], modules: [{ ...module, tasks: [task] }] } as unknown as ProjectDetail);
+      const duplicate = screen.getByRole('button', { name: 'Duplicar tarea Diseñar interfaz' });
+      expect(duplicate).toHaveAttribute('title', 'Duplicar para otra persona');
+      fireEvent.click(duplicate);
+      expect(screen.getByRole('dialog', { name: 'Duplicar para otra persona' })).toBeInTheDocument();
+      expect(screen.getByRole('textbox', { name: 'Título de la tarea' })).toHaveValue('Diseñar interfaz (2)');
+      expect(screen.getByRole('spinbutton', { name: 'HH estimadas' })).toHaveValue(20);
+    },
+  );
+
   it('confirma antes de borrar, utiliza Volver y presenta notificación al eliminar', async () => {
     const task = { id: 'task-1', name: 'Acompañamiento UAT', status: 'todo',
       startDate: '2026-11-04', date: '2026-11-15', estimatedHours: 12,
