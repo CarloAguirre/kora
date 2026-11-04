@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { TicketDailyHours, TicketSummary } from '@kora/contracts';
-import { buildTicketHistoryWorkbook } from './ticket-history-export';
+import { assertTicketHistoryExportComplete, buildTicketHistoryWorkbook } from './ticket-history-export';
 import { formatTicketReportDate, ticketExcelSerial, ticketReportDay } from './ticket-history-dates';
 
 const ticket = (overrides: Partial<TicketSummary> = {}): TicketSummary => ({
@@ -88,6 +88,14 @@ describe('exportación del historial de tickets', () => {
     expect(summary['N3']?.v).toBe(0);
     expect(detail['N4']?.v).toBe('Sin horas');
     expect(detail['M4']?.v).toBe(0);
+  });
+
+  it('impide exportar tickets duplicados u omitidos por paginación', () => {
+    const first = ticket();
+    const second = ticket({ id: '22222222-2222-4222-8222-222222222222' });
+    expect(() => assertTicketHistoryExportComplete([first, second], 2)).not.toThrow();
+    expect(() => assertTicketHistoryExportComplete([first, first], 2)).toThrow(/repetidos o faltantes/);
+    expect(() => assertTicketHistoryExportComplete([first], 2)).toThrow(/repetidos o faltantes/);
   });
 
   it('rechaza fechas calendario inválidas y evita corrimientos de zona horaria', () => {
