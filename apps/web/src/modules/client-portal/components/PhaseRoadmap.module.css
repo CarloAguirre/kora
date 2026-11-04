@@ -610,3 +610,161 @@ button.ganttBar {
   .phaseHeaderActions { flex: 1 1 100%; justify-content: flex-end; }
   .phaseNameControl { flex: 1 1 150px; }
 }
+
+
+/* Roadmap interno v5.02: vista operativa y cronograma único (sin afectar el portal cliente). */
+.operationalWrapper {
+  padding: 14px 16px;
+  box-shadow: none;
+  border-radius: 14px;
+  gap: 12px;
+}
+.operationalWrapper .summaryRow {
+  padding: 0 0 6px;
+  gap: 10px;
+}
+.operationalWrapper .summaryChips { gap: 8px; }
+.operationalWrapper .summaryChip {
+  padding: 8px 12px;
+  background: #fff;
+  color: #0f2a44;
+  border-radius: 8px;
+}
+.operationalWrapper .summaryChip b { font-weight: 700; }
+.operationalWrapper .legendRow {
+  border: none;
+  padding: 2px 0;
+  gap: 14px;
+}
+.operationalWrapper .phaseList { gap: 14px; }
+.operationalPhase {
+  border: 1px solid #e4e9ee;
+  border-radius: 14px;
+  background: #fff;
+}
+.operationalPhaseHeader {
+  cursor: default;
+  padding: 12px 14px;
+  gap: 10px;
+  min-height: 52px;
+}
+.operationalPhaseHeader:hover { background: #fff; }
+.operationalPhaseHeader .phaseName {
+  font-weight: 700;
+  font-size: 14px;
+}
+.operationalPhaseHeader .phaseBadge {
+  font-size: 11px;
+  background: #0f1729;
+}
+.operationalPhaseBody {
+  padding: 0 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.operationalGantt {
+  min-width: 0;
+  width: 100%;
+}
+.operationalTimelineHeading,
+.operationalLine {
+  display: grid;
+  grid-template-columns: minmax(165px, 230px) minmax(0, 1fr);
+  align-items: center;
+}
+.operationalTimelineHeading { height: 32px; }
+.operationalAxis {
+  position: relative;
+  height: 100%;
+  min-width: 0;
+  border-bottom: 1px solid #eef0f4;
+}
+.operationalAxis > span {
+  position: absolute;
+  top: 6px;
+  font-size: 10.5px;
+  color: #687484;
+  white-space: nowrap;
+  transform: translateX(3px);
+}
+.operationalLine {
+  min-height: 44px;
+  border-top: 1px solid #eef0f4;
+}
+.operationalBlockLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding-right: 12px;
+  font-size: 12.5px;
+  color: #0f2a44;
+}
+.operationalRole {
+  flex: none;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  color: #fff;
+  height: 22px;
+  min-width: 27px;
+  padding: 0 4px;
+  border-radius: 5px;
+  font-weight: 700;
+  font-size: 9.5px;
+}
+.operationalLabelText {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.operationalLabelText small {
+  display: block;
+  color: #6b7280;
+  font-weight: 400;
+  font-size: 11px;
+  margin-top: 2px;
+}
+.operationalTrack {
+  height: 44px;
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+}
+.operationalGridLine {
+  position: absolute;
+  height: 100%;
+  width: 1px;
+  background: #e9edf3;
+}
+.operationalToday {
+  position: absolute;
+  height: 100%;
+  width: 2px;
+  z-index: 2;
+  background: #e03131;
+}
+.operationalBar {
+  position: absolute;
+  top: 12px;
+  height: 20px;
+  min-width: 7px;
+  border: 1px solid currentColor;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.operationalBarSelected { outline: 2px solid #0f1729; outline-offset: 2px; }
+.operationalNoDates {
+  color: #7b8794;
+  font-size: 12.5px;
+  padding: 6px;
+}
+@media (max-width: 760px) {
+  .operationalTimelineHeading,
+  .operationalLine { grid-template-columns: minmax(125px, 35%) minmax(0, 1fr); }
+  .operationalNoDates { font-size: 11px; }
+}
