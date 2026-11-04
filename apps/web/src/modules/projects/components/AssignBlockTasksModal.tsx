@@ -13,7 +13,7 @@ type CommercialTask = AppliedQuotationPlanning['modules'][number]['tasks'][numbe
 type AssignmentRow = {
   key: string; kind: 'existing' | 'reference'; taskId?: string;
   reference?: CommercialTask; name: string; hours: number; description: string | null;
-  assignee: string; startDate: string; date: string;
+  assignee: string; segmentId: string | null; startDate: string; date: string;
 };
 function roleScope(role: string): ProjectModuleTaskScope {
   const value = role.toLowerCase();
@@ -46,12 +46,13 @@ export function AssignBlockTasksModal({
       task.teamId === teamId && !task.assigneeUserId).map((task) => ({
       key: task.id, kind: 'existing', taskId: task.id,
       name: task.name, hours: task.estimatedHours ?? 0, description: task.description,
-      assignee: '', startDate: task.startDate, date: task.date,
+      assignee: '', segmentId: task.segmentId ?? null, startDate: task.startDate, date: task.date,
     }));
     const refs: AssignmentRow[] = referenceTasks.map((task) => ({
       key: 'ref:' + task.wbs + ':' + task.role, kind: 'reference',
       reference: task, name: task.name, hours: task.hours, description: task.description ?? null,
-      assignee: '', startDate: block?.startDate ?? '', date: block?.endDate ?? '',
+      assignee: '', segmentId: block?.id ?? null,
+      startDate: block?.startDate ?? '', date: block?.endDate ?? '',
     }));
     return [...existing, ...refs].filter((row) => !focusKey || row.key === focusKey);
   }, [module.tasks, referenceTasks, teamId, focusKey]); // Fecha de bloque se ajusta vía selector.
@@ -61,9 +62,12 @@ export function AssignBlockTasksModal({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
   const selected = rows.filter((row) => row.assignee && !saved.has(row.key));
-  const eligible = selected.length > 0 && selected.every((row) =>
-    row.hours > 0 && row.startDate && row.date && row.startDate <= row.date &&
-    (!block || (row.startDate >= block.startDate && row.date <= block.endDate)));
+  const eligible = selected.length > 0 && selected.every((row) => {
+    const linked = module.segments.find((item) => item.id === (blockId || row.segmentId));
+    return row.hours > 0 && row.startDate && row.date && row.startDate <= row.date &&
+      (!linked || (linked.teamId === teamId &&
+        row.startDate >= linked.startDate && row.date <= linked.endDate));
+  });
   const formatIso = (date: string) => date ? date.slice(8, 10) + '-' + date.slice(5, 7) +
     '-' + date.slice(0, 4) : '—';
 
@@ -74,7 +78,7 @@ export function AssignBlockTasksModal({
     setBlockId(value);
     const chosen = blocks.find((entry) => entry.id === value);
     if (chosen) setRows((current) => current.map((row) => saved.has(row.key) ? row : {
-      ...row, startDate: chosen.startDate, date: chosen.endDate,
+      ...row, segmentId: chosen.id, startDate: chosen.startDate, date: chosen.endDate,
     }));
   };
   const assign = async () => {
@@ -90,7 +94,7 @@ export function AssignBlockTasksModal({
         if (row.kind === 'existing' && row.taskId) {
           await update.mutateAsync({
             projectId: project.id, moduleId: module.id, taskId: row.taskId,
-            input: { assigneeUserId: row.assignee, teamId, segmentId: blockId || null,
+            input: { assigneeUserId: row.assignee, teamId, segmentId: blockId || row.segmentId || null,
               startDate: row.startDate, date: row.date, status: 'todo' },
           });
         } else if (row.reference) {
@@ -103,7 +107,7 @@ export function AssignBlockTasksModal({
           await create.mutateAsync({
             projectId: project.id, moduleId: module.id,
             input: {
-              name: row.name, teamId, segmentId: blockId || null,
+              name: row.name, teamId, segmentId: blockId || row.segmentId || null,
               assigneeUserId: row.assignee, status: 'todo', scope: roleScope(row.reference.role),
               startDate: row.startDate, date: row.date, estimatedHours: row.hours,
               description: fullDescription,
