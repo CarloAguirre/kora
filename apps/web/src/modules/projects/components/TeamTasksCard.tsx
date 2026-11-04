@@ -417,7 +417,7 @@ export function TeamTasksCard({ project, projectId, teamId, managerView = false 
               key: 'status',
               header: 'Estado',
               render: (task) => (
-                <span className={[styles.badge, managerView && !task.assigneeUserId
+                <span className={[styles.badge, !task.assigneeUserId
                   ? styles.badgeUnassigned : styles[TASK_STATUS_BADGE_CLASS[task.status]]].join(' ')}>
                   {task.cancelledAt ? 'Cancelada' :
                     !task.assigneeUserId ? 'Por asignar' : PROJECT_MODULE_TASK_STATUS_LABELS[task.status]}
