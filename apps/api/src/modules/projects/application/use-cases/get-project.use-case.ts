@@ -134,7 +134,7 @@ export class GetProjectUseCase implements UseCase<GetProjectCommand, ProjectDeta
         snapshot.developerUserId === command.actorUserId ||
         snapshot.commercialManagerUserId === command.actorUserId ||
         projectTeams.some((team) => team.leaderUserId === command.actorUserId) ||
-        members.some((member) => member.userId === command.actorUserId);
+        members.some((member) => member.userId === command.actorUserId && !member.blockedAt);
       if (!isParticipant) return err(new ForbiddenError('No tienes acceso a este proyecto.', 'PROJECT_NOT_ASSIGNED'));
     }
 
