@@ -32,7 +32,7 @@ export function ProjectManagerTeamDetailView({ project, projectId, teamId }: Pro
   const members = project.members.filter((item) => item.teamId === teamId && !item.blockedAt);
   const modules = useMemo(() => project.modules.map((module) => ({
     ...module,
-    tasks: module.tasks.filter((task) => task.teamId === teamId),
+    tasks: module.tasks.filter((task) => task.teamId === teamId && !task.cancelledAt),
     segments: module.segments.filter((segment) => segment.teamId === teamId),
   })), [project.modules, teamId]);
   const tasks = modules.flatMap((module) => module.tasks);
