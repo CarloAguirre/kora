@@ -239,7 +239,7 @@ export function PhaseRoadmap({
         </span>}
         {!operationalView && <span className={styles.legendItem}>
           <span className={[styles.legendDot, styles.legendTaskMark, styles.taskDotDelayed].join(' ')} /> Tarea atrasada
-        </span>
+        </span>}
         <span className={styles.legendHoy}>— Hoy</span>
         {!operationalView && <span className={styles.hint}>Usa el zoom de cada fase para ver días y tareas.</span>}
       </div>
