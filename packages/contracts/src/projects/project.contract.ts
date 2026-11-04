@@ -236,6 +236,8 @@ export const projectModuleSegmentSchema = z.object({
   endDate: z.string(),
   /** HH de este bloque; nullable para bloques anteriores. */
   estimatedHours: z.number().nullable(),
+  /** Solo horas aprobadas con segmentId explícito, no extrapola historial. */
+  consumedHours: z.number().nonnegative().optional(),
   members: z.array(projectModuleSegmentMemberSchema),
 });
 export type ProjectModuleSegment = z.infer<typeof projectModuleSegmentSchema>;
