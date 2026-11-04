@@ -208,45 +208,97 @@ ORDER BY created_at DESC LIMIT 5;
 No insertar registros en `drizzle.__drizzle_migrations`, no eliminar
 columnas ni ejecutar `drizzle-kit push` para sortear el incidente.
 
-## Corrección: fechas relativas después de iniciar proyecto (04-11-2026)
+## Decisión final — calendario definitivo al iniciar el proyecto (04-11-2026)
 
-Síntoma: el proyecto ya tiene `projects.start_date` pero las fases muestran
-«Sin fechas: se calculan al definir el inicio del proyecto». El mensaje estaba
-codificado de forma fija en `PhaseRoadmap.tsx`, y las referencias
-`relativeTeamBlocks` incluían `startWeek`/`durationWeeks` pero no se
-calculaban con `project.startDate`.
+### Criterio del negocio, sin segunda aprobación
 
-Solución **no destructiva**:
-- `proposedBlockPeriod(project.startDate, startWeek, durationWeeks)` calcula una
-  proyección de semanas comerciales (semana 1 comienza en el inicio; cada semana
-  abarca siete días calendario; fin inclusive). Usa fechas ISO/UTC, sin
-  desplazamiento por zona horaria. Una fecha inicial 05-11-2026 con semana 3
-  y cinco semanas de duración produce 19-11-2026 → 23-12-2026.
-- La cabecera de una fase aún no planificada muestra el rango de propuestas
-  seguido de «· propuesta»; nunca lo presenta como cierre real.
-- Los bloques EDT referenciales muestran fechas calculadas y una **barra
-  rayada** visualmente distinta del segmento operativo. El rango horizontal
-  del Gantt se expande para cubrir las propuestas y se actualiza al recibir
-  asincrónicamente la cotización o cambiar el inicio del proyecto.
-- El lateral de referencia también distingue fechas propuestas de operativas.
-- Al pulsar «Planificar bloque», el formulario se precarga con equipo, nombre,
-  HH, inicio y fin referenciales; el responsable todavía puede ajustarlos.
-  **Solo guardar** crea un segmento `project_module_segments`, eventualmente
-  una entrega real, y habilita el flujo de Forecast.
-- No se migran ni escriben fechas automáticas en tareas, bloques, entregas,
-  cotizaciones o Forecast. No se crean bloques nuevos en background.
-- Si el proyecto no tiene inicio, se explica que falta definirlo. Si existe
-  un bloque operativo del equipo, prevalece su fecha REAL y no se duplica la
-  referencia en el Gantt.
+Una cotización **aprobada por el cliente, revisada por el PM y traspasada al
+proyecto** YA tiene un calendario comercial aprobado. Al iniciar el proyecto
+(`status=active` y `projects.start_date`), Kora debe convertir sus fases,
+semanas y HH en **bloques operativos REALES**, con barras cronológicas definitivas.
+No corresponde hablar de «fechas propuestas», pedir otra aprobación ni dejar la
+planificación esperando que el usuario vuelva a ingresarla. Las fechas de cada
+bloque son editables después mediante «Editar bloque», preservando entregas y
+reglas existentes.
 
-### Validación específica
+### Implementación
+
+- **API, puerto:** `application/ports/approved-project-calendar.port.ts`.
+- **Adaptador Drizzle:** `infrastructure/persistence/drizzle-approved-project-calendar.ts`.
+  Solo lee cotizaciones con evento `quotation_transferred` y metadata
+  `moduleIds` (IDs de fases creadas por la operación aprobada). Para cada
+  referencia `relativeTeamBlocks` de ese snapshot, convierte
+  `startWeek/durationWeeks` a fechas ISO utilizando
+  `approvedCalendarPeriod` de `@kora/contracts` (semana 1 = fecha inicial;
+  7 días calendario por semana; fin inclusivo).
+- Materializa dentro de **una misma transacción**:
+  1. `project_module_segments` por fase/equipo con fechas y HH aprobadas.
+  2. Una `project_module_deliveries` planificada por cada bloque creado,
+     vinculada mediante `segment_id`, con fecha de cierre igual al fin del bloque.
+  3. `project_modules.estimated_start_date/end_date` si estaban vacías,
+     respetando fechas editadas previamente.
+  4. Evento append-only `quotation_events.action='roadmap_calendar_materialized'`.
+- **Idempotencia real:** `SELECT projects FOR UPDATE` serializa dos lecturas
+  concurrentes; el evento comprueba que el calendario ya fue materializado.
+  Jamás sobrescribe segmentos del mismo equipo/fase preexistentes. Si el PM
+  edita o elimina un bloque después, las siguientes lecturas NO lo recrean.
+- **Momento de ejecución:** `GetProjectUseCase` verifica autorización y
+  luego materializa perezosamente al leer por primera vez un proyecto
+  iniciado con `salesStage=approved`. Esto también corrige proyectos que
+  se iniciaron antes de desplegar el cambio; el controlador ya realiza
+  promociones de pagos idempotentes en lectura. Si hubo nuevos segmentos,
+  recarga `ProjectModuleRepository` antes de devolver `ProjectDetail`.
+- **Frontend:** `ProjectModulesCard` y `PhaseRoadmap` ya no dibujan barras
+  de «propuesta». Solo utilizan `ProjectDetail.modules[].segments`
+  persistidos, con fechas editables y marcadores de entrega planificada/cierre
+  real. Las referencias EDT sin bloque persisten solo en proyectos
+  **no iniciados** o cuando faltan datos/relaciones válidas.
+- **No se fabrican fechas** si la cotización traspasada no posee semanas
+  relativas válidas; se conserva la referencia EDT y el caso requiere
+  revisión de datos. No se convierte automáticamente la EDT en tareas con
+  usuarios asignados. No se alteran HH vendidas, horas aprobadas ni pagos.
+- **Sin migración adicional**: utiliza tablas y columnas de las migraciones
+  anteriores 0050/0051/0052 y un evento cuyo campo `action` es varchar(40).
+
+### Casos de prueba
+
+- `packages/contracts/src/projects/approved-calendar.spec.ts`: fecha inicial,
+  semanas relativas, cambio de año, invalidaciones y husos horarios.
+- `apps/api/src/modules/projects/infrastructure/persistence/drizzle-approved-project-calendar.spec.ts`:
+  segment+delivery reales, fechas del módulo, evento idempotente, preservación
+  de un bloque previamente editado y negativa antes de iniciar o sin traspaso.
+- `apps/web/src/modules/client-portal/components/PhaseRoadmap.header-actions.test.tsx`:
+  solo el segmento REAL dibuja barra y cierre planificado; nada de propuestas.
+- `apps/web/src/modules/projects/components/ProjectModulesCard.phase-controls.test.tsx`:
+  cabecera de fase con fechas de bloque materializado y ausencia de
+  «Planificar bloque» para el mismo equipo.
+
+### Comandos (PowerShell desde la raíz)
+
 ```powershell
-pnpm --filter @kora/web exec vitest run src/modules/projects/lib/quotation-relative-dates.test.ts src/modules/projects/components/ProjectModulesCard.phase-controls.test.tsx src/modules/client-portal/components/PhaseRoadmap.header-actions.test.tsx
+git fetch kora
+git switch feature/calculadora-roadmap-diseno-v5-02
+git pull --ff-only kora feature/calculadora-roadmap-diseno-v5-02
+
+pnpm --filter @kora/contracts build
+pnpm --filter @kora/core build
+pnpm --filter @kora/db build
+pnpm --filter @kora/contracts exec vitest run src/projects/approved-calendar.spec.ts
+pnpm --filter @kora/api typecheck
+pnpm --filter @kora/api exec vitest run src/test/architecture.spec.ts src/modules/projects/infrastructure/persistence/drizzle-approved-project-calendar.spec.ts src/modules/projects/application/use-cases/get-project.use-case.spec.ts
 pnpm --filter @kora/web typecheck
+pnpm --filter @kora/web exec vitest run src/modules/projects/components/ProjectModulesCard.phase-controls.test.tsx src/modules/client-portal/components/PhaseRoadmap.header-actions.test.tsx
+pnpm --filter @kora/api build
 pnpm --filter @kora/web build
+pnpm test
 ```
 
-Verificar un proyecto con `startDate` y cotización aplicada antes/después de
-recargar. La fase sin bloques debe indicar las fechas *propuestas*, no «Sin
-fechas»; la planificación debe abrirse precargada y las fechas reales de otros
-bloques no deben cambiarse.
+Verificar en BD con consultas de solo lectura tras abrir la ficha de proyecto
+activo: `project_module_segments` debe tener una fila por equipo de cada
+fase traspasada; `project_module_deliveries.segment_id` debe asociar su
+entrega planificada y `quotation_events` debe registrar una única
+materialización. Editar una fecha, recargar y comprobar que NO cambia ni
+surgen segmentos duplicados.
+
+**Validación:** los tests y el build necesitan ejecutarse sobre el entorno
+del usuario/CI; no afirmar éxito hasta obtener salida real.
