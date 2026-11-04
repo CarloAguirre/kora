@@ -78,8 +78,12 @@ describe('Avance global por los mismos bloques que el avance del equipo', () => 
     expect(progress.blocksCount).toBe(6);
     expect(progress.taskCount).toBe(6);
     expect(progress.phases.map((phase) => phase.actualHours)).toEqual([464, 0]);
-    expect(progress.laggingBlocks.map((block) => [block.id, block.gapPoints]))
-      .toEqual([['rpa-2', 17], ['qa-2', 5], ['pmo-2', 2]]);
+    expect(progress.laggingBlocks.map((block) => block.id))
+      .toEqual(['rpa-2', 'qa-2', 'pmo-2']);
+    // Se conserva la fracción real y se redondea solo al presentar.
+    expect(progress.laggingBlocks[0]?.gapPoints).toBeCloseTo(16.64, 2);
+    expect(progress.laggingBlocks[1]?.gapPoints).toBeCloseTo(4.94, 2);
+    expect(progress.laggingBlocks[2]?.gapPoints).toBeCloseTo(1.98, 2);
     // Ni la estimación vendida (606,5) ni el consumo (273,5) alteran la barra.
     expect(progress.soldHours).toBe(606.5);
     expect(progress.usedHours).toBe(273.5);
@@ -118,6 +122,28 @@ describe('Avance global por los mismos bloques que el avance del equipo', () => 
     expect(progress.unlinkedTaskCount).toBe(2);
     expect(progress.phases[1]?.blocks[2]?.actualHours).toBe(40);
     expect(progress.phases[1]?.blocks[0]?.actualHours).toBe(0);
+  });
+
+  it('mantiene las causas de un atraso global pequeño aunque cada bloque aporte menos de un punto', () => {
+    const original = fixture();
+    const justStarted = {
+      ...original,
+      modules: original.modules.map((module) => ({
+        ...module,
+        deliveries: [],
+        segments: module.segments.map((block) => ({
+          ...block, closedAt: null,
+          startDate: '2026-11-04', endDate: '2026-12-01',
+        })),
+      })),
+    };
+    const progress = calculateProjectExecutionProgress(justStarted, today);
+    expect(progress.actualPercent).toBe(0);
+    expect(progress.expectedPercent).toBeGreaterThan(0);
+    expect(progress.laggingBlocks).toHaveLength(6);
+    expect(progress.laggingBlocks.some((block) =>
+      block.gapPoints > 0 && block.gapPoints < 0.5)).toBe(true);
+    expect(progress.laggingBlocks.every((block) => block.gapPoints > 0)).toBe(true);
   });
 
   it('no publica 0% ficticio si hay HH comerciales pero faltan HH de bloques', () => {
