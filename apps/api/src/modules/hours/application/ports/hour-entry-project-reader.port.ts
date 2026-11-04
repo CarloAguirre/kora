@@ -38,6 +38,7 @@ export interface HourEntryProjectReader {
   findModuleById(moduleId: string): Promise<HourEntryModuleReference | null>;
   /** Bloques reales de una fase, sin acceso a DB desde casos de uso. */
   findSegmentsForModule(moduleId: string): Promise<HourEntrySegmentReference[]>;
+  hasWorkBlocks(projectId: string): Promise<boolean>;
   /** Un usuario puede registrar HH en su equipo activo del proyecto o si es su líder. */
   isUserOnSegmentTeam(projectId: string, teamId: string, userId: string): Promise<boolean>;
   /**
