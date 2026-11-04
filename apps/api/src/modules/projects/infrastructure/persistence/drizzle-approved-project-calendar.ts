@@ -118,9 +118,15 @@ export class DrizzleApprovedProjectCalendar implements ApprovedProjectCalendar {
         bounds.set(segment.moduleId, list);
       }
 
-      // Hito 0 es el inicio real cuando el proyecto se activó sin start_date.
-      // Nunca se reescribe una fecha de inicio explícita del PM.
-      const startIso = (project.startDate ?? project.hito0At)!.toISOString().slice(0, 10);
+      // Hito 0 es un TIMESTAMP: usamos el día calendario chileno, no su día
+      // UTC, que podría adelantarse si el PM inició el proyecto de noche.
+      // Una fecha explícita start_date (tipo DATE) siempre tiene prioridad.
+      const startIso = project.startDate
+        ? project.startDate.toISOString().slice(0, 10)
+        : new Intl.DateTimeFormat('en-CA', {
+            timeZone: 'America/Santiago',
+            year: 'numeric', month: '2-digit', day: '2-digit',
+          }).format(project.hito0At!);
       let generated = 0;
       for (const reference of references.modules) {
         const moduleId = reference.moduleId;
