@@ -626,6 +626,7 @@ export function TeamTasksCard({ project, projectId, teamId, managerView = false 
           row.moduleId === executionEdit.moduleId);
         return task ? <ExecutionTaskModal key={task.id}
           project={project} moduleId={executionEdit.moduleId} task={task}
+          allowedTeamId={managerView ? undefined : teamId}
           onClose={() => setExecutionEdit(null)}
           onDuplicate={() => {
             setDuplicateTarget(executionEdit);
