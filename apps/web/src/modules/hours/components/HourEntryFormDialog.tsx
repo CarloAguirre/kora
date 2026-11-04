@@ -108,6 +108,7 @@ const blockFromEntry = (entry: HourEntrySummary): DailyBlock => ({
     : '',
   projectId: entry.project?.id ?? '',
   moduleId: entry.module?.id ?? '',
+  segmentId: entry.segment?.id ?? '',
   category: entry.category,
   hours: String(entry.hours),
   description: entry.description,
@@ -207,6 +208,7 @@ function EditEntryForm({
           assignment: block.assignment as HourEntryAssignment,
           projectId: needsProject ? block.projectId : null,
           moduleId: needsProject && block.moduleId ? block.moduleId : null,
+          segmentId: needsProject && block.segmentId ? block.segmentId : null,
           category: block.category,
           description: block.description,
           hours: Number(block.hours),
@@ -273,6 +275,7 @@ function EditEntryForm({
         onRemove={() => undefined}
         onToggleExpand={() => setBlock((prev) => ({ ...prev, expanded: !prev.expanded }))}
         onAdjustHours={(delta) => setBlock((prev) => ({ ...prev, hours: stepBlockHours(prev.hours, delta) }))}
+        ownerUserId={entry.user.id}
       />
 
       <div className={styles.actions}>
