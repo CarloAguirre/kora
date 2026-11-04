@@ -98,5 +98,16 @@ export const leaderRemindersSchema = z.object({
       teamsWithoutAssignedHours: z.array(z.string()),
     }),
   ),
+  /** Equipos con cotización traspasada pendientes de incorporar colaboradores activos.
+   * Se calcula en vivo; desaparece automáticamente al asignar personas. */
+  teamsAwaitingStaffing: z.array(z.object({
+    projectId: uuidSchema,
+    projectSlug: z.string(),
+    projectName: z.string(),
+    clientName: z.string().nullable(),
+    teamId: uuidSchema,
+    teamSlug: z.string(),
+    teamName: z.string(),
+  })),
 });
 export type LeaderReminders = z.infer<typeof leaderRemindersSchema>;
