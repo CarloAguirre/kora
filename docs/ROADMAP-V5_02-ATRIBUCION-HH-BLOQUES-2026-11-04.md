@@ -20,9 +20,11 @@ horas de un bloque por nombre, por fecha o por pertenencia al equipo.
      efectivo de ese equipo en ese proyecto.
    - Si la fase tiene bloques, un alta de horas de tipo `Proyecto` exige
      el segmento explícito.
-   - Si el proyecto tiene bloques y el registro es de tipo `Proyecto`,
-     también se exige indicar fase. Se conserva el caso de proyectos sin
-     Roadmap y las horas de `Prospecto`.
+   - Si el autor participa de un equipo con bloques en el Roadmap y
+     registra horas `Proyecto`, se exige indicar fase y bloque.
+     Los registros generales de personal sin participación en esos equipos,
+     los proyectos aún sin Roadmap y las horas de `Prospecto` conservan
+     el flujo anterior, sin atribución especulativa.
    - Un registro anterior no asociado puede seguir consultándose. Al
      editarlo seleccionando un bloque se valida su identidad, sin borrarlo.
 4. Formularios `Registro diario`, `Registro semanal` y
