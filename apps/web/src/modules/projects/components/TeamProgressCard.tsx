@@ -197,7 +197,8 @@ export function TeamProgressCard({ progress, teamName }: Props) {
             Las HH consumidas muestran el costo y no mueven el avance: haber usado
             el 60% de las horas no significa llevar el 60% del trabajo.
             El detalle por bloque aparece como «—» porque el registro de horas
-            no identifica un bloque de forma verificable.
+            no identifica un bloque de forma verificable: el sistema
+            no lo distribuye entre bloques sin evidencia.
           </p>
         </div>}
       </div>
