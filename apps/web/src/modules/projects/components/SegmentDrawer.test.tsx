@@ -1,0 +1,189 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import type {
+  ProjectDetail, ProjectModule, ProjectModuleSegment,
+  ProjectModuleDelivery, ProjectModuleTask,
+} from '@kora/contracts';
+import { SegmentDrawer, type SegmentDrawerProps } from './SegmentDrawer';
+
+const mocks = vi.hoisted(() => ({
+  updateDelivery: vi.fn(),
+  success: vi.fn(),
+  error: vi.fn(),
+}));
+
+vi.mock('../api/projects.queries', () => ({
+  useUpdateProjectModuleDelivery: () => ({ mutateAsync: mocks.updateDelivery, isPending: false }),
+}));
+vi.mock('@/shared/components/ui/Toast', () => ({
+  useToast: () => ({ success: mocks.success, error: mocks.error }),
+}));
+vi.mock('@/shared/components/ui/Modal', () => ({
+  Modal: ({ children, title, eyebrow, footer, side, compactSide }: {
+    children: React.ReactNode; title: string; eyebrow?: string; footer?: React.ReactNode;
+    side?: boolean; compactSide?: boolean;
+  }) => <aside role="dialog" aria-label={title}
+    data-layout={side && compactSide ? 'compact-side' : 'other'}>
+    <header><span>{eyebrow}</span><h2>{title}</h2></header>
+    {children}
+    {footer && <footer>{footer}</footer>}
+  </aside>,
+}));
+
+const segment = {
+  id: 'segment-1', teamId: 'team-rpa', teamName: 'RPA',
+  name: 'Bot de conciliación', startDate: '2026-09-07', endDate: '2026-10-16',
+  estimatedHours: 360, consumedHours: 0, members: [],
+  closedAt: '2026-10-16T18:00:00.000Z',
+} as ProjectModuleSegment;
+const task = (name: string, status: ProjectModuleTask['status'] = 'done') => ({
+  id: name, teamId: segment.teamId, teamName: 'RPA',
+  name, segmentId: segment.id, segmentName: segment.name,
+  assigneeUserId: 'user-1', assigneeName: 'José Aponte',
+  status, estimatedHours: 40, startDate: segment.startDate, date: segment.endDate,
+  description: null, scope: 'desarrollo', completedAt: null, cancelledAt: null,
+  rejectionReason: null,
+}) as ProjectModuleTask;
+const delivery = (status: ProjectModuleDelivery['status']) => ({
+  id: 'delivery-1', name: 'Bot de conciliación · RPA',
+  segmentId: segment.id, segmentName: segment.name,
+  teamId: segment.teamId, teamName: segment.teamName,
+  estimatedDate: '2026-10-16', status,
+  assigneeUserId: 'user-1', assigneeName: 'Ana María Soto',
+  canManage: true, rejectionReason: null,
+  createdAt: '2026-09-07T12:00:00.000Z',
+}) as ProjectModuleDelivery;
+const moduleBase = {
+  id: 'module-1', name: 'Bot de conciliación',
+  segments: [segment], tasks: [task('Diseño del bot'), task('Desarrollo del bot')],
+  deliveries: [delivery('approved')],
+} as ProjectModule;
+const project = {
+  id: 'project-1', modules: [moduleBase],
+  teams: [{
+    teamId: segment.teamId, teamName: 'RPA',
+    leader: { fullName: 'José Aponte' },
+  }],
+} as ProjectDetail;
+
+const progress = {
+  id: segment.id, name: segment.name, estimatedHours: 360,
+  actualHours: 360, expectedHours: 360, consumedHours: 0,
+  actualPercent: 100, expectedPercent: 100,
+  coveragePercent: 22, isClosed: true,
+  pendingApprovalCount: 0, overdueCount: 0, unassignedCount: 0,
+};
+
+function show(overrides: {
+  segment?: ProjectModuleSegment;
+  deliveries?: ProjectModuleDelivery[];
+  tasks?: ProjectModuleTask[];
+  onAddTask?: () => void;
+  onDeleteTask?: (task: ProjectModuleTask) => void;
+  onChangeClosure?: SegmentDrawerProps['onChangeClosure'];
+  actualPercent?: number;
+} = {}) {
+  const chosenSegment = overrides.segment ?? segment;
+  const module = {
+    ...moduleBase,
+    segments: [chosenSegment],
+    deliveries: overrides.deliveries ?? [delivery('approved')],
+    tasks: overrides.tasks ?? moduleBase.tasks,
+  };
+  const props: SegmentDrawerProps = {
+    project: { ...project, modules: [module] },
+    module, segment: chosenSegment, blockProgress: {
+      ...progress, actualPercent: overrides.actualPercent ?? 100,
+    },
+    onClose: vi.fn(), onEdit: vi.fn(), onDelete: vi.fn(),
+    onAddTask: overrides.onAddTask, onDeleteTask: overrides.onDeleteTask,
+    onChangeClosure: overrides.onChangeClosure,
+    onEditTask: vi.fn(), onDuplicateTask: vi.fn(),
+  };
+  return { ...render(<SegmentDrawer {...props} />), props };
+}
+
+beforeEach(() => {
+  mocks.updateDelivery.mockReset().mockResolvedValue(undefined);
+  mocks.success.mockReset();
+  mocks.error.mockReset();
+});
+
+describe('Bloque operativo: fidelidad de los tres estados v5.02', () => {
+  it('entrega aprobada: panel compacto, estado cerrado, entrega verde y tareas aprobadas', () => {
+    show({ onChangeClosure: vi.fn() });
+    const dialog = screen.getByRole('dialog', { name: 'Bot de conciliación' });
+    expect(dialog).toHaveAttribute('data-layout', 'compact-side');
+    expect(within(dialog).getByText('Fase 1: Bot de conciliación')).toBeInTheDocument();
+    expect(within(dialog).getByText('Líder: José Aponte')).toBeInTheDocument();
+    expect(within(dialog).getByLabelText('Estado: Cerrado')).toBeInTheDocument();
+    expect(within(dialog).getByText('07-09 — 16-10')).toBeInTheDocument();
+    expect(within(dialog).getByRole('progressbar', { name: 'Avance real del bloque' }))
+      .toHaveAttribute('aria-valuenow', '100');
+    expect(within(dialog).getByText(/Cerrado con entrega aprobada/)).toBeInTheDocument();
+    expect(within(dialog).getByText('Entrega aprobada')).toBeInTheDocument();
+    expect(within(dialog).getByRole('heading', { name: 'Tareas (2)' })).toBeInTheDocument();
+    expect(within(dialog).getAllByText('Aprobada')).toHaveLength(2);
+    expect(within(dialog).getByRole('button', { name: 'Reabrir bloque' })).toBeEnabled();
+    expect(within(dialog).getByRole('button', { name: 'Eliminar bloque' })).toBeEnabled();
+    expect(within(dialog).getByRole('button', { name: 'Editar bloque' })).toBeEnabled();
+  });
+
+  it('entrega vencida: mantiene estado rojo aun con avance de tareas en 100%', async () => {
+    const onAddTask = vi.fn();
+    const onDeleteTask = vi.fn();
+    const overdue = { ...segment, teamId: 'team-rpa', closedAt: null } as ProjectModuleSegment;
+    const { props } = show({
+      segment: overdue, deliveries: [delivery('planned')],
+      onAddTask, onDeleteTask,
+    });
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByLabelText('Estado: Entrega vencida')).toBeInTheDocument();
+    expect(within(dialog).getByText('Fecha planificada: 16-10-2026 (vencida)'))
+      .toBeInTheDocument();
+    expect(within(dialog).getByRole('progressbar', { name: 'Avance real del bloque' }))
+      .toHaveAttribute('aria-valuenow', '100');
+    fireEvent.click(within(dialog).getByRole('button', { name: '+ Agregar tarea' }));
+    expect(onAddTask).toHaveBeenCalledOnce();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Eliminar tarea Diseño del bot' }));
+    expect(onDeleteTask).toHaveBeenCalledWith(expect.objectContaining({ name: 'Diseño del bot' }));
+
+    // El backend exige comentario; no enviar una entrega vacía por buscar
+    // fidelidad visual con el botón del prototipo.
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Marcar como entregada' }));
+    expect(within(dialog).getByRole('button', { name: 'Confirmar entrega' })).toBeDisabled();
+    fireEvent.change(within(dialog).getByLabelText('Comentario de entrega'), {
+      target: { value: 'Ejecución QA verificada' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Confirmar entrega' }));
+    await waitFor(() => expect(mocks.updateDelivery).toHaveBeenCalledWith({
+      projectId: 'project-1', moduleId: 'module-1', deliveryId: 'delivery-1',
+      input: { status: 'delivered', comment: 'Ejecución QA verificada' },
+    }));
+    await waitFor(() => expect(props.onClose).toHaveBeenCalled());
+    expect(mocks.success).toHaveBeenCalled();
+  });
+
+  it('cierre sin entrega: explica el cierre registrado sin inventar autor', () => {
+    const onChangeClosure = vi.fn();
+    show({ deliveries: [], onChangeClosure });
+    expect(screen.getByLabelText('Estado: Cerrado')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Cierre del bloque' }))
+      .toHaveTextContent('Su cierre quedó registrado el 16-10-2026');
+    expect(screen.queryByText('Entrega aprobada')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Marcar como entregada' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Reabrir bloque' }));
+    expect(onChangeClosure).toHaveBeenCalledExactlyOnceWith('reopen');
+  });
+
+  it('una entrega presentada espera aprobación; no se declara cerrada por entrega', () => {
+    show({
+      segment: { ...segment, closedAt: null } as ProjectModuleSegment,
+      deliveries: [delivery('delivered')],
+      actualPercent: 60,
+    });
+    expect(screen.getByLabelText('Estado: Entregada')).toBeInTheDocument();
+    expect(screen.getByText(/Entrega presentada; pendiente de aprobación/)).toBeInTheDocument();
+    expect(screen.queryByText(/Cerrado con entrega aprobada/)).not.toBeInTheDocument();
+  });
+});
