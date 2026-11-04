@@ -24,7 +24,8 @@ import {
   type ProjectDocument,
 } from "../components/ProjectInfoBar";
 import { ProjectModulesCard } from "../components/ProjectModulesCard";
-import { ProjectTimeline } from "../components/ProjectTimeline";
+import { ProjectExecutionProgressCard } from "../components/ProjectExecutionProgressCard";
+import { calculateProjectExecutionProgress } from "../lib/project-execution-progress";
 import { TeamHoursSummaryChart } from "../components/TeamHoursSummaryChart";
 import styles from "./ProjectDetailPage.module.css";
 
@@ -146,6 +147,8 @@ export function DevelopmentProjectDetailView({
     [project.teams],
   );
 
+  const projectExecutionProgress = useMemo(() => calculateProjectExecutionProgress(project), [project]);
+
   const remainingHours = project.soldHours - project.usedHours;
 
   /**
@@ -261,7 +264,7 @@ export function DevelopmentProjectDetailView({
         </div>
       )}
 
-      {/* Datos del proyecto y Timeline: siempre visibles, fuera de las tabs (igual que en el mockup del líder de proyecto). */}
+      {/* Datos del proyecto y avance operativo: siempre visibles, fuera de las pestañas. */}
       <Card className={styles.infoCard}>
         <ProjectInfoBar
           clientName={project.client?.companyName ?? "Sin cliente"}
@@ -289,10 +292,7 @@ export function DevelopmentProjectDetailView({
       </Card>
 
       <Card>
-        <p className={styles.sectionTitle}>Avance del proyecto</p>
-        <div style={{ marginTop: "var(--kora-space-4)" }}>
-          <ProjectTimeline progress={project.progress} />
-        </div>
+        <ProjectExecutionProgressCard progress={projectExecutionProgress} />
 
         <div className={styles.metricsDivider} />
         <div className={styles.metricsStrip}>
