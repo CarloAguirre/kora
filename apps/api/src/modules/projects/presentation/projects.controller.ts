@@ -716,6 +716,7 @@ export class ProjectsController {
     @Param('id') id: string,
     @Param('moduleId') moduleId: string,
     @Param('taskId') taskId: string,
+    @Query('cancel') cancel: string | undefined,
     @CurrentUser() actor: RequestUser,
   ): Promise<void> {
     unwrapOrThrow(
@@ -723,6 +724,7 @@ export class ProjectsController {
         projectId: id,
         moduleId,
         taskId,
+        forceCancel: cancel === 'true',
         actor: toActorContext(actor),
         actorPermissions: actor.permissions,
       }),
