@@ -88,7 +88,7 @@ export class UpdateHourEntryUseCase implements UseCase<UpdateHourEntryCommand, v
         ? null : previousSegmentId)
       : data.segmentId;
     if (projectId && !moduleId && data.projectId !== undefined &&
-      await this.projects.hasWorkBlocks(projectId)) {
+      await this.projects.hasAttributableWorkBlocks(projectId, entry.userId)) {
       return err(new HourEntrySegmentRequiredError());
     }
     if (selectedSegmentId && !moduleId) {
@@ -102,10 +102,12 @@ export class UpdateHourEntryUseCase implements UseCase<UpdateHourEntryCommand, v
         if (!selected || !await this.projects.isUserOnSegmentTeam(
           selected.projectId, selected.teamId, entry.userId,
         )) return err(new InvalidHourEntrySegmentError());
-      } else if (segments.length > 0 &&
-        (data.segmentId !== undefined || (data.moduleId !== undefined &&
-          data.moduleId !== entry.toSnapshot().moduleId))) {
-        return err(new HourEntrySegmentRequiredError());
+      } else if (data.segmentId !== undefined || (data.moduleId !== undefined &&
+        data.moduleId !== entry.toSnapshot().moduleId)) {
+        const hasEligibleSegment = (await Promise.all(segments.map((segment) =>
+          this.projects.isUserOnSegmentTeam(segment.projectId, segment.teamId, entry.userId),
+        ))).some(Boolean);
+        if (hasEligibleSegment) return err(new HourEntrySegmentRequiredError());
       }
     }
 
