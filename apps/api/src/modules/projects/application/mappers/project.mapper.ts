@@ -146,6 +146,13 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
       stopsClock: snapshot.stopsClock,
       modules: source.modules.map((module) => ({
         ...module, tasks: module.tasks.filter((task) => !task.cancelledAt),
+        // Global y fases: mismo denominador operacional de los bloques que
+        // utiliza la ficha interna del proyecto y Avance del equipo.
+        segments: module.segments.map((block) => ({
+          id: block.id, teamId: block.teamId,
+          estimatedHours: block.estimatedHours,
+          startDate: block.startDate, endDate: block.endDate, closedAt: block.closedAt,
+        })),
       })),
     },
     today,
@@ -213,6 +220,11 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
     blockerCount: module.blockerCount,
     progress: calculateModuleProgress({
       ...module, tasks: module.tasks.filter((task) => !task.cancelledAt),
+      segments: module.segments.map((block) => ({
+        id: block.id, teamId: block.teamId,
+        estimatedHours: block.estimatedHours,
+        startDate: block.startDate, endDate: block.endDate, closedAt: block.closedAt,
+      })),
     }, today),
   }));
 
