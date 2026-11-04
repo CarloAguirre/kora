@@ -91,13 +91,31 @@ describe('Roadmap operativo · diseño aprobado v5.02', () => {
     expect(screen.getByText('18')).toBeInTheDocument();
     expect(screen.getByText('4')).toBeInTheDocument();
     expect(screen.getByText('PMO')).toBeInTheDocument();
-    expect(screen.getByText('Sin fechas: se calculan al definir el inicio del proyecto')).toBeInTheDocument();
+    expect(screen.getByText('Sin fechas: define el inicio del proyecto para ver la propuesta')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Abrir bloque Coordinación' })).toBeInTheDocument();
     expect(screen.queryByText('Resumen de avance')).not.toBeInTheDocument();
     expect(screen.queryByText('Rango visible:')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Planificar bloque' }));
     expect(plan).toHaveBeenCalledOnce();
     expect(screen.getByText('Tareas 18, 0 aprobadas')).toBeInTheDocument();
+  });
+
+  it('al disponer de inicio muestra fechas propuestas, no la etiqueta Sin fechas', () => {
+    render(<PhaseRoadmap phaseRoadmap={{
+      ...phaseRoadmap,
+      rangeStartDate: '2026-10-29',
+      rangeEndDate: '2026-12-30',
+    }} operationalView
+      operationalRows={() => [{
+        id: 'team-qa', role: 'qa', label: 'Aseguramiento QA', hours: 140,
+        proposedStartDate: '2026-11-05', proposedEndDate: '2026-11-18',
+      }]} />);
+    expect(screen.getByRole('button', { name: 'Ver propuesta de bloque Aseguramiento QA' }))
+      .toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Fechas propuestas de Aseguramiento QA' }))
+      .toHaveTextContent('Propuesta: 05-11-2026 → 18-11-2026');
+    expect(screen.queryByText(/Sin fechas: se calculan al definir/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Planificar bloque' })).toBeInTheDocument();
   });
 
   it('abre el detalle de un bloque sin fechas desde el nombre o la zona temporal', () => {
@@ -113,7 +131,7 @@ describe('Roadmap operativo · diseño aprobado v5.02', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Cerrar detalle' }));
     expect(screen.queryByText('Detalle: reference-block')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', {
-      name: 'Sin fechas: se calculan al definir el inicio del proyecto',
+      name: 'Sin fechas: define el inicio del proyecto para ver la propuesta',
     }));
     expect(screen.getByText('Detalle: reference-block')).toBeInTheDocument();
   });
