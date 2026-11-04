@@ -104,9 +104,11 @@ export class CreateProjectModuleTaskUseCase
     const now = this.clock.now();
     const assigneeUserId = command.data.assigneeUserId ?? null;
     const assignee = assigneeUserId
-      ? (await this.projectTeamMembers.listForProject(project.id)).find((member) => member.userId === assigneeUserId)
+      ? (await this.projectTeamMembers.listForProject(project.id)).find((member) =>
+        member.userId === assigneeUserId && member.teamId === command.data.teamId && !member.blockedAt)
       : undefined;
-    if (assignee?.userStatus === 'disabled') return err(new ProjectAssigneeDisabledError());
+    if (assigneeUserId && (!assignee || assignee.userStatus === 'disabled'))
+      return err(new ProjectAssigneeDisabledError());
     const assigneeName = assignee?.fullName;
 
     // Alta y registro en la misma transacción: no queda una tarea sin su registro de creación.
