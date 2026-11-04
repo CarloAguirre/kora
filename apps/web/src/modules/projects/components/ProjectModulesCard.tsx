@@ -28,9 +28,12 @@ import { ApiRequestError } from '@/shared/lib/api-client';
 import { PhaseRoadmap, type PhaseRoadmapSelection, type OperationalRoadmapRow } from '@/modules/client-portal/components/PhaseRoadmap';
 import { roleFromTeamName, toPhaseRoadmap } from '@/modules/client-portal/adapters/project-detail.adapter';
 import { PHASE_ROADMAP_ROLE_COLORS } from '@/modules/client-portal/types';
-import { useCreateProjectModule, useCreateProjectModuleSegment, useDeleteProjectModule, useDeleteProjectModuleSegment, useDeleteProjectModuleTask, useUpdateProjectModule, useUpdateProjectModuleDelivery, useUpdateProjectModuleSegment, useUpdateProjectModuleTask } from '../api/projects.queries';
+import { useCreateProjectModule, useCreateProjectModuleSegment, useDeleteProjectModule, useDeleteProjectModuleSegment, useDeleteProjectModuleTask, useUpdateProjectModule, useUpdateProjectModuleDelivery, useUpdateProjectModuleSegment } from '../api/projects.queries';
 import { useConfirmAction } from '@/shared/components/ui/useConfirmAction';
 import { QuotationReferenceTaskModal } from './QuotationReferenceTaskModal';
+import { ExecutionTaskModal } from './ExecutionTaskModal';
+import { DuplicateTaskModal } from './DuplicateTaskModal';
+import { ReferenceBlockDrawer } from './ReferenceBlockDrawer';
 import { useAppliedQuotationPlanning } from '@/modules/estimation/api/quotation.queries';
 import {
   EMPTY_EXECUTION_SEGMENT_MODAL_VALUES,
@@ -115,7 +118,6 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
   const updateSegment = useUpdateProjectModuleSegment();
   const createSegment = useCreateProjectModuleSegment();
   const deleteSegment = useDeleteProjectModuleSegment();
-  const updateTask = useUpdateProjectModuleTask();
   const deleteTask = useDeleteProjectModuleTask();
   const { confirm, dialog: confirmationDialog } = useConfirmAction();
   const appliedPlanning = useAppliedQuotationPlanning(project.id);
@@ -127,10 +129,8 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
   const [planningBlock, setPlanningBlock] = useState<{ moduleId: string; teamId: string; name: string } | null>(null);
   const [planningMode, setPlanningMode] = useState(false);
   const [addingPhase, setAddingPhase] = useState(false);
-  const [editingTask, setEditingTask] = useState<{
-    moduleId: string; taskId: string; name: string; startDate: string;
-    date: string; estimatedHours: string;
-  } | null>(null);
+  const [editingTask, setEditingTask] = useState<{ moduleId: string; task: ProjectModuleTask } | null>(null);
+  const [duplicatingTask, setDuplicatingTask] = useState<{ moduleId: string; task: ProjectModuleTask } | null>(null);
   const [newPhase, setNewPhase] = useState({
     name: '', initialStage: 'discovery' as ProjectModuleStage, estimatedHours: '',
     estimatedStartDate: '', estimatedEndDate: '',
@@ -196,29 +196,6 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
       toast.success('Bloque eliminado. Las referencias comerciales se conservaron.');
     } catch (error) {
       toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo eliminar el bloque.');
-    }
-  };
-
-  const onSaveTask = async () => {
-    if (!editingTask) return;
-    const hours = Number(editingTask.estimatedHours);
-    if (!editingTask.name.trim()) return toast.error('Escribe el nombre de la tarea.');
-    if (!editingTask.estimatedHours.trim() || !Number.isFinite(hours) || hours <= 0) {
-      return toast.error('Ingresa HH estimadas mayores a cero.');
-    }
-    if (!editingTask.startDate || !editingTask.date || editingTask.startDate > editingTask.date) {
-      return toast.error('Revisa las fechas de inicio y límite de la tarea.');
-    }
-    try {
-      await updateTask.mutateAsync({
-        projectId: project.id, moduleId: editingTask.moduleId, taskId: editingTask.taskId,
-        input: { name: editingTask.name.trim(), startDate: editingTask.startDate,
-          date: editingTask.date, estimatedHours: hours },
-      });
-      setEditingTask(null);
-      toast.success('Tarea actualizada.');
-    } catch (error) {
-      toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo editar la tarea.');
     }
   };
 
@@ -545,11 +522,7 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
                     {canManage && <>
                       <button type="button" className={styles.taskIconAction}
                         aria-label={'Editar tarea ' + task.name} title="Editar tarea"
-                        onClick={() => setEditingTask({
-                          moduleId: module.id, taskId: task.id, name: task.name,
-                          startDate: task.startDate, date: task.date,
-                          estimatedHours: task.estimatedHours == null ? '' : String(task.estimatedHours),
-                        })}><PencilIcon size={15} /></button>
+                        onClick={() => setEditingTask({ moduleId: module.id, task })}><PencilIcon size={15} /></button>
                       <button type="button" className={styles.taskIconAction}
                         aria-label={'Eliminar tarea ' + task.name} title="Eliminar tarea"
                         onClick={() => void onRemoveTask(module, task)}><TrashIcon size={15} /></button>
@@ -584,6 +557,30 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
     const module = modulesById.get(phase.id);
     if (!module) return null;
     if (selection.kind === 'incident') return <IncidentsDetail module={module} hourEntries={hourEntries} onClose={close} />;
+    if (selection.kind === 'reference-block') {
+      const commercial = appliedPlanning.data?.modules.find((entry) => entry.moduleId === module.id);
+      const block = commercial?.relativeTeamBlocks?.find((entry) => entry.teamId === selection.id);
+      return block && commercial && appliedPlanning.data ? (
+        <ReferenceBlockDrawer project={project} module={module}
+          block={block} reference={commercial} versionId={appliedPlanning.data.versionId}
+          onClose={close}
+          onPlan={canManage ? () => {
+            setPlanningBlock({ moduleId: module.id, teamId: block.teamId,
+              name: module.name + ' · ' + (teamOptions.find((item) =>
+                item.value === block.teamId)?.label ?? 'Equipo') });
+            close();
+          } : undefined}
+          onCreateReference={canManage ? (task) => {
+            setCreatingFromReference({ moduleId: module.id, task });
+            close();
+          } : undefined}
+          onEditTask={canManage ? (task) => { setEditingTask({ moduleId: module.id, task }); close(); } : undefined}
+          onDuplicateTask={canManage ? (task) => {
+            setDuplicatingTask({ moduleId: module.id, task }); close();
+          } : undefined}
+        />
+      ) : null;
+    }
     if (selection.kind === 'segment') {
       const segment = module.segments.find((s) => s.id === selection.id);
       return segment ? (
@@ -598,6 +595,13 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
             close();
           } : undefined}
           onDelete={canManage ? () => void onDeleteSegment(module.id, segment, close) : undefined}
+          onEditTask={canManage ? (task) => { setEditingTask({ moduleId: module.id, task }); close(); } : undefined}
+          onDuplicateTask={canManage ? (task) => {
+            setDuplicatingTask({ moduleId: module.id, task }); close();
+          } : undefined}
+          onCreateReference={canManage ? (task) => {
+            setCreatingFromReference({ moduleId: module.id, task }); close();
+          } : undefined}
         />
       ) : null;
     }
@@ -679,33 +683,16 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
         />
       )}
       {confirmationDialog}
-      <Modal open={editingTask !== null} title="Editar tarea"
-        onClose={() => setEditingTask(null)} dismissible={!updateTask.isPending}
-        footer={<>
-          <Button variant="outline" onClick={() => setEditingTask(null)}
-            disabled={updateTask.isPending}>Cancelar</Button>
-          <Button loading={updateTask.isPending} onClick={() => void onSaveTask()}>
-            Guardar cambios
-          </Button>
-        </>}>
-        {editingTask && <div className={styles.phaseCreationForm}>
-          <TextField label="Nombre de la tarea" value={editingTask.name}
-            onChange={(event) => setEditingTask((current) =>
-              current ? { ...current, name: event.target.value } : current)} />
-          <TextField label="Horas estimadas" type="number" min={0.01} step={0.01}
-            value={editingTask.estimatedHours}
-            onChange={(event) => setEditingTask((current) =>
-              current ? { ...current, estimatedHours: event.target.value } : current)} />
-          <div className={styles.phaseCreationDates}>
-            <TextField label="Fecha de inicio" type="date" value={editingTask.startDate}
-              onChange={(event) => setEditingTask((current) =>
-                current ? { ...current, startDate: event.target.value } : current)} />
-            <TextField label="Fecha límite" type="date" value={editingTask.date}
-              onChange={(event) => setEditingTask((current) =>
-                current ? { ...current, date: event.target.value } : current)} />
-          </div>
-        </div>}
-      </Modal>
+      {editingTask && <ExecutionTaskModal
+        key={editingTask.task.id} project={project} moduleId={editingTask.moduleId}
+        task={editingTask.task} onClose={() => setEditingTask(null)}
+        onDuplicate={() => {
+          setDuplicatingTask(editingTask);
+          setEditingTask(null);
+        }} />}
+      {duplicatingTask && <DuplicateTaskModal
+        key={duplicatingTask.task.id} project={project} moduleId={duplicatingTask.moduleId}
+        task={duplicatingTask.task} onClose={() => setDuplicatingTask(null)} />}
       <Modal open={addingPhase} title="Agregar fase" onClose={() => setAddingPhase(false)}
         dismissible={!createModule.isPending}
         footer={<>
@@ -757,6 +744,7 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
  * No infiere consumo por bloque: los registros horarios solo indican módulo. */
 function SegmentDrawer({
   project, module, segment, reference, onClose, onEdit, onDelete,
+  onEditTask, onDuplicateTask, onCreateReference,
 }: {
   project: ProjectDetail;
   module: ProjectModule;
@@ -765,6 +753,9 @@ function SegmentDrawer({
   onClose: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
+  onEditTask?: (task: ProjectModuleTask) => void;
+  onDuplicateTask?: (task: ProjectModuleTask) => void;
+  onCreateReference?: (task: AppliedQuotationPlanning['modules'][number]['tasks'][number]) => void;
 }) {
   const toast = useToast();
   const updateDelivery = useUpdateProjectModuleDelivery();
@@ -885,11 +876,32 @@ function SegmentDrawer({
           )}
         </div>
         <div className={styles.drawerSection}>
-          <h4>Tareas del equipo en esta fase ({teamTasks.length})</h4>
+          <div className={styles.drawerTaskHeading}>
+            <h4>Tareas ({teamTasks.length})</h4>
+            {onCreateReference && reference?.tasks.some((task) =>
+              task.teamId === segment.teamId &&
+              !teamTasks.some((saved) => saved.description?.includes(
+                ' · WBS ' + task.wbs + ' · ' + task.role))) && (
+              <Button size="sm" variant="outline" onClick={() => {
+                const task = reference.tasks.find((item) => item.teamId === segment.teamId &&
+                  !teamTasks.some((saved) => saved.description?.includes(
+                    ' · WBS ' + item.wbs + ' · ' + item.role)));
+                if (task) onCreateReference(task);
+              }}>+ Agregar tarea</Button>
+            )}
+          </div>
           {teamTasks.length ? (
             <ul className={styles.drawerTaskList}>
-              {teamTasks.map((task) => <li key={task.id}>
-                {task.name} · {task.estimatedHours ?? '—'} HH
+              {teamTasks.map((task) => <li key={task.id} className={styles.drawerTaskRow}>
+                <div><strong>{task.name}</strong>
+                  <small>{task.assigneeName ?? 'Sin asignar'} · {task.estimatedHours ?? '—'} HH est. · {formatDate(task.date)}</small>
+                </div>
+                {onEditTask && <button type="button" className={styles.taskIconAction}
+                  aria-label={'Editar tarea ' + task.name} title="Editar tarea"
+                  onClick={() => onEditTask(task)}><PencilIcon size={15} /></button>}
+                {onDuplicateTask && <button type="button" className={styles.taskIconAction}
+                  aria-label={'Duplicar tarea ' + task.name} title="Duplicar para otra persona"
+                  onClick={() => onDuplicateTask(task)}>Duplicar</button>}
               </li>)}
             </ul>
           ) : <p className={styles.drawerHint}>Aún no hay tareas operativas de este equipo.</p>}

@@ -569,3 +569,11 @@
 }
 .taskIconAction:hover { background: #eef1f6; color: #0f1729; }
 .taskIconAction:focus-visible { outline: 2px solid #0f1729; }
+
+/* Acciones de tareas en el panel lateral de bloque operativo. */
+.drawerTaskHeading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.drawerTaskList { padding: 0; margin: 0; list-style: none; }
+.drawerTaskRow { display: flex; gap: 8px; align-items: center; padding: 10px 0; border-top: 1px solid #edf0f4; }
+.drawerTaskRow > div { flex: 1; min-width: 0; display: grid; gap: 4px; }
+.drawerTaskRow strong { font-weight: 600; overflow-wrap: anywhere; }
+.drawerTaskRow small { color: #667085; }
