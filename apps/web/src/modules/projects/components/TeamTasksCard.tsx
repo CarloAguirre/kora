@@ -18,6 +18,8 @@ import { DropdownMenu, type DropdownMenuItem } from '@/shared/components/ui/Drop
 import { useToast } from '@/shared/components/ui/Toast';
 import { ReviewActionModal, type ReviewAction } from './ReviewActionModal';
 import { AssignCollaboratorModal } from './AssignCollaboratorModal';
+import { ExecutionTaskModal } from './ExecutionTaskModal';
+import { DuplicateTaskModal } from './DuplicateTaskModal';
 import { useCreateProjectModuleTask, useDeleteProjectModuleTask, useUpdateProjectModuleTask } from '../api/projects.queries';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
@@ -104,10 +106,14 @@ export function TeamTasksCard({ project, projectId, teamId, managerView = false 
   const [taskModalOpen, setTaskModalOpen] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<{ moduleId: string; taskId: string } | null>(null);
   const [taskDraft, setTaskDraft] = useState<TaskDraft>(EMPTY_TASK_DRAFT);
+  const [executionEdit, setExecutionEdit] = useState<{ moduleId: string; taskId: string } | null>(null);
+  const [duplicateTarget, setDuplicateTarget] = useState<{ moduleId: string; taskId: string } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ moduleId: string; taskId: string } | null>(null);
+  const [reassignUserId, setReassignUserId] = useState('');
 
   const team = useMemo(() => {
     const teamRow = project.teams.find((t) => t.teamId === teamId);
-    const members = project.members.filter((m) => m.teamId === teamId);
+    const members = project.members.filter((m) => m.teamId === teamId && !m.blockedAt);
     const teamName = teamRow?.teamName ?? members[0]?.teamName ?? 'Equipo';
     const leaderId = teamRow?.leader?.id ?? null;
     return { teamId, teamName, leaderId, members };
@@ -129,8 +135,8 @@ export function TeamTasksCard({ project, projectId, teamId, managerView = false 
   }, [project, teamId]);
 
   const matchesFilter = (task: (typeof teamTasks)[number], filter: TaskFilter) =>
-    filter === 'all' || (filter === 'unassigned' ? !task.assigneeUserId :
-      task.status === filter && (!managerView || Boolean(task.assigneeUserId)));
+    filter === 'all' || (!task.cancelledAt && (filter === 'unassigned' ? !task.assigneeUserId :
+      task.status === filter && (!managerView || Boolean(task.assigneeUserId))));
   const filteredTasks = teamTasks.filter((task) => matchesFilter(task, taskFilter));
   const taskTabCount = (filter: TaskFilter) => teamTasks.filter((task) => matchesFilter(task, filter)).length;
   const { pageItems, pagination } = usePaginatedItems(filteredTasks);
@@ -142,18 +148,7 @@ export function TeamTasksCard({ project, projectId, teamId, managerView = false 
   };
 
   const openEditTaskModal = (moduleId: string, task: (typeof teamTasks)[number]) => {
-    setEditingTaskId({ moduleId, taskId: task.id });
-    setTaskDraft({
-      name: task.name,
-      description: task.description ?? '',
-      assigneeUserId: task.assigneeUserId ?? '',
-      moduleId,
-      status: task.status,
-      estimatedHours: task.estimatedHours != null ? String(task.estimatedHours) : '',
-      startDate: task.startDate,
-      date: task.date,
-    });
-    setTaskModalOpen(true);
+    setExecutionEdit({ moduleId, taskId: task.id });
   };
 
   // Fechas ISO (yyyy-mm-dd): la comparación de strings respeta el orden cronológico.
@@ -241,12 +236,26 @@ export function TeamTasksCard({ project, projectId, teamId, managerView = false 
     }
   };
 
-  const onDeleteTask = async (moduleId: string, taskId: string) => {
+  const deletingTask = deleteTarget ? teamTasks.find((task) =>
+    task.id === deleteTarget.taskId && task.moduleId === deleteTarget.moduleId) : undefined;
+  const preserveTask = deletingTask ? (
+    deletingTask.status === 'done' || deletingTask.status === 'in_review' ||
+    Boolean(deletingTask.assigneeUserId && project.members.some((member) =>
+      member.userId === deletingTask.assigneeUserId && member.consumedHours > 0))
+  ) : false;
+
+  const onConfirmDelete = async () => {
+    if (!deleteTarget) return;
     try {
-      await deleteTask.mutateAsync({ projectId, moduleId, taskId });
-      toast.success('Se eliminó la tarea.');
+      await deleteTask.mutateAsync({
+        projectId, moduleId: deleteTarget.moduleId, taskId: deleteTarget.taskId,
+        cancel: preserveTask,
+      });
+      toast.success(preserveTask ? 'Tarea cancelada. Las HH registradas siguen en la bitácora.' :
+        'Tarea retirada del plan.');
+      setDeleteTarget(null);
     } catch (error) {
-      toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo eliminar la tarea.');
+      toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo procesar la tarea.');
     }
   };
 
@@ -285,9 +294,9 @@ export function TeamTasksCard({ project, projectId, teamId, managerView = false 
         projectId,
         moduleId: reassignTarget.moduleId,
         taskId: reassignTarget.taskId,
-        input: { assigneeUserId: userId },
+        input: { assigneeUserId: userId, status: 'todo' },
       });
-      toast.success('Se reasignó la tarea.');
+      toast.success('Se reasignó la tarea. Se mantienen sus HH estimadas.');
       setReassignTarget(null);
     } catch (error) {
       toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo reasignar la tarea.');
@@ -295,6 +304,24 @@ export function TeamTasksCard({ project, projectId, teamId, managerView = false 
   };
 
   const taskMenuItems = (task: (typeof teamTasks)[number]): DropdownMenuItem[] => {
+    if (task.cancelledAt) return [];
+    if (!managerView) return [
+      {
+        key: 'reasignar', label: 'Reasignar',
+        onSelect: () => {
+          setReassignUserId(task.assigneeUserId ?? '');
+          setReassignTarget({ moduleId: task.moduleId, taskId: task.id });
+        },
+      },
+      {
+        key: 'editar', label: 'Editar',
+        onSelect: () => openEditTaskModal(task.moduleId, task),
+      },
+      {
+        key: 'eliminar', label: 'Eliminar', tone: 'danger',
+        onSelect: () => setDeleteTarget({ moduleId: task.moduleId, taskId: task.id }),
+      },
+    ];
     const items: DropdownMenuItem[] =
       task.status === 'in_review'
         ? [
@@ -346,7 +373,7 @@ export function TeamTasksCard({ project, projectId, teamId, managerView = false 
       key: 'eliminar',
       label: 'Eliminar',
       tone: 'danger',
-      onSelect: () => void onDeleteTask(task.moduleId, task.id),
+      onSelect: () => setDeleteTarget({ moduleId: task.moduleId, taskId: task.id }),
     });
     return items;
   };
@@ -365,7 +392,7 @@ export function TeamTasksCard({ project, projectId, teamId, managerView = false 
 
         <Tabs tabs={(managerView ? TASK_TABS : TASK_TABS.filter((tab) => tab.id !== 'unassigned'))
           .map((tab) => ({
-            ...tab, label: managerView ? `${tab.label} ${taskTabCount(tab.id)}` : tab.label,
+            ...tab, label: `${tab.label} ${taskTabCount(tab.id)}`,
           }))} activeId={taskFilter} onSelect={(id) => setTaskFilter(id as TaskFilter)} />
 
         <DataTable
@@ -376,7 +403,7 @@ export function TeamTasksCard({ project, projectId, teamId, managerView = false 
               render: (task) => (
                 <span
                   className={styles.taskNameCell}
-                  onClick={() => canManageTeam && task.status !== 'in_review' && openEditTaskModal(task.moduleId, task)}
+                  onClick={() => canManageTeam && !task.cancelledAt && task.status !== 'in_review' && openEditTaskModal(task.moduleId, task)}
                 >
                   {task.name}
                   {task.rejectionReason && <span className={styles.rejectionNote}>Rechazada: {task.rejectionReason}</span>}
@@ -392,7 +419,8 @@ export function TeamTasksCard({ project, projectId, teamId, managerView = false 
               render: (task) => (
                 <span className={[styles.badge, managerView && !task.assigneeUserId
                   ? styles.badgeUnassigned : styles[TASK_STATUS_BADGE_CLASS[task.status]]].join(' ')}>
-                  {managerView && !task.assigneeUserId ? 'Por asignar' : PROJECT_MODULE_TASK_STATUS_LABELS[task.status]}
+                  {task.cancelledAt ? 'Cancelada' :
+                    !task.assigneeUserId ? 'Por asignar' : PROJECT_MODULE_TASK_STATUS_LABELS[task.status]}
                 </span>
               ),
             },
@@ -403,7 +431,7 @@ export function TeamTasksCard({ project, projectId, teamId, managerView = false 
               header: '',
               align: 'right',
               render: (task) =>
-                canManageTeam ? (
+                canManageTeam && !task.cancelledAt ? (
                   <DropdownMenu
                     items={taskMenuItems(task)}
                     trigger={({ onClick }) => (
@@ -547,7 +575,7 @@ export function TeamTasksCard({ project, projectId, teamId, managerView = false 
         onConfirm={(reason) => void onConfirmReview(reason)}
       />
 
-      <AssignCollaboratorModal
+      {managerView && <AssignCollaboratorModal
         open={reassignTarget !== null}
         isReassign={Boolean(reassigningTask?.assigneeUserId)}
         summary={
@@ -564,7 +592,53 @@ export function TeamTasksCard({ project, projectId, teamId, managerView = false 
         submitting={updateTask.isPending}
         onCancel={() => setReassignTarget(null)}
         onConfirm={(userId) => void onConfirmReassign(userId)}
-      />
+      />}
+      {!managerView && <Modal open={reassignTarget !== null}
+        title="Reasignar tarea" onClose={() => setReassignTarget(null)}
+        footer={<>
+          <Button variant="outline" onClick={() => setReassignTarget(null)}>Cancelar</Button>
+          <Button disabled={!reassignUserId || reassignUserId === reassigningTask?.assigneeUserId}
+            loading={updateTask.isPending}
+            onClick={() => void onConfirmReassign(reassignUserId)}>Reasignar</Button>
+        </>}>
+        <p className={styles.taskModalHint}>
+          “{reassigningTask?.name}”, hoy asignada a {reassigningTask?.assigneeName ?? 'nadie'}.
+          Las horas que ya registró se mantienen en la tarea.
+        </p>
+        <Select label="Asignar a" value={reassignUserId}
+          options={assignableOptions(team.members, toMemberCandidate)}
+          onChange={(event) => setReassignUserId(event.target.value)} />
+      </Modal>}
+      <Modal open={deleteTarget !== null}
+        title={preserveTask ? 'No se puede eliminar la tarea' : 'Eliminar tarea'}
+        onClose={() => setDeleteTarget(null)} footer={<>
+          <Button variant="outline" onClick={() => setDeleteTarget(null)}>Volver</Button>
+          <Button loading={deleteTask.isPending} onClick={() => void onConfirmDelete()}>
+            {preserveTask ? 'Cancelar tarea' : 'Eliminar tarea'}
+          </Button>
+        </>}>
+        <p>“{deletingTask?.name}” {preserveTask
+          ? 'tiene un estado aprobado o el colaborador registra HH en este proyecto. Se conserva el historial y las horas registradas en la bitácora.'
+          : 'se eliminará del plan. Esta acción no puede deshacerse.'}</p>
+      </Modal>
+      {executionEdit && (() => {
+        const task = teamTasks.find((row) => row.id === executionEdit.taskId &&
+          row.moduleId === executionEdit.moduleId);
+        return task ? <ExecutionTaskModal key={task.id}
+          project={project} moduleId={executionEdit.moduleId} task={task}
+          onClose={() => setExecutionEdit(null)}
+          onDuplicate={() => {
+            setDuplicateTarget(executionEdit);
+            setExecutionEdit(null);
+          }} /> : null;
+      })()}
+      {duplicateTarget && (() => {
+        const task = teamTasks.find((row) => row.id === duplicateTarget.taskId &&
+          row.moduleId === duplicateTarget.moduleId);
+        return task ? <DuplicateTaskModal key={task.id}
+          project={project} moduleId={duplicateTarget.moduleId} task={task}
+          onClose={() => setDuplicateTarget(null)} /> : null;
+      })()}
     </>
   );
 }
