@@ -78,4 +78,14 @@ describe('Asignación masiva de EDT y tareas operativas', () => {
     }));
     expect(mocks.create).not.toHaveBeenCalled();
   });
+
+  it('no convierte referencia EDT sin bloque planificado, evitando tareas sin FK', () => {
+    const unplanned = { ...module, segments: [], tasks: [] } as unknown as ProjectModule;
+    render(<AssignBlockTasksModal project={project} module={unplanned}
+      teamId="team-qa" referenceTasks={[reference]} versionId="version-1" onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Aplicar' }));
+    expect(screen.getByText(/Primero planifica un bloque de trabajo/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Asignar tareas' })).toBeDisabled();
+  });
+
 });
