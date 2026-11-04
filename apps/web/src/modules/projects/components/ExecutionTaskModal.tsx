@@ -23,13 +23,14 @@ const sourceAndText = (description: string | null) => {
 };
 
 export function ExecutionTaskModal({
-  project, moduleId, task, onClose, onDuplicate,
+  project, moduleId, task, onClose, onDuplicate, allowedTeamId,
 }: {
   project: ProjectDetail;
   moduleId: string;
   task: ProjectModuleTask;
   onClose: () => void;
   onDuplicate: () => void;
+  allowedTeamId?: string;
 }) {
   const update = useUpdateProjectModuleTask();
   const toast = useToast();
@@ -45,7 +46,8 @@ export function ExecutionTaskModal({
   const [date, setDate] = useState(task.date);
 
   const module = project.modules.find((item) => item.id === moduleId);
-  const members = project.members.filter((member) => member.userStatus === 'active' && !member.blockedAt);
+  const members = project.members.filter((member) => member.userStatus === 'active' && !member.blockedAt &&
+    (!allowedTeamId || member.teamId === allowedTeamId));
   const assigneeOptions = members.map((member) => ({
     value: member.teamId + ':' + member.userId,
     label: member.fullName + ' · ' + member.teamName,
