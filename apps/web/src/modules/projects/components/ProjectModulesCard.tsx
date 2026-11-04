@@ -566,7 +566,7 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
         const teamName = team?.teamName ?? teamOptions.find((entry) => entry.value === id)?.label ??
           'Equipo sin vincular';
         const members = project.members.filter((member) =>
-          member.teamId === id && member.userStatus === 'active');
+          member.teamId === id && member.userStatus === 'active' && !member.blockedAt);
         return <div className={styles.awaitingAssignment} key={id || 'unmapped'}>
           <span className={styles.awaitingBadge}
             style={{ background: operationalTeamColor(teamName) }} aria-hidden="true">
@@ -580,7 +580,7 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
               : group.hours + ' HH estimadas. Las referencias EDT deben convertirse en tareas antes de asignarlas.'}
             </span>
           </div>
-          {canManage && <Button size="sm" variant="secondary"
+          {canManage && members.length > 0 && <Button size="sm" variant="secondary"
             onClick={() => setAssigningTasks({ moduleId: module.id, teamId: id })}>
             Asignar tareas
           </Button>}
