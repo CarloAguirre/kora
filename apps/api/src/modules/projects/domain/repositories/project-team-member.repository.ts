@@ -13,7 +13,7 @@ export interface ProjectTeamMemberRecord {
   readonly activity: string | null;
   readonly assignedHours: number;
   readonly consumedHours: number;
-  readonly blockedAt: Date | null;
+  readonly blockedAt?: Date | null;
 }
 
 export interface AssignProjectTeamMemberRecord {
