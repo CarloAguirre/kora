@@ -376,9 +376,8 @@ export interface OperationalRoadmapRow {
   role: keyof typeof PHASE_ROADMAP_ROLE_LABELS;
   label: string;
   hours: number;
-  /** Proyección SOLO de lectura desde project.startDate y las semanas de la cotización. */
-  proposedStartDate?: string;
-  proposedEndDate?: string;
+  /** Explica por qué aún no existe un bloque operativo. */
+  missingBlockMessage?: string;
 }
 
 export interface PhaseRoadmapProps {
@@ -400,7 +399,7 @@ export interface PhaseRoadmapProps {
   operationalTaskCount?: number;
   operationalBlockCount?: number;
   onPlanOperationalRow?: (phase: PhaseRoadmapPhase, row: OperationalRoadmapRow) => void;
-  /** Referencias de cotización: pueden tener fechas PROYECTADAS, nunca segmentos reales ficticios. */
+  /** Referencias pendientes: solo los segmentos persistidos dibujan barras del Gantt. */
   operationalRows?: (phase: PhaseRoadmapPhase) => readonly OperationalRoadmapRow[];
   /** HH y avance comprobables de cada bloque operativo; no se inventan porcentajes. */
   operationalMetrics?: (phase: PhaseRoadmapPhase, task: PhaseRoadmapTask) => { hours: number | null; progress: number | null };
@@ -804,8 +803,7 @@ function OperationalPhaseCard({
   const [zoom, setZoom] = useState(0);
   const choose = (selection: PhaseRoadmapSelection) =>
     setSelected((current) => sameSelection(current, selection) ? null : selection);
-  const hasDatedRows = phase.tasks.length > 0 ||
-    placeholderRows.some((row) => Boolean(row.proposedStartDate && row.proposedEndDate));
+  const hasDatedRows = phase.tasks.length > 0;
   const hasOtherDatedItems = phase.deliveries.length > 0 || phase.taskItems.length > 0;
   const relatedEntries = selected?.kind === 'incident'
     ? phase.relatedBitacora.filter((entry) => entry.kind === 'attention')
@@ -934,34 +932,19 @@ function OperationalPhaseCard({
                     {PHASE_ROADMAP_ROLE_LABELS[row.role]}
                   </span>
                   <span className={styles.operationalLabelText}>
-                    {row.label}<small>{row.hours} HH de referencia ·
-                      {row.proposedStartDate && row.proposedEndDate
-                        ? ' fechas propuestas' : ' sin fechas'}</small>
+                    {row.label}<small>{row.hours} HH de referencia · sin bloque operativo</small>
                   </span>
                 </button>
                 <div className={styles.operationalNoDates}>
-                  {row.proposedStartDate && row.proposedEndDate ? <>
-                    <div className={styles.operationalReferenceTrack}>
-                      {(() => {
-                        const geometry = barGeometry({
-                          role: row.role, scope: 'desarrollo', label: row.label,
-                          startDate: row.proposedStartDate!, endDate: row.proposedEndDate!,
-                        }, axis.range);
-                        return geometry && <button type="button"
-                          className={styles.operationalProposedBar}
-                          aria-label={'Ver propuesta de bloque ' + row.label}
-                          title={'Fechas propuestas: ' + row.proposedStartDate + ' → ' + row.proposedEndDate}
-                          style={{ left: geometry.leftPercent + '%',
-                            width: geometry.widthPercent + '%' }}
-                          onClick={() => choose(selection)} />;
-                      })()}
-                      <button type="button" className={styles.operationalOpenReference}
-                        aria-label={'Fechas propuestas de ' + row.label}
-                        onClick={() => choose(selection)}>
-                        Propuesta: {row.proposedStartDate.slice(8, 10)}-{row.proposedStartDate.slice(5, 7)}-{row.proposedStartDate.slice(0, 4)}
-                        {' → '}{row.proposedEndDate.slice(8, 10)}-{row.proposedEndDate.slice(5, 7)}-{row.proposedEndDate.slice(0, 4)}
-                      </button>
-                    </div>
+                  <button type="button" className={styles.operationalOpenReference}
+                    onClick={() => choose(selection)}>
+                    {row.missingBlockMessage ??
+                      'Se generará al iniciar el proyecto desde la cotización aprobada.'}
+                  </button>
+                  {onPlanRow && <button type="button" onClick={() => onPlanRow(phase, row)}>
+                    Planificar bloque
+                  </button>}
+                </div>
                   </> : <button type="button" className={styles.operationalOpenReference}
                     onClick={() => choose(selection)}>
                     Sin fechas: define el inicio del proyecto para ver la propuesta
