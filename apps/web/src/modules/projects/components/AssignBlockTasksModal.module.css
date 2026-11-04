@@ -1,0 +1,17 @@
+.body { display: grid; gap: 16px; }
+.bulk { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; }
+.bulk select, .table select {
+  background: white; color: #1e293b; border: 1px solid #c8d4e4;
+  border-radius: 8px; padding: 8px; font: inherit; max-width: 100%;
+}
+.scroll { overflow-x: auto; max-height: 370px; }
+.table { min-width: 720px; width: 100%; border-collapse: collapse; font-size: 12px; }
+.table th { text-align: left; color: #607087; font-weight: 600; background: #f6f8fb; padding: 10px 8px; }
+.table td { padding: 8px; border-top: 1px solid #e8edf4; vertical-align: middle; }
+.table td:first-child { min-width: 170px; }
+.table td strong { display: block; color: #1e293b; }
+.table td small { display: block; color: #198754; margin-top: 4px; }
+.table input { min-width: 120px; max-width: 158px; }
+.footer { display: flex; width: 100%; gap: 12px; align-items: center; justify-content: space-between; font-size: 12px; color: #627086; }
+.actions { display: flex; gap: 8px; }
+.warning { color: #9a3412; background: #fff5d6; padding: 9px; border-radius: 8px; font-size: 12px; }
