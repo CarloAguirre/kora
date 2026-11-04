@@ -579,4 +579,15 @@
 .drawerTaskRow small { color: #667085; }
 
 /* Tres acciones (editar, duplicar, eliminar) en la tabla operativa. */
-.operationalTaskTable th:last-child { width: 112px; }
+/* La tabla v5.02 mantiene solamente editar y eliminar en la última columna.
+   Duplicar sigue disponible dentro del modal de edición. */
+.operationalTaskTable th:last-child { width: 90px; min-width: 90px; }
+.operationalTaskTable td:last-child { padding-right: 6px; }
+.operationalTaskActions .taskIconAction + .taskIconAction { margin-left: 6px; }
+.addTaskButton {
+  margin: 7px 0 4px; padding: 4px 0;
+  border: 0; background: transparent; color: #132b4b;
+  font: inherit; font-size: 12px; font-weight: 600; text-decoration: underline;
+  cursor: pointer;
+}
+.addTaskButton:focus-visible { outline: 2px solid #385a89; outline-offset: 2px; }

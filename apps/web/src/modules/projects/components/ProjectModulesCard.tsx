@@ -35,6 +35,7 @@ import { QuotationReferenceTaskModal } from './QuotationReferenceTaskModal';
 import { ExecutionTaskModal } from './ExecutionTaskModal';
 import { DuplicateTaskModal } from './DuplicateTaskModal';
 import { NewWorkBlockModal } from './NewWorkBlockModal';
+import { NewOperationalTaskModal } from './NewOperationalTaskModal';
 import { ReferenceBlockDrawer } from './ReferenceBlockDrawer';
 import { useAppliedQuotationPlanning } from '@/modules/estimation/api/quotation.queries';
 import {
@@ -133,6 +134,7 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
   } | null>(null);
   const [planningMode, setPlanningMode] = useState(false);
   const [addingPhase, setAddingPhase] = useState(false);
+  const [addingTaskModuleId, setAddingTaskModuleId] = useState<string | null>(null);
   const [editingTask, setEditingTask] = useState<{ moduleId: string; task: ProjectModuleTask } | null>(null);
   const [duplicatingTask, setDuplicatingTask] = useState<{ moduleId: string; task: ProjectModuleTask } | null>(null);
   const [newPhase, setNewPhase] = useState({
@@ -212,7 +214,7 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
       description: 'Se eliminará «' + task.name + '», ' +
         (task.assigneeName ? 'asignada a ' + task.assigneeName + '.' : 'sin asignar.') +
         ' Las referencias de cotización, si existen, se conservan.',
-      confirmLabel: 'Eliminar tarea', cancelLabel: 'Volver',
+      confirmLabel: 'Eliminar tarea', cancelLabel: 'Volver', confirmVariant: 'secondary',
     })) return;
     try {
       await deleteTask.mutateAsync({ projectId: project.id, moduleId: module.id, taskId: task.id });
@@ -558,6 +560,8 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
             </tbody>
           </table>
         </div> : <p className={styles.noOperationalTasks}>Sin tareas registradas en esta fase.</p>}
+        {canManage && <button type="button" className={styles.addTaskButton}
+          onClick={() => setAddingTaskModuleId(module.id)}>+ Agregar tarea</button>}
       </details>
     </div>;
   };
@@ -693,6 +697,9 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
         />
       )}
       {confirmationDialog}
+      {addingTaskModuleId && <NewOperationalTaskModal
+        key={addingTaskModuleId} project={project} moduleId={addingTaskModuleId}
+        onClose={() => setAddingTaskModuleId(null)} />}
       {editingTask && <ExecutionTaskModal
         key={editingTask.task.id} project={project} moduleId={editingTask.moduleId}
         task={editingTask.task} onClose={() => setEditingTask(null)}
