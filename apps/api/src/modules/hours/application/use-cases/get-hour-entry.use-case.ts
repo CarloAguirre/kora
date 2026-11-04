@@ -62,6 +62,11 @@ export class GetHourEntryUseCase implements UseCase<GetHourEntryCommand, HourEnt
       snapshot.projectId ? this.projects.findApprovers(snapshot.projectId, snapshot.userId) : Promise.resolve([]),
     ]);
 
-    return ok(toHourEntryDetail({ entry, owner, project, module, designatedApprover, decisionBy, team, projectApprovers }));
+    const segment = snapshot.segmentId && snapshot.moduleId
+      ? (await this.projects.findSegmentsForModule(snapshot.moduleId))
+          .find((candidate) => candidate.id === snapshot.segmentId) ?? null
+      : null;
+
+    return ok(toHourEntryDetail({ entry, owner, project, module, segment, designatedApprover, decisionBy, team, projectApprovers }));
   }
 }
