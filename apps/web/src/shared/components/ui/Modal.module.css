@@ -81,6 +81,12 @@
   min-width: 0;
 }
 
+.eyebrow {
+  font-size: 10.5px;
+  line-height: 1.35;
+  color: var(--kora-text-muted);
+  font-weight: var(--kora-weight-regular);
+}
 .title {
   font-size: var(--kora-text-xl);
   font-weight: var(--kora-weight-bold);
