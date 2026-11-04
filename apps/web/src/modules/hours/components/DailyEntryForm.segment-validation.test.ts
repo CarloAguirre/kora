@@ -10,7 +10,7 @@ const base: DailyBlock = {
 };
 
 const context = {
-  projects: [{ id: 'project-1', allowsOvertime: true } as ProjectSummary],
+  projects: [{ id: 'project-1', allowsOvertime: true } as unknown as ProjectSummary],
   isCollaborator: true,
 };
 
