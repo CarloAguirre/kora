@@ -555,7 +555,10 @@
 }
 .unlinkedBlock { font-size: 11.5px; color: #7b8794; }
 
-.phaseCreationForm { display: grid; gap: 14px; }
+/* Nueva fase: modal corto de un solo campo, igual al flujo prototipado. */
+.phaseCreationModal { max-width: min(400px, calc(100vw - 32px)); }
+.phaseCreationModal .phaseCreationForm { gap: 8px; }
+.phaseCreationForm { display: grid; gap: 8px; }
 .phaseCreationDates { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 @media (max-width: 580px) { .phaseCreationDates { grid-template-columns: 1fr; } }
 
