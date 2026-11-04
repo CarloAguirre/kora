@@ -179,6 +179,7 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
       startDate: segment.startDate.toISOString().slice(0, 10),
       endDate: segment.endDate.toISOString().slice(0, 10),
       estimatedHours: segment.estimatedHours,
+      consumedHours: segment.consumedHours ?? 0,
       members: segment.members.map((member) => ({
         teamMemberId: member.teamMemberId,
         fullName: member.fullName,
