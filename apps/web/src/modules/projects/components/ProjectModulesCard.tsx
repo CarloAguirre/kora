@@ -310,31 +310,51 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
     }
   };
 
+  /** Periodo real de los bloques cuando existen; estimaciones del módulo como respaldo.
+   * HH del módulo si están registradas, o suma de bloques SOLO si todos tienen HH. */
+  const phaseHeaderMeta = (module: ProjectModule) => {
+    const starts = module.segments.map((segment) => segment.startDate).sort();
+    const ends = module.segments.map((segment) => segment.endDate).sort();
+    const start = starts[0] ?? module.estimatedStartDate;
+    const end = ends[ends.length - 1] ?? module.estimatedEndDate;
+    const segmentHoursKnown = module.segments.length > 0 &&
+      module.segments.every((segment) => segment.estimatedHours != null);
+    const hours = module.estimatedHours ??
+      (segmentHoursKnown ? module.segments.reduce((sum, segment) =>
+        sum + (segment.estimatedHours ?? 0), 0) : null);
+    return (start && end ? formatDate(start) + ' → ' + formatDate(end) : 'Sin fechas') +
+      ', ' + (hours == null ? '—' : new Intl.NumberFormat('es-CL', {
+        maximumFractionDigits: 2,
+      }).format(hours)) + ' HH';
+  };
+
   const renderPhaseHeaderName = (phase: { id: string }) => {
     const module = modulesById.get(phase.id);
     if (!module) return null;
-    if (!canManage || !planningMode) return <strong className={styles.headerPhaseName}>{module.name}</strong>;
-    return (
-      <input
-        aria-label={'Nombre de la fase ' + module.name}
-        className={styles.headerPhaseInput}
-        value={phaseNameDrafts[module.id] ?? module.name}
-        maxLength={300}
-        disabled={updateModule.isPending}
-        onChange={(event) => setPhaseNameDrafts((current) => ({
-          ...current, [module.id]: event.target.value,
-        }))}
-        onBlur={(event) => void onRenamePhase(module, event.currentTarget.value)}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter') event.currentTarget.blur();
-          if (event.key === 'Escape') {
-            event.currentTarget.value = module.name;
-            setPhaseNameDrafts((current) => ({ ...current, [module.id]: module.name }));
-            event.currentTarget.blur();
-          }
-        }}
-      />
-    );
+    return <span className={styles.phaseHeadingIdentity}>
+      {!canManage || !planningMode
+        ? <strong className={styles.headerPhaseName}>{module.name}</strong>
+        : <input
+            aria-label={'Nombre de la fase ' + module.name}
+            className={styles.headerPhaseInput}
+            value={phaseNameDrafts[module.id] ?? module.name}
+            maxLength={300}
+            disabled={updateModule.isPending}
+            onChange={(event) => setPhaseNameDrafts((current) => ({
+              ...current, [module.id]: event.target.value,
+            }))}
+            onBlur={(event) => void onRenamePhase(module, event.currentTarget.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') event.currentTarget.blur();
+              if (event.key === 'Escape') {
+                event.currentTarget.value = module.name;
+                setPhaseNameDrafts((current) => ({ ...current, [module.id]: module.name }));
+                event.currentTarget.blur();
+              }
+            }}
+          />}
+      <span className={styles.phaseHeadingMeta}>{phaseHeaderMeta(module)}</span>
+    </span>;
   };
 
   const renderPhaseHeaderActions = (phase: { id: string }) => {
@@ -350,12 +370,6 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
         item.moduleId === module.id && (item.tasks.length || item.relativeTeamBlocks?.length)));
     return (
       <div className={styles.phaseHeadingActions}>
-        <span className={styles.phaseHeadingMeta}>
-          {module.estimatedStartDate && module.estimatedEndDate
-            ? formatDate(module.estimatedStartDate) + ' → ' + formatDate(module.estimatedEndDate)
-            : 'Sin fechas'},
-          {' '}{module.estimatedHours == null ? '—' : module.estimatedHours} HH
-        </span>
         <span className={styles.phaseHeadingProgress}
           title="Avances automáticos del Roadmap de Kora, no porcentajes editables manualmente.">
           <span className={styles.phaseHeadingBar} aria-hidden="true">
@@ -658,6 +672,7 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
       )}
       <PhaseRoadmap alwaysExpanded operationalView borderlessSummary phaseRoadmap={phaseRoadmap}
         operationalTaskCount={operationalCounts.tasks} operationalBlockCount={operationalCounts.blocks}
+        operationalPresaleHours={project.prospectPhaseHours}
         operationalRows={getOperationalRows}
         operationalMetrics={getOperationalMetrics}
         operationalFooter={canManage ? <button type="button" className={styles.addPhaseButton}
@@ -675,7 +690,7 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
         } : undefined}
         renderPhaseReferences={renderOperationalContent}
         renderSelectionDetail={renderSelectionDetail}
-        renderPhaseHeaderName={canManage && planningMode ? renderPhaseHeaderName : undefined}
+        renderPhaseHeaderName={renderPhaseHeaderName}
         renderPhaseHeaderActions={renderPhaseHeaderActions}
         toolbarActions={canManage ? (
           <div className={styles.roadmapModeSwitch} role="group" aria-label="Modo del Roadmap">
