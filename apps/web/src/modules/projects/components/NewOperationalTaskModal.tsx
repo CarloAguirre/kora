@@ -38,7 +38,7 @@ export function NewOperationalTaskModal({
     value: member.userId, label: member.fullName,
   }));
   const numericHours = Number(hours);
-  const valid = Boolean(name.trim() && teamId && hours.trim() &&
+  const valid = Boolean(name.trim() && teamId && block && hours.trim() &&
     Number.isFinite(numericHours) && numericHours > 0 && startDate && date &&
     startDate <= date && (!block || (startDate >= block.startDate && date <= block.endDate)));
 
@@ -93,8 +93,8 @@ export function NewOperationalTaskModal({
       <Select label="Asignado a" value={assignee} placeholder="Sin asignar"
         options={memberOptions} onChange={(event) => setAssignee(event.target.value)} />
       <p className={styles.help}>Solo puedes asignar colaboradores activos del proyecto.</p>
-      <Select label="Bloque de trabajo" value={blockId}
-        placeholder={blocks.length ? 'Sin bloque específico' : 'Sin bloques planificados'}
+      <Select label="Bloque de trabajo" required value={blockId}
+        placeholder={blocks.length ? 'Selecciona un bloque' : 'Primero planifica un bloque'}
         options={blocks.map((item) => ({
           value: item.id, label: item.name + ' (' + item.startDate + ' – ' + item.endDate + ')',
         }))}
@@ -117,6 +117,9 @@ export function NewOperationalTaskModal({
         <TextField label="Fecha límite" required type="date" value={date} min={startDate || undefined}
           onChange={(event) => setDate(event.target.value)} />
       </div>
+      {blocks.length === 0 && <p role="alert" className={styles.error}>
+        Primero crea un bloque de trabajo para este equipo en la fase seleccionada.
+      </p>}
       {block && !(startDate >= block.startDate && date <= block.endDate) &&
         <p role="alert" className={styles.error}>
           Las fechas deben quedar dentro del bloque seleccionado.
