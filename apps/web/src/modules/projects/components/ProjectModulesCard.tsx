@@ -552,9 +552,9 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
               : group.hours + ' HH estimadas. Las referencias EDT deben convertirse en tareas antes de asignarlas.'}
             </span>
           </div>
-          {canManage && members.length > 0 && firstReference && <Button size="sm" variant="secondary"
-            onClick={() => setCreatingFromReference({ moduleId: module.id, task: firstReference })}>
-            Crear tarea
+          {canManage && <Button size="sm" variant="secondary"
+            onClick={() => setAssigningTasks({ moduleId: module.id, teamId: id })}>
+            Asignar tareas
           </Button>}
         </div>;
       })}
@@ -606,8 +606,11 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
                   <td>{reference.hours} / —</td>
                   <td>—</td>
                   <td className={styles.operationalTaskActions}>{canManage && <Button size="sm" variant="ghost"
-                    onClick={() => setCreatingFromReference({ moduleId: module.id, task: reference })}>
-                    Crear tarea
+                    onClick={() => setAssigningTasks({
+                      moduleId: module.id, teamId: reference.teamId ?? '',
+                      focusKey: 'ref:' + reference.wbs + ':' + reference.role,
+                    })}>
+                    Asignar tarea
                   </Button>}</td>
                 </tr>;
               })}
@@ -661,6 +664,11 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
             setEditingSegment({ moduleId: module.id, segment });
             close();
           } : undefined}
+          onEditMembers={canManage ? () => {
+            setEditingForecastSegment({ moduleId: module.id, segment });
+            close();
+          } : undefined}
+          onChangeClosure={canManage ? (action) => void changeClosure(module.id, segment, action, close) : undefined}
           onDelete={canManage ? () => void onDeleteSegment(module.id, segment, close) : undefined}
           onEditTask={canManage ? (task) => { setEditingTask({ moduleId: module.id, task }); close(); } : undefined}
           onDuplicateTask={canManage ? (task) => {
