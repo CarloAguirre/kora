@@ -272,7 +272,7 @@ describe('DevelopmentProjectDetailView — equipos PM/PMO', () => {
 
   it('muestra las HH reales y la planificación en el resumen de equipos', () => {
     renderView();
-    expect(screen.getByText('HH vendidas')).toBeInTheDocument();
+    expect(screen.getAllByText('HH vendidas').length).toBeGreaterThan(1);
     expect(screen.getByText('Asignadas a equipos')).toBeInTheDocument();
     expect(screen.getByText('Por asignar')).toBeInTheDocument();
     expect(screen.getByText('Planificadas en bloques')).toBeInTheDocument();
