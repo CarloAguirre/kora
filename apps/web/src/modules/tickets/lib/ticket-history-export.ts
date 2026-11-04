@@ -184,8 +184,15 @@ export function buildTicketHistoryWorkbook(
   return workbook;
 }
 
+/** Evita exportar reportes incompletos cuando las páginas contienen IDs repetidos. */
+export function assertTicketHistoryExportComplete(tickets: readonly TicketSummary[], expectedTotal: number): void {
+  if (tickets.length !== expectedTotal || new Set(tickets.map((ticket) => ticket.id)).size !== expectedTotal) {
+    throw new Error('El historial contiene tickets repetidos o faltantes entre páginas. Intenta descargar nuevamente.');
+  }
+}
+
 export function exportTicketHistory(tickets: readonly TicketSummary[], dailyHours: readonly TicketDailyHours[]) {
   const workbook = buildTicketHistoryWorkbook(tickets, dailyHours);
   const today = ticketReportDay(new Date().toISOString());
-  XLSX.writeFile(workbook, `historial-tickets-${today}.xlsx`);
+  XLSX.writeFile(workbook, `historial-tickets-${today}.xlsx`, { compression: true });
 }
