@@ -74,10 +74,21 @@ export class CreateProjectModuleSegmentUseCase
           name: command.data.name,
           startDate: new Date(command.data.startDate),
           endDate: new Date(command.data.endDate),
+          estimatedHours: command.data.estimatedHours ?? null,
         },
         now,
         tx,
       );
+      if (command.data.closingDelivery) {
+        await this.modules.addDelivery({
+          moduleId: command.moduleId,
+          teamId: command.data.teamId,
+          name: command.data.closingDelivery.name,
+          description: command.data.closingDelivery.description ?? null,
+          assigneeUserId: null,
+          estimatedDate: new Date(command.data.endDate),
+        }, now, tx);
+      }
       await this.modules.replaceSegmentMembers(segmentId, members, now, tx);
       await this.forecastSync.syncSegment(project, command.moduleId, segmentId, now, tx);
       return segmentId;
@@ -88,7 +99,8 @@ export class CreateProjectModuleSegmentUseCase
       action: 'update',
       entityType: 'project',
       entityId: project.id,
-      metadata: { event: 'module_segment_created', moduleId: command.moduleId, segmentId: id },
+      metadata: { event: 'module_segment_created', moduleId: command.moduleId,
+        segmentId: id, createdClosingDelivery: Boolean(command.data.closingDelivery) },
     });
 
     return ok({ id });

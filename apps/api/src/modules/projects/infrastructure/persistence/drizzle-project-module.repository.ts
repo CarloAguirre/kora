@@ -79,6 +79,7 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
           name: projectModuleSegments.name,
           startDate: projectModuleSegments.startDate,
           endDate: projectModuleSegments.endDate,
+          estimatedHours: projectModuleSegments.estimatedHours,
         })
         .from(projectModuleSegments)
         .innerJoin(projectModules, eq(projectModules.id, projectModuleSegments.moduleId))
@@ -225,6 +226,7 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
           name: projectModuleSegments.name,
           startDate: projectModuleSegments.startDate,
           endDate: projectModuleSegments.endDate,
+          estimatedHours: projectModuleSegments.estimatedHours,
         })
         .from(projectModuleSegments)
         .innerJoin(teams, eq(teams.id, projectModuleSegments.teamId))
@@ -384,6 +386,7 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
         name: input.name,
         startDate: input.startDate,
         endDate: input.endDate,
+        estimatedHours: input.estimatedHours?.toString() ?? null,
         createdAt: now,
         updatedAt: now,
       })
@@ -409,6 +412,8 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
         ...(input.name !== undefined ? { name: input.name } : {}),
         ...(input.startDate !== undefined ? { startDate: input.startDate } : {}),
         ...(input.endDate !== undefined ? { endDate: input.endDate } : {}),
+        ...(input.estimatedHours !== undefined
+          ? { estimatedHours: input.estimatedHours?.toString() ?? null } : {}),
         updatedAt: now,
       })
       .where(eq(projectModuleSegments.id, id));
@@ -589,6 +594,7 @@ interface SegmentRow {
   name: string;
   startDate: Date;
   endDate: Date;
+  estimatedHours: string | null;
 }
 
 interface RawTaskRow {
@@ -703,6 +709,7 @@ function toRecord(
       name: s.name,
       startDate: s.startDate,
       endDate: s.endDate,
+      estimatedHours: s.estimatedHours !== null ? Number(s.estimatedHours) : null,
       members: membersBySegment.get(s.id) ?? [],
     })),
     tasks: taskRows.filter((t) => t.moduleId === row.id),

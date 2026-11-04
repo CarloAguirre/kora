@@ -81,6 +81,7 @@ export class UpdateProjectModuleSegmentUseCase
           ...(command.data.name !== undefined ? { name: command.data.name } : {}),
           ...(command.data.startDate !== undefined ? { startDate: new Date(command.data.startDate) } : {}),
           ...(command.data.endDate !== undefined ? { endDate: new Date(command.data.endDate) } : {}),
+          ...(command.data.estimatedHours !== undefined ? { estimatedHours: command.data.estimatedHours } : {}),
         },
         now,
         tx,
