@@ -12,6 +12,8 @@ const mocks = vi.hoisted(() => ({
   createTask: vi.fn(),
   removeTask: vi.fn(),
   createSegment: vi.fn(),
+  excludeReference: vi.fn(),
+  excluded: [] as Array<{ moduleId: string; versionId: string; wbs: string; role: string }>,
   confirm: vi.fn(),
   success: vi.fn(),
   error: vi.fn(),
@@ -79,6 +81,8 @@ vi.mock('../api/projects.queries', () => ({
   useUpdateProjectModuleTask: () => ({ mutateAsync: mocks.updateTask, isPending: false }),
   useCreateProjectModuleTask: () => ({ mutateAsync: mocks.createTask, isPending: false }),
   useDeleteProjectModuleTask: () => ({ mutateAsync: mocks.removeTask, isPending: false }),
+  useRoadmapReferenceExclusions: () => ({ data: mocks.excluded }),
+  useExcludeRoadmapReference: () => ({ mutateAsync: mocks.excludeReference, isPending: false }),
 }));
 vi.mock('@/modules/estimation/api/quotation.queries', () => ({
   useAppliedQuotationPlanning: () => ({ data: mocks.appliedPlan }),
@@ -114,6 +118,10 @@ const show = (p: ProjectDetail = project) => render(
     teamOptions={[{ value: 'team-1', label: 'Desarrollo' }]} canManage />,
 );
 
+const inputHasInlinePlanningClass = () =>
+  Boolean(screen.getByRole('textbox', { name: 'Nombre de la fase Diseño Backend' })
+    .parentElement?.className.includes('phaseHeadingIdentityPlanning'));
+
 beforeEach(() => {
   mocks.update.mockReset().mockResolvedValue(undefined);
   mocks.create.mockReset().mockResolvedValue(undefined);
@@ -122,6 +130,8 @@ beforeEach(() => {
   mocks.removeTask.mockReset().mockResolvedValue(undefined);
   mocks.remove.mockReset().mockResolvedValue(undefined);
   mocks.createSegment.mockReset().mockResolvedValue(undefined);
+  mocks.excludeReference.mockReset().mockResolvedValue(undefined);
+  mocks.excluded = [];
   mocks.confirm.mockReset().mockResolvedValue(true);
   mocks.success.mockReset();
   mocks.error.mockReset();
@@ -148,6 +158,7 @@ describe('Cabecera de las fases · HTML v5', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Planificar' }));
     expect(screen.getByRole('textbox', { name: 'Nombre de la fase Diseño Backend' }))
       .toHaveValue('Diseño Backend');
+    expect(inputHasInlinePlanningClass()).toBe(true);
     expect(screen.getByRole('button', { name: '+ Bloque de trabajo' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Eliminar fase Diseño Backend' })).toBeEnabled();
   });
@@ -308,12 +319,55 @@ describe('Traspaso de cotización · vista operativa v5.02', () => {
     expect(screen.getByText('Conexión con taller')).toBeInTheDocument();
     expect(screen.getByTitle('Referencia de cotización pendiente de crear como tarea operativa')).toBeInTheDocument();
     expect(screen.getByText('Tareas')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Asignar tarea' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Asignar tarea' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Editar tarea Conexión con taller' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Eliminar tarea Conexión con taller' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Asignar tareas' })).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Editar tarea Conexión con taller' }));
+    expect(screen.getByRole('dialog', { name: 'Editar tarea' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
     fireEvent.click(screen.getByRole('button', { name: 'Asignar tareas' }));
     expect(screen.getByRole('dialog', { name: 'Asignar tareas · Diseño Backend' })).toBeInTheDocument();
     expect(screen.getAllByText('Conexión con taller').length).toBeGreaterThan(0);
     expect(mocks.createSegment).not.toHaveBeenCalled();
+  });
+});
+
+describe('Acciones reales para referencias EDT antes de convertirlas', () => {
+  const seed = () => {
+    mocks.appliedPlan.modules = [{
+      moduleId: 'module-1', tasks: [{
+        wbs: 'WBS-01', role: 'Desarrollador', name: 'Conexión con taller',
+        hours: 35, teamId: 'team-1',
+      }], relativeTeamBlocks: [], totalHours: 35,
+    }];
+  };
+
+  it('elimina solo la fila operativa, no llama al borrado de tarea ni toca la cotización', async () => {
+    seed();
+    show();
+    fireEvent.click(screen.getByRole('button', { name: 'Eliminar tarea Conexión con taller' }));
+    await waitFor(() => expect(mocks.confirm).toHaveBeenCalledWith(expect.objectContaining({
+      title: 'Eliminar tarea', confirmLabel: 'Eliminar tarea', cancelLabel: 'Volver',
+    })));
+    await waitFor(() => expect(mocks.excludeReference).toHaveBeenCalledWith({
+      projectId: 'project-1', moduleId: 'module-1',
+      input: { versionId: 'version-1', wbs: 'WBS-01', role: 'Desarrollador' },
+    }));
+    expect(mocks.removeTask).not.toHaveBeenCalled();
+    expect(mocks.appliedPlan.modules[0]!.tasks).toHaveLength(1);
+  });
+
+  it('no vuelve a mostrar una referencia descartada registrada por el backend', () => {
+    seed();
+    mocks.excluded = [{
+      moduleId: 'module-1', versionId: 'version-1',
+      wbs: 'WBS-01', role: 'Desarrollador',
+    }];
+    show();
+    expect(screen.queryByText('Conexión con taller')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Editar tarea Conexión con taller' }))
+      .not.toBeInTheDocument();
   });
 });
 
