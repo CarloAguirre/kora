@@ -110,6 +110,8 @@ describe('Roadmap operativo · diseño aprobado v5.02', () => {
       }],
     };
     render(<PhaseRoadmap phaseRoadmap={withSegment} operationalView
+      operationalMetrics={() => ({ hours: 80, progress: 100 })}
+      operationalFooter={<button type="button">+ Agregar fase</button>}
       renderSelectionDetail={(_phase, selection, clear) => (
         <div>Bloque seleccionado: {'label' in selection ? selection.label : 'Incidente'}
           <button type="button" onClick={clear}>Cerrar detalle</button>
@@ -117,6 +119,9 @@ describe('Roadmap operativo · diseño aprobado v5.02', () => {
       )} />);
     const bar = screen.getByRole('button', { name: 'Abrir bloque Desarrollo backend' });
     expect(bar).toBeInTheDocument();
+    expect(screen.getByText('80 HH · 100% de avance')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '+ Agregar fase' })).toBeInTheDocument();
+    expect(bar).not.toHaveStyle({ opacity: '0.45' });
     fireEvent.click(bar);
     expect(screen.getByText('Bloque seleccionado: Desarrollo backend')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Cerrar detalle' }));
@@ -127,7 +132,7 @@ describe('Roadmap operativo · diseño aprobado v5.02', () => {
 
 
 describe('Controles históricos preservados en vista operativa', () => {
-  it('permite abrir detalles de tareas y entregas fechadas, y conserva las opciones de etapa', () => {
+  it('permite abrir tareas y entregas fechadas sin mostrar el acordeón de etapa descartado', () => {
     const roadmap: ProjectPhaseRoadmap = {
       ...phaseRoadmap,
       phases: [{
@@ -142,10 +147,8 @@ describe('Controles históricos preservados en vista operativa', () => {
       renderSelectionDetail={(_phase, selection) =>
         <div>Detalle: {'label' in selection ? selection.label : 'Incidente'}</div>
       } />);
-    const stageOptions = screen.getByText('Etapa y datos de la fase').closest('details');
-    expect(stageOptions).not.toHaveAttribute('open');
-    fireEvent.click(screen.getByText('Etapa y datos de la fase'));
-    expect(screen.getByText('Etapa de Kora')).toBeInTheDocument();
+    expect(screen.queryByText('Etapa y datos de la fase')).not.toBeInTheDocument();
+    expect(screen.queryByText('Etapa de Kora')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByText(/Entregas y tareas en el cronograma/));
     fireEvent.click(screen.getByRole('button', { name: 'Abrir entrega Entrega QA' }));
