@@ -34,7 +34,7 @@ function fixture(status = 'planned', tasks: unknown[] = []) {
   const useCase = new UpdateProjectModuleSegmentUseCase(
     projects, modules, forecast, audit, new FixedClock(), new PassthroughUnitOfWork(), progress,
   );
-  return { useCase, modules };
+  return { useCase, modules, progress };
 }
 const command = {
   projectId: 'project-1', moduleId: 'module-1', segmentId: 'segment-1',
@@ -44,7 +44,7 @@ const command = {
 
 describe('Edición y cierre de bloque operativo', () => {
   it('actualiza entrega vinculada y fechas dentro de la misma transacción', async () => {
-    const { useCase, modules } = fixture();
+    const { useCase, modules, progress } = fixture();
     const result = await useCase.execute({ ...command, data: {
       endDate: '2026-11-05', estimatedHours: 80,
       closingDelivery: { name: 'QA revisado', description: 'Evidencias UAT' },
@@ -59,6 +59,7 @@ describe('Edición y cierre de bloque operativo', () => {
       }), expect.any(Date), expect.anything());
     expect(vi.mocked(modules.updateSegment).mock.calls[0]![3])
       .toBe(vi.mocked(modules.updateDelivery).mock.calls[0]![3]);
+    expect(progress.recalculate).toHaveBeenCalledWith('project-1', vi.mocked(modules.updateSegment).mock.calls[0]![3]);
   });
 
   it('rechaza eliminar una entrega ya aprobada', async () => {
