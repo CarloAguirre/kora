@@ -178,3 +178,41 @@ describe('Controles históricos preservados en vista operativa', () => {
     expect(screen.getByText('Desarrollo Backend')).toBeInTheDocument();
   });
 });
+
+describe('Cabecera del Roadmap operativo · fidelidad HTML v5.02', () => {
+  it('muestra los tres contadores, explicación, leyenda exacta y HH reales de preventa', () => {
+    const { container } = render(<PhaseRoadmap phaseRoadmap={{ ...phaseRoadmap, phaseCount: 2 }}
+      operationalView operationalBlockCount={6} operationalTaskCount={19}
+      operationalPresaleHours={18} toolbarActions={<button type="button">Planificar</button>} />);
+    const counters = container.querySelector('[class*="summaryChips"]');
+    expect(counters).toHaveTextContent('2 fases');
+    expect(counters).toHaveTextContent('6 bloques de trabajo');
+    expect(counters).toHaveTextContent('19 tareas');
+    expect(screen.getByRole('button', { name: 'Planificar' })).toBeInTheDocument();
+    expect(screen.getByText('Bloque de trabajo:').parentElement).toHaveTextContent(
+      'Cada bloque cierra con una sola entrega; si se necesita otra entrega, se crea otro bloque.',
+    );
+    expect(screen.getByText('Avance del bloque')).toBeInTheDocument();
+    expect(screen.getByText('Entrega planificada')).toBeInTheDocument();
+    expect(screen.getByText('Entregada')).toBeInTheDocument();
+    expect(screen.getByText('Entrega vencida')).toBeInTheDocument();
+    expect(screen.getByText('Hoy')).toBeInTheDocument();
+    expect(screen.getByText(/Preventa: 18 HH de prospecto y cotización/)).toHaveTextContent(
+      'Cuentan como HH consumidas, pero no forman parte del plan.',
+    );
+    expect(screen.queryByText('Entrega comprometida')).not.toBeInTheDocument();
+    expect(screen.queryByText('Entrega realizada')).not.toBeInTheDocument();
+  });
+
+  it('no muestra guía ni preventa en el portal cliente y conserva su leyenda original', () => {
+    render(<PhaseRoadmap phaseRoadmap={phaseRoadmap} operationalPresaleHours={18} />);
+    expect(screen.queryByText('Bloque de trabajo:')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Preventa:/)).not.toBeInTheDocument();
+    expect(screen.getByText('Entrega comprometida')).toBeInTheDocument();
+  });
+
+  it('no inventa mensaje de preventa cuando el backend no informa HH anteriores al inicio', () => {
+    render(<PhaseRoadmap phaseRoadmap={phaseRoadmap} operationalView operationalPresaleHours={0} />);
+    expect(screen.queryByText(/Preventa:/)).not.toBeInTheDocument();
+  });
+});
