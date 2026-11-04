@@ -136,7 +136,7 @@ export function TeamTasksCard({ project, projectId, teamId, managerView = false 
 
   const matchesFilter = (task: (typeof teamTasks)[number], filter: TaskFilter) =>
     filter === 'all' || (!task.cancelledAt && (filter === 'unassigned' ? !task.assigneeUserId :
-      task.status === filter && (!managerView || Boolean(task.assigneeUserId))));
+      task.status === filter && (filter !== 'todo' || Boolean(task.assigneeUserId))));
   const filteredTasks = teamTasks.filter((task) => matchesFilter(task, taskFilter));
   const taskTabCount = (filter: TaskFilter) => teamTasks.filter((task) => matchesFilter(task, filter)).length;
   const { pageItems, pagination } = usePaginatedItems(filteredTasks);
