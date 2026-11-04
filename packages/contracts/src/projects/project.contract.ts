@@ -90,7 +90,7 @@ export const projectTeamMemberSchema = z.object({
   activity: z.string().nullable(),
   assignedHours: z.number(),
   consumedHours: z.number(),
-  blockedAt: isoDateTimeSchema.nullable(),
+  blockedAt: isoDateTimeSchema.nullable().optional(),
 });
 export type ProjectTeamMember = z.infer<typeof projectTeamMemberSchema>;
 
@@ -311,7 +311,7 @@ export const projectModuleTaskSchema = z.object({
   status: projectModuleTaskStatusSchema,
   scope: projectModuleTaskScopeSchema,
   completedAt: isoDateTimeSchema.nullable(),
-  cancelledAt: isoDateTimeSchema.nullable(),
+  cancelledAt: isoDateTimeSchema.nullable().optional(),
   /** Motivo del último rechazo del líder — se limpia al aprobar o al volver a marcarla en revisión. */
   rejectionReason: z.string().nullable(),
 });
