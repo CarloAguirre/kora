@@ -29,6 +29,9 @@ import { PROJECT_HOUR_ENTRY_READER, type ProjectHourEntryReader } from '../ports
 import { PROJECT_ACTIVITY_READER, type ProjectActivityReader } from '../ports/project-activity-reader.port';
 import type { UseCase } from '../../../../shared/application/use-case';
 import { toProjectDetail } from '../mappers/project.mapper';
+import {
+  APPROVED_PROJECT_CALENDAR, type ApprovedProjectCalendar,
+} from '../ports/approved-project-calendar.port';
 
 export interface GetProjectCommand {
   readonly projectId: string;
@@ -58,6 +61,7 @@ export class GetProjectUseCase implements UseCase<GetProjectCommand, ProjectDeta
     @Inject(PROJECT_ACTIVITY_READER) private readonly activity: ProjectActivityReader,
     @Inject(CLOCK) private readonly clock: Clock,
     private readonly paymentTriggers: PaymentMilestoneTriggerService,
+    @Inject(APPROVED_PROJECT_CALENDAR) private readonly approvedCalendar: ApprovedProjectCalendar,
   ) {}
 
   async execute(command: GetProjectCommand): Promise<Result<ProjectDetail, ApplicationError>> {
@@ -134,6 +138,15 @@ export class GetProjectUseCase implements UseCase<GetProjectCommand, ProjectDeta
       if (!isParticipant) return err(new ForbiddenError('No tienes acceso a este proyecto.', 'PROJECT_NOT_ASSIGNED'));
     }
 
+    // El traspaso ya fue aprobado. En la primera lectura autorizada de un
+    // proyecto iniciado se materializan las semanas comerciales como bloques
+    // operativos reales. Esta operación es transaccional, idempotente y
+    // preserva toda edición previa; NO exige una segunda aprobación.
+    const generated = await this.approvedCalendar.ensure(project.id);
+    const currentModules = generated
+      ? await this.modules.listForProject(project.id)
+      : projectModules;
+
     /**
      * Quién puede autorizar que ESTE proyecto admita horas extra: mismo
      * criterio EXCLUYENTE que el resto del sistema (líder de proyecto o líder
@@ -152,7 +165,7 @@ export class GetProjectUseCase implements UseCase<GetProjectCommand, ProjectDeta
      * con que `UpdateProjectModuleDeliveryUseCase` deja al líder de equipo gestionar sus entregas.
      */
     const deliveryTeamIds = [
-      ...new Set(projectModules.flatMap((module) => module.deliveries.flatMap((delivery) => (delivery.teamId ? [delivery.teamId] : [])))),
+      ...new Set(currentModules.flatMap((module) => module.deliveries.flatMap((delivery) => (delivery.teamId ? [delivery.teamId] : [])))),
     ];
     const ledTeamIds = new Set(
       canManagePendings
@@ -177,7 +190,7 @@ export class GetProjectUseCase implements UseCase<GetProjectCommand, ProjectDeta
         members,
         teams: projectTeams,
         observations: projectObservations,
-        modules: projectModules,
+        modules: currentModules,
         paymentMilestones: projectPaymentMilestones,
         usedHoursUpdatedAt,
         leaderLastActivityAt,
