@@ -35,6 +35,9 @@ export function paymentMilestoneReadyReason(
   today: string,
 ): string | null {
   if (milestone.status !== 'pending' || milestone.amount <= 0 || project.isDeleted) return null;
+  // La cotización puede tener un plan estimado, pero ningún hito (ni por fecha)
+  // debe enviarse a Facturación antes de la aprobación comercial.
+  if (project.salesStage !== 'approved') return null;
 
   switch (milestone.triggerType) {
     case 'approval':

@@ -204,14 +204,13 @@ const TIPO_TO_SALES_STAGE: Record<ProjectTipo, ProjectSalesStage | null> = {
 };
 
 /**
- * Mismo criterio que `STATUS_OPTIONS_APPROVED`/`STATUS_OPTIONS_NOT_APPROVED` de `NewProjectPage`:
- * Prospecto y Cotización siempre son "No iniciado" (el Estado queda bloqueado); Aprobado arranca
- * "No iniciado" y pasa a Activo por Hito 0 (factura del primer tramo, o manual con motivo).
- * Finalizar no es un Estado: se elige "Proyecto finalizado" en Tipo de proyecto.
+ * En edición, Prospecto y Cotización admiten "No iniciado" y "Detenido" sin aprobarse.
+ * La creación conserva "No iniciado" como estado inicial. Solo Aprobado puede activarse
+ * por Hito 0; Finalizado sigue siendo una opción del selector de Tipo.
  */
 const ESTADO_OPTIONS_BY_TIPO: Record<ProjectTipo, ProjectStatus[]> = {
-  prospecto: ['draft'],
-  cotizacion: ['draft'],
+  prospecto: ['draft', 'on_hold'],
+  cotizacion: ['draft', 'on_hold'],
   aprobado: ['draft', 'active', 'on_hold'],
   finalizado: ['finished'],
 };
@@ -224,8 +223,8 @@ const ESTADO_DEFAULT_BY_TIPO: Record<ProjectTipo, ProjectStatus> = {
   finalizado: 'finished',
 };
 
-function estadoLabel(tipo: ProjectTipo, status: ProjectStatus, currentStatus: ProjectStatus): string {
-  if (status === 'active' && tipo === 'aprobado' && currentStatus === 'draft') return 'Activo (activación manual)';
+function estadoLabel(tipo: ProjectTipo, status: ProjectStatus, currentStatus: ProjectStatus, hasHito0: boolean): string {
+  if (status === 'active' && tipo === 'aprobado' && currentStatus !== 'active' && !hasHito0) return 'Activo (activación manual)';
   return PROJECT_STATUS_LABELS[status];
 }
 
@@ -650,8 +649,8 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
 
   const estadoOptions = ESTADO_OPTIONS_BY_TIPO[tipo];
   const totalTeamHours = teamsValue.reduce((sum, team) => sum + (Number(team.assignedHours) || 0), 0);
-  /** Hito 0 manual: activar a mano (sin factura) un proyecto Aprobado que seguía "No iniciado" — exige motivo (ver `ChangeProjectStatusUseCase`). */
-  const isManualHito0 = isDevelopment && tipo === 'aprobado' && project.status === 'draft' && estado === 'active';
+  /** Activar por primera vez un Aprobado requiere Hito 0 manual también si estaba Detenido. */
+  const isManualHito0 = isDevelopment && tipo === 'aprobado' && project.hito0At == null && project.status !== 'active' && estado === 'active';
   /** En Prospecto la estimación aún no se completa: fechas y horas se ingresan al pasar a Cotización (prototipo: `renderEstimacion()`). */
   const estimationDisabled = isDevelopment && tipo === 'prospecto';
   /** Hito 0 permite corregir HH vendidas; el motivo es obligatorio si su valor realmente cambia. */
@@ -663,10 +662,10 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
     soldHoursChangedAfterHito0 && !watch('soldHoursChangeReason')?.trim();
   /** Finalizado: Estado, etapa de avance y etapa de cada fase quedan fijos (se reabre volviendo a "Proyecto aprobado"). */
   const isFinalized = isDevelopment && tipo === 'finalizado';
-  /** Prospecto y Cotización solo pueden estar "No iniciado": el Estado no se elige. */
-  const estadoLocked = isFinalized || tipo === 'prospecto' || tipo === 'cotizacion';
-  /** La etapa de avance solo corresponde a proyectos Activos — Prospecto, Cotización y Aprobado No iniciado o Detenido la tienen bloqueada (igual que al crear). */
-  const phaseEnabled = estado === 'active';
+  /** Solo Finalizado tiene el Estado bloqueado. Prospecto/Cotización permiten pausar y reanudar. */
+  const estadoLocked = isFinalized;
+  /** La etapa de avance solo se edita en proyectos aprobados y activos. */
+  const phaseEnabled = tipo === 'aprobado' && estado === 'active';
   /** Antes de Aprobado son horas estimadas para la cotización; al aprobarse quedan como horas vendidas. */
   const hoursLabel = isDevelopment && (tipo === 'prospecto' || tipo === 'cotizacion') ? 'HH estimadas' : 'HH vendidas';
   /** Al pasar a Aprobado el plan de pago debe tener montos — se avisa apenas se elige el tipo y bloquea el guardado. */
@@ -728,7 +727,17 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
     // sincroniza al guardar el contrato — mandarlas acá dejaría HH vendidas y bolsa desalineadas.
     const baseValues = supportPlan ? { ...values, soldHours: undefined, supportHours: undefined } : values;
     const projectValues = isDevelopment && isInternal !== project.isInternal ? { ...baseValues, isInternal } : baseValues;
+    const statusChanged = isDevelopment && estado !== project.status;
+    const statusInput = {
+      projectId: project.id,
+      input: { status: estado, ...(isManualHito0 ? { reason: manualActivationReason.trim() } : {}) },
+    };
+    // Si un Aprobado activo vuelve a Prospecto/Cotización, primero deja de estar Activo:
+    // el backend impide una etapa comercial no aprobada con estado operativo Activo.
+    const pauseBeforeDemotion = statusChanged && project.status === 'active' &&
+      (tipo === 'prospecto' || tipo === 'cotizacion');
     try {
+      if (pauseBeforeDemotion) await changeStatus.mutateAsync(statusInput);
       await updateProject.mutateAsync({
         projectId: project.id,
         input: sendPaymentPlan ? { ...projectValues, ...paymentPlanPayload(paymentPlan) } : projectValues,
@@ -749,12 +758,7 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
         }
         if (Object.keys(planInput).length > 0) await updateSupportPlan.mutateAsync(planInput);
       }
-      if (isDevelopment && estado !== project.status) {
-        await changeStatus.mutateAsync({
-          projectId: project.id,
-          input: { status: estado, ...(isManualHito0 ? { reason: manualActivationReason.trim() } : {}) },
-        });
-      }
+      if (statusChanged && !pauseBeforeDemotion) await changeStatus.mutateAsync(statusInput);
       if (project.canAuthorizeOvertime && allowsOvertime !== project.allowsOvertime) {
         await setOvertimeAuthorization.mutateAsync({ projectId: project.id, input: { allowsOvertime } });
       }
@@ -871,7 +875,7 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
               />
               <Select
                 label="Estado"
-                options={estadoOptions.map((status) => ({ value: status, label: estadoLabel(tipo, status, project.status) }))}
+                options={estadoOptions.map((status) => ({ value: status, label: estadoLabel(tipo, status, project.status, project.hito0At != null) }))}
                 value={estado}
                 disabled={estadoLocked}
                 onChange={(event) => setEstado(event.target.value as ProjectStatus)}

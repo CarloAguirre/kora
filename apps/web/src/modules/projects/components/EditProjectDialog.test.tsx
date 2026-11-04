@@ -150,6 +150,7 @@ describe('EditProjectDialog', () => {
   beforeEach(() => {
     useUsersListMock.mockReturnValue({ data: { items: [] } });
     mutateAsync.mockClear();
+    changeStatusMutateAsync.mockClear();
   });
 
   it('precarga el formulario con los datos actuales del proyecto', () => {
@@ -297,7 +298,8 @@ describe('EditProjectDialog', () => {
     expect(screen.getByLabelText(/Responsable comercial/)).toBeInTheDocument();
   });
 
-  it.each(['prospect', 'quoted'] as const)('en %s el Estado queda fijo en "No iniciado" y bloqueado', (salesStage) => {
+  it.each(['prospect', 'quoted'] as const)('en %s permite Detenido sin aprobar el proyecto', async (salesStage) => {
+    const user = userEvent.setup();
     renderDialog({
       open: true,
       project: buildProject({ salesStage, status: 'draft', phase: null }),
@@ -307,10 +309,87 @@ describe('EditProjectDialog', () => {
     });
 
     const estado = screen.getByLabelText('Estado') as HTMLSelectElement;
-    const labels = Array.from(estado.options).map((option) => option.textContent);
-    expect(labels).toEqual(['No iniciado']);
-    expect(estado).toHaveValue('draft');
-    expect(estado).toBeDisabled();
+    expect(Array.from(estado.options).map((option) => option.textContent)).toEqual(['No iniciado', 'Detenido']);
+    expect(estado).toBeEnabled();
+    await user.selectOptions(estado, 'on_hold');
+    expect(screen.getByLabelText('Motivo del detenimiento')).toBeInTheDocument();
+    expect(screen.getByLabelText('Etapa de avance')).toBeDisabled();
+    expect(screen.queryByText(/Activación manual \(Hito 0 sin factura\)/)).not.toBeInTheDocument();
+  });
+
+  it('detiene una cotización conservando etapa comercial, motivo y sin solicitar facturación', async () => {
+    const user = userEvent.setup();
+    renderDialog({
+      open: true,
+      project: buildProject({
+        salesStage: 'quoted', status: 'draft', phase: null,
+        commercialManager: { id: '22222222-2222-4222-8222-222222222222', fullName: 'Responsable Comercial' },
+      }),
+      onClose: vi.fn(), onSuccess: vi.fn(), isManagement: true,
+    });
+
+    await user.selectOptions(screen.getByLabelText('Estado'), 'on_hold');
+    await user.type(screen.getByLabelText('Motivo del detenimiento'), 'Cliente pausó la cotización.');
+    fireEvent.submit(document.getElementById('edit-project-form') as HTMLFormElement);
+
+    await waitFor(() => expect(changeStatusMutateAsync).toHaveBeenCalledWith({
+      projectId: 'project-1', input: { status: 'on_hold' },
+    }));
+    expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({
+      input: expect.objectContaining({ salesStage: 'quoted', onHoldReason: 'Cliente pausó la cotización.' }),
+    }));
+    expect(screen.queryByText(/Completa los montos/)).not.toBeInTheDocument();
+  });
+
+  it('reanuda una cotización detenida a No iniciado, sin Hito 0', async () => {
+    const user = userEvent.setup();
+    renderDialog({
+      open: true,
+      project: buildProject({
+        salesStage: 'quoted', status: 'on_hold', phase: null, onHoldReason: 'Pausada',
+        commercialManager: { id: '22222222-2222-4222-8222-222222222222', fullName: 'Responsable Comercial' },
+      }),
+      onClose: vi.fn(), onSuccess: vi.fn(), isManagement: true,
+    });
+
+    await user.selectOptions(screen.getByLabelText('Estado'), 'draft');
+    fireEvent.submit(document.getElementById('edit-project-form') as HTMLFormElement);
+    await waitFor(() => expect(changeStatusMutateAsync).toHaveBeenCalledWith({
+      projectId: 'project-1', input: { status: 'draft' },
+    }));
+    expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({
+      input: expect.objectContaining({ salesStage: 'quoted' }),
+    }));
+  });
+
+  it('al activar por primera vez un Aprobado detenido exige motivo del Hito 0', async () => {
+    const user = userEvent.setup();
+    renderDialog({
+      open: true,
+      project: buildProject({ salesStage: 'approved', status: 'on_hold', phase: null, hito0At: null }),
+      onClose: vi.fn(), onSuccess: vi.fn(), isManagement: true,
+    });
+    await user.selectOptions(screen.getByLabelText('Estado'), 'active');
+    expect(screen.getByLabelText('Estado')).toHaveValue('active');
+    expect(screen.getByRole('heading', { name: 'Activación manual (Hito 0 sin factura)' })).toBeInTheDocument();
+  });
+
+  it('al retroceder un Aprobado activo a Cotización cambia primero el estado', async () => {
+    const user = userEvent.setup();
+    renderDialog({
+      open: true,
+      project: buildProject({
+        salesStage: 'approved', status: 'active', hito0At: '2026-10-01T00:00:00.000Z',
+        commercialManager: { id: '22222222-2222-4222-8222-222222222222', fullName: 'Responsable Comercial' },
+      }),
+      onClose: vi.fn(), onSuccess: vi.fn(), isManagement: true,
+    });
+    await user.selectOptions(screen.getByLabelText('Tipo de proyecto'), 'cotizacion');
+    expect(screen.getByLabelText('Estado')).toHaveValue('draft');
+    fireEvent.submit(document.getElementById('edit-project-form') as HTMLFormElement);
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalled());
+    expect(changeStatusMutateAsync).toHaveBeenCalledWith({ projectId: 'project-1', input: { status: 'draft' } });
+    expect(changeStatusMutateAsync.mock.invocationCallOrder[0]).toBeLessThan(mutateAsync.mock.invocationCallOrder[0]!);
   });
 
   it('ofrece la activación manual también al líder del proyecto (sin Gerencia/PMO)', () => {

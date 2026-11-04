@@ -16,6 +16,7 @@ import {
   CannotReassignProjectLeaderError,
   ProjectNameAlreadyInUseError,
   ProjectNotFoundError,
+  ProjectApprovalRequiredForActivationError,
   ProjectTeamMaxMembersBelowAssignedError,
   ReferencedClientNotFoundError,
   SoldHoursChangeReasonRequiredError,
@@ -85,6 +86,13 @@ export class UpdateProjectUseCase implements UseCase<UpdateProjectCommand, void,
 
     if (!hasFullManage && data.isInternal !== undefined && data.isInternal !== project.isInternal) {
       return err(new CannotChangeProjectInternalFlagError());
+    }
+
+    // Al retroceder la etapa comercial desde un proyecto activo, primero se debe
+    // cambiar su estado: nunca persistir "Cotización/Prospecto + Activo".
+    if (project.type === 'development' && project.status === 'active' &&
+        data.salesStage !== undefined && data.salesStage !== project.salesStage && data.salesStage !== 'approved') {
+      return err(new ProjectApprovalRequiredForActivationError());
     }
 
     // Hito 0 ya no bloquea el ajuste de HH vendidas. Como cambia los indicadores

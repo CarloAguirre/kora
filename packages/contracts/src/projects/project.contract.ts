@@ -901,6 +901,10 @@ export const createProjectSchema = z
     message: 'Los proyectos de desarrollo requieren una etapa comercial.',
     path: ['salesStage'],
   })
+  .refine((data) => data.type !== 'development' || data.salesStage === 'approved' || data.status !== 'active', {
+    message: 'Solo un proyecto aprobado puede estar Activo.',
+    path: ['status'],
+  })
   /** Desde que se crea, al proyecto de desarrollo se le pueden cargar horas — necesita un líder que las apruebe. */
   .refine((data) => data.type !== 'development' || data.leaderUserId, {
     message: 'Selecciona el líder a cargo del proyecto.',
