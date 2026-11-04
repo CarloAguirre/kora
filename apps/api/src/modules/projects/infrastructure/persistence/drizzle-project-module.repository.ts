@@ -11,6 +11,7 @@ import {
   projectModuleSegmentMembers,
   projectModuleSegments,
   projectModuleTasks,
+  projectRoadmapReferenceExclusions,
   projectModules,
   projects,
   teamMembers,
@@ -524,6 +525,14 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
         updatedAt: now,
       })
       .where(eq(projectModuleTasks.id, id));
+  }
+
+  async excludeQuotationReference(input: {
+    projectId: string; moduleId: string; versionId: string;
+    wbs: string; role: string; actorUserId: string;
+  }, context?: TransactionContext): Promise<void> {
+    const db = resolveDb(this.database, context);
+    await db.insert(projectRoadmapReferenceExclusions).values(input).onConflictDoNothing();
   }
 
   async removeTask(id: string, context?: TransactionContext): Promise<void> {
