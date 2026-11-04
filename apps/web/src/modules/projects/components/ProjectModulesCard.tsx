@@ -322,7 +322,8 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
     const hours = module.estimatedHours ??
       (segmentHoursKnown ? module.segments.reduce((sum, segment) =>
         sum + (segment.estimatedHours ?? 0), 0) : null);
-    return (start && end ? formatDate(start) + ' → ' + formatDate(end) : 'Sin fechas') +
+    const asDayMonthYear = (iso: string) => iso.slice(8, 10) + '-' + iso.slice(5, 7) + '-' + iso.slice(0, 4);
+    return (start && end ? asDayMonthYear(start) + ' → ' + asDayMonthYear(end) : 'Sin fechas') +
       ', ' + (hours == null ? '—' : new Intl.NumberFormat('es-CL', {
         maximumFractionDigits: 2,
       }).format(hours)) + ' HH';
