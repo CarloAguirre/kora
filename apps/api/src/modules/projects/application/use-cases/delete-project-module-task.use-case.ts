@@ -29,6 +29,7 @@ import {
 import type { ActorContext, UseCase } from '../../../../shared/application/use-case';
 import { ProjectChangeLogRecorder } from '../services/project-change-log.recorder';
 import { ProjectProgressRecalculator } from '../services/project-progress-recalculator';
+import { ForecastSourceSyncService } from '../services/forecast-source-sync.service';
 
 export interface DeleteProjectModuleTaskCommand {
   readonly projectId: string;
@@ -49,6 +50,7 @@ export class DeleteProjectModuleTaskUseCase
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
     private readonly changeLog: ProjectChangeLogRecorder,
     private readonly progress: ProjectProgressRecalculator,
+    private readonly forecastSync: ForecastSourceSyncService,
     @Inject(CLOCK) private readonly clock: Clock,
     @Inject(UNIT_OF_WORK) private readonly unitOfWork: UnitOfWork,
   ) {}
@@ -101,6 +103,7 @@ export class DeleteProjectModuleTaskUseCase
       }
       if (task.segmentId) await this.modules.refreshSegmentClosure(task.segmentId, this.clock.now(), tx);
       await this.progress.recalculate(project.id, tx);
+      if (preserve) await this.forecastSync.syncTask(project, command.moduleId, command.taskId, this.clock.now(), tx);
       await this.changeLog.record(
         [
           {
