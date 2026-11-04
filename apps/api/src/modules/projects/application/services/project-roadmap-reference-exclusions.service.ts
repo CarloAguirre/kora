@@ -1,13 +1,14 @@
 import { ForbiddenException, Injectable, NotFoundException, Inject } from '@nestjs/common';
 import type { ExcludeRoadmapReferenceInput, Permission, RoadmapReferenceExclusion } from '@kora/contracts';
 import { ROADMAP_REFERENCE_EXCLUSION_STORE, type RoadmapReferenceExclusionStore } from '../ports/roadmap-reference-exclusion-store.port';
+import { unwrapOrThrow } from '../../../../shared/presentation/unwrap-result';
+import { GetProjectUseCase } from '../use-cases/get-project.use-case';
+
 /** Actor mínimo de aplicación, sin dependencia de la capa HTTP/presentación. */
 interface RoadmapReferenceActor {
   readonly id: string;
   readonly permissions: readonly Permission[];
 }
-import { unwrapOrThrow } from '../../../../shared/presentation/unwrap-result';
-import { GetProjectUseCase } from '../use-cases/get-project.use-case';
 
 /** Separar decisiones del Roadmap de la versión aprobada de cotización.
  * No se borra la fuente EDT ni se crea una tarea operativa ficticia.
