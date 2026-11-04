@@ -165,7 +165,12 @@ export function useQuotationLifecycle(projectId: string) {
       quotationApi.transferApproved(projectId, versionId, {
         revision, confirmation: 'TRASPASAR_COTIZACION_APROBADA',
       }),
-    onSuccess: refresh,
+    onSuccess: () => {
+      refresh();
+      // Tras el traspaso, el líder efectivo ve de inmediato el pendiente de
+      // incorporación de colaboradores en la campanita (sin esperar al polling).
+      void client.invalidateQueries({ queryKey: ['notifications', 'reminders'] });
+    },
   });
   return { acceptAi, markSent, approveClient, transferApproved };
 }
