@@ -207,3 +207,46 @@ ORDER BY created_at DESC LIMIT 5;
 
 No insertar registros en `drizzle.__drizzle_migrations`, no eliminar
 columnas ni ejecutar `drizzle-kit push` para sortear el incidente.
+
+## Corrección: fechas relativas después de iniciar proyecto (04-11-2026)
+
+Síntoma: el proyecto ya tiene `projects.start_date` pero las fases muestran
+«Sin fechas: se calculan al definir el inicio del proyecto». El mensaje estaba
+codificado de forma fija en `PhaseRoadmap.tsx`, y las referencias
+`relativeTeamBlocks` incluían `startWeek`/`durationWeeks` pero no se
+calculaban con `project.startDate`.
+
+Solución **no destructiva**:
+- `proposedBlockPeriod(project.startDate, startWeek, durationWeeks)` calcula una
+  proyección de semanas comerciales (semana 1 comienza en el inicio; cada semana
+  abarca siete días calendario; fin inclusive). Usa fechas ISO/UTC, sin
+  desplazamiento por zona horaria. Una fecha inicial 05-11-2026 con semana 3
+  y cinco semanas de duración produce 19-11-2026 → 23-12-2026.
+- La cabecera de una fase aún no planificada muestra el rango de propuestas
+  seguido de «· propuesta»; nunca lo presenta como cierre real.
+- Los bloques EDT referenciales muestran fechas calculadas y una **barra
+  rayada** visualmente distinta del segmento operativo. El rango horizontal
+  del Gantt se expande para cubrir las propuestas y se actualiza al recibir
+  asincrónicamente la cotización o cambiar el inicio del proyecto.
+- El lateral de referencia también distingue fechas propuestas de operativas.
+- Al pulsar «Planificar bloque», el formulario se precarga con equipo, nombre,
+  HH, inicio y fin referenciales; el responsable todavía puede ajustarlos.
+  **Solo guardar** crea un segmento `project_module_segments`, eventualmente
+  una entrega real, y habilita el flujo de Forecast.
+- No se migran ni escriben fechas automáticas en tareas, bloques, entregas,
+  cotizaciones o Forecast. No se crean bloques nuevos en background.
+- Si el proyecto no tiene inicio, se explica que falta definirlo. Si existe
+  un bloque operativo del equipo, prevalece su fecha REAL y no se duplica la
+  referencia en el Gantt.
+
+### Validación específica
+```powershell
+pnpm --filter @kora/web exec vitest run src/modules/projects/lib/quotation-relative-dates.test.ts src/modules/projects/components/ProjectModulesCard.phase-controls.test.tsx src/modules/client-portal/components/PhaseRoadmap.header-actions.test.tsx
+pnpm --filter @kora/web typecheck
+pnpm --filter @kora/web build
+```
+
+Verificar un proyecto con `startDate` y cotización aplicada antes/después de
+recargar. La fase sin bloques debe indicar las fechas *propuestas*, no «Sin
+fechas»; la planificación debe abrirse precargada y las fechas reales de otros
+bloques no deben cambiarse.
