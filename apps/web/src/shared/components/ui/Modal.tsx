@@ -16,6 +16,8 @@ import { CloseIcon } from '../icons/Icons';
 export interface ModalProps {
   open: boolean;
   title: string;
+  /** Optional compact context above the title, useful for Roadmap drawers. */
+  eyebrow?: string;
   description?: string;
   onClose: () => void;
   children: ReactNode;
@@ -34,6 +36,7 @@ export interface ModalProps {
 export function Modal({
   open,
   title,
+  eyebrow,
   description,
   onClose,
   children,
@@ -88,6 +91,7 @@ export function Modal({
     >
       <header className={styles.header}>
         <div className={styles.titles}>
+          {eyebrow && <span className={styles.eyebrow}>{eyebrow}</span>}
           <h2 className={styles.title} id={titleId}>
             {title}
           </h2>
