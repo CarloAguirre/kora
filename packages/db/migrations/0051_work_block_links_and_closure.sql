@@ -12,7 +12,7 @@ ALTER TABLE "project_module_tasks"
 --> statement-breakpoint
 -- La columna preexistente puede no tener FK: verificar por tabla, columna y destino,
 -- no solo por nombre de la constraint (que puede variar entre entornos).
-DO $
+DO $guard$
 DECLARE existing_action "char";
 BEGIN
   SELECT con.confdeltype INTO existing_action
@@ -31,9 +31,9 @@ BEGIN
   ELSIF existing_action <> 'n' THEN
     RAISE EXCEPTION 'project_module_deliveries.segment_id: se encontró FK con ON DELETE distinto de SET NULL';
   END IF;
-END $;
+END $guard$;
 --> statement-breakpoint
-DO $
+DO $guard$
 DECLARE existing_action "char";
 BEGIN
   SELECT con.confdeltype INTO existing_action
@@ -52,7 +52,7 @@ BEGIN
   ELSIF existing_action <> 'n' THEN
     RAISE EXCEPTION 'project_module_tasks.segment_id: se encontró FK con ON DELETE distinto de SET NULL';
   END IF;
-END $;
+END $guard$;
 --> statement-breakpoint
 CREATE UNIQUE INDEX IF NOT EXISTS "project_module_deliveries_one_closure_per_segment"
   ON "project_module_deliveries"("segment_id") WHERE "segment_id" IS NOT NULL;
