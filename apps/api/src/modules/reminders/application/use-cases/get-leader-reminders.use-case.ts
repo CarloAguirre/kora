@@ -16,7 +16,7 @@ export interface GetLeaderRemindersCommand {
   readonly today: string;
 }
 
-const NO_REMINDERS: LeaderReminders = { pendingApprovals: { entries: 0, hours: 0 }, missingHourDays: [], projectsMissingData: [] };
+const NO_REMINDERS: LeaderReminders = { pendingApprovals: { entries: 0, hours: 0 }, missingHourDays: [], projectsMissingData: [], teamsAwaitingStaffing: [] };
 
 /**
  * Pendientes del líder para la campanita, calculados en vivo — desaparecen
@@ -45,14 +45,15 @@ export class GetLeaderRemindersUseCase implements UseCase<GetLeaderRemindersComm
     const { userId, role, permissions, today } = command;
     if (role !== 'leader') return ok(NO_REMINDERS);
 
-    const [pendingApprovals, missingHourDays, projectsMissingData] = await Promise.all([
+    const [pendingApprovals, missingHourDays, projectsMissingData, teamsAwaitingStaffing] = await Promise.all([
       permissions.includes('hours:approve')
         ? this.hourEntries.summarize({ status: 'pending', leaderScopeUserId: userId, excludeUserId: userId })
         : NO_REMINDERS.pendingApprovals,
       permissions.includes('hours:register') ? this.findMissingHourDays(userId, today) : NO_REMINDERS.missingHourDays,
       this.findProjectsMissingData(userId),
+      this.ledProjects.listTeamsAwaitingStaffing(userId),
     ]);
-    return ok({ pendingApprovals, missingHourDays, projectsMissingData });
+    return ok({ pendingApprovals, missingHourDays, projectsMissingData, teamsAwaitingStaffing });
   }
 
   private async findMissingHourDays(userId: string, today: string): Promise<LeaderReminders['missingHourDays']> {
