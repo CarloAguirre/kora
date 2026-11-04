@@ -40,6 +40,11 @@ export class ProjectsModuleHourEntryProjectReader implements HourEntryProjectRea
     }));
   }
 
+  async hasWorkBlocks(projectId: string): Promise<boolean> {
+    const modules = await this.modules.listForProject(projectId);
+    return modules.some((module) => module.segments.length > 0);
+  }
+
   async isUserOnSegmentTeam(projectId: string, teamId: string, userId: string): Promise<boolean> {
     const [members, teams] = await Promise.all([
       this.members.listForProject(projectId),
