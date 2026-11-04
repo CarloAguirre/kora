@@ -63,11 +63,11 @@ export function QuotationReferenceTaskModal({
   const sourceMarker = 'Referencia cotización ' + versionId + ' · WBS ' +
     reference.wbs + ' · ' + reference.role;
   const formValid = Boolean(targetModuleId && name.trim() && teamId && (mode === 'edit' || assignee) && scope && startDate && date &&
-    startDate <= date && chosenDatesFitBlock && Number(hours) > 0 &&
+    startDate <= date && Boolean(selectedBlock) && chosenDatesFitBlock && Number(hours) > 0 &&
     Number.isFinite(Number(hours)) && Number(hours) <= 1_000_000);
   const submit = async () => {
     if (!formValid) {
-      setError('Completa la fase, equipo, ámbito y fechas; el responsable puede quedar pendiente. Si eliges un bloque, respeta su período.');
+      setError('Completa la fase, equipo, ámbito, fechas y bloque de trabajo. El responsable puede quedar pendiente.');
       return;
     }
     setError('');
@@ -151,10 +151,10 @@ export function QuotationReferenceTaskModal({
             value: module.id, label: module.name,
           }))}
           onChange={(event) => { setTargetModuleId(event.target.value); setBlockId(''); }} />
-        <Select label="Bloque de trabajo" value={blockId}
+        <Select label="Bloque de trabajo" required value={blockId}
           disabled={eligibleBlocks.length === 0 || (mode === 'create' && !assignee)}
-          placeholder={eligibleBlocks.length === 0 ? 'Sin bloques planificados' :
-            mode === 'create' && !assignee ? 'Elige primero a quién se asigna' : 'Sin bloque específico'}
+          placeholder={eligibleBlocks.length === 0 ? 'Primero planifica un bloque' :
+            mode === 'create' && !assignee ? 'Elige primero a quién se asigna' : 'Selecciona un bloque'}
           options={eligibleBlocks.map((segment) => ({
             value: segment.id, label: segment.name + ' (' + segment.startDate + ' – ' + segment.endDate + ')',
           }))}
@@ -186,6 +186,9 @@ export function QuotationReferenceTaskModal({
             min={startDate || undefined} value={date}
             onChange={(event) => setDate(event.target.value)} />
         </div>
+        {eligibleBlocks.length === 0 && <p role="alert" className={styles.error}>
+          Planifica primero un bloque de trabajo para este equipo en la fase seleccionada.
+        </p>}
         {selectedBlock && !chosenDatesFitBlock && (
           <p role="alert" className={styles.error}>
             Las fechas deben estar dentro del bloque seleccionado:
