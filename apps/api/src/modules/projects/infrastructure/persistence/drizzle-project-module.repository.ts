@@ -583,7 +583,7 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
       .from(projectModuleTasks)
       .innerJoin(projectModules, eq(projectModules.id, projectModuleTasks.moduleId))
       .innerJoin(projects, eq(projects.id, projectModules.projectId))
-      .where(eq(projectModuleTasks.assigneeUserId, userId))
+      .where(and(eq(projectModuleTasks.assigneeUserId, userId), sql`${projectModuleTasks.cancelledAt} is null`))
       .orderBy(asc(projectModuleTasks.date));
 
     return rows;
