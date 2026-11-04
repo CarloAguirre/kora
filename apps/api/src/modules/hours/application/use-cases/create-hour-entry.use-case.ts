@@ -8,6 +8,8 @@ import {
   ProjectOvertimeNotAllowedError,
   ProjectStoppedError,
   ReferencedModuleNotFoundError,
+  InvalidHourEntrySegmentError,
+  HourEntrySegmentRequiredError,
   ReferencedProjectNotFoundError,
 } from '../../domain/errors/hour-entry.errors';
 import { HOUR_ENTRY_REPOSITORY, type HourEntryRepository } from '../../domain/repositories/hour-entry.repository';
@@ -72,6 +74,22 @@ export class CreateHourEntryUseCase implements UseCase<CreateHourEntryCommand, {
       if (module.projectId !== data.projectId) return err(new ModuleNotInProjectError());
     }
 
+    if (data.segmentId && !data.moduleId) {
+      return err(new InvalidHourEntrySegmentError('Selecciona la fase antes de elegir un bloque.'));
+    }
+    if (data.moduleId) {
+      const segments = await this.projects.findSegmentsForModule(data.moduleId);
+      if (data.segmentId) {
+        const selected = segments.find((segment) =>
+          segment.id === data.segmentId && segment.projectId === data.projectId);
+        if (!selected || !await this.projects.isUserOnSegmentTeam(
+          selected.projectId, selected.teamId, ownerId,
+        )) return err(new InvalidHourEntrySegmentError());
+      } else if (segments.length > 0 && data.assignment === 'Proyecto') {
+        return err(new HourEntrySegmentRequiredError());
+      }
+    }
+
     if (data.designatedApproverUserId) {
       const approver = await this.users.findById(data.designatedApproverUserId);
       if (!approver || approver.role !== 'leader' || approver.status !== 'active') {
@@ -84,6 +102,7 @@ export class CreateHourEntryUseCase implements UseCase<CreateHourEntryCommand, {
       userId: ownerId,
       projectId: data.projectId ?? null,
       moduleId: data.moduleId ?? null,
+      segmentId: data.segmentId ?? null,
       assignment: data.assignment,
       category: data.category,
       description: data.description,
