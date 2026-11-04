@@ -558,3 +558,14 @@
 .phaseCreationForm { display: grid; gap: 14px; }
 .phaseCreationDates { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 @media (max-width: 580px) { .phaseCreationDates { grid-template-columns: 1fr; } }
+
+/* La última columna no lleva título: solo iconos de edición y eliminación. */
+.operationalTaskActions { white-space: nowrap; }
+.taskIconAction {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; margin-left: 3px;
+  color: #64748b; border: 0; border-radius: 6px; background: transparent;
+  cursor: pointer;
+}
+.taskIconAction:hover { background: #eef1f6; color: #0f1729; }
+.taskIconAction:focus-visible { outline: 2px solid #0f1729; }
