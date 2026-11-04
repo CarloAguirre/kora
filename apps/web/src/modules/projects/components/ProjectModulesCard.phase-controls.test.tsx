@@ -41,12 +41,14 @@ vi.mock('@/modules/client-portal/components/PhaseRoadmap', () => ({
   PhaseRoadmap: ({ phaseRoadmap, toolbarActions, renderPhaseHeaderName,
     renderPhaseHeaderActions, renderPhaseReferences, operationalRows, onPlanOperationalRow, operationalFooter,
     renderSelectionDetail, operationalPresaleHours }: {
-    phaseRoadmap: { phases: { id: string }[] };
+    phaseRoadmap: { phases: { id: string }[]; rangeStartDate: string; rangeEndDate: string };
     toolbarActions?: ReactNode;
     renderPhaseHeaderName?: (phase: { id: string }) => ReactNode;
     renderPhaseHeaderActions?: (phase: { id: string }) => ReactNode;
     renderPhaseReferences?: (phase: { id: string }) => ReactNode;
-    operationalRows?: (phase: { id: string }) => Array<{ id: string; label: string; hours: number }>;
+    operationalRows?: (phase: { id: string }) => Array<{
+      id: string; label: string; hours: number; proposedStartDate?: string; proposedEndDate?: string;
+    }>;
     onPlanOperationalRow?: (phase: { id: string }, row: { id: string; label: string; hours: number }) => void;
     operationalFooter?: ReactNode;
     operationalPresaleHours?: number | null;
@@ -56,10 +58,16 @@ vi.mock('@/modules/client-portal/components/PhaseRoadmap', () => ({
     const phase = phaseRoadmap.phases[0]!;
     const [selection, setSelection] = useState<{ kind: 'reference-block'; id: string; label: string } | null>(null);
     return <section>
+      <output data-testid="roadmap-date-range">
+        {phaseRoadmap.rangeStartDate} → {phaseRoadmap.rangeEndDate}
+      </output>
       {operationalPresaleHours != null && <output data-testid="presale-hours">{operationalPresaleHours}</output>}
       {toolbarActions}{renderPhaseHeaderName?.(phase)}
       {renderPhaseHeaderActions?.(phase)}
       {operationalRows?.(phase).map((row) => <div key={row.id}>{row.label}
+        {row.proposedStartDate && row.proposedEndDate && <output data-testid="dates-propuesta">
+          {row.proposedStartDate} → {row.proposedEndDate}
+        </output>}
         <button type="button" onClick={() => setSelection({
           kind: 'reference-block', id: row.id, label: row.label,
         })}>Abrir bloque {row.label}</button>
@@ -257,6 +265,30 @@ describe('Referencias de bloque de trabajo de la cotización', () => {
     name: 'Diseño Backend · Desarrollo',
     startDate: '2026-11-03', endDate: '2026-12-08', members: [],
   };
+
+  it('proyecta fechas de la cotización tras definir inicio y las precarga al planificar', () => {
+    seedReference();
+    show({ ...project, startDate: '2026-11-05' } as unknown as ProjectDetail);
+    expect(screen.getByText('19-11-2026 → 23-12-2026, 120 HH · propuesta')).toBeInTheDocument();
+    expect(screen.getByTestId('dates-propuesta')).toHaveTextContent(
+      '2026-11-19 → 2026-12-23',
+    );
+    expect(screen.getByTestId('roadmap-date-range')).toHaveTextContent('2026-12-30');
+    fireEvent.click(screen.getByRole('button', { name: 'Planificar bloque' }));
+    expect(screen.getByRole('dialog', { name: 'Nuevo bloque de trabajo' })).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: /Nombre del bloque/ }))
+      .toHaveValue('Diseño Backend · Desarrollo');
+    expect(screen.getByLabelText(/Fecha de inicio/)).toHaveValue('2026-11-19');
+    expect(screen.getByLabelText(/Fecha de fin/)).toHaveValue('2026-12-23');
+    expect(screen.getByLabelText(/HH estimadas/)).toHaveValue(160);
+  });
+
+  it('no crea fechas comerciales si el proyecto todavía carece de inicio', () => {
+    seedReference();
+    show();
+    expect(screen.getByText('Sin fechas, 120 HH')).toBeInTheDocument();
+    expect(screen.queryByTestId('dates-propuesta')).not.toBeInTheDocument();
+  });
 
   it('ofrece planificar mientras no exista un segmento de ese equipo y fase', () => {
     seedReference();
