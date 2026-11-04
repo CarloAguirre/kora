@@ -194,3 +194,24 @@ describe('Referencias de bloque de trabajo de la cotización', () => {
     expect(screen.queryByRole('button', { name: 'Planificar bloque' })).not.toBeInTheDocument();
   });
 });
+
+
+describe('Traspaso de cotización · vista operativa v5.02', () => {
+  it('muestra tareas de la EDT sin colaborador y sin simular que ya están persistidas como tareas', () => {
+    mocks.appliedPlan.modules = [{
+      moduleId: 'module-1',
+      tasks: [{ wbs: 'WBS-01', role: 'Desarrollador', name: 'Conexión con taller',
+        hours: 35, teamId: 'team-1' }],
+      totalHours: 35,
+      relativeTeamBlocks: [{ teamId: 'team-1', hours: 35, startWeek: 1, durationWeeks: 3 }],
+    }];
+    show();
+    expect(screen.getByText('Diseño Backend: 1 tarea espera asignación')).toBeInTheDocument();
+    expect(screen.getByText(/No hay colaboradores activos de este equipo/)).toBeInTheDocument();
+    expect(screen.getByText('Conexión con taller')).toBeInTheDocument();
+    expect(screen.getByText('Referencia EDT · pendiente de crear como tarea de Kora')).toBeInTheDocument();
+    expect(screen.getByText('Tareas')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Crear tarea' })).toBeEnabled();
+    expect(mocks.createSegment).not.toHaveBeenCalled();
+  });
+});
