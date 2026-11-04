@@ -193,7 +193,8 @@ describe('GetProjectUseCase — calendario traspasado al iniciar', () => {
       projectId, actorUserId: 'project-pm', actorPermissions: ['projects:read'],
     });
     expect(result.isOk()).toBe(true);
-    expect(ensure).toHaveBeenCalledExactlyOnceWith(projectId);
+    expect(ensure).toHaveBeenCalledOnce();
+    expect(ensure).toHaveBeenCalledWith(projectId);
     // El GET devuelve el calendario ya materializado y no el snapshot obsoleto.
     expect(modules.listForProject).toHaveBeenCalledTimes(2);
   });
