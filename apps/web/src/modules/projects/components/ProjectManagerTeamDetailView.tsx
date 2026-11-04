@@ -31,7 +31,6 @@ export function ProjectManagerTeamDetailView({ project, projectId, teamId }: Pro
     tasks: module.tasks.filter((task) => task.teamId === teamId && !task.cancelledAt),
     segments: module.segments.filter((segment) => segment.teamId === teamId),
   })), [project.modules, teamId]);
-  const tasks = modules.flatMap((module) => module.tasks);
   const segments = modules.flatMap((module) => module.segments);
   const used = project.members.filter((item) => item.teamId === teamId)
     .reduce((sum, member) => sum + member.consumedHours, 0);
