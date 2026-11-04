@@ -160,8 +160,8 @@ export const projectsApi = {
   ): Promise<void> {
     return api.patch<void>(`/projects/${projectId}/modules/${moduleId}/tasks/${taskId}`, input);
   },
-  deleteModuleTask(projectId: string, moduleId: string, taskId: string): Promise<void> {
-    return api.delete<void>(`/projects/${projectId}/modules/${moduleId}/tasks/${taskId}`);
+  deleteModuleTask(projectId: string, moduleId: string, taskId: string, cancel = false): Promise<void> {
+    return api.delete<void>(`/projects/${projectId}/modules/${moduleId}/tasks/${taskId}${cancel ? '?cancel=true' : ''}`);
   },
   createPaymentMilestone(projectId: string, input: CreateProjectPaymentMilestoneInput): Promise<{ id: string }> {
     return api.post<{ id: string }>(`/projects/${projectId}/payment-milestones`, input);
