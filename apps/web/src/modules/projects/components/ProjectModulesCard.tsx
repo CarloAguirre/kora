@@ -1,7 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import {
   PROJECT_MODULE_DELIVERY_STATUS_LABELS,
-  PROJECT_MODULE_STAGE_LABELS,
   PROJECT_MODULE_TASK_SCOPE_LABELS,
   PROJECT_MODULE_TASK_STATUS_LABELS,
   type CreateProjectModuleSegmentInput,
@@ -25,7 +24,7 @@ import { CloseIcon, CopyIcon, PencilIcon, TrashIcon } from '@/shared/components/
 import { useToast } from '@/shared/components/ui/Toast';
 import { ApiRequestError } from '@/shared/lib/api-client';
 import { PhaseRoadmap, type PhaseRoadmapSelection, type OperationalRoadmapRow } from '@/modules/client-portal/components/PhaseRoadmap';
-import { roleFromTeamName, toPhaseRoadmap, toRoadmapPhase } from '@/modules/client-portal/adapters/project-detail.adapter';
+import { roleFromTeamName, toPhaseRoadmap } from '@/modules/client-portal/adapters/project-detail.adapter';
 import { PHASE_ROADMAP_ROLE_COLORS } from '@/modules/client-portal/types';
 import { useCreateProjectModule, useCreateProjectModuleSegment, useDeleteProjectModule, useDeleteProjectModuleSegment, useDeleteProjectModuleTask, useUpdateProjectModule, useUpdateProjectModuleDelivery, useUpdateProjectModuleSegment } from '../api/projects.queries';
 import { useConfirmAction } from '@/shared/components/ui/useConfirmAction';
@@ -39,7 +38,6 @@ import { NewOperationalTaskModal } from './NewOperationalTaskModal';
 import { ReferenceBlockDrawer } from './ReferenceBlockDrawer';
 import { useAppliedQuotationPlanning } from '@/modules/estimation/api/quotation.queries';
 import { getLinkedBlockTasks, indexTeamBlockProgress, roadmapBlockMetrics, type TeamBlockProgress } from '../lib/team-progress';
-import { PhaseProgressBar } from '@/modules/client-portal/components/PhaseProgressBar';
 import { useHolidays } from '@/modules/hours/api/hours.queries';
 import { countBusinessDays } from '../lib/business-days';
 import {
@@ -561,16 +559,6 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
     const count = module.tasks.length + references.length;
     const approved = module.tasks.filter((task) => task.status === 'done').length;
     return <div className={styles.operationalContent}>
-      <PhaseProgressBar phase={toRoadmapPhase(module, project.modules.indexOf(module))} embedded />
-      <div className={styles.moduleFields}>
-        <Fact label="Etapa actual" value={PROJECT_MODULE_STAGE_LABELS[module.currentStage]} />
-        <Fact label="Etapa inicial" value={PROJECT_MODULE_STAGE_LABELS[module.initialStage]} />
-        <Fact label="Horas estimadas" value={module.estimatedHours != null ? `${module.estimatedHours} hh` : 'Sin definir'} />
-        <Fact label="Fechas estimadas" value={`${formatDate(module.estimatedStartDate)} — ${formatDate(module.estimatedEndDate)}`} />
-        {module.progress.actual != null && (
-          <Fact label="Avance real · esperado" value={`${module.progress.actual}% · ${module.progress.expected ?? 0}%`} />
-        )}
-      </div>
       {Array.from(groups, ([id, group]) => {
         const team = project.teams.find((entry) => entry.teamId === id);
         const teamName = team?.teamName ?? teamOptions.find((entry) => entry.value === id)?.label ??
