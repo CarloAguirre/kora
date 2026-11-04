@@ -76,7 +76,7 @@ describe('Nueva tarea operativa vinculada a bloque', () => {
     fireEvent.change(screen.getByLabelText('HH estimadas'), {
       target: { value: '20' },
     });
-    fireEvent.change(screen.getByLabelText('Bloque de trabajo'), {
+    fireEvent.change(screen.getByLabelText(/Bloque de trabajo/), {
       target: { value: blockId },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Crear tarea' }));
