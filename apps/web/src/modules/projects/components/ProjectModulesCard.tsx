@@ -32,6 +32,7 @@ import { roleFromTeamName, toPhaseRoadmap } from '@/modules/client-portal/adapte
 import { PHASE_ROADMAP_ROLE_COLORS } from '@/modules/client-portal/types';
 import { useCreateProjectModule, useCreateProjectModuleSegment, useDeleteProjectModule, useDeleteProjectModuleSegment, useDeleteProjectModuleTask, useUpdateProjectModule, useUpdateProjectModuleDelivery, useUpdateProjectModuleSegment } from '../api/projects.queries';
 import { useConfirmAction } from '@/shared/components/ui/useConfirmAction';
+import { useExcludeRoadmapReference, useRoadmapReferenceExclusions } from '../api/projects.queries';
 import { QuotationReferenceTaskModal } from './QuotationReferenceTaskModal';
 import { ExecutionTaskModal } from './ExecutionTaskModal';
 import { DuplicateTaskModal } from './DuplicateTaskModal';
@@ -127,6 +128,8 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
   const deleteTask = useDeleteProjectModuleTask();
   const { confirm, dialog: confirmationDialog } = useConfirmAction();
   const appliedPlanning = useAppliedQuotationPlanning(project.id);
+  const roadmapExclusions = useRoadmapReferenceExclusions(project.id);
+  const excludeRoadmapReference = useExcludeRoadmapReference();
   const phaseRoadmap = useMemo(() => toPhaseRoadmap(project), [project]);
   const modulesById = useMemo(() => new Map(project.modules.map((module) => [module.id, module])), [project.modules]);
 
@@ -154,6 +157,7 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
   const [creatingFromReference, setCreatingFromReference] = useState<{
     moduleId: string | null;
     task: AppliedQuotationPlanning['modules'][number]['tasks'][number];
+    mode?: 'create' | 'edit';
   } | null>(null);
   // Estable mientras el modal está abierto: `ExecutionSegmentModal` reinicia su formulario cuando cambia `initialValues`,
   // y un refetch del proyecto (re-render de esta tarjeta) no debe borrar lo que se está escribiendo.
@@ -456,6 +460,41 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
     'Referencia cotización ' + appliedPlanning.data?.versionId +
     ' · WBS ' + reference.wbs + ' · ' + reference.role,
   ));
+
+  const referenceIsExcluded = (
+    module: ProjectModule,
+    reference: AppliedQuotationPlanning['modules'][number]['tasks'][number],
+  ) => roadmapExclusions.data?.some((item) =>
+    item.moduleId === module.id && item.versionId === appliedPlanning.data?.versionId &&
+    item.wbs === reference.wbs && item.role === reference.role,
+  ) ?? false;
+
+  const referenceIsPending = (
+    module: ProjectModule,
+    reference: AppliedQuotationPlanning['modules'][number]['tasks'][number],
+  ) => !referenceIsConverted(module, reference) && !referenceIsExcluded(module, reference);
+
+  const onDiscardReference = async (
+    module: ProjectModule,
+    reference: AppliedQuotationPlanning['modules'][number]['tasks'][number],
+  ) => {
+    if (!appliedPlanning.data || !await confirm({
+      title: 'Eliminar tarea',
+      description: 'Se quitará «' + reference.name +
+        '», sin asignar, del Roadmap operativo. La cotización original se conserva.',
+      confirmLabel: 'Eliminar tarea', cancelLabel: 'Volver', confirmVariant: 'secondary',
+    })) return;
+    try {
+      await excludeRoadmapReference.mutateAsync({
+        projectId: project.id, moduleId: module.id,
+        input: { versionId: appliedPlanning.data.versionId,
+          wbs: reference.wbs, role: reference.role },
+      });
+      toast.success('Tarea quitada del Roadmap. La referencia comercial permanece intacta.');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'No fue posible quitar la referencia.');
+    }
+  };
 
   const getOperationalRows = (phase: { id: string }): readonly OperationalRoadmapRow[] => {
     const module = modulesById.get(phase.id);
