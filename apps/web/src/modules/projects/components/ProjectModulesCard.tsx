@@ -24,7 +24,7 @@ import { Badge, type BadgeTone } from '@/shared/components/ui/Badge';
 import { CloseIcon, PencilIcon, TrashIcon } from '@/shared/components/icons/Icons';
 import { useToast } from '@/shared/components/ui/Toast';
 import { ApiRequestError } from '@/shared/lib/api-client';
-import { PhaseRoadmap, type PhaseRoadmapSelection } from '@/modules/client-portal/components/PhaseRoadmap';
+import { PhaseRoadmap, type PhaseRoadmapSelection, type OperationalRoadmapRow } from '@/modules/client-portal/components/PhaseRoadmap';
 import { roleFromTeamName, toPhaseRoadmap } from '@/modules/client-portal/adapters/project-detail.adapter';
 import { PHASE_ROADMAP_ROLE_COLORS } from '@/modules/client-portal/types';
 import { useCreateProjectModuleSegment, useDeleteProjectModule, useDeleteProjectModuleSegment, useUpdateProjectModule, useUpdateProjectModuleDelivery, useUpdateProjectModuleSegment } from '../api/projects.queries';
@@ -460,6 +460,141 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
     );
   };
 
+
+  /** En v5.02 los bloques/HH de la cotización siguen siendo referencias hasta
+   * crear el segmento real. No asignamos fechas, responsables ni estados falsos. */
+  const referenceIsConverted = (
+    module: ProjectModule,
+    reference: AppliedQuotationPlanning['modules'][number]['tasks'][number],
+  ) => module.tasks.some((task) => task.description?.includes(
+    'Referencia cotización ' + appliedPlanning.data?.versionId +
+    ' · WBS ' + reference.wbs + ' · ' + reference.role,
+  ));
+
+  const getOperationalRows = (phase: { id: string }): readonly OperationalRoadmapRow[] => {
+    const module = modulesById.get(phase.id);
+    const reference = appliedPlanning.data?.modules.find((entry) => entry.moduleId === phase.id);
+    if (!module || !reference?.relativeTeamBlocks) return [];
+    return reference.relativeTeamBlocks
+      .filter((block) => !module.segments.some((segment) => segment.teamId === block.teamId))
+      .map((block) => {
+        const teamName = project.teams.find((team) => team.teamId === block.teamId)?.teamName ??
+          teamOptions.find((team) => team.value === block.teamId)?.label ?? 'Equipo por vincular';
+        return {
+          id: block.teamId,
+          label: module.name + ' · ' + teamName,
+          role: roleFromTeamName(teamName),
+          hours: block.hours,
+        };
+      });
+  };
+
+  /** Contadores de la vista operativa: tareas existentes + referencias EDT
+   * no convertidas. Nunca contamos dos veces una referencia ya creada. */
+  const operationalCounts = project.modules.reduce((total, module) => {
+    const reference = appliedPlanning.data?.modules.find((entry) => entry.moduleId === module.id);
+    total.tasks += module.tasks.length +
+      (reference?.tasks.filter((task) => !referenceIsConverted(module, task)).length ?? 0);
+    total.blocks += module.segments.length + getOperationalRows({ id: module.id }).length;
+    return total;
+  }, { tasks: 0, blocks: 0 });
+
+  const renderOperationalContent = (phase: { id: string }) => {
+    const module = modulesById.get(phase.id);
+    if (!module) return null;
+    const commercial = appliedPlanning.data?.modules.find((entry) => entry.moduleId === module.id);
+    const references = commercial?.tasks.filter((task) => !referenceIsConverted(module, task)) ?? [];
+    const unassignedActual = module.tasks.filter((task) => !task.assigneeUserId);
+    const pending = [
+      ...unassignedActual.map((task) => ({
+        id: task.id, teamId: task.teamId, hours: task.estimatedHours ?? 0,
+      })),
+      ...references.map((task) => ({
+        id: task.wbs + ':' + task.role, teamId: task.teamId, hours: task.hours,
+      })),
+    ];
+    const groups = new Map<string, { count: number; hours: number }>();
+    for (const row of pending) {
+      const id = row.teamId ?? '';
+      const group = groups.get(id) ?? { count: 0, hours: 0 };
+      group.count += 1;
+      group.hours += row.hours;
+      groups.set(id, group);
+    }
+    const count = module.tasks.length + references.length;
+    const approved = module.tasks.filter((task) => task.status === 'done').length;
+    return <div className={styles.operationalContent}>
+      {Array.from(groups, ([id, group]) => {
+        const team = project.teams.find((entry) => entry.teamId === id);
+        const teamName = team?.teamName ?? teamOptions.find((entry) => entry.value === id)?.label ??
+          'Equipo sin vincular';
+        const members = project.members.filter((member) =>
+          member.teamId === id && member.userStatus === 'active');
+        const firstReference = references.find((task) => task.teamId === id);
+        return <div className={styles.awaitingAssignment} key={id || 'unmapped'}>
+          <span className={styles.awaitingBadge}
+            style={{ background: teamColor(teamName) }} aria-hidden="true">
+            {teamName.slice(0, 3).toUpperCase()}
+          </span>
+          <div className={styles.awaitingText}>
+            <strong>{module.name}: {group.count} {group.count === 1 ? 'tarea espera' : 'tareas esperan'} asignación</strong>
+            <span>{members.length === 0 ?
+              'No hay colaboradores activos de este equipo asignados al proyecto.' +
+                (team?.leader?.fullName ? ' Esperando que ' + team.leader.fullName + ' asigne colaboradores.' : '')
+              : group.hours + ' HH estimadas. Las referencias EDT deben convertirse en tareas antes de asignarlas.'}
+            </span>
+          </div>
+          {canManage && members.length > 0 && firstReference && <Button size="sm" variant="secondary"
+            onClick={() => setCreatingFromReference({ moduleId: module.id, task: firstReference })}>
+            Crear tarea
+          </Button>}
+        </div>;
+      })}
+      <details className={styles.operationalTasks} open>
+        <summary><strong>Tareas</strong> {count}, {approved} aprobadas</summary>
+        {count ? <div className={styles.operationalTaskScroll}>
+          <table className={styles.operationalTaskTable}>
+            <thead><tr><th>Tarea</th><th>Asignada a</th><th>Bloque de trabajo</th>
+              <th>Estado</th><th>HH est. / reales</th><th>Fecha límite</th><th>Acción</th></tr></thead>
+            <tbody>
+              {module.tasks.map((task) => (
+                <tr key={task.id}>
+                  <td className={styles.operationalTaskTitle}>{task.name}</td>
+                  <td>{task.assigneeName || 'Sin asignar'}</td>
+                  <td>{task.teamName || '—'}</td>
+                  <td><span className={[styles.taskState, task.assigneeUserId ? styles.taskStateAssigned : ''].join(' ')}>
+                    {task.assigneeUserId ? PROJECT_MODULE_TASK_STATUS_LABELS[task.status] : 'Por asignar'}
+                  </span></td>
+                  <td>{task.estimatedHours ?? '—'} / —</td>
+                  <td>{formatDate(task.date)}</td>
+                  <td>—</td>
+                </tr>
+              ))}
+              {references.map((reference) => {
+                const teamName = project.teams.find((team) => team.teamId === reference.teamId)?.teamName ??
+                  teamOptions.find((team) => team.value === reference.teamId)?.label ?? reference.role;
+                return <tr key={'ref:' + reference.wbs + ':' + reference.role}>
+                  <td className={styles.operationalTaskTitle}>{reference.name}
+                    <small>Referencia EDT · pendiente de crear como tarea de Kora</small>
+                  </td>
+                  <td>Sin asignar</td>
+                  <td>{teamName}</td>
+                  <td><span className={styles.taskState}>Por asignar</span></td>
+                  <td>{reference.hours} / —</td>
+                  <td>—</td>
+                  <td>{canManage ? <Button size="sm" variant="ghost"
+                    onClick={() => setCreatingFromReference({ moduleId: module.id, task: reference })}>
+                    Crear tarea
+                  </Button> : '—'}</td>
+                </tr>;
+              })}
+            </tbody>
+          </table>
+        </div> : <p className={styles.noOperationalTasks}>Sin tareas registradas en esta fase.</p>}
+      </details>
+    </div>;
+  };
+
   const renderSelectionDetail = (phase: { id: string }, selection: PhaseRoadmapSelection, close: () => void) => {
     const module = modulesById.get(phase.id);
     if (!module) return null;
@@ -519,8 +654,26 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
           </details>
         </Card>
       )}
-      <PhaseRoadmap alwaysExpanded borderlessSummary phaseRoadmap={phaseRoadmap} renderPhaseExtras={renderPhaseExtras}
-        renderPhaseReferences={renderPhaseReferences} renderSelectionDetail={renderSelectionDetail}
+      <PhaseRoadmap alwaysExpanded operationalView borderlessSummary phaseRoadmap={phaseRoadmap}
+        operationalTaskCount={operationalCounts.tasks} operationalBlockCount={operationalCounts.blocks}
+        operationalRows={getOperationalRows}
+        onPlanOperationalRow={canManage && planningMode ? (phase, row) => {
+          const module = modulesById.get(phase.id);
+          const reference = appliedPlanning.data?.modules.find((item) => item.moduleId === phase.id)
+            ?.relativeTeamBlocks?.find((block) => block.teamId === row.id);
+          if (module && reference) setPlanningBlock({
+            moduleId: module.id, teamId: reference.teamId,
+            name: module.name + ' · ' +
+              (teamOptions.find((item) => item.value === reference.teamId)?.label ?? 'Equipo'),
+          });
+        } : undefined}
+        renderPhaseExtras={renderPhaseExtras}
+        renderPhaseReferences={(phase) => <>{renderOperationalContent(phase)}
+          {planningMode && <details className={styles.legacyReferences}>
+            <summary>Referencias comerciales y planificación manual</summary>
+            {renderPhaseReferences(phase)}
+          </details>}</>}
+        renderSelectionDetail={renderSelectionDetail}
         renderPhaseHeaderName={canManage && planningMode ? renderPhaseHeaderName : undefined}
         renderPhaseHeaderActions={renderPhaseHeaderActions}
         toolbarActions={canManage ? (
