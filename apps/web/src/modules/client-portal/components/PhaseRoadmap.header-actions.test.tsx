@@ -124,3 +124,36 @@ describe('Roadmap operativo · diseño aprobado v5.02', () => {
     expect(bar).toBeInTheDocument();
   });
 });
+
+
+describe('Controles históricos preservados en vista operativa', () => {
+  it('permite abrir detalles de tareas y entregas fechadas, y conserva las opciones de etapa', () => {
+    const roadmap: ProjectPhaseRoadmap = {
+      ...phaseRoadmap,
+      phases: [{
+        ...phaseRoadmap.phases[0]!,
+        deliveries: [{ id: 'delivery-01', label: 'Entrega QA', date: '2026-11-12', state: 'committed' }],
+        taskItems: [{ id: 'task-01', label: 'Validar interfaz', date: '2026-11-13',
+          state: 'upcoming', scope: 'diseno' }],
+      }],
+    };
+    render(<PhaseRoadmap phaseRoadmap={roadmap} operationalView
+      renderPhaseExtras={() => <span>Etapa de Kora</span>}
+      renderSelectionDetail={(_phase, selection) =>
+        <div>Detalle: {'label' in selection ? selection.label : 'Incidente'}</div>
+      } />);
+    const stageOptions = screen.getByText('Etapa y datos de la fase').closest('details');
+    expect(stageOptions).not.toHaveAttribute('open');
+    fireEvent.click(screen.getByText('Etapa y datos de la fase'));
+    expect(screen.getByText('Etapa de Kora')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText(/Entregas y tareas en el cronograma/));
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir entrega Entrega QA' }));
+    expect(screen.getByText('Detalle: Entrega QA')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir tarea Validar interfaz' }));
+    expect(screen.getByText('Detalle: Validar interfaz')).toBeInTheDocument();
+
+    expect(screen.getByText('Opciones de cronograma · rango de fechas')).toBeInTheDocument();
+    expect(screen.getByText('Desarrollo Backend')).toBeInTheDocument();
+  });
+});
