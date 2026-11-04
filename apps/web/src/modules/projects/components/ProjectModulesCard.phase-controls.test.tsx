@@ -149,6 +149,15 @@ beforeEach(() => {
 });
 
 describe('Cabecera de las fases · HTML v5', () => {
+  it('no muestra la antigua Hoja de ruta ni el resumen duplicado de etapas', () => {
+    show();
+    expect(screen.queryByText(/Hoja de ruta/i)).not.toBeInTheDocument();
+    expect(screen.queryByText('Etapa actual')).not.toBeInTheDocument();
+    expect(screen.queryByText('Etapa inicial')).not.toBeInTheDocument();
+    // Las HH no desaparecen: siguen visibles en la cabecera de fase.
+    expect(screen.getByText('Sin fechas, 120 HH de fase')).toBeInTheDocument();
+  });
+
   it('la cabecera de fase muestra periodo, HH reales y preventa del contrato', () => {
     show({ ...project, prospectPhaseHours: 18,
       modules: [{ ...module, estimatedHours: null, segments: [{
