@@ -27,7 +27,7 @@ import { ApiRequestError } from '@/shared/lib/api-client';
 import { PhaseRoadmap, type PhaseRoadmapSelection, type OperationalRoadmapRow } from '@/modules/client-portal/components/PhaseRoadmap';
 import { roleFromTeamName, toPhaseRoadmap } from '@/modules/client-portal/adapters/project-detail.adapter';
 import { PHASE_ROADMAP_ROLE_COLORS } from '@/modules/client-portal/types';
-import { useCreateProjectModule, useCreateProjectModuleSegment, useDeleteProjectModule, useDeleteProjectModuleSegment, useUpdateProjectModule, useUpdateProjectModuleDelivery, useUpdateProjectModuleSegment } from '../api/projects.queries';
+import { useCreateProjectModule, useCreateProjectModuleSegment, useDeleteProjectModule, useDeleteProjectModuleSegment, useDeleteProjectModuleTask, useUpdateProjectModule, useUpdateProjectModuleDelivery, useUpdateProjectModuleSegment, useUpdateProjectModuleTask } from '../api/projects.queries';
 import { useConfirmAction } from '@/shared/components/ui/useConfirmAction';
 import { QuotationReferenceTaskModal } from './QuotationReferenceTaskModal';
 import { useAppliedQuotationPlanning } from '@/modules/estimation/api/quotation.queries';
@@ -114,6 +114,8 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
   const updateSegment = useUpdateProjectModuleSegment();
   const createSegment = useCreateProjectModuleSegment();
   const deleteSegment = useDeleteProjectModuleSegment();
+  const updateTask = useUpdateProjectModuleTask();
+  const deleteTask = useDeleteProjectModuleTask();
   const { confirm, dialog: confirmationDialog } = useConfirmAction();
   const appliedPlanning = useAppliedQuotationPlanning(project.id);
   const phaseRoadmap = useMemo(() => toPhaseRoadmap(project), [project]);
@@ -124,6 +126,10 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
   const [planningBlock, setPlanningBlock] = useState<{ moduleId: string; teamId: string; name: string } | null>(null);
   const [planningMode, setPlanningMode] = useState(false);
   const [addingPhase, setAddingPhase] = useState(false);
+  const [editingTask, setEditingTask] = useState<{
+    moduleId: string; taskId: string; name: string; startDate: string;
+    date: string; estimatedHours: string;
+  } | null>(null);
   const [newPhase, setNewPhase] = useState({
     name: '', initialStage: 'discovery' as ProjectModuleStage, estimatedHours: '',
     estimatedStartDate: '', estimatedEndDate: '',
@@ -189,6 +195,43 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
       toast.success('Bloque eliminado. Las referencias comerciales se conservaron.');
     } catch (error) {
       toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo eliminar el bloque.');
+    }
+  };
+
+  const onSaveTask = async () => {
+    if (!editingTask) return;
+    const hours = Number(editingTask.estimatedHours);
+    if (!editingTask.name.trim()) return toast.error('Escribe el nombre de la tarea.');
+    if (!editingTask.estimatedHours.trim() || !Number.isFinite(hours) || hours <= 0) {
+      return toast.error('Ingresa HH estimadas mayores a cero.');
+    }
+    if (!editingTask.startDate || !editingTask.date || editingTask.startDate > editingTask.date) {
+      return toast.error('Revisa las fechas de inicio y límite de la tarea.');
+    }
+    try {
+      await updateTask.mutateAsync({
+        projectId: project.id, moduleId: editingTask.moduleId, taskId: editingTask.taskId,
+        input: { name: editingTask.name.trim(), startDate: editingTask.startDate,
+          date: editingTask.date, estimatedHours: hours },
+      });
+      setEditingTask(null);
+      toast.success('Tarea actualizada.');
+    } catch (error) {
+      toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo editar la tarea.');
+    }
+  };
+
+  const onRemoveTask = async (module: ProjectModule, task: ProjectModuleTask) => {
+    if (!await confirm({
+      title: 'Eliminar tarea',
+      description: '¿Eliminar «' + task.name + '» del proyecto? Se mantendrá la referencia de cotización si existe.',
+      confirmLabel: 'Eliminar tarea', destructive: true,
+    })) return;
+    try {
+      await deleteTask.mutateAsync({ projectId: project.id, moduleId: module.id, taskId: task.id });
+      toast.success('Tarea eliminada.');
+    } catch (error) {
+      toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo eliminar la tarea.');
     }
   };
 
@@ -497,25 +540,36 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
                   </span></td>
                   <td>{task.estimatedHours ?? '—'} / —</td>
                   <td>{formatDate(task.date)}</td>
-                  <td>—</td>
+                  <td className={styles.operationalTaskActions}>
+                    {canManage && <>
+                      <button type="button" className={styles.taskIconAction}
+                        aria-label={'Editar tarea ' + task.name} title="Editar tarea"
+                        onClick={() => setEditingTask({
+                          moduleId: module.id, taskId: task.id, name: task.name,
+                          startDate: task.startDate, date: task.date,
+                          estimatedHours: task.estimatedHours == null ? '' : String(task.estimatedHours),
+                        })}><PencilIcon size={15} /></button>
+                      <button type="button" className={styles.taskIconAction}
+                        aria-label={'Eliminar tarea ' + task.name} title="Eliminar tarea"
+                        onClick={() => void onRemoveTask(module, task)}><TrashIcon size={15} /></button>
+                    </>}
+                  </td>
                 </tr>
               ))}
               {references.map((reference) => {
                 const teamName = project.teams.find((team) => team.teamId === reference.teamId)?.teamName ??
                   teamOptions.find((team) => team.value === reference.teamId)?.label ?? reference.role;
                 return <tr key={'ref:' + reference.wbs + ':' + reference.role}>
-                  <td className={styles.operationalTaskTitle}>{reference.name}
-                    <small>Referencia EDT · pendiente de crear como tarea de Kora</small>
-                  </td>
+                  <td className={styles.operationalTaskTitle} title="Referencia de cotización pendiente de crear como tarea operativa">{reference.name}</td>
                   <td>Sin asignar</td>
                   <td><span className={styles.unlinkedBlock}>Pendiente de planificar</span></td>
                   <td><span className={styles.taskState} title={'Equipo: ' + teamName}>Por asignar</span></td>
                   <td>{reference.hours} / —</td>
                   <td>—</td>
-                  <td>{canManage ? <Button size="sm" variant="ghost"
+                  <td className={styles.operationalTaskActions}>{canManage && <Button size="sm" variant="ghost"
                     onClick={() => setCreatingFromReference({ moduleId: module.id, task: reference })}>
                     Crear tarea
-                  </Button> : '—'}</td>
+                  </Button>}</td>
                 </tr>;
               })}
             </tbody>
@@ -624,6 +678,33 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
         />
       )}
       {confirmationDialog}
+      <Modal open={editingTask !== null} title="Editar tarea"
+        onClose={() => setEditingTask(null)} dismissible={!updateTask.isPending}
+        footer={<>
+          <Button variant="outline" onClick={() => setEditingTask(null)}
+            disabled={updateTask.isPending}>Cancelar</Button>
+          <Button loading={updateTask.isPending} onClick={() => void onSaveTask()}>
+            Guardar cambios
+          </Button>
+        </>}>
+        {editingTask && <div className={styles.phaseCreationForm}>
+          <TextField label="Nombre de la tarea" value={editingTask.name}
+            onChange={(event) => setEditingTask((current) =>
+              current ? { ...current, name: event.target.value } : current)} />
+          <TextField label="Horas estimadas" type="number" min={0.01} step={0.01}
+            value={editingTask.estimatedHours}
+            onChange={(event) => setEditingTask((current) =>
+              current ? { ...current, estimatedHours: event.target.value } : current)} />
+          <div className={styles.phaseCreationDates}>
+            <TextField label="Fecha de inicio" type="date" value={editingTask.startDate}
+              onChange={(event) => setEditingTask((current) =>
+                current ? { ...current, startDate: event.target.value } : current)} />
+            <TextField label="Fecha límite" type="date" value={editingTask.date}
+              onChange={(event) => setEditingTask((current) =>
+                current ? { ...current, date: event.target.value } : current)} />
+          </div>
+        </div>}
+      </Modal>
       <Modal open={addingPhase} title="Agregar fase" onClose={() => setAddingPhase(false)}
         dismissible={!createModule.isPending}
         footer={<>
