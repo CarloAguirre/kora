@@ -77,3 +77,37 @@ pnpm db:migrate
 pnpm --filter @kora/api exec vitest run src/modules/projects/application/use-cases/update-project-module-segment.use-case.spec.ts src/modules/projects/application/use-cases/update-project-module-task.use-case.spec.ts
 pnpm --filter @kora/web exec vitest run src/modules/projects/components/AssignBlockTasksModal.test.tsx src/modules/projects/components/ProjectModulesCard.phase-controls.test.tsx src/modules/client-portal/components/PhaseRoadmap.header-actions.test.tsx
 ```
+
+## Ajustes de fidelidad UI del 04-11 — cabecera y acciones de tareas
+
+- El header de fase en modo **Planificar** mantiene el nombre editable, fechas y HH en una sola línea en escritorio (en anchos reducidos permite saltos controlados), con los controles de progreso, crear bloque y borrar fase alineados a la derecha.
+- La última columna de tareas **no tiene texto «Asignar tarea»**. Todas las filas presentan **lápiz** y **basurero**.
+- Tareas operativas existentes: lápiz = `ExecutionTaskModal` (`Editar tarea`), basurero = confirmación con `useConfirmAction` y `DELETE /projects/:id/modules/:moduleId/tasks/:taskId`.
+- Referencias EDT aún no convertidas: lápiz = `QuotationReferenceTaskModal mode=edit`, con nombre, descripción, horas y bloque precargados si es único. Guardar crea la tarea operativa con `sourceMarker` trazable, conservando intacta la versión comercial.
+- Basurero de referencia EDT no convertida = confirmación `Eliminar tarea` y exclusión **operativa** persistida por `(moduleId,versionId,wbs,role)`, sin tocar el artefacto comercial ni simular una tarea guardada.
+- Al borrar una tarea operativa que se originó en una referencia EDT, el backend persiste la exclusión de esa referencia **en la misma transacción** del borrado, evitando que reaparezca inmediatamente como tarea por asignar.
+- Se incluye endpoint de restauración programática de exclusión, sin acción visual nueva en esta iteración.
+
+### Migración adicional 0052
+`packages/db/migrations/0052_roadmap_reference_exclusions.sql` crea
+`project_roadmap_reference_exclusions` y sus índices de unicidad/consulta.
+**Aplicar también migración 0052** antes de iniciar API/Frontend (además de 0051).
+
+### Validación puntual (PowerShell)
+```powershell
+pnpm --filter @kora/contracts build
+pnpm --filter @kora/db build
+pnpm --filter @kora/api typecheck
+pnpm --filter @kora/web typecheck
+pnpm --filter @kora/api exec vitest run src/modules/projects/application/use-cases/delete-project-module-task.use-case.spec.ts
+pnpm --filter @kora/web exec vitest run src/modules/projects/components/ProjectModulesCard.phase-controls.test.tsx src/modules/projects/components/QuotationReferenceTaskModal.test.tsx
+pnpm --filter @kora/api build
+pnpm --filter @kora/web build
+# Tras backup y comprobación de DATABASE_URL:
+pnpm db:migrate
+```
+
+Comprobar con dos escenarios: (a) fase que ya tiene tareas operativas con dates/HH y
+(b) fase con tareas aún referenciales procedentes de una versión de cotización aplicada.
+En ambos, el lápiz abre «Editar tarea» y el basurero confirma «Eliminar tarea»;
+no deben regresar filas eliminadas tras refrescar la página.
