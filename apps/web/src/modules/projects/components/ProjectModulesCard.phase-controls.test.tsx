@@ -308,7 +308,11 @@ describe('Traspaso de cotización · vista operativa v5.02', () => {
     expect(screen.getByText('Conexión con taller')).toBeInTheDocument();
     expect(screen.getByTitle('Referencia de cotización pendiente de crear como tarea operativa')).toBeInTheDocument();
     expect(screen.getByText('Tareas')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Crear tarea' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Asignar tarea' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Asignar tareas' })).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Asignar tareas' }));
+    expect(screen.getByRole('dialog', { name: 'Asignar tareas · Diseño Backend' })).toBeInTheDocument();
+    expect(screen.getAllByText('Conexión con taller').length).toBeGreaterThan(0);
     expect(mocks.createSegment).not.toHaveBeenCalled();
   });
 });
@@ -348,7 +352,7 @@ describe('Fidelidad del Roadmap v5.02 · acciones y estructura', () => {
     await waitFor(() => expect(mocks.updateTask).toHaveBeenCalledWith({
       projectId: 'project-1', moduleId: 'module-1', taskId: 'task-1',
       input: { name: 'Diseñar interfaz principal', description: null,
-        teamId: 'team-1', assigneeUserId: null, status: 'todo',
+        teamId: 'team-1', segmentId: null, assigneeUserId: null, status: 'todo',
         startDate: '2026-11-04', date: '2026-11-15', estimatedHours: 20 },
     }));
   });
@@ -385,7 +389,7 @@ describe('Fidelidad del Roadmap v5.02 · acciones y estructura', () => {
       projectId: 'project-1', moduleId: 'module-1',
       input: {
         name: 'Revisar integración', description: null,
-        teamId: 'team-1', assigneeUserId: null, scope: 'desarrollo',
+        teamId: 'team-1', segmentId: null, assigneeUserId: null, scope: 'desarrollo',
         status: 'todo', estimatedHours: 16,
         startDate: '2026-11-05', date: '2026-11-12',
       },
@@ -411,7 +415,7 @@ describe('Fidelidad del Roadmap v5.02 · acciones y estructura', () => {
       projectId: 'project-1', moduleId: 'module-1',
       input: {
         name: 'Diseñar interfaz (2)', description: 'Diseño validado',
-        teamId: 'team-1', assigneeUserId: 'user-2', scope: 'diseno',
+        teamId: 'team-1', segmentId: null, assigneeUserId: 'user-2', scope: 'diseno',
         status: 'todo', estimatedHours: 20, startDate: '2026-11-04', date: '2026-11-15',
       },
     }));
