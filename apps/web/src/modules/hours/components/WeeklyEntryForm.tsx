@@ -108,6 +108,8 @@ export function WeeklyEntryForm({
   ]);
   const availableSegments = (selectedModule?.segments ?? [])
     .filter((segment) => allowedTeamIds.has(segment.teamId));
+  const hasEligibleRoadmapBlocks = (projectDetail?.modules ?? [])
+    .some((module) => module.segments.some((segment) => allowedTeamIds.has(segment.teamId)));
   const overtimeDisabled = needsProject && !selectedProject?.allowsOvertime;
   const weekTotal = dayHours.reduce((sum, value) => sum + (Number(value) || 0), 0);
 
@@ -162,9 +164,9 @@ export function WeeklyEntryForm({
     if (activeDays.some((day) => day.hours > 24)) return 'No puede registrar más de 24 horas en un día.';
     if (activeDays.some((day) => holidayDayIndexes.has(day.index))) return 'No se pueden registrar horas en un día feriado.';
     if (needsProject && !projectId) return 'Selecciona un proyecto para esta asignación.';
-    if (needsProject && projectDetail?.modules.some((m) => m.segments.length > 0) && !moduleId)
+    if (needsProject && hasEligibleRoadmapBlocks && !moduleId)
       return 'Selecciona una fase y su bloque de trabajo para imputar estas horas.';
-    if (needsProject && selectedModule?.segments.length && !segmentId)
+    if (needsProject && availableSegments.length > 0 && !segmentId)
       return 'Selecciona el bloque al que corresponden estas HH.';
     if (needsApprover && !designatedApproverUserId) return 'Selecciona a quién aprueba estas horas.';
     if (needsProject && isOvertime && overtimeDisabled) return 'Este proyecto no tiene autorizadas horas extra.';
@@ -295,12 +297,12 @@ export function WeeklyEntryForm({
       {needsProject && projectId && (projectDetail?.modules.length ?? 0) > 0 && (
         <div className={styles.row}>
           <Select label="Fase / Módulo"
-            required={Boolean(projectDetail?.modules.some((module) => module.segments.length > 0))}
+            required={hasEligibleRoadmapBlocks}
             placeholder="Seleccionar fase..."
             options={(projectDetail?.modules ?? []).map((module) => ({ value: module.id, label: module.name }))}
             value={moduleId}
             onChange={(event) => { setModuleId(event.target.value); setSegmentId(''); }} />
-          {selectedModule && selectedModule.segments.length > 0 && (
+          {selectedModule && availableSegments.length > 0 && (
             <Select label="Bloque de trabajo" required
               placeholder="Seleccionar bloque..."
               options={availableSegments.map((segment) => ({
