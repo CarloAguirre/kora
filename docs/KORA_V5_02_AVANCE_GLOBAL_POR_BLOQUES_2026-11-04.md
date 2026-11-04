@@ -54,7 +54,9 @@ fases y del proyecto. No inventa un 0% ni distribuye HH vendidas a bloques.
 `TeamProgressCard`, adaptado a **todos los equipos**: barra, marca esperada,
 estado, metodología, bloques con mayor contribución al atraso (en puntos
 del porcentaje TOTAL), cierre aprobado/manual, tabla por fase y bloque
-con HH consumidas atribuidas explícitamente. El pie de HH vendidas,
+con HH consumidas atribuidas explícitamente. El resumen muestra también
+el número de tareas **operativas persistidas y no canceladas**; no incluye
+referencias de cotización todavía sin convertir. El pie de HH vendidas,
 consumidas, restantes y fechas de la ficha original se conserva.
 
 `DevelopmentProjectDetailView` usa el nuevo agregador. `ProjectTimeline`
