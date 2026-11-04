@@ -166,9 +166,15 @@ export function calculateTeamProgress(
 
   for (const [index, module] of project.modules.entries()) {
     const teamBlocks = module.segments.filter((block) => block.teamId === teamId);
-    if (teamBlocks.length === 0) continue;
-
     const tasks = module.tasks.filter((task) => task.teamId === teamId && !task.cancelledAt);
+    if (teamBlocks.length === 0) {
+      // Una tarea del equipo en una fase sin sus bloques (por ejemplo una
+      // referencia EDT importada bajo UX en una fase de Desarrollo) sigue
+      // siendo una tarea sin atribución y debe aparecer en el diagnóstico.
+      unlinkedTaskCount += tasks.length;
+      continue;
+    }
+
     const matched = new Set<string>();
     const blocks = teamBlocks.map((block) => {
       if (!validHours(block.estimatedHours)) unplannedBlockCount++;
