@@ -142,7 +142,9 @@ export class GetProjectUseCase implements UseCase<GetProjectCommand, ProjectDeta
     // proyecto iniciado se materializan las semanas comerciales como bloques
     // operativos reales. Esta operación es transaccional, idempotente y
     // preserva toda edición previa; NO exige una segunda aprobación.
-    const generated = await this.approvedCalendar.ensure(project.id);
+    const generated = snapshot.status === 'active' && snapshot.startDate &&
+      snapshot.salesStage === 'approved'
+      ? await this.approvedCalendar.ensure(project.id) : false;
     const currentModules = generated
       ? await this.modules.listForProject(project.id)
       : projectModules;
