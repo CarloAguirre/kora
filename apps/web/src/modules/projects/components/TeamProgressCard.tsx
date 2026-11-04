@@ -173,7 +173,7 @@ export function TeamProgressCard({ progress, teamName }: Props) {
                 <th>HH</th>
                 <th>Real vs plan a hoy</th>
                 <th>Cómo avanza</th>
-                <th title="El sistema conserva el consumo a nivel de equipo; no lo distribuye entre bloques sin evidencia.">HH consumidas</th>
+                <th title="Solo HH aprobadas con un bloque identificado. Histórico sin bloque no distribuido.">HH consumidas</th>
               </tr></thead>
               <tbody>
                 {progress.phases.map((phase) => (
@@ -194,11 +194,11 @@ export function TeamProgressCard({ progress, teamName }: Props) {
             </p>
           )}
           <p className={styles.note}>
-            Las HH consumidas muestran el costo y no mueven el avance: haber usado
-            el 60% de las horas no significa llevar el 60% del trabajo.
-            El detalle por bloque aparece como «—» porque el registro de horas
-            no identifica un bloque de forma verificable: el sistema
-            no lo distribuye entre bloques sin evidencia.
+            Las HH consumidas identificadas por bloque provienen de registros
+            aprobados que señalan ese bloque expresamente. Las horas históricas
+            sin esa asociación permanecen en el consumo general del equipo
+            y no se asignan artificialmente. El consumo muestra costo,
+            no avance: usar el 60% de las horas no implica completar el 60% del trabajo.
           </p>
         </div>}
       </div>
@@ -213,14 +213,14 @@ function FragmentPhase({ phase }: { phase: TeamProgress['phases'][number] }) {
       <td>{hours(phase.estimatedHours)}</td>
       <td><ProgressMiniTrack real={phase.actualPercent} planned={phase.expectedPercent} /></td>
       <td>{percent(phase.actualPercent)} real, {percent(phase.expectedPercent)} según plan</td>
-      <td title="No atribuible por bloque">—</td>
+      <td title="Suma de HH aprobadas imputadas a bloques de la fase">{hours(phase.consumedHours)} HH</td>
     </tr>
     {phase.blocks.map((block) => <tr key={block.id}>
       <td><span className={styles.blockLabel}><span className={styles.blockDot} />{block.name}</span></td>
       <td>{hours(block.estimatedHours)}</td>
       <td><ProgressMiniTrack real={block.actualPercent} planned={block.expectedPercent} /></td>
       <td><BlockNote block={block} /></td>
-      <td title="Consumo no atribuido inequívocamente a este bloque">—</td>
+      <td title="Suma de HH aprobadas imputadas a este bloque">{hours(block.consumedHours)} HH</td>
     </tr>)}
   </>;
 }
