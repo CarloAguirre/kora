@@ -180,7 +180,7 @@ export function TeamDeliveriesCard({ project, projectId, teamId, managerView = f
 
       <DeliveryActionDialogs
         projectId={projectId}
-        members={project.members}
+        members={project.members.filter((member) => !member.blockedAt)}
         target={actionTarget}
         onClose={() => setActionTarget(null)}
       />
