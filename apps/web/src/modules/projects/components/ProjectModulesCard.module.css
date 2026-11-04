@@ -529,3 +529,14 @@
   .awaitingAssignment { flex-wrap: wrap; }
   .awaitingAssignment > button { margin-left: 40px; }
 }
+
+
+.operationalTeamDot {
+  display: inline-block;
+  vertical-align: middle;
+  width: 8px;
+  height: 8px;
+  border-radius: 3px;
+  margin-right: 5px;
+}
+.unlinkedBlock { font-size: 11.5px; color: #7b8794; }
