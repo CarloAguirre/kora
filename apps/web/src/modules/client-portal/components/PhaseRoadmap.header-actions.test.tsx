@@ -215,8 +215,8 @@ describe('Hitos verificables del bloque operativo', () => {
   });
 });
 
-describe('Controles históricos preservados en vista operativa', () => {
-  it('permite abrir tareas y entregas fechadas sin mostrar el acordeón de etapa descartado', () => {
+describe('Cronograma operativo simplificado', () => {
+  it('elimina el subcronograma redundante aun cuando haya tareas y entregas', () => {
     const roadmap: ProjectPhaseRoadmap = {
       ...phaseRoadmap,
       phases: [{
@@ -228,18 +228,12 @@ describe('Controles históricos preservados en vista operativa', () => {
     };
     render(<PhaseRoadmap phaseRoadmap={roadmap} operationalView
       renderPhaseExtras={() => <span>Etapa de Kora</span>}
-      renderSelectionDetail={(_phase, selection) =>
-        <div>Detalle: {'label' in selection ? selection.label : 'Incidente'}</div>
-      } />);
-    expect(screen.queryByText('Etapa y datos de la fase')).not.toBeInTheDocument();
+      renderPhaseReferences={() => <span>Tareas operativas visibles</span>} />);
+    expect(screen.queryByText(/Entregas y tareas en el cronograma/)).not.toBeInTheDocument();
     expect(screen.queryByText('Etapa de Kora')).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByText(/Entregas y tareas en el cronograma/));
-    fireEvent.click(screen.getByRole('button', { name: 'Abrir entrega Entrega QA' }));
-    expect(screen.getByText('Detalle: Entrega QA')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Abrir tarea Validar interfaz' }));
-    expect(screen.getByText('Detalle: Validar interfaz')).toBeInTheDocument();
-
+    expect(screen.queryByRole('button', { name: 'Abrir entrega Entrega QA' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Abrir tarea Validar interfaz' })).not.toBeInTheDocument();
+    expect(screen.getByText('Tareas operativas visibles')).toBeInTheDocument();
     expect(screen.getByText('Opciones de cronograma · rango de fechas')).toBeInTheDocument();
     expect(screen.getByText('Desarrollo Backend')).toBeInTheDocument();
   });
