@@ -207,14 +207,26 @@ export interface DeliveryAssignedToUserRecord {
 /** Lo mínimo de una fase para calcular el avance del proyecto — ver `calculateProjectProgress`. */
 export interface ProjectModuleProgressInputRecord {
   readonly estimatedHours: number | null;
+  readonly segments: readonly {
+    readonly id: string;
+    readonly teamId: string;
+    readonly estimatedHours: number | null;
+    readonly startDate: Date;
+    readonly endDate: Date;
+    readonly closedAt: Date | null;
+  }[];
   readonly currentStage: ProjectModuleStage;
   readonly tasks: readonly {
+    readonly segmentId: string | null;
+    readonly teamId: string | null;
+    readonly description: string | null;
     readonly estimatedHours: number | null;
     readonly status: ProjectModuleTaskStatus;
     readonly date: Date;
     readonly scope: ProjectModuleTaskScope;
   }[];
   readonly deliveries: readonly {
+    readonly segmentId: string | null;
     readonly status: ProjectModuleDeliveryStatus;
     readonly estimatedDate: Date;
   }[];
