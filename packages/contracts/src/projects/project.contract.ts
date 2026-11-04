@@ -372,8 +372,8 @@ export type ProjectModule = z.infer<typeof projectModuleSchema>;
 export const createProjectModuleSchema = z.object({
   name: nonEmptyTrimmed(300, 'El nombre del módulo'),
   initialStage: projectModuleStageSchema,
-  /** Obligatorio: forma parte de la base del avance real del proyecto (ver `projectProgressSchema`). */
-  estimatedHours: estimatedHoursSchema,
+  /** La fase puede crearse solo con nombre: las HH se planifican al añadir bloques. */
+  estimatedHours: estimatedHoursSchema.optional(),
   estimatedStartDate: z.iso.date().nullish(),
   estimatedEndDate: z.iso.date().nullish(),
 });
