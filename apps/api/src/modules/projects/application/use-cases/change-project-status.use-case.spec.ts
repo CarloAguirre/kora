@@ -137,10 +137,13 @@ describe('ChangeProjectStatusUseCase — Hito 0 manual', () => {
       slug: 'portal',
       type: 'development',
       salesStage: 'approved',
-      status: 'on_hold',
+      status: 'draft',
       leaderUserId: 'leader-1',
       now: NOW,
     }).unwrap();
+    // Reactivación real: este proyecto ya pasó por Hito 0 antes de detenerse.
+    project.activateFromHito0(NOW, 'manual', 'Contrato firmado');
+    project.changeStatus('on_hold', NOW);
     const { useCase, projects } = buildUseCase(project);
 
     const result = await useCase.execute({
