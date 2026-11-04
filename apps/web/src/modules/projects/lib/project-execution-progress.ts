@@ -46,6 +46,7 @@ export interface ProjectExecutionProgress {
   readonly unplannedBlockCount: number;
   readonly unlinkedTaskCount: number;
   readonly blocksCount: number;
+  readonly taskCount: number;
   readonly phases: readonly ProjectExecutionPhase[];
   readonly laggingBlocks: readonly (ProjectExecutionBlock & { phaseName: string })[];
 }
