@@ -67,7 +67,7 @@ describe('Avance del proyecto — mismo desglose que el equipo', () => {
     expect(within(table).getByText('Fase 1: Bot de conciliación')).toBeInTheDocument();
     expect(within(table).getByText('Fase 2: Reportería')).toBeInTheDocument();
     expect(screen.getByText(/Cerrado el 16-10-2026/)).toBeInTheDocument();
-    expect(screen.getAllByText(/Completado mediante entrega aprobada/).length).toBe(1);
+    expect(screen.getAllByText(/Cerrado por entrega aprobada/).length).toBe(1);
   });
 
   it('mantiene el desglose desplegable como en la referencia', () => {
