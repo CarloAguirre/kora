@@ -282,6 +282,18 @@ const estimatedHoursSchema = z.coerce
   .gt(0, 'Las horas estimadas deben ser mayores a 0.');
 
 /** Tarea puntual (una fecha) de una fase/módulo, por equipo y opcionalmente asignada a una persona — marcador en el Roadmap y base de "Mis tareas". */
+/** Quitar una referencia EDT solo de la planificación operacional; la cotización permanece intacta. */
+export const excludeRoadmapReferenceSchema = z.object({
+  versionId: uuidSchema,
+  wbs: z.string().trim().min(1).max(160),
+  role: z.string().trim().min(1).max(160),
+});
+export type ExcludeRoadmapReferenceInput = z.infer<typeof excludeRoadmapReferenceSchema>;
+export const roadmapReferenceExclusionSchema = excludeRoadmapReferenceSchema.extend({
+  moduleId: uuidSchema,
+});
+export type RoadmapReferenceExclusion = z.infer<typeof roadmapReferenceExclusionSchema>;
+
 export const projectModuleTaskSchema = z.object({
   id: uuidSchema,
   /** Relación verificable con el bloque operativo; las tareas antiguas pueden no tenerla. */
