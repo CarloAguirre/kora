@@ -577,3 +577,6 @@
 .drawerTaskRow > div { flex: 1; min-width: 0; display: grid; gap: 4px; }
 .drawerTaskRow strong { font-weight: 600; overflow-wrap: anywhere; }
 .drawerTaskRow small { color: #667085; }
+
+/* Tres acciones (editar, duplicar, eliminar) en la tabla operativa. */
+.operationalTaskTable th:last-child { width: 112px; }

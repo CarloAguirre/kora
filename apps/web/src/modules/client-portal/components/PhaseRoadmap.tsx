@@ -799,7 +799,7 @@ function OperationalPhaseCard({
               const isSelected = sameSelection(selected, selection);
               return <div key={task.id ?? index} className={styles.operationalLine}>
                 <button type="button" className={styles.operationalBlockLabel}
-                  title={task.label} aria-label={'Abrir bloque ' + task.label}
+                  title={task.label} aria-label={'Ver detalle del bloque ' + task.label}
                   onClick={() => choose(selection)}>
                   <span className={styles.operationalRole}
                     style={{ background: OPERATIONAL_ROLE_COLORS[task.role] }}>

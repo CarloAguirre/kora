@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   create: vi.fn(),
   remove: vi.fn(),
   updateTask: vi.fn(),
+  createTask: vi.fn(),
   removeTask: vi.fn(),
   createSegment: vi.fn(),
   confirm: vi.fn(),
@@ -64,6 +65,7 @@ vi.mock('../api/projects.queries', () => ({
   useDeleteProjectModuleSegment: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateProjectModuleDelivery: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateProjectModuleTask: () => ({ mutateAsync: mocks.updateTask, isPending: false }),
+  useCreateProjectModuleTask: () => ({ mutateAsync: mocks.createTask, isPending: false }),
   useDeleteProjectModuleTask: () => ({ mutateAsync: mocks.removeTask, isPending: false }),
 }));
 vi.mock('@/modules/estimation/api/quotation.queries', () => ({
@@ -104,6 +106,7 @@ beforeEach(() => {
   mocks.update.mockReset().mockResolvedValue(undefined);
   mocks.create.mockReset().mockResolvedValue(undefined);
   mocks.updateTask.mockReset().mockResolvedValue(undefined);
+  mocks.createTask.mockReset().mockResolvedValue(undefined);
   mocks.removeTask.mockReset().mockResolvedValue(undefined);
   mocks.remove.mockReset().mockResolvedValue(undefined);
   mocks.createSegment.mockReset().mockResolvedValue(undefined);
@@ -259,13 +262,39 @@ describe('Fidelidad del Roadmap v5.02 · acciones y estructura', () => {
     expect(screen.queryByRole('columnheader', { name: 'Acción' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Editar tarea Diseñar interfaz' }));
     expect(screen.getByRole('dialog', { name: 'Editar tarea' })).toBeInTheDocument();
-    fireEvent.change(screen.getByRole('textbox', { name: 'Nombre de la tarea' }),
+    fireEvent.change(screen.getByRole('textbox', { name: 'Título de la tarea' }),
       { target: { value: 'Diseñar interfaz principal' } });
     fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
     await waitFor(() => expect(mocks.updateTask).toHaveBeenCalledWith({
       projectId: 'project-1', moduleId: 'module-1', taskId: 'task-1',
-      input: { name: 'Diseñar interfaz principal', startDate: '2026-11-04',
-        date: '2026-11-15', estimatedHours: 20 },
+      input: { name: 'Diseñar interfaz principal', description: null,
+        teamId: 'team-1', assigneeUserId: null, status: 'todo',
+        startDate: '2026-11-04', date: '2026-11-15', estimatedHours: 20 },
     }));
   });
+  it('abre el formulario para duplicar sin copiar estado ni horas consumidas', async () => {
+    const task = { id: 'task-1', name: 'Diseñar interfaz', status: 'done',
+      startDate: '2026-11-04', date: '2026-11-15', estimatedHours: 20,
+      scope: 'diseno', description: 'Diseño validado', teamId: 'team-1',
+      assigneeUserId: 'user-1', assigneeName: 'Persona original', teamName: 'Desarrollo' };
+    const member = (userId: string, fullName: string) => ({
+      userId, fullName, teamId: 'team-1', teamName: 'Desarrollo', userStatus: 'active',
+    });
+    show({ ...project, members: [member('user-1', 'Persona original'),
+      member('user-2', 'Persona nueva')], modules: [{ ...module, tasks: [task] }] } as unknown as ProjectDetail);
+    fireEvent.click(screen.getByRole('button', { name: 'Editar tarea Diseñar interfaz' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Duplicar para otra persona' }));
+    expect(screen.getByRole('dialog', { name: 'Duplicar para otra persona' })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Asignado a'), { target: { value: 'team-1:user-2' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Duplicar tarea' }));
+    await waitFor(() => expect(mocks.createTask).toHaveBeenCalledWith({
+      projectId: 'project-1', moduleId: 'module-1',
+      input: {
+        name: 'Diseñar interfaz (2)', description: 'Diseño validado',
+        teamId: 'team-1', assigneeUserId: 'user-2', scope: 'diseno',
+        status: 'todo', estimatedHours: 20, startDate: '2026-11-04', date: '2026-11-15',
+      },
+    }));
+  });
+
 });

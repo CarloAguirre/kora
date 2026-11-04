@@ -22,7 +22,7 @@ import { Button } from '@/shared/components/ui/Button';
 import { Select } from '@/shared/components/ui/Select';
 import { Avatar } from '@/shared/components/ui/Avatar';
 import { Badge, type BadgeTone } from '@/shared/components/ui/Badge';
-import { CloseIcon, PencilIcon, TrashIcon } from '@/shared/components/icons/Icons';
+import { CloseIcon, CopyIcon, PencilIcon, TrashIcon } from '@/shared/components/icons/Icons';
 import { useToast } from '@/shared/components/ui/Toast';
 import { ApiRequestError } from '@/shared/lib/api-client';
 import { PhaseRoadmap, type PhaseRoadmapSelection, type OperationalRoadmapRow } from '@/modules/client-portal/components/PhaseRoadmap';
@@ -524,6 +524,9 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
                         aria-label={'Editar tarea ' + task.name} title="Editar tarea"
                         onClick={() => setEditingTask({ moduleId: module.id, task })}><PencilIcon size={15} /></button>
                       <button type="button" className={styles.taskIconAction}
+                        aria-label={'Duplicar tarea ' + task.name} title="Duplicar para otra persona"
+                        onClick={() => setDuplicatingTask({ moduleId: module.id, task })}><CopyIcon size={15} /></button>
+                      <button type="button" className={styles.taskIconAction}
                         aria-label={'Eliminar tarea ' + task.name} title="Eliminar tarea"
                         onClick={() => void onRemoveTask(module, task)}><TrashIcon size={15} /></button>
                     </>}
@@ -770,7 +773,11 @@ function SegmentDrawer({
   const deliveries = module.deliveries.filter((delivery) =>
     delivery.teamId === segment.teamId && delivery.estimatedDate === segment.endDate);
   const delivery = deliveries.length === 1 ? deliveries[0]! : null;
-  const teamTasks = module.tasks.filter((task) => task.teamId === segment.teamId);
+  const sameTeamSegments = module.segments.filter((entry) => entry.teamId === segment.teamId);
+  const teamTasks = module.tasks.filter((task) => task.teamId === segment.teamId &&
+    (task.description?.includes(' · ID ' + segment.id) ||
+      (sameTeamSegments.length === 1 &&
+        !task.description?.includes('Bloque de trabajo: '))));
   const deliver = async () => {
     if (!delivery || delivery.status !== 'planned' || !comment.trim()) return;
     try {

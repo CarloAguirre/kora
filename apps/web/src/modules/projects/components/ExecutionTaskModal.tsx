@@ -17,9 +17,9 @@ const sourceAndText = (description: string | null) => {
   const marker = lines.filter((line) => line.startsWith('Referencia cotización '));
   const content = lines.filter((line) => !line.startsWith(BLOCK_PREFIX) &&
     !line.startsWith('Referencia cotización ')).join('\n').trim();
-  const blockId = lines.find((line) => line.startsWith(BLOCK_PREFIX))
-    ?.match(/ · ID ([a-f0-9-]{36})$/i)?.[1] ?? '';
-  return { marker, content, blockId };
+  const blockLine = lines.find((line) => line.startsWith(BLOCK_PREFIX)) ?? '';
+  const blockId = blockLine.match(/ · ID ([a-f0-9-]{36})$/i)?.[1] ?? '';
+  return { marker, content, blockId, blockLine };
 };
 
 export function ExecutionTaskModal({
@@ -69,7 +69,8 @@ export function ExecutionTaskModal({
       return;
     }
     const blockLine = chosenBlock
-      ? BLOCK_PREFIX + chosenBlock.name + ' · ID ' + chosenBlock.id : '';
+      ? BLOCK_PREFIX + chosenBlock.name + ' · ID ' + chosenBlock.id
+      : blockId ? original.blockLine : '';
     const newDescription = [...original.marker, blockLine, description.trim()].filter(Boolean).join('\n');
     if (newDescription.length > 2000) {
       toast.error('La descripción y referencias superan el máximo de 2.000 caracteres.');
@@ -120,7 +121,6 @@ export function ExecutionTaskModal({
           setAssignee(member?.userId ?? '');
           setTeamId(member?.teamId ?? task.teamId ?? '');
           setBlockId('');
-          if (member && status === 'todo') setStatus('todo');
         }} />
       <p className={styles.help}>Solo puedes asignar colaboradores del proyecto. Si está vacío, la tarea continúa por asignar.</p>
       <Select label="Módulo relacionado" value={moduleId} disabled
