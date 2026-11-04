@@ -77,13 +77,32 @@ La referencia muestra:
 - **Inconsistencia en la referencia:** el pie dice 606,5 HH vendidas,
   pero el plan suma 607. La implementación reporta diferencia, no "igual".
 
-## Limitación de alcance
+## Actualización posterior: unificación de `project.progress` también en backend
 
-Esta intervención corrige específicamente **la ficha interna principal**.
-El backend y otros consumidores de `project.progress` (por ejemplo
-algunas vistas externas/listados) aún conservan el cálculo anterior.
-No se modificaron allí por tratarse de contratos y reglas que afectan
-más pantallas; no se debe afirmar una unificación global de toda la app.
+Se corrigió la limitación inicial: el usuario detectó que dejar
+`project.progress` con la fórmula antigua produciría cifras incoherentes en
+otras pantallas.
+
+- `calculateProjectProgress` y `calculateModuleProgress` consumen los
+  bloques reales cuando la fuente proporciona `segments`. Su denominador
+  es la suma de `segment.estimatedHours`; real por tarea `done` vinculada,
+  entrega `approved` o `closedAt`; esperado por días calendario en Chile.
+  Se mantiene el modelo anterior **solo para callers legacy que omitan
+  `segments`**, preservando compatibilidad de pruebas/fuentes antiguas.
+- `DrizzleProjectModuleRepository.listProgressInputsForProjects` carga
+  segmentos, vínculos de tarea y entrega de forma explícita, tanto para
+  listados y Dashboard como para el recálculo persistido.
+- `toProjectDetail` pasa los mismos bloques al cálculo global y al de fase,
+  eliminando la discrepancia entre API y la tarjeta principal.
+- `ProjectProgressRecalculator` se invoca en la misma transacción al crear,
+  editar o eliminar bloques, y **después** de reconciliar el cierre al crear
+  o editar tareas. Al materializar por primera vez el calendario de una
+  cotización en `GetProjectUseCase`, también refresca el porcentaje guardado
+  en `projects.actual_progress` (usado por el ordenamiento).
+- Proyectos sin bloques con HH quedan **Sin plan**, aunque tengan HH
+  comerciales; no se infiere avance desde tareas de cotización sin bloque.
+
+El único cambio en contratos es interno a puertos del API; no hay migración.
 
 ## Pruebas incorporadas
 
