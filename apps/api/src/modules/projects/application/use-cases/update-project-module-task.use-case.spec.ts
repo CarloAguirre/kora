@@ -26,7 +26,11 @@ function buildModule(overrides: Partial<ProjectModuleRecord['tasks'][number]> = 
     projectId: 'project-1',
     name: 'Módulo Financiero',
     deliveries: [],
-    segments: [],
+    segments: overrides.segmentId ? [{
+      id: overrides.segmentId, teamId: 'team-1',
+      startDate: new Date('2026-08-01'), endDate: new Date('2026-09-30'),
+      closedAt: null, estimatedHours: 8, members: [],
+    }] : [],
     tasks: [
       {
         id: 'task-1',
@@ -54,9 +58,11 @@ function buildModule(overrides: Partial<ProjectModuleRecord['tasks'][number]> = 
 function buildUseCase(module: ProjectModuleRecord) {
   const changeLogRecord = vi.fn().mockResolvedValue(undefined);
   const recalculateProgress = vi.fn().mockResolvedValue(undefined);
+  const refreshSegmentClosure = vi.fn().mockResolvedValue(undefined);
   const useCase = new UpdateProjectModuleTaskUseCase(
     { findById: vi.fn().mockResolvedValue(FAKE_PROJECT) } as unknown as ProjectRepository,
-    { findById: vi.fn().mockResolvedValue(module), updateTask: vi.fn().mockResolvedValue(undefined) } as unknown as ProjectModuleRepository,
+    { findById: vi.fn().mockResolvedValue(module), updateTask: vi.fn().mockResolvedValue(undefined),
+      refreshSegmentClosure } as unknown as ProjectModuleRepository,
     { isTeamLeaderForProject: vi.fn().mockResolvedValue(false), findByProject: vi.fn().mockResolvedValue([]) } as unknown as ProjectTeamRepository,
     {
       listForProject: vi.fn().mockResolvedValue([
@@ -72,7 +78,7 @@ function buildUseCase(module: ProjectModuleRecord) {
     new FixedClock(),
     new PassthroughUnitOfWork(),
   );
-  return { useCase, changeLogRecord, recalculateProgress };
+  return { useCase, changeLogRecord, recalculateProgress, refreshSegmentClosure };
 }
 
 const LEADER = { actor: { userId: 'leader-1', email: 'leader@kabeli.cl' }, actorPermissions: [] as Permission[] };
@@ -103,6 +109,17 @@ describe('UpdateProjectModuleTaskUseCase — bitácora', () => {
     await useCase.execute({ ...TARGET, ...LEADER, data: { status: 'done' } });
 
     expect(recalculateProgress).toHaveBeenCalledWith('project-1', expect.anything());
+  });
+
+  it('al aprobar la última tarea vinculada, concilia el cierre real en la misma transacción', async () => {
+    const { useCase, refreshSegmentClosure } = buildUseCase(
+      buildModule({ status: 'in_review', segmentId: 'segment-1' }),
+    );
+    const result = await useCase.execute({ ...TARGET, ...LEADER, data: { status: 'done' } });
+    expect(result.isOk()).toBe(true);
+    expect(refreshSegmentClosure).toHaveBeenCalledWith(
+      'segment-1', expect.any(Date), expect.anything(),
+    );
   });
 
   it('al rechazar, el registro incluye el motivo', async () => {
