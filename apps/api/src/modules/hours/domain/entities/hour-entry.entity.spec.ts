@@ -12,6 +12,19 @@ const base = {
 };
 
 describe('HourEntry', () => {
+  it('conserva segmentId al crear y no lo extrapola a registros generales', () => {
+    const result = HourEntry.create({ ...base, assignment: 'Proyecto',
+      projectId: 'project-1', moduleId: 'module-1', segmentId: 'segment-1',
+      ownerRequiresApproval: false });
+    expect(result.isOk()).toBe(true);
+    if (result.isOk()) expect(result.value.toSnapshot().segmentId).toBe('segment-1');
+
+    const general = HourEntry.create({ ...base, assignment: 'Vacaciones',
+      designatedApproverUserId: 'leader-1', moduleId: 'module-1',
+      segmentId: 'segment-1', ownerRequiresApproval: true });
+    expect(general.isOk()).toBe(true);
+    if (general.isOk()) expect(general.value.toSnapshot().segmentId).toBeNull();
+  });
   describe('creación', () => {
     it('un colaborador nace pendiente', () => {
       const result = HourEntry.create({
