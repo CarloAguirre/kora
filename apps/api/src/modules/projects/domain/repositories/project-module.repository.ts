@@ -246,6 +246,11 @@ export interface ProjectModuleRepository {
   addTask(input: CreateProjectModuleTaskInput, now: Date, context?: TransactionContext): Promise<string>;
   updateTask(id: string, input: UpdateProjectModuleTaskInput, now: Date, context?: TransactionContext): Promise<void>;
   removeTask(id: string, context?: TransactionContext): Promise<void>;
+  /** Persistir en el mismo commit que el borrado de tarea una referencia de cotización oculta. */
+  excludeQuotationReference(input: {
+    projectId: string; moduleId: string; versionId: string;
+    wbs: string; role: string; actorUserId: string;
+  }, context?: TransactionContext): Promise<void>;
   listTasksAssignedToUser(userId: string, context?: TransactionContext): Promise<TaskAssignedToUserRecord[]>;
   listDeliveriesAssignedToUser(userId: string, context?: TransactionContext): Promise<DeliveryAssignedToUserRecord[]>;
 }
