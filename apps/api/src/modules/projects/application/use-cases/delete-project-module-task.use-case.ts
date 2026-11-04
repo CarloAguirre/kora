@@ -78,6 +78,19 @@ export class DeleteProjectModuleTaskUseCase
     // la misma transacción.
     await this.unitOfWork.run(async (tx) => {
       await this.modules.removeTask(command.taskId, tx);
+      // Una tarea convertida de la EDT no debe reaparecer como "Por asignar"
+      // después de borrarla. Se oculta solo la referencia OPERATIVA, sin alterar
+      // la cotización; ambas escrituras comparten la misma transacción.
+      const quoteMarker = task.description?.match(
+        /^Referencia cotización ([0-9a-fA-F-]{36}) · WBS (.+?) · (.+)$/m,
+      );
+      if (quoteMarker && quoteMarker[2]!.length <= 160 && quoteMarker[3]!.length <= 160) {
+        await this.modules.excludeQuotationReference({
+          projectId: project.id, moduleId: command.moduleId,
+          versionId: quoteMarker[1]!, wbs: quoteMarker[2]!, role: quoteMarker[3]!,
+          actorUserId: command.actor.userId,
+        }, tx);
+      }
       if (task.segmentId) await this.modules.refreshSegmentClosure(task.segmentId, this.clock.now(), tx);
       await this.progress.recalculate(project.id, tx);
       await this.changeLog.record(
