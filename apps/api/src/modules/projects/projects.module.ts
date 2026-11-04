@@ -34,6 +34,8 @@ import { CreateProjectModuleTaskUseCase } from './application/use-cases/create-p
 import { UpdateProjectModuleTaskUseCase } from './application/use-cases/update-project-module-task.use-case';
 import { DeleteProjectModuleTaskUseCase } from './application/use-cases/delete-project-module-task.use-case';
 import { ProjectRoadmapReferenceExclusionsService } from './application/services/project-roadmap-reference-exclusions.service';
+import { ROADMAP_REFERENCE_EXCLUSION_STORE } from './application/ports/roadmap-reference-exclusion-store.port';
+import { DrizzleRoadmapReferenceExclusionStore } from './infrastructure/persistence/drizzle-roadmap-reference-exclusion.store';
 import { CreateProjectPaymentMilestoneUseCase } from './application/use-cases/create-project-payment-milestone.use-case';
 import { UpdateProjectPaymentMilestoneUseCase } from './application/use-cases/update-project-payment-milestone.use-case';
 import { DeleteProjectPaymentMilestoneUseCase } from './application/use-cases/delete-project-payment-milestone.use-case';
@@ -118,6 +120,7 @@ import { DrizzleForecastSourceStore } from './infrastructure/services/drizzle-fo
     UpdateProjectModuleTaskUseCase,
     DeleteProjectModuleTaskUseCase,
     ProjectRoadmapReferenceExclusionsService,
+    { provide: ROADMAP_REFERENCE_EXCLUSION_STORE, useClass: DrizzleRoadmapReferenceExclusionStore },
     CreateProjectPaymentMilestoneUseCase,
     UpdateProjectPaymentMilestoneUseCase,
     DeleteProjectPaymentMilestoneUseCase,
