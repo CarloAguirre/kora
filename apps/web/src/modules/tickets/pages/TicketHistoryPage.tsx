@@ -28,7 +28,7 @@ import { TicketServiceTypeIcon } from '../components/TicketServiceTypeIcon';
 import { TicketDetailModal } from '../components/TicketDetailModal';
 import { useDeleteTicket, useTicketLinkableClients, useTicketsList } from '../api/tickets.queries';
 import { ticketsApi } from '../api/tickets.api';
-import { exportTicketHistory } from '../lib/ticket-history-export';
+import { assertTicketHistoryExportComplete, exportTicketHistory } from '../lib/ticket-history-export';
 import { formatTicketReportDate } from '../lib/ticket-history-dates';
 import { useUsersList } from '@/modules/users/api/users.queries';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
@@ -111,13 +111,14 @@ export function TicketHistoryPage() {
           const next = await ticketsApi.list({ ...query, page: currentPage, pageSize: EXPORT_PAGE_SIZE });
           rows.push(...next.items);
         }
+        assertTicketHistoryExportComplete(rows, first.total);
         return rows;
       };
       // El desglose por día viene de un endpoint aparte (sin paginar, mismos filtros) — en paralelo con las páginas.
       const [rows, dailyHours] = await Promise.all([fetchAllTickets(), ticketsApi.dailyHours(query)]);
       exportTicketHistory(rows, dailyHours);
     } catch (exportErr) {
-      setExportError(exportErr instanceof ApiRequestError ? exportErr.message : 'No se pudo generar el Excel.');
+      setExportError(exportErr instanceof Error ? exportErr.message : 'No se pudo generar el Excel.');
     } finally {
       setExporting(false);
     }
