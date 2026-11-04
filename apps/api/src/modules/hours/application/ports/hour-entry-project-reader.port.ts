@@ -19,6 +19,14 @@ export interface HourEntryModuleReference {
   readonly projectId: string;
 }
 
+export interface HourEntrySegmentReference {
+  readonly id: string;
+  readonly name: string;
+  readonly moduleId: string;
+  readonly projectId: string;
+  readonly teamId: string;
+}
+
 export interface HourEntryProjectReader {
   findById(projectId: string): Promise<HourEntryProjectReference | null>;
   findManyByIds(projectIds: readonly string[]): Promise<HourEntryProjectReference[]>;
@@ -28,6 +36,10 @@ export interface HourEntryProjectReader {
   findApprovers(projectId: string, memberUserId: string): Promise<HourEntryProjectApprover[]>;
   /** Módulo ("Fases · Módulos") contra el que se puede imputar una hora — valida que pertenezca al proyecto elegido. */
   findModuleById(moduleId: string): Promise<HourEntryModuleReference | null>;
+  /** Bloques reales de una fase, sin acceso a DB desde casos de uso. */
+  findSegmentsForModule(moduleId: string): Promise<HourEntrySegmentReference[]>;
+  /** Un usuario puede registrar HH en su equipo activo del proyecto o si es su líder. */
+  isUserOnSegmentTeam(projectId: string, teamId: string, userId: string): Promise<boolean>;
   /**
    * Persiste `usedHours` en el proyecto — única escritura de este puerto
    * (por lo demás de solo lectura). `usedHours` ya viene calculado por quien
