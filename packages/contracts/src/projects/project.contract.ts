@@ -229,6 +229,8 @@ export const projectModuleSegmentSchema = z.object({
   name: z.string(),
   startDate: z.string(),
   endDate: z.string(),
+  /** HH de este bloque; nullable para bloques anteriores. */
+  estimatedHours: z.number().nullable(),
   members: z.array(projectModuleSegmentMemberSchema),
 });
 export type ProjectModuleSegment = z.infer<typeof projectModuleSegmentSchema>;
@@ -251,12 +253,19 @@ export const createProjectModuleSegmentSchema = z.object({
   name: nonEmptyTrimmed(300, 'El nombre del tramo'),
   startDate: z.iso.date(),
   endDate: z.iso.date(),
+  /** Opcional para consumidores anteriores de esta API; obligatorio en la UI nueva. */
+  estimatedHours: z.coerce.number().gt(0).max(1000000).optional(),
+  /** Entrega opcional de cierre, al finalizar el bloque, en la misma transacción. */
+  closingDelivery: z.object({
+    name: nonEmptyTrimmed(300, 'El nombre de la entrega'),
+    description: z.string().trim().max(2000).nullish(),
+  }).optional(),
   /** Opcional — omitirlo en una edición deja los colaboradores como estaban (salvo que cambie el equipo). */
   members: segmentMembersInputSchema.optional(),
 });
 export type CreateProjectModuleSegmentInput = z.infer<typeof createProjectModuleSegmentSchema>;
 
-export const updateProjectModuleSegmentSchema = createProjectModuleSegmentSchema.partial();
+export const updateProjectModuleSegmentSchema = createProjectModuleSegmentSchema.omit({ closingDelivery: true }).partial();
 export type UpdateProjectModuleSegmentInput = z.infer<typeof updateProjectModuleSegmentSchema>;
 
 /** HH estimadas de una tarea o fase — obligatorias y mayores a 0 en altas y ediciones (las antiguas pueden venir nulas). */

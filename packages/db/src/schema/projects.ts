@@ -330,6 +330,7 @@ export const projectModuleSegments = pgTable('project_module_segments', {
   name: varchar('name', { length: 300 }).notNull(),
   startDate: date('start_date', { mode: 'date' }).notNull(),
   endDate: date('end_date', { mode: 'date' }).notNull(),
+  estimatedHours: numeric('estimated_hours', { precision: 10, scale: 2 }),
   ...timestamps,
 });
 
