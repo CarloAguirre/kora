@@ -389,3 +389,10 @@
   color: var(--kora-danger);
   margin-top: 2px;
 }
+
+
+/* Solo cuando la tabla del PM presenta tareas de la cotización aún no asignadas. */
+.badgeUnassigned {
+  background: #eee9ff;
+  color: #6233bc;
+}
