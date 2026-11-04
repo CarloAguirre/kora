@@ -2,7 +2,7 @@ import { sql } from 'drizzle-orm';
 import { boolean, date, numeric, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
 import { primaryId, timestamps } from './columns';
 import { users } from './identity';
-import { projectModules, projects } from './projects';
+import { projectModules, projectModuleSegments, projects } from './projects';
 
 /**
  * Ver docs/DECISION-M4-HORAS.md.
@@ -31,6 +31,8 @@ export const hourEntries = pgTable(
     projectId: uuid('project_id').references(() => projects.id, { onDelete: 'set null' }),
     /** Fase/módulo del proyecto contra la que se imputa esta hora — opcional. */
     moduleId: uuid('module_id').references(() => projectModules.id, { onDelete: 'set null' }),
+    /** Bloque operativo exacto al que se imputan estas HH, NULL en histórico sin atribución. */
+    segmentId: uuid('segment_id').references(() => projectModuleSegments.id, { onDelete: 'set null' }),
 
     assignment: text('assignment'),
     category: text('category').notNull().default(''),
