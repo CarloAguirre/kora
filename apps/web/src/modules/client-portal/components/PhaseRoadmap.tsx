@@ -147,7 +147,7 @@ export function PhaseRoadmap({
   toolbarActions, renderPhaseHeaderName, renderPhaseHeaderActions, borderlessSummary = false,
   alwaysExpanded = false,
   operationalView = false, operationalTaskCount, operationalBlockCount, operationalRows, onPlanOperationalRow,
-  operationalMetrics, operationalFooter,
+  operationalMetrics, operationalFooter, operationalPresaleHours,
 }: PhaseRoadmapProps) {
   /** Fases abiertas — cada una se abre/cierra por separado (varias a la vez); arranca abierta la primera. */
   const [expandedPhaseIds, setExpandedPhaseIds] = useState<ReadonlySet<string>>(
@@ -180,7 +180,7 @@ export function PhaseRoadmap({
       <div className={[styles.summaryRow, borderlessSummary ? styles.summaryRowBorderless : ''].filter(Boolean).join(' ')}>
         <div className={styles.summaryChips}>
           <span className={styles.summaryChip}>
-            <b>{phaseRoadmap.phaseCount}</b> Fases
+            <b>{phaseRoadmap.phaseCount}</b> {operationalView ? 'fases' : 'Fases'}
           </span>
           <span className={styles.summaryChip}>
             <b>{operationalView ? (operationalBlockCount ?? phaseRoadmap.teamSegmentCount) : phaseRoadmap.teamSegmentCount}</b> {operationalView ? 'bloques de trabajo' : 'tramos de equipo'}
@@ -217,23 +217,31 @@ export function PhaseRoadmap({
       </div>
 
       {operationalView && (
-        <details className={styles.operationalDateOptions}>
-          <summary>Opciones de cronograma · rango de fechas</summary>
-          <div className={styles.filterRow}>
-            <TextField className={styles.rangeDateField} type="date" value={rangeDraft.from}
-              onChange={(event) => setRangeDraft((current) => ({ ...current, from: event.target.value }))} />
-            <span>–</span>
-            <TextField className={styles.rangeDateField} type="date" value={rangeDraft.to}
-              onChange={(event) => setRangeDraft((current) => ({ ...current, to: event.target.value }))} />
-            <Button size="sm" variant="ghost" disabled={!rangeDraftIsValid}
-              onClick={() => setAppliedRange(rangeDraft)}>Aplicar</Button>
-            <Button size="sm" variant="ghost" disabled={!rangeIsCustom} onClick={onResetRange}>
-              Restablecer
-            </Button>
-          </div>
-        </details>
+        <div className={styles.operationalExplanation}>
+          <strong>Bloque de trabajo:</strong>{' '}
+          periodo en que un equipo trabaja en una fase con sus horas estimadas.
+          Cada bloque cierra con una sola entrega; si se necesita otra entrega, se crea otro bloque.
+        </div>
       )}
       <div className={[styles.legendRow, operationalView ? styles.operationalLegend : ''].filter(Boolean).join(' ')}>
+        {operationalView ? <>
+          <span className={styles.legendItem}>
+            <span className={styles.legendProgress} aria-hidden="true"><i /></span>Avance del bloque
+          </span>
+          <span className={styles.legendItem}>
+            <DiamondIcon size={14} className={styles.legendDiamondPlanned} /> Entrega planificada
+          </span>
+          <span className={styles.legendItem}>
+            <DiamondIcon size={14} className={styles.legendDiamondDone} /> Entregada
+          </span>
+          <span className={styles.legendItem}>
+            <DiamondIcon size={14} className={styles.legendDiamondDelayed} /> Entrega vencida
+          </span>
+          <span className={styles.legendItem}>
+            <span className={styles.legendTodayMarker} aria-hidden="true" /> Hoy
+          </span>
+        </> : <>
+
         {!operationalView && (Object.keys(PHASE_ROADMAP_ROLE_LABELS) as Array<keyof typeof PHASE_ROADMAP_ROLE_LABELS>).map((role) => (
           <span key={role} className={styles.legendItem}>
             <span className={styles.legendDot} style={{ background: PHASE_ROADMAP_ROLE_COLORS[role] }} />
@@ -260,7 +268,15 @@ export function PhaseRoadmap({
         </span>}
         <span className={styles.legendHoy}>— Hoy</span>
         {!operationalView && <span className={styles.hint}>Usa el zoom de cada fase para ver días y tareas.</span>}
+        </>}
       </div>
+      {operationalView && operationalPresaleHours != null && operationalPresaleHours > 0 && (
+        <p className={styles.operationalPresale}>
+          Preventa: {new Intl.NumberFormat('es-CL', { maximumFractionDigits: 2 }).format(operationalPresaleHours)} HH
+          de prospecto y cotización registradas antes del inicio. Cuentan como HH consumidas,
+          pero no forman parte del plan.
+        </p>
+      )}
 
       <div className={styles.phaseList}>
         {phaseRoadmap.phases.map((phase) => operationalView ? (
@@ -289,6 +305,24 @@ export function PhaseRoadmap({
         ))}
       </div>
       {operationalView && operationalFooter && <div className={styles.operationalFooter}>{operationalFooter}</div>}
+      {operationalView && (
+        <details className={styles.operationalDateOptions}>
+          <summary>Opciones de cronograma · rango de fechas</summary>
+          <div className={styles.filterRow}>
+            <TextField className={styles.rangeDateField} type="date" value={rangeDraft.from}
+              onChange={(event) => setRangeDraft((current) => ({ ...current, from: event.target.value }))} />
+            <span>–</span>
+            <TextField className={styles.rangeDateField} type="date" value={rangeDraft.to}
+              onChange={(event) => setRangeDraft((current) => ({ ...current, to: event.target.value }))} />
+            <Button size="sm" variant="ghost" disabled={!rangeDraftIsValid}
+              onClick={() => setAppliedRange(rangeDraft)}>Aplicar</Button>
+            <Button size="sm" variant="ghost" disabled={!rangeIsCustom} onClick={onResetRange}>
+              Restablecer
+            </Button>
+          </div>
+        </details>
+      )}
+
     </div>
   );
 }
@@ -355,6 +389,8 @@ export interface PhaseRoadmapProps {
   operationalRows?: (phase: PhaseRoadmapPhase) => readonly OperationalRoadmapRow[];
   /** HH y avance comprobables de cada bloque operativo; no se inventan porcentajes. */
   operationalMetrics?: (phase: PhaseRoadmapPhase, task: PhaseRoadmapTask) => { hours: number | null; progress: number | null };
+  /** HH reales de preventa previas al Hito 0, fuera del plan operativo. */
+  operationalPresaleHours?: number | null;
   /** Acción al final de las fases, exclusiva de la ficha interna. */
   operationalFooter?: ReactNode;
   renderPhaseHeaderName?: (phase: PhaseRoadmapPhase) => ReactNode;
