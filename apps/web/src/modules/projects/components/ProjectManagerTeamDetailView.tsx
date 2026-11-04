@@ -139,7 +139,7 @@ export function ProjectManagerTeamDetailView({ project, projectId, teamId }: Pro
         </div>)}
       </div>}
 
-      <TeamTasksCard project={project} projectId={projectId} teamId={teamId} />
+      <TeamTasksCard project={project} projectId={projectId} teamId={teamId} managerView />
       <TeamDeliveriesCard project={project} projectId={projectId} teamId={teamId} managerView />
     </div>
   );
