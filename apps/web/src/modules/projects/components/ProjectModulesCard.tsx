@@ -93,7 +93,8 @@ const deliveryDelayDays = (delivery: ProjectModuleDelivery) => {
 };
 
 function segmentState(segment: ProjectModuleSegment): { label: string; tone: BadgeTone } {
-  if (parseDate(segment.endDate) < today()) return { label: 'Terminado', tone: 'success' };
+  if (segment.closedAt) return { label: 'Cerrado', tone: 'success' };
+  if (parseDate(segment.endDate) < today()) return { label: 'Vencido', tone: 'warning' };
   if (parseDate(segment.startDate) <= today()) return { label: 'En curso', tone: 'info' };
   return { label: 'Próximo', tone: 'neutral' };
 }
