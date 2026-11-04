@@ -29,6 +29,8 @@ export interface ModalProps {
   headerExtra?: ReactNode;
   /** Panel lateral (desliza desde la derecha, alto completo) en vez de diálogo centrado — para formularios largos. */
   side?: boolean;
+  /** Panel lateral compacto: detalle de bloque del Roadmap con pie fijo. */
+  compactSide?: boolean;
   /** Clase extra para el `<dialog>`, p. ej. para un ancho a medida. */
   className?: string;
 }
@@ -45,6 +47,7 @@ export function Modal({
   dismissible = true,
   headerExtra,
   side = false,
+  compactSide = false,
   className,
 }: ModalProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -86,7 +89,8 @@ export function Modal({
   return (
     <dialog
       ref={dialogRef}
-      className={[styles.dialog, wide ? styles.wide : '', side ? styles.side : '', className].filter(Boolean).join(' ')}
+      className={[styles.dialog, wide ? styles.wide : '', side ? styles.side : '',
+        compactSide ? styles.compactSide : '', className].filter(Boolean).join(' ')}
       aria-labelledby={titleId}
     >
       <header className={styles.header}>
