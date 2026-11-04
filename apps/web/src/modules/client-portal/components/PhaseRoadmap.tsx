@@ -945,14 +945,6 @@ function OperationalPhaseCard({
                     Planificar bloque
                   </button>}
                 </div>
-                  </> : <button type="button" className={styles.operationalOpenReference}
-                    onClick={() => choose(selection)}>
-                    Sin fechas: define el inicio del proyecto para ver la propuesta
-                  </button>}
-                  {onPlanRow && <button type="button" onClick={() => onPlanRow(phase, row)}>
-                    Planificar bloque
-                  </button>}
-                </div>
               </div>;
             })}
           </div>
