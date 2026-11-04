@@ -1,14 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ok } from '@kora/core';
-import type { RequestUser } from '../../../../shared/presentation/decorators/current-user.decorator';
 import type { GetProjectUseCase } from '../use-cases/get-project.use-case';
 import type { RoadmapReferenceExclusionStore } from '../ports/roadmap-reference-exclusion-store.port';
 import { ProjectRoadmapReferenceExclusionsService } from './project-roadmap-reference-exclusions.service';
 
 const versionId = '0777e456-fd76-445e-83f1-afc25061c106';
 const actor = {
-  id: 'leader-1', permissions: ['projects:read_assigned'], email: 'pm@example.com',
-} as RequestUser;
+  id: 'leader-1',
+  permissions: ['projects:read_assigned'] as const,
+};
 const input = { versionId, wbs: '1.2', role: 'QA' };
 
 function setup(belongs = true) {
