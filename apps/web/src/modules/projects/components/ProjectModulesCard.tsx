@@ -540,8 +540,9 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
           label: module.name + ' · ' + teamName,
           role: roleFromTeamName(teamName),
           hours: block.hours,
-          proposedStartDate: proposal?.startDate,
-          proposedEndDate: proposal?.endDate,
+          ...(proposal ? {
+            proposedStartDate: proposal.startDate, proposedEndDate: proposal.endDate,
+          } : {}),
         };
       });
   };
