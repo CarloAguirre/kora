@@ -5,6 +5,7 @@ import type { ProjectTeamRepository } from '../../domain/repositories/project-te
 import type { AuditRecorder } from '../../../../shared/application/ports/audit-recorder.port';
 import type { ProjectChangeLogRecorder } from '../services/project-change-log.recorder';
 import type { ProjectProgressRecalculator } from '../services/project-progress-recalculator';
+import type { ForecastSourceSyncService } from '../services/forecast-source-sync.service';
 import { FixedClock, PassthroughUnitOfWork } from '../../../../test/fakes';
 import { DeleteProjectModuleTaskUseCase } from './delete-project-module-task.use-case';
 
@@ -20,6 +21,8 @@ function fixture(description: string | null) {
     }),
     removeTask: vi.fn().mockResolvedValue(undefined),
     excludeQuotationReference: vi.fn().mockResolvedValue(undefined),
+    cancelTask: vi.fn().mockResolvedValue(undefined),
+    hasTaskUserHours: vi.fn().mockResolvedValue(false),
   } as unknown as ProjectModuleRepository;
   const useCase = new DeleteProjectModuleTaskUseCase(
     { findById: vi.fn().mockResolvedValue({
@@ -30,6 +33,7 @@ function fixture(description: string | null) {
     { record: vi.fn().mockResolvedValue(undefined) } as unknown as AuditRecorder,
     { record: vi.fn().mockResolvedValue(undefined) } as unknown as ProjectChangeLogRecorder,
     { recalculate: vi.fn().mockResolvedValue(undefined) } as unknown as ProjectProgressRecalculator,
+    { syncTask: vi.fn().mockResolvedValue(undefined) } as unknown as ForecastSourceSyncService,
     new FixedClock(), new PassthroughUnitOfWork(),
   );
   return { modules, useCase };
@@ -54,6 +58,28 @@ describe('Eliminar tarea EDT sin reintroducir la referencia comercial', () => {
     const removedInTx = vi.mocked(modules.removeTask).mock.calls[0]![1];
     const excludedInTx = vi.mocked(modules.excludeQuotationReference).mock.calls[0]![1];
     expect(excludedInTx).toBe(removedInTx);
+  });
+
+  it('cancela de forma lógica una tarea aprobada preservando su historial', async () => {
+    const { modules, useCase } = fixture('Trabajo histórico');
+    const module = await modules.findById('module-1');
+    vi.mocked(modules.findById).mockResolvedValue({
+      ...module!,
+      tasks: [{ ...module!.tasks[0]!, assigneeUserId: 'member-1',
+        status: 'done', cancelledAt: null }],
+    });
+    const result = await useCase.execute(command);
+    expect(result.isOk()).toBe(true);
+    expect(modules.cancelTask).toHaveBeenCalledWith('task-1', expect.any(Date), expect.anything());
+    expect(modules.removeTask).not.toHaveBeenCalled();
+  });
+
+  it('respeta cancelación solicitada por el líder aun si el registro no identifica una tarea', async () => {
+    const { modules, useCase } = fixture('Trabajo manual');
+    const result = await useCase.execute({ ...command, forceCancel: true });
+    expect(result.isOk()).toBe(true);
+    expect(modules.cancelTask).toHaveBeenCalled();
+    expect(modules.removeTask).not.toHaveBeenCalled();
   });
 
   it('elimina tareas sin referencia sin crear exclusiones', async () => {
