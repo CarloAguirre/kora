@@ -95,7 +95,7 @@ export function NewWorkBlockModal({
         {missingEstimates ? ' HH conocidas en otros bloques (existen bloques sin HH definidas)' :
           ' HH ya en otros bloques'},
         {' '}{available} disponibles.
-        {(available === 0 || (validHours && numericHours > available)) &&
+        {(available !== null && (available === 0 || (validHours && numericHours > available))) &&
           ' Este equipo no tiene capacidad suficiente: revisa sus HH en Equipos asignados.'}
       </div>}
       <section className={styles.delivery}>
