@@ -61,6 +61,9 @@ describe('Avance del proyecto — mismo desglose que el equipo', () => {
       .toBeInTheDocument();
     expect(screen.getByText(/607 HH planificadas frente a 606,5 HH vendidas/))
       .toBeInTheDocument();
+    const toggle = screen.getByRole('button', { name: /Cómo se calcula este avance/i });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(toggle);
     expect(screen.getByText('Qué explica la diferencia')).toBeInTheDocument();
     expect(screen.getByText('−17 pts')).toBeInTheDocument();
     expect(screen.getByText('−5 pts')).toBeInTheDocument();
@@ -75,12 +78,14 @@ describe('Avance del proyecto — mismo desglose que el equipo', () => {
   it('mantiene el desglose desplegable como en la referencia', () => {
     render(<ProjectExecutionProgressCard progress={progress} />);
     const toggle = screen.getByRole('button', { name: /Cómo se calcula este avance/i });
-    expect(toggle).toHaveAttribute('aria-expanded', 'true');
-    fireEvent.click(toggle);
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByText('Qué explica la diferencia')).not.toBeInTheDocument();
     fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByText('Qué explica la diferencia')).toBeInTheDocument();
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText('Qué explica la diferencia')).not.toBeInTheDocument();
   });
 
   it('no inventa porcentajes cuando los bloques no tienen horas operativas', () => {
@@ -95,10 +100,40 @@ describe('Avance del proyecto — mismo desglose que el equipo', () => {
     expect(screen.queryByText('76%')).not.toBeInTheDocument();
   });
 
+  it('explica atrasos pequeños sin redondearlos a cero y clasifica las HH extra como información', () => {
+    const smallGap: ProjectExecutionProgress = {
+      ...progress, expectedHours: 5.8, expectedPercent: 1,
+      actualHours: 0, actualPercent: 0,
+      soldHours: 1000, plannedHours: 1003,
+      phases: progress.phases.map((phase) => ({
+        ...phase, commercialHours: phase.estimatedHours,
+      })),
+      laggingBlocks: [
+        { ...block('ux-01', 'UX-UI', 120, 0, 0.43), phaseName: 'Diseño y Arquitectura' },
+        { ...block('dev-01', 'Desarrollo', 40, 0, 0.14), phaseName: 'Diseño y Arquitectura' },
+      ],
+    };
+    render(<ProjectExecutionProgressCard progress={smallGap} />);
+    expect(screen.getByText('Atrasado')).toBeInTheDocument();
+    const toggle = screen.getByRole('button', { name: /Cómo se calcula este avance/i });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(toggle);
+    expect(screen.getByText('Qué explica la diferencia')).toBeInTheDocument();
+    expect(screen.getByText('−0,43 pts')).toBeInTheDocument();
+    expect(screen.getByText('−0,14 pts')).toBeInTheDocument();
+    expect(screen.getByText(/3 HH/)).toBeInTheDocument();
+    expect(screen.getByText(/La diferencia no cambia el contrato/)).toBeInTheDocument();
+    expect(screen.queryByText(/Las HH de bloques no coinciden con la estimación comercial/))
+      .not.toBeInTheDocument();
+    expect(screen.queryByText(/No hay bloques atrasados respecto del plan/))
+      .not.toBeInTheDocument();
+  });
+
   it('indica pausa y no etiqueta atraso aunque exista brecha', () => {
     render(<ProjectExecutionProgressCard progress={{ ...progress, paused: true }} />);
     expect(screen.getByText('Pausado')).toBeInTheDocument();
     expect(screen.queryByText('Atrasado')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Cómo se calcula este avance/i }));
     expect(screen.getByText(/no se califica la diferencia como atraso/)).toBeInTheDocument();
   });
 });
