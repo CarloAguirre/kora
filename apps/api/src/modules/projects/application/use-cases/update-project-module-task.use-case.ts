@@ -216,13 +216,13 @@ export class UpdateProjectModuleTaskUseCase
           tx,
         );
       }
-      await this.progress.recalculate(project.id, tx);
       await this.forecastSync.syncTask(project, command.moduleId, command.taskId, now, tx);
       // Reconciliar también el bloque anterior si la tarea se movió de segmento.
       const affected = new Set([task.segmentId, targetSegmentId].filter(
         (id): id is string => Boolean(id),
       ));
       for (const id of affected) await this.modules.refreshSegmentClosure(id, now, tx);
+      await this.progress.recalculate(project.id, tx);
     });
 
     await this.audit.record({
