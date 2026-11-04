@@ -67,6 +67,28 @@ describe('Nueva tarea operativa vinculada a bloque', () => {
     expect(mocks.create).not.toHaveBeenCalled();
   });
 
+  it('al abrir desde una barra del Roadmap preselecciona equipo, bloque y fechas', async () => {
+    render(<NewOperationalTaskModal project={project} moduleId={moduleId}
+      initialSegmentId={blockId} onClose={mocks.onClose} />);
+    expect(screen.getByLabelText(/Equipo/)).toHaveValue(teamId);
+    expect(screen.getByLabelText(/Bloque de trabajo/)).toHaveValue(blockId);
+    expect(screen.getByLabelText(/Fecha de inicio/)).toHaveValue('2026-11-05');
+    expect(screen.getByLabelText(/Fecha límite/)).toHaveValue('2026-11-15');
+    fireEvent.change(screen.getByLabelText(/Título de la tarea/), {
+      target: { value: 'Extender la PWA' },
+    });
+    fireEvent.change(screen.getByLabelText(/HH estimadas/), {
+      target: { value: '12' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Crear tarea' }));
+    await waitFor(() => expect(mocks.create).toHaveBeenCalledWith({
+      projectId, moduleId, input: expect.objectContaining({
+        teamId, segmentId: blockId, name: 'Extender la PWA',
+        startDate: '2026-11-05', date: '2026-11-15', estimatedHours: 12,
+      }),
+    }));
+  });
+
   it('registra explícitamente el segmento seleccionado', async () => {
     render(<NewOperationalTaskModal project={project} moduleId={moduleId}
       onClose={mocks.onClose} />);
