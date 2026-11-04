@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ProjectDetail } from '@kora/contracts';
+import { MemoryRouter } from 'react-router-dom';
 import { ProjectModulesCard } from './ProjectModulesCard';
 
 const mocks = vi.hoisted(() => ({
@@ -114,8 +115,8 @@ const project = { id: 'project-1', modules: [module], teams: [{
   maxMembers: 2, assignedHours: 160,
 }], members: [] } as unknown as ProjectDetail;
 const show = (p: ProjectDetail = project) => render(
-  <ProjectModulesCard project={p} hourEntries={[]}
-    teamOptions={[{ value: 'team-1', label: 'Desarrollo' }]} canManage />,
+  <MemoryRouter><ProjectModulesCard project={p} hourEntries={[]}
+    teamOptions={[{ value: 'team-1', label: 'Desarrollo' }]} canManage /></MemoryRouter>,
 );
 
 const inputHasInlinePlanningClass = () =>
