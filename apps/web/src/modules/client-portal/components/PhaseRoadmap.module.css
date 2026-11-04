@@ -882,3 +882,69 @@ button.ganttBar {
   text-align: left;
 }
 .operationalReferenceRow:hover .operationalOpenReference { color: #244e91; }
+
+/* Fidelidad de la cabecera del Roadmap interno v5.02: no afecta al portal cliente. */
+.operationalWrapper .summaryRow {
+  padding: 5px 0 0;
+  gap: 12px;
+}
+.operationalWrapper .summaryChips { gap: 8px; }
+.operationalWrapper .summaryChip {
+  background: #fff;
+  border: 1px solid #e1e6ef;
+  border-radius: 9px;
+  padding: 8px 12px;
+  color: #17243c;
+  font-size: 12.5px;
+  line-height: 1.2;
+}
+.operationalWrapper .summaryChip b { font-weight: 400; }
+.operationalExplanation {
+  padding: 11px 14px;
+  background: #f4f5f9;
+  border-left: 3px solid #142039;
+  color: #21304c;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.operationalExplanation strong { font-weight: 700; }
+.operationalWrapper .operationalLegend {
+  justify-content: flex-start;
+  padding: 2px 0;
+  gap: 11px 18px;
+  border: 0;
+  border-radius: 0;
+}
+.operationalWrapper .operationalLegend .legendItem {
+  color: #52637d;
+  font-size: 12px;
+  gap: 7px;
+}
+.legendProgress {
+  width: 25px;
+  height: 8px;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #dce3ee;
+}
+.legendProgress i { display: block; height: 100%; width: 57%; background: #acd94a; }
+.legendDiamondPlanned { color: #17243c; fill: none; }
+.legendTodayMarker { display: block; height: 15px; width: 2px; flex: none; background: #df2c2c; }
+.operationalPresale {
+  color: #62718a;
+  margin: -3px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.operationalWrapper .operationalDateOptions {
+  margin-top: 0;
+  font-size: 11px;
+}
+.operationalWrapper .operationalDateOptions > summary { color: #77879c; }
+@media (max-width: 700px) {
+  .operationalWrapper .summaryRow { align-items: stretch; }
+  .operationalWrapper .summaryChips { gap: 6px; }
+  .operationalWrapper .summaryChip { padding: 7px 9px; font-size: 12px; }
+  .operationalWrapper .operationalLegend { gap: 10px 14px; }
+}
