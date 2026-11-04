@@ -141,7 +141,9 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
       usedHours: Number(snapshot.usedHours),
       status: snapshot.status,
       stopsClock: snapshot.stopsClock,
-      modules: source.modules,
+      modules: source.modules.map((module) => ({
+        ...module, tasks: module.tasks.filter((task) => !task.cancelledAt),
+      })),
     },
     today,
   );
@@ -202,7 +204,9 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
       rejectionReason: task.rejectionReason,
     })),
     blockerCount: module.blockerCount,
-    progress: calculateModuleProgress(module, today),
+    progress: calculateModuleProgress({
+      ...module, tasks: module.tasks.filter((task) => !task.cancelledAt),
+    }, today),
   }));
 
   const paymentMilestones: ProjectPaymentMilestoneDto[] = source.paymentMilestones.map((milestone) => ({
