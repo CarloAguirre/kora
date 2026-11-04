@@ -292,6 +292,11 @@ export class DrizzleTicketRepository implements TicketRepository {
   private buildOrderBy(sort: SortRequest<TicketSortableField>) {
     const direction = sort.direction === 'desc' ? desc : asc;
     const column = { createdAt: tickets.createdAt, status: tickets.status, priority: tickets.priority }[sort.field];
-    return [direction(column), desc(tickets.createdAt)];
+    // Orden total y estable: sin desempate por ID, los tickets con igual
+    // createdAt pueden repetirse u omitirse entre páginas LIMIT/OFFSET.
+    // En el historial esto duplicaba 7 tickets en límites de 200 registros.
+    return sort.field === 'createdAt'
+      ? [direction(tickets.createdAt), asc(tickets.id)]
+      : [direction(column), desc(tickets.createdAt), asc(tickets.id)];
   }
 }
