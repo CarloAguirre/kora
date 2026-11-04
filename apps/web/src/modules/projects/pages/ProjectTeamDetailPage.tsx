@@ -50,7 +50,8 @@ export function ProjectTeamDetailPage() {
   /** `projectTeamPath` arma la URL con el slug del equipo; la vista trabaja con el UUID. */
   const teamRow = project.teams.find((t) => t.teamId === teamId || t.teamSlug === teamId);
   const teamName = teamRow?.teamName ?? 'Equipo';
-  const isProjectManager = can('projects:manage') || (user !== null && project.leader?.id === user.id);
+  const isProjectManager = project.type === 'development' &&
+    (can('projects:manage') || (user !== null && project.leader?.id === user.id));
   /** Si quien entra lidera más de un equipo del proyecto, puede saltar entre ellos sin volver a la ficha. */
   const ledTeams = user ? project.teams.filter((t) => t.leader?.id === user.id) : [];
   const showTeamSwitcher = ledTeams.length > 1 && ledTeams.some((t) => t.teamId === teamRow?.teamId);
