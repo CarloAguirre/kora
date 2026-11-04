@@ -30,6 +30,8 @@ export interface ExecutionSegmentModalValues {
   name: string;
   startDate: string;
   endDate: string;
+  /** Opcional para bloques heredados sin HH definidas. */
+  estimatedHours?: string;
   members: ExecutionSegmentMemberValue[];
 }
 
@@ -38,6 +40,7 @@ export const EMPTY_EXECUTION_SEGMENT_MODAL_VALUES: ExecutionSegmentModalValues =
   name: '',
   startDate: '',
   endDate: '',
+  estimatedHours: '',
   members: [],
 };
 
@@ -47,6 +50,7 @@ export function segmentToModalValues(segment: ProjectModuleSegment): ExecutionSe
     name: segment.name,
     startDate: segment.startDate,
     endDate: segment.endDate,
+    estimatedHours: segment.estimatedHours == null ? '' : String(segment.estimatedHours),
     members: segment.members.map((member) => ({
       teamMemberId: member.teamMemberId,
       fullName: member.fullName,
@@ -61,6 +65,7 @@ export function toSegmentInput(values: ExecutionSegmentModalValues): CreateProje
     name: values.name.trim(),
     startDate: values.startDate,
     endDate: values.endDate,
+    ...(values.estimatedHours?.trim() ? { estimatedHours: Number(values.estimatedHours) } : {}),
     members: values.members.map((member) => ({
       teamMemberId: member.teamMemberId,
       dailyPercent: member.dailyPercent.trim() ? Number(member.dailyPercent) : null,
@@ -147,7 +152,9 @@ export function ExecutionSegmentModal({
       values.startDate &&
       values.endDate &&
       values.startDate <= values.endDate &&
-      values.members.every((member) => !percentError(member.dailyPercent)),
+      values.members.every((member) => !percentError(member.dailyPercent)) &&
+      (!values.estimatedHours?.trim() ||
+        (Number.isFinite(Number(values.estimatedHours)) && Number(values.estimatedHours) > 0)),
   );
 
   const addMember = (teamMemberId: string) => {
@@ -247,6 +254,12 @@ export function ExecutionSegmentModal({
           />
         </div>
 
+        <TextField label="HH estimadas del bloque" type="number" min="0.01" step="0.01"
+          placeholder="Sin definir (bloque histórico)"
+          value={values.estimatedHours ?? ''}
+          onChange={(event) => setValues((prev) => ({
+            ...prev, estimatedHours: event.target.value,
+          }))} />
         <div className={segmentStyles.members}>
           <div className={styles.subsectionHead}>
             <span className={styles.subsectionLabel}>Colaboradores (opcional)</span>
