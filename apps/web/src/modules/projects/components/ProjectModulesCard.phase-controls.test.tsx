@@ -157,7 +157,7 @@ describe('Cabecera de las fases · HTML v5', () => {
         members: [],
       }] }],
     } as unknown as ProjectDetail);
-    expect(screen.getByText('07-09-2026 → 16-10-2026, 464 HH')).toBeInTheDocument();
+    expect(screen.getByText('07-09-2026 → 16-10-2026, 464 HH de bloques')).toBeInTheDocument();
     expect(screen.getByTestId('presale-hours')).toHaveTextContent('18');
   });
 
@@ -272,7 +272,7 @@ describe('Referencias de bloque de trabajo de la cotización', () => {
     show({ ...project, status: 'active', startDate: '2026-11-05',
       modules: [{ ...module, segments: [plannedSegment] }],
     } as unknown as ProjectDetail);
-    expect(screen.getByText('03-11-2026 → 08-12-2026, 120 HH')).toBeInTheDocument();
+    expect(screen.getByText('03-11-2026 → 08-12-2026, 120 HH de fase · 1 bloque sin HH')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Planificar bloque' })).not.toBeInTheDocument();
     expect(screen.queryByText(/propuesta/i)).not.toBeInTheDocument();
   });
@@ -280,7 +280,7 @@ describe('Referencias de bloque de trabajo de la cotización', () => {
   it('una fase sin bloques antes de Hito 0 aún no muestra fechas operativas', () => {
     seedReference();
     show();
-    expect(screen.getByText('Sin fechas, 120 HH')).toBeInTheDocument();
+    expect(screen.getByText('Sin fechas, 120 HH de fase')).toBeInTheDocument();
   });
 
   it('ofrece planificar mientras no exista un segmento de ese equipo y fase', () => {

@@ -70,6 +70,18 @@ export function TeamProgressCard({ progress, teamName }: Props) {
         </div>
       </div>
 
+      <div className={styles.budgetComparison} role="group"
+        aria-label="Comparación entre presupuesto del equipo y bloques operativos">
+        <span>Presupuesto asignado al equipo: <b>{hours(progress.assignedHours)} HH</b></span>
+        <span>HH definidas en bloques: <b>{progress.plannedHours > 0
+          ? hours(progress.plannedHours) + ' HH' + (progress.unplannedBlockCount > 0 ? ' (parcial)' : '')
+          : progress.phases.length > 0 ? 'Sin definir' : 'Sin bloques creados'}</b></span>
+        {progress.unplannedBlockCount > 0 && <span>
+          <b>{progress.unplannedBlockCount}</b> {progress.unplannedBlockCount === 1
+            ? 'bloque sin HH' : 'bloques sin HH'}
+        </span>}
+      </div>
+
       <div className={styles.timelineWrap}>
         <div className={styles.timeline} role="img"
           aria-label={progress.hasPlan

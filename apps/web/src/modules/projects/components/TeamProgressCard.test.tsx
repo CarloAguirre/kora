@@ -46,6 +46,11 @@ describe('Avance del equipo — fidelización del desplegable V5', () => {
     expect(screen.getByText(/HH consumidas: 43% de las asignadas al equipo/)).toBeInTheDocument();
     expect(screen.getByRole('img', { name: /Avance real 9%; plan a la fecha 49%/ })).toBeInTheDocument();
     expect(screen.getByText('Plan a la fecha: 49%')).toBeInTheDocument();
+    const comparison = screen.getByRole('group', {
+      name: 'Comparación entre presupuesto del equipo y bloques operativos',
+    });
+    expect(within(comparison).getByText(/Presupuesto asignado al equipo:/)).toHaveTextContent('180 HH');
+    expect(within(comparison).getByText(/HH definidas en bloques:/)).toHaveTextContent('180 HH');
   });
 
   it('despliega explicación, brechas por fase, bloques y HH sin inventar', () => {
@@ -95,6 +100,12 @@ describe('Avance del equipo — fidelización del desplegable V5', () => {
     expect(screen.getByText(/el equipo tiene 180 HH asignadas/)).toBeInTheDocument();
     expect(screen.getByText('Faltan HH estimadas para calcular el avance del bloque')).toBeInTheDocument();
     expect(screen.getByText('HH del bloque sin definir')).toBeInTheDocument();
+    const comparison = screen.getByRole('group', {
+      name: 'Comparación entre presupuesto del equipo y bloques operativos',
+    });
+    expect(within(comparison).getByText(/Presupuesto asignado al equipo:/)).toHaveTextContent('180 HH');
+    expect(within(comparison).getByText(/HH definidas en bloques:/)).toHaveTextContent('Sin definir');
+    expect(comparison).toHaveTextContent('1 bloque sin HH');
     expect(screen.getAllByText('—').length).toBeGreaterThan(0);
   });
 
