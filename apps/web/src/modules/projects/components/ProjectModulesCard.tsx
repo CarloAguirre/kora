@@ -602,11 +602,31 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
                       task.segmentId === segment.id ||
                       (!task.segmentId && task.description?.includes(
                         'Bloque de trabajo: ' + segment.name + ' · ID ' + segment.id)));
-                    return linked ? <>
+                    if (linked) return <>
                       <span className={styles.operationalTeamDot}
                         style={{ background: operationalTeamColor(linked.teamName) }} />
                       {linked.name}
-                    </> : <span className={styles.unlinkedBlock}>Sin bloque vinculado</span>;
+                    </>;
+                    // Una referencia EDT convertida puede conservar el WBS
+                    // sin segmentId. Recuperar SOLO su bloque comercial de
+                    // origen, sin fingir un vínculo con un segmento operativo.
+                    const source = commercial?.tasks.find((reference) =>
+                      task.description?.includes(
+                        'Referencia cotización ' + appliedPlanning.data?.versionId +
+                        ' · WBS ' + reference.wbs + ' · ' + reference.role));
+                    const sourceTeamId = source?.teamId;
+                    if (sourceTeamId) {
+                      const sourceTeamName = project.teams.find((team) =>
+                        team.teamId === sourceTeamId)?.teamName ??
+                        teamOptions.find((team) => team.value === sourceTeamId)?.label ??
+                        source.role;
+                      return <span title="Bloque de origen de la cotización; falta vincular el segmento operativo">
+                        <span className={styles.operationalTeamDot}
+                          style={{ background: operationalTeamColor(sourceTeamName) }} />
+                        {module.name} · {sourceTeamName}
+                      </span>;
+                    }
+                    return <span className={styles.unlinkedBlock}>Sin bloque de origen identificado</span>;
                   })()}</td>
                   <td><span className={[styles.taskState, task.assigneeUserId ? styles.taskStateAssigned : ''].join(' ')}>
                     {task.assigneeUserId ? PROJECT_MODULE_TASK_STATUS_LABELS[task.status] : 'Por asignar'}
@@ -636,7 +656,12 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
                 return <tr key={'ref:' + reference.wbs + ':' + reference.role}>
                   <td className={styles.operationalTaskTitle} title="Referencia de cotización pendiente de crear como tarea operativa">{reference.name}</td>
                   <td>Sin asignar</td>
-                  <td><span className={styles.unlinkedBlock}>Pendiente de planificar</span></td>
+                  <td>{reference.teamId ? <span
+                    title="Bloque de origen de la estimación comercial. La tarea todavía no está vinculada operativamente">
+                    <span className={styles.operationalTeamDot}
+                      style={{ background: operationalTeamColor(teamName) }} />
+                    {module.name} · {teamName}
+                  </span> : <span className={styles.unlinkedBlock}>Sin bloque de origen identificado</span>}</td>
                   <td><span className={styles.taskState} title={'Equipo: ' + teamName}>Por asignar</span></td>
                   <td>{reference.hours} / —</td>
                   <td>—</td>
