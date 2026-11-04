@@ -95,8 +95,11 @@ export function calculateProjectExecutionProgress(
       return {
         ...detail, teamId: segment.teamId, teamName: segment.teamName,
         closedAt: segment.closedAt ?? null, approvedDelivery,
+        // Mantener precisión interna: redondear a enteros por bloque podía
+        // ocultar TODAS las causas cuando el proyecto apenas lleva 1% esperado.
+        // Solo se formatea el número al mostrarlo en la interfaz.
         gapPoints: plannedHours > 0
-          ? Math.max(0, Math.round(100 * (detail.expectedHours - detail.actualHours) / plannedHours))
+          ? Math.max(0, 100 * (detail.expectedHours - detail.actualHours) / plannedHours)
           : 0,
       };
     });
