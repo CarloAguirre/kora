@@ -41,12 +41,15 @@ describe('Ficha existente del equipo — enriquecimiento PMO/PM', () => {
     expect(screen.getByLabelText('Entregas del equipo')).toBeInTheDocument();
   });
 
-  it('conserva la sección de explicación desplegable para la próxima iteración', () => {
+  it('expone el avance real del equipo y el desglose completo con el mismo componente del líder', () => {
     render(<ProjectManagerTeamDetailView project={project} projectId={project.id} teamId={teamId} />);
     const button = screen.getByRole('button', { name: /Cómo se calcula este avance/i });
     expect(button).toHaveAttribute('aria-expanded', 'false');
     fireEvent.click(button);
     expect(button).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByText(/El avance real considera las HH estimadas/)).toBeInTheDocument();
+    expect(screen.getByText('1. El plan')).toBeInTheDocument();
+    expect(screen.getByText('2. Las tareas')).toBeInTheDocument();
+    expect(screen.getByText('3. La entrega')).toBeInTheDocument();
+    expect(screen.getByText('Fase 1: Agendamiento de mantenciones')).toBeInTheDocument();
   });
 });
