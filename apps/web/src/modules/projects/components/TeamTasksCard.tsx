@@ -120,7 +120,11 @@ export function TeamTasksCard({ project, projectId, teamId, managerView = false 
     return project.modules.flatMap((module) =>
       module.tasks
         .filter((task) => task.teamId === teamId)
-        .map((task) => ({ ...task, moduleId: module.id, moduleName: module.name })),
+        .map((task) => ({
+          ...task, moduleId: module.id, moduleName: module.name,
+          blockName: module.segments.find((segment) => segment.id === task.segmentId)?.name ??
+            module.segments.find((segment) => segment.teamId === teamId)?.name ?? null,
+        })),
     );
   }, [project, teamId]);
 
@@ -380,7 +384,8 @@ export function TeamTasksCard({ project, projectId, teamId, managerView = false 
               ),
             },
             { key: 'assignee', header: 'Colaborador', render: (task) => task.assigneeName ?? 'Sin asignar' },
-            { key: 'module', header: 'Módulo', render: (task) => task.moduleName },
+            { key: 'module', header: 'Módulo', render: (task) => managerView && task.blockName
+              ? `${task.moduleName} · ${task.blockName}` : task.moduleName },
             {
               key: 'status',
               header: 'Estado',
