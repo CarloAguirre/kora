@@ -140,7 +140,9 @@ export class UpdateProjectModuleTaskUseCase
     const nextAssigneeUserId = command.data.assigneeUserId;
     if (nextAssigneeUserId && nextAssigneeUserId !== task.assigneeUserId) {
       const members = await this.projectTeamMembers.listForProject(project.id);
-      if (members.some((member) => member.userId === nextAssigneeUserId && member.userStatus === 'disabled')) {
+      const matching = members.find((member) => member.userId === nextAssigneeUserId &&
+        member.teamId === targetTeamId && !member.blockedAt);
+      if (!matching || matching.userStatus === 'disabled') {
         return err(new ProjectAssigneeDisabledError());
       }
     }
