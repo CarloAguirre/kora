@@ -12,7 +12,7 @@ import { Select } from '@/shared/components/ui/Select';
 import { Combobox } from '@/shared/components/ui/Combobox';
 import { AlertIcon, ChevronLeftIcon, ChevronRightIcon } from '@/shared/components/icons/Icons';
 import { useCreateHourEntry, useHolidays, useHourEntriesList } from '../api/hours.queries';
-import { useProjectsList } from '@/modules/projects/api/projects.queries';
+import { useProjectDetail, useProjectsList } from '@/modules/projects/api/projects.queries';
 import { getProjectOptionLabel } from '@/modules/projects/lib/project-option-label';
 import { useUsersList } from '@/modules/users/api/users.queries';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
@@ -81,6 +81,8 @@ export function WeeklyEntryForm({
   const [monday, setMonday] = useState(() => mondayOf(new Date().toISOString().slice(0, 10)));
   const [assignment, setAssignment] = useState<HourEntryAssignment | ''>('');
   const [projectId, setProjectId] = useState('');
+  const [moduleId, setModuleId] = useState('');
+  const [segmentId, setSegmentId] = useState('');
   const [category, setCategory] = useState('');
   const [description, setDescription] = useState('');
   const [designatedApproverUserId, setDesignatedApproverUserId] = useState('');
@@ -96,6 +98,16 @@ export function WeeklyEntryForm({
   const needsApprover = !needsProject && assignment !== '' && (user?.role === 'collaborator' || isOvertime);
   const showApproverInRow = needsApprover;
   const selectedProject = needsProject ? (projects?.items ?? []).find((p) => p.id === projectId) : undefined;
+  const { data: projectDetail } = useProjectDetail(needsProject && projectId ? projectId : null);
+  const selectedModule = projectDetail?.modules.find((m) => m.id === moduleId);
+  const allowedTeamIds = new Set([
+    ...(projectDetail?.members ?? []).filter((member) => member.userId === user?.id && !member.blockedAt)
+      .map((member) => member.teamId),
+    ...(projectDetail?.teams ?? []).filter((team) => team.leader?.id === user?.id)
+      .map((team) => team.teamId),
+  ]);
+  const availableSegments = (selectedModule?.segments ?? [])
+    .filter((segment) => allowedTeamIds.has(segment.teamId));
   const overtimeDisabled = needsProject && !selectedProject?.allowsOvertime;
   const weekTotal = dayHours.reduce((sum, value) => sum + (Number(value) || 0), 0);
 
@@ -150,6 +162,10 @@ export function WeeklyEntryForm({
     if (activeDays.some((day) => day.hours > 24)) return 'No puede registrar más de 24 horas en un día.';
     if (activeDays.some((day) => holidayDayIndexes.has(day.index))) return 'No se pueden registrar horas en un día feriado.';
     if (needsProject && !projectId) return 'Selecciona un proyecto para esta asignación.';
+    if (needsProject && projectDetail?.modules.some((m) => m.segments.length > 0) && !moduleId)
+      return 'Selecciona una fase y su bloque de trabajo para imputar estas horas.';
+    if (needsProject && selectedModule?.segments.length && !segmentId)
+      return 'Selecciona el bloque al que corresponden estas HH.';
     if (needsApprover && !designatedApproverUserId) return 'Selecciona a quién aprueba estas horas.';
     if (needsProject && isOvertime && overtimeDisabled) return 'Este proyecto no tiene autorizadas horas extra.';
     if (description.trim().length > 0 && description.trim().length < MIN_DESCRIPTION_LENGTH) {
@@ -179,6 +195,8 @@ export function WeeklyEntryForm({
         const input: CreateHourEntryInput = {
           assignment: assignment as HourEntryAssignment,
           projectId: needsProject ? projectId : undefined,
+          moduleId: needsProject && moduleId ? moduleId : undefined,
+          segmentId: needsProject && segmentId ? segmentId : undefined,
           category: category || undefined,
           description: description || undefined,
           hours: day.hours,
@@ -266,11 +284,32 @@ export function WeeklyEntryForm({
             onChange={(nextProjectId) => {
               const nextProject = (projects?.items ?? []).find((p) => p.id === nextProjectId);
               setProjectId(nextProjectId);
+              setModuleId('');
+              setSegmentId('');
               if (!nextProject?.allowsOvertime) setIsOvertime(false);
             }}
           />
         )}
       </div>
+
+      {needsProject && projectId && (projectDetail?.modules.length ?? 0) > 0 && (
+        <div className={styles.row}>
+          <Select label="Fase / Módulo"
+            required={Boolean(projectDetail?.modules.some((module) => module.segments.length > 0))}
+            placeholder="Seleccionar fase..."
+            options={(projectDetail?.modules ?? []).map((module) => ({ value: module.id, label: module.name }))}
+            value={moduleId}
+            onChange={(event) => { setModuleId(event.target.value); setSegmentId(''); }} />
+          {selectedModule && selectedModule.segments.length > 0 && (
+            <Select label="Bloque de trabajo" required
+              placeholder="Seleccionar bloque..."
+              options={availableSegments.map((segment) => ({
+                value: segment.id, label: segment.name + ' (' + segment.startDate + ' → ' + segment.endDate + ')',
+              }))}
+              value={segmentId} onChange={(event) => setSegmentId(event.target.value)} />
+          )}
+        </div>
+      )}
 
       <div className={styles.row}>
         <TextField label="Actividad" placeholder="Ej: Diseño webapp" value={category} onChange={(event) => setCategory(event.target.value)} />
