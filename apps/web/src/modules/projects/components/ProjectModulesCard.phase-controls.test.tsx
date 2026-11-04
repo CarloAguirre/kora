@@ -299,6 +299,16 @@ describe('Referencias de bloque de trabajo de la cotización', () => {
   });
 
 
+  it('el lateral distingue una propuesta fechada del bloque operativo no creado', () => {
+    seedReference();
+    show({ ...project, startDate: '2026-11-05' } as unknown as ProjectDetail);
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir bloque Diseño Backend · Desarrollo' }));
+    expect(screen.getByText('Fechas propuestas')).toBeInTheDocument();
+    expect(screen.getByText('19-11-2026 → 23-12-2026')).toBeInTheDocument();
+    expect(screen.getByText(/Confírmala mediante «Planificar bloque»/)).toBeInTheDocument();
+    expect(mocks.createSegment).not.toHaveBeenCalled();
+  });
+
   it('abre el panel lateral del bloque EDT referencial al seleccionarlo', () => {
     seedReference();
     show();
