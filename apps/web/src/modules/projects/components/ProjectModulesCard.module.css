@@ -591,3 +591,27 @@
   cursor: pointer;
 }
 .addTaskButton:focus-visible { outline: 2px solid #385a89; outline-offset: 2px; }
+
+/* Información temporal junto al nombre, como la cabecera de fases v5.02. */
+.phaseHeadingIdentity {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  min-width: 0;
+  gap: 7px 12px;
+}
+.phaseHeadingIdentity .headerPhaseName {
+  font-size: 14px;
+  font-weight: 700;
+  color: #142039;
+}
+.phaseHeadingIdentity .phaseHeadingMeta {
+  color: #69768c;
+  font-size: 12px;
+  font-weight: 400;
+  white-space: nowrap;
+}
+@media (max-width: 720px) {
+  .phaseHeadingIdentity { gap: 6px 9px; }
+  .phaseHeadingIdentity .phaseHeadingMeta { white-space: normal; }
+}
