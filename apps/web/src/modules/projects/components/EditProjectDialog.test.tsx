@@ -554,7 +554,7 @@ describe('Editar proyecto de desarrollo · contenido acotado a la referencia v5.
       'Fecha de inicio', 'Fecha de fin', 'HH vendidas', 'Autorizar horas extra',
       'Cotización', 'Contrato',
     ]) {
-      expect(screen.getByLabelText(name)).toBeInTheDocument();
+      expect(screen.getByLabelText(new RegExp(`^${name}`))).toBeInTheDocument();
     }
     for (const section of ['Fechas y horas', 'Plan de pago', 'Documentación']) {
       expect(screen.getByRole('heading', { name: section })).toBeInTheDocument();
@@ -590,8 +590,8 @@ describe('Editar proyecto de desarrollo · contenido acotado a la referencia v5.
       }] as ProjectDetail['teams'],
     });
     renderDevelopmentDialog(p);
-    await userEvent.clear(screen.getByLabelText('Nombre del proyecto'));
-    await userEvent.type(screen.getByLabelText('Nombre del proyecto'), 'Portal actualizado');
+    await userEvent.clear(screen.getByLabelText(/^Nombre del proyecto/));
+    await userEvent.type(screen.getByLabelText(/^Nombre del proyecto/), 'Portal actualizado');
     fireEvent.submit(document.getElementById('edit-project-form') as HTMLFormElement);
     await waitFor(() => expect(mutateAsync).toHaveBeenCalled());
     const input = mutateAsync.mock.calls.at(-1)?.[0].input;
