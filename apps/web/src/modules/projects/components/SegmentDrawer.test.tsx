@@ -151,8 +151,29 @@ describe('Bloque operativo: fidelidad de los tres estados v5.02', () => {
       ['Por asignar', 'taskUnassigned'],
     ] as const;
     for (const [name, colorClass] of expected) {
-      expect(within(dialog).getByText(name).className).toContain(colorClass);
+      const chip = within(dialog).getByText(name);
+      expect(chip.className).toContain(colorClass);
+      if (name === 'Por asignar') {
+        expect(chip.className).not.toContain('taskStatusWithDot');
+      } else {
+        expect(chip.className).toContain('taskStatusWithDot');
+      }
     }
+  });
+
+  it('muestra En curso, Devuelta y Vencida juntos con punto de color, y conserva el motivo', () => {
+    show({ tasks: [{
+      ...task('Corrección devuelta', 'in_progress'),
+      rejectionReason: 'Corregir integración de fechas',
+      date: '2026-10-10',
+    }] });
+    const dialog = screen.getByRole('dialog', { name: 'Bot de conciliación' });
+    for (const name of ['En curso', 'Devuelta', 'Vencida']) {
+      const chip = within(dialog).getByText(name);
+      expect(chip.className).toContain('taskStatus');
+      expect(chip.className).toContain('taskStatusWithDot');
+    }
+    expect(within(dialog).getByText('Devuelta')).toHaveAttribute('title', 'Corregir integración de fechas');
   });
 
   it('muestra HH de tareas aprobadas, no las HH consumidas, bajo el avance', () => {
