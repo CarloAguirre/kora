@@ -61,6 +61,19 @@ export function NewEstimationModal({ open, prospects, onClose }: NewEstimationMo
   const [drivePocResult, setDrivePocResult] = useState<string | null>(null);
   const drivePocWindow = useRef<Window | null>(null);
 
+  // Permite reintentar si el usuario cierra la ventana de Google sin finalizar.
+  useEffect(() => {
+    if (!drivePocBusy) return;
+    const timer = window.setInterval(() => {
+      if (drivePocWindow.current?.closed) {
+        setDrivePocBusy(false);
+        setDrivePocResult((previous) => previous ??
+          'Se cerró la ventana de Google antes de finalizar. Puedes reintentar.');
+      }
+    }, 500);
+    return () => window.clearInterval(timer);
+  }, [drivePocBusy]);
+
   const selected = useMemo(
     () => prospects.find((project) => project.slug === projectRef || project.id === projectRef) ?? null,
     [projectRef, prospects],
@@ -372,9 +385,9 @@ export function NewEstimationModal({ open, prospects, onClose }: NewEstimationMo
           <div className={styles.drivePocPanel}>
             <div>
               <strong>Diagnóstico de conexión Google Drive (PoC)</strong>
-              <p>Autoriza temporalmente una carpeta real con tu cuenta Google.
-                No cambia tu sesión en Kora, no guarda tokens y todavía no habilita
-                la lectura permanente para las estimaciones.</p>
+              <p>Google solicitará permiso de lectura sobre los archivos de tu Drive.
+                Esta prueba consulta únicamente la carpeta indicada, descarta los tokens
+                al terminar y no modifica tu sesión en Kora ni habilita aún la lectura permanente.</p>
             </div>
             <Button variant="outline" size="sm"
               disabled={!selected || !driveUrlIsValid || drivePocBusy}
