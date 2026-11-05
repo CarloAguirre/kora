@@ -14,6 +14,8 @@ import type {
   IssueProjectPaymentMilestoneInvoiceInput,
   ListProjectsQuery,
   ListProjectsResponse,
+  CollaboratorProjectsResponse,
+  CollaboratorProjectDetail,
   MarkProjectPaymentMilestonePaidInput,
   ProjectBillingSettings,
   ProjectDetail,
@@ -34,6 +36,12 @@ import type {
 import { api } from '@/shared/lib/api-client';
 
 export const projectsApi = {
+  mine(query: { page: number; pageSize: number; search?: string }): Promise<CollaboratorProjectsResponse> {
+    return api.get<CollaboratorProjectsResponse>('/projects/my', query);
+  },
+  myDetail(projectId: string): Promise<CollaboratorProjectDetail> {
+    return api.get<CollaboratorProjectDetail>(`/projects/my/${encodeURIComponent(projectId)}`);
+  },
   list(query: Partial<ListProjectsQuery>): Promise<ListProjectsResponse> {
     return api.get<ListProjectsResponse>('/projects', {
       page: query.page,

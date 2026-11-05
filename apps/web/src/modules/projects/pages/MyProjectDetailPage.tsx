@@ -1,0 +1,116 @@
+import { useMemo, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import {
+  PROJECT_PHASE_LABELS, PROJECT_STATUS_LABELS, PROJECT_MODULE_TASK_STATUS_LABELS,
+  type CollaboratorProjectDetail,
+} from '@kora/contracts';
+import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
+import { Card } from '@/shared/components/ui/Card';
+import { Button } from '@/shared/components/ui/Button';
+import { Badge } from '@/shared/components/ui/Badge';
+import { PageLoadError } from '@/shared/components/ui/PageLoadError';
+import { ChevronLeftIcon } from '@/shared/components/icons/Icons';
+import { PhaseRoadmap, type PhaseRoadmapSelection } from '@/modules/client-portal/components/PhaseRoadmap';
+import { ProjectProgressOverview } from '@/modules/client-portal/components/ProjectProgressOverview';
+import { toPhaseRoadmap } from '@/modules/client-portal/adapters/project-detail.adapter';
+import { useMyProjectDetail } from '../api/projects.queries';
+import { MyProjectBitacora } from '../components/MyProjectBitacora';
+import styles from './MyProjectDetailPage.module.css';
+
+const date = (value: string | null | undefined) => value
+  ? new Date(value.slice(0, 10) + 'T12:00:00').toLocaleDateString('es-CL') : '—';
+
+function RoadmapDetail({ project, phaseId, selection }: {
+  project: CollaboratorProjectDetail;
+  phaseId: string;
+  selection: PhaseRoadmapSelection;
+}) {
+  const phase = project.modules.find((module) => module.id === phaseId);
+  const task = phase?.tasks.find((item) => selection.kind === 'task' && item.id === selection.id);
+  const block = phase?.segments.find((item) => selection.kind === 'segment' && item.id === selection.id);
+  const delivery = phase?.deliveries.find((item) => selection.kind === 'delivery' && item.id === selection.id);
+  if (!task && !block && !delivery) return null;
+  return <div className={styles.selection} role="note">
+    {task ? <>
+      <strong>{task.name}</strong>
+      <span>Responsable: {task.assigneeName ?? 'Sin asignar'} · Estado: {PROJECT_MODULE_TASK_STATUS_LABELS[task.status]}</span>
+      <span>Inicio: {date(task.startDate)} · Límite: {date(task.date)} · HH estimadas: {task.estimatedHours ?? '—'}</span>
+      {task.description && <span>{task.description}</span>}
+    </> : block ? <>
+      <strong>{block.name}</strong><span>Equipo: {block.teamName}</span>
+      <span>{date(block.startDate)} – {date(block.endDate)} · {block.estimatedHours ?? '—'} HH estimadas</span>
+    </> : delivery ? <>
+      <strong>{delivery.name ?? 'Entrega'}</strong>
+      <span>Responsable: {delivery.assigneeName ?? delivery.teamName ?? '—'}</span>
+      <span>Fecha comprometida: {date(delivery.estimatedDate)}</span>
+      {delivery.description && <span>{delivery.description}</span>}
+    </> : null}
+  </div>;
+}
+
+export function MyProjectDetailPage() {
+  const { projectId } = useParams<{ projectId: string }>();
+  const navigate = useNavigate();
+  const { data: project, error, isLoading } = useMyProjectDetail(projectId ?? null);
+  const [tab, setTab] = useState<'roadmap' | 'bitacora'>('roadmap');
+  const roadmap = useMemo(() => project ? toPhaseRoadmap(project) : null, [project]);
+
+  if (error) return <DashboardLayout title="Mis proyectos">
+    <PageLoadError error={error} subject="este proyecto"
+      backLabel="Volver a mis proyectos" onBack={() => navigate('/mis-proyectos')} />
+  </DashboardLayout>;
+  if (isLoading || !project || !roadmap) return <DashboardLayout title="Mis proyectos"><p>Cargando proyecto…</p></DashboardLayout>;
+
+  return <DashboardLayout title="Mis proyectos">
+    <div className={styles.page}>
+      <Button variant="tertiary" size="sm" className={styles.back}
+        onClick={() => navigate('/mis-proyectos')}>
+        <ChevronLeftIcon size={16} /> Volver a mis proyectos
+      </Button>
+      <h1 className={styles.name}>{project.name}</h1>
+      <Card className={styles.metadata}>
+        <div><small>Cliente</small><strong>{project.client?.companyName ?? 'Sin cliente'}</strong></div>
+        <div><small>Líder a cargo</small><strong>{project.leader?.fullName ?? '—'}</strong></div>
+        <div><small>Fecha inicio</small><strong>{date(project.startDate)}</strong></div>
+        <div><small>Fecha fin</small><strong>{date(project.endDate ?? project.estimatedDeliveryDate)}</strong></div>
+        <div><small>Etapa de avance</small><Badge tone="info">
+          {project.phase ? PROJECT_PHASE_LABELS[project.phase] : PROJECT_STATUS_LABELS[project.status]}
+        </Badge></div>
+      </Card>
+      <Card className={styles.progressCard}>
+        <h2>Avance del proyecto</h2>
+        <ProjectProgressOverview bare actualPercent={project.progress.actual}
+          expectedPercent={project.progress.expected}
+          startDate={date(project.startDate)} endDate={date(project.endDate)} />
+      </Card>
+      <div className={styles.tabsShell}>
+        <div className={styles.tabs} role="tablist" aria-label="Detalle de mi proyecto">
+          <button type="button" role="tab" aria-selected={tab === 'roadmap'}
+            className={tab === 'roadmap' ? styles.selected : ''}
+            onClick={() => setTab('roadmap')}>Roadmap</button>
+          <button type="button" role="tab" aria-selected={tab === 'bitacora'}
+            className={tab === 'bitacora' ? styles.selected : ''}
+            onClick={() => setTab('bitacora')}>Bitácora</button>
+        </div>
+        <div className={styles.tabsBody}>
+          {tab === 'roadmap' ? <>
+            {project.modules.length === 0
+              ? <p>Este proyecto todavía no tiene fases planificadas.</p>
+              : <PhaseRoadmap alwaysExpanded operationalView borderlessSummary
+                  phaseRoadmap={roadmap}
+                  operationalTaskCount={project.modules.reduce((n, m) => n + m.tasks.filter((t) => !t.cancelledAt).length, 0)}
+                  operationalBlockCount={project.modules.reduce((n, m) => n + m.segments.length, 0)}
+                  operationalMetrics={(phase, row) => {
+                    const segment = project.modules.find((m) => m.id === phase.id)
+                      ?.segments.find((s) => s.id === row.id);
+                    return { hours: segment?.estimatedHours ?? null, progress: null };
+                  }}
+                  renderSelectionDetail={(phase, selection) =>
+                    <RoadmapDetail project={project} phaseId={phase.id} selection={selection} />
+                  } />}
+          </> : <MyProjectBitacora project={project} />}
+        </div>
+      </div>
+    </div>
+  </DashboardLayout>;
+}

@@ -29,6 +29,23 @@ import type {
 } from '@kora/contracts';
 import { projectKeys, projectsApi } from './projects.api';
 
+/** Recursos del colaborador con clave separada del detalle interno. */
+export function useMyProjects(query: { page: number; pageSize: number; search?: string }) {
+  return useQuery({
+    queryKey: ['projects', 'mine', query],
+    queryFn: () => projectsApi.mine(query),
+    placeholderData: (previous) => previous,
+    staleTime: 30_000,
+  });
+}
+export function useMyProjectDetail(projectId: string | null) {
+  return useQuery({
+    queryKey: ['projects', 'mine', 'detail', projectId],
+    queryFn: () => projectsApi.myDetail(projectId as string),
+    enabled: Boolean(projectId),
+  });
+}
+
 export function useProjectsList(query: Partial<ListProjectsQuery>, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: projectKeys.list(query),

@@ -908,6 +908,8 @@ export const collaboratorProjectSummarySchema = projectSummarySchema.pick({
   client: true, leader: true, startDate: true, endDate: true, progress: true,
 }).extend({ weekHours: z.number().nonnegative() });
 export type CollaboratorProjectSummary = z.infer<typeof collaboratorProjectSummarySchema>;
+export const collaboratorProjectsResponseSchema = pageSchema(collaboratorProjectSummarySchema);
+export type CollaboratorProjectsResponse = z.infer<typeof collaboratorProjectsResponseSchema>;
 
 export const collaboratorProjectEventSchema = z.object({
   id: uuidSchema, date: z.iso.date(), createdAt: isoDateTimeSchema,
