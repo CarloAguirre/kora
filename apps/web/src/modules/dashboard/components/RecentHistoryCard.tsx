@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import type { DashboardMyTask, HourEntrySummary } from '@kora/contracts';
 import styles from './RecentHistoryCard.module.css';
 import { Card } from '@/shared/components/ui/Card';
@@ -61,7 +61,7 @@ function approverNames(entry: HourEntrySummary) {
 }
 
 function DetailItem({ label, children }: {
-  label: string; children: React.ReactNode;
+  label: string; children: ReactNode;
 }) {
   return <div className={styles.detailRow}>
     <dt>{label}</dt><dd>{children}</dd>
