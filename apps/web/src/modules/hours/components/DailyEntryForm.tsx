@@ -44,11 +44,13 @@ export const isWeekend = (isoDate: string) => {
  * Solo se pueden imputar HH a tareas activas asignadas al autor y pertenecientes
  * al bloque seleccionado. El filtro se replica y refuerza en el backend.
  */
-export function selectAttributableTasks(
-  tasks: readonly ProjectPhaseOption['tasks'][number][],
+export function selectAttributableTasks<
+  T extends Pick<ProjectPhaseOption['tasks'][number], 'assigneeUserId' | 'segmentId' | 'cancelledAt'>,
+>(
+  tasks: readonly T[],
   ownerId: string | null | undefined,
   segmentId: string | null | undefined,
-): ProjectPhaseOption['tasks'] {
+): T[] {
   if (!ownerId) return [];
   return tasks.filter((task) =>
     !task.cancelledAt && task.assigneeUserId === ownerId &&
