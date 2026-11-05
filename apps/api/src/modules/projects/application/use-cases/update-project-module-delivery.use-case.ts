@@ -205,6 +205,10 @@ export class UpdateProjectModuleDeliveryUseCase
     // --- Estado ----------------------------------------------------------------------------
     const nextStatus = finalizeBlock ? 'approved' : reopenBlock ? 'planned' : command.data.status;
     const statusChanged = nextStatus !== undefined && nextStatus !== delivery.status;
+    // Otra vista puede revertir una aprobación mediante el ciclo tradicional.
+    // Si había un cierre de bloque, esa reversión también debe limpiarlo.
+    const undoRecordedBlockClose = reopenBlock ||
+      (delivery.status === 'approved' && nextStatus === 'delivered' && Boolean(delivery.completedOn));
     if (statusChanged) {
       if (!finalizeBlock && !reopenBlock &&
         !PROJECT_MODULE_DELIVERY_ALLOWED_TRANSITIONS[delivery.status].includes(nextStatus)) {
@@ -332,7 +336,7 @@ export class UpdateProjectModuleDeliveryUseCase
             completedByUserId: command.actor.userId,
             completionComment: command.data.comment?.trim() || null,
           } : {}),
-          ...(reopenBlock ? {
+          ...(undoRecordedBlockClose ? {
             completedOn: null, completedByUserId: null, completionComment: null,
           } : {}),
           ...(command.data.estimatedDate !== undefined ? { estimatedDate: new Date(command.data.estimatedDate) } : {}),
@@ -341,7 +345,7 @@ export class UpdateProjectModuleDeliveryUseCase
         now,
         tx,
       );
-      if ((finalizeBlock || reopenBlock) && linkedSegment) {
+      if ((finalizeBlock || undoRecordedBlockClose) && linkedSegment) {
         await this.modules.updateSegment(linkedSegment.id,
           { closedAt: finalizeBlock ? now : null }, now, tx);
       }
