@@ -22,6 +22,8 @@ import { useUsersList } from '@/modules/users/api/users.queries';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { HOUR_ENTRY_PROJECT_STATUSES } from '../lib/selectable-project-statuses';
 import { ApiRequestError } from '@/shared/lib/api-client';
+import { ProjectHourPlanFields } from './ProjectHourPlanFields';
+import { activityForTaskChange, OTHER_TASK_OPTION, toHourTaskId } from './hour-task-selection';
 
 /** Proyecto primero: es la asignación más común y el resto confundía al elegir. */
 const ASSIGNMENT_OPTIONS = [...HOUR_ENTRY_ASSIGNMENTS]
@@ -30,17 +32,6 @@ const ASSIGNMENT_OPTIONS = [...HOUR_ENTRY_ASSIGNMENTS]
 export const DAILY_CAP_HOURS = 8;
 const MIN_DESCRIPTION_LENGTH = 5;
 const HOURS_STEP = 0.25;
-/** La opción «Otro» es solamente visual: nunca llega como task_id a la API. */
-export const OTHER_TASK_OPTION = '__other__';
-export const toHourTaskId = (value: string | null | undefined): string | undefined =>
-  value && value !== OTHER_TASK_OPTION ? value : undefined;
-/** Etiqueta de HH aprobadas; el registro pendiente aún no cuenta como HH reales. */
-export const formatTaskHourSummary = (approved: number | null | undefined, estimated: number | null | undefined): string => {
-  const hours = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 2 });
-  return estimated == null
-    ? `${hours(approved ?? 0)} HH aprobadas · sin estimación`
-    : `${hours(approved ?? 0)} de ${hours(estimated)} HH aprobadas`;
-};
 const today = () => new Date().toISOString().slice(0, 10);
 /** `2026-11-03` → `03-11-2026`. */
 const formatSegmentDate = (isoDate: string) => isoDate.split('-').reverse().join('-');
@@ -531,6 +522,7 @@ export function DailyEntryBlockFields({
     hourPhases?.find((phase) => phase.id === block.moduleId)?.tasks ?? [],
     ownerUserId ?? user?.id, block.segmentId,
   );
+  const selectedTask = availableTasks.find((task) => task.id === block.taskId);
   const allowedTeamIds = new Set([
     ...(projectDetail?.members ?? []).filter((member) => member.userId === (ownerUserId ?? user?.id) && !member.blockedAt)
       .map((member) => member.teamId),
@@ -553,11 +545,14 @@ export function DailyEntryBlockFields({
   useEffect(() => {
     const roadmapNeedsPhase = Boolean(needsProject && block.projectId && requiresPhase);
     const roadmapNeedsSegment = Boolean(needsProject && block.moduleId && availableSegments.length > 0);
-    if (block.roadmapNeedsPhase !== roadmapNeedsPhase || block.roadmapNeedsSegment !== roadmapNeedsSegment) {
-      onUpdate({ roadmapNeedsPhase, roadmapNeedsSegment });
+    const roadmapNeedsTask = Boolean(needsProject && block.segmentId && availableTasks.length > 0);
+    if (block.roadmapNeedsPhase !== roadmapNeedsPhase ||
+      block.roadmapNeedsSegment !== roadmapNeedsSegment || block.roadmapNeedsTask !== roadmapNeedsTask) {
+      onUpdate({ roadmapNeedsPhase, roadmapNeedsSegment, roadmapNeedsTask });
     }
-  }, [needsProject, block.projectId, block.moduleId, block.roadmapNeedsPhase,
-    block.roadmapNeedsSegment, requiresPhase, availableSegments.length, onUpdate]);
+  }, [needsProject, block.projectId, block.moduleId, block.segmentId,
+    block.roadmapNeedsPhase, block.roadmapNeedsSegment, block.roadmapNeedsTask,
+    requiresPhase, availableSegments.length, availableTasks.length, onUpdate]);
 
   return (
     <div className={styles.block}>
@@ -642,60 +637,34 @@ export function DailyEntryBlockFields({
             )}
           </div>
 
-          {needsProject && block.projectId &&
-            (projectDetail?.modules.length ?? hourPhases?.length ?? 0) > 0 && (
-            <div className={styles.row}>
-              <Select
-                label="Fase / Módulo"
-                required={requiresPhase}
-                placeholder={requiresPhase ? 'Seleccionar fase para imputar HH...' : 'Seleccionar fase (opcional)'}
-                options={(projectDetail?.modules ?? hourPhases ?? []).map((module) =>
-                  ({ value: module.id, label: module.name }))}
-                value={block.moduleId}
-                onChange={(event) => onUpdate({ moduleId: event.target.value, segmentId: '', taskId: '' })}
-              />
-              {(selectedModule ?? selectedHourPhase) && (
-                <span className={styles.stepperLabel}>
-                  Etapa: {PROJECT_MODULE_STAGE_LABELS[(selectedModule ?? selectedHourPhase)!.currentStage]}
-                </span>
-              )}
-            </div>
-          )}
-
-          {needsProject && block.moduleId && availableSegments.length > 0 && (
-            <div className={styles.row}>
-              <Select
-                label="Bloque de trabajo"
-                required
-                placeholder="Seleccionar bloque de trabajo..."
-                options={availableSegments.map((segment) => ({
-                  value: segment.id, label: segment.name + ' (' + segment.startDate + ' → ' + segment.endDate + ')',
-                }))}
-                value={block.segmentId ?? ''}
-                onChange={(event) => onUpdate({ segmentId: event.target.value, taskId: '' })}
-              />
-              <span className={styles.stepperLabel}>
-                {availableSegments.length === 0
-                  ? 'No tienes bloques de este módulo asignados a tu equipo. Consulta al líder.'
-                  : 'Las HH aprobadas se sumarán a este bloque en el Roadmap.'}
-              </span>
-            </div>
-          )}
-
-          {needsProject && block.moduleId && availableTasks.length > 0 && (
-            <div className={styles.row}>
-              <Select label="Tarea" placeholder="Sin tarea específica (HH del bloque)"
-                options={availableTasks.map((task) => ({ value: task.id, label: task.name }))}
-                value={block.taskId ?? ''}
-                helperText="Las HH aprobadas se mostrarán como reales en la tarea seleccionada."
-                onChange={(event) => onUpdate({ taskId: event.target.value })} />
-            </div>
+          {needsProject && block.projectId && (projectDetail?.modules ?? hourPhases ?? []).length > 0 && (
+            <ProjectHourPlanFields
+              phases={projectDetail?.modules ?? hourPhases ?? []}
+              phaseId={block.moduleId}
+              segments={availableSegments}
+              segmentId={block.segmentId ?? ''}
+              tasks={availableTasks}
+              taskId={block.taskId ?? ''}
+              requiresPhase={requiresPhase}
+              approverName={projectDetail?.teams.find((team) =>
+                team.teamId === selectedModule?.segments.find((segment) => segment.id === block.segmentId)?.teamId
+              )?.leader?.fullName}
+              onPhaseChange={(moduleId) => onUpdate({ moduleId, segmentId: '', taskId: '' })}
+              onSegmentChange={(segmentId) => onUpdate({ segmentId, taskId: '' })}
+              onTaskChange={(taskId) => onUpdate({
+                taskId,
+                category: activityForTaskChange(
+                  block.category, selectedTask?.name,
+                  availableTasks.find((task) => task.id === taskId)?.name,
+                ),
+              })}
+            />
           )}
 
           <TextField
             label="Actividad"
             required
-            placeholder="Ej: Diseño de wireframes de alta fidelidad para módulo dashboard"
+            placeholder={block.taskId === OTHER_TASK_OPTION ? 'Describe el trabajo realizado fuera de las tareas asignadas' : 'Ej: Diseño de wireframes para el módulo'}
             value={block.category}
             onChange={(event) => onUpdate({ category: event.target.value })}
           />
@@ -753,10 +722,12 @@ export function DailyEntryBlockFields({
           </div>
 
           <div className={styles.textareaField}>
-            <label className={styles.textareaLabel}>Descripción / Bitácora Detallada</label>
+            <label className={styles.textareaLabel}>
+              Descripción / Bitácora Detallada {selectedTask && '(opcional, ya está vinculada a una tarea)'}
+            </label>
             <textarea
               className={styles.textarea}
-              placeholder="Describa detalladamente el avance técnico realizado (mínimo 5 caracteres)"
+              placeholder={selectedTask ? 'Agrega detalles si te sirven para la bitácora' : 'Describa detalladamente el avance realizado (mínimo 5 caracteres)'}
               value={block.description}
               onChange={(event) => onUpdate({ description: event.target.value })}
             />
