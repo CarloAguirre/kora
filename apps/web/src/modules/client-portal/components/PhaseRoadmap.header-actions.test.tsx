@@ -275,7 +275,7 @@ describe('Restauración de checks y zoom sobre el Gantt operativo v5.02', () => 
     expect(canvas).toHaveStyle({ width: '100%' });
     expect(screen.getByRole('button', { name: 'Alejar cronograma de Desarrollo Backend' })).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: 'Acercar cronograma de Desarrollo Backend' }));
-    expect(slider).toHaveValue('20');
+    expect((slider as HTMLInputElement).value).toBe('20');
     expect(canvas).toHaveStyle({ width: '160%' });
     fireEvent.change(slider, { target: { value: '100' } });
     expect(canvas).toHaveAttribute('data-zoom', '100');
