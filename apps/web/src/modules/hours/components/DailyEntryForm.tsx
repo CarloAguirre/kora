@@ -652,7 +652,8 @@ export function DailyEntryBlockFields({
               requiresPhase={requiresPhase}
               approverName={projectDetail?.teams.find((team) =>
                 team.teamId === selectedModule?.segments.find((segment) => segment.id === block.segmentId)?.teamId
-              )?.leader?.fullName}
+              )?.leader?.fullName ?? selectedHourPhase?.segments.find((segment) =>
+                segment.id === block.segmentId)?.leaderName}
               onPhaseChange={(moduleId) => onUpdate({
                 moduleId, segmentId: '', taskId: '',
                 category: activityForTaskChange(block.category, selectedTask?.name, undefined),
