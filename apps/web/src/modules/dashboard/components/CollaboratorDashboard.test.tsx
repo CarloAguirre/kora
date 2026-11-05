@@ -80,7 +80,7 @@ describe('Dashboard colaborador v5.02', () => {
     expect(screen.getByText('Esperando aprobación de Eduardo Aranda')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('tab', { name: /Aprobadas 1/ }));
     expect(screen.getByText('Integración aprobada')).toBeInTheDocument();
-    expect(screen.getByText('Aprobada')).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: 'Mis tareas' })).getByText('Aprobada')).toBeInTheDocument();
   });
 
   it('marcar terminada envía la tarea a revisión, nunca directo a done', async () => {
