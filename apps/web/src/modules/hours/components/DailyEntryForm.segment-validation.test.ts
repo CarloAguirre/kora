@@ -42,6 +42,18 @@ describe('registro diario: imputación por bloque del Roadmap', () => {
       roadmapNeedsPhase: true, roadmapNeedsSegment: true }, context)).toBeNull();
   });
 
+  it('exige selección consciente de la tarea u Otro si existen tareas del colaborador en el bloque', () => {
+    const selected = { ...base, moduleId: 'module-1', segmentId: 'segment-1',
+      roadmapNeedsPhase: true, roadmapNeedsSegment: true, roadmapNeedsTask: true };
+    expect(validateDailyBlock(selected, context)).toBe('Selecciona una tarea o «Otro trabajo del bloque».');
+    expect(validateDailyBlock({ ...selected, taskId: 'task-1', category: 'Modelo de datos' }, context))
+      .toBeNull();
+    expect(validateDailyBlock({ ...selected, taskId: '__other__', category: 'Reunión de seguimiento' }, context))
+      .toBeNull();
+    expect(validateDailyBlock({ ...selected, taskId: '__other__', category: '' }, context))
+      .toBe('Indica la actividad realizada.');
+  });
+
   it('permite HH generales cuando el colaborador no participa en el Roadmap', () => {
     expect(validateDailyBlock({ ...base, roadmapNeedsPhase: false,
       roadmapNeedsSegment: false }, context)).toBeNull();
