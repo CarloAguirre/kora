@@ -41,7 +41,7 @@ interface RecentHistoryCardProps {
 }
 
 function taskName(entry: HourEntrySummary, tasks: readonly DashboardMyTask[]): string {
-  if (!entry.taskId) return 'Otro trabajo del bloque';
+  if (!entry.taskId) return entry.segment ? 'Otro trabajo del bloque' : 'Otro trabajo';
   return tasks.find((item) => item.id === entry.taskId)?.title ?? 'Tarea vinculada (nombre no disponible)';
 }
 
