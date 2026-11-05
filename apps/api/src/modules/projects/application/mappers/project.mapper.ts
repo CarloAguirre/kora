@@ -180,6 +180,9 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
       status: delivery.status,
       rejectionReason: delivery.rejectionReason,
       createdAt: delivery.createdAt.toISOString(),
+      completedOn: delivery.completedOn?.toISOString().slice(0, 10) ?? null,
+      completedByName: delivery.completedByName ?? null,
+      completionComment: delivery.completionComment ?? null,
       canManage: source.canManagePendings || (delivery.teamId !== null && source.ledTeamIds.has(delivery.teamId)),
     })),
     segments: module.segments.map((segment) => ({
