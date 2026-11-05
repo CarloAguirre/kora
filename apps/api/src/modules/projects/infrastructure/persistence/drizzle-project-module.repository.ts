@@ -12,6 +12,7 @@ import {
   projectModuleSegmentMembers,
   projectModuleSegments,
   projectModuleTasks,
+  projectTeams,
   projectRoadmapReferenceExclusions,
   projectModules,
   projects,
@@ -46,6 +47,7 @@ import { resolveDb } from '../../../../shared/infrastructure/database/unit-of-wo
 /** Tramo al que apunta una tarea/entrega — alias porque las consultas de tramos ya usan la tabla. */
 const linkedSegments = alias(projectModuleSegments, 'linked_segments');
 const completionUsers = alias(users, 'completion_users');
+const dashboardApprovalUsers = alias(users, 'dashboard_approval_users');
 
 @Injectable()
 export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
@@ -692,6 +694,8 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
         segmentName: linkedSegments.name,
         estimatedHours: projectModuleTasks.estimatedHours,
         approvedHours: sql<number>`COALESCE((SELECT SUM(${hourEntries.hours}) FROM ${hourEntries} WHERE ${hourEntries.taskId} = ${projectModuleTasks.id} AND ${hourEntries.status} = 'approved'), 0)`.mapWith(Number),
+        reviewerFirstName: dashboardApprovalUsers.firstName,
+        reviewerLastName: dashboardApprovalUsers.lastName,
         pendingHours: sql<number>`COALESCE((SELECT SUM(${hourEntries.hours}) FROM ${hourEntries} WHERE ${hourEntries.taskId} = ${projectModuleTasks.id} AND ${hourEntries.status} = 'pending'), 0)`.mapWith(Number),
         date: projectModuleTasks.date,
         status: projectModuleTasks.status,
@@ -702,12 +706,16 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
       .innerJoin(projectModules, eq(projectModules.id, projectModuleTasks.moduleId))
       .innerJoin(projects, eq(projects.id, projectModules.projectId))
       .leftJoin(linkedSegments, eq(linkedSegments.id, projectModuleTasks.segmentId))
+      .leftJoin(projectTeams, and(eq(projectTeams.projectId, projectModules.projectId), eq(projectTeams.teamId, projectModuleTasks.teamId)))
+      .leftJoin(teams, eq(teams.id, projectModuleTasks.teamId))
+      .leftJoin(dashboardApprovalUsers, sql`${dashboardApprovalUsers.id} = COALESCE(${projectTeams.leaderUserId}, ${teams.leaderUserId}, ${projects.leaderUserId})`)
       .where(and(eq(projectModuleTasks.assigneeUserId, userId), sql`${projectModuleTasks.cancelledAt} is null`))
       .orderBy(asc(projectModuleTasks.date));
 
     return rows.map((row) => ({
       ...row,
       estimatedHours: row.estimatedHours == null ? null : Number(row.estimatedHours),
+      reviewerName: [row.reviewerFirstName, row.reviewerLastName].filter(Boolean).join(' ') || null,
     }));
   }
 
