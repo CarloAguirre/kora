@@ -7,6 +7,7 @@ import {
   type CreateHourEntryInput,
   type HourEntryAssignment,
   type ProjectSummary,
+  type ProjectPhaseOption,
 } from '@kora/contracts';
 import styles from './HourEntryFormDialog.module.css';
 import { Button } from '@/shared/components/ui/Button';
@@ -36,6 +37,21 @@ export const isWeekend = (isoDate: string) => {
   const day = new Date(`${isoDate}T00:00:00`).getDay();
   return day === 0 || day === 6;
 };
+
+/**
+ * Solo se pueden imputar HH a tareas activas asignadas al autor y pertenecientes
+ * al bloque seleccionado. El filtro se replica y refuerza en el backend.
+ */
+export function selectAttributableTasks(
+  tasks: readonly ProjectPhaseOption['tasks'][number][],
+  ownerId: string | null | undefined,
+  segmentId: string | null | undefined,
+): ProjectPhaseOption['tasks'] {
+  if (!ownerId) return [];
+  return tasks.filter((task) =>
+    !task.cancelledAt && task.assigneeUserId === ownerId &&
+    (task.segmentId ?? null) === (segmentId || null));
+}
 
 export interface DailyBlock {
   key: string;
@@ -495,9 +511,10 @@ export function DailyEntryBlockFields({
   // Fases ofrece tareas sin requerir permiso de lectura de toda la ficha.
   const { data: hourPhases } = useProjectPhases(needsProject && block.projectId ? block.projectId : null);
   const { user } = useAuth();
-  const availableTasks = (hourPhases?.find((phase) => phase.id === block.moduleId)?.tasks ?? [])
-    .filter((task) => !task.cancelledAt && task.assigneeUserId === (ownerUserId ?? user?.id) &&
-      (task.segmentId ?? null) === (block.segmentId || null));
+  const availableTasks = selectAttributableTasks(
+    hourPhases?.find((phase) => phase.id === block.moduleId)?.tasks ?? [],
+    ownerUserId ?? user?.id, block.segmentId,
+  );
   const allowedTeamIds = new Set([
     ...(projectDetail?.members ?? []).filter((member) => member.userId === (ownerUserId ?? user?.id) && !member.blockedAt)
       .map((member) => member.teamId),
