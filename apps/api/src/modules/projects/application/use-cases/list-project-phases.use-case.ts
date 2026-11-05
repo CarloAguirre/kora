@@ -72,6 +72,9 @@ export class ListProjectPhasesUseCase
         tasks: module.tasks.filter((task) => !task.cancelledAt).map((task) => ({
           id: task.id, name: task.name, teamId: task.teamId,
           segmentId: task.segmentId, assigneeUserId: task.assigneeUserId,
+          estimatedHours: task.estimatedHours,
+          /** Solo HH aprobadas enlazadas por task_id; sin atribuir historiales. */
+          actualHours: task.actualHours ?? null,
           cancelledAt: null,
         })),
       })),
