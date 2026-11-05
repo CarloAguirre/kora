@@ -60,10 +60,18 @@
 .headRow,
 .row {
   display: grid;
-  grid-template-columns: minmax(90px, 1.3fr) 76px minmax(110px, 1.1fr) minmax(130px, 1.3fr) minmax(150px, 1.3fr) 36px;
-  gap: var(--kora-space-2);
+  /* Seis columnas visibles incluso dentro del drawer de desarrollo de 600px:
+     Tramo | % | Monto | Hito | Fase/fecha | Acciones. Evita desbordar o
+     reorganizar celdas mientras el panel tenga espacio suficiente. */
+  grid-template-columns: minmax(0, 1.22fr) minmax(0, .57fr) minmax(0, .94fr) minmax(0, 1.32fr) minmax(0, 1.02fr) 24px;
+  gap: 6px;
   align-items: center;
+  min-width: 0;
 }
+.headRow > *,
+.row > * { min-width: 0; max-width: 100%; }
+.row input,
+.row select { min-width: 0; max-width: 100%; width: 100%; }
 
 .summary {
   display: flex;
@@ -159,8 +167,9 @@
   color: var(--kora-text-muted);
 }
 
-/* Adaptar por ancho REAL del editor/drawer, no por el viewport. */
-@container (max-width: 780px) {
+/* Solo las pantallas realmente angostas convierten la tabla en tarjetas.
+   Antes este umbral de 780px rompía todas las filas incluso con 600px. */
+@container (max-width: 515px) {
   .headRow {
     display: none;
   }
