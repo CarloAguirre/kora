@@ -264,7 +264,7 @@ export function SegmentDrawer({
           </span>)}
         </div>
       </section>}
-      {onChangeClosure && !canReopen && !closedByDelivery && <div className={styles.closureAction}>
+      {onChangeClosure && !delivery && !canReopen && <div className={styles.closureAction}>
         <span title={closeHint}>
           <Button size="sm" variant="outline" disabled={!canCloseManually}
             onClick={() => onChangeClosure('close')}>Cerrar bloque</Button>
