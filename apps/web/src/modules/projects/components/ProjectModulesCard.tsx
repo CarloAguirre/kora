@@ -38,13 +38,6 @@ import { SegmentDrawer } from './SegmentDrawer';
 import { ReferenceBlockDrawer } from './ReferenceBlockDrawer';
 import { useAppliedQuotationPlanning } from '@/modules/estimation/api/quotation.queries';
 import { indexTeamBlockProgress, roadmapBlockMetrics } from '../lib/team-progress';
-import {
-  EMPTY_EXECUTION_SEGMENT_MODAL_VALUES,
-  ExecutionSegmentModal,
-  segmentToModalValues,
-  toSegmentInput,
-  type ExecutionSegmentModalValues,
-} from './ExecutionSegmentModal';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -123,9 +116,6 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
 
   /** Tiempo de ejecución que se está editando (`null` = modal cerrado). */
   const [editingSegment, setEditingSegment] = useState<{ moduleId: string; segment: ProjectModuleSegment } | null>(null);
-  const [editingForecastSegment, setEditingForecastSegment] = useState<{
-    moduleId: string; segment: ProjectModuleSegment;
-  } | null>(null);
   const [assigningTasks, setAssigningTasks] = useState<{
     moduleId: string; teamId: string; focusKey?: string;
   } | null>(null);
@@ -147,34 +137,6 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
     task: AppliedQuotationPlanning['modules'][number]['tasks'][number];
     mode?: 'create' | 'edit';
   } | null>(null);
-  // Estable mientras el modal está abierto: `ExecutionSegmentModal` reinicia su formulario cuando cambia `initialValues`,
-  // y un refetch del proyecto (re-render de esta tarjeta) no debe borrar lo que se está escribiendo.
-  const segmentModalInitialValues = useMemo<ExecutionSegmentModalValues>(
-    () => editingForecastSegment ? segmentToModalValues(editingForecastSegment.segment) : EMPTY_EXECUTION_SEGMENT_MODAL_VALUES,
-    [editingForecastSegment],
-  );
-  // El equipo actual del tramo siempre es elegible, aunque ya no figure entre los equipos del proyecto.
-  const segmentModalTeamOptions = useMemo(() => {
-    if (!editingForecastSegment || teamOptions.some((option) => option.value === editingForecastSegment.segment.teamId)) return [...teamOptions];
-    return [{ value: editingForecastSegment.segment.teamId, label: editingForecastSegment.segment.teamName }, ...teamOptions];
-  }, [editingForecastSegment, teamOptions]);
-
-  const onConfirmSegmentEdit = async (values: ExecutionSegmentModalValues) => {
-    if (!editingForecastSegment) return;
-    try {
-      await updateSegment.mutateAsync({
-        projectId: project.id,
-        moduleId: editingForecastSegment.moduleId,
-        segmentId: editingForecastSegment.segment.id,
-        input: toSegmentInput(values),
-      });
-      setEditingForecastSegment(null);
-      toast.success('Bloque actualizado.');
-    } catch (error) {
-      toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo guardar el bloque.');
-    }
-  };
-
   const onCreateWorkBlock = async (input: WorkBlockFormInput) => {
     if (!planningBlock) return;
     const { closingDelivery, ...data } = input;
@@ -724,12 +686,9 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
           blockProgress={blockProgressById.get(segment.id)}
           onClose={close}
           onEdit={canManage ? () => {
+            // El formulario se abre sobre el panel lateral, que debe continuar
+            // visible para conservar el contexto del bloque seleccionado.
             setEditingSegment({ moduleId: module.id, segment });
-            close();
-          } : undefined}
-          onEditMembers={canManage ? () => {
-            setEditingForecastSegment({ moduleId: module.id, segment });
-            close();
           } : undefined}
           onChangeClosure={canManage ? (action) => void changeClosure(module.id, segment, action, close) : undefined}
           onDelete={canManage ? () => void onDeleteSegment(module.id, segment, close) : undefined}
@@ -912,16 +871,6 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
           onConfirm={(input) => void onEditWorkBlock(input)}
         />
       )}
-      <ExecutionSegmentModal
-        open={editingForecastSegment !== null}
-        mode="edit"
-        teamOptions={segmentModalTeamOptions}
-        initialValues={segmentModalInitialValues}
-        segmentId={editingForecastSegment?.segment.id ?? null}
-        submitting={updateSegment.isPending}
-        onCancel={() => setEditingForecastSegment(null)}
-        onConfirm={(values) => void onConfirmSegmentEdit(values)}
-      />
     </>
   );
 }
