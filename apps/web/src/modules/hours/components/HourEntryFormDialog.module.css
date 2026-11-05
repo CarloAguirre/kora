@@ -366,3 +366,68 @@
   font-size: var(--kora-text-sm);
   color: var(--kora-navy);
 }
+
+/* Registro de horas v6: selector progresivo de fase / bloque / tarea.
+   Se comparte entre alta diaria, semanal y edición; no altera los modales
+   de detalle ni las reglas de autorización y aprobación de horas. */
+.projectPlanPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 11px;
+  min-width: 0;
+  border: 1px solid #c7d8ff;
+  border-radius: 9px;
+  background: #f3f6fd;
+}
+.projectPlanHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.projectPlanHeader strong {
+  color: #14233c;
+  font-size: 12px;
+  line-height: 1.3;
+}
+.projectPlanHeader > span {
+  color: #718198;
+  font-size: 11px;
+  line-height: 1.3;
+}
+.planFieldsSingle,
+.planFieldsTriple {
+  display: grid;
+  gap: 10px;
+  align-items: start;
+  min-width: 0;
+}
+.planFieldsSingle { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr); }
+.planFieldsSingle > :first-child { grid-column: 1; }
+.planFieldsTriple { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.planFieldsTriple > * { min-width: 0; }
+.planHelp,
+.planTaskSummary {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: #758399;
+}
+.planTaskSummary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  align-items: center;
+}
+.planTaskSummary strong { color: #1a597f; font-weight: 650; }
+@media (max-width: 680px) {
+  .planFieldsSingle { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .planFieldsTriple { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .planFieldsTriple > :last-child { grid-column: 1 / -1; }
+}
+@media (max-width: 490px) {
+  .planFieldsSingle, .planFieldsTriple { grid-template-columns: minmax(0, 1fr); }
+  .planFieldsTriple > :last-child { grid-column: auto; }
+}
