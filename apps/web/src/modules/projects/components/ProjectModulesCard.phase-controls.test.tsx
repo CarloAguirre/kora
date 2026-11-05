@@ -54,10 +54,13 @@ vi.mock('@/modules/client-portal/components/PhaseRoadmap', () => ({
     operationalFooter?: ReactNode;
     operationalPresaleHours?: number | null;
     renderSelectionDetail?: (phase: { id: string },
-      selection: { kind: 'reference-block'; id: string; label: string }, close: () => void) => ReactNode;
+      selection: { kind: 'reference-block' | 'segment'; id: string; label: string },
+      close: () => void) => ReactNode;
   }) => {
     const phase = phaseRoadmap.phases[0]!;
-    const [selection, setSelection] = useState<{ kind: 'reference-block'; id: string; label: string } | null>(null);
+    const [selection, setSelection] = useState<{
+      kind: 'reference-block' | 'segment'; id: string; label: string;
+    } | null>(null);
     return <section>
       <output data-testid="roadmap-date-range">
         {phaseRoadmap.rangeStartDate} → {phaseRoadmap.rangeEndDate}
@@ -76,6 +79,9 @@ vi.mock('@/modules/client-portal/components/PhaseRoadmap', () => ({
           onClick={() => onPlanOperationalRow(phase, row)}>Planificar bloque</button>}
       </div>)}
       {renderPhaseReferences?.(phase)}
+      {renderSelectionDetail && <button type="button" onClick={() => setSelection({
+        kind: 'segment', id: 'segment-real-1', label: 'Bloque operativo',
+      })}>Abrir segmento operativo</button>}
       {selection && renderSelectionDetail?.(phase, selection, () => setSelection(null))}
       {operationalFooter}</section>;
   },
@@ -146,6 +152,33 @@ beforeEach(() => {
   mocks.success.mockReset();
   mocks.error.mockReset();
   mocks.appliedPlan.modules = [];
+});
+
+describe('Edición superpuesta sobre el detalle lateral del bloque', () => {
+  it('conserva seleccionado el bloque mientras se edita y al cancelar vuelve al panel lateral', async () => {
+    const segment = {
+      id: 'segment-real-1', name: 'Bloque operativo',
+      teamId: 'team-1', teamName: 'Desarrollo',
+      startDate: '2026-11-04', endDate: '2026-11-24',
+      estimatedHours: 80, consumedHours: 0, closedAt: null, members: [],
+    };
+    show({
+      ...project,
+      modules: [{ ...module, segments: [segment] }],
+    } as unknown as ProjectDetail);
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir segmento operativo' }));
+    expect(screen.getByRole('dialog', { name: 'Bloque operativo' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Editar bloque' }));
+    const editForm = await screen.findByRole('dialog', { name: 'Editar bloque de trabajo' });
+    // Deben coexistir DOS dialog nativos: edición en primer plano y
+    // contexto del segmento detrás, sin reiniciar la selección.
+    expect(document.querySelectorAll('dialog')).toHaveLength(2);
+    expect(editForm).toBeInTheDocument();
+    fireEvent.click(within(editForm).getByRole('button', { name: 'Cancelar' }));
+    expect(screen.queryByRole('dialog', { name: 'Editar bloque de trabajo' }))
+      .not.toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Bloque operativo' })).toBeInTheDocument();
+  });
 });
 
 describe('Cabecera de las fases · HTML v5', () => {
