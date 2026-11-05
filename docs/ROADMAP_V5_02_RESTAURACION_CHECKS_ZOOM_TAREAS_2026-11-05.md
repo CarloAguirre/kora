@@ -26,6 +26,21 @@ subcronograma redundante**:
 7. cada fase conserva su propio estado de zoom; una fase sin fechas no genera
    marcadores ni zoom artificiales.
 
+## Ajuste de presentación: fila única de tareas
+
+Después de la restauración inicial se corrigió la distribución del visor:
+en vez de dibujar una fila por cada tarea, **cada fase muestra una sola fila
+«Tareas»**, exactamente como el cronograma anterior. Los marcadores se ubican
+en esa pista por fecha límite. Si dos o más tareas comparten el mismo día,
+`MarkerTrackRow` las agrupa en un marcador con contador y un
+`DropdownMenu` para seleccionar cada tarea por su ID. Se mantiene la
+prioridad visual del estado atrasado (rojo) en los grupos mixtos, el detalle
+individual y el zoom con el mismo eje de bloques y entregas.
+
+No se modificaron tablas de tareas, estados, permisos ni backend.
+La prueba de regresión verifica fila única, contador, menú, selección de
+cada tarea y persistencia del agrupador al cambiar el zoom.
+
 ## Reutilización, sin duplicación de entidades
 
 - `PhaseRoadmap.tsx`: se reutilizan `taskItemSymbol`,
