@@ -35,7 +35,8 @@ describe('Tabla operativa compartida de tareas', () => {
     expect(headers).toEqual(['Tarea', 'Asignada a', 'Bloque de trabajo', 'Estado', 'Fecha límite']);
     expect(within(table).getByText('Análisis de flujos existentes')).toBeInTheDocument();
     expect(within(table).getByText('Leslie Galaz')).toBeInTheDocument();
-    expect(within(table).getByText('S1 - Diseño y Arquitectura')).toBeInTheDocument();
+    // Ambas tareas pertenecen al mismo bloque; debe aparecer en las dos filas.
+    expect(within(table).getAllByText('S1 - Diseño y Arquitectura')).toHaveLength(2);
     expect(within(table).getByText('Aprobada')).toBeInTheDocument();
     expect(within(table).getByText('En curso')).toBeInTheDocument();
     expect(within(table).queryByRole('button')).not.toBeInTheDocument();
