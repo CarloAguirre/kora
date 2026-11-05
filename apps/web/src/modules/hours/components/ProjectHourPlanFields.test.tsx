@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { ProjectHourPlanFields } from './ProjectHourPlanFields';
 import {
-  OTHER_TASK_OPTION, activityForTaskChange, formatTaskHourSummary, toHourTaskId,
+  OTHER_TASK_OPTION, activityForTaskChange, formatTaskHourSummary, resolveHourApprover, toHourTaskId,
 } from './hour-task-selection';
 
 const tasks = [
@@ -35,6 +35,30 @@ describe('Vincula estas horas al plan', () => {
     expect(screen.getByText('2 HH pendientes de aprobación')).toBeInTheDocument();
     expect(screen.getByText(/Solo las aprobadas se suman a las reales del Roadmap/)).toBeInTheDocument();
     expect(screen.getByText('Aprobador: Eduardo Aranda')).toBeInTheDocument();
+  });
+
+  it('muestra al líder antes de la fase solo cuando es unívoco para las tareas del colaborador', () => {
+    const phase = {
+      id: 'phase-1', name: 'Desarrollo', currentStage: 'development',
+      segments: [{ ...segments[0]!, leaderName: 'Eduardo Aranda' }],
+      tasks: [{
+        id: 'task-1', name: 'Modelo de datos', teamId: 'team-1',
+        segmentId: 'segment-1', assigneeUserId: 'user-1', cancelledAt: null,
+      }],
+    };
+    expect(resolveHourApprover([phase] as never, 'user-1')).toBe('Eduardo Aranda');
+    expect(resolveHourApprover([phase] as never, 'unassigned')).toBeNull();
+    const ambiguous = {
+      ...phase,
+      segments: [...phase.segments, {
+        ...segments[0]!, id: 'segment-2', leaderName: 'Otro líder',
+      }],
+      tasks: [...phase.tasks, {
+        ...phase.tasks[0]!, id: 'task-2', segmentId: 'segment-2',
+      }],
+    };
+    expect(resolveHourApprover([ambiguous] as never, 'user-1')).toBeNull();
+    expect(resolveHourApprover([ambiguous] as never, 'user-1', 'segment-2')).toBe('Otro líder');
   });
 
   it('permite elegir explícitamente Otro trabajo del bloque sin enviar un ID inexistente', () => {
