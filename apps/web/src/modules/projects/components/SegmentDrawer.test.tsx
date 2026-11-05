@@ -164,7 +164,7 @@ describe('Bloque operativo: fidelidad de los tres estados v5.02', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Marcar como entregado' }));
     const completion = screen.getByRole('dialog', { name: 'Marcar como entregada' });
     expect(screen.getByRole('dialog', { name: 'Bot de conciliación' })).toBeInTheDocument();
-    fireEvent.change(within(completion).getByLabelText('Fecha de entrega'), {
+    fireEvent.change(within(completion).getByLabelText(/Fecha de entrega/), {
       target: { value: '2026-10-30' },
     });
     fireEvent.change(within(completion).getByLabelText('Comentario o link de evidencia'), {
@@ -186,7 +186,7 @@ describe('Bloque operativo: fidelidad de los tres estados v5.02', () => {
     show({ deliveries: [delivery('planned')], onChangeClosure: vi.fn() });
     fireEvent.click(screen.getByRole('button', { name: 'Marcar como entregado' }));
     const form = screen.getByRole('dialog', { name: 'Marcar como entregada' });
-    fireEvent.change(within(form).getByLabelText('Fecha de entrega'), {
+    fireEvent.change(within(form).getByLabelText(/Fecha de entrega/), {
       target: { value: '2026-10-16' },
     });
     expect(within(form).getByRole('button', { name: 'Marcar como entregada' })).toBeEnabled();
