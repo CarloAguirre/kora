@@ -29,7 +29,7 @@ describe('Tabla operativa compartida de tareas', () => {
       canManage readOnly onEditTask={onEditTask} onDeleteTask={onDeleteTask}
       onAddTask={onAddTask} />);
     expect(screen.getByText('Tareas')).toBeInTheDocument();
-    expect(screen.getByText('2, 1 aprobadas')).toBeInTheDocument();
+    expect(screen.getByText(/2, 1 aprobadas/)).toBeInTheDocument();
     const table = screen.getByRole('table');
     const headers = within(table).getAllByRole('columnheader').map((th) => th.textContent);
     expect(headers).toEqual(['Tarea', 'Asignada a', 'Bloque de trabajo', 'Estado', 'Fecha límite']);

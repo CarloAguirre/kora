@@ -39,7 +39,7 @@ if ($LASTEXITCODE -ne 0) { throw "Falló Web" }
 
 pnpm --filter @kora/api exec vitest run src/modules/projects/application/services/collaborator-project-activity.service.spec.ts src/modules/projects/presentation/projects.controller.my-projects.spec.ts
 if ($LASTEXITCODE -ne 0) { throw "Fallaron pruebas API: agregación o permisos" }
-pnpm --filter @kora/web exec vitest run src/modules/projects/pages/MyProjectsPage.test.tsx src/modules/projects/pages/MyProjectDetailPage.test.tsx
+pnpm --filter @kora/web exec vitest run src/modules/projects/pages/MyProjectsPage.test.tsx src/modules/projects/pages/MyProjectDetailPage.test.tsx src/modules/projects/components/SegmentDrawer.test.tsx src/modules/projects/components/ProjectPhaseTasksTable.test.tsx src/modules/projects/components/ProjectModulesCard.phase-controls.test.tsx
 if ($LASTEXITCODE -ne 0) { throw "Fallaron pruebas de vistas" }
 
 pnpm --filter @kora/api build
@@ -59,3 +59,41 @@ if ($LASTEXITCODE -ne 0) { throw "Falló build Web" }
 7. Intentar modificar tarea por API con rol colaborador fuera de su propia tarea: deben mantenerse las restricciones existentes.
 
 No hay migraciones, backfill ni cambios de datos históricos.
+
+## Ajuste de fidelidad visual — 05/11/2026 (detalle de bloques y tareas)
+
+Se aplicaron las referencias de las imágenes del colaborador v6, reutilizando
+componentes reales del producto y sin reemplazar las vistas internas.
+
+- Al pulsar la barra de un bloque operativo dentro de un `PhaseRoadmap`, el
+  colaborador abre **`SegmentDrawer`**: exactamente el mismo panel lateral que
+  Líder/PMO, con datos del equipo, líder, fechas, HH, avance, entrega de cierre,
+  integrantes y tareas del bloque. Se eliminó el resumen de bloque que antes
+  se mostraba debajo del gráfico.
+- `SegmentDrawer` ahora admite `readOnly`. En ese modo neutraliza la UI y
+  los callbacks de cerrar, reabrir, entregar, crear, editar, duplicar o eliminar.
+  No se crearon rutas de mutación para esta funcionalidad.
+- `ProjectPhaseTasksTable` extraída desde `ProjectModulesCard` se comparte
+  con el colaborador: tabla abierta por fase **Tareas N, M aprobadas**, con tarea,
+  responsable, bloque, estado y fecha límite. La vista interna conserva sus
+  columnas de HH, referencias EDT y acciones originales.
+- La cabecera de cada fase muestra las mismas fechas, HH y comparación
+  real/plan con los estilos de `ProjectModulesCard`. La función
+  `phaseHeaderMeta` se comparte entre vistas.
+- El avance del drawer y la barra se calcula con
+  `calculateOperationalBlockProgress`, que reutiliza la función interna
+  `blockDetail` del líder. No se infieren ni inventan progresos a partir del
+  consumo de horas.
+- El endpoint del colaborador solo agrega `teams: [{ teamId, leader }]`
+  para identificar al líder del bloque. **No** entrega información adicional
+  de cotización, presupuesto, facturación ni otros datos internos.
+
+**Pruebas incorporadas:** interacción del Roadmap que abre el drawer, tabla
+operativa read-only sin acciones aun recibiendo callbacks, y
+`SegmentDrawer.test.tsx` verificando la ausencia de todas las acciones de
+gestión. Incluye `ProjectModulesCard.phase-controls.test.tsx` para regresión
+de la vista de Líder/PMO.
+
+**Estado de validación:** cambios confirmados en GitHub. Las pruebas TypeScript,
+Vitest y builds deben ejecutarse en el monorepo; no se reportan aprobados sin
+ejecutarlos. Sin migraciones de base de datos.
