@@ -90,3 +90,65 @@ pnpm --filter @kora/web build
 **Sin migraciones, SQL correctivo ni cambios de backend**.
 La ejecución de typecheck, Vitest y build en el entorno del usuario
 sigue pendiente.
+
+## Refinamiento: cierre manual y edición superpuesta (05-11-2026)
+
+En el panel lateral se retiró el enlace **«Colaboradores / Forecast»** y
+el formulario especial al que conducía, que ya no forma parte del flujo
+de esta vista. Los colaboradores registrados siguen visibles en el
+desglose del bloque, si los hay.
+
+Se añadió **«Cerrar bloque»** junto a la sección de cierre, donde
+antes aparecía el enlace. La acción está disponible únicamente para
+quienes pueden gestionar el proyecto, sin entrega vinculada y con al
+menos una tarea operativa activa, todas con estado `done` (aprobadas).
+El botón se presenta deshabilitado cuando no cumple las reglas, con
+explicación visible y atributo `title` para el tooltip:
+
+- Sin tareas: se solicita agregar y aprobar tareas.
+- Tareas no aprobadas: se habilita cuando todas estén aprobadas.
+- Con entrega vinculada: no se permite cierre manual; la entrega
+  requiere presentación y aprobación.
+
+No se deben ofrecer acciones que el backend rechaza. El caso de uso
+`UpdateProjectModuleSegmentUseCase` conserva la restricción de
+`closingDelivery` y valida solo tareas activas, excluyendo canceladas.
+Para que el botón de cierre manual pueda efectivamente llegar a
+habilitarse, `refreshSegmentClosure` **deja de crear automáticamente
+`closedAt` al aprobar todas las tareas**: conserva cierres anteriores
+pero permite que el líder lo registre explícitamente. Si una tarea se
+reabre o el bloque se queda sin tareas, se limpia el cierre previo.
+Una entrega `approved` mantiene su criterio de cierre por entrega,
+independientemente de `closedAt`.
+
+Al pulsar **«Editar bloque»** ya no se invoca `close()` del
+`PhaseRoadmap`: el `SegmentDrawer` permanece abierto mientras
+`NewWorkBlockModal` se monta como segundo `<dialog>` nativo, encima
+del panel. «Cancelar» vuelve a dejar el panel lateral tal como estaba;
+«Guardar cambios» actualiza la información y conserva la selección.
+No se añadieron overlays manuales ni z-index globales.
+
+Pruebas actualizadas:
+- `SegmentDrawer.test.tsx`: cierre deshabilitado por tarea pendiente,
+  sin tareas o con entrega, cierre habilitado con tareas aprobadas y
+  ausencia del link retirado.
+- `ProjectModulesCard.phase-controls.test.tsx`: ambos diálogos
+  abiertos a la vez y selección conservada al cancelar.
+- `drizzle-project-module.repository.spec.ts`: sin cierre automático
+  al aprobar todas las tareas.
+- `update-project-module-segment.use-case.spec.ts`: validación de
+  cierre manual y protección de entrega aprobable por separado.
+
+Validación local pendiente:
+
+```powershell
+git fetch kora
+git switch feature/calculadora-roadmap-diseno-v5-02
+git pull --ff-only kora feature/calculadora-roadmap-diseno-v5-02
+pnpm exec turbo run typecheck --filter=@kora/api --force
+pnpm --filter @kora/web typecheck
+pnpm --filter @kora/api exec vitest run src/modules/projects/infrastructure/persistence/drizzle-project-module.repository.spec.ts src/modules/projects/application/use-cases/update-project-module-segment.use-case.spec.ts
+pnpm --filter @kora/web exec vitest run src/modules/projects/components/SegmentDrawer.test.tsx src/modules/projects/components/ProjectModulesCard.phase-controls.test.tsx
+```
+
+**Sin nuevas migraciones ni escritura manual contra PostgreSQL.**
