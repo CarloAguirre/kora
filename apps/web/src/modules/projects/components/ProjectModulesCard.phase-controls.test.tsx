@@ -603,7 +603,7 @@ describe('Acciones reales para referencias EDT antes de convertirlas', () => {
 describe('HH reales de las tareas y atribución explícita de bitácora', () => {
   it('muestra las HH aprobadas de la tarea y mantiene — cuando no existe vínculo', () => {
     const tasks = [
-      { id: 'task-with-entries', name: 'Diseño con horas', actualHours: 6, estimatedHours: 8 },
+      { id: 'task-with-entries', name: 'Diseño con horas', actualHours: 6, estimatedHours: 8, pendingHours: 2 },
       { id: 'task-legacy', name: 'Tarea histórica sin vínculo', actualHours: null, estimatedHours: 12 },
     ].map((item) => ({
       ...item, status: 'done', assigneeUserId: 'user-1', assigneeName: 'Leslie',
@@ -615,6 +615,7 @@ describe('HH reales de las tareas y atribución explícita de bitácora', () => 
     const unlinked = screen.getByText('Tarea histórica sin vínculo', { selector: 'td' }).closest('tr')!;
     expect(within(attributed).getByText('8 / 6')).toHaveAttribute('title',
       'HH reales de bitácora aprobadas y vinculadas a esta tarea.');
+    expect(within(attributed).getByText('2 HH por aprobar')).toBeInTheDocument();
     expect(within(unlinked).getByText('12 / —')).toHaveAttribute('title',
       'Sin HH aprobadas asociadas explícitamente a esta tarea.');
   });
