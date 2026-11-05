@@ -19,7 +19,7 @@ vi.mock('@/modules/client-portal/components/PhaseRoadmap', () => ({
     operationalView: boolean; toolbarActions?: ReactNode; onPlanOperationalRow?: () => void;
     renderPhaseReferences?: (phase: { id: string }) => ReactNode;
     renderSelectionDetail?: (phase: { id: string },
-      selection: { kind: 'segment'; id: string; label: string }, close: () => void) => ReactNode;
+      selection: { kind: 'segment' | 'task'; id: string; label: string }, close: () => void) => ReactNode;
   }) => {
     const [selected, setSelected] = useState<'segment' | 'task' | null>(null);
     const phase = { id: 'm-1' };
