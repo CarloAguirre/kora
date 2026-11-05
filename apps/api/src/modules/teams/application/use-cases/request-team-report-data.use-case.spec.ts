@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { teamReportDataRequestDataSchema, type TeamReportDataRequestData } from '@kora/contracts';
+import type { TeamReportDataRequestData } from '@kora/contracts';
 import { FixedClock } from '../../../../test/fakes';
 import type { TeamRepository } from '../../domain/repositories/team.repository';
 import type { TeamReportProjectRow, TeamReportReader } from '../ports/team-report-reader.port';
@@ -74,14 +74,11 @@ function setup(
   };
   const users = { findById: vi.fn().mockResolvedValue({ id: ACTOR.userId, fullName: 'Eduardo Aranda' }) };
   const inbox = { create: vi.fn(async (input: CreateNotificationInput) => {
-    if (input.type !== 'team_report_data_request') {
+    if (input.type !== 'team_report_data_request' ||
+      !('items' in input.data) || !('note' in input.data)) {
       throw new Error('Esta prueba solo admite solicitudes de datos de equipos');
     }
-    created.push({
-      ...input,
-      type: 'team_report_data_request',
-      data: teamReportDataRequestDataSchema.parse(input.data),
-    });
+    created.push({ ...input, type: 'team_report_data_request', data: input.data });
   }) };
   const useCase = new RequestTeamReportDataUseCase(
     teams as unknown as TeamRepository,
