@@ -19,7 +19,7 @@ import { Modal } from '@/shared/components/ui/Modal';
 import { TextField } from '@/shared/components/ui/TextField';
 import { Button } from '@/shared/components/ui/Button';
 import { Badge, type BadgeTone } from '@/shared/components/ui/Badge';
-import { CloseIcon, CopyIcon, PencilIcon, TrashIcon } from '@/shared/components/icons/Icons';
+import { CloseIcon, PencilIcon, TrashIcon } from '@/shared/components/icons/Icons';
 import { useToast } from '@/shared/components/ui/Toast';
 import { ApiRequestError } from '@/shared/lib/api-client';
 import { PhaseRoadmap, type PhaseRoadmapSelection, type OperationalRoadmapRow } from '@/modules/client-portal/components/PhaseRoadmap';
@@ -39,6 +39,7 @@ import { ReviewActionModal, type ReviewAction } from './ReviewActionModal';
 import { ReferenceBlockDrawer } from './ReferenceBlockDrawer';
 import { useAppliedQuotationPlanning } from '@/modules/estimation/api/quotation.queries';
 import { indexTeamBlockProgress, roadmapBlockMetrics } from '../lib/team-progress';
+import { ProjectPhaseTasksTable } from './ProjectPhaseTasksTable';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -70,12 +71,6 @@ const TASK_STATUS_TONE: Record<ProjectModuleTask['status'], BadgeTone> = {
 /** La tabla usa el tamaño original de "Por asignar" para TODOS sus chips.
  *  Las cuatro clases existen en el CSS Module; el ! resuelve la firma
  *  string | undefined generada con noUncheckedIndexedAccess. */
-const TABLE_TASK_STATUS_CLASS: Record<ProjectModuleTask['status'], string> = {
-  todo: styles.taskPending!,
-  in_progress: styles.taskInProgress!,
-  in_review: styles.taskReview!,
-  done: styles.taskApproved!,
-};
 
 const DELIVERY_STATUS_TONE: Record<ProjectModuleDelivery['status'], BadgeTone> = {
   planned: 'neutral',
@@ -555,8 +550,6 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
       group.hours += row.hours;
       groups.set(id, group);
     }
-    const count = module.tasks.length + references.length;
-    const approved = module.tasks.filter((task) => task.status === 'done').length;
     return <div className={styles.operationalContent}>
       {Array.from(groups, ([id, group]) => {
         const team = project.teams.find((entry) => entry.teamId === id);
@@ -583,135 +576,19 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
           </Button>}
         </div>;
       })}
-      <details className={styles.operationalTasks} open>
-        <summary><strong>Tareas</strong> {count}, {approved} aprobadas</summary>
-        {count ? <div className={styles.operationalTaskScroll}>
-          <table className={styles.operationalTaskTable}>
-            <thead><tr><th>Tarea</th><th>Asignada a</th><th>Bloque de trabajo</th>
-              <th>Estado</th><th>HH est. / reales</th><th>Fecha límite</th><th aria-label="Acciones" /></tr></thead>
-            <tbody>
-              {module.tasks.map((task) => (
-                <tr key={task.id}>
-                  <td className={styles.operationalTaskTitle}>{task.name}</td>
-                  <td>{task.assigneeName || 'Sin asignar'}</td>
-                  <td>{(() => {
-                    const linked = module.segments.find((segment) =>
-                      task.segmentId === segment.id ||
-                      (!task.segmentId && task.description?.includes(
-                        'Bloque de trabajo: ' + segment.name + ' · ID ' + segment.id)));
-                    if (linked) return <>
-                      <span className={styles.operationalTeamDot}
-                        style={{ background: operationalTeamColor(linked.teamName) }} />
-                      {linked.name}
-                    </>;
-                    // Una referencia EDT convertida puede conservar el WBS
-                    // sin segmentId. Recuperar SOLO su bloque comercial de
-                    // origen, sin fingir un vínculo con un segmento operativo.
-                    const source = commercial?.tasks.find((reference) =>
-                      task.description?.includes(
-                        'Referencia cotización ' + appliedPlanning.data?.versionId +
-                        ' · WBS ' + reference.wbs + ' · ' + reference.role));
-                    const sourceTeamId = source?.teamId;
-                    if (sourceTeamId) {
-                      const sourceTeamName = project.teams.find((team) =>
-                        team.teamId === sourceTeamId)?.teamName ??
-                        teamOptions.find((team) => team.value === sourceTeamId)?.label ??
-                        source?.role ?? 'Equipo';
-                      return <span title="Bloque de origen de la cotización; falta vincular el segmento operativo">
-                        <span className={styles.operationalTeamDot}
-                          style={{ background: operationalTeamColor(sourceTeamName) }} />
-                        {module.name} · {sourceTeamName}
-                      </span>;
-                    }
-                    return <span className={styles.unlinkedBlock}>Sin bloque de origen identificado</span>;
-                  })()}</td>
-                  <td><span className={styles.taskStatusGroup}>
-                    {task.assigneeUserId
-                      ? <>
-                        <span className={[styles.taskState, styles.taskStateWithDot,
-                          TABLE_TASK_STATUS_CLASS[task.status]].join(' ')}>
-                          {PROJECT_MODULE_TASK_STATUS_LABELS[task.status]}
-                        </span>
-                        {task.status === 'in_progress' && Boolean(task.rejectionReason?.trim()) &&
-                          <span className={[styles.taskState, styles.taskStateWithDot,
-                            styles.taskReturned].join(' ')} title={task.rejectionReason ?? undefined}>
-                            Devuelta
-                          </span>}
-                        {(task.status === 'todo' || task.status === 'in_progress') &&
-                          parseDate(task.date) < today() &&
-                          <span className={[styles.taskState, styles.taskStateWithDot,
-                            styles.taskOverdue].join(' ')}>Vencida</span>}
-                      </>
-                      : <span className={styles.taskState}>Por asignar</span>}
-                  </span></td>
-                  <td title={task.actualHours == null
-                    ? 'Sin HH aprobadas asociadas explícitamente a esta tarea.'
-                    : 'HH reales de bitácora aprobadas y vinculadas a esta tarea.'}>
-                    {task.estimatedHours ?? '—'} / {task.actualHours ?? '—'}
-                    {(task.pendingHours ?? 0) > 0 && (
-                      <small className={styles.taskPendingHours}>
-                        {task.pendingHours?.toLocaleString('es-CL', { maximumFractionDigits: 2 })} HH por aprobar
-                      </small>
-                    )}
-                  </td>
-                  <td>{formatDate(task.date)}</td>
-                  <td className={styles.operationalTaskActions}>
-                    {canManage && task.status === 'in_review' && !task.cancelledAt &&
-                      reviewActions(module.id, task)}
-                    {canManage && <>
-                      <button type="button" className={styles.taskIconAction}
-                        aria-label={'Editar tarea ' + task.name} title="Editar tarea"
-                        onClick={() => setEditingTask({ moduleId: module.id, task })}><PencilIcon size={15} /></button>
-                      {task.assigneeUserId && <button type="button" className={styles.taskIconAction}
-                        aria-label={'Duplicar tarea ' + task.name} title="Duplicar para otra persona"
-                        onClick={() => setDuplicatingTask({ moduleId: module.id, task })}>
-                        <CopyIcon size={15} />
-                      </button>}
-                      <button type="button" className={styles.taskIconAction}
-                        aria-label={'Eliminar tarea ' + task.name} title="Eliminar tarea"
-                        onClick={() => void onRemoveTask(module, task)}><TrashIcon size={15} /></button>
-                    </>}
-                  </td>
-                </tr>
-              ))}
-              {references.map((reference) => {
-                const teamName = project.teams.find((team) => team.teamId === reference.teamId)?.teamName ??
-                  teamOptions.find((team) => team.value === reference.teamId)?.label ?? reference.role;
-                return <tr key={'ref:' + reference.wbs + ':' + reference.role}>
-                  <td className={styles.operationalTaskTitle} title="Referencia de cotización pendiente de crear como tarea operativa">{reference.name}</td>
-                  <td>Sin asignar</td>
-                  <td>{reference.teamId ? <span
-                    title="Bloque de origen de la estimación comercial. La tarea todavía no está vinculada operativamente">
-                    <span className={styles.operationalTeamDot}
-                      style={{ background: operationalTeamColor(teamName) }} />
-                    {module.name} · {teamName}
-                  </span> : <span className={styles.unlinkedBlock}>Sin bloque de origen identificado</span>}</td>
-                  <td><span className={styles.taskState} title={'Equipo: ' + teamName}>Por asignar</span></td>
-                  <td>{reference.hours} / —</td>
-                  <td>—</td>
-                  <td className={styles.operationalTaskActions}>
-                    {canManage && <>
-                      <button type="button" className={styles.taskIconAction}
-                        aria-label={'Editar tarea ' + reference.name} title="Editar tarea"
-                        onClick={() => setCreatingFromReference({
-                          moduleId: module.id, task: reference, mode: 'edit',
-                        })}><PencilIcon size={15} /></button>
-                      <button type="button" className={styles.taskIconAction}
-                        aria-label={'Eliminar tarea ' + reference.name} title="Eliminar tarea"
-                        disabled={excludeRoadmapReference.isPending}
-                        onClick={() => void onDiscardReference(module, reference)}>
-                        <TrashIcon size={15} />
-                      </button>
-                    </>}
-                  </td>
-                </tr>;
-              })}
-            </tbody>
-          </table>
-        </div> : <p className={styles.noOperationalTasks}>Sin tareas registradas en esta fase.</p>}
-        {canManage && <button type="button" className={styles.addTaskButton}
-          onClick={() => setAddingTask({ moduleId: module.id })}>+ Agregar tarea</button>}
-      </details>
+      <ProjectPhaseTasksTable
+        module={module} teams={project.teams} teamOptions={teamOptions}
+        commercial={commercial} quotationVersionId={appliedPlanning.data?.versionId}
+        references={references} canManage={canManage}
+        referenceDeletePending={excludeRoadmapReference.isPending}
+        onReviewTask={(task) => reviewActions(module.id, task)}
+        onEditTask={(task) => setEditingTask({ moduleId: module.id, task })}
+        onDuplicateTask={(task) => setDuplicatingTask({ moduleId: module.id, task })}
+        onDeleteTask={(task) => void onRemoveTask(module, task)}
+        onEditReference={(task) => setCreatingFromReference({ moduleId: module.id, task, mode: 'edit' })}
+        onDeleteReference={(task) => void onDiscardReference(module, task)}
+        onAddTask={() => setAddingTask({ moduleId: module.id })}
+      />
     </div>;
   };
 

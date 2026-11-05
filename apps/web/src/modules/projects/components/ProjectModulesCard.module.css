@@ -712,3 +712,12 @@
   color: #98610e;
   white-space: nowrap;
 }
+
+/* Colaborador: las últimas columnas son Estado y Fecha límite, no acciones de gestión. */
+.readonlyTaskTable th:last-child,
+.readonlyTaskTable td:last-child {
+  width: auto;
+  min-width: 120px;
+  text-align: left;
+  padding: 9px 10px;
+}
