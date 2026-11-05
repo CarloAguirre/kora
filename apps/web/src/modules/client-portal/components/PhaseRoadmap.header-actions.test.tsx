@@ -215,27 +215,104 @@ describe('Hitos verificables del bloque operativo', () => {
   });
 });
 
-describe('Cronograma operativo simplificado', () => {
-  it('elimina el subcronograma redundante aun cuando haya tareas y entregas', () => {
-    const roadmap: ProjectPhaseRoadmap = {
-      ...phaseRoadmap,
-      phases: [{
-        ...phaseRoadmap.phases[0]!,
-        deliveries: [{ id: 'delivery-01', label: 'Entrega QA', date: '2026-11-12', state: 'committed' }],
-        taskItems: [{ id: 'task-01', label: 'Validar interfaz', date: '2026-11-13',
-          state: 'upcoming', scope: 'diseno' }],
-      }],
-    };
+describe('Restauración de checks y zoom sobre el Gantt operativo v5.02', () => {
+  const roadmap: ProjectPhaseRoadmap = {
+    ...phaseRoadmap,
+    phases: [{
+      ...phaseRoadmap.phases[0]!,
+      tasks: [{ id: 'segment-01', role: 'qa', scope: 'qa', label: 'Bloque QA',
+        startDate: '2026-11-02', endDate: '2026-11-18' }],
+      deliveries: [{ id: 'delivery-01', label: 'Entrega QA',
+        date: '2026-11-12', state: 'committed' }],
+      taskItems: [
+        { id: 'task-01', label: 'Diseño aprobado', date: '2026-11-04',
+          state: 'done', scope: 'diseno' },
+        { id: 'task-02', label: 'Ejecución atrasada', date: '2026-11-06',
+          state: 'delayed', scope: 'qa' },
+        { id: 'task-03', label: 'Próxima validación', date: '2026-11-13',
+          state: 'upcoming', scope: 'qa' },
+      ],
+    }],
+  };
+
+  it('restaura checks con tres estados, los posiciona por fecha y abre detalle real de cada tarea', () => {
     render(<PhaseRoadmap phaseRoadmap={roadmap} operationalView
       renderPhaseExtras={() => <span>Etapa de Kora</span>}
+      renderSelectionDetail={(_phase, selection, clear) => (
+        <div>
+          <span>Detalle seleccionado: {selection.kind} {'label' in selection ? selection.label : ''}</span>
+          <button type="button" onClick={clear}>Cerrar detalle</button>
+        </div>
+      )}
       renderPhaseReferences={() => <span>Tareas operativas visibles</span>} />);
     expect(screen.queryByText(/Entregas y tareas en el cronograma/)).not.toBeInTheDocument();
     expect(screen.queryByText('Etapa de Kora')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Abrir entrega Entrega QA' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Abrir tarea Validar interfaz' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Abrir bloque Bloque QA' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Ver entrega Entrega QA: Comprometida' }))
+      .toBeInTheDocument();
+    const approved = screen.getByRole('button', { name: 'Ver tarea Diseño aprobado: Terminada' });
+    const delayed = screen.getByRole('button', { name: 'Ver tarea Ejecución atrasada: Atrasada' });
+    const upcoming = screen.getByRole('button', { name: 'Ver tarea Próxima validación: Próxima' });
+    expect(approved.querySelector('[class*="legendCheck"]')).toHaveTextContent('✓');
+    expect(delayed.querySelector('[class*="taskDotDelayed"]')).toBeInTheDocument();
+    expect(upcoming.querySelector('[class*="taskDotUpcoming"]')).toBeInTheDocument();
+    fireEvent.click(delayed);
+    expect(delayed).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByText('Detalle seleccionado: task Ejecución atrasada')).toBeInTheDocument();
+    fireEvent.click(approved);
+    expect(screen.getByText('Detalle seleccionado: task Diseño aprobado')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar detalle' }));
+    expect(screen.queryByText(/Detalle seleccionado:/)).not.toBeInTheDocument();
     expect(screen.getByText('Tareas operativas visibles')).toBeInTheDocument();
     expect(screen.queryByText('Opciones de cronograma · rango de fechas')).not.toBeInTheDocument();
-    expect(screen.getByText('Desarrollo Backend')).toBeInTheDocument();
+  });
+
+  it('zoom semanas a días anima el mismo eje de las barras y tareas, sin recargar la página', () => {
+    const { container } = render(<PhaseRoadmap phaseRoadmap={roadmap} operationalView />);
+    const slider = screen.getByRole('slider', { name: /Zoom del cronograma de Desarrollo Backend/ });
+    const canvas = container.querySelector('[data-zoom]');
+    expect(canvas).toHaveAttribute('data-zoom', '0');
+    expect(canvas).toHaveStyle({ width: '100%' });
+    expect(screen.getByRole('button', { name: 'Alejar cronograma de Desarrollo Backend' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Acercar cronograma de Desarrollo Backend' }));
+    expect(slider).toHaveValue('20');
+    expect(canvas).toHaveStyle({ width: '160%' });
+    fireEvent.change(slider, { target: { value: '100' } });
+    expect(canvas).toHaveAttribute('data-zoom', '100');
+    expect(canvas).toHaveStyle({ width: '400%' });
+    expect(screen.getByRole('button', { name: 'Acercar cronograma de Desarrollo Backend' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Ver tarea Ejecución atrasada: Atrasada' }))
+      .toBeInTheDocument();
+    fireEvent.change(slider, { target: { value: '0' } });
+    expect(canvas).toHaveStyle({ width: '100%' });
+    expect(screen.getByRole('button', { name: 'Cierre planificado Bloque QA' })).toBeInTheDocument();
+  });
+
+  it('cada fase tiene zoom independiente y no muestra falsos marcadores cuando faltan fechas', () => {
+    const twoPhases = {
+      ...roadmap,
+      phases: [
+        ...roadmap.phases,
+        {
+          ...roadmap.phases[0]!,
+          id: 'phase-3',
+          badge: 'FASE 3',
+          name: 'Pruebas finales',
+          tasks: [],
+          taskItems: [],
+          deliveries: [],
+        },
+      ],
+    };
+    render(<PhaseRoadmap phaseRoadmap={twoPhases} operationalView
+      operationalRows={(phase) => phase.id === 'phase-3'
+        ? [{ id: 'missing', role: 'qa', label: 'QA sin fecha', hours: 40 }]
+        : []} />);
+    expect(screen.getByRole('slider', { name: /Zoom del cronograma de Desarrollo Backend/ })).toBeInTheDocument();
+    expect(screen.queryByRole('slider', { name: /Zoom del cronograma de Pruebas finales/ }))
+      .not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Abrir bloque QA sin fecha' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Ver tarea QA sin fecha' })).not.toBeInTheDocument();
   });
 });
 
