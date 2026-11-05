@@ -662,9 +662,29 @@ button.ganttBar {
   flex-direction: column;
   gap: 12px;
 }
-.operationalGantt {
+/* Una sola pista desplazable por fase: las barras, diamantes y checks comparten
+   idéntico eje. El ancho responde al slider y anima de semanas a días. */
+.operationalGanttViewport {
   min-width: 0;
   width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+}
+.operationalGantt {
+  min-width: 100%;
+  width: 100%;
+  transition: width 260ms ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .operationalGantt { transition: none; }
+}
+.operationalStickyLabel,
+.operationalBlockLabel {
+  position: sticky;
+  left: 0;
+  z-index: 4;
+  background: #fff;
 }
 .operationalTimelineHeading,
 .operationalLine {
@@ -795,10 +815,73 @@ button.ganttBar {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 9px;
-  padding: 8px 4px;
+  gap: 7px;
+  padding: 7px 4px 2px;
+  font-size: 11px;
+  color: #617086;
 }
-.operationalZoomRow input { width: 98px; accent-color: #0f1729; }
+.operationalZoomRow input[type="range"] {
+  width: 112px;
+  accent-color: #0f1729;
+  cursor: pointer;
+}
+.operationalZoomButton {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  width: 23px;
+  height: 23px;
+  border: 1px solid #dce3ee;
+  border-radius: 6px;
+  background: white;
+  color: #17243c;
+  font-size: 14px;
+  cursor: pointer;
+}
+.operationalZoomButton:hover:not(:disabled) { background: #f0f4fa; }
+.operationalZoomButton:disabled { opacity: .4; cursor: default; }
+.operationalZoomButton:focus-visible { outline: 2px solid #1d457b; outline-offset: 2px; }
+/* Marcadores de tarea recuperados del antiguo cronograma.
+   El check azul oscuro confirma aprobación; rojo indica fecha vencida. */
+.operationalDayGridLine {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: #f3f5f9;
+  pointer-events: none;
+}
+.operationalMarkerTrack {
+  height: 46px;
+  overflow: visible;
+  position: relative;
+}
+.operationalMarkerTrack .trackRow {
+  height: 46px;
+  position: relative;
+}
+.operationalMarkerTrack .markerItem {
+  z-index: 2;
+}
+.operationalEventTitle.operationalStickyLabel {
+  display: flex;
+  align-items: center;
+  padding: 4px 10px 4px 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+.operationalTaskSection {
+  position: sticky;
+  left: 0;
+  width: max-content;
+  max-width: 100%;
+  padding: 9px 0 4px;
+  color: #68778f;
+  font-size: 11px;
+  font-weight: 650;
+}
 .operationalEventViewport { overflow-x: auto; }
 .operationalEventTrack { min-width: 100%; }
 .operationalEventRow {
