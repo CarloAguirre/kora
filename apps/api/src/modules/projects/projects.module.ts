@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ProjectsController } from './presentation/projects.controller';
 import { TeamsModule } from '../teams/teams.module';
+import { NotificationsModule } from '../notifications/notifications.module';
+import { ProjectTaskReviewNotifier } from './infrastructure/services/project-task-review-notifier';
 
 import { CreateProjectUseCase } from './application/use-cases/create-project.use-case';
 import { UpdateProjectUseCase } from './application/use-cases/update-project.use-case';
@@ -90,7 +92,7 @@ import { DrizzleSupportContractStatusReader } from './infrastructure/services/dr
  * M1 y desde el módulo de usuario original.
  */
 @Module({
-  imports: [TeamsModule],
+  imports: [TeamsModule, NotificationsModule],
   controllers: [ProjectsController],
   providers: [
     CreateProjectUseCase,
@@ -124,6 +126,7 @@ import { DrizzleSupportContractStatusReader } from './infrastructure/services/dr
     DeleteProjectModuleSegmentUseCase,
     CreateProjectModuleTaskUseCase,
     UpdateProjectModuleTaskUseCase,
+    ProjectTaskReviewNotifier,
     DeleteProjectModuleTaskUseCase,
     ProjectRoadmapReferenceExclusionsService,
     { provide: ROADMAP_REFERENCE_EXCLUSION_STORE, useClass: DrizzleRoadmapReferenceExclusionStore },
