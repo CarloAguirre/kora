@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import {
   CLOCK,
   ForbiddenError,
@@ -47,6 +47,7 @@ import { ProjectChangeLogRecorder } from '../services/project-change-log.recorde
 import { deadlineNote, formatCommittedDate } from '../services/deadline-note';
 import { ProjectProgressRecalculator } from '../services/project-progress-recalculator';
 import { ForecastSourceSyncService } from '../services/forecast-source-sync.service';
+import { ProjectTaskReviewNotifier } from '../../infrastructure/services/project-task-review-notifier';
 
 export interface UpdateProjectModuleTaskCommand {
   readonly projectId: string;
@@ -87,6 +88,7 @@ export class UpdateProjectModuleTaskUseCase
     private readonly forecastSync: ForecastSourceSyncService,
     @Inject(CLOCK) private readonly clock: Clock,
     @Inject(UNIT_OF_WORK) private readonly unitOfWork: UnitOfWork,
+    @Optional() private readonly taskNotifier?: ProjectTaskReviewNotifier,
   ) {}
 
   async execute(command: UpdateProjectModuleTaskCommand): Promise<Result<void, ApplicationError>> {
@@ -231,6 +233,25 @@ export class UpdateProjectModuleTaskUseCase
       entityType: 'project',
       entityId: project.id,
       metadata: { event: 'module_task_updated', moduleId: command.moduleId, taskId: command.taskId },
+    });
+
+    // Notificar solo transiciones reales y después del commit: nunca informar
+    // una aprobación/devolución que la transacción haya revertido.
+    const reviewKind = nextStatus !== task.status && nextStatus === 'in_review'
+      ? 'review_requested'
+      : task.status === 'in_review' && nextStatus === 'in_progress'
+        ? 'returned' : null;
+    if (reviewKind) await this.taskNotifier?.publish({
+      kind: reviewKind,
+      projectId: project.id,
+      projectLeaderUserId: project.leaderUserId,
+      moduleId: module.id,
+      taskId: task.id,
+      taskName: command.data.name ?? task.name,
+      assigneeUserId: nextAssigneeUserId ?? task.assigneeUserId,
+      assigneeName: task.assigneeName,
+      actorUserId: command.actor.userId,
+      reason: reviewKind === 'returned' ? command.data.rejectionReason?.trim() ?? null : null,
     });
 
     return ok(undefined);
