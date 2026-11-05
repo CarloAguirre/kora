@@ -269,6 +269,7 @@ export const dashboardMyTaskSchema = z.object({
   estimatedHours: z.number().nullable().optional(),
   approvedHours: z.number().optional(),
   pendingHours: z.number().optional(),
+  reviewerName: z.string().nullable().optional(),
   date: z.string(),
   status: projectModuleTaskStatusSchema,
   completedAt: isoDateTimeSchema.nullable(),
