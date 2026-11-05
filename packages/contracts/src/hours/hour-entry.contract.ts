@@ -135,7 +135,7 @@ export const createHourEntrySchema = z
     message: 'Selecciona una fase antes de elegir la tarea.',
     path: ['taskId'],
   })
-  .refine((data) => !data.hasBlocker || Boolean(data.blockerDescription?.trim()),
+  .refine((data) => !data.hasBlocker || Boolean(data.blockerDescription?.trim()), {
     message: 'Describe el bloqueo.',
     path: ['blockerDescription'],
   });
