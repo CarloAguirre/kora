@@ -88,6 +88,7 @@ export function HourEntryFormDialog({ open, entry, onClose, onSuccess, readOnly 
       onClose={onClose}
       title="Registrar horas"
       wide
+      bodyScrollOnly
       headerExtra={
         <span className={styles.headerTotal}>Total: {total.toLocaleString('es-CL', { maximumFractionDigits: 1 })}h</span>
       }

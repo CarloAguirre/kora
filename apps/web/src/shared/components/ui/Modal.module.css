@@ -210,3 +210,28 @@
 @media (max-width: 640px) {
   .projectEditSide .body { padding: 14px 12px; }
 }
+
+/*
+ * Opt-in para formularios largos (p. ej. registrar HH).
+ * El <dialog> nativo no debe desplazar su propio contenido además de .body.
+ * Mantiene cabecera visible y una única barra vertical para el formulario.
+ * Sin este modificador siguen vigentes las reglas de los demás modales.
+ */
+.dialog.bodyScrollOnly[open] {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px);
+  overflow: hidden;
+}
+.dialog.bodyScrollOnly[open] .header,
+.dialog.bodyScrollOnly[open] .footer {
+  flex: 0 0 auto;
+}
+.dialog.bodyScrollOnly[open] .body {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+}
