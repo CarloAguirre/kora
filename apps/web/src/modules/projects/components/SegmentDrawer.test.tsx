@@ -130,6 +130,15 @@ describe('Bloque operativo: fidelidad de los tres estados v5.02', () => {
     expect(within(dialog).getByRole('button', { name: 'Editar bloque' })).toBeEnabled();
   });
 
+  it('muestra HH de tareas aprobadas, no las HH consumidas, bajo el avance', () => {
+    const withProgress = { ...segment, consumedHours: 88 } as ProjectModuleSegment;
+    show({ segment: withProgress, deliveries: [delivery('planned')],
+      tasks: [task('Tarea aprobada'), { ...task('Tarea sin aprobar'), status: 'in_progress' }] });
+    const progressRegion = screen.getByRole('region', { name: 'Avance del bloque' });
+    expect(within(progressRegion).getByText('40 HH en tareas aprobadas.')).toBeInTheDocument();
+    expect(within(progressRegion).queryByText(/HH consumidas atribuidas/)).not.toBeInTheDocument();
+  });
+
   it('entrega vencida: mantiene estado rojo aun con avance de tareas en 100%', async () => {
     const onAddTask = vi.fn();
     const onDeleteTask = vi.fn();
