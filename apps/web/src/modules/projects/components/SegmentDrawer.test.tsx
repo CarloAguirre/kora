@@ -83,6 +83,7 @@ function show(overrides: {
   onDeleteTask?: (task: ProjectModuleTask) => void;
   onChangeClosure?: SegmentDrawerProps['onChangeClosure'];
   actualPercent?: number;
+  readOnly?: boolean;
 } = {}) {
   const chosenSegment = overrides.segment ?? segment;
   const module = {
@@ -96,7 +97,7 @@ function show(overrides: {
     module, segment: chosenSegment, blockProgress: {
       ...progress, actualPercent: overrides.actualPercent ?? 100,
     },
-    onClose: vi.fn(), onEdit: vi.fn(), onDelete: vi.fn(),
+    onClose: vi.fn(), onEdit: vi.fn(), onDelete: vi.fn(), readOnly: overrides.readOnly,
     onAddTask: overrides.onAddTask, onDeleteTask: overrides.onDeleteTask,
     onChangeClosure: overrides.onChangeClosure,
     onEditTask: vi.fn(), onDuplicateTask: vi.fn(),
@@ -368,5 +369,24 @@ describe('Bloque operativo: fidelidad de los tres estados v5.02', () => {
     expect(screen.getByLabelText('Estado: Entregada')).toBeInTheDocument();
     expect(screen.getByText(/Entrega presentada; pendiente de aprobación/)).toBeInTheDocument();
     expect(screen.queryByText(/Cerrado por entrega/)).not.toBeInTheDocument();
+  });
+});
+
+describe('SegmentDrawer compartido en modo de solo lectura', () => {
+  it('conserva panel lateral, avance, entrega y tareas sin gestionar nada aunque reciba callbacks', () => {
+    show({ readOnly: true, onChangeClosure: vi.fn(), onAddTask: vi.fn(),
+      onDeleteTask: vi.fn() });
+    const drawer = screen.getByRole('dialog', { name: 'Bot de conciliación' });
+    expect(drawer).toHaveAttribute('data-layout', 'compact-side');
+    expect(within(drawer).getByText('Líder: José Aponte')).toBeInTheDocument();
+    expect(within(drawer).getByRole('progressbar', { name: 'Avance real del bloque' }))
+      .toHaveAttribute('aria-valuenow', '100');
+    expect(within(drawer).getByRole('heading', { name: 'Tareas (2)' })).toBeInTheDocument();
+    for (const action of ['Editar bloque', 'Eliminar bloque', 'Reabrir bloque',
+      'Cerrar bloque', '+ Agregar tarea', 'Editar tarea Diseño del bot',
+      'Duplicar tarea Diseño del bot', 'Eliminar tarea Diseño del bot']) {
+      expect(within(drawer).queryByRole('button', { name: action })).not.toBeInTheDocument();
+    }
+    expect(mocks.updateDelivery).not.toHaveBeenCalled();
   });
 });
