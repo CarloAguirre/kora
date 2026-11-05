@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState } from 'react';
 import {
   PROJECT_MODULE_DELIVERY_STATUS_LABELS,
   type CreateProjectModuleSegmentInput,
@@ -17,7 +17,7 @@ import { Modal } from '@/shared/components/ui/Modal';
 import { TextField } from '@/shared/components/ui/TextField';
 import { Button } from '@/shared/components/ui/Button';
 import { Badge, type BadgeTone } from '@/shared/components/ui/Badge';
-import { PencilIcon, TrashIcon } from '@/shared/components/icons/Icons';
+import { TrashIcon } from '@/shared/components/icons/Icons';
 import { useToast } from '@/shared/components/ui/Toast';
 import { ApiRequestError } from '@/shared/lib/api-client';
 import { PhaseRoadmap, type PhaseRoadmapSelection, type OperationalRoadmapRow } from '@/modules/client-portal/components/PhaseRoadmap';
