@@ -133,3 +133,27 @@ ejecutarlos. Sin migraciones de base de datos.
 **Estado:** publicado en GitHub, a validar con Vitest y typecheck local.
 Sin migraciones de base de datos.
 
+
+
+## Corrección visual del zoom del Roadmap — 05/11/2026
+
+**Síntoma:** al acercar el zoom a vista por días y desplazarse horizontalmente, las barras
+coloreadas de los bloques se dibujaban a través de las letras/nombres de equipos.
+La causa estaba en el CSS operativo compartido de `PhaseRoadmap`: la etiqueta
+tiene `position: sticky` pero `.operationalBlockLabel` anulaba el fondo blanco
+con `background: transparent`.
+
+**Ajuste:** exclusivamente al Roadmap operativo, en `PhaseRoadmap.module.css`:
+fondo opaco para etiquetas, `z-index: 5` superior a las marcas de cierre (`3`),
+línea de límite visual y aislamiento del scroll por fase. Se conserva la máscara
+en referencias EDT para hover/selección, sin dejar transparente su etiqueta.
+No se modifican datos, cálculos de avance, fechas ni geometría del cronograma.
+
+**Regresión:** `PhaseRoadmap.header-actions.test.tsx` comprueba a zoom máximo
+(400%) que la etiqueta sigue fija, opaca, por delante del Gantt y seleccionable.
+
+**Validación local pendiente:** `pnpm --filter @kora/web typecheck` y
+`pnpm --filter @kora/web exec vitest run src/modules/client-portal/components/PhaseRoadmap.header-actions.test.tsx`.
+Revisar visualmente el scroll horizontal y los zooms 0%, 50% y 100% con varios bloques.
+
+Sin migraciones ni modificaciones del backend.
