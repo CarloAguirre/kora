@@ -23,15 +23,19 @@ La referencia del dashboard colaborador v6 debía conservar tarjetas, márgenes 
 ## Auditoría SQL de solo lectura para el proyecto del error
 
 ```sql
-SELECT p.id, p.name, p.slug, p.status, p.deleted_at,
-       pm.id AS module_id, pm.name AS module_name,
-       t.id AS task_id, t.name AS task_name,
-       t.assignee_user_id, t.status AS task_status, t.cancelled_at
-FROM projects p
-LEFT JOIN project_modules pm ON pm.project_id = p.id
-LEFT JOIN project_module_tasks t ON t.module_id = pm.id
-WHERE p.id = 'a683b310-99ee-4faa-a03c-a05674a37736'::uuid
-  AND (t.id = '72edc36d-9d8f-4439-a155-c87e48035bc5'::uuid OR t.id IS NULL);
+-- 1. Confirmar existencia y estado real del proyecto.
+SELECT id, name, slug, status, deleted_at
+FROM projects
+WHERE id = 'a683b310-99ee-4faa-a03c-a05674a37736'::uuid;
+
+-- 2. Confirmar que la tarea corresponde a ese proyecto y a qué usuario.
+SELECT t.id AS task_id, t.name AS task_name, t.status AS task_status,
+       t.assignee_user_id, t.cancelled_at,
+       pm.id AS module_id, pm.project_id, p.name AS project_name, p.deleted_at
+FROM project_module_tasks t
+JOIN project_modules pm ON pm.id = t.module_id
+JOIN projects p ON p.id = pm.project_id
+WHERE t.id = '72edc36d-9d8f-4439-a155-c87e48035bc5'::uuid;
 ```
 
 Resultado **no ejecutado**; no presumir que la BD del usuario ya fue auditada.

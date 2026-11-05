@@ -7,7 +7,7 @@
   /* Card centraliza elevación, borde, radio y padding, como en Kora. */
   min-width: 0;
 }
-.kpiCard {
+.kpis .kpiCard {
   min-height: 110px;
   gap: var(--kora-space-3);
 }
@@ -36,7 +36,7 @@
   gap: var(--kora-space-4);
   min-width: 0;
 }
-.planningCard {
+.planningGrid .planningCard {
   gap: 0;
 }
 .sectionHeading {

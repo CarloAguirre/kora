@@ -17,7 +17,7 @@
 .greeting h1 { margin: 0 0 5px; font-size: 19px; font-weight: 700; line-height: 1.3; }
 .greeting p { color: #718097; font-size: 12px; margin: 0; }
 .register { white-space: nowrap; }
-.card {
+.dashboard .card {
   /* Superficie, borde, radio, sombra y padding del Card oficial de Kora. */
   gap: 0;
   min-width: 0;
