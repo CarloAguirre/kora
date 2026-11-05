@@ -172,6 +172,10 @@ export const PROJECT_MODULE_DELIVERY_STATUS_LABELS: Readonly<Record<ProjectModul
  * - `planned → delivered`: el colaborador asignado la marca como terminada (o un líder en su nombre).
  * - `delivered → approved | planned`: un líder (de proyecto o del equipo) la aprueba o la rechaza con motivo.
  * - `approved → delivered`: un líder revierte la aprobación y la devuelve a revisión.
+ * - La entrega planificada que CIERRA UN BLOQUE tiene una acción especial
+ *   `finalizeBlock`: un líder confirma fecha y evidencia tras aprobar todas
+ *   las tareas; registra `approved` y `closedAt` atómicamente. No altera
+ *   los permisos ni las transiciones normales de entregas independientes.
  */
 export const PROJECT_MODULE_DELIVERY_ALLOWED_TRANSITIONS: Readonly<
   Record<ProjectModuleDeliveryStatus, readonly ProjectModuleDeliveryStatus[]>
