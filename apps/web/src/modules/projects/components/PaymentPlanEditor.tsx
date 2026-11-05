@@ -343,6 +343,7 @@ export function PaymentPlanEditor({ value, onChange, disabled }: PaymentPlanEdit
                 <PaymentTriggerFields
                   compact
                   triggerType={item.triggerType}
+                  linkedCommercialModule={item.triggerType === 'phase' && Boolean(item.triggerModuleId) && !item.triggerPhase}
                   triggerPhase={item.triggerPhase}
                   triggerDate={item.triggerDate}
                   onChange={(patch) => updateItem(item.key, {
@@ -352,8 +353,6 @@ export function PaymentPlanEditor({ value, onChange, disabled }: PaymentPlanEdit
                   })}
                   disabled={disabled}
                 />
-                {item.triggerType === 'phase' && item.triggerModuleId && !item.triggerPhase &&
-                  <span className={styles.noValue}>Vinculado a módulo comercial</span>}
                 {item.triggerType !== 'phase' && item.triggerType !== 'date' && <span className={styles.noValue}>—</span>}
                 <Button
                   type="button"
