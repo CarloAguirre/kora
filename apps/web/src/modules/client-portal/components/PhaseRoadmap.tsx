@@ -1072,32 +1072,33 @@ function OperationalPhaseCard({
                 />
               </div>
             </div>}
-            {phase.taskItems.length > 0 && <div className={styles.operationalTaskSection}>
-              <span>Tareas · {phase.taskItems.length}</span>
-            </div>}
-            {phase.taskItems.map((task, index) => (
-              <div key={task.id ?? 'task-' + index} className={styles.operationalLine}>
-                <span className={[styles.operationalEventTitle, styles.operationalStickyLabel].join(' ')}
-                  title={task.label}>Tarea · {task.label}</span>
+            {phase.taskItems.length > 0 && (
+              <div className={styles.operationalLine}>
+                <span className={[styles.operationalEventTitle, styles.operationalStickyLabel].join(' ')}>
+                  Tareas
+                </span>
                 <div className={[styles.operationalTrack, styles.operationalMarkerTrack].join(' ')}>
                   {showDays && axis.dayLines.map((percent, idx) =>
                     <span key={idx} className={styles.operationalDayGridLine}
                       style={{ left: percent + '%' }} />)}
+                  {/* Una sola fila, como el cronograma original. MarkerTrackRow agrupa
+                      automáticamente las tareas con igual fecha límite y permite elegir
+                      cada una en el desplegable, conservando sus estados y sus IDs. */}
                   <MarkerTrackRow
-                    markers={[{
+                    markers={phase.taskItems.map((task, index) => ({
                       key: task.id ?? 'task-' + index,
                       label: task.label, date: task.date,
                       urgency: TASK_ITEM_URGENCY[task.state],
                       symbol: taskItemSymbol(task.state),
                       stateLabel: TASK_ITEM_STATE_LABEL[task.state],
-                      selection: { kind: 'task', id: task.id, label: task.label },
-                    }]}
+                      selection: { kind: 'task' as const, id: task.id, label: task.label },
+                    }))}
                     range={axis.range} variant="task" pluralNoun="tareas"
                     showLabels={showDays} selected={selected} onSelect={choose}
                   />
                 </div>
               </div>
-            ))}
+            )}
             {placeholderRows.map((row) => {
               const selection: PhaseRoadmapSelection = {
                 kind: 'reference-block', id: row.id, label: row.label,
