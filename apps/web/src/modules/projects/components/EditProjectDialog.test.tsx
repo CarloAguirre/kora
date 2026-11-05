@@ -22,6 +22,12 @@ function renderDevelopmentDialog(props: EditDevelopmentProjectDialogProps) {
   );
 }
 
+const projectQuotationMock = vi.hoisted(() => vi.fn());
+
+vi.mock('@/modules/estimation/api/quotation.queries', () => ({
+  useProjectQuotation: (...args: unknown[]) => projectQuotationMock(...args),
+}));
+
 const mutateAsync = vi.fn().mockResolvedValue(undefined);
 
 const changeStatusMutateAsync = vi.fn().mockResolvedValue(undefined);
@@ -531,6 +537,7 @@ const activeMonthlyPlanDetail = {
 describe('Editar proyecto de desarrollo · contenido acotado a la referencia v5.02', () => {
   beforeEach(() => {
     useUsersListMock.mockReturnValue({ data: { items: [] } });
+    projectQuotationMock.mockReset().mockReturnValue({ data: null });
     mutateAsync.mockReset().mockResolvedValue(undefined);
     changeStatusMutateAsync.mockReset().mockResolvedValue(undefined);
   });
@@ -548,6 +555,7 @@ describe('Editar proyecto de desarrollo · contenido acotado a la referencia v5.
 
   it('muestra exclusivamente los bloques de la imagen y ningún editor de equipos/fases', () => {
     renderDevelopmentDialog(props({ canAuthorizeOvertime: true }));
+    expect(screen.getByRole('dialog', { name: 'Editar proyecto' })).toHaveClass('projectEditSide');
     for (const name of [
       'Nombre del proyecto', 'Cliente', 'Líder Kabeli a cargo', 'Responsable comercial',
       'Tipo de proyecto', 'Estado', 'Etapa de avance', 'Proyecto interno',
@@ -578,6 +586,35 @@ describe('Editar proyecto de desarrollo · contenido acotado a la referencia v5.
     expect(screen.getByText('Cotización · Aprobada · traspaso pendiente')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Ver cotizaciones' }));
     expect(onView).toHaveBeenCalledOnce();
+  });
+
+  it('presenta versión y fecha verificadas del evento de traspaso, con enlace al tab Cotizaciones', async () => {
+    const openQuotations = vi.fn();
+    projectQuotationMock.mockReturnValue({
+      data: {
+        transferredVersionId: 'version-1',
+        transferredAt: '2026-09-02T15:00:00.000Z',
+        versions: [{ id: 'version-1', versionNumber: 1, status: 'approved' }],
+      },
+    });
+    renderDevelopmentDialog(props({ quotationStatus: 'transferred' }, openQuotations));
+    expect(screen.getByText('Cotización · v1 traspasada el 02 sept 2026')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Ver cotizaciones' }));
+    expect(openQuotations).toHaveBeenCalledOnce();
+    expect(projectQuotationMock).toHaveBeenCalledWith('project-1', true);
+  });
+
+  it('evita inventar la fecha si no hay evento de traspaso', () => {
+    projectQuotationMock.mockReturnValue({
+      data: {
+        transferredVersionId: 'version-1',
+        transferredAt: null,
+        versions: [{ id: 'version-1', versionNumber: 1, status: 'approved' }],
+      },
+    });
+    renderDevelopmentDialog(props({ quotationStatus: 'planning_applied' }));
+    expect(screen.getByText('Cotización · v1 traspasada')).toBeInTheDocument();
+    expect(screen.queryByText(/traspasada el/)).not.toBeInTheDocument();
   });
 
   it('guarda solo datos generales y no envía relaciones de equipos ni módulos', async () => {
