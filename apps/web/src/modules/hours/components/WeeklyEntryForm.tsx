@@ -91,6 +91,7 @@ export function WeeklyEntryForm({
   const [moduleId, setModuleId] = useState('');
   /** Tiempo de ejecución de la fase elegida — vacío ⇔ sin tramo. */
   const [segmentId, setSegmentId] = useState('');
+  const [taskId, setTaskId] = useState('');
   const [category, setCategory] = useState('');
   const [description, setDescription] = useState('');
   const [designatedApproverUserId, setDesignatedApproverUserId] = useState('');
@@ -104,6 +105,10 @@ export function WeeklyEntryForm({
   const selectedProject = needsProject ? (projects?.items ?? []).find((p) => p.id === projectId) : undefined;
   const { data: projectDetail } = useProjectDetail(needsProject && projectId ? projectId : null);
   const selectedModule = projectDetail?.modules.find((m) => m.id === moduleId);
+  const { data: hourPhases } = useProjectPhases(needsProject && projectId ? projectId : null);
+  const availableTasks = (hourPhases?.find((phase) => phase.id === moduleId)?.tasks ?? [])
+    .filter((task) => !task.cancelledAt && task.assigneeUserId === user?.id &&
+      (task.segmentId ?? null) === (segmentId || null));
   const allowedTeamIds = new Set([
     ...(projectDetail?.members ?? []).filter((member) => member.userId === user?.id && !member.blockedAt)
       .map((member) => member.teamId),
@@ -226,6 +231,7 @@ export function WeeklyEntryForm({
           projectId: needsProject ? projectId : undefined,
           moduleId: needsProject && moduleId ? moduleId : undefined,
           segmentId: needsProject && moduleId && segmentId ? segmentId : undefined,
+          taskId: needsProject && moduleId && taskId ? taskId : undefined,
           category: category.trim(),
           description: description || undefined,
           hours: day.hours,
@@ -328,6 +334,7 @@ export function WeeklyEntryForm({
               setProjectId(nextProjectId);
               setModuleId('');
               setSegmentId('');
+              setTaskId('');
               if (!nextProject?.allowsOvertime) setIsOvertime(false);
             }}
           />
@@ -341,15 +348,24 @@ export function WeeklyEntryForm({
             placeholder="Seleccionar fase..."
             options={(projectDetail?.modules ?? []).map((module) => ({ value: module.id, label: module.name }))}
             value={moduleId}
-            onChange={(event) => { setModuleId(event.target.value); setSegmentId(''); }} />
+            onChange={(event) => { setModuleId(event.target.value); setSegmentId(''); setTaskId(''); }} />
           {selectedModule && availableSegments.length > 0 && (
             <Select label="Bloque de trabajo" required
               placeholder="Seleccionar bloque..."
               options={availableSegments.map((segment) => ({
                 value: segment.id, label: segment.name + ' (' + segment.startDate + ' → ' + segment.endDate + ')',
               }))}
-              value={segmentId} onChange={(event) => setSegmentId(event.target.value)} />
+              value={segmentId} onChange={(event) => { setSegmentId(event.target.value); setTaskId(''); }} />
           )}
+        </div>
+      )}
+
+      {needsProject && moduleId && availableTasks.length > 0 && (
+        <div className={styles.row}>
+          <Select label="Tarea" placeholder="Sin tarea específica (HH del bloque)"
+            options={availableTasks.map((task) => ({ value: task.id, label: task.name }))}
+            value={taskId} onChange={(event) => setTaskId(event.target.value)}
+            helperText="Las HH aprobadas se mostrarán como reales en esta tarea." />
         </div>
       )}
 
