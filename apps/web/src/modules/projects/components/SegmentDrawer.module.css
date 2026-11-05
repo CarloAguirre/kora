@@ -144,6 +144,12 @@
 .deliveryActions { justify-content: flex-end; gap: 8px; }
 .membersSection { border-top: 1px solid var(--drawer-line); padding-top: 11px; }
 .members { display: grid; gap: 4px; font-size: 11px; color: #64738a; }
+/* Dentro del grid de cierre, impedir que "Reabrir" se estire a toda la columna. */
+.reopenButton {
+  justify-self: start;
+  width: max-content;
+  max-width: 100%;
+}
 .closureAction {
   display: flex;
   align-items: center;
