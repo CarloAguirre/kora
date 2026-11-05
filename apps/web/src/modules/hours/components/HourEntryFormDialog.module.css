@@ -422,6 +422,13 @@
   align-items: center;
 }
 .planTaskSummary strong { color: #1a597f; font-weight: 650; }
+.planPendingHours {
+  color: #98610e;
+  background: #fff1da;
+  border-radius: 999px;
+  padding: 2px 7px;
+  white-space: nowrap;
+}
 @media (max-width: 680px) {
   .planFieldsSingle { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .planFieldsTriple { grid-template-columns: repeat(2, minmax(0, 1fr)); }
