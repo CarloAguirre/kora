@@ -603,10 +603,10 @@ describe('Acciones reales para referencias EDT antes de convertirlas', () => {
 describe('Homologación de estados del Roadmap v5.02', () => {
   it('asigna verde, amarillo, azul, gris y violeta a los estados de tareas', () => {
     const states = [
-      ['aprobada', 'done', 'success', 'user-1'],
-      ['completada', 'in_review', 'warning', 'user-1'],
-      ['curso', 'in_progress', 'info', 'user-1'],
-      ['pendiente', 'todo', 'neutral', 'user-1'],
+      ['aprobada', 'done', 'taskApproved', 'user-1'],
+      ['completada', 'in_review', 'taskReview', 'user-1'],
+      ['curso', 'in_progress', 'taskInProgress', 'user-1'],
+      ['pendiente', 'todo', 'taskPending', 'user-1'],
       ['sin-asignar', 'todo', 'taskState', null],
     ] as const;
     const tasks = states.map(([id, status, , assigneeUserId]) => ({
@@ -623,7 +623,35 @@ describe('Homologación de estados del Roadmap v5.02', () => {
         id === 'completada' ? 'Completada' : id === 'curso' ? 'En curso' :
           id === 'pendiente' ? 'Pendiente' : 'Por asignar');
       expect(badge.className).toContain(expectedTone);
+      expect(badge.className).toContain('taskState');
+      if (id === 'sin-asignar') {
+        expect(badge.className).not.toContain('taskStateWithDot');
+      } else {
+        expect(badge.className).toContain('taskStateWithDot');
+      }
     }
+  });
+
+  it('muestra En curso + Devuelta + Vencida simultáneamente, con puntitos y el mismo tamaño', () => {
+    const rejected = {
+      id: 'task-returned', name: 'Corrección devuelta', status: 'in_progress',
+      rejectionReason: 'Corregir la validación de fechas',
+      startDate: '2026-10-01', date: '2026-10-20', estimatedHours: 20,
+      assigneeUserId: 'user-1', assigneeName: 'Colaborador',
+      teamId: 'team-1', teamName: 'Desarrollo', description: null,
+    };
+    show({ ...project, modules: [{ ...module, tasks: [rejected] }] } as unknown as ProjectDetail);
+    const row = screen.getByText('Corrección devuelta', { selector: 'td' }).closest('tr')!;
+    const progress = within(row).getByText('En curso');
+    const returned = within(row).getByText('Devuelta');
+    const overdue = within(row).getByText('Vencida');
+    for (const chip of [progress, returned, overdue]) {
+      expect(chip.className).toContain('taskState');
+      expect(chip.className).toContain('taskStateWithDot');
+    }
+    expect(returned).toHaveAttribute('title', 'Corregir la validación de fechas');
+    expect(progress.parentElement).toBe(returned.parentElement);
+    expect(returned.parentElement).toBe(overdue.parentElement);
   });
 
   it('solo indica vencimiento en tareas abiertas, no en completadas para aprobar', () => {
