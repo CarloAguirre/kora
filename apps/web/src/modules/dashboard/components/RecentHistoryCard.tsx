@@ -24,6 +24,8 @@ interface RecentHistoryCardProps {
   onWeekStartChange: (week: string) => void;
   /** Tareas autorizadas de /dashboard/summary: para mostrar el vínculo por nombre. */
   tasks?: readonly DashboardMyTask[];
+  /** En el panel del colaborador, mostrar recientes incluso si no registró horas esta semana. */
+  recentDays?: number;
 }
 
 function LinkedTo({ entry, tasks }: {
@@ -50,9 +52,18 @@ function approverNames(entry: HourEntrySummary) {
  * Historial de la propia persona, con rango semanal o personalizado.
  * El detalle es de solo lectura. La edición sigue en /horas y sus reglas.
  */
-export function RecentHistoryCard({ weekStart, onWeekStartChange, tasks = [] }: RecentHistoryCardProps) {
+const dateIso = (date: Date) => [date.getFullYear(),
+  String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-');
+
+export function RecentHistoryCard({ weekStart, onWeekStartChange, tasks = [], recentDays }: RecentHistoryCardProps) {
   const { user } = useAuth();
-  const [range, setRange] = useState<PeriodRange | null>(null);
+  const [range, setRange] = useState<PeriodRange | null>(() => {
+    if (!recentDays || recentDays <= 0) return null;
+    const end = new Date();
+    const start = new Date(end);
+    start.setDate(end.getDate() - (recentDays - 1));
+    return { mode: 'range', dateFrom: dateIso(start), dateTo: dateIso(end) };
+  });
   const period = useMemo(() => range ?? weekPeriod(weekStart), [range, weekStart]);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
