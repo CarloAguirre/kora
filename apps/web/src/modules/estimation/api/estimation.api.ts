@@ -13,7 +13,15 @@ import type {
 } from '@kora/contracts';
 import { api } from '@/shared/lib/api-client';
 
+export interface DriveOAuthPocStart {
+  authorizationUrl: string;
+}
+
 export const estimationApi = {
+  /** PoC aislada: no devuelve ni persiste tokens OAuth. */
+  startDriveOAuthPoc(input: { projectId: string; driveFolderUrl: string }): Promise<DriveOAuthPocStart> {
+    return api.post<DriveOAuthPocStart>('/estimations/drive/oauth-poc/start', input);
+  },
   questionnaireDefinition(): Promise<EstimationQuestionnaireDefinition> {
     return api.get<EstimationQuestionnaireDefinition>('/estimations/questionnaire-definition');
   },

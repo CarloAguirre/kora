@@ -14,17 +14,63 @@ function setup() {
   const analyzer = { execute: vi.fn().mockResolvedValue({ projectId, provider: 'gemini' }) };
   const generator = { execute: vi.fn().mockResolvedValue({ projectId, provider: 'gemini' }) };
   const resolver = { execute: vi.fn().mockResolvedValue({ projectId }) };
+  const driveOAuthPoc = {
+    start: vi.fn().mockReturnValue({
+      state: 'kora-drive-poc-test',
+      authorizationUrl: 'https://accounts.google.com/o/oauth2/v2/auth?state=kora-drive-poc-test',
+    }),
+  };
+  const config = { googleDriveOauthPocEnabled: true, google: { enabled: true } };
   const controller = new EstimationController(
     new GetEstimationQuestionnaireDefinitionUseCase(),
     analyzer as never, generator as never,
     { execute: vi.fn() } as never,
     resolver as never, { execute: vi.fn() } as never,
-    drafts as never,
+    drafts as never, driveOAuthPoc as never, config as never,
   );
-  return { controller, drafts, analyzer, generator, resolver };
+  return { controller, drafts, analyzer, generator, resolver, driveOAuthPoc, config };
 }
 
 describe('EstimationController · líder PM de proyecto asignado', () => {
+
+  it('solo inicia la PoC tras verificar permiso comercial del proyecto y coloca cookie httpOnly', async () => {
+    const { controller, drafts, driveOAuthPoc } = setup();
+    const reply = { header: vi.fn(), setCookie: vi.fn() };
+    const result = await controller.startDriveOAuthPoc({
+      projectId, driveFolderUrl: 'https://drive.google.com/drive/folders/abc123xyz',
+    }, actor as never, reply as never);
+    expect(drafts.authorizeAiPoc).toHaveBeenCalledWith(projectId, actor);
+    expect(driveOAuthPoc.start).toHaveBeenCalledWith(actor.id, 'abc123xyz');
+    expect(result.authorizationUrl).toContain('accounts.google.com');
+    expect(reply.setCookie).toHaveBeenCalledWith('kora_drive_poc_state',
+      'kora-drive-poc-test', expect.objectContaining({
+        httpOnly: true, sameSite: 'lax', maxAge: 300,
+      }));
+  });
+
+  it('si el proyecto es ajeno no emite consentimiento ni cookie de OAuth', async () => {
+    const { controller, drafts, driveOAuthPoc } = setup();
+    const reply = { header: vi.fn(), setCookie: vi.fn() };
+    drafts.authorizeAiPoc.mockRejectedValueOnce(new ForbiddenException('No autorizado'));
+    await expect(controller.startDriveOAuthPoc({
+      projectId, driveFolderUrl: 'https://drive.google.com/drive/folders/abc123xyz',
+    }, actor as never, reply as never)).rejects.toBeInstanceOf(ForbiddenException);
+    expect(driveOAuthPoc.start).not.toHaveBeenCalled();
+    expect(reply.setCookie).not.toHaveBeenCalled();
+  });
+
+  it('rechaza carpetas ficticias de demo y el permiso está acotado a cotizaciones', async () => {
+    const { controller, driveOAuthPoc } = setup();
+    await expect(controller.startDriveOAuthPoc({
+      projectId, driveFolderUrl: 'https://drive.google.com/drive/folders/kora-poc-fallback',
+    }, actor as never, {} as never)).rejects.toThrow();
+    expect(driveOAuthPoc.start).not.toHaveBeenCalled();
+    expect(Reflect.getMetadata(ANY_PERMISSIONS_KEY,
+      EstimationController.prototype.startDriveOAuthPoc)).toEqual([
+        'projects:manage', 'projects:read_assigned',
+      ]);
+  });
+
   it('el cuestionario fijo admite projects:read_assigned y devuelve F01-F05 sin BD', () => {
     const { controller } = setup();
     const allowed = Reflect.getMetadata(
