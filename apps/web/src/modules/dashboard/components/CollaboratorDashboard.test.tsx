@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   success: vi.fn(),
   error: vi.fn(),
   hours: vi.fn(),
+  detail: vi.fn(),
 }));
 
 vi.mock('@/modules/auth/hooks/useAuth', () => ({
@@ -17,6 +18,7 @@ vi.mock('@/modules/auth/hooks/useAuth', () => ({
 }));
 vi.mock('@/modules/hours/api/hours.queries', () => ({
   useHourEntriesList: mocks.hours,
+  useHourEntryDetail: mocks.detail,
 }));
 vi.mock('@/modules/projects/api/projects.queries', () => ({
   useUpdateProjectModuleTask: () => ({ mutateAsync: mocks.update, isPending: false }),
@@ -64,6 +66,7 @@ const planning: DashboardMyPlanning = {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.update.mockResolvedValue(undefined);
+  mocks.detail.mockReturnValue({ data: null, isLoading: false, isError: false });
   mocks.hours.mockReturnValue({
     isLoading: false, isError: false, error: null,
     data: {
@@ -168,9 +171,13 @@ describe('Dashboard colaborador · homologación v6', () => {
       expect.objectContaining({ enabled: true }),
     );
     fireEvent.click(within(table).getByRole('button', { name: 'Ver registro del 28/10/2026' }));
-    const dialog = screen.getByRole('dialog', { name: 'Detalle de registro de horas' });
+    const dialog = screen.getByRole('dialog', { name: 'Detalle del registro' });
     expect(within(dialog).getByText('Tablas y consultas')).toBeInTheDocument();
-    expect(within(dialog).getByText('8 HH')).toBeInTheDocument();
+    expect(within(dialog).getByText('8 h')).toBeInTheDocument();
+    expect(within(dialog).getByText('Bloqueo o problema')).toBeInTheDocument();
+    expect(within(dialog).getByText('Tarea')).toBeInTheDocument();
+    expect(within(dialog).getByText('Descripción')).toBeInTheDocument();
+    expect(within(dialog).getByText('Estado')).toBeInTheDocument();
   });
 
   it('oculta registrar horas sin permiso y no muestra métricas inventadas', () => {
