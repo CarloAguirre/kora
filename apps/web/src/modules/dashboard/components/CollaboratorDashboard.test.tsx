@@ -167,7 +167,7 @@ describe('Dashboard colaborador · homologación v6', () => {
       expect.objectContaining({ userId: 'u-1', sortField: 'date', sortDirection: 'desc' }),
       expect.objectContaining({ enabled: true }),
     );
-    fireEvent.click(within(table).getByRole('button', { name: 'Ver registro del 28-10-2026' }));
+    fireEvent.click(within(table).getByRole('button', { name: 'Ver registro del 28/10/2026' }));
     const dialog = screen.getByRole('dialog', { name: 'Detalle de registro de horas' });
     expect(within(dialog).getByText('Tablas y consultas')).toBeInTheDocument();
     expect(within(dialog).getByText('8 HH')).toBeInTheDocument();
