@@ -1,9 +1,13 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { Modal } from '@/shared/components/ui/Modal';
 import modalStyles from '@/shared/components/ui/Modal.module.css';
-import modalCss from '@/shared/components/ui/Modal.module.css?raw';
 import { HourEntryFormDialog } from './HourEntryFormDialog';
+
+// La transformación de CSS Modules en Vitest no garantiza una importación ?raw de tipo string.
+// Este archivo solo se lee durante la ejecución de la prueba, no en el frontend.
+const modalCss = readFileSync(new URL('../../../shared/components/ui/Modal.module.css', import.meta.url), 'utf8');
 
 // No se simulan consultas ni se envían HH; verificamos el contenedor real.
 vi.mock('./DailyEntryForm', async (importOriginal) => ({
