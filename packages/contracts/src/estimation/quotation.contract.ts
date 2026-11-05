@@ -240,5 +240,7 @@ export const projectQuotationSchema = z.object({
   projectId: uuidSchema,
   versions: z.array(quotationVersionSchema),
   transferredVersionId: uuidSchema.nullable().optional(),
+  /** Timestamp del último evento 'quotation_transferred', no la fecha de edición de la versión. */
+  transferredAt: isoDateTimeSchema.nullable().optional(),
 });
 export type ProjectQuotation = z.infer<typeof projectQuotationSchema>;
