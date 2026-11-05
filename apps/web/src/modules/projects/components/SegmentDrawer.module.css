@@ -127,7 +127,7 @@
   font-weight: 700;
 }
 .markDelivered:hover { background: #baf13d; }
-.markDelivered:focus-visible, .addTask:focus-visible, .membersLink:focus-visible,
+.markDelivered:focus-visible, .addTask:focus-visible,
 .taskActions button:focus-visible { outline: 2px solid #3862a5; outline-offset: 2px; }
 .deliveryForm { display: grid; gap: 7px; }
 .deliveryForm label { color: #344860; font-weight: 650; }
@@ -139,12 +139,21 @@
 .deliveryActions { justify-content: flex-end; gap: 8px; }
 .membersSection { border-top: 1px solid var(--drawer-line); padding-top: 11px; }
 .members { display: grid; gap: 4px; font-size: 11px; color: #64738a; }
-.membersLink {
-  border: 0; background: transparent; color: #687a91;
-  font-size: 11px; text-decoration: underline;
-  cursor: pointer; justify-self: start;
-  padding: 0; margin-top: -8px;
+.closureAction {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-top: -3px;
+  color: #738095;
 }
+.closureAction small {
+  flex: 1 1 165px;
+  font-size: 10.5px;
+  line-height: 1.4;
+}
+.closureAction > span { flex: none; }
+.closureAction button:disabled { cursor: not-allowed; opacity: .65; }
 .tasksSection { padding-top: 9px; }
 .tasksHeading { justify-content: space-between; gap: 12px; }
 .addTask {
