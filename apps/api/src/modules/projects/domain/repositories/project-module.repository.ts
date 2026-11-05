@@ -201,6 +201,8 @@ export interface TaskAssignedToUserRecord {
   /** HH de bitácora explícitamente ligadas a esta tarea. */
   readonly approvedHours?: number;
   readonly pendingHours?: number;
+  /** Responsable que puede revisar esta tarea según proyecto/equipo actual. */
+  readonly reviewerName?: string | null;
   readonly date: Date;
   readonly status: ProjectModuleTaskStatus;
   readonly completedAt: Date | null;
