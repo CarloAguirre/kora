@@ -181,6 +181,59 @@ describe('Bloque operativo: fidelidad de los tres estados v5.02', () => {
     expect(onChangeClosure).toHaveBeenCalledWith('reopen');
   });
 
+  it('reemplaza Colaboradores / Forecast por Cerrar bloque deshabilitado mientras hay tareas pendientes', () => {
+    const onChangeClosure = vi.fn();
+    show({
+      segment: { ...segment, closedAt: null } as ProjectModuleSegment,
+      deliveries: [], tasks: [task('Diseñar interfaz', 'todo')],
+      onChangeClosure,
+    });
+    expect(screen.queryByText('Colaboradores / Forecast')).not.toBeInTheDocument();
+    const close = screen.getByRole('button', { name: 'Cerrar bloque' });
+    expect(close).toBeDisabled();
+    expect(screen.getByText('Se habilita cuando todas las tareas estén aprobadas.'))
+      .toBeInTheDocument();
+    fireEvent.click(close);
+    expect(onChangeClosure).not.toHaveBeenCalled();
+  });
+
+  it('habilita el cierre manual cuando no hay entrega y todas las tareas están aprobadas', () => {
+    const onChangeClosure = vi.fn();
+    show({
+      segment: { ...segment, closedAt: null } as ProjectModuleSegment,
+      deliveries: [], tasks: [task('Diseñar interfaz'), task('Validar integración')],
+      onChangeClosure,
+    });
+    const close = screen.getByRole('button', { name: 'Cerrar bloque' });
+    expect(close).toBeEnabled();
+    fireEvent.click(close);
+    expect(onChangeClosure).toHaveBeenCalledOnce();
+    expect(onChangeClosure).toHaveBeenCalledWith('close');
+  });
+
+  it('no habilita cierre manual si existe entrega: debe presentarse y aprobarse', () => {
+    const onChangeClosure = vi.fn();
+    show({
+      segment: { ...segment, closedAt: null } as ProjectModuleSegment,
+      deliveries: [delivery('planned')], tasks: [task('Revisar entrega')],
+      onChangeClosure,
+    });
+    expect(screen.getByRole('button', { name: 'Cerrar bloque' })).toBeDisabled();
+    expect(screen.getByText(/tiene entrega de cierre: debe marcarse como entregada y aprobarse/))
+      .toBeInTheDocument();
+    expect(onChangeClosure).not.toHaveBeenCalled();
+  });
+
+  it('no permite cerrar un bloque sin tareas ni entrega', () => {
+    show({
+      segment: { ...segment, closedAt: null } as ProjectModuleSegment,
+      deliveries: [], tasks: [], onChangeClosure: vi.fn(),
+    });
+    expect(screen.getByRole('button', { name: 'Cerrar bloque' })).toBeDisabled();
+    expect(screen.getByText('Agrega tareas al bloque y apruébalas antes de cerrarlo.'))
+      .toBeInTheDocument();
+  });
+
   it('una entrega presentada espera aprobación; no se declara cerrada por entrega', () => {
     show({
       segment: { ...segment, closedAt: null } as ProjectModuleSegment,
