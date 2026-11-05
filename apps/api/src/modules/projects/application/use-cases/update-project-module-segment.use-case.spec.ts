@@ -7,7 +7,7 @@ import type { ProjectProgressRecalculator } from '../services/project-progress-r
 import type { AuditRecorder } from '../../../../shared/application/ports/audit-recorder.port';
 import { FixedClock, PassthroughUnitOfWork } from '../../../../test/fakes';
 
-function fixture(status = 'planned', tasks: unknown[] = []) {
+function fixture(status = 'planned', tasks: unknown[] = [], withDelivery = true) {
   const projects = { findById: vi.fn().mockResolvedValue({
     id: 'project-1', isDeleted: false, leaderUserId: 'leader-1',
   }) } as unknown as ProjectRepository;
@@ -17,10 +17,10 @@ function fixture(status = 'planned', tasks: unknown[] = []) {
       segments: [{ id: 'segment-1', teamId: 'team-1',
         startDate: new Date('2026-10-10'), endDate: new Date('2026-10-30'), members: [] }],
       tasks,
-      deliveries: [{
+      deliveries: withDelivery ? [{
         id: 'delivery-1', segmentId: 'segment-1', teamId: 'team-1', status,
         name: 'Cierre QA', estimatedDate: new Date('2026-10-30'), assigneeUserId: null,
-      }],
+      }] : [],
     }),
     updateSegment: vi.fn().mockResolvedValue(undefined),
     updateDelivery: vi.fn().mockResolvedValue(undefined),
@@ -75,6 +75,47 @@ describe('Edición y cierre de bloque operativo', () => {
       startDate: new Date('2026-10-10'), date: new Date('2026-10-29'),
     }]);
     const result = await useCase.execute({ ...command, data: { endDate: '2026-10-20' } });
+    expect(result.isErr()).toBe(true);
+    expect(modules.updateSegment).not.toHaveBeenCalled();
+  });
+
+  it('permite cerrar manualmente SOLO un bloque sin entrega con tareas aprobadas', async () => {
+    const approved = {
+      segmentId: 'segment-1', teamId: 'team-1', status: 'done',
+      startDate: new Date('2026-10-10'), date: new Date('2026-10-29'),
+      cancelledAt: null,
+    };
+    const { useCase, modules, progress } = fixture('planned', [approved], false);
+    const result = await useCase.execute({ ...command, data: { closureAction: 'close' } });
+    expect(result.isOk()).toBe(true);
+    expect(modules.updateSegment).toHaveBeenCalledWith('segment-1',
+      expect.objectContaining({ closedAt: expect.any(Date) }),
+      expect.any(Date), expect.anything());
+    expect(progress.recalculate).toHaveBeenCalledWith('project-1', expect.anything());
+  });
+
+  it('impide el cierre manual si hay tareas pendientes o ninguna tarea activa', async () => {
+    const pending = {
+      segmentId: 'segment-1', teamId: 'team-1', status: 'todo',
+      startDate: new Date('2026-10-10'), date: new Date('2026-10-29'),
+      cancelledAt: null,
+    };
+    for (const tasks of [[pending], [], [{ ...pending, cancelledAt: new Date('2026-10-22') }]]) {
+      const { useCase, modules } = fixture('planned', tasks, false);
+      const result = await useCase.execute({ ...command, data: { closureAction: 'close' } });
+      expect(result.isErr()).toBe(true);
+      expect(modules.updateSegment).not.toHaveBeenCalled();
+    }
+  });
+
+  it('no elude la aprobación de una entrega de cierre aunque todas las tareas estén aprobadas', async () => {
+    const approved = {
+      segmentId: 'segment-1', teamId: 'team-1', status: 'done',
+      startDate: new Date('2026-10-10'), date: new Date('2026-10-29'),
+      cancelledAt: null,
+    };
+    const { useCase, modules } = fixture('planned', [approved], true);
+    const result = await useCase.execute({ ...command, data: { closureAction: 'close' } });
     expect(result.isErr()).toBe(true);
     expect(modules.updateSegment).not.toHaveBeenCalled();
   });
