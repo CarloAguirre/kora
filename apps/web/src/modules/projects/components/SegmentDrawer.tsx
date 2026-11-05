@@ -287,13 +287,26 @@ export function SegmentDrawer({
                 ? 'HH sin definir' : hh(task.estimatedHours) + ' HH est.'}
                 {' '}· Límite {dateFull(task.date)}</small>
             </div>
-            <span className={[styles.taskStatus,
-              !task.assigneeUserId ? styles.taskUnassigned :
-                task.status === 'done' ? styles.taskApproved :
-                  task.status === 'in_review' ? styles.taskReview :
-                    task.status === 'in_progress' ? styles.taskInProgress :
-                      styles.taskPending].join(' ')}>
-              {task.assigneeUserId ? PROJECT_MODULE_TASK_STATUS_LABELS[task.status] : 'Por asignar'}
+            <span className={styles.taskStatusGroup}>
+              <span className={[styles.taskStatus,
+                task.assigneeUserId ? styles.taskStatusWithDot : '',
+                !task.assigneeUserId ? styles.taskUnassigned :
+                  task.status === 'done' ? styles.taskApproved :
+                    task.status === 'in_review' ? styles.taskReview :
+                      task.status === 'in_progress' ? styles.taskInProgress :
+                        styles.taskPending].filter(Boolean).join(' ')}>
+                {task.assigneeUserId ? PROJECT_MODULE_TASK_STATUS_LABELS[task.status] : 'Por asignar'}
+              </span>
+              {task.assigneeUserId && task.status === 'in_progress' &&
+                Boolean(task.rejectionReason?.trim()) &&
+                <span className={[styles.taskStatus, styles.taskStatusWithDot,
+                  styles.taskReturned].join(' ')} title={task.rejectionReason ?? undefined}>
+                  Devuelta
+                </span>}
+              {task.assigneeUserId && (task.status === 'todo' || task.status === 'in_progress') &&
+                task.date < today &&
+                <span className={[styles.taskStatus, styles.taskStatusWithDot,
+                  styles.taskOverdue].join(' ')}>Vencida</span>}
             </span>
             <div className={styles.taskActions}>
               {onEditTask && <button type="button" title="Editar tarea"
