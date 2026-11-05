@@ -833,7 +833,7 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
             ))}
           </section>
         ) : undefined}
-        operationalFooter={canManage ? <button type="button" className={styles.addPhaseButton}
+        operationalFooter={canManage && planningMode ? <button type="button" className={styles.addPhaseButton}
           onClick={() => setAddingPhase(true)}>+ Agregar fase</button> : undefined}
         onPlanOperationalRow={canManage && planningMode ? (phase, row) => {
           const module = modulesById.get(phase.id);
