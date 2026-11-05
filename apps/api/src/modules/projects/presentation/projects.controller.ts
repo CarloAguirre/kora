@@ -107,7 +107,11 @@ import { ResolveProjectManagementApprovalUseCase } from '../application/use-case
 import { CorrectProjectHito0DateUseCase } from '../application/use-cases/correct-project-hito0-date.use-case';
 
 
-function toCollaboratorSummary(project: ProjectSummary, weekHours = 0): CollaboratorProjectSummary {
+function toCollaboratorSummary(
+  project: Pick<ProjectSummary, 'id' | 'name' | 'slug' | 'type' | 'status' | 'phase'
+    | 'client' | 'leader' | 'startDate' | 'endDate' | 'progress'>,
+  weekHours = 0,
+): CollaboratorProjectSummary {
   return {
     id: project.id, name: project.name, slug: project.slug, type: project.type,
     status: project.status, phase: project.phase, client: project.client, leader: project.leader,

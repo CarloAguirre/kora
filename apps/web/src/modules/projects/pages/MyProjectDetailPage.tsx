@@ -14,6 +14,7 @@ import { PhaseRoadmap, type PhaseRoadmapSelection } from '@/modules/client-porta
 import { ProjectProgressOverview } from '@/modules/client-portal/components/ProjectProgressOverview';
 import { toPhaseRoadmap } from '@/modules/client-portal/adapters/project-detail.adapter';
 import { useMyProjectDetail } from '../api/projects.queries';
+import { getLinkedBlockTasks } from '../lib/team-progress';
 import { MyProjectBitacora } from '../components/MyProjectBitacora';
 import styles from './MyProjectDetailPage.module.css';
 
@@ -101,9 +102,18 @@ export function MyProjectDetailPage() {
                   operationalTaskCount={project.modules.reduce((n, m) => n + m.tasks.filter((t) => !t.cancelledAt).length, 0)}
                   operationalBlockCount={project.modules.reduce((n, m) => n + m.segments.length, 0)}
                   operationalMetrics={(phase, row) => {
-                    const segment = project.modules.find((m) => m.id === phase.id)
-                      ?.segments.find((s) => s.id === row.id);
-                    return { hours: segment?.estimatedHours ?? null, progress: null };
+                    const module = project.modules.find((m) => m.id === phase.id);
+                    const block = module?.segments.find((s) => s.id === row.id);
+                    if (!module || !block || !block.estimatedHours) return { hours: null, progress: null };
+                    const closed = Boolean(block.closedAt) ||
+                      module.deliveries.some((d) => d.segmentId === block.id && d.status === 'approved');
+                    const approvedHours = getLinkedBlockTasks(module, block)
+                      .filter((task) => task.status === 'done')
+                      .reduce((sum, task) => sum + (task.estimatedHours ?? 0), 0);
+                    return {
+                      hours: block.estimatedHours,
+                      progress: closed ? 100 : Math.min(100, Math.round(approvedHours * 100 / block.estimatedHours)),
+                    };
                   }}
                   renderSelectionDetail={(phase, selection) =>
                     <RoadmapDetail project={project} phaseId={phase.id} selection={selection} />

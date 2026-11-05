@@ -23,7 +23,7 @@ function rowsFromProject(project: CollaboratorProjectDetail): Row[] {
     id: 'h-' + e.id, date: e.date, createdAt: e.createdAt,
     title: e.userName + ' registró ' + e.hours + ' HH · ' + (e.description || e.activity),
     type: e.hasBlocker ? 'Incidente' : 'Evento', phase: e.moduleName ?? '—',
-    person: e.userName, status: 'Aprobado', tone: e.hasBlocker ? 'danger' : 'success',
+    person: e.userName, status: 'Aprobado', tone: (e.hasBlocker ? 'danger' : 'success') as BadgeTone,
     detail: [e.activity, e.description, e.blockerDescription ? 'Bloqueo: ' + e.blockerDescription : ''].filter(Boolean).join(' · '),
     incident: e.hasBlocker, work: false, milestone: false,
   }));
@@ -32,10 +32,11 @@ function rowsFromProject(project: CollaboratorProjectDetail): Row[] {
     title: o.title ?? o.message, type: PROJECT_OBSERVATION_TYPE_LABELS[o.type],
     phase: o.moduleName ?? '—', person: o.authorName,
     status: o.status ? PROJECT_OBSERVATION_STATUS_LABELS[o.status] : 'Registrado',
-    tone: o.status === 'resuelto' || o.status === 'cumplido' ? 'success'
-      : o.status === 'rechazado' || o.status === 'abierto' ? 'danger' : 'neutral',
+    tone: (o.status === 'resuelto' || o.status === 'cumplido' ? 'success'
+      : o.status === 'rechazado' || o.status === 'abierto' ? 'danger' : 'neutral') as BadgeTone,
     detail: o.message, incident: o.type === 'incidente',
-    work: Boolean(o.taskId || o.deliveryId), milestone: o.type === 'hito',
+    work: Boolean(o.taskId || o.deliveryId),
+    milestone: ['hito', 'observacion', 'compromiso', 'atencion'].includes(o.type),
   }));
   const deliveries: Row[] = project.modules.flatMap((m) => m.deliveries.map((d) => ({
     id: 'd-' + d.id, date: d.createdAt.slice(0, 10), createdAt: d.createdAt,
