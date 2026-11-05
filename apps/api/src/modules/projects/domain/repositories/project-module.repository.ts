@@ -22,6 +22,11 @@ export interface ProjectModuleDeliveryRecord {
   readonly status: ProjectModuleDeliveryStatus;
   readonly rejectionReason: string | null;
   readonly createdAt: Date;
+  /** Metadatos de cierre del bloque, nulos hasta confirmarlo. */
+  readonly completedOn?: Date | null;
+  readonly completedByUserId?: string | null;
+  readonly completedByName?: string | null;
+  readonly completionComment?: string | null;
 }
 
 export interface ProjectModuleSegmentMemberRecord {
@@ -174,6 +179,10 @@ export interface UpdateProjectModuleDeliveryInput {
   readonly status?: ProjectModuleDeliveryStatus;
   readonly estimatedDate?: Date;
   readonly rejectionReason?: string | null;
+  /** Actualizados solo por el caso de uso de cierre del bloque. */
+  readonly completedOn?: Date | null;
+  readonly completedByUserId?: string | null;
+  readonly completionComment?: string | null;
 }
 
 /** Fila de "Mis tareas" — tarea asignada a una persona, con el nombre de su proyecto/módulo. */
