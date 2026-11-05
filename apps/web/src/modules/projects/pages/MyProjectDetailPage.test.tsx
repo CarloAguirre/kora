@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { MyProjectDetailPage } from './MyProjectDetailPage';
 
@@ -9,7 +9,8 @@ vi.mock('../api/projects.queries', () => ({ useMyProjectDetail: mocks.detail }))
 vi.mock('@/shared/components/layout/DashboardLayout', () => ({
   DashboardLayout: ({ children }: { children: React.ReactNode }) => <main>{children}</main>,
 }));
-vi.mock('@/modules/client-portal/adapters/project-detail.adapter', () => ({
+vi.mock('@/modules/client-portal/adapters/project-detail.adapter', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@/modules/client-portal/adapters/project-detail.adapter')>(),
   toPhaseRoadmap: mocks.roadmap,
 }));
 vi.mock('@/modules/client-portal/components/PhaseRoadmap', () => ({
@@ -20,16 +21,19 @@ vi.mock('@/modules/client-portal/components/PhaseRoadmap', () => ({
     renderSelectionDetail?: (phase: { id: string },
       selection: { kind: 'segment'; id: string; label: string }, close: () => void) => ReactNode;
   }) => {
-    const [selected, setSelected] = useState(false);
+    const [selected, setSelected] = useState<'segment' | 'task' | null>(null);
     const phase = { id: 'm-1' };
     return <div data-testid="visor-roadmap">
       {operationalView ? 'Vista operativa' : 'Vista general'}
       {toolbarActions ? 'CON_EDICION' : ''}{onPlanOperationalRow ? 'CON_PLANIFICACION' : ''}
       {renderPhaseReferences?.(phase)}
-      <button type="button" onClick={() => setSelected(true)}>Abrir bloque de trabajo</button>
-      {selected && renderSelectionDetail?.(phase, {
+      <button type="button" onClick={() => setSelected('segment')}>Abrir bloque de trabajo</button>
+      <button type="button" onClick={() => setSelected('task')}>Abrir tarea de fase</button>
+      {selected && renderSelectionDetail?.(phase, selected === 'task' ? {
+        kind: 'task', id: 'task-1', label: 'Revisar prototipo',
+      } : {
         kind: 'segment', id: 'segment-1', label: 'Diseño de flujos',
-      }, () => setSelected(false))}
+      }, () => setSelected(null))}
     </div>;
   },
 }));
@@ -95,7 +99,13 @@ describe('Detalle de proyecto del colaborador', () => {
           teamName: 'UX-UI', startDate: '2026-10-19', endDate: '2026-11-04',
           estimatedHours: 120, consumedHours: 0, members: [],
         }],
-        tasks: [], deliveries: [],
+        tasks: [{
+          id: 'task-1', name: 'Revisar prototipo', teamName: 'UX-UI',
+          status: 'in_progress', assigneeName: 'Leslie Galaz',
+          date: '2026-12-01', startDate: '2026-11-04', scope: 'desarrollo',
+          estimatedHours: 2, description: 'Revisar el diseño de interfaz.',
+          completedAt: null, rejectionReason: null,
+        }], deliveries: [],
       }],
       observations: [], events: [], activityTruncated: false,
     } });
@@ -109,5 +119,20 @@ describe('Detalle de proyecto del colaborador', () => {
     expect(screen.queryByText('EDICION ACTIVADA')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Cerrar panel' }));
     expect(screen.queryByRole('dialog', { name: 'Detalle del bloque' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir tarea de fase' }));
+    const taskDetail = screen.getByRole('region', { name: 'Tarea: Revisar prototipo' });
+    expect(taskDetail).toHaveTextContent('Leslie Galaz');
+    expect(taskDetail).toHaveTextContent('En curso');
+    expect(taskDetail).toHaveTextContent('Inicio');
+    expect(taskDetail).toHaveTextContent('Fecha límite');
+    expect(taskDetail).toHaveTextContent('Ámbito');
+    expect(taskDetail).toHaveTextContent('Horas estimadas');
+    expect(taskDetail).toHaveTextContent('Revisar el diseño de interfaz.');
+    expect(within(taskDetail).queryByRole('button', { name: /editar|eliminar|aprobar/i }))
+      .not.toBeInTheDocument();
+    fireEvent.click(within(taskDetail).getByRole('button', { name: 'Cerrar detalle' }));
+    expect(screen.queryByRole('region', { name: 'Tarea: Revisar prototipo' }))
+      .not.toBeInTheDocument();
   });
 });

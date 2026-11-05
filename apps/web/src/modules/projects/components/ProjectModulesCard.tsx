@@ -22,7 +22,6 @@ import { useToast } from '@/shared/components/ui/Toast';
 import { ApiRequestError } from '@/shared/lib/api-client';
 import { PhaseRoadmap, type PhaseRoadmapSelection, type OperationalRoadmapRow } from '@/modules/client-portal/components/PhaseRoadmap';
 import { roleFromTeamName, toPhaseRoadmap } from '@/modules/client-portal/adapters/project-detail.adapter';
-import { PHASE_ROADMAP_ROLE_COLORS } from '@/modules/client-portal/types';
 import { useCreateProjectModule, useCreateProjectModuleSegment, useDeleteProjectModule, useDeleteProjectModuleSegment, useDeleteProjectModuleTask, useUpdateProjectModule, useUpdateProjectModuleSegment, useUpdateProjectModuleTask } from '../api/projects.queries';
 import { useConfirmAction } from '@/shared/components/ui/useConfirmAction';
 import { useExcludeRoadmapReference, useRoadmapReferenceExclusions } from '../api/projects.queries';
@@ -56,8 +55,6 @@ const today = () => {
 const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`;
 
 
-/** Color del equipo — el mismo que el Roadmap (`PHASE_ROADMAP_ROLE_COLORS`, Figma), no el de `getTeamStyle`. */
-const teamColor = (teamName: string | null) => PHASE_ROADMAP_ROLE_COLORS[roleFromTeamName(teamName)];
 /** Paleta de los chips del Roadmap operativo v5.02. No modifica el portal cliente. */
 const operationalTeamColor = (teamName: string | null) => ({
   dev: '#ea7a1f', pmo: '#64748b', qa: '#3b82f6',
