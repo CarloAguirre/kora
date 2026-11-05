@@ -172,7 +172,7 @@ describe('Edición superpuesta sobre el detalle lateral del bloque', () => {
     const editForm = await screen.findByRole('dialog', { name: 'Editar bloque de trabajo' });
     // Deben coexistir DOS dialog nativos: edición en primer plano y
     // contexto del segmento detrás, sin reiniciar la selección.
-    expect(document.querySelectorAll('dialog')).toHaveLength(2);
+    expect(document.querySelectorAll('dialog[open]')).toHaveLength(2);
     expect(editForm).toBeInTheDocument();
     fireEvent.click(within(editForm).getByRole('button', { name: 'Cancelar' }));
     expect(screen.queryByRole('dialog', { name: 'Editar bloque de trabajo' }))
