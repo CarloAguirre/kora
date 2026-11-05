@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { PhaseRoadmap } from './PhaseRoadmap';
 import type { ProjectPhaseRoadmap } from '../types';
 
@@ -288,8 +288,8 @@ describe('Restauración de checks y zoom sobre el Gantt operativo v5.02', () => 
     expect(screen.getByRole('button', { name: 'Cierre planificado Bloque QA' })).toBeInTheDocument();
   });
 
-  it('cada fase tiene zoom independiente y no muestra falsos marcadores cuando faltan fechas', () => {
-    const twoPhases = {
+  it('cada fase conserva un zoom independiente, sin recalcular fases vecinas', () => {
+    const twoPhases: ProjectPhaseRoadmap = {
       ...roadmap,
       phases: [
         ...roadmap.phases,
@@ -298,21 +298,37 @@ describe('Restauración de checks y zoom sobre el Gantt operativo v5.02', () => 
           id: 'phase-3',
           badge: 'FASE 3',
           name: 'Pruebas finales',
-          tasks: [],
+          tasks: [{ id: 'segment-3', role: 'qa', scope: 'qa', label: 'Pruebas QA',
+            startDate: '2026-11-07', endDate: '2026-11-25' }],
           taskItems: [],
           deliveries: [],
         },
       ],
     };
-    render(<PhaseRoadmap phaseRoadmap={twoPhases} operationalView
-      operationalRows={(phase) => phase.id === 'phase-3'
-        ? [{ id: 'missing', role: 'qa', label: 'QA sin fecha', hours: 40 }]
-        : []} />);
-    expect(screen.getByRole('slider', { name: /Zoom del cronograma de Desarrollo Backend/ })).toBeInTheDocument();
-    expect(screen.queryByRole('slider', { name: /Zoom del cronograma de Pruebas finales/ }))
-      .not.toBeInTheDocument();
+    render(<PhaseRoadmap phaseRoadmap={twoPhases} operationalView />);
+    const design = screen.getByRole('region', { name: 'FASE 2: Desarrollo Backend' });
+    const qa = screen.getByRole('region', { name: 'FASE 3: Pruebas finales' });
+    fireEvent.change(within(design).getByRole('slider'), { target: { value: '80' } });
+    expect(design.querySelector('[data-zoom="80"]')).toHaveStyle({ width: '340%' });
+    expect(qa.querySelector('[data-zoom="0"]')).toHaveStyle({ width: '100%' });
+    expect(within(qa).getByRole('button', { name: 'Abrir bloque Pruebas QA' })).toBeInTheDocument();
+  });
+
+  it('no dibuja falsos checks ni zoom cuando la fase aún no tiene fechas', () => {
+    const noDates: ProjectPhaseRoadmap = {
+      ...roadmap,
+      phases: [{
+        ...roadmap.phases[0]!,
+        tasks: [],
+        deliveries: [],
+        taskItems: [],
+      }],
+    };
+    render(<PhaseRoadmap phaseRoadmap={noDates} operationalView
+      operationalRows={() => [{ id: 'missing', role: 'qa', label: 'QA sin fecha', hours: 40 }]} />);
+    expect(screen.queryByRole('slider', { name: /Zoom del cronograma/ })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Abrir bloque QA sin fecha' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Ver tarea QA sin fecha' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Ver tarea QA sin fecha/ })).not.toBeInTheDocument();
   });
 });
 
