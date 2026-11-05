@@ -45,6 +45,7 @@ import { resolveDb } from '../../../../shared/infrastructure/database/unit-of-wo
 
 /** Tramo al que apunta una tarea/entrega — alias porque las consultas de tramos ya usan la tabla. */
 const linkedSegments = alias(projectModuleSegments, 'linked_segments');
+const completionUsers = alias(users, 'completion_users');
 
 @Injectable()
 export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
@@ -77,12 +78,18 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
           estimatedDate: projectModuleDeliveries.estimatedDate,
           status: projectModuleDeliveries.status,
           rejectionReason: projectModuleDeliveries.rejectionReason,
+          completedOn: projectModuleDeliveries.completedOn,
+          completedByUserId: projectModuleDeliveries.completedByUserId,
+          completionFirstName: completionUsers.firstName,
+          completionLastName: completionUsers.lastName,
+          completionComment: projectModuleDeliveries.completionComment,
           createdAt: projectModuleDeliveries.createdAt,
         })
         .from(projectModuleDeliveries)
         .innerJoin(projectModules, eq(projectModules.id, projectModuleDeliveries.moduleId))
         .leftJoin(teams, eq(teams.id, projectModuleDeliveries.teamId))
         .leftJoin(users, eq(users.id, projectModuleDeliveries.assigneeUserId))
+        .leftJoin(completionUsers, eq(completionUsers.id, projectModuleDeliveries.completedByUserId))
         .leftJoin(linkedSegments, eq(linkedSegments.id, projectModuleDeliveries.segmentId))
         .where(eq(projectModules.projectId, projectId))
         .orderBy(asc(projectModuleDeliveries.estimatedDate)),
@@ -285,11 +292,17 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
           estimatedDate: projectModuleDeliveries.estimatedDate,
           status: projectModuleDeliveries.status,
           rejectionReason: projectModuleDeliveries.rejectionReason,
+          completedOn: projectModuleDeliveries.completedOn,
+          completedByUserId: projectModuleDeliveries.completedByUserId,
+          completionFirstName: completionUsers.firstName,
+          completionLastName: completionUsers.lastName,
+          completionComment: projectModuleDeliveries.completionComment,
           createdAt: projectModuleDeliveries.createdAt,
         })
         .from(projectModuleDeliveries)
         .leftJoin(teams, eq(teams.id, projectModuleDeliveries.teamId))
         .leftJoin(users, eq(users.id, projectModuleDeliveries.assigneeUserId))
+        .leftJoin(completionUsers, eq(completionUsers.id, projectModuleDeliveries.completedByUserId))
         .leftJoin(linkedSegments, eq(linkedSegments.id, projectModuleDeliveries.segmentId))
         .where(eq(projectModuleDeliveries.moduleId, id))
         .orderBy(asc(projectModuleDeliveries.estimatedDate)),
@@ -447,6 +460,9 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
         ...(input.status !== undefined ? { status: input.status } : {}),
         ...(input.estimatedDate !== undefined ? { estimatedDate: input.estimatedDate } : {}),
         ...(input.rejectionReason !== undefined ? { rejectionReason: input.rejectionReason } : {}),
+        ...(input.completedOn !== undefined ? { completedOn: input.completedOn } : {}),
+        ...(input.completedByUserId !== undefined ? { completedByUserId: input.completedByUserId } : {}),
+        ...(input.completionComment !== undefined ? { completionComment: input.completionComment } : {}),
         updatedAt: now,
       })
       .where(eq(projectModuleDeliveries.id, id));
@@ -734,6 +750,11 @@ interface DeliveryRow {
   estimatedDate: Date;
   status: ProjectModuleDeliveryRecord['status'];
   rejectionReason: string | null;
+  completedOn: Date | null;
+  completedByUserId: string | null;
+  completionFirstName: string | null;
+  completionLastName: string | null;
+  completionComment: string | null;
   createdAt: Date;
 }
 
@@ -880,6 +901,11 @@ function toRecord(
       estimatedDate: d.estimatedDate,
       status: d.status,
       rejectionReason: d.rejectionReason,
+      completedOn: d.completedOn,
+      completedByUserId: d.completedByUserId,
+      completedByName: d.completedByUserId
+        ? [d.completionFirstName, d.completionLastName].filter(Boolean).join(' ') : null,
+      completionComment: d.completionComment,
       createdAt: d.createdAt,
     })),
     segments: segmentRows.map((s) => ({
