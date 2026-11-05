@@ -69,6 +69,8 @@ describe('Detalle de proyecto del colaborador', () => {
       <Routes><Route path="/mis-proyectos/:projectId" element={<MyProjectDetailPage />} /></Routes>
     </MemoryRouter>);
     expect(screen.getByText('Mejoras Kora')).toBeInTheDocument();
+    const stage = screen.getByText('Activo');
+    expect(stage).toHaveClass('stageBadge');
     expect(screen.getByTestId('visor-roadmap')).toHaveTextContent('Vista operativa');
     expect(screen.queryByText('CON_EDICION')).not.toBeInTheDocument();
     expect(screen.queryByText('CON_PLANIFICACION')).not.toBeInTheDocument();

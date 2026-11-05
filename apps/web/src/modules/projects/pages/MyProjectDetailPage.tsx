@@ -77,7 +77,7 @@ export function MyProjectDetailPage() {
         <div><small>Líder a cargo</small><strong>{project.leader?.fullName ?? '—'}</strong></div>
         <div><small>Fecha inicio</small><strong>{date(project.startDate)}</strong></div>
         <div><small>Fecha fin</small><strong>{date(project.endDate ?? project.estimatedDeliveryDate)}</strong></div>
-        <div><small>Etapa de avance</small><Badge tone="info">
+        <div><small>Etapa de avance</small><Badge tone="info" className={styles.stageBadge}>
           {project.phase ? PROJECT_PHASE_LABELS[project.phase] : PROJECT_STATUS_LABELS[project.status]}
         </Badge></div>
       </Card>
