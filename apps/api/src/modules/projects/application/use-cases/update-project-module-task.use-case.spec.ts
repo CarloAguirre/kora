@@ -13,7 +13,7 @@ import type { ProjectChangeLogRecorder } from '../services/project-change-log.re
 import type { ProjectProgressRecalculator } from '../services/project-progress-recalculator';
 import type { ForecastSourceSyncService } from '../services/forecast-source-sync.service';
 import { FixedClock, PassthroughUnitOfWork } from '../../../../test/fakes';
-import type { ProjectTaskReviewNotifier } from '../../infrastructure/services/project-task-review-notifier';
+import type { ProjectTaskReviewNotifierPort } from '../ports/project-task-review-notifier.port';
 
 const FAKE_PROJECT = {
   id: 'project-1',
@@ -79,7 +79,7 @@ function buildUseCase(module: ProjectModuleRecord) {
     { syncTask: vi.fn().mockResolvedValue(undefined) } as unknown as ForecastSourceSyncService,
     new FixedClock(),
     new PassthroughUnitOfWork(),
-    { publish: publishNotification } as unknown as ProjectTaskReviewNotifier,
+    { publish: publishNotification } as unknown as ProjectTaskReviewNotifierPort,
   );
   return { useCase, changeLogRecord, recalculateProgress, refreshSegmentClosure, publishNotification };
 }
