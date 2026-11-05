@@ -283,6 +283,15 @@ export function PhaseRoadmap({
           <span className={styles.legendItem}>
             <span className={styles.legendTodayMarker} aria-hidden="true" /> Hoy
           </span>
+          <span className={styles.legendItem}>
+            <span className={styles.legendCheck} aria-hidden="true">✓</span> Tarea aprobada
+          </span>
+          <span className={styles.legendItem}>
+            <span className={[styles.legendDot, styles.legendTaskMark, styles.taskDotUpcoming].join(' ')} aria-hidden="true" /> Tarea pendiente
+          </span>
+          <span className={styles.legendItem}>
+            <span className={[styles.legendDot, styles.legendTaskMark, styles.taskDotDelayed].join(' ')} aria-hidden="true" /> Tarea vencida
+          </span>
         </> : <>
 
         {!operationalView && (Object.keys(PHASE_ROADMAP_ROLE_LABELS) as Array<keyof typeof PHASE_ROADMAP_ROLE_LABELS>).map((role) => (
@@ -890,7 +899,21 @@ function OperationalPhaseCard({
   const [selected, setSelected] = useState<PhaseRoadmapSelection | null>(null);
   const choose = (selection: PhaseRoadmapSelection) =>
     setSelected((current) => sameSelection(current, selection) ? null : selection);
+  // Restaurar el zoom real del cronograma anterior, sin alterar el modelo de bloques v5.02.
+  // Cada fase conserva su propio zoom y el mismo eje para barras, entregas y tareas.
+  const [zoom, setZoom] = useState(0);
+  const showDays = zoom >= DETAIL_ZOOM_THRESHOLD;
+  const dailyTickStride = axis.dayLines.length > 150 ? 7 : axis.dayLines.length > 70 ? 3 : 1;
+  const ticks = showDays
+    ? axis.dayLines.flatMap((leftPercent, index) =>
+      index % dailyTickStride === 0
+        ? [{ leftPercent, label: formatShortDate(
+            `${shiftDays(axis.range.min, index).getFullYear()}-${String(shiftDays(axis.range.min, index).getMonth() + 1).padStart(2, '0')}-${String(shiftDays(axis.range.min, index).getDate()).padStart(2, '0')}`,
+          ) }]
+        : [])
+    : axis.dayTicks;
   const hasDatedRows = phase.tasks.length > 0;
+  const hasTimelineItems = hasDatedRows || phase.taskItems.length > 0 || phase.deliveries.length > 0;
   const relatedEntries = selected?.kind === 'incident'
     ? phase.relatedBitacora.filter((entry) => entry.kind === 'attention')
     : selected && 'label' in selected
@@ -912,20 +935,36 @@ function OperationalPhaseCard({
           onClick={() => choose({ kind: 'incident' })}>⚑ {phase.alertLabel}</button>}
       </div>
       <div className={styles.operationalPhaseBody}>
-        {(hasDatedRows || placeholderRows.length > 0) && (
-          <div className={styles.operationalGantt}>
-            {hasDatedRows && (
-              <div className={styles.operationalTimelineHeading}>
-                <div />
-                <div className={styles.operationalAxis}>
-                  {axis.dayTicks.map((tick, index) => (
-                    <span key={index} style={{ left: tick.leftPercent + '%' }}>
-                      {tick.label}
-                    </span>
-                  ))}
+        {hasTimelineItems && <div className={styles.operationalZoomRow}>
+          <span>Semanas</span>
+          <button type="button" className={styles.operationalZoomButton}
+            disabled={zoom === 0} onClick={() => setZoom((value) => Math.max(0, value - 20))}
+            aria-label={'Alejar cronograma de ' + phase.name}>−</button>
+          <input type="range" min={0} max={100} step={5} value={zoom}
+            onChange={(event) => setZoom(Number(event.target.value))}
+            aria-label={'Zoom del cronograma de ' + phase.name + ': Semanas a Días'} />
+          <button type="button" className={styles.operationalZoomButton}
+            disabled={zoom === 100} onClick={() => setZoom((value) => Math.min(100, value + 20))}
+            aria-label={'Acercar cronograma de ' + phase.name}>+</button>
+          <span>Días</span>
+        </div>}
+        {(hasTimelineItems || placeholderRows.length > 0) && (
+          <div className={styles.operationalGanttViewport}>
+            <div className={styles.operationalGantt}
+              style={{ width: scrollWidthPercent(zoom) + '%' }}
+              data-zoom={zoom}>
+              {hasTimelineItems && (
+                <div className={styles.operationalTimelineHeading}>
+                  <div className={styles.operationalStickyLabel} />
+                  <div className={styles.operationalAxis}>
+                    {ticks.map((tick, index) => (
+                      <span key={index} style={{ left: tick.leftPercent + '%' }}>
+                        {tick.label}
+                      </span>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
             {phase.tasks.map((task, index) => {
               const geometry = barGeometry(task, axis.range);
               const metrics = getMetrics?.(phase, task);
@@ -948,6 +987,9 @@ function OperationalPhaseCard({
                 <div className={styles.operationalTrack}>
                   {axis.weekLines.map((percent, idx) =>
                     <span key={idx} className={styles.operationalGridLine}
+                      style={{ left: percent + '%' }} />)}
+                  {showDays && axis.dayLines.map((percent, idx) =>
+                    <span key={'day-' + idx} className={styles.operationalDayGridLine}
                       style={{ left: percent + '%' }} />)}
                   {axis.todayPercent !== null && <span className={styles.operationalToday}
                     style={{ left: axis.todayPercent + '%' }} />}
@@ -1001,6 +1043,51 @@ function OperationalPhaseCard({
                 </div>
               </div>;
             })}
+            {phase.deliveries.length > 0 && <div className={styles.operationalLine}>
+              <span className={[styles.operationalEventTitle, styles.operationalStickyLabel].join(' ')}>
+                Entregas · {phase.deliveries.length}
+              </span>
+              <div className={[styles.operationalTrack, styles.operationalMarkerTrack].join(' ')}>
+                <MarkerTrackRow
+                  markers={phase.deliveries.map((delivery, index) => ({
+                    key: delivery.id ?? 'delivery-' + index,
+                    label: delivery.label, date: delivery.date,
+                    urgency: DELIVERY_URGENCY[delivery.state],
+                    symbol: deliverySymbol(delivery.state),
+                    stateLabel: DELIVERY_STATE_LABEL[delivery.state],
+                    selection: { kind: 'delivery' as const, id: delivery.id, label: delivery.label },
+                  }))}
+                  range={axis.range} variant="delivery" pluralNoun="entregas"
+                  showLabels={showDays} selected={selected} onSelect={choose}
+                />
+              </div>
+            </div>}
+            {phase.taskItems.length > 0 && <div className={styles.operationalTaskSection}>
+              <span>Tareas · {phase.taskItems.length}</span>
+            </div>}
+            {phase.taskItems.map((task, index) => (
+              <div key={task.id ?? 'task-' + index} className={styles.operationalLine}>
+                <span className={[styles.operationalEventTitle, styles.operationalStickyLabel].join(' ')}
+                  title={task.label}>Tarea · {task.label}</span>
+                <div className={[styles.operationalTrack, styles.operationalMarkerTrack].join(' ')}>
+                  {showDays && axis.dayLines.map((percent, idx) =>
+                    <span key={idx} className={styles.operationalDayGridLine}
+                      style={{ left: percent + '%' }} />)}
+                  <MarkerTrackRow
+                    markers={[{
+                      key: task.id ?? 'task-' + index,
+                      label: task.label, date: task.date,
+                      urgency: TASK_ITEM_URGENCY[task.state],
+                      symbol: taskItemSymbol(task.state),
+                      stateLabel: TASK_ITEM_STATE_LABEL[task.state],
+                      selection: { kind: 'task', id: task.id, label: task.label },
+                    }]}
+                    range={axis.range} variant="task" pluralNoun="tareas"
+                    showLabels={showDays} selected={selected} onSelect={choose}
+                  />
+                </div>
+              </div>
+            ))}
             {placeholderRows.map((row) => {
               const selection: PhaseRoadmapSelection = {
                 kind: 'reference-block', id: row.id, label: row.label,
@@ -1033,10 +1120,11 @@ function OperationalPhaseCard({
                 </div>
               </div>;
             })}
+            </div>
           </div>
         )}
-        {renderReferences?.(phase)}
         {selected && renderSelectionDetail?.(phase, selected, () => setSelected(null))}
+        {renderReferences?.(phase)}
         {selected && phase.relatedBitacora.length > 0 && (
           <div className={styles.relatedBitacora}>
             <div className={styles.relatedBitacoraLabelRow}>
