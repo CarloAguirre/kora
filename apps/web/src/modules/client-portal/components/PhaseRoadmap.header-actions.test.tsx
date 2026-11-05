@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { PhaseRoadmap } from './PhaseRoadmap';
+import styles from './PhaseRoadmap.module.css';
+import roadmapCssSource from './PhaseRoadmap.module.css?raw';
 import type { ProjectPhaseRoadmap } from '../types';
 
 const phaseRoadmap: ProjectPhaseRoadmap = {
@@ -345,12 +347,24 @@ describe('Restauración de checks y zoom sobre el Gantt operativo v5.02', () => 
       { target: { value: '100' } });
     expect(container.querySelector('[data-zoom="100"]')).toHaveStyle({ width: '400%' });
     const label = screen.getByRole('button', { name: 'Ver detalle del bloque Bloque QA' });
-    const labelStyle = window.getComputedStyle(label);
-    expect(labelStyle.position).toBe('sticky');
-    expect(labelStyle.left).toBe('0px');
-    expect(labelStyle.backgroundColor).toBe('rgb(255, 255, 255)');
-    // Marcadores de cierre usan z-index 3; el panel del nombre debe cubrirlos.
-    expect(Number(labelStyle.zIndex)).toBeGreaterThan(3);
+    expect(label).toHaveClass(styles.operationalBlockLabel!);
+
+    // JSDOM no aplica de manera fiable los CSS Modules a getComputedStyle.
+    // Verificamos que el componente usa la clase real y que las reglas
+    // CSS publicadas protegen la etiqueta delante de las barras.
+    const stickyRule = roadmapCssSource.match(
+      /\.operationalStickyLabel,\s*\.operationalBlockLabel\s*\{([^}]+)\}/,
+    )?.[1] ?? '';
+    expect(stickyRule).toMatch(/\bposition:\s*sticky\s*;/);
+    expect(stickyRule).toMatch(/\bleft:\s*0\s*;/);
+    expect(stickyRule).toMatch(/\bbackground:\s*#fff\s*;/);
+    const zIndex = Number(stickyRule.match(/\bz-index:\s*(\d+)/)?.[1]);
+    // Los marcadores de cierre tienen z-index 3: la etiqueta debe cubrirlos.
+    expect(zIndex).toBeGreaterThan(3);
+
+    // Esta regla individual no debe volver a transparentar el fondo común.
+    const blockLabelRule = roadmapCssSource.match(/\.operationalBlockLabel\s*\{([^}]+)\}/)?.[1] ?? '';
+    expect(blockLabelRule).toMatch(/\bbackground:\s*#fff\s*;/);
     expect(screen.getByRole('button', { name: 'Abrir bloque Bloque QA' })).toBeInTheDocument();
     fireEvent.click(label);
     expect(screen.getByText('Seleccionado: segment')).toBeInTheDocument();
