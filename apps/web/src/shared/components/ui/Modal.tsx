@@ -33,6 +33,8 @@ export interface ModalProps {
   compactSide?: boolean;
   /** Drawer ancho para formularios con grillas de pago; no altera otros paneles laterales. */
   expandedSide?: boolean;
+  /** Panel de edición de desarrollo v5.02, ancho fijo adaptable y espaciado compacto. */
+  projectEditSide?: boolean;
   /** Clase extra para el `<dialog>`, p. ej. para un ancho a medida. */
   className?: string;
 }
@@ -51,6 +53,7 @@ export function Modal({
   side = false,
   compactSide = false,
   expandedSide = false,
+  projectEditSide = false,
   className,
 }: ModalProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -93,7 +96,7 @@ export function Modal({
     <dialog
       ref={dialogRef}
       className={[styles.dialog, wide ? styles.wide : '', side ? styles.side : '',
-        compactSide ? styles.compactSide : '', expandedSide ? styles.expandedSide : '', className].filter(Boolean).join(' ')}
+        compactSide ? styles.compactSide : '', expandedSide ? styles.expandedSide : '', projectEditSide ? styles.projectEditSide : '', className].filter(Boolean).join(' ')}
       aria-labelledby={titleId}
     >
       <header className={styles.header}>
