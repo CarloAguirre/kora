@@ -29,7 +29,7 @@ conservando Kora (color, tarjetas, tipografía, botones, permisos y consultas re
    payload autorizado DashboardMyPlanning, proveniente de forecast; los
    montos son HH **planificadas**, no consumidas de compañeros. Se mantiene
    paginación de miembros y estados de datos vacíos.
-5. Historial Reciente: filtro de semana/rango, paginación, vínculo visible a
+5. Historial Reciente: muestra por defecto los últimos 21 días, con filtro de semana/rango, paginación, vínculo visible a
    fase, bloque y tarea (si la tarea está entre las autorizadas), aprobador,
    actividad, HH, estado y botón Ver que abre detalle de solo lectura.
    La edición continúa en /horas con sus reglas existentes.
