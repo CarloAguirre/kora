@@ -116,6 +116,10 @@ export class UpdateHourEntryUseCase implements UseCase<UpdateHourEntryCommand, v
         : (moduleId ?? null) === previous.moduleId
           ? previous.segmentId
           : null;
+    const taskId = data.taskId !== undefined
+      ? data.taskId
+      : (moduleId === previous.moduleId && segmentId === previous.segmentId &&
+         projectId === previous.projectId ? previous.taskId ?? null : null);
     if (moduleId) {
       const module = await this.projects.findModuleById(moduleId);
       if (!module) return err(new ReferencedModuleNotFoundError(moduleId));
@@ -123,6 +127,15 @@ export class UpdateHourEntryUseCase implements UseCase<UpdateHourEntryCommand, v
       if (segmentId && !module.segments.some((segment) => segment.id === segmentId)) {
         return err(new SegmentNotInModuleError());
       }
+      if (taskId && (taskId !== previous.taskId || segmentId !== previous.segmentId ||
+        moduleId !== previous.moduleId || projectId !== previous.projectId) &&
+        !module.tasks?.some((task) => task.id === taskId && !task.cancelledAt &&
+          task.assigneeUserId === entry.userId && task.segmentId === (segmentId ?? null))) {
+        return err(new ForbiddenError('Selecciona una tarea activa, asignada al autor y al bloque elegido.', 'HOUR_ENTRY_TASK_INVALID'));
+      }
+    }
+    if (taskId && !moduleId) {
+      return err(new ForbiddenError('Selecciona una fase antes de elegir la tarea.', 'HOUR_ENTRY_TASK_INVALID'));
     }
 
     if (projectId && !moduleId && data.projectId !== undefined &&
@@ -169,6 +182,7 @@ export class UpdateHourEntryUseCase implements UseCase<UpdateHourEntryCommand, v
         projectId: data.projectId === undefined ? undefined : data.projectId,
         moduleId: data.moduleId === undefined ? undefined : data.moduleId,
         segmentId: moduleId ? (segmentId ?? null) : null,
+        taskId: moduleId ? taskId : null,
         category: data.category,
         description: data.description,
         hours: ownTranche!.hours,
@@ -193,6 +207,7 @@ export class UpdateHourEntryUseCase implements UseCase<UpdateHourEntryCommand, v
         projectId: updated.projectId,
         moduleId: updated.moduleId,
         segmentId: updated.segmentId,
+        taskId: updated.taskId ?? null,
         assignment: updated.assignment ?? '',
         category: updated.category,
         description: updated.description,
