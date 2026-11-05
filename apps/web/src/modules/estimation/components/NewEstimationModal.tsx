@@ -62,19 +62,6 @@ export function NewEstimationModal({ open, prospects, onClose }: NewEstimationMo
   const [drivePocResult, setDrivePocResult] = useState<string | null>(null);
   const drivePocWindow = useRef<Window | null>(null);
 
-  // Permite reintentar si el usuario cierra la ventana de Google sin finalizar.
-  useEffect(() => {
-    if (!drivePocBusy) return;
-    const timer = window.setInterval(() => {
-      if (drivePocWindow.current?.closed) {
-        setDrivePocBusy(false);
-        setDrivePocResult((previous) => previous ??
-          'Se cerró la ventana de Google antes de finalizar. Puedes reintentar.');
-      }
-    }, 500);
-    return () => window.clearInterval(timer);
-  }, [drivePocBusy]);
-
   const selected = useMemo(
     () => prospects.find((project) => project.slug === projectRef || project.id === projectRef) ?? null,
     [projectRef, prospects],
@@ -391,12 +378,24 @@ export function NewEstimationModal({ open, prospects, onClose }: NewEstimationMo
                 Esta prueba consulta únicamente la carpeta indicada, descarta los tokens
                 al terminar y no modifica tu sesión en Kora ni habilita aún la lectura permanente.</p>
             </div>
-            <Button variant="outline" size="sm"
-              disabled={!selected || !driveUrlIsValid || drivePocBusy}
-              loading={drivePocBusy}
-              onClick={() => void startDriveOAuthPoc()}>
-              Probar acceso con Google
-            </Button>
+            <div className={styles.drivePocButtons}>
+              <Button variant="outline" size="sm"
+                disabled={!selected || !driveUrlIsValid || drivePocBusy}
+                loading={drivePocBusy}
+                onClick={() => void startDriveOAuthPoc()}>
+                Probar acceso con Google
+              </Button>
+              {drivePocBusy && <Button variant="ghost" size="sm"
+                onClick={() => {
+                  // No depender de Window.closed: Google aplica COOP en algunos navegadores.
+                  try { drivePocWindow.current?.close(); } catch { /* Puede estar aislado. */ }
+                  drivePocWindow.current = null;
+                  setDrivePocBusy(false);
+                  setDrivePocResult('Prueba cancelada. Puedes intentarla nuevamente.');
+                }}>
+                Cancelar prueba
+              </Button>}
+            </div>
             {drivePocResult && <p className={styles.drivePocResult} role="status">{drivePocResult}</p>}
           </div>}
 
