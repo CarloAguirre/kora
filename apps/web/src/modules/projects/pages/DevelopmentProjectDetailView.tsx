@@ -12,7 +12,7 @@ import { Card } from "@/shared/components/ui/Card";
 import { useToast } from "@/shared/components/ui/Toast";
 import { ApiRequestError } from "@/shared/lib/api-client";
 import type { ProjectDetail } from "@kora/contracts";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useResolveProjectManagementApproval } from "../api/projects.queries";
 import { AssignedTeamsCard, type AssignedTeamSummary } from "../components/AssignedTeamsCard";
 import { ProjectTeamsManagementCard } from "../components/ProjectTeamsManagementCard";
@@ -48,12 +48,15 @@ export function DevelopmentProjectDetailView({
   project,
   projectId,
   onEdit,
+  quotationTabRequestId = 0,
   readOnlyTeamIds,
 }: {
   project: ProjectDetail;
   projectId: string;
   /** Abre "Editar proyecto" — sin él (quien no puede editar) no se muestra el lápiz. */
   onEdit?: () => void;
+  /** Solicitud explícita del enlace «Ver cotizaciones» del editor de desarrollo. */
+  quotationTabRequestId?: number;
   /**
    * Vista de consulta para un líder de equipo que no lidera el proyecto: ve la
    * ficha completa sin editar nada (sin Extras, Roadmap de solo lectura) y solo
@@ -66,6 +69,9 @@ export function DevelopmentProjectDetailView({
   const { user } = useAuth();
   const toast = useToast();
   const [tab, setTab] = useState<DetailTab>("resumen");
+  useEffect(() => {
+    if (quotationTabRequestId > 0) setTab('cotizaciones');
+  }, [quotationTabRequestId]);
   const resolveManagementApproval = useResolveProjectManagementApproval();
   const { data: projectHourEntries } = useHourEntriesList({
     projectId,
