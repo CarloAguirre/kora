@@ -670,6 +670,8 @@ button.ganttBar {
   overflow-x: auto;
   overscroll-behavior-x: contain;
   scrollbar-width: thin;
+  /* Mantiene el orden de capas del Gantt dentro del scroll de cada fase. */
+  isolation: isolate;
 }
 .operationalGantt {
   min-width: 100%;
@@ -683,8 +685,10 @@ button.ganttBar {
 .operationalBlockLabel {
   position: sticky;
   left: 0;
-  z-index: 4;
+  /* Barra, líneas y diamantes se desplazan DETRÁS de la columna de nombres. */
+  z-index: 5;
   background: #fff;
+  box-shadow: 1px 0 0 #e4e9ee;
 }
 .operationalTimelineHeading,
 .operationalLine {
@@ -715,7 +719,8 @@ button.ganttBar {
   display: flex;
   text-align: left;
   width: 100%;
-  background: transparent;
+  /* No dejar transparentes los nombres: el scroll pasaría por debajo del texto. */
+  background: #fff;
   border: 0;
   font: inherit;
   cursor: pointer;
@@ -930,7 +935,9 @@ button.ganttBar {
    Controles separados evitan anidar botones y conservan navegación por teclado. */
 .operationalReferenceRow { transition: background-color .15s ease; }
 .operationalReferenceRow:hover { background: #f7f9fd; }
+.operationalReferenceRow:hover .operationalBlockLabel { background: #f7f9fd; }
 .operationalReferenceSelected { background: #eef3ff; }
+.operationalReferenceSelected .operationalBlockLabel { background: #eef3ff; }
 .operationalReferenceRow:focus-within { outline: 2px solid #8ca9d4; outline-offset: -2px; }
 .operationalBlockLabel:focus-visible, .operationalOpenReference:focus-visible {
   outline: 2px solid #3b82f6;

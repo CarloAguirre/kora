@@ -336,6 +336,26 @@ describe('Restauración de checks y zoom sobre el Gantt operativo v5.02', () => 
     expect(screen.getByRole('button', { name: 'Cierre planificado Bloque QA' })).toBeInTheDocument();
   });
 
+  it('mantiene opacas y por encima de barras las etiquetas sticky al acercar el zoom a días', () => {
+    const { container } = render(<PhaseRoadmap phaseRoadmap={roadmap} operationalView
+      renderSelectionDetail={(_phase, selection) =>
+        <p>Seleccionado: {selection.kind}</p>}
+    />);
+    fireEvent.change(screen.getByRole('slider', { name: /Zoom del cronograma de Desarrollo Backend/ }),
+      { target: { value: '100' } });
+    expect(container.querySelector('[data-zoom="100"]')).toHaveStyle({ width: '400%' });
+    const label = screen.getByRole('button', { name: 'Ver detalle del bloque Bloque QA' });
+    const labelStyle = window.getComputedStyle(label);
+    expect(labelStyle.position).toBe('sticky');
+    expect(labelStyle.left).toBe('0px');
+    expect(labelStyle.backgroundColor).toBe('rgb(255, 255, 255)');
+    // Marcadores de cierre usan z-index 3; el panel del nombre debe cubrirlos.
+    expect(Number(labelStyle.zIndex)).toBeGreaterThan(3);
+    expect(screen.getByRole('button', { name: 'Abrir bloque Bloque QA' })).toBeInTheDocument();
+    fireEvent.click(label);
+    expect(screen.getByText('Seleccionado: segment')).toBeInTheDocument();
+  });
+
   it('cada fase conserva un zoom independiente, sin recalcular fases vecinas', () => {
     const twoPhases: ProjectPhaseRoadmap = {
       ...roadmap,
