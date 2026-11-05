@@ -345,6 +345,9 @@ export function WeeklyEntryForm({
               setModuleId('');
               setSegmentId('');
               setTaskId('');
+              setCategory((previous) => activityForTaskChange(
+                previous, availableTasks.find((task) => task.id === taskId)?.name, undefined,
+              ));
               if (!nextProject?.allowsOvertime) setIsOvertime(false);
             }}
           />
@@ -363,8 +366,18 @@ export function WeeklyEntryForm({
           approverName={projectDetail?.teams.find((team) =>
             team.teamId === selectedModule?.segments.find((segment) => segment.id === segmentId)?.teamId
           )?.leader?.fullName}
-          onPhaseChange={(id) => { setModuleId(id); setSegmentId(''); setTaskId(''); }}
-          onSegmentChange={(id) => { setSegmentId(id); setTaskId(''); }}
+          onPhaseChange={(id) => {
+            setModuleId(id); setSegmentId(''); setTaskId('');
+            setCategory((previous) => activityForTaskChange(
+              previous, availableTasks.find((task) => task.id === taskId)?.name, undefined,
+            ));
+          }}
+          onSegmentChange={(id) => {
+            setSegmentId(id); setTaskId('');
+            setCategory((previous) => activityForTaskChange(
+              previous, availableTasks.find((task) => task.id === taskId)?.name, undefined,
+            ));
+          }}
           onTaskChange={(id) => {
             setCategory((previous) => activityForTaskChange(
               previous,
