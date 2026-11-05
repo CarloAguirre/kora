@@ -13,6 +13,7 @@ import type {
   ProjectReactivatedFromHoldNotification,
   SupportBillingDigestNotification,
   TeamReportDataRequestEmail,
+  ProjectTaskStatusEmail,
   UserInvitation,
 } from '../../application/ports/notification.port';
 import {
@@ -26,6 +27,7 @@ import {
   renderProjectReactivatedFromHold,
   renderSupportBillingDigest,
   renderTeamReportDataRequest,
+  renderProjectTaskStatus,
   renderUserInvitation,
   type RenderedEmail,
 } from './email-templates';
@@ -135,6 +137,11 @@ export class ResendNotificationSender implements NotificationSender {
       notification.recipientEmail,
       renderTeamReportDataRequest(notification, this.settings.webAppUrl),
     );
+  }
+
+  sendProjectTaskStatus(notification: ProjectTaskStatusEmail): Promise<void> {
+    return this.deliver('project_task_' + notification.kind, notification.recipientEmail,
+      renderProjectTaskStatus(notification, this.settings.webAppUrl));
   }
 
   private async deliver(kind: string, to: string, email: RenderedEmail): Promise<void> {
