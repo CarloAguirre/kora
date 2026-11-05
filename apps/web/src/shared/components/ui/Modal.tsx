@@ -31,6 +31,8 @@ export interface ModalProps {
   side?: boolean;
   /** Panel lateral compacto: detalle de bloque del Roadmap con pie fijo. */
   compactSide?: boolean;
+  /** Drawer ancho para formularios con grillas de pago; no altera otros paneles laterales. */
+  expandedSide?: boolean;
   /** Clase extra para el `<dialog>`, p. ej. para un ancho a medida. */
   className?: string;
 }
@@ -48,6 +50,7 @@ export function Modal({
   headerExtra,
   side = false,
   compactSide = false,
+  expandedSide = false,
   className,
 }: ModalProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -90,7 +93,7 @@ export function Modal({
     <dialog
       ref={dialogRef}
       className={[styles.dialog, wide ? styles.wide : '', side ? styles.side : '',
-        compactSide ? styles.compactSide : '', className].filter(Boolean).join(' ')}
+        compactSide ? styles.compactSide : '', expandedSide ? styles.expandedSide : '', className].filter(Boolean).join(' ')}
       aria-labelledby={titleId}
     >
       <header className={styles.header}>
