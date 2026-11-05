@@ -251,7 +251,7 @@ export function SegmentDrawer({
             : 'Este bloque no tiene entrega de cierre. Puedes registrarla desde «Editar bloque».'}
         </p>}
         {canReopen && <Button size="sm" variant="outline"
-          disabled={updateDelivery.isPending}
+          className={styles.reopenButton} disabled={updateDelivery.isPending}
           onClick={() => void reopen()}>Reabrir bloque</Button>}
       </section>
 
