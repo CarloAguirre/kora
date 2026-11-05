@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ProjectSummary } from '@kora/contracts';
-import { type DailyBlock, validateDailyBlock } from './DailyEntryForm';
+import { type DailyBlock, selectAttributableTasks, validateDailyBlock } from './DailyEntryForm';
 
 const base: DailyBlock = {
   key: 'hh-1', expanded: true, assignment: 'Proyecto', projectId: 'project-1',
@@ -15,6 +15,18 @@ const context = {
 };
 
 describe('registro diario: imputación por bloque del Roadmap', () => {
+  it('ofrece sólo tareas propias, del bloque elegido y no canceladas', () => {
+    const tasks = [
+      { id: 'a', name: 'Mía', assigneeUserId: 'worker-1', segmentId: 'block-1', teamId: 'team-1', cancelledAt: null },
+      { id: 'b', name: 'Ajena', assigneeUserId: 'worker-2', segmentId: 'block-1', teamId: 'team-1', cancelledAt: null },
+      { id: 'c', name: 'Otro bloque', assigneeUserId: 'worker-1', segmentId: 'block-2', teamId: 'team-1', cancelledAt: null },
+      { id: 'd', name: 'Cancelada', assigneeUserId: 'worker-1', segmentId: 'block-1', teamId: 'team-1',
+        cancelledAt: '2026-11-04T12:00:00.000Z' },
+    ];
+    expect(selectAttributableTasks(tasks, 'worker-1', 'block-1').map((task) => task.id)).toEqual(['a']);
+    expect(selectAttributableTasks(tasks, undefined, 'block-1')).toEqual([]);
+  });
+
   it('exige fase cuando la persona pertenece a un equipo con bloques', () => {
     expect(validateDailyBlock({ ...base, roadmapNeedsPhase: true }, context))
       .toBe('Selecciona una fase y su bloque de trabajo para imputar estas horas.');
