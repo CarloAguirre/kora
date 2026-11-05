@@ -640,3 +640,38 @@
   .phaseHeadingIdentityPlanning { flex-wrap: wrap; }
   .phaseHeadingIdentityPlanning .phaseHeadingMeta { white-space: normal; }
 }
+
+
+/* Cola de revisión del Líder PM, calculada desde tareas in_review no canceladas. */
+.reviewNotice {
+  display: grid;
+  padding: 12px 14px;
+  border: 1px solid #f6d288;
+  border-radius: 11px;
+  background: #fff9ed;
+  gap: 0;
+}
+.reviewNoticeHead, .reviewNoticeRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 9px 18px;
+}
+.reviewNoticeHead {
+  padding-bottom: 10px;
+  color: #15243a;
+  font-size: 13px;
+}
+.reviewNoticeHead small { color: #8c7460; font-size: 11px; }
+.reviewNoticeRow {
+  border-top: 1px solid #f5e5c3;
+  padding: 9px 0;
+}
+.reviewNoticeRow > div:first-child { display: grid; gap: 3px; flex: 1 1 200px; min-width: 0; }
+.reviewNoticeRow strong { font-size: 12px; color: #16243c; font-weight: 650; }
+.reviewNoticeRow small { font-size: 11px; color: #7c8190; }
+.reviewActions { display: inline-flex; align-items: center; flex: none; gap: 6px; }
+.reviewActions button { min-height: 28px; font-size: 11px; }
+.operationalTaskActions .reviewActions { margin-right: 6px; vertical-align: middle; }
+.operationalTaskActions .reviewActions button { padding: 4px 8px; }
