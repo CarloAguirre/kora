@@ -5,6 +5,7 @@ import type {
 } from '@kora/contracts';
 import { CollaboratorDashboard } from './CollaboratorDashboard';
 import buttonStyles from '@/shared/components/ui/Button.module.css';
+import taskStyles from './CollaboratorDashboard.module.css';
 
 const mocks = vi.hoisted(() => ({
   update: vi.fn(),
@@ -183,7 +184,7 @@ describe('Dashboard colaborador · homologación v6', () => {
       name: 'Lista desplazable de mis tareas',
     });
     expect(scrollable).toHaveAttribute('tabindex', '0');
-    expect(scrollable.className).toContain('taskListScrollable');
+    expect(scrollable).toHaveClass(taskStyles.taskListScrollable!);
     expect(within(scrollable).getAllByRole('article')).toHaveLength(7);
 
     // El filtro En curso solo contiene cuatro; por lo tanto no tiene scroll.
