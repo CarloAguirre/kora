@@ -75,6 +75,7 @@ export class ListProjectPhasesUseCase
           estimatedHours: task.estimatedHours,
           /** Solo HH aprobadas enlazadas por task_id; sin atribuir historiales. */
           actualHours: task.actualHours ?? null,
+          pendingHours: task.pendingHours ?? null,
           cancelledAt: null,
         })),
       })),
