@@ -14,10 +14,8 @@ import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { resolvedApprover } from '@/modules/hours/lib/approver';
 
 function formatDate(date: string): string {
-  const d = new Date(date.slice(0, 10) + 'T00:00:00');
-  return Number.isNaN(d.valueOf()) ? date : d.toLocaleDateString('es-CL', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
-  });
+  const [year, month, day] = date.slice(0, 10).split('-');
+  return year && month && day ? day + '/' + month + '/' + year : date;
 }
 const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 2 });
 
