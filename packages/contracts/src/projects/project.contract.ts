@@ -346,6 +346,8 @@ export const projectModuleTaskSchema = z.object({
   startDate: z.string(),
   date: z.string(),
   estimatedHours: z.number().nullable(),
+  /** HH aprobadas imputadas a esta tarea por FK; NULL sin asociación explícita. */
+  actualHours: z.number().nonnegative().nullable().optional(),
   status: projectModuleTaskStatusSchema,
   scope: projectModuleTaskScopeSchema,
   completedAt: isoDateTimeSchema.nullable(),
@@ -417,6 +419,8 @@ export type ProjectModule = z.infer<typeof projectModuleSchema>;
  */
 export const projectPhaseOptionSchema = projectModuleSchema.pick({ id: true, name: true, currentStage: true }).extend({
   segments: z.array(projectModuleSegmentSchema.pick({ id: true, teamName: true, name: true, startDate: true, endDate: true })),
+  /** Sólo metadatos necesarios para imputar HH, sin datos sensibles de la ficha. */
+  tasks: z.array(projectModuleTaskSchema.pick({ id: true, name: true, segmentId: true, assigneeUserId: true, cancelledAt: true, teamId: true })),
 });
 export type ProjectPhaseOption = z.infer<typeof projectPhaseOptionSchema>;
 
