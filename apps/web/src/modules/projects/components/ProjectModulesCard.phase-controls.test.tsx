@@ -618,7 +618,7 @@ describe('Homologación de estados del Roadmap v5.02', () => {
     show({ ...project, modules: [{ ...module, tasks }] } as unknown as ProjectDetail);
 
     for (const [id, , expectedTone] of states) {
-      const row = screen.getByText('Estado ' + id).closest('tr')!;
+      const row = screen.getByText('Estado ' + id, { selector: 'td' }).closest('tr')!;
       const badge = within(row).getByText(id === 'aprobada' ? 'Aprobada' :
         id === 'completada' ? 'Completada' : id === 'curso' ? 'En curso' :
           id === 'pendiente' ? 'Pendiente' : 'Por asignar');
