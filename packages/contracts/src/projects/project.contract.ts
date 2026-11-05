@@ -424,7 +424,14 @@ export const projectPhaseOptionSchema = projectModuleSchema.pick({ id: true, nam
     leaderName: z.string().nullable().optional(),
   })),
   /** Sólo metadatos necesarios para imputar HH, sin datos sensibles de la ficha. */
-  tasks: z.array(projectModuleTaskSchema.pick({ id: true, name: true, segmentId: true, assigneeUserId: true, cancelledAt: true, teamId: true, estimatedHours: true, actualHours: true, pendingHours: true })),
+  tasks: z.array(projectModuleTaskSchema.pick({
+    id: true, name: true, segmentId: true, assigneeUserId: true, cancelledAt: true, teamId: true,
+  }).extend({
+    /** Opcionales para compatibilidad con clientes de /phases previos. La API actual los informa. */
+    estimatedHours: z.number().nullable().optional(),
+    actualHours: z.number().nonnegative().nullable().optional(),
+    pendingHours: z.number().nonnegative().nullable().optional(),
+  })),
 });
 export type ProjectPhaseOption = z.infer<typeof projectPhaseOptionSchema>;
 
