@@ -17,7 +17,11 @@ const formatDate = (date: string) => {
   const [year, month, day] = date.slice(0, 10).split('-');
   return year && month && day ? `${day}-${month}-${year}` : date;
 };
-const isOverdue = (date: string) => date.slice(0, 10) < new Date().toLocaleDateString('en-CA');
+const isOverdue = (date: string) => {
+  const now = new Date();
+  const today = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0'), String(now.getDate()).padStart(2, '0')].join('-');
+  return date.slice(0, 10) < today;
+};
 const tabOf = (task: DashboardMyTask): TaskTab =>
   task.status === 'done' ? 'done' : task.status === 'in_review' ? 'in_review' : 'todo';
 
@@ -60,6 +64,7 @@ interface CollaboratorDashboardProps {
   tasks: readonly DashboardMyTask[];
   loading: boolean;
   onRegisterHours: () => void;
+  canRegisterHours: boolean;
 }
 
 /**
@@ -67,7 +72,7 @@ interface CollaboratorDashboardProps {
  * bitácora autorizada; no infiere HH reales de tareas aprobadas.
  */
 export function CollaboratorDashboard({
-  firstName, teamName, activeProjectCount, tasks, loading, onRegisterHours,
+  firstName, teamName, activeProjectCount, tasks, loading, onRegisterHours, canRegisterHours,
 }: CollaboratorDashboardProps) {
   const { user } = useAuth();
   const toast = useToast();
@@ -110,9 +115,9 @@ export function CollaboratorDashboard({
           <h1>Hola, {firstName}</h1>
           <p>{teamName ?? 'Colaborador'}, en {activeProjectCount} {activeProjectCount === 1 ? 'proyecto' : 'proyectos'}</p>
         </div>
-        <Button className={styles.register} iconLeft={<ClockIcon size={16} />} onClick={onRegisterHours}>
+        {canRegisterHours && <Button className={styles.register} iconLeft={<ClockIcon size={16} />} onClick={onRegisterHours}>
           Registrar horas
-        </Button>
+        </Button>}
       </div>
 
       <section className={styles.card} aria-label="Mis tareas">
