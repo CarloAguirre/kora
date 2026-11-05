@@ -285,6 +285,7 @@ export function SegmentDrawer({
               <strong>{task.name}</strong>
               <small>{task.assigneeName ?? 'Sin asignar'} · {task.estimatedHours == null
                 ? 'HH sin definir' : hh(task.estimatedHours) + ' HH est.'}
+                {' '} / {task.actualHours == null ? '—' : hh(task.actualHours)} HH reales
                 {' '}· Límite {dateFull(task.date)}</small>
             </div>
             <span className={styles.taskStatusGroup}>
