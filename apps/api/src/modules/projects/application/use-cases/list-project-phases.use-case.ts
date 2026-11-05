@@ -69,6 +69,11 @@ export class ListProjectPhasesUseCase
           startDate: segment.startDate.toISOString().slice(0, 10),
           endDate: segment.endDate.toISOString().slice(0, 10),
         })),
+        tasks: module.tasks.filter((task) => !task.cancelledAt).map((task) => ({
+          id: task.id, name: task.name, teamId: task.teamId,
+          segmentId: task.segmentId, assigneeUserId: task.assigneeUserId,
+          cancelledAt: null,
+        })),
       })),
     );
   }
