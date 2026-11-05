@@ -15,6 +15,7 @@ import type {
   ProjectReactivatedFromHoldNotification,
   SupportBillingDigestNotification,
   TeamReportDataRequestEmail,
+  ProjectTaskStatusEmail,
   UserInvitation,
 } from '../../shared/application/ports/notification.port';
 import type { OpaqueTokenGenerator } from '../../shared/application/ports/token.port';
@@ -180,6 +181,11 @@ export class RecordingNotificationSender implements NotificationSender {
   async sendTeamReportDataRequest(notification: TeamReportDataRequestEmail): Promise<void> {
     if (this.shouldFail || this.failFor.has(notification.recipientEmail)) throw new Error('proveedor de correo caído');
     this.teamReportDataRequests.push(notification);
+  }
+  readonly projectTaskStatusEmails: ProjectTaskStatusEmail[] = [];
+  async sendProjectTaskStatus(notification: ProjectTaskStatusEmail): Promise<void> {
+    if (this.shouldFail || this.failFor.has(notification.recipientEmail)) throw new Error('proveedor de correo caído');
+    this.projectTaskStatusEmails.push(notification);
   }
 }
 
