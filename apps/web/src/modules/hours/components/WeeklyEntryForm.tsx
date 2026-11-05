@@ -19,7 +19,7 @@ import { useUsersList } from '@/modules/users/api/users.queries';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { HOUR_ENTRY_PROJECT_STATUSES } from '../lib/selectable-project-statuses';
 import { ApiRequestError } from '@/shared/lib/api-client';
-import { overflowByBlock } from './DailyEntryForm';
+import { overflowByBlock, selectAttributableTasks } from './DailyEntryForm';
 
 /** Proyecto primero: es la asignación más común y el resto confundía al elegir. */
 const ASSIGNMENT_OPTIONS = [...HOUR_ENTRY_ASSIGNMENTS]
@@ -106,9 +106,10 @@ export function WeeklyEntryForm({
   const { data: projectDetail } = useProjectDetail(needsProject && projectId ? projectId : null);
   const selectedModule = projectDetail?.modules.find((m) => m.id === moduleId);
   const { data: hourPhases } = useProjectPhases(needsProject && projectId ? projectId : null);
-  const availableTasks = (hourPhases?.find((phase) => phase.id === moduleId)?.tasks ?? [])
-    .filter((task) => !task.cancelledAt && task.assigneeUserId === user?.id &&
-      (task.segmentId ?? null) === (segmentId || null));
+  const availableTasks = selectAttributableTasks(
+    hourPhases?.find((phase) => phase.id === moduleId)?.tasks ?? [],
+    user?.id, segmentId,
+  );
   const allowedTeamIds = new Set([
     ...(projectDetail?.members ?? []).filter((member) => member.userId === user?.id && !member.blockedAt)
       .map((member) => member.teamId),
