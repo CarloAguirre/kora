@@ -30,6 +30,17 @@ const ASSIGNMENT_OPTIONS = [...HOUR_ENTRY_ASSIGNMENTS]
 export const DAILY_CAP_HOURS = 8;
 const MIN_DESCRIPTION_LENGTH = 5;
 const HOURS_STEP = 0.25;
+/** La opción «Otro» es solamente visual: nunca llega como task_id a la API. */
+export const OTHER_TASK_OPTION = '__other__';
+export const toHourTaskId = (value: string | null | undefined): string | undefined =>
+  value && value !== OTHER_TASK_OPTION ? value : undefined;
+/** Etiqueta de HH aprobadas; el registro pendiente aún no cuenta como HH reales. */
+export const formatTaskHourSummary = (approved: number | null | undefined, estimated: number | null | undefined): string => {
+  const hours = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 2 });
+  return estimated == null
+    ? `${hours(approved ?? 0)} HH aprobadas · sin estimación`
+    : `${hours(approved ?? 0)} de ${hours(estimated)} HH aprobadas`;
+};
 const today = () => new Date().toISOString().slice(0, 10);
 /** `2026-11-03` → `03-11-2026`. */
 const formatSegmentDate = (isoDate: string) => isoDate.split('-').reverse().join('-');
@@ -65,6 +76,8 @@ export interface DailyBlock {
   /** Solo estado visual: lo informa el detalle del proyecto para validar antes de enviar. */
   roadmapNeedsPhase?: boolean;
   roadmapNeedsSegment?: boolean;
+  /** Debe elegir una tarea propia o «Otro trabajo del bloque», si hay tareas disponibles. */
+  roadmapNeedsTask?: boolean;
   category: string;
   hours: string;
   description: string;
@@ -149,6 +162,8 @@ export function validateDailyBlock(
     return 'Selecciona una fase y su bloque de trabajo para imputar estas horas.';
   if (block.assignment === 'Proyecto' && block.roadmapNeedsSegment && !block.segmentId)
     return 'Selecciona el bloque al que corresponden estas HH.';
+  if (block.assignment === 'Proyecto' && block.roadmapNeedsTask && !block.taskId)
+    return 'Selecciona una tarea o «Otro trabajo del bloque».';
   if (needsProject && block.isOvertime && !overtimeAlreadyGranted) {
     const project = projects.find((p) => p.id === block.projectId);
     if (!project?.allowsOvertime) return 'Este proyecto no tiene autorizadas horas extra.';
@@ -286,7 +301,7 @@ export function DailyEntryForm({
           projectId: needsProject ? block.projectId : undefined,
           moduleId: needsProject && block.moduleId ? block.moduleId : undefined,
           segmentId: needsProject && block.moduleId && block.segmentId ? block.segmentId : undefined,
-          taskId: needsProject && block.moduleId && block.taskId ? block.taskId : undefined,
+          taskId: needsProject && block.moduleId ? toHourTaskId(block.taskId) : undefined,
           category: block.category.trim(),
           description: block.description || undefined,
           hours: Number(block.hours),
