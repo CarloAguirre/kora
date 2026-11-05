@@ -3,7 +3,8 @@ import type { Database } from '@kora/db';
 import type { Logger } from '@kora/core';
 import type { NotificationInbox } from '../../../notifications/application/ports/notification-inbox.port';
 import { RecordingNotificationSender } from '../../../../test/fakes';
-import { ProjectTaskReviewNotifier, type ProjectTaskReviewEvent } from './project-task-review-notifier';
+import { ProjectTaskReviewNotifier } from './project-task-review-notifier';
+import type { ProjectTaskReviewEvent } from '../../application/ports/project-task-review-notifier.port';
 
 const logger = {
   debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), child: vi.fn(),
