@@ -197,6 +197,6 @@ export function CollaboratorDashboard({
     <CollaboratorPlanning planning={planning} loading={loading} />
 
     <RecentHistoryCard weekStart={weekStart} onWeekStartChange={onWeekStartChange}
-      tasks={tasks} />
+      tasks={tasks} recentDays={21} />
   </div>;
 }
