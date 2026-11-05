@@ -29,8 +29,9 @@ describe('PaymentPlanEditor · disposición de tramos', () => {
     const rows = screen.getAllByRole('row');
     expect(rows).toHaveLength(4);
     // Encabezados: Tramo, %, Monto, Hito, Fase/fecha, acción.
-    expect(rows[0].children).toHaveLength(6);
-    for (const row of rows.slice(1)) {
+    // Validar encabezado y tramos juntos, sin indexar un elemento que
+    // TypeScript considera posiblemente indefinido con noUncheckedIndexedAccess.
+    for (const row of rows) {
       expect(row.children).toHaveLength(6);
     }
     expect(screen.getByTitle(/Vinculado a módulo comercial/)).toBeInTheDocument();
