@@ -13,7 +13,7 @@ import { Select } from '@/shared/components/ui/Select';
 import { Combobox } from '@/shared/components/ui/Combobox';
 import { AlertIcon, ChevronLeftIcon, ChevronRightIcon } from '@/shared/components/icons/Icons';
 import { useCreateHourEntry, useHolidays, useHourEntriesList } from '../api/hours.queries';
-import { useProjectDetail, useProjectsList } from '@/modules/projects/api/projects.queries';
+import { useProjectDetail, useProjectPhases, useProjectsList } from '@/modules/projects/api/projects.queries';
 import { getProjectOptionLabel } from '@/modules/projects/lib/project-option-label';
 import { useUsersList } from '@/modules/users/api/users.queries';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
