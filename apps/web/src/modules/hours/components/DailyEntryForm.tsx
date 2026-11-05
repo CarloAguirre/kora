@@ -510,6 +510,7 @@ export function DailyEntryBlockFields({
   const selectedModule = projectDetail?.modules.find((m) => m.id === block.moduleId);
   // Fases ofrece tareas sin requerir permiso de lectura de toda la ficha.
   const { data: hourPhases } = useProjectPhases(needsProject && block.projectId ? block.projectId : null);
+  const selectedHourPhase = hourPhases?.find((phase) => phase.id === block.moduleId);
   const { user } = useAuth();
   const availableTasks = selectAttributableTasks(
     hourPhases?.find((phase) => phase.id === block.moduleId)?.tasks ?? [],
@@ -521,10 +522,16 @@ export function DailyEntryBlockFields({
     ...(projectDetail?.teams ?? []).filter((team) => team.leader?.id === (ownerUserId ?? user?.id))
       .map((team) => team.teamId),
   ]);
-  const availableSegments = (selectedModule?.segments ?? [])
-    .filter((segment) => allowedTeamIds.has(segment.teamId));
-  const requiresPhase = (projectDetail?.modules ?? [])
-    .some((module) => module.segments.some((segment) => allowedTeamIds.has(segment.teamId)));
+  // Un colaborador puede registrar HH aunque no tenga projects:read_assigned.
+  // En ese caso, la ruta /phases (hours:register) es la fuente de selección.
+  // La API valida equipo y autor siempre, incluso si aparecen otros bloques.
+  const availableSegments = selectedModule
+    ? selectedModule.segments.filter((segment) => allowedTeamIds.has(segment.teamId))
+    : (selectedHourPhase?.segments ?? []);
+  const requiresPhase = projectDetail
+    ? projectDetail.modules.some((module) =>
+        module.segments.some((segment) => allowedTeamIds.has(segment.teamId)))
+    : (hourPhases ?? []).some((phase) => phase.segments.length > 0);
 
   // La obligatoriedad depende de los equipos REALES del autor en este proyecto.
   // La capa de API conserva la misma regla y vuelve a comprobarla al guardar.
@@ -620,18 +627,22 @@ export function DailyEntryBlockFields({
             )}
           </div>
 
-          {needsProject && block.projectId && (projectDetail?.modules.length ?? 0) > 0 && (
+          {needsProject && block.projectId &&
+            (projectDetail?.modules.length ?? hourPhases?.length ?? 0) > 0 && (
             <div className={styles.row}>
               <Select
                 label="Fase / Módulo"
                 required={requiresPhase}
                 placeholder={requiresPhase ? 'Seleccionar fase para imputar HH...' : 'Seleccionar fase (opcional)'}
-                options={(projectDetail?.modules ?? []).map((module) => ({ value: module.id, label: module.name }))}
+                options={(projectDetail?.modules ?? hourPhases ?? []).map((module) =>
+                  ({ value: module.id, label: module.name }))}
                 value={block.moduleId}
                 onChange={(event) => onUpdate({ moduleId: event.target.value, segmentId: '', taskId: '' })}
               />
-              {selectedModule && (
-                <span className={styles.stepperLabel}>Etapa: {PROJECT_MODULE_STAGE_LABELS[selectedModule.currentStage]}</span>
+              {(selectedModule ?? selectedHourPhase) && (
+                <span className={styles.stepperLabel}>
+                  Etapa: {PROJECT_MODULE_STAGE_LABELS[(selectedModule ?? selectedHourPhase)!.currentStage]}
+                </span>
               )}
             </div>
           )}
