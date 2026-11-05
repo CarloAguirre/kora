@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
   HOUR_ENTRY_ASSIGNMENTS,
-  PROJECT_MODULE_STAGE_LABELS,
   PROJECT_REQUIRING_ASSIGNMENTS,
   hourEntryRequiresApproval,
   type CreateHourEntryInput,
@@ -33,8 +32,6 @@ export const DAILY_CAP_HOURS = 8;
 const MIN_DESCRIPTION_LENGTH = 5;
 const HOURS_STEP = 0.25;
 const today = () => new Date().toISOString().slice(0, 10);
-/** `2026-11-03` → `03-11-2026`. */
-const formatSegmentDate = (isoDate: string) => isoDate.split('-').reverse().join('-');
 export const isWeekend = (isoDate: string) => {
   const day = new Date(`${isoDate}T00:00:00`).getDay();
   return day === 0 || day === 6;
