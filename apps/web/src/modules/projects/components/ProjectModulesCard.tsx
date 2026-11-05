@@ -67,6 +67,13 @@ const TASK_STATUS_TONE: Record<ProjectModuleTask['status'], BadgeTone> = {
   in_review: 'warning',
   done: 'success',
 };
+/** La tabla usa el tamaño original de "Por asignar" para TODOS sus chips. */
+const TABLE_TASK_STATUS_CLASS: Record<ProjectModuleTask['status'], string> = {
+  todo: styles.taskPending,
+  in_progress: styles.taskInProgress,
+  in_review: styles.taskReview,
+  done: styles.taskApproved,
+};
 
 const DELIVERY_STATUS_TONE: Record<ProjectModuleDelivery['status'], BadgeTone> = {
   planned: 'neutral',
@@ -618,13 +625,22 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
                   })()}</td>
                   <td><span className={styles.taskStatusGroup}>
                     {task.assigneeUserId
-                      ? <Badge tone={TASK_STATUS_TONE[task.status]}>
-                        {PROJECT_MODULE_TASK_STATUS_LABELS[task.status]}
-                      </Badge>
+                      ? <>
+                        <span className={[styles.taskState, styles.taskStateWithDot,
+                          TABLE_TASK_STATUS_CLASS[task.status]].join(' ')}>
+                          {PROJECT_MODULE_TASK_STATUS_LABELS[task.status]}
+                        </span>
+                        {task.status === 'in_progress' && Boolean(task.rejectionReason?.trim()) &&
+                          <span className={[styles.taskState, styles.taskStateWithDot,
+                            styles.taskReturned].join(' ')} title={task.rejectionReason ?? undefined}>
+                            Devuelta
+                          </span>}
+                        {(task.status === 'todo' || task.status === 'in_progress') &&
+                          parseDate(task.date) < today() &&
+                          <span className={[styles.taskState, styles.taskStateWithDot,
+                            styles.taskOverdue].join(' ')}>Vencida</span>}
+                      </>
                       : <span className={styles.taskState}>Por asignar</span>}
-                    {task.assigneeUserId && (task.status === 'todo' || task.status === 'in_progress') &&
-                      parseDate(task.date) < today() &&
-                      <Badge tone="danger">Vencida</Badge>}
                   </span></td>
                   <td>{task.estimatedHours ?? '—'} / —</td>
                   <td>{formatDate(task.date)}</td>
