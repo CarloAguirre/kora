@@ -152,3 +152,61 @@ pnpm --filter @kora/web exec vitest run src/modules/projects/components/SegmentD
 ```
 
 **Sin nuevas migraciones ni escritura manual contra PostgreSQL.**
+
+
+## Ajuste del cierre mediante entrega — flujo fiel al prototipo (05-11-2026)
+
+Se aclaró que un bloque **con entrega de cierre configurada** usa un
+flujo específico y no el botón genérico «Cerrar bloque» de los bloques
+sin entrega.
+
+1. La entrega se define al crear/editar el bloque y **conserva su fecha
+   planificada**, nombre y descripción, hasta una edición explícita.
+2. El panel muestra **«Marcar como entregado»** para una entrega
+   `planned` gestionable; el botón permanece deshabilitado si falta
+   aprobar alguna tarea operativa activa del bloque. Solo un tooltip
+   (`title`) explica la condición; **sin texto de ayuda fijo**.
+3. Una vez aprobadas todas, aparece el modal centrado **«Marcar como
+   entregada»**, sobre el panel lateral que sigue abierto. Permite elegir
+   la **fecha real de entrega**, entre el inicio del bloque y hoy, y
+   escribir opcionalmente un comentario o enlace de evidencia.
+4. La confirmación llama al mismo endpoint de actualización con la
+   operación explícita `finalizeBlock: true`. El API valida permisos
+   de gerente/líder, entrega `planned` y tareas activas todas
+   aprobadas. Guarda en una sola transacción la entrega `approved`,
+   `completedOn`, el usuario actuante, comentario, `closedAt`,
+   bitácora y recálculo del progreso. El colaborador **no puede**
+   saltarse el ciclo estándar `planned → delivered → approved`.
+5. El detalle queda verde **«Cerrado»**, con fecha real, autor, evidencia
+   y aviso «con atraso» si la fecha real supera la planificada.
+   **«Reabrir bloque»** revierte explícitamente `approved → planned`,
+   limpia los metadatos del cierre vigente y `closedAt` en una
+   transacción, dejando registro en bitácora.
+6. Un bloque **sin entrega** conserva «Cerrar bloque» como operación
+   manual tras aprobación de todas sus tareas, sin permitir cierres con
+   tareas pendientes ni sin tareas.
+
+### Migración requerida
+
+`packages/db/migrations/0055_block_delivery_completion.sql`
+
+Añade las columnas anulables:
+
+- `project_module_deliveries.completed_on date`
+- `project_module_deliveries.completed_by_user_id uuid` (FK usuario)
+- `project_module_deliveries.completion_comment text`
+
+El histórico permanece sin cambios y los nuevos metadatos son nulos
+cuando no existe cierre final. **Hay que aplicar la migración antes de
+iniciar la API nueva**, y recompilar `@kora/db` y `@kora/contracts`.
+
+Pruebas principales:
+
+```powershell
+pnpm exec turbo run typecheck --filter=@kora/api --force
+pnpm --filter @kora/web typecheck
+pnpm --filter @kora/api exec vitest run src/modules/projects/application/use-cases/update-project-module-delivery.use-case.spec.ts
+pnpm --filter @kora/web exec vitest run src/modules/projects/components/SegmentDrawer.test.tsx
+```
+
+Pendiente de validación en ambiente local y PostgreSQL real.
