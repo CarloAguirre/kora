@@ -95,3 +95,38 @@ Write-Host "Dashboard colaborador validado en compilación y tests." -Foreground
 **Estado:** implementado y publicado en GitHub, revisado estáticamente.
 La ejecución de TypeScript, Vitest y la revisión visual local depende de
 la integración del desarrollador. No se ha modificado master ni fusionado PR.
+
+
+## Ajuste posterior: Historial Reciente, edición y detalle
+
+- Añadido botón lápiz para entradas propias pendientes/rechazadas, reutilizando
+  HourEntryFormDialog. Entradas aprobadas no ofrecen edición al colaborador.
+- Las entradas de meses cerrados conservan el lápiz deshabilitado y explican
+  la restricción mensual impuesta por UpdateHourEntryUseCase (excepto admin/PMO).
+  No se alteró la política de períodos cerrados.
+- El ojito ahora abre «Detalle del registro» compacto con Fecha (día de la
+  semana), Asignación, Proyecto, Fase, Bloque de trabajo, Tarea (si existe),
+  Actividad, Horas trabajadas, Descripción, Bloqueo o problema y Estado.
+  Los casos de rechazo incluyen el motivo, y las horas extra se identifican.
+- Se consulta GET /hour-entries/:id al abrir el detalle para exponer
+  decisionBy y decisionAt reales; no se atribuye una aprobación al líder actual
+  del proyecto si no fue quien decidió.
+- Para registros sin tarea se muestra «Otro trabajo», sin inventar referencias.
+  Si hay taskId pero su tarea no está en el resumen autorizado del colaborador,
+  se mantiene el vínculo sin inventar su nombre.
+- Pruebas nuevas: RecentHistoryCard.details.test.tsx; test anterior de
+  CollaboratorDashboard actualizado para el detalle.
+- Sin migraciones ni cambios de backend.
+
+### Validación puntual
+
+~~~powershell
+pnpm --filter @kora/web typecheck
+if ($LASTEXITCODE -ne 0) { throw "Falló typecheck Web" }
+
+pnpm --filter @kora/web exec vitest run src/modules/dashboard/components/RecentHistoryCard.details.test.tsx src/modules/dashboard/components/CollaboratorDashboard.test.tsx
+if ($LASTEXITCODE -ne 0) { throw "Fallaron pruebas del historial" }
+
+pnpm --filter @kora/web build
+if ($LASTEXITCODE -ne 0) { throw "Falló build Web" }
+~~~
