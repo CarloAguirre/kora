@@ -13,6 +13,7 @@ function setup() {
   const result = HourEntry.create({
     id: 'entry-1', userId: 'worker-1', assignment: 'Proyecto',
     projectId: 'project-1', moduleId: 'module-1', segmentId: 'segment-1',
+    taskId: 'task-1',
     hours: 4, date: new Date('2026-11-04T00:00:00Z'),
     ownerRequiresApproval: true, now: new Date('2026-11-04T12:00:00Z'),
   });
@@ -23,6 +24,11 @@ function setup() {
     findModuleById: vi.fn().mockResolvedValue({
       id: 'module-1', projectId: 'project-1',
       segments: [{ id: 'segment-1', name: 'Bloque 1' }, { id: 'segment-2', name: 'Bloque 2' }],
+      tasks: [
+        { id: 'task-1', segmentId: 'segment-1', assigneeUserId: 'worker-1', cancelledAt: null },
+        { id: 'task-2', segmentId: 'segment-2', assigneeUserId: 'worker-1', cancelledAt: null },
+        { id: 'task-3', segmentId: 'segment-1', assigneeUserId: 'other-user', cancelledAt: null },
+      ],
     }),
     findSegmentsForModule: vi.fn().mockResolvedValue([
       { id: 'segment-1', projectId: 'project-1', moduleId: 'module-1', teamId: 'team-1' },
@@ -46,6 +52,37 @@ function setup() {
 }
 
 describe('edición de horas y atribución a bloque', () => {
+  it('conserva taskId mientras cambian únicamente HH y descripción', async () => {
+    const { useCase, entry } = setup();
+    const result = await useCase.execute({
+      entryId: 'entry-1', data: { hours: 3, description: 'Trabajo corregido' },
+      actor, actorRole: 'collaborator',
+    });
+    expect(result.isOk()).toBe(true);
+    expect(entry.toSnapshot()).toMatchObject({ taskId: 'task-1', hours: 3 });
+  });
+
+  it('permite cambiar la atribución a una tarea válida de otro bloque', async () => {
+    const { useCase, entry } = setup();
+    const result = await useCase.execute({
+      entryId: 'entry-1', data: { segmentId: 'segment-2', taskId: 'task-2' },
+      actor, actorRole: 'collaborator',
+    });
+    expect(result.isOk()).toBe(true);
+    expect(entry.toSnapshot()).toMatchObject({ taskId: 'task-2', segmentId: 'segment-2' });
+  });
+
+  it('no permite vincular una tarea ajena al autor', async () => {
+    const { useCase, save } = setup();
+    const result = await useCase.execute({
+      entryId: 'entry-1', data: { taskId: 'task-3' },
+      actor, actorRole: 'collaborator',
+    });
+    expect(result.isErr()).toBe(true);
+    expect(result.isErr() && result.error.code).toBe('HOUR_ENTRY_TASK_INVALID');
+    expect(save).not.toHaveBeenCalled();
+  });
+
   it('puede corregir una imputación aún pendiente sin modificar su número de horas', async () => {
     const { useCase, entry, save } = setup();
     const result = await useCase.execute({
@@ -55,7 +92,7 @@ describe('edición de horas y atribución a bloque', () => {
     expect(result.isOk()).toBe(true);
     expect(save).toHaveBeenCalledOnce();
     expect(entry.toSnapshot()).toMatchObject({
-      segmentId: 'segment-2', moduleId: 'module-1', hours: 4,
+      segmentId: 'segment-2', taskId: null, moduleId: 'module-1', hours: 4,
     });
   });
 
