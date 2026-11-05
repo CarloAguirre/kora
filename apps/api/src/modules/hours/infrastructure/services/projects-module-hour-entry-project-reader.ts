@@ -33,6 +33,10 @@ export class ProjectsModuleHourEntryProjectReader implements HourEntryProjectRea
       name: module.name,
       projectId: module.projectId,
       segments: module.segments.map((segment) => ({ id: segment.id, name: segment.name })),
+      tasks: module.tasks.map((task) => ({
+        id: task.id, name: task.name, segmentId: task.segmentId,
+        assigneeUserId: task.assigneeUserId, cancelledAt: task.cancelledAt ?? null,
+      })),
     };
   }
 
