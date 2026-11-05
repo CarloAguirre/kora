@@ -4,7 +4,7 @@ import styles from './HourEntryFormDialog.module.css';
 import { formatTaskHourSummary, OTHER_TASK_OPTION } from './hour-task-selection';
 
 type PlanSegment = Pick<ProjectPhaseOption['segments'][number], 'id' | 'name' | 'teamName' | 'startDate' | 'endDate'>;
-type PlanTask = Pick<ProjectPhaseOption['tasks'][number], 'id' | 'name' | 'estimatedHours' | 'actualHours'>;
+type PlanTask = Pick<ProjectPhaseOption['tasks'][number], 'id' | 'name' | 'estimatedHours' | 'actualHours' | 'pendingHours'>;
 type PlanPhase = Pick<ProjectPhaseOption, 'id' | 'name'>;
 
 export interface ProjectHourPlanFieldsProps {
@@ -70,6 +70,11 @@ export function ProjectHourPlanFields({
       {selectedTask ? (
         <div className={styles.planTaskSummary} role="status">
           <strong>{formatTaskHourSummary(selectedTask.actualHours, selectedTask.estimatedHours)}</strong>
+          {(selectedTask.pendingHours ?? 0) > 0 && (
+            <span className={styles.planPendingHours}>
+              {selectedTask.pendingHours?.toLocaleString('es-CL', { maximumFractionDigits: 2 })} HH pendientes de aprobación
+            </span>
+          )}
           <span>Las nuevas HH se registran por separado. Solo las aprobadas se suman a las reales del Roadmap.</span>
         </div>
       ) : <p className={styles.planHelp}>
