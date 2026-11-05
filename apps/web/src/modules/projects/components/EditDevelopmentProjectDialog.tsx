@@ -17,7 +17,7 @@ import { Button } from '@/shared/components/ui/Button';
 import { TextField } from '@/shared/components/ui/TextField';
 import { Select } from '@/shared/components/ui/Select';
 import { Combobox } from '@/shared/components/ui/Combobox';
-import { AlertIcon } from '@/shared/components/icons/Icons';
+import { AlertIcon, FileTextIcon } from '@/shared/components/icons/Icons';
 import { ApiRequestError } from '@/shared/lib/api-client';
 import { useProjectQuotation } from '@/modules/estimation/api/quotation.queries';
 import { useClientsList } from '@/modules/clients/api/clients.queries';
@@ -290,7 +290,7 @@ export function EditDevelopmentProjectDialog({
 
         {quotationHeading && (
           <div className={styles.quotationBanner}>
-            <span>Cotización · {quotationHeading}</span>
+            <span className={styles.quotationBannerText}><FileTextIcon size={14} /> Cotización · {quotationHeading}</span>
             {onViewQuotations && <button type="button" onClick={onViewQuotations}>
               Ver cotizaciones
             </button>}
