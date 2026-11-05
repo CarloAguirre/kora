@@ -14,7 +14,9 @@ import { PhaseRoadmap, type PhaseRoadmapSelection } from '@/modules/client-porta
 import { ProjectProgressOverview } from '@/modules/client-portal/components/ProjectProgressOverview';
 import { toPhaseRoadmap } from '@/modules/client-portal/adapters/project-detail.adapter';
 import { useMyProjectDetail } from '../api/projects.queries';
-import { getLinkedBlockTasks } from '../lib/team-progress';
+import { calculateOperationalBlockProgress, roadmapBlockMetrics } from '../lib/team-progress';
+import { SegmentDrawer } from '../components/SegmentDrawer';
+import { ProjectPhaseTasksTable } from '../components/ProjectPhaseTasksTable';
 import { MyProjectBitacora } from '../components/MyProjectBitacora';
 import styles from './MyProjectDetailPage.module.css';
 
@@ -28,18 +30,14 @@ function RoadmapDetail({ project, phaseId, selection }: {
 }) {
   const phase = project.modules.find((module) => module.id === phaseId);
   const task = phase?.tasks.find((item) => selection.kind === 'task' && item.id === selection.id);
-  const block = phase?.segments.find((item) => selection.kind === 'segment' && item.id === selection.id);
   const delivery = phase?.deliveries.find((item) => selection.kind === 'delivery' && item.id === selection.id);
-  if (!task && !block && !delivery) return null;
+  if (!task && !delivery) return null;
   return <div className={styles.selection} role="note">
     {task ? <>
       <strong>{task.name}</strong>
       <span>Responsable: {task.assigneeName ?? 'Sin asignar'} · Estado: {PROJECT_MODULE_TASK_STATUS_LABELS[task.status]}</span>
       <span>Inicio: {date(task.startDate)} · Límite: {date(task.date)} · HH estimadas: {task.estimatedHours ?? '—'}</span>
       {task.description && <span>{task.description}</span>}
-    </> : block ? <>
-      <strong>{block.name}</strong><span>Equipo: {block.teamName}</span>
-      <span>{date(block.startDate)} – {date(block.endDate)} · {block.estimatedHours ?? '—'} HH estimadas</span>
     </> : delivery ? <>
       <strong>{delivery.name ?? 'Entrega'}</strong>
       <span>Responsable: {delivery.assigneeName ?? delivery.teamName ?? '—'}</span>
@@ -55,6 +53,15 @@ export function MyProjectDetailPage() {
   const { data: project, error, isLoading } = useMyProjectDetail(projectId ?? null);
   const [tab, setTab] = useState<'roadmap' | 'bitacora'>('roadmap');
   const roadmap = useMemo(() => project ? toPhaseRoadmap(project) : null, [project]);
+  const blockProgressById = useMemo(() => {
+    const blocks = new Map<string, ReturnType<typeof calculateOperationalBlockProgress>>();
+    for (const module of project?.modules ?? []) {
+      for (const segment of module.segments) {
+        blocks.set(segment.id, calculateOperationalBlockProgress(module, segment));
+      }
+    }
+    return blocks;
+  }, [project]);
 
   if (error) return <DashboardLayout title="Mis proyectos">
     <PageLoadError error={error} subject="este proyecto"
@@ -101,23 +108,27 @@ export function MyProjectDetailPage() {
                   phaseRoadmap={roadmap}
                   operationalTaskCount={project.modules.reduce((n, m) => n + m.tasks.filter((t) => !t.cancelledAt).length, 0)}
                   operationalBlockCount={project.modules.reduce((n, m) => n + m.segments.length, 0)}
-                  operationalMetrics={(phase, row) => {
-                    const module = project.modules.find((m) => m.id === phase.id);
-                    const block = module?.segments.find((s) => s.id === row.id);
-                    if (!module || !block || !block.estimatedHours) return { hours: null, progress: null };
-                    const closed = Boolean(block.closedAt) ||
-                      module.deliveries.some((d) => d.segmentId === block.id && d.status === 'approved');
-                    const approvedHours = getLinkedBlockTasks(module, block)
-                      .filter((task) => task.status === 'done')
-                      .reduce((sum, task) => sum + (task.estimatedHours ?? 0), 0);
-                    return {
-                      hours: block.estimatedHours,
-                      progress: closed ? 100 : Math.min(100, Math.round(approvedHours * 100 / block.estimatedHours)),
-                    };
+                  operationalMetrics={(_phase, row) =>
+                    roadmapBlockMetrics(row.id ? blockProgressById.get(row.id) : undefined)}
+                  renderPhaseReferences={(phase) => {
+                    const module = project.modules.find((item) => item.id === phase.id);
+                    return module ? (
+                      <ProjectPhaseTasksTable module={module} canManage={false} readOnly />
+                    ) : null;
                   }}
-                  renderSelectionDetail={(phase, selection) =>
-                    <RoadmapDetail project={project} phaseId={phase.id} selection={selection} />
-                  } />}
+                  renderSelectionDetail={(phase, selection, clearSelection) => {
+                    if (selection.kind === 'segment') {
+                      const module = project.modules.find((item) => item.id === phase.id);
+                      const segment = module?.segments.find((item) => item.id === selection.id);
+                      return module && segment ? (
+                        <SegmentDrawer readOnly project={project}
+                          module={module} segment={segment}
+                          blockProgress={blockProgressById.get(segment.id)}
+                          onClose={clearSelection} />
+                      ) : null;
+                    }
+                    return <RoadmapDetail project={project} phaseId={phase.id} selection={selection} />;
+                  }} />}
           </> : <MyProjectBitacora project={project} />}
         </div>
       </div>
