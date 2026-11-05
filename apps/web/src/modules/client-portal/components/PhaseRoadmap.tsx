@@ -162,7 +162,7 @@ function phaseRange(phase: PhaseRoadmapPhase): DateRange | null {
  */
 export function PhaseRoadmap({
   phaseRoadmap, renderPhaseExtras, renderPhaseReferences, renderSelectionDetail,
-  toolbarActions, renderPhaseHeaderName, renderPhaseHeaderActions, borderlessSummary = false,
+  toolbarActions, operationalNotice, renderPhaseHeaderName, renderPhaseHeaderActions, borderlessSummary = false,
   alwaysExpanded = false,
   operationalView = false, operationalTaskCount, operationalBlockCount, operationalRows, onPlanOperationalRow,
   operationalMetrics, operationalFooter, operationalPresaleHours,
@@ -258,6 +258,7 @@ export function PhaseRoadmap({
         </div>
       </div>
 
+      {operationalView && operationalNotice}
       {operationalView && (
         <div className={styles.operationalExplanation}>
           <strong>Bloque de trabajo:</strong>{' '}
@@ -559,6 +560,8 @@ export interface PhaseRoadmapProps {
   renderSelectionDetail?: (phase: PhaseRoadmapPhase, selection: PhaseRoadmapSelection, clearSelection: () => void) => ReactNode;
   /** Extensiones exclusivas de la ficha interna; si se omiten el portal cliente permanece idéntico. */
   toolbarActions?: ReactNode;
+  /** Avisos operativos dentro del Roadmap interno, antes de la leyenda. */
+  operationalNotice?: ReactNode;
   /** Solo en ficha interna: elimina borde de la barra de filtros sin modificar el portal cliente. */
   borderlessSummary?: boolean;
   /** La ficha interna v5 mantiene todas las fases y su Gantt visibles; solo los detalles interiores colapsan. */
