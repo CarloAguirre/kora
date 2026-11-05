@@ -41,9 +41,10 @@ vi.mock('@/modules/client-portal/adapters/project-detail.adapter', async (import
 vi.mock('@/modules/client-portal/components/PhaseRoadmap', () => ({
   PhaseRoadmap: ({ phaseRoadmap, toolbarActions, renderPhaseHeaderName,
     renderPhaseHeaderActions, renderPhaseReferences, operationalRows, onPlanOperationalRow, operationalFooter,
-    renderSelectionDetail, operationalPresaleHours }: {
+    renderSelectionDetail, operationalPresaleHours, operationalNotice }: {
     phaseRoadmap: { phases: { id: string }[]; rangeStartDate: string; rangeEndDate: string };
     toolbarActions?: ReactNode;
+    operationalNotice?: ReactNode;
     renderPhaseHeaderName?: (phase: { id: string }) => ReactNode;
     renderPhaseHeaderActions?: (phase: { id: string }) => ReactNode;
     renderPhaseReferences?: (phase: { id: string }) => ReactNode;
@@ -66,7 +67,7 @@ vi.mock('@/modules/client-portal/components/PhaseRoadmap', () => ({
         {phaseRoadmap.rangeStartDate} → {phaseRoadmap.rangeEndDate}
       </output>
       {operationalPresaleHours != null && <output data-testid="presale-hours">{operationalPresaleHours}</output>}
-      {toolbarActions}{renderPhaseHeaderName?.(phase)}
+      {toolbarActions}{operationalNotice}{renderPhaseHeaderName?.(phase)}
       {renderPhaseHeaderActions?.(phase)}
       {operationalRows?.(phase).map((row) => <div key={row.id}>{row.label}
         {row.proposedStartDate && row.proposedEndDate && <output data-testid="dates-propuesta">
@@ -152,6 +153,61 @@ beforeEach(() => {
   mocks.success.mockReset();
   mocks.error.mockReset();
   mocks.appliedPlan.modules = [];
+});
+
+describe('Revisión de tareas desde el Roadmap del Líder PM', () => {
+  const pendingTask = {
+    id: 'task-review-1', name: 'Mejoras en bitácora', teamId: 'team-1',
+    assigneeUserId: 'collab-1', assigneeName: 'Claudio Flores',
+    segmentId: null, status: 'in_review', scope: 'desarrollo',
+    description: null, startDate: '2026-10-19', date: '2026-10-30',
+    estimatedHours: 24, cancelledAt: null, completedAt: null,
+  };
+  const reviewProject = () => ({
+    ...project, modules: [{ ...module, tasks: [pendingTask] }],
+  } as unknown as ProjectDetail);
+
+  it('muestra aviso de tarea completada y permite aprobar desde el Roadmap', async () => {
+    show(reviewProject());
+    const queue = screen.getByRole('region', { name: 'Tareas por aprobar' });
+    expect(within(queue).getByText('Tareas por aprobar (1)')).toBeInTheDocument();
+    expect(within(queue).getByText('Mejoras en bitácora')).toBeInTheDocument();
+    fireEvent.click(within(queue).getByRole('button', { name: 'Aprobar' }));
+    const modal = screen.getByRole('dialog', { name: 'Aprobar tarea' });
+    expect(within(modal).getByText('Claudio Flores')).toBeInTheDocument();
+    fireEvent.click(within(modal).getByRole('button', { name: 'Aprobar' }));
+    await waitFor(() => expect(mocks.updateTask).toHaveBeenCalledWith({
+      projectId: 'project-1', moduleId: 'module-1', taskId: 'task-review-1',
+      input: { status: 'done', rejectionReason: null },
+    }));
+  });
+
+  it('muestra Aprobar y Devolver en la fila y exige motivo al devolver', async () => {
+    show(reviewProject());
+    const row = screen.getByText('Mejoras en bitácora', { selector: 'td' }).closest('tr')!;
+    expect(within(row).getByRole('button', { name: 'Aprobar' })).toBeInTheDocument();
+    fireEvent.click(within(row).getByRole('button', { name: 'Devolver' }));
+    const modal = screen.getByRole('dialog', { name: 'Devolver tarea' });
+    fireEvent.click(within(modal).getByRole('button', { name: 'Devolver' }));
+    expect(within(modal).getByText('Escribe el motivo del rechazo antes de continuar.'))
+      .toBeInTheDocument();
+    expect(mocks.updateTask).not.toHaveBeenCalled();
+    fireEvent.change(within(modal).getByLabelText('Motivo del rechazo'), {
+      target: { value: 'Corregir validación de fechas' },
+    });
+    fireEvent.click(within(modal).getByRole('button', { name: 'Devolver' }));
+    await waitFor(() => expect(mocks.updateTask).toHaveBeenCalledWith({
+      projectId: 'project-1', moduleId: 'module-1', taskId: 'task-review-1',
+      input: { status: 'in_progress', rejectionReason: 'Corregir validación de fechas' },
+    }));
+  });
+
+  it('no muestra tareas canceladas ni ya aprobadas en la cola', () => {
+    show({ ...project, modules: [{ ...module,
+      tasks: [{ ...pendingTask, status: 'done' }, { ...pendingTask, id: 'cancelled', cancelledAt: '2026-10-31' }],
+    }] } as unknown as ProjectDetail);
+    expect(screen.queryByRole('region', { name: 'Tareas por aprobar' })).not.toBeInTheDocument();
+  });
 });
 
 describe('Edición superpuesta sobre el detalle lateral del bloque', () => {
