@@ -228,6 +228,27 @@ function NotificationItem({
 }) {
   const { data } = notification;
 
+  if (notification.type === 'task_review_requested' || notification.type === 'task_returned') {
+    return (
+      <li className={[styles.item, notification.readAt ? '' : styles.itemUnread]
+        .filter(Boolean).join(' ')} onClick={onOpen}>
+        <div className={styles.itemHeader}>
+          {!notification.readAt && <span className={styles.unreadDot} aria-label="Sin leer" />}
+          <span className={styles.itemTitle}>{notification.title}</span>
+        </div>
+        <span className={styles.itemTime}>{timeAgo(notification.createdAt)}</span>
+        <Link to={projectPath({ id: data.projectId, slug: data.projectSlug })}
+          className={styles.projectLink} onClick={onNavigate}>
+          {data.projectName} · {data.taskName}
+        </Link>
+        {notification.type === 'task_review_requested' && data.assigneeName &&
+          <p className={styles.note}>Completada por {data.assigneeName}. Requiere aprobación.</p>}
+        {notification.type === 'task_returned' && data.reason &&
+          <p className={styles.note}>Motivo de devolución: {data.reason}</p>}
+      </li>
+    );
+  }
+
   return (
     <li className={[styles.item, notification.readAt ? '' : styles.itemUnread].filter(Boolean).join(' ')} onClick={onOpen}>
       <div className={styles.itemHeader}>
