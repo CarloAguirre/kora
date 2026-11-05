@@ -139,12 +139,6 @@
 .taskBottom { align-items: center; min-height: 28px; }
 .waiting { font-size: 11px; color: #8290a4; line-height: 1.4; }
 .overdueDate { font-size: 11px; color: #c44343; line-height: 1.4; }
-.task .markDone {
-  background: #111c32;
-  border-color: #111c32;
-  color: #fff;
-  white-space: nowrap;
-}
 .empty { margin: 14px 0; color: #8190a4; font-size: 12px; }
 @media (max-width: 780px) {
   .tabs { gap: 13px; }

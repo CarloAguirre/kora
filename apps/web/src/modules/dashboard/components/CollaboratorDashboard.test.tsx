@@ -4,6 +4,7 @@ import type {
   DashboardHoursSummary, DashboardMyPlanning, DashboardMyTask,
 } from '@kora/contracts';
 import { CollaboratorDashboard } from './CollaboratorDashboard';
+import buttonStyles from '@/shared/components/ui/Button.module.css';
 
 const mocks = vi.hoisted(() => ({
   update: vi.fn(),
@@ -174,7 +175,12 @@ describe('Dashboard colaborador · homologación v6', () => {
     show();
     const region = screen.getByRole('region', { name: 'Mis tareas' });
     const running = within(region).getByText('Modelo de datos').closest('article')!;
-    fireEvent.click(within(running).getByRole('button', { name: 'Marcar completada' }));
+    // Misma variante primaria y mismo hover que el botón 'Registrar horas'.
+    const completeButton = within(running).getByRole('button', { name: 'Marcar completada' });
+    const registerButton = screen.getByRole('button', { name: 'Registrar horas' });
+    expect(completeButton).toHaveClass(buttonStyles.primary!);
+    expect(registerButton).toHaveClass(buttonStyles.primary!);
+    fireEvent.click(completeButton);
     await waitFor(() => expect(mocks.update).toHaveBeenCalledWith({
       projectId: 'p-1', moduleId: 'm-1', taskId: 't-1', input: { status: 'in_review' },
     }));

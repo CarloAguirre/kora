@@ -184,8 +184,8 @@ export function CollaboratorDashboard({
                       onClick={() => void onAdvance(task, 'in_progress')}>
                       Empezar
                     </Button>}
-                    {task.status === 'in_progress' && <Button size="sm"
-                      className={styles.markDone} disabled={updateTask.isPending}
+                    {task.status === 'in_progress' && <Button size="sm" variant="primary"
+                      disabled={updateTask.isPending}
                       onClick={() => void onAdvance(task, 'in_review')}>
                       Marcar completada
                     </Button>}
