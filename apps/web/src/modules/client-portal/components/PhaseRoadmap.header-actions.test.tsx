@@ -280,6 +280,7 @@ describe('Restauración de checks y zoom sobre el Gantt operativo v5.02', () => 
     fireEvent.change(slider, { target: { value: '100' } });
     expect(canvas).toHaveAttribute('data-zoom', '100');
     expect(canvas).toHaveStyle({ width: '400%' });
+    expect(container.querySelectorAll('[class*="operationalDayGridLine"]').length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: 'Acercar cronograma de Desarrollo Backend' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Ver tarea Ejecución atrasada: Atrasada' }))
       .toBeInTheDocument();
