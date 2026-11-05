@@ -689,6 +689,10 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
         moduleId: projectModules.id,
         moduleName: projectModules.name,
         name: projectModuleTasks.name,
+        segmentName: linkedSegments.name,
+        estimatedHours: projectModuleTasks.estimatedHours,
+        approvedHours: sql<number>`COALESCE((SELECT SUM(${hourEntries.hours}) FROM ${hourEntries} WHERE ${hourEntries.taskId} = ${projectModuleTasks.id} AND ${hourEntries.status} = 'approved'), 0)`.mapWith(Number),
+        pendingHours: sql<number>`COALESCE((SELECT SUM(${hourEntries.hours}) FROM ${hourEntries} WHERE ${hourEntries.taskId} = ${projectModuleTasks.id} AND ${hourEntries.status} = 'pending'), 0)`.mapWith(Number),
         date: projectModuleTasks.date,
         status: projectModuleTasks.status,
         completedAt: projectModuleTasks.completedAt,
@@ -697,10 +701,14 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
       .from(projectModuleTasks)
       .innerJoin(projectModules, eq(projectModules.id, projectModuleTasks.moduleId))
       .innerJoin(projects, eq(projects.id, projectModules.projectId))
+      .leftJoin(linkedSegments, eq(linkedSegments.id, projectModuleTasks.segmentId))
       .where(and(eq(projectModuleTasks.assigneeUserId, userId), sql`${projectModuleTasks.cancelledAt} is null`))
       .orderBy(asc(projectModuleTasks.date));
 
-    return rows;
+    return rows.map((row) => ({
+      ...row,
+      estimatedHours: row.estimatedHours == null ? null : Number(row.estimatedHours),
+    }));
   }
 
   async listDeliveriesAssignedToUser(
