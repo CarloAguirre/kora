@@ -37,9 +37,8 @@ function DailyDonut({ percent }: { percent: number }) {
   );
 }
 
-/** KPI autorizados de /dashboard/summary, sin sumar aprobaciones de tareas como HH consumidas. */
+/** Solo acciones del propio colaborador. 'in_review' espera decisión del líder, no requiere su acción. */
 export function CollaboratorKpis({ hours, tasks, loading }: OverviewProps) {
-  const inReviewCount = tasks.filter((task) => task.status === 'in_review').length;
   const returnedCount = tasks.filter((task) =>
     (task.status === 'todo' || task.status === 'in_progress') && Boolean(task.rejectionReason),
   ).length;
@@ -89,13 +88,15 @@ export function CollaboratorKpis({ hours, tasks, loading }: OverviewProps) {
       <Card className={styles.kpiCard} role="region" aria-label="Atención requerida">
         <span className={styles.kpiLabel}>Atención Requerida</span>
         {loading ? <span className={styles.muted}>Cargando…</span>
-          : inReviewCount + returnedCount + rejectedEntries === 0
+          : returnedCount + rejectedEntries === 0
             ? <span className={styles.allClear}>Todo al día</span>
             : <div className={styles.attention}>
-                {inReviewCount > 0 && <strong>{inReviewCount} {inReviewCount === 1
-                  ? 'tarea esperando revisión' : 'tareas esperando revisión'}</strong>}
-                {returnedCount > 0 && <span>{returnedCount} {returnedCount === 1
-                  ? 'tarea devuelta por el líder' : 'tareas devueltas por el líder'}</span>}
+                {returnedCount > 0 && <>
+                  <strong>{returnedCount} {returnedCount === 1
+                    ? 'tarea por revisar' : 'tareas por revisar'}</strong>
+                  <span>{returnedCount} {returnedCount === 1
+                    ? 'devuelta por el líder' : 'devueltas por el líder'}</span>
+                </>}
                 {rejectedEntries > 0 && <span>{rejectedEntries} {rejectedEntries === 1
                   ? 'registro de horas rechazado' : 'registros de horas rechazados'}</span>}
               </div>}

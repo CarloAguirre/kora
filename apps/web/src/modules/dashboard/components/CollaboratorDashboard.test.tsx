@@ -108,8 +108,9 @@ describe('Dashboard colaborador · homologación v6', () => {
     expect(within(screen.getByRole('region', { name: 'Horas extra este mes' }))
       .getByText('2 horas')).toBeInTheDocument();
     const attention = screen.getByRole('region', { name: 'Atención requerida' });
-    expect(within(attention).getByText('1 tarea esperando revisión')).toBeInTheDocument();
-    expect(within(attention).getByText('1 tarea devuelta por el líder')).toBeInTheDocument();
+    expect(within(attention).getByText('1 tarea por revisar')).toBeInTheDocument();
+    expect(within(attention).getByText('1 devuelta por el líder')).toBeInTheDocument();
+    expect(within(attention).queryByText(/esperando revisión/)).not.toBeInTheDocument();
     expect(within(attention).getByText('1 registro de horas rechazado')).toBeInTheDocument();
 
     const week = screen.getByRole('region', { name: 'Planificación semanal' });
@@ -118,6 +119,31 @@ describe('Dashboard colaborador · homologación v6', () => {
     const team = screen.getByRole('region', { name: 'Mi equipo' });
     expect(within(team).getByText('Compañera QA')).toBeInTheDocument();
     expect(within(team).getByText('Pruebas Carlo')).toBeInTheDocument();
+  });
+
+  it('no marca tareas completadas en espera de aprobación como acción del colaborador', () => {
+    show({
+      tasks: [{ ...base, id: 't-review', title: 'Esperando líder', status: 'in_review',
+        rejectionReason: null }],
+      hours: { ...hours, rejectedCount: 0 },
+    });
+    const attention = screen.getByRole('region', { name: 'Atención requerida' });
+    expect(within(attention).getByText('Todo al día')).toBeInTheDocument();
+    expect(within(attention).queryByText(/revisar|devuelta|rechazado/i)).not.toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: 'Mis tareas' }))
+      .getByText('Esperando líder')).toBeInTheDocument();
+  });
+
+  it('muestra las tareas devueltas y registros rechazados del propio colaborador', () => {
+    show({
+      tasks: [{ ...base, id: 't-returned', title: 'Corregir modelo', status: 'in_progress',
+        rejectionReason: 'Faltan cambios' }],
+      hours: { ...hours, rejectedCount: 2 },
+    });
+    const attention = screen.getByRole('region', { name: 'Atención requerida' });
+    expect(within(attention).getByText('1 tarea por revisar')).toBeInTheDocument();
+    expect(within(attention).getByText('1 devuelta por el líder')).toBeInTheDocument();
+    expect(within(attention).getByText('2 registros de horas rechazados')).toBeInTheDocument();
   });
 
   it('presenta cinco filtros, estados acumulativos y progreso de registro sin inventar HH', () => {

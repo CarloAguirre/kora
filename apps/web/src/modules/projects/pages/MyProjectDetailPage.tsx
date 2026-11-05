@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
-  PROJECT_PHASE_LABELS, PROJECT_STATUS_LABELS, PROJECT_MODULE_TASK_STATUS_LABELS,
+  PROJECT_PHASE_LABELS, PROJECT_STATUS_LABELS,
   type CollaboratorProjectDetail,
 } from '@kora/contracts';
 import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
@@ -17,6 +17,7 @@ import { useMyProjectDetail } from '../api/projects.queries';
 import { calculateOperationalBlockProgress, roadmapBlockMetrics } from '../lib/team-progress';
 import { SegmentDrawer } from '../components/SegmentDrawer';
 import { ProjectPhaseTasksTable } from '../components/ProjectPhaseTasksTable';
+import { ProjectRoadmapTaskDetail } from '../components/ProjectRoadmapTaskDetail';
 import { phaseHeaderMeta } from '../lib/phase-header-meta';
 import roadmapStyles from '../components/ProjectModulesCard.module.css';
 import { MyProjectBitacora } from '../components/MyProjectBitacora';
@@ -25,27 +26,20 @@ import styles from './MyProjectDetailPage.module.css';
 const date = (value: string | null | undefined) => value
   ? new Date(value.slice(0, 10) + 'T12:00:00').toLocaleDateString('es-CL') : '—';
 
-function RoadmapDetail({ project, phaseId, selection }: {
+/** Solo entregas mantienen el detalle simple; las tareas usan la misma tarjeta de Líder/PMO. */
+function DeliveryRoadmapDetail({ project, phaseId, selection }: {
   project: CollaboratorProjectDetail;
   phaseId: string;
   selection: PhaseRoadmapSelection;
 }) {
   const phase = project.modules.find((module) => module.id === phaseId);
-  const task = phase?.tasks.find((item) => selection.kind === 'task' && item.id === selection.id);
   const delivery = phase?.deliveries.find((item) => selection.kind === 'delivery' && item.id === selection.id);
-  if (!task && !delivery) return null;
+  if (!delivery) return null;
   return <div className={styles.selection} role="note">
-    {task ? <>
-      <strong>{task.name}</strong>
-      <span>Responsable: {task.assigneeName ?? 'Sin asignar'} · Estado: {PROJECT_MODULE_TASK_STATUS_LABELS[task.status]}</span>
-      <span>Inicio: {date(task.startDate)} · Límite: {date(task.date)} · HH estimadas: {task.estimatedHours ?? '—'}</span>
-      {task.description && <span>{task.description}</span>}
-    </> : delivery ? <>
-      <strong>{delivery.name ?? 'Entrega'}</strong>
-      <span>Responsable: {delivery.assigneeName ?? delivery.teamName ?? '—'}</span>
-      <span>Fecha comprometida: {date(delivery.estimatedDate)}</span>
-      {delivery.description && <span>{delivery.description}</span>}
-    </> : null}
+    <strong>{delivery.name ?? 'Entrega'}</strong>
+    <span>Responsable: {delivery.assigneeName ?? delivery.teamName ?? '—'}</span>
+    <span>Fecha comprometida: {date(delivery.estimatedDate)}</span>
+    {delivery.description && <span>{delivery.description}</span>}
   </div>;
 }
 
@@ -154,7 +148,12 @@ export function MyProjectDetailPage() {
                           onClose={clearSelection} />
                       ) : null;
                     }
-                    return <RoadmapDetail project={project} phaseId={phase.id} selection={selection} />;
+                    if (selection.kind === 'task') {
+                      const task = project.modules.find((item) => item.id === phase.id)
+                        ?.tasks.find((item) => item.id === selection.id);
+                      return task ? <ProjectRoadmapTaskDetail task={task} onClose={clearSelection} /> : null;
+                    }
+                    return <DeliveryRoadmapDetail project={project} phaseId={phase.id} selection={selection} />;
                   }} />}
           </> : <MyProjectBitacora project={project} />}
         </div>

@@ -1,8 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import {
   PROJECT_MODULE_DELIVERY_STATUS_LABELS,
-  PROJECT_MODULE_TASK_SCOPE_LABELS,
-  PROJECT_MODULE_TASK_STATUS_LABELS,
   type CreateProjectModuleSegmentInput,
   type UpdateProjectModuleSegmentInput,
   type HourEntrySummary,
@@ -19,7 +17,7 @@ import { Modal } from '@/shared/components/ui/Modal';
 import { TextField } from '@/shared/components/ui/TextField';
 import { Button } from '@/shared/components/ui/Button';
 import { Badge, type BadgeTone } from '@/shared/components/ui/Badge';
-import { CloseIcon, PencilIcon, TrashIcon } from '@/shared/components/icons/Icons';
+import { PencilIcon, TrashIcon } from '@/shared/components/icons/Icons';
 import { useToast } from '@/shared/components/ui/Toast';
 import { ApiRequestError } from '@/shared/lib/api-client';
 import { PhaseRoadmap, type PhaseRoadmapSelection, type OperationalRoadmapRow } from '@/modules/client-portal/components/PhaseRoadmap';
@@ -41,6 +39,9 @@ import { useAppliedQuotationPlanning } from '@/modules/estimation/api/quotation.
 import { indexTeamBlockProgress, roadmapBlockMetrics } from '../lib/team-progress';
 import { ProjectPhaseTasksTable } from './ProjectPhaseTasksTable';
 import { phaseHeaderMeta } from '../lib/phase-header-meta';
+import {
+  ProjectRoadmapTaskDetail, DetailPanel, Facts, Fact, Description,
+} from './ProjectRoadmapTaskDetail';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -63,12 +64,6 @@ const operationalTeamColor = (teamName: string | null) => ({
   ux: '#22a55a', ia: '#e0526b', rpa: '#14a3a0',
 })[roleFromTeamName(teamName)];
 
-const TASK_STATUS_TONE: Record<ProjectModuleTask['status'], BadgeTone> = {
-  todo: 'neutral',
-  in_progress: 'info',
-  in_review: 'warning',
-  done: 'success',
-};
 /** La tabla usa el tamaño original de "Por asignar" para TODOS sus chips.
  *  Las cuatro clases existen en el CSS Module; el ! resuelve la firma
  *  string | undefined generada con noUncheckedIndexedAccess. */
@@ -636,7 +631,7 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
     }
     if (selection.kind === 'task') {
       const task = module.tasks.find((t) => t.id === selection.id);
-      return task ? <TaskDetail task={task} onClose={close} /> : null;
+      return task ? <ProjectRoadmapTaskDetail task={task} onClose={close} /> : null;
     }
     const delivery = module.deliveries.find((d) => d.id === selection.id);
     return delivery ? <DeliveryDetail delivery={delivery} label={selection.label} onClose={close} /> : null;
@@ -831,127 +826,6 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
         />
       )}
     </>
-  );
-}
-
-/**
- * Tarjeta de detalle del ítem seleccionado en el Roadmap: cabecera (tipo, nombre, equipo y estado,
- * con sus acciones), una fila de datos clave y, si hay, la descripción aparte.
- */
-function DetailPanel({
-  eyebrow,
-  title,
-  teamName,
-  subtitle,
-  badges,
-  onEdit,
-  editLabel,
-  onClose,
-  children,
-}: {
-  eyebrow: string;
-  title: string;
-  teamName?: string | null;
-  subtitle?: string | null;
-  badges?: ReactNode;
-  onEdit?: () => void;
-  editLabel?: string;
-  onClose: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <section className={styles.detail} aria-label={`${eyebrow}: ${title}`}>
-      <header className={styles.detailHead}>
-        <span className={styles.detailAccent} style={{ background: teamColor(teamName ?? null) }} aria-hidden="true" />
-        <div className={styles.detailHeadText}>
-          <span className={styles.detailEyebrow}>{eyebrow}</span>
-          <h4 className={styles.detailTitle}>{title}</h4>
-          {(teamName || subtitle) && (
-            <span className={styles.detailSubtitle}>
-              {teamName && (
-                <span className={styles.detailTeam}>
-                  <i className={styles.detailTeamDot} style={{ background: teamColor(teamName) }} />
-                  {teamName}
-                </span>
-              )}
-              {teamName && subtitle && <span aria-hidden="true">·</span>}
-              {subtitle}
-            </span>
-          )}
-        </div>
-        <div className={styles.detailActions}>
-          {badges}
-          {onEdit && (
-            <Button type="button" variant="outline" size="sm" onClick={onEdit} title={editLabel}>
-              <PencilIcon size={14} /> Editar
-            </Button>
-          )}
-          <Button type="button" variant="ghost" size="icon" onClick={onClose} aria-label="Cerrar detalle">
-            <CloseIcon size={14} />
-          </Button>
-        </div>
-      </header>
-      <div className={styles.detailBody}>{children}</div>
-    </section>
-  );
-}
-
-function Facts({ children }: { children: ReactNode }) {
-  return <dl className={styles.facts}>{children}</dl>;
-}
-
-function Fact({ label, value, hint, danger }: { label: string; value: string; hint?: string; danger?: boolean }) {
-  return (
-    <div className={styles.fact}>
-      <dt className={styles.factLabel}>{label}</dt>
-      <dd className={[styles.factValue, danger ? styles.factValueDanger : ''].filter(Boolean).join(' ')}>{value}</dd>
-      {hint && <dd className={styles.factHint}>{hint}</dd>}
-    </div>
-  );
-}
-
-function Description({ text }: { text: string | null }) {
-  if (!text?.trim()) return null;
-  return (
-    <div className={styles.description}>
-      <span className={styles.factLabel}>Descripción</span>
-      <p className={styles.descriptionText}>{text}</p>
-    </div>
-  );
-}
-
-function TaskDetail({ task, onClose }: { task: ProjectModuleTask; onClose: () => void }) {
-  const late = task.status !== 'done' && parseDate(task.date) < today();
-  return (
-    <DetailPanel
-      eyebrow="Tarea"
-      title={task.name}
-      teamName={task.teamName}
-      subtitle={task.assigneeName}
-      badges={
-        <>
-          {late && <Badge tone="danger">Atrasada</Badge>}
-          <Badge tone={TASK_STATUS_TONE[task.status]}>{PROJECT_MODULE_TASK_STATUS_LABELS[task.status]}</Badge>
-        </>
-      }
-      onClose={onClose}
-    >
-      <Facts>
-        {task.startDate && <Fact label="Inicio" value={formatDate(task.startDate)} />}
-        <Fact label="Fecha límite" value={formatDate(task.date)} danger={late} />
-        <Fact label="Ámbito" value={PROJECT_MODULE_TASK_SCOPE_LABELS[task.scope]} />
-        <Fact label="Horas estimadas" value={task.estimatedHours != null ? `${task.estimatedHours} hh` : 'Sin definir'} />
-        {/* Solo si hay fecha real: "Aprobada" + "Completada: Aún no" se contradecían en tareas antiguas sin `completedAt`. */}
-        {task.completedAt && (
-          <Fact
-            label="Completada"
-            value={new Date(task.completedAt).toLocaleDateString('es-CL')}
-            hint={new Date(task.completedAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}
-          />
-        )}
-      </Facts>
-      <Description text={task.description} />
-    </DetailPanel>
   );
 }
 
