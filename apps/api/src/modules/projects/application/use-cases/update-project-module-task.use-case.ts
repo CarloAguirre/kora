@@ -47,7 +47,9 @@ import { ProjectChangeLogRecorder } from '../services/project-change-log.recorde
 import { deadlineNote, formatCommittedDate } from '../services/deadline-note';
 import { ProjectProgressRecalculator } from '../services/project-progress-recalculator';
 import { ForecastSourceSyncService } from '../services/forecast-source-sync.service';
-import { ProjectTaskReviewNotifier } from '../../infrastructure/services/project-task-review-notifier';
+import {
+  PROJECT_TASK_REVIEW_NOTIFIER, type ProjectTaskReviewNotifierPort,
+} from '../ports/project-task-review-notifier.port';
 
 export interface UpdateProjectModuleTaskCommand {
   readonly projectId: string;
@@ -88,7 +90,8 @@ export class UpdateProjectModuleTaskUseCase
     private readonly forecastSync: ForecastSourceSyncService,
     @Inject(CLOCK) private readonly clock: Clock,
     @Inject(UNIT_OF_WORK) private readonly unitOfWork: UnitOfWork,
-    @Optional() private readonly taskNotifier?: ProjectTaskReviewNotifier,
+    @Optional() @Inject(PROJECT_TASK_REVIEW_NOTIFIER)
+    private readonly taskNotifier?: ProjectTaskReviewNotifierPort,
   ) {}
 
   async execute(command: UpdateProjectModuleTaskCommand): Promise<Result<void, ApplicationError>> {
