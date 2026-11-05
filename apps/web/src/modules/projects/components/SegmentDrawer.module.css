@@ -126,7 +126,11 @@
   font-size: 11px;
   font-weight: 700;
 }
-.markDelivered:hover { background: #baf13d; }
+.markDelivered:hover:not(:disabled) { background: #baf13d; }
+.markDelivered:disabled { cursor: not-allowed; opacity: .62; }
+.deliveryButtonWrapper { display: inline-flex; width: max-content; max-width: 100%; }
+.completionForm { display: grid; gap: 16px; min-width: 0; }
+.completionFooter { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
 .markDelivered:focus-visible, .addTask:focus-visible,
 .taskActions button:focus-visible { outline: 2px solid #3862a5; outline-offset: 2px; }
 .deliveryForm { display: grid; gap: 7px; }
