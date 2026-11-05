@@ -31,14 +31,12 @@ describe('DrizzleProjectModuleRepository.refreshSegmentClosure', () => {
     expect(context.set).toHaveBeenCalledWith({ closedAt: null, updatedAt: date });
   });
 
-  it('con tareas aprobadas conserva el instante real del cierre anterior', async () => {
+  it('al aprobar todas las tareas NO cierra automáticamente: habilita cierre manual', async () => {
     const context = fixture(3, 0);
     await context.repository.refreshSegmentClosure('segment-1', date);
-    const update = context.set.mock.calls[0]?.[0] as { closedAt: unknown; updatedAt: Date };
-    // La actualización usa COALESCE(closed_at, ahora); no reescribe un
-    // cierre ya registrado ni usa la antigua subconsulta correlacionada.
-    expect(update.closedAt).not.toBeNull();
-    expect(update.updatedAt).toBe(date);
-    expect(context.whereUpdate).toHaveBeenCalledOnce();
+    expect(context.whereSelect).toHaveBeenCalledOnce();
+    expect(context.update).not.toHaveBeenCalled();
+    // Si había un closedAt histórico, queda intacto. Si no, sigue abierto
+    // hasta ejecutar closureAction='close' mediante el caso de uso.
   });
 });
