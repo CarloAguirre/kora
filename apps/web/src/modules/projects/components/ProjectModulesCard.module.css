@@ -517,6 +517,14 @@
   font-weight: 400;
   font-size: 10.5px;
 }
+/* Colores de los estados: verde aprobado, amarillo completado, azul en curso,
+   gris pendiente, rojo vencida y violeta por asignar, igual al prototipo. */
+.taskStatusGroup {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
 .taskState {
   display: inline-flex;
   padding: 5px 9px;
