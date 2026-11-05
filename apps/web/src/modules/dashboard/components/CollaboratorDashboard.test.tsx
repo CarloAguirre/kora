@@ -73,6 +73,7 @@ beforeEach(() => {
       page: 1, pageCount: 1, pageSize: 10, total: 1,
       items: [{
         id: 'h-1', taskId: 't-1', date: '2026-10-28',
+        user: { id: 'u-1', fullName: 'Carlo Aguirre' },
         project: { id: 'p-1', name: 'Kora 2' },
         module: { id: 'm-1', name: 'Mejoras y correcciones' },
         segment: { id: 's-1', name: 'Calculadora' },
