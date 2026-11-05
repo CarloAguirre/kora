@@ -106,6 +106,7 @@ export function WeeklyEntryForm({
   const { data: projectDetail } = useProjectDetail(needsProject && projectId ? projectId : null);
   const selectedModule = projectDetail?.modules.find((m) => m.id === moduleId);
   const { data: hourPhases } = useProjectPhases(needsProject && projectId ? projectId : null);
+  const selectedHourPhase = hourPhases?.find((phase) => phase.id === moduleId);
   const availableTasks = selectAttributableTasks(
     hourPhases?.find((phase) => phase.id === moduleId)?.tasks ?? [],
     user?.id, segmentId,
@@ -116,10 +117,14 @@ export function WeeklyEntryForm({
     ...(projectDetail?.teams ?? []).filter((team) => team.leader?.id === user?.id)
       .map((team) => team.teamId),
   ]);
-  const availableSegments = (selectedModule?.segments ?? [])
-    .filter((segment) => allowedTeamIds.has(segment.teamId));
-  const hasEligibleRoadmapBlocks = (projectDetail?.modules ?? [])
-    .some((module) => module.segments.some((segment) => allowedTeamIds.has(segment.teamId)));
+  // Usar /phases si el actor sólo tiene permiso hours:register.
+  const availableSegments = selectedModule
+    ? selectedModule.segments.filter((segment) => allowedTeamIds.has(segment.teamId))
+    : (selectedHourPhase?.segments ?? []);
+  const hasEligibleRoadmapBlocks = projectDetail
+    ? projectDetail.modules.some((module) =>
+        module.segments.some((segment) => allowedTeamIds.has(segment.teamId)))
+    : (hourPhases ?? []).some((phase) => phase.segments.length > 0);
   const overtimeDisabled = needsProject && !selectedProject?.allowsOvertime;
   const weekTotal = dayHours.reduce((sum, value) => sum + (Number(value) || 0), 0);
 
@@ -342,12 +347,14 @@ export function WeeklyEntryForm({
         )}
       </div>
 
-      {needsProject && projectId && (projectDetail?.modules.length ?? 0) > 0 && (
+      {needsProject && projectId &&
+        (projectDetail?.modules.length ?? hourPhases?.length ?? 0) > 0 && (
         <div className={styles.row}>
           <Select label="Fase / Módulo"
             required={hasEligibleRoadmapBlocks}
             placeholder="Seleccionar fase..."
-            options={(projectDetail?.modules ?? []).map((module) => ({ value: module.id, label: module.name }))}
+            options={(projectDetail?.modules ?? hourPhases ?? []).map((module) =>
+              ({ value: module.id, label: module.name }))}
             value={moduleId}
             onChange={(event) => { setModuleId(event.target.value); setSegmentId(''); setTaskId(''); }} />
           {selectedModule && availableSegments.length > 0 && (
