@@ -151,6 +151,7 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
     const blockerCountByModule = new Map(blockerRows.map((r) => [r.moduleId, r.value]));
     const membersBySegment = await loadSegmentMembers(db, segmentRows.map((s) => s.id));
     const consumedBySegment = await loadSegmentConsumption(db, segmentRows.map((s) => s.id));
+    const approvedByTask = await loadTaskConsumption(db, mappedTaskRows.map((task) => task.id));
     return moduleRows.map((row) =>
       toRecord(
         row,
@@ -158,7 +159,9 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
         segmentRows.filter((s) => s.moduleId === row.id),
         membersBySegment,
         consumedBySegment,
-        mappedTaskRows,
+        mappedTaskRows.map((task) => ({
+          ...task, actualHours: approvedByTask.get(task.id) ?? null,
+        })),
         blockerCountByModule.get(row.id) ?? 0,
       ),
     );
@@ -358,8 +361,12 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
 
     const membersBySegment = await loadSegmentMembers(db, segmentRows.map((s) => s.id));
     const consumedBySegment = await loadSegmentConsumption(db, segmentRows.map((s) => s.id));
+    const mappedTasks = taskRows.map(toTaskRow);
+    const approvedByTask = await loadTaskConsumption(db, mappedTasks.map((task) => task.id));
     return toRecord(row, deliveryRows, segmentRows, membersBySegment, consumedBySegment,
-      taskRows.map(toTaskRow), blockerRows[0]?.value ?? 0);
+      mappedTasks.map((task) => ({
+        ...task, actualHours: approvedByTask.get(task.id) ?? null,
+      })), blockerRows[0]?.value ?? 0);
   }
 
   async create(input: CreateProjectModuleInput, now: Date, context?: TransactionContext): Promise<string> {
@@ -854,6 +861,22 @@ async function loadSegmentMembers(
  * Agregación por FK real hour_entries.segment_id: solo aprobadas, sin join
  * por nombre o fechas. Ejecutada una vez para los segmentos visibles.
  */
+/** Sólo HH registradas y aprobadas, con task_id explícito. */
+async function loadTaskConsumption(
+  db: Database,
+  taskIds: readonly string[],
+): Promise<Map<string, number>> {
+  if (taskIds.length === 0) return new Map();
+  const rows = await db.select({
+    taskId: hourEntries.taskId,
+    total: sql<string>`coalesce(sum(${hourEntries.hours}), 0)`,
+  }).from(hourEntries)
+    .where(and(inArray(hourEntries.taskId, [...taskIds]), eq(hourEntries.status, 'approved')))
+    .groupBy(hourEntries.taskId);
+  return new Map(rows.flatMap((row) => row.taskId
+    ? [[row.taskId, Number(row.total)] as const] : []));
+}
+
 async function loadSegmentConsumption(
   db: Database,
   segmentIds: readonly string[],
