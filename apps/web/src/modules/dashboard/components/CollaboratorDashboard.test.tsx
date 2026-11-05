@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import type { DashboardMyTask } from '@kora/contracts';
+import type {
+  DashboardHoursSummary, DashboardMyPlanning, DashboardMyTask,
+} from '@kora/contracts';
 import { CollaboratorDashboard } from './CollaboratorDashboard';
 
 const mocks = vi.hoisted(() => ({
@@ -44,64 +46,137 @@ const tasks: DashboardMyTask[] = [
   { ...base, id: 't-3', title: 'Ajustes en vista', status: 'in_review', rejectionReason: null },
   { ...base, id: 't-4', title: 'Integración aprobada', status: 'done', rejectionReason: null },
 ];
+const hours: DashboardHoursSummary = {
+  todayHours: 8, weekHours: 32, weekTargetHours: 40, weekHolidayCount: 0,
+  rejectedCount: 1, weekOvertimeHours: 0, monthOvertimeHours: 2,
+};
+const planning: DashboardMyPlanning = {
+  weekStart: '2026-10-26',
+  items: [{ type: 'project', projectName: 'Kora 2', hours: 24 }],
+  totalHours: 24,
+  teamName: 'Desarrollo',
+  teamMembers: [
+    { fullName: 'Compañera QA', items: [{ type: 'project', projectName: 'Pruebas Carlo', hours: 32 }],
+      totalHours: 32 },
+  ],
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.update.mockResolvedValue(undefined);
   mocks.hours.mockReturnValue({
-    isLoading: false, isError: false,
-    data: { items: [{
-      id: 'h-1', taskId: 't-1', date: '2026-10-28', project: { id: 'p-1', name: 'Kora 2' },
-      module: { id: 'm-1', name: 'Mejoras y correcciones' },
-      segment: { id: 's-1', name: 'Calculadora' }, category: 'Modelo de datos: relaciones', hours: 8, status: 'approved',
-    }] },
+    isLoading: false, isError: false, error: null,
+    data: {
+      page: 1, pageCount: 1, pageSize: 10, total: 1,
+      items: [{
+        id: 'h-1', taskId: 't-1', date: '2026-10-28',
+        project: { id: 'p-1', name: 'Kora 2' },
+        module: { id: 'm-1', name: 'Mejoras y correcciones' },
+        segment: { id: 's-1', name: 'Calculadora' },
+        category: 'Modelo de datos: relaciones', description: 'Tablas y consultas',
+        assignment: 'Proyecto', hours: 8, status: 'approved',
+        projectApprovers: [{ id: 'leader-1', fullName: 'Eduardo Aranda' }],
+      }],
+    },
   });
 });
 
-const show = () => render(
-  <CollaboratorDashboard firstName="Carlo" teamName="Desarrollo" activeProjectCount={1}
-    tasks={tasks} loading={false} onRegisterHours={vi.fn()} canRegisterHours />,
+const show = (extras: Partial<Parameters<typeof CollaboratorDashboard>[0]> = {}) => render(
+  <CollaboratorDashboard
+    firstName="Carlo" teamName="Desarrollo" activeProjectCount={1}
+    tasks={tasks} hours={hours} planning={planning} loading={false}
+    weekStart="2026-10-26" onWeekStartChange={vi.fn()}
+    onRegisterHours={vi.fn()} canRegisterHours
+    {...extras}
+  />,
 );
 
-describe('Dashboard colaborador v5.02', () => {
-  it('separa Por hacer, Por aprobar y Aprobadas y muestra chips acumulativos', () => {
+describe('Dashboard colaborador · homologación v6', () => {
+  it('muestra KPIs existentes con datos reales y planificación/equipo autorizados', () => {
     show();
-    expect(screen.getByText('Hola, Carlo')).toBeInTheDocument();
-    expect(screen.getByText('Desarrollo, en 1 proyecto')).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: /Por hacer 2/ })).toHaveAttribute('aria-selected', 'true');
-    const returned = within(screen.getByRole('region', { name: 'Mis tareas' })).getByText('Modelo de datos').closest('article')!;
+    expect(screen.getByRole('heading', { name: 'Mi Panel de Actividad' })).toBeInTheDocument();
+    expect(screen.getByText(/Hola, Carlo/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Registrar horas' })).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: 'Progreso diario' }))
+      .getByRole('img', { name: '100% de la jornada registrada' })).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: 'Horas registradas esta semana' }))
+      .getByText('32/40 horas')).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: 'Horas extra este mes' }))
+      .getByText('2 horas')).toBeInTheDocument();
+    const attention = screen.getByRole('region', { name: 'Atención requerida' });
+    expect(within(attention).getByText('1 tarea esperando revisión')).toBeInTheDocument();
+    expect(within(attention).getByText('1 tarea devuelta por el líder')).toBeInTheDocument();
+    expect(within(attention).getByText('1 registro de horas rechazado')).toBeInTheDocument();
+
+    const week = screen.getByRole('region', { name: 'Planificación semanal' });
+    expect(within(week).getByText('24 HH')).toBeInTheDocument();
+    expect(within(week).getByText(/no equivalen a horas registradas/)).toBeInTheDocument();
+    const team = screen.getByRole('region', { name: 'Mi equipo' });
+    expect(within(team).getByText('Compañera QA')).toBeInTheDocument();
+    expect(within(team).getByText('Pruebas Carlo')).toBeInTheDocument();
+  });
+
+  it('presenta cinco filtros, estados acumulativos y progreso de registro sin inventar HH', () => {
+    show();
+    const region = screen.getByRole('region', { name: 'Mis tareas' });
+    expect(within(region).getByRole('tab', { name: 'Todas 4' })).toHaveAttribute('aria-selected', 'true');
+    const returned = within(region).getByText('Modelo de datos').closest('article')!;
     expect(within(returned).getByText('En curso')).toBeInTheDocument();
     expect(within(returned).getByText('Devuelta')).toBeInTheDocument();
     expect(within(returned).getByText('Vencida')).toBeInTheDocument();
-    expect(within(returned).getByText(/24 HH estimadas, 16 aprobadas y 7 por aprobar/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('tab', { name: /Por aprobar 1/ }));
-    expect(screen.getByText('Ajustes en vista')).toBeInTheDocument();
-    expect(screen.getByText('Completada')).toBeInTheDocument();
-    expect(screen.getByText('Esperando aprobación de Eduardo Aranda')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('tab', { name: /Aprobadas 1/ }));
-    expect(screen.getByText('Integración aprobada')).toBeInTheDocument();
-    expect(within(screen.getByRole('region', { name: 'Mis tareas' })).getByText('Aprobada')).toBeInTheDocument();
+    expect(within(returned).getByText(/23 de 24 HH estimadas registradas/)).toBeInTheDocument();
+    expect(within(returned).getByText(/16 aprobadas, 7 pendientes/)).toBeInTheDocument();
+
+    fireEvent.click(within(region).getByRole('tab', { name: 'Completada 1' }));
+    expect(within(region).getByText('Ajustes en vista')).toBeInTheDocument();
+    expect(within(region).getByText('Esperando aprobación de Eduardo Aranda')).toBeInTheDocument();
+    fireEvent.click(within(region).getByRole('tab', { name: 'Aprobada 1' }));
+    const approvedTask = within(region).getByText('Integración aprobada').closest('article')!;
+    expect(within(approvedTask).getByText('Aprobada')).toBeInTheDocument();
+    expect(within(approvedTask).getByText(/La aprobación de la tarea no completa automáticamente/))
+      .toBeInTheDocument();
+    fireEvent.click(within(region).getByRole('tab', { name: 'Pendiente 1' }));
+    expect(within(region).getByText('Pantalla calculadora')).toBeInTheDocument();
+    expect(within(region).getByRole('button', { name: 'Empezar' })).toBeInTheDocument();
   });
 
-  it('marcar terminada envía la tarea a revisión, nunca directo a done', async () => {
+  it('respeta transiciones: empezar -> en curso -> por aprobar, nunca aprueba unilateralmente', async () => {
     show();
-    const task = within(screen.getByRole('region', { name: 'Mis tareas' })).getByText('Modelo de datos').closest('article')!;
-    fireEvent.click(within(task).getByRole('button', { name: 'Marcar terminada' }));
+    const region = screen.getByRole('region', { name: 'Mis tareas' });
+    const running = within(region).getByText('Modelo de datos').closest('article')!;
+    fireEvent.click(within(running).getByRole('button', { name: 'Marcar completada' }));
     await waitFor(() => expect(mocks.update).toHaveBeenCalledWith({
       projectId: 'p-1', moduleId: 'm-1', taskId: 't-1', input: { status: 'in_review' },
     }));
-    expect(mocks.success).toHaveBeenCalled();
+    const todo = within(region).getByText('Pantalla calculadora').closest('article')!;
+    fireEvent.click(within(todo).getByRole('button', { name: 'Empezar' }));
+    await waitFor(() => expect(mocks.update).toHaveBeenCalledWith({
+      projectId: 'p-1', moduleId: 'm-1', taskId: 't-2', input: { status: 'in_progress' },
+    }));
+    expect(mocks.success).toHaveBeenCalledTimes(2);
   });
 
-  it('muestra registros aprobados propios con contexto de tarea y sin fabricar HH', () => {
+  it('historial usa mis entradas y permite ver vínculos reales sin modificar registros', () => {
     show();
-    const table = screen.getByRole('table');
+    const table = screen.getByRole('table', { name: 'Historial reciente de mis horas' });
     expect(within(table).getByText('Modelo de datos: relaciones')).toBeInTheDocument();
     expect(within(table).getByText('Calculadora')).toBeInTheDocument();
-    expect(within(table).getByText('8')).toBeInTheDocument();
+    expect(within(table).getByText('Modelo de datos')).toBeInTheDocument();
+    expect(within(table).getByText('Eduardo Aranda')).toBeInTheDocument();
     expect(mocks.hours).toHaveBeenCalledWith(
       expect.objectContaining({ userId: 'u-1', sortField: 'date', sortDirection: 'desc' }),
       expect.objectContaining({ enabled: true }),
     );
+    fireEvent.click(within(table).getByRole('button', { name: 'Ver registro del 28-10-2026' }));
+    const dialog = screen.getByRole('dialog', { name: 'Detalle de registro de horas' });
+    expect(within(dialog).getByText('Tablas y consultas')).toBeInTheDocument();
+    expect(within(dialog).getByText('8 HH')).toBeInTheDocument();
+  });
+
+  it('oculta registrar horas sin permiso y no muestra métricas inventadas', () => {
+    show({ canRegisterHours: false, hours: null, planning: null });
+    expect(screen.queryByRole('button', { name: 'Registrar horas' })).not.toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: 'Progreso diario' }))
+      .getByText('No disponible')).toBeInTheDocument();
   });
 });
