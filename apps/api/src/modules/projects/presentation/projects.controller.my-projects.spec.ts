@@ -61,6 +61,8 @@ describe('ProjectsController — visor personal de colaborador', () => {
       type: 'development', status: 'active', phase: null,
       client: null, leader: null, startDate: '2026-11-01', endDate: '2026-12-01',
       progress: { actual: 10, expected: 25 }, estimatedDeliveryDate: '2026-12-01',
+      teams: [{ teamId: 'team-1', leader: { id: 'leader-1', fullName: 'Eduardo Aranda' },
+        teamName: 'UX-UI', assignedHours: 160 }],
       modules: [{
         id: 'module-1', name: 'Fase 1', tasks: [], segments: [],
         deliveries: [{ id: 'delivery-1', canManage: true }],
@@ -75,6 +77,11 @@ describe('ProjectsController — visor personal de colaborador', () => {
     expect(result.observations[0]).toEqual(expect.objectContaining({
       canEdit: false, canDelete: false, canResolve: false,
     }));
+    expect(result.teams).toEqual([{
+      teamId: 'team-1', leader: { id: 'leader-1', fullName: 'Eduardo Aranda' },
+    }]);
+    expect(result.teams[0]).not.toHaveProperty('assignedHours');
+    expect(result.teams[0]).not.toHaveProperty('teamName');
     expect(result).not.toHaveProperty('contractAmount');
     expect(result).not.toHaveProperty('quotationLink');
     expect(result).not.toHaveProperty('paymentMilestones');
