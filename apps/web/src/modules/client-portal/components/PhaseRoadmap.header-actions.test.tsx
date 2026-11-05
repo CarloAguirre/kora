@@ -3,10 +3,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { PhaseRoadmap } from './PhaseRoadmap';
 import styles from './PhaseRoadmap.module.css';
+import type { ProjectPhaseRoadmap } from '../types';
+
 // Vitest/JSDOM puede transformar ?raw en un objeto CSS Module en lugar de texto.
 // Leer la fuente real evita depender de esa transformación al comprobar las reglas.
 const roadmapCssSource = readFileSync(new URL('./PhaseRoadmap.module.css', import.meta.url), 'utf8');
-import type { ProjectPhaseRoadmap } from '../types';
 
 const phaseRoadmap: ProjectPhaseRoadmap = {
   phaseCount: 1,
