@@ -121,7 +121,7 @@ describe('Bloque operativo: fidelidad de los tres estados v5.02', () => {
     expect(within(dialog).getByText('07-09 — 16-10')).toBeInTheDocument();
     expect(within(dialog).getByRole('progressbar', { name: 'Avance real del bloque' }))
       .toHaveAttribute('aria-valuenow', '100');
-    expect(within(dialog).getByText(/Cerrado con entrega aprobada/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/Cerrado por entrega/)).toBeInTheDocument();
     expect(within(dialog).getByText('Entrega aprobada')).toBeInTheDocument();
     expect(within(dialog).getByRole('heading', { name: 'Tareas (2)' })).toBeInTheDocument();
     expect(within(dialog).getAllByText('Aprobada')).toHaveLength(2);
@@ -152,19 +152,24 @@ describe('Bloque operativo: fidelidad de los tres estados v5.02', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Eliminar tarea Diseño del bot' }));
     expect(onDeleteTask).toHaveBeenCalledWith(expect.objectContaining({ name: 'Diseño del bot' }));
 
-    // El backend exige comentario; no enviar una entrega vacía por buscar
-    // fidelidad visual con el botón del prototipo.
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Marcar como entregada' }));
-    expect(within(dialog).getByRole('button', { name: 'Confirmar entrega' })).toBeDisabled();
-    fireEvent.change(within(dialog).getByLabelText('Comentario de entrega'), {
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Marcar como entregado' }));
+    const completion = screen.getByRole('dialog', { name: 'Marcar como entregada' });
+    expect(screen.getByRole('dialog', { name: 'Bot de conciliación' })).toBeInTheDocument();
+    fireEvent.change(within(completion).getByLabelText('Fecha de entrega'), {
+      target: { value: '2026-10-30' },
+    });
+    fireEvent.change(within(completion).getByLabelText('Comentario o link de evidencia'), {
       target: { value: 'Ejecución QA verificada' },
     });
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Confirmar entrega' }));
+    fireEvent.click(within(completion).getByRole('button', { name: 'Marcar como entregada' }));
     await waitFor(() => expect(mocks.updateDelivery).toHaveBeenCalledWith({
       projectId: 'project-1', moduleId: 'module-1', deliveryId: 'delivery-1',
-      input: { status: 'delivered', comment: 'Ejecución QA verificada' },
+      input: { finalizeBlock: true, completedOn: '2026-10-30',
+        comment: 'Ejecución QA verificada' },
     }));
-    await waitFor(() => expect(props.onClose).toHaveBeenCalled());
+    expect(props.onClose).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Marcar como entregada' }))
+      .not.toBeInTheDocument());
     expect(mocks.success).toHaveBeenCalled();
   });
 
@@ -175,7 +180,7 @@ describe('Bloque operativo: fidelidad de los tres estados v5.02', () => {
     expect(screen.getByRole('region', { name: 'Cierre del bloque' }))
       .toHaveTextContent('Su cierre quedó registrado el 16-10-2026');
     expect(screen.queryByText('Entrega aprobada')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Marcar como entregada' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Marcar como entregado' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Reabrir bloque' }));
     expect(onChangeClosure).toHaveBeenCalledOnce();
     expect(onChangeClosure).toHaveBeenCalledWith('reopen');
@@ -191,8 +196,10 @@ describe('Bloque operativo: fidelidad de los tres estados v5.02', () => {
     expect(screen.queryByText('Colaboradores / Forecast')).not.toBeInTheDocument();
     const close = screen.getByRole('button', { name: 'Cerrar bloque' });
     expect(close).toBeDisabled();
-    expect(screen.getByText('Se habilita cuando todas las tareas estén aprobadas.'))
-      .toBeInTheDocument();
+    expect(close.parentElement).toHaveAttribute('title',
+      'Se habilita cuando todas las tareas estén aprobadas.');
+    expect(screen.queryByText('Se habilita cuando todas las tareas estén aprobadas.'))
+      .not.toBeInTheDocument();
     fireEvent.click(close);
     expect(onChangeClosure).not.toHaveBeenCalled();
   });
@@ -218,9 +225,9 @@ describe('Bloque operativo: fidelidad de los tres estados v5.02', () => {
       deliveries: [delivery('planned')], tasks: [task('Revisar entrega')],
       onChangeClosure,
     });
-    expect(screen.getByRole('button', { name: 'Cerrar bloque' })).toBeDisabled();
-    expect(screen.getByText(/tiene entrega de cierre: debe marcarse como entregada y aprobarse/))
-      .toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Cerrar bloque' })).not.toBeInTheDocument();
+    const deliver = screen.getByRole('button', { name: 'Marcar como entregado' });
+    expect(deliver).toBeEnabled();
     expect(onChangeClosure).not.toHaveBeenCalled();
   });
 
@@ -230,8 +237,35 @@ describe('Bloque operativo: fidelidad de los tres estados v5.02', () => {
       deliveries: [], tasks: [], onChangeClosure: vi.fn(),
     });
     expect(screen.getByRole('button', { name: 'Cerrar bloque' })).toBeDisabled();
-    expect(screen.getByText('Agrega tareas al bloque y apruébalas antes de cerrarlo.'))
+    expect(screen.getByRole('button', { name: 'Cerrar bloque' }).parentElement)
+      .toHaveAttribute('title', 'Agrega tareas al bloque y apruébalas antes de cerrarlo.');
+  });
+
+  it('no habilita Marcar como entregado mientras una tarea siga pendiente', () => {
+    show({
+      segment: { ...segment, closedAt: null } as ProjectModuleSegment,
+      deliveries: [delivery('planned')],
+      tasks: [task('Diseñar UX', 'todo')], onChangeClosure: vi.fn(),
+    });
+    const action = screen.getByRole('button', { name: 'Marcar como entregado' });
+    expect(action).toBeDisabled();
+    expect(action.parentElement).toHaveAttribute('title',
+      'Se habilita cuando todas las tareas estén aprobadas.');
+    expect(screen.queryByText('Se habilita cuando todas las tareas estén aprobadas.'))
+      .not.toBeInTheDocument();
+  });
+
+  it('muestra la fecha real, el responsable y la evidencia persistidos del cierre', () => {
+    const completed = {
+      ...delivery('approved'), completedOn: '2026-10-30',
+      completedByName: 'Mangel Tort', completionComment: 'Acta de conformidad',
+    } as ProjectModuleDelivery;
+    show({ deliveries: [completed], onChangeClosure: vi.fn() });
+    expect(screen.getByLabelText('Estado: Cerrado')).toBeInTheDocument();
+    expect(screen.getByText(/Entregada el 30-10-2026 por Mangel Tort, con atraso/))
       .toBeInTheDocument();
+    expect(screen.getByText('«Acta de conformidad»')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Reabrir bloque' })).toBeEnabled();
   });
 
   it('una entrega presentada espera aprobación; no se declara cerrada por entrega', () => {
@@ -242,6 +276,6 @@ describe('Bloque operativo: fidelidad de los tres estados v5.02', () => {
     });
     expect(screen.getByLabelText('Estado: Entregada')).toBeInTheDocument();
     expect(screen.getByText(/Entrega presentada; pendiente de aprobación/)).toBeInTheDocument();
-    expect(screen.queryByText(/Cerrado con entrega aprobada/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Cerrado por entrega/)).not.toBeInTheDocument();
   });
 });
