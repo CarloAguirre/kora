@@ -77,6 +77,10 @@ export function SegmentDrawer({
   const delivery = module.deliveries.find((item) => item.segmentId === segment.id) ?? null;
   const tasks = getLinkedBlockTasks(module, segment);
   const approvedTasks = tasks.filter((task) => task.status === 'done');
+  // El avance operativo se basa en HH estimadas de tareas aprobadas.
+  // NO utilizar segment.consumedHours: son horas registradas, no avance.
+  const approvedHours = approvedTasks.reduce((sum, task) =>
+    sum + Math.max(0, task.estimatedHours ?? 0), 0);
   const { hours, progress } = roadmapBlockMetrics(blockProgress);
   const expectedPercent = blockProgress?.expectedPercent ?? null;
   const today = currentChileDate();
@@ -206,8 +210,7 @@ export function SegmentDrawer({
             ' Todas las tareas del bloque están aprobadas.'}
         </p>
         <p className={styles.hoursNote}>
-          HH consumidas atribuidas a este bloque: {hh(segment.consumedHours ?? 0)}.
-          El consumo es costo y no determina el avance real.
+          {hh(approvedHours)} HH en tareas aprobadas.
         </p>
       </section>
 
