@@ -37,8 +37,8 @@ if ($LASTEXITCODE -ne 0) { throw "Falló API" }
 pnpm --filter @kora/web typecheck
 if ($LASTEXITCODE -ne 0) { throw "Falló Web" }
 
-pnpm --filter @kora/api exec vitest run src/modules/projects/application/services/collaborator-project-activity.service.spec.ts
-if ($LASTEXITCODE -ne 0) { throw "Falló prueba de agregación" }
+pnpm --filter @kora/api exec vitest run src/modules/projects/application/services/collaborator-project-activity.service.spec.ts src/modules/projects/presentation/projects.controller.my-projects.spec.ts
+if ($LASTEXITCODE -ne 0) { throw "Fallaron pruebas API: agregación o permisos" }
 pnpm --filter @kora/web exec vitest run src/modules/projects/pages/MyProjectsPage.test.tsx src/modules/projects/pages/MyProjectDetailPage.test.tsx
 if ($LASTEXITCODE -ne 0) { throw "Fallaron pruebas de vistas" }
 
