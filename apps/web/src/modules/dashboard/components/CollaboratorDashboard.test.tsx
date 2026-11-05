@@ -171,6 +171,47 @@ describe('Dashboard colaborador · homologación v6', () => {
     expect(within(region).getByRole('button', { name: 'Empezar' })).toBeInTheDocument();
   });
 
+  it('activa scroll interno solo con más de cinco tareas visibles y lo retira al filtrar', () => {
+    const extraTasks: DashboardMyTask[] = Array.from({ length: 7 }, (_, index) => ({
+      ...base, id: `scroll-${index}`, title: `Tarea ${index + 1}`,
+      status: index < 3 ? 'todo' : 'in_progress',
+      date: '2039-01-01', rejectionReason: null,
+    }));
+    show({ tasks: extraTasks });
+    const tasksRegion = screen.getByRole('region', { name: 'Mis tareas' });
+    const scrollable = within(tasksRegion).getByRole('region', {
+      name: 'Lista desplazable de mis tareas',
+    });
+    expect(scrollable).toHaveAttribute('tabindex', '0');
+    expect(scrollable.className).toContain('taskListScrollable');
+    expect(within(scrollable).getAllByRole('article')).toHaveLength(7);
+
+    // El filtro En curso solo contiene cuatro; por lo tanto no tiene scroll.
+    fireEvent.click(within(tasksRegion).getByRole('tab', { name: 'En curso 4' }));
+    expect(within(tasksRegion).queryByRole('region', {
+      name: 'Lista desplazable de mis tareas',
+    })).not.toBeInTheDocument();
+    expect(within(tasksRegion).getAllByRole('article')).toHaveLength(4);
+
+    fireEvent.click(within(tasksRegion).getByRole('tab', { name: 'Todas 7' }));
+    expect(within(tasksRegion).getByRole('region', {
+      name: 'Lista desplazable de mis tareas',
+    })).toBeInTheDocument();
+  });
+
+  it('con cinco tareas no limita la altura del listado', () => {
+    const five: DashboardMyTask[] = Array.from({ length: 5 }, (_, index) => ({
+      ...base, id: `small-${index}`, title: `Tarea ${index + 1}`,
+      status: 'todo', date: '2039-01-01', rejectionReason: null,
+    }));
+    show({ tasks: five });
+    const tasksRegion = screen.getByRole('region', { name: 'Mis tareas' });
+    expect(within(tasksRegion).getAllByRole('article')).toHaveLength(5);
+    expect(within(tasksRegion).queryByRole('region', {
+      name: 'Lista desplazable de mis tareas',
+    })).not.toBeInTheDocument();
+  });
+
   it('respeta transiciones: empezar -> en curso -> por aprobar, nunca aprueba unilateralmente', async () => {
     show();
     const region = screen.getByRole('region', { name: 'Mis tareas' });

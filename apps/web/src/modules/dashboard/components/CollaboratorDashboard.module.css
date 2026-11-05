@@ -63,6 +63,21 @@
 .tabs button.activeTab { color: #14243d; font-weight: 700; border-bottom-color: #14243d; }
 .tabs button:focus-visible { outline: 2px solid #497fc7; outline-offset: -2px; border-radius: 2px; }
 .taskList { display: flex; flex-direction: column; gap: 7px; }
+/* Solo los listados con más de cinco tareas se desplazan internamente.
+ * El límite equivale aproximadamente a cinco tarjetas a tamaño escritorio.
+ * No altera el alto del Card, el header, las pestañas ni otros listados. */
+.taskListScrollable {
+  max-height: min(720px, 80vh);
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-width: thin;
+  padding-right: 6px;
+}
+.taskListScrollable:focus-visible {
+  outline: 2px solid var(--kora-blue-500, #497fc7);
+  outline-offset: -2px;
+  border-radius: 4px;
+}
 .task {
   border: 1px solid #e2e7f0;
   border-radius: 9px;

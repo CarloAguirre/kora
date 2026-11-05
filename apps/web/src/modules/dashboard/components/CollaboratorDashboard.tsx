@@ -75,6 +75,8 @@ export function CollaboratorDashboard({
   const updateTask = useUpdateProjectModuleTask();
   const [tab, setTab] = useState<TaskTab>('all');
   const visibleTasks = tasks.filter((task) => tab === 'all' || task.status === tab);
+  // Acotar solo cuando el filtro activo devuelve más de cinco tarjetas.
+  const scrollTasks = visibleTasks.length > 5;
 
   const onAdvance = async (task: DashboardMyTask, status: 'in_progress' | 'in_review') => {
     try {
@@ -123,7 +125,11 @@ export function CollaboratorDashboard({
       </div>
       {loading ? <p className={styles.empty}>Cargando tareas…</p>
         : visibleTasks.length === 0 ? <p className={styles.empty}>No tienes tareas en este estado.</p>
-          : <div className={styles.taskList}>
+          : <div className={[styles.taskList, scrollTasks ? styles.taskListScrollable : '']
+              .filter(Boolean).join(' ')}
+              role={scrollTasks ? 'region' : undefined}
+              aria-label={scrollTasks ? 'Lista desplazable de mis tareas' : undefined}
+              tabIndex={scrollTasks ? 0 : undefined}>
               {visibleTasks.map((task) => {
                 // El avance de registro no es el avance de aprobación de la tarea.
                 const approved = Math.max(0, task.approvedHours ?? 0);
