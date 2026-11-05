@@ -347,7 +347,7 @@ describe('Cierre de bloque por entrega configurada en el Roadmap', () => {
     }),
     segments: [{
       id: 'segment-1', moduleId: 'module-1', teamId: 'team-1',
-      name: 'Entrega UX', startDate: new Date('2026-08-01'),
+      teamName: 'UX-UI', name: 'Entrega UX', startDate: new Date('2026-08-01'),
       endDate: new Date('2026-08-10'), estimatedHours: 120,
       members: [], closedAt: null,
     }],
