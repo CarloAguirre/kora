@@ -97,3 +97,39 @@ de la vista de Líder/PMO.
 **Estado de validación:** cambios confirmados en GitHub. Las pruebas TypeScript,
 Vitest y builds deben ejecutarse en el monorepo; no se reportan aprobados sin
 ejecutarlos. Sin migraciones de base de datos.
+
+## Corrección del Dashboard y tarjeta de tarea — 05/11/2026
+
+**Atención requerida (colaborador):**
+- Se elimina el conteo de tareas `in_review`: el colaborador ya las completó y el
+  siguiente paso depende del líder aprobador.
+- El KPI cuenta **sus tareas devueltas**: `status in ('todo','in_progress')`
+  con `rejectionReason`, indicando «N tarea(s) por revisar» y «N devuelta(s)
+  por el líder».
+- Continúan los registros de horas rechazados del propio colaborador. Si no
+  hay tareas devueltas ni HH rechazadas, muestra «Todo al día».
+- Los datos ya estaban disponibles en `DashboardMyTask` y
+  `DashboardHoursSummary`; no hubo cambios de API ni migraciones.
+
+**Roadmap, detalle al seleccionar una tarea:**
+- Se extrajeron `DetailPanel`, `Facts`, `Fact`, `Description` y
+  `TaskDetail` desde `ProjectModulesCard.tsx` a
+  `ProjectRoadmapTaskDetail.tsx`, manteniendo **el mismo CSS Module y
+  estructura visual** del Roadmap de Líder/PMO.
+- `ProjectModulesCard` y `MyProjectDetailPage` usan ahora la misma
+  `ProjectRoadmapTaskDetail`, con título, equipo, responsable, estado,
+  fecha de inicio/límite, ámbito, HH estimadas y descripción.
+- El colaborador no recibe callbacks de edición, aprobación ni mutación.
+  El drawer de bloques y la Bitácora no se modificaron.
+
+**Regresiones añadidas/actualizadas:**
+- `CollaboratorDashboard.test.tsx`: tarea enviada a aprobación no figura como
+  acción requerida; tarea devuelta y horas rechazadas sí figuran.
+- `MyProjectDetailPage.test.tsx`: selección de tarea muestra la tarjeta
+  compartida, con datos completos y únicamente acción de cerrar.
+- Mantener `ProjectModulesCard.phase-controls.test.tsx` para detectar cambios
+  no deseados en la vista del Líder/PMO.
+
+**Estado:** publicado en GitHub, a validar con Vitest y typecheck local.
+Sin migraciones de base de datos.
+
