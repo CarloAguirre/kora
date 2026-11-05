@@ -3,12 +3,21 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SUPPORT_SURPLUS_POLICY_LABELS, type ProjectDetail } from '@kora/contracts';
 import { EditProjectDialog, type EditProjectDialogProps } from './EditProjectDialog';
+import { EditDevelopmentProjectDialog, type EditDevelopmentProjectDialogProps } from './EditDevelopmentProjectDialog';
 import { ToastProvider } from '@/shared/components/ui/Toast';
 
 function renderDialog(props: EditProjectDialogProps) {
   return render(
     <ToastProvider>
       <EditProjectDialog {...props} />
+    </ToastProvider>,
+  );
+}
+
+function renderDevelopmentDialog(props: EditDevelopmentProjectDialogProps) {
+  return render(
+    <ToastProvider>
+      <EditDevelopmentProjectDialog {...props} />
     </ToastProvider>,
   );
 }
@@ -517,3 +526,109 @@ const activeMonthlyPlanDetail = {
   linkedProjects: [],
   summary: { currentPeriod: null },
 };
+
+
+describe('Editar proyecto de desarrollo · contenido acotado a la referencia v5.02', () => {
+  beforeEach(() => {
+    useUsersListMock.mockReturnValue({ data: { items: [] } });
+    mutateAsync.mockReset().mockResolvedValue(undefined);
+    changeStatusMutateAsync.mockReset().mockResolvedValue(undefined);
+  });
+
+  const props = (overrides: Partial<ProjectDetail> = {}, onViewQuotations = vi.fn()) => ({
+    open: true,
+    project: buildProject({ commercialManager: {
+      id: '22222222-2222-4222-8222-222222222222', fullName: 'Rodrigo Viveros',
+    }, ...overrides }),
+    onClose: vi.fn(),
+    onSuccess: vi.fn(),
+    onViewQuotations,
+    isManagement: true,
+  });
+
+  it('muestra exclusivamente los bloques de la imagen y ningún editor de equipos/fases', () => {
+    renderDevelopmentDialog(props({ canAuthorizeOvertime: true }));
+    for (const name of [
+      'Nombre del proyecto', 'Cliente', 'Líder Kabeli a cargo', 'Responsable comercial',
+      'Tipo de proyecto', 'Estado', 'Etapa de avance', 'Proyecto interno',
+      'Fecha de inicio', 'Fecha de fin', 'HH vendidas', 'Autorizar horas extra',
+      'Cotización', 'Contrato',
+    ]) {
+      expect(screen.getByLabelText(name)).toBeInTheDocument();
+    }
+    for (const section of ['Fechas y horas', 'Plan de pago', 'Documentación']) {
+      expect(screen.getByRole('heading', { name: section })).toBeInTheDocument();
+    }
+    expect(screen.getByText(/se gestionan en la ficha/)).toBeInTheDocument();
+    expect(screen.getByText('Equipos asignados')).toBeInTheDocument();
+    expect(screen.getByText('Roadmap')).toBeInTheDocument();
+    for (const removed of [
+      'Equipos e involucrados', 'Fases · Módulos', 'Contrato de soporte',
+      'Tiempos de respuesta (SLA)', 'Agregar fase / módulo',
+      'Notas de alcance', 'Horas totales (equipos)',
+      'Documentación de entrega',
+    ]) {
+      expect(screen.queryByText(removed)).not.toBeInTheDocument();
+    }
+  });
+
+  it('muestra el estado real de la cotización y abre su pestaña desde el aviso', async () => {
+    const onView = vi.fn();
+    renderDevelopmentDialog(props({ quotationStatus: 'approved_pending' }, onView));
+    expect(screen.getByText('Cotización · Aprobada · traspaso pendiente')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Ver cotizaciones' }));
+    expect(onView).toHaveBeenCalledOnce();
+  });
+
+  it('guarda solo datos generales y no envía relaciones de equipos ni módulos', async () => {
+    const p = props({
+      teams: [{
+        teamId: '33333333-3333-4333-8333-333333333333',
+        teamName: 'UX-UI',
+        assignedHours: 120,
+        leader: null,
+      }] as ProjectDetail['teams'],
+    });
+    renderDevelopmentDialog(p);
+    await userEvent.clear(screen.getByLabelText('Nombre del proyecto'));
+    await userEvent.type(screen.getByLabelText('Nombre del proyecto'), 'Portal actualizado');
+    fireEvent.submit(document.getElementById('edit-project-form') as HTMLFormElement);
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalled());
+    const input = mutateAsync.mock.calls.at(-1)?.[0].input;
+    expect(input.name).toBe('Portal actualizado');
+    expect(input).not.toHaveProperty('teams');
+    expect(input).not.toHaveProperty('modules');
+    expect(input).not.toHaveProperty('deliveries');
+    expect(input).not.toHaveProperty('paymentMilestones');
+    expect(p.onSuccess).toHaveBeenCalledWith('Se actualizaron los datos de Portal actualizado.');
+  });
+
+  it('conserva el motivo obligatorio al cambiar HH después del Hito 0', async () => {
+    renderDevelopmentDialog(props({ hito0At: '2026-10-01T00:00:00.000Z' }));
+    const sold = screen.getByLabelText('HH vendidas');
+    fireEvent.change(sold, { target: { value: '650' } });
+    expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('Motivo del ajuste de HH vendidas'), {
+      target: { value: 'Alcance ampliado y aprobado' },
+    });
+    expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeEnabled();
+    fireEvent.submit(document.getElementById('edit-project-form') as HTMLFormElement);
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({
+      input: expect.objectContaining({
+        soldHours: 650, soldHoursChangeReason: 'Alcance ampliado y aprobado',
+      }),
+    })));
+  });
+
+  it('con proyecto interno oculta el plan de pago sin borrar su contrato guardado', async () => {
+    renderDevelopmentDialog(props());
+    fireEvent.click(screen.getByLabelText('Proyecto interno'));
+    expect(screen.queryByRole('heading', { name: 'Plan de pago' })).not.toBeInTheDocument();
+    fireEvent.submit(document.getElementById('edit-project-form') as HTMLFormElement);
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({
+      input: expect.objectContaining({ isInternal: true }),
+    })));
+    const input = mutateAsync.mock.calls.at(-1)?.[0].input;
+    expect(input).not.toHaveProperty('paymentMilestones');
+  });
+});
