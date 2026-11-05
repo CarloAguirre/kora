@@ -600,6 +600,50 @@ describe('Acciones reales para referencias EDT antes de convertirlas', () => {
   });
 });
 
+describe('Homologación de estados del Roadmap v5.02', () => {
+  it('asigna verde, amarillo, azul, gris y violeta a los estados de tareas', () => {
+    const states = [
+      ['aprobada', 'done', 'success', 'user-1'],
+      ['completada', 'in_review', 'warning', 'user-1'],
+      ['curso', 'in_progress', 'info', 'user-1'],
+      ['pendiente', 'todo', 'neutral', 'user-1'],
+      ['sin-asignar', 'todo', 'taskState', null],
+    ] as const;
+    const tasks = states.map(([id, status, , assigneeUserId]) => ({
+      id, name: 'Estado ' + id, status,
+      startDate: '2026-11-04', date: '2027-01-10', estimatedHours: 10,
+      assigneeUserId, assigneeName: assigneeUserId ? 'Colaborador' : null,
+      teamId: 'team-1', teamName: 'Desarrollo', description: null,
+    }));
+    show({ ...project, modules: [{ ...module, tasks }] } as unknown as ProjectDetail);
+
+    for (const [id, , expectedTone] of states) {
+      const row = screen.getByText('Estado ' + id).closest('tr')!;
+      const badge = within(row).getByText(id === 'aprobada' ? 'Aprobada' :
+        id === 'completada' ? 'Completada' : id === 'curso' ? 'En curso' :
+          id === 'pendiente' ? 'Pendiente' : 'Por asignar');
+      expect(badge.className).toContain(expectedTone);
+    }
+  });
+
+  it('solo indica vencimiento en tareas abiertas, no en completadas para aprobar', () => {
+    const tasks = [
+      { id: 'task-open', name: 'Ajuste en curso', status: 'in_progress' },
+      { id: 'task-review', name: 'Esperando aprobación', status: 'in_review' },
+    ].map((entry) => ({
+      ...entry, startDate: '2026-10-01', date: '2026-10-03',
+      estimatedHours: 10, assigneeUserId: 'user-1', assigneeName: 'Colaborador',
+      teamId: 'team-1', teamName: 'Desarrollo', description: null,
+    }));
+    show({ ...project, modules: [{ ...module, tasks }] } as unknown as ProjectDetail);
+    const openRow = screen.getByText('Ajuste en curso').closest('tr')!;
+    const reviewRow = screen.getByText('Esperando aprobación', { selector: 'td' }).closest('tr')!;
+    expect(within(openRow).getByText('Vencida')).toBeInTheDocument();
+    expect(within(reviewRow).getByText('Completada')).toBeInTheDocument();
+    expect(within(reviewRow).queryByText('Vencida')).not.toBeInTheDocument();
+  });
+});
+
 describe('Fidelidad del Roadmap v5.02 · acciones y estructura', () => {
   it('muestra Agregar fase al final sin los desplegables descartados', async () => {
     show();
