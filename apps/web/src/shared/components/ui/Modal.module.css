@@ -41,9 +41,16 @@
   animation: kora-modal-slide-in 0.22s ease-out;
 }
 
-.side.wide[open] {
+ .side.wide[open] {
   max-width: min(760px, 100vw);
 }
+
+/* Exclusivo para formularios complejos como Editar proyecto: la grilla de tramos
+   cabe en el drawer sin hacer scroll horizontal del formulario. */
+.side.expandedSide[open] {
+  max-width: min(1040px, 100vw);
+}
+.side.expandedSide[open] .body { min-width: 0; overflow-x: hidden; }
 
 .side[open] .body {
   flex: 1 1 auto;
