@@ -603,6 +603,9 @@ export function DailyEntryBlockFields({
                   moduleId: needsProjectNext ? block.moduleId : '',
                   segmentId: needsProjectNext ? block.segmentId : '',
                   taskId: needsProjectNext ? block.taskId : '',
+                  category: needsProjectNext
+                    ? block.category
+                    : activityForTaskChange(block.category, selectedTask?.name, undefined),
                   designatedApproverUserId: needsProjectNext ? '' : block.designatedApproverUserId,
                 });
               }}
@@ -630,6 +633,7 @@ export function DailyEntryBlockFields({
                     moduleId: '',
                     segmentId: '',
                     taskId: '',
+                    category: activityForTaskChange(block.category, selectedTask?.name, undefined),
                     isOvertime: nextProject?.allowsOvertime ? block.isOvertime : false,
                   });
                 }}
@@ -649,8 +653,14 @@ export function DailyEntryBlockFields({
               approverName={projectDetail?.teams.find((team) =>
                 team.teamId === selectedModule?.segments.find((segment) => segment.id === block.segmentId)?.teamId
               )?.leader?.fullName}
-              onPhaseChange={(moduleId) => onUpdate({ moduleId, segmentId: '', taskId: '' })}
-              onSegmentChange={(segmentId) => onUpdate({ segmentId, taskId: '' })}
+              onPhaseChange={(moduleId) => onUpdate({
+                moduleId, segmentId: '', taskId: '',
+                category: activityForTaskChange(block.category, selectedTask?.name, undefined),
+              })}
+              onSegmentChange={(segmentId) => onUpdate({
+                segmentId, taskId: '',
+                category: activityForTaskChange(block.category, selectedTask?.name, undefined),
+              })}
               onTaskChange={(taskId) => onUpdate({
                 taskId,
                 category: activityForTaskChange(
