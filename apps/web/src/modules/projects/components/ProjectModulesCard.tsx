@@ -644,7 +644,9 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
                       </>
                       : <span className={styles.taskState}>Por asignar</span>}
                   </span></td>
-                  <td title="HH est. / reales aprobadas. Las HH pendientes se informan aparte y no aumentan el avance.">
+                  <td title={task.actualHours == null
+                    ? 'Sin HH aprobadas asociadas explícitamente a esta tarea.'
+                    : 'HH reales de bitácora aprobadas y vinculadas a esta tarea.'}>
                     {task.estimatedHours ?? '—'} / {task.actualHours ?? '—'}
                     {(task.pendingHours ?? 0) > 0 && (
                       <small className={styles.taskPendingHours}>
