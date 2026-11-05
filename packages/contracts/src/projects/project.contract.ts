@@ -462,7 +462,14 @@ export const updateProjectModuleDeliverySchema = z.object({
    * como terminada en nombre del colaborador asignado — por qué lo hizo sin que el colaborador la enviara.
    */
   comment: z.string().trim().max(1000).optional(),
+  /** Finalizar en una sola operación la entrega vinculada a un bloque: requiere tareas aprobadas y permiso de líder. */
+  finalizeBlock: z.boolean().optional(),
+  /** Reabrir explícitamente el bloque ya finalizado, sin confundirlo con rechazo de entrega del colaborador. */
+  reopenBlock: z.boolean().optional(),
+  /** Fecha real seleccionada en el formulario de cierre; NO modifica estimatedDate. */
+  completedOn: z.iso.date().optional(),
 });
+
 export type UpdateProjectModuleDeliveryInput = z.infer<typeof updateProjectModuleDeliverySchema>;
 
 /**
