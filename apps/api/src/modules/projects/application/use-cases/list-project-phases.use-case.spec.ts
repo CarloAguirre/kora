@@ -52,6 +52,9 @@ describe('Fases para registrar horas · consumo progresivo por tarea', () => {
         name: 'Modelo de datos', estimatedHours: 10, actualHours: 3,
         pendingHours: 2, segmentId: 'segment-1', assigneeUserId: memberId,
       });
+      expect(result.value[0]?.segments[0]).toMatchObject({
+        name: 'Calculadora', leaderName: 'Eduardo Aranda',
+      });
     }
   });
 
