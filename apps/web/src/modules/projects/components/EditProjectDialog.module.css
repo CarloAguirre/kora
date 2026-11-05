@@ -297,6 +297,13 @@
   color: #254d86;
   font-size: 12px;
 }
+.quotationBannerText {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+.quotationBannerText svg { flex: 0 0 auto; }
 .quotationBanner button {
   padding: 0;
   border: none;
