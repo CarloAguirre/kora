@@ -792,6 +792,7 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
       open={open}
       wide
       side
+      expandedSide
       title="Editar proyecto"
       onClose={onClose}
       dismissible={!isSubmitting}
