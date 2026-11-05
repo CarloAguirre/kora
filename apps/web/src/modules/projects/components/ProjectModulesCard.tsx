@@ -642,7 +642,11 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
                       </>
                       : <span className={styles.taskState}>Por asignar</span>}
                   </span></td>
-                  <td>{task.estimatedHours ?? '—'} / —</td>
+                  <td title={task.actualHours == null
+                    ? 'Sin HH aprobadas asociadas explícitamente a esta tarea.'
+                    : 'HH reales de bitácora aprobadas y vinculadas a esta tarea.'}>
+                    {task.estimatedHours ?? '—'} / {task.actualHours ?? '—'}
+                  </td>
                   <td>{formatDate(task.date)}</td>
                   <td className={styles.operationalTaskActions}>
                     {canManage && task.status === 'in_review' && !task.cancelledAt &&
