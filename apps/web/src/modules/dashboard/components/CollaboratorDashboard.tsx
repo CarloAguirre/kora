@@ -3,7 +3,6 @@ import type { DashboardMyTask, HourEntrySummary } from '@kora/contracts';
 import styles from './CollaboratorDashboard.module.css';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { useHourEntriesList } from '@/modules/hours/api/hours.queries';
-import { HourEntryStatusBadge } from '@/modules/hours/components/HourEntryStatusBadge';
 import { useUpdateProjectModuleTask } from '@/modules/projects/api/projects.queries';
 import { Button } from '@/shared/components/ui/Button';
 import { useToast } from '@/shared/components/ui/Toast';
@@ -164,7 +163,7 @@ export function CollaboratorDashboard({
                         disabled={updateTask.isPending}
                       >Marcar terminada</Button>
                     )}
-                    {tab === 'in_review' && <span className={styles.waiting}>Esperando aprobación del líder</span>}
+                    {tab === 'in_review' && <span className={styles.waiting}>Esperando aprobación {task.reviewerName ? `de ${task.reviewerName}` : 'del líder'}</span>}
                   </div>
                 </article>
               ))}
@@ -192,7 +191,7 @@ export function CollaboratorDashboard({
                       <td><EntryLink entry={entry} tasks={tasks} /></td>
                       <td>{entry.category}</td>
                       <td className={styles.numeric}>{formatHours(entry.hours)}</td>
-                      <td><HourEntryStatusBadge status={entry.status} /></td>
+                      <td><span className={[styles.chip, entry.status === 'approved' ? styles.approved : entry.status === 'rejected' ? styles.overdue : styles.completed].join(' ')}>{entry.status === 'approved' ? 'Aprobada' : entry.status === 'rejected' ? 'Rechazada' : 'Por aprobar'}</span></td>
                     </tr>
                   ))}
             </tbody>
