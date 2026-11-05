@@ -52,6 +52,16 @@ function buildItem(overrides: Partial<HourEntryListItem> = {}): HourEntryListIte
  * muestre "debe aprobar" a alguien sin autoridad real sobre ese registro.
  */
 describe('toHourEntrySummary — bloque real de trabajo', () => {
+  it('expone la tarea seleccionada sin inventar tareas en registros legados', () => {
+    const linked = toHourEntrySummary(buildItem({
+      projectId: 'project-1', moduleId: 'module-1', segmentId: 'segment-1',
+      taskId: 'task-1',
+    }));
+    expect(linked.taskId).toBe('task-1');
+    const previous = toHourEntrySummary(buildItem({ taskId: null }));
+    expect(previous.taskId).toBeNull();
+  });
+
   it('incluye el segmento persistido y deja sin atribución los registros legacy', () => {
     const attributed = toHourEntrySummary(buildItem({
       projectId: 'project-1', moduleId: 'module-1', moduleName: 'Fase',
