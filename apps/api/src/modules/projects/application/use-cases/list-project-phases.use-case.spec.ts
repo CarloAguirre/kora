@@ -32,7 +32,9 @@ describe('Fases para registrar horas · consumo progresivo por tarea', () => {
     return new ListProjectPhasesUseCase(
       projects,
       { listForProject: vi.fn() } as unknown as ProjectTeamMemberRepository,
-      { findByProject: vi.fn() } as unknown as ProjectTeamRepository,
+      { findByProject: vi.fn().mockResolvedValue([{
+        teamId: 'team-1', leaderName: 'Eduardo Aranda', leaderUserId: 'leader-1',
+      }]) } as unknown as ProjectTeamRepository,
       modules,
     );
   };
