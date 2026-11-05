@@ -127,7 +127,8 @@
   font-weight: 700;
 }
 .markDelivered:hover:not(:disabled) { background: #baf13d; }
-.markDelivered:disabled { cursor: not-allowed; opacity: .62; }
+/* El hover debe llegar al wrapper con title aunque el botón esté disabled. */
+.markDelivered:disabled { cursor: not-allowed; opacity: .62; pointer-events: none; }
 .deliveryButtonWrapper { display: inline-flex; width: max-content; max-width: 100%; }
 .completionForm { display: grid; gap: 16px; min-width: 0; }
 .completionFooter { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
@@ -157,7 +158,7 @@
   line-height: 1.4;
 }
 .closureAction > span { flex: none; }
-.closureAction button:disabled { cursor: not-allowed; opacity: .65; }
+.closureAction button:disabled { cursor: not-allowed; opacity: .65; pointer-events: none; }
 .tasksSection { padding-top: 9px; }
 .tasksHeading { justify-content: space-between; gap: 12px; }
 .addTask {
