@@ -195,6 +195,12 @@ export interface TaskAssignedToUserRecord {
   readonly moduleId: string;
   readonly moduleName: string;
   readonly name: string;
+  /** Bloque vinculado, sin inferirlo por el nombre del módulo. */
+  readonly segmentName?: string | null;
+  readonly estimatedHours?: number | null;
+  /** HH de bitácora explícitamente ligadas a esta tarea. */
+  readonly approvedHours?: number;
+  readonly pendingHours?: number;
   readonly date: Date;
   readonly status: ProjectModuleTaskStatus;
   readonly completedAt: Date | null;
