@@ -183,12 +183,14 @@ export class DrizzleQuotationRepository implements QuotationRepository {
     const ids = rows.map((row) => row.id);
     const [transfer] = ids.length ? await this.db.select({
       versionId: quotationEvents.versionId,
+      occurredAt: quotationEvents.occurredAt,
     }).from(quotationEvents).where(and(
       inArray(quotationEvents.versionId, ids),
       eq(quotationEvents.action, 'quotation_transferred'),
     )).orderBy(desc(quotationEvents.occurredAt)).limit(1) : [];
     return { ...quotation, versions: rows.map(toVersion),
-      transferredVersionId: transfer?.versionId ?? null };
+      transferredVersionId: transfer?.versionId ?? null,
+      transferredAt: transfer?.occurredAt.toISOString() ?? null };
   }
 
   /** Sólo consulta de actas inmutables relacionadas con ESTA cotización. */
