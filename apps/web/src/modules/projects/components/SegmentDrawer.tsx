@@ -288,9 +288,12 @@ export function SegmentDrawer({
                 {' '}· Límite {dateFull(task.date)}</small>
             </div>
             <span className={[styles.taskStatus,
-              task.status === 'done' ? styles.taskApproved :
-                task.status === 'in_review' ? styles.taskReview : styles.taskPending].join(' ')}>
-              {PROJECT_MODULE_TASK_STATUS_LABELS[task.status]}
+              !task.assigneeUserId ? styles.taskUnassigned :
+                task.status === 'done' ? styles.taskApproved :
+                  task.status === 'in_review' ? styles.taskReview :
+                    task.status === 'in_progress' ? styles.taskInProgress :
+                      styles.taskPending].join(' ')}>
+              {task.assigneeUserId ? PROJECT_MODULE_TASK_STATUS_LABELS[task.status] : 'Por asignar'}
             </span>
             <div className={styles.taskActions}>
               {onEditTask && <button type="button" title="Editar tarea"
