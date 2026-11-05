@@ -908,12 +908,19 @@ function OperationalPhaseCard({
   // Cada fase conserva su propio zoom y el mismo eje para barras, entregas y tareas.
   const [zoom, setZoom] = useState(0);
   const showDays = zoom >= DETAIL_ZOOM_THRESHOLD;
-  const dailyTickStride = axis.dayLines.length > 150 ? 7 : axis.dayLines.length > 70 ? 3 : 1;
+  // El zoom alto sí debe mostrar días (1, 2, 3…), no seguir en semanas.
+  // En rangos muy extensos se espacian etiquetas para impedir superposiciones.
+  const dayCount = axis.dayLines.length;
+  const dailyTickStride = zoom >= 85 ? (dayCount > 300 ? 2 : 1)
+    : zoom >= 65 ? (dayCount > 200 ? 3 : dayCount > 90 ? 2 : 1)
+      : dayCount > 120 ? 7 : dayCount > 45 ? 4 : 2;
   const ticks = showDays
-    ? axis.dayLines.flatMap((leftPercent, index) =>
-      index % dailyTickStride === 0
-        ? [{ leftPercent, label: formatAxisDay(shiftDays(axis.range.min, index)) }]
-        : [])
+    ? axis.dayLines.flatMap((leftPercent, index) => {
+      if (index % dailyTickStride !== 0) return [];
+      const date = shiftDays(axis.range.min, index);
+      return [{ leftPercent, label: date.getDate() === 1 || index === 0
+        ? formatAxisDay(date) : String(date.getDate()) }];
+    })
     : axis.dayTicks;
   const hasDatedRows = phase.tasks.length > 0;
   const hasTimelineItems = hasDatedRows || phase.taskItems.length > 0 || phase.deliveries.length > 0;
