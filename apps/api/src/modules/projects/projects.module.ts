@@ -3,6 +3,7 @@ import { ProjectsController } from './presentation/projects.controller';
 import { TeamsModule } from '../teams/teams.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { ProjectTaskReviewNotifier } from './infrastructure/services/project-task-review-notifier';
+import { PROJECT_TASK_REVIEW_NOTIFIER } from './application/ports/project-task-review-notifier.port';
 
 import { CreateProjectUseCase } from './application/use-cases/create-project.use-case';
 import { UpdateProjectUseCase } from './application/use-cases/update-project.use-case';
@@ -126,7 +127,7 @@ import { DrizzleSupportContractStatusReader } from './infrastructure/services/dr
     DeleteProjectModuleSegmentUseCase,
     CreateProjectModuleTaskUseCase,
     UpdateProjectModuleTaskUseCase,
-    ProjectTaskReviewNotifier,
+    { provide: PROJECT_TASK_REVIEW_NOTIFIER, useClass: ProjectTaskReviewNotifier },
     DeleteProjectModuleTaskUseCase,
     ProjectRoadmapReferenceExclusionsService,
     { provide: ROADMAP_REFERENCE_EXCLUSION_STORE, useClass: DrizzleRoadmapReferenceExclusionStore },
