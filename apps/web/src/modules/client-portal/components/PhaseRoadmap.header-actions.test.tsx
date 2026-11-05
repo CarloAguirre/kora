@@ -267,6 +267,53 @@ describe('Restauración de checks y zoom sobre el Gantt operativo v5.02', () => 
     expect(screen.queryByText('Opciones de cronograma · rango de fechas')).not.toBeInTheDocument();
   });
 
+  it('agrupa en una sola fila los checks con la misma fecha y despliega cada tarea', () => {
+    const grouped: ProjectPhaseRoadmap = {
+      ...roadmap,
+      phases: [{
+        ...roadmap.phases[0]!,
+        taskItems: [
+          { id: 'task-01', label: 'Diseño aprobado', date: '2026-11-06',
+            state: 'done', scope: 'diseno' },
+          { id: 'task-02', label: 'Ejecución atrasada', date: '2026-11-06',
+            state: 'delayed', scope: 'qa' },
+          { id: 'task-03', label: 'Próxima validación', date: '2026-11-13',
+            state: 'upcoming', scope: 'qa' },
+        ],
+      }],
+    };
+    const { container } = render(<PhaseRoadmap phaseRoadmap={grouped} operationalView
+      renderSelectionDetail={(_phase, selection) =>
+        <p>Detalle seleccionado: {selection.kind} {'label' in selection ? selection.label : ''}</p>}
+    />);
+    expect(screen.getAllByText('Tareas')).toHaveLength(1);
+    // Solo existe una fila de marcadores de tareas, además de la fila Entregas.
+    expect(container.querySelectorAll('[class*="operationalMarkerTrack"]')).toHaveLength(2);
+    const group = screen.getByRole('button', { name: 'Ver 2 tareas del 6 Nov' });
+    expect(group.querySelector('[class*="taskDotDelayed"]')).toBeInTheDocument();
+    expect(within(group).getByText('2')).toBeInTheDocument();
+    expect(screen.getByRole('button', {
+      name: 'Ver tarea Próxima validación: Próxima',
+    }).closest('[class*="operationalLine"]'))
+      .toBe(group.closest('[class*="operationalLine"]'));
+
+    fireEvent.click(group);
+    const menu = screen.getByRole('menu');
+    expect(within(menu).getAllByRole('menuitem')).toHaveLength(2);
+    fireEvent.click(within(menu).getByRole('menuitem', { name: /Diseño aprobado/ }));
+    expect(screen.getByText('Detalle seleccionado: task Diseño aprobado')).toBeInTheDocument();
+    fireEvent.click(group);
+    fireEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', {
+      name: /Ejecución atrasada/,
+    }));
+    expect(screen.getByText('Detalle seleccionado: task Ejecución atrasada'))
+      .toBeInTheDocument();
+    // Ampliar la escala no desagrupa ni duplica filas: mantiene el mismo marcador.
+    fireEvent.change(screen.getByRole('slider'), { target: { value: '80' } });
+    expect(screen.getByRole('button', { name: 'Ver 2 tareas del 6 Nov' })).toBeInTheDocument();
+    expect(screen.getAllByText('Tareas')).toHaveLength(1);
+  });
+
   it('zoom semanas a días anima el mismo eje de las barras y tareas, sin recargar la página', () => {
     const { container } = render(<PhaseRoadmap phaseRoadmap={roadmap} operationalView />);
     const slider = screen.getByRole('slider', { name: /Zoom del cronograma de Desarrollo Backend/ });
