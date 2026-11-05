@@ -44,6 +44,9 @@ import {
   type MarkProjectPaymentMilestonePaidInput,
   type ProjectBillingSettings,
   type ProjectDetail,
+  type ProjectSummary,
+  type CollaboratorProjectSummary,
+  type CollaboratorProjectDetail,
   type ProjectPhaseOption,
   type ResolveProjectObservationInput,
   type SetProjectOvertimeAuthorizationInput,
@@ -69,6 +72,7 @@ import { UpdateProjectExtrasUseCase } from '../application/use-cases/update-proj
 import { ListProjectsUseCase } from '../application/use-cases/list-projects.use-case';
 import { GetProjectUseCase } from '../application/use-cases/get-project.use-case';
 import { ListProjectPhasesUseCase } from '../application/use-cases/list-project-phases.use-case';
+import { CollaboratorProjectActivityService } from '../application/services/collaborator-project-activity.service';
 import { ChangeProjectStatusUseCase } from '../application/use-cases/change-project-status.use-case';
 import { SetProjectOvertimeAuthorizationUseCase } from '../application/use-cases/set-project-overtime-authorization.use-case';
 import { DeleteProjectUseCase } from '../application/use-cases/delete-project.use-case';
@@ -101,6 +105,15 @@ import { GetProjectBillingSettingsUseCase } from '../application/use-cases/get-p
 import { UpdateProjectBillingSettingsUseCase } from '../application/use-cases/update-project-billing-settings.use-case';
 import { ResolveProjectManagementApprovalUseCase } from '../application/use-cases/resolve-project-management-approval.use-case';
 import { CorrectProjectHito0DateUseCase } from '../application/use-cases/correct-project-hito0-date.use-case';
+
+
+function toCollaboratorSummary(project: ProjectSummary, weekHours = 0): CollaboratorProjectSummary {
+  return {
+    id: project.id, name: project.name, slug: project.slug, type: project.type,
+    status: project.status, phase: project.phase, client: project.client, leader: project.leader,
+    startDate: project.startDate, endDate: project.endDate, progress: project.progress, weekHours,
+  };
+}
 
 @Controller('projects')
 export class ProjectsController {
@@ -143,6 +156,7 @@ export class ProjectsController {
     private readonly updateBillingSettings: UpdateProjectBillingSettingsUseCase,
     private readonly resolveManagementApproval: ResolveProjectManagementApprovalUseCase,
     private readonly correctHito0Date: CorrectProjectHito0DateUseCase,
+    private readonly collaboratorActivity: CollaboratorProjectActivityService,
   ) {}
 
   /**
@@ -184,6 +198,48 @@ export class ProjectsController {
       await this.listProjects.execute({ query, actor: toActorContext(actor), actorPermissions: actor.permissions }),
     );
     return { ...page, items: [...page.items] };
+  }
+
+  /** Endpoint personal: la API fuerza pertenencia, incluso si el actor tiene otros permisos. */
+  @Get('my')
+  @RequirePermissions('hours:read_own')
+  async myProjects(
+    @Query(new ZodValidationPipe(listProjectsQuerySchema)) query: ListProjectsQuery,
+    @CurrentUser() actor: RequestUser,
+  ): Promise<{ items: CollaboratorProjectSummary[]; page: number; pageSize: number; pageCount: number; total: number }> {
+    const page = unwrapOrThrow(await this.listProjects.execute({
+      query: {
+        page: query.page, pageSize: query.pageSize, search: query.search,
+        sortField: query.sortField, sortDirection: query.sortDirection,
+      } as ListProjectsQuery,
+      actor: toActorContext(actor), actorPermissions: [],
+    }));
+    const hours = await this.collaboratorActivity.weeklyHours(actor.id, page.items.map((p) => p.id));
+    return { ...page, items: page.items.map((p) => toCollaboratorSummary(p, hours.get(p.id) ?? 0)) };
+  }
+
+  @Get('my/:id')
+  @RequirePermissions('hours:read_own')
+  async myProjectDetail(
+    @Param('id') id: string, @CurrentUser() actor: RequestUser,
+  ): Promise<CollaboratorProjectDetail> {
+    const project = unwrapOrThrow(await this.getProject.execute({
+      projectId: id, actorUserId: actor.id, actorPermissions: [],
+    }));
+    const activity = await this.collaboratorActivity.approvedEvents(project.id);
+    const { weekHours: _ignored, ...summary } = toCollaboratorSummary(project);
+    return {
+      ...summary,
+      estimatedDeliveryDate: project.estimatedDeliveryDate,
+      modules: project.modules.map((module) => ({
+        ...module,
+        deliveries: module.deliveries.map((delivery) => ({ ...delivery, canManage: false })),
+      })),
+      observations: project.observations.map((observation) => ({
+        ...observation, canEdit: false, canDelete: false, canResolve: false,
+      })),
+      events: activity.entries, activityTruncated: activity.truncated,
+    };
   }
 
   @Get(':id')

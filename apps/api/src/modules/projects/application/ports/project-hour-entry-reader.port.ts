@@ -4,7 +4,26 @@
  * importa `ProjectsModule`): mismo patrón que `ProjectUserReader`, un puerto
  * propio implementado contra `@kora/db` directamente.
  */
+export interface CollaboratorProjectEventRecord {
+  readonly id: string;
+  readonly date: Date;
+  readonly createdAt: Date;
+  readonly userName: string;
+  readonly moduleName: string | null;
+  readonly activity: string;
+  readonly description: string;
+  readonly hours: number;
+  readonly hasBlocker: boolean;
+  readonly blockerDescription: string | null;
+}
 export interface ProjectHourEntryReader {
+  weeklyHoursByProjectForUser(
+    userId: string, projectIds: readonly string[], from: Date, through: Date,
+  ): Promise<readonly { projectId: string; hours: number }[]>;
+  approvedProjectEvents(
+    projectId: string, limit: number,
+  ): Promise<{ entries: readonly CollaboratorProjectEventRecord[]; truncated: boolean }>;
+
   /** Fecha de la hora aprobada más reciente del proyecto — el "actualizado al" de la tarjeta de horas. `null` si no tiene ninguna. */
   maxApprovedEntryDateForProject(projectId: string): Promise<Date | null>;
   /**

@@ -315,7 +315,7 @@ function shiftIsoDate(iso: string, days: number): string {
  * "Roadmap por Fases" del proyecto — lo usan tanto el portal de cliente como el Roadmap interno
  * (`ProjectModulesCard`), así ambas vistas muestran exactamente lo mismo.
  */
-export function toPhaseRoadmap(project: ProjectDetail): ProjectPhaseRoadmap {
+export function toPhaseRoadmap(project: Pick<ProjectDetail, 'modules' | 'observations' | 'startDate' | 'endDate'>): ProjectPhaseRoadmap {
   const observationsByModule = new Map<string, ProjectObservation[]>();
   for (const observation of project.observations) {
     if (!observation.moduleId) continue;

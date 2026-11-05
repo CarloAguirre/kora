@@ -902,6 +902,31 @@ export const projectDetailSchema = projectSummarySchema.omit({ supportPlanType: 
 });
 export type ProjectDetail = z.infer<typeof projectDetailSchema>;
 
+// Solo datos operativos. Quedan fuera cotizaciones, facturación y contactos.
+export const collaboratorProjectSummarySchema = projectSummarySchema.pick({
+  id: true, name: true, slug: true, type: true, status: true, phase: true,
+  client: true, leader: true, startDate: true, endDate: true, progress: true,
+}).extend({ weekHours: z.number().nonnegative() });
+export type CollaboratorProjectSummary = z.infer<typeof collaboratorProjectSummarySchema>;
+
+export const collaboratorProjectEventSchema = z.object({
+  id: uuidSchema, date: z.iso.date(), createdAt: isoDateTimeSchema,
+  userName: z.string(), moduleName: z.string().nullable(),
+  activity: z.string(), description: z.string(), hours: z.number().nonnegative(),
+  hasBlocker: z.boolean(), blockerDescription: z.string().nullable(),
+});
+export type CollaboratorProjectEvent = z.infer<typeof collaboratorProjectEventSchema>;
+
+export const collaboratorProjectDetailSchema = collaboratorProjectSummarySchema.omit({ weekHours: true }).extend({
+  estimatedDeliveryDate: z.string().nullable(),
+  modules: z.array(projectModuleSchema),
+  observations: z.array(projectObservationSchema),
+  events: z.array(collaboratorProjectEventSchema),
+  activityTruncated: z.boolean(),
+});
+export type CollaboratorProjectDetail = z.infer<typeof collaboratorProjectDetailSchema>;
+
+
 /** Equipo asignado desde la creación del proyecto — ver `project_teams` (v1: `equipo_proyecto`). */
 export const createProjectTeamAssignmentSchema = z.object({
   teamId: uuidSchema,

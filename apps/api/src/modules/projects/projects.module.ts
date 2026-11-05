@@ -22,6 +22,7 @@ import { UpdateProjectObservationUseCase } from './application/use-cases/update-
 import { ResolveProjectObservationUseCase } from './application/use-cases/resolve-project-observation.use-case';
 import { DeleteProjectObservationUseCase } from './application/use-cases/delete-project-observation.use-case';
 import { ProjectChangeLogRecorder } from './application/services/project-change-log.recorder';
+import { CollaboratorProjectActivityService } from './application/services/collaborator-project-activity.service';
 import { ForecastSourceSyncService } from './application/services/forecast-source-sync.service';
 import { PaymentMilestoneTriggerService } from './application/services/payment-milestone-trigger.service';
 import { ProjectProgressRecalculator } from './application/services/project-progress-recalculator';
@@ -113,6 +114,7 @@ import { DrizzleSupportContractStatusReader } from './infrastructure/services/dr
     ResolveProjectObservationUseCase,
     DeleteProjectObservationUseCase,
     ProjectChangeLogRecorder,
+    CollaboratorProjectActivityService,
     ForecastSourceSyncService,
     PaymentMilestoneTriggerService,
     ProjectProgressRecalculator,
