@@ -107,10 +107,10 @@ export function RecentHistoryCard({ weekStart, onWeekStartChange, tasks = [], re
 
   const closeDetail = () => setSelected(null);
   const closeEdit = () => setEditing(null);
+  const canOfferEdit = (entry: HourEntrySummary) =>
+    entry.user.id === user?.id && entry.status !== 'approved';
   const canEdit = (entry: HourEntrySummary) =>
-    entry.user.id === user?.id &&
-    entry.status !== 'approved' &&
-    (canEditAnyMonth(user?.role) || isInCurrentMonth(entry.date));
+    canOfferEdit(entry) && (canEditAnyMonth(user?.role) || isInCurrentMonth(entry.date));
 
   const columns: Column<HourEntrySummary>[] = [
     { key: 'date', header: 'Fecha', render: (entry) => formatDate(entry.date) },
@@ -131,15 +131,17 @@ export function RecentHistoryCard({ weekStart, onWeekStartChange, tasks = [], re
         <Button size="icon" variant="ghost" title="Ver detalle de este registro"
           aria-label={'Ver registro del ' + formatDate(entry.date)}
           onClick={() => setSelected(entry)}><EyeIcon size={16} /></Button>
-        {canEdit(entry) && <Button size="icon" variant="ghost"
-          title="Editar registro de horas"
+        {canOfferEdit(entry) && <Button size="icon" variant="ghost"
+          title={canEdit(entry) ? 'Editar registro de horas' : 'Solo se pueden editar registros del mes en curso'}
           aria-label={'Editar registro del ' + formatDate(entry.date)}
+          disabled={!canEdit(entry)}
           onClick={() => setEditing(entry)}><PencilIcon size={16} /></Button>}
       </div>,
     },
   ];
 
-  const selectedEntry = detail?.id === selected?.id ? detail : selected;
+  const currentDetail = detail?.id === selected?.id ? detail : null;
+  const selectedEntry = currentDetail ?? selected;
 
   return <Card className={styles.card}>
     <div className={styles.header}>
@@ -191,14 +193,14 @@ export function RecentHistoryCard({ weekStart, onWeekStartChange, tasks = [], re
             <HourEntryStatusBadge status={selectedEntry.status} />
             {selectedEntry.status === 'pending'
               ? <span>En revisión por {approverNames(selectedEntry)}</span>
-              : detail?.decisionBy
-                ? <span>por {detail.decisionBy.fullName}</span> : null}
+              : currentDetail?.decisionBy
+                ? <span>por {currentDetail.decisionBy.fullName}</span> : null}
           </span>
         </DetailItem>
         {selectedEntry.status === 'rejected' && selectedEntry.rejectionReason &&
           <DetailItem label="Motivo de rechazo">{selectedEntry.rejectionReason}</DetailItem>}
-        {detail?.decisionAt && selectedEntry.status !== 'pending' &&
-          <DetailItem label="Fecha de decisión">{new Date(detail.decisionAt).toLocaleString('es-CL')}</DetailItem>}
+        {currentDetail?.decisionAt && selectedEntry.status !== 'pending' &&
+          <DetailItem label="Fecha de decisión">{new Date(currentDetail.decisionAt).toLocaleString('es-CL')}</DetailItem>}
       </dl>}
       {selected && loadingDetail && <p className={styles.note}>Consultando estado y responsable de la decisión…</p>}
       {selected && detailError && <p className={styles.note} role="alert">
