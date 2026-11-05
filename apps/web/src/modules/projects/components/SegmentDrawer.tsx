@@ -9,6 +9,7 @@ import {
 } from '@kora/contracts';
 import { Modal } from '@/shared/components/ui/Modal';
 import { Button } from '@/shared/components/ui/Button';
+import { TextField } from '@/shared/components/ui/TextField';
 import { CopyIcon, PencilIcon, TrashIcon } from '@/shared/components/icons/Icons';
 import { useToast } from '@/shared/components/ui/Toast';
 import { ApiRequestError } from '@/shared/lib/api-client';
@@ -70,6 +71,7 @@ export function SegmentDrawer({
   const toast = useToast();
   const updateDelivery = useUpdateProjectModuleDelivery();
   const [showDeliveryForm, setShowDeliveryForm] = useState(false);
+  const [completedOn, setCompletedOn] = useState(currentChileDate);
   const [comment, setComment] = useState('');
   const team = project.teams.find((item) => item.teamId === segment.teamId);
   const delivery = module.deliveries.find((item) => item.segmentId === segment.id) ?? null;
@@ -93,49 +95,59 @@ export function SegmentDrawer({
     : state === 'Cerrado' || state === 'Entregada' ? styles.stateClosed
       : styles.statePending;
 
-  const canMarkDelivered = delivery?.status === 'planned' && Boolean(onEdit) &&
-    Boolean(delivery.canManage) && Boolean(delivery.assigneeUserId);
-  // El backend puede fijar closedAt al aprobar todas las tareas aunque una
-  // entrega siga planificada. Mientras falte presentarla, el panel permanece
-  // en estado "Entrega vencida" y permite agregar trabajo como el prototipo.
+  const tasksAreApproved = tasks.length > 0 && tasks.every((task) => task.status === 'done');
+  const canShowDeliveryAction = delivery?.status === 'planned' && Boolean(onEdit) &&
+    Boolean(delivery.canManage);
+  const canMarkDelivered = canShowDeliveryAction && tasksAreApproved;
   const canAddTask = Boolean(onAddTask) && !closedByDelivery &&
     (delivery?.status === 'planned' || !segment.closedAt);
-  const canReopen = Boolean(segment.closedAt) && Boolean(onChangeClosure) &&
-    (!delivery || delivery.status === 'approved');
-  // El API rechaza closureAction='close' si existe una entrega vinculada.
-  // Por eso la acción manual solo se habilita para bloques sin entrega y
-  // con al menos una tarea, todas aprobadas. No confundir "100% de tareas"
-  // con la aprobación de una entrega de cierre.
-  const tasksAreApproved = tasks.length > 0 && tasks.every((task) => task.status === 'done');
+  const canReopen = Boolean(onChangeClosure) && (!delivery && Boolean(segment.closedAt) ||
+    delivery?.status === 'approved');
   const canCloseManually = !segment.closedAt && !delivery && tasksAreApproved &&
     Boolean(onChangeClosure);
-  const closeHint = delivery
-    ? 'Este bloque tiene entrega de cierre: debe marcarse como entregada y aprobarse.'
-    : !tasks.length
-      ? 'Agrega tareas al bloque y apruébalas antes de cerrarlo.'
-      : !tasksAreApproved
-        ? 'Se habilita cuando todas las tareas estén aprobadas.'
-        : 'Cerrar manualmente este bloque de trabajo.';
+  const closeHint = !tasks.length
+    ? 'Agrega tareas al bloque y apruébalas antes de cerrarlo.'
+    : !tasksAreApproved
+      ? 'Se habilita cuando todas las tareas estén aprobadas.'
+      : 'Cerrar manualmente este bloque de trabajo.';
   const pendingReferences = reference?.tasks.some((task) =>
     task.teamId === segment.teamId && !tasks.some((saved) =>
       saved.description?.includes(' · WBS ' + task.wbs + ' · ' + task.role))) ?? false;
 
+  const validCompletionDate = completedOn >= segment.startDate && completedOn <= today;
   const submitDelivery = async () => {
-    if (!delivery || !canMarkDelivered || !comment.trim()) return;
+    if (!delivery || !canMarkDelivered || !validCompletionDate) return;
     try {
       await updateDelivery.mutateAsync({
         projectId: project.id, moduleId: module.id, deliveryId: delivery.id,
-        input: { status: 'delivered', comment: comment.trim() },
+        input: { finalizeBlock: true, completedOn,
+          ...(comment.trim() ? { comment: comment.trim() } : {}) },
       });
-      toast.success('Entrega marcada como realizada; queda pendiente de aprobación.');
-      onClose();
+      setShowDeliveryForm(false);
+      toast.success('Bloque cerrado con su entrega registrada.');
     } catch (error) {
       toast.error(error instanceof ApiRequestError
-        ? error.message : 'No se pudo registrar la entrega.');
+        ? error.message : 'No se pudo marcar el bloque como entregado.');
+    }
+  };
+  const reopen = async () => {
+    if (delivery?.status !== 'approved') {
+      onChangeClosure?.('reopen');
+      return;
+    }
+    try {
+      await updateDelivery.mutateAsync({
+        projectId: project.id, moduleId: module.id, deliveryId: delivery.id,
+        input: { reopenBlock: true },
+      });
+      toast.success('Bloque reabierto.');
+    } catch (error) {
+      toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo reabrir el bloque.');
     }
   };
 
-  return <Modal open side compactSide className={styles.drawer} title={segment.name}
+  return <>
+  <Modal open side compactSide className={styles.drawer} title={segment.name}
     eyebrow={'Fase ' + (project.modules.findIndex((item) => item.id === module.id) + 1) +
       ': ' + module.name}
     onClose={onClose}
@@ -181,8 +193,9 @@ export function SegmentDrawer({
             (expectedPercent === null ? 'sin fechas de referencia.' :
               expectedPercent + '% según el plan a hoy.')}
           {' '}
-          {closedByDelivery && 'Cerrado con entrega aprobada' +
-            (segment.closedAt ? ' el ' + dateFull(segment.closedAt) : '') + '.'}
+          {closedByDelivery && 'Cerrado por entrega' +
+            (delivery?.completedOn ? ' el ' + dateFull(delivery.completedOn) :
+              segment.closedAt ? ' el ' + dateFull(segment.closedAt) : '') + '.'}
           {closedWithoutDelivery && 'Cierre del bloque registrado el ' +
             dateFull(segment.closedAt!) + '.'}
           {deliveryOverdue && 'La entrega de cierre está vencida.'}
@@ -211,29 +224,23 @@ export function SegmentDrawer({
               <small>Fecha planificada: {dateFull(delivery.estimatedDate)}
                 {deliveryOverdue ? ' (vencida)' : ''}</small>
               {delivery.assigneeName && <small>Responsable: {delivery.assigneeName}</small>}
-              {delivery.status === 'approved' && <small>Entrega aprobada</small>}
+              {delivery.status === 'approved' && <>
+                {delivery.completedOn ? <small>
+                  Entregada el {dateFull(delivery.completedOn)}
+                  {delivery.completedByName ? ' por ' + delivery.completedByName : ''}
+                  {delivery.completedOn > delivery.estimatedDate ? ', con atraso' : ', en fecha'}.
+                </small> : <small>Entrega aprobada</small>}
+                {delivery.completionComment && <small>«{delivery.completionComment}»</small>}
+              </>}
               {delivery.status === 'delivered' && <small>Entregada; pendiente de aprobación</small>}
             </div>
           </div>
-          {canMarkDelivered && <>
-            {!showDeliveryForm ? <button type="button" className={styles.markDelivered}
-              onClick={() => setShowDeliveryForm(true)}>Marcar como entregada</button> :
-              <div className={styles.deliveryForm}>
-                <label htmlFor={'delivery-comment-' + delivery.id}>Comentario de entrega</label>
-                <textarea id={'delivery-comment-' + delivery.id} rows={3}
-                  maxLength={1000} placeholder="Describe la entrega realizada"
-                  value={comment} onChange={(event) => setComment(event.target.value)} />
-                <div className={styles.deliveryActions}>
-                  <Button size="sm" variant="outline" onClick={() => setShowDeliveryForm(false)}>
-                    Cancelar
-                  </Button>
-                  <Button size="sm" disabled={!comment.trim() || updateDelivery.isPending}
-                    loading={updateDelivery.isPending} onClick={() => void submitDelivery()}>
-                    Confirmar entrega
-                  </Button>
-                </div>
-              </div>}
-          </>}
+          {canShowDeliveryAction && <span className={styles.deliveryButtonWrapper}
+            title={canMarkDelivered ? 'Registrar el cierre del bloque con su entrega.' : closeHint}>
+            <button type="button" className={styles.markDelivered}
+              disabled={!canMarkDelivered || updateDelivery.isPending}
+              onClick={() => setShowDeliveryForm(true)}>Marcar como entregado</button>
+          </span>}
         </> : <p className={styles.closureNote}>
           {segment.closedAt
             ? 'Este bloque no tiene entrega de cierre. Su cierre quedó registrado el ' +
@@ -241,7 +248,8 @@ export function SegmentDrawer({
             : 'Este bloque no tiene entrega de cierre. Puedes registrarla desde «Editar bloque».'}
         </p>}
         {canReopen && <Button size="sm" variant="outline"
-          onClick={() => onChangeClosure?.('reopen')}>Reabrir bloque</Button>}
+          disabled={updateDelivery.isPending}
+          onClick={() => void reopen()}>Reabrir bloque</Button>}
       </section>
 
       {segment.members.length > 0 && <section className={styles.membersSection}>
@@ -258,7 +266,6 @@ export function SegmentDrawer({
           <Button size="sm" variant="outline" disabled={!canCloseManually}
             onClick={() => onChangeClosure('close')}>Cerrar bloque</Button>
         </span>
-        {!canCloseManually && <small title={closeHint}>{closeHint}</small>}
       </div>}
 
       <section className={styles.tasksSection} aria-label="Tareas del bloque">
@@ -300,5 +307,27 @@ export function SegmentDrawer({
         </ul> : <p className={styles.emptyTasks}>Sin tareas operativas vinculadas a este bloque.</p>}
       </section>
     </div>
-  </Modal>;
+  </Modal>
+  {showDeliveryForm && delivery && <Modal open title="Marcar como entregada"
+    description={delivery.name + ', del bloque ' + segment.name +
+      '. Se registrará el cierre del bloque al confirmar.'}
+    onClose={() => setShowDeliveryForm(false)}
+    dismissible={!updateDelivery.isPending}
+    footer={<div className={styles.completionFooter}>
+      <Button variant="outline" disabled={updateDelivery.isPending}
+        onClick={() => setShowDeliveryForm(false)}>Volver</Button>
+      <Button disabled={!validCompletionDate || updateDelivery.isPending}
+        loading={updateDelivery.isPending} onClick={() => void submitDelivery()}>
+        Marcar como entregada
+      </Button>
+    </div>}>
+    <div className={styles.completionForm}>
+      <TextField label="Fecha de entrega" type="date" required
+        min={segment.startDate} max={today} value={completedOn}
+        onChange={(event) => setCompletedOn(event.target.value)} />
+      <TextField label="Comentario o link de evidencia" placeholder="Opcional"
+        maxLength={1000} value={comment} onChange={(event) => setComment(event.target.value)} />
+    </div>
+  </Modal>}
+  </>;
 }
