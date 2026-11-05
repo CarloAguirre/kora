@@ -200,6 +200,10 @@ export const projectModuleDeliverySchema = z.object({
   rejectionReason: z.string().nullable(),
   /** Cuándo se agregó la entrega al proyecto (ISO) — fecha de su fila en la bitácora; la agendada es `estimatedDate`. */
   createdAt: z.string(),
+  /** Metadatos del cierre de bloque, nulos para entregas no finalizadas o históricas. */
+  completedOn: z.iso.date().nullable().optional(),
+  completedByName: z.string().nullable().optional(),
+  completionComment: z.string().nullable().optional(),
   /**
    * ¿Quien consulta puede gestionarla (asignar, aprobar, rechazar, revertir, editar)? Líder del proyecto,
    * PMO/admin o líder del equipo responsable — mismo criterio que `UpdateProjectModuleDeliveryUseCase`.
