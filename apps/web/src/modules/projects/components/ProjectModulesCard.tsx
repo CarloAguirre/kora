@@ -25,7 +25,7 @@ import { ApiRequestError } from '@/shared/lib/api-client';
 import { PhaseRoadmap, type PhaseRoadmapSelection, type OperationalRoadmapRow } from '@/modules/client-portal/components/PhaseRoadmap';
 import { roleFromTeamName, toPhaseRoadmap } from '@/modules/client-portal/adapters/project-detail.adapter';
 import { PHASE_ROADMAP_ROLE_COLORS } from '@/modules/client-portal/types';
-import { useCreateProjectModule, useCreateProjectModuleSegment, useDeleteProjectModule, useDeleteProjectModuleSegment, useDeleteProjectModuleTask, useUpdateProjectModule, useUpdateProjectModuleSegment } from '../api/projects.queries';
+import { useCreateProjectModule, useCreateProjectModuleSegment, useDeleteProjectModule, useDeleteProjectModuleSegment, useDeleteProjectModuleTask, useUpdateProjectModule, useUpdateProjectModuleSegment, useUpdateProjectModuleTask } from '../api/projects.queries';
 import { useConfirmAction } from '@/shared/components/ui/useConfirmAction';
 import { useExcludeRoadmapReference, useRoadmapReferenceExclusions } from '../api/projects.queries';
 import { QuotationReferenceTaskModal } from './QuotationReferenceTaskModal';
@@ -35,6 +35,7 @@ import { NewWorkBlockModal, type WorkBlockFormInput } from './NewWorkBlockModal'
 import { AssignBlockTasksModal } from './AssignBlockTasksModal';
 import { NewOperationalTaskModal } from './NewOperationalTaskModal';
 import { SegmentDrawer } from './SegmentDrawer';
+import { ReviewActionModal, type ReviewAction } from './ReviewActionModal';
 import { ReferenceBlockDrawer } from './ReferenceBlockDrawer';
 import { useAppliedQuotationPlanning } from '@/modules/estimation/api/quotation.queries';
 import { indexTeamBlockProgress, roadmapBlockMetrics } from '../lib/team-progress';
@@ -95,7 +96,8 @@ interface ProjectModulesCardProps {
  * detalle del ítem seleccionado (tramo con lápiz para editarlo sin pasar por "Editar proyecto",
  * tarea, entrega o incidentes). La etapa actual se muestra pero no se cambia acá — un select que
  * guardaba al elegir hacía fácil cambiarla sin querer —; se cambia en "Editar proyecto", igual que
- * crear/quitar fases y entregas. Aprobar/rechazar tareas, en la vista de líder de equipo.
+ * crear/quitar fases y entregas. La revisión de tareas está disponible aquí y
+ * también en la vista del líder de equipo; ambas usan el mismo endpoint y modal.
  */
 export function ProjectModulesCard({ project, hourEntries, teamOptions, canManage }: ProjectModulesCardProps) {
   const toast = useToast();
@@ -106,6 +108,7 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
   const createSegment = useCreateProjectModuleSegment();
   const deleteSegment = useDeleteProjectModuleSegment();
   const deleteTask = useDeleteProjectModuleTask();
+  const updateTask = useUpdateProjectModuleTask();
   const { confirm, dialog: confirmationDialog } = useConfirmAction();
   const appliedPlanning = useAppliedQuotationPlanning(project.id);
   const roadmapExclusions = useRoadmapReferenceExclusions(project.id);
@@ -113,6 +116,38 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
   const phaseRoadmap = useMemo(() => toPhaseRoadmap(project), [project]);
   const modulesById = useMemo(() => new Map(project.modules.map((module) => [module.id, module])), [project.modules]);
   const blockProgressById = useMemo(() => indexTeamBlockProgress(project), [project]);
+  const pendingReview = useMemo(() => project.modules.flatMap((module) =>
+    module.tasks.filter((task) => !task.cancelledAt && task.status === 'in_review')
+      .map((task) => ({ moduleId: module.id, moduleName: module.name, task })),
+  ), [project.modules]);
+  const [reviewTarget, setReviewTarget] = useState<{
+    moduleId: string; taskId: string; action: ReviewAction;
+  } | null>(null);
+  const reviewing = reviewTarget ? project.modules.find((module) =>
+    module.id === reviewTarget.moduleId)?.tasks.find((task) => task.id === reviewTarget.taskId) : null;
+  const confirmReview = async (reason?: string) => {
+    if (!reviewTarget || !reviewing || reviewing.status !== 'in_review') return;
+    try {
+      await updateTask.mutateAsync({
+        projectId: project.id, moduleId: reviewTarget.moduleId, taskId: reviewTarget.taskId,
+        input: reviewTarget.action === 'approve'
+          ? { status: 'done', rejectionReason: null }
+          : { status: 'in_progress', rejectionReason: reason ?? '' },
+      });
+      toast.success(reviewTarget.action === 'approve' ? 'Tarea aprobada.' : 'Tarea devuelta al colaborador.');
+      setReviewTarget(null);
+    } catch (error) {
+      toast.error(error instanceof ApiRequestError ? error.message :
+        'No fue posible revisar la tarea.');
+    }
+  };
+  const reviewActions = (moduleId: string, task: ProjectModuleTask) =>
+    <div className={styles.reviewActions}>
+      <Button size="sm" disabled={updateTask.isPending}
+        onClick={() => setReviewTarget({ moduleId, taskId: task.id, action: 'approve' })}>Aprobar</Button>
+      <Button size="sm" variant="outline" disabled={updateTask.isPending}
+        onClick={() => setReviewTarget({ moduleId, taskId: task.id, action: 'reject' })}>Devolver</Button>
+    </div>;
 
   /** Tiempo de ejecución que se está editando (`null` = modal cerrado). */
   const [editingSegment, setEditingSegment] = useState<{ moduleId: string; segment: ProjectModuleSegment } | null>(null);
@@ -587,6 +622,8 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
                   <td>{task.estimatedHours ?? '—'} / —</td>
                   <td>{formatDate(task.date)}</td>
                   <td className={styles.operationalTaskActions}>
+                    {canManage && task.status === 'in_review' && !task.cancelledAt &&
+                      reviewActions(module.id, task)}
                     {canManage && <>
                       <button type="button" className={styles.taskIconAction}
                         aria-label={'Editar tarea ' + task.name} title="Editar tarea"
@@ -750,6 +787,25 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
         operationalPresaleHours={project.prospectPhaseHours}
         operationalRows={getOperationalRows}
         operationalMetrics={getOperationalMetrics}
+        operationalNotice={canManage && pendingReview.length > 0 ? (
+          <section className={styles.reviewNotice} aria-label="Tareas por aprobar">
+            <header className={styles.reviewNoticeHead}>
+              <strong>Tareas por aprobar ({pendingReview.length})</strong>
+              <small>El colaborador las marcó como terminadas. Al aprobarlas, suman al avance.</small>
+            </header>
+            {pendingReview.map(({ moduleId, moduleName, task }) => (
+              <div className={styles.reviewNoticeRow} key={task.id}>
+                <div>
+                  <strong>{task.name}</strong>
+                  <small>{task.assigneeName ?? 'Sin responsable'} · {moduleName}.
+                    {task.estimatedHours == null ? '' : ' ' + task.estimatedHours + ' HH estimadas.'}
+                  </small>
+                </div>
+                {reviewActions(moduleId, task)}
+              </div>
+            ))}
+          </section>
+        ) : undefined}
         operationalFooter={canManage ? <button type="button" className={styles.addPhaseButton}
           onClick={() => setAddingPhase(true)}>+ Agregar fase</button> : undefined}
         onPlanOperationalRow={canManage && planningMode ? (phase, row) => {
@@ -803,6 +859,19 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
         />
       )}
       {confirmationDialog}
+      <ReviewActionModal open={Boolean(reviewTarget && reviewing)}
+        action={reviewTarget?.action ?? 'approve'}
+        title={reviewTarget?.action === 'reject' ? 'Devolver tarea' : 'Aprobar tarea'}
+        confirmLabel={reviewTarget?.action === 'reject' ? 'Devolver' : 'Aprobar'}
+        summary={[
+          { label: 'Tarea', value: reviewing?.name ?? '—' },
+          { label: 'Colaborador', value: reviewing?.assigneeName ?? 'Sin responsable' },
+          { label: 'HH estimadas', value: reviewing?.estimatedHours == null ?
+            'Sin definir' : reviewing.estimatedHours + ' HH' },
+        ]}
+        submitting={updateTask.isPending}
+        onCancel={() => setReviewTarget(null)}
+        onConfirm={(reason) => void confirmReview(reason)} />
       {addingTask && <NewOperationalTaskModal
         key={addingTask.moduleId + ':' + (addingTask.segmentId ?? '')}
         project={project} moduleId={addingTask.moduleId}
