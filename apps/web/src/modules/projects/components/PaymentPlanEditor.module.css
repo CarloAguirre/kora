@@ -1,4 +1,7 @@
 .editor {
+  min-width: 0;
+  width: 100%;
+  container-type: inline-size;
   display: flex;
   flex-direction: column;
   gap: var(--kora-space-3);
@@ -48,6 +51,7 @@
 }
 
 .table {
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: var(--kora-space-2);
@@ -155,13 +159,14 @@
   color: var(--kora-text-muted);
 }
 
-@media (max-width: 860px) {
+/* Adaptar por ancho REAL del editor/drawer, no por el viewport. */
+@container (max-width: 780px) {
   .headRow {
     display: none;
   }
 
   .row {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     padding-bottom: var(--kora-space-3);
     border-bottom: 1px solid var(--kora-surface-disabled);
   }
@@ -173,4 +178,9 @@
   .quotaFields {
     grid-template-columns: 1fr;
   }
+}
+
+@container (max-width: 430px) {
+  .row { grid-template-columns: minmax(0, 1fr); }
+  .contractRow > :first-child { flex-basis: 100%; }
 }
