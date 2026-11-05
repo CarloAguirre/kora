@@ -109,7 +109,7 @@ export function RecentHistoryCard({ weekStart, onWeekStartChange, tasks = [] }: 
       loading={isLoading} error={error ? 'No se pudo cargar el historial de horas.' : null}
       emptyMessage={period.mode === 'week'
         ? 'No hay registros en esta semana.' : 'No hay registros en este período.'}
-      topScrollbar />
+      />
     {data && <Pagination page={page} pageCount={data.pageCount}
       total={data.total} pageSize={data.pageSize} onPageChange={setPage}
       onPageSizeChange={(size) => { setPageSize(size); setPage(1); }} />}
