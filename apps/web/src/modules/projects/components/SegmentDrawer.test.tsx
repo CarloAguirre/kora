@@ -173,6 +173,32 @@ describe('Bloque operativo: fidelidad de los tres estados v5.02', () => {
     expect(mocks.success).toHaveBeenCalled();
   });
 
+  it('permite confirmar la entrega con fecha y sin comentario obligatorio', async () => {
+    show({ deliveries: [delivery('planned')], onChangeClosure: vi.fn() });
+    fireEvent.click(screen.getByRole('button', { name: 'Marcar como entregado' }));
+    const form = screen.getByRole('dialog', { name: 'Marcar como entregada' });
+    fireEvent.change(within(form).getByLabelText('Fecha de entrega'), {
+      target: { value: '2026-10-16' },
+    });
+    expect(within(form).getByRole('button', { name: 'Marcar como entregada' })).toBeEnabled();
+    fireEvent.click(within(form).getByRole('button', { name: 'Marcar como entregada' }));
+    await waitFor(() => expect(mocks.updateDelivery).toHaveBeenCalledWith({
+      projectId: 'project-1', moduleId: 'module-1', deliveryId: 'delivery-1',
+      input: { finalizeBlock: true, completedOn: '2026-10-16' },
+    }));
+  });
+
+  it('reabrir una entrega finalizada usa la transición específica y deja registro', async () => {
+    show({ deliveries: [{
+      ...delivery('approved'), completedOn: '2026-10-30',
+    } as ProjectModuleDelivery], onChangeClosure: vi.fn() });
+    fireEvent.click(screen.getByRole('button', { name: 'Reabrir bloque' }));
+    await waitFor(() => expect(mocks.updateDelivery).toHaveBeenCalledWith({
+      projectId: 'project-1', moduleId: 'module-1', deliveryId: 'delivery-1',
+      input: { reopenBlock: true },
+    }));
+  });
+
   it('cierre sin entrega: explica el cierre registrado sin inventar autor', () => {
     const onChangeClosure = vi.fn();
     show({ deliveries: [], onChangeClosure });
