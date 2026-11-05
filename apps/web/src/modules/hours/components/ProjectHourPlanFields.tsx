@@ -1,7 +1,7 @@
 import type { ProjectPhaseOption } from '@kora/contracts';
 import { Select } from '@/shared/components/ui/Select';
 import styles from './HourEntryFormDialog.module.css';
-import { formatTaskHourSummary, OTHER_TASK_OPTION } from './DailyEntryForm';
+import { formatTaskHourSummary, OTHER_TASK_OPTION } from './hour-task-selection';
 
 type PlanSegment = Pick<ProjectPhaseOption['segments'][number], 'id' | 'name' | 'teamName' | 'startDate' | 'endDate'>;
 type PlanTask = Pick<ProjectPhaseOption['tasks'][number], 'id' | 'name' | 'estimatedHours' | 'actualHours'>;
