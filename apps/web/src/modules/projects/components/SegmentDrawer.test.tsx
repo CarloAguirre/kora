@@ -125,9 +125,34 @@ describe('Bloque operativo: fidelidad de los tres estados v5.02', () => {
     expect(within(dialog).getByText('Entrega aprobada')).toBeInTheDocument();
     expect(within(dialog).getByRole('heading', { name: 'Tareas (2)' })).toBeInTheDocument();
     expect(within(dialog).getAllByText('Aprobada')).toHaveLength(2);
-    expect(within(dialog).getByRole('button', { name: 'Reabrir bloque' })).toBeEnabled();
+    const reopen = within(dialog).getByRole('button', { name: 'Reabrir bloque' });
+    expect(reopen).toBeEnabled();
+    expect(reopen.className).toContain('reopenButton');
     expect(within(dialog).getByRole('button', { name: 'Eliminar bloque' })).toBeEnabled();
     expect(within(dialog).getByRole('button', { name: 'Editar bloque' })).toBeEnabled();
+  });
+
+  it('usa los colores semánticos y Por asignar también dentro del panel lateral', () => {
+    show({
+      tasks: [
+        task('Tarea aprobada', 'done'),
+        task('Tarea completada', 'in_review'),
+        task('Tarea en curso', 'in_progress'),
+        task('Tarea pendiente', 'todo'),
+        { ...task('Tarea no asignada', 'todo'), assigneeUserId: null } as ProjectModuleTask,
+      ],
+    });
+    const dialog = screen.getByRole('dialog', { name: 'Bot de conciliación' });
+    const expected = [
+      ['Aprobada', 'taskApproved'],
+      ['Completada', 'taskReview'],
+      ['En curso', 'taskInProgress'],
+      ['Pendiente', 'taskPending'],
+      ['Por asignar', 'taskUnassigned'],
+    ] as const;
+    for (const [name, colorClass] of expected) {
+      expect(within(dialog).getByText(name).className).toContain(colorClass);
+    }
   });
 
   it('muestra HH de tareas aprobadas, no las HH consumidas, bajo el avance', () => {
