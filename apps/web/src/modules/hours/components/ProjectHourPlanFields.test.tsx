@@ -1,3 +1,4 @@
+import type { ProjectPhaseOption } from '@kora/contracts';
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { ProjectHourPlanFields } from './ProjectHourPlanFields';
@@ -46,8 +47,8 @@ describe('Vincula estas horas al plan', () => {
         segmentId: 'segment-1', assigneeUserId: 'user-1', cancelledAt: null,
       }],
     };
-    expect(resolveHourApprover([phase] as never, 'user-1')).toBe('Eduardo Aranda');
-    expect(resolveHourApprover([phase] as never, 'unassigned')).toBeNull();
+    expect(resolveHourApprover([phase] as unknown as ProjectPhaseOption[], 'user-1')).toBe('Eduardo Aranda');
+    expect(resolveHourApprover([phase] as unknown as ProjectPhaseOption[], 'unassigned')).toBeNull();
     const ambiguous = {
       ...phase,
       segments: [...phase.segments, {
@@ -57,8 +58,8 @@ describe('Vincula estas horas al plan', () => {
         ...phase.tasks[0]!, id: 'task-2', segmentId: 'segment-2',
       }],
     };
-    expect(resolveHourApprover([ambiguous] as never, 'user-1')).toBeNull();
-    expect(resolveHourApprover([ambiguous] as never, 'user-1', 'segment-2')).toBe('Otro líder');
+    expect(resolveHourApprover([ambiguous] as unknown as ProjectPhaseOption[], 'user-1')).toBeNull();
+    expect(resolveHourApprover([ambiguous] as unknown as ProjectPhaseOption[], 'user-1', 'segment-2')).toBe('Otro líder');
   });
 
   it('permite elegir explícitamente Otro trabajo del bloque sin enviar un ID inexistente', () => {
