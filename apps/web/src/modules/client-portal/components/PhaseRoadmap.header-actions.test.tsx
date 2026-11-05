@@ -1,13 +1,19 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { PhaseRoadmap } from './PhaseRoadmap';
 import styles from './PhaseRoadmap.module.css';
 import type { ProjectPhaseRoadmap } from '../types';
 
-// Vitest/JSDOM puede transformar ?raw en un objeto CSS Module en lugar de texto.
-// Leer la fuente real evita depender de esa transformación al comprobar las reglas.
-const roadmapCssSource = readFileSync(new URL('./PhaseRoadmap.module.css', import.meta.url), 'utf8');
+// Vitest/JSDOM puede transformar import.meta.url en una URL que no es file:.
+// Se lee la fuente CSS real desde la raíz de apps/web o del monorepo.
+const roadmapCssSourcePath = [
+  resolve(process.cwd(), 'src/modules/client-portal/components/PhaseRoadmap.module.css'),
+  resolve(process.cwd(), 'apps/web/src/modules/client-portal/components/PhaseRoadmap.module.css'),
+].find((path) => existsSync(path));
+if (!roadmapCssSourcePath) throw new Error('No se encontró PhaseRoadmap.module.css para el test.');
+const roadmapCssSource = readFileSync(roadmapCssSourcePath, 'utf8');
 
 const phaseRoadmap: ProjectPhaseRoadmap = {
   phaseCount: 1,
