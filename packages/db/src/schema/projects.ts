@@ -342,6 +342,10 @@ export const projectModuleDeliveries = pgTable('project_module_deliveries', {
   status: projectModuleDeliveryStatusEnum('status').notNull().default('planned'),
   /** Motivo del último rechazo del líder — se limpia al aprobar o al volver a marcarla entregada. */
   rejectionReason: text('rejection_reason'),
+  /** Cierre confirmado de la entrega de un bloque: distinto de la fecha prometida. */
+  completedOn: date('completed_on', { mode: 'date' }),
+  completedByUserId: uuid('completed_by_user_id').references(() => users.id, { onDelete: 'set null' }),
+  completionComment: text('completion_comment'),
   ...timestamps,
 });
 
