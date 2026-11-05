@@ -176,6 +176,16 @@ describe('Bloque operativo: fidelidad de los tres estados v5.02', () => {
     expect(within(dialog).getByText('Devuelta')).toHaveAttribute('title', 'Corregir integración de fechas');
   });
 
+  it('muestra HH reales de bitácora por tarea sin inventar datos históricos', () => {
+    show({ tasks: [
+      { ...task('Diseño del bot'), actualHours: 6 },
+      { ...task('Desarrollo del bot'), actualHours: null },
+    ] });
+    const dialog = screen.getByRole('dialog', { name: 'Bot de conciliación' });
+    expect(within(dialog).getByText(/40 HH est.\s*\/ 6 HH reales/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/40 HH est.\s*\/ — HH reales/)).toBeInTheDocument();
+  });
+
   it('muestra HH de tareas aprobadas, no las HH consumidas, bajo el avance', () => {
     const withProgress = { ...segment, consumedHours: 88 } as ProjectModuleSegment;
     show({ segment: withProgress, deliveries: [delivery('planned')],
