@@ -7,24 +7,31 @@
   gap: var(--kora-space-3);
 }
 
+/* Una única fila: monto a la izquierda y ambos botones a la derecha.
+   No usar flex-wrap: forzaba los botones a bajar aun en el drawer de 600px. */
 .contractRow {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: var(--kora-space-4);
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  align-items: end;
+  column-gap: 8px;
+  min-width: 0;
 }
 
 .contractRow > :first-child {
-  /* Monto a la izquierda, botones a la derecha en el drawer de 600px. */
-  flex: 0 1 260px;
   min-width: 0;
+  width: 100%;
 }
 
 .toolbar {
   display: flex;
-  gap: var(--kora-space-2);
-  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
+.toolbar > * {
+  flex-shrink: 0;
 }
 
 .quotaPanel {
@@ -172,6 +179,12 @@
 /* Solo las pantallas realmente angostas convierten la tabla en tarjetas.
    Antes este umbral de 780px rompía todas las filas incluso con 600px. */
 @container (max-width: 515px) {
+  .contractRow {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 8px;
+  }
+  .toolbar { justify-content: flex-start; }
+
   .headRow {
     display: none;
   }
@@ -193,5 +206,4 @@
 
 @container (max-width: 430px) {
   .row { grid-template-columns: minmax(0, 1fr); }
-  .contractRow > :first-child { flex-basis: 100%; }
 }
