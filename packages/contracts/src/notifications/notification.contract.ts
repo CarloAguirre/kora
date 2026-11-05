@@ -57,7 +57,36 @@ export const teamReportDataRequestDataSchema = z.object({
 });
 export type TeamReportDataRequestData = z.infer<typeof teamReportDataRequestDataSchema>;
 
+/** Eventos persistidos de tareas. La notificación señala el proyecto y la tarea,
+ * la cola operativa se obtiene en vivo y se cierra al resolver in_review. */
+export const projectTaskNotificationDataSchema = z.object({
+  projectId: uuidSchema,
+  projectSlug: z.string(),
+  projectName: z.string(),
+  moduleId: uuidSchema,
+  taskId: uuidSchema,
+  taskName: z.string(),
+  assigneeName: z.string().nullable(),
+  reason: z.string().nullable(),
+});
+
 export const notificationSchema = z.discriminatedUnion('type', [
+  z.object({
+    id: uuidSchema,
+    type: z.literal('task_review_requested'),
+    title: z.string(),
+    data: projectTaskNotificationDataSchema,
+    readAt: isoDateTimeSchema.nullable(),
+    createdAt: isoDateTimeSchema,
+  }),
+  z.object({
+    id: uuidSchema,
+    type: z.literal('task_returned'),
+    title: z.string(),
+    data: projectTaskNotificationDataSchema,
+    readAt: isoDateTimeSchema.nullable(),
+    createdAt: isoDateTimeSchema,
+  }),
   z.object({
     id: uuidSchema,
     type: z.literal('team_report_data_request'),
