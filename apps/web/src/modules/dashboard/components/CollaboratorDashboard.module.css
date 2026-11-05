@@ -154,9 +154,10 @@
 .taskBottom b { font-weight: 600; }
 .overdueDate { color: #d23d3d; }
 .waiting { color: #77869a; font-size: 11.5px; white-space: nowrap; }
-.markDone {
+.task .markDone {
   background: #0f1729;
-  color: white;
+  border-color: #0f1729;
+  color: #fff;
   white-space: nowrap;
 }
 
