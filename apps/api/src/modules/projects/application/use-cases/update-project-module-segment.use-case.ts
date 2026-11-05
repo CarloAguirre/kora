@@ -114,11 +114,13 @@ export class UpdateProjectModuleSegmentUseCase
         'PROJECT_SEGMENT_DELIVERY_ALREADY_SUBMITTED',
       ));
     }
+    const activeLinkedTasks = linkedTasks.filter((task) => !task.cancelledAt);
     if (command.data.closureAction === 'close' &&
       (closingDelivery || command.data.closingDelivery ||
-        linkedTasks.some((task) => task.status !== 'done'))) {
+        activeLinkedTasks.length === 0 ||
+        activeLinkedTasks.some((task) => task.status !== 'done'))) {
       return err(new ForbiddenError(
-        'El cierre manual requiere no tener entrega vinculada y todas las tareas aprobadas.',
+        'El cierre manual requiere un bloque sin entrega y al menos una tarea activa, con todas aprobadas.',
         'PROJECT_SEGMENT_MANUAL_CLOSE_RESTRICTED',
       ));
     }
