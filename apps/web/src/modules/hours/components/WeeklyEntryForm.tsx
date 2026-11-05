@@ -20,6 +20,8 @@ import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { HOUR_ENTRY_PROJECT_STATUSES } from '../lib/selectable-project-statuses';
 import { ApiRequestError } from '@/shared/lib/api-client';
 import { overflowByBlock, selectAttributableTasks } from './DailyEntryForm';
+import { ProjectHourPlanFields } from './ProjectHourPlanFields';
+import { activityForTaskChange, OTHER_TASK_OPTION, toHourTaskId } from './hour-task-selection';
 
 /** Proyecto primero: es la asignación más común y el resto confundía al elegir. */
 const ASSIGNMENT_OPTIONS = [...HOUR_ENTRY_ASSIGNMENTS]
@@ -205,6 +207,8 @@ export function WeeklyEntryForm({
       return 'Selecciona una fase y su bloque de trabajo para imputar estas horas.';
     if (needsProject && availableSegments.length > 0 && !segmentId)
       return 'Selecciona el bloque al que corresponden estas HH.';
+    if (needsProject && segmentId && availableTasks.length > 0 && !taskId)
+      return 'Selecciona una tarea o «Otro trabajo del bloque».';
     if (needsApprover && !designatedApproverUserId) return 'Selecciona a quién aprueba estas horas.';
     if (needsProject && isOvertime && overtimeDisabled) return 'Este proyecto no tiene autorizadas horas extra.';
     if (!category.trim()) return 'Indica la actividad realizada.';
@@ -237,7 +241,7 @@ export function WeeklyEntryForm({
           projectId: needsProject ? projectId : undefined,
           moduleId: needsProject && moduleId ? moduleId : undefined,
           segmentId: needsProject && moduleId && segmentId ? segmentId : undefined,
-          taskId: needsProject && moduleId && taskId ? taskId : undefined,
+          taskId: needsProject && moduleId ? toHourTaskId(taskId) : undefined,
           category: category.trim(),
           description: description || undefined,
           hours: day.hours,
@@ -347,38 +351,35 @@ export function WeeklyEntryForm({
         )}
       </div>
 
-      {needsProject && projectId &&
-        (projectDetail?.modules.length ?? hourPhases?.length ?? 0) > 0 && (
-        <div className={styles.row}>
-          <Select label="Fase / Módulo"
-            required={hasEligibleRoadmapBlocks}
-            placeholder="Seleccionar fase..."
-            options={(projectDetail?.modules ?? hourPhases ?? []).map((module) =>
-              ({ value: module.id, label: module.name }))}
-            value={moduleId}
-            onChange={(event) => { setModuleId(event.target.value); setSegmentId(''); setTaskId(''); }} />
-          {selectedModule && availableSegments.length > 0 && (
-            <Select label="Bloque de trabajo" required
-              placeholder="Seleccionar bloque..."
-              options={availableSegments.map((segment) => ({
-                value: segment.id, label: segment.name + ' (' + segment.startDate + ' → ' + segment.endDate + ')',
-              }))}
-              value={segmentId} onChange={(event) => { setSegmentId(event.target.value); setTaskId(''); }} />
-          )}
-        </div>
-      )}
-
-      {needsProject && moduleId && availableTasks.length > 0 && (
-        <div className={styles.row}>
-          <Select label="Tarea" placeholder="Sin tarea específica (HH del bloque)"
-            options={availableTasks.map((task) => ({ value: task.id, label: task.name }))}
-            value={taskId} onChange={(event) => setTaskId(event.target.value)}
-            helperText="Las HH aprobadas se mostrarán como reales en esta tarea." />
-        </div>
+      {needsProject && projectId && (projectDetail?.modules ?? hourPhases ?? []).length > 0 && (
+        <ProjectHourPlanFields
+          phases={projectDetail?.modules ?? hourPhases ?? []}
+          phaseId={moduleId}
+          segments={availableSegments}
+          segmentId={segmentId}
+          tasks={availableTasks}
+          taskId={taskId}
+          requiresPhase={hasEligibleRoadmapBlocks}
+          approverName={projectDetail?.teams.find((team) =>
+            team.teamId === selectedModule?.segments.find((segment) => segment.id === segmentId)?.teamId
+          )?.leader?.fullName}
+          onPhaseChange={(id) => { setModuleId(id); setSegmentId(''); setTaskId(''); }}
+          onSegmentChange={(id) => { setSegmentId(id); setTaskId(''); }}
+          onTaskChange={(id) => {
+            setCategory((previous) => activityForTaskChange(
+              previous,
+              availableTasks.find((task) => task.id === taskId)?.name,
+              availableTasks.find((task) => task.id === id)?.name,
+            ));
+            setTaskId(id);
+          }}
+        />
       )}
 
       <div className={styles.row}>
-        <TextField label="Actividad" required placeholder="Ej: Diseño webapp" value={category} onChange={(event) => setCategory(event.target.value)} />
+        <TextField label="Actividad" required
+          placeholder={taskId === OTHER_TASK_OPTION ? 'Describe el trabajo realizado fuera de las tareas asignadas' : 'Ej: Diseño webapp'}
+          value={category} onChange={(event) => setCategory(event.target.value)} />
         <div className={styles.overtimeField}>
           <span className={styles.stepperLabel}>Horas Extra</span>
           <label
@@ -449,10 +450,14 @@ export function WeeklyEntryForm({
       )}
 
       <div className={styles.textareaField}>
-        <label className={styles.textareaLabel}>Descripción / Bitácora Detallada</label>
+        <label className={styles.textareaLabel}>
+          Descripción / Bitácora Detallada {availableTasks.some((task) => task.id === taskId) && '(opcional, ya está vinculada a una tarea)'}
+        </label>
         <textarea
           className={styles.textarea}
-          placeholder="Describa detalladamente el avance técnico realizado (mínimo 5 caracteres)"
+          placeholder={availableTasks.some((task) => task.id === taskId)
+            ? 'Agrega detalles si te sirven para la bitácora'
+            : 'Describa detalladamente el avance realizado (mínimo 5 caracteres)'}
           value={description}
           onChange={(event) => setDescription(event.target.value)}
         />
