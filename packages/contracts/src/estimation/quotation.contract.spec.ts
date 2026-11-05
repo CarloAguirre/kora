@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isQuotationDraftEligibleProject, approveClientQuotationSchema, type QuotationEligibilityProject } from './quotation.contract';
+import { isQuotationDraftEligibleProject, approveClientQuotationSchema, projectQuotationSchema, type QuotationEligibilityProject } from './quotation.contract';
 
 const base: QuotationEligibilityProject = { type: 'development', salesStage: 'quoted', status: 'draft' };
 
@@ -44,5 +44,24 @@ describe('Aprobación comercial directa sin envío', () => {
     expect(approveClientQuotationSchema.safeParse({
       ...input, confirmWithoutSend: 'true',
     }).success).toBe(false);
+  });
+});
+
+describe('ProjectQuotation · fecha auditada de traspaso', () => {
+  const quotation = {
+    id: '11111111-1111-4111-8111-111111111111',
+    projectId: '22222222-2222-4222-8222-222222222222',
+    versions: [],
+    transferredVersionId: null,
+  };
+  it('acepta transferredAt del evento de cotización y la conserva íntegra', () => {
+    const result = projectQuotationSchema.parse({
+      ...quotation, transferredAt: '2026-09-02T15:00:00.000Z',
+    });
+    expect(result.transferredAt).toBe('2026-09-02T15:00:00.000Z');
+  });
+  it('permite cotizaciones históricas sin transferredAt y rechaza fechas inválidas', () => {
+    expect(projectQuotationSchema.safeParse(quotation).success).toBe(true);
+    expect(projectQuotationSchema.safeParse({ ...quotation, transferredAt: '02/09/2026' }).success).toBe(false);
   });
 });
