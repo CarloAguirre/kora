@@ -6,7 +6,7 @@ import {
 } from './hour-task-selection';
 
 const tasks = [
-  { id: 'task-1', name: 'Modelo de datos', estimatedHours: 10, actualHours: 3 },
+  { id: 'task-1', name: 'Modelo de datos', estimatedHours: 10, actualHours: 3, pendingHours: 2 },
   { id: 'task-2', name: 'Interfaz', estimatedHours: 24, actualHours: null },
 ];
 const phases = [{ id: 'phase-1', name: 'Mejoras y correcciones' }];
@@ -32,6 +32,7 @@ describe('Vincula estas horas al plan', () => {
     expect(screen.getByLabelText(/^Bloque de trabajo/)).toHaveValue('segment-1');
     expect(screen.getByLabelText(/^Tarea/)).toHaveValue('task-1');
     expect(screen.getByText('3 de 10 HH aprobadas')).toBeInTheDocument();
+    expect(screen.getByText('2 HH pendientes de aprobación')).toBeInTheDocument();
     expect(screen.getByText(/Solo las aprobadas se suman a las reales del Roadmap/)).toBeInTheDocument();
     expect(screen.getByText('Aprobador: Eduardo Aranda')).toBeInTheDocument();
   });
