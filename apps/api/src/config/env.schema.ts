@@ -40,6 +40,8 @@ export const envSchema = z.object({
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   GOOGLE_CALLBACK_URL: z.string().optional(),
+  // PoC opt-in: nunca inicia OAuth Drive ni altera el login salvo habilitación explícita.
+  GOOGLE_DRIVE_OAUTH_POC_ENABLED: z.stringbool().default(false),
 
   // Integración servidor-a-servidor con Google Drive para los antecedentes de
   // proyectos. Ambas son opcionales: sin ellas, Calculadora informa que Drive

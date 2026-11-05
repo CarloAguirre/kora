@@ -118,6 +118,11 @@ export class AppConfigService {
     };
   }
 
+  /** Prueba de autorización temporal sobre OAuth web existente, apagada por defecto. */
+  get googleDriveOauthPocEnabled(): boolean {
+    return this.config.get('GOOGLE_DRIVE_OAUTH_POC_ENABLED', { infer: true });
+  }
+
   get googleDrive(): GoogleDriveSettings {
     const clientEmail = this.config.get('GOOGLE_DRIVE_CLIENT_EMAIL', { infer: true }) ?? '';
     const privateKeyRaw = this.config.get('GOOGLE_DRIVE_PRIVATE_KEY', { infer: true }) ?? '';

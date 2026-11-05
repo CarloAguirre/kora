@@ -1,4 +1,6 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import { Body, Controller, Get, Post, Res, ServiceUnavailableException, BadRequestException } from '@nestjs/common';
+import type { FastifyReply } from 'fastify';
+import { z } from 'zod';
 import {
   analyzeEstimationPocSchema,
   generateEstimationPocSchema,
@@ -18,6 +20,9 @@ import {
   type ResolveEstimationDriveFolderInput,
 } from '@kora/contracts';
 import { CurrentUser, type RequestUser } from '../../../shared/presentation/decorators/current-user.decorator';
+import { AppConfigService } from '../../../config/app-config.service';
+import { GoogleDriveOAuthPocService } from '../../../shared/infrastructure/auth/google-drive-oauth-poc.service';
+import { extractDriveFolderId } from '../application/drive-source-selection';
 import { RequireAnyPermission, RequirePermissions } from '../../../shared/presentation/decorators/require-permissions.decorator';
 import { ManageQuotationDraftsUseCase } from '../application/use-cases/manage-quotation-drafts.use-case';
 import { ZodValidationPipe } from '../../../shared/presentation/pipes/zod-validation.pipe';
@@ -29,6 +34,16 @@ import { ListEstimationDriveFilesUseCase } from '../application/use-cases/list-e
 import { ResolveEstimationDriveFolderUseCase } from '../application/use-cases/resolve-estimation-drive-folder.use-case';
 import { validateFixedQuestionnaireAnswers } from '../application/validate-estimation-questionnaire';
 
+const startDriveOAuthPocSchema = z.object({
+  projectId: z.uuid(),
+  driveFolderUrl: z.url().max(2048),
+});
+
+/** Diagnóstico aislado: esta respuesta nunca contiene tokens de Google. */
+export interface StartDriveOAuthPocResponse {
+  authorizationUrl: string;
+}
+
 @Controller('estimations')
 export class EstimationController {
   constructor(
@@ -39,7 +54,38 @@ export class EstimationController {
     private readonly resolveDriveFolder: ResolveEstimationDriveFolderUseCase,
     private readonly inventoryDrive: InventoryEstimationDriveUseCase,
     private readonly quotationDrafts: ManageQuotationDraftsUseCase,
+    private readonly driveOAuthPoc: GoogleDriveOAuthPocService,
+    private readonly config: AppConfigService,
   ) {}
+
+  /**
+   * PoC: solo comprueba OAuth y lectura de una carpeta real de Drive.
+   * No guarda tokens, no altera la sesión Google/Kora y no cambia el lector
+   * definitivo de documentos hasta completar autorización y persistencia.
+   */
+  @Post('drive/oauth-poc/start')
+  @RequireAnyPermission('projects:manage', 'projects:read_assigned')
+  async startDriveOAuthPoc(
+    @Body(new ZodValidationPipe(startDriveOAuthPocSchema)) input: z.infer<typeof startDriveOAuthPocSchema>,
+    @CurrentUser() actor: RequestUser,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ): Promise<StartDriveOAuthPocResponse> {
+    if (!this.config.googleDriveOauthPocEnabled || !this.config.google.enabled) {
+      throw new ServiceUnavailableException('La prueba OAuth de Drive no está habilitada en este entorno.');
+    }
+    await this.quotationDrafts.authorizeAiPoc(input.projectId, actor);
+    const folderId = extractDriveFolderId(input.driveFolderUrl);
+    if (!folderId || folderId === 'kora-poc-fallback') {
+      throw new BadRequestException('Selecciona una carpeta real de Google Drive para la prueba.');
+    }
+    const { state, authorizationUrl } = this.driveOAuthPoc.start(actor.id, folderId);
+    void reply.header('Cache-Control', 'no-store');
+    void reply.setCookie('kora_drive_poc_state', state, {
+      httpOnly: true, secure: this.config.isProduction, sameSite: 'lax',
+      path: '/', maxAge: 300,
+    });
+    return { authorizationUrl };
+  }
 
   @Get('questionnaire-definition')
   @RequireAnyPermission('projects:manage', 'projects:read_assigned')
