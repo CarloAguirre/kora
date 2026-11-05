@@ -13,6 +13,7 @@ import type { ProjectChangeLogRecorder } from '../services/project-change-log.re
 import type { ProjectProgressRecalculator } from '../services/project-progress-recalculator';
 import type { ForecastSourceSyncService } from '../services/forecast-source-sync.service';
 import { FixedClock, PassthroughUnitOfWork } from '../../../../test/fakes';
+import type { ProjectTaskReviewNotifier } from '../../infrastructure/services/project-task-review-notifier';
 
 const FAKE_PROJECT = {
   id: 'project-1',
@@ -59,6 +60,7 @@ function buildUseCase(module: ProjectModuleRecord) {
   const changeLogRecord = vi.fn().mockResolvedValue(undefined);
   const recalculateProgress = vi.fn().mockResolvedValue(undefined);
   const refreshSegmentClosure = vi.fn().mockResolvedValue(undefined);
+  const publishNotification = vi.fn().mockResolvedValue(undefined);
   const useCase = new UpdateProjectModuleTaskUseCase(
     { findById: vi.fn().mockResolvedValue(FAKE_PROJECT) } as unknown as ProjectRepository,
     { findById: vi.fn().mockResolvedValue(module), updateTask: vi.fn().mockResolvedValue(undefined),
@@ -77,8 +79,9 @@ function buildUseCase(module: ProjectModuleRecord) {
     { syncTask: vi.fn().mockResolvedValue(undefined) } as unknown as ForecastSourceSyncService,
     new FixedClock(),
     new PassthroughUnitOfWork(),
+    { publish: publishNotification } as unknown as ProjectTaskReviewNotifier,
   );
-  return { useCase, changeLogRecord, recalculateProgress, refreshSegmentClosure };
+  return { useCase, changeLogRecord, recalculateProgress, refreshSegmentClosure, publishNotification };
 }
 
 const LEADER = { actor: { userId: 'leader-1', email: 'leader@kabeli.cl' }, actorPermissions: [] as Permission[] };
@@ -166,5 +169,54 @@ describe('UpdateProjectModuleTaskUseCase — colaborador deshabilitado', () => {
     const result = await useCase.execute({ ...TARGET, ...LEADER, data: { assigneeUserId: 'collab-1', name: 'Maqueta v2' } });
 
     expect(result.isOk()).toBe(true);
+  });
+});
+
+
+describe('Notificaciones de revisión y devolución de tareas', () => {
+  it('avisa al líder del proyecto cuando el colaborador marca la tarea como completada', async () => {
+    const { useCase, publishNotification } = buildUseCase(buildModule({ status: 'in_progress' }));
+    const result = await useCase.execute({
+      ...TARGET,
+      actor: { userId: 'collab-1', email: 'ana@kabeli.cl' },
+      actorPermissions: [],
+      data: { status: 'in_review' },
+    });
+    expect(result.isOk()).toBe(true);
+    expect(publishNotification).toHaveBeenCalledWith(expect.objectContaining({
+      kind: 'review_requested', projectLeaderUserId: 'leader-1',
+      taskId: 'task-1', assigneeUserId: 'collab-1',
+    }));
+  });
+
+  it('avisa al colaborador cuando el líder devuelve una tarea y conserva el motivo', async () => {
+    const { useCase, publishNotification } = buildUseCase(buildModule({ status: 'in_review' }));
+    const result = await useCase.execute({
+      ...TARGET, ...LEADER,
+      data: { status: 'in_progress', rejectionReason: 'Corregir integración' },
+    });
+    expect(result.isOk()).toBe(true);
+    expect(publishNotification).toHaveBeenCalledWith(expect.objectContaining({
+      kind: 'returned', reason: 'Corregir integración', assigneeUserId: 'collab-1',
+      actorUserId: 'leader-1',
+    }));
+  });
+
+  it('no notifica de nuevo por aprobar una tarea ni por actualizar el mismo estado', async () => {
+    const approved = buildUseCase(buildModule({ status: 'in_review' }));
+    await approved.useCase.execute({ ...TARGET, ...LEADER, data: { status: 'done' } });
+    expect(approved.publishNotification).not.toHaveBeenCalled();
+    const unchanged = buildUseCase(buildModule({ status: 'in_review' }));
+    await unchanged.useCase.execute({ ...TARGET, ...LEADER, data: { status: 'in_review' } });
+    expect(unchanged.publishNotification).not.toHaveBeenCalled();
+  });
+
+  it('sin motivo válido no devuelve la tarea ni envía aviso', async () => {
+    const { useCase, publishNotification } = buildUseCase(buildModule({ status: 'in_review' }));
+    const result = await useCase.execute({
+      ...TARGET, ...LEADER, data: { status: 'in_progress', rejectionReason: '  ' },
+    });
+    expect(result.isErr()).toBe(true);
+    expect(publishNotification).not.toHaveBeenCalled();
   });
 });
