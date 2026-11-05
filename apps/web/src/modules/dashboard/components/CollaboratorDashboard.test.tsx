@@ -109,7 +109,7 @@ describe('Dashboard colaborador · homologación v6', () => {
     expect(within(attention).getByText('1 registro de horas rechazado')).toBeInTheDocument();
 
     const week = screen.getByRole('region', { name: 'Planificación semanal' });
-    expect(within(week).getByText('24 HH')).toBeInTheDocument();
+    expect(within(week).getAllByText('24 HH')).toHaveLength(2);
     expect(within(week).getByText(/no equivalen a horas registradas/)).toBeInTheDocument();
     const team = screen.getByRole('region', { name: 'Mi equipo' });
     expect(within(team).getByText('Compañera QA')).toBeInTheDocument();
