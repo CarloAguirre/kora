@@ -526,13 +526,19 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
     })
       .from(projectModuleTasks)
       .where(eq(projectModuleTasks.segmentId, segmentId));
-    const allApproved = Number(counts?.active ?? 0) > 0 && Number(counts?.pending ?? 0) === 0;
+    const active = Number(counts?.active ?? 0);
+    const pending = Number(counts?.pending ?? 0);
+    // Aprobar todas las tareas habilita el cierre MANUAL del bloque sin
+    // entrega: no debe ejecutarlo automáticamente antes de que el líder
+    // pulse "Cerrar bloque". Para bloques con entrega, la aprobación de
+    // tareas tampoco sustituye la aprobación de la entrega.
+    // Conservar closedAt histórico cuando las tareas ya están aprobadas.
+    if (active > 0 && pending === 0) return;
+    // Si se agregó o reabrió una tarea (o ya no quedan tareas activas),
+    // el antiguo cierre deja de ser válido. Se mantiene la transacción
+    // compartida para que los datos del bloque sean consistentes.
     await db.update(projectModuleSegments)
-      .set({
-        closedAt: allApproved
-          ? sql`coalesce(${projectModuleSegments.closedAt}, ${now})` : null,
-        updatedAt: now,
-      })
+      .set({ closedAt: null, updatedAt: now })
       .where(eq(projectModuleSegments.id, segmentId));
   }
 
