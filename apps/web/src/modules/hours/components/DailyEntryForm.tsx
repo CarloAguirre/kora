@@ -44,6 +44,8 @@ export interface DailyBlock {
   projectId: string;
   moduleId: string;
   segmentId?: string;
+  /** FK opcional de tarea, nunca se infiere al guardar. */
+  taskId?: string;
   /** Solo estado visual: lo informa el detalle del proyecto para validar antes de enviar. */
   roadmapNeedsPhase?: boolean;
   roadmapNeedsSegment?: boolean;
@@ -64,6 +66,7 @@ const createEmptyBlock = (): DailyBlock => ({
   projectId: '',
   moduleId: '',
   segmentId: '',
+  taskId: '',
   category: '',
   hours: '',
   description: '',
@@ -267,6 +270,7 @@ export function DailyEntryForm({
           projectId: needsProject ? block.projectId : undefined,
           moduleId: needsProject && block.moduleId ? block.moduleId : undefined,
           segmentId: needsProject && block.moduleId && block.segmentId ? block.segmentId : undefined,
+          taskId: needsProject && block.moduleId && block.taskId ? block.taskId : undefined,
           category: block.category.trim(),
           description: block.description || undefined,
           hours: Number(block.hours),
@@ -488,7 +492,12 @@ export function DailyEntryBlockFields({
   const overtimeDisabled = needsProject && !selectedProject?.allowsOvertime;
   const { data: projectDetail } = useProjectDetail(needsProject && block.projectId ? block.projectId : null);
   const selectedModule = projectDetail?.modules.find((m) => m.id === block.moduleId);
+  // Fases ofrece tareas sin requerir permiso de lectura de toda la ficha.
+  const { data: hourPhases } = useProjectPhases(needsProject && block.projectId ? block.projectId : null);
   const { user } = useAuth();
+  const availableTasks = (hourPhases?.find((phase) => phase.id === block.moduleId)?.tasks ?? [])
+    .filter((task) => !task.cancelledAt && task.assigneeUserId === (ownerUserId ?? user?.id) &&
+      (task.segmentId ?? null) === (block.segmentId || null));
   const allowedTeamIds = new Set([
     ...(projectDetail?.members ?? []).filter((member) => member.userId === (ownerUserId ?? user?.id) && !member.blockedAt)
       .map((member) => member.teamId),
@@ -559,6 +568,7 @@ export function DailyEntryBlockFields({
                   projectId: needsProjectNext ? block.projectId : '',
                   moduleId: needsProjectNext ? block.moduleId : '',
                   segmentId: needsProjectNext ? block.segmentId : '',
+                  taskId: needsProjectNext ? block.taskId : '',
                   designatedApproverUserId: needsProjectNext ? '' : block.designatedApproverUserId,
                 });
               }}
@@ -585,6 +595,7 @@ export function DailyEntryBlockFields({
                     projectId: nextProjectId,
                     moduleId: '',
                     segmentId: '',
+                    taskId: '',
                     isOvertime: nextProject?.allowsOvertime ? block.isOvertime : false,
                   });
                 }}
@@ -600,7 +611,7 @@ export function DailyEntryBlockFields({
                 placeholder={requiresPhase ? 'Seleccionar fase para imputar HH...' : 'Seleccionar fase (opcional)'}
                 options={(projectDetail?.modules ?? []).map((module) => ({ value: module.id, label: module.name }))}
                 value={block.moduleId}
-                onChange={(event) => onUpdate({ moduleId: event.target.value, segmentId: '' })}
+                onChange={(event) => onUpdate({ moduleId: event.target.value, segmentId: '', taskId: '' })}
               />
               {selectedModule && (
                 <span className={styles.stepperLabel}>Etapa: {PROJECT_MODULE_STAGE_LABELS[selectedModule.currentStage]}</span>
@@ -618,13 +629,23 @@ export function DailyEntryBlockFields({
                   value: segment.id, label: segment.name + ' (' + segment.startDate + ' → ' + segment.endDate + ')',
                 }))}
                 value={block.segmentId ?? ''}
-                onChange={(event) => onUpdate({ segmentId: event.target.value })}
+                onChange={(event) => onUpdate({ segmentId: event.target.value, taskId: '' })}
               />
               <span className={styles.stepperLabel}>
                 {availableSegments.length === 0
                   ? 'No tienes bloques de este módulo asignados a tu equipo. Consulta al líder.'
                   : 'Las HH aprobadas se sumarán a este bloque en el Roadmap.'}
               </span>
+            </div>
+          )}
+
+          {needsProject && block.moduleId && availableTasks.length > 0 && (
+            <div className={styles.row}>
+              <Select label="Tarea" placeholder="Sin tarea específica (HH del bloque)"
+                options={availableTasks.map((task) => ({ value: task.id, label: task.name }))}
+                value={block.taskId ?? ''}
+                helperText="Las HH aprobadas se mostrarán como reales en la tarea seleccionada."
+                onChange={(event) => onUpdate({ taskId: event.target.value })} />
             </div>
           )}
 
