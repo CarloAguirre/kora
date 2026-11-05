@@ -32,6 +32,7 @@ const base = {
   estimatedHours: 24,
   approvedHours: 16,
   pendingHours: 7,
+  reviewerName: 'Eduardo Aranda',
   date: '2020-10-29',
   completedAt: null,
   rejectionReason: null,
@@ -68,7 +69,7 @@ describe('Dashboard colaborador v5.02', () => {
     expect(screen.getByText('Hola, Carlo')).toBeInTheDocument();
     expect(screen.getByText('Desarrollo, en 1 proyecto')).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /Por hacer 2/ })).toHaveAttribute('aria-selected', 'true');
-    const returned = screen.getByText('Modelo de datos').closest('article')!;
+    const returned = within(screen.getByRole('region', { name: 'Mis tareas' })).getByText('Modelo de datos').closest('article')!;
     expect(within(returned).getByText('En curso')).toBeInTheDocument();
     expect(within(returned).getByText('Devuelta')).toBeInTheDocument();
     expect(within(returned).getByText('Vencida')).toBeInTheDocument();
@@ -76,7 +77,7 @@ describe('Dashboard colaborador v5.02', () => {
     fireEvent.click(screen.getByRole('tab', { name: /Por aprobar 1/ }));
     expect(screen.getByText('Ajustes en vista')).toBeInTheDocument();
     expect(screen.getByText('Completada')).toBeInTheDocument();
-    expect(screen.getByText('Esperando aprobación del líder')).toBeInTheDocument();
+    expect(screen.getByText('Esperando aprobación de Eduardo Aranda')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('tab', { name: /Aprobadas 1/ }));
     expect(screen.getByText('Integración aprobada')).toBeInTheDocument();
     expect(screen.getByText('Aprobada')).toBeInTheDocument();
@@ -84,7 +85,7 @@ describe('Dashboard colaborador v5.02', () => {
 
   it('marcar terminada envía la tarea a revisión, nunca directo a done', async () => {
     show();
-    const task = screen.getByText('Modelo de datos').closest('article')!;
+    const task = within(screen.getByRole('region', { name: 'Mis tareas' })).getByText('Modelo de datos').closest('article')!;
     fireEvent.click(within(task).getByRole('button', { name: 'Marcar terminada' }));
     await waitFor(() => expect(mocks.update).toHaveBeenCalledWith({
       projectId: 'p-1', moduleId: 'm-1', taskId: 't-1', input: { status: 'in_review' },
