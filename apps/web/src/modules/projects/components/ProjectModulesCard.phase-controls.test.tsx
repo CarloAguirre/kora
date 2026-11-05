@@ -697,6 +697,8 @@ describe('Fidelidad del Roadmap v5.02 · acciones y estructura', () => {
     show();
     expect(screen.queryByText('Referencias comerciales y planificación manual')).not.toBeInTheDocument();
     expect(screen.queryByText('Etapa y datos de la fase')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '+ Agregar fase' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Planificar' }));
     fireEvent.click(screen.getByRole('button', { name: '+ Agregar fase' }));
     expect(screen.getByRole('dialog', { name: 'Nueva fase' })).toBeInTheDocument();
     expect(screen.getByText('La etapa macro del plan. Después le agregas bloques de trabajo por equipo.'))
