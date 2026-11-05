@@ -702,3 +702,13 @@
 .reviewActions button { min-height: 28px; font-size: 11px; }
 .operationalTaskActions .reviewActions { margin-right: 6px; vertical-align: middle; }
 .operationalTaskActions .reviewActions button { padding: 4px 8px; }
+
+/* HH todavía en revisión: informativas, no forman parte de avance real. */
+.taskPendingHours {
+  display: block;
+  margin-top: 3px;
+  font-size: 10.5px;
+  line-height: 1.25;
+  color: #98610e;
+  white-space: nowrap;
+}
