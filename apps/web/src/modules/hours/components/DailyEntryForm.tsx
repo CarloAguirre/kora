@@ -23,7 +23,7 @@ import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { HOUR_ENTRY_PROJECT_STATUSES } from '../lib/selectable-project-statuses';
 import { ApiRequestError } from '@/shared/lib/api-client';
 import { ProjectHourPlanFields } from './ProjectHourPlanFields';
-import { activityForTaskChange, OTHER_TASK_OPTION, toHourTaskId } from './hour-task-selection';
+import { activityForTaskChange, OTHER_TASK_OPTION, resolveHourApprover, toHourTaskId } from './hour-task-selection';
 
 /** Proyecto primero: es la asignación más común y el resto confundía al elegir. */
 const ASSIGNMENT_OPTIONS = [...HOUR_ENTRY_ASSIGNMENTS]
@@ -654,8 +654,9 @@ export function DailyEntryBlockFields({
               requiresPhase={requiresPhase}
               approverName={projectDetail?.teams.find((team) =>
                 team.teamId === selectedModule?.segments.find((segment) => segment.id === block.segmentId)?.teamId
-              )?.leader?.fullName ?? selectedHourPhase?.segments.find((segment) =>
-                segment.id === block.segmentId)?.leaderName}
+              )?.leader?.fullName ?? resolveHourApprover(
+                hourPhases, ownerUserId ?? user?.id, block.segmentId,
+              )}
               onPhaseChange={(moduleId) => onUpdate({
                 moduleId, segmentId: '', taskId: '',
                 category: activityForTaskChange(block.category, selectedTask?.name, undefined),
