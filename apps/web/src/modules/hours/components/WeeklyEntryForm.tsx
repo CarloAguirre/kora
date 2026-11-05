@@ -105,7 +105,10 @@ export function WeeklyEntryForm({
 
   const needsProject = PROJECT_REQUIRING_ASSIGNMENTS.has(assignment as HourEntryAssignment);
   const selectedProject = needsProject ? (projects?.items ?? []).find((p) => p.id === projectId) : undefined;
-  const { data: projectDetail } = useProjectDetail(needsProject && projectId ? projectId : null);
+  // Colaborador usa /phases y no solicita detalle que podría estar prohibido.
+  const { data: projectDetail } = useProjectDetail(
+    needsProject && projectId && user?.role !== 'collaborator' ? projectId : null,
+  );
   const selectedModule = projectDetail?.modules.find((m) => m.id === moduleId);
   const { data: hourPhases } = useProjectPhases(needsProject && projectId ? projectId : null);
   const selectedHourPhase = hourPhases?.find((phase) => phase.id === moduleId);
