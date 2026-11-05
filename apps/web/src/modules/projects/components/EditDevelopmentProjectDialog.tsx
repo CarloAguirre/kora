@@ -19,6 +19,7 @@ import { Select } from '@/shared/components/ui/Select';
 import { Combobox } from '@/shared/components/ui/Combobox';
 import { AlertIcon } from '@/shared/components/icons/Icons';
 import { ApiRequestError } from '@/shared/lib/api-client';
+import { useProjectQuotation } from '@/modules/estimation/api/quotation.queries';
 import { useClientsList } from '@/modules/clients/api/clients.queries';
 import { useUsersList } from '@/modules/users/api/users.queries';
 import { assignableOptions } from '@/modules/users/lib/assignable-options';
@@ -87,6 +88,12 @@ function formValues(project: ProjectDetail): FormValues {
   };
 }
 
+/** Mostrar solo fechas documentadas por el evento de traspaso; nunca usar updatedAt como sustituto. */
+const formatTransferDate = (iso: string) =>
+  new Intl.DateTimeFormat('es-CL', {
+    day: '2-digit', month: 'short', year: 'numeric', timeZone: 'America/Santiago',
+  }).format(new Date(iso)).replace(/\./g, '');
+
 const quotationLabel: Record<NonNullable<ProjectDetail['quotationStatus']>, string> = {
   none: 'Sin cotización',
   draft: 'Borrador',
@@ -116,6 +123,22 @@ export function EditDevelopmentProjectDialog({
   const updateProject = useUpdateProject();
   const changeStatus = useChangeProjectStatus();
   const updateOvertime = useSetProjectOvertimeAuthorization();
+  const { data: quotation } = useProjectQuotation(project.id, open);
+  const transferredVersion = quotation?.versions.find((version) => version.id === quotation.transferredVersionId);
+  const latestVersion = [...(quotation?.versions ?? [])]
+    .sort((a, b) => b.versionNumber - a.versionNumber)[0];
+  const pendingApprovedVersion = quotation?.versions
+    .filter((version) => version.status === 'approved')
+    .sort((a, b) => b.versionNumber - a.versionNumber)[0];
+  const quotationHeading = transferredVersion
+    ? `v${transferredVersion.versionNumber} traspasada${quotation?.transferredAt
+      ? ` el ${formatTransferDate(quotation.transferredAt)}` : ''}`
+    : project.quotationStatus === 'approved_pending' && pendingApprovedVersion
+      ? `v${pendingApprovedVersion.versionNumber} aprobada · traspaso pendiente`
+      : latestVersion && project.quotationStatus
+        ? `v${latestVersion.versionNumber} · ${quotationLabel[project.quotationStatus]}`
+        : project.quotationStatus && project.quotationStatus !== 'none'
+          ? quotationLabel[project.quotationStatus] : null;
   const [tipo, setTipo] = useState<ProjectTipo>(() => tipoOf(project));
   const [estado, setEstado] = useState<ProjectStatus>(project.status);
   const [isInternal, setIsInternal] = useState(project.isInternal);
@@ -249,6 +272,7 @@ export function EditDevelopmentProjectDialog({
     <Modal
       open={open}
       side
+      projectEditSide
       title="Editar proyecto"
       onClose={onClose}
       dismissible={!isSubmitting}
@@ -264,9 +288,9 @@ export function EditDevelopmentProjectDialog({
           <span>{serverError}</span>
         </div>}
 
-        {project.quotationStatus && project.quotationStatus !== 'none' && (
+        {quotationHeading && (
           <div className={styles.quotationBanner}>
-            <span>Cotización · {quotationLabel[project.quotationStatus]}</span>
+            <span>Cotización · {quotationHeading}</span>
             {onViewQuotations && <button type="button" onClick={onViewQuotations}>
               Ver cotizaciones
             </button>}
