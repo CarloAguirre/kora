@@ -616,9 +616,16 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
                     }
                     return <span className={styles.unlinkedBlock}>Sin bloque de origen identificado</span>;
                   })()}</td>
-                  <td><span className={[styles.taskState, task.assigneeUserId ? styles.taskStateAssigned : ''].join(' ')}>
-                    {task.assigneeUserId ? PROJECT_MODULE_TASK_STATUS_LABELS[task.status] : 'Por asignar'}
-                  </span></td>
+                  <td>
+                    {task.assigneeUserId
+                      ? <Badge tone={TASK_STATUS_TONE[task.status]}>
+                        {PROJECT_MODULE_TASK_STATUS_LABELS[task.status]}
+                      </Badge>
+                      : <span className={styles.taskState}>Por asignar</span>}
+                    {task.assigneeUserId && task.status !== 'done' &&
+                      parseDate(task.date) < today() &&
+                      <Badge tone="danger">Vencida</Badge>}
+                  </td>
                   <td>{task.estimatedHours ?? '—'} / —</td>
                   <td>{formatDate(task.date)}</td>
                   <td className={styles.operationalTaskActions}>
