@@ -153,7 +153,11 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
     const blockerCountByModule = new Map(blockerRows.map((r) => [r.moduleId, r.value]));
     const membersBySegment = await loadSegmentMembers(db, segmentRows.map((s) => s.id));
     const consumedBySegment = await loadSegmentConsumption(db, segmentRows.map((s) => s.id));
-    const approvedByTask = await loadTaskConsumption(db, mappedTaskRows.map((task) => task.id));
+    const taskIds = mappedTaskRows.map((task) => task.id);
+    const [approvedByTask, pendingByTask] = await Promise.all([
+      loadTaskConsumption(db, taskIds, 'approved'),
+      loadTaskConsumption(db, taskIds, 'pending'),
+    ]);
     return moduleRows.map((row) =>
       toRecord(
         row,
@@ -162,7 +166,9 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
         membersBySegment,
         consumedBySegment,
         mappedTaskRows.map((task) => ({
-          ...task, actualHours: approvedByTask.get(task.id) ?? null,
+          ...task,
+          actualHours: approvedByTask.get(task.id) ?? null,
+          pendingHours: pendingByTask.get(task.id) ?? null,
         })),
         blockerCountByModule.get(row.id) ?? 0,
       ),
@@ -364,10 +370,16 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
     const membersBySegment = await loadSegmentMembers(db, segmentRows.map((s) => s.id));
     const consumedBySegment = await loadSegmentConsumption(db, segmentRows.map((s) => s.id));
     const mappedTasks = taskRows.map(toTaskRow);
-    const approvedByTask = await loadTaskConsumption(db, mappedTasks.map((task) => task.id));
+    const taskIds = mappedTasks.map((task) => task.id);
+    const [approvedByTask, pendingByTask] = await Promise.all([
+      loadTaskConsumption(db, taskIds, 'approved'),
+      loadTaskConsumption(db, taskIds, 'pending'),
+    ]);
     return toRecord(row, deliveryRows, segmentRows, membersBySegment, consumedBySegment,
       mappedTasks.map((task) => ({
-        ...task, actualHours: approvedByTask.get(task.id) ?? null,
+        ...task,
+        actualHours: approvedByTask.get(task.id) ?? null,
+        pendingHours: pendingByTask.get(task.id) ?? null,
       })), blockerRows[0]?.value ?? 0);
   }
 
@@ -881,13 +893,14 @@ async function loadSegmentMembers(
 async function loadTaskConsumption(
   db: Database,
   taskIds: readonly string[],
+  status: 'approved' | 'pending',
 ): Promise<Map<string, number>> {
   if (taskIds.length === 0) return new Map();
   const rows = await db.select({
     taskId: hourEntries.taskId,
     total: sql<string>`coalesce(sum(${hourEntries.hours}), 0)`,
   }).from(hourEntries)
-    .where(and(inArray(hourEntries.taskId, [...taskIds]), eq(hourEntries.status, 'approved')))
+    .where(and(inArray(hourEntries.taskId, [...taskIds]), eq(hourEntries.status, status)))
     .groupBy(hourEntries.taskId);
   return new Map(rows.flatMap((row) => row.taskId
     ? [[row.taskId, Number(row.total)] as const] : []));
