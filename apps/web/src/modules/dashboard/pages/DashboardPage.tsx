@@ -88,6 +88,10 @@ export function DashboardPage() {
             teamName={summary?.planning?.teamName ?? null}
             activeProjectCount={summary?.myActiveProjects.length ?? 0}
             tasks={summary?.myTasks ?? []}
+            hours={summary?.hours ?? null}
+            planning={summary?.planning ?? null}
+            weekStart={weekStart}
+            onWeekStartChange={setWeekStart}
             loading={isLoading}
             canRegisterHours={can('hours:register')}
             onRegisterHours={() => setRegisterHoursOpen(true)}
