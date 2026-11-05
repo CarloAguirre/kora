@@ -65,8 +65,9 @@ function useInvalidateProjects() {
     // El Dashboard resume proyectos/soporte: sin esto quedaba desactualizado
     // hasta que el usuario recargaba la página a mano.
     void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
-    // La campanita del Líder PM avisa fechas y HH asignadas por completar.
-    void queryClient.invalidateQueries({ queryKey: ['notifications', 'reminders'] });
+    // Una tarea completada o devuelta también puede generar avisos de
+    // revisión. Actualizar tanto la campanita persistida como recordatorios.
+    void queryClient.invalidateQueries({ queryKey: ['notifications'] });
     return projectRefresh;
   };
 }
