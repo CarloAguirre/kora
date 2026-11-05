@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { teamReportDataRequestDataSchema, type TeamReportDataRequestData } from '@kora/contracts';
 import { FixedClock } from '../../../../test/fakes';
 import type { TeamRepository } from '../../domain/repositories/team.repository';
 import type { TeamReportProjectRow, TeamReportReader } from '../ports/team-report-reader.port';
@@ -39,7 +40,11 @@ function setup(
     projectsWithPendingHoursOnly = [] as string[],
   } = {},
 ) {
-  const created: CreateNotificationInput[] = [];
+  // La cola de notificaciones admite varios tipos; esta prueba verifica
+  // únicamente solicitudes de datos, cuyo payload contiene items y note.
+  const created: Array<CreateNotificationInput & {
+    type: 'team_report_data_request'; data: TeamReportDataRequestData;
+  }> = [];
   const teams = {
     findById: vi.fn().mockResolvedValue({ id: TEAM_ID, name: 'UX-UI', isDeleted: false, leaderUserId: ACTOR.userId }),
     isLeaderOfTeam: vi.fn().mockResolvedValue(isLeader),
@@ -68,7 +73,16 @@ function setup(
     markDataRequested: vi.fn().mockResolvedValue(undefined),
   };
   const users = { findById: vi.fn().mockResolvedValue({ id: ACTOR.userId, fullName: 'Eduardo Aranda' }) };
-  const inbox = { create: vi.fn(async (input: CreateNotificationInput) => void created.push(input)) };
+  const inbox = { create: vi.fn(async (input: CreateNotificationInput) => {
+    if (input.type !== 'team_report_data_request') {
+      throw new Error('Esta prueba solo admite solicitudes de datos de equipos');
+    }
+    created.push({
+      ...input,
+      type: 'team_report_data_request',
+      data: teamReportDataRequestDataSchema.parse(input.data),
+    });
+  }) };
   const useCase = new RequestTeamReportDataUseCase(
     teams as unknown as TeamRepository,
     reports as unknown as TeamReportReader,
