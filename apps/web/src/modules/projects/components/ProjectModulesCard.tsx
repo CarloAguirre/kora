@@ -67,12 +67,14 @@ const TASK_STATUS_TONE: Record<ProjectModuleTask['status'], BadgeTone> = {
   in_review: 'warning',
   done: 'success',
 };
-/** La tabla usa el tamaño original de "Por asignar" para TODOS sus chips. */
+/** La tabla usa el tamaño original de "Por asignar" para TODOS sus chips.
+ *  Las cuatro clases existen en el CSS Module; el ! resuelve la firma
+ *  string | undefined generada con noUncheckedIndexedAccess. */
 const TABLE_TASK_STATUS_CLASS: Record<ProjectModuleTask['status'], string> = {
-  todo: styles.taskPending,
-  in_progress: styles.taskInProgress,
-  in_review: styles.taskReview,
-  done: styles.taskApproved,
+  todo: styles.taskPending!,
+  in_progress: styles.taskInProgress!,
+  in_review: styles.taskReview!,
+  done: styles.taskApproved!,
 };
 
 const DELIVERY_STATUS_TONE: Record<ProjectModuleDelivery['status'], BadgeTone> = {
