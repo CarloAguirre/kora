@@ -622,7 +622,7 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
                         {PROJECT_MODULE_TASK_STATUS_LABELS[task.status]}
                       </Badge>
                       : <span className={styles.taskState}>Por asignar</span>}
-                    {task.assigneeUserId && task.status !== 'done' &&
+                    {task.assigneeUserId && (task.status === 'todo' || task.status === 'in_progress') &&
                       parseDate(task.date) < today() &&
                       <Badge tone="danger">Vencida</Badge>}
                   </span></td>
