@@ -526,7 +526,6 @@
   border-radius: 999px;
   font-size: 11px;
 }
-.taskStateAssigned { color: #334155; background: #e9edf2; }
 .noOperationalTasks { color: #667085; font-size: 12px; }
 .legacyReferences {
   border-top: 1px solid #e5e8ef;
