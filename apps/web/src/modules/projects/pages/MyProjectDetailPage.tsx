@@ -17,6 +17,8 @@ import { useMyProjectDetail } from '../api/projects.queries';
 import { calculateOperationalBlockProgress, roadmapBlockMetrics } from '../lib/team-progress';
 import { SegmentDrawer } from '../components/SegmentDrawer';
 import { ProjectPhaseTasksTable } from '../components/ProjectPhaseTasksTable';
+import { phaseHeaderMeta } from '../lib/phase-header-meta';
+import roadmapStyles from '../components/ProjectModulesCard.module.css';
 import { MyProjectBitacora } from '../components/MyProjectBitacora';
 import styles from './MyProjectDetailPage.module.css';
 
@@ -108,6 +110,31 @@ export function MyProjectDetailPage() {
                   phaseRoadmap={roadmap}
                   operationalTaskCount={project.modules.reduce((n, m) => n + m.tasks.filter((t) => !t.cancelledAt).length, 0)}
                   operationalBlockCount={project.modules.reduce((n, m) => n + m.segments.length, 0)}
+                  renderPhaseHeaderName={(phase) => {
+                    const module = project.modules.find((item) => item.id === phase.id);
+                    return module ? <span className={roadmapStyles.phaseHeadingIdentity}>
+                      <strong className={roadmapStyles.headerPhaseName}>{module.name}</strong>
+                      <span className={roadmapStyles.phaseHeadingMeta}>{phaseHeaderMeta(module)}</span>
+                    </span> : null;
+                  }}
+                  renderPhaseHeaderActions={(phase) => {
+                    const module = project.modules.find((item) => item.id === phase.id);
+                    if (!module) return null;
+                    const actual = module.progress.actual;
+                    const expected = module.progress.expected;
+                    const pct = (value: number | null) => value == null ? '—' : value + '%';
+                    return <div className={roadmapStyles.phaseHeadingActions}>
+                      <span className={roadmapStyles.phaseHeadingProgress}>
+                        <span className={roadmapStyles.phaseHeadingBar} aria-hidden="true">
+                          <span className={roadmapStyles.phaseHeadingReal}
+                            style={{ width: Math.max(0, Math.min(100, actual ?? 0)) + '%' }} />
+                          {expected !== null && <i className={roadmapStyles.phaseHeadingMarker}
+                            style={{ left: Math.max(0, Math.min(100, expected)) + '%' }} />}
+                        </span>
+                        <span>{pct(actual)} real · {pct(expected)} plan</span>
+                      </span>
+                    </div>;
+                  }}
                   operationalMetrics={(_phase, row) =>
                     roadmapBlockMetrics(row.id ? blockProgressById.get(row.id) : undefined)}
                   renderPhaseReferences={(phase) => {
