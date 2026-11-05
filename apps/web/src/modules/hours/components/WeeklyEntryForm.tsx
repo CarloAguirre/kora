@@ -21,7 +21,7 @@ import { HOUR_ENTRY_PROJECT_STATUSES } from '../lib/selectable-project-statuses'
 import { ApiRequestError } from '@/shared/lib/api-client';
 import { overflowByBlock, selectAttributableTasks } from './DailyEntryForm';
 import { ProjectHourPlanFields } from './ProjectHourPlanFields';
-import { activityForTaskChange, OTHER_TASK_OPTION, toHourTaskId } from './hour-task-selection';
+import { activityForTaskChange, OTHER_TASK_OPTION, resolveHourApprover, toHourTaskId } from './hour-task-selection';
 
 /** Proyecto primero: es la asignación más común y el resto confundía al elegir. */
 const ASSIGNMENT_OPTIONS = [...HOUR_ENTRY_ASSIGNMENTS]
@@ -365,8 +365,7 @@ export function WeeklyEntryForm({
           requiresPhase={hasEligibleRoadmapBlocks}
           approverName={projectDetail?.teams.find((team) =>
             team.teamId === selectedModule?.segments.find((segment) => segment.id === segmentId)?.teamId
-          )?.leader?.fullName ?? selectedHourPhase?.segments.find((segment) =>
-            segment.id === segmentId)?.leaderName}
+          )?.leader?.fullName ?? resolveHourApprover(hourPhases, user?.id, segmentId)}
           onPhaseChange={(id) => {
             setModuleId(id); setSegmentId(''); setTaskId('');
             setCategory((previous) => activityForTaskChange(
