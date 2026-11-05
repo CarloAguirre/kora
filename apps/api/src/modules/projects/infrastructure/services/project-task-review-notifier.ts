@@ -9,18 +9,9 @@ import {
   NOTIFICATION_SENDER, type NotificationSender,
 } from '../../../../shared/application/ports/notification.port';
 
-export interface ProjectTaskReviewEvent {
-  readonly kind: 'review_requested' | 'returned';
-  readonly projectId: string;
-  readonly moduleId: string;
-  readonly taskId: string;
-  readonly taskName: string;
-  readonly assigneeUserId: string | null;
-  readonly assigneeName: string | null;
-  readonly projectLeaderUserId: string | null;
-  readonly actorUserId: string;
-  readonly reason: string | null;
-}
+import {
+  type ProjectTaskReviewEvent, type ProjectTaskReviewNotifierPort,
+} from '../../application/ports/project-task-review-notifier.port';
 
 /**
  * Los avisos se publican después de confirmar el cambio de estado; una falla
@@ -30,7 +21,7 @@ export interface ProjectTaskReviewEvent {
  * entregan primero en la campanita (correo a las 48h si no se abren).
  */
 @Injectable()
-export class ProjectTaskReviewNotifier {
+export class ProjectTaskReviewNotifier implements ProjectTaskReviewNotifierPort {
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     @Inject(NOTIFICATION_INBOX) private readonly inbox: NotificationInbox,
