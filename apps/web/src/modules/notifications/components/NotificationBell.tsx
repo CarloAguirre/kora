@@ -226,9 +226,8 @@ function NotificationItem({
   onOpen: () => void;
   onNavigate: () => void;
 }) {
-  const { data } = notification;
-
   if (notification.type === 'task_review_requested' || notification.type === 'task_returned') {
+    const { data } = notification;
     return (
       <li className={[styles.item, notification.readAt ? '' : styles.itemUnread]
         .filter(Boolean).join(' ')} onClick={onOpen}>
@@ -249,6 +248,7 @@ function NotificationItem({
     );
   }
 
+  const { data } = notification;
   return (
     <li className={[styles.item, notification.readAt ? '' : styles.itemUnread].filter(Boolean).join(' ')} onClick={onOpen}>
       <div className={styles.itemHeader}>
