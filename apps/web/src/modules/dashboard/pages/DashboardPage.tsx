@@ -11,7 +11,7 @@ import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { HourEntryFormDialog } from '@/modules/hours/components/HourEntryFormDialog';
 import { useDashboardSummary } from '../api/dashboard.queries';
 import { DashboardMySummary } from '../components/DashboardMySummary';
-import { MyActivityPanel } from '../components/MyActivityPanel';
+import { CollaboratorDashboard } from '../components/CollaboratorDashboard';
 import { DashboardProjectsTab } from './DashboardProjectsTab';
 import { DashboardSupportTab } from './DashboardSupportTab';
 import { OvertimeReportSection } from '../components/OvertimeReportSection';
@@ -69,31 +69,29 @@ export function DashboardPage() {
   return (
     <DashboardLayout title="Dashboard Principal">
       <div className={styles.page}>
-        <div className={styles.topRow}>
-          {isCollaborator ? <div /> : <Tabs tabs={tabs} activeId={activeTab} onSelect={(id) => setTab(id as DashboardTab)} />}
-          <div className={styles.actions}>
-            {can('hours:register') && (
-              <Button iconLeft={<ClockIcon size={16} />} onClick={() => setRegisterHoursOpen(true)}>
-                Registrar Horas
-              </Button>
-            )}
+        {!isCollaborator && (
+          <div className={styles.topRow}>
+            <Tabs tabs={tabs} activeId={activeTab} onSelect={(id) => setTab(id as DashboardTab)} />
+            <div className={styles.actions}>
+              {can('hours:register') && (
+                <Button iconLeft={<ClockIcon size={16} />} onClick={() => setRegisterHoursOpen(true)}>
+                  Registrar Horas
+                </Button>
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
         {isCollaborator ? (
-          <>
-            <DashboardMySummary hours={null} approvals={null} tickets={summary?.tickets ?? null} loading={isLoading} />
-            <MyActivityPanel
-              hours={summary?.hours ?? null}
-              myActiveProjects={summary?.myActiveProjects ?? []}
-              myTasks={summary?.myTasks ?? []}
-              myDeliveries={summary?.myDeliveries ?? []}
-              planning={summary?.planning ?? null}
-              loading={isLoading}
-              weekStart={weekStart}
-              onWeekStartChange={setWeekStart}
-            />
-          </>
+          <CollaboratorDashboard
+            firstName={user?.firstName ?? ''}
+            teamName={summary?.planning?.teamName ?? null}
+            activeProjectCount={summary?.myActiveProjects.length ?? 0}
+            tasks={summary?.myTasks ?? []}
+            loading={isLoading}
+            canRegisterHours={can('hours:register')}
+            onRegisterHours={() => setRegisterHoursOpen(true)}
+          />
         ) : (
           <>
             {user?.role === 'leader' && (
