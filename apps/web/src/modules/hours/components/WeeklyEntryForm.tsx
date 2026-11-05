@@ -365,7 +365,8 @@ export function WeeklyEntryForm({
           requiresPhase={hasEligibleRoadmapBlocks}
           approverName={projectDetail?.teams.find((team) =>
             team.teamId === selectedModule?.segments.find((segment) => segment.id === segmentId)?.teamId
-          )?.leader?.fullName}
+          )?.leader?.fullName ?? selectedHourPhase?.segments.find((segment) =>
+            segment.id === segmentId)?.leaderName}
           onPhaseChange={(id) => {
             setModuleId(id); setSegmentId(''); setTaskId('');
             setCategory((previous) => activityForTaskChange(
