@@ -32,6 +32,7 @@ import {
 } from './DailyEntryForm';
 import { WeeklyEntryForm } from './WeeklyEntryForm';
 import { canEditAnyMonth, isInCurrentMonth, OUTSIDE_CURRENT_MONTH_MESSAGE } from '../lib/edit-window';
+import { OTHER_TASK_OPTION, toHourTaskId } from './hour-task-selection';
 
 const formatDateTime = (value: string) => new Date(value).toLocaleString('es-CL');
 const NEW_ENTRY_TABS = [
@@ -113,7 +114,7 @@ const blockFromEntry = (entry: HourEntrySummary): DailyBlock => ({
   projectId: entry.project?.id ?? '',
   moduleId: entry.module?.id ?? '',
   segmentId: entry.segment?.id ?? '',
-  taskId: entry.taskId ?? '',
+  taskId: entry.taskId ?? OTHER_TASK_OPTION,
   category: entry.category,
   hours: String(entry.hours),
   description: entry.description,
@@ -222,7 +223,7 @@ function EditEntryForm({
           projectId: needsProject ? block.projectId : null,
           moduleId: needsProject && block.moduleId ? block.moduleId : null,
           segmentId: needsProject && block.moduleId && block.segmentId ? block.segmentId : null,
-          taskId: needsProject && block.moduleId && block.taskId ? block.taskId : null,
+          taskId: needsProject && block.moduleId ? (toHourTaskId(block.taskId) ?? null) : null,
           category: block.category.trim(),
           description: block.description,
           hours: Number(block.hours),
