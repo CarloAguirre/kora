@@ -215,6 +215,7 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
       date: task.date.toISOString().slice(0, 10),
       estimatedHours: task.estimatedHours,
       actualHours: task.actualHours ?? null,
+      pendingHours: task.pendingHours ?? null,
       status: task.status,
       scope: task.scope,
       completedAt: task.completedAt?.toISOString() ?? null,
