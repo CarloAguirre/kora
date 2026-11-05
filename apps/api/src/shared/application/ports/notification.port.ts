@@ -135,6 +135,18 @@ export interface TeamReportDataRequestEmail {
   }>;
 }
 
+/** Aviso de tarea enviada a revisión o devuelta para correcciones. */
+export interface ProjectTaskStatusEmail {
+  readonly recipientEmail: string;
+  readonly recipientFirstName: string;
+  readonly kind: 'review_requested' | 'returned';
+  readonly projectName: string;
+  readonly projectSlug: string;
+  readonly taskName: string;
+  readonly assigneeName: string | null;
+  readonly reason: string | null;
+}
+
 export interface NotificationSender {
   sendUserInvitation(invitation: UserInvitation): Promise<void>;
   sendPasswordReset(notification: PasswordResetNotification): Promise<void>;
@@ -147,6 +159,7 @@ export interface NotificationSender {
   sendPendingHoursDigest(notification: PendingHoursDigestNotification): Promise<void>;
   sendSupportBillingDigest(notification: SupportBillingDigestNotification): Promise<void>;
   sendTeamReportDataRequest(notification: TeamReportDataRequestEmail): Promise<void>;
+  sendProjectTaskStatus(notification: ProjectTaskStatusEmail): Promise<void>;
 }
 
 export const NOTIFICATION_SENDER = Symbol('NotificationSender');
