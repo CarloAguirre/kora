@@ -123,6 +123,7 @@ export class GetDashboardSummaryUseCase implements UseCase<GetDashboardSummaryCo
       estimatedHours: row.estimatedHours ?? null,
       approvedHours: row.approvedHours ?? 0,
       pendingHours: row.pendingHours ?? 0,
+      reviewerName: row.reviewerName ?? null,
       date: toIsoDate(row.date),
       status: row.status,
       completedAt: row.completedAt?.toISOString() ?? null,
