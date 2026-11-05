@@ -56,6 +56,8 @@ const formatShortDate = (isoDate: string) => {
   const date = toDate(isoDate);
   return `${date.getDate()} ${MONTH_LABELS[date.getMonth()]}`;
 };
+/** Etiquetas diarias sobre el eje: no cambian la fecha ni el estado de la tarea. */
+const formatAxisDay = (date: Date) => `${date.getDate()} ${MONTH_LABELS[date.getMonth()]}`;
 
 interface DateRange {
   readonly min: Date;
@@ -463,6 +465,8 @@ function MarkerTrackRow({
               key={marker.key}
               type="button"
               className={itemClassName(sameSelection(selected, marker.selection))}
+              aria-label={`Ver ${variant === 'task' ? 'tarea' : 'entrega'} ${marker.label}: ${marker.stateLabel}`}
+              aria-pressed={sameSelection(selected, marker.selection)}
               style={{ left: `${leftPercent}%` }}
               title={`${marker.label} · ${formatShortDate(date)}`}
               onClick={() => onSelect(marker.selection)}
@@ -496,6 +500,7 @@ function MarkerTrackRow({
                   type="button"
                   aria-haspopup="menu"
                   aria-expanded={open}
+                  aria-label={`Ver ${items.length} ${pluralNoun} del ${formatShortDate(date)}`}
                   className={itemClassName(isSelected)}
                   title={`${items.map((marker) => marker.label).join(' · ')} · ${formatShortDate(date)}`}
                   onClick={onClick}
@@ -907,9 +912,7 @@ function OperationalPhaseCard({
   const ticks = showDays
     ? axis.dayLines.flatMap((leftPercent, index) =>
       index % dailyTickStride === 0
-        ? [{ leftPercent, label: formatShortDate(
-            `${shiftDays(axis.range.min, index).getFullYear()}-${String(shiftDays(axis.range.min, index).getMonth() + 1).padStart(2, '0')}-${String(shiftDays(axis.range.min, index).getDate()).padStart(2, '0')}`,
-          ) }]
+        ? [{ leftPercent, label: formatAxisDay(shiftDays(axis.range.min, index)) }]
         : [])
     : axis.dayTicks;
   const hasDatedRows = phase.tasks.length > 0;
