@@ -521,19 +521,39 @@
    gris pendiente, rojo vencida y violeta por asignar, igual al prototipo. */
 .taskStatusGroup {
   display: inline-flex;
-  flex-direction: column;
-  align-items: flex-start;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 4px;
 }
 .taskState {
   display: inline-flex;
+  align-items: center;
+  gap: 5px;
   padding: 5px 9px;
   white-space: nowrap;
   color: #6d28d9;
   background: #ede9fe;
   border-radius: 999px;
   font-size: 11px;
+  line-height: normal;
+  font-weight: 400;
 }
+/* Las píldoras de estado llevan punto; «Por asignar» conserva su versión sin punto. */
+.taskStateWithDot::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: 0 0 6px;
+}
+.taskApproved { color: #268044; background: #e2f5e5; }
+.taskReview { color: #96600c; background: #fff1dd; }
+.taskInProgress { color: #245b9b; background: #e6f1ff; }
+.taskPending { color: #64738a; background: #f1f3f7; }
+.taskReturned { color: #a3660d; background: #fff0d2; }
+.taskOverdue { color: #c83d36; background: #fde9e8; }
 .noOperationalTasks { color: #667085; font-size: 12px; }
 .legacyReferences {
   border-top: 1px solid #e5e8ef;
