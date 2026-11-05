@@ -1,3 +1,5 @@
+import type { ProjectPhaseOption } from '@kora/contracts';
+
 /**
  * «Otro trabajo del bloque» es una elección consciente del usuario sin tarea
  * operativa vinculada. No puede convertirse en FK ni inferirse por nombres.
@@ -26,3 +28,23 @@ export const activityForTaskChange = (
   if (nextTaskName) return nextTaskName;
   return previousActivity === previousTaskName ? '' : previousActivity;
 };
+
+/**
+ * Informa el aprobador incluso antes de elegir fase, pero solo cuando todas
+ * las tareas asignadas al autor apuntan a un único líder. Nunca presupone
+ * un líder en proyectos con múltiples equipos.
+ */
+export function resolveHourApprover(
+  phases: readonly ProjectPhaseOption[] | undefined,
+  ownerUserId: string | undefined,
+  selectedSegmentId?: string,
+): string | null {
+  if (!phases || !ownerUserId) return null;
+  const eligible = phases.flatMap((phase) => phase.segments.filter((segment) =>
+    phase.tasks.some((task) =>
+      !task.cancelledAt && task.assigneeUserId === ownerUserId && task.segmentId === segment.id)));
+  const selected = eligible.find((segment) => segment.id === selectedSegmentId)?.leaderName;
+  if (selected) return selected;
+  const names = [...new Set(eligible.flatMap((segment) => segment.leaderName ? [segment.leaderName] : []))];
+  return names.length === 1 ? names[0]! : null;
+}
