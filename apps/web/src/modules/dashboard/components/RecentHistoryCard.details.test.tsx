@@ -112,8 +112,6 @@ describe('Historial reciente del colaborador', () => {
 
   it('el ojo presenta fase, bloque, tarea, bitácora y la decisión real del aprobador', () => {
     show();
-    const view = screen.getByRole('button', { name: 'Ver registro del ' + previous.slice(8, 10)
-      + '/' + previous.slice(5, 7) + '/' + previous.slice(0, 4) });
     // Dos filas en octubre comparten fecha: seleccionar la fila aprobada.
     const approvedRow = screen.getAllByText('Portal Herramientas')[1]!.closest('tr')!;
     fireEvent.click(within(approvedRow).getByRole('button', { name: /Ver registro/ }));
