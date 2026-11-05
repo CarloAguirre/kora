@@ -32,7 +32,6 @@ export interface SegmentDrawerProps {
   onClose: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
-  onEditMembers?: () => void;
   onChangeClosure?: (action: 'close' | 'reopen') => void;
   onAssignTasks?: () => void;
   onAddTask?: () => void;
@@ -65,7 +64,7 @@ const badgeLabel = (name: string) => {
  * No se atribuye un cierre a una persona: la API aún no expone closedBy. */
 export function SegmentDrawer({
   project, module, segment, reference, blockProgress, onClose,
-  onEdit, onDelete, onEditMembers, onChangeClosure, onAssignTasks,
+  onEdit, onDelete, onChangeClosure, onAssignTasks,
   onAddTask, onEditTask, onDuplicateTask, onDeleteTask,
 }: SegmentDrawerProps) {
   const toast = useToast();
@@ -103,8 +102,20 @@ export function SegmentDrawer({
     (delivery?.status === 'planned' || !segment.closedAt);
   const canReopen = Boolean(segment.closedAt) && Boolean(onChangeClosure) &&
     (!delivery || delivery.status === 'approved');
-  const canCloseManually = !segment.closedAt && !delivery && tasks.length > 0 &&
-    tasks.every((task) => task.status === 'done') && Boolean(onChangeClosure);
+  // El API rechaza closureAction='close' si existe una entrega vinculada.
+  // Por eso la acción manual solo se habilita para bloques sin entrega y
+  // con al menos una tarea, todas aprobadas. No confundir "100% de tareas"
+  // con la aprobación de una entrega de cierre.
+  const tasksAreApproved = tasks.length > 0 && tasks.every((task) => task.status === 'done');
+  const canCloseManually = !segment.closedAt && !delivery && tasksAreApproved &&
+    Boolean(onChangeClosure);
+  const closeHint = delivery
+    ? 'Este bloque tiene entrega de cierre: debe marcarse como entregada y aprobarse.'
+    : !tasks.length
+      ? 'Agrega tareas al bloque y apruébalas antes de cerrarlo.'
+      : !tasksAreApproved
+        ? 'Se habilita cuando todas las tareas estén aprobadas.'
+        : 'Cerrar manualmente este bloque de trabajo.';
   const pendingReferences = reference?.tasks.some((task) =>
     task.teamId === segment.teamId && !tasks.some((saved) =>
       saved.description?.includes(' · WBS ' + task.wbs + ' · ' + task.role))) ?? false;
@@ -231,8 +242,6 @@ export function SegmentDrawer({
         </p>}
         {canReopen && <Button size="sm" variant="outline"
           onClick={() => onChangeClosure?.('reopen')}>Reabrir bloque</Button>}
-        {canCloseManually && <Button size="sm" variant="outline"
-          onClick={() => onChangeClosure?.('close')}>Cerrar bloque</Button>}
       </section>
 
       {segment.members.length > 0 && <section className={styles.membersSection}>
@@ -244,9 +253,13 @@ export function SegmentDrawer({
           </span>)}
         </div>
       </section>}
-      {onEditMembers && <button type="button" className={styles.membersLink} onClick={onEditMembers}>
-        Colaboradores / Forecast
-      </button>}
+      {onChangeClosure && !canReopen && <div className={styles.closureAction}>
+        <span title={closeHint}>
+          <Button size="sm" variant="outline" disabled={!canCloseManually}
+            onClick={() => onChangeClosure('close')}>Cerrar bloque</Button>
+        </span>
+        {!canCloseManually && <small title={closeHint}>{closeHint}</small>}
+      </div>}
 
       <section className={styles.tasksSection} aria-label="Tareas del bloque">
         <div className={styles.tasksHeading}>
