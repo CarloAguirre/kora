@@ -8,6 +8,7 @@ import {
   sql,
   hourEntries,
   inArray,
+  isNull,
   projectModuleDeliveries,
   projectModuleSegmentMembers,
   projectModuleSegments,
@@ -721,7 +722,11 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
       .leftJoin(projectTeams, and(eq(projectTeams.projectId, projectModules.projectId), eq(projectTeams.teamId, projectModuleTasks.teamId)))
       .leftJoin(teams, eq(teams.id, projectModuleTasks.teamId))
       .leftJoin(dashboardApprovalUsers, sql`${dashboardApprovalUsers.id} = COALESCE(${projectTeams.leaderUserId}, ${teams.leaderUserId}, ${projects.leaderUserId})`)
-      .where(and(eq(projectModuleTasks.assigneeUserId, userId), sql`${projectModuleTasks.cancelledAt} is null`))
+      .where(and(
+        eq(projectModuleTasks.assigneeUserId, userId),
+        isNull(projects.deletedAt),
+        sql`${projectModuleTasks.cancelledAt} is null`,
+      ))
       .orderBy(asc(projectModuleTasks.date));
 
     return rows.map((row) => ({
@@ -752,7 +757,7 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
       .from(projectModuleDeliveries)
       .innerJoin(projectModules, eq(projectModules.id, projectModuleDeliveries.moduleId))
       .innerJoin(projects, eq(projects.id, projectModules.projectId))
-      .where(eq(projectModuleDeliveries.assigneeUserId, userId))
+      .where(and(eq(projectModuleDeliveries.assigneeUserId, userId), isNull(projects.deletedAt)))
       .orderBy(asc(projectModuleDeliveries.estimatedDate));
 
     return rows;

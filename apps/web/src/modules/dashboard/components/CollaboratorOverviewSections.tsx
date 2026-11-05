@@ -6,6 +6,7 @@ import type {
 } from '@kora/contracts';
 import { FORECAST_ASSIGNMENT_TYPE_LABELS } from '@kora/contracts';
 import { Pagination, usePaginatedItems } from '@/shared/components/ui/Pagination';
+import { Card } from '@/shared/components/ui/Card';
 import styles from './CollaboratorOverviewSections.module.css';
 
 const DAILY_TARGET_HOURS = 8;
@@ -52,7 +53,7 @@ export function CollaboratorKpis({ hours, tasks, loading }: OverviewProps) {
 
   return (
     <div className={styles.kpis} aria-label="Indicadores de mi actividad">
-      <section className={styles.kpiCard} aria-label="Progreso diario">
+      <Card className={styles.kpiCard} role="region" aria-label="Progreso diario">
         <span className={styles.kpiLabel}>Progreso Diario</span>
         {unavailable ? <span className={styles.muted}>{loading ? 'Cargando…' : 'No disponible'}</span>
           : <div className={styles.donutRow}>
@@ -60,8 +61,8 @@ export function CollaboratorKpis({ hours, tasks, loading }: OverviewProps) {
               <div><strong className={styles.value}>{formatHours(today)}/{DAILY_TARGET_HOURS}</strong>
                 <span className={styles.muted}>Horas hoy</span></div>
             </div>}
-      </section>
-      <section className={styles.kpiCard} aria-label="Horas registradas esta semana">
+      </Card>
+      <Card className={styles.kpiCard} role="region" aria-label="Horas registradas esta semana">
         <span className={styles.kpiLabel}>HH registradas esta semana</span>
         {unavailable ? <span className={styles.muted}>{loading ? 'Cargando…' : 'No disponible'}</span>
           : <>
@@ -76,16 +77,16 @@ export function CollaboratorKpis({ hours, tasks, loading }: OverviewProps) {
                 {hours.weekHolidayCount > 0 ? ' · ' + hours.weekHolidayCount + ' feriado(s) descontado(s)' : ''}
               </span>
             </>}
-      </section>
-      <section className={styles.kpiCard} aria-label="Horas extra este mes">
+      </Card>
+      <Card className={styles.kpiCard} role="region" aria-label="Horas extra este mes">
         <span className={styles.kpiLabel}>Horas extra este mes</span>
         {unavailable ? <span className={styles.muted}>{loading ? 'Cargando…' : 'No disponible'}</span>
           : <>
               <strong className={styles.value}>{formatHours(hours.monthOvertimeHours)} horas</strong>
               <span className={styles.muted}>{formatHours(hours.weekOvertimeHours)} h esta semana</span>
             </>}
-      </section>
-      <section className={styles.kpiCard} aria-label="Atención requerida">
+      </Card>
+      <Card className={styles.kpiCard} role="region" aria-label="Atención requerida">
         <span className={styles.kpiLabel}>Atención Requerida</span>
         {loading ? <span className={styles.muted}>Cargando…</span>
           : inReviewCount + returnedCount + rejectedEntries === 0
@@ -98,7 +99,7 @@ export function CollaboratorKpis({ hours, tasks, loading }: OverviewProps) {
                 {rejectedEntries > 0 && <span>{rejectedEntries} {rejectedEntries === 1
                   ? 'registro de horas rechazado' : 'registros de horas rechazados'}</span>}
               </div>}
-      </section>
+      </Card>
     </div>
   );
 }
@@ -127,7 +128,7 @@ export function CollaboratorPlanning({ planning, loading }: PlanningProps) {
   const { pageItems, pagination } = usePaginatedItems(teamMembers);
   return (
     <div className={styles.planningGrid}>
-      <section className={styles.planningCard} aria-label="Planificación semanal">
+      <Card className={styles.planningCard} role="region" aria-label="Planificación semanal">
         <div className={styles.sectionHeading}>
           <h2>Planificación Semanal</h2>
           {planning && <span>{formatWeek(planning.weekStart)}</span>}
@@ -150,8 +151,8 @@ export function CollaboratorPlanning({ planning, loading }: PlanningProps) {
           </table>
         </div>
         <p className={styles.caption}>HH asignadas en planificación; no equivalen a horas registradas.</p>
-      </section>
-      <section className={styles.planningCard} aria-label="Mi equipo">
+      </Card>
+      <Card className={styles.planningCard} role="region" aria-label="Mi equipo">
         <div className={styles.sectionHeading}>
           <h2>Mi Equipo{planning?.teamName ? ' — ' + planning.teamName : ''}</h2>
           {!loading && <span className={styles.count}>{teamMembers.length}</span>}
@@ -173,7 +174,7 @@ export function CollaboratorPlanning({ planning, loading }: PlanningProps) {
         </div>
         {teamMembers.length > 0 && <Pagination {...pagination} />}
         <p className={styles.caption}>Asignación semanal del equipo; no expone bitácoras privadas de otros usuarios.</p>
-      </section>
+      </Card>
     </div>
   );
 }

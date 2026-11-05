@@ -7,6 +7,7 @@ import type {
 import styles from './CollaboratorDashboard.module.css';
 import { useUpdateProjectModuleTask } from '@/modules/projects/api/projects.queries';
 import { Button } from '@/shared/components/ui/Button';
+import { Card } from '@/shared/components/ui/Card';
 import { useToast } from '@/shared/components/ui/Toast';
 import { ClockIcon } from '@/shared/components/icons/Icons';
 import { ApiRequestError } from '@/shared/lib/api-client';
@@ -107,7 +108,7 @@ export function CollaboratorDashboard({
 
     <CollaboratorKpis hours={hours} tasks={tasks} loading={loading} />
 
-    <section className={styles.card} aria-label="Mis tareas">
+    <Card className={styles.card} role="region" aria-label="Mis tareas">
       <div className={styles.sectionTop}>
         <h2>Mis Tareas</h2>
         {!loading && <span className={styles.count}>{tasks.length}</span>}
@@ -192,7 +193,7 @@ export function CollaboratorDashboard({
                 </article>;
               })}
             </div>}
-    </section>
+    </Card>
 
     <CollaboratorPlanning planning={planning} loading={loading} />
 

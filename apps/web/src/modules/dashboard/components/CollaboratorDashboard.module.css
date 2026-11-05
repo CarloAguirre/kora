@@ -1,11 +1,10 @@
 .dashboard {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--kora-space-4);
   width: 100%;
-  max-width: 1240px;
   min-width: 0;
-  margin: 0 auto;
+  /* El padding y ancho de la página los administra DashboardLayout. */
   color: var(--kora-navy);
 }
 .greeting {
@@ -19,11 +18,8 @@
 .greeting p { color: #718097; font-size: 12px; margin: 0; }
 .register { white-space: nowrap; }
 .card {
-  padding: 18px 19px 20px;
-  background: #fff;
-  border: 1px solid #e2e8ef;
-  border-radius: 14px;
-  box-shadow: 0 2px 8px rgba(16,29,51,.04);
+  /* Superficie, borde, radio, sombra y padding del Card oficial de Kora. */
+  gap: 0;
   min-width: 0;
 }
 .sectionTop {
@@ -151,7 +147,6 @@
 }
 .empty { margin: 14px 0; color: #8190a4; font-size: 12px; }
 @media (max-width: 780px) {
-  .card { padding: 13px 12px; }
   .tabs { gap: 13px; }
   .taskTop { flex-wrap: wrap; }
   .chips { justify-content: flex-start; }
