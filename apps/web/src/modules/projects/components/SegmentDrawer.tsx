@@ -86,7 +86,7 @@ export function SegmentDrawer({
   const closedWithoutDelivery = !delivery && Boolean(segment.closedAt);
   const state = deliveryOverdue
     ? 'Entrega vencida'
-    : (closedByDelivery || closedWithoutDelivery || Boolean(segment.closedAt))
+    : (closedByDelivery || closedWithoutDelivery)
       ? 'Cerrado'
       : delivery?.status === 'delivered' ? 'Entregada'
         : segment.endDate < today ? 'Vencido'
