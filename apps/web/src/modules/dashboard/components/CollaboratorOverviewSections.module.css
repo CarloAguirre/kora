@@ -1,0 +1,105 @@
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.kpiCard, .planningCard {
+  background: #fff;
+  border: 1px solid #e3e8f0;
+  border-radius: 13px;
+  box-shadow: 0 2px 8px rgba(16,29,51,.04);
+  min-width: 0;
+}
+.kpiCard {
+  min-height: 110px;
+  padding: 14px 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+.kpiLabel { color: #77879d; font-size: 11.5px; font-weight: 600; }
+.value { color: var(--kora-navy); font-size: 21px; font-weight: 650; line-height: 1.3; }
+.muted { color: #8795a9; font-size: 11.5px; }
+.donutRow { display: flex; align-items: center; gap: 13px; }
+.donutRow > div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.donutText { font: 650 12px sans-serif; fill: var(--kora-navy); }
+.progressTrack {
+  width: 100%;
+  height: 7px;
+  border-radius: 99px;
+  background: #e9edf3;
+  overflow: hidden;
+}
+.progressFill { display: block; height: 100%; background: #2e7d32; border-radius: 99px; }
+.attention { display: flex; flex-direction: column; gap: 5px; line-height: 1.45; }
+.attention strong { color: #a96510; font-size: 12px; font-weight: 650; }
+.attention span { color: #805f85; font-size: 11px; }
+.allClear { color: #197647; font-size: 13px; font-weight: 650; margin-top: 6px; }
+.planningGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid #e3e8f0;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(16,29,51,.04);
+}
+.planningCard {
+  padding: 17px 18px 14px;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+.planningCard + .planningCard { border-left: 1px solid #e6eaf1; }
+.sectionHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 9px;
+  margin-bottom: 12px;
+}
+.sectionHeading h2 { font-size: 14px; margin: 0; font-weight: 700; }
+.sectionHeading > span:not(.count) { color: #8d9ab0; font-size: 11px; white-space: nowrap; }
+.count {
+  background: #eef0f5;
+  padding: 3px 8px;
+  border-radius: 20px;
+  font-size: 11px;
+  color: #61718d;
+  font-weight: 600;
+}
+.tableScroll { width: 100%; overflow-x: auto; }
+.table { border-collapse: collapse; width: 100%; font-size: 11.5px; min-width: 0; }
+.table th {
+  padding: 9px 8px;
+  text-align: left;
+  border-bottom: 1px solid #e8edf3;
+  font-weight: 650;
+  color: #526580;
+  white-space: nowrap;
+}
+.table td {
+  padding: 10px 8px;
+  border-bottom: 1px solid #eef1f5;
+  line-height: 1.4;
+  vertical-align: top;
+}
+.table th.numeric, .table td.numeric {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.totalRow td { background: #e6f5d9; font-weight: 700; border-bottom: 0; }
+.caption { margin: 11px 2px 0; color: #8795a9; font-size: 10.5px; line-height: 1.4; }
+@media (max-width: 1050px) {
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 760px) {
+  .planningGrid { grid-template-columns: minmax(0, 1fr); }
+  .planningCard + .planningCard { border-left: 0; border-top: 1px solid #e6eaf1; }
+}
+@media (max-width: 540px) {
+  .kpis { grid-template-columns: minmax(0, 1fr); }
+  .planningCard { padding: 14px 12px; }
+}
