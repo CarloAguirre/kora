@@ -420,7 +420,9 @@ export type ProjectModule = z.infer<typeof projectModuleSchema>;
  * horas aunque no pueda ver el detalle del proyecto (`GET /projects/:id/phases`).
  */
 export const projectPhaseOptionSchema = projectModuleSchema.pick({ id: true, name: true, currentStage: true }).extend({
-  segments: z.array(projectModuleSegmentSchema.pick({ id: true, teamName: true, name: true, startDate: true, endDate: true })),
+  segments: z.array(projectModuleSegmentSchema.pick({ id: true, teamName: true, name: true, startDate: true, endDate: true }).extend({
+    leaderName: z.string().nullable(),
+  })),
   /** Sólo metadatos necesarios para imputar HH, sin datos sensibles de la ficha. */
   tasks: z.array(projectModuleTaskSchema.pick({ id: true, name: true, segmentId: true, assigneeUserId: true, cancelledAt: true, teamId: true, estimatedHours: true, actualHours: true, pendingHours: true })),
 });
