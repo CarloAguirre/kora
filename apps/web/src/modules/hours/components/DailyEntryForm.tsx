@@ -514,12 +514,15 @@ export function DailyEntryBlockFields({
     block.assignment !== '' && !needsProject && (isCollaborator || (overtimeNeedsApproval && (block.isOvertime || exceedsDailyCap)));
   const selectedProject = needsProject ? projects.find((p) => p.id === block.projectId) : undefined;
   const overtimeDisabled = needsProject && !selectedProject?.allowsOvertime;
-  const { data: projectDetail } = useProjectDetail(needsProject && block.projectId ? block.projectId : null);
+  const { user } = useAuth();
+  // Los colaboradores no requieren projects:read para registrar horas; /phases
+  // entrega el contexto autorizado. Evita un GET de detalle innecesario/403.
+  const { data: projectDetail } = useProjectDetail(
+    needsProject && block.projectId && user?.role !== 'collaborator' ? block.projectId : null,
+  );
   const selectedModule = projectDetail?.modules.find((m) => m.id === block.moduleId);
-  // Fases ofrece tareas sin requerir permiso de lectura de toda la ficha.
   const { data: hourPhases } = useProjectPhases(needsProject && block.projectId ? block.projectId : null);
   const selectedHourPhase = hourPhases?.find((phase) => phase.id === block.moduleId);
-  const { user } = useAuth();
   const availableTasks = selectAttributableTasks(
     hourPhases?.find((phase) => phase.id === block.moduleId)?.tasks ?? [],
     ownerUserId ?? user?.id, block.segmentId,
