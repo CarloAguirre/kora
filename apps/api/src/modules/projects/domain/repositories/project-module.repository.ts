@@ -69,6 +69,7 @@ export interface ProjectModuleTaskRecord {
   readonly estimatedHours: number | null;
   /** HH aprobadas con FK a esta tarea; históricas no atribuidas permanecen null. */
   readonly actualHours?: number | null;
+  readonly pendingHours?: number | null;
   readonly status: ProjectModuleTaskStatus;
   readonly scope: ProjectModuleTaskScope;
   readonly completedAt: Date | null;
