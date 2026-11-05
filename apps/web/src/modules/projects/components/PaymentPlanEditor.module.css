@@ -16,7 +16,9 @@
 }
 
 .contractRow > :first-child {
-  flex: 0 1 320px;
+  /* Monto a la izquierda, botones a la derecha en el drawer de 600px. */
+  flex: 0 1 260px;
+  min-width: 0;
 }
 
 .toolbar {
