@@ -20,7 +20,9 @@ function setup() {
       authorizationUrl: 'https://accounts.google.com/o/oauth2/v2/auth?state=kora-drive-poc-test',
     }),
   };
-  const config = { googleDriveOauthPocEnabled: true, google: { enabled: true } };
+  const config: { googleDriveOauthPocEnabled: boolean; google: { enabled: boolean } } = {
+    googleDriveOauthPocEnabled: true, google: { enabled: true },
+  };
   const controller = new EstimationController(
     new GetEstimationQuestionnaireDefinitionUseCase(),
     analyzer as never, generator as never,
@@ -32,6 +34,13 @@ function setup() {
 }
 
 describe('EstimationController · líder PM de proyecto asignado', () => {
+
+  it('expone solo estado de habilitación sin datos sensibles', () => {
+    const { controller, config } = setup();
+    expect(controller.driveOAuthPocStatus()).toEqual({ enabled: true });
+    config.googleDriveOauthPocEnabled = false;
+    expect(controller.driveOAuthPocStatus()).toEqual({ enabled: false });
+  });
 
   it('solo inicia la PoC tras verificar permiso comercial del proyecto y coloca cookie httpOnly', async () => {
     const { controller, drafts, driveOAuthPoc } = setup();

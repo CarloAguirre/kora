@@ -18,6 +18,9 @@ export interface DriveOAuthPocStart {
 }
 
 export const estimationApi = {
+  driveOAuthPocStatus(): Promise<{ enabled: boolean }> {
+    return api.get<{ enabled: boolean }>('/estimations/drive/oauth-poc/status');
+  },
   /** PoC aislada: no devuelve ni persiste tokens OAuth. */
   startDriveOAuthPoc(input: { projectId: string; driveFolderUrl: string }): Promise<DriveOAuthPocStart> {
     return api.post<DriveOAuthPocStart>('/estimations/drive/oauth-poc/start', input);

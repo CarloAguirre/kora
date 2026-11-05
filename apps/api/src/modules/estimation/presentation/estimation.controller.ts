@@ -63,6 +63,12 @@ export class EstimationController {
    * No guarda tokens, no altera la sesión Google/Kora y no cambia el lector
    * definitivo de documentos hasta completar autorización y persistencia.
    */
+  @Get('drive/oauth-poc/status')
+  @RequireAnyPermission('projects:manage', 'projects:read_assigned')
+  driveOAuthPocStatus(): { enabled: boolean } {
+    return { enabled: this.config.googleDriveOauthPocEnabled && this.config.google.enabled };
+  }
+
   @Post('drive/oauth-poc/start')
   @RequireAnyPermission('projects:manage', 'projects:read_assigned')
   async startDriveOAuthPoc(

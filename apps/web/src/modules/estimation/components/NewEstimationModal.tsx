@@ -21,6 +21,7 @@ import { Select } from '@/shared/components/ui/Select';
 import { TextField } from '@/shared/components/ui/TextField';
 import {
   useEstimationDriveInventory,
+  useEstimationDriveOAuthPocStatus,
   useResolveEstimationDriveFolder,
 } from '../api/estimation.queries';
 import styles from './NewEstimationModal.module.css';
@@ -98,6 +99,7 @@ export function NewEstimationModal({ open, prospects, onClose }: NewEstimationMo
     open && mode === 'ai' && Boolean(selected),
   );
 
+  const drivePocStatus = useEstimationDriveOAuthPocStatus(open && mode === 'ai');
   const driveUrlIsValid = isGoogleDriveFolderUrl(driveFolderUrl);
   const driveInventory = useEstimationDriveInventory(
     driveFolderUrl.trim(),
@@ -382,7 +384,7 @@ export function NewEstimationModal({ open, prospects, onClose }: NewEstimationMo
             inventory={driveInventory.data}
           />
 
-          <div className={styles.drivePocPanel}>
+          {drivePocStatus.data?.enabled && <div className={styles.drivePocPanel}>
             <div>
               <strong>Diagnóstico de conexión Google Drive (PoC)</strong>
               <p>Google solicitará permiso de lectura sobre los archivos de tu Drive.
@@ -396,7 +398,7 @@ export function NewEstimationModal({ open, prospects, onClose }: NewEstimationMo
               Probar acceso con Google
             </Button>
             {drivePocResult && <p className={styles.drivePocResult} role="status">{drivePocResult}</p>}
-          </div>
+          </div>}
 
           <label className={styles.instructions}>
             <span>Indicaciones para el agente (opcional)</span>
