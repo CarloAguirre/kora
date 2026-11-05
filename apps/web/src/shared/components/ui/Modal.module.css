@@ -181,3 +181,32 @@
   justify-content: flex-end;
 }
 .compactSide .footer button { font-size: 11px; }
+
+/* Ficha Kora v5.02: drawer de ~600 px (como el HTML de referencia).
+ * Los campos y los tramos de cobro permanecen alineados horizontalmente.
+ * No modificar el drawer de soporte ni el detalle compacto de bloques. */
+.side.projectEditSide[open] {
+  width: 100%;
+  max-width: min(600px, 100vw);
+}
+.projectEditSide .header {
+  padding: 14px 16px 12px;
+  align-items: center;
+}
+.projectEditSide .title {
+  font-size: 16px;
+  line-height: 1.35;
+}
+.projectEditSide .body {
+  min-width: 0;
+  overflow-x: hidden;
+  padding: 14px 16px 18px;
+  gap: 12px;
+}
+.projectEditSide .footer {
+  padding: 10px 14px;
+  align-items: center;
+}
+@media (max-width: 640px) {
+  .projectEditSide .body { padding: 14px 12px; }
+}
