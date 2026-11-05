@@ -921,6 +921,8 @@ export type CollaboratorProjectEvent = z.infer<typeof collaboratorProjectEventSc
 
 export const collaboratorProjectDetailSchema = collaboratorProjectSummarySchema.omit({ weekHours: true }).extend({
   estimatedDeliveryDate: z.string().nullable(),
+  /** Líder del equipo necesario para el drawer, sin datos comerciales ni de gestión. */
+  teams: z.array(projectTeamSchema.pick({ teamId: true, leader: true })),
   modules: z.array(projectModuleSchema),
   observations: z.array(projectObservationSchema),
   events: z.array(collaboratorProjectEventSchema),

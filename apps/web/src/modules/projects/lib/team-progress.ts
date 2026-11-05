@@ -151,6 +151,17 @@ function blockDetail(
   };
 }
 
+/** Misma fórmula de bloque del líder, sin necesitar miembros ni datos comerciales del proyecto. */
+export function calculateOperationalBlockProgress(
+  module: Pick<ProjectModule, 'segments' | 'tasks' | 'deliveries'>,
+  block: ProjectModuleSegment,
+  today = currentChileDate(),
+): TeamBlockProgress {
+  const approvedDelivery = module.deliveries.some((delivery) =>
+    delivery.segmentId === block.id && delivery.status === 'approved');
+  return blockDetail(block, getLinkedBlockTasks(module, block), approvedDelivery, today);
+}
+
 export function calculateTeamProgress(
   project: Pick<ProjectDetail, 'modules' | 'teams' | 'members' | 'status' | 'stopsClock'>,
   teamId: string,

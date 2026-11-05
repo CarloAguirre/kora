@@ -24,8 +24,14 @@ import styles from './SegmentDrawer.module.css';
 
 type Reference = AppliedQuotationPlanning['modules'][number];
 
+/** Proyección mínima, apta también para el colaborador. */
+export type SegmentDrawerProject = Pick<ProjectDetail, 'id' | 'modules'> & {
+  teams: ReadonlyArray<Pick<ProjectDetail['teams'][number], 'teamId' | 'leader'>>;
+};
 export interface SegmentDrawerProps {
-  project: ProjectDetail;
+  project: SegmentDrawerProject;
+  /** En consulta no hay mutaciones aunque alguien pase callbacks de edición. */
+  readOnly?: boolean;
   module: ProjectModule;
   segment: ProjectModuleSegment;
   reference?: Reference;
@@ -64,7 +70,7 @@ const badgeLabel = (name: string) => {
  * pero distinguen entrega aprobada, entrega vencida y cierre sin entrega.
  * No se atribuye un cierre a una persona: la API aún no expone closedBy. */
 export function SegmentDrawer({
-  project, module, segment, reference, blockProgress, onClose,
+  project, module, segment, reference, blockProgress, onClose, readOnly = false,
   onEdit, onDelete, onChangeClosure, onAssignTasks,
   onAddTask, onEditTask, onDuplicateTask, onDeleteTask,
 }: SegmentDrawerProps) {
@@ -100,14 +106,14 @@ export function SegmentDrawer({
       : styles.statePending;
 
   const tasksAreApproved = tasks.length > 0 && tasks.every((task) => task.status === 'done');
-  const canShowDeliveryAction = delivery?.status === 'planned' && Boolean(onEdit) &&
+  const canShowDeliveryAction = !readOnly && delivery?.status === 'planned' && Boolean(onEdit) &&
     Boolean(delivery.canManage);
   const canMarkDelivered = canShowDeliveryAction && tasksAreApproved;
-  const canAddTask = Boolean(onAddTask) && !closedByDelivery &&
+  const canAddTask = !readOnly && Boolean(onAddTask) && !closedByDelivery &&
     (delivery?.status === 'planned' || !segment.closedAt);
-  const canReopen = Boolean(onChangeClosure) && (!delivery && Boolean(segment.closedAt) ||
+  const canReopen = !readOnly && Boolean(onChangeClosure) && (!delivery && Boolean(segment.closedAt) ||
     delivery?.status === 'approved');
-  const canCloseManually = !segment.closedAt && !delivery && tasksAreApproved &&
+  const canCloseManually = !readOnly && !segment.closedAt && !delivery && tasksAreApproved &&
     Boolean(onChangeClosure);
   const closeHint = !tasks.length
     ? 'Agrega tareas al bloque y apruébalas antes de cerrarlo.'
@@ -120,7 +126,7 @@ export function SegmentDrawer({
 
   const validCompletionDate = completedOn >= segment.startDate && completedOn <= today;
   const submitDelivery = async () => {
-    if (!delivery || !canMarkDelivered || !validCompletionDate) return;
+    if (readOnly || !delivery || !canMarkDelivered || !validCompletionDate) return;
     try {
       await updateDelivery.mutateAsync({
         projectId: project.id, moduleId: module.id, deliveryId: delivery.id,
@@ -135,6 +141,7 @@ export function SegmentDrawer({
     }
   };
   const reopen = async () => {
+    if (readOnly) return;
     if (delivery?.status !== 'approved') {
       onChangeClosure?.('reopen');
       return;
@@ -155,7 +162,7 @@ export function SegmentDrawer({
     eyebrow={'Fase ' + (project.modules.findIndex((item) => item.id === module.id) + 1) +
       ': ' + module.name}
     onClose={onClose}
-    footer={onEdit || onDelete ? <>
+    footer={!readOnly && (onEdit || onDelete) ? <>
       {onDelete && <Button variant="outline" onClick={onDelete}>Eliminar bloque</Button>}
       {onEdit && <Button onClick={onEdit}>Editar bloque</Button>}
     </> : undefined}>
@@ -248,7 +255,8 @@ export function SegmentDrawer({
           {segment.closedAt
             ? 'Este bloque no tiene entrega de cierre. Su cierre quedó registrado el ' +
               dateFull(segment.closedAt) + '.'
-            : 'Este bloque no tiene entrega de cierre. Puedes registrarla desde «Editar bloque».'}
+            : readOnly ? 'Este bloque no tiene una entrega de cierre registrada.'
+              : 'Este bloque no tiene entrega de cierre. Puedes registrarla desde «Editar bloque».'}
         </p>}
         {canReopen && <Button size="sm" variant="outline"
           className={styles.reopenButton} disabled={updateDelivery.isPending}
@@ -264,7 +272,7 @@ export function SegmentDrawer({
           </span>)}
         </div>
       </section>}
-      {onChangeClosure && !delivery && !canReopen && <div className={styles.closureAction}>
+      {!readOnly && onChangeClosure && !delivery && !canReopen && <div className={styles.closureAction}>
         <span title={closeHint}>
           <Button size="sm" variant="outline" disabled={!canCloseManually}
             onClick={() => onChangeClosure('close')}>Cerrar bloque</Button>
@@ -276,7 +284,7 @@ export function SegmentDrawer({
           <h3>Tareas ({tasks.length})</h3>
           {canAddTask && <button type="button" className={styles.addTask}
             onClick={onAddTask}>+ Agregar tarea</button>}
-          {onAssignTasks && pendingReferences && <button type="button"
+          {!readOnly && onAssignTasks && pendingReferences && <button type="button"
             className={styles.addTask} onClick={onAssignTasks}>Asignar tareas EDT</button>}
         </div>
         {tasks.length ? <ul className={styles.taskList}>
@@ -310,15 +318,15 @@ export function SegmentDrawer({
                   styles.taskOverdue].join(' ')}>Vencida</span>}
             </span>
             <div className={styles.taskActions}>
-              {onEditTask && <button type="button" title="Editar tarea"
+              {!readOnly && onEditTask && <button type="button" title="Editar tarea"
                 aria-label={'Editar tarea ' + task.name} onClick={() => onEditTask(task)}>
                 <PencilIcon size={14} />
               </button>}
-              {onDuplicateTask && <button type="button" title="Duplicar tarea"
+              {!readOnly && onDuplicateTask && <button type="button" title="Duplicar tarea"
                 aria-label={'Duplicar tarea ' + task.name} onClick={() => onDuplicateTask(task)}>
                 <CopyIcon size={14} />
               </button>}
-              {onDeleteTask && <button type="button" title="Eliminar tarea"
+              {!readOnly && onDeleteTask && <button type="button" title="Eliminar tarea"
                 aria-label={'Eliminar tarea ' + task.name} onClick={() => onDeleteTask(task)}>
                 <TrashIcon size={14} />
               </button>}
@@ -328,7 +336,7 @@ export function SegmentDrawer({
       </section>
     </div>
   </Modal>
-  {showDeliveryForm && delivery && <Modal open title="Marcar como entregada"
+  {!readOnly && showDeliveryForm && delivery && <Modal open title="Marcar como entregada"
     description={delivery.name + ', del bloque ' + segment.name +
       '. Se registrará el cierre del bloque al confirmar.'}
     onClose={() => setShowDeliveryForm(false)}

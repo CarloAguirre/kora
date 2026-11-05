@@ -235,6 +235,7 @@ export class ProjectsController {
     return {
       ...summary,
       estimatedDeliveryDate: project.estimatedDeliveryDate,
+      teams: project.teams.map((team) => ({ teamId: team.teamId, leader: team.leader })),
       modules: project.modules.map((module) => ({
         ...module,
         deliveries: module.deliveries.map((delivery) => ({ ...delivery, canManage: false })),
