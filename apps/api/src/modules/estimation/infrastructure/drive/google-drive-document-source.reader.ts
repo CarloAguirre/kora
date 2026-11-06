@@ -65,16 +65,16 @@ interface CandidateCollection {
 
 function topicFor(path: string): Topic {
   const normalized = normalizeDriveLabel(path);
-  if (/(requerimiento|especificacion|levantamiento|\\bers\\b|alcance|rf\\d)/.test(normalized)) {
+  if (/(requerimiento|especificacion|levantamiento|\bers\b|alcance|rf\d)/.test(normalized)) {
     return 'requirements';
   }
-  if (/(historia de usuario|caso de uso|\\bhu\\b|\\bhdu\\b|flujo|proceso|journey)/.test(normalized)) {
+  if (/(historia de usuario|caso de uso|\bhu\b|\bhdu\b|flujo|proceso|journey)/.test(normalized)) {
     return 'stories';
   }
   if (/(regla|matriz|validacion|aprobacion|permiso|perfil|rol de usuario)/.test(normalized)) {
     return 'rules';
   }
-  if (/(integracion|\\bapi\\b|interfaz|\\bsap\\b|fiori|webhook)/.test(normalized)) {
+  if (/(integracion|\bapi\b|interfaz|\bsap\b|fiori|webhook)/.test(normalized)) {
     return 'integrations';
   }
   if (/(prototipo|maqueta|figma|pantalla|wireframe|ux|diseno visual)/.test(normalized)) {
