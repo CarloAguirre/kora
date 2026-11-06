@@ -1,5 +1,5 @@
 import { createSign } from 'node:crypto';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { AppConfigService } from '../../../../config/app-config.service';
 import type {
   DriveFolderClient,
@@ -46,7 +46,10 @@ interface GoogleDriveListResponse {
 export class GoogleDriveFolderClient implements DriveFolderClient {
   private cachedToken: { value: string; expiresAtMs: number } | null = null;
 
-  constructor(private readonly config: AppConfigService, private readonly delegatedAccessToken?: string) {}
+  constructor(
+    private readonly config: AppConfigService,
+    @Optional() private readonly delegatedAccessToken?: string,
+  ) {}
 
   isConfigured(): boolean {
     return Boolean(this.delegatedAccessToken) || this.config.googleDrive.enabled;
