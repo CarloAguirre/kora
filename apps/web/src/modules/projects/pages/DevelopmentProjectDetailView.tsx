@@ -12,7 +12,7 @@ import { Card } from "@/shared/components/ui/Card";
 import { useToast } from "@/shared/components/ui/Toast";
 import { ApiRequestError } from "@/shared/lib/api-client";
 import type { ProjectDetail } from "@kora/contracts";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useResolveProjectManagementApproval } from "../api/projects.queries";
 import { AssignedTeamsCard, type AssignedTeamSummary } from "../components/AssignedTeamsCard";
 import { ProjectTeamsManagementCard } from "../components/ProjectTeamsManagementCard";
@@ -69,6 +69,17 @@ export function DevelopmentProjectDetailView({
   const { user } = useAuth();
   const toast = useToast();
   const [tab, setTab] = useState<DetailTab>("resumen");
+  const [manageTeamsOnArrival, setManageTeamsOnArrival] = useState(false);
+  const teamsSectionRef = useRef<HTMLDivElement>(null);
+  const goToAssignedTeams = () => {
+    setManageTeamsOnArrival(true);
+    setTab("resumen");
+  };
+  useEffect(() => {
+    if (tab !== "resumen" || !manageTeamsOnArrival) return;
+    teamsSectionRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+    setManageTeamsOnArrival(false);
+  }, [tab, manageTeamsOnArrival]);
   useEffect(() => {
     if (quotationTabRequestId > 0) setTab('cotizaciones');
   }, [quotationTabRequestId]);
@@ -377,16 +388,23 @@ export function DevelopmentProjectDetailView({
               <div className={styles.colLeft}>
                 <TeamHoursSummaryChart teams={teamSummaries} unassignedHours={unassignedHours} />
 
-                {canManageProject ? (
-                  <ProjectTeamsManagementCard project={project} catalog={teamsCatalog?.items ?? []} />
-                ) : (
-                  <AssignedTeamsCard
-                    project={project}
-                    teams={teamSummaries}
-                    onViewHours={() => setTab("bitacora")}
-                    canOpenTeam={readOnlyTeamIds ? (teamId) => readOnlyTeamIds.has(teamId) : undefined}
-                  />
-                )}
+                <div id="project-assigned-teams" className={styles.assignedTeamsAnchor}
+                  ref={teamsSectionRef}>
+                  {canManageProject ? (
+                    <ProjectTeamsManagementCard
+                      project={project}
+                      catalog={teamsCatalog?.items ?? []}
+                      startManaging={manageTeamsOnArrival}
+                    />
+                  ) : (
+                    <AssignedTeamsCard
+                      project={project}
+                      teams={teamSummaries}
+                      onViewHours={() => setTab("bitacora")}
+                      canOpenTeam={readOnlyTeamIds ? (teamId) => readOnlyTeamIds.has(teamId) : undefined}
+                    />
+                  )}
+                </div>
               </div>
 
               <div className={styles.colRight}>
@@ -410,6 +428,7 @@ export function DevelopmentProjectDetailView({
                 hourEntries={projectHourEntries?.items ?? []}
                 teamOptions={segmentTeamOptions}
                 canManage={canManageProject}
+                onNavigateToTeams={goToAssignedTeams}
               />
             ) : (
               <Card>

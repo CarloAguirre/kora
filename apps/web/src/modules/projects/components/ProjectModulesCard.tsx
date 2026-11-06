@@ -84,6 +84,8 @@ interface ProjectModulesCardProps {
   /** Equipos asignados al proyecto — opciones de equipo al editar un tiempo de ejecución desde el detalle (mismo criterio que `EditProjectDialog`). */
   teamOptions: ReadonlyArray<{ value: string; label: string }>;
   canManage: boolean;
+  /** Lleva a Resumen → Equipos asignados cuando la fase no puede planificarse. */
+  onNavigateToTeams?: () => void;
 }
 
 /**
@@ -96,7 +98,9 @@ interface ProjectModulesCardProps {
  * crear/quitar fases y entregas. La revisión de tareas está disponible aquí y
  * también en la vista del líder de equipo; ambas usan el mismo endpoint y modal.
  */
-export function ProjectModulesCard({ project, hourEntries, teamOptions, canManage }: ProjectModulesCardProps) {
+export function ProjectModulesCard({
+  project, hourEntries, teamOptions, canManage, onNavigateToTeams,
+}: ProjectModulesCardProps) {
   const toast = useToast();
   const createModule = useCreateProjectModule();
   const updateModule = useUpdateProjectModule();
@@ -157,8 +161,11 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
     /** Fase recién creada: permite mostrar el modal sin esperar el refetch del proyecto. */
     phaseName?: string;
   } | null>(null);
-  const [planningMode, setPlanningMode] = useState(false);
+  const [planningMode, setPlanningMode] = useState(
+    () => canManage && project.modules.length === 0,
+  );
   const [addingPhase, setAddingPhase] = useState(false);
+  const [needsTeamsModal, setNeedsTeamsModal] = useState(false);
   const [addingTask, setAddingTask] = useState<{ moduleId: string; segmentId?: string } | null>(null);
   const [editingTask, setEditingTask] = useState<{ moduleId: string; task: ProjectModuleTask } | null>(null);
   const [duplicatingTask, setDuplicatingTask] = useState<{ moduleId: string; task: ProjectModuleTask } | null>(null);
@@ -271,7 +278,8 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
         });
         toast.success('Fase creada. Ahora agrega su primer bloque de trabajo.');
       } else {
-        toast.success('Fase creada. Asigna un equipo al proyecto para planificar su primer bloque.');
+        setNeedsTeamsModal(true);
+        toast.success('Fase creada. Ahora asigna un equipo para planificar bloques de trabajo.');
       }
     } catch (error) {
       toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo agregar la fase.');
@@ -297,7 +305,7 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
 
   const onAddPhaseBlock = (module: ProjectModule) => {
     if (teamOptions.length === 0) {
-      toast.error('Primero asigna un equipo real al proyecto antes de crear un bloque de trabajo.');
+      setNeedsTeamsModal(true);
       return;
     }
     setPlanningBlock({
@@ -406,14 +414,6 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
       </div>
     );
   };
-
-  if (project.modules.length === 0) {
-    return (
-      <Card>
-        <p className={styles.empty}>Aún no hay fases. Se agregan desde "Editar proyecto".</p>
-      </Card>
-    );
-  }
 
   /** En v5.02 los bloques/HH de la cotización siguen siendo referencias hasta
    * crear el segmento real. No asignamos fechas, responsables ni estados falsos. */
@@ -664,6 +664,61 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
           </details>
         </Card>
       )}
+      {project.modules.length === 0 ? (
+        <section className={styles.emptyRoadmap} aria-label="Roadmap sin fases">
+          <header className={styles.emptyRoadmapTop}>
+            <div className={styles.emptyRoadmapCounters} aria-label="Resumen del plan">
+              <span>0 fases</span>
+              <span>0 bloques de trabajo</span>
+              <span>0 tareas</span>
+            </div>
+            {canManage && (
+              <div className={styles.roadmapModeSwitch} role="group" aria-label="Modo del Roadmap">
+                <Button size="sm" variant="ghost" aria-pressed={!planningMode}
+                  onClick={() => setPlanningMode(false)}>Ver</Button>
+                <Button size="sm" variant="ghost" aria-pressed={planningMode}
+                  onClick={() => setPlanningMode(true)}>Planificar</Button>
+              </div>
+            )}
+          </header>
+          <p className={styles.emptyRoadmapDefinition}>
+            <strong>Bloque de trabajo:</strong> periodo en que un equipo trabaja en una fase, con sus horas estimadas.
+            Cada bloque cierra con una sola entrega; si se necesita otra entrega, se crea otro bloque.
+          </p>
+          <Card className={styles.emptyRoadmapCard}>
+            <h2>Arma el plan del proyecto</h2>
+            <ol className={styles.emptyRoadmapSteps}>
+              <li>
+                <span className={styles.emptyRoadmapStepNumber}>1</span>
+                <strong>Crea una fase</strong>
+                <p>La etapa macro del proyecto, por ejemplo «Calculadora de estimaciones».</p>
+              </li>
+              <li>
+                <span className={styles.emptyRoadmapStepNumber}>2</span>
+                <strong>Agrega bloques de trabajo</strong>
+                <p>Qué equipo trabaja, entre qué fechas, cuántas horas y qué entrega lo cierra.</p>
+              </li>
+              <li>
+                <span className={styles.emptyRoadmapStepNumber}>3</span>
+                <strong>Desglosa en tareas</strong>
+                <p>Opcional. Las tareas aprobadas mueven el avance antes de la entrega.</p>
+              </li>
+            </ol>
+            {canManage ? (
+              <div className={styles.emptyRoadmapActions}>
+                <Button onClick={() => {
+                  setPlanningMode(true);
+                  setAddingPhase(true);
+                }}>Crear la primera fase</Button>
+              </div>
+            ) : (
+              <p className={styles.emptyRoadmapReadOnly}>
+                El responsable del proyecto debe crear la primera fase para comenzar la planificación.
+              </p>
+            )}
+          </Card>
+        </section>
+      ) : (
       <PhaseRoadmap alwaysExpanded operationalView borderlessSummary phaseRoadmap={phaseRoadmap}
         operationalTaskCount={operationalCounts.tasks} operationalBlockCount={operationalCounts.blocks}
         operationalPresaleHours={project.prospectPhaseHours}
@@ -715,6 +770,7 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
               onClick={() => setPlanningMode(true)}>Planificar</Button>
           </div>
         ) : undefined} />
+      )}
       {creatingFromReference && appliedPlanning.data && (
         <QuotationReferenceTaskModal
           key={creatingFromReference.task.wbs + ':' + creatingFromReference.task.role}
@@ -787,6 +843,23 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
             placeholder="Ej. Calculadora de estimaciones" value={newPhaseName}
             onChange={(event) => setNewPhaseName(event.target.value)} />
         </div>
+      </Modal>
+      <Modal open={needsTeamsModal} title="Primero agrega equipos"
+        className={styles.missingTeamsModal}
+        onClose={() => setNeedsTeamsModal(false)}
+        footer={<>
+          {onNavigateToTeams && (
+            <Button onClick={() => {
+              setNeedsTeamsModal(false);
+              onNavigateToTeams();
+            }}>Ir a Equipos asignados</Button>
+          )}
+          <Button variant="outline" onClick={() => setNeedsTeamsModal(false)}>
+            Entendido
+          </Button>
+        </>}>
+        <p>El proyecto no tiene equipos asignados. Agrégalos en Equipos asignados
+          antes de crear bloques de trabajo.</p>
       </Modal>
       {planningBlock && (modulesById.get(planningBlock.moduleId) || planningBlock.phaseName) && (
         <NewWorkBlockModal

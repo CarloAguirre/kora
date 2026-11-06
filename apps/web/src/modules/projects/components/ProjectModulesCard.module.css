@@ -721,3 +721,58 @@
   text-align: left;
   padding: 9px 10px;
 }
+
+
+/* Inicio de Roadmap sin fases: mismas superficies y colores del sistema Kora. */
+.emptyRoadmap { display: grid; gap: var(--kora-space-3); min-width: 0; }
+.emptyRoadmapTop {
+  display: flex; justify-content: space-between; align-items: center;
+  flex-wrap: wrap; gap: var(--kora-space-3);
+}
+.emptyRoadmapCounters { display: flex; flex-wrap: wrap; gap: var(--kora-space-2); }
+.emptyRoadmapCounters span {
+  border: 1px solid var(--kora-border-subtle);
+  background: var(--kora-surface);
+  color: var(--kora-text);
+  border-radius: var(--kora-radius-input);
+  padding: 7px 11px; font-size: var(--kora-text-xs);
+}
+.emptyRoadmapDefinition {
+  border-left: 3px solid var(--kora-navy);
+  border-radius: var(--kora-radius-sm);
+  background: var(--kora-surface-muted);
+  color: var(--kora-text-muted);
+  padding: 10px 14px;
+  font-size: var(--kora-text-xs); line-height: 1.5;
+}
+.emptyRoadmapDefinition strong { color: var(--kora-navy); }
+.emptyRoadmapCard {
+  display: grid; gap: var(--kora-space-4);
+  padding: var(--kora-space-6);
+  border: 1px solid var(--kora-border-subtle);
+  border-radius: var(--kora-radius-lg);
+  box-shadow: var(--kora-shadow-sm);
+}
+.emptyRoadmapCard h2 { color: var(--kora-navy); font-size: var(--kora-text-lg); }
+.emptyRoadmapSteps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--kora-space-3); }
+.emptyRoadmapSteps li {
+  display: grid; align-content: start; gap: var(--kora-space-2);
+  min-width: 0; padding: var(--kora-space-4);
+  border: 1px solid var(--kora-border-subtle); border-radius: var(--kora-radius-input);
+  background: var(--kora-surface-alt);
+}
+.emptyRoadmapStepNumber {
+  display: grid; place-items: center; width: 26px; height: 26px;
+  background: var(--kora-navy); color: white;
+  border-radius: 50%; font-size: var(--kora-text-xs); font-weight: var(--kora-weight-bold);
+}
+.emptyRoadmapSteps strong { color: var(--kora-navy); font-size: var(--kora-text-sm); }
+.emptyRoadmapSteps p { color: var(--kora-text-muted); font-size: var(--kora-text-xs); line-height: 1.45; }
+.emptyRoadmapActions { display: flex; justify-content: flex-start; }
+.emptyRoadmapReadOnly { font-size: var(--kora-text-xs); color: var(--kora-text-muted); }
+.missingTeamsModal { max-width: min(420px, calc(100vw - 32px)); }
+.missingTeamsModal p { font-size: var(--kora-text-sm); line-height: 1.6; color: var(--kora-text-muted); }
+@media (max-width: 750px) {
+  .emptyRoadmapSteps { grid-template-columns: 1fr; }
+  .emptyRoadmapCard { padding: var(--kora-space-4); }
+}

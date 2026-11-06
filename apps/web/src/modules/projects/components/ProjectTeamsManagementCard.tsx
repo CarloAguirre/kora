@@ -26,6 +26,8 @@ interface TeamDraft {
 interface Props {
   project: ProjectDetail;
   catalog: readonly TeamCatalogEntry[];
+  /** Desde el modal del Roadmap, abrir directamente el editor de asignaciones. */
+  startManaging?: boolean;
 }
 
 const hours = (n: number) => n.toLocaleString('es-CL', { maximumFractionDigits: 2 });
@@ -37,10 +39,10 @@ const draftFromProject = (project: ProjectDetail): TeamDraft[] => project.teams.
 }));
 
 /** Vista PM/PMO. El líder de equipo mantiene su interfaz propia en TeamLeaderProjectView. */
-export function ProjectTeamsManagementCard({ project, catalog }: Props) {
+export function ProjectTeamsManagementCard({ project, catalog, startManaging = false }: Props) {
   const toast = useToast();
   const updateProject = useUpdateProject();
-  const [managing, setManaging] = useState(false);
+  const [managing, setManaging] = useState(startManaging);
   const [drafts, setDrafts] = useState<TeamDraft[]>(() => draftFromProject(project));
   const draftsRef = useRef(drafts);
   const [removing, setRemoving] = useState<string | null>(null);
