@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query, Res, ServiceUnavailableException, BadRequestException } from '@nestjs/common';
+import { Body, Controller, Get, Header, Post, Query, Res, ServiceUnavailableException, BadRequestException } from '@nestjs/common';
 import type { FastifyReply } from 'fastify';
 import { z } from 'zod';
 import {
@@ -64,9 +64,9 @@ export class EstimationController {
   ) {}
 
   /**
-   * PoC: solo comprueba OAuth y lectura de una carpeta real de Drive.
-   * No guarda tokens, no altera la sesión Google/Kora y no cambia el lector
-   * definitivo de documentos hasta completar autorización y persistencia.
+   * Concesión OAuth temporal para la calculadora, separada del login de Kora.
+   * El access token permanece exclusivamente en memoria del backend, ligado
+   * a usuario+carpeta; no se devuelve al cliente ni se guarda en PostgreSQL.
    */
   @Get('drive/oauth-poc/status')
   @RequireAnyPermission('projects:manage', 'projects:read_assigned')
@@ -122,6 +122,7 @@ export class EstimationController {
    * Ofrece carpetas hermanas y subcarpetas accesibles, sin exponer el token.
    */
   @Post('drive/folders/browse')
+  @Header('Cache-Control', 'no-store')
   @RequireAnyPermission('projects:manage', 'projects:read_assigned')
   async browseDriveFolder(
     @Body(new ZodValidationPipe(browseDriveFolderInputSchema)) input: BrowseDriveFolderInput,
