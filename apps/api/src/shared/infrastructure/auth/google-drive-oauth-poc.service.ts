@@ -267,8 +267,8 @@ export function renderDriveOAuthPocResult(result: DriveOAuthPocResult): string {
     status: result.status, code: result.code, message: result.message,
     filesInSample: result.filesInSample ?? 0,
   }).replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026');
-  const heading = result.status === 'ok' ? 'Lectura de Drive confirmada' : 'Drive no disponible';
-  return `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Prueba Google Drive · Kora</title>
+  const heading = result.status === 'ok' ? 'Conexión con Drive completada' : 'No se pudo conectar a Drive';
+  return `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Conexión Google Drive · Kora</title>
 <style>body{font:16px system-ui,sans-serif;padding:30px;background:#f7f9fc;color:#132237}
 section{max-width:540px;padding:24px;background:#fff;border:1px solid #d8e3ed;border-radius:14px}
 button{padding:10px 18px;background:#132237;color:#fff;border:0;border-radius:8px;cursor:pointer}

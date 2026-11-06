@@ -72,6 +72,11 @@ export async function browseAuthorizedDriveFolder(
   // Google Drive puede no entregar un padre en unidades compartidas o raíces.
   // Si está presente, la selección debe pertenecer al subárbol de ese padre.
   const allowedAncestorId = original.parentIds[0] ?? originalId;
+  // El padre sirve para comprobar hermandad, pero no es una carpeta seleccionable:
+  // permitirlo expondría los hermanos del propio padre en el siguiente listado.
+  if (selectedId !== originalId && selectedId === allowedAncestorId) {
+    throw new BadRequestException('Selecciona una carpeta de este grupo, no su carpeta superior.');
+  }
   if (selectedId !== originalId) {
     let cursor: DriveFolderMetadata | null = selected;
     const visited = new Set<string>();
