@@ -14,7 +14,7 @@
 
 
 /* Cotizaciones v5 — capas locales de fidelidad visual; no alteran tokens globales. */
-.page{width:100%;min-width:0;margin:0;gap:14px;padding:0 0 36px}
+.page{width:100%;min-width:0;margin:0;gap:14px;padding:0}
 .breadcrumb{justify-content:space-between;margin:2px 0 0;font-size:12px}
 .breadcrumb a:first-child{font-weight:700;color:var(--kora-navy)}
 .listLink{color:var(--kora-text-muted)}
@@ -74,9 +74,9 @@
 .modeNotice{margin:0 0 10px;padding:10px 12px;background:var(--kora-badge-warning-bg);color:var(--kora-badge-warning-text);font-size:12px;line-height:1.5;border-radius:7px}
 
 
-/* Fidelidad HTML v5 — maqueta de cotización 900px + resumen 330px.
-   Todas las modificaciones son locales a esta ruta. */
-.page{width:100%;min-width:0;max-width:none;margin:0;gap:15px;padding:0 0 52px}
+/* Cotización fluida: usa los márgenes de DashboardLayout, con resumen lateral.
+   Las modificaciones son locales a esta ruta. */
+.page{width:100%;min-width:0;max-width:none;margin:0;gap:15px;padding:0}
 .projectTitle{font-size:26px;font-weight:650;color:#10182d;line-height:1.25;margin:3px 0 0}
 .breadcrumb{margin:0 0 2px;justify-content:flex-start;gap:22px;min-height:26px;font-size:12.5px}
 .breadcrumb a:first-child{color:#10182d;font-weight:700}
