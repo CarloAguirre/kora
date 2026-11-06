@@ -8,6 +8,8 @@ import buttonStyles from '@/shared/components/ui/Button.module.css';
 import taskStyles from './CollaboratorDashboard.module.css';
 import tabsStyles from '@/shared/components/ui/Tabs.module.css';
 import badgeStyles from '@/shared/components/ui/Badge.module.css';
+import kpiStyles from '@/shared/components/ui/KpiCard.module.css';
+import dataTableStyles from '@/shared/components/ui/DataTable.module.css';
 
 const mocks = vi.hoisted(() => ({
   update: vi.fn(),
@@ -117,7 +119,11 @@ describe('Dashboard colaborador · homologación v6', () => {
     expect(within(attention).queryByText(/esperando revisión/)).not.toBeInTheDocument();
     expect(within(attention).getByText('1 registro de horas rechazado')).toBeInTheDocument();
 
+    const daily = screen.getByRole('region', { name: 'Progreso diario' });
+    expect(daily).toHaveClass(kpiStyles.card!);
     const week = screen.getByRole('region', { name: 'Planificación semanal' });
+    expect(within(week).getByRole('table', { name: 'Asignaciones de la semana' }))
+      .toHaveClass(dataTableStyles.table!);
     expect(within(week).getAllByText('24 HH')).toHaveLength(2);
     expect(within(week).getByText(/no equivalen a horas registradas/)).toBeInTheDocument();
     const team = screen.getByRole('region', { name: 'Mi equipo' });

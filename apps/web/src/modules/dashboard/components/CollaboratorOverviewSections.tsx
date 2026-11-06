@@ -7,6 +7,8 @@ import type {
 import { FORECAST_ASSIGNMENT_TYPE_LABELS } from '@kora/contracts';
 import { Pagination, usePaginatedItems } from '@/shared/components/ui/Pagination';
 import { Card } from '@/shared/components/ui/Card';
+import { KpiCard } from '@/shared/components/ui/KpiCard';
+import { DataTable, type Column } from '@/shared/components/ui/DataTable';
 import styles from './CollaboratorOverviewSections.module.css';
 
 const DAILY_TARGET_HOURS = 8;
@@ -49,58 +51,56 @@ export function CollaboratorKpis({ hours, tasks, loading }: OverviewProps) {
   const dailyPercent = Math.min(100, Math.max(0, today / DAILY_TARGET_HOURS * 100));
   const weeklyPercent = target > 0 ? Math.min(100, Math.round(weekly / target * 100)) : 100;
   const unavailable = loading || !hours;
+  const fallback = <span className={styles.muted}>{loading ? 'Cargando…' : 'No disponible'}</span>;
 
   return (
     <div className={styles.kpis} aria-label="Indicadores de mi actividad">
-      <Card className={styles.kpiCard} role="region" aria-label="Progreso diario">
-        <span className={styles.kpiLabel}>Progreso Diario</span>
-        {unavailable ? <span className={styles.muted}>{loading ? 'Cargando…' : 'No disponible'}</span>
-          : <div className={styles.donutRow}>
+      <KpiCard ariaLabel="Progreso diario" label="Progreso Diario" className={styles.kpiCard}
+        value={unavailable ? fallback
+          : <span className={styles.donutRow}>
               <DailyDonut percent={dailyPercent} />
-              <div><strong className={styles.value}>{formatHours(today)}/{DAILY_TARGET_HOURS}</strong>
-                <span className={styles.muted}>Horas hoy</span></div>
-            </div>}
-      </Card>
-      <Card className={styles.kpiCard} role="region" aria-label="Horas registradas esta semana">
-        <span className={styles.kpiLabel}>HH registradas esta semana</span>
-        {unavailable ? <span className={styles.muted}>{loading ? 'Cargando…' : 'No disponible'}</span>
-          : <>
-              <strong className={styles.value}>{formatHours(weekly)}/{formatHours(target)} horas</strong>
-              <div className={styles.progressTrack} role="progressbar"
+              <span className={styles.donutValues}>
+                <strong className={styles.donutNumber}>{formatHours(today)}/{DAILY_TARGET_HOURS}</strong>
+                <span className={styles.muted}>Horas hoy</span>
+              </span>
+            </span>}
+      />
+      <KpiCard ariaLabel="Horas registradas esta semana" label="HH registradas esta semana"
+        className={styles.kpiCard}
+        value={unavailable ? fallback
+          : <span className={styles.weeklyGroup}>
+              <strong className={styles.weeklyNumber}>{formatHours(weekly)}/{formatHours(target)} horas</strong>
+              <span className={styles.progressTrack} role="progressbar"
                 aria-label="Progreso de horas semanales" aria-valuenow={weeklyPercent}
                 aria-valuemin={0} aria-valuemax={100}>
-                <span className={styles.progressFill} style={{ width: String(weeklyPercent) + '%' }} />
-              </div>
-              <span className={styles.muted}>
-                {weeklyPercent}% completado
-                {hours.weekHolidayCount > 0 ? ' · ' + hours.weekHolidayCount + ' feriado(s) descontado(s)' : ''}
+                <span className={styles.progressFill} style={{ width: weeklyPercent + '%' }} />
               </span>
-            </>}
-      </Card>
-      <Card className={styles.kpiCard} role="region" aria-label="Horas extra este mes">
-        <span className={styles.kpiLabel}>Horas extra este mes</span>
-        {unavailable ? <span className={styles.muted}>{loading ? 'Cargando…' : 'No disponible'}</span>
-          : <>
-              <strong className={styles.value}>{formatHours(hours.monthOvertimeHours)} horas</strong>
-              <span className={styles.muted}>{formatHours(hours.weekOvertimeHours)} h esta semana</span>
-            </>}
-      </Card>
-      <Card className={styles.kpiCard} role="region" aria-label="Atención requerida">
-        <span className={styles.kpiLabel}>Atención Requerida</span>
-        {loading ? <span className={styles.muted}>Cargando…</span>
-          : returnedCount + rejectedEntries === 0
-            ? <span className={styles.allClear}>Todo al día</span>
-            : <div className={styles.attention}>
-                {returnedCount > 0 && <>
-                  <strong>{returnedCount} {returnedCount === 1
-                    ? 'tarea por revisar' : 'tareas por revisar'}</strong>
-                  <span>{returnedCount} {returnedCount === 1
-                    ? 'devuelta por el líder' : 'devueltas por el líder'}</span>
-                </>}
-                {rejectedEntries > 0 && <span>{rejectedEntries} {rejectedEntries === 1
-                  ? 'registro de horas rechazado' : 'registros de horas rechazados'}</span>}
-              </div>}
-      </Card>
+            </span>}
+        sub={!unavailable
+          ? weeklyPercent + '% completado' + ((hours?.weekHolidayCount ?? 0) > 0
+            ? ' · ' + hours!.weekHolidayCount + ' feriado(s) descontado(s)' : '')
+          : undefined}
+      />
+      <KpiCard ariaLabel="Horas extra este mes" label="Horas extra este mes"
+        className={styles.kpiCard}
+        value={unavailable ? fallback : formatHours(hours?.monthOvertimeHours ?? 0) + ' horas'}
+        sub={!unavailable ? formatHours(hours?.weekOvertimeHours ?? 0) + ' h esta semana' : undefined}
+      />
+      <KpiCard ariaLabel="Atención requerida" label="Atención Requerida"
+        className={styles.kpiCard}
+        value={loading ? fallback : returnedCount + rejectedEntries === 0
+          ? <span className={styles.allClear}>Todo al día</span>
+          : <span className={styles.attention}>
+              {returnedCount > 0 && <>
+                <strong>{returnedCount} {returnedCount === 1
+                  ? 'tarea por revisar' : 'tareas por revisar'}</strong>
+                <span>{returnedCount} {returnedCount === 1
+                  ? 'devuelta por el líder' : 'devueltas por el líder'}</span>
+              </>}
+              {rejectedEntries > 0 && <span>{rejectedEntries} {rejectedEntries === 1
+                ? 'registro de horas rechazado' : 'registros de horas rechazados'}</span>}
+            </span>}
+      />
     </div>
   );
 }
@@ -124,9 +124,34 @@ const formatWeek = (iso: string) => {
 };
 
 /** Mis asignaciones y las de mi equipo: cantidades planificadas, no HH registradas. */
+type WeekRow = { readonly id: string; readonly label: string; readonly hours: number; readonly total: boolean };
+type TeamMember = NonNullable<DashboardMyPlanning['teamMembers']>[number];
+
+const weekColumns: readonly Column<WeekRow>[] = [
+  { key: 'project', header: 'Proyecto / tipo', render: (row) => row.total
+    ? <strong>{row.label}</strong> : row.label },
+  { key: 'hours', header: 'HH semana', align: 'right', render: (row) => row.total
+    ? <strong>{formatHours(row.hours)} HH</strong> : formatHours(row.hours) + ' HH' },
+];
+const teamColumns: readonly Column<TeamMember>[] = [
+  { key: 'collaborator', header: 'Colaborador', render: (member) => member.fullName },
+  { key: 'projects', header: 'Proyectos esta semana', render: (member) =>
+    member.items.length ? member.items.map(planningLabel).join(', ') : 'Sin asignaciones' },
+  { key: 'hours', header: 'HH semana', align: 'right', render: (member) =>
+    formatHours(member.totalHours) + ' HH' },
+];
+
+/** Planificación autorizada: componentes DataTable y Pagination de Kora. */
 export function CollaboratorPlanning({ planning, loading }: PlanningProps) {
   const teamMembers = planning?.teamMembers ?? EMPTY_TEAM;
   const { pageItems, pagination } = usePaginatedItems(teamMembers);
+  const weekRows: WeekRow[] = planning
+    ? [...planning.items.map((item, index) => ({
+        id: item.type + '-' + (item.projectName ?? index),
+        label: planningLabel(item), hours: item.hours, total: false,
+      })), { id: '__total__', label: 'Total semana', hours: planning.totalHours, total: true }]
+    : [];
+
   return (
     <div className={styles.planningGrid}>
       <Card className={styles.planningCard} role="region" aria-label="Planificación semanal">
@@ -134,23 +159,11 @@ export function CollaboratorPlanning({ planning, loading }: PlanningProps) {
           <h2>Planificación Semanal</h2>
           {planning && <span>{formatWeek(planning.weekStart)}</span>}
         </div>
-        <div className={styles.tableScroll}>
-          <table className={styles.table}>
-            <thead><tr><th>Proyecto / tipo</th><th className={styles.numeric}>HH semana</th></tr></thead>
-            <tbody>
-              {loading ? <tr><td colSpan={2}>Cargando planificación…</td></tr>
-                : !planning || planning.items.length === 0
-                  ? <tr><td colSpan={2}>Sin horas planificadas esta semana.</td></tr>
-                  : planning.items.map((item, index) => <tr key={item.type + '-' + (item.projectName ?? index)}>
-                      <td>{planningLabel(item)}</td>
-                      <td className={styles.numeric}>{formatHours(item.hours)} HH</td>
-                    </tr>)}
-              {planning && <tr className={styles.totalRow}>
-                <td>Total semana</td><td className={styles.numeric}>{formatHours(planning.totalHours)} HH</td>
-              </tr>}
-            </tbody>
-          </table>
-        </div>
+        <DataTable columns={weekColumns} items={weekRows} getRowKey={(row) => row.id}
+          density="compact" loading={loading}
+          getRowClassName={(row) => row.total ? styles.totalRow : undefined}
+          emptyMessage="Sin horas planificadas esta semana."
+          caption="Asignaciones de la semana" />
         <p className={styles.caption}>HH asignadas en planificación; no equivalen a horas registradas.</p>
       </Card>
       <Card className={styles.planningCard} role="region" aria-label="Mi equipo">
@@ -158,21 +171,10 @@ export function CollaboratorPlanning({ planning, loading }: PlanningProps) {
           <h2>Mi Equipo{planning?.teamName ? ' — ' + planning.teamName : ''}</h2>
           {!loading && <span className={styles.count}>{teamMembers.length}</span>}
         </div>
-        <div className={styles.tableScroll}>
-          <table className={styles.table}>
-            <thead><tr><th>Colaborador</th><th>Proyectos esta semana</th>
-              <th className={styles.numeric}>HH semana</th></tr></thead>
-            <tbody>
-              {loading ? <tr><td colSpan={3}>Cargando equipo…</td></tr>
-                : teamMembers.length === 0 ? <tr><td colSpan={3}>Sin compañeros de equipo disponibles.</td></tr>
-                : pageItems.map((member) => <tr key={member.fullName}>
-                    <td>{member.fullName}</td>
-                    <td>{member.items.length ? member.items.map(planningLabel).join(', ') : 'Sin asignaciones'}</td>
-                    <td className={styles.numeric}>{formatHours(member.totalHours)} HH</td>
-                  </tr>)}
-            </tbody>
-          </table>
-        </div>
+        <DataTable columns={teamColumns} items={pageItems} getRowKey={(member) => member.fullName}
+          density="compact" loading={loading}
+          emptyMessage="Sin compañeros de equipo disponibles."
+          caption="Planificación semanal de mi equipo" />
         {teamMembers.length > 0 && <Pagination {...pagination} />}
         <p className={styles.caption}>Asignación semanal del equipo; no expone bitácoras privadas de otros usuarios.</p>
       </Card>
