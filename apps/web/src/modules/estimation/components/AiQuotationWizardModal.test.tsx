@@ -212,6 +212,32 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
     })));
   });
 
+  it('muestra progreso real de lectura y solicitud a Gemini, sin duplicar peticiones', async () => {
+    let releaseBrowse!: (result: typeof previewResult) => void;
+    const pendingBrowse = new Promise<typeof previewResult>((resolve) => {
+      releaseBrowse = resolve;
+    });
+    mocks.browse.mockReturnValueOnce(pendingBrowse);
+    renderWizard();
+    fireEvent.click(screen.getByRole('button', { name: 'Analizar proyecto' }));
+    expect(screen.getByRole('status', { name: 'Preparación de la documentación' }))
+      .toHaveTextContent('Leyendo documentos');
+    releaseBrowse(previewResult);
+    expect(await screen.findByText('Levantamiento QA')).toBeInTheDocument();
+
+    let releaseAnalysis!: (result: typeof analysisResult) => void;
+    mocks.analyze.mockReturnValueOnce(new Promise<typeof analysisResult>((resolve) => {
+      releaseAnalysis = resolve;
+    }));
+    fireEvent.click(screen.getByRole('button', { name: 'Analizar proyecto' }));
+    expect(screen.getByRole('status', { name: 'Progreso del análisis IA' }))
+      .toHaveTextContent('Gemini está revisando antecedentes');
+    expect(mocks.analyze).toHaveBeenCalledTimes(1);
+    releaseAnalysis(analysisResult);
+    expect(await screen.findByText('Entendimiento del proyecto')).toBeInTheDocument();
+    expect(mocks.analyze).toHaveBeenCalledTimes(1);
+  });
+
   it('bloquea análisis si la carpeta no contiene documentos legibles', async () => {
     mocks.browse.mockResolvedValueOnce({ ...previewResult, documents: [] });
     renderWizard();
