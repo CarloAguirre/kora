@@ -30,6 +30,7 @@ import { readQuotationTaskExcel } from '../lib/quotation-task-excel';
 import { suggestedKoraTeamForRole } from '../components/quotation-role-team-suggestions';
 import { QuotationCommercialSections } from '../components/QuotationCommercialSections';
 import { QuotationDraftSaveBar } from '../components/QuotationDraftSaveBar';
+import { QuotationAiReviewBanner } from '../components/QuotationAiReviewBanner';
 import { NewProjectQuotationModal } from '../components/NewProjectQuotationModal';
 import styles from './QuotationWorkspacePage.module.css';
 
@@ -67,6 +68,10 @@ export function QuotationWorkspacePage() {
   const [roleMappingOpen, setRoleMappingOpen] = useState(false);
   const [teamView, setTeamView] = useState<'team' | 'phases'>('phases');
   const [dirty, setDirty] = useState(false);
+  // Modo de revisión IA estrictamente por versión, sin modificar el artefacto
+  // generado hasta que el usuario edite y guarde.
+  const [adjustingAiVersionId, setAdjustingAiVersionId] = useState<string | null>(null);
+  const [recentAiAcceptance, setRecentAiAcceptance] = useState<{ versionId: string; actor: string } | null>(null);
   // Si el usuario descarta la asignación sugerida por IA, no aplicarla de nuevo
   // sobre esa misma revisión guardada hasta que cambie de versión/revisión.
   const dismissedAutomaticMapping = useRef<string | null>(null);
@@ -93,6 +98,10 @@ export function QuotationWorkspacePage() {
   const teamById = useMemo(() => new Map(activeTeams.map((team) => [team.id, team.name])), [activeTeams]);
 
   // La edición local no se sobreescribe en cada refetch, solo al cambiar de versión/revisión.
+  useEffect(() => {
+    setAdjustingAiVersionId(null);
+  }, [selected?.id]);
+
   useEffect(() => {
     setForm(selected ? fromVersion(selected) : null);
     setDirty(false);
@@ -175,6 +184,7 @@ export function QuotationWorkspacePage() {
     setDirty(false);
     setTeamView(selected.draft.aiPoc?.edt || selected.draft.mode === 'phases'
       ? 'phases' : 'team');
+    setAdjustingAiVersionId(null);
     inform('Se descartaron los cambios. Se restauró la versión guardada.');
   };
 
@@ -191,6 +201,7 @@ export function QuotationWorkspacePage() {
       });
       setForm(fromVersion(saved));
       setDirty(false);
+      setAdjustingAiVersionId(null);
       toast.success('Cambios guardados en la versión. Revisión ' + saved.revision + '.');
     } catch (err) {
       reportError(err instanceof Error ? err.message : 'No se pudo guardar. Revisa los campos.');
@@ -497,11 +508,13 @@ export function QuotationWorkspacePage() {
   const acceptAiProposal = async () => {
     if (!selected || lifecycle.acceptAi.isPending) return;
     if (aiAcceptBlockReason) { reportError(aiAcceptBlockReason); return; }
-    if (!await confirm({ title: 'Aceptar propuesta de Gemini', description: 'Aceptar la propuesta no aprueba al cliente ni traspasa el proyecto.', confirmLabel: 'Aceptar propuesta' })) return;
-
+    // «Usar tal cual» es la confirmación explícita del usuario.
+    // El backend vuelve a validar revisión, equipos y conciliación antes de aceptar.
     try {
       await lifecycle.acceptAi.mutateAsync({ versionId: selected.id, revision: selected.revision });
-      inform('Propuesta IA aceptada. La aprobación del cliente es una acción posterior.');
+      setAdjustingAiVersionId(null);
+      setRecentAiAcceptance({ versionId: selected.id, actor: user?.fullName?.trim() ?? '' });
+      toast.success('Propuesta IA aceptada. La aprobación del cliente es una acción posterior.');
     } catch (err) {
       reportError(err instanceof Error ? err.message : 'No se pudo aceptar la propuesta de IA.');
     }
@@ -577,23 +590,21 @@ export function QuotationWorkspacePage() {
                       </Badge>
                     </div>
                   </div>
-                  {selected.origin === 'ai' && selected.aiReviewStatus === 'pending' && (
-                    <div className={styles.aiBanner}>
-                      <div><strong>✦ Propuesta generada con Gemini</strong>
-                        <p>{selected.draft.aiPoc
-                          ? money(selected.draft.aiPoc.proposal.totalHours) + ' HH propuestas desde KDM de demostración y ' + selected.draft.aiPoc.answers.length + ' respuestas. '
-                          : 'Propuesta IA pendiente. '}
-                          {aiAcceptBlockReason ?? 'Revisa perfiles y HH antes de aceptar.'} La IA no define el valor HH comercial.</p>
-                      </div>
-                      {selected.draft.aiPoc && (
-                        <Button size="sm" className={styles.aiAccept}
-                          disabled={lifecycle.acceptAi.isPending}
-                          loading={lifecycle.acceptAi.isPending}
-                          onClick={() => void acceptAiProposal()}>
-                          Aceptar propuesta
-                        </Button>
-                      )}
-                    </div>
+                  {selected.origin === 'ai' && (
+                    <QuotationAiReviewBanner
+                      version={selected}
+                      adjusting={adjustingAiVersionId === selected.id}
+                      editable={editable}
+                      dirty={dirty}
+                      saving={saveDraft.isPending}
+                      accepting={lifecycle.acceptAi.isPending}
+                      acceptedBy={recentAiAcceptance?.versionId === selected.id
+                        ? recentAiAcceptance.actor : undefined}
+                      onAdjust={() => setAdjustingAiVersionId(selected.id)}
+                      onAccept={() => void acceptAiProposal()}
+                      onDiscard={discardChanges}
+                      onSave={() => void save()}
+                    />
                   )}
                 </>}
                 {versions.length === 0 && <p className={styles.helper}>Aún no hay versiones. Crea un borrador para comenzar.</p>}
@@ -806,7 +817,9 @@ export function QuotationWorkspacePage() {
           </div>
         )}
         <QuotationDraftSaveBar
-          dirty={editable && dirty}
+          visible={editable && (dirty || (adjustingAiVersionId === selected?.id &&
+            selected?.aiReviewStatus === 'pending' && selected?.origin === 'ai'))}
+          dirty={dirty}
           saving={saveDraft.isPending}
           fromAi={Boolean(selected?.draft.aiPoc)}
           onDiscard={discardChanges}

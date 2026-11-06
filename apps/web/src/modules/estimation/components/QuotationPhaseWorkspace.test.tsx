@@ -202,6 +202,14 @@ describe('Cotización HTML v5 · fases y tareas', () => {
     expect(callbacks.onDeleteTask).toHaveBeenCalledWith(extraTask.wbs);
   });
 
+  it('el contador anuncia las filas reales de un WBS multiperfil, no sólo códigos WBS únicos', () => {
+    renderEditor(mappedDraft);
+    expect(screen.getByText('2 filas · 1 actividad · 15 HH')).toBeInTheDocument();
+    expect(screen.getByText('1 fila · 8 HH')).toBeInTheDocument();
+    const fields = screen.getAllByLabelText(/^Tarea T01.01/);
+    expect(fields).toHaveLength(2);
+  });
+
   it('mantiene HH por perfil y WBS al representar un mismo trabajo multiperfil', () => {
     const stages = referencePhasesFromEdt(edt, {}, teams, draft);
     expect(stages).toHaveLength(2);

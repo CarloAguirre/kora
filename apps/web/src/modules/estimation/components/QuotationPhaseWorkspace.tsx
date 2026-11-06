@@ -191,7 +191,11 @@ export function QuotationPhaseWorkspace({
           const visibleName = prefix ? phase.name.slice(prefix.length) : phase.name;
           const total = phase.teamHours.reduce((sum, row) => sum + row.hours, 0);
           const tasks = referenceTasksForPhase(phase, edt, mapping, teamNames, draft);
+          // Cada fila representa una asignación WBS × perfil, no una tarea única.
+          // Si una actividad involucra varios perfiles, el desplegable tiene
+          // más filas que WBS únicos; informar ambas cifras sin confundirlas.
           const uniqueTasks = new Set(tasks.map((task) => task.wbs)).size;
+          const assignmentCount = tasks.length;
           const taskTotal = tasks.reduce((sum, task) => sum + task.hours, 0);
           const editStage = (patch: {name?:string;startWeek?:number;durationWeeks?:number}) => {
             if (edt && stageCode && onEditStage) onEditStage(stageCode, patch);
@@ -266,8 +270,10 @@ export function QuotationPhaseWorkspace({
               {edt && (
                 <details className={styles.tasks}>
                   <summary><strong>Tareas</strong>
-                    <span>{uniqueTasks} {uniqueTasks === 1 ? 'tarea' : 'tareas'}
-                      {uniqueTasks > 0 && ' · ' + hh(taskTotal) + ' HH'}</span>
+                    <span>{assignmentCount} {assignmentCount === 1 ? 'fila' : 'filas'}
+                      {assignmentCount !== uniqueTasks && ' · ' + uniqueTasks +
+                        (uniqueTasks === 1 ? ' actividad' : ' actividades')}
+                      {assignmentCount > 0 && ' · ' + hh(taskTotal) + ' HH'}</span>
                   </summary>
                   {tasks.length > 0 && (
                     <div className={styles.tableScroll}>

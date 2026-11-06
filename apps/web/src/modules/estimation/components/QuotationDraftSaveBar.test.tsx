@@ -28,6 +28,14 @@ describe('Cotización: guardado desde footer contextual', () => {
     expect(onDiscard).toHaveBeenCalledOnce();
   });
 
+  it('en ajuste IA sin cambios mantiene el footer y deshabilita guardar', () => {
+    render(<QuotationDraftSaveBar visible dirty={false} saving={false} fromAi
+      onSave={vi.fn()} onDiscard={vi.fn()} />);
+    expect(screen.getByText('No hay cambios pendientes.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Guardar ajustes' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Descartar cambios' })).toBeEnabled();
+  });
+
   it('en una versión manual muestra mensaje correcto y bloquea las acciones durante guardado', () => {
     const onSave = vi.fn();
     const onDiscard = vi.fn();
