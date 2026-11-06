@@ -22,7 +22,7 @@ describe('GoogleDriveFolderClient · NestJS dependency injection', () => {
   });
 
   it('permite crear un lector puntual con token OAuth de un usuario', () => {
-    const config = { googleDrive: { enabled: false } } as AppConfigService;
+    const config = { googleDrive: { enabled: false } } as never as AppConfigService;
     const client = new GoogleDriveFolderClient(config, 'token-temporal');
     expect(client.isConfigured()).toBe(true);
   });
