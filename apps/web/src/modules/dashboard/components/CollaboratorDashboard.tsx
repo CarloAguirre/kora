@@ -8,6 +8,7 @@ import styles from './CollaboratorDashboard.module.css';
 import { useUpdateProjectModuleTask } from '@/modules/projects/api/projects.queries';
 import { Button } from '@/shared/components/ui/Button';
 import { Card } from '@/shared/components/ui/Card';
+import { Modal } from '@/shared/components/ui/Modal';
 import { Tabs } from '@/shared/components/ui/Tabs';
 import { Badge } from '@/shared/components/ui/Badge';
 import { useToast } from '@/shared/components/ui/Toast';
@@ -63,6 +64,8 @@ interface CollaboratorDashboardProps {
   weekStart: string | undefined;
   onWeekStartChange: (week: string) => void;
   onRegisterHours: () => void;
+  /** Registro de HH vinculadas a una tarea y posterior envío a aprobación. */
+  onRegisterHoursAndComplete?: (task: DashboardMyTask) => void;
   canRegisterHours: boolean;
 }
 
@@ -72,11 +75,12 @@ interface CollaboratorDashboardProps {
  */
 export function CollaboratorDashboard({
   firstName, teamName, activeProjectCount, tasks, hours, planning,
-  loading, weekStart, onWeekStartChange, onRegisterHours, canRegisterHours,
+  loading, weekStart, onWeekStartChange, onRegisterHours, onRegisterHoursAndComplete, canRegisterHours,
 }: CollaboratorDashboardProps) {
   const toast = useToast();
   const updateTask = useUpdateProjectModuleTask();
   const [tab, setTab] = useState<TaskTab>('all');
+  const [taskToComplete, setTaskToComplete] = useState<DashboardMyTask | null>(null);
   const visibleTasks = tasks.filter((task) => tab === 'all' || task.status === tab);
   // Acotar solo cuando el filtro activo devuelve más de cinco tarjetas.
   const scrollTasks = visibleTasks.length > 5;
@@ -92,6 +96,7 @@ export function CollaboratorDashboard({
       toast.success(status === 'in_review'
         ? 'Tarea completada. Queda pendiente de aprobación.'
         : 'Tarea iniciada.');
+      if (status === 'in_review') setTaskToComplete(null);
     } catch (error) {
       toast.error(error instanceof ApiRequestError
         ? error.message : 'No se pudo actualizar la tarea.');
@@ -200,7 +205,7 @@ export function CollaboratorDashboard({
                     </Button>}
                     {task.status === 'in_progress' && <Button size="sm" variant="primary"
                       disabled={updateTask.isPending}
-                      onClick={() => void onAdvance(task, 'in_review')}>
+                      onClick={() => setTaskToComplete(task)}>
                       Marcar completada
                     </Button>}
                   </div>
@@ -208,6 +213,45 @@ export function CollaboratorDashboard({
               })}
             </div>}
     </Card>
+
+    <Modal
+      open={Boolean(taskToComplete)}
+      title="Completar tarea"
+      onClose={() => setTaskToComplete(null)}
+      dismissible={!updateTask.isPending}
+      footer={taskToComplete && <div className={styles.completeActions}>
+        {canRegisterHours && onRegisterHoursAndComplete &&
+          (taskToComplete.estimatedHours == null ||
+            (taskToComplete.approvedHours ?? 0) + (taskToComplete.pendingHours ?? 0)
+              < taskToComplete.estimatedHours) &&
+          <Button variant="outline" disabled={updateTask.isPending}
+            onClick={() => {
+              onRegisterHoursAndComplete(taskToComplete);
+              setTaskToComplete(null);
+            }}>
+            Registrar horas y completar
+          </Button>}
+        <Button variant="secondary" loading={updateTask.isPending}
+          loadingText="Completando…"
+          onClick={() => void onAdvance(taskToComplete, 'in_review')}>
+          Completar tarea
+        </Button>
+      </div>}
+    >
+      {taskToComplete && <div className={styles.completeMessage}>
+        <p>“{taskToComplete.title}” tiene{' '}
+          <strong>{formatHours((taskToComplete.approvedHours ?? 0) +
+            (taskToComplete.pendingHours ?? 0))} HH registradas</strong>
+          {taskToComplete.estimatedHours != null &&
+            <> (estimadas: {formatHours(taskToComplete.estimatedHours)} HH)</>}.
+        </p>
+        {(taskToComplete.estimatedHours == null ||
+          (taskToComplete.approvedHours ?? 0) + (taskToComplete.pendingHours ?? 0)
+            < taskToComplete.estimatedHours) && canRegisterHours && onRegisterHoursAndComplete
+          ? <p>¿Quedó alguna hora sin registrar? Puedes agregarla ahora y completar la tarea en el mismo paso.</p>
+          : <p>¿Quieres enviar esta tarea para aprobación del líder?</p>}
+      </div>}
+    </Modal>
 
     <CollaboratorPlanning planning={planning} loading={loading} />
 

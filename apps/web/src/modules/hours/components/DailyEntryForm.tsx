@@ -80,6 +80,14 @@ export interface DailyBlock {
   blockerDescription: string;
 }
 
+/** Contexto específico para el flujo «Registrar horas y completar tarea». */
+export interface TaskHourEntryTarget {
+  projectId: string;
+  moduleId: string;
+  taskId: string;
+  taskTitle: string;
+}
+
 let blockCounter = 0;
 const createEmptyBlock = (): DailyBlock => ({
   key: `block-${(blockCounter += 1)}`,
@@ -187,9 +195,11 @@ export function DailyEntryForm({
   onClose,
   onSuccess,
   onTotalChange,
+  initialTask,
 }: {
   onClose: () => void;
   onSuccess: (message: string) => void;
+  initialTask?: TaskHourEntryTarget;
   /** Notifica al diálogo contenedor el total de horas del día (para el contador junto al cierre). */
   onTotalChange?: (total: number) => void;
 }) {
@@ -208,7 +218,35 @@ export function DailyEntryForm({
   const { data: leaders } = useUsersList({ page: 1, pageSize: 200, sortField: 'firstName', role: 'leader' });
 
   const [date, setDate] = useState(today());
-  const [blocks, setBlocks] = useState<DailyBlock[]>([createEmptyBlock()]);
+  const [blocks, setBlocks] = useState<DailyBlock[]>(() => [{
+    ...createEmptyBlock(),
+    ...(initialTask ? {
+      assignment: 'Proyecto' as const,
+      projectId: initialTask.projectId,
+      moduleId: initialTask.moduleId,
+      taskId: initialTask.taskId,
+      category: initialTask.taskTitle,
+    } : {}),
+  }]);
+  // La tarea determina su segmento por ID persistido desde /phases, nunca por nombre.
+  const { data: taskPhases } = useProjectPhases(initialTask?.projectId ?? null);
+  const targetTask = taskPhases?.find((phase) => phase.id === initialTask?.moduleId)
+    ?.tasks.find((task) => task.id === initialTask?.taskId);
+  const targetAllowed = Boolean(targetTask && !targetTask.cancelledAt &&
+    targetTask.assigneeUserId === user?.id);
+  useEffect(() => {
+    if (!initialTask || !targetAllowed || !targetTask) return;
+    const segmentId = targetTask.segmentId ?? '';
+    setBlocks((current) => current.map((block) =>
+      block.taskId === initialTask.taskId && block.segmentId !== segmentId
+        ? { ...block, segmentId } : block));
+  }, [initialTask, targetAllowed, targetTask]);
+  const validTaskPrefill = !initialTask || Boolean(taskPhases && targetAllowed &&
+    blocks.length === 1 && blocks[0]?.assignment === 'Proyecto' &&
+    blocks[0]?.projectId === initialTask.projectId &&
+    blocks[0]?.moduleId === initialTask.moduleId &&
+    blocks[0]?.taskId === initialTask.taskId &&
+    blocks[0]?.segmentId === (targetTask?.segmentId ?? ''));
   const [blockErrors, setBlockErrors] = useState<Record<string, string>>({});
   const [serverError, setServerError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -270,11 +308,12 @@ export function DailyEntryForm({
       exceedsDailyCap: (overflowByKey.get(block.key) ?? 0) > 0,
     });
 
-  const canSubmit = !blockingMessage && blocks.every((block) => validateBlock(block) === null);
+  const canSubmit = !blockingMessage && validTaskPrefill &&
+    blocks.every((block) => validateBlock(block) === null);
 
   const onSubmit = async () => {
     setServerError(null);
-    if (blockingMessage) return;
+    if (blockingMessage || !validTaskPrefill) return;
     const nextErrors: Record<string, string> = {};
     for (const block of blocks) {
       const error = validateBlock(block);
@@ -318,7 +357,14 @@ export function DailyEntryForm({
 
   return (
     <div className={styles.form}>
-      <p className={styles.formSubtitle}>Agrega uno o más registros y registra tus horas del día</p>
+      <p className={styles.formSubtitle}>{initialTask
+        ? 'Registra las horas de «' + initialTask.taskTitle +
+          '». Al guardarlas, la tarea se enviará a aprobación.'
+        : 'Agrega uno o más registros y registra tus horas del día'}</p>
+      {initialTask && taskPhases && !targetAllowed &&
+        <p className={styles.alert} role="alert">
+          Esta tarea ya no está disponible para registrar horas. Cancela y vuelve al dashboard.
+        </p>}
 
       {serverError && (
         <div className={styles.alert} role="alert">
@@ -384,10 +430,10 @@ export function DailyEntryForm({
         />
       ))}
 
-      <button type="button" className={styles.addBlockButton} onClick={addBlock}>
+      {!initialTask && <button type="button" className={styles.addBlockButton} onClick={addBlock}>
         <PlusIcon size={16} />
         Agregar otro registro
-      </button>
+      </button>}
 
       <div className={styles.dailyTotal}>
         Total del día: <strong>{dailyTotal.toLocaleString('es-CL', { maximumFractionDigits: 1 })} horas</strong>

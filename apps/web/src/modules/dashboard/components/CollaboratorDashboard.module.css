@@ -119,3 +119,11 @@
   .chips { justify-content: flex-start; }
   .taskBottom { flex-wrap: wrap; }
 }
+
+/* Confirmación de tarea: Modal + Button compartidos, sin alterar otras pantallas. */
+.completeMessage { display: flex; flex-direction: column; gap: var(--kora-space-3); font-size: var(--kora-text-base); }
+.completeMessage p { margin: 0; line-height: 1.5; }
+.completeActions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: var(--kora-space-2); }
+@media (max-width: 520px) {
+  .completeActions { flex-direction: column; align-items: stretch; }
+}
