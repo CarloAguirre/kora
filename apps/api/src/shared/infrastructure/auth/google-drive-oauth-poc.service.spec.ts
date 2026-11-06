@@ -181,6 +181,16 @@ describe('GoogleDriveOAuthPocService — diagnóstico temporal seguro', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it('cierra automáticamente el popup tras un consentimiento exitoso sin otra confirmación', () => {
+    const html = renderDriveOAuthPocResult({
+      status: 'ok', code: 'DRIVE_READ_SUCCESS',
+      message: 'Carpeta leída', filesInSample: 3,
+    });
+    expect(html).toContain("if(result.status==='ok')setTimeout(()=>window.close(),250)");
+    expect(html).toContain('postMessage');
+    expect(html).not.toContain('access_token');
+  });
+
   it('su HTML no introduce nombres externos como scripts ni expone tokens', () => {
     const html = renderDriveOAuthPocResult({
       status: 'error', code: 'FAILED',
