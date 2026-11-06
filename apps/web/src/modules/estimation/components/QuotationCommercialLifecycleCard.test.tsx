@@ -136,7 +136,8 @@ describe('Ciclo comercial separado · Kora', () => {
     await waitFor(() => expect(mocks.markSent).toHaveBeenCalledWith({
       versionId: version.id, revision: 3,
     }));
-    expect(mocks.toastSuccess).toHaveBeenCalledWith('Envío registrado. La versión quedó bloqueada.');
+    await waitFor(() => expect(mocks.toastSuccess).toHaveBeenCalledWith(
+      'Envío registrado. La versión quedó bloqueada.'));
   });
 
   it('la aprobación con traspaso después no altera el proyecto', async () => {
