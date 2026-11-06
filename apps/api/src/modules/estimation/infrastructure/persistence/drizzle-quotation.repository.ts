@@ -38,7 +38,7 @@ import { calculateQuotation } from '../../domain/quotation-math';
 import { hasOnlyUntouchedDefaultPaymentMilestones } from '../../domain/default-payment-plan-eligibility';
 import { initialQuotationTransferBlockers } from '../../domain/initial-quotation-transfer-blockers';
 import { hasOnlyCommercialPreparationHours } from '../../domain/commercial-preparation-transfer';
-import { buildQuotationTransferReferences } from '../../domain/quotation-transfer-references';
+import { buildQuotationTransferReferences, matchingCopiedQuotationReferenceSource } from '../../domain/quotation-transfer-references';
 import { InvalidCommercialQuotation, assertQuotationReadyForClient, assertAiProposalReadyToAccept, assertDirectClientApprovalAcknowledged } from '../../domain/quotation-commercial-eligibility';
 import type { QuotationProjectScope, QuotationRepository } from '../../domain/repositories/quotation.repository';
 
@@ -507,6 +507,51 @@ export class DrizzleQuotationRepository implements QuotationRepository {
     const draft = quotationDraftDataSchema.parse(version.draft);
     const edt = draft.aiPoc?.edt;
     if (!metadata.moduleIds) return null;
+    // Recuperar referencias de copias comerciales locales que perdieron la EDT
+    // al clonarse. La evidencia IA sigue en la versión fuente; nunca se modifica
+    // el snapshot histórico aprobado ni se crean tareas con fechas ficticias.
+    let referenceDraft = draft;
+    if (version.origin === 'copy' && !edt) {
+      let cursorVersionId = version.id;
+      const visited = new Set<string>();
+      for (let hops = 0; hops < 8 && !visited.has(cursorVersionId); hops++) {
+        visited.add(cursorVersionId);
+        const [creation] = await this.db.select({ metadata: quotationEvents.metadata })
+          .from(quotationEvents)
+          .where(and(
+            eq(quotationEvents.versionId, cursorVersionId),
+            eq(quotationEvents.action, 'draft_created'),
+          ))
+          .orderBy(desc(quotationEvents.occurredAt)).limit(1);
+        const lineage = creation?.metadata as {
+          sourceVersionId?: unknown; sourceProjectId?: unknown;
+        } | undefined;
+        // No utilizar referencias procedentes de otra cotización/proyecto.
+        if (lineage?.sourceProjectId !== projectId ||
+            typeof lineage.sourceVersionId !== 'string') break;
+        const [source] = await this.db.select({
+          id: quotationVersions.id,
+          origin: quotationVersions.origin,
+          draft: quotationVersions.draft,
+          totalHours: quotationVersions.totalHours,
+        }).from(quotationVersions).where(and(
+          eq(quotationVersions.id, lineage.sourceVersionId),
+          eq(quotationVersions.quotationId, quotation.id),
+        )).limit(1);
+        if (!source) break;
+        const parsed = quotationDraftDataSchema.safeParse(source.draft);
+        if (!parsed.success) break;
+        if (source.origin === 'ai' &&
+            matchingCopiedQuotationReferenceSource(
+              draft, parsed.data, Number(version.totalHours), Number(source.totalHours),
+            )) {
+          referenceDraft = parsed.data;
+          break;
+        }
+        if (source.origin !== 'copy' || parsed.data.aiPoc?.edt) break;
+        cursorVersionId = source.id;
+      }
+    }
     const commercialModules = draft.mode === 'phases' && draft.phases.length
       ? draft.phases.map((phase) => ({
           name: phase.name,
@@ -517,11 +562,21 @@ export class DrizzleQuotationRepository implements QuotationRepository {
         }));
     const positive = commercialModules.filter((module) => module.hours > 0);
     if (metadata.moduleIds.length !== positive.length) return null;
-    const references = buildQuotationTransferReferences(draft,
-      positive.map((module, index) => ({
-        moduleId: metadata.moduleIds![index]!,
-        name: module.name, totalHours: module.hours,
-      })));
+    // El reparto vigente por equipo y sus bloques procede siempre de la
+    // versión transferida, aunque las tareas sean referencias de su origen IA.
+    const targets = positive.map((module, index) => ({
+      moduleId: metadata.moduleIds![index]!,
+      name: module.name, totalHours: module.hours,
+    }));
+    const commercialReferences = buildQuotationTransferReferences(draft, targets);
+    const originalReferences = referenceDraft === draft ? commercialReferences
+      : buildQuotationTransferReferences(referenceDraft, targets);
+    const references = {
+      modules: commercialReferences.modules.map((module, index) => ({
+        ...module, tasks: originalReferences.modules[index]?.tasks ?? [],
+      })),
+      unassignedTasks: originalReferences.unassignedTasks,
+    };
     return appliedQuotationPlanningSchema.parse({
       projectId, versionId: version.id, versionNumber: version.versionNumber,
       revision: metadata.revision ?? metadata.versionRevision ?? version.revision,
