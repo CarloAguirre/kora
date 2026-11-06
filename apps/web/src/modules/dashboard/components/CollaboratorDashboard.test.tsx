@@ -6,6 +6,8 @@ import type {
 import { CollaboratorDashboard } from './CollaboratorDashboard';
 import buttonStyles from '@/shared/components/ui/Button.module.css';
 import taskStyles from './CollaboratorDashboard.module.css';
+import tabsStyles from '@/shared/components/ui/Tabs.module.css';
+import badgeStyles from '@/shared/components/ui/Badge.module.css';
 
 const mocks = vi.hoisted(() => ({
   update: vi.fn(),
@@ -151,9 +153,11 @@ describe('Dashboard colaborador · homologación v6', () => {
   it('presenta cinco filtros, estados acumulativos y progreso de registro sin inventar HH', () => {
     show();
     const region = screen.getByRole('region', { name: 'Mis tareas' });
+    const tablist = within(region).getByRole('tablist', { name: 'Estado de mis tareas' });
+    expect(tablist).toHaveClass(tabsStyles.tabs!);
     expect(within(region).getByRole('tab', { name: 'Todas 4' })).toHaveAttribute('aria-selected', 'true');
     const returned = within(region).getByText('Modelo de datos').closest('article')!;
-    expect(within(returned).getByText('En curso')).toBeInTheDocument();
+    expect(within(returned).getByText('En curso')).toHaveClass(badgeStyles.badge!);
     expect(within(returned).getByText('Devuelta')).toBeInTheDocument();
     expect(within(returned).getByText('Vencida')).toBeInTheDocument();
     expect(within(returned).getByText(/23 de 24 HH estimadas registradas/)).toBeInTheDocument();

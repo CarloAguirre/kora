@@ -28,7 +28,7 @@
   justify-content: space-between;
   margin-bottom: 14px;
 }
-.sectionTop h2 { font-size: 14px; font-weight: 700; margin: 0; }
+.sectionTop h2 { font-size: var(--kora-text-lg); font-weight: var(--kora-weight-bold); margin: 0; }
 .count {
   min-width: 23px;
   padding: 3px 8px;
@@ -39,29 +39,13 @@
   font-size: 11px;
   font-weight: 600;
 }
-.tabs {
-  display: flex;
-  gap: 16px;
-  align-items: center;
-  border-bottom: 1px solid #e5eaf2;
-  margin-bottom: 13px;
+.taskTabs {
+  border-bottom: 1px solid var(--kora-border-soft);
+  margin-bottom: var(--kora-space-3);
   overflow-x: auto;
   scrollbar-width: thin;
 }
-.tabs button {
-  flex: 0 0 auto;
-  padding: 9px 2px;
-  border: none;
-  border-bottom: 2px solid transparent;
-  color: #65748f;
-  font-size: 11.5px;
-  background: transparent;
-  cursor: pointer;
-  white-space: nowrap;
-}
-.tabs button span { margin-left: 3px; font-variant-numeric: tabular-nums; }
-.tabs button.activeTab { color: #14243d; font-weight: 700; border-bottom-color: #14243d; }
-.tabs button:focus-visible { outline: 2px solid #497fc7; outline-offset: -2px; border-radius: 2px; }
+.taskTabs :global([role="tablist"]) { min-width: max-content; }
 .taskList { display: flex; flex-direction: column; gap: 7px; }
 /* Solo los listados con más de cinco tareas se desplazan internamente.
  * El límite equivale aproximadamente a cinco tarjetas a tamaño escritorio.
@@ -79,9 +63,9 @@
   border-radius: 4px;
 }
 .task {
-  border: 1px solid #e2e7f0;
-  border-radius: 9px;
-  padding: 12px 13px;
+  border: 1px solid var(--kora-border-soft);
+  border-radius: var(--kora-radius);
+  padding: var(--kora-space-3);
   display: flex;
   flex-direction: column;
   gap: 9px;
@@ -96,34 +80,9 @@
   min-width: 0;
 }
 .taskInfo { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
-.taskInfo strong { font-size: 12.5px; line-height: 1.35; font-weight: 650; }
-.taskContext { font-size: 11px; color: #73839b; line-height: 1.5; }
+.taskInfo strong { font-size: var(--kora-text-sm); line-height: 1.35; font-weight: var(--kora-weight-semibold); }
+.taskContext { font-size: var(--kora-text-xs); color: var(--kora-blue-400); line-height: 1.5; }
 .chips { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 5px; }
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border-radius: 99px;
-  padding: 4px 9px;
-  line-height: 1.25;
-  font-size: 10.5px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-.chip::before {
-  content: '';
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: currentColor;
-}
-.pending { background: #edf0f5; color: #677287; }
-.running { background: #e4f0ff; color: #2b679e; }
-.completed { background: #f3e6ff; color: #8657c0; }
-.approved { background: #e2f6e8; color: #247a47; }
-.returned { background: #fff0d5; color: #a06a14; }
-.overdue { background: #ffe2e2; color: #c13232; }
 .taskBody { display: flex; flex-direction: column; gap: 5px; max-width: min(100%, 620px); }
 .progressTrack {
   width: 100%;
@@ -156,7 +115,6 @@
 .overdueDate { font-size: 11px; color: #c44343; line-height: 1.4; }
 .empty { margin: 14px 0; color: #8190a4; font-size: 12px; }
 @media (max-width: 780px) {
-  .tabs { gap: 13px; }
   .taskTop { flex-wrap: wrap; }
   .chips { justify-content: flex-start; }
   .taskBottom { flex-wrap: wrap; }

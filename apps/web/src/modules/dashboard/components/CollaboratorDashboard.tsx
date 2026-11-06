@@ -8,6 +8,8 @@ import styles from './CollaboratorDashboard.module.css';
 import { useUpdateProjectModuleTask } from '@/modules/projects/api/projects.queries';
 import { Button } from '@/shared/components/ui/Button';
 import { Card } from '@/shared/components/ui/Card';
+import { Tabs } from '@/shared/components/ui/Tabs';
+import { Badge } from '@/shared/components/ui/Badge';
 import { useToast } from '@/shared/components/ui/Toast';
 import { ClockIcon } from '@/shared/components/icons/Icons';
 import { ApiRequestError } from '@/shared/lib/api-client';
@@ -35,16 +37,17 @@ const isOverdue = (date: string) => {
   return date.slice(0, 10) < today;
 };
 
+/** Estado visual consistente con las insignias compartidas de Kora. */
 function TaskChips({ task }: { task: DashboardMyTask }) {
   return <div className={styles.chips}>
-    {task.status === 'done' ? <span className={[styles.chip, styles.approved].join(' ')}>Aprobada</span>
-      : task.status === 'in_review' ? <span className={[styles.chip, styles.completed].join(' ')}>Completada</span>
+    {task.status === 'done' ? <Badge tone="success">Aprobada</Badge>
+      : task.status === 'in_review' ? <Badge tone="warning">Completada</Badge>
         : <>
-            <span className={[styles.chip, task.status === 'in_progress' ? styles.running : styles.pending].join(' ')}>
+            <Badge tone={task.status === 'in_progress' ? 'info' : 'neutral'}>
               {task.status === 'in_progress' ? 'En curso' : 'Pendiente'}
-            </span>
-            {task.rejectionReason && <span className={[styles.chip, styles.returned].join(' ')}>Devuelta</span>}
-            {isOverdue(task.date) && <span className={[styles.chip, styles.overdue].join(' ')}>Vencida</span>}
+            </Badge>
+            {task.rejectionReason && <Badge tone="warning">Devuelta</Badge>}
+            {isOverdue(task.date) && <Badge tone="danger">Vencida</Badge>}
           </>}
   </div>;
 }
@@ -115,13 +118,18 @@ export function CollaboratorDashboard({
         <h2>Mis Tareas</h2>
         {!loading && <span className={styles.count}>{tasks.length}</span>}
       </div>
-      <div className={styles.tabs} role="tablist" aria-label="Estado de mis tareas">
-        {TABS.map((item) => <button
-          key={item.id} type="button" role="tab" aria-selected={tab === item.id}
-          className={tab === item.id ? styles.activeTab : ''}
-          onClick={() => setTab(item.id)}>
-          {item.label} <span>{tasks.filter((task) => item.id === 'all' || task.status === item.id).length}</span>
-        </button>)}
+      <div className={styles.taskTabs}>
+        <Tabs
+          ariaLabel="Estado de mis tareas"
+          tabs={TABS.map((item) => ({
+            id: item.id,
+            label: item.label + ' ' + tasks.filter(
+              (task) => item.id === 'all' || task.status === item.id,
+            ).length,
+          }))}
+          activeId={tab}
+          onSelect={(id) => setTab(id as TaskTab)}
+        />
       </div>
       {loading ? <p className={styles.empty}>Cargando tareas…</p>
         : visibleTasks.length === 0 ? <p className={styles.empty}>No tienes tareas en este estado.</p>
