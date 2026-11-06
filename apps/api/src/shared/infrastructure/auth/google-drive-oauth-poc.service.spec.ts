@@ -26,7 +26,8 @@ describe('GoogleDriveOAuthPocService — diagnóstico temporal seguro', () => {
     expect(uri.searchParams.get('redirect_uri')).toBe(config.google.callbackUrl);
     expect(uri.searchParams.get('client_id')).toBe(config.google.clientId);
     expect(uri.searchParams.get('state')).toBe(state);
-    expect(uri.searchParams.get('scope')).toContain('https://www.googleapis.com/auth/drive.readonly');
+    expect(uri.searchParams.get('scope')).toBe('https://www.googleapis.com/auth/drive.readonly');
+    expect(uri.searchParams.get('scope')).not.toContain('openid');
     expect(uri.searchParams.get('access_type')).toBe('online');
     expect(uri.searchParams.get('prompt')).toContain('consent');
     expect(state).toMatch(/^kora-drive-poc-[a-f0-9]{64}$/);

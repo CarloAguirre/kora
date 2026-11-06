@@ -58,7 +58,9 @@ export class GoogleDriveOAuthPocService {
     // Reutiliza el redirect URI REAL del login; no requiere otro registro en Cloud.
     url.searchParams.set('redirect_uri', this.config.google.callbackUrl);
     url.searchParams.set('response_type', 'code');
-    url.searchParams.set('scope', `openid email profile ${READ_SCOPE}`);
+    // Esta autorización es independiente del login Kora: pedir únicamente Drive
+    // evita la concesión parcial de scopes de identidad sin acceso a documentos.
+    url.searchParams.set('scope', READ_SCOPE);
     url.searchParams.set('state', state);
     url.searchParams.set('prompt', 'consent select_account');
     // No necesitamos refresh_token: nunca persistimos autorización en esta PoC.
