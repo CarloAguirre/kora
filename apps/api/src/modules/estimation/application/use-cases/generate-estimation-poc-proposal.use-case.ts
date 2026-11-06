@@ -30,6 +30,8 @@ import {
 import {
   DOCUMENT_SOURCE_READER,
   type DocumentSourceReader,
+  readEstimationDocuments,
+  describeDocumentCoverage,
 } from '../ports/document-source-reader.port';
 
 const TEAM_ESTIMATE_RESPONSE_SCHEMA = {
@@ -224,7 +226,11 @@ export class GenerateEstimationPocProposalUseCase {
       throw new BadRequestException('La EDT no corresponde al análisis Gemini de la carpeta seleccionada.');
     }
     this.validatePreliminaryRoles(proposal.roles);
-    const docs = await (authorizedSources ?? this.sources).readDriveSources(input.driveFolderUrl);
+    const loaded = await readEstimationDocuments(
+      authorizedSources ?? this.sources, input.driveFolderUrl,
+    );
+    const docs = loaded.documents;
+    const coverageNote = describeDocumentCoverage(loaded.coverage);
     if (docs.length === 0 || (isDemo && (docs.length !== 1 || docs[0]?.name !== 'Requerimiento_KDM.pdf'))) {
       throw new BadRequestException('No se pudieron comprobar antecedentes válidos de la carpeta documental.');
     }
@@ -247,6 +253,7 @@ export class GenerateEstimationPocProposalUseCase {
           estimatedDuration: role.duration, unit: role.unit,
         })),
         ...(activeKoraTeams ? { activeKoraTeams } : {}),
+        sourceCoverage: coverageNote,
       },
       instructions: [
         'Genera una EDT comercial DETALLADA basada en los documentos reales adjuntos y respuestas, siguiendo la estructura de un EDT profesional.',
@@ -273,6 +280,7 @@ export class GenerateEstimationPocProposalUseCase {
         'Controla el tamaño de salida: para un proyecto de complejidad media busca unas 20 a 45 actividades WBS concretas; no fragmentes tareas triviales. Prioriza cubrir todo el alcance documentado sin exceder los límites de respuesta de Gemini.',
         'Evita entregables genéricos; describe actividades que un desarrollador o QA pueda implementar y revisar.',
         'No reutilices horas ni reservas de otros proyectos. Usa únicamente estos antecedentes y respuestas.',
+        'Si context.sourceCoverage indica omisiones, no supongas que has recibido todos los requerimientos de Drive; evita inventar alcance no disponible.',
       ].join('\n'),
       documents: docs.map((doc) => ({
         name: doc.name, mimeType: doc.mimeType,
@@ -553,14 +561,16 @@ export class GenerateEstimationPocProposalUseCase {
     if (activeKoraTeams && activeKoraTeams.length === 0) {
       throw new BadRequestException('Kora no tiene equipos activos disponibles para estimar.');
     }
-    const documents =
-      this.ai.name === 'poc-ai'
-        ? []
-        : await (authorizedSources ?? this.sources).readDriveSources(input.driveFolderUrl);
+    const loaded = this.ai.name === 'poc-ai'
+      ? { documents: [], coverage: null }
+      : await readEstimationDocuments(authorizedSources ?? this.sources, input.driveFolderUrl);
+    const documents = loaded.documents;
+    const coverageNote = describeDocumentCoverage(loaded.coverage);
 
     if (this.ai.name !== 'poc-ai' && documents.length === 0) {
       throw new Error(
-        'La carpeta no contiene documentos compatibles para la PoC. Usa PDF, Google Docs, Sheets, Slides o archivos de texto/CSV.',
+        'La carpeta no contiene documentos compatibles para la PoC. ' +
+        (coverageNote ?? 'Usa PDF, Google Docs, Sheets, Slides o archivos de texto/CSV.'),
       );
     }
 
@@ -582,9 +592,11 @@ export class GenerateEstimationPocProposalUseCase {
             path: document.path,
             mimeType: document.mimeType,
           })),
+          sourceCoverage: coverageNote,
         },
         instructions: [
           BASE_INSTRUCTIONS,
+          'Si context.sourceCoverage advierte omisiones, no inventes los requisitos faltantes ni afirmes cobertura documental total.',
           ...(activeKoraTeams ? [
             'Los únicos equipos permitidos son los de context.activeKoraTeams, leídos del catálogo real de Kora.',
             'Cada perfil profesional debe indicar teamId, que debe coincidir EXACTAMENTE con un ID del catálogo.',
@@ -709,7 +721,10 @@ export class GenerateEstimationPocProposalUseCase {
         ? 'poc_simulated' : 'drive',
       documentsAnalyzed:
         this.ai.name === 'poc-ai' ? 0 : documents.length,
-      summary: draft.summary,
+      summary: coverageNote
+        ? (draft.summary.slice(0, Math.max(0, 2998 - coverageNote.length)) +
+          '\n\n' + coverageNote).slice(0, 3000)
+        : draft.summary,
       roles,
       totalHours,
       assumptions: draft.assumptions,
