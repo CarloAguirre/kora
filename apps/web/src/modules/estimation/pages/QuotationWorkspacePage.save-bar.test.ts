@@ -22,6 +22,8 @@ describe('Cotización: acciones de cambios y feedback real', () => {
     expect(page).toContain('setForm(fromVersion(selected));');
     expect(page).toContain('setDirty(false);');
     expect(page).toContain('onDiscard={discardChanges}');
+    // Descartar una asignación automática no debe dispararla de nuevo.
+    expect(page).toContain('dismissedAutomaticMapping.current = selected.id');
   });
   it('las respuestas de acciones son snackbars Kora y no alertas duplicadas', () => {
     expect(page).toContain('const toast = useToast();');

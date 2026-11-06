@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { estimationAnalysisArtifactSchema, isQuotationDraftEligibleProject, quotationDraftDataSchema, effectiveQuotationEdt, reconcilePocCommercialDraft, projectPocRolesToQuotationDraft, redistributeQuotationEdtHours, withQuotationTaskSetting, withQuotationEdtStageSetting, quotationEdtAssignments, withQuotationCommercialStage, withoutQuotationCommercialStage, withQuotationCommercialTask, withoutQuotationCommercialTask, patchQuotationCommercialTask, withQuotationTaskDisplayName, type EstimationAnalysisArtifact, type QuotationDraftData, type QuotationVersion, type UpdateQuotationDraftInput } from '@kora/contracts';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
@@ -67,6 +67,9 @@ export function QuotationWorkspacePage() {
   const [roleMappingOpen, setRoleMappingOpen] = useState(false);
   const [teamView, setTeamView] = useState<'team' | 'phases'>('phases');
   const [dirty, setDirty] = useState(false);
+  // Si el usuario descarta la asignación sugerida por IA, no aplicarla de nuevo
+  // sobre esa misma revisión guardada hasta que cambie de versión/revisión.
+  const dismissedAutomaticMapping = useRef<string | null>(null);
   const toast = useToast();
   // Mensajes transitorios: usar siempre el snackbar nativo de Kora.
   const reportError = (message: string) => toast.error(message);
@@ -107,6 +110,7 @@ export function QuotationWorkspacePage() {
   // Solo vincula si CADA perfil tiene una correspondencia única y no ambigua.
   useEffect(() => {
     if (!editable || dirty || !selected?.draft.aiPoc?.edt || !activeTeams.length) return;
+    if (dismissedAutomaticMapping.current === selected.id + ':' + selected.revision) return;
     const evidence = selected.draft.aiPoc;
     const mapping = { ...evidence.roleTeamIds };
     if (evidence.proposal.roles.every((role) => Boolean(mapping[role.role]))) return;
@@ -166,6 +170,7 @@ export function QuotationWorkspacePage() {
   };
   const discardChanges = () => {
     if (!editable || !selected || saveDraft.isPending) return;
+    dismissedAutomaticMapping.current = selected.id + ':' + selected.revision;
     setForm(fromVersion(selected));
     setDirty(false);
     setTeamView(selected.draft.aiPoc?.edt || selected.draft.mode === 'phases'
