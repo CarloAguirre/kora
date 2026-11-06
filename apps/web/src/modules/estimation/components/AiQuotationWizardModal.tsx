@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type {
   EstimationAnswerValue,
@@ -14,12 +14,24 @@ import { TextField } from '@/shared/components/ui/TextField';
 import {
   useAnalyzeEstimationPoc,
   useEstimationQuestionnaireDefinition,
+  useEstimationDriveOAuthPocStatus,
 } from '../api/estimation.queries';
+import { estimationApi } from '../api/estimation.api';
 import { useGenerateAiDemoQuotationVersion } from '../api/quotation.queries';
-import { DEMO_KDM_FOLDER_URL } from '../lib/demo-source';
 import styles from './AiQuotationWizardModal.module.css';
 
 const STAGES = ['Análisis', 'Entendimiento', 'Condiciones', 'Aclaraciones', 'Confirmación'] as const;
+
+function isRealDriveFolderUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.hostname === 'drive.google.com' &&
+      /\/folders\/[A-Za-z0-9_-]+/.test(url.pathname) &&
+      !url.pathname.includes('/folders/kora-poc-fallback');
+  } catch {
+    return false;
+  }
+}
 
 type AnswerState = Record<string, EstimationAnswerValue>;
 
@@ -187,7 +199,7 @@ function QuestionField({
         </label>
       )}
       {prefillSource && <p className={styles.source}>
-        Prellenada desde el documento de demostración: <span className={styles.sourceBadge}>{prefillSource}</span>.
+        Prellenada desde el documento: <span className={styles.sourceBadge}>{prefillSource}</span>.
         Puedes corregirla.
       </p>}
       {question.sourceRefs.length > 0 &&
@@ -219,17 +231,80 @@ export function AiQuotationWizardModal({ project, onClose }: {
   const reportError = (message: string) => { setError(message); toast.error(message); };
   const [invalidId, setInvalidId] = useState<string | null>(null);
   const [analysisCompleted, setAnalysisCompleted] = useState(false);
+  const extrasFolderUrl = project.documentationLink?.trim() ?? '';
+  const [manualFolderUrl, setManualFolderUrl] = useState('');
+  const driveFolderUrl = extrasFolderUrl || manualFolderUrl.trim();
+  const driveUrlValid = isRealDriveFolderUrl(driveFolderUrl);
+  const [authorizedUrl, setAuthorizedUrl] = useState('');
+  const [oauthBusy, setOauthBusy] = useState(false);
+  const [oauthResult, setOauthResult] = useState('');
+  const oauthPopup = useRef<Window | null>(null);
+  const requestedUrl = useRef('');
+  const driveStatus = useEstimationDriveOAuthPocStatus();
+  const serviceAccountEnabled = driveStatus.data?.serviceAccountEnabled === true;
+  const driveAuthorized = driveUrlValid &&
+    (serviceAccountEnabled || authorizedUrl === driveFolderUrl);
   const questionnaire = useEstimationQuestionnaireDefinition();
   const analysis = useAnalyzeEstimationPoc();
   const generate = useGenerateAiDemoQuotationVersion(project.id);
 
   const verifiedAnalysis = analysis.data?.provider === 'gemini' &&
-    analysis.data.sourceMode === 'poc_simulated' && analysis.data.documentsAnalyzed > 0
+    analysis.data.sourceMode === 'drive' && analysis.data.documentsAnalyzed > 0
     ? analysis.data : null;
   const fixed = questionnaire.data?.fixedQuestions ?? [];
   const dynamic = verifiedAnalysis?.dynamicQuestions ?? [];
-  const working = analysis.isPending || generate.isPending;
+  const working = analysis.isPending || generate.isPending || oauthBusy;
   const relevant = stage === 2 ? fixed : dynamic;
+  useEffect(() => {
+    const onResult = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin || event.source !== oauthPopup.current) return;
+      const raw: unknown = event.data;
+      if (!raw || typeof raw !== 'object') return;
+      const payload = raw as Record<string, unknown>;
+      if (payload.type !== 'kora-drive-oauth-poc' ||
+          (payload.status !== 'ok' && payload.status !== 'error') ||
+          typeof payload.message !== 'string') return;
+      setOauthBusy(false);
+      if (payload.status === 'ok') {
+        setAuthorizedUrl(requestedUrl.current);
+        setOauthResult('Drive autorizado: ' + payload.message +
+          ' Archivos de la primera página: ' + String(payload.filesInSample ?? 0) + '.');
+      } else {
+        setAuthorizedUrl('');
+        setOauthResult('No se autorizó Drive: ' + payload.message + ' (' + String(payload.code ?? 'sin código') + ').');
+      }
+    };
+    window.addEventListener('message', onResult);
+    return () => window.removeEventListener('message', onResult);
+  }, []);
+
+  const authorizeDrive = async () => {
+    if (!driveUrlValid || oauthBusy) return;
+    setOauthResult('');
+    setAuthorizedUrl('');
+    const popup = window.open('about:blank', 'kora-drive-oauth-poc',
+      'width=580,height=730,scrollbars=yes');
+    if (!popup) {
+      setOauthResult('El navegador bloqueó la ventana de autorización de Google.');
+      return;
+    }
+    oauthPopup.current = popup;
+    requestedUrl.current = driveFolderUrl;
+    setOauthBusy(true);
+    try {
+      const { authorizationUrl } = await estimationApi.startDriveOAuthPoc({
+        projectId: project.id, driveFolderUrl,
+      });
+      if (new URL(authorizationUrl).origin !== 'https://accounts.google.com') {
+        throw new Error('Proveedor OAuth inesperado.');
+      }
+      popup.location.replace(authorizationUrl);
+    } catch (cause) {
+      popup.close();
+      setOauthBusy(false);
+      setOauthResult(cause instanceof Error ? cause.message : 'No fue posible solicitar acceso a Drive.');
+    }
+  };
   const answered = (question: EstimationQuestion) => {
     if (assumptions.includes(question.id)) return true;
     const value = answers[question.id];
@@ -269,6 +344,16 @@ export function AiQuotationWizardModal({ project, onClose }: {
       }));
 
   const analyze = async () => {
+    if (!driveUrlValid) {
+      reportError(extrasFolderUrl
+        ? 'El enlace de documentación en Extras no es una carpeta Drive. Corrígelo en Extras.'
+        : 'Ingresa la URL válida de una carpeta de Google Drive.');
+      return;
+    }
+    if (!driveAuthorized) {
+      reportError('Autoriza primero la carpeta con Google para leer la documentación real.');
+      return;
+    }
     setAnalysisCompleted(false);
     setError('');
     setInvalidId(null);
@@ -277,12 +362,12 @@ export function AiQuotationWizardModal({ project, onClose }: {
         projectId: project.id,
         projectName: project.name,
         clientName: project.client?.companyName ?? null,
-        driveFolderUrl: DEMO_KDM_FOLDER_URL,
+        driveFolderUrl,
         instructions: instructions.trim() || null,
       });
-      if (result.provider !== 'gemini' || result.sourceMode !== 'poc_simulated' ||
+      if (result.provider !== 'gemini' || result.sourceMode !== 'drive' ||
           result.documentsAnalyzed < 1) {
-        reportError('No se obtuvo un análisis real de Gemini sobre el documento KDM.');
+        reportError('Gemini no consiguió analizar documentos reales de la carpeta indicada.');
         return;
       }
       setUnderstanding(result.summary);
@@ -307,7 +392,7 @@ export function AiQuotationWizardModal({ project, onClose }: {
       setAnalysisCompleted(true);
       setStage(1);
     } catch (reason) {
-      reportError(reason instanceof Error ? reason.message : 'No se pudo analizar el documento KDM.');
+      reportError(reason instanceof Error ? reason.message : 'No se pudo analizar la documentación de Drive.');
     }
   };
 
@@ -347,7 +432,7 @@ export function AiQuotationWizardModal({ project, onClose }: {
         projectId: project.id,
         projectName: project.name,
         clientName: project.client?.companyName ?? null,
-        driveFolderUrl: DEMO_KDM_FOLDER_URL,
+        driveFolderUrl,
         instructions: instructions.trim() || null,
         confirmedUnderstanding: understanding.trim(),
         dynamicQuestions: dynamic,
@@ -381,7 +466,7 @@ export function AiQuotationWizardModal({ project, onClose }: {
             stage === 1 ? editingUnderstanding ? 'Guardar resumen' : 'Editar' : 'Atrás'}
         </Button>
         <Button className={styles.primaryAction} loading={working} disabled={
-          (stage === 0 && questionnaire.isLoading) ||
+          (stage === 0 && (questionnaire.isLoading || driveStatus.isLoading || !driveAuthorized || oauthBusy)) ||
           (stage > 0 && !verifiedAnalysis)
         } onClick={() => void next()}>
           {stage === 0 ? 'Analizar proyecto' : stage === 1 ? 'Está correcto' :
@@ -400,20 +485,61 @@ export function AiQuotationWizardModal({ project, onClose }: {
       {stage === 0 && (
         <section className={styles.stage}>
           <h3 className={styles.srOnly}>Documentos para el análisis</h3>
-          <p className={styles.intro}>El agente lee todo antes de preguntar. Usando:
-            {' '}<strong>Documento de demostración KDM</strong>
-          </p>
-          <ul className={styles.documents} aria-label="Documentos que analizará el agente">
-            <li>
-              <span className={styles.docIcon} aria-hidden="true">📄</span>
-              <span>Requerimiento_KDM.pdf</span>
-              <span className={styles.docDate}>Fuente de prueba</span>
-            </li>
-          </ul>
-          <p className={styles.demoNote}>
-            No existe una conexión real con Google Drive. El documento KDM de ejemplo
-            sustituye temporalmente los antecedentes del proyecto.
-          </p>
+          <p className={styles.intro}>El agente analizará los antecedentes reales del proyecto en Google Drive.</p>
+          {extrasFolderUrl ? (
+            <div className={styles.driveSource}>
+              <strong>Carpeta de documentación configurada en Extras</strong>
+              {driveUrlValid ? (
+                <a href={extrasFolderUrl} target="_blank" rel="noreferrer">
+                  Abrir documentación en Google Drive
+                </a>
+              ) : (
+                <p role="alert">El enlace guardado en Extras no es una carpeta de Drive.
+                  Actualízalo desde la pestaña Extras del proyecto.</p>
+              )}
+            </div>
+          ) : (
+            <div className={styles.driveSource}>
+              <TextField label="Carpeta de Google Drive del proyecto" type="url"
+                value={manualFolderUrl}
+                onChange={(event) => {
+                  setManualFolderUrl(event.target.value);
+                  setOauthResult('');
+                  setError('');
+                }}
+                placeholder="https://drive.google.com/drive/folders/..."
+                helperText="No existe documentación en Extras. Indica la carpeta del proyecto para analizar." />
+            </div>
+          )}
+          {driveUrlValid && !serviceAccountEnabled && driveStatus.data?.enabled && (
+            <div className={styles.driveAuth}>
+              <p>Autoriza temporalmente la carpeta con tu cuenta Google. El token
+                se mantiene solo en memoria del backend, nunca en la base de datos.</p>
+              <div className={styles.driveAuthActions}>
+                <Button variant="outline" size="sm" loading={oauthBusy}
+                  disabled={oauthBusy || analysis.isPending}
+                  onClick={() => void authorizeDrive()}>
+                  {driveAuthorized ? 'Renovar autorización Google' : 'Probar acceso con Google'}
+                </Button>
+                {oauthBusy && <Button variant="ghost" size="sm" onClick={() => {
+                  oauthPopup.current?.close();
+                  setOauthBusy(false);
+                  setOauthResult('Prueba cancelada. Puedes volver a autorizar.');
+                }}>Cancelar prueba</Button>}
+              </div>
+            </div>
+          )}
+          {oauthResult && <p role="status" className={styles.driveResult}>{oauthResult}</p>}
+          {driveStatus.isLoading && <p>Verificando disponibilidad de Google Drive…</p>}
+          {!driveStatus.isLoading && driveUrlValid && !driveAuthorized &&
+            !driveStatus.data?.enabled && !serviceAccountEnabled && (
+              <p role="alert" className={styles.error}>
+                La API no tiene Drive configurado. Activa GOOGLE_DRIVE_OAUTH_POC_ENABLED en el backend.
+              </p>
+            )}
+          {driveAuthorized && <p role="status" className={styles.analysisComplete}>
+            ✓ Carpeta de Drive autorizada para analizar los documentos.
+          </p>}
           <details className={styles.more}>
             <summary>Indicaciones adicionales · opcional</summary>
             <label className={styles.textLabel} htmlFor="kora-quotation-instructions">
@@ -426,7 +552,7 @@ export function AiQuotationWizardModal({ project, onClose }: {
           </details>
           {analysis.isPending && (
             <ol role="status" aria-label="Progreso verificable del análisis IA" className={styles.analysisMilestones}>
-              <li className={styles.milestoneDone}>✓ Documento KDM seleccionado para su lectura</li>
+              <li className={styles.milestoneDone}>✓ Carpeta documental de Google Drive seleccionada</li>
               <li className={styles.milestoneDone}>✓ Identificación y datos del proyecto preparados</li>
               <li className={styles.milestoneActive}>◌ Gemini está analizando los documentos y detectando incertidumbres…</li>
               <li className={styles.milestonePending}>○ Validar resultados y presentar preguntas</li>
@@ -525,7 +651,7 @@ export function AiQuotationWizardModal({ project, onClose }: {
             {assumptions.length > 0 &&
               <ul>{dynamic.filter((question) => assumptions.includes(question.id))
                 .map((question) => <li key={question.id}>Confirmar: {question.question}</li>)}</ul>}
-            <p>Validar con el cliente los resultados de esta estimación basada en KDM,
+            <p>Validar con el cliente los resultados de esta estimación basada en Drive,
               antes de utilizarla en un proyecto real.</p>
           </div>
           <p className={styles.warning}>La cotización se guardará como borrador
