@@ -40,7 +40,7 @@ export const ESTIMATION_EDT_GUIDANCE = [
 export function isTechLeadRole(role: string): boolean {
   const normalized = role.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .toLocaleLowerCase('es').replace(/[^a-z0-9]+/g, ' ').trim();
-  return /^(tech lead|technical lead|lider tecnico|lider tecnica|lider de desarrollo|lider tecnico de proyecto|tl)$/.test(normalized);
+  return normalized === 'tl' || /(^| )(tech lead|technical lead|lider tecnico|lider tecnica|lider de desarrollo)( |$)/.test(normalized);
 }
 
 export function estimatedWeeksFromRoles(
@@ -134,6 +134,7 @@ export function validateStageCapacity(
   const activities = new Map(edt.activities.map((task) => [task.wbs, task]));
   const peopleByRole = new Map(roles.map((role) => [role.role, role.people]));
   const totals = new Map<string, number>();
+  const totalsByRole = new Map<string, number>();
   for (const row of edt.roleHours) {
     const task = activities.get(row.wbs);
     if (!task) continue; // El validador de relaciones existente informa la FK.
@@ -141,6 +142,7 @@ export function validateStageCapacity(
     if (!stage) continue;
     const key = stage.code + '\u0000' + row.role;
     totals.set(key, (totals.get(key) ?? 0) + row.hours);
+    totalsByRole.set(row.role, (totalsByRole.get(row.role) ?? 0) + row.hours);
   }
   for (const [key, hours] of totals) {
     const [stageCode, role] = key.split('\u0000');
@@ -153,6 +155,21 @@ export function validateStageCapacity(
         ' HH en ' + stage.durationWeeks + ' semana(s) con ' + people +
         ' persona(s), excediendo el máximo físico de ' + physicalMaximum +
         ' HH. Ajusta tramos, dotación o esfuerzo; no alteres HH para cuadrar.');
+    }
+  }
+  // Además del control por tramo, comprueba el máximo global para evitar
+  // sobrecargas ocultas en tramos paralelos dentro del mismo horizonte.
+  const horizon = Math.max(1, ...edt.stages.map((stage) =>
+    stage.startWeek + stage.durationWeeks - 1));
+  for (const [role, hours] of totalsByRole) {
+    const people = peopleByRole.get(role);
+    if (!people) continue;
+    const maximum = WEEKLY_HOURS_PER_PERSON * horizon * people;
+    if (hours > maximum + 0.001) {
+      throw new Error('La carga total de ' + role + ': ' + hours +
+        ' HH supera la capacidad de ' + people + ' persona(s) en ' +
+        horizon + ' semanas (' + maximum +
+        ' HH). Revisa paralelismo y duración, no redistribuyas horas artificialmente.');
     }
   }
 }
