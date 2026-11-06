@@ -46,10 +46,10 @@ interface GoogleDriveListResponse {
 export class GoogleDriveFolderClient implements DriveFolderClient {
   private cachedToken: { value: string; expiresAtMs: number } | null = null;
 
-  constructor(private readonly config: AppConfigService) {}
+  constructor(private readonly config: AppConfigService, private readonly delegatedAccessToken?: string) {}
 
   isConfigured(): boolean {
-    return this.config.googleDrive.enabled;
+    return Boolean(this.delegatedAccessToken) || this.config.googleDrive.enabled;
   }
 
   async listFiles(folderId: string): Promise<readonly DriveFolderFile[]> {
@@ -215,6 +215,7 @@ export class GoogleDriveFolderClient implements DriveFolderClient {
   }
 
   private async getAccessToken(): Promise<string> {
+    if (this.delegatedAccessToken) return this.delegatedAccessToken;
     const nowMs = Date.now();
     if (this.cachedToken && this.cachedToken.expiresAtMs > nowMs + 60_000) {
       return this.cachedToken.value;

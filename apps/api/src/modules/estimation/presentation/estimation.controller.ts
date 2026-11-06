@@ -23,6 +23,7 @@ import { CurrentUser, type RequestUser } from '../../../shared/presentation/deco
 import { AppConfigService } from '../../../config/app-config.service';
 import { GoogleDriveOAuthPocService } from '../../../shared/infrastructure/auth/google-drive-oauth-poc.service';
 import { extractDriveFolderId } from '../application/drive-source-selection';
+import { resolveAuthorizedDriveReader } from '../infrastructure/drive/resolve-authorized-drive-reader';
 import { RequireAnyPermission, RequirePermissions } from '../../../shared/presentation/decorators/require-permissions.decorator';
 import { ManageQuotationDraftsUseCase } from '../application/use-cases/manage-quotation-drafts.use-case';
 import { ZodValidationPipe } from '../../../shared/presentation/pipes/zod-validation.pipe';
@@ -65,8 +66,9 @@ export class EstimationController {
    */
   @Get('drive/oauth-poc/status')
   @RequireAnyPermission('projects:manage', 'projects:read_assigned')
-  driveOAuthPocStatus(): { enabled: boolean } {
-    return { enabled: this.config.googleDriveOauthPocEnabled && this.config.google.enabled };
+  driveOAuthPocStatus(): { enabled: boolean; serviceAccountEnabled: boolean } {
+    return { enabled: this.config.googleDriveOauthPocEnabled && this.config.google.enabled,
+      serviceAccountEnabled: this.config.googleDrive.enabled };
   }
 
   @Post('drive/oauth-poc/start')
@@ -135,7 +137,9 @@ export class EstimationController {
     @CurrentUser() actor: RequestUser,
   ): Promise<EstimationPocAnalysis> {
     await this.quotationDrafts.authorizeAiPoc(input.projectId, actor);
-    return this.analyzePoc.execute(input);
+    return this.analyzePoc.execute(input, resolveAuthorizedDriveReader(
+      input.driveFolderUrl, actor.id, this.config, this.driveOAuthPoc,
+    ));
   }
 
   /**

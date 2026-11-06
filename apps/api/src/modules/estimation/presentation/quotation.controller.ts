@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, HttpCode, HttpStatus, Optional, Param, ParseUUIDPipe, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
 import {
   applyQuotationPlanningSchema, generateAiDemoQuotationSchema, createQuotationVersionSchema, updateQuotationDraftSchema, quotationReconciliationReviewSchema, assessQuotationReconciliationSchema,
   quotationRevisionActionSchema, approveClientQuotationSchema, transferApprovedQuotationSchema,
@@ -12,6 +12,10 @@ import { ManageQuotationDraftsUseCase } from '../application/use-cases/manage-qu
 import { GenerateEstimationPocProposalUseCase } from '../application/use-cases/generate-estimation-poc-proposal.use-case';
 import { GetEstimationQuestionnaireDefinitionUseCase } from '../application/use-cases/get-estimation-questionnaire-definition.use-case';
 import { validateQuestionnaireAnswers } from '../application/validate-estimation-questionnaire';
+import { AppConfigService } from '../../../config/app-config.service';
+import { GoogleDriveOAuthPocService } from '../../../shared/infrastructure/auth/google-drive-oauth-poc.service';
+import { extractDriveFolderId } from '../application/drive-source-selection';
+import { resolveAuthorizedDriveReader } from '../infrastructure/drive/resolve-authorized-drive-reader';
 
 /**
  * API comercial separada de /poc/*. Además de borradores y actas,
@@ -25,6 +29,8 @@ export class QuotationController {
     private readonly drafts: ManageQuotationDraftsUseCase,
     private readonly generator: GenerateEstimationPocProposalUseCase,
     private readonly questionnaire: GetEstimationQuestionnaireDefinitionUseCase,
+    @Optional() private readonly config?: AppConfigService,
+    @Optional() private readonly driveOAuthPoc?: GoogleDriveOAuthPocService,
   ) {}
 
   @Get()
@@ -138,15 +144,26 @@ export class QuotationController {
     @Body(new ZodValidationPipe(generateAiDemoQuotationSchema)) input: GenerateAiDemoQuotationInput,
     @CurrentUser() actor: RequestUser,
   ): Promise<QuotationVersion> {
-    if (input.projectId !== projectId ||
-        input.driveFolderUrl !== 'https://drive.google.com/drive/folders/kora-poc-fallback') {
-      throw new BadRequestException('La simulación documental solo admite la fuente KDM explícita.');
+    if (input.projectId !== projectId) throw new BadRequestException('El proyecto no coincide.');
+    await this.drafts.authorizeAiPoc(projectId, actor);
+    const isDemo = extractDriveFolderId(input.driveFolderUrl) === 'kora-poc-fallback';
+    if (isDemo && input.driveFolderUrl !== 'https://drive.google.com/drive/folders/kora-poc-fallback') {
+      throw new BadRequestException('URL de demostración no autorizada.');
     }
+    const sourceReader = isDemo ? undefined : resolveAuthorizedDriveReader(
+      input.driveFolderUrl, actor.id, this.config, this.driveOAuthPoc,
+    );
     if (input.dynamicQuestions.some((question) =>
       question.kind !== 'dynamic' || question.sourceRefs.length === 0 ||
-      question.sourceRefs.some((ref) => ref.sourceId !== 'kora-poc-requerimiento-kdm')
+      (isDemo && question.sourceRefs.some((ref) => ref.sourceId !== 'kora-poc-requerimiento-kdm'))
     )) {
-      throw new BadRequestException('Las preguntas dinámicas deben acreditar la fuente KDM.');
+      throw new BadRequestException('Las preguntas dinámicas deben citar la fuente documental seleccionada.');
+    }
+    if (!isDemo && sourceReader && input.dynamicQuestions.length) {
+      const validIds = new Set((await sourceReader.readDriveSources(input.driveFolderUrl)).map((doc) => doc.sourceId));
+      if (input.dynamicQuestions.some((question) => question.sourceRefs.some((ref) => !validIds.has(ref.sourceId)))) {
+        throw new BadRequestException('Las preguntas recibidas citan documentos ajenos a la carpeta de Drive.');
+      }
     }
     validateQuestionnaireAnswers(
       this.questionnaire.execute(), input.answers, input.dynamicQuestions,
@@ -157,18 +174,17 @@ export class QuotationController {
     if (!activeTeams.length) {
       throw new BadRequestException('No existen equipos activos en Kora para generar la cotización.');
     }
-    const proposal = await this.generator.execute(input, activeTeams);
-    if (proposal.provider !== 'gemini' || proposal.sourceMode !== 'poc_simulated' ||
+    const proposal = await this.generator.execute(input, activeTeams, sourceReader);
+    if (proposal.provider !== 'gemini' ||
+        proposal.sourceMode !== (isDemo ? 'poc_simulated' : 'drive') ||
         proposal.documentsAnalyzed < 1) {
-      throw new BadRequestException(
-        'No se generó una propuesta válida con Gemini y el PDF KDM de demostración.',
-      );
+      throw new BadRequestException('La propuesta Gemini no tiene evidencia documental válida.');
     }
     const validIds = new Set(activeTeams.map((team) => team.teamId));
     if (proposal.roles.some((role) => !role.teamId || !validIds.has(role.teamId))) {
       throw new BadRequestException('Gemini propuso un perfil sin equipo activo de Kora.');
     }
-    const edt = await this.generator.generateEdt(input, proposal, activeTeams);
+    const edt = await this.generator.generateEdt(input, proposal, activeTeams, sourceReader);
     // La EDT detallada determina las HH finales; la primera llamada propone
     // perfiles/capacidad, pero no impone un presupuesto a las actividades.
     const reconciled = this.generator.reconcileProposalWithEdt(proposal, edt);

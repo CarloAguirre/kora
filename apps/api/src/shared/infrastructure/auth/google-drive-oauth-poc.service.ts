@@ -9,6 +9,8 @@ const READ_SCOPE = 'https://www.googleapis.com/auth/drive.readonly';
 const PREFIX = 'kora-drive-poc-';
 const TTL_MS = 5 * 60_000;
 const MAX_PENDING = 100;
+const MAX_DELEGATED = 100;
+const MAX_TOKEN_TTL_MS = 45 * 60_000;
 const FOLDER_MIME = 'application/vnd.google-apps.folder';
 
 interface PendingAttempt {
@@ -28,12 +30,15 @@ export interface DriveOAuthPocResult {
 interface TokenReply {
   access_token?: string;
   scope?: string;
+  expires_in?: number;
 }
 
 @Injectable()
 export class GoogleDriveOAuthPocService {
   /** PoC de UN proceso; reiniciar la API invalida intentos aún pendientes. */
   private readonly pending = new Map<string, PendingAttempt>();
+  /** Autorizaciones efímeras por usuario+carpeta. Solo en memoria; jamás en cookies/BD/frontend. */
+  private readonly delegated = new Map<string, { token: string; expiresAt: number }>();
 
   constructor(private readonly config: AppConfigService) {}
 
@@ -59,6 +64,12 @@ export class GoogleDriveOAuthPocService {
     // No necesitamos refresh_token: nunca persistimos autorización en esta PoC.
     url.searchParams.set('access_type', 'online');
     return { state, authorizationUrl: url.toString() };
+  }
+
+  getAuthorizedAccessToken(userId: string, folderId: string): string | null {
+    if (!this.config.googleDriveOauthPocEnabled) return null;
+    this.expireOldAttempts();
+    return this.delegated.get(`${userId}:${folderId}`)?.token ?? null;
   }
 
   async finish(input: {
@@ -126,6 +137,19 @@ export class GoogleDriveOAuthPocService {
       });
       if (!filesResponse.ok) return driveFailure(filesResponse.status);
       const files = await filesResponse.json() as { files?: unknown[] };
+      // Se conserva SOLO en memoria un token corto para leer los antecedentes de esta
+      // carpeta durante el asistente. No se expone al navegador ni se obtiene refresh token.
+      const usableTtlMs = Math.min(MAX_TOKEN_TTL_MS, Math.max(0, (tokens.expires_in ?? 3600) * 1000 - 60_000));
+      if (usableTtlMs > 0) {
+        this.expireOldAttempts();
+        if (this.delegated.size >= MAX_DELEGATED) {
+          const oldest = this.delegated.keys().next().value;
+          if (oldest) this.delegated.delete(oldest);
+        }
+        this.delegated.set(`${attempt.userId}:${attempt.folderId}`, {
+          token: tokens.access_token, expiresAt: Date.now() + usableTtlMs,
+        });
+      }
       return {
         status: 'ok',
         code: 'DRIVE_READ_SUCCESS',
@@ -143,6 +167,9 @@ export class GoogleDriveOAuthPocService {
     const now = Date.now();
     for (const [state, attempt] of this.pending) {
       if (attempt.expiresAt <= now) this.pending.delete(state);
+    }
+    for (const [key, grant] of this.delegated) {
+      if (grant.expiresAt <= now) this.delegated.delete(key);
     }
   }
 }

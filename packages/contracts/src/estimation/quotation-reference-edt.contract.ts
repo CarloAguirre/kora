@@ -46,7 +46,7 @@ export const quotationReferenceEdtSchema = z.object({
     'kora.quotation.reference-edt.v1',
     'kora.quotation.reference-edt.v2',
   ]),
-  source: z.literal('kdm_demo'),
+  source: z.enum(['kdm_demo', 'drive']),
   provider: z.literal('gemini'),
   modules: z.array(quotationReferenceModuleSchema).min(1).max(30),
   /** Horas base, sin reserva técnica. */
@@ -120,7 +120,7 @@ export const appliedQuotationPlanningSchema = z.object({
   revision: z.number().int().positive(),
   appliedAt: z.string().datetime(),
   appliedByUserId: uuidSchema.nullable(),
-  source: z.enum(['kdm_demo', 'manual', 'copy']),
+  source: z.enum(['kdm_demo', 'drive', 'manual', 'copy']),
   status: z.enum(['accepted_for_planning_only', 'transferred']),
   commercialApproval: z.boolean(),
   totalHours: z.number().positive(),

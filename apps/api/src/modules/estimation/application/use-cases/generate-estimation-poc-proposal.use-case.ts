@@ -203,16 +203,18 @@ export class GenerateEstimationPocProposalUseCase {
     input: EstimationInputWithQuestions,
     proposal: EstimationPocProposal,
     activeKoraTeams?: readonly KoraActiveTeam[],
+    authorizedSources?: DocumentSourceReader,
   ): Promise<QuotationReferenceEdt> {
+    const isDemo = extractDriveFolderId(input.driveFolderUrl) === 'kora-poc-fallback';
     if (this.ai.name !== 'gemini' || proposal.provider !== 'gemini' ||
         proposal.projectId !== input.projectId ||
-        extractDriveFolderId(input.driveFolderUrl) !== 'kora-poc-fallback') {
-      throw new BadRequestException('EDT KDM solo admite la propuesta Gemini de la misma cotización.');
+        proposal.sourceMode !== (isDemo ? 'poc_simulated' : 'drive')) {
+      throw new BadRequestException('La EDT no corresponde al análisis Gemini de la carpeta seleccionada.');
     }
     this.validatePreliminaryRoles(proposal.roles);
-    const docs = await this.sources.readDriveSources(input.driveFolderUrl);
-    if (docs.length !== 1 || docs[0]?.name !== 'Requerimiento_KDM.pdf') {
-      throw new BadRequestException('No se pudo comprobar el documento KDM de demostración.');
+    const docs = await (authorizedSources ?? this.sources).readDriveSources(input.driveFolderUrl);
+    if (docs.length === 0 || (isDemo && (docs.length !== 1 || docs[0]?.name !== 'Requerimiento_KDM.pdf'))) {
+      throw new BadRequestException('No se pudieron comprobar antecedentes válidos de la carpeta documental.');
     }
     const request = {
       task: 'estimation.poc.reference-edt',
@@ -221,7 +223,7 @@ export class GenerateEstimationPocProposalUseCase {
         projectName: input.projectName,
         clientName: input.clientName,
         provider: 'gemini',
-        source: 'kdm_demo',
+        source: isDemo ? 'kdm_demo' : 'drive',
         userInstructions: input.instructions,
         preliminaryAssumptions: proposal.assumptions,
         unresolvedPreliminaryQuestions: proposal.clarifyingQuestions,
@@ -235,7 +237,7 @@ export class GenerateEstimationPocProposalUseCase {
         ...(activeKoraTeams ? { activeKoraTeams } : {}),
       },
       instructions: [
-        'Genera una EDT comercial DETALLADA basada en los documentos KDM y respuestas, siguiendo la estructura de un EDT profesional.',
+        'Genera una EDT comercial DETALLADA basada en los documentos reales adjuntos y respuestas, siguiendo la estructura de un EDT profesional.',
         'Devuelve 3 tablas planas: stages (cada tramo una sola vez), activities (cada WBS una sola vez) y roleHours (cada pareja WBS×perfil una sola vez).',
         'activities NO contiene role, hours ni la definición del tramo: solo stageCode como clave foránea hacia stages.',
         'Si una actividad necesita dos perfiles, escribe una sola fila en activities y DOS filas en roleHours con el mismo WBS y distintos role.',
@@ -256,7 +258,7 @@ export class GenerateEstimationPocProposalUseCase {
         'Máximo 20 módulos, 120 actividades WBS únicas, 20 tramos y 240 filas roleHours.',
         'Controla el tamaño de salida: para un proyecto de complejidad media busca unas 20 a 45 actividades WBS concretas; no fragmentes tareas triviales. Prioriza cubrir todo el alcance documentado sin exceder los límites de respuesta de Gemini.',
         'Evita entregables genéricos; describe actividades que un desarrollador o QA pueda implementar y revisar.',
-        'El EDT de Zurich sirve de patrón de estructura, no de presupuesto para KDM: no reutilices sus horas ni su reserva.',
+        'No reutilices horas ni reservas de otros proyectos. Usa únicamente estos antecedentes y respuestas.',
       ].join('\n'),
       documents: docs.map((doc) => ({
         name: doc.name, mimeType: doc.mimeType,
@@ -289,7 +291,7 @@ export class GenerateEstimationPocProposalUseCase {
         ].join('\n'),
       });
       try {
-        return this.buildVerifiedEdt(output, proposal);
+        return this.buildVerifiedEdt(output, proposal, isDemo ? 'kdm_demo' : 'drive');
       } catch (error) {
         if (!(error instanceof BadRequestException) && !(error instanceof z.ZodError)) {
           throw error;
@@ -317,7 +319,7 @@ export class GenerateEstimationPocProposalUseCase {
    * Cada FK y cada cruce debe existir exactamente una vez.
    */
   private buildVerifiedEdt(
-    output: unknown, proposal: EstimationPocProposal,
+    output: unknown, proposal: EstimationPocProposal, source: 'kdm_demo' | 'drive',
   ): QuotationReferenceEdt {
     const raw = detailResponseSchema.parse(output);
     const validRoles = new Set(proposal.roles.map((role) => role.role));
@@ -432,7 +434,7 @@ export class GenerateEstimationPocProposalUseCase {
     const reserveHours = roundHours(totalHours * reservePercent / 100);
     return quotationReferenceEdtSchema.parse({
       schemaVersion: 'kora.quotation.reference-edt.v2',
-      source: 'kdm_demo', provider: 'gemini',
+      source, provider: 'gemini',
       modules, totalHours,
       stages: [...stages.values()].sort((a, b) =>
         a.startWeek - b.startWeek || a.code.localeCompare(b.code)),
@@ -512,6 +514,7 @@ export class GenerateEstimationPocProposalUseCase {
   async execute(
     input: EstimationInputWithQuestions,
     activeKoraTeams?: readonly KoraActiveTeam[],
+    authorizedSources?: DocumentSourceReader,
   ): Promise<EstimationPocProposal> {
     if (activeKoraTeams && activeKoraTeams.length === 0) {
       throw new BadRequestException('Kora no tiene equipos activos disponibles para estimar.');
@@ -519,7 +522,7 @@ export class GenerateEstimationPocProposalUseCase {
     const documents =
       this.ai.name === 'poc-ai'
         ? []
-        : await this.sources.readDriveSources(input.driveFolderUrl);
+        : await (authorizedSources ?? this.sources).readDriveSources(input.driveFolderUrl);
 
     if (this.ai.name !== 'poc-ai' && documents.length === 0) {
       throw new Error(

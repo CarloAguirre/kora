@@ -68,10 +68,10 @@ export class AnalyzeEstimationPocUseCase {
     private readonly sources?: DocumentSourceReader,
   ) {}
 
-  async execute(input: AnalyzeEstimationPocInput): Promise<EstimationPocAnalysis> {
+  async execute(input: AnalyzeEstimationPocInput, authorizedSources?: DocumentSourceReader): Promise<EstimationPocAnalysis> {
     const isLegacyPoc = this.ai.name === 'poc-ai';
     const documents = isLegacyPoc ? [] :
-      await this.sources?.readDriveSources(input.driveFolderUrl);
+      await (authorizedSources ?? this.sources)?.readDriveSources(input.driveFolderUrl);
     if (!isLegacyPoc && (!documents || documents.length === 0)) {
       throw new BadRequestException('No se encontraron documentos legibles para analizar.');
     }

@@ -338,11 +338,11 @@ export class DrizzleQuotationRepository implements QuotationRepository {
     dynamicQuestions: readonly EstimationQuestion[], edt: QuotationReferenceEdt,
     confirmedUnderstanding?: string, roleTeamIds?: Readonly<Record<string, string>>): Promise<QuotationVersion> {
     if (proposal.projectId !== projectId || proposal.provider !== 'gemini' ||
-        proposal.sourceMode !== 'poc_simulated' || proposal.documentsAnalyzed < 1 ||
+        !['poc_simulated', 'drive'].includes(proposal.sourceMode) || proposal.documentsAnalyzed < 1 ||
         proposal.totalHours <= 0 || proposal.roles.some((role) => role.totalHours <= 0) ||
         Math.abs(proposal.roles.reduce((total, role) => total + role.totalHours, 0) - proposal.totalHours) > 0.011 ||
         Math.abs(edt.totalHours - proposal.totalHours) > 0.011 ||
-        edt.source !== 'kdm_demo' || edt.provider !== 'gemini') {
+        edt.source !== (proposal.sourceMode === 'drive' ? 'drive' : 'kdm_demo') || edt.provider !== 'gemini') {
       throw new BadRequestException('Propuesta Gemini KDM inválida o sin trazabilidad documental.');
     }
     return this.createVersionInternal(projectId, userId, {}, { proposal, answers, dynamicQuestions, edt, confirmedUnderstanding, roleTeamIds });
@@ -380,12 +380,14 @@ export class DrizzleQuotationRepository implements QuotationRepository {
           paymentPlan: [],
           assumptions: aiPoc.proposal.assumptions,
           exclusions: [],
-          sourceRefs: ['demo:kdm_fixture'],
+          sourceRefs: aiPoc.proposal.sourceMode === 'drive'
+            ? [...new Set(aiPoc.dynamicQuestions.flatMap((question) => question.sourceRefs.map((ref) => ref.sourceId)))]
+            : ['demo:kdm_fixture'],
           answers: Object.fromEntries(aiPoc.answers.map((answer) => [
             answer.questionId, answer.value,
           ])),
           aiPoc: quotationAiPocSnapshotSchema.parse({
-            source: 'kdm_demo', proposal: aiPoc.proposal,
+            source: aiPoc.proposal.sourceMode === 'drive' ? 'drive' : 'kdm_demo', proposal: aiPoc.proposal,
             answers: aiPoc.answers, dynamicQuestions: aiPoc.dynamicQuestions,
             confirmedUnderstanding: aiPoc.confirmedUnderstanding,
             edt: aiPoc.edt, roleTeamIds: aiPoc.roleTeamIds ?? {},
@@ -457,7 +459,7 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       const [created] = await tx.insert(quotationVersions).values({
         quotationId: quotation.id,
         versionNumber: next,
-        name: aiPoc ? `IA KDM (demo) · versión ${next}` : input.simulation ? `Simulación IA · ${input.simulation.analysis.project.client.slice(0, 170)}` : `Versión ${next}`,
+        name: aiPoc ? `IA ${aiPoc.proposal.sourceMode === 'drive' ? 'Drive' : 'KDM (demo)'} · versión ${next}` : input.simulation ? `Simulación IA · ${input.simulation.analysis.project.client.slice(0, 170)}` : `Versión ${next}`,
         status: 'draft',
         origin,
         aiReviewStatus,
@@ -475,7 +477,7 @@ export class DrizzleQuotationRepository implements QuotationRepository {
         versionId: created.id, actorUserId: userId, action: 'draft_created',
         metadata: { origin, sourceVersionId: input.sourceVersionId ?? null,
           sourceProjectId: input.sourceVersionId ? (input.sourceProjectId ?? projectId) : null,
-          simulation: input.simulation ? 'simulated_fixture' : aiPoc ? 'kdm_demo' : null,
+          simulation: input.simulation ? 'simulated_fixture' : aiPoc ? (aiPoc.proposal.sourceMode === 'drive' ? null : 'kdm_demo') : null,
           provider: aiPoc?.proposal.provider ?? null,
           proposedHours: aiPoc?.proposal.totalHours ?? null },
       });
@@ -613,8 +615,8 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       const draft = quotationDraftDataSchema.parse(version.draft);
       const snapshot = draft.aiPoc;
       const edt = snapshot?.edt;
-      if (!snapshot || !edt || snapshot.source !== 'kdm_demo' ||
-          edt.source !== 'kdm_demo' || edt.provider !== 'gemini' ||
+      if (!snapshot || !edt || !['kdm_demo', 'drive'].includes(snapshot.source) ||
+          edt.source !== snapshot.source || edt.provider !== 'gemini' ||
           snapshot.proposal.provider !== 'gemini' ||
           snapshot.proposal.projectId !== projectId ||
           draft.analysisProjectionStatus !== 'synced') {
@@ -694,7 +696,7 @@ export class DrizzleQuotationRepository implements QuotationRepository {
         versionId, actorUserId: actorId, action: 'planning_baseline_applied',
         metadata: {
           status: 'accepted_for_planning_only', commercialApproval: false,
-          source: 'kdm_demo', moduleIds, revision: input.revision,
+          source: snapshot.source, moduleIds, revision: input.revision,
           totalHours: edt.totalHours,
         },
       }).returning();
@@ -702,7 +704,7 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       return appliedQuotationPlanningSchema.parse({
         projectId, versionId, versionNumber: version.versionNumber,
         revision: input.revision, appliedAt: event.occurredAt.toISOString(),
-        appliedByUserId: actorId, source: 'kdm_demo',
+        appliedByUserId: actorId, source: snapshot.source,
         status: 'accepted_for_planning_only', commercialApproval: false,
         totalHours: edt.totalHours,
         modules: edt.modules.map((module, index) => ({
