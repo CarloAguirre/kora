@@ -291,7 +291,7 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
     renderWizard();
     fireEvent.click(screen.getByRole('button', { name: 'Analizar proyecto' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'No se obtuvo un análisis real de Gemini',
+      'Gemini no consiguió analizar documentos reales de la carpeta indicada.',
     );
     expect(screen.queryByText('Entendimiento del proyecto')).not.toBeInTheDocument();
     expect(mocks.generate).not.toHaveBeenCalled();
