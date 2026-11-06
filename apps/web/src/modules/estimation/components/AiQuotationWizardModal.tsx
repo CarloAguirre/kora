@@ -233,7 +233,6 @@ export function AiQuotationWizardModal({ project, onClose }: {
   const toast = useToast();
   const reportError = (message: string) => { setError(message); toast.error(message); };
   const [invalidId, setInvalidId] = useState<string | null>(null);
-  const [analysisCompleted, setAnalysisCompleted] = useState(false);
   const extrasFolderUrl = project.documentationLink?.trim() ?? '';
   const [manualFolderUrl, setManualFolderUrl] = useState('');
   // Una selección distinta en el explorador no modifica el vínculo de Extras.
@@ -286,7 +285,6 @@ export function AiQuotationWizardModal({ project, onClose }: {
       setSelectedFolderUrl(result.folder.url);
       setAuthorizationRootUrl(rootUrl);
       setAnalysisSnapshot(null);
-      setAnalysisCompleted(false);
       setSourceStep('documents');
       setPickerOpen(false);
       setPickerError('');
@@ -487,7 +485,6 @@ export function AiQuotationWizardModal({ project, onClose }: {
         setSaveWarning('La carpeta funcionará en esta cotización, pero no se pudo guardar en Extras. Revisa tus permisos.');
       }
     }
-    setAnalysisCompleted(false);
     setSourceStep('analyzing');
     setError('');
     setInvalidId(null);
@@ -524,7 +521,6 @@ export function AiQuotationWizardModal({ project, onClose }: {
       }
       setAnswers(prefilled);
       setAssumptions([]);
-      setAnalysisCompleted(true);
       setStage(1);
     } catch (reason) {
       reportError(reason instanceof Error ? reason.message : 'No se pudo analizar la documentación de Drive.');
