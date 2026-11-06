@@ -9,6 +9,7 @@ import {
   DOCUMENT_SOURCE_READER, type DocumentSourceReader,
 } from '../ports/document-source-reader.port';
 import { extractDriveFolderId } from '../drive-source-selection';
+import { ESTIMATION_ANALYSIS_GUIDANCE } from '../estimation-methodology';
 
 const DYNAMIC_QUESTIONS_JSON_SCHEMA = {
   type: 'OBJECT',
@@ -90,6 +91,8 @@ export class AnalyzeEstimationPocUseCase {
       },
       instructions: [
         'Analiza EXCLUSIVAMENTE los documentos adjuntos. No inventes archivos ni hallazgos.',
+        ESTIMATION_ANALYSIS_GUIDANCE,
+        'Informa únicamente sobre las fuentes realmente entregadas a esta llamada; no afirmes haber revisado toda la carpeta Drive si solo se seleccionó una parte.',
         'Propón como máximo 5 preguntas dinámicas SOLO cuando su respuesta pueda modificar alcance, HH o arquitectura.',
         'No repitas las preguntas fijas de nivel de entrega, plazo, equipo, postproducción y condiciones generales.',
         'Si el documento contiene respuestas claras a F01/F02/F04, agrega fixedPrefills con questionId, value y sourceId real. Si no hay evidencia, devuelve [].',
