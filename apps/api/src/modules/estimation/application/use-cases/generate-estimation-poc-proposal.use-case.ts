@@ -523,13 +523,20 @@ export class GenerateEstimationPocProposalUseCase {
         preliminary.roles.some((role) => !byRole.has(role.role))) {
       throw new BadRequestException('Los perfiles de la EDT no coinciden con la propuesta de capacidad.');
     }
+    const edtWeeks = Math.max(1, ...(edt.stages ?? []).map((stage) =>
+      stage.startWeek + stage.durationWeeks - 1));
     const roles = preliminary.roles.map((role) => {
       const totalHours = byRole.get(role.role)!;
-      const units = role.duration * role.people;
+      // El calendario real de la EDT reemplaza el horizonte tentativo del
+      // Líder Técnico; así el compromiso semanal se ve en el perfil agregado.
+      const duration = isTechLeadRole(role.role) ? edtWeeks : role.duration;
+      const unit = isTechLeadRole(role.role) ? 'week' as const : role.unit;
+      const units = duration * role.people;
       if (units <= 0) throw new BadRequestException('La capacidad preliminar incluye perfiles sin duración.');
       return {
-        ...role, totalHours,
-        // La tasa media se deriva de las HH reales; nunca vuelve a distribuirlas.
+        ...role, unit, duration, totalHours,
+        // En el TL, >5 puede reflejar arquitectura hands-on adicional.
+        // La base fija vive separada en el WBS TL-GOV.01.
         hoursPerUnit: Math.round(totalHours / units * 10000) / 10000,
       };
     });
