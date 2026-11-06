@@ -78,7 +78,7 @@ export function CollaboratorKpis({ hours, tasks, loading }: OverviewProps) {
             </span>}
         sub={!unavailable
           ? weeklyPercent + '% completado' + ((hours?.weekHolidayCount ?? 0) > 0
-            ? ' · ' + hours!.weekHolidayCount + ' feriado(s) descontado(s)' : '')
+            ? ' · ' + (hours?.weekHolidayCount ?? 0) + ' feriado(s) descontado(s)' : '')
           : undefined}
       />
       <KpiCard ariaLabel="Horas extra este mes" label="Horas extra este mes"
