@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Res, ServiceUnavailableException, BadRequestException } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, Res, ServiceUnavailableException, BadRequestException } from '@nestjs/common';
 import type { FastifyReply } from 'fastify';
 import { z } from 'zod';
 import {
@@ -93,6 +93,24 @@ export class EstimationController {
       path: '/', maxAge: 300,
     });
     return { authorizationUrl };
+  }
+
+  /** Comprobación explícita para navegadores que pierden window.opener por COOP de Google. */
+  @Get('drive/oauth-poc/access')
+  @RequireAnyPermission('projects:manage', 'projects:read_assigned')
+  async driveOAuthPocAccess(
+    @Query(new ZodValidationPipe(startDriveOAuthPocSchema)) input: z.infer<typeof startDriveOAuthPocSchema>,
+    @CurrentUser() actor: RequestUser,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ): Promise<{ authorized: boolean }> {
+    await this.quotationDrafts.authorizeAiPoc(input.projectId, actor);
+    const id = extractDriveFolderId(input.driveFolderUrl);
+    void reply.header('Cache-Control', 'no-store');
+    return {
+      authorized: Boolean(id && id !== 'kora-poc-fallback' &&
+        (this.config.googleDrive.enabled ||
+        this.driveOAuthPoc.getAuthorizedAccessToken(actor.id, id))),
+    };
   }
 
   @Get('questionnaire-definition')

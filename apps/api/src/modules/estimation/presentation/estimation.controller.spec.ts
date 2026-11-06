@@ -15,6 +15,7 @@ function setup() {
   const generator = { execute: vi.fn().mockResolvedValue({ projectId, provider: 'gemini' }) };
   const resolver = { execute: vi.fn().mockResolvedValue({ projectId }) };
   const driveOAuthPoc = {
+    getAuthorizedAccessToken: vi.fn().mockReturnValue(null),
     start: vi.fn().mockReturnValue({
       state: 'kora-drive-poc-test',
       authorizationUrl: 'https://accounts.google.com/o/oauth2/v2/auth?state=kora-drive-poc-test',
@@ -78,6 +79,22 @@ describe('EstimationController · líder PM de proyecto asignado', () => {
       EstimationController.prototype.startDriveOAuthPoc)).toEqual([
         'projects:manage', 'projects:read_assigned',
       ]);
+  });
+
+  it('comprueba autorización por usuario y carpeta sin revelar tokens', async () => {
+    const { controller, drafts, driveOAuthPoc } = setup();
+    driveOAuthPoc.getAuthorizedAccessToken.mockReturnValueOnce('secret-token');
+    const reply = { header: vi.fn() };
+    const url = 'https://drive.google.com/drive/folders/carpetaQA123';
+    expect(await controller.driveOAuthPocAccess({
+      projectId, driveFolderUrl: url,
+    }, actor as never, reply as never)).toEqual({ authorized: true });
+    expect(drafts.authorizeAiPoc).toHaveBeenCalledWith(projectId, actor);
+    expect(driveOAuthPoc.getAuthorizedAccessToken).toHaveBeenCalledWith(actor.id, 'carpetaQA123');
+    expect(reply.header).toHaveBeenCalledWith('Cache-Control', 'no-store');
+    expect(await controller.driveOAuthPocAccess({
+      projectId, driveFolderUrl: url,
+    }, actor as never, reply as never)).toEqual({ authorized: false });
   });
 
   it('el cuestionario fijo admite projects:read_assigned y devuelve F01-F05 sin BD', () => {

@@ -21,7 +21,13 @@ export const estimationApi = {
   driveOAuthPocStatus(): Promise<{ enabled: boolean; serviceAccountEnabled: boolean }> {
     return api.get<{ enabled: boolean; serviceAccountEnabled: boolean }>('/estimations/drive/oauth-poc/status');
   },
-  /** PoC aislada: no devuelve ni persiste tokens OAuth. */
+  /** Comprueba la concesión efímera sin enviar tokens al navegador. */
+  driveOAuthPocAccess(input: { projectId: string; driveFolderUrl: string }): Promise<{ authorized: boolean }> {
+    return api.get<{ authorized: boolean }>(
+      '/estimations/drive/oauth-poc/access?' + new URLSearchParams(input).toString(),
+    );
+  },
+  /** PoC sin tokens ni credenciales devueltos al navegador. */
   startDriveOAuthPoc(input: { projectId: string; driveFolderUrl: string }): Promise<DriveOAuthPocStart> {
     return api.post<DriveOAuthPocStart>('/estimations/drive/oauth-poc/start', input);
   },

@@ -7,6 +7,7 @@ import type {
   SubmitEstimationAnswerInput,
 } from '@kora/contracts';
 import { projectQuotationPath } from '@/app/router/paths';
+import { useUpdateProjectExtras } from '@/modules/projects/api/projects.queries';
 import { Button } from '@/shared/components/ui/Button';
 import { Modal } from '@/shared/components/ui/Modal';
 import { useToast } from '@/shared/components/ui/Toast';
@@ -244,6 +245,8 @@ export function AiQuotationWizardModal({ project, onClose }: {
   const serviceAccountEnabled = driveStatus.data?.serviceAccountEnabled === true;
   const driveAuthorized = driveUrlValid &&
     (serviceAccountEnabled || authorizedUrl === driveFolderUrl);
+  const updateProjectExtras = useUpdateProjectExtras();
+  const [saveWarning, setSaveWarning] = useState('');
   const questionnaire = useEstimationQuestionnaireDefinition();
   const analysis = useAnalyzeEstimationPoc();
   const generate = useGenerateAiDemoQuotationVersion(project.id);
@@ -277,6 +280,24 @@ export function AiQuotationWizardModal({ project, onClose }: {
     window.addEventListener('message', onResult);
     return () => window.removeEventListener('message', onResult);
   }, []);
+
+  const confirmDriveAccess = async () => {
+    if (!driveUrlValid) return;
+    try {
+      const status = await estimationApi.driveOAuthPocAccess({
+        projectId: project.id, driveFolderUrl,
+      });
+      if (!status.authorized) {
+        setOauthResult('Google aún no confirmó acceso a esta carpeta. Revisa el resultado en la ventana emergente.');
+        return;
+      }
+      setAuthorizedUrl(driveFolderUrl);
+      setOauthBusy(false);
+      setOauthResult('Google Drive autorizó el acceso temporal a esta carpeta.');
+    } catch (cause) {
+      setOauthResult(cause instanceof Error ? cause.message : 'No se pudo confirmar la autorización.');
+    }
+  };
 
   const authorizeDrive = async () => {
     if (!driveUrlValid || oauthBusy) return;
@@ -353,6 +374,18 @@ export function AiQuotationWizardModal({ project, onClose }: {
     if (!driveAuthorized) {
       reportError('Autoriza primero la carpeta con Google para leer la documentación real.');
       return;
+    }
+    if (!extrasFolderUrl) {
+      // Si el rol puede editar Extras, persistimos el enlace para no volver
+      // a solicitarlo. La falta de permiso de edición no impide cotizar.
+      try {
+        await updateProjectExtras.mutateAsync({
+          projectId: project.id, input: { documentationLink: driveFolderUrl },
+        });
+        setSaveWarning('');
+      } catch {
+        setSaveWarning('La carpeta funcionará en esta cotización, pero no se pudo guardar en Extras. Revisa tus permisos.');
+      }
     }
     setAnalysisCompleted(false);
     setError('');
@@ -521,6 +554,10 @@ export function AiQuotationWizardModal({ project, onClose }: {
                   onClick={() => void authorizeDrive()}>
                   {driveAuthorized ? 'Renovar autorización Google' : 'Probar acceso con Google'}
                 </Button>
+                {oauthBusy && <Button variant="outline" size="sm"
+                  onClick={() => void confirmDriveAccess()}>
+                  Comprobar autorización
+                </Button>}
                 {oauthBusy && <Button variant="ghost" size="sm" onClick={() => {
                   oauthPopup.current?.close();
                   setOauthBusy(false);
@@ -530,6 +567,7 @@ export function AiQuotationWizardModal({ project, onClose }: {
             </div>
           )}
           {oauthResult && <p role="status" className={styles.driveResult}>{oauthResult}</p>}
+          {saveWarning && <p role="status" className={styles.driveResult}>{saveWarning}</p>}
           {driveStatus.isLoading && <p>Verificando disponibilidad de Google Drive…</p>}
           {!driveStatus.isLoading && driveUrlValid && !driveAuthorized &&
             !driveStatus.data?.enabled && !serviceAccountEnabled && (
