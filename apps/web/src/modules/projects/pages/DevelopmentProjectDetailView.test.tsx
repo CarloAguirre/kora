@@ -37,6 +37,8 @@ vi.mock('../api/projects.queries', () => ({
   useCreateProjectModuleTask: () => ({ mutateAsync: vi.fn() }),
   useUpdateProjectModuleTask: () => ({ mutateAsync: vi.fn() }),
   useDeleteProjectModuleTask: () => ({ mutateAsync: vi.fn() }),
+  useRoadmapReferenceExclusions: () => ({ data: [] }),
+  useExcludeRoadmapReference: () => ({ mutateAsync: vi.fn(), isPending: false }),
   // Requeridos por `DailyEntryForm`/`WeeklyEntryForm`, montados siempre (aunque
   // cerrado el diálogo) por el botón "+" de `BitacoraMiniCard`.
   useProjectsList: () => ({ data: { items: [] } }),
