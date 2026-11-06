@@ -17,6 +17,35 @@ export interface DriveOAuthPocStart {
   authorizationUrl: string;
 }
 
+export interface DriveBrowseFolder {
+  id: string;
+  name: string;
+  url: string;
+  modifiedAt: string | null;
+}
+export interface DriveBrowseDocument {
+  id: string;
+  name: string;
+  path: string;
+  mimeType: string;
+  modifiedAt: string | null;
+}
+export interface DriveBrowseResult {
+  folder: DriveBrowseFolder;
+  parentFolder: DriveBrowseFolder | null;
+  siblingFolders: DriveBrowseFolder[];
+  childFolders: DriveBrowseFolder[];
+  documents: DriveBrowseDocument[];
+  coverage: {
+    scannedItems: number;
+    eligibleDocuments: number;
+    analyzedDocuments: number;
+    scanTruncated: boolean;
+    omitted: Array<{ path: string; reason: string }>;
+  } | null;
+  siblingsUnavailable: boolean;
+}
+
 export const estimationApi = {
   driveOAuthPocStatus(): Promise<{ enabled: boolean; serviceAccountEnabled: boolean }> {
     return api.get<{ enabled: boolean; serviceAccountEnabled: boolean }>('/estimations/drive/oauth-poc/status');
@@ -30,6 +59,11 @@ export const estimationApi = {
   /** PoC sin tokens ni credenciales devueltos al navegador. */
   startDriveOAuthPoc(input: { projectId: string; driveFolderUrl: string }): Promise<DriveOAuthPocStart> {
     return api.post<DriveOAuthPocStart>('/estimations/drive/oauth-poc/start', input);
+  },
+  browseDriveFolder(input: {
+    projectId: string; authorizationFolderUrl: string; folderUrl: string;
+  }): Promise<DriveBrowseResult> {
+    return api.post<DriveBrowseResult>('/estimations/drive/folders/browse', input);
   },
   questionnaireDefinition(): Promise<EstimationQuestionnaireDefinition> {
     return api.get<EstimationQuestionnaireDefinition>('/estimations/questionnaire-definition');

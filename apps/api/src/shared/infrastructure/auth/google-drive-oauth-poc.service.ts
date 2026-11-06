@@ -74,6 +74,24 @@ export class GoogleDriveOAuthPocService {
     return this.delegated.get(`${userId}:${folderId}`)?.token ?? null;
   }
 
+  /**
+   * Extiende una autorización ya concedida SOLO a carpetas que el servidor
+   * verificó dentro del árbol permitido (carpeta original, sus hermanas y descendientes).
+   * Nunca publica el token a los clientes ni lo persiste.
+   */
+  authorizeRelatedFolder(userId: string, originalFolderId: string, selectedFolderId: string): void {
+    this.expireOldAttempts();
+    const grant = this.delegated.get(`${userId}:${originalFolderId}`);
+    if (!this.config.googleDriveOauthPocEnabled || !grant || grant.expiresAt <= Date.now()) {
+      throw new Error('La autorización temporal de Google Drive caducó.');
+    }
+    if (this.delegated.size >= MAX_DELEGATED && !this.delegated.has(`${userId}:${selectedFolderId}`)) {
+      const oldest = this.delegated.keys().next().value;
+      if (oldest) this.delegated.delete(oldest);
+    }
+    this.delegated.set(`${userId}:${selectedFolderId}`, grant);
+  }
+
   async finish(input: {
     state: string; stateCookie: string | null;
     code?: string; error?: string;
@@ -258,5 +276,6 @@ small{color:#475467}</style></head><body><section><h2>${heading}</h2>
 <p id="message"></p><small id="code"></small><p><button onclick="window.close()">Cerrar</button></p>
 </section><script>const result=${safe};document.querySelector('#message').textContent=result.message;
 document.querySelector('#code').textContent=result.code+(result.status==='ok'?' · Archivos en primera página: '+result.filesInSample:'');
-if(window.opener)window.opener.postMessage(result,window.location.origin);</script></body></html>`;
+if(window.opener)window.opener.postMessage(result,window.location.origin);
+if(result.status==='ok')setTimeout(()=>window.close(),250);</script></body></html>`;
 }

@@ -24,6 +24,10 @@ import { AppConfigService } from '../../../config/app-config.service';
 import { GoogleDriveOAuthPocService } from '../../../shared/infrastructure/auth/google-drive-oauth-poc.service';
 import { extractDriveFolderId } from '../application/drive-source-selection';
 import { resolveAuthorizedDriveReader } from '../infrastructure/drive/resolve-authorized-drive-reader';
+import {
+  browseAuthorizedDriveFolder, browseDriveFolderInputSchema,
+  type BrowseDriveFolderInput, type BrowseDriveFolderResult,
+} from '../infrastructure/drive/browse-authorized-drive-folder';
 import { RequireAnyPermission, RequirePermissions } from '../../../shared/presentation/decorators/require-permissions.decorator';
 import { ManageQuotationDraftsUseCase } from '../application/use-cases/manage-quotation-drafts.use-case';
 import { ZodValidationPipe } from '../../../shared/presentation/pipes/zod-validation.pipe';
@@ -111,6 +115,20 @@ export class EstimationController {
         (this.config.googleDrive.enabled ||
         this.driveOAuthPoc.getAuthorizedAccessToken(actor.id, id))),
     };
+  }
+
+  /**
+   * Previsualiza exactamente los documentos que puede leer Gemini.
+   * Ofrece carpetas hermanas y subcarpetas accesibles, sin exponer el token.
+   */
+  @Post('drive/folders/browse')
+  @RequireAnyPermission('projects:manage', 'projects:read_assigned')
+  async browseDriveFolder(
+    @Body(new ZodValidationPipe(browseDriveFolderInputSchema)) input: BrowseDriveFolderInput,
+    @CurrentUser() actor: RequestUser,
+  ): Promise<BrowseDriveFolderResult> {
+    await this.quotationDrafts.authorizeAiPoc(input.projectId, actor);
+    return browseAuthorizedDriveFolder(input, actor.id, this.config, this.driveOAuthPoc);
   }
 
   @Get('questionnaire-definition')
