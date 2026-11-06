@@ -223,6 +223,53 @@ describe('Dashboard colaborador · homologación v6', () => {
     })).not.toBeInTheDocument();
   });
 
+  it('confirma completar una tarea y permite cancelar sin mutaciones', async () => {
+    show();
+    const running = screen.getByText('Modelo de datos').closest('article')!;
+    fireEvent.click(within(running).getByRole('button', { name: 'Marcar completada' }));
+    const dialog = screen.getByRole('dialog', { name: 'Completar tarea' });
+    expect(within(dialog).getByText(/23 HH registradas/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/estimadas: 24 HH/)).toBeInTheDocument();
+    expect(mocks.update).not.toHaveBeenCalled();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cerrar' }));
+    expect(mocks.update).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog', { name: 'Completar tarea' })).not.toBeInTheDocument();
+
+    fireEvent.click(within(running).getByRole('button', { name: 'Marcar completada' }));
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Completar tarea' }))
+      .getByRole('button', { name: 'Completar tarea' }));
+    await waitFor(() => expect(mocks.update).toHaveBeenCalledWith({
+      projectId: 'p-1', moduleId: 'm-1', taskId: 't-1', input: { status: 'in_review' },
+    }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Completar tarea' }))
+      .not.toBeInTheDocument());
+  });
+
+  it('registrar horas y completar solicita la tarea al formulario sin marcarla antes de guardar', () => {
+    const registerForTask = vi.fn();
+    show({ onRegisterHoursAndComplete: registerForTask });
+    const running = screen.getByText('Modelo de datos').closest('article')!;
+    fireEvent.click(within(running).getByRole('button', { name: 'Marcar completada' }));
+    const dialog = screen.getByRole('dialog', { name: 'Completar tarea' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Registrar horas y completar' }));
+    expect(registerForTask).toHaveBeenCalledWith(expect.objectContaining({
+      id: 't-1', projectId: 'p-1', moduleId: 'm-1', title: 'Modelo de datos',
+    }));
+    expect(mocks.update).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog', { name: 'Completar tarea' })).not.toBeInTheDocument();
+  });
+
+  it('no cierra el diálogo ni envía la tarea a revisión si falla la confirmación', async () => {
+    mocks.update.mockRejectedValueOnce(new Error('Sin permiso'));
+    show();
+    const running = screen.getByText('Modelo de datos').closest('article')!;
+    fireEvent.click(within(running).getByRole('button', { name: 'Marcar completada' }));
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Completar tarea' }))
+      .getByRole('button', { name: 'Completar tarea' }));
+    await waitFor(() => expect(mocks.error).toHaveBeenCalled());
+    expect(screen.getByRole('dialog', { name: 'Completar tarea' })).toBeInTheDocument();
+  });
+
   it('respeta transiciones: empezar -> en curso -> por aprobar, nunca aprueba unilateralmente', async () => {
     show();
     const region = screen.getByRole('region', { name: 'Mis tareas' });
@@ -233,6 +280,8 @@ describe('Dashboard colaborador · homologación v6', () => {
     expect(completeButton).toHaveClass(buttonStyles.primary!);
     expect(registerButton).toHaveClass(buttonStyles.primary!);
     fireEvent.click(completeButton);
+    const confirmation = screen.getByRole('dialog', { name: 'Completar tarea' });
+    fireEvent.click(within(confirmation).getByRole('button', { name: 'Completar tarea' }));
     await waitFor(() => expect(mocks.update).toHaveBeenCalledWith({
       projectId: 'p-1', moduleId: 'm-1', taskId: 't-1', input: { status: 'in_review' },
     }));
