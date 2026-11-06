@@ -3,6 +3,17 @@ import { z } from 'zod';
 import { extractDriveFolderId } from '../drive-source-selection';
 import { resolveEstimationQuestionnaireContext, type EstimationInputWithQuestions } from '../resolve-estimation-questionnaire-context';
 import {
+  ESTIMATION_METHODOLOGY_VERSION,
+  ESTIMATION_TEAM_GUIDANCE,
+  ESTIMATION_EDT_GUIDANCE,
+  TECH_LEAD_HOURS_PER_WEEK,
+  isTechLeadRole,
+  isCompatibleTechLeadTeam,
+  estimatedWeeksFromRoles,
+  addMandatoryTechLeadSupervision,
+  validateStageCapacity,
+} from '../estimation-methodology';
+import {
   estimationPocAiDraftSchema,
   quotationReferenceEdtSchema,
   type QuotationReferenceEdt,
@@ -184,6 +195,7 @@ const BASE_INSTRUCTIONS = [
   'Cuando falte información, documenta el supuesto en assumptions en vez de inventar funcionalidades.',
   'Los roles habituales pueden incluir Desarrollo, Tech Lead/Líder, QA, Arquitectura, UX/UI, IA, RPA o PMO, pero no es obligatorio incluirlos todos.',
   'Devuelve una propuesta razonable para dimensionamiento inicial comercial, no un compromiso definitivo.',
+  ESTIMATION_TEAM_GUIDANCE,
 ].join('\n');
 
 @Injectable()
@@ -238,6 +250,8 @@ export class GenerateEstimationPocProposalUseCase {
       },
       instructions: [
         'Genera una EDT comercial DETALLADA basada en los documentos reales adjuntos y respuestas, siguiendo la estructura de un EDT profesional.',
+        'Metodología vigente: ' + ESTIMATION_METHODOLOGY_VERSION + '.',
+        ESTIMATION_EDT_GUIDANCE,
         'Devuelve 3 tablas planas: stages (cada tramo una sola vez), activities (cada WBS una sola vez) y roleHours (cada pareja WBS×perfil una sola vez).',
         'activities NO contiene role, hours ni la definición del tramo: solo stageCode como clave foránea hacia stages.',
         'Si una actividad necesita dos perfiles, escribe una sola fila en activities y DOS filas en roleHours con el mismo WBS y distintos role.',
@@ -321,7 +335,19 @@ export class GenerateEstimationPocProposalUseCase {
   private buildVerifiedEdt(
     output: unknown, proposal: EstimationPocProposal, source: 'kdm_demo' | 'drive',
   ): QuotationReferenceEdt {
-    const raw = detailResponseSchema.parse(output);
+    const parsed = detailResponseSchema.parse(output);
+    const leadRoles = proposal.roles.filter((role) => isTechLeadRole(role.role));
+    // La regla contractual se exige en cotizaciones reales. Los fixtures
+    // PoC de la rama mantienen su estructura heredada para no falsear tests.
+    if (source === 'drive' && leadRoles.length !== 1) {
+      throw new BadRequestException(
+        'La propuesta requiere exactamente un Líder Técnico para supervisión semanal. ' +
+        'Verifica el catálogo de equipos y vuelve a generar la propuesta.',
+      );
+    }
+    const raw = source === 'drive'
+      ? addMandatoryTechLeadSupervision(parsed, leadRoles[0]!.role)
+      : parsed;
     const validRoles = new Set(proposal.roles.map((role) => role.role));
 
     type Stage = {
@@ -428,6 +454,7 @@ export class GenerateEstimationPocProposalUseCase {
       throw new BadRequestException(
         'Todos los tramos declarados deben tener actividades con HH positivas.');
     }
+    validateStageCapacity(raw, proposal.roles);
     const modules = [...modulesByName.values()];
     const totalHours = roundHours(modules.reduce((sum, module) => sum + module.totalHours, 0));
     const reservePercent = raw.reservePercent;
@@ -602,10 +629,59 @@ export class GenerateEstimationPocProposalUseCase {
       }
     }
 
+    // El modelo propone roles; el backend materializa la gobernanza obligatoria.
+    // En datos PoC de demostración preservamos el fixture heredado.
+    const preliminaryRoles = [...draft.roles];
+    const isRealGemini = this.ai.name === 'gemini' &&
+      extractDriveFolderId(input.driveFolderUrl) !== 'kora-poc-fallback';
+    if (isRealGemini) {
+      const horizonWeeks = estimatedWeeksFromRoles(preliminaryRoles);
+      const leadIndices = preliminaryRoles
+        .map((role, index) => isTechLeadRole(role.role) ? index : -1)
+        .filter((index) => index >= 0);
+      if (leadIndices.length > 1) {
+        throw new BadRequestException(
+          'Gemini propuso más de un Líder Técnico. Debe existir un único perfil de supervisión.',
+        );
+      }
+      const governanceSource = 'Política ' + ESTIMATION_METHODOLOGY_VERSION +
+        ': supervisión y control técnico ' + TECH_LEAD_HOURS_PER_WEEK +
+        ' HH por semana; arquitectura hands-on adicional se estima en la EDT.';
+      if (leadIndices.length === 0) {
+        const compatibleTeam = activeKoraTeams?.find((team) =>
+          isCompatibleTechLeadTeam(team.name));
+        if (activeKoraTeams && !compatibleTeam) {
+          throw new BadRequestException(
+            'No existe equipo activo compatible con Líder Técnico. ' +
+            'Asigna explícitamente un equipo de desarrollo/arquitectura ' +
+            'antes de cotizar; no se inventará un teamId.',
+          );
+        }
+        preliminaryRoles.push({
+          role: 'Líder Técnico',
+          unit: 'week',
+          duration: horizonWeeks,
+          hoursPerUnit: TECH_LEAD_HOURS_PER_WEEK,
+          people: 1,
+          source: governanceSource,
+          ...(compatibleTeam ? { teamId: compatibleTeam.teamId } : {}),
+        });
+      } else {
+        const index = leadIndices[0]!;
+        preliminaryRoles[index] = {
+          ...preliminaryRoles[index]!,
+          unit: 'week',
+          duration: horizonWeeks,
+          hoursPerUnit: TECH_LEAD_HOURS_PER_WEEK,
+          people: 1,
+          source: governanceSource,
+        };
+      }
+    }
     // El esquema inicial permite 0 para compatibilidad con la PoC, pero
     // una EDT real exige duración, dedicación y colaboradores positivos.
     // Rechazar aquí evita consumir la segunda llamada Gemini innecesariamente.
-    const preview = draft.roles.map((role) => ({
+    const preview = preliminaryRoles.map((role) => ({
       ...role,
       totalHours: roundHours(role.duration * role.hoursPerUnit * role.people),
     }));
