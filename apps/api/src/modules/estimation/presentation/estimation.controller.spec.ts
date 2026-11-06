@@ -20,8 +20,8 @@ function setup() {
       authorizationUrl: 'https://accounts.google.com/o/oauth2/v2/auth?state=kora-drive-poc-test',
     }),
   };
-  const config: { googleDriveOauthPocEnabled: boolean; google: { enabled: boolean } } = {
-    googleDriveOauthPocEnabled: true, google: { enabled: true },
+  const config: { googleDriveOauthPocEnabled: boolean; google: { enabled: boolean }; googleDrive: { enabled: boolean } } = {
+    googleDriveOauthPocEnabled: true, google: { enabled: true }, googleDrive: { enabled: false },
   };
   const controller = new EstimationController(
     new GetEstimationQuestionnaireDefinitionUseCase(),
@@ -37,9 +37,9 @@ describe('EstimationController · líder PM de proyecto asignado', () => {
 
   it('expone solo estado de habilitación sin datos sensibles', () => {
     const { controller, config } = setup();
-    expect(controller.driveOAuthPocStatus()).toEqual({ enabled: true });
+    expect(controller.driveOAuthPocStatus()).toEqual({ enabled: true, serviceAccountEnabled: false });
     config.googleDriveOauthPocEnabled = false;
-    expect(controller.driveOAuthPocStatus()).toEqual({ enabled: false });
+    expect(controller.driveOAuthPocStatus()).toEqual({ enabled: false, serviceAccountEnabled: false });
   });
 
   it('solo inicia la PoC tras verificar permiso comercial del proyecto y coloca cookie httpOnly', async () => {
@@ -96,7 +96,7 @@ describe('EstimationController · líder PM de proyecto asignado', () => {
       .toContain('projects:read_assigned');
     await controller.analyze(request, actor as never);
     expect(drafts.authorizeAiPoc).toHaveBeenCalledWith(projectId, actor);
-    expect(analyzer.execute).toHaveBeenCalledWith(request);
+    expect(analyzer.execute).toHaveBeenCalledWith(request, undefined);
   });
 
   it('bloquea análisis de proyecto ajeno antes de gastar tokens Gemini', async () => {
