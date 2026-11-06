@@ -197,7 +197,7 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Cambiar' }));
     const picker = screen.getByRole('dialog', { name: 'Elegir carpeta del proyecto' });
     expect(picker).toBeInTheDocument();
-    fireEvent.click(screen.getByText('Otra carpeta de requisitos'));
+    fireEvent.click(screen.getByRole('radio', { name: /Otra carpeta de requisitos/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar carpeta' }));
     await waitFor(() => expect(mocks.browse).toHaveBeenCalledWith(expect.objectContaining({
       authorizationFolderUrl: 'https://drive.google.com/drive/folders/carpeta-qa-real',
@@ -245,9 +245,9 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
       const data = {
         type: 'kora-drive-oauth-poc', status: 'ok', code: 'DRIVE_READ_SUCCESS', message: 'OK',
       };
-      window.dispatchEvent(new MessageEvent('message', {
-        origin: window.location.origin, source: popup as unknown as Window, data,
-      }));
+      const event = new MessageEvent('message', { origin: window.location.origin, data });
+      Object.defineProperty(event, 'source', { value: popup });
+      window.dispatchEvent(event);
       await waitFor(() => expect(mocks.browse).toHaveBeenCalledTimes(1));
       expect(await screen.findByText('Levantamiento QA')).toBeInTheDocument();
     } finally {

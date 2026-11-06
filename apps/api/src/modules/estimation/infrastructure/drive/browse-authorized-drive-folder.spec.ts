@@ -27,7 +27,7 @@ const data = new Map([
   ['carpeta-ajena', folder('carpeta-ajena', 'Privada', ['otro-grupo'])],
   ['otro-grupo', folder('otro-grupo', 'Otro cliente')],
 ]);
-function setup(params: { noParentAccess?: boolean; delegated?: boolean } = {}) {
+function setup(params: { noParentAccess?: boolean; delegated?: boolean; serviceAccount?: boolean } = {}) {
   const oauth = {
     getAuthorizedAccessToken: vi.fn().mockReturnValue(params.delegated === false ? null : 'token-secreto'),
     authorizeRelatedFolder: vi.fn(),
@@ -53,7 +53,7 @@ function setup(params: { noParentAccess?: boolean; delegated?: boolean } = {}) {
     searchFolders: async () => [],
     readAnalysisContent: async () => ({ mimeType: 'text/plain', text: 'Requisitos reales' }),
   };
-  const config = { googleDrive: { enabled: params.delegated === false } } as never;
+  const config = { googleDrive: { enabled: params.serviceAccount ?? params.delegated === false } } as never;
   const browse = (selected: string, original = 'carpeta-inicial') =>
     browseAuthorizedDriveFolder({
       projectId: '0777e456-fd76-445e-83f1-afc25061c101',
@@ -116,9 +116,7 @@ describe('Exploración Drive autorizada y evidencia real para Gemini', () => {
   });
 
   it('sin autorización delegada ni cuenta de servicio no permite navegar', async () => {
-    const { browse } = setup({ delegated: false });
-    // Con cuenta de servicio (config true) sí es posible; este caso valida ausencia total:
-    // El resto del test mantiene explícito que el backend no inventa resultados.
-    expect((await browse('carpeta-inicial')).documents).toHaveLength(1);
+    const { browse } = setup({ delegated: false, serviceAccount: false });
+    await expect(browse('carpeta-inicial')).rejects.toBeInstanceOf(BadRequestException);
   });
 });

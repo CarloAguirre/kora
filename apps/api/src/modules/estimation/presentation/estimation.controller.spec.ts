@@ -97,6 +97,21 @@ describe('EstimationController · líder PM de proyecto asignado', () => {
     }, actor as never, reply as never)).toEqual({ authorized: false });
   });
 
+  it('el explorador de carpetas comprueba el proyecto antes de consultar Google Drive', async () => {
+    const { controller, drafts, driveOAuthPoc } = setup();
+    drafts.authorizeAiPoc.mockRejectedValueOnce(new ForbiddenException('No autorizado'));
+    await expect(controller.browseDriveFolder({
+      projectId,
+      authorizationFolderUrl: 'https://drive.google.com/drive/folders/original123',
+      folderUrl: 'https://drive.google.com/drive/folders/hermana123',
+    }, actor as never)).rejects.toBeInstanceOf(ForbiddenException);
+    expect(driveOAuthPoc.getAuthorizedAccessToken).not.toHaveBeenCalled();
+    expect(Reflect.getMetadata(ANY_PERMISSIONS_KEY,
+      EstimationController.prototype.browseDriveFolder)).toEqual([
+        'projects:manage', 'projects:read_assigned',
+      ]);
+  });
+
   it('el cuestionario fijo admite projects:read_assigned y devuelve F01-F05 sin BD', () => {
     const { controller } = setup();
     const allowed = Reflect.getMetadata(
