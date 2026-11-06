@@ -4,6 +4,7 @@ import type {
   DriveFolderItem,
 } from '../../application/ports/drive-folder-client.port';
 import { GoogleDriveDocumentSourceReader } from './google-drive-document-source.reader';
+import { describeDocumentCoverage } from '../../application/ports/document-source-reader.port';
 
 function file(
   id: string,
@@ -130,4 +131,133 @@ describe('GoogleDriveDocumentSourceReader', () => {
     expect(result[0]?.dataBase64).toBe('cGRm');
     expect(result[1]?.text).toContain('Notas generales');
   });
+
+  const mockDrive = (
+    entries: DriveFolderItem[],
+    content: (fileId: string, mimeType: string) =>
+      Promise<{ mimeType: string; text?: string; dataBase64?: string } | null>,
+  ): DriveFolderClient => ({
+    isConfigured: () => true,
+    listFiles: async () => [],
+    listChildren: async (folderId) => folderId === 'root123' ? entries : [],
+    searchFolders: async () => [],
+    getMetadata: async () => null,
+    readAnalysisContent: content,
+  });
+
+  it('analiza más de cuatro documentos y distribuye la selección por áreas del alcance', async () => {
+    const names = [
+      'Requerimientos generales.txt',
+      'Historia de usuario solicitudes.txt',
+      'Matriz de aprobacion.txt',
+      'Integracion con ERP.txt',
+      'Prototipo Figma.txt',
+      'Arquitectura plataforma.txt',
+      'Roadmap desarrollo.txt',
+      'Minuta reuniones.txt',
+      'Reglas de negocio.txt',
+    ];
+    const drive = mockDrive(names.map((name, i) =>
+      file('source-' + i, name, 'text/plain')),
+    async (id, mimeType) => ({ mimeType, text: 'Contenido de ' + id }));
+    const reader = new GoogleDriveDocumentSourceReader(drive);
+    const result = await reader.readDriveSourcesWithCoverage(
+      'https://drive.google.com/drive/folders/root123',
+    );
+    expect(result.documents).toHaveLength(9);
+    expect(new Set(result.documents.map((doc) => doc.sourceId)).size).toBe(9);
+    expect(result.coverage?.omitted).toHaveLength(0);
+    expect(result.coverage?.analyzedDocuments).toBe(9);
+  });
+
+  it('no deja que 22 documentos de requisitos oculten la matriz, integraciones y prototipo', async () => {
+    const manyRequirements = Array.from({ length: 22 }, (_, i) =>
+      file('req-' + i, 'Requerimientos funcionales ' + i + '.txt', 'text/plain'));
+    const drive = mockDrive([
+      ...manyRequirements,
+      file('rules', 'Matriz de aprobacion.txt', 'text/plain'),
+      file('sap', 'Integracion SAP.txt', 'text/plain'),
+      file('design', 'Prototipo Figma.txt', 'text/plain'),
+    ], async (id, mimeType) => ({ mimeType, text: id + ' - contenido' }));
+    const reader = new GoogleDriveDocumentSourceReader(drive);
+    const result = await reader.readDriveSourcesWithCoverage(
+      'https://drive.google.com/drive/folders/root123',
+    );
+    const ids = result.documents.map((doc) => doc.sourceId);
+    expect(ids).toHaveLength(18);
+    expect(ids).toContain('rules');
+    expect(ids).toContain('sap');
+    expect(ids).toContain('design');
+    expect(result.coverage?.eligibleDocuments).toBe(25);
+    expect(result.coverage?.omitted).toHaveLength(7);
+    expect(describeDocumentCoverage(result.coverage)).toContain('COBERTURA DOCUMENTAL PARCIAL');
+  });
+
+  it('preserva documentos de más de 30.000 caracteres sin recorte silencioso', async () => {
+    const complete = 'A'.repeat(45_000) + 'FIN DE LOS REQUISITOS';
+    const drive = mockDrive([
+      file('large', 'Requerimientos extensos.txt', 'text/plain'),
+    ], async (_, mimeType) => ({ mimeType, text: complete }));
+    const reader = new GoogleDriveDocumentSourceReader(drive);
+    const result = await reader.readDriveSourcesWithCoverage(
+      'https://drive.google.com/drive/folders/root123',
+    );
+    expect(result.documents[0]?.text).toBe(complete);
+    expect(result.coverage?.omitted).toHaveLength(0);
+  });
+
+  it('reporta archivos grandes o descartados por presupuesto; jamás usa fragmentos invisibles', async () => {
+    const drive = mockDrive([
+      file('a', 'Requerimientos A.txt', 'text/plain'),
+      file('b', 'Requerimientos B.txt', 'text/plain'),
+      file('c', 'Requerimientos C.txt', 'text/plain'),
+      file('d', 'Requerimientos D.txt', 'text/plain'),
+    ], async (id, mimeType) => ({
+      mimeType,
+      text: id === 'd' ? 'D'.repeat(170_000) : id.toUpperCase().repeat(140_000),
+    }));
+    const reader = new GoogleDriveDocumentSourceReader(drive);
+    const result = await reader.readDriveSourcesWithCoverage(
+      'https://drive.google.com/drive/folders/root123',
+    );
+    expect(result.documents).toHaveLength(2);
+    expect(result.documents.every((doc) => doc.text?.length === 140_000)).toBe(true);
+    expect(result.coverage?.omitted).toEqual(expect.arrayContaining([
+      expect.objectContaining({ path: 'Requerimientos C.txt', reason: expect.stringContaining('presupuesto') }),
+      expect.objectContaining({ path: 'Requerimientos D.txt', reason: expect.stringContaining('no se recorta') }),
+    ]));
+  });
+
+  it('continúa con otras fuentes si un documento no se puede leer y registra la omisión', async () => {
+    const drive = mockDrive([
+      file('unreadable', 'Requerimientos no legibles.txt', 'text/plain'),
+      file('good', 'Matriz de reglas.txt', 'text/plain'),
+    ], async (id, mimeType) => {
+      if (id === 'unreadable') throw new Error('Permiso denegado');
+      return { mimeType, text: 'Reglas revisables' };
+    });
+    const reader = new GoogleDriveDocumentSourceReader(drive);
+    const result = await reader.readDriveSourcesWithCoverage(
+      'https://drive.google.com/drive/folders/root123',
+    );
+    expect(result.documents.map((doc) => doc.sourceId)).toEqual(['good']);
+    expect(result.coverage?.omitted).toEqual(expect.arrayContaining([
+      expect.objectContaining({ path: 'Requerimientos no legibles.txt' }),
+    ]));
+  });
+
+  it('advierte cuando el recorrido de Drive supera el límite de exploración', async () => {
+    const many = Array.from({ length: 260 }, (_, i) =>
+      file('doc-' + i, 'Minuta ' + i + '.txt', 'text/plain'));
+    const drive = mockDrive(many, async (id, mimeType) =>
+      ({ mimeType, text: id }));
+    const reader = new GoogleDriveDocumentSourceReader(drive);
+    const result = await reader.readDriveSourcesWithCoverage(
+      'https://drive.google.com/drive/folders/root123',
+    );
+    expect(result.coverage?.scannedItems).toBe(250);
+    expect(result.coverage?.scanTruncated).toBe(true);
+    expect(describeDocumentCoverage(result.coverage)).toContain('límite de exploración');
+  });
+
 });

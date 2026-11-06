@@ -36,7 +36,7 @@ export function classifyDriveSource(
   }
 
   if (
-    /(levantamiento|requerimiento|especificacion|arquitectura|as is|to be|flujo|proceso|caso de uso|historia de usuario|kick ?off|matriz funcional|documentacion por modulos|alcance|propuesta tecnica)/.test(
+    /(levantamiento|requerimiento|especificacion|arquitectura|as is|to be|flujo|proceso|caso de uso|historia de usuario|kick ?off|matriz funcional|documentacion por modulos|alcance|propuesta tecnica|matriz|reglas? de negocio|validacion|aprobacion|integracion|prototipo|maqueta|figma|wireframe)/.test(
       value,
     )
   ) {
