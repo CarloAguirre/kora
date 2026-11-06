@@ -14,7 +14,7 @@ La autoasignación de equipos de propuestas IA nuevas no ensucia el borrador ant
 ## Contador de tareas
 Las actividades WBS pueden involucrar varios perfiles. El contador anterior calculaba `new Set(tasks.map(task => task.wbs)).size` y lo etiquetaba como **tareas**, mientras el desplegable dibuja todas las filas WBS×perfil.
 
-Ahora se indican **filas**, y si son distintas de los WBS únicos, también las **actividades**. Las HH son la suma de las mismas filas. Ejemplo: `2 filas · 1 actividad · 15 HH`; no se altera el presupuesto ni el número real de actividades.
+Ahora el contador **tareas** coincide con las filas realmente desplegadas; si difiere de los WBS únicos, se indica además el número de **actividades**. Las HH son la suma de las mismas filas. Ejemplo: `2 tareas · 1 actividad · 15 HH`; no se altera el presupuesto ni el número real de actividades.
 
 ## Comandos PowerShell
 ```powershell

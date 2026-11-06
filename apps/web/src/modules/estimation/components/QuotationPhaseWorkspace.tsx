@@ -270,7 +270,7 @@ export function QuotationPhaseWorkspace({
               {edt && (
                 <details className={styles.tasks}>
                   <summary><strong>Tareas</strong>
-                    <span>{assignmentCount} {assignmentCount === 1 ? 'fila' : 'filas'}
+                    <span>{assignmentCount} {assignmentCount === 1 ? 'tarea' : 'tareas'}
                       {assignmentCount !== uniqueTasks && ' · ' + uniqueTasks +
                         (uniqueTasks === 1 ? ' actividad' : ' actividades')}
                       {assignmentCount > 0 && ' · ' + hh(taskTotal) + ' HH'}</span>
