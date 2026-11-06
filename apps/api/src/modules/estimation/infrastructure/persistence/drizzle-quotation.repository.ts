@@ -39,6 +39,7 @@ import { hasOnlyUntouchedDefaultPaymentMilestones } from '../../domain/default-p
 import { initialQuotationTransferBlockers } from '../../domain/initial-quotation-transfer-blockers';
 import { hasOnlyCommercialPreparationHours } from '../../domain/commercial-preparation-transfer';
 import { buildQuotationTransferReferences, matchingCopiedQuotationReferenceSource } from '../../domain/quotation-transfer-references';
+import { copyQuotationDraft } from '../../domain/copy-quotation-draft';
 import { InvalidCommercialQuotation, assertQuotationReadyForClient, assertAiProposalReadyToAccept, assertDirectClientApprovalAcknowledged } from '../../domain/quotation-commercial-eligibility';
 import type { QuotationProjectScope, QuotationRepository } from '../../domain/repositories/quotation.repository';
 
@@ -439,16 +440,12 @@ export class DrizzleQuotationRepository implements QuotationRepository {
           .where(and(eq(quotationVersions.id, input.sourceVersionId),
             eq(quotationVersions.quotationId, sourceQuotation.id))).limit(1);
         if (!source) throw new NotFoundException('La versión no pertenece a la cotización de origen.');
-        // Una copia MANUAL desde una propuesta IA no hereda fuentes ni respuestas IA.
+        // Copiar una versión IA del MISMO proyecto conserva su EDT WBS,
+        // asignaciones por perfil y ediciones comerciales, sin crear una
+        // nueva generación IA ni perder las tareas al traspasar la v2.
+        // Copias entre proyectos y fuentes demo siguen sin heredar evidencia.
         const previous = quotationDraftDataSchema.parse(source.draft);
-        draft = {
-          ...previous, sourceRefs: [], answers: {}, analysis: null, aiPoc: null,
-          analysisProjectionStatus: undefined,
-          edtHourAdjustments: undefined, edtTaskSettings: undefined,
-          edtRoleCollaborators: undefined, edtStageSettings: undefined,
-          edtCommercialStages: undefined, edtCommercialTasks: undefined,
-          edtTaskNames: undefined,
-        };
+        draft = copyQuotationDraft(previous, sourceProjectId, projectId);
         hourlyRate = source.hourlyRate === null ? null : Number(source.hourlyRate);
         currency = source.currency as typeof currency;
         tax = source.tax as typeof tax;
