@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import type { ProjectDetail } from '@kora/contracts';
 import { estimationQuestionSchema } from '@kora/contracts';
@@ -273,7 +273,7 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
       };
       const event = new MessageEvent('message', { origin: window.location.origin, data });
       Object.defineProperty(event, 'source', { value: popup });
-      window.dispatchEvent(event);
+      await act(async () => { window.dispatchEvent(event); });
       await waitFor(() => expect(mocks.browse).toHaveBeenCalledTimes(1));
       expect(await screen.findByText('Levantamiento QA')).toBeInTheDocument();
     } finally {
@@ -299,7 +299,7 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
   it('si Extras apunta a otro tipo de enlace no suplanta documentos con KDM', () => {
     renderWizard({ ...project, documentationLink: 'https://example.com/docs' } as ProjectDetail);
     expect(screen.queryByLabelText('Carpeta de Google Drive del proyecto')).not.toBeInTheDocument();
-    expect(screen.getByText(/Actualízalo desde la pestaña Extras/)).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('Corrígelo en la pestaña Extras.');
     expect(screen.getByRole('button', { name: 'Analizar proyecto' })).toBeDisabled();
   });
 
@@ -324,7 +324,11 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
     expect(instructions).toHaveAttribute('open');
     expect(mocks.analyze).not.toHaveBeenCalled();
     expect(mocks.generate).not.toHaveBeenCalled();
-    await analyzeToUnderstanding();
+    // Ya estamos en la previsualización: el segundo clic envía la solicitud
+    // a Gemini. No se debe volver a ejecutar prepareDocuments().
+    fireEvent.click(screen.getByRole('button', { name: 'Analizar proyecto' }));
+    expect(await screen.findByText('Entendimiento del proyecto')).toBeInTheDocument();
+    expect(mocks.analyze).toHaveBeenCalledTimes(1);
     expect(mocks.analyze).toHaveBeenCalledWith(expect.objectContaining({
       projectId: project.id,
       driveFolderUrl: 'https://drive.google.com/drive/folders/carpeta-qa-real',
