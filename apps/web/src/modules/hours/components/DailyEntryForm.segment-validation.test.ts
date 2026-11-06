@@ -98,7 +98,7 @@ describe('registro diario desde completar tarea: consistencia de IDs', () => {
 
   it('no permite registrar HH para una tarea cancelada, ni para un bloque cambiado', () => {
     const cancelled = [{
-      ...phases[0], tasks: [{ ...phases[0]!.tasks[0]!, cancelledAt: '2026-11-05T00:00:00.000Z' }],
+      ...phases[0]!, tasks: [{ ...phases[0]!.tasks[0]!, cancelledAt: '2026-11-05T00:00:00.000Z' }],
     }] as ProjectPhaseOption[];
     expect(matchesTaskHourTarget([selection], target, cancelled, 'collaborator-1')).toBe(false);
     expect(matchesTaskHourTarget([{ ...selection, projectId: 'other-project' }],
