@@ -16,7 +16,7 @@ Cuando un proyecto de desarrollo recién iniciado todavía no tiene fases operat
 
 ## Alcance / invariantes
 - Solo vista interna de proyectos de desarrollo. Sin cambios en el Roadmap del portal cliente o los proyectos de soporte.
-- El tab Roadmap se habilita también en proyectos de desarrollo **Prospecto / No iniciado** (`salesStage=prospect`, `status=draft`). El gate anterior por etapa comercial evitaba mostrar el estado vacío y habría vuelto a ocultarlo después de crear la primera fase. Al quitarlo no se cambia el estado del proyecto ni sus horas; los permisos de gestión siguen en `canManageProject` y en el backend.
+- El tab Roadmap se habilita también en proyectos de desarrollo **Prospecto / No iniciado** (`salesStage=prospect`, `status=draft`). El gate anterior por etapa comercial evitaba mostrar el estado vacío y habría vuelto a ocultarlo después de crear la primera fase. Se añade el estado `draft` a los estados habilitados, conservando las otras restricciones; no se cambia el estado del proyecto ni sus horas. Los permisos de gestión siguen en `canManageProject` y en el backend.
 - Conserva permisos de `canManageProject`; los usuarios de consulta no pueden crear fases ni equipos.
 - No inventa equipos, HH, fechas, bloques ni tareas.
 - La creación real de fase sigue requiriendo validación backend; un error conserva el formulario y muestra el toast existente.

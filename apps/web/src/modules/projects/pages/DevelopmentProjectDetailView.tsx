@@ -421,17 +421,27 @@ export function DevelopmentProjectDetailView({
           )}
 
           {tab === "roadmap" && (
-            // El Roadmap es una herramienta de planificación, también en
-            // Prospecto / No iniciado. No modifica por sí solo el estado
-            // comercial ni activa el proyecto. El backend controla permisos
-            // de creación y edición de fases.
-            <ProjectModulesCard
-              project={project}
-              hourEntries={projectHourEntries?.items ?? []}
-              teamOptions={segmentTeamOptions}
-              canManage={canManageProject}
-              onNavigateToTeams={goToAssignedTeams}
-            />
+            project.salesStage === "approved" ||
+            project.status === "active" ||
+            project.status === "finished" ||
+            project.status === "draft" ? (
+              // También se puede preparar el plan en Prospecto / No iniciado.
+              // La creación de fases no modifica el estado comercial del proyecto.
+              <ProjectModulesCard
+                project={project}
+                hourEntries={projectHourEntries?.items ?? []}
+                teamOptions={segmentTeamOptions}
+                canManage={canManageProject}
+                onNavigateToTeams={goToAssignedTeams}
+              />
+            ) : (
+              <Card>
+                <p className={styles.empty}>
+                  El Roadmap está disponible para proyectos no iniciados,
+                  aprobados, activos o finalizados.
+                </p>
+              </Card>
+            )
           )}
 
           {tab === "bitacora" && (
