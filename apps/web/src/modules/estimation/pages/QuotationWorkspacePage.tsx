@@ -119,6 +119,10 @@ export function QuotationWorkspacePage() {
   // Solo vincula si CADA perfil tiene una correspondencia única y no ambigua.
   useEffect(() => {
     if (!editable || dirty || !selected?.draft.aiPoc?.edt || !activeTeams.length) return;
+    // No iniciar ajustes silenciosos antes de que el usuario elija «Ajustar».
+    // Las cotizaciones históricas ya revisadas conservan su compatibilidad.
+    if (selected.origin === 'ai' && selected.aiReviewStatus === 'pending' &&
+        adjustingAiVersionId !== selected.id) return;
     if (dismissedAutomaticMapping.current === selected.id + ':' + selected.revision) return;
     const evidence = selected.draft.aiPoc;
     const mapping = { ...evidence.roleTeamIds };
@@ -137,7 +141,7 @@ export function QuotationWorkspacePage() {
     } catch {
       // Si no concilia el artefacto histórico, preservar sus HH para revisión.
     }
-  }, [editable, dirty, selected?.id, selected?.revision, activeTeams]);
+  }, [editable, dirty, selected?.id, selected?.revision, activeTeams, adjustingAiVersionId]);
 
   const change = (update: (current: Form) => Form) => {
     setForm((current) => current ? update(current) : null);
