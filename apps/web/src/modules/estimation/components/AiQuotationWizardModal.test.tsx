@@ -64,6 +64,10 @@ const analysisResult = {
   dynamicQuestions,
 };
 
+vi.mock('@/modules/projects/api/projects.queries', () => ({
+  useUpdateProjectExtras: () => ({ mutateAsync: vi.fn().mockResolvedValue(undefined) }),
+}));
+
 vi.mock('@/shared/components/ui/Toast', () => ({
   useToast: () => ({ error: mocks.toastError }),
 }));
