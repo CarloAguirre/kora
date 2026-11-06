@@ -226,6 +226,7 @@ export function CollaboratorDashboard({
               < taskToComplete.estimatedHours) &&
           <Button variant="outline" disabled={updateTask.isPending}
             onClick={() => {
+              if (!taskToComplete || !onRegisterHoursAndComplete) return;
               onRegisterHoursAndComplete(taskToComplete);
               setTaskToComplete(null);
             }}>
@@ -233,7 +234,9 @@ export function CollaboratorDashboard({
           </Button>}
         <Button variant="secondary" loading={updateTask.isPending}
           loadingText="Completando…"
-          onClick={() => void onAdvance(taskToComplete, 'in_review')}>
+          onClick={() => {
+            if (taskToComplete) void onAdvance(taskToComplete, 'in_review');
+          }}>
           Completar tarea
         </Button>
       </div>}

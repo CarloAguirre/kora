@@ -256,8 +256,9 @@ export function DailyEntryForm({
   useEffect(() => {
     if (!initialTask || !targetAllowed || !targetTask) return;
     const segmentId = targetTask.segmentId ?? '';
+    const taskId = initialTask.taskId;
     setBlocks((current) => current.map((block) =>
-      block.taskId === initialTask.taskId && block.segmentId !== segmentId
+      block.taskId === taskId && block.segmentId !== segmentId
         ? { ...block, segmentId } : block));
   }, [initialTask, targetAllowed, targetTask]);
   const validTaskPrefill = matchesTaskHourTarget(blocks, initialTask, taskPhases, user?.id);
@@ -382,6 +383,11 @@ export function DailyEntryForm({
       {initialTask && taskPhases && !targetAllowed &&
         <p className={styles.alert} role="alert">
           Esta tarea ya no está disponible para registrar horas. Cancela y vuelve al dashboard.
+        </p>}
+      {initialTask && taskPhases && targetAllowed && !validTaskPrefill &&
+        <p className={styles.noticeWarning} role="status">
+          Para registrar y completar esta tarea, conserva el mismo proyecto, fase,
+          bloque y tarea. Revisa la selección antes de guardar.
         </p>}
 
       {serverError && (
