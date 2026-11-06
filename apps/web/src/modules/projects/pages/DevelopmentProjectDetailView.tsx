@@ -422,6 +422,7 @@ export function DevelopmentProjectDetailView({
 
           {tab === "roadmap" &&
             (project.salesStage === "approved" ||
+            project.status === "active" ||
             project.status === "finished" ? (
               <ProjectModulesCard
                 project={project}
