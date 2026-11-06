@@ -14,7 +14,7 @@
 
 
 /* Cotizaciones v5 — capas locales de fidelidad visual; no alteran tokens globales. */
-.page{width:min(100%,1020px);margin:0 auto;gap:14px;padding-bottom:36px}
+.page{width:100%;min-width:0;margin:0;gap:14px;padding:0 0 36px}
 .breadcrumb{justify-content:space-between;margin:2px 0 0;font-size:12px}
 .breadcrumb a:first-child{font-weight:700;color:var(--kora-navy)}
 .listLink{color:var(--kora-text-muted)}
@@ -66,7 +66,7 @@
 .advanced .tableWrap{margin-top:12px}
 .aiRoleReview,.edtView{min-width:0;scroll-margin-top:110px}
 .pendingNotice{font-size:11px;color:var(--kora-warning-text);line-height:1.5}
-@media(max-width:1100px){.page{max-width:100%;padding-inline:0}.layout{grid-template-columns:minmax(0,1fr) 250px}}
+@media(max-width:1100px){.layout{grid-template-columns:minmax(0,1fr) 250px}}
 @media(max-width:910px){.layout{grid-template-columns:1fr}.sidebar{position:static;max-width:none}.priceGrid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:630px){.identityHeading{flex-wrap:wrap}.identityFields{grid-template-columns:1fr}.priceGrid{grid-template-columns:1fr}.teamColumns,.teamLine{grid-template-columns:minmax(0,1fr) 70px 75px;gap:5px}.teamsHeading [role=radiogroup]{width:100%;max-width:100%}.listLink{display:none}.aiBanner{display:grid}.aiBanner button{justify-self:start}}
 
@@ -76,9 +76,9 @@
 
 /* Fidelidad HTML v5 — maqueta de cotización 900px + resumen 330px.
    Todas las modificaciones son locales a esta ruta. */
-.page{width:min(100%,1268px);margin:0 auto;gap:15px;padding-bottom:52px}
+.page{width:100%;min-width:0;max-width:none;margin:0;gap:15px;padding:0 0 52px}
 .projectTitle{font-size:26px;font-weight:650;color:#10182d;line-height:1.25;margin:3px 0 0}
-.breadcrumb{margin:0 0 2px 16px;justify-content:flex-start;gap:22px;min-height:26px;font-size:12.5px}
+.breadcrumb{margin:0 0 2px;justify-content:flex-start;gap:22px;min-height:26px;font-size:12.5px}
 .breadcrumb a:first-child{color:#10182d;font-weight:700}
 .layout{grid-template-columns:minmax(0,1fr) 330px;gap:20px;align-items:start}
 .main{gap:16px}
@@ -119,7 +119,7 @@
 .addTeams,.advanced{border-color:#e5e8ef}
 .advanced{background:#f9fafc}
 .aiRoleReview,.edtView{scroll-margin-top:92px}
-@media(max-width:1240px){.page{width:100%}.layout{grid-template-columns:minmax(0,1fr) 300px;gap:16px}}
+@media(max-width:1240px){.layout{grid-template-columns:minmax(0,1fr) 300px;gap:16px}}
 @media(max-width:980px){.layout{grid-template-columns:1fr}.sidebar{position:static;max-width:100%}.priceGrid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:650px){.projectTitle{font-size:22px}.identityFields{grid-template-columns:1fr}.priceGrid{grid-template-columns:1fr}.teamColumns,.teamLine{grid-template-columns:minmax(0,1fr) 65px 65px;gap:6px}.main>div:has(> .identityHeading),.main>div:has(> .cardTitle),.main>div:has(> .teamsHeading){padding:16px}.sidebar>div:first-child{padding:18px}.aiBanner{display:grid}.aiBanner .aiAccept{justify-self:start}}
 
