@@ -767,7 +767,6 @@ export function AiQuotationWizardModal({ project, onClose }: {
           {saveWarning && <p role="status" className={styles.coverageNote}>{saveWarning}</p>}
           {questionnaire.isLoading && <p>Cargando condiciones de estimación…</p>}
           {questionnaire.isError && <p role="alert">No fue posible cargar las preguntas fijas.</p>}
-          {error && <p role="alert" className={styles.error}>{error}</p>}
         </section>
       )}
 
@@ -777,9 +776,6 @@ export function AiQuotationWizardModal({ project, onClose }: {
           <p className={styles.intro}>
             Confirma que el agente entendió bien el proyecto. Si algo no calza, corrígelo en bloque.
           </p>
-          {analysisCompleted && <p role="status" className={styles.analysisComplete}>
-            ✓ Gemini completó el análisis; el resultado fue validado y sus preguntas están disponibles.
-          </p>}
           {editingUnderstanding ? (
             <>
               <label className={styles.textLabel} htmlFor="kora-understanding">
