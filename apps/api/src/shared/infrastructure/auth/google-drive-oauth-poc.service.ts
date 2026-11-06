@@ -119,7 +119,7 @@ export class GoogleDriveOAuthPocService {
         { headers: { Authorization: `Bearer ${tokens.access_token}` },
           signal: AbortSignal.timeout(15_000) },
       );
-      if (!metadata.ok) return driveFailure(metadata.status);
+      if (!metadata.ok) return driveFailure(metadata, 'metadatos');
       const folder = await metadata.json() as { mimeType?: string };
       if (folder.mimeType !== FOLDER_MIME) {
         return fail('NOT_A_FOLDER', 'El enlace no corresponde a una carpeta de Drive.');
@@ -135,7 +135,7 @@ export class GoogleDriveOAuthPocService {
         headers: { Authorization: `Bearer ${tokens.access_token}` },
         signal: AbortSignal.timeout(15_000),
       });
-      if (!filesResponse.ok) return driveFailure(filesResponse.status);
+      if (!filesResponse.ok) return driveFailure(filesResponse, 'listado');
       const files = await filesResponse.json() as { files?: unknown[] };
       // Se conserva SOLO en memoria un token corto para leer los antecedentes de esta
       // carpeta durante el asistente. No se expone al navegador ni se obtiene refresh token.
@@ -178,12 +178,66 @@ function fail(code: string, message: string): DriveOAuthPocResult {
   return { status: 'error', code, message };
 }
 
-function driveFailure(status: number): DriveOAuthPocResult {
-  if (status === 403) return fail('DRIVE_API_DISABLED_OR_FORBIDDEN',
-    'Drive devolvió HTTP 403. Puede faltar habilitar Drive API o acceso al recurso.');
+/**
+ * Google devuelve HTTP 403 para situaciones muy diferentes. Clasificamos SOLO
+ * razones técnicas conocidas y el paso de la consulta. No devolvemos el cuerpo
+ * sin filtrar de Google: podría incluir nombres, emails o IDs privados.
+ */
+async function driveFailure(
+  response: Response,
+  step: 'metadatos' | 'listado',
+): Promise<DriveOAuthPocResult> {
+  const status = response.status;
+  const raw: unknown = await response.json().catch(() => null);
+  const err = raw && typeof raw === 'object' && !Array.isArray(raw)
+    ? (raw as { error?: unknown }).error
+    : null;
+  const detail = err && typeof err === 'object' && !Array.isArray(err)
+    ? err as {
+      status?: unknown;
+      message?: unknown;
+      errors?: Array<{ reason?: unknown }>;
+      details?: Array<{ reason?: unknown }>;
+    }
+    : null;
+  const reasons = [
+    ...(Array.isArray(detail?.errors) ? detail.errors.map((item) => item?.reason) : []),
+    ...(Array.isArray(detail?.details) ? detail.details.map((item) => item?.reason) : []),
+  ].filter((reason): reason is string => typeof reason === 'string')
+    .map((reason) => reason.replace(/[^a-z0-9]/gi, '').toLowerCase());
+  const reason = new Set(reasons);
+  const message = typeof detail?.message === 'string' ? detail.message : '';
+
+  if (status === 403) {
+    if (
+      ['servicedisabled', 'apidisabled', 'accessnotconfigured'].some((value) => reason.has(value)) ||
+      /(?:drive api|google drive api|api has not been used in project).*(?:disabled|not enabled|not been used)|api has not been used in project/i.test(message)
+    ) {
+      return fail('DRIVE_API_NOT_ENABLED',
+        'Google Drive API no está habilitada en el proyecto Google Cloud de estas credenciales. ' +
+        'El administrador debe habilitar Google Drive API (drive.googleapis.com) y repetir la prueba.');
+    }
+
+    if (['ratelimitexceeded', 'userratelimitexceeded', 'dailylimitexceeded'].some((value) => reason.has(value))) {
+      return fail('DRIVE_QUOTA_EXCEEDED',
+        'Google Drive rechazó la solicitud por límites de cuota o frecuencia. Comprueba las cuotas de Drive API.');
+    }
+
+    if (['insufficientpermissions', 'domainpolicy', 'appnotauthorizedtofile', 'accessdenied',
+      'forbidden', 'insufficientfilepermissions', 'permissiondenied'].some((value) => reason.has(value))) {
+      return fail('DRIVE_PERMISSION_DENIED',
+        `Google Drive rechazó los permisos al consultar ${step}. Revisa el acceso de la cuenta Google a la carpeta y las políticas de Workspace.`);
+    }
+
+    return fail('DRIVE_API_DISABLED_OR_FORBIDDEN',
+      `Google Drive devolvió HTTP 403 al consultar ${step}. Revisa en Google Cloud que Drive API esté habilitada y que la cuenta tenga permisos.`);
+  }
+
   if (status === 404) return fail('FOLDER_NOT_ACCESSIBLE',
     'Carpeta inexistente o sin permisos para la cuenta Google que autorizó.');
-  return fail('DRIVE_HTTP_ERROR', `Google Drive rechazó la consulta (HTTP ${status}).`);
+  if (status === 401) return fail('DRIVE_TOKEN_REJECTED',
+    'Google Drive rechazó el token de acceso. Vuelve a conceder el consentimiento.');
+  return fail('DRIVE_HTTP_ERROR', `Google Drive rechazó ${step} (HTTP ${status}).`);
 }
 
 /** Página segura de resultado para el popup: solo diagnóstico, jamás tokens. */

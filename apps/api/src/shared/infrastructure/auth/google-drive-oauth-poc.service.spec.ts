@@ -104,6 +104,70 @@ describe('GoogleDriveOAuthPocService — diagnóstico temporal seguro', () => {
     expect(service.getAuthorizedAccessToken('actor-1', 'realFolder123')).toBeNull();
   });
 
+  it('identifica la API deshabilitada usando el reason estructurado de Google', async () => {
+    const service = setup();
+    const { state } = service.start('actor-1', 'realFolder123');
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        access_token: 'private-token', scope: 'https://www.googleapis.com/auth/drive.readonly',
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        error: {
+          code: 403,
+          message: 'Google Drive API has not been used in project 123456789 before or it is disabled.',
+          details: [{
+            '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+            reason: 'SERVICE_DISABLED',
+            metadata: { service: 'drive.googleapis.com', consumer: 'projects/123456789' },
+          }],
+        },
+      }), { status: 403 })),
+    );
+    const result = await service.finish({ state, stateCookie: state, code: 'code' });
+    expect(result.code).toBe('DRIVE_API_NOT_ENABLED');
+    expect(result.message).toContain('drive.googleapis.com');
+    expect(JSON.stringify(result)).not.toContain('private-token');
+    expect(JSON.stringify(result)).not.toContain('123456789');
+    expect(service.getAuthorizedAccessToken('actor-1', 'realFolder123')).toBeNull();
+  });
+
+  it('distingue acceso prohibido al listar archivos de una API deshabilitada', async () => {
+    const service = setup();
+    const { state } = service.start('actor-1', 'realFolder123');
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        access_token: 'private-token', scope: 'https://www.googleapis.com/auth/drive.readonly',
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        id: 'realFolder123', mimeType: 'application/vnd.google-apps.folder',
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        error: { code: 403, errors: [{
+          reason: 'domainPolicy', message: 'user sensitive information',
+        }] },
+      }), { status: 403 })),
+    );
+    const result = await service.finish({ state, stateCookie: state, code: 'code' });
+    expect(result.code).toBe('DRIVE_PERMISSION_DENIED');
+    expect(result.message).toContain('listado');
+    expect(JSON.stringify(result)).not.toContain('user sensitive information');
+  });
+
+  it('identifica la cuota de Drive cuando Google responde 403 rateLimitExceeded', async () => {
+    const service = setup();
+    const { state } = service.start('actor-1', 'realFolder123');
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        access_token: 'private-token', scope: 'https://www.googleapis.com/auth/drive.readonly',
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        error: { errors: [{ reason: 'rateLimitExceeded' }] },
+      }), { status: 403 })),
+    );
+    const result = await service.finish({ state, stateCookie: state, code: 'code' });
+    expect(result.code).toBe('DRIVE_QUOTA_EXCEEDED');
+  });
+
   it('no informa éxito si Google solo concede scopes de identidad', async () => {
     const service = setup();
     const { state } = service.start('actor-1', 'realFolder123');
