@@ -5,6 +5,7 @@ import type {
   EstimationQuestion,
   ProjectDetail,
   SubmitEstimationAnswerInput,
+  EstimationPocAnalysis,
 } from '@kora/contracts';
 import { projectQuotationPath } from '@/app/router/paths';
 import { useUpdateProjectExtras } from '@/modules/projects/api/projects.queries';
@@ -17,7 +18,8 @@ import {
   useEstimationQuestionnaireDefinition,
   useEstimationDriveOAuthPocStatus,
 } from '../api/estimation.queries';
-import { estimationApi } from '../api/estimation.api';
+import { estimationApi, type DriveBrowseResult, type DriveBrowseFolder } from '../api/estimation.api';
+import { FileTextIcon, FolderOpenIcon, CheckIcon } from '@/shared/components/icons/Icons';
 import { useGenerateAiDemoQuotationVersion } from '../api/quotation.queries';
 import styles from './AiQuotationWizardModal.module.css';
 
@@ -234,30 +236,102 @@ export function AiQuotationWizardModal({ project, onClose }: {
   const [analysisCompleted, setAnalysisCompleted] = useState(false);
   const extrasFolderUrl = project.documentationLink?.trim() ?? '';
   const [manualFolderUrl, setManualFolderUrl] = useState('');
-  const driveFolderUrl = extrasFolderUrl || manualFolderUrl.trim();
+  // Una selección distinta en el explorador no modifica el vínculo de Extras.
+  const [selectedFolderUrl, setSelectedFolderUrl] = useState(extrasFolderUrl);
+  const driveFolderUrl = selectedFolderUrl || manualFolderUrl.trim();
   const driveUrlValid = isRealDriveFolderUrl(driveFolderUrl);
-  const [authorizedUrl, setAuthorizedUrl] = useState('');
-  const [oauthBusy, setOauthBusy] = useState(false);
+  const [authorizationRootUrl, setAuthorizationRootUrl] = useState('');
+  const [sourceStep, setSourceStep] = useState<'source' | 'connecting' | 'loading' | 'documents' | 'analyzing'>('source');
+  const [preview, setPreview] = useState<DriveBrowseResult | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerChoice, setPickerChoice] = useState('');
+  const [pickerManualUrl, setPickerManualUrl] = useState('');
+  const [pickerBusy, setPickerBusy] = useState(false);
+  const [pickerError, setPickerError] = useState('');
   const [oauthResult, setOauthResult] = useState('');
   const oauthPopup = useRef<Window | null>(null);
   const requestedUrl = useRef('');
+  const previewInFlight = useRef(false);
+  const accessCheckInFlight = useRef(false);
+  const [saveWarning, setSaveWarning] = useState('');
+  const [analysisSnapshot, setAnalysisSnapshot] = useState<EstimationPocAnalysis | null>(null);
   const driveStatus = useEstimationDriveOAuthPocStatus();
   const serviceAccountEnabled = driveStatus.data?.serviceAccountEnabled === true;
-  const driveAuthorized = driveUrlValid &&
-    (serviceAccountEnabled || authorizedUrl === driveFolderUrl);
   const updateProjectExtras = useUpdateProjectExtras();
-  const [saveWarning, setSaveWarning] = useState('');
   const questionnaire = useEstimationQuestionnaireDefinition();
   const analysis = useAnalyzeEstimationPoc();
   const generate = useGenerateAiDemoQuotationVersion(project.id);
 
-  const verifiedAnalysis = analysis.data?.provider === 'gemini' &&
-    analysis.data.sourceMode === 'drive' && analysis.data.documentsAnalyzed > 0
-    ? analysis.data : null;
+  const verifiedAnalysis = analysisSnapshot?.provider === 'gemini' &&
+    analysisSnapshot.sourceMode === 'drive' && analysisSnapshot.documentsAnalyzed > 0
+    ? analysisSnapshot : null;
   const fixed = questionnaire.data?.fixedQuestions ?? [];
   const dynamic = verifiedAnalysis?.dynamicQuestions ?? [];
-  const working = analysis.isPending || generate.isPending || oauthBusy;
+  const working = sourceStep === 'connecting' || sourceStep === 'loading' ||
+    sourceStep === 'analyzing' || generate.isPending;
   const relevant = stage === 2 ? fixed : dynamic;
+
+  const loadDocuments = async (folderUrl: string, rootUrl: string) => {
+    if (previewInFlight.current) return;
+    previewInFlight.current = true;
+    setSourceStep('loading');
+    setError('');
+    try {
+      const result = await estimationApi.browseDriveFolder({
+        projectId: project.id,
+        authorizationFolderUrl: rootUrl,
+        folderUrl,
+      });
+      setPreview(result);
+      setSelectedFolderUrl(result.folder.url);
+      setAuthorizationRootUrl(rootUrl);
+      setAnalysisSnapshot(null);
+      setAnalysisCompleted(false);
+      setSourceStep('documents');
+      setPickerOpen(false);
+      setPickerError('');
+      setOauthResult('');
+      oauthPopup.current?.close();
+    } catch (cause) {
+      setSourceStep('source');
+      reportError(cause instanceof Error ? cause.message :
+        'No se pudieron obtener los documentos. Comprueba los permisos de Drive.');
+    } finally {
+      previewInFlight.current = false;
+    }
+  };
+
+  // Google usa COOP: en algunos navegadores el callback no puede comunicarse
+  // mediante window.opener. Comprobamos el estado del servidor sin exigir clics.
+  useEffect(() => {
+    if (sourceStep !== 'connecting') return;
+    let cancelled = false;
+    let attempts = 0;
+    const check = async () => {
+      if (accessCheckInFlight.current || previewInFlight.current || cancelled) return;
+      accessCheckInFlight.current = true;
+      try {
+        const state = await estimationApi.driveOAuthPocAccess({
+          projectId: project.id, driveFolderUrl: requestedUrl.current,
+        });
+        if (!cancelled && state.authorized) {
+          void loadDocuments(requestedUrl.current, requestedUrl.current);
+        }
+      } catch {
+        // El callback OAuth todavía puede estar terminando: reintentar.
+      } finally {
+        accessCheckInFlight.current = false;
+      }
+      attempts++;
+      if (attempts >= 180 && !cancelled && !previewInFlight.current) {
+        setSourceStep('source');
+        setError('No se confirmó la autorización de Google. Intenta conectar nuevamente.');
+      }
+    };
+    const timer = window.setInterval(() => void check(), 1500);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [sourceStep, project.id]);
+
   useEffect(() => {
     const onResult = (event: MessageEvent) => {
       if (event.origin !== window.location.origin || event.source !== oauthPopup.current) return;
@@ -265,67 +339,99 @@ export function AiQuotationWizardModal({ project, onClose }: {
       if (!raw || typeof raw !== 'object') return;
       const payload = raw as Record<string, unknown>;
       if (payload.type !== 'kora-drive-oauth-poc' ||
-          (payload.status !== 'ok' && payload.status !== 'error') ||
-          typeof payload.message !== 'string') return;
-      setOauthBusy(false);
+          (payload.status !== 'ok' && payload.status !== 'error')) return;
       if (payload.status === 'ok') {
-        setAuthorizedUrl(requestedUrl.current);
-        setOauthResult('Drive autorizado: ' + payload.message +
-          ' Archivos de la primera página: ' + String(payload.filesInSample ?? 0) + '.');
+        void loadDocuments(requestedUrl.current, requestedUrl.current);
       } else {
-        setAuthorizedUrl('');
-        setOauthResult('No se autorizó Drive: ' + payload.message + ' (' + String(payload.code ?? 'sin código') + ').');
+        setSourceStep('source');
+        setOauthResult(typeof payload.message === 'string' ? payload.message :
+          'Google no autorizó la lectura de Drive.');
+        oauthPopup.current?.close();
       }
     };
     window.addEventListener('message', onResult);
     return () => window.removeEventListener('message', onResult);
-  }, []);
+  });
 
-  const confirmDriveAccess = async () => {
-    if (!driveUrlValid) return;
-    try {
-      const status = await estimationApi.driveOAuthPocAccess({
-        projectId: project.id, driveFolderUrl,
-      });
-      if (!status.authorized) {
-        setOauthResult('Google aún no confirmó acceso a esta carpeta. Revisa el resultado en la ventana emergente.');
-        return;
-      }
-      setAuthorizedUrl(driveFolderUrl);
-      setOauthBusy(false);
-      setOauthResult('Google Drive autorizó el acceso temporal a esta carpeta.');
-    } catch (cause) {
-      setOauthResult(cause instanceof Error ? cause.message : 'No se pudo confirmar la autorización.');
+  const connectAndPreview = async (url: string) => {
+    if (!isRealDriveFolderUrl(url)) {
+      reportError('Ingresa una URL válida de carpeta de Google Drive.');
+      return;
     }
-  };
-
-  const authorizeDrive = async () => {
-    if (!driveUrlValid || oauthBusy) return;
-    setOauthResult('');
-    setAuthorizedUrl('');
-    const popup = window.open('about:blank', 'kora-drive-oauth-poc',
+    if (serviceAccountEnabled) {
+      await loadDocuments(url, url);
+      return;
+    }
+    if (driveStatus.data?.enabled !== true) {
+      reportError('La conexión de Google Drive no está habilitada en este entorno.');
+      return;
+    }
+    // Debe abrirse antes del primer await para que el navegador no lo bloquee.
+    const popup = window.open('about:blank', 'kora-drive-auth',
       'width=580,height=730,scrollbars=yes');
     if (!popup) {
-      setOauthResult('El navegador bloqueó la ventana de autorización de Google.');
+      reportError('Permite ventanas emergentes para autorizar Google Drive.');
       return;
     }
     oauthPopup.current = popup;
-    requestedUrl.current = driveFolderUrl;
-    setOauthBusy(true);
+    requestedUrl.current = url;
+    setSourceStep('connecting');
+    setError('');
+    setOauthResult('');
     try {
+      // Reutilizar acceso válido evita presentar Google de nuevo.
+      const state = await estimationApi.driveOAuthPocAccess({
+        projectId: project.id, driveFolderUrl: url,
+      });
+      if (state.authorized) {
+        popup.close();
+        await loadDocuments(url, url);
+        return;
+      }
       const { authorizationUrl } = await estimationApi.startDriveOAuthPoc({
-        projectId: project.id, driveFolderUrl,
+        projectId: project.id, driveFolderUrl: url,
       });
       if (new URL(authorizationUrl).origin !== 'https://accounts.google.com') {
-        throw new Error('Proveedor OAuth inesperado.');
+        throw new Error('La dirección de autorización Google no es válida.');
       }
       popup.location.replace(authorizationUrl);
     } catch (cause) {
       popup.close();
-      setOauthBusy(false);
-      setOauthResult(cause instanceof Error ? cause.message : 'No fue posible solicitar acceso a Drive.');
+      setSourceStep('source');
+      reportError(cause instanceof Error ? cause.message :
+        'No se pudo iniciar la autorización de Google Drive.');
     }
   };
+
+  const selectFolder = async () => {
+    const url = pickerChoice || pickerManualUrl.trim();
+    if (!isRealDriveFolderUrl(url)) {
+      setPickerError('Selecciona una carpeta o pega una URL válida de Google Drive.');
+      return;
+    }
+    setPickerBusy(true);
+    setPickerError('');
+    // Elegir una carpeta que aparece en el explorador aprovecha la autorización
+    // original. Un enlace ajeno inicia una autorización propia (no intenta
+    // explorar carpetas fuera de la jerarquía validada).
+    const candidates = [...(preview?.siblingFolders ?? []), ...(preview?.childFolders ?? [])];
+    const related = url === preview?.folder.url ||
+      candidates.some((folder) => folder.url === url);
+    try {
+      setPickerOpen(false);
+      if (related && authorizationRootUrl) {
+        await loadDocuments(url, authorizationRootUrl);
+      } else {
+        setSelectedFolderUrl(url);
+        setPreview(null);
+        setAuthorizationRootUrl('');
+        await connectAndPreview(url);
+      }
+    } finally {
+      setPickerBusy(false);
+    }
+  };
+
   const answered = (question: EstimationQuestion) => {
     if (assumptions.includes(question.id)) return true;
     const value = answers[question.id];
@@ -365,14 +471,8 @@ export function AiQuotationWizardModal({ project, onClose }: {
       }));
 
   const analyze = async () => {
-    if (!driveUrlValid) {
-      reportError(extrasFolderUrl
-        ? 'El enlace de documentación en Extras no es una carpeta Drive. Corrígelo en Extras.'
-        : 'Ingresa la URL válida de una carpeta de Google Drive.');
-      return;
-    }
-    if (!driveAuthorized) {
-      reportError('Autoriza primero la carpeta con Google para leer la documentación real.');
+    if (!preview || preview.documents.length === 0 || sourceStep !== 'documents') {
+      reportError('Selecciona una carpeta con documentos legibles antes de analizar.');
       return;
     }
     if (!extrasFolderUrl) {
@@ -388,6 +488,7 @@ export function AiQuotationWizardModal({ project, onClose }: {
       }
     }
     setAnalysisCompleted(false);
+    setSourceStep('analyzing');
     setError('');
     setInvalidId(null);
     try {
@@ -403,6 +504,7 @@ export function AiQuotationWizardModal({ project, onClose }: {
         reportError('Gemini no consiguió analizar documentos reales de la carpeta indicada.');
         return;
       }
+      setAnalysisSnapshot(result);
       setUnderstanding(result.summary);
       setEditingUnderstanding(false);
       const prefilled: AnswerState = {};
@@ -426,6 +528,8 @@ export function AiQuotationWizardModal({ project, onClose }: {
       setStage(1);
     } catch (reason) {
       reportError(reason instanceof Error ? reason.message : 'No se pudo analizar la documentación de Drive.');
+    } finally {
+      setSourceStep('documents');
     }
   };
 
@@ -437,7 +541,11 @@ export function AiQuotationWizardModal({ project, onClose }: {
         reportError('No fue posible cargar las preguntas fijas. Comprueba tu acceso al cuestionario y vuelve a intentarlo.');
         return;
       }
-      await analyze();
+      if (sourceStep === 'source') {
+        await connectAndPreview(driveFolderUrl);
+      } else if (sourceStep === 'documents') {
+        await analyze();
+      }
       return;
     }
     if (stage === 1) {
@@ -486,23 +594,31 @@ export function AiQuotationWizardModal({ project, onClose }: {
   };
 
   return (
+    <>
     <Modal open wide className={styles.dialog}
       title="✦ Nueva cotización con el agente IA"
       onClose={onClose}
       dismissible={!working}
       footer={<>
         <Button variant="outline" className={styles.secondaryAction}
-          disabled={working}
-          onClick={stage === 0 ? onClose :
+          disabled={working && sourceStep !== 'connecting'}
+          onClick={stage === 0 ? sourceStep === 'connecting' ? () => {
+            oauthPopup.current?.close();
+            setSourceStep('source');
+          } : onClose :
             stage === 1 ? () => setEditingUnderstanding((current) => !current) : back}>
           {stage === 0 ? 'Cancelar' :
             stage === 1 ? editingUnderstanding ? 'Guardar resumen' : 'Editar' : 'Atrás'}
         </Button>
         <Button className={styles.primaryAction} loading={working} disabled={
-          (stage === 0 && (questionnaire.isLoading || driveStatus.isLoading || !driveAuthorized || oauthBusy)) ||
+          (stage === 0 && (questionnaire.isLoading || driveStatus.isLoading || !driveUrlValid ||
+            (sourceStep === 'documents' && !preview?.documents.length) ||
+            (sourceStep !== 'source' && sourceStep !== 'documents'))) ||
           (stage > 0 && !verifiedAnalysis)
         } onClick={() => void next()}>
-          {stage === 0 ? 'Analizar proyecto' : stage === 1 ? 'Está correcto' :
+          {stage === 0 ? sourceStep === 'connecting' ? 'Conectando Google…' :
+            sourceStep === 'loading' ? 'Leyendo documentos…' :
+            sourceStep === 'analyzing' ? 'Analizando…' : 'Analizar proyecto' : stage === 1 ? 'Está correcto' :
             stage === 4 ? 'Generar estimación' : 'Continuar'}
         </Button>
       </>}>
@@ -518,86 +634,140 @@ export function AiQuotationWizardModal({ project, onClose }: {
       {stage === 0 && (
         <section className={styles.stage}>
           <h3 className={styles.srOnly}>Documentos para el análisis</h3>
-          <p className={styles.intro}>El agente analizará los antecedentes reales del proyecto en Google Drive.</p>
-          {extrasFolderUrl ? (
-            <div className={styles.driveSource}>
-              <strong>Carpeta de documentación configurada en Extras</strong>
-              {driveUrlValid ? (
-                <a href={extrasFolderUrl} target="_blank" rel="noreferrer">
-                  Abrir documentación en Google Drive
-                </a>
-              ) : (
-                <p role="alert">El enlace guardado en Extras no es una carpeta de Drive.
-                  Actualízalo desde la pestaña Extras del proyecto.</p>
-              )}
-            </div>
-          ) : (
-            <div className={styles.driveSource}>
-              <TextField label="Carpeta de Google Drive del proyecto" type="url"
-                value={manualFolderUrl}
-                onChange={(event) => {
-                  setManualFolderUrl(event.target.value);
-                  setOauthResult('');
-                  setError('');
-                }}
-                placeholder="https://drive.google.com/drive/folders/..."
-                helperText="No existe documentación en Extras. Indica la carpeta del proyecto para analizar." />
-            </div>
-          )}
-          {driveUrlValid && !serviceAccountEnabled && driveStatus.data?.enabled && (
-            <div className={styles.driveAuth}>
-              <p>Autoriza temporalmente la carpeta con tu cuenta Google. El token
-                se mantiene solo en memoria del backend, nunca en la base de datos.</p>
-              <div className={styles.driveAuthActions}>
-                <Button variant="outline" size="sm" loading={oauthBusy}
-                  disabled={oauthBusy || analysis.isPending}
-                  onClick={() => void authorizeDrive()}>
-                  {driveAuthorized ? 'Renovar autorización Google' : 'Probar acceso con Google'}
-                </Button>
-                {oauthBusy && <Button variant="outline" size="sm"
-                  onClick={() => void confirmDriveAccess()}>
-                  Comprobar autorización
-                </Button>}
-                {oauthBusy && <Button variant="ghost" size="sm" onClick={() => {
-                  oauthPopup.current?.close();
-                  setOauthBusy(false);
-                  setOauthResult('Prueba cancelada. Puedes volver a autorizar.');
-                }}>Cancelar prueba</Button>}
-              </div>
-            </div>
-          )}
-          {oauthResult && <p role="status" className={styles.driveResult}>{oauthResult}</p>}
-          {saveWarning && <p role="status" className={styles.driveResult}>{saveWarning}</p>}
-          {driveStatus.isLoading && <p>Verificando disponibilidad de Google Drive…</p>}
-          {!driveStatus.isLoading && driveUrlValid && !driveAuthorized &&
-            !driveStatus.data?.enabled && !serviceAccountEnabled && (
-              <p role="alert" className={styles.error}>
-                La API no tiene Drive configurado. Activa GOOGLE_DRIVE_OAUTH_POC_ENABLED en el backend.
+          {sourceStep === 'source' && (
+            <>
+              <p className={styles.intro}>
+                El agente analizará los antecedentes reales del proyecto en Google Drive.
               </p>
-            )}
-          {driveAuthorized && <p role="status" className={styles.analysisComplete}>
-            ✓ Carpeta de Drive autorizada para analizar los documentos.
-          </p>}
-          <details className={styles.more}>
-            <summary>Indicaciones adicionales · opcional</summary>
-            <label className={styles.textLabel} htmlFor="kora-quotation-instructions">
-              Instrucciones para Gemini
-            </label>
-            <textarea id="kora-quotation-instructions" className={styles.textarea}
-              value={instructions} maxLength={3000}
-              onChange={(event) => setInstructions(event.target.value)}
-              placeholder="Ej. Considerar integración SAP, excluir soporte de postproducción..." />
-          </details>
-          {analysis.isPending && (
-            <ol role="status" aria-label="Progreso verificable del análisis IA" className={styles.analysisMilestones}>
-              <li className={styles.milestoneDone}>✓ Carpeta documental de Google Drive seleccionada</li>
-              <li className={styles.milestoneDone}>✓ Identificación y datos del proyecto preparados</li>
-              <li className={styles.milestoneActive}>◌ Gemini está analizando los documentos y detectando incertidumbres…</li>
-              <li className={styles.milestonePending}>○ Validar resultados y presentar preguntas</li>
+              {extrasFolderUrl ? (
+                <div className={styles.driveSource}>
+                  <strong>Carpeta de documentación registrada en Extras</strong>
+                  {driveUrlValid ? (
+                    <a href={driveFolderUrl} target="_blank" rel="noreferrer">
+                      Abrir carpeta en Google Drive
+                    </a>
+                  ) : (
+                    <p role="alert">El enlace de Extras no es una carpeta de Google Drive.
+                      Corrígelo en la pestaña Extras.</p>
+                  )}
+                </div>
+              ) : (
+                <div className={styles.driveSource}>
+                  <TextField label="Carpeta de Google Drive del proyecto" type="url"
+                    value={manualFolderUrl}
+                    onChange={(event) => {
+                      setManualFolderUrl(event.target.value);
+                      setSelectedFolderUrl('');
+                      setError('');
+                    }}
+                    placeholder="https://drive.google.com/drive/folders/..."
+                    helperText="No existe documentación en Extras. Introduce la carpeta del proyecto." />
+                </div>
+              )}
+              {oauthResult && <p role="alert" className={styles.error}>{oauthResult}</p>}
+            </>
+          )}
+          {sourceStep === 'connecting' && (
+            <div className={styles.connecting} role="status">
+              <span className={styles.bigSpinner} aria-hidden="true" />
+              <strong>Conectando con Google Drive</strong>
+              <p>Autoriza la lectura en la ventana de Google. Kora continuará
+                automáticamente cuando el acceso esté disponible.</p>
+            </div>
+          )}
+          {sourceStep === 'loading' && (
+            <ol role="status" className={styles.analysisMilestones}
+              aria-label="Preparación de la documentación">
+              <li className={styles.milestoneDone}>
+                <CheckIcon size={15} /> Carpeta autorizada con Google
+              </li>
+              <li className={styles.milestoneActive}>
+                <span className={styles.milestoneSpinner} aria-hidden="true" />
+                Leyendo documentos y preparando las fuentes de análisis…
+              </li>
+              <li className={styles.milestonePending}>
+                <span className={styles.milestoneCircle} /> Analizar el proyecto con Gemini
+              </li>
             </ol>
           )}
+          {(sourceStep === 'documents' || sourceStep === 'analyzing') && preview && (
+            <>
+              {sourceStep === 'documents' && (
+                <>
+                  <p className={styles.intro}>
+                    El agente leerá estos documentos antes de hacer preguntas. Usando:
+                    {' '}<strong>{preview.folder.name}</strong>
+                    {' '}<button type="button" className={styles.changeFolder}
+                      onClick={() => {
+                        setPickerChoice('');
+                        setPickerManualUrl('');
+                        setPickerError('');
+                        setPickerOpen(true);
+                      }}>Cambiar</button>
+                  </p>
+                  <ul className={styles.documents} aria-label="Documentos que analizará el agente">
+                    {preview.documents.map((doc) => (
+                      <li key={doc.id}>
+                        <FileTextIcon size={14} className={styles.documentIcon} />
+                        <span>{doc.name}</span>
+                        <span className={styles.docDate}>
+                          {doc.modifiedAt ? 'Modificado ' +
+                            new Date(doc.modifiedAt).toLocaleDateString('es-CL') : 'Archivo de Drive'}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  {!preview.documents.length && <p role="alert" className={styles.error}>
+                    No hay documentos legibles en esta carpeta. Prueba con otra carpeta.
+                  </p>}
+                  {preview.coverage && (preview.coverage.omitted.length > 0 ||
+                    preview.coverage.scanTruncated) && (
+                    <p className={styles.coverageNote}>
+                      Se seleccionaron {preview.documents.length} de {preview.coverage.eligibleDocuments}
+                      {' '}archivos compatibles detectados. Algunos archivos no podrán analizarse.
+                    </p>
+                  )}
+                  <details className={styles.more}>
+                    <summary>Indicaciones adicionales · opcional</summary>
+                    <label className={styles.textLabel} htmlFor="kora-quotation-instructions">
+                      Instrucciones para Gemini
+                    </label>
+                    <textarea id="kora-quotation-instructions" className={styles.textarea}
+                      value={instructions} maxLength={3000}
+                      onChange={(event) => setInstructions(event.target.value)}
+                      placeholder="Ej. Considerar integración SAP, excluir soporte de postproducción..." />
+                  </details>
+                </>
+              )}
+              {sourceStep === 'analyzing' && (
+                <ol role="status" className={styles.analysisMilestones}
+                  aria-label="Progreso del análisis IA">
+                  <li className={styles.milestoneDone}>
+                    <CheckIcon size={15} /> Documentación leída: {preview.documents.length} archivos
+                  </li>
+                  <li className={styles.milestoneDone}>
+                    <CheckIcon size={15} /> Datos del proyecto preparados
+                  </li>
+                  <li className={styles.milestoneActive}>
+                    <span className={styles.milestoneSpinner} aria-hidden="true" />
+                    Gemini está revisando antecedentes y elaborando el entendimiento…
+                  </li>
+                  <li className={styles.milestonePending}>
+                    <span className={styles.milestoneCircle} />
+                    Presentar aclaraciones y resultados
+                  </li>
+                  <li className={styles.progressNote}>
+                    El análisis se realiza en el servidor. Estas etapas muestran operaciones
+                    verificables, no porcentajes estimados.
+                  </li>
+                </ol>
+              )}
+            </>
+          )}
+          {saveWarning && <p role="status" className={styles.coverageNote}>{saveWarning}</p>}
           {questionnaire.isLoading && <p>Cargando condiciones de estimación…</p>}
           {questionnaire.isError && <p role="alert">No fue posible cargar las preguntas fijas.</p>}
+          {error && <p role="alert" className={styles.error}>{error}</p>}
         </section>
       )}
 
@@ -698,5 +868,58 @@ export function AiQuotationWizardModal({ project, onClose }: {
       )}
       {error && <p role="alert" className={styles.error}>{error}</p>}
     </Modal>
+    {pickerOpen && preview && (
+      <Modal open wide title="Elegir carpeta del proyecto"
+        className={styles.folderPicker}
+        onClose={() => setPickerOpen(false)}
+        footer={<>
+          <Button variant="outline" disabled={pickerBusy}
+            onClick={() => setPickerOpen(false)}>Cancelar</Button>
+          <Button className={styles.primaryAction} loading={pickerBusy}
+            disabled={!pickerChoice && !isRealDriveFolderUrl(pickerManualUrl)}
+            onClick={() => void selectFolder()}>Confirmar carpeta</Button>
+        </>}>
+        <p className={styles.intro}>Selecciona otra carpeta accesible o pega su enlace.</p>
+        <div className={styles.folderPickerList}>
+          {preview.siblingFolders.length > 0 && <h3>Carpetas de la misma ubicación</h3>}
+          {preview.siblingFolders.map((folder: DriveBrowseFolder) => (
+            <label key={'sibling-' + folder.id} className={styles.folderPickerItem}>
+              <input type="radio" name="kora-drive-folder"
+                checked={pickerChoice === folder.url}
+                onChange={() => { setPickerChoice(folder.url); setPickerManualUrl(''); }} />
+              <FolderOpenIcon size={17} />
+              <span><strong>{folder.name}</strong><small>Carpeta accesible</small></span>
+            </label>
+          ))}
+          {preview.childFolders.length > 0 && <h3>Subcarpetas</h3>}
+          {preview.childFolders.map((folder: DriveBrowseFolder) => (
+            <label key={'child-' + folder.id} className={styles.folderPickerItem}>
+              <input type="radio" name="kora-drive-folder"
+                checked={pickerChoice === folder.url}
+                onChange={() => { setPickerChoice(folder.url); setPickerManualUrl(''); }} />
+              <FolderOpenIcon size={17} />
+              <span><strong>{folder.name}</strong><small>Dentro de {preview.folder.name}</small></span>
+            </label>
+          ))}
+          {!preview.siblingFolders.length && !preview.childFolders.length && (
+            <p className={styles.coverageNote}>No se encontraron carpetas alternativas accesibles
+              en esta ubicación. Puedes ingresar un enlace manualmente.</p>
+          )}
+          {preview.siblingsUnavailable && (
+            <p className={styles.coverageNote}>Google no permite consultar la carpeta superior.
+              Solo se muestran subcarpetas accesibles.</p>
+          )}
+        </div>
+        <TextField label="O pega el enlace de otra carpeta" type="url"
+          value={pickerManualUrl} placeholder="https://drive.google.com/drive/folders/..."
+          onChange={(event) => {
+            setPickerManualUrl(event.target.value);
+            setPickerChoice('');
+            setPickerError('');
+          }} />
+        {pickerError && <p role="alert" className={styles.error}>{pickerError}</p>}
+      </Modal>
+    )}
+    </>
   );
 }
