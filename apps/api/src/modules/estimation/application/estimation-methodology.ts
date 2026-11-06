@@ -33,7 +33,7 @@ export const ESTIMATION_EDT_GUIDANCE = [
   'Las HH deben ser factibles para el calendario, las personas y el paralelismo real; distingue esfuerzo en HH, duración y capacidad.',
   'NO incluyas en activities ni roleHours la supervisión semanal ordinaria del Líder Técnico: el backend la añade una vez en un tramo propio con 5 HH por semana.',
   'Puedes asignar HH adicionales de Líder Técnico únicamente a arquitectura o implementación hands-on específica, separada de la supervisión.',
-  'Devuelve como máximo 19 tramos y 119 actividades generadas por IA: el motor reserva un tramo y una actividad para supervisión técnica.',
+  'Devuelve como máximo 19 módulos, 19 tramos y 119 actividades generadas por IA: el motor reserva un módulo, un tramo y una actividad para supervisión técnica.',
   'Si una fuente se desconoce o falta una definición de alto impacto, identifica el supuesto o la exclusión; no la reemplaces por una tarea inventada.',
 ].join('\n');
 
