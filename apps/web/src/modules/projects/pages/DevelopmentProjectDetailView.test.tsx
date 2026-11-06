@@ -23,7 +23,9 @@ vi.mock('../api/projects.queries', () => ({
   useUpdateProjectObservation: () => ({ mutateAsync: vi.fn() }),
   useDeleteProjectObservation: () => ({ mutateAsync: vi.fn() }),
   useUpdateProject: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useCreateProjectModule: () => ({ mutateAsync: vi.fn() }),
+  useCreateProjectModule: () => ({
+    mutateAsync: vi.fn().mockResolvedValue({ id: 'new-phase-id' }), isPending: false,
+  }),
   useUpdateProjectModule: () => ({ mutateAsync: vi.fn() }),
   useDeleteProjectModule: () => ({ mutateAsync: vi.fn() }),
   useAddProjectModuleDelivery: () => ({ mutateAsync: vi.fn() }),
@@ -264,6 +266,31 @@ describe('Cotizaciones integradas en ficha Kora', () => {
     expect(screen.getByText('Este proyecto aún no tiene cotización')).toBeInTheDocument();
     // Una etapa comercial aprobada activa puede recotizarse sin sobrescribir el plan.
     expect(screen.getByRole('button', { name: '+ Nueva cotización' })).toBeEnabled();
+  });
+});
+
+describe('Navegación guiada desde el Roadmap a Resumen', () => {
+  it('tras crear una fase sin equipos abre la sección real de Equipos asignados en modo gestión', async () => {
+    const initial = buildProject();
+    renderView(['projects:manage'], { groups: [] }, {
+      ...initial, modules: [], teams: [], members: [],
+    } as ProjectDetail);
+    fireEvent.click(screen.getByRole('button', { name: 'Roadmap' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Crear la primera fase' }));
+    const createModal = screen.getByRole('dialog', { name: 'Nueva fase' });
+    fireEvent.change(within(createModal).getByRole('textbox', { name: 'Nombre de la fase' }), {
+      target: { value: 'Fase de integración' },
+    });
+    fireEvent.click(within(createModal).getByRole('button', { name: 'Crear fase' }));
+    const missingTeams = await screen.findByRole('dialog', { name: 'Primero agrega equipos' });
+    fireEvent.click(within(missingTeams).getByRole('button', { name: 'Ir a Equipos asignados' }));
+    expect(screen.getByRole('button', { name: 'Resumen' }).className)
+      .toContain('tabsShellButtonActive');
+    const teams = document.getElementById('project-assigned-teams');
+    expect(teams).not.toBeNull();
+    expect(within(teams!).getByText('Agregar equipo')).toBeInTheDocument();
+    expect(within(teams!).getByRole('combobox', { name: 'Agregar equipo' })).toBeInTheDocument();
+    expect(within(teams!).getByRole('button', { name: 'Listo' })).toBeInTheDocument();
   });
 });
 

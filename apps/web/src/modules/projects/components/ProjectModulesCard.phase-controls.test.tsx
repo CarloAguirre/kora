@@ -130,9 +130,15 @@ const project = { id: 'project-1', modules: [module], teams: [{
   teamId: 'team-1', teamName: 'Desarrollo', leader: null, memberCount: 0,
   maxMembers: 2, assignedHours: 160,
 }], members: [] } as unknown as ProjectDetail;
-const show = (p: ProjectDetail = project) => render(
+const show = (p: ProjectDetail = project, options?: {
+  teamOptions?: Array<{ value: string; label: string }>;
+  canManage?: boolean;
+  onNavigateToTeams?: () => void;
+}) => render(
   <MemoryRouter><ProjectModulesCard project={p} hourEntries={[]}
-    teamOptions={[{ value: 'team-1', label: 'Desarrollo' }]} canManage /></MemoryRouter>,
+    teamOptions={options?.teamOptions ?? [{ value: 'team-1', label: 'Desarrollo' }]}
+    canManage={options?.canManage ?? true}
+    onNavigateToTeams={options?.onNavigateToTeams} /></MemoryRouter>,
 );
 
 const inputHasInlinePlanningClass = () =>
@@ -153,6 +159,71 @@ beforeEach(() => {
   mocks.success.mockReset();
   mocks.error.mockReset();
   mocks.appliedPlan.modules = [];
+});
+
+describe('Roadmap vacío · creación guiada y equipos asignados', () => {
+  const emptyProject = () => ({
+    ...project, modules: [], teams: [], members: [],
+  } as unknown as ProjectDetail);
+
+  it('muestra los tres pasos y el resumen vacío sin depender de Editar proyecto', () => {
+    show(emptyProject(), { teamOptions: [] });
+    const empty = screen.getByRole('region', { name: 'Roadmap sin fases' });
+    expect(within(empty).getByText('0 fases')).toBeInTheDocument();
+    expect(within(empty).getByText('0 bloques de trabajo')).toBeInTheDocument();
+    expect(within(empty).getByText('0 tareas')).toBeInTheDocument();
+    expect(within(empty).getByRole('heading', { name: 'Arma el plan del proyecto' }))
+      .toBeInTheDocument();
+    expect(within(empty).getByText('Crea una fase')).toBeInTheDocument();
+    expect(within(empty).getByText('Agrega bloques de trabajo')).toBeInTheDocument();
+    expect(within(empty).getByText('Desglosa en tareas')).toBeInTheDocument();
+    expect(within(empty).getByRole('button', { name: 'Planificar' }))
+      .toHaveAttribute('aria-pressed', 'true');
+    expect(within(empty).getByRole('button', { name: 'Crear la primera fase' })).toBeEnabled();
+  });
+
+  it('después de crear la fase sin equipos muestra un segundo modal y navega al Resumen', async () => {
+    const onNavigateToTeams = vi.fn();
+    show(emptyProject(), { teamOptions: [], onNavigateToTeams });
+    fireEvent.click(screen.getByRole('button', { name: 'Crear la primera fase' }));
+    const phaseModal = screen.getByRole('dialog', { name: 'Nueva fase' });
+    expect(within(phaseModal).getByRole('button', { name: 'Crear fase' })).toBeDisabled();
+    fireEvent.change(within(phaseModal).getByRole('textbox', { name: 'Nombre de la fase' }), {
+      target: { value: 'Implementación de Kora' },
+    });
+    fireEvent.click(within(phaseModal).getByRole('button', { name: 'Crear fase' }));
+    await waitFor(() => expect(mocks.create).toHaveBeenCalledWith({
+      projectId: 'project-1',
+      input: { name: 'Implementación de Kora', initialStage: 'discovery' },
+    }));
+    const teamsModal = await screen.findByRole('dialog', { name: 'Primero agrega equipos' });
+    expect(within(teamsModal).getByText(/El proyecto no tiene equipos asignados/))
+      .toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Nuevo bloque de trabajo' })).not.toBeInTheDocument();
+    fireEvent.click(within(teamsModal).getByRole('button', { name: 'Ir a Equipos asignados' }));
+    expect(onNavigateToTeams).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('dialog', { name: 'Primero agrega equipos' })).not.toBeInTheDocument();
+  });
+
+  it('si tiene equipos asignados abre directamente el formulario de bloque tras crear la fase', async () => {
+    const withTeams = { ...emptyProject(), teams: project.teams } as ProjectDetail;
+    show(withTeams);
+    fireEvent.click(screen.getByRole('button', { name: 'Crear la primera fase' }));
+    fireEvent.change(screen.getByRole('dialog', { name: 'Nueva fase' })
+      .querySelector('input')!, { target: { value: 'Desarrollo inicial' } });
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Nueva fase' }))
+      .getByRole('button', { name: 'Crear fase' }));
+    expect(await screen.findByRole('dialog', { name: 'Nuevo bloque de trabajo' }))
+      .toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Primero agrega equipos' })).not.toBeInTheDocument();
+  });
+
+  it('en solo lectura informa el estado vacío sin permitir crear fases', () => {
+    show(emptyProject(), { canManage: false, teamOptions: [] });
+    expect(screen.getByText(/El responsable del proyecto debe crear la primera fase/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Crear la primera fase' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Nueva fase' })).not.toBeInTheDocument();
+  });
 });
 
 describe('Revisión de tareas desde el Roadmap del Líder PM', () => {
