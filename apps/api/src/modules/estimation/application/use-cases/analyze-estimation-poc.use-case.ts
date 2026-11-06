@@ -7,6 +7,7 @@ import {
 import { AI_PROVIDER, type AiProvider } from '../../../ai/application/ports/ai-provider.port';
 import {
   DOCUMENT_SOURCE_READER, type DocumentSourceReader,
+  readEstimationDocuments, describeDocumentCoverage,
 } from '../ports/document-source-reader.port';
 import { extractDriveFolderId } from '../drive-source-selection';
 import { ESTIMATION_ANALYSIS_GUIDANCE } from '../estimation-methodology';
@@ -71,12 +72,16 @@ export class AnalyzeEstimationPocUseCase {
 
   async execute(input: AnalyzeEstimationPocInput, authorizedSources?: DocumentSourceReader): Promise<EstimationPocAnalysis> {
     const isLegacyPoc = this.ai.name === 'poc-ai';
-    const documents = isLegacyPoc ? [] :
-      await (authorizedSources ?? this.sources)?.readDriveSources(input.driveFolderUrl);
-    if (!isLegacyPoc && (!documents || documents.length === 0)) {
-      throw new BadRequestException('No se encontraron documentos legibles para analizar.');
+    const sourceReader = authorizedSources ?? this.sources;
+    const loaded = isLegacyPoc || !sourceReader
+      ? { documents: [], coverage: null }
+      : await readEstimationDocuments(sourceReader, input.driveFolderUrl);
+    const coverageNote = describeDocumentCoverage(loaded.coverage);
+    if (!isLegacyPoc && loaded.documents.length === 0) {
+      throw new BadRequestException('No se encontraron documentos legibles para analizar. ' +
+        (coverageNote ?? 'Comprueba los formatos de Drive y sus permisos.'));
     }
-    const selected = documents ?? [];
+    const selected = loaded.documents;
     const raw = await this.ai.generateStructured({
       task: 'estimation.poc.analysis',
       context: {
@@ -88,6 +93,7 @@ export class AnalyzeEstimationPocUseCase {
         sourceDocuments: selected.map((doc) => ({
           sourceId: doc.sourceId, name: doc.name, path: doc.path, mimeType: doc.mimeType,
         })),
+        sourceCoverage: coverageNote,
       },
       instructions: [
         'Analiza EXCLUSIVAMENTE los documentos adjuntos. No inventes archivos ni hallazgos.',
@@ -201,7 +207,10 @@ export class AnalyzeEstimationPocUseCase {
       sourceMode: isLegacyPoc || extractDriveFolderId(input.driveFolderUrl) === 'kora-poc-fallback'
         ? 'poc_simulated' : 'drive',
       documentsAnalyzed: selected.length,
-      summary: data.summary,
+      summary: coverageNote
+        ? (String(data.summary).slice(0, Math.max(0, 2998 - coverageNote.length)) +
+          '\n\n' + coverageNote).slice(0, 3000)
+        : data.summary,
       detectedDocuments: selected.map((doc) => doc.name),
       fixedPrefills,
       dynamicQuestions: normalizedQuestions,
