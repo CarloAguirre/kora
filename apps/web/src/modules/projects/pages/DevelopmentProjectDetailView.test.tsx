@@ -272,6 +272,38 @@ describe('Cotizaciones integradas en ficha Kora', () => {
 });
 
 describe('Navegación guiada desde el Roadmap a Resumen', () => {
+  it('habilita el Roadmap con estado Prospecto / No iniciado aun sin una fase', () => {
+    const initial = buildProject();
+    renderView(['projects:manage'], { groups: [] }, {
+      ...initial, salesStage: 'prospect', status: 'draft', modules: [], teams: [], members: [],
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Roadmap' }));
+    expect(screen.getByRole('heading', { name: 'Arma el plan del proyecto' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Crear la primera fase' })).toBeEnabled();
+    expect(screen.queryByText(/El Roadmap está disponible para proyectos aprobados/))
+      .not.toBeInTheDocument();
+  });
+
+  it('conserva el Roadmap visible en Prospecto / No iniciado después de que existe una fase', () => {
+    const initial = buildProject();
+    const projectWithPhase = { ...initial, salesStage: 'prospect', status: 'draft',
+      modules: [{
+        id: 'fase-1', name: 'Planificación inicial', initialStage: 'discovery',
+        currentStage: 'discovery', progress: {
+          actual: null, expected: null, scopes: {}, estimatedByCount: false,
+        }, blockerCount: 0, segments: [], deliveries: [], tasks: [],
+        estimatedHours: null, estimatedStartDate: null, estimatedEndDate: null,
+      }],
+    } as unknown as ProjectDetail;
+    renderView(['projects:manage'], { groups: [] }, projectWithPhase);
+    fireEvent.click(screen.getByRole('button', { name: 'Roadmap' }));
+    expect(screen.queryByText(/El Roadmap está disponible para proyectos aprobados/))
+      .not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Arma el plan del proyecto' }))
+      .not.toBeInTheDocument();
+    expect(screen.getByText('Planificación inicial')).toBeInTheDocument();
+  });
+
   it('permite iniciar planificación de un proyecto operativo aunque su etapa comercial no sea approved', () => {
     const initial = buildProject();
     renderView(['projects:manage'], { groups: [] }, {
