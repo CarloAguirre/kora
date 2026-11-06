@@ -13,7 +13,11 @@ const page = readFileSync(file, 'utf8');
 describe('Cotización: acciones de cambios y feedback real', () => {
   it('el único control de guardado está en el footer y conserva la mutación original', () => {
     expect(page).toContain('<QuotationDraftSaveBar');
-    expect(page).toContain('dirty={editable && dirty}');
+    // El footer ahora separa visibilidad de estado de cambios: durante el
+    // ajuste IA puede mostrarse aun sin modificaciones, pero no debe guardar.
+    expect(page).toContain('visible={editable && (dirty || (adjustingAiVersionId === selected?.id &&');
+    expect(page).toContain("selected?.aiReviewStatus === 'pending' && selected?.origin === 'ai'))}");
+    expect(page).toContain('dirty={dirty}');
     expect(page).toContain('onSave={() => void save()}');
     expect(page).toContain('saveDraft.mutateAsync');
     expect(page).not.toContain('Guardar borrador');
