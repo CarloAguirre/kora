@@ -343,7 +343,7 @@ export class DrizzleQuotationRepository implements QuotationRepository {
         Math.abs(proposal.roles.reduce((total, role) => total + role.totalHours, 0) - proposal.totalHours) > 0.011 ||
         Math.abs(edt.totalHours - proposal.totalHours) > 0.011 ||
         edt.source !== (proposal.sourceMode === 'drive' ? 'drive' : 'kdm_demo') || edt.provider !== 'gemini') {
-      throw new BadRequestException('Propuesta Gemini KDM inválida o sin trazabilidad documental.');
+      throw new BadRequestException('Propuesta Gemini sin trazabilidad documental coherente o HH conciliadas.');
     }
     return this.createVersionInternal(projectId, userId, {}, { proposal, answers, dynamicQuestions, edt, confirmedUnderstanding, roleTeamIds });
   }
@@ -620,7 +620,7 @@ export class DrizzleQuotationRepository implements QuotationRepository {
           snapshot.proposal.provider !== 'gemini' ||
           snapshot.proposal.projectId !== projectId ||
           draft.analysisProjectionStatus !== 'synced') {
-        throw new BadRequestException('EDT no conciliada o sin evidencia Gemini/KDM.');
+        throw new BadRequestException('EDT no conciliada o sin evidencia Gemini de la fuente declarada.');
       }
       const roles = snapshot.proposal.roles;
       const roleNames = roles.map((role) => role.role);

@@ -148,8 +148,10 @@ export function buildQuotationCommercialPreflight(
         add('AI_QUESTIONS_INVALID', 'ai', 'blocker',
           'El expediente IA contiene preguntas que no corresponden al análisis dinámico.');
       }
-      add('AI_POC_DEMO_NOT_COMMERCIAL', 'ai', 'blocker',
-        'La propuesta de roles proviene de Gemini con el PDF KDM de prueba; no tiene EDT ni documentación del proyecto real.');
+      if (draft.aiPoc.source === 'kdm_demo') {
+        add('AI_POC_DEMO_NOT_COMMERCIAL', 'ai', 'blocker',
+          'La propuesta de roles proviene de Gemini con el PDF KDM de prueba; no tiene documentación del proyecto real.');
+      }
       if (Object.keys(draft.aiPoc.roleTeamIds).length !== draft.aiPoc.proposal.roles.length) {
         add('AI_ROLE_MAPPING_PENDING', 'ai', 'blocker',
           'Debes mapear todos los perfiles propuestos a equipos activos de Kora.');
