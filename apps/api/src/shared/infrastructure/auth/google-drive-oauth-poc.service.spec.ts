@@ -54,7 +54,7 @@ describe('GoogleDriveOAuthPocService — diagnóstico temporal seguro', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('verifica la carpeta y lista una página con token descartado tras el callback', async () => {
+  it('verifica Drive y conserva un token de corta vida solo para el usuario y la carpeta autorizados', async () => {
     const service = setup();
     const { state } = service.start('actor-1', 'realFolder123');
     const fetchMock = vi.fn()
@@ -78,6 +78,9 @@ describe('GoogleDriveOAuthPocService — diagnóstico temporal seguro', () => {
     const url = String(fetchMock.mock.calls[2]?.[0]);
     expect(new URL(url).searchParams.get('q')).toContain('realFolder123');
     expect(JSON.stringify(result)).not.toContain('google-temporary-access');
+    expect(service.getAuthorizedAccessToken('actor-1', 'realFolder123')).toBe('google-temporary-access');
+    expect(service.getAuthorizedAccessToken('actor-2', 'realFolder123')).toBeNull();
+    expect(service.getAuthorizedAccessToken('actor-1', 'otra-carpeta')).toBeNull();
     expect((await service.finish({ state, stateCookie: state, code: 'replayed' })).code)
       .toBe('STATE_EXPIRED');
     expect(fetchMock).toHaveBeenCalledTimes(3);
@@ -98,6 +101,7 @@ describe('GoogleDriveOAuthPocService — diagnóstico temporal seguro', () => {
       status: 'error', code: 'DRIVE_API_DISABLED_OR_FORBIDDEN',
     }));
     expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(service.getAuthorizedAccessToken('actor-1', 'realFolder123')).toBeNull();
   });
 
   it('no informa éxito si Google solo concede scopes de identidad', async () => {

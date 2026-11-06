@@ -30,7 +30,7 @@ describe('ResolveEstimationDriveFolderUseCase', () => {
   });
 
 
-  it('usa carpeta virtual de la PoC si Drive no está configurado', async () => {
+  it('no inventa carpeta de proyecto si falta la configuración Drive', async () => {
     const drive: DriveFolderClient = {
       isConfigured: () => false,
       listFiles: async () => [],
@@ -48,9 +48,9 @@ describe('ResolveEstimationDriveFolderUseCase', () => {
       quotationLink: null,
     });
 
-    expect(result.status).toBe('resolved');
+    expect(result.status).toBe('not_found');
     expect(result.connection).toBe('not_configured');
-    expect(result.selectedFolder?.folderId).toBe('kora-poc-fallback');
+    expect(result.selectedFolder).toBeNull();
   });
 
   it('resuelve automáticamente una carpeta con nombre exacto', async () => {

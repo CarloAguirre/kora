@@ -24,7 +24,7 @@ export const estimationApi = {
   /** Comprueba la concesión efímera sin enviar tokens al navegador. */
   driveOAuthPocAccess(input: { projectId: string; driveFolderUrl: string }): Promise<{ authorized: boolean }> {
     return api.get<{ authorized: boolean }>(
-      '/estimations/drive/oauth-poc/access?' + new URLSearchParams(input).toString(),
+      '/estimations/drive/oauth-poc/access?' + new URLSearchParams({ projectId: input.projectId, driveFolderUrl: input.driveFolderUrl }).toString(),
     );
   },
   /** PoC sin tokens ni credenciales devueltos al navegador. */
