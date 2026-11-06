@@ -1,0 +1,40 @@
+/* Sólo el editor de cotizaciones: no altera footers ni modales compartidos. */
+.bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kora-space-4, 16px);
+  width: 100%;
+  min-width: 0;
+  padding: 12px 18px;
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+  border: 1px solid var(--kora-border-soft, #d9dfe8);
+  border-radius: var(--kora-radius, 10px);
+  background: var(--kora-surface, #fff);
+  box-shadow: 0 -6px 22px rgba(15, 23, 41, .09);
+}
+.message {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.dot {
+  flex: 0 0 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--kora-lime, #d1ff5e);
+  box-shadow: 0 0 0 2px var(--kora-navy, #0f1729);
+}
+.copy { display: grid; gap: 3px; min-width: 0; }
+.copy strong { font-size: 12px; color: var(--kora-navy); }
+.copy span { font-size: 11px; color: var(--kora-text-muted, #667085); }
+.actions { display: flex; gap: 8px; flex-shrink: 0; }
+@media (max-width: 620px) {
+  .bar { flex-wrap: wrap; gap: 10px; padding: 12px; }
+  .actions { width: 100%; justify-content: flex-end; flex-wrap: wrap; }
+}
