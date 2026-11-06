@@ -642,7 +642,10 @@ export class GenerateEstimationPocProposalUseCase {
     const isRealGemini = this.ai.name === 'gemini' &&
       extractDriveFolderId(input.driveFolderUrl) !== 'kora-poc-fallback';
     if (isRealGemini) {
-      const horizonWeeks = estimatedWeeksFromRoles(preliminaryRoles);
+      // El propio TL no fija el horizonte: evita que una duración sugerida
+      // excesiva por Gemini infle circularmente sus horas de supervisión.
+      const horizonWeeks = estimatedWeeksFromRoles(preliminaryRoles.filter((role) =>
+        !isTechLeadRole(role.role)));
       const leadIndices = preliminaryRoles
         .map((role, index) => isTechLeadRole(role.role) ? index : -1)
         .filter((index) => index >= 0);
