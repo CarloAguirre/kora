@@ -70,7 +70,7 @@ export function describeDocumentCoverage(
     return null;
   }
   const examples = coverage.omitted.slice(0, 8)
-    .map((entry) => entry.path + ' (' + entry.reason + ')').join('; ');
+    .map((entry) => entry.path + ' (' + entry.reason + ')').join('; ').slice(0, 1100);
   const extra = Math.max(0, coverage.omitted.length - 8);
   return 'COBERTURA DOCUMENTAL PARCIAL: se analizaron ' +
     coverage.analyzedDocuments + ' de ' + coverage.eligibleDocuments +
