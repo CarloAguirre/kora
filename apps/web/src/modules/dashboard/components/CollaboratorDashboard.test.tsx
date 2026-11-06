@@ -245,6 +245,19 @@ describe('Dashboard colaborador · homologación v6', () => {
       .not.toBeInTheDocument());
   });
 
+  it('con HH completas confirma sin ofrecer un nuevo registro de horas', () => {
+    const registerForTask = vi.fn();
+    const fullTask: DashboardMyTask = { ...tasks[0]!,
+      approvedHours: 20, pendingHours: 4, estimatedHours: 24 };
+    show({ tasks: [fullTask], onRegisterHoursAndComplete: registerForTask });
+    fireEvent.click(screen.getByRole('button', { name: 'Marcar completada' }));
+    const dialog = screen.getByRole('dialog', { name: 'Completar tarea' });
+    expect(within(dialog).queryByRole('button', { name: 'Registrar horas y completar' }))
+      .not.toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Completar tarea' }))
+      .toBeInTheDocument();
+  });
+
   it('registrar horas y completar solicita la tarea al formulario sin marcarla antes de guardar', () => {
     const registerForTask = vi.fn();
     show({ onRegisterHoursAndComplete: registerForTask });

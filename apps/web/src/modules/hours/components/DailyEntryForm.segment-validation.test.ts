@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { ProjectSummary } from '@kora/contracts';
-import { type DailyBlock, selectAttributableTasks, validateDailyBlock } from './DailyEntryForm';
+import type { ProjectSummary, ProjectPhaseOption } from '@kora/contracts';
+import { type DailyBlock, matchesTaskHourTarget, selectAttributableTasks, validateDailyBlock } from './DailyEntryForm';
 
 const base: DailyBlock = {
   key: 'hh-1', expanded: true, assignment: 'Proyecto', projectId: 'project-1',
@@ -65,5 +65,43 @@ describe('registro diario: imputación por bloque del Roadmap', () => {
     expect(validateDailyBlock({ ...base, assignment: 'Capacitación', projectId: '',
       roadmapNeedsPhase: true, roadmapNeedsSegment: true }, context))
       .toBe('Selecciona a quién aprueba estas horas.');
+  });
+});
+
+describe('registro diario desde completar tarea: consistencia de IDs', () => {
+  const target = {
+    projectId: 'project-1', moduleId: 'phase-1',
+    taskId: 'task-1', taskTitle: 'Revisar diseño',
+  };
+  const selection: DailyBlock = { ...base, moduleId: target.moduleId,
+    segmentId: 'segment-1', taskId: target.taskId, category: 'Revisar diseño' };
+  const phases = [{
+    id: target.moduleId, tasks: [{
+      id: target.taskId, segmentId: 'segment-1',
+      assigneeUserId: 'collaborator-1', cancelledAt: null,
+    }],
+  }] as unknown as ProjectPhaseOption[];
+
+  it('solo permite guardar la tarea propia en la fase y bloque correctos', () => {
+    expect(matchesTaskHourTarget([selection], target, phases, 'collaborator-1')).toBe(true);
+    expect(matchesTaskHourTarget([selection], target, undefined, 'collaborator-1')).toBe(false);
+    expect(matchesTaskHourTarget([selection], target, phases, 'another-user')).toBe(false);
+    expect(matchesTaskHourTarget([{ ...selection, segmentId: 'other-segment' }], target,
+      phases, 'collaborator-1')).toBe(false);
+    expect(matchesTaskHourTarget([{ ...selection, taskId: 'other-task' }], target,
+      phases, 'collaborator-1')).toBe(false);
+    expect(matchesTaskHourTarget([selection, selection], target, phases,
+      'collaborator-1')).toBe(false);
+    expect(matchesTaskHourTarget([{ ...selection, assignment: 'Capacitación' }], target,
+      phases, 'collaborator-1')).toBe(false);
+  });
+
+  it('no permite registrar HH para una tarea cancelada, ni para un bloque cambiado', () => {
+    const cancelled = [{
+      ...phases[0], tasks: [{ ...phases[0]!.tasks[0]!, cancelledAt: '2026-11-05T00:00:00.000Z' }],
+    }] as ProjectPhaseOption[];
+    expect(matchesTaskHourTarget([selection], target, cancelled, 'collaborator-1')).toBe(false);
+    expect(matchesTaskHourTarget([{ ...selection, projectId: 'other-project' }],
+      target, phases, 'collaborator-1')).toBe(false);
   });
 });

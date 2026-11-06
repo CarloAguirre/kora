@@ -88,6 +88,25 @@ export interface TaskHourEntryTarget {
   taskTitle: string;
 }
 
+/** No completar una tarea con HH imputadas a un proyecto, bloque o persona distinta. */
+export function matchesTaskHourTarget(
+  blocks: readonly DailyBlock[],
+  target: TaskHourEntryTarget | undefined,
+  phases: readonly ProjectPhaseOption[] | undefined,
+  userId: string | undefined,
+): boolean {
+  if (!target) return true;
+  const task = phases?.find((phase) => phase.id === target.moduleId)
+    ?.tasks.find((item) => item.id === target.taskId);
+  const block = blocks[0];
+  return Boolean(task && !task.cancelledAt && task.assigneeUserId === userId &&
+    blocks.length === 1 && block?.assignment === 'Proyecto' &&
+    block.projectId === target.projectId &&
+    block.moduleId === target.moduleId &&
+    block.taskId === target.taskId &&
+    block.segmentId === (task.segmentId ?? ''));
+}
+
 let blockCounter = 0;
 const createEmptyBlock = (): DailyBlock => ({
   key: `block-${(blockCounter += 1)}`,
@@ -229,7 +248,7 @@ export function DailyEntryForm({
     } : {}),
   }]);
   // La tarea determina su segmento por ID persistido desde /phases, nunca por nombre.
-  const { data: taskPhases } = useProjectPhases(initialTask?.projectId ?? null);
+  const { data: taskPhases, isError: taskPhasesError } = useProjectPhases(initialTask?.projectId ?? null);
   const targetTask = taskPhases?.find((phase) => phase.id === initialTask?.moduleId)
     ?.tasks.find((task) => task.id === initialTask?.taskId);
   const targetAllowed = Boolean(targetTask && !targetTask.cancelledAt &&
@@ -241,12 +260,7 @@ export function DailyEntryForm({
       block.taskId === initialTask.taskId && block.segmentId !== segmentId
         ? { ...block, segmentId } : block));
   }, [initialTask, targetAllowed, targetTask]);
-  const validTaskPrefill = !initialTask || Boolean(taskPhases && targetAllowed &&
-    blocks.length === 1 && blocks[0]?.assignment === 'Proyecto' &&
-    blocks[0]?.projectId === initialTask.projectId &&
-    blocks[0]?.moduleId === initialTask.moduleId &&
-    blocks[0]?.taskId === initialTask.taskId &&
-    blocks[0]?.segmentId === (targetTask?.segmentId ?? ''));
+  const validTaskPrefill = matchesTaskHourTarget(blocks, initialTask, taskPhases, user?.id);
   const [blockErrors, setBlockErrors] = useState<Record<string, string>>({});
   const [serverError, setServerError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -361,6 +375,10 @@ export function DailyEntryForm({
         ? 'Registra las horas de «' + initialTask.taskTitle +
           '». Al guardarlas, la tarea se enviará a aprobación.'
         : 'Agrega uno o más registros y registra tus horas del día'}</p>
+      {initialTask && taskPhasesError &&
+        <p className={styles.alert} role="alert">
+          No se pudo consultar la tarea. Cancela e inténtalo nuevamente.
+        </p>}
       {initialTask && taskPhases && !targetAllowed &&
         <p className={styles.alert} role="alert">
           Esta tarea ya no está disponible para registrar horas. Cancela y vuelve al dashboard.
