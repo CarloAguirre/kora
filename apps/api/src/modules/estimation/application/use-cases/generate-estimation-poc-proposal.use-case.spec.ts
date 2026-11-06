@@ -178,6 +178,11 @@ describe('GenerateEstimationPocProposalUseCase', () => {
   it('usa catálogo real en el prompt y rechaza perfiles con IDs ajenos a Kora', async () => {
     const teamId = '0777e456-fd76-445e-83f1-afc25061c103';
     const catalog = [{ teamId, name: 'Desarrollo' }];
+    // La política de 5 HH/semana se aplica a fuentes Drive reales,
+    // no al identificador reservado para la demostración KDM.
+    const realInput = {
+      ...input, driveFolderUrl: 'https://drive.google.com/drive/folders/real-catalog',
+    };
     let activeCatalog: unknown = null;
     let requiredFields: unknown = null;
     const ai: AiProvider = {
@@ -200,7 +205,7 @@ describe('GenerateEstimationPocProposalUseCase', () => {
       },
     };
     const generator = new GenerateEstimationPocProposalUseCase(ai, sources);
-    const result = await generator.execute(input, catalog);
+    const result = await generator.execute(realInput, catalog);
     expect(activeCatalog).toEqual(catalog);
     expect(requiredFields).toContain('teamId');
     expect(result.roles[0]?.teamId).toBe(teamId);
@@ -223,7 +228,7 @@ describe('GenerateEstimationPocProposalUseCase', () => {
       }),
     };
     await expect(new GenerateEstimationPocProposalUseCase(invalid, sources)
-      .execute(input, catalog)).rejects.toThrow(/equipo activo válido/);
+      .execute(realInput, catalog)).rejects.toThrow(/equipo activo válido/);
   });
 
   const projectId = '550e8400-e29b-41d4-a716-446655440000';
