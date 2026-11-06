@@ -7,6 +7,7 @@ import {
 } from '@kora/contracts';
 import { buildQuotationTransferReferences } from './quotation-transfer-references';
 import { copyQuotationDraft } from './copy-quotation-draft';
+import { assertQuotationReadyForClient } from './quotation-commercial-eligibility';
 
 const projectId = '0777e456-fd76-445e-83f1-afc25061c101';
 const otherProjectId = '0777e456-fd76-445e-83f1-afc25061c102';
@@ -169,6 +170,28 @@ describe('Copia de cotización IA con EDT y traspaso de tareas', () => {
     expect(copied.aiPoc).toBeNull();
     expect(copied.sourceRefs).toEqual([]);
     expect(copied.edtTaskSettings).toBeUndefined();
+  });
+
+  it('permite aprobar la copia con EDT coherente, pero no con HH sin conciliar', () => {
+    const original = aiVersionDraft();
+    const copied = copyQuotationDraft(original, projectId, projectId);
+    const version = {
+      origin: 'copy' as const,
+      aiReviewStatus: null,
+      draft: copied,
+      hourlyRate: 2,
+      totalHours: 60,
+      netAmount: 120,
+      totalAmount: 142.8,
+    };
+    expect(() => assertQuotationReadyForClient(version)).not.toThrow();
+    expect(() => assertQuotationReadyForClient({
+      ...version, totalHours: 61,
+    })).toThrow(/conciliar/i);
+    expect(() => assertQuotationReadyForClient({
+      ...version,
+      draft: { ...copied, analysisProjectionStatus: 'modified' as const },
+    })).toThrow(/Concilia la planificación/);
   });
 
   it('conserva estado no conciliado para impedir traspaso accidental', () => {

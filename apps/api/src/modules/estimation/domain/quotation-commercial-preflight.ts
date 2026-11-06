@@ -164,6 +164,11 @@ export function buildQuotationCommercialPreflight(
     'El análisis proviene de un fixture de demostración: no puede utilizarse para envío real.');
   if (draft.analysisProjectionStatus === 'modified') add('ANALYSIS_NOT_RECONCILED', 'ai', 'blocker',
     'Se editaron HH o condiciones después del EDT de origen; requiere conciliación.');
+  if (version.origin === 'copy' && draft.aiPoc?.edt &&
+      draft.analysisProjectionStatus !== 'synced') {
+    add('COPIED_EDT_NOT_RECONCILED', 'ai', 'blocker',
+      'La versión copiada conserva tareas EDT, pero aún no tiene HH conciliadas con su planificación.');
+  }
 
   if (operational.status === 'active' || operational.usedHours > 0 ||
       operational.paymentMilestones.some((row) => row.status === 'invoiced' || row.status === 'paid')) {
