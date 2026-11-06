@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Delete, Get, HttpCode, HttpStatus, Optional, Param, ParseUUIDPipe, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, HttpCode, HttpStatus, Inject, Optional, Param, ParseUUIDPipe, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
 import {
   applyQuotationPlanningSchema, generateAiDemoQuotationSchema, createQuotationVersionSchema, updateQuotationDraftSchema, quotationReconciliationReviewSchema, assessQuotationReconciliationSchema,
   quotationRevisionActionSchema, approveClientQuotationSchema, transferApprovedQuotationSchema,
@@ -29,8 +29,8 @@ export class QuotationController {
     private readonly drafts: ManageQuotationDraftsUseCase,
     private readonly generator: GenerateEstimationPocProposalUseCase,
     private readonly questionnaire: GetEstimationQuestionnaireDefinitionUseCase,
-    @Optional() private readonly config?: AppConfigService,
-    @Optional() private readonly driveOAuthPoc?: GoogleDriveOAuthPocService,
+    @Optional() @Inject(AppConfigService) private readonly config?: AppConfigService,
+    @Optional() @Inject(GoogleDriveOAuthPocService) private readonly driveOAuthPoc?: GoogleDriveOAuthPocService,
   ) {}
 
   @Get()
