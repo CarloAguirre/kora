@@ -272,6 +272,16 @@ describe('Cotizaciones integradas en ficha Kora', () => {
 });
 
 describe('Navegación guiada desde el Roadmap a Resumen', () => {
+  it('permite iniciar planificación de un proyecto operativo aunque su etapa comercial no sea approved', () => {
+    const initial = buildProject();
+    renderView(['projects:manage'], { groups: [] }, {
+      ...initial, salesStage: 'quoted', status: 'active', modules: [],
+    } as ProjectDetail);
+    fireEvent.click(screen.getByRole('button', { name: 'Roadmap' }));
+    expect(screen.getByRole('heading', { name: 'Arma el plan del proyecto' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Crear la primera fase' })).toBeEnabled();
+  });
+
   it('tras crear una fase sin equipos abre la sección real de Equipos asignados en modo gestión', async () => {
     const initial = buildProject();
     renderView(['projects:manage'], { groups: [] }, {
