@@ -146,7 +146,13 @@ export function validateStageCapacity(
   }
   for (const [key, hours] of totals) {
     const [stageCode, role] = key.split('\u0000');
-    const stage = stages.get(stageCode)!;
+    if (!stageCode || !role) {
+      throw new Error('Clave interna de capacidad por tramo/perfil inválida.');
+    }
+    const stage = stages.get(stageCode);
+    if (!stage) {
+      throw new Error('Tramo de capacidad inexistente: ' + stageCode);
+    }
     const people = peopleByRole.get(role);
     if (!people) continue; // El validador de perfiles existente informa la FK.
     const physicalMaximum = WEEKLY_HOURS_PER_PERSON * stage.durationWeeks * people;
