@@ -31,15 +31,17 @@ export function projectPocRolesToQuotationDraft(
   roleTeamIds: Readonly<Record<string, string>>,
 ): QuotationDraftData {
   const aiPoc = draft.aiPoc;
-  // Conservar la compatibilidad con el fixture histórico, pero permitir
-  // propuestas Gemini basadas en documentación real de Google Drive.
-  // Las tres fuentes de procedencia deben coincidir, sin degradación implícita.
-  const isKdmDemo = aiPoc?.source === 'kdm_demo' &&
+  if (!aiPoc) {
+    throw new Error('El borrador no contiene una propuesta IA con procedencia documental coherente.');
+  }
+  // La propuesta, el snapshot y la EDT deben declarar el mismo origen.
+  // Preservar el fixture KDM histórico sin confundirlo con Drive real.
+  const isKdmDemo = aiPoc.source === 'kdm_demo' &&
     aiPoc.proposal.sourceMode === 'poc_simulated';
-  const isRealDrive = aiPoc?.source === 'drive' &&
+  const isRealDrive = aiPoc.source === 'drive' &&
     aiPoc.proposal.sourceMode === 'drive';
   if ((!isKdmDemo && !isRealDrive) ||
-      (aiPoc?.edt && aiPoc.edt.source !== aiPoc.source)) {
+      (aiPoc.edt && aiPoc.edt.source !== aiPoc.source)) {
     throw new Error('El borrador no contiene una propuesta IA con procedencia documental coherente.');
   }
   const roles = aiPoc.proposal.roles;
