@@ -8,6 +8,7 @@ import { AiQuotationWizardModal } from './AiQuotationWizardModal';
 
 const mocks = vi.hoisted(() => ({
   analyze: vi.fn(), generate: vi.fn(), onClose: vi.fn(), toastError: vi.fn(),
+  serviceAccountEnabled: true,
 }));
 const project = {
   id: '0777e456-fd76-445e-83f1-afc25061c101',
@@ -48,7 +49,7 @@ const dynamicQuestions = [estimationQuestionSchema.parse({
   impact: 'high', answerType: 'single_choice', required: true,
   options: [{ value: 'yes', label: 'Sí' }, { value: 'no', label: 'No' }],
   sourceRefs: [{
-    sourceId: 'kora-poc-requerimiento-kdm', fileName: 'Requerimiento_KDM.pdf',
+    sourceId: 'drive-requerimiento-qa', fileName: 'Requerimiento_KDM.pdf',
   }],
   assumptionIfSkipped: 'API no disponible; estimar adaptador temporal.',
 })];
@@ -58,7 +59,7 @@ const analysisResult = {
   summary: 'El motor centraliza notificaciones y requiere confirmar su API.',
   fixedPrefills: [{
     questionId: 'F01', value: 'mvp',
-    sourceRefs: [{ sourceId: 'kora-poc-requerimiento-kdm',
+    sourceRefs: [{ sourceId: 'drive-requerimiento-qa',
       fileName: 'Requerimiento_KDM.pdf' }],
   }],
   dynamicQuestions,
@@ -79,7 +80,7 @@ vi.mock('@/shared/components/ui/Modal', () => ({
 vi.mock('../api/estimation.queries', async () => {
   const React = await import('react');
   return {
-    useEstimationDriveOAuthPocStatus: () => ({ data: { enabled: true, serviceAccountEnabled: true }, isLoading: false }),
+    useEstimationDriveOAuthPocStatus: () => ({ data: { enabled: true, serviceAccountEnabled: mocks.serviceAccountEnabled }, isLoading: false }),
     useEstimationQuestionnaireDefinition: () => ({
       data: { fixedQuestions, maxDynamicFirstRound: 5,
         maxDynamicFollowUp: 2, targetMinutesMin: 3, targetMinutesMax: 5 },
@@ -121,6 +122,7 @@ beforeEach(() => {
   });
   mocks.onClose.mockClear();
   mocks.toastError.mockReset();
+  mocks.serviceAccountEnabled = true;
 });
 
 async function analyzeAndConfirm() {
@@ -139,6 +141,14 @@ function answerFixed() {
 }
 
 describe('Asistente v5 de cotización · sistema visual Kora', () => {
+  it('no permite analizar Drive cuando aún falta autorizar Google', () => {
+    mocks.serviceAccountEnabled = false;
+    renderWizard();
+    expect(screen.getByRole('button', { name: 'Probar acceso con Google' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Analizar proyecto' })).toBeDisabled();
+    expect(mocks.analyze).not.toHaveBeenCalled();
+  });
+
   it('pide el enlace de Drive únicamente cuando Extras no tiene documentación', async () => {
     renderWizard({ ...project, documentationLink: null } as ProjectDetail);
     const input = screen.getByLabelText('Carpeta de Google Drive del proyecto');

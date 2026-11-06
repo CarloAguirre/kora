@@ -375,8 +375,9 @@ export function NewEstimationModal({ open, prospects, onClose }: NewEstimationMo
             <div>
               <strong>Diagnóstico de conexión Google Drive (PoC)</strong>
               <p>Google solicitará permiso de lectura sobre los archivos de tu Drive.
-                Esta prueba consulta únicamente la carpeta indicada, descarta los tokens
-                al terminar y no modifica tu sesión en Kora ni habilita aún la lectura permanente.</p>
+                Esta prueba consulta únicamente la carpeta indicada. La API conserva
+                el token temporalmente en memoria para permitir análisis durante la cotización,
+                sin guardarlo en base de datos ni alterar tu sesión de Kora.</p>
             </div>
             <div className={styles.drivePocButtons}>
               <Button variant="outline" size="sm"

@@ -87,6 +87,40 @@ describe('POST versions/ai-poc · Gemini con KDM', () => {
     );
   });
 
+  it('admite una carpeta Drive verdadera con autorización OAuth del actor', async () => {
+    const { drafts, generator } = setup();
+    const oauth = { getAuthorizedAccessToken: vi.fn().mockReturnValue('token-prueba') };
+    const controller = new QuotationController(
+      drafts as never, generator as never,
+      new GetEstimationQuestionnaireDefinitionUseCase(),
+      { googleDrive: { enabled: false } } as never, oauth as never,
+    );
+    const real = { ...input, driveFolderUrl: 'https://drive.google.com/drive/folders/carpeta-real-123' };
+    generator.execute.mockResolvedValueOnce({ ...proposal, sourceMode: 'drive' });
+    generator.generateEdt.mockResolvedValueOnce({ ...edt, source: 'drive' });
+    await controller.createAiPoc(projectId, real, actor as never);
+    expect(oauth.getAuthorizedAccessToken).toHaveBeenCalledWith(actor.id, 'carpeta-real-123');
+    expect(generator.execute).toHaveBeenCalledWith(real, catalog,
+      expect.objectContaining({ readDriveSources: expect.any(Function) }));
+    expect(generator.generateEdt).toHaveBeenCalledWith(real,
+      expect.objectContaining({ sourceMode: 'drive' }), catalog,
+      expect.objectContaining({ readDriveSources: expect.any(Function) }));
+  });
+
+  it('no gasta solicitudes Gemini si no existe autorización para carpeta real', async () => {
+    const { drafts, generator } = setup();
+    const controller = new QuotationController(
+      drafts as never, generator as never,
+      new GetEstimationQuestionnaireDefinitionUseCase(),
+      { googleDrive: { enabled: false } } as never,
+      { getAuthorizedAccessToken: vi.fn().mockReturnValue(null) } as never,
+    );
+    await expect(controller.createAiPoc(projectId, {
+      ...input, driveFolderUrl: 'https://drive.google.com/drive/folders/carpeta-real-123',
+    }, actor as never)).rejects.toBeInstanceOf(BadRequestException);
+    expect(generator.execute).not.toHaveBeenCalled();
+  });
+
   it('no llama al modelo cuando cambia proyecto, URL o falta una respuesta fija', async () => {
     const { controller, generator, drafts } = setup();
     await expect(controller.createAiPoc(
