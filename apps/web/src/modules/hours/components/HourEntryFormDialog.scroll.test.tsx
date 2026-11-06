@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { Modal } from '@/shared/components/ui/Modal';
 import modalStyles from '@/shared/components/ui/Modal.module.css';
 import { HourEntryFormDialog } from './HourEntryFormDialog';
@@ -18,7 +18,8 @@ const modalCss = readFileSync(modalCssPath, 'utf8');
 // No se simulan consultas ni se envían HH; verificamos el contenedor real.
 vi.mock('./DailyEntryForm', async (importOriginal) => ({
   ...await importOriginal<typeof import('./DailyEntryForm')>(),
-  DailyEntryForm: () => <div>Formulario diario</div>,
+  DailyEntryForm: ({ initialTask }: { initialTask?: { taskId: string; taskTitle: string } }) =>
+    <div>Formulario diario{initialTask && <span>Tarea preseleccionada: {initialTask.taskTitle} ({initialTask.taskId})</span>}</div>,
 }));
 vi.mock('./WeeklyEntryForm', () => ({
   WeeklyEntryForm: () => <div>Formulario semanal</div>,
@@ -34,6 +35,15 @@ describe('Scroll vertical del modal Registrar horas', () => {
     expect(screen.getByText('Formulario diario')).toBeInTheDocument();
     fireEvent.click(screen.getByText('Registro semanal'));
     expect(screen.getByText('Formulario semanal')).toBeInTheDocument();
+    expect(dialog).toHaveClass(modalStyles.bodyScrollOnly!);
+  });
+
+  it('preselecciona la tarea cuando el registro se inicia desde completar', () => {
+    render(<HourEntryFormDialog open entry={null} onClose={noop} onSuccess={noop}
+      initialTask={{ projectId: 'p-1', moduleId: 'm-1', taskId: 'task-1', taskTitle: 'Diseño' }} />);
+    const dialog = screen.getByRole('dialog', { name: 'Registrar horas' });
+    expect(within(dialog).getByText('Tarea preseleccionada: Diseño (task-1)')).toBeInTheDocument();
+    expect(within(dialog).queryByText('Registro semanal')).not.toBeInTheDocument();
     expect(dialog).toHaveClass(modalStyles.bodyScrollOnly!);
   });
 
