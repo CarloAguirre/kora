@@ -2,7 +2,7 @@
 
 **Fecha:** 2026-11-06  
 **Rama de trabajo:** `feature/calculadora-roadmap-diseno-v5-02`
-**Estado:** Iteraciones 1–3 validadas localmente por el equipo; iteración 4 implementada y pendiente de validación local.  
+**Estado:** Iteraciones 1–4 validadas localmente por el equipo; iteración 5 implementada y auditada estáticamente en GitHub, pendiente de ejecución de Vitest/typecheck/build y de revisión visual local.  
 **Alcance:** Calculadora de cotizaciones y estimaciones, no reescritura funcional.
 
 ## 1. Contexto y conclusión
@@ -177,3 +177,82 @@ if ($LASTEXITCODE -ne 0) { throw "Error build Web" }
 ```
 
 **Prueba manual:** cambiar entre «Por equipo» y «Por fases y módulos», editar colaboradores, unidad, duración, HH/semana y dedicación; comprobar que en EDT estas variables siguen siendo referenciales, no alteran las HH de tareas. Verificar disabled de QA, perfiles IA sin equipo y el scroll horizontal en ventanas angostas.
+
+
+## 6. Cierre de iteración 5 — auditoría transversal del editor de cotizaciones
+
+**Fecha:** 2026-11-06.
+**Rama:** `feature/calculadora-roadmap-diseno-v5-02`.
+
+### Resultado y cambios
+
+- **`1e155bc` — componentes y limpieza:** las acciones comerciales de envío, aprobación y traspaso usan respectivamente `Button outline` y `Button secondary` de Kora. Se eliminaron 38 reglas de CSS incrustado o no utilizado que reestilizaban las acciones, y el bloque semanal histórico sin uso en `QuotationTeamsWorkspace.module.css` (37 referencias de selectores semanales). No cambian guards, validaciones, confirmaciones ni mutaciones.
+- **`a6db132` — layout y resumen:** removidas 71 reglas no referenciadas de `QuotationWorkspacePage.module.css` y 20 del resumen comercial, incluidos estilos que imponían `margin-top` a todos los botones del sidebar. Se preserva el layout 330px de escritorio, sticky sidebar y scroll móvil.
+- **`ab05d30` — EDT:** eliminar tarea comercial KT-* usa `Button variant="ghost" size="icon"`; se conserva su dimensión de 26px y el callback `onDeleteTask`. «Ver plantilla» usa `Button tertiary` sin capa visual propia. Se normalizaron 52 colores hexadecimales del CSS de fases usando tokens Kora; no cambian HH, nombres, WBS ni asignación por perfil.
+- **`c1012fa` — tarjetas auxiliares:** preflight, previsualización de traspaso, comparación de versiones y conciliación usan tokens compartidos (75 colores literal reemplazados), con focos explícitos en `summary` y `textarea` interactivos. No se modifican cálculos ni operaciones de aprobación/traspaso.
+- **`30df039`, `6568640`, `d31f314` — pruebas:** nueva suite `QuotationVisualConsistency.test.ts` para controles nativos, variantes de botón, responsive/scroll, eliminación de reglas heredadas, colores no tokenizados, referencias reales a `tokens.css`, guards y focos. Se reforzó el test funcional de eliminación de tarea KT-*.
+
+### Métricas estáticas verificadas
+
+| Indicador | Resultado |
+| --- | --- |
+| CSS centrales del flujo de cotización revisados | **12** |
+| Colores hexadecimales literales en esos 12 CSS | **0** |
+| Variables `--kora-*` sin definición en `apps/web/src/styles/tokens.css` | **0** |
+| CSS heredado eliminado en página principal | **71 reglas** |
+| CSS heredado eliminado en resumen comercial | **20 reglas** |
+| CSS heredado eliminado en acciones comerciales | **38 reglas** |
+| Estilos semanales no utilizados retirados | **Bloque heredado completo** |
+| Reglas funcionales o contratos de API modificados | **Ninguno** |
+
+### Cobertura y límites de la auditoría
+
+El **flujo principal de cotización** y sus tarjetas de preflight, conciliación, comparación y traspaso quedan homologados a tokens Kora. No se declara terminada la homogeneización de **todo** `modules/estimation`: el escaneo encontró **185 apariciones** de hexadecimales en diez CSS de otros flujos y asistentes. Son pendientes separados y deben evaluarse junto con sus formularios y estados antes de reemplazarlos:
+
+| Archivo CSS pendiente | Hexadecimales |
+| --- | ---: |
+| `EstimationWorkspacePage.module.css` | 35 |
+| `NewEstimationModal.module.css` | 34 |
+| `AiQuotationWizardModal.module.css` | 27 |
+| `AnalysisEvidenceCard.module.css` | 25 |
+| `EstimationQuestionnaireForm.module.css` | 16 |
+| `ProjectQuotationCard.module.css` | 15 |
+| `CalculatorPage.module.css` | 14 |
+| `AiPocRoleMappingCard.module.css` | 9 |
+| `QuestionnaireBlueprintCard.module.css` | 6 |
+| `NewProjectQuotationModal.module.css` | 4 |
+
+Estos remanentes no se modificaron de forma masiva para no degradar el asistente Gemini, el cuestionario o las pantallas históricas de Kora sin una evaluación visual específica. Los colores dinámicos de equipo (generados por `quotationTeamColor`) no son hexadecimales de los CSS auditados y se conservan por significado.
+
+### Comandos de integración y regresión completa — PowerShell
+
+```powershell
+git fetch kora
+git switch feature/calculadora-roadmap-diseno-v5-02
+git pull --ff-only kora feature/calculadora-roadmap-diseno-v5-02
+
+pnpm --filter @kora/contracts build
+if ($LASTEXITCODE -ne 0) { throw 'Error build contratos' }
+
+pnpm --filter @kora/web typecheck
+if ($LASTEXITCODE -ne 0) { throw 'Error typecheck Web' }
+
+# Ejecutar todas las pruebas del módulo, incluidas las nuevas auditorías
+pnpm --filter @kora/web exec vitest run src/modules/estimation
+if ($LASTEXITCODE -ne 0) { throw 'Error tests de estimación' }
+
+pnpm --filter @kora/web build
+if ($LASTEXITCODE -ne 0) { throw 'Error build Web' }
+```
+
+### Validación manual necesaria
+
+1. **Versiones:** navegar v1/v2/v3 y cancelar cambio con datos sin guardar; crear copia, nueva IA y versión en blanco.
+2. **Propuesta Gemini:** probar «Ajustar antes de aceptar», «Usar tal cual», snackbar de éxito/error y aceptación sin aprobación del cliente.
+3. **Footer:** dirty, guardar, descartar, scroll largo y móvil. No debe tapar acciones del sidebar.
+4. **EDT:** abrir módulos, eliminar exclusivamente tareas KT-* y verificar que tareas originales, WBS, HH por perfil, equipos y contador no cambian.
+5. **Costos/pagos:** editar montos, periodicidades, porcentajes y fechas; las recurrencias no deben sumarse al neto; controles disabled en versión aprobada.
+6. **Comercial:** preflight, bloqueo por datos incompletos, envío, aprobación, segunda confirmación de traspaso y Roadmap.
+7. **Accesibilidad:** teclado y foco en botones, selector de versiones, textos largos, resúmenes y formularios de conciliación; scroll horizontal sin desbordes globales.
+
+**Validación efectuada:** auditoría de código y CSS del repositorio remoto. **No** se ejecutaron Vitest, TypeScript ni build en el entorno del usuario desde este chat; requieren confirmación local antes de PR. Sin migraciones, cambios de backend, cambios de contratos ni modificación de `master`.
