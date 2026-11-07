@@ -242,15 +242,15 @@ export function QuotationCommercialLifecycleCard({
       <div className={styles.v5Actions}>
         {commercialDialogs}
         {version.status === 'draft' &&
-          <Button variant="outline" className={styles.v5Send}
+          <Button variant="outline"
             disabled={!canOperate || busy}
             onClick={() => void markSent()}>Marcar como enviada al cliente</Button>}
         {(version.status === 'sent' || version.status === 'draft') &&
-          <Button className={styles.v5Approve}
+          <Button variant="secondary"
             disabled={!canOperate || busy}
             onClick={openApproval}>Registrar aprobación del cliente</Button>}
         {version.status === 'approved' && !transferred &&
-          <Button className={styles.v5Approve}
+          <Button variant="secondary"
             disabled={!canOperate || busy}
             onClick={openTransfer}>Traspasar al proyecto</Button>}
         {transferred && <p className={styles.success}>Cotización aprobada y traspasada.</p>}

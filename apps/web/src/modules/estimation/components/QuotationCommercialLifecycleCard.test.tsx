@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ProjectDetail, ProjectQuotation, QuotationVersion } from '@kora/contracts';
 import { QuotationCommercialLifecycleCard } from './QuotationCommercialLifecycleCard';
+import buttonStyles from '@/shared/components/ui/Button.module.css';
 
 const mocks = vi.hoisted(() => ({
   acceptAi: vi.fn(), markSent: vi.fn(), approveClient: vi.fn(), transferApproved: vi.fn(),
@@ -68,8 +69,18 @@ describe('Ciclo comercial separado · Kora', () => {
     render(<QuotationCommercialLifecycleCard project={project} quotation={quotation}
       version={{ ...version, aiReviewStatus: 'accepted' }} canOperate
       hasUnsavedChanges={false} embedded showAiAcceptance={false} />);
-    expect(screen.getByRole('button', { name: 'Marcar como enviada al cliente' })).toBeEnabled();
-    expect(screen.getByRole('button', { name: 'Registrar aprobación del cliente' })).toBeEnabled();
+    const requiredClass = (value: string | undefined) => {
+      if (!value) throw new Error('Clase compartida Button ausente');
+      return value;
+    };
+    expect(screen.getByRole('button', { name: 'Marcar como enviada al cliente' }))
+      .toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Marcar como enviada al cliente' }))
+      .toHaveClass(requiredClass(buttonStyles.outline));
+    expect(screen.getByRole('button', { name: 'Registrar aprobación del cliente' }))
+      .toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Registrar aprobación del cliente' }))
+      .toHaveClass(requiredClass(buttonStyles.secondary));
     expect(screen.queryByText('Ciclo comercial de la cotización')).not.toBeInTheDocument();
     expect(screen.queryByText('Opciones de aprobación y traspaso')).not.toBeInTheDocument();
     expect(screen.queryByText('La fuente documental es el PDF KDM de prueba.'))
