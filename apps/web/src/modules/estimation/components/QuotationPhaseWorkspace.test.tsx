@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { quotationDraftDataSchema, quotationReferenceEdtSchema } from '@kora/contracts';
 import { QuotationPhaseWorkspace, referenceTasksForPhase, referencePhasesFromEdt } from './QuotationPhaseWorkspace';
+import buttonStyles from '@/shared/components/ui/Button.module.css';
 
 const dev = '0777e456-fd76-445e-83f1-afc25061c103';
 const qa = '0777e456-fd76-445e-83f1-afc25061c104';
@@ -157,6 +158,21 @@ describe('Cotización HTML v5 · fases y tareas', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Eliminar' }));
     expect(callbacks.onRemovePhase).not.toHaveBeenCalled();
     vi.restoreAllMocks();
+  });
+
+  it('reutiliza Button Kora en las acciones sin cambiar sus callbacks ni permisos', () => {
+    renderEditor();
+    expect(screen.getByRole('button', { name: 'Asignar equipos Kora' }))
+      .toHaveClass(buttonStyles.button, buttonStyles.secondary);
+    expect(screen.getByRole('button', { name: '+ Agregar fase / módulo' }))
+      .toHaveClass(buttonStyles.button, buttonStyles.outline);
+    screen.getAllByText('Tareas').forEach((title) => title.closest('details')?.setAttribute('open', ''));
+    expect(screen.getAllByRole('button', { name: '+ Agregar tarea' })[0])
+      .toHaveClass(buttonStyles.button, buttonStyles.outline);
+    expect(screen.getAllByRole('button', { name: 'Ver plantilla' })[0])
+      .toHaveClass(buttonStyles.button, buttonStyles.tertiary);
+    fireEvent.click(screen.getByRole('button', { name: 'Asignar equipos Kora' }));
+    expect(callbacks.onOpenRoleMapping).toHaveBeenCalledOnce();
   });
 
   it('muestra añadir tarea, Excel y plantilla dentro de cada fase EDT', () => {

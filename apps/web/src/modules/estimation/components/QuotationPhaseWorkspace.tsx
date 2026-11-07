@@ -1,6 +1,7 @@
 import type { QuotationDraftData, QuotationReferenceEdt } from '@kora/contracts';
 import { quotationEdtAssignments } from '@kora/contracts';
 import { Card } from '@/shared/components/ui/Card';
+import { Button } from '@/shared/components/ui/Button';
 import { quotationTeamColor } from './quotation-team-colors';
 import { QuotationGroupHoursInput } from './QuotationGroupHoursInput';
 import { downloadQuotationTaskTemplate } from '../lib/quotation-task-excel';
@@ -177,8 +178,8 @@ export function QuotationPhaseWorkspace({
             <p>{unmappedRoles.length} perfil(es) pendientes. La EDT conserva las actividades y HH,
               pero sus perfiles no son equipos. Completa la asociación antes de distribuir tareas.</p>
           </div>
-          {onOpenRoleMapping && <button type="button" disabled={!editable}
-            onClick={onOpenRoleMapping}>Asignar equipos Kora</button>}
+          {onOpenRoleMapping && <Button variant="secondary" size="sm" disabled={!editable}
+            onClick={onOpenRoleMapping}>Asignar equipos Kora</Button>}
         </div>
       )}
       <div className={styles.phases}>
@@ -211,12 +212,12 @@ export function QuotationPhaseWorkspace({
                   {hh(total)} HH · semanas {phase.startWeek} a {phase.startWeek + phase.durationWeeks - 1}
                 </span>
                 {editable && (!edt || stageCode?.startsWith('KS-')) && (
-                  <button type="button" className={styles.remove}
+                  <Button variant="tertiary" size="sm" className={styles.remove}
                     onClick={() => {
                       if (!window.confirm('¿Eliminar esta fase y sus tareas comerciales?')) return;
                       if (stageCode?.startsWith('KS-')) onRemoveCommercialPhase?.(stageCode);
                       else onRemovePhase(index);
-                    }}>Eliminar</button>
+                    }}>Eliminar</Button>
                 )}
               </div>
               <div className={styles.phaseFields}>
@@ -339,9 +340,9 @@ export function QuotationPhaseWorkspace({
                   )}
                   {editable && edt && stageCode && onAddTask && (
                     <div className={styles.addRow}>
-                      <button type="button" className={styles.add} onClick={() => onAddTask(stageCode)}>
+                      <Button variant="outline" size="sm" onClick={() => onAddTask(stageCode)}>
                         + Agregar tarea
-                      </button>
+                      </Button>
                       <label className={styles.add + ' ' + styles.importAction}>
                         Importar Excel
                         <input type="file" accept=".xlsx,.xls,.csv" hidden
@@ -352,11 +353,11 @@ export function QuotationPhaseWorkspace({
                             if (file) void onImportTaskExcel?.(stageCode, visibleName, file);
                           }}/>
                       </label>
-                      <button type="button" className={styles.templateLink}
+                      <Button variant="tertiary" size="sm" className={styles.templateLink}
                         disabled={!activeTeams.length}
                         onClick={() => downloadQuotationTaskTemplate(visibleName, activeTeams)}>
                         Ver plantilla
-                      </button>
+                      </Button>
                     </div>
                   )}
                 </details>
@@ -368,9 +369,9 @@ export function QuotationPhaseWorkspace({
           <p className={styles.empty}>Todavía no hay fases definidas.</p>}
       </div>
       {editable && (
-        <button className={styles.add} type="button" onClick={onAddPhase}>
+        <Button variant="outline" size="sm" onClick={onAddPhase}>
           + Agregar fase / módulo
-        </button>
+        </Button>
       )}
       {displayPhases.length > 0 && (
         <section className={styles.roadmap} aria-labelledby="quotation-roadmap-title">

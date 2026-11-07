@@ -1,14 +1,14 @@
 /* HTML v5 — tarjetas de módulos, tareas, semanas y roadmap. */
 .surface{display:grid;gap:13px;min-width:0}
 .head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
-.head h2,.head h3{margin:0;font-size:15px;font-weight:750;color:#111a2f}
-.head h3{font-size:14px}.head p{font-size:11.5px;color:#7b8496;margin:0}
+.head h2,.head h3{margin:0;font-size:15px;font-weight:750;color:var(--kora-text)}
+.head h3{font-size:14px}.head p{font-size:11.5px;color:var(--kora-text-muted);margin:0}
 .phases{display:grid;gap:14px}
-.phase{background:#f8f9fc;border:1px solid #e0e4ed;border-radius:11px;padding:15px;min-width:0;display:grid;gap:13px}
+.phase{background:var(--kora-surface-alt);border:1px solid var(--kora-border-subtle);border-radius:var(--kora-radius);padding:15px;min-width:0;display:grid;gap:13px}
 .phaseHeader{display:flex;align-items:center;gap:10px;min-width:0}
-.phaseBadge{flex:0 0 auto;background:#111a2e;color:#fff;font-size:11px;font-weight:750;border-radius:100px;padding:4px 10px}
-.phaseDescription{color:#7b8496;font-size:12px;font-weight:500}
-.remove{all:unset;color:#c72927;text-decoration:underline;cursor:pointer;font-size:12px;margin-left:auto}
+.phaseBadge{flex:0 0 auto;background:var(--kora-navy);color:var(--kora-surface);font-size:11px;font-weight:750;border-radius:var(--kora-radius-pill);padding:4px 10px}
+.phaseDescription{color:var(--kora-text-muted);font-size:12px;font-weight:500}
+.remove{color:var(--kora-danger);text-decoration:underline;margin-left:auto;min-width:0}
 .phaseFields{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(110px,.85fr) minmax(110px,.85fr);gap:10px}
 .phaseFields label,.phaseTeams label{display:grid;gap:6px;font-size:12px;color:#182338;font-weight:550;min-width:0}
 .phaseFields input,.phaseTeams input{font:inherit;min-width:0;width:100%;height:38px;border:1px solid #e0e4ec;border-radius:8px;background:white;color:#152238;padding:8px 10px;font-size:12.5px}
@@ -60,12 +60,10 @@
 @media(max-width:510px){.phaseFields{grid-template-columns:1fr 1fr}.phaseFields label:first-child{grid-column:1/-1}.phaseTeams{grid-template-columns:1fr}.timelineRow{grid-template-columns:95px minmax(0,1fr)}.axis{padding-left:104px}}
 
 .mappingNotice{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;
- padding:12px 14px;border:1px solid #e4d9f6;background:#f8f5ff;border-radius:10px}
-.mappingNotice strong{font-size:12.5px;color:#4c2881}
-.mappingNotice p{margin:4px 0 0;font-size:11.5px;line-height:1.5;color:#6d5c87}
-.mappingNotice button{flex:none;border:1px solid #6b21a8;background:#6b21a8;color:white;
- border-radius:8px;padding:9px 12px;font:inherit;font-size:11.5px;font-weight:650;cursor:pointer}
-.mappingNotice button:disabled{opacity:.55;cursor:not-allowed}
+ padding:12px 14px;border:1px solid var(--kora-border-subtle);background:var(--kora-blue-surface-alt);border-radius:var(--kora-radius)}
+.mappingNotice strong{font-size:12.5px;color:var(--kora-navy)}
+.mappingNotice p{margin:4px 0 0;font-size:11.5px;line-height:1.5;color:var(--kora-text-muted)}
+.mappingNotice button{flex:none}
 .taskName .taskRole{color:#596579;font-size:10.5px}
 
 /* Fidelidad v5: filas compactas sin metadatos Gemini a la vista.
