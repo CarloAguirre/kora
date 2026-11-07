@@ -69,3 +69,8 @@ variantes nativas, acceso solo lectura, callback, EDT pendiente y modo Planifica
 El conector GitHub confirma los cambios y el commit, no ejecuta estas pruebas.
 
 Siguientes: UI-3 tokens y responsive; UI-4 auditoría transversal.
+
+Nota de ajuste estático UI-2: se tipa explícitamente la referencia EDT del test en
+ambos renders y se aumenta la especificidad de las clases locales de tamaño
+para evitar que la hoja de estilos compartida `Button.icon` altere las medidas
+de 28×28 px (tabla) y 22×24 px (drawer) por orden de carga de CSS Modules.

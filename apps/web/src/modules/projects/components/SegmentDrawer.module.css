@@ -175,7 +175,7 @@
   max-width: 100%;
 }
 .taskActions { flex: 0 0 auto; gap: 2px; }
-.taskActionIcon {
+.taskActions .taskActionIcon {
   /* Button ghost icon con dimensiones locales para no ampliar el drawer. */
   width: 22px; height: 24px; padding: 3px; color: var(--kora-text-muted);
 }

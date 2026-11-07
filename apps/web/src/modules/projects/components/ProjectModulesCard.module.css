@@ -550,7 +550,7 @@
 
 /* La última columna no lleva título: solo iconos de edición y eliminación. */
 .operationalTaskActions { white-space: nowrap; }
-.taskIconAction {
+.operationalTaskActions .taskIconAction {
   /* El Button ghost icon pone la interacción; estas medidas conservan la tabla v5.02. */
   width: 28px; height: 28px; margin-left: 3px;
   color: var(--kora-text-muted);

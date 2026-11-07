@@ -110,10 +110,10 @@ describe('Tabla operativa compartida de tareas', () => {
     const reference = {
       wbs: 'WBS-UI-1', name: 'Referencia EDT', role: 'QA',
       teamId: 'team-1', hours: 8,
-    };
+    } as unknown as AppliedQuotationPlanning['modules'][number]['tasks'][number];
     const onDeleteReference = vi.fn();
     const { rerender } = render(<ProjectPhaseTasksTable module={module} canManage
-      references={[reference as unknown as AppliedQuotationPlanning['modules'][number]['tasks'][number]]} onDeleteReference={onDeleteReference}
+      references={[reference]} onDeleteReference={onDeleteReference}
       referenceDeletePending />);
     const edit = screen.getByRole('button', { name: 'Editar tarea Referencia EDT' });
     const remove = screen.getByRole('button', { name: 'Eliminar tarea Referencia EDT' });
