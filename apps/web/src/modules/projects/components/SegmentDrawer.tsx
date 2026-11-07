@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import {
-  PROJECT_MODULE_TASK_STATUS_LABELS,
   type ProjectDetail,
   type ProjectModule,
   type ProjectModuleSegment,
@@ -9,6 +8,8 @@ import {
 } from '@kora/contracts';
 import { Modal } from '@/shared/components/ui/Modal';
 import { Button } from '@/shared/components/ui/Button';
+import { Badge, type BadgeTone } from '@/shared/components/ui/Badge';
+import { RoadmapTaskStatusBadges } from './RoadmapTaskStatusBadges';
 import { TextField } from '@/shared/components/ui/TextField';
 import { CopyIcon, PencilIcon, TrashIcon } from '@/shared/components/icons/Icons';
 import { useToast } from '@/shared/components/ui/Toast';
@@ -101,10 +102,8 @@ export function SegmentDrawer({
       : delivery?.status === 'delivered' ? 'Entregada'
         : segment.endDate < today ? 'Vencido'
           : segment.startDate <= today ? 'En curso' : 'Próximo';
-  const stateClass = deliveryOverdue || state === 'Vencido' ? styles.stateOverdue
-    : state === 'Cerrado' || state === 'Entregada' ? styles.stateClosed
-      : styles.statePending;
-
+  const stateTone: BadgeTone = deliveryOverdue || state === 'Vencido' ? 'danger'
+    : state === 'Cerrado' || state === 'Entregada' ? 'success' : 'neutral';
   const tasksAreApproved = tasks.length > 0 && tasks.every((task) => task.status === 'done');
   const canShowDeliveryAction = !readOnly && delivery?.status === 'planned' && Boolean(onEdit) &&
     Boolean(delivery.canManage);
@@ -178,8 +177,8 @@ export function SegmentDrawer({
             <small>Líder: {team?.leader?.fullName ?? 'Sin líder asignado'}</small>
           </div>
         </div>
-        <span className={[styles.state, stateClass].join(' ')} aria-label={'Estado: ' + state}>
-          <span aria-hidden="true">●</span> {state}
+        <span aria-label={'Estado: ' + state}>
+          <Badge tone={stateTone} className={styles.blockState}>{state}</Badge>
         </span>
       </div>
 
@@ -297,27 +296,12 @@ export function SegmentDrawer({
                 {' '}· Límite {dateFull(task.date)}</small>
             </div>
             <span className={styles.taskStatusGroup}>
-              <span className={[styles.taskStatus,
-                task.assigneeUserId ? styles.taskStatusWithDot : '',
-                !task.assigneeUserId ? styles.taskUnassigned :
-                  task.status === 'done' ? styles.taskApproved :
-                    task.status === 'in_review' ? styles.taskReview :
-                      task.status === 'in_progress' ? styles.taskInProgress :
-                        styles.taskPending].filter(Boolean).join(' ')}>
-                {task.assigneeUserId ? PROJECT_MODULE_TASK_STATUS_LABELS[task.status] : 'Por asignar'}
-              </span>
-              {task.assigneeUserId && task.status === 'in_progress' &&
-                Boolean(task.rejectionReason?.trim()) &&
-                <span className={[styles.taskStatus, styles.taskStatusWithDot,
-                  styles.taskReturned].join(' ')} title={task.rejectionReason ?? undefined}>
-                  Devuelta
-                </span>}
-              {task.assigneeUserId && (task.status === 'todo' || task.status === 'in_progress') &&
-                task.date < today &&
-                <span className={[styles.taskStatus, styles.taskStatusWithDot,
-                  styles.taskOverdue].join(' ')}>Vencida</span>}
-            </span>
-            <div className={styles.taskActions}>
+               <RoadmapTaskStatusBadges status={task.status}
+                 assigned={Boolean(task.assigneeUserId)}
+                 rejectionReason={task.rejectionReason}
+                 overdue={task.date < today} />
+             </span>
+             <div className={styles.taskActions}>
               {!readOnly && onEditTask && <button type="button" title="Editar tarea"
                 aria-label={'Editar tarea ' + task.name} onClick={() => onEditTask(task)}>
                 <PencilIcon size={14} />

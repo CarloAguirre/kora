@@ -144,22 +144,16 @@ describe('Bloque operativo: fidelidad de los tres estados v5.02', () => {
       ],
     });
     const dialog = screen.getByRole('dialog', { name: 'Bot de conciliación' });
-    const expected = [
-      ['Aprobada', 'taskApproved'],
-      ['Completada', 'taskReview'],
-      ['En curso', 'taskInProgress'],
-      ['Pendiente', 'taskPending'],
-      ['Por asignar', 'taskUnassigned'],
-    ] as const;
-    for (const [name, colorClass] of expected) {
+    for (const [name, tone] of [
+      ['Aprobada', 'success'], ['Completada', 'warning'], ['En curso', 'info'],
+      ['Pendiente', 'neutral'], ['Por asignar', 'unassigned'],
+    ] as const) {
       const chip = within(dialog).getByText(name);
-      expect(chip.className).toContain(colorClass);
-      if (name === 'Por asignar') {
-        expect(chip.className).not.toContain('taskStatusWithDot');
-      } else {
-        expect(chip.className).toContain('taskStatusWithDot');
-      }
+      expect(chip.className).toContain('badge');
+      expect(chip.className).toContain(tone);
     }
+    expect(within(dialog).getByText('Aprobada').querySelector('span'))
+      .toHaveAttribute('aria-hidden', 'true');
   });
 
   it('muestra En curso, Devuelta y Vencida juntos con punto de color, y conserva el motivo', () => {
@@ -169,12 +163,15 @@ describe('Bloque operativo: fidelidad de los tres estados v5.02', () => {
       date: '2026-10-10',
     }] });
     const dialog = screen.getByRole('dialog', { name: 'Bot de conciliación' });
-    for (const name of ['En curso', 'Devuelta', 'Vencida']) {
+    for (const [name, tone] of [
+      ['En curso', 'info'], ['Devuelta', 'warning'], ['Vencida', 'danger'],
+    ] as const) {
       const chip = within(dialog).getByText(name);
-      expect(chip.className).toContain('taskStatus');
-      expect(chip.className).toContain('taskStatusWithDot');
+      expect(chip.className).toContain('badge');
+      expect(chip.className).toContain(tone);
     }
-    expect(within(dialog).getByText('Devuelta')).toHaveAttribute('title', 'Corregir integración de fechas');
+    expect(within(dialog).getByText('Devuelta').parentElement)
+      .toHaveAttribute('title', 'Corregir integración de fechas');
   });
 
   it('muestra HH reales de bitácora por tarea sin inventar datos históricos', () => {

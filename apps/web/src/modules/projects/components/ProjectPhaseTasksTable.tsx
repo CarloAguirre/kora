@@ -1,11 +1,11 @@
 import type { ReactNode } from 'react';
 import {
-  PROJECT_MODULE_TASK_STATUS_LABELS,
   type AppliedQuotationPlanning, type ProjectModule, type ProjectModuleTask, type ProjectTeam,
 } from '@kora/contracts';
 import { PencilIcon, CopyIcon, TrashIcon } from '@/shared/components/icons/Icons';
 import { roleFromTeamName } from '@/modules/client-portal/adapters/project-detail.adapter';
 import styles from './ProjectModulesCard.module.css';
+import { RoadmapTaskStatusBadges } from './RoadmapTaskStatusBadges';
 
 type ReferenceTask = AppliedQuotationPlanning['modules'][number]['tasks'][number];
 type CommercialPhase = AppliedQuotationPlanning['modules'][number];
@@ -37,13 +37,6 @@ const operationalTeamColor = (name: string | null) => ({
   dev: '#ea7a1f', pmo: '#64748b', qa: '#3b82f6',
   ux: '#22a55a', ia: '#e0526b', rpa: '#14a3a0',
 })[roleFromTeamName(name)];
-const TABLE_TASK_STATUS_CLASS: Record<ProjectModuleTask['status'], string> = {
-  todo: styles.taskPending!,
-  in_progress: styles.taskInProgress!,
-  in_review: styles.taskReview!,
-  done: styles.taskApproved!,
-};
-
 /**
  * Tabla de tareas operativas compartida entre Líder/PMO y colaborador.
  * Los handlers son opcionales y se anulan siempre en modo solo lectura.
@@ -100,25 +93,10 @@ export function ProjectPhaseTasksTable({
                     }
                     return <span className={styles.unlinkedBlock}>Sin bloque de origen identificado</span>;
                   })()}</td>
-                  <td><span className={styles.taskStatusGroup}>
-                    {task.assigneeUserId
-                      ? <>
-                        <span className={[styles.taskState, styles.taskStateWithDot,
-                          TABLE_TASK_STATUS_CLASS[task.status]].join(' ')}>
-                          {PROJECT_MODULE_TASK_STATUS_LABELS[task.status]}
-                        </span>
-                        {task.status === 'in_progress' && Boolean(task.rejectionReason?.trim()) &&
-                          <span className={[styles.taskState, styles.taskStateWithDot,
-                            styles.taskReturned].join(' ')} title={task.rejectionReason ?? undefined}>
-                            Devuelta
-                          </span>}
-                        {(task.status === 'todo' || task.status === 'in_progress') &&
-                          parseDate(task.date) < today() &&
-                          <span className={[styles.taskState, styles.taskStateWithDot,
-                            styles.taskOverdue].join(' ')}>Vencida</span>}
-                      </>
-                      : <span className={styles.taskState}>Por asignar</span>}
-                  </span></td>
+                  <td><RoadmapTaskStatusBadges status={task.status}
+                    assigned={Boolean(task.assigneeUserId)}
+                    rejectionReason={task.rejectionReason}
+                    overdue={parseDate(task.date) < today()} /></td>
                   {!readOnly && (<td title={task.actualHours == null
                     ? 'Sin HH aprobadas asociadas explícitamente a esta tarea.'
                     : 'HH reales de bitácora aprobadas y vinculadas a esta tarea.'}>
@@ -161,7 +139,8 @@ export function ProjectPhaseTasksTable({
                       style={{ background: operationalTeamColor(teamName) }} />
                     {module.name} · {teamName}
                   </span> : <span className={styles.unlinkedBlock}>Sin bloque de origen identificado</span>}</td>
-                  <td><span className={styles.taskState} title={'Equipo: ' + teamName}>Por asignar</span></td>
+                  <td><RoadmapTaskStatusBadges status="todo" assigned={false}
+                    unassignedTitle={'Equipo: ' + teamName} /></td>
                   {!readOnly && <td>{reference.hours} / —</td>}
                   <td>—</td>
                   {showActions && (<td className={styles.operationalTaskActions}>

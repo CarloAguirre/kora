@@ -33,22 +33,11 @@
 .teamDetails { display: grid; gap: 3px; min-width: 0; }
 .teamDetails strong { font-size: 13px; font-weight: 700; }
 .teamDetails small { color: var(--drawer-muted); font-size: 11px; }
-.state {
-  display: inline-flex;
-  align-items: center;
-  flex: none;
-  gap: 5px;
-  border-radius: 999px;
-  padding: 4px 10px;
+.blockState {
   font-size: 10px;
+  padding: 4px 10px;
   line-height: 1.25;
-  font-weight: 600;
-  white-space: nowrap;
 }
-.state > span { font-size: 8px; }
-.stateClosed { color: #268347; background: #e6f6e8; }
-.stateOverdue { color: #c94b43; background: #fde9e8; }
-.statePending { color: #54627a; background: #f0f2f6; }
 .metrics {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -194,28 +183,6 @@
   gap: 4px;
   max-width: 100%;
 }
-.taskStatus {
-  display: inline-flex; align-items: center; flex: 0 0 auto; gap: 5px;
-  padding: 5px 9px; border-radius: 999px;
-  font-size: 11px; font-weight: 400; line-height: normal;
-  white-space: nowrap;
-}
-/* Igual al Roadmap: todos los estados llevan punto, excepto «Por asignar». */
-.taskStatusWithDot::before {
-  content: '';
-  display: inline-block;
-  width: 6px; height: 6px;
-  flex: 0 0 6px;
-  border-radius: 50%;
-  background: currentColor;
-}
-.taskApproved { background: #e2f5e5; color: #268044; }
-.taskReview { background: #fff1dd; color: #96600c; }
-.taskInProgress { background: #e6f1ff; color: #245b9b; }
-.taskPending { background: #f1f3f7; color: #64738a; }
-.taskReturned { background: #fff0d2; color: #a3660d; }
-.taskOverdue { background: #fde9e8; color: #c83d36; }
-.taskUnassigned { background: #ede9fe; color: #6d28d9; }
 .taskActions { flex: 0 0 auto; gap: 2px; }
 .taskActions button {
   cursor: pointer; border: none; background: transparent;
@@ -229,5 +196,5 @@
   .drawer .content { gap: 12px; }
   .metrics { padding: 10px 8px; }
   .taskRow { flex-wrap: wrap; }
-  .taskStatus { margin-left: auto; }
+  .taskStatusGroup { margin-left: auto; }
 }

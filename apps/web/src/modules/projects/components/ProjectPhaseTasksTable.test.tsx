@@ -44,4 +44,31 @@ describe('Tabla operativa compartida de tareas', () => {
     expect(onDeleteTask).not.toHaveBeenCalled();
     expect(onAddTask).not.toHaveBeenCalled();
   });
+  it('usa Badge nativo y conserva etiquetas adicionales y referencias sin asignación', () => {
+    const altered = {
+      ...module,
+      tasks: [
+        { ...module.tasks[0]!, status: 'in_review', date: '2099-11-15' },
+        { ...module.tasks[1]!, status: 'in_progress', date: '2020-01-01',
+          rejectionReason: 'Corregir validaciones' },
+        { ...module.tasks[1]!, id: 'task-3', name: 'Sin asignación',
+          assigneeUserId: null, status: 'todo', date: '2020-01-01' },
+        { ...module.tasks[0]!, id: 'task-4', name: 'Tarea aprobada',
+          status: 'done', date: '2020-01-01' },
+      ],
+    } as ProjectModule;
+    render(<ProjectPhaseTasksTable module={altered} canManage={false} />);
+    for (const [label, tone] of [
+      ['Completada', 'warning'], ['En curso', 'info'], ['Devuelta', 'warning'],
+      ['Vencida', 'danger'], ['Por asignar', 'unassigned'], ['Aprobada', 'success'],
+    ] as const) {
+      const badge = screen.getByText(label);
+      expect(badge.className).toContain('badge');
+      expect(badge.className).toContain(tone);
+    }
+    expect(screen.getByText('Devuelta').parentElement)
+      .toHaveAttribute('title', 'Corregir validaciones');
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
+
 });
