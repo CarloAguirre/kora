@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
-import type { ProjectModule } from '@kora/contracts';
+import { fireEvent, render, screen, within } from '@testing-library/react';
+import type { AppliedQuotationPlanning, ProjectModule } from '@kora/contracts';
 import { ProjectPhaseTasksTable } from './ProjectPhaseTasksTable';
 
 const module = {
@@ -68,6 +68,62 @@ describe('Tabla operativa compartida de tareas', () => {
     }
     expect(screen.getByText('Devuelta').parentElement)
       .toHaveAttribute('title', 'Corregir validaciones');
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
+
+  it('usa Button ghost icon y tertiary con los mismos callbacks y etiquetas accesibles', () => {
+    const onEditTask = vi.fn(), onDuplicateTask = vi.fn(),
+      onDeleteTask = vi.fn(), onAddTask = vi.fn();
+    render(<ProjectPhaseTasksTable module={module} canManage
+      onEditTask={onEditTask} onDuplicateTask={onDuplicateTask}
+      onDeleteTask={onDeleteTask} onAddTask={onAddTask} />);
+    for (const name of [
+      'Editar tarea Análisis de flujos existentes',
+      'Duplicar tarea Análisis de flujos existentes',
+      'Eliminar tarea Análisis de flujos existentes',
+    ]) {
+      const action = screen.getByRole('button', { name });
+      expect(action.className).toContain('ghost');
+      expect(action.className).toContain('icon');
+      expect(action).toHaveAttribute('type', 'button');
+      expect(action).toBeEnabled();
+    }
+    fireEvent.click(screen.getByRole('button', {
+      name: 'Editar tarea Análisis de flujos existentes',
+    }));
+    fireEvent.click(screen.getByRole('button', {
+      name: 'Duplicar tarea Análisis de flujos existentes',
+    }));
+    fireEvent.click(screen.getByRole('button', {
+      name: 'Eliminar tarea Análisis de flujos existentes',
+    }));
+    const add = screen.getByRole('button', { name: '+ Agregar tarea' });
+    expect(add.className).toContain('tertiary');
+    fireEvent.click(add);
+    expect(onEditTask).toHaveBeenCalledWith(module.tasks[0]);
+    expect(onDuplicateTask).toHaveBeenCalledWith(module.tasks[0]);
+    expect(onDeleteTask).toHaveBeenCalledWith(module.tasks[0]);
+    expect(onAddTask).toHaveBeenCalledOnce();
+  });
+
+  it('conserva botones EDT con eliminación bloqueada y nunca da gestión sin canManage', () => {
+    const reference = {
+      wbs: 'WBS-UI-1', name: 'Referencia EDT', role: 'QA',
+      teamId: 'team-1', hours: 8,
+    };
+    const onDeleteReference = vi.fn();
+    const { rerender } = render(<ProjectPhaseTasksTable module={module} canManage
+      references={[reference as unknown as AppliedQuotationPlanning['modules'][number]['tasks'][number]]} onDeleteReference={onDeleteReference}
+      referenceDeletePending />);
+    const edit = screen.getByRole('button', { name: 'Editar tarea Referencia EDT' });
+    const remove = screen.getByRole('button', { name: 'Eliminar tarea Referencia EDT' });
+    expect(edit.className).toContain('ghost');
+    expect(remove.className).toContain('ghost');
+    expect(remove).toBeDisabled();
+    fireEvent.click(remove);
+    expect(onDeleteReference).not.toHaveBeenCalled();
+    rerender(<ProjectPhaseTasksTable module={module} canManage={false}
+      references={[reference]} onDeleteReference={onDeleteReference} />);
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 

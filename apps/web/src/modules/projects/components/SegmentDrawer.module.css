@@ -105,24 +105,17 @@
 .deliveryInfo small { font-size: 10.5px; color: #65738a; }
 .closureNote { font-size: 11px; color: #64738a; margin: 0; line-height: 1.5; }
 .markDelivered {
-  justify-self: start;
-  cursor: pointer;
-  border: none;
-  border-radius: 5px;
-  background: #caff5d;
-  color: #102038;
-  padding: 8px 12px;
-  font-size: 11px;
-  font-weight: 700;
+  /* Color, hover y disabled pertenecen al Button primary de Kora. */
+  justify-self: start; height: auto; min-width: 0;
+  border-radius: 5px; padding: 8px 12px; font-size: 11px;
 }
-.markDelivered:hover:not(:disabled) { background: #baf13d; }
-/* El hover debe llegar al wrapper con title aunque el botón esté disabled. */
-.markDelivered:disabled { cursor: not-allowed; opacity: .62; pointer-events: none; }
+/* El wrapper conserva el title aunque el botón esté disabled. */
+.markDelivered:disabled { pointer-events: none; }
 .deliveryButtonWrapper { display: inline-flex; width: max-content; max-width: 100%; }
 .completionForm { display: grid; gap: 16px; min-width: 0; }
 .completionFooter { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
 .markDelivered:focus-visible, .addTask:focus-visible,
-.taskActions button:focus-visible { outline: 2px solid #3862a5; outline-offset: 2px; }
+.taskActionIcon:focus-visible { outline: 2px solid var(--kora-blue-600); outline-offset: 2px; }
 .deliveryForm { display: grid; gap: 7px; }
 .deliveryForm label { color: #344860; font-weight: 650; }
 .deliveryForm textarea {
@@ -157,12 +150,10 @@
 .tasksSection { padding-top: 9px; }
 .tasksHeading { justify-content: space-between; gap: 12px; }
 .addTask {
-  margin: 0; background: white; border: 1px solid #dde5ef;
-  border-radius: 7px; padding: 6px 9px;
-  font: inherit; font-size: 10.5px; font-weight: 600;
-  color: #213249; cursor: pointer;
+  /* Mantiene la escala compacta del drawer; usa Button outline del UI kit. */
+  height: 30px; min-width: 0; padding: 6px 9px;
+  border-radius: 7px; font-size: 10.5px; font-weight: 600;
 }
-.addTask:hover { background: #f6f8fc; }
 .taskList { list-style: none; margin: 0; padding: 0; }
 .taskRow {
   min-height: 50px;
@@ -184,13 +175,11 @@
   max-width: 100%;
 }
 .taskActions { flex: 0 0 auto; gap: 2px; }
-.taskActions button {
-  cursor: pointer; border: none; background: transparent;
-  color: #64728c; border-radius: 4px;
-  width: 22px; height: 24px; padding: 3px;
-  display: inline-flex; align-items: center; justify-content: center;
+.taskActionIcon {
+  /* Button ghost icon con dimensiones locales para no ampliar el drawer. */
+  width: 22px; height: 24px; padding: 3px; color: var(--kora-text-muted);
 }
-.taskActions button:hover { color: #12213a; background: #eef2f8; }
+.taskActionIcon:hover:not(:disabled) { color: var(--kora-navy); }
 .emptyTasks { font-size: 11px; color: #718093; margin: 0; }
 @media (max-width: 560px) {
   .drawer .content { gap: 12px; }

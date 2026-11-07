@@ -551,13 +551,12 @@
 /* La última columna no lleva título: solo iconos de edición y eliminación. */
 .operationalTaskActions { white-space: nowrap; }
 .taskIconAction {
-  display: inline-flex; align-items: center; justify-content: center;
+  /* El Button ghost icon pone la interacción; estas medidas conservan la tabla v5.02. */
   width: 28px; height: 28px; margin-left: 3px;
-  color: #64748b; border: 0; border-radius: 6px; background: transparent;
-  cursor: pointer;
+  color: var(--kora-text-muted);
 }
-.taskIconAction:hover { background: #eef1f6; color: #0f1729; }
-.taskIconAction:focus-visible { outline: 2px solid #0f1729; }
+.taskIconAction:hover:not(:disabled) { color: var(--kora-navy); }
+.taskIconAction:focus-visible { outline: 2px solid var(--kora-navy); }
 
 /* Acciones de tareas en el panel lateral de bloque operativo. */
 .drawerTaskHeading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
@@ -575,12 +574,11 @@
 .operationalTaskTable td:last-child { padding-right: 6px; }
 .operationalTaskActions .taskIconAction + .taskIconAction { margin-left: 6px; }
 .addTaskButton {
-  margin: 7px 0 4px; padding: 4px 0;
-  border: 0; background: transparent; color: #132b4b;
-  font: inherit; font-size: 12px; font-weight: 600; text-decoration: underline;
-  cursor: pointer;
+  /* Presentación de enlace bajo la tabla, con foco y hover del Button tertiary. */
+  height: auto; min-width: 0; margin: 7px 0 4px; padding: 4px 0;
+  font-size: 12px; font-weight: 600; text-decoration: underline;
 }
-.addTaskButton:focus-visible { outline: 2px solid #385a89; outline-offset: 2px; }
+.addTaskButton:focus-visible { outline: 2px solid var(--kora-navy); outline-offset: 2px; }
 
 /* Información temporal junto al nombre, como la cabecera de fases v5.02. */
 .phaseHeadingIdentity {

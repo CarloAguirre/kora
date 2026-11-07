@@ -81,6 +81,8 @@ function show(overrides: {
   tasks?: ProjectModuleTask[];
   onAddTask?: () => void;
   onDeleteTask?: (task: ProjectModuleTask) => void;
+  onAssignTasks?: () => void;
+  reference?: SegmentDrawerProps['reference'];
   onChangeClosure?: SegmentDrawerProps['onChangeClosure'];
   actualPercent?: number;
   readOnly?: boolean;
@@ -99,6 +101,7 @@ function show(overrides: {
     },
     onClose: vi.fn(), onEdit: vi.fn(), onDelete: vi.fn(), readOnly: overrides.readOnly,
     onAddTask: overrides.onAddTask, onDeleteTask: overrides.onDeleteTask,
+    reference: overrides.reference, onAssignTasks: overrides.onAssignTasks,
     onChangeClosure: overrides.onChangeClosure,
     onEditTask: vi.fn(), onDuplicateTask: vi.fn(),
   };
@@ -366,6 +369,40 @@ describe('Bloque operativo: fidelidad de los tres estados v5.02', () => {
     expect(screen.getByLabelText('Estado: Entregada')).toBeInTheDocument();
     expect(screen.getByText(/Entrega presentada; pendiente de aprobación/)).toBeInTheDocument();
     expect(screen.queryByText(/Cerrado por entrega/)).not.toBeInTheDocument();
+  });
+});
+
+describe('Homologación UI-2 de acciones del bloque operativo', () => {
+  it('usa botones nativos y conserva los callbacks de tareas, EDT y entrega', () => {
+    const onAddTask = vi.fn(), onAssignTasks = vi.fn();
+    const reference = { tasks: [{
+      teamId: segment.teamId, wbs: 'WBS-EDT-1', role: 'QA', name: 'Validar EDT',
+    }] } as unknown as NonNullable<SegmentDrawerProps['reference']>;
+    show({ deliveries: [delivery('planned')], onAddTask, onAssignTasks, reference });
+    const dialog = screen.getByRole('dialog', { name: 'Bot de conciliación' });
+    for (const name of ['+ Agregar tarea', 'Asignar tareas EDT']) {
+      const button = within(dialog).getByRole('button', { name });
+      expect(button.className).toContain('outline');
+      expect(button).toHaveAttribute('type', 'button');
+      fireEvent.click(button);
+    }
+    expect(onAddTask).toHaveBeenCalledOnce();
+    expect(onAssignTasks).toHaveBeenCalledOnce();
+    for (const name of [
+      'Editar tarea Diseño del bot',
+      'Duplicar tarea Diseño del bot',
+      'Eliminar tarea Diseño del bot',
+    ]) {
+      const action = within(dialog).getByRole('button', { name });
+      expect(action.className).toContain('ghost');
+      expect(action.className).toContain('icon');
+      expect(action).toHaveAttribute('type', 'button');
+    }
+    const delivered = within(dialog).getByRole('button', { name: 'Marcar como entregado' });
+    expect(delivered.className).toContain('primary');
+    expect(delivered).toBeEnabled();
+    expect(delivered.parentElement).toHaveAttribute(
+      'title', 'Registrar el cierre del bloque con su entrega.');
   });
 });
 

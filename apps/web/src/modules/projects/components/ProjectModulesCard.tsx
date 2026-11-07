@@ -743,8 +743,8 @@ export function ProjectModulesCard({
             ))}
           </section>
         ) : undefined}
-        operationalFooter={canManage && planningMode ? <button type="button" className={styles.addPhaseButton}
-          onClick={() => setAddingPhase(true)}>+ Agregar fase</button> : undefined}
+        operationalFooter={canManage && planningMode ? <Button variant="tertiary" size="sm"
+          onClick={() => setAddingPhase(true)}>+ Agregar fase</Button> : undefined}
         onPlanOperationalRow={canManage && planningMode ? (phase, row) => {
           const module = modulesById.get(phase.id);
           const reference = appliedPlanning.data?.modules.find((item) => item.moduleId === phase.id)

@@ -41,3 +41,31 @@ El usuario ejecutó sobre `732324be` el `typecheck` Web (correcto), las pruebas 
 En `QuotationPhaseWorkspace.module.css` se eliminó una declaración huérfana de la limpieza de CSS de la Calculadora (viejo estilo `templateLink`) que dejaba una llave de cierre adicional e impedía compilar. Se conserva `importAction` y sus controles; no se modifica el flujo de importación.
 
 **Pendiente:** volver a ejecutar `typecheck`, Vitest y build locales sobre el nuevo HEAD; esta corrección fue revisada estáticamente vía GitHub, no declarada PASS sin log posterior.
+
+## UI-2 · Botones e iconos del Roadmap operativo (06-11-2026)
+
+Base de trabajo: `e00bf0caace371a8db0e28e4941d78ff2e6e1744`. Migración visual acotada a `Button` original
+de `apps/web/src/shared/components/ui`. Sin nuevos controles compartidos ni lógica duplicada.
+
+- `ProjectPhaseTasksTable`: editar, duplicar y eliminar tareas y referencias EDT
+  pasan a `Button variant="ghost" size="icon"`. Pie de tabla `+ Agregar tarea`
+  usa `Button tertiary sm` conservando apariencia de enlace. La eliminación EDT
+  conserva `referenceDeletePending`; las acciones solo aparecen con `canManage && !readOnly`.
+- `SegmentDrawer`: `+ Agregar tarea` y `Asignar tareas EDT` usan `Button outline sm`;
+  los tres iconos usan `Button ghost icon`; `Marcar como entregado` usa
+  `Button primary sm`. El wrapper mantiene tooltip cuando el botón está
+  deshabilitado. No se cambia cuándo pueden entregarse o cerrarse bloques.
+- `ProjectModulesCard`: el botón residual `+ Agregar fase` usa `Button tertiary sm`,
+  pero conserva exactamente `canManage && planningMode`.
+- Se restringe CSS local a tamaños/espaciado propios del Roadmap y se eliminan
+  estilos de hover/bordes/colores redundantes con el kit. Se mantienen
+  `aria-label`, `title`, handlers, iconos e identidad de los equipos.
+
+Pruebas ampliadas: `ProjectPhaseTasksTable.test.tsx`,
+`SegmentDrawer.test.tsx` y `ProjectModulesCard.phase-controls.test.tsx`:
+variantes nativas, acceso solo lectura, callback, EDT pendiente y modo Planificar.
+
+**Validación pendiente en local:** typecheck Web, Vitest Roadmap y build Web.
+El conector GitHub confirma los cambios y el commit, no ejecuta estas pruebas.
+
+Siguientes: UI-3 tokens y responsive; UI-4 auditoría transversal.

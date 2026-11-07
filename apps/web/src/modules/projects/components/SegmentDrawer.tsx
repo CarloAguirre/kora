@@ -246,9 +246,9 @@ export function SegmentDrawer({
           </div>
           {canShowDeliveryAction && <span className={styles.deliveryButtonWrapper}
             title={canMarkDelivered ? 'Registrar el cierre del bloque con su entrega.' : closeHint}>
-            <button type="button" className={styles.markDelivered}
+            <Button variant="primary" size="sm" className={styles.markDelivered}
               disabled={!canMarkDelivered || updateDelivery.isPending}
-              onClick={() => setShowDeliveryForm(true)}>Marcar como entregado</button>
+              onClick={() => setShowDeliveryForm(true)}>Marcar como entregado</Button>
           </span>}
         </> : <p className={styles.closureNote}>
           {segment.closedAt
@@ -281,10 +281,9 @@ export function SegmentDrawer({
       <section className={styles.tasksSection} aria-label="Tareas del bloque">
         <div className={styles.tasksHeading}>
           <h3>Tareas ({tasks.length})</h3>
-          {canAddTask && <button type="button" className={styles.addTask}
-            onClick={onAddTask}>+ Agregar tarea</button>}
-          {!readOnly && onAssignTasks && pendingReferences && <button type="button"
-            className={styles.addTask} onClick={onAssignTasks}>Asignar tareas EDT</button>}
+          {canAddTask && <Button variant="outline" size="sm" className={styles.addTask}
+            onClick={onAddTask}>+ Agregar tarea</Button>}
+          {!readOnly && onAssignTasks && pendingReferences && <Button variant="outline" size="sm" className={styles.addTask} onClick={onAssignTasks}>Asignar tareas EDT</Button>}
         </div>
         {tasks.length ? <ul className={styles.taskList}>
           {tasks.map((task) => <li key={task.id} className={styles.taskRow}>
@@ -302,18 +301,18 @@ export function SegmentDrawer({
                  overdue={task.date < today} />
              </span>
              <div className={styles.taskActions}>
-              {!readOnly && onEditTask && <button type="button" title="Editar tarea"
+              {!readOnly && onEditTask && <Button variant="ghost" size="icon" className={styles.taskActionIcon} title="Editar tarea"
                 aria-label={'Editar tarea ' + task.name} onClick={() => onEditTask(task)}>
                 <PencilIcon size={14} />
-              </button>}
-              {!readOnly && onDuplicateTask && <button type="button" title="Duplicar tarea"
+              </Button>}
+              {!readOnly && onDuplicateTask && <Button variant="ghost" size="icon" className={styles.taskActionIcon} title="Duplicar tarea"
                 aria-label={'Duplicar tarea ' + task.name} onClick={() => onDuplicateTask(task)}>
                 <CopyIcon size={14} />
-              </button>}
-              {!readOnly && onDeleteTask && <button type="button" title="Eliminar tarea"
+              </Button>}
+              {!readOnly && onDeleteTask && <Button variant="ghost" size="icon" className={styles.taskActionIcon} title="Eliminar tarea"
                 aria-label={'Eliminar tarea ' + task.name} onClick={() => onDeleteTask(task)}>
                 <TrashIcon size={14} />
-              </button>}
+              </Button>}
             </div>
           </li>)}
         </ul> : <p className={styles.emptyTasks}>Sin tareas operativas vinculadas a este bloque.</p>}

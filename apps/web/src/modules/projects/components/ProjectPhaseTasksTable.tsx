@@ -3,6 +3,7 @@ import {
   type AppliedQuotationPlanning, type ProjectModule, type ProjectModuleTask, type ProjectTeam,
 } from '@kora/contracts';
 import { PencilIcon, CopyIcon, TrashIcon } from '@/shared/components/icons/Icons';
+import { Button } from '@/shared/components/ui/Button';
 import { roleFromTeamName } from '@/modules/client-portal/adapters/project-detail.adapter';
 import styles from './ProjectModulesCard.module.css';
 import { RoadmapTaskStatusBadges } from './RoadmapTaskStatusBadges';
@@ -112,17 +113,17 @@ export function ProjectPhaseTasksTable({
                     {showActions && task.status === 'in_review' && !task.cancelledAt &&
                       onReviewTask?.(task)}
                     {showActions && <>
-                      <button type="button" className={styles.taskIconAction}
+                      <Button variant="ghost" size="icon" className={styles.taskIconAction}
                         aria-label={'Editar tarea ' + task.name} title="Editar tarea"
-                        onClick={() => onEditTask?.(task)}><PencilIcon size={15} /></button>
-                      {task.assigneeUserId && <button type="button" className={styles.taskIconAction}
+                        onClick={() => onEditTask?.(task)}><PencilIcon size={15} /></Button>
+                      {task.assigneeUserId && <Button variant="ghost" size="icon" className={styles.taskIconAction}
                         aria-label={'Duplicar tarea ' + task.name} title="Duplicar para otra persona"
                         onClick={() => onDuplicateTask?.(task)}>
                         <CopyIcon size={15} />
-                      </button>}
-                      <button type="button" className={styles.taskIconAction}
+                      </Button>}
+                      <Button variant="ghost" size="icon" className={styles.taskIconAction}
                         aria-label={'Eliminar tarea ' + task.name} title="Eliminar tarea"
-                        onClick={() => onDeleteTask?.(task)}><TrashIcon size={15} /></button>
+                        onClick={() => onDeleteTask?.(task)}><TrashIcon size={15} /></Button>
                     </>}
                   </td>)}
                 </tr>
@@ -145,15 +146,15 @@ export function ProjectPhaseTasksTable({
                   <td>—</td>
                   {showActions && (<td className={styles.operationalTaskActions}>
                     {showActions && <>
-                      <button type="button" className={styles.taskIconAction}
+                      <Button variant="ghost" size="icon" className={styles.taskIconAction}
                         aria-label={'Editar tarea ' + reference.name} title="Editar tarea"
-                        onClick={() => onEditReference?.(reference)}><PencilIcon size={15} /></button>
-                      <button type="button" className={styles.taskIconAction}
+                        onClick={() => onEditReference?.(reference)}><PencilIcon size={15} /></Button>
+                      <Button variant="ghost" size="icon" className={styles.taskIconAction}
                         aria-label={'Eliminar tarea ' + reference.name} title="Eliminar tarea"
                         disabled={referenceDeletePending}
                         onClick={() => onDeleteReference?.(reference)}>
                         <TrashIcon size={15} />
-                      </button>
+                      </Button>
                     </>}
                   </td>)}
                 </tr>;
@@ -161,8 +162,8 @@ export function ProjectPhaseTasksTable({
             </tbody>
           </table>
         </div> : <p className={styles.noOperationalTasks}>Sin tareas registradas en esta fase.</p>}
-        {showActions && <button type="button" className={styles.addTaskButton}
-          onClick={() => onAddTask?.()}>+ Agregar tarea</button>}
+        {showActions && <Button variant="tertiary" size="sm" className={styles.addTaskButton}
+          onClick={() => onAddTask?.()}>+ Agregar tarea</Button>}
       </details>
   );
 }
