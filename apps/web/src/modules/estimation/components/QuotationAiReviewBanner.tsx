@@ -1,5 +1,6 @@
 import type { QuotationVersion } from '@kora/contracts';
 import { Button } from '@/shared/components/ui/Button';
+import { Badge } from '@/shared/components/ui/Badge';
 import styles from './QuotationAiReviewBanner.module.css';
 
 /**
@@ -26,7 +27,9 @@ export function QuotationAiReviewBanner({
   if (version.aiReviewStatus === 'accepted') {
     return (
       <p className={styles.accepted} role="status">
-        ✦ Propuesta del agente IA, aceptada{acceptedBy ? ' por ' + acceptedBy : ''}.
+        <Badge tone="success">
+          Propuesta del agente IA, aceptada{acceptedBy ? ' por ' + acceptedBy : ''}.
+        </Badge>
         <span className={styles.srOnly}> La aprobación del cliente se registra aparte.</span>
       </p>
     );

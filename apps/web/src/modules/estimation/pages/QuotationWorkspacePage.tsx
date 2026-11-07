@@ -560,23 +560,25 @@ export function QuotationWorkspacePage() {
                 </div>
                 <div className={styles.versions}>
                   {versions.map((version) => (
-                    <button key={version.id} type="button" onClick={() => void selectVersion(version.id)}
+                    <Button key={version.id} size="sm"
+                      variant={selected?.id === version.id ? 'secondary' : 'outline'}
+                      className={styles.version}
+                      onClick={() => void selectVersion(version.id)}
                       aria-label={'Abrir versión ' + version.versionNumber}
-                      aria-pressed={selected?.id === version.id} title={version.name}
-                      className={[styles.version, selected?.id === version.id ? styles.selected : ''].join(' ')}>
+                      aria-pressed={selected?.id === version.id} title={version.name}>
                       v{version.versionNumber}{version.origin === 'ai' ? ' ✦' : ''}
-                    </button>
+                    </Button>
                   ))}
                   {mayWrite && <>
-                    <button type="button" className={styles.textAction} disabled={createVersion.isPending}
-                      onClick={() => void newVersion(selected?.id)}>+ Nueva versión</button>
-                    <button type="button" className={styles.textAction + ' ' + styles.aiAction}
+                    <Button variant="tertiary" size="sm" disabled={createVersion.isPending}
+                      onClick={() => void newVersion(selected?.id)}>+ Nueva versión</Button>
+                    <Button variant="tertiary" size="sm" disabled={createVersion.isPending}
                       onClick={() => void (async () => {
                         if (dirty && !await confirm({ title: 'Descartar cambios', description: 'Hay cambios sin guardar. ¿Deseas descartarlos?', confirmLabel: 'Descartar', destructive: true })) return;
                         setNewQuotationOpen(true);
-                      })()}>✦ Nueva versión con IA</button>
-                    <button type="button" className={styles.textAction} disabled={createVersion.isPending}
-                      onClick={() => void newVersion()}>En blanco</button>
+                      })()}>✦ Nueva versión con IA</Button>
+                    <Button variant="tertiary" size="sm" disabled={createVersion.isPending}
+                      onClick={() => void newVersion()}>En blanco</Button>
                   </>}
                 </div>
                 {selected && form && <>
@@ -659,12 +661,12 @@ export function QuotationWorkspacePage() {
                       onEditRoleCollaborators={editRoleCollaborators}
                       onEditMappedCollaborators={editMappedCollaborators}
                       mappingAction={form.draft.aiPoc && !aiRolesMapped
-                        ? <button type="button" className={styles.mappingLink}
+                        ? <Button variant="tertiary" size="sm"
                             disabled={dirty}
                             title={dirty ? 'Guarda el borrador antes de revisar la asignación de perfiles.' : undefined}
                             onClick={() => setRoleMappingOpen(true)}>
                             ✦ Resolver correspondencia pendiente con equipos Kora
-                          </button> : null}
+                          </Button> : null}
                     />
                   </Card>
 
