@@ -4,6 +4,15 @@ import { quotationDraftDataSchema, quotationReferenceEdtSchema } from '@kora/con
 import { QuotationPhaseWorkspace, referenceTasksForPhase, referencePhasesFromEdt } from './QuotationPhaseWorkspace';
 import buttonStyles from '@/shared/components/ui/Button.module.css';
 
+// Los tipos generados para CSS Modules contemplan claves ausentes.
+// Validamos su existencia antes de pasarlas a toHaveClass, sin ocultar un
+// posible cambio de nombre o una exportación CSS rota.
+const nativeButtonClass = (variant: 'button' | 'secondary' | 'outline' | 'tertiary'): string => {
+  const className = buttonStyles[variant];
+  if (!className) throw new Error('Falta la clase nativa Button.' + variant);
+  return className;
+};
+
 const dev = '0777e456-fd76-445e-83f1-afc25061c103';
 const qa = '0777e456-fd76-445e-83f1-afc25061c104';
 const teams = new Map([[dev, 'Desarrollo'], [qa, 'QA']]);
@@ -163,14 +172,14 @@ describe('Cotización HTML v5 · fases y tareas', () => {
   it('reutiliza Button Kora en las acciones sin cambiar sus callbacks ni permisos', () => {
     renderEditor();
     expect(screen.getByRole('button', { name: 'Asignar equipos Kora' }))
-      .toHaveClass(buttonStyles.button, buttonStyles.secondary);
+      .toHaveClass(nativeButtonClass('button'), nativeButtonClass('secondary'));
     expect(screen.getByRole('button', { name: '+ Agregar fase / módulo' }))
-      .toHaveClass(buttonStyles.button, buttonStyles.outline);
+      .toHaveClass(nativeButtonClass('button'), nativeButtonClass('outline'));
     screen.getAllByText('Tareas').forEach((title) => title.closest('details')?.setAttribute('open', ''));
     expect(screen.getAllByRole('button', { name: '+ Agregar tarea' })[0])
-      .toHaveClass(buttonStyles.button, buttonStyles.outline);
+      .toHaveClass(nativeButtonClass('button'), nativeButtonClass('outline'));
     expect(screen.getAllByRole('button', { name: 'Ver plantilla' })[0])
-      .toHaveClass(buttonStyles.button, buttonStyles.tertiary);
+      .toHaveClass(nativeButtonClass('button'), nativeButtonClass('tertiary'));
     fireEvent.click(screen.getByRole('button', { name: 'Asignar equipos Kora' }));
     expect(callbacks.onOpenRoleMapping).toHaveBeenCalledOnce();
   });
