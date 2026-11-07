@@ -54,7 +54,8 @@ export function ProjectPhaseTasksTable({
   return (
       <details className={styles.operationalTasks} open>
         <summary><strong>Tareas</strong> {count}, {approved} aprobadas</summary>
-        {count ? <div className={styles.operationalTaskScroll}>
+        {count ? <div className={styles.operationalTaskScroll}
+          role="region" aria-label={'Tabla de tareas de ' + module.name} tabIndex={0}>
           <table className={[styles.operationalTaskTable, readOnly ? styles.readonlyTaskTable : ''].filter(Boolean).join(' ')}>
             <thead><tr><th>Tarea</th><th>Asignada a</th><th>Bloque de trabajo</th>
               <th>Estado</th>{!readOnly && <th>HH est. / reales</th>}<th>Fecha límite</th>{showActions && <th aria-label="Acciones" />}</tr></thead>

@@ -487,6 +487,13 @@
   overscroll-behavior-x: contain;
   scrollbar-width: thin;
 }
+/* Al llegar con Tab a una tabla desbordada, se puede recorrer con las flechas
+   sin perder el foco y sin ocultar qué región está seleccionada. */
+.operationalTaskScroll:focus-visible {
+  outline: 2px solid var(--kora-blue-600);
+  outline-offset: -2px;
+  border-radius: var(--kora-radius-sm);
+}
 .operationalTaskTable {
   width: 100%;
   min-width: 760px;

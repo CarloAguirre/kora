@@ -127,4 +127,20 @@ describe('Tabla operativa compartida de tareas', () => {
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 
+
+  it('hace accesible por teclado la tabla desbordada sin habilitar gestión', () => {
+    const longName = 'Validación de integraciones y conciliaciones de múltiples sistemas empresariales';
+    const wideModule = {
+      ...module,
+      tasks: [{ ...module.tasks[0]!, name: longName }],
+    };
+    render(<ProjectPhaseTasksTable module={wideModule} canManage={false} />);
+    const scrollRegion = screen.getByRole('region', {
+      name: 'Tabla de tareas de Diseño y Arquitectura',
+    });
+    expect(scrollRegion).toHaveAttribute('tabindex', '0');
+    expect(within(scrollRegion).getByRole('table')).toHaveTextContent(longName);
+    expect(within(scrollRegion).queryByRole('button')).not.toBeInTheDocument();
+  });
+
 });

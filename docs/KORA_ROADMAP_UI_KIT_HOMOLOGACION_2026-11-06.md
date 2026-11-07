@@ -171,3 +171,63 @@ publicados, pero queda pendiente la confirmación de Vitest en Windows.
 
 **Próxima validación:** ejecutar las 3 pruebas UI-3 y luego toda la suite
 Roadmap (67 pruebas) sobre el nuevo HEAD. Sin cambios en API, BD ni Gantt.
+
+## UI-4 · Auditoría transversal de regresión (07-11-2026)
+
+Base de la auditoría: `76763dce91c41b65e3abd5f573a1171dfd50d5f9`, PR #7 todavía draft contra
+`feature/calculadora-cotizacion-ui-v5`. Alcance delimitado a la vista
+operativa del Roadmap (fases, tareas, panel de bloque), más la integración
+ya existente del `PhaseRoadmap` compartido con portal cliente.
+
+### Inspección de código y cobertura identificada
+
+- Gantt: `PhaseRoadmap` ya tiene scroll por fase,
+  `operationalStickyLabel` y barras/diamantes/checks en el mismo eje;
+  tiene zoom independiente por fase y estilo de movimiento reducido.
+  `PhaseRoadmap.header-actions.test.tsx` ya cubre selección, zoom,
+  estados de hitos, fecha de referencias, checks y separación del portal.
+  **No se alteran esos controles ni el CSS compartido.**
+- Tabla de tareas: `canManage && !readOnly` sigue condicionando edición,
+  duplicación, borrado, aprobación y alta; `referenceDeletePending`
+  bloquea el borrado de EDT. El pie de tabla muestra Agregar tarea solo
+  al gestor. Ya existen pruebas de badges, HH, reglas y callbacks.
+- Drawer: botón de entrega condicionado al estado y permiso; las acciones
+  operativas dependen de callbacks y `readOnly`. Las pruebas actuales
+  cubren cierre, entrega, vencimiento y acceso de colaborador.
+- Accesibilidad detectada en UI-4: una tabla de anchura mínima 760 px en
+  pantalla estrecha podía tener scroll visible para mouse/touch pero el
+  contenedor no era tabulable. Se añade `role="region"`,
+  `aria-label="Tabla de tareas de <fase>"`, `tabIndex={0}` y un contorno
+  `:focus-visible` con token Kora. Permite enfocarla para desplazamiento
+  horizontal por teclado sin cambiar la estructura de tabla ni sus acciones.
+- Regresión automatizada extendida: un test funcional de región
+  accesible sin permisos y un test de contrato CSS del foco, scroll local,
+  scrollbar del Gantt y nombre sticky. **No se simulan resultados visuales
+  mediante jsdom**.
+
+### Matriz de QA visual pendiente en navegador real
+
+| Caso | Viewport | Acción de validación | Esperado |
+| --- | --- | --- | --- |
+| Tabla larga | 320/375/768/1280 px | Crear nombres de tarea y bloque extensos; desplazar lateralmente solo la tabla | Sin corte de contenidos; el Gantt no se desplaza con la tabla |
+| Accesibilidad de tabla | 320/375 px | Tab hasta «Tabla de tareas de ...»; usar flechas y recorrer columnas | Foco visible, scroll horizontal accesible, sin acciones no autorizadas |
+| Gantt operativo | 320/375/768/1280 px | Zoom de semanas a días; recorrer el eje horizontal | Barras, hoy, diamantes y checks alineados; etiquetas opacas/sticky |
+| Fases y cabecera | 320/375/768/1280 px | Alternar Ver/Planificar, nombre editable y avance | Sin controles solapados; avance real y plan coherentes |
+| Drawer de bloque | 320/375/768/1280 px | Abrir bloque con tareas largas, 3 métricas y badges | Sin overflow lateral; métricas en 1/2/3 columnas según ancho; pie visible |
+| Estados/entregas | Escritorio y móvil | Bloque sin entrega, planificado, vencido, entregado, aprobado | Iconografía y estados diferenciados; entrega no implica aprobación |
+| EDT sin materializar | Escritorio y móvil | Ver referencias y bloques sin fechas ni colaborador | No aparecen barras o fechas ficticias; asignación solo si corresponde |
+| Permisos | Escritorio y móvil | Repetir con gestor y colaborador | Colaborador no puede gestionar ni aprobar; gestor respeta restricciones |
+| Portal cliente | Escritorio y móvil | Abrir el roadmap del portal | Cabecera, leyenda y controles del portal sin cambios por UI-4 |
+
+**Evidencia disponible antes de UI-4:** el usuario validó localmente
+`1383be42` con `typecheck` y `build` correctos, además de 64/64 tests
+funcionales; los tests UI-3 fallaban durante la carga por `import.meta.url`.
+El commit posterior `76763dce` cambió la ruta de lectura a
+`process.cwd()` y todavía no cuenta con un log local compartido.
+No se atribuye PASS a los tests añadidos en UI-4 ni se declara hecha la
+inspección visual en Chrome sin evidencia de navegador.
+
+**Cierre de UI-4 condicionado:** recibir evidencia de validación local
+(typecheck, suites Roadmap, `PhaseRoadmap.header-actions`, build)
+y revisión de la matriz visual antes de pasar el PR de draft a revisión.
+No se modifica `apps/api/.env.example`, API, BD, contratos o migraciones.

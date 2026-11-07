@@ -10,6 +10,8 @@ import { describe, expect, it } from 'vitest';
 const cssDir = resolve(process.cwd(), 'src/modules/projects/components');
 const phaseCss = readFileSync(resolve(cssDir, 'ProjectModulesCard.module.css'), 'utf8');
 const drawerCss = readFileSync(resolve(cssDir, 'SegmentDrawer.module.css'), 'utf8');
+const ganttCss = readFileSync(resolve(cssDir,
+  '../../client-portal/components/PhaseRoadmap.module.css'), 'utf8');
 
 /**
  * Contratos estáticos de estilos que jsdom no puede medir visualmente.
@@ -37,4 +39,13 @@ describe('Roadmap UI-3: tokens y scroll local', () => {
     expect(drawerCss).toMatch(/@media \(max-width: 560px\)\s*\{[\s\S]*?\.metrics\s*\{[^}]*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\);/s);
     expect(drawerCss).toMatch(/@media \(max-width: 380px\)\s*\{[\s\S]*?\.metrics\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\);/s);
   });
+
+  it('protege el foco del scroll local y el scroll/sticky del Gantt compartido', () => {
+    expect(phaseCss).toMatch(/\.operationalTaskScroll:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--kora-blue-600\);/s);
+    expect(ganttCss).toMatch(/\.operationalGanttViewport\s*\{[^}]*overflow-x:\s*auto;/s);
+    expect(ganttCss).toMatch(/\.operationalGanttViewport\s*\{[^}]*overscroll-behavior-x:\s*contain;/s);
+    expect(ganttCss).toMatch(/\.operationalStickyLabel,\s*\.operationalBlockLabel\s*\{[^}]*position:\s*sticky;/s);
+    expect(ganttCss).toMatch(/@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.operationalGantt\s*\{[^}]*transition:\s*none;/s);
+  });
+
 });
