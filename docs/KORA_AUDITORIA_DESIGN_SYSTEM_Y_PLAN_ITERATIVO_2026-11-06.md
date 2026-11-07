@@ -2,7 +2,7 @@
 
 **Fecha:** 2026-11-06  
 **Rama de trabajo:** `feature/calculadora-roadmap-diseno-v5-02`
-**Estado:** Iteración 1 validada localmente por el equipo; iteración 2 implementada y pendiente de validación local.  
+**Estado:** Iteraciones 1 y 2 validadas localmente por el equipo; iteración 3 implementada y pendiente de validación local.  
 **Alcance:** Calculadora de cotizaciones y estimaciones, no reescritura funcional.
 
 ## 1. Contexto y conclusión
@@ -74,6 +74,35 @@ Kora ya contaba con una librería compartida en `apps/web/src/shared/components/
 - **Estilos iteración 2:** tokens Kora para encabezados, tabla, estados deshabilitados y perfiles sin asignación. El espacio compacto de la grilla solo ajusta alto/alineación de los wrappers nativos; sus focos, bordes y estados permanecen en sus CSS Modules. No se toca el motor `quotationEdtAssignments` ni `QuotationGroupHoursInput`.
 - **Pruebas iteración 2:** `QuotationTeamsWorkspace.test.tsx` verifica estilos reales de `TextField`, `Select` y `SegmentedControl`; 160 HH del modo manual, callbacks de duración, dedicación y HH; estados disabled, modo EDT y perfiles pendientes.
 - **Pendiente:** ejecutar el typecheck, Vitest y build local de iteración 2; revisión visual en desktop y responsive antes de continuar con costos/pagos.
+
+- **Iteración 3 — commit `2c3749e`:** `QuotationCommercialSections.tsx` reutiliza `TextField` en descripciones, montos, tramos, porcentajes y fechas; `Select` para periodicidad, hitos y fases; `Button` para crear/eliminar costos y pagos. Se mantienen las tablas editables actuales: el `DataTable` genérico no ofrece la misma interacción de celdas controladas sin adaptación riesgosa.
+- **Estilos iteración 3:** `QuotationCommercialSections.module.css` elimina bordes, focus y disabled personalizados de inputs/selects, adopta tokens `--kora-*` y ajusta solo densidad/alineación dentro de tablas. Se preservan `textarea` nativos, pues no existe un `Textarea` compartido.
+- **Sin cambios funcionales:** `commercialNet` sigue incorporando únicamente costos `once` y excluyendo mensual/anual; el importe de tramos conserva sus porcentajes y 4 decimales; validación del 100%, supuestos, exclusiones ocultas y solo lectura permanecen idénticos. Sin modificaciones a backend, contratos o BD.
+- **Regresiones añadidas:** `QuotationCommercialSections.test.tsx` cubre estilos de componentes compartidos, edición de descripciones y montos, triggers de fase/fecha, alta y baja de registros, supuestos, cálculo y controles deshabilitados.
+- **Pendiente:** ejecutar typecheck + Vitest + build en la máquina local y validar los selectores/fechas en navegador, incluido el scroll horizontal con seis columnas.
+
+### Comandos de validación — iteración 3 (PowerShell)
+```powershell
+git fetch kora
+git switch feature/calculadora-roadmap-diseno-v5-02
+git pull --ff-only kora feature/calculadora-roadmap-diseno-v5-02
+
+pnpm --filter @kora/web typecheck
+if ($LASTEXITCODE -ne 0) { throw "Error typecheck Web" }
+
+pnpm --filter @kora/web exec vitest run `
+  src/modules/estimation/components/QuotationCommercialSections.test.tsx `
+  src/modules/estimation/components/QuotationTeamsWorkspace.test.tsx `
+  src/modules/estimation/components/QuotationPhaseWorkspace.test.tsx `
+  src/modules/estimation/pages/QuotationWorkspacePage.save-bar.test.ts
+
+if ($LASTEXITCODE -ne 0) { throw "Error tests Web" }
+
+pnpm --filter @kora/web build
+if ($LASTEXITCODE -ne 0) { throw "Error build Web" }
+```
+
+**Pruebas manuales:** abrir cotización con tarifa definida; editar costo único y recurrente, cambiar periodicidad; variar % de pago y verificar el aviso del 100%, alternar hito de aprobación/fase/fecha; agregar/eliminar filas; verificar fechas con el calendario nativo de Kora. Comprobar que los costos recurrentes no aumenten el neto y que la vista aprobada sea de solo lectura.
 
 ### Comandos de validación — iteración 1 (PowerShell)
 ```powershell
