@@ -7,7 +7,7 @@ import buttonStyles from '@/shared/components/ui/Button.module.css';
 // Los tipos generados para CSS Modules contemplan claves ausentes.
 // Validamos su existencia antes de pasarlas a toHaveClass, sin ocultar un
 // posible cambio de nombre o una exportación CSS rota.
-const nativeButtonClass = (variant: 'button' | 'secondary' | 'outline' | 'tertiary'): string => {
+const nativeButtonClass = (variant: 'button' | 'secondary' | 'outline' | 'tertiary' | 'ghost'): string => {
   const className = buttonStyles[variant];
   if (!className) throw new Error('Falta la clase nativa Button.' + variant);
   return className;
@@ -223,7 +223,9 @@ describe('Cotización HTML v5 · fases y tareas', () => {
     screen.getAllByText('Tareas').forEach((title) => title.closest('details')?.setAttribute('open', ''));
     expect(screen.getByText('Fase 4')).toBeInTheDocument();
     expect(screen.getByDisplayValue('Control de entregas')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Quitar tarea ' + extraTask.wbs }));
+    const deleteButton = screen.getByRole('button', { name: 'Quitar tarea ' + extraTask.wbs });
+    expect(deleteButton).toHaveClass(nativeButtonClass('button'), nativeButtonClass('ghost'));
+    fireEvent.click(deleteButton);
     expect(callbacks.onDeleteTask).toHaveBeenCalledWith(extraTask.wbs);
   });
 
