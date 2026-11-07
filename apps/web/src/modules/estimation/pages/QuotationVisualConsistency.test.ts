@@ -37,10 +37,10 @@ describe('Iteración 5 · auditoría transversal del sistema de diseño Kora', (
   it('todas las variables de los CSS auditados existen en tokens.css de Kora', () => {
     const tokens = readFileSync(resolve(dir, '../../styles/tokens.css'), 'utf8');
     const defined = new Set(
-      [...tokens.matchAll(/(--kora-[\\w-]+)\\s*:/g)].map((match) => match[1]),
+      [...tokens.matchAll(/(--kora-[\w-]+)\s*:/g)].map((match) => match[1]),
     );
     for (const cssPath of css) {
-      const variables = [...read(cssPath).matchAll(/var\\((--kora-[\\w-]+)/g)]
+      const variables = [...read(cssPath).matchAll(/var\((--kora-[\w-]+)/g)]
         .map((match) => match[1]);
       for (const variable of variables) {
         expect(defined.has(variable), cssPath + ' hace referencia a ' + variable).toBe(true);
