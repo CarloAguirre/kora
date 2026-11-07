@@ -329,10 +329,10 @@ export function QuotationPhaseWorkspace({
                                 task.wbs, task.role, e.target.checked)}/>
                           </label>
                           {task.wbs.startsWith('KT-') && editable
-                            ? <button type="button" className={styles.deleteTask}
+                            ? <Button variant="ghost" size="icon" className={styles.deleteTask}
                                 aria-label={'Quitar tarea ' + task.wbs}
                                 title="Quitar tarea añadida (no altera Gemini)"
-                                onClick={() => onDeleteTask?.(task.wbs)}>×</button>
+                                onClick={() => onDeleteTask?.(task.wbs)}>×</Button>
                             : <span className={styles.noDelete} title="Tarea original conservada como evidencia"/>}
                         </div>
                       ))}
@@ -353,7 +353,7 @@ export function QuotationPhaseWorkspace({
                             if (file) void onImportTaskExcel?.(stageCode, visibleName, file);
                           }}/>
                       </label>
-                      <Button variant="tertiary" size="sm" className={styles.templateLink}
+                      <Button variant="tertiary" size="sm"
                         disabled={!activeTeams.length}
                         onClick={() => downloadQuotationTaskTemplate(visibleName, activeTeams)}>
                         Ver plantilla

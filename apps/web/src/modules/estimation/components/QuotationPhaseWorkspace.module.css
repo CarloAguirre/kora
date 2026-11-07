@@ -10,52 +10,49 @@
 .phaseDescription{color:var(--kora-text-muted);font-size:12px;font-weight:500}
 .remove{color:var(--kora-danger);text-decoration:underline;margin-left:auto;min-width:0}
 .phaseFields{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(110px,.85fr) minmax(110px,.85fr);gap:10px}
-.phaseFields label,.phaseTeams label{display:grid;gap:6px;font-size:12px;color:#182338;font-weight:550;min-width:0}
-.phaseFields input,.phaseTeams input{font:inherit;min-width:0;width:100%;height:38px;border:1px solid #e0e4ec;border-radius:8px;background:white;color:#152238;padding:8px 10px;font-size:12.5px}
-.phaseFields input:focus-visible,.phaseTeams input:focus-visible{border-color:#5b21b6;outline:2px solid #ede9fe}
-.phaseFields input:disabled,.phaseTeams input:disabled{background:#f0f2f6;color:#667085}
+.phaseFields label,.phaseTeams label{display:grid;gap:6px;font-size:12px;color:var(--kora-text);font-weight:550;min-width:0}
+.phaseFields input,.phaseTeams input{font:inherit;min-width:0;width:100%;height:38px;border:1px solid var(--kora-border-soft);border-radius:8px;background:white;color:var(--kora-text);padding:8px 10px;font-size:12.5px}
+.phaseFields input:focus-visible,.phaseTeams input:focus-visible{border-color:var(--kora-blue-link);outline:2px solid var(--kora-blue-surface)}
+.phaseFields input:disabled,.phaseTeams input:disabled{background:var(--kora-surface-muted);color:var(--kora-text-muted)}
 .phaseTeams{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;align-items:start}
 .phaseTeams label>span{display:flex;align-items:center;gap:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11.5px}
 .phaseTeams i{height:9px;width:9px;display:inline-block;flex:none;border-radius:3px}
-.phaseTeams input{text-align:right;font-variant-numeric:tabular-nums;border-color:#d5c6f6}
-.tasks{padding-top:12px;border-top:1px dashed #e0e4ed}
+.phaseTeams input{text-align:right;font-variant-numeric:tabular-nums;border-color:var(--kora-blue-200)}
+.tasks{padding-top:12px;border-top:1px dashed var(--kora-border-soft)}
 .tasks>summary{display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;list-style:none;user-select:none}
 .tasks>summary::-webkit-details-marker{display:none}
-.tasks>summary:before{content:'▸';color:#111a2f;font-size:12px;transform:translateY(-1px)}
+.tasks>summary:before{content:'▸';color:var(--kora-navy);font-size:12px;transform:translateY(-1px)}
 .tasks[open]>summary:before{content:'▾'}
-.tasks>summary strong{color:#142035;font-size:12px}
-.tasks>summary span{color:#7b8496;font-size:11.5px}
+.tasks>summary strong{color:var(--kora-text);font-size:12px}
+.tasks>summary span{color:var(--kora-text-muted);font-size:11.5px}
 .tableScroll{width:100%;overflow-x:auto;margin-top:12px}
 .tasksHeader,.taskRow{display:grid;grid-template-columns:minmax(270px,2fr) minmax(150px,1fr) 88px 42px 26px;column-gap:6px;align-items:center;min-width:680px}
-.tasksHeader{padding:8px 5px;font-size:11px;color:#7b8496;border-bottom:1px solid #dfe3ec}
+.tasksHeader{padding:8px 5px;font-size:11px;color:var(--kora-text-muted);border-bottom:1px solid var(--kora-border-subtle)}
 .tasksHeader span:nth-last-child(2),.tasksHeader span:last-child{text-align:center}
-.taskRow{padding:7px 5px;row-gap:4px;border-bottom:1px solid #e5e8ef}
+.taskRow{padding:7px 5px;row-gap:4px;border-bottom:1px solid var(--kora-border-subtle)}
 .taskRow:last-child{border-bottom:0}
 .taskName{display:grid;gap:4px;min-width:0}
-.taskName small{color:#6b21a8;font-size:10.5px;line-height:1.4}
-.readonlyInput{display:flex;align-items:center;min-width:0;min-height:37px;padding:7px 9px;background:#fff;border:1px solid #e0e4ec;border-radius:8px;color:#132039;font-size:12px;overflow-wrap:anywhere}
+.taskName small{color:var(--kora-blue-link);font-size:10.5px;line-height:1.4}
+.readonlyInput{display:flex;align-items:center;min-width:0;min-height:37px;padding:7px 9px;background:var(--kora-surface);border:1px solid var(--kora-border-soft);border-radius:8px;color:var(--kora-text);font-size:12px;overflow-wrap:anywhere}
 .readonlyHours{text-align:right;justify-content:flex-end;font-variant-numeric:tabular-nums}
-.teamSelect{width:100%;min-width:0;min-height:37px;border:1px solid #e0e4ec;border-radius:8px;padding:7px 9px;background:white;font-family:inherit;color:#132039;font-size:12px}
-.teamSelect:focus-visible{outline:2px solid #ede9fe;border-color:#5b21b6}
-.teamSelect:disabled{color:#8793a5;background:#f6f7fb}
-.editableHours{width:100%;min-width:0;height:37px;padding:6px 7px;text-align:right;font:inherit;font-size:12px;color:#141e32;background:#fff;border:1px solid #c7b3f1;border-radius:8px;font-variant-numeric:tabular-nums}
-.editableHours:focus-visible{outline:2px solid #e9ddff;border-color:#5b21b6}
+.teamSelect{width:100%;min-width:0;min-height:37px;border:1px solid var(--kora-border-soft);border-radius:8px;padding:7px 9px;background:white;font-family:inherit;color:var(--kora-text);font-size:12px}
+.teamSelect:focus-visible{outline:2px solid var(--kora-blue-surface);border-color:var(--kora-blue-link)}
+.teamSelect:disabled{color:var(--kora-text-disabled);background:var(--kora-surface-muted)}
+.editableHours{width:100%;min-width:0;height:37px;padding:6px 7px;text-align:right;font:inherit;font-size:12px;color:var(--kora-text);background:var(--kora-surface);border:1px solid var(--kora-blue-200);border-radius:8px;font-variant-numeric:tabular-nums}
+.editableHours:focus-visible{outline:2px solid var(--kora-blue-surface);border-color:var(--kora-blue-link)}
 .fixedField{justify-self:center;cursor:pointer}
-.fixedField input{width:14px;height:14px;accent-color:#5b21b6}
-.taskDescription{font-size:11.5px;color:#667085;margin:1px 0 4px}
-.taskDescription summary{cursor:pointer;color:#6b21a8;font-size:10.5px;max-width:max-content;font-weight:600}
-.taskDescription p{margin:6px 0 0;line-height:1.5}
-.add{all:unset;cursor:pointer;justify-self:start;color:#14213d;font-size:12px;font-weight:650;border:1px solid #e1e5ed;border-radius:8px;padding:8px 12px;background:white}
-.add:hover{background:#eef0f5}
+.fixedField input{width:14px;height:14px;accent-color:var(--kora-blue-link)}
+.add{all:unset;cursor:pointer;justify-self:start;color:var(--kora-text);font-size:12px;font-weight:650;border:1px solid var(--kora-border-soft);border-radius:8px;padding:8px 12px;background:white}
+.add:hover{background:var(--kora-surface-muted)}
 .roadmap{padding-top:6px;display:grid;gap:12px}
-.timeline{display:grid;gap:7px;border:1px solid #e0e4ed;border-radius:11px;background:white;padding:14px 12px}
+.timeline{display:grid;gap:7px;border:1px solid var(--kora-border-soft);border-radius:11px;background:white;padding:14px 12px}
 .timelineRow{display:grid;grid-template-columns:190px minmax(0,1fr);gap:9px;align-items:center;font-size:11px;font-weight:650}
 .timelineRow>span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.timelineTrack{position:relative;height:21px;background:#eef0f5;border-radius:6px;overflow:hidden}
+.timelineTrack{position:relative;height:21px;background:var(--kora-surface-muted);border-radius:6px;overflow:hidden}
 .timelineBar{position:absolute;top:0;height:100%;display:flex;overflow:hidden;border-radius:5px;min-width:1px}
 .timelineBar>span{display:block;height:100%;min-width:0}
-.axis{display:flex;justify-content:space-between;padding-left:199px;color:#8790a0;font-size:11px}
-.empty{color:#7b8496;font-size:12px;margin:8px 0}
+.axis{display:flex;justify-content:space-between;padding-left:199px;color:var(--kora-text-muted);font-size:11px}
+.empty{color:var(--kora-text-muted);font-size:12px;margin:8px 0}
 @media(max-width:750px){.phaseTeams{grid-template-columns:repeat(2,minmax(0,1fr))}.timelineRow{grid-template-columns:120px minmax(0,1fr)}.axis{padding-left:129px}}
 @media(max-width:510px){.phaseFields{grid-template-columns:1fr 1fr}.phaseFields label:first-child{grid-column:1/-1}.phaseTeams{grid-template-columns:1fr}.timelineRow{grid-template-columns:95px minmax(0,1fr)}.axis{padding-left:104px}}
 
@@ -64,26 +61,23 @@
 .mappingNotice strong{font-size:12.5px;color:var(--kora-navy)}
 .mappingNotice p{margin:4px 0 0;font-size:11.5px;line-height:1.5;color:var(--kora-text-muted)}
 .mappingNotice button{flex:none}
-.taskName .taskRole{color:#596579;font-size:10.5px}
 
 /* Fidelidad v5: filas compactas sin metadatos Gemini a la vista.
  * Los WBS, perfiles, fuente y referencias persisten en el borrador/aiPoc. */
-.taskText{width:100%;min-width:0;height:34px;background:#fff;color:#182337;
- border:1px solid #e0e4ec;border-radius:7px;padding:6px 9px;font:inherit;
+.taskText{width:100%;min-width:0;height:34px;background:var(--kora-surface);color:var(--kora-text);
+ border:1px solid var(--kora-border-soft);border-radius:7px;padding:6px 9px;font:inherit;
  font-size:11.5px;text-overflow:ellipsis}
-.taskText:focus-visible{outline:2px solid #e9ddff;border-color:#5b21b6}
+.taskText:focus-visible{outline:2px solid var(--kora-blue-surface);border-color:var(--kora-blue-link)}
 .taskRow{min-height:42px;padding:4px 2px}
 .tasksHeader{padding:7px 2px}
 .taskRow .teamSelect,.taskRow .editableHours{min-height:34px;height:34px;
- font-size:11.5px;border-color:#e0e4ec}
-.taskRow .editableHours{border-color:#d6c6f2}
-.deleteTask{font:inherit;font-size:18px;color:#788296;background:transparent;
- border:0;cursor:pointer;line-height:1;padding:3px}
-.deleteTask:hover{color:#c72b3b}
+ font-size:11.5px;border-color:var(--kora-border-soft)}
+.taskRow .editableHours{border-color:var(--kora-blue-200)}
+.deleteTask{width:26px;min-width:26px;height:26px;font-size:18px;color:var(--kora-text-muted);line-height:1}
+.deleteTask:hover:not(:disabled){color:var(--kora-danger)}
+.deleteTask:focus-visible{outline:2px solid var(--kora-blue-600);outline-offset:1px}
 .noDelete{display:block;min-width:15px;height:15px}
 .addRow{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:11px}
 .addRow .add{font-size:11.5px;padding:7px 10px;border-radius:7px}
 .importAction{display:inline-flex;align-items:center;cursor:pointer}
-.templateLink{background:transparent;border:0;color:#1b2740;text-decoration:underline;
  cursor:pointer;padding:6px 2px;font:inherit;font-size:11.5px}
-.templateLink:hover{color:#5b21b6}
