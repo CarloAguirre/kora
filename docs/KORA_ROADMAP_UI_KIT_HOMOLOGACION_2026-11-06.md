@@ -74,3 +74,24 @@ Nota de ajuste estático UI-2: se tipa explícitamente la referencia EDT del tes
 ambos renders y se aumenta la especificidad de las clases locales de tamaño
 para evitar que la hoja de estilos compartida `Button.icon` altere las medidas
 de 28×28 px (tabla) y 22×24 px (drawer) por orden de carga de CSS Modules.
+
+## Corrección de integración UI-2 (07-11-2026)
+
+En la validación local del commit `4783edd7`, `typecheck` pasó y el
+build Web completó correctamente. Vitest Roadmap terminó con **63/64 PASS**;
+el único fallo fue la prueba nueva
+`SegmentDrawer.test.tsx > Homologación UI-2 de acciones del bloque operativo`.
+
+**Causa comprobada:** `SegmentDrawer` renderiza el botón `Eliminar tarea`
+solo si `!readOnly && onDeleteTask`. El helper `show` transmite
+`overrides.onDeleteTask`, pero el escenario de UI-2 lo omitía y aun así
+buscaba el botón. El DOM registrado en el fallo confirma que están
+`Editar` y `Duplicar`, y no `Eliminar`.
+
+**Corrección:** pasar `onDeleteTask: vi.fn()` al escenario y verificar
+la presencia de `Button ghost icon`, su interacción y que se envía
+la tarea correcta al callback. No se modifica `SegmentDrawer.tsx`, no se
+relajan aserciones ni se habilita eliminar sin permiso.
+
+**Pendiente de validar en local:** volver a ejecutar Vitest (64 tests),
+`typecheck` y build Web, con salida verificada sobre el nuevo HEAD.

@@ -374,11 +374,11 @@ describe('Bloque operativo: fidelidad de los tres estados v5.02', () => {
 
 describe('Homologación UI-2 de acciones del bloque operativo', () => {
   it('usa botones nativos y conserva los callbacks de tareas, EDT y entrega', () => {
-    const onAddTask = vi.fn(), onAssignTasks = vi.fn();
+    const onAddTask = vi.fn(), onAssignTasks = vi.fn(), onDeleteTask = vi.fn();
     const reference = { tasks: [{
       teamId: segment.teamId, wbs: 'WBS-EDT-1', role: 'QA', name: 'Validar EDT',
     }] } as unknown as NonNullable<SegmentDrawerProps['reference']>;
-    show({ deliveries: [delivery('planned')], onAddTask, onAssignTasks, reference });
+    show({ deliveries: [delivery('planned')], onAddTask, onAssignTasks, onDeleteTask, reference });
     const dialog = screen.getByRole('dialog', { name: 'Bot de conciliación' });
     for (const name of ['+ Agregar tarea', 'Asignar tareas EDT']) {
       const button = within(dialog).getByRole('button', { name });
@@ -398,6 +398,11 @@ describe('Homologación UI-2 de acciones del bloque operativo', () => {
       expect(action.className).toContain('icon');
       expect(action).toHaveAttribute('type', 'button');
     }
+    fireEvent.click(within(dialog).getByRole('button', {
+      name: 'Eliminar tarea Diseño del bot',
+    }));
+    expect(onDeleteTask).toHaveBeenCalledOnce();
+    expect(onDeleteTask).toHaveBeenCalledWith(moduleBase.tasks[0]);
     const delivered = within(dialog).getByRole('button', { name: 'Marcar como entregado' });
     expect(delivered.className).toContain('primary');
     expect(delivered).toBeEnabled();
