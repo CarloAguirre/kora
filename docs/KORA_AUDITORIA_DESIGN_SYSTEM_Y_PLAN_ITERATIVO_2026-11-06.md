@@ -1,7 +1,7 @@
 # Kora — Auditoría de reutilización UI y plan de homologación incremental
 
 **Fecha:** 2026-11-06  
-**Rama de trabajo:** `feature/calculadora-roadmap-diseno-v5-02`  
+**Rama de trabajo:** `feature/calculadora-roadmap-diseno-v5-02`
 **Estado:** Auditoría completada; iteración 1 implementada en la rama, pendiente de validación local.  
 **Alcance:** Calculadora de cotizaciones y estimaciones, no reescritura funcional.
 
@@ -80,9 +80,9 @@ git pull --ff-only kora feature/calculadora-roadmap-diseno-v5-02
 pnpm --filter @kora/web typecheck
 if ($LASTEXITCODE -ne 0) { throw "Error typecheck Web" }
 
-pnpm --filter @kora/web exec vitest run ` 
-  src/modules/estimation/components/QuotationPhaseWorkspace.test.tsx ` 
-  src/modules/estimation/pages/QuotationWorkspacePage.ai-review.test.ts ` 
+pnpm --filter @kora/web exec vitest run `
+  src/modules/estimation/components/QuotationPhaseWorkspace.test.tsx `
+  src/modules/estimation/pages/QuotationWorkspacePage.ai-review.test.ts `
   src/modules/estimation/pages/QuotationWorkspacePage.save-bar.test.ts
 if ($LASTEXITCODE -ne 0) { throw "Error tests Web" }
 
