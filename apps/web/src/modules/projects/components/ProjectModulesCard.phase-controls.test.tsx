@@ -693,13 +693,13 @@ describe('HH reales de las tareas y atribución explícita de bitácora', () => 
 });
 
 describe('Homologación de estados del Roadmap v5.02', () => {
-  it('asigna verde, amarillo, azul, gris y violeta a los estados de tareas', () => {
+  it('reutiliza Badge y sus tonos; conserva violeta para Por asignar', () => {
     const states = [
-      ['aprobada', 'done', 'taskApproved', 'user-1'],
-      ['completada', 'in_review', 'taskReview', 'user-1'],
-      ['curso', 'in_progress', 'taskInProgress', 'user-1'],
-      ['pendiente', 'todo', 'taskPending', 'user-1'],
-      ['sin-asignar', 'todo', 'taskState', null],
+      ['aprobada', 'done', 'success', 'user-1'],
+      ['completada', 'in_review', 'warning', 'user-1'],
+      ['curso', 'in_progress', 'info', 'user-1'],
+      ['pendiente', 'todo', 'neutral', 'user-1'],
+      ['sin-asignar', 'todo', 'brand', null],
     ] as const;
     const tasks = states.map(([id, status, , assigneeUserId]) => ({
       id, name: 'Estado ' + id, status,
@@ -709,22 +709,25 @@ describe('Homologación de estados del Roadmap v5.02', () => {
     }));
     show({ ...project, modules: [{ ...module, tasks }] } as unknown as ProjectDetail);
 
-    for (const [id, , expectedTone] of states) {
+    for (const [id, , tone] of states) {
       const row = screen.getByText('Estado ' + id, { selector: 'td' }).closest('tr')!;
       const badge = within(row).getByText(id === 'aprobada' ? 'Aprobada' :
         id === 'completada' ? 'Completada' : id === 'curso' ? 'En curso' :
           id === 'pendiente' ? 'Pendiente' : 'Por asignar');
-      expect(badge.className).toContain(expectedTone);
-      expect(badge.className).toContain('taskState');
+      expect(badge.className).toContain('badge');
+      expect(badge.className).toContain(tone);
+      expect(badge.className).toContain('compact');
       if (id === 'sin-asignar') {
-        expect(badge.className).not.toContain('taskStateWithDot');
+        // Mantiene la excepción violeta sin punto visible mediante CSS local.
+        expect(badge.className).toContain('unassigned');
       } else {
-        expect(badge.className).toContain('taskStateWithDot');
+        expect(badge.className).not.toContain('unassigned');
+        expect(badge.querySelector('[aria-hidden="true"]')).toBeInTheDocument();
       }
     }
   });
 
-  it('muestra En curso + Devuelta + Vencida simultáneamente, con puntitos y el mismo tamaño', () => {
+  it('muestra En curso + Devuelta + Vencida juntos con Badge nativo, punto y tamaño compacto', () => {
     const rejected = {
       id: 'task-returned', name: 'Corrección devuelta', status: 'in_progress',
       rejectionReason: 'Corregir la validación de fechas',
@@ -737,13 +740,19 @@ describe('Homologación de estados del Roadmap v5.02', () => {
     const progress = within(row).getByText('En curso');
     const returned = within(row).getByText('Devuelta');
     const overdue = within(row).getByText('Vencida');
-    for (const chip of [progress, returned, overdue]) {
-      expect(chip.className).toContain('taskState');
-      expect(chip.className).toContain('taskStateWithDot');
+    for (const [chip, tone] of [
+      [progress, 'info'], [returned, 'warning'], [overdue, 'danger'],
+    ] as const) {
+      expect(chip.className).toContain('badge');
+      expect(chip.className).toContain(tone);
+      expect(chip.className).toContain('compact');
+      expect(chip.querySelector('[aria-hidden="true"]')).toBeInTheDocument();
     }
-    expect(returned).toHaveAttribute('title', 'Corregir la validación de fechas');
-    expect(progress.parentElement).toBe(returned.parentElement);
-    expect(returned.parentElement).toBe(overdue.parentElement);
+    // El tooltip del motivo está en el wrapper, no sobre el Badge.
+    expect(returned.parentElement).toHaveAttribute('title', 'Corregir la validación de fechas');
+    // Los tres indicadores coexisten en el mismo grupo, sin sustituirse.
+    expect(progress.parentElement).toContainElement(returned);
+    expect(progress.parentElement).toContainElement(overdue);
   });
 
   it('solo indica vencimiento en tareas abiertas, no en completadas para aprobar', () => {
