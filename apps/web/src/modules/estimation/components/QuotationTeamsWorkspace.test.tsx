@@ -2,6 +2,9 @@ import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { quotationDraftDataSchema } from '@kora/contracts';
 import { QuotationTeamsWorkspace } from './QuotationTeamsWorkspace';
+import textStyles from '@/shared/components/ui/TextField.module.css';
+import selectStyles from '@/shared/components/ui/Select.module.css';
+import segmentedStyles from '@/shared/components/ui/SegmentedControl.module.css';
 
 const dev = '0777e456-fd76-445e-83f1-afc25061c103';
 const qa = '0777e456-fd76-445e-83f1-afc25061c104';
@@ -66,6 +69,36 @@ describe('Equipos · fuente visual prototipo HTML v5', () => {
       .toHaveAttribute('aria-checked', 'true');
     fireEvent.click(screen.getByRole('radio', { name: 'Por equipo' }));
     expect(handlers.onChangeView).toHaveBeenCalledWith('team');
+  });
+
+  it('utiliza campos TextField y Select compartidos sin alterar HH manuales', () => {
+    renderTeams(manual);
+    const requiredClass = (value: string | undefined, name: string) => {
+      if (!value) throw new Error('Falta clase Kora ' + name);
+      return value;
+    };
+    const duration = screen.getByRole('spinbutton', { name: 'Duración de Desarrollo' });
+    const unit = screen.getByRole('combobox', { name: 'Unidad de Desarrollo' });
+    expect(duration.parentElement).toHaveClass(requiredClass(textStyles.field, 'TextField.field'));
+    expect(unit.parentElement).toHaveClass(requiredClass(selectStyles.field, 'Select.field'));
+    expect(screen.getByRole('radiogroup', { name: 'Vista de equipos' }))
+      .toHaveClass(requiredClass(segmentedStyles.group, 'SegmentedControl.group'));
+    expect(screen.getByText('160')).toBeInTheDocument();
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Horas semanales de Desarrollo' }),
+      { target: { value: '35' } });
+    expect(handlers.onEditTeam).toHaveBeenCalledWith(dev, { hoursPerWeek: 35 });
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Dedicación de Desarrollo' }),
+      { target: { value: '75' } });
+    expect(handlers.onEditTeam).toHaveBeenCalledWith(dev, { dedicationPercent: 75 });
+  });
+
+  it('conserva disabled y las etiquetas accesibles para equipos no seleccionados', () => {
+    renderTeams(manual);
+    expect(screen.getByRole('spinbutton', { name: 'Colaboradores de QA' })).toBeDisabled();
+    expect(screen.getByRole('combobox', { name: 'Unidad de QA' })).toBeDisabled();
+    expect(screen.getByRole('spinbutton', { name: 'Duración de QA' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Incluir QA' }));
+    expect(handlers.onToggleTeam).toHaveBeenCalledWith(qa, true);
   });
 
   it('en Por equipo muestra siete columnas y solo equipos del catálogo, nunca perfiles como equipos', () => {

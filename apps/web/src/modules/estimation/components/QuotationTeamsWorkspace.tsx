@@ -2,6 +2,8 @@ import type { ReactNode } from 'react';
 import type { QuotationDraftData } from '@kora/contracts';
 import { quotationEdtAssignments } from '@kora/contracts';
 import { SegmentedControl } from '@/shared/components/ui/SegmentedControl';
+import { TextField } from '@/shared/components/ui/TextField';
+import { Select } from '@/shared/components/ui/Select';
 import { quotationTeamColor } from './quotation-team-colors';
 import { QuotationGroupHoursInput } from './QuotationGroupHoursInput';
 import styles from './QuotationTeamsWorkspace.module.css';
@@ -110,7 +112,7 @@ export function QuotationTeamsWorkspace({
                   <strong>{label}</strong>
                 </span>
               </label>
-              <input className={styles.number} type="number" min={1} max={100}
+              <TextField className={styles.numberField} type="number" min={1} max={100}
                 disabled={!editable || !checked}
                 aria-label={'Colaboradores de ' + label} value={people}
                 title={hasEdt ? 'Dotación de referencia; no cambia las HH de las tareas.' : undefined}
@@ -121,28 +123,29 @@ export function QuotationTeamsWorkspace({
                   else onEditTeam(teamId, { collaborators: count });
                 }}/>
               {view === 'team' && <>
-                <select disabled={!editable || !checked}
+                <Select className={styles.unitField} disabled={!editable || !checked}
                   aria-label={'Unidad de ' + label} value={team?.unit ?? 'week'}
+                  options={[
+                    { value: 'week', label: 'Semanas' },
+                    { value: 'day', label: 'Días' },
+                  ]}
                   onChange={(e) => onEditTeam(teamId, {
                     unit: e.target.value as Team['unit'],
-                  })}>
-                  <option value="week">Semanas</option>
-                  <option value="day">Días</option>
-                </select>
-                <input className={styles.number} type="number" min={0} max={520}
+                  })} />
+                <TextField className={styles.numberField} type="number" min={0} max={520}
                   disabled={!editable || !checked}
                   aria-label={'Duración de ' + label} value={team?.duration ?? 0}
                   onChange={(e) => onEditTeam(teamId, {
                     duration: Math.max(0, Number(e.target.value) || 0),
                   })}/>
-                <input className={styles.number} type="number" min={0} max={168}
+                <TextField className={styles.numberField} type="number" min={0} max={168}
                   disabled={!editable || !checked}
                   aria-label={'Horas semanales de ' + label}
                   value={team?.hoursPerWeek ?? 40}
                   onChange={(e) => onEditTeam(teamId, {
                     hoursPerWeek: Math.max(0, Number(e.target.value) || 0),
                   })}/>
-                <input className={styles.number} type="number" min={0} max={100}
+                <TextField className={styles.numberField} type="number" min={0} max={100}
                   disabled={!editable || !checked}
                   aria-label={'Dedicación de ' + label}
                   value={team?.dedicationPercent ?? 100}
@@ -178,15 +181,15 @@ export function QuotationTeamsWorkspace({
               return <div key={key} className={styles.pendingRole}>
                 <strong>{role}</strong>
                 <span>{fmt(hours)} HH propuestas</span>
-                <label>Colaboradores de referencia
-                  <input type="number" min={1} max={100} value={rolePeople.get(role) ?? 1}
-                    disabled={!editable} aria-label={'Colaboradores de ' + role}
-                    onChange={(e) => {
-                      const count = Number(e.target.value);
-                      if (Number.isInteger(count) && count >= 1 && count <= 100)
-                        onEditRoleCollaborators(role, count);
-                    }}/>
-                </label>
+                <TextField className={styles.pendingPeopleField}
+                  label="Colaboradores de referencia" type="number" min={1} max={100}
+                  value={rolePeople.get(role) ?? 1}
+                  disabled={!editable} aria-label={'Colaboradores de ' + role}
+                  onChange={(e) => {
+                    const count = Number(e.target.value);
+                    if (Number.isInteger(count) && count >= 1 && count <= 100)
+                      onEditRoleCollaborators(role, count);
+                  }} />
               </div>;
             })}
           </div>
