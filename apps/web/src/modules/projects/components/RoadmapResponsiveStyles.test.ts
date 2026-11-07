@@ -1,13 +1,15 @@
 import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 /**
- * Vitest/Vite procesa los .module.css como objetos de clases, incluso si se
- * importa con ?raw. Para validar el CSS fuente necesitamos leerlo como texto
- * desde el sistema de archivos, independientemente del pipeline de estilos.
+ * El runner ejecuta Vitest desde apps/web (pnpm --filter @kora/web).
+ * Vite transforma import.meta.url en una URL virtual sin esquema file,
+ * por lo que leemos desde el directorio real del paquete, sin CSS Modules.
  */
-const phaseCss = readFileSync(new URL('./ProjectModulesCard.module.css', import.meta.url), 'utf8');
-const drawerCss = readFileSync(new URL('./SegmentDrawer.module.css', import.meta.url), 'utf8');
+const cssDir = resolve(process.cwd(), 'src/modules/projects/components');
+const phaseCss = readFileSync(resolve(cssDir, 'ProjectModulesCard.module.css'), 'utf8');
+const drawerCss = readFileSync(resolve(cssDir, 'SegmentDrawer.module.css'), 'utf8');
 
 /**
  * Contratos estáticos de estilos que jsdom no puede medir visualmente.

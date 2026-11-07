@@ -148,3 +148,26 @@ por Vite. Ningún estilo productivo ni componente cambió.
 **Pendiente:** ejecutar de nuevo `typecheck`, las 67 pruebas de Roadmap y
 `build` Web sobre el nuevo commit. El log compartido terminaba en el fallo
 de Vitest y no prueba el resultado del build para ese mismo HEAD.
+
+## Corrección de lectura de CSS en Vitest UI-3 (07-11-2026)
+
+Nueva validación local con HEAD `1383be42adad3c990d5516b1c0633f9f5a04b5d9`: `typecheck` correcto,
+**64/64 pruebas funcionales correctas** y `build` Web exitoso (con avisos
+de chunks grandes/loader, sin error de compilación). El suite de UI-3 registró
+`0 test` porque falló al cargar: `TypeError: The URL must be of scheme file`.
+
+**Causa:** Vite/Vitest transforma `import.meta.url` del archivo de prueba
+en una URL virtual que no posee el esquema `file:`, por lo que
+`readFileSync(new URL(..., import.meta.url))` no puede resolverla.
+
+**Corrección:** sustituir la URL del módulo por una ruta real relativa a la
+raíz de ejecución del paquete Web: `resolve(process.cwd(),
+'src/modules/projects/components')`. Así los tests leen el CSS original
+vía `readFileSync(resolve(cssDir, '...module.css'), 'utf8')`.
+El comando usado (`pnpm --filter @kora/web exec vitest`) ejecuta desde
+`apps/web`. Las tres aserciones y el CSS productivo permanecen intactos.
+Se verificó estáticamente que los 13 patrones del test coinciden con los CSS
+publicados, pero queda pendiente la confirmación de Vitest en Windows.
+
+**Próxima validación:** ejecutar las 3 pruebas UI-3 y luego toda la suite
+Roadmap (67 pruebas) sobre el nuevo HEAD. Sin cambios en API, BD ni Gantt.
