@@ -2,7 +2,7 @@
 
 **Fecha:** 2026-11-06  
 **Rama de trabajo:** `feature/calculadora-roadmap-diseno-v5-02`
-**Estado:** Auditoría completada; iteración 1 implementada en la rama, pendiente de validación local.  
+**Estado:** Iteración 1 validada localmente por el equipo; iteración 2 implementada y pendiente de validación local.  
 **Alcance:** Calculadora de cotizaciones y estimaciones, no reescritura funcional.
 
 ## 1. Contexto y conclusión
@@ -69,7 +69,11 @@ Kora ya contaba con una librería compartida en `apps/web/src/shared/components/
 - **2026-11-06 — Auditoría:** identificadas reutilizaciones y duplicaciones. Se prioriza fase/tareas para iniciar con cambios pequeños y reversibles.
 - **Iteración 1 — commit `148da8b`:** se integró el `Button` compartido en cinco acciones del editor: asociar equipos, eliminar fase, agregar tarea, ver plantilla y agregar fase/módulo. Se homologaron superficie/identificador de fase, textos estructurales y aviso de mapeo a tokens `--kora-*`. La carga de Excel conserva su etiqueta con input de archivo (patrón nativo) y el ícono × de eliminación de tarea se evaluará en una iteración posterior por su ancho de columna.
 - **Regresión añadida:** `QuotationPhaseWorkspace.test.tsx` verifica las variantes de `Button` compartido y la acción de asociación. Se conservan pruebas de edición de HH, tareas, equipos y operaciones sobre fases.
-- **Validación:** revisión estática de los tres archivos publicados; faltan ejecutar las pruebas de Vitest, typecheck y build en el entorno local del proyecto y confirmar la apariencia visual en navegador.
+- **Validación iteración 1:** el equipo confirmó que los comandos de integración pasaron tras corregir la prueba CSS Module en commit `f2d522d`.
+- **Iteración 2 — commit `d15819c`:** `QuotationTeamsWorkspace.tsx` ahora usa 5 instancias de `TextField` y un `Select` compartidos en vez de campos `<input type="number">` y `<select>` estilizados manualmente. Los números de colaboradores, duración, horas semanales, dedicación y perfiles IA mantienen sus callbacks, límites y validaciones. El selector «Por equipo / Por fases y módulos» sigue usando el `SegmentedControl` ya existente, pero se eliminaron las reglas `:global([role="radio"])` que anulaban su apariencia nativa.
+- **Estilos iteración 2:** tokens Kora para encabezados, tabla, estados deshabilitados y perfiles sin asignación. El espacio compacto de la grilla solo ajusta alto/alineación de los wrappers nativos; sus focos, bordes y estados permanecen en sus CSS Modules. No se toca el motor `quotationEdtAssignments` ni `QuotationGroupHoursInput`.
+- **Pruebas iteración 2:** `QuotationTeamsWorkspace.test.tsx` verifica estilos reales de `TextField`, `Select` y `SegmentedControl`; 160 HH del modo manual, callbacks de duración, dedicación y HH; estados disabled, modo EDT y perfiles pendientes.
+- **Pendiente:** ejecutar el typecheck, Vitest y build local de iteración 2; revisión visual en desktop y responsive antes de continuar con costos/pagos.
 
 ### Comandos de validación — iteración 1 (PowerShell)
 ```powershell
@@ -89,3 +93,26 @@ if ($LASTEXITCODE -ne 0) { throw "Error tests Web" }
 pnpm --filter @kora/web build
 if ($LASTEXITCODE -ne 0) { throw "Error build Web" }
 ```
+
+### Comandos de validación — iteración 2 (PowerShell)
+```powershell
+git fetch kora
+git switch feature/calculadora-roadmap-diseno-v5-02
+git pull --ff-only kora feature/calculadora-roadmap-diseno-v5-02
+
+pnpm --filter @kora/web typecheck
+if ($LASTEXITCODE -ne 0) { throw "Error typecheck Web" }
+
+pnpm --filter @kora/web exec vitest run `
+  src/modules/estimation/components/QuotationTeamsWorkspace.test.tsx `
+  src/modules/estimation/components/QuotationPhaseWorkspace.test.tsx `
+  src/modules/estimation/pages/QuotationWorkspacePage.ai-review.test.ts `
+  src/modules/estimation/pages/QuotationWorkspacePage.save-bar.test.ts
+
+if ($LASTEXITCODE -ne 0) { throw "Error tests Web" }
+
+pnpm --filter @kora/web build
+if ($LASTEXITCODE -ne 0) { throw "Error build Web" }
+```
+
+**Prueba manual:** cambiar entre «Por equipo» y «Por fases y módulos», editar colaboradores, unidad, duración, HH/semana y dedicación; comprobar que en EDT estas variables siguen siendo referenciales, no alteran las HH de tareas. Verificar disabled de QA, perfiles IA sin equipo y el scroll horizontal en ventanas angostas.
