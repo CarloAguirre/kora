@@ -34,6 +34,20 @@ describe('Iteración 5 · auditoría transversal del sistema de diseño Kora', (
     expect(styles).toContain('var(--kora-');
   });
 
+  it('todas las variables de los CSS auditados existen en tokens.css de Kora', () => {
+    const tokens = readFileSync(resolve(dir, '../../styles/tokens.css'), 'utf8');
+    const defined = new Set(
+      [...tokens.matchAll(/(--kora-[\\w-]+)\\s*:/g)].map((match) => match[1]),
+    );
+    for (const cssPath of css) {
+      const variables = [...read(cssPath).matchAll(/var\\((--kora-[\\w-]+)/g)]
+        .map((match) => match[1]);
+      for (const variable of variables) {
+        expect(defined.has(variable), cssPath + ' hace referencia a ' + variable).toBe(true);
+      }
+    }
+  });
+
   it('elimina controles estilizados manualmente de la cabecera y los comerciales', () => {
     const page = read('pages/QuotationWorkspacePage.tsx');
     const commercial = read('components/QuotationCommercialSections.tsx');
