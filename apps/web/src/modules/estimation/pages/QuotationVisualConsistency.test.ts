@@ -21,6 +21,10 @@ const css = [
   'components/QuotationCommercialSections.module.css',
   'components/QuotationAiReviewBanner.module.css',
   'components/QuotationDraftSaveBar.module.css',
+  'components/QuotationCommercialPreflightCard.module.css',
+  'components/QuotationTransferPreviewCard.module.css',
+  'components/QuotationVersionComparison.module.css',
+  'components/QuotationReconciliationReviewCard.module.css',
 ];
 
 describe('Iteración 5 · auditoría transversal del sistema de diseño Kora', () => {
@@ -71,6 +75,14 @@ describe('Iteración 5 · auditoría transversal del sistema de diseño Kora', (
     expect(lifecycle).not.toContain('.v5Actions .v5Approve');
     expect(lifecycle).not.toContain('.v5Actions .v5Send');
     expect(lifecycle).toContain('.v5Actions button{width:100%}');
+  });
+
+  it('conserva foco visible en formularios y detalles de la conciliación', () => {
+    const reconciliation = read('components/QuotationReconciliationReviewCard.module.css');
+    const transfer = read('components/QuotationTransferPreviewCard.module.css');
+    expect(reconciliation).toContain('.field textarea:focus-visible');
+    expect(reconciliation).toContain('.module>summary:focus-visible');
+    expect(transfer).toContain('.taskDetails summary:focus-visible');
   });
 
   it('la aprobación y el traspaso mantienen acciones nativas y los guards de negocio', () => {
