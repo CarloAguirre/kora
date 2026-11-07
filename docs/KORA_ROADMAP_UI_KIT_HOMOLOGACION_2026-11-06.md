@@ -129,3 +129,22 @@ incluido scroll de tabla, Gantt, modales y estados del bloque.
 
 **Pendiente de ejecución local:** `typecheck`, Vitest Roadmap incluido el
 nuevo test CSS, y `build`. No se proclama PASS sin el log del usuario.
+
+## Ajuste de la validación local de UI-3 (07-11-2026)
+
+Validación local del HEAD `e220827f87e1573a59383cc7830199378d922ebe`: `typecheck` Web correcto y
+**64 pruebas funcionales de UI-1/UI-2 pasaron**. Los tres tests nuevos de
+`RoadmapResponsiveStyles.test.ts` fallaron antes de ejecutar sus aserciones
+de CSS: `toMatch()` recibió un objeto, no un string. La combinación de
+`.module.css?raw` con la transformación CSS Modules de Vite/Vitest devolvió
+el mapa de clases en lugar de texto fuente.
+
+**Corrección limitada al test:** leer los dos CSS Modules desde Node mediante
+`readFileSync(new URL('./archivo.module.css', import.meta.url), 'utf8')`.
+Se conservan las tres pruebas y todas sus aserciones sobre scroll aislado,
+columna Acciones, tokens y breakpoints; se evita el procesamiento del import
+por Vite. Ningún estilo productivo ni componente cambió.
+
+**Pendiente:** ejecutar de nuevo `typecheck`, las 67 pruebas de Roadmap y
+`build` Web sobre el nuevo commit. El log compartido terminaba en el fallo
+de Vitest y no prueba el resultado del build para ese mismo HEAD.
