@@ -427,7 +427,7 @@
 
 
 /* Roadmap v5.02: avisos de equipo + tareas operativas, debajo del cronograma. */
-.operationalContent { display: grid; gap: 10px; }
+.operationalContent { display: grid; gap: 10px; min-width: 0; }
 .awaitingAssignment {
   display: flex;
   align-items: center;
@@ -467,17 +467,26 @@
   color: #fff;
 }
 .operationalTasks {
-  border-top: 1px dashed #e4e8f0;
-  padding-top: 12px;
+  min-width: 0;
+  border-top: 1px dashed var(--kora-border-subtle);
+  padding-top: var(--kora-space-3);
 }
 .operationalTasks > summary {
   cursor: pointer;
-  font-size: 13px;
-  color: #24344f;
+  font-size: var(--kora-text-sm);
+  color: var(--kora-navy);
   padding: 3px 0 8px;
   list-style: revert;
 }
-.operationalTaskScroll { width: 100%; overflow-x: auto; }
+.operationalTaskScroll {
+  /* La tabla conserva sus columnas y se desplaza sola, sin arrastrar el Gantt. */
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+}
 .operationalTaskTable {
   width: 100%;
   min-width: 760px;
@@ -486,38 +495,42 @@
 }
 .operationalTaskTable th {
   padding: 9px 10px;
-  background: #f7f8fa;
-  border-bottom: 1px solid #e5e9f0;
-  font-size: 11px;
-  font-weight: 600;
-  color: #64748b;
+  background: var(--kora-surface-muted);
+  border-bottom: 1px solid var(--kora-border-subtle);
+  font-size: var(--kora-text-2xs);
+  font-weight: var(--kora-weight-semibold);
+  color: var(--kora-text-muted);
   text-align: left;
 }
 .operationalTaskTable td {
   padding: 9px 10px;
-  border-bottom: 1px solid #e9edf2;
+  border-bottom: 1px solid var(--kora-border-subtle);
   vertical-align: middle;
-  font-size: 12px;
-  color: #4b5563;
+  font-size: var(--kora-text-xs);
+  color: var(--kora-text-muted);
 }
 .operationalTaskTable tr:last-child td { border-bottom: none; }
 .operationalTaskTable td:nth-child(5),
 .operationalTaskTable td:nth-child(6) { white-space: nowrap; }
-.operationalTaskTable th:last-child { width: 84px; }
-.operationalTaskTable td:last-child { text-align: right; white-space: nowrap; }
-.operationalTaskTitle {
+.operationalTaskTable td:nth-child(2),
+.operationalTaskTable td:nth-child(3) { overflow-wrap: anywhere; }
+/* Solo la vista gestionable tiene la columna de acciones. Sin ella, la fecha no
+   hereda una anchura fija ni se alinea erróneamente a la derecha. */
+.operationalTaskTable th[aria-label="Acciones"] { width: 118px; min-width: 118px; }
+.operationalTaskTable .operationalTaskTitle {
   min-width: 190px;
-  color: #0f2a44 !important;
-  font-weight: 650;
+  color: var(--kora-navy);
+  font-weight: var(--kora-weight-semibold);
+  overflow-wrap: anywhere;
 }
 .operationalTaskTitle small {
   display: block;
   margin-top: 3px;
-  color: #7b8794;
-  font-weight: 400;
+  color: var(--kora-text-muted);
+  font-weight: var(--kora-weight-regular);
   font-size: 10.5px;
 }
-.noOperationalTasks { color: #667085; font-size: 12px; }
+.noOperationalTasks { color: var(--kora-text-muted); font-size: var(--kora-text-xs); }
 .legacyReferences {
   border-top: 1px solid #e5e8ef;
   padding-top: 10px;
@@ -539,7 +552,7 @@
   border-radius: 3px;
   margin-right: 5px;
 }
-.unlinkedBlock { font-size: 11.5px; color: #7b8794; }
+.unlinkedBlock { font-size: 11.5px; color: var(--kora-text-muted); }
 
 /* Nueva fase: modal corto de un solo campo, igual al flujo prototipado. */
 .phaseCreationModal { max-width: min(400px, calc(100vw - 32px)); }
@@ -570,8 +583,7 @@
 /* La tabla v5.02 mantiene solamente editar y eliminar en la última columna.
    Duplicar sigue disponible dentro del modal de edición. */
 /* Tres iconos para tareas asignadas; sin recortar acciones ni texto de otras columnas. */
-.operationalTaskTable th:last-child { width: 118px; min-width: 118px; }
-.operationalTaskTable td:last-child { padding-right: 6px; }
+.operationalTaskTable .operationalTaskActions { padding-right: 6px; text-align: right; white-space: nowrap; }
 .operationalTaskActions .taskIconAction + .taskIconAction { margin-left: 6px; }
 .addTaskButton {
   /* Presentación de enlace bajo la tabla, con foco y hover del Button tertiary. */

@@ -95,3 +95,37 @@ relajan aserciones ni se habilita eliminar sin permiso.
 
 **Pendiente de validar en local:** volver a ejecutar Vitest (64 tests),
 `typecheck` y build Web, con salida verificada sobre el nuevo HEAD.
+
+## UI-3 · Tokens y responsive del Roadmap operativo (07-11-2026)
+
+Base: `674fca4bceb5b26b90c1387d7bf81bddbf277c91`. Trabajo exclusivo en CSS Modules del Roadmap interno:
+`ProjectModulesCard.module.css` y `SegmentDrawer.module.css`. No se
+modificó `PhaseRoadmap` (Gantt común con el portal), JSX, lógica, BD ni API.
+
+**Tabla operativa:** `operationalContent` y `operationalTasks` permiten
+`min-width: 0` y `operationalTaskScroll` tiene scroll horizontal propio con
+`overscroll-behavior-x: contain`, manteniendo la tabla a un mínimo de 760 px
+y todas las columnas accesibles. Las tareas y nombres de bloque largos pueden
+quebrarse en su celda. Se corrigió una regla de selector: el ancho fijo de
+118 px y la alineación derecha se aplican exclusivamente a la columna
+`aria-label="Acciones"`, no a `Fecha límite` cuando no hay gestión.
+Las cabeceras, bordes, textos y superficie neutra usan tokens existentes
+(`--kora-*`). Se respetan iconos compactos y colores de identidad por equipo.
+
+**Drawer:** color de texto, líneas y superficies neutras se conectan a tokens
+Kora existentes. La cabecera del equipo y las acciones de tareas permiten
+wrap. En viewport de hasta 560 px, las métricas pasan de 3 a 2 columnas
+y las acciones de tarea bajan sin desplazar el contenido. Hasta 380 px,
+las métricas usan 1 columna y los botones del modal de entrega pueden
+apilarse. Las barras de progreso real y los estados especiales de entrega
+conservan sus colores originales; sus reglas de negocio no cambian.
+
+**Regresión automatizable:** nuevo `RoadmapResponsiveStyles.test.ts`
+verifica contratos estáticos del CSS con imports `?raw`: scroll aislado,
+min-width de la tabla, selector exclusivo de acciones, tokens y dos
+breakpoints del drawer. Estas pruebas **no sustituyen una inspección
+visual real**. Para UI-4 validar Chrome en 320, 375, 768 y 1280 px,
+incluido scroll de tabla, Gantt, modales y estados del bloque.
+
+**Pendiente de ejecución local:** `typecheck`, Vitest Roadmap incluido el
+nuevo test CSS, y `build`. No se proclama PASS sin el log del usuario.

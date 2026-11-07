@@ -1,9 +1,11 @@
 /* Panel de bloque operativo v5.02. Usa el modal lateral nativo para conservar
    manejo de foco, Escape y scroll independiente del Roadmap. */
 .drawer {
-  --drawer-ink: #122038;
-  --drawer-muted: #6b7789;
-  --drawer-line: #e4e9f1;
+  /* El panel consume tokens compartidos sin cambiar los colores por equipo ni
+     la semántica de estados de las entregas. */
+  --drawer-ink: var(--kora-navy);
+  --drawer-muted: var(--kora-text-muted);
+  --drawer-line: var(--kora-border-subtle);
 }
 .drawer .content {
   display: flex;
@@ -17,8 +19,8 @@
   display: flex;
   align-items: center;
 }
-.teamHeader { justify-content: space-between; gap: 12px; }
-.teamIdentity { min-width: 0; gap: 10px; }
+.teamHeader { justify-content: space-between; gap: var(--kora-space-3); flex-wrap: wrap; }
+.teamIdentity { flex: 1 1 180px; min-width: 0; gap: 10px; }
 .teamBadge {
   display: inline-flex;
   flex: 0 0 29px;
@@ -31,7 +33,7 @@
   font-weight: 800;
 }
 .teamDetails { display: grid; gap: 3px; min-width: 0; }
-.teamDetails strong { font-size: 13px; font-weight: 700; }
+.teamDetails strong { font-size: var(--kora-text-sm); font-weight: var(--kora-weight-bold); overflow-wrap: anywhere; }
 .teamDetails small { color: var(--drawer-muted); font-size: 11px; }
 .blockState {
   font-size: 10px;
@@ -41,10 +43,10 @@
 .metrics {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  border: 1px solid #e0e5ef;
-  border-radius: 8px;
-  background: #f7f8fa;
-  padding: 10px 12px;
+  border: 1px solid var(--kora-border-subtle);
+  border-radius: var(--kora-radius);
+  background: var(--kora-surface-muted);
+  padding: 10px var(--kora-space-3);
   gap: 5px;
 }
 .metrics > div { display: grid; min-width: 0; gap: 5px; }
@@ -65,8 +67,8 @@
 .progressBar {
   position: relative;
   height: 9px;
-  border-radius: 999px;
-  background: #e8edf4;
+  border-radius: var(--kora-radius-pill);
+  background: var(--kora-border-subtle);
   overflow: visible;
 }
 .progressBar > span {
@@ -81,7 +83,7 @@
   top: -2px;
   bottom: -2px;
   width: 2px;
-  background: #10213c;
+  background: var(--kora-navy);
   transform: translateX(-1px);
 }
 .progressExplanation { margin: 0; line-height: 1.4; font-size: 11px; color: #586b85; }
@@ -92,14 +94,14 @@
   align-items: flex-start;
   padding: 12px 11px;
   border-radius: 8px;
-  border: 1px solid #dfe5ec;
-  background: #f8fafb;
+  border: 1px solid var(--kora-border-subtle);
+  background: var(--kora-surface-alt);
 }
 .diamond { color: #122138; font-size: 14px; line-height: 1.1; }
 .deliverySuccess { background: #f4f9ef; border-color: #e5efde; }
 .deliveryOverdue { background: #fff6f5; border-color: #ff8c86; }
 .deliveryOverdue .diamond { color: #dc514b; }
-.deliveryNeutral { background: #f8fafc; border-color: #dfe5ec; }
+.deliveryNeutral { background: var(--kora-surface-alt); border-color: var(--kora-border-subtle); }
 .deliveryInfo { display: grid; gap: 4px; min-width: 0; }
 .deliveryInfo strong { font-size: 11.5px; overflow-wrap: anywhere; }
 .deliveryInfo small { font-size: 10.5px; color: #65738a; }
@@ -148,7 +150,13 @@
 .closureAction > span { flex: none; }
 .closureAction button:disabled { cursor: not-allowed; opacity: .65; pointer-events: none; }
 .tasksSection { padding-top: 9px; }
-.tasksHeading { justify-content: space-between; gap: 12px; }
+.tasksHeading {
+  justify-content: space-between;
+  gap: var(--kora-space-2);
+  flex-wrap: wrap;
+}
+.tasksHeading h3 { flex: 1 1 100px; min-width: 0; }
+.tasksHeading > button { max-width: 100%; }
 .addTask {
   /* Mantiene la escala compacta del drawer; usa Button outline del UI kit. */
   height: 30px; min-width: 0; padding: 6px 9px;
@@ -157,7 +165,8 @@
 .taskList { list-style: none; margin: 0; padding: 0; }
 .taskRow {
   min-height: 50px;
-  border-top: 1px solid #e9edf3;
+  min-width: 0;
+  border-top: 1px solid var(--kora-border-subtle);
   gap: 9px;
   padding: 7px 0;
 }
@@ -171,7 +180,8 @@
   display: inline-flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px;
+  gap: var(--kora-space-1);
+  min-width: 0;
   max-width: 100%;
 }
 .taskActions { flex: 0 0 auto; gap: 2px; }
@@ -180,10 +190,18 @@
   width: 22px; height: 24px; padding: 3px; color: var(--kora-text-muted);
 }
 .taskActionIcon:hover:not(:disabled) { color: var(--kora-navy); }
-.emptyTasks { font-size: 11px; color: #718093; margin: 0; }
+.emptyTasks { font-size: var(--kora-text-2xs); color: var(--kora-text-muted); margin: 0; }
+/* En móviles compactos, los valores de HH/fechas no compiten por tres columnas
+   estrechas y las acciones bajan de línea sin cortar badges ni nombres. */
 @media (max-width: 560px) {
-  .drawer .content { gap: 12px; }
-  .metrics { padding: 10px 8px; }
+  .drawer .content { gap: var(--kora-space-3); }
+  .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 10px var(--kora-space-2); }
   .taskRow { flex-wrap: wrap; }
-  .taskStatusGroup { margin-left: auto; }
+  .taskInfo { flex: 1 1 100%; }
+  .taskStatusGroup { margin-left: 0; }
+  .taskActions { margin-left: auto; }
+}
+@media (max-width: 380px) {
+  .metrics { grid-template-columns: minmax(0, 1fr); }
+  .completionFooter > button { flex: 1 1 100%; }
 }
