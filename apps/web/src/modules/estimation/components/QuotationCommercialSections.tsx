@@ -1,6 +1,9 @@
 import type { EstimationQuestion, QuotationDraftData, QuotationVersion } from '@kora/contracts';
 import { useEstimationQuestionnaireDefinition } from '../api/estimation.queries';
 import { Card } from '@/shared/components/ui/Card';
+import { Button } from '@/shared/components/ui/Button';
+import { TextField } from '@/shared/components/ui/TextField';
+import { Select } from '@/shared/components/ui/Select';
 import styles from './QuotationCommercialSections.module.css';
 
 type Cost = QuotationDraftData['costs'][number];
@@ -81,27 +84,29 @@ export function QuotationCommercialSections({
             <tbody>
               {draft.costs.map((cost, index) => (
                 <tr key={index}>
-                  <td><input aria-label={'Descripción costo ' + (index + 1)}
+                  <td><TextField className={styles.field} aria-label={'Descripción costo ' + (index + 1)}
                     value={cost.description} maxLength={500} disabled={!editable}
                     onChange={(event) => editCost(index, { description: event.target.value })} /></td>
-                  <td><input aria-label={'Monto costo ' + (index + 1)}
+                  <td><TextField className={styles.field + ' ' + styles.numericField}
+                    aria-label={'Monto costo ' + (index + 1)}
                     type="number" min={0} step="0.01" value={cost.amount}
-                    disabled={!editable} className={styles.right}
+                    disabled={!editable}
                     onChange={(event) => editCost(index, { amount: num(event.target.value) })} /></td>
-                  <td><select aria-label={'Cobro costo ' + (index + 1)}
+                  <td><Select className={styles.field} aria-label={'Cobro costo ' + (index + 1)}
                     value={cost.recurrence} disabled={!editable}
+                    options={[
+                      { value: 'once', label: 'Único' },
+                      { value: 'monthly', label: 'Mensual' },
+                      { value: 'annual', label: 'Anual' },
+                    ]}
                     onChange={(event) => editCost(index, {
                       recurrence: event.target.value as Cost['recurrence'],
-                    })}>
-                    <option value="once">Único</option>
-                    <option value="monthly">Mensual</option>
-                    <option value="annual">Anual</option>
-                  </select></td>
-                  <td>{editable && <button className={styles.remove} type="button"
+                    })} /></td>
+                  <td>{editable && <Button variant="ghost" size="icon" className={styles.remove}
                     aria-label={'Eliminar costo ' + (index + 1)}
                     onClick={() => onDraftChange({
                       costs: draft.costs.filter((_, i) => i !== index),
-                    })}>×</button>}</td>
+                    })}>×</Button>}</td>
                 </tr>
               ))}
               {draft.costs.length === 0 && <tr><td colSpan={4} className={styles.empty}>
@@ -110,10 +115,10 @@ export function QuotationCommercialSections({
             </tbody>
           </table>
         </div>
-        {editable && <button type="button" className={styles.add}
+        {editable && <Button variant="outline" size="sm" className={styles.add}
           onClick={() => onDraftChange({
             costs: [...draft.costs, { description: 'Nuevo costo', amount: 0, recurrence: 'once' }],
-          })}>+ Agregar costo</button>}
+          })}>+ Agregar costo</Button>}
       </Card>
 
       <Card className={styles.surface}>
@@ -130,35 +135,41 @@ export function QuotationCommercialSections({
             <tbody>
               {draft.paymentPlan.map((payment, index) => (
                 <tr key={index}>
-                  <td><input maxLength={120} aria-label={'Tramo de pago ' + (index + 1)}
+                  <td><TextField className={styles.field} maxLength={120}
+                    aria-label={'Tramo de pago ' + (index + 1)}
                     value={payment.name} disabled={!editable}
                     onChange={(event) => editPayment(index, { name: event.target.value })} /></td>
-                  <td><input aria-label={'Porcentaje de pago ' + (index + 1)}
-                    className={styles.right} type="number" min={0} max={100}
+                  <td><TextField className={styles.field + ' ' + styles.numericField}
+                    aria-label={'Porcentaje de pago ' + (index + 1)}
+                    type="number" min={0} max={100}
                     step="0.01" value={payment.percent} disabled={!editable}
                     onChange={(event) => editPayment(index, { percent: num(event.target.value) })} /></td>
-                  <td><select aria-label={'Hito de cobro ' + (index + 1)}
+                  <td><Select className={styles.field} aria-label={'Hito de cobro ' + (index + 1)}
                     value={payment.trigger} disabled={!editable}
+                    options={[
+                      { value: 'approval', label: 'Aprobación del proyecto' },
+                      { value: 'phase', label: 'Inicio de fase' },
+                      { value: 'date', label: 'Fecha' },
+                    ]}
                     onChange={(event) => editPayment(index, {
                       trigger: event.target.value as Payment['trigger'],
-                    })}>
-                    <option value="approval">Aprobación del proyecto</option>
-                    <option value="phase">Inicio de fase</option>
-                    <option value="date">Fecha</option>
-                  </select></td>
+                    })} /></td>
                   <td>
                     {payment.trigger === 'phase'
-                      ? <select aria-label={'Fase de pago ' + (index + 1)}
+                      ? <Select className={styles.field} aria-label={'Fase de pago ' + (index + 1)}
                           value={payment.triggerPhase ?? ''} disabled={!editable}
+                          options={[
+                            { value: '', label: 'Seleccionar fase' },
+                            ...draft.phases.map((phase) => ({
+                              value: phase.name, label: phase.name,
+                            })),
+                          ]}
                           onChange={(event) => editPayment(index, {
                             triggerPhase: event.target.value || null,
-                          })}>
-                          <option value="">Seleccionar fase</option>
-                          {draft.phases.map((phase, phaseIndex) =>
-                            <option key={phaseIndex} value={phase.name}>{phase.name}</option>)}
-                        </select>
+                          })} />
                       : payment.trigger === 'date'
-                        ? <input type="date" aria-label={'Fecha de pago ' + (index + 1)}
+                        ? <TextField className={styles.field} type="date"
+                            aria-label={'Fecha de pago ' + (index + 1)}
                             value={payment.triggerDate ?? ''} disabled={!editable}
                             onChange={(event) => editPayment(index, {
                               triggerDate: event.target.value || null,
@@ -168,11 +179,11 @@ export function QuotationCommercialSections({
                   <td className={styles.amount}>
                     {net === null ? '—' : fmt(Math.round(net * payment.percent / 100 * 10000) / 10000) + ' ' + currency}
                   </td>
-                  <td>{editable && <button className={styles.remove}
-                    type="button" aria-label={'Eliminar tramo de pago ' + (index + 1)}
+                  <td>{editable && <Button variant="ghost" size="icon" className={styles.remove}
+                    aria-label={'Eliminar tramo de pago ' + (index + 1)}
                     onClick={() => onDraftChange({
                       paymentPlan: draft.paymentPlan.filter((_, i) => i !== index),
-                    })}>×</button>}</td>
+                    })}>×</Button>}</td>
                 </tr>
               ))}
               {draft.paymentPlan.length === 0 && <tr><td colSpan={6} className={styles.empty}>
@@ -181,11 +192,11 @@ export function QuotationCommercialSections({
             </tbody>
           </table>
         </div>
-        {editable && <button type="button" className={styles.add}
+        {editable && <Button variant="outline" size="sm" className={styles.add}
           onClick={() => onDraftChange({
             paymentPlan: [...draft.paymentPlan,
               { name: 'Nuevo hito', percent: 0, trigger: 'approval' }],
-          })}>+ Agregar tramo</button>}
+          })}>+ Agregar tramo</Button>}
         <p className={sumPercent === 100 ? styles.ok : styles.notice}>
           Plan de pago: {fmt(sumPercent)}% de 100%.
           {sumPercent !== 100 && ' Debe completar el 100% antes del envío o aprobación.'}
