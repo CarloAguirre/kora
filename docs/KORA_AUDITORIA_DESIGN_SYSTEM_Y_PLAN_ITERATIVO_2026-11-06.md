@@ -2,7 +2,7 @@
 
 **Fecha:** 2026-11-06  
 **Rama de trabajo:** `feature/calculadora-roadmap-diseno-v5-02`
-**Estado:** Iteraciones 1 y 2 validadas localmente por el equipo; iteración 3 implementada y pendiente de validación local.  
+**Estado:** Iteraciones 1–3 validadas localmente por el equipo; iteración 4 implementada y pendiente de validación local.  
 **Alcance:** Calculadora de cotizaciones y estimaciones, no reescritura funcional.
 
 ## 1. Contexto y conclusión
@@ -80,6 +80,38 @@ Kora ya contaba con una librería compartida en `apps/web/src/shared/components/
 - **Sin cambios funcionales:** `commercialNet` sigue incorporando únicamente costos `once` y excluyendo mensual/anual; el importe de tramos conserva sus porcentajes y 4 decimales; validación del 100%, supuestos, exclusiones ocultas y solo lectura permanecen idénticos. Sin modificaciones a backend, contratos o BD.
 - **Regresiones añadidas:** `QuotationCommercialSections.test.tsx` cubre estilos de componentes compartidos, edición de descripciones y montos, triggers de fase/fecha, alta y baja de registros, supuestos, cálculo y controles deshabilitados.
 - **Pendiente:** ejecutar typecheck + Vitest + build en la máquina local y validar los selectores/fechas en navegador, incluido el scroll horizontal con seis columnas.
+
+- **Validación iteración 3:** el equipo confirmó las pruebas e integración antes de dar continuidad a la iteración 4.
+- **Iteración 4 — commit `6dc5814`:** el selector de versiones y las acciones crear/copia/nueva IA/en blanco usan `Button` del design system. La versión seleccionada utiliza `variant="secondary"` y las demás `outline`, preservando `aria-pressed`, `title` y la confirmación destructiva cuando hay cambios sin guardar. No se usa `Tabs`: la selección de una versión no es una pestaña de sección y puede pedir confirmación.
+- **Revisión IA:** `QuotationAiReviewBanner` mantiene Ajustar / Usar tal cual / Guardar / Descartar y la aceptación transaccional existente, pero deja de pintar los botones con overrides violetas. El aviso emplea `--kora-*` y la propuesta aceptada usa `Badge tone="success"` compartido. `QuotationDraftSaveBar` conserva posición y comportamiento; sus colores usan tokens Kora directos.
+- **Limpieza:** eliminado CSS local de versiones activas, vínculos de IA, botones de mapeo, avisos viejos sin uso y estilos de hover/disabled que entraban en conflicto con los componentes nativos. El mapeo de equipos mantiene su guardado previo y bloqueo mientras hay cambios pendientes.
+- **Pruebas iteración 4:** `QuotationAiReviewBanner.test.tsx` verifica variante de Button y Badge; `QuotationWorkspacePage.design-system.test.ts` comprueba selección, accesibilidad, callbacks, confirmación al salir y footer. Se mantienen los tests existentes de aceptación, guardado y layout.
+- **Sin cambios funcionales:** no cambian API, contratos, Gemini, Drive, EDT, costos, reglas de cotización, migraciones ni `master`.
+- **Pendiente:** ejecutar validaciones locales y revisar encabezado de versiones, aceptación IA, modo ajuste, responsive y footer en navegador.
+
+### Comandos de validación — iteración 4 (PowerShell)
+```powershell
+git fetch kora
+git switch feature/calculadora-roadmap-diseno-v5-02
+git pull --ff-only kora feature/calculadora-roadmap-diseno-v5-02
+
+pnpm --filter @kora/web typecheck
+if ($LASTEXITCODE -ne 0) { throw "Error typecheck Web" }
+
+pnpm --filter @kora/web exec vitest run `
+  src/modules/estimation/pages/QuotationWorkspacePage.design-system.test.ts `
+  src/modules/estimation/components/QuotationAiReviewBanner.test.tsx `
+  src/modules/estimation/components/QuotationDraftSaveBar.test.tsx `
+  src/modules/estimation/pages/QuotationWorkspacePage.ai-review.test.ts `
+  src/modules/estimation/pages/QuotationWorkspacePage.save-bar.test.ts `
+  src/modules/estimation/pages/QuotationWorkspacePage.layout.test.ts
+if ($LASTEXITCODE -ne 0) { throw "Error pruebas de cotización" }
+
+pnpm --filter @kora/web build
+if ($LASTEXITCODE -ne 0) { throw "Error build Web" }
+```
+
+**Verificación visual:** navegar entre versiones con/sin cambios pendientes y confirmar cancelación; iniciar cotización manual, copiar y generar IA; comparar los estados de Badge y Button con el resto de Kora; probar «Ajustar antes de aceptar», «Usar tal cual», guardar y descartar; comprobar snackbar y footer sin tapar los controles.
 
 ### Comandos de validación — iteración 3 (PowerShell)
 ```powershell
