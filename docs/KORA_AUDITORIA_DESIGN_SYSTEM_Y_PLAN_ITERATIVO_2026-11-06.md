@@ -2,7 +2,7 @@
 
 **Fecha:** 2026-11-06  
 **Rama de trabajo:** `feature/calculadora-roadmap-diseno-v5-02`  
-**Estado:** Auditoría completada; iteración 1 en ejecución.  
+**Estado:** Auditoría completada; iteración 1 implementada en la rama, pendiente de validación local.  
 **Alcance:** Calculadora de cotizaciones y estimaciones, no reescritura funcional.
 
 ## 1. Contexto y conclusión
@@ -67,4 +67,25 @@ Kora ya contaba con una librería compartida en `apps/web/src/shared/components/
 ## 5. Bitácora
 
 - **2026-11-06 — Auditoría:** identificadas reutilizaciones y duplicaciones. Se prioriza fase/tareas para iniciar con cambios pequeños y reversibles.
-- **Iteración 1:** el commit de implementación se registrará en la respuesta y en el historial de GitHub.
+- **Iteración 1 — commit `148da8b`:** se integró el `Button` compartido en cinco acciones del editor: asociar equipos, eliminar fase, agregar tarea, ver plantilla y agregar fase/módulo. Se homologaron superficie/identificador de fase, textos estructurales y aviso de mapeo a tokens `--kora-*`. La carga de Excel conserva su etiqueta con input de archivo (patrón nativo) y el ícono × de eliminación de tarea se evaluará en una iteración posterior por su ancho de columna.
+- **Regresión añadida:** `QuotationPhaseWorkspace.test.tsx` verifica las variantes de `Button` compartido y la acción de asociación. Se conservan pruebas de edición de HH, tareas, equipos y operaciones sobre fases.
+- **Validación:** revisión estática de los tres archivos publicados; faltan ejecutar las pruebas de Vitest, typecheck y build en el entorno local del proyecto y confirmar la apariencia visual en navegador.
+
+### Comandos de validación — iteración 1 (PowerShell)
+```powershell
+git fetch kora
+git switch feature/calculadora-roadmap-diseno-v5-02
+git pull --ff-only kora feature/calculadora-roadmap-diseno-v5-02
+
+pnpm --filter @kora/web typecheck
+if ($LASTEXITCODE -ne 0) { throw "Error typecheck Web" }
+
+pnpm --filter @kora/web exec vitest run ` 
+  src/modules/estimation/components/QuotationPhaseWorkspace.test.tsx ` 
+  src/modules/estimation/pages/QuotationWorkspacePage.ai-review.test.ts ` 
+  src/modules/estimation/pages/QuotationWorkspacePage.save-bar.test.ts
+if ($LASTEXITCODE -ne 0) { throw "Error tests Web" }
+
+pnpm --filter @kora/web build
+if ($LASTEXITCODE -ne 0) { throw "Error build Web" }
+```
