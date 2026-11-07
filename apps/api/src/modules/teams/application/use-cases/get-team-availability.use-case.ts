@@ -52,7 +52,7 @@ export class GetTeamAvailabilityUseCase
 
     // Una membresía sin fecha de salida no significa que la cuenta esté habilitada.
     // Mantener la membresía y sus HH históricas en BD; excluirla solo del tablero operativo.
-    const visibleMembers = currentTeamMembers.filter((member) => member.userStatus === 'active');
+    const visibleMembers = currentTeamMembers.filter((member) => member.userStatus !== 'disabled');
 
     const hoursByMemberId = new Map<string, Map<string, { approved: number; pending: number }>>();
     for (const row of hoursByMemberAndDate) {

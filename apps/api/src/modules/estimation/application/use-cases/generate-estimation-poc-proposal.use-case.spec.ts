@@ -170,11 +170,19 @@ describe('GenerateEstimationPocProposalUseCase', () => {
     expect(result.provider).toBe('gemini');
     expect(result.sourceMode).toBe('drive');
     expect(result.documentsAnalyzed).toBe(1);
-    expect(result.totalHours).toBe(160);
+    expect(result.totalHours).toBe(180); // 160 dev + 4 semanas x 5 HH TL
+    expect(result.roles.find((role) => role.role === 'Líder Técnico')).toMatchObject({
+      unit: 'week', duration: 4, hoursPerUnit: 5, people: 1, totalHours: 20,
+    });
   });
   it('usa catálogo real en el prompt y rechaza perfiles con IDs ajenos a Kora', async () => {
     const teamId = '0777e456-fd76-445e-83f1-afc25061c103';
     const catalog = [{ teamId, name: 'Desarrollo' }];
+    // La política de 5 HH/semana se aplica a fuentes Drive reales,
+    // no al identificador reservado para la demostración KDM.
+    const realInput = {
+      ...input, driveFolderUrl: 'https://drive.google.com/drive/folders/real-catalog',
+    };
     let activeCatalog: unknown = null;
     let requiredFields: unknown = null;
     const ai: AiProvider = {
@@ -197,12 +205,15 @@ describe('GenerateEstimationPocProposalUseCase', () => {
       },
     };
     const generator = new GenerateEstimationPocProposalUseCase(ai, sources);
-    const result = await generator.execute(input, catalog);
+    const result = await generator.execute(realInput, catalog);
     expect(activeCatalog).toEqual(catalog);
     expect(requiredFields).toContain('teamId');
     expect(result.roles[0]?.teamId).toBe(teamId);
     expect(result.roles[0]?.role).toBe('Desarrollador Backend');
-    expect(result.totalHours).toBe(80);
+    expect(result.roles.find((role) => role.role === 'Líder Técnico')).toMatchObject({
+      teamId, duration: 2, hoursPerUnit: 5, totalHours: 10,
+    });
+    expect(result.totalHours).toBe(90);
 
     const invalid: AiProvider = {
       name: 'gemini',
@@ -217,7 +228,7 @@ describe('GenerateEstimationPocProposalUseCase', () => {
       }),
     };
     await expect(new GenerateEstimationPocProposalUseCase(invalid, sources)
-      .execute(input, catalog)).rejects.toThrow(/equipo activo válido/);
+      .execute(realInput, catalog)).rejects.toThrow(/equipo activo válido/);
   });
 
   const projectId = '550e8400-e29b-41d4-a716-446655440000';
@@ -360,6 +371,44 @@ describe('GenerateEstimationPocProposalUseCase', () => {
       '¿Quién habilita la conectividad SAP?',
     ]);
     expect(edt.totalHours).toBe(79);
+  });
+
+  it('garantiza en Drive real 5 HH semanales al TL y reconcilia duración EDT', async () => {
+    const realInput = {
+      ...input, driveFolderUrl: 'https://drive.google.com/drive/folders/demo-real',
+    };
+    const ai: AiProvider = {
+      name: 'gemini',
+      generateStructured: async (request) => {
+        if (request.task === 'estimation.poc.proposal') {
+          return {
+            summary: 'Portal documentado',
+            roles: [
+              { role: 'Desarrollo', unit: 'week', duration: 2, hoursPerUnit: 40,
+                people: 1, source: 'KDM.pdf' },
+              { role: 'QA', unit: 'week', duration: 2, hoursPerUnit: 10,
+                people: 1, source: 'KDM.pdf' },
+            ],
+            assumptions: [], clarifyingQuestions: [],
+          };
+        }
+        return baseDetail();
+      },
+    };
+    const generator = new GenerateEstimationPocProposalUseCase(ai, sources);
+    const prelim = await generator.execute(realInput);
+    expect(prelim.roles.find((role) => role.role === 'Líder Técnico'))
+      .toMatchObject({ duration: 2, hoursPerUnit: 5, totalHours: 10 });
+
+    const edt = await generator.generateEdt(realInput, prelim);
+    expect(edt.stages?.find((stage) => stage.code === 'TL-GOV')).toMatchObject({
+      startWeek: 1, durationWeeks: 3, totalHours: 15,
+    });
+    expect(edt.totalHours).toBe(94); // 79 HH de features + 3 semanas x 5
+    const reconciled = generator.reconcileProposalWithEdt(prelim, edt);
+    expect(reconciled.roles.find((role) => role.role === 'Líder Técnico'))
+      .toMatchObject({ duration: 3, hoursPerUnit: 5, totalHours: 15 });
+    expect(reconciled.totalHours).toBe(94);
   });
 
   it('descarta roles duplicados del primer Gemini sin pedir la EDT', async () => {

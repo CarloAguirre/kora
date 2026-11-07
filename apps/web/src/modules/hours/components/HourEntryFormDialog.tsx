@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   HOUR_ENTRY_ASSIGNMENTS,
   PROJECT_REQUIRING_ASSIGNMENTS,
+  hourEntryRequiresApproval,
   type HourEntryAssignment,
   type HourEntrySummary,
   type ProjectSummary,
@@ -17,17 +18,22 @@ import { useProjectsList } from '@/modules/projects/api/projects.queries';
 import { getProjectOptionLabel } from '@/modules/projects/lib/project-option-label';
 import { useUsersList } from '@/modules/users/api/users.queries';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
+import { HOUR_ENTRY_PROJECT_STATUSES } from '../lib/selectable-project-statuses';
 import { ApiRequestError } from '@/shared/lib/api-client';
 import {
   DAILY_CAP_HOURS,
   DailyEntryBlockFields,
   DailyEntryForm,
   isWeekend,
+  overflowByBlock,
   stepBlockHours,
   validateDailyBlock,
   type DailyBlock,
+  type TaskHourEntryTarget,
 } from './DailyEntryForm';
 import { WeeklyEntryForm } from './WeeklyEntryForm';
+import { canEditAnyMonth, isInCurrentMonth, OUTSIDE_CURRENT_MONTH_MESSAGE } from '../lib/edit-window';
+import { OTHER_TASK_OPTION, toHourTaskId } from './hour-task-selection';
 
 const formatDateTime = (value: string) => new Date(value).toLocaleString('es-CL');
 const NEW_ENTRY_TABS = [
@@ -43,6 +49,8 @@ export interface HourEntryFormDialogProps {
   onSuccess: (message: string) => void;
   /** Solo lectura — para revisar el registro de otro colaborador sin poder editarlo. */
   readOnly?: boolean;
+  /** Alta vinculada a una tarea, con finalización posterior al guardado exitoso. */
+  initialTask?: TaskHourEntryTarget;
 }
 
 /**
@@ -53,7 +61,7 @@ export interface HourEntryFormDialogProps {
  * "Registro diario" (varios proyectos el mismo día) y "Registro semanal"
  * (un proyecto, lunes a viernes) — ver `DailyEntryForm`/`WeeklyEntryForm`.
  */
-export function HourEntryFormDialog({ open, entry, onClose, onSuccess, readOnly = false }: HourEntryFormDialogProps) {
+export function HourEntryFormDialog({ open, entry, onClose, onSuccess, readOnly = false, initialTask }: HourEntryFormDialogProps) {
   const [tab, setTab] = useState<'diario' | 'semanal'>('diario');
   const [total, setTotal] = useState(0);
 
@@ -83,15 +91,17 @@ export function HourEntryFormDialog({ open, entry, onClose, onSuccess, readOnly 
       onClose={onClose}
       title="Registrar horas"
       wide
+      bodyScrollOnly
       headerExtra={
         <span className={styles.headerTotal}>Total: {total.toLocaleString('es-CL', { maximumFractionDigits: 1 })}h</span>
       }
     >
-      <div className={styles.tabsRow}>
+      {!initialTask && <div className={styles.tabsRow}>
         <Tabs tabs={NEW_ENTRY_TABS} activeId={tab} onSelect={(id) => setTab(id as 'diario' | 'semanal')} />
-      </div>
-      {tab === 'diario' ? (
-        <DailyEntryForm onClose={onClose} onSuccess={onSuccess} onTotalChange={setTotal} />
+      </div>}
+      {initialTask || tab === 'diario' ? (
+        <DailyEntryForm key={initialTask ? 'task-' + initialTask.taskId : 'standard'}
+          initialTask={initialTask} onClose={onClose} onSuccess={onSuccess} onTotalChange={setTotal} />
       ) : (
         <WeeklyEntryForm onClose={onClose} onSuccess={onSuccess} onTotalChange={setTotal} />
       )}
@@ -108,6 +118,8 @@ const blockFromEntry = (entry: HourEntrySummary): DailyBlock => ({
     : '',
   projectId: entry.project?.id ?? '',
   moduleId: entry.module?.id ?? '',
+  segmentId: entry.segment?.id ?? '',
+  taskId: entry.taskId ?? OTHER_TASK_OPTION,
   category: entry.category,
   hours: String(entry.hours),
   description: entry.description,
@@ -119,7 +131,7 @@ const blockFromEntry = (entry: HourEntrySummary): DailyBlock => ({
 
 /**
  * Edición de un registro existente — mismo bloque que el "Registro diario"
- * (`DailyEntryBlockFields`: stepper de horas, switch de horas extra, módulo,
+ * (`DailyEntryBlockFields`: stepper de horas, switch de horas extra, fase/tiempo de ejecución,
  * bitácora y bloqueo) con las mismas validaciones, pero de una sola entrada.
  */
 function EditEntryForm({
@@ -147,6 +159,7 @@ function EditEntryForm({
     pageSize: 200,
     sortField: 'name',
     assignedToUserId: restrictToAssigned ? user?.id : undefined,
+    status: HOUR_ENTRY_PROJECT_STATUSES,
   });
   const { data: leaders } = useUsersList({ page: 1, pageSize: 200, sortField: 'firstName', role: 'leader' });
   /** Catálogo completo (unas decenas de filas): el calendario puede navegar a cualquier mes. */
@@ -155,7 +168,7 @@ function EditEntryForm({
   const { data: entriesForDate } = useHourEntriesList({ userId: entry.user.id, dateFrom: date, dateTo: date, pageSize: 100 });
 
   // El proyecto guardado puede no venir en la lista (p. ej. ya no está asignado
-  // al autor): se agrega para que el combobox lo siga mostrando.
+  // al autor, o ya se finalizó): se agrega para que el combobox lo siga mostrando.
   const projects = useMemo(() => {
     const items = projectsData?.items ?? [];
     if (!entry.project || items.some((p) => p.id === entry.project?.id)) return items;
@@ -163,29 +176,36 @@ function EditEntryForm({
   }, [projectsData, entry.project]);
 
   const holiday = holidaysForDate?.[0] ?? null;
-  const blockingMessage = isWeekend(date)
-    ? 'No se puede registrar horas en fines de semana.'
-    : holiday
-      ? `No se puede registrar horas el ${holiday.name} (feriado).`
-      : null;
+  const blockingMessage = !canEditAnyMonth(user?.role) && !isInCurrentMonth(date)
+    ? OUTSIDE_CURRENT_MONTH_MESSAGE
+    : isWeekend(date)
+      ? 'No se puede registrar horas en fines de semana.'
+      : holiday
+        ? `No se puede registrar horas el ${holiday.name} (feriado).`
+        : null;
   /** El propio registro no cuenta contra el tope: se reemplaza por lo que quede en el bloque. */
   const otherNonOvertimeHours = (entriesForDate?.items ?? [])
     .filter((e) => e.id !== entry.id && e.status !== 'rejected' && !e.isOvertime)
     .reduce((sum, e) => sum + e.hours, 0);
   const nonOvertimeTotal = otherNonOvertimeHours + (block.isOvertime ? 0 : Number(block.hours) || 0);
-  const exceedsDailyCap = nonOvertimeTotal > DAILY_CAP_HOURS;
+  /** Lo que el backend dejará como horas extra al guardar (ver `splitByDailyCap`). */
+  const autoOvertimeHours = overflowByBlock(otherNonOvertimeHours, [block.isOvertime ? 0 : Number(block.hours) || 0])[0] ?? 0;
 
   // El aprobador obligatorio depende del rol del DUEÑO, no de quien edita. Al
   // editar el registro de otro (líder/PMO desde aprobaciones) no conocemos su
   // rol: si ya tenía aprobador designado, se sigue exigiendo.
   const ownerRequiresApprover =
     user?.id === entry.user.id ? user.role === 'collaborator' : entry.designatedApprover !== null;
+  // Las horas extra de un líder se autoaprueban; con el registro de otro se asume que no.
+  const overtimeNeedsApproval = user?.id === entry.user.id ? hourEntryRequiresApproval(user.role, true) : true;
   const validationOptions = {
     projects,
     isCollaborator: ownerRequiresApprover,
+    overtimeNeedsApproval,
     overtimeAlreadyGranted: entry.isOvertime && block.projectId === entry.project?.id,
+    exceedsDailyCap: autoOvertimeHours > 0,
   };
-  const canSubmit = !blockingMessage && !exceedsDailyCap && validateDailyBlock(block, validationOptions) === null;
+  const canSubmit = !blockingMessage && validateDailyBlock(block, validationOptions) === null;
   const blockTitle = (() => {
     const project = projects.find((p) => p.id === block.projectId);
     return project ? getProjectOptionLabel(project) : block.assignment || 'Registro';
@@ -193,7 +213,7 @@ function EditEntryForm({
 
   const onSubmit = async () => {
     setServerError(null);
-    if (blockingMessage || exceedsDailyCap) return;
+    if (blockingMessage) return;
     const error = validateDailyBlock(block, validationOptions);
     setBlockError(error);
     if (error) return;
@@ -207,7 +227,9 @@ function EditEntryForm({
           assignment: block.assignment as HourEntryAssignment,
           projectId: needsProject ? block.projectId : null,
           moduleId: needsProject && block.moduleId ? block.moduleId : null,
-          category: block.category,
+          segmentId: needsProject && block.moduleId && block.segmentId ? block.segmentId : null,
+          taskId: needsProject && block.moduleId ? (toHourTaskId(block.taskId) ?? null) : null,
+          category: block.category.trim(),
           description: block.description,
           hours: Number(block.hours),
           date,
@@ -243,12 +265,13 @@ function EditEntryForm({
         onChange={(event) => setDate(event.target.value)}
       />
 
-      {!blockingMessage && exceedsDailyCap && (
-        <div className={styles.noticeWarning} role="alert">
+      {!blockingMessage && autoOvertimeHours > 0 && (
+        <div className={styles.noticeWarning} role="status">
           <AlertIcon size={16} />
           <span>
-            Superarías el límite diario de {DAILY_CAP_HOURS}h ({nonOvertimeTotal.toLocaleString('es-CL', { maximumFractionDigits: 1 })}h
-            sin horas extra ese día). Marca las horas que correspondan como "Horas Extra" para poder guardar.
+            Superas la jornada de {DAILY_CAP_HOURS}h ({nonOvertimeTotal.toLocaleString('es-CL', { maximumFractionDigits: 1 })}h
+            normales ese día): {autoOvertimeHours.toLocaleString('es-CL', { maximumFractionDigits: 2 })}h quedarán como horas
+            extra{overtimeNeedsApproval ? ', pendientes de aprobación.' : '.'}
           </span>
         </div>
       )}
@@ -267,12 +290,15 @@ function EditEntryForm({
         projects={projects}
         leaders={leaders?.items ?? []}
         isCollaborator={ownerRequiresApprover}
+        overtimeNeedsApproval={overtimeNeedsApproval}
+        exceedsDailyCap={autoOvertimeHours > 0}
         error={blockError ?? undefined}
         title={blockTitle}
         onUpdate={(patch) => setBlock((prev) => ({ ...prev, ...patch }))}
         onRemove={() => undefined}
         onToggleExpand={() => setBlock((prev) => ({ ...prev, expanded: !prev.expanded }))}
         onAdjustHours={(delta) => setBlock((prev) => ({ ...prev, hours: stepBlockHours(prev.hours, delta) }))}
+        ownerUserId={entry.user.id}
       />
 
       <div className={styles.actions}>
@@ -315,6 +341,13 @@ function ViewEntryDetail({ entry, onClose }: { entry: HourEntrySummary; onClose:
               <TextField label="Aprobador designado" disabled readOnly value={entry.designatedApprover?.fullName ?? '—'} />
             )}
           </div>
+
+          {needsProject && (
+            <div className={styles.row}>
+              <TextField label="Fase" disabled readOnly value={entry.module?.name ?? '—'} />
+              <TextField label="Tiempo de ejecución" disabled readOnly value={entry.segment?.name ?? '—'} />
+            </div>
+          )}
 
           <TextField label="Actividad" disabled readOnly value={entry.category} />
 
@@ -370,4 +403,3 @@ function ViewEntryDetail({ entry, onClose }: { entry: HourEntrySummary; onClose:
     </div>
   );
 }
-

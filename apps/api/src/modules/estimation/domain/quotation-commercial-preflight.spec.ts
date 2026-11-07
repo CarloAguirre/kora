@@ -151,6 +151,42 @@ describe('R3-f · validación comercial de solo lectura', () => {
   });
 
 
+  it('no confunde una cotización Gemini basada en Drive con el fixture KDM', () => {
+    const aiProposal = {
+      projectId: ids.project,
+      provider: 'gemini',
+      sourceMode: 'drive',
+      documentsAnalyzed: 1,
+      summary: 'Antecedentes reales analizados',
+      roles: [{
+        role: 'Desarrollo', unit: 'week', duration: 2,
+        hoursPerUnit: 40, people: 1, totalHours: 80,
+        source: 'Requerimientos.pdf',
+      }],
+      totalHours: 80, assumptions: [], clarifyingQuestions: [],
+    };
+    const base = version({
+      sourceRefs: ['drive:requerimientos-pdf'],
+      aiPoc: {
+        source: 'drive', proposal: aiProposal,
+        answers: [], dynamicQuestions: [],
+        roleTeamIds: { Desarrollo: ids.team },
+      },
+    }, { origin: 'ai', aiReviewStatus: 'accepted' });
+    const result = run(base);
+    expect(codes(result)).not.toContain('AI_POC_DEMO_NOT_COMMERCIAL');
+    expect(result.sendEnabled).toBe(false);
+    const fixture = version({
+      aiPoc: {
+        source: 'kdm_demo',
+        proposal: { ...aiProposal, sourceMode: 'poc_simulated' },
+        answers: [], dynamicQuestions: [],
+        roleTeamIds: { Desarrollo: ids.team },
+      },
+    }, { origin: 'ai', aiReviewStatus: 'accepted' });
+    expect(codes(run(fixture))).toContain('AI_POC_DEMO_NOT_COMMERCIAL');
+  });
+
   it('bloquea explícitamente el artefacto demostrativo incluso si otra validación luce completa', () => {
     const simulated = estimationAnalysisArtifactSchema.parse({
       schemaVersion: 'kora.estimation.analysis.v1',

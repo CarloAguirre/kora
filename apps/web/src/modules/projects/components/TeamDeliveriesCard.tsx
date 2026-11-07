@@ -32,6 +32,8 @@ export interface TeamDeliveriesCardProps {
   project: ProjectDetail;
   projectId: string;
   teamId: string;
+  /** Solo vista PMO/PM: resumen compacto según prototipo sin cambiar la del líder de equipo. */
+  managerView?: boolean;
 }
 
 /**
@@ -43,21 +45,35 @@ export interface TeamDeliveriesCardProps {
  * La estructura de las entregas (nombre, fecha objetivo) se crea desde
  * "Crear/editar proyecto", no aquí.
  */
-export function TeamDeliveriesCard({ project, projectId, teamId }: TeamDeliveriesCardProps) {
+export function TeamDeliveriesCard({ project, projectId, teamId, managerView = false }: TeamDeliveriesCardProps) {
   const [deliveryFilter, setDeliveryFilter] = useState<DeliveryFilter>('all');
+  const [managerFilter, setManagerFilter] = useState<'all' | 'planned' | 'overdue' | 'completed'>('all');
   const [actionTarget, setActionTarget] = useState<DeliveryActionTarget | null>(null);
 
   const teamDeliveries = useMemo(() => {
     return project.modules.flatMap((module) =>
       module.deliveries
         .filter((delivery) => delivery.teamId === teamId)
-        .map((delivery) => ({ delivery, moduleId: module.id, moduleName: module.name })),
+        .map((delivery) => ({
+          delivery, moduleId: module.id, moduleName: module.name,
+          blockName: module.segments.find((segment) => segment.id === delivery.segmentId)?.name ??
+            module.segments.find((segment) => segment.teamId === teamId)?.name ?? '—',
+        })),
     );
   }, [project, teamId]);
 
-  const filteredDeliveries = teamDeliveries.filter(
-    ({ delivery }) => deliveryFilter === 'all' || deliveryDisplayStatus(delivery) === deliveryFilter,
-  );
+  const now = new Date();
+  const today = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0'),
+    String(now.getDate()).padStart(2, '0')].join('-');
+  const overdue = (delivery: (typeof teamDeliveries)[number]['delivery']) =>
+    delivery.status === 'planned' && delivery.estimatedDate < today;
+  const matchesManagerFilter = (delivery: (typeof teamDeliveries)[number]['delivery'],
+    filter: typeof managerFilter) =>
+    filter === 'all' || (filter === 'planned' ? delivery.status === 'planned' :
+      filter === 'overdue' ? overdue(delivery) : delivery.status !== 'planned');
+  const filteredDeliveries = teamDeliveries.filter(({ delivery }) =>
+    managerView ? matchesManagerFilter(delivery, managerFilter) :
+      deliveryFilter === 'all' || deliveryDisplayStatus(delivery) === deliveryFilter);
   const { pageItems, pagination } = usePaginatedItems(filteredDeliveries);
 
   return (
@@ -67,9 +83,42 @@ export function TeamDeliveriesCard({ project, projectId, teamId }: TeamDeliverie
           <p className={styles.sectionTitle}>Entregas del equipo</p>
         </div>
 
-        <Tabs tabs={[...DELIVERY_TABS]} activeId={deliveryFilter} onSelect={(id) => setDeliveryFilter(id as DeliveryFilter)} />
+        {managerView ? <Tabs tabs={[
+          { id: 'all', label: 'Todas ' + teamDeliveries.length },
+          { id: 'planned', label: 'Planificadas ' + teamDeliveries.filter((d) => matchesManagerFilter(d.delivery, 'planned')).length },
+          { id: 'overdue', label: 'Vencidas ' + teamDeliveries.filter((d) => overdue(d.delivery)).length },
+          { id: 'completed', label: 'Entregadas ' + teamDeliveries.filter((d) => matchesManagerFilter(d.delivery, 'completed')).length },
+        ]} activeId={managerFilter} onSelect={(id) => setManagerFilter(id as typeof managerFilter)} />
+          : <Tabs tabs={[...DELIVERY_TABS]} activeId={deliveryFilter} onSelect={(id) => setDeliveryFilter(id as DeliveryFilter)} />}
 
-        <DataTable
+        {managerView ? <DataTable columns={[
+          { key: 'name', header: 'Entrega', render: ({ delivery, moduleName }: (typeof teamDeliveries)[number]) =>
+              delivery.name ?? `Entrega de fase: ${moduleName}` },
+          { key: 'block', header: 'Bloque de trabajo', render: (item: (typeof teamDeliveries)[number]) => item.blockName },
+          { key: 'module', header: 'Módulo', render: (item: (typeof teamDeliveries)[number]) => item.moduleName },
+          { key: 'status', header: 'Estado', render: ({ delivery }: (typeof teamDeliveries)[number]) => <Badge
+              tone={delivery.status === 'planned' && overdue(delivery) ? 'danger' :
+                DELIVERY_DISPLAY_STATUS_TONE[deliveryDisplayStatus(delivery)]}>
+              {delivery.status === 'planned' && overdue(delivery) ? 'Vencida' :
+                DELIVERY_DISPLAY_STATUS_LABEL[deliveryDisplayStatus(delivery)]}
+            </Badge> },
+          { key: 'date', header: 'Fecha objetivo', render: ({ delivery }: (typeof teamDeliveries)[number]) =>
+              formatDate(delivery.estimatedDate) },
+          { key: 'action', header: '', align: 'right' as const, render: (item: (typeof teamDeliveries)[number]) => {
+            const { delivery } = item;
+            if (!delivery.canManage) return null;
+            if (delivery.status === 'approved') return <span>Aprobada</span>;
+            if (delivery.status === 'delivered') return <Button variant="outline" size="sm"
+              onClick={() => setActionTarget({ ...item, action: 'approve' })}>Aprobar entrega</Button>;
+            return <Button variant="outline" size="sm"
+              title={delivery.assigneeUserId ? 'Marcar como terminada para aprobación' : 'Primero asigna un colaborador a la entrega'}
+              onClick={() => setActionTarget({ ...item,
+                action: delivery.assigneeUserId ? 'complete' : 'assign',
+              })}>{delivery.assigneeUserId ? 'Marcar como entregada' : 'Asignar responsable'}</Button>;
+          } },
+        ]} items={pageItems} getRowKey={(item) => item.delivery.id}
+          emptyMessage="Sin entregas en este filtro." />
+        : <DataTable
           columns={[
             {
               key: 'name',
@@ -86,7 +135,11 @@ export function TeamDeliveriesCard({ project, projectId, teamId }: TeamDeliverie
               header: 'Colaborador',
               render: ({ delivery }) => delivery.assigneeName ?? <span style={{ fontStyle: 'italic' }}>Sin asignar</span>,
             },
-            { key: 'module', header: 'Módulo', render: ({ moduleName }) => moduleName },
+            {
+              key: 'module',
+              header: 'Módulo',
+              render: ({ delivery, moduleName }) => (delivery.segmentName ? `${moduleName} · ${delivery.segmentName}` : moduleName),
+            },
             {
               key: 'status',
               header: 'Estado',
@@ -124,14 +177,14 @@ export function TeamDeliveriesCard({ project, projectId, teamId }: TeamDeliverie
           items={pageItems}
           getRowKey={({ delivery }) => delivery.id}
           emptyMessage="Sin entregas en este filtro."
-        />
+        />}
 
         <Pagination {...pagination} />
       </Card>
 
       <DeliveryActionDialogs
         projectId={projectId}
-        members={project.members}
+        members={project.members.filter((member) => !member.blockedAt)}
         target={actionTarget}
         onClose={() => setActionTarget(null)}
       />

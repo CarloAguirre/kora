@@ -7,8 +7,11 @@ import { Select } from '@/shared/components/ui/Select';
 import { ChevronLeftIcon } from '@/shared/components/icons/Icons';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { TeamLeaderProjectView } from '../components/TeamLeaderProjectView';
+import { ProjectManagerTeamDetailView } from '../components/ProjectManagerTeamDetailView';
+import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { useProjectDetail } from '../api/projects.queries';
 import { projectPath, projectTeamPath } from '@/app/router/paths';
+import { PROJECTS_LIST_PATH, RESTORE_PROJECTS_LIST_STATE } from '../lib/projects-list-search';
 
 /**
  * Deep link a un equipo puntual dentro de un proyecto. Dos entradas:
@@ -26,12 +29,13 @@ export function ProjectTeamDetailPage() {
   const { projectId, teamId } = useParams<{ projectId: string; teamId: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { can } = usePermissions();
   const { data: project, isLoading, error } = useProjectDetail(projectId ?? null);
 
   if (error) {
     return (
       <DashboardLayout title="Equipo">
-        <PageLoadError error={error} subject="este proyecto" backLabel="Volver a proyectos" onBack={() => void navigate('/proyectos')} />
+        <PageLoadError error={error} subject="este proyecto" backLabel="Volver a proyectos" onBack={() => void navigate(PROJECTS_LIST_PATH, { state: RESTORE_PROJECTS_LIST_STATE })} />
       </DashboardLayout>
     );
   }
@@ -47,6 +51,8 @@ export function ProjectTeamDetailPage() {
   /** `projectTeamPath` arma la URL con el slug del equipo; la vista trabaja con el UUID. */
   const teamRow = project.teams.find((t) => t.teamId === teamId || t.teamSlug === teamId);
   const teamName = teamRow?.teamName ?? 'Equipo';
+  const isProjectManager = project.type === 'development' &&
+    (can('projects:manage') || (user !== null && project.leader?.id === user.id));
   /** Si quien entra lidera más de un equipo del proyecto, puede saltar entre ellos sin volver a la ficha. */
   const ledTeams = user ? project.teams.filter((t) => t.leader?.id === user.id) : [];
   const showTeamSwitcher = ledTeams.length > 1 && ledTeams.some((t) => t.teamId === teamRow?.teamId);
@@ -71,7 +77,13 @@ export function ProjectTeamDetailPage() {
             />
           )}
         </div>
-        <TeamLeaderProjectView project={project} projectId={projectId} teamId={teamRow?.teamId ?? teamId} />
+        {isProjectManager ? (
+          <ProjectManagerTeamDetailView project={project} projectId={projectId}
+            teamId={teamRow?.teamId ?? teamId} />
+        ) : (
+          <TeamLeaderProjectView project={project} projectId={projectId}
+            teamId={teamRow?.teamId ?? teamId} />
+        )}
       </div>
     </DashboardLayout>
   );

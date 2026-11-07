@@ -1,10 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CLOCK, err, ForbiddenError, ok, type ApplicationError, type Clock, type Result } from '@kora/core';
-import type {
-  Permission,
-  RequestTeamReportDataResponse,
-  TeamReportDataRequestData,
-  TeamReportMissingField,
+import {
+  teamReportMissingFields,
+  type Permission,
+  type RequestTeamReportDataResponse,
+  type TeamReportDataRequestData,
+  type TeamReportMissingField,
 } from '@kora/contracts';
 import { TeamNotFoundError } from '../../domain/errors/team.errors';
 import { TEAM_REPOSITORY, type TeamRepository } from '../../domain/repositories/team.repository';
@@ -19,14 +20,6 @@ export interface RequestTeamReportDataCommand {
   readonly note: string | undefined;
   readonly actor: ActorContext;
   readonly actorPermissions: readonly Permission[];
-}
-
-/** Mismo criterio que el aviso del reporte: "sin HH asignadas" solo cuenta si el equipo ya incurrió horas en el proyecto. */
-function missingFields(project: TeamReportProjectRow, hasTeamHours: boolean): TeamReportMissingField[] {
-  const missing: TeamReportMissingField[] = [];
-  if (!project.assignedHours && hasTeamHours) missing.push('assigned_hours');
-  if (!project.startDate || !project.endDate) missing.push('dates');
-  return missing;
 }
 
 /**
@@ -77,7 +70,7 @@ export class RequestTeamReportDataUseCase
 
     const byLeader = new Map<string, { project: TeamReportProjectRow; missing: TeamReportMissingField[] }[]>();
     for (const project of candidates) {
-      const missing = missingFields(project, withTeamHours.has(project.projectId));
+      const missing = teamReportMissingFields(project, withTeamHours.has(project.projectId));
       if (!project.projectLeader || missing.length === 0) continue;
       const list = byLeader.get(project.projectLeader.id) ?? [];
       list.push({ project, missing });

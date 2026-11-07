@@ -17,6 +17,24 @@ export interface HourEntryModuleReference {
   readonly id: string;
   readonly name: string;
   readonly projectId: string;
+  /** Tiempos de ejecución de la fase — contra cuáles se puede imputar una hora. */
+  readonly segments: readonly { readonly id: string; readonly name: string }[];
+  /** Tareas vinculables a HH. Opcional para adaptadores previos en tests. */
+  readonly tasks?: readonly {
+    readonly id: string;
+    readonly name: string;
+    readonly segmentId: string | null;
+    readonly assigneeUserId: string | null;
+    readonly cancelledAt?: Date | null;
+  }[];
+}
+
+export interface HourEntrySegmentReference {
+  readonly id: string;
+  readonly name: string;
+  readonly moduleId: string;
+  readonly projectId: string;
+  readonly teamId: string;
 }
 
 export interface HourEntryProjectReader {
@@ -28,6 +46,12 @@ export interface HourEntryProjectReader {
   findApprovers(projectId: string, memberUserId: string): Promise<HourEntryProjectApprover[]>;
   /** Módulo ("Fases · Módulos") contra el que se puede imputar una hora — valida que pertenezca al proyecto elegido. */
   findModuleById(moduleId: string): Promise<HourEntryModuleReference | null>;
+  /** Bloques reales de una fase, sin acceso a DB desde casos de uso. */
+  findSegmentsForModule(moduleId: string): Promise<HourEntrySegmentReference[]>;
+  /** Si el autor no participa en los equipos del Roadmap, puede imputar HH generales sin bloque. */
+  hasAttributableWorkBlocks(projectId: string, userId: string): Promise<boolean>;
+  /** Un usuario puede registrar HH en su equipo activo del proyecto o si es su líder. */
+  isUserOnSegmentTeam(projectId: string, teamId: string, userId: string): Promise<boolean>;
   /**
    * Persiste `usedHours` en el proyecto — única escritura de este puerto
    * (por lo demás de solo lectura). `usedHours` ya viene calculado por quien

@@ -2,6 +2,16 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { quotationDraftDataSchema, quotationReferenceEdtSchema } from '@kora/contracts';
 import { QuotationPhaseWorkspace, referenceTasksForPhase, referencePhasesFromEdt } from './QuotationPhaseWorkspace';
+import buttonStyles from '@/shared/components/ui/Button.module.css';
+
+// Los tipos generados para CSS Modules contemplan claves ausentes.
+// Validamos su existencia antes de pasarlas a toHaveClass, sin ocultar un
+// posible cambio de nombre o una exportación CSS rota.
+const nativeButtonClass = (variant: 'button' | 'secondary' | 'outline' | 'tertiary' | 'ghost'): string => {
+  const className = buttonStyles[variant];
+  if (!className) throw new Error('Falta la clase nativa Button.' + variant);
+  return className;
+};
 
 const dev = '0777e456-fd76-445e-83f1-afc25061c103';
 const qa = '0777e456-fd76-445e-83f1-afc25061c104';
@@ -159,6 +169,21 @@ describe('Cotización HTML v5 · fases y tareas', () => {
     vi.restoreAllMocks();
   });
 
+  it('reutiliza Button Kora en las acciones sin cambiar sus callbacks ni permisos', () => {
+    renderEditor();
+    expect(screen.getByRole('button', { name: 'Asignar equipos Kora' }))
+      .toHaveClass(nativeButtonClass('button'), nativeButtonClass('secondary'));
+    expect(screen.getByRole('button', { name: '+ Agregar fase / módulo' }))
+      .toHaveClass(nativeButtonClass('button'), nativeButtonClass('outline'));
+    screen.getAllByText('Tareas').forEach((title) => title.closest('details')?.setAttribute('open', ''));
+    expect(screen.getAllByRole('button', { name: '+ Agregar tarea' })[0])
+      .toHaveClass(nativeButtonClass('button'), nativeButtonClass('outline'));
+    expect(screen.getAllByRole('button', { name: 'Ver plantilla' })[0])
+      .toHaveClass(nativeButtonClass('button'), nativeButtonClass('tertiary'));
+    fireEvent.click(screen.getByRole('button', { name: 'Asignar equipos Kora' }));
+    expect(callbacks.onOpenRoleMapping).toHaveBeenCalledOnce();
+  });
+
   it('muestra añadir tarea, Excel y plantilla dentro de cada fase EDT', () => {
     renderEditor(mappedDraft);
     screen.getAllByText('Tareas').forEach((title) => title.closest('details')?.setAttribute('open', ''));
@@ -198,8 +223,18 @@ describe('Cotización HTML v5 · fases y tareas', () => {
     screen.getAllByText('Tareas').forEach((title) => title.closest('details')?.setAttribute('open', ''));
     expect(screen.getByText('Fase 4')).toBeInTheDocument();
     expect(screen.getByDisplayValue('Control de entregas')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Quitar tarea ' + extraTask.wbs }));
+    const deleteButton = screen.getByRole('button', { name: 'Quitar tarea ' + extraTask.wbs });
+    expect(deleteButton).toHaveClass(nativeButtonClass('button'), nativeButtonClass('ghost'));
+    fireEvent.click(deleteButton);
     expect(callbacks.onDeleteTask).toHaveBeenCalledWith(extraTask.wbs);
+  });
+
+  it('el contador anuncia las filas reales de un WBS multiperfil, no sólo códigos WBS únicos', () => {
+    renderEditor(mappedDraft);
+    expect(screen.getByText('2 tareas · 1 actividad · 15 HH')).toBeInTheDocument();
+    expect(screen.getByText('1 tarea · 8 HH')).toBeInTheDocument();
+    const fields = screen.getAllByLabelText(/^Tarea T01.01/);
+    expect(fields).toHaveLength(2);
   });
 
   it('mantiene HH por perfil y WBS al representar un mismo trabajo multiperfil', () => {

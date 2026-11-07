@@ -11,6 +11,10 @@ import {
   SendPendingHoursDigestUseCase,
   type SendPendingHoursDigestResult,
 } from '../application/use-cases/send-pending-hours-digest.use-case';
+import {
+  SendSupportBillingDigestUseCase,
+  type SendSupportBillingDigestResult,
+} from '../application/use-cases/send-support-billing-digest.use-case';
 
 /**
  * Ejecución manual de los recordatorios de horas — el equivalente al
@@ -25,6 +29,7 @@ export class HourRemindersController {
   constructor(
     private readonly missingHours: SendMissingHoursRemindersUseCase,
     private readonly pendingDigest: SendPendingHoursDigestUseCase,
+    private readonly supportBillingDigest: SendSupportBillingDigestUseCase,
     @Inject(CLOCK) private readonly clock: Clock,
   ) {}
 
@@ -47,6 +52,23 @@ export class HourRemindersController {
   ): Promise<SendPendingHoursDigestResult> {
     return unwrapOrThrow(
       await this.pendingDigest.execute({ today: chileDate(this.clock.now()), dryRun: dryRun !== 'false', onlyEmail }),
+    );
+  }
+
+  /** Corre aunque hoy no sea el último día hábil: las HH son las del mes en curso hasta hoy. */
+  @Post('support-billing')
+  @RequirePermissions('billing:manage')
+  async runSupportBilling(
+    @Query('dryRun') dryRun?: string,
+    @Query('onlyEmail') onlyEmail?: string,
+  ): Promise<SendSupportBillingDigestResult> {
+    return unwrapOrThrow(
+      await this.supportBillingDigest.execute({
+        today: chileDate(this.clock.now()),
+        dryRun: dryRun !== 'false',
+        onlyOnLastBusinessDay: false,
+        onlyEmail,
+      }),
     );
   }
 }

@@ -1,5 +1,10 @@
 import { useEffect, useState } from 'react';
-import { TICKET_HH_REQUEST_STATUS_LABELS, type TicketHhRequest } from '@kora/contracts';
+import {
+  TICKET_HH_REQUEST_NOTE_MAX_LENGTH,
+  TICKET_HH_REQUEST_STATUS_LABELS,
+  hourEntryRequiresApproval,
+  type TicketHhRequest,
+} from '@kora/contracts';
 import styles from './TicketHhRequestsSection.module.css';
 import { Avatar } from '@/shared/components/ui/Avatar';
 import { Badge, type BadgeTone } from '@/shared/components/ui/Badge';
@@ -8,7 +13,6 @@ import { CheckIcon, ChevronDownIcon, InfoIcon, PlusIcon, TriangleAlertIcon } fro
 import { TextField } from '@/shared/components/ui/TextField';
 import { useToast } from '@/shared/components/ui/Toast';
 import { ApiRequestError } from '@/shared/lib/api-client';
-import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { useHourEntriesList } from '@/modules/hours/api/hours.queries';
 import {
@@ -39,6 +43,12 @@ function requestMeta(request: TicketHhRequest): string {
     .join(' · ');
 }
 
+/** Si el backend rechazó por validación, muestra el motivo de cada campo en vez del genérico "Los datos enviados no son válidos." */
+function describeApiError(error: ApiRequestError): string {
+  const issues = error.fieldIssues ? Object.values(error.fieldIssues).flat() : [];
+  return issues.length > 0 ? issues.join(' ') : error.message;
+}
+
 interface TicketHhRequestsSectionProps {
   ticketId: string;
   /** `ticket.canRequestHh` — responsable o autoridad del proyecto, ticket no cerrado y con proyecto asociado (ver `GetTicketUseCase`). */
@@ -67,7 +77,6 @@ export function TicketHhRequestsSection({
   hhApprovers,
   onUnsentHoursChange,
 }: TicketHhRequestsSectionProps) {
-  const { can } = usePermissions();
   const { user } = useAuth();
   const toast = useToast();
   const { data: requests, isLoading } = useTicketHhRequestsList(ticketId);
@@ -82,7 +91,13 @@ export function TicketHhRequestsSection({
   const [rejectionReason, setRejectionReason] = useState('');
   const [resolvedOpen, setResolvedOpen] = useState(false);
 
-  const canApprove = can('hours:approve');
+  // Mismo criterio que `CreateTicketHhRequestUseCase`: solo el colaborador
+  // espera aprobación por sus horas normales; las extra la esperan salvo que
+  // el usuario sea líder o quien decide en este proyecto.
+  const selfApprovesRegularHours = Boolean(user && user.role !== 'collaborator');
+  const overtimeNeedsApproval = hourEntryRequiresApproval(user?.role, true);
+  const approverNames = hhApprovers.map((approver) => approver.fullName).join(' o ');
+
   const pendingRequests = (requests ?? []).filter((request) => request.status === 'pending');
   const resolvedRequests = (requests ?? []).filter((request) => request.status !== 'pending');
 
@@ -113,7 +128,7 @@ export function TicketHhRequestsSection({
       setHours('');
       setNote('');
     } catch (error) {
-      toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo enviar la solicitud.');
+      toast.error(error instanceof ApiRequestError ? describeApiError(error) : 'No se pudo enviar la solicitud.');
     }
   };
 
@@ -169,7 +184,7 @@ export function TicketHhRequestsSection({
                     </span>
                     <span className={styles.itemMeta}>{requestMeta(request)}</span>
                   </div>
-                  {canApprove && rejectingId !== request.id && (
+                  {request.canReview && rejectingId !== request.id && (
                     <div className={styles.actions}>
                       <Button variant="tertiary" size="sm" className={styles.rejectButton} onClick={() => setRejectingId(request.id)}>
                         Rechazar
@@ -263,9 +278,13 @@ export function TicketHhRequestsSection({
           <div className={styles.headerStack}>
             <span className={styles.title}>Registrar horas</span>
             <span className={styles.subtitle}>
-              {hhApprovers.length > 0
-                ? `Tus horas quedan pendientes hasta que las apruebe ${hhApprovers.map((approver) => approver.fullName).join(' o ')}.`
-                : 'Este proyecto no tiene un aprobador definido para tu solicitud.'}
+              {selfApprovesRegularHours
+                ? overtimeNeedsApproval && approverNames && !hhApprovers.some((approver) => approver.id === user?.id)
+                  ? `Tus horas normales quedan aprobadas al registrarlas; las horas extra las aprueba ${approverNames}.`
+                  : 'Tus horas quedan aprobadas al registrarlas.'
+                : approverNames
+                  ? `Tus horas quedan pendientes hasta que las apruebe ${approverNames}.`
+                  : 'Este proyecto no tiene un aprobador definido para tu solicitud.'}
             </span>
           </div>
 
@@ -300,15 +319,26 @@ export function TicketHhRequestsSection({
               value={hours}
               onChange={(event) => setHours(event.target.value)}
             />
-            <TextField
-              label="Nota (opcional)"
-              placeholder="¿En qué trabajaste?"
-              value={note}
-              onChange={(event) => setNote(event.target.value)}
-            />
+            <div className={styles.noteField}>
+              <label className={styles.noteLabel} htmlFor={`ticket-hh-note-${ticketId}`}>
+                Nota (opcional)
+              </label>
+              <textarea
+                id={`ticket-hh-note-${ticketId}`}
+                className={styles.noteTextarea}
+                placeholder="¿En qué trabajaste?"
+                rows={3}
+                maxLength={TICKET_HH_REQUEST_NOTE_MAX_LENGTH}
+                value={note}
+                onChange={(event) => setNote(event.target.value)}
+              />
+            </div>
           </div>
 
           <div className={styles.formFooter}>
+            <span className={styles.noteCounter}>
+              {note.length}/{TICKET_HH_REQUEST_NOTE_MAX_LENGTH}
+            </span>
             <Button
               variant="outlineDark"
               className={styles.submitButton}

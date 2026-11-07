@@ -10,22 +10,34 @@ import {
 import styles from './TeamHourHistoryPanel.module.css';
 import { Button } from '@/shared/components/ui/Button';
 import { DataTable, type Column } from '@/shared/components/ui/DataTable';
+import { DropdownMenu, type DropdownMenuItem } from '@/shared/components/ui/DropdownMenu';
+import { Modal } from '@/shared/components/ui/Modal';
+import { MultiSelect } from '@/shared/components/ui/MultiSelect';
+import { PeriodRangeFilter, type PeriodRange } from '@/shared/components/ui/PeriodRangeFilter';
+import { ConfirmActionDialog } from '@/shared/components/ui/ConfirmActionDialog';
 import { DEFAULT_PAGE_SIZE, Pagination } from '@/shared/components/ui/Pagination';
 import { Select } from '@/shared/components/ui/Select';
 import { TextField } from '@/shared/components/ui/TextField';
 import { Badge } from '@/shared/components/ui/Badge';
 import { useToast } from '@/shared/components/ui/Toast';
-import { PencilIcon, TrashIcon, EyeIcon, DownloadIcon, SearchIcon } from '@/shared/components/icons/Icons';
+import { ApiRequestError } from '@/shared/lib/api-client';
+import { DownloadIcon, SearchIcon } from '@/shared/components/icons/Icons';
 import { HourEntryStatusBadge } from './HourEntryStatusBadge';
 import { HourEntryFormDialog } from './HourEntryFormDialog';
-import { useDeleteHourEntry, useHourEntriesList } from '../api/hours.queries';
+import { useApproveHourEntry, useDeleteHourEntry, useHourEntriesList, useRejectHourEntry } from '../api/hours.queries';
 import { useHourEntriesExport } from '../hooks/useHourEntriesExport';
-import { resolvedApprover } from '../lib/approver';
+import { canDecideHourEntry, resolvedApprover } from '../lib/approver';
+import { isInCurrentMonth } from '../lib/edit-window';
+import { useProjectsList } from '@/modules/projects/api/projects.queries';
+import { getProjectOptionLabel } from '@/modules/projects/lib/project-option-label';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
+import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 
 const STATUS_OPTIONS = HOUR_ENTRY_STATUSES.map((status) => ({ value: status, label: HOUR_ENTRY_STATUS_LABELS[status] }));
 const formatDate = (value: string) => new Date(`${value}T00:00:00`).toLocaleDateString('es-CL');
 const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 2 });
+/** Sin fechas: todo el historial, como antes de existir el filtro por semana. */
+const NO_PERIOD: PeriodRange = { mode: 'range', dateFrom: '', dateTo: '' };
 
 type DialogState = { kind: 'none' } | { kind: 'view' | 'edit'; entry: HourEntrySummary | null };
 
@@ -33,39 +45,65 @@ type DialogState = { kind: 'none' } | { kind: 'view' | 'edit'; entry: HourEntryS
  * "Registro de horas Líder" — réplica del card homónimo de `LiderDashboardB`
  * (v1), sin el botón "Registrar horas" que tenía allá (se sacó por diseño):
  * el historial de TODO el equipo (no solo el propio) con filtro por persona,
- * fecha y estado. La visibilidad viene gratis del alcance `hours:read_team`
+ * proyecto, período (semana o rango de fechas) y estado. La visibilidad viene gratis del alcance `hours:read_team`
  * ya resuelto en el backend (propias + del equipo liderado).
  *
- * Editar/eliminar solo están disponibles sobre los registros propios: a
- * diferencia de la v1, el backend de v2 no permite que un líder modifique el
- * registro de otro colaborador (solo su dueño o admin/PMO) — ver "Ver" para
- * los ajenos. Sobre los propios: Editar no depende del estado (el backend lo
- * permite en cualquier estado para el dueño), Eliminar sí — un registro
- * aprobado ya afectó el consumo del proyecto y el backend rechaza borrarlo.
+ * Las acciones de cada fila van en un menú ⋮ (mismo patrón que la cola de
+ * `/horas/aprobaciones`) y siguen las reglas del backend. Editar lo puede el
+ * dueño o un admin/PMO (pendiente o rechazado) y quien aprueba (pendiente o
+ * aprobado — la corrección de un aprobado lo deja aprobado). Eliminar: el
+ * dueño o un admin/PMO si no está aprobado; un aprobado, solo quien lo aprueba
+ * (el backend recalcula el consumo del proyecto). Editar y eliminar, salvo
+ * admin/PMO (que pueden con cualquier registro), solo dentro del mes en curso. Aprobar/Rechazar solo
+ * aplica a pendientes; si el actor no es el aprobador de ese registro, el
+ * backend lo rechaza y se muestra su mensaje.
  */
 export function TeamHourHistoryPanel({ teamId, userId }: { teamId?: string; userId?: string }) {
   const { user } = useAuth();
+  const { can } = usePermissions();
   const toast = useToast();
   const [personSearch, setPersonSearch] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const [projectIds, setProjectIds] = useState<string[]>([]);
+  const [period, setPeriod] = useState<PeriodRange>(NO_PERIOD);
+  const dateFrom = period.dateFrom;
+  const dateTo = period.dateTo;
   const [status, setStatus] = useState<HourEntryStatus | ''>('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [dialog, setDialog] = useState<DialogState>({ kind: 'none' });
   const { exporting, exportError, exportEntries } = useHourEntriesExport();
   const deleteEntry = useDeleteHourEntry();
+  const approveEntry = useApproveHourEntry();
+  const rejectEntry = useRejectHourEntry();
+  const [rejecting, setRejecting] = useState<HourEntrySummary | null>(null);
+  const [deleting, setDeleting] = useState<HourEntrySummary | null>(null);
+  const [reason, setReason] = useState('');
+  const canApprove = can('hours:approve');
+  const isAdminLike = user?.role === 'admin' || user?.role === 'pmo';
 
-  const hasFilters = Boolean(personSearch || dateFrom || dateTo || status);
+  const hasFilters = Boolean(personSearch || projectIds.length || dateFrom || dateTo || status);
 
+  // Las opciones de proyecto dependen del equipo/colaborador: al cambiarlos se sueltan los proyectos elegidos.
   useEffect(() => {
+    setProjectIds([]);
     setPage(1);
   }, [teamId, userId]);
+
+  const { data: projects } = useProjectsList({
+    page: 1,
+    pageSize: 200,
+    sortField: 'name',
+    sortDirection: 'asc',
+    teamId,
+    assignedToUserId: userId,
+  });
+  const projectOptions = (projects?.items ?? []).map((project) => ({ value: project.id, label: getProjectOptionLabel(project) }));
 
   const { data, isLoading, error } = useHourEntriesList({
     search: personSearch.trim() || undefined,
     teamId,
     userId,
+    projectIds: projectIds.length ? projectIds : undefined,
     dateFrom: dateFrom || undefined,
     dateTo: dateTo || undefined,
     status: status || undefined,
@@ -77,17 +115,73 @@ export function TeamHourHistoryPanel({ teamId, userId }: { teamId?: string; user
 
   const clearFilters = () => {
     setPersonSearch('');
-    setDateFrom('');
-    setDateTo('');
+    setProjectIds([]);
+    setPeriod(NO_PERIOD);
     setStatus('');
     setPage(1);
   };
 
   const closeDialog = () => setDialog({ kind: 'none' });
 
-  const handleDelete = async (entry: HourEntrySummary) => {
-    await deleteEntry.mutateAsync(entry.id);
+  const showError = (error: unknown, fallback: string) =>
+    toast.error(error instanceof ApiRequestError ? error.message : fallback);
+
+  // Sin try/catch: si falla, `ConfirmActionDialog` queda abierto y muestra el error.
+  const confirmDelete = async () => {
+    if (!deleting) return;
+    await deleteEntry.mutateAsync(deleting.id);
     toast.success('Se eliminó el registro de horas.');
+  };
+
+  const handleApprove = async (entry: HourEntrySummary) => {
+    try {
+      await approveEntry.mutateAsync(entry.id);
+    } catch (error) {
+      showError(error, 'No se pudo aprobar el registro.');
+      return;
+    }
+    toast.success('Registro aprobado.');
+  };
+
+  const closeReject = () => {
+    setRejecting(null);
+    setReason('');
+  };
+
+  const confirmReject = async () => {
+    if (!rejecting) return;
+    try {
+      await rejectEntry.mutateAsync({ entryId: rejecting.id, input: { reason } });
+    } catch (error) {
+      showError(error, 'No se pudo rechazar el registro.');
+      return;
+    }
+    toast.success('Registro rechazado.');
+    closeReject();
+  };
+
+  const rowActions = (e: HourEntrySummary): DropdownMenuItem[] => {
+    const isOwner = e.user.id === user?.id;
+    const isPending = e.status === 'pending';
+    const isApproved = e.status === 'approved';
+    const inCurrentMonth = isInCurrentMonth(e.date);
+    const isApprover = canDecideHourEntry(e, user, canApprove);
+    const canEdit = isAdminLike || (inCurrentMonth && ((isOwner && !isApproved) || (isApprover && (isPending || isApproved))));
+    const canDecide = isApprover && isPending;
+    const canDelete = isAdminLike || (inCurrentMonth && (isApproved ? isApprover : isOwner));
+    return [
+      { key: 'ver', label: 'Ver detalle', onSelect: () => setDialog({ kind: 'view', entry: e }) },
+      ...(canEdit ? [{ key: 'editar', label: 'Editar', onSelect: () => setDialog({ kind: 'edit', entry: e }) }] : []),
+      ...(canDecide
+        ? [
+            { key: 'aprobar', label: 'Aprobar', tone: 'success' as const, onSelect: () => void handleApprove(e) },
+            { key: 'rechazar', label: 'Rechazar', tone: 'danger' as const, onSelect: () => setRejecting(e) },
+          ]
+        : []),
+      ...(canDelete
+        ? [{ key: 'eliminar', label: 'Eliminar', tone: 'danger' as const, onSelect: () => setDeleting(e) }]
+        : []),
+    ];
   };
 
   const handleExport = () =>
@@ -95,6 +189,7 @@ export function TeamHourHistoryPanel({ teamId, userId }: { teamId?: string; user
       search: personSearch.trim() || undefined,
       teamId,
       userId,
+      projectIds: projectIds.length ? projectIds : undefined,
       dateFrom: dateFrom || undefined,
       dateTo: dateTo || undefined,
       status: status || undefined,
@@ -139,36 +234,21 @@ export function TeamHourHistoryPanel({ teamId, userId }: { teamId?: string; user
     },
     {
       key: 'actions',
-      header: '',
+      header: 'Acciones',
       align: 'right',
-      width: '120px',
-      render: (e) => {
-        const isOwner = e.user.id === user?.id;
-        return (
-          <div className={styles.actions}>
-            <Button variant="ghost" size="icon" onClick={() => setDialog({ kind: 'view', entry: e })} aria-label="Ver" title="Ver">
-              <EyeIcon size={16} />
-            </Button>
-            {isOwner && (
-              <Button variant="ghost" size="icon" onClick={() => setDialog({ kind: 'edit', entry: e })} aria-label="Editar" title="Editar">
-                <PencilIcon size={16} />
+      width: '80px',
+      render: (e) => (
+        <div className={styles.actions}>
+          <DropdownMenu
+            items={rowActions(e)}
+            trigger={({ onClick }) => (
+              <Button variant="ghost" size="icon" onClick={onClick} aria-label={`Acciones — ${e.user.fullName}`} title="Acciones">
+                ⋮
               </Button>
             )}
-            {isOwner && e.status !== 'approved' && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => void handleDelete(e)}
-                aria-label="Eliminar"
-                title="Eliminar"
-                className={styles.dangerAction}
-              >
-                <TrashIcon size={16} />
-              </Button>
-            )}
-          </div>
-        );
-      },
+          />
+        </div>
+      ),
     },
   ];
 
@@ -208,23 +288,22 @@ export function TeamHourHistoryPanel({ teamId, userId }: { teamId?: string; user
           }}
           iconLeft={<SearchIcon size={16} />}
         />
-        <TextField
+        <MultiSelect
           className={styles.filter}
-          label="Fecha HH desde"
-          type="date"
-          value={dateFrom}
-          onChange={(event) => {
-            setDateFrom(event.target.value);
+          label="Proyecto"
+          placeholder="Todos"
+          searchPlaceholder="Buscar proyecto"
+          options={projectOptions}
+          value={projectIds}
+          onChange={(nextProjectIds) => {
+            setProjectIds(nextProjectIds);
             setPage(1);
           }}
         />
-        <TextField
-          className={styles.filter}
-          label="Fecha HH hasta"
-          type="date"
-          value={dateTo}
-          onChange={(event) => {
-            setDateTo(event.target.value);
+        <PeriodRangeFilter
+          value={period}
+          onChange={(next) => {
+            setPeriod(next);
             setPage(1);
           }}
         />
@@ -280,6 +359,41 @@ export function TeamHourHistoryPanel({ teamId, userId }: { teamId?: string; user
           closeDialog();
         }}
       />
+
+      <ConfirmActionDialog
+        open={deleting !== null}
+        title="Eliminar registro de horas"
+        description={
+          deleting
+            ? `Se eliminarán ${formatHours(deleting.hours)} h de ${deleting.user.fullName} del ${formatDate(deleting.date)}. Esta acción no se puede deshacer.`
+            : ''
+        }
+        warning={deleting?.status === 'approved' ? 'El registro ya está aprobado: se descontará del consumo del proyecto.' : null}
+        confirmLabel="Eliminar"
+        destructive
+        onConfirm={confirmDelete}
+        onClose={() => setDeleting(null)}
+      />
+
+      <Modal open={rejecting !== null} title="Rechazar registro de horas" onClose={closeReject}>
+        <div className={styles.rejectForm}>
+          <TextField
+            label="Motivo del rechazo"
+            required
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+            placeholder="Explica por qué se rechaza este registro"
+          />
+          <div className={styles.rejectActions}>
+            <Button variant="outline" onClick={closeReject}>
+              Cancelar
+            </Button>
+            <Button variant="danger" disabled={!reason.trim()} loading={rejectEntry.isPending} onClick={() => void confirmReject()}>
+              Rechazar registro
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

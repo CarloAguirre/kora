@@ -91,3 +91,19 @@ export class SupportInvoiceAlreadyPaidError extends ConflictError {
     super('Esta factura ya está marcada como pagada.', 'SUPPORT_INVOICE_ALREADY_PAID');
   }
 }
+
+/**
+ * Una factura pagada ya movió dinero: anularla en Kora dejaría el pago sin
+ * respaldo. Como las facturas de un período se anulan juntas, basta con que
+ * una de ellas esté pagada (`paidFolio`, si no es la que se pidió anular).
+ */
+export class SupportInvoicePaidCannotBeVoidedError extends ConflictError {
+  constructor(paidFolio?: string) {
+    super(
+      paidFolio
+        ? `No se puede anular: el folio ${paidFolio} del mismo período ya está pagado, y las facturas de un período se anulan juntas.`
+        : 'No se puede anular una factura que ya está pagada.',
+      'SUPPORT_INVOICE_PAID_CANNOT_BE_VOIDED',
+    );
+  }
+}

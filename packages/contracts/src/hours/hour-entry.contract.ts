@@ -1,8 +1,18 @@
 import { z } from 'zod';
-import { isoDateTimeSchema, nonEmptyTrimmed, pageSchema, paginationQuerySchema, sortDirectionSchema, uuidSchema } from '../common/primitives';
-import { roleCodeSchema } from '../users/roles';
+import { arrayQueryParam, isoDateTimeSchema, nonEmptyTrimmed, pageSchema, paginationQuerySchema, sortDirectionSchema, uuidSchema } from '../common/primitives';
+import { roleCodeSchema, type RoleCode } from '../users/roles';
 
 /** Ver docs/DECISION-M4-HORAS.md. */
+
+/**
+ * ¿El registro nace pendiente de aprobación? Las horas de un colaborador
+ * siempre (regla de la v1); las horas extra también, salvo las de un líder:
+ * todas sus horas se autoaprueban. Misma regla en el alta y edición de horas,
+ * las solicitudes de HH de ticket y los avisos de los formularios.
+ */
+export function hourEntryRequiresApproval(ownerRole: RoleCode | null | undefined, isOvertime: boolean): boolean {
+  return ownerRole === 'collaborator' || (isOvertime && ownerRole !== 'leader');
+}
 
 export const HOUR_ENTRY_STATUSES = ['pending', 'approved', 'rejected'] as const;
 export const hourEntryStatusSchema = z.enum(HOUR_ENTRY_STATUSES);
@@ -44,6 +54,10 @@ export const hourEntrySummarySchema = z.object({
   team: z.object({ id: uuidSchema, name: z.string() }).nullable(),
   /** Fase/módulo contra la que se imputó la hora, si se eligió una. */
   module: z.object({ id: uuidSchema, name: z.string() }).nullable(),
+  /** Bloque explícitamente seleccionado. NULL = aún no atribuido a un bloque. */
+  segment: z.object({ id: uuidSchema, name: z.string() }).nullable().optional(),
+  /** Tarea real a la que se atribuyen estas HH; NULL para históricos sin asociación. */
+  taskId: uuidSchema.nullable().optional(),
   assignment: z.string().nullable(),
   category: z.string(),
   description: z.string(),
@@ -60,12 +74,11 @@ export const hourEntrySummarySchema = z.object({
   designatedApprover: z.object({ id: uuidSchema, fullName: z.string() }).nullable(),
   /**
    * Quién puede aprobar este registro cuando es de proyecto: EXCLUYENTE — el
-   * líder del propio equipo del autor si tiene uno resoluble para este
-   * proyecto, y si no, el líder del proyecto (ver DECISION-M4-HORAS.md "Con
-   * proyecto" — acotado al equipo del autor, no cualquier equipo asignado al
-   * proyecto). En la práctica trae como mucho una persona; es un arreglo por
-   * si el autor pertenece a más de un equipo asignado al proyecto. Vacío
-   * para registros sin proyecto — ahí el aprobador es `designatedApprover`.
+   * en desarrollo, el líder del equipo del autor asignado al proyecto o,
+   * cuando no existe uno resoluble, el líder del proyecto; en soporte,
+   * siempre el líder del proyecto. Puede haber múltiples líderes de equipo
+   * si el autor pertenece a varios equipos asignados. Vacío para registros
+   * sin proyecto, cuyo aprobador es designado o líder de equipo del autor.
    */
   projectApprovers: z.array(z.object({ id: uuidSchema, fullName: z.string() })),
   /** Ticket de origen si este registro viene de una solicitud de HH de ticket (ver `TicketHhRequestSyncPort`), null si es un registro de horas normal. */
@@ -82,13 +95,18 @@ export const hourEntryDetailSchema = hourEntrySummarySchema.extend({
 });
 export type HourEntryDetail = z.infer<typeof hourEntryDetailSchema>;
 
+/** "Actividad" del registro: obligatoria al crear y, si se envía, al editar. */
+const hourEntryCategorySchema = z.string().trim().min(1, 'Indica la actividad realizada.').max(300);
+
 export const createHourEntrySchema = z
   .object({
     userId: uuidSchema.optional(),
     projectId: uuidSchema.nullish(),
     moduleId: uuidSchema.nullish(),
+    segmentId: uuidSchema.nullish(),
+    taskId: uuidSchema.nullish(),
     assignment: hourEntryAssignmentSchema,
-    category: z.string().trim().max(300).optional(),
+    category: hourEntryCategorySchema,
     description: z.string().trim().max(2000).optional(),
     hours: z.coerce.number().positive('Las horas deben ser mayores a 0.').max(24, 'No puede registrar más de 24 horas en un día.'),
     date: z.iso.date(),
@@ -109,6 +127,14 @@ export const createHourEntrySchema = z
     message: 'Selecciona un proyecto para elegir un módulo.',
     path: ['moduleId'],
   })
+  .refine((data) => !data.segmentId || Boolean(data.moduleId), {
+    message: 'Selecciona una fase para elegir un tiempo de ejecución.',
+    path: ['segmentId'],
+  })
+  .refine((data) => !data.taskId || Boolean(data.moduleId), {
+    message: 'Selecciona una fase antes de elegir la tarea.',
+    path: ['taskId'],
+  })
   .refine((data) => !data.hasBlocker || Boolean(data.blockerDescription?.trim()), {
     message: 'Describe el bloqueo.',
     path: ['blockerDescription'],
@@ -119,7 +145,9 @@ export const updateHourEntrySchema = z.object({
   assignment: hourEntryAssignmentSchema.optional(),
   projectId: uuidSchema.nullish(),
   moduleId: uuidSchema.nullish(),
-  category: z.string().trim().max(300).optional(),
+  segmentId: uuidSchema.nullish(),
+  taskId: uuidSchema.nullish(),
+  category: hourEntryCategorySchema.optional(),
   description: z.string().trim().max(2000).optional(),
   hours: z.coerce.number().positive().max(24).optional(),
   date: z.iso.date().optional(),
@@ -142,8 +170,19 @@ export const listHourEntriesQuerySchema = paginationQuerySchema.extend({
   search: z.string().trim().max(120).optional(),
   /** Acota a los autores con membresía activa en este equipo, dentro del alcance de visibilidad ya resuelto. */
   teamId: uuidSchema.optional(),
+  /**
+   * Solo autores sin membresía activa en ningún equipo que lidera el actor (y
+   * sin sus propios registros) — p.ej. horas de soporte de otro equipo en un
+   * proyecto que el actor lidera. La cola por equipo de `/horas/aprobaciones`
+   * nunca los muestra, pero sí cuentan en la campanita y el Dashboard.
+   */
+  outsideLedTeams: z.stringbool().optional(),
+  /** Deja fuera los registros del propio actor (los decide otro) — así cuenta la campanita los pendientes del líder. */
+  excludeOwn: z.stringbool().optional(),
   /** Acepta id o slug: la ficha de proyecto filtra por el `projectId` de la URL, que ahora es el slug del proyecto — se resuelve a UUID en `ListHourEntriesUseCase`. */
   projectId: z.string().optional(),
+  /** Varios proyectos por UUID (filtro Proyecto del historial de equipo). */
+  projectIds: arrayQueryParam(uuidSchema),
   status: hourEntryStatusSchema.optional(),
   dateFrom: z.iso.date().optional(),
   dateTo: z.iso.date().optional(),
@@ -210,13 +249,26 @@ export const capacityReportSortFieldSchema = z.enum([
 ]);
 export type CapacityReportSortField = z.infer<typeof capacityReportSortFieldSchema>;
 
-export const listCapacityReportQuerySchema = paginationQuerySchema.extend({
-  search: z.string().trim().max(120).optional(),
-  /** Cualquier día del mes a reportar; se normaliza al primer día del mes. */
-  periodStart: z.iso.date(),
-  sortField: capacityReportSortFieldSchema.default('periodDate'),
-  sortDirection: sortDirectionSchema.default('desc'),
-});
+/** Tope del rango de Capacity: un año alcanza para cualquier revisión y acota cuántas horas se cargan en memoria. */
+export const CAPACITY_REPORT_MAX_RANGE_DAYS = 366;
+
+export const listCapacityReportQuerySchema = paginationQuerySchema
+  .extend({
+    search: z.string().trim().max(120).optional(),
+    /** Rango de fechas del registro (inclusive), `yyyy-mm-dd`. Puede abarcar varios meses. */
+    dateFrom: z.iso.date(),
+    dateTo: z.iso.date(),
+    sortField: capacityReportSortFieldSchema.default('periodDate'),
+    sortDirection: sortDirectionSchema.default('desc'),
+  })
+  .refine((data) => data.dateFrom <= data.dateTo, {
+    message: 'La fecha de inicio no puede ser posterior a la fecha de fin.',
+    path: ['dateTo'],
+  })
+  .refine(
+    (data) => (Date.parse(data.dateTo) - Date.parse(data.dateFrom)) / 86_400_000 < CAPACITY_REPORT_MAX_RANGE_DAYS,
+    { message: `El rango no puede superar ${CAPACITY_REPORT_MAX_RANGE_DAYS} días.`, path: ['dateTo'] },
+  );
 export type ListCapacityReportQuery = z.infer<typeof listCapacityReportQuerySchema>;
 
 export const listCapacityReportResponseSchema = pageSchema(capacityReportRowSchema);

@@ -128,3 +128,8 @@
     background-position: -200% 0;
   }
 }
+
+/* Compactación opt-in: ninguna tabla existente cambia por defecto. */
+.compact .table { min-width: 0; }
+.compact .headerCell { padding: var(--kora-space-2) var(--kora-space-3); }
+.compact .cell { padding: var(--kora-space-2) var(--kora-space-3); }

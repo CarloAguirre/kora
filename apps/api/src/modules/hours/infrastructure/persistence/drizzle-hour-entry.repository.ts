@@ -15,6 +15,7 @@ import {
   lte,
   ne,
   or,
+  projectModuleSegments,
   projectModules,
   projects,
   projectTeams,
@@ -32,8 +33,10 @@ import type {
   HourEntryListItem,
   HourEntryRepository,
   HourEntrySortableField,
-  OvertimeHoursByProjectAndUser,
+  HourEntrySummary,
+  OvertimeHoursByDayProjectAndUser,
   OvertimeHoursByUser,
+  OvertimeReportScope,
 } from '../../domain/repositories/hour-entry.repository';
 import type { HourEntry } from '../../domain/entities/hour-entry.entity';
 import { DATABASE } from '../../../../shared/infrastructure/database/database.module';
@@ -81,6 +84,9 @@ export class DrizzleHourEntryRepository implements HourEntryRepository {
           clientName: clients.companyName,
           moduleId: hourEntries.moduleId,
           moduleName: projectModules.name,
+          segmentId: hourEntries.segmentId,
+          segmentName: projectModuleSegments.name,
+          taskId: hourEntries.taskId,
           assignment: hourEntries.assignment,
           category: hourEntries.category,
           description: hourEntries.description,
@@ -103,6 +109,7 @@ export class DrizzleHourEntryRepository implements HourEntryRepository {
         .leftJoin(projects, eq(projects.id, hourEntries.projectId))
         .leftJoin(clients, eq(clients.id, projects.clientId))
         .leftJoin(projectModules, eq(projectModules.id, hourEntries.moduleId))
+        .leftJoin(projectModuleSegments, eq(projectModuleSegments.id, hourEntries.segmentId))
         // Un `hour_entries` viene de a lo más UNA solicitud de HH de ticket
         // (índice único parcial en `ticket_hh_requests.hour_entry_id`), así
         // que este join no duplica filas.
@@ -129,51 +136,50 @@ export class DrizzleHourEntryRepository implements HourEntryRepository {
       teamRows.map((row) => [row.userId, { id: row.teamId, name: row.teamName, leaderUserId: row.teamLeaderUserId }]),
     );
 
-    const projectIds = [...new Set(rows.map((row) => row.projectId).filter((id): id is string => Boolean(id)))];
-    const authorTeamIds = [...new Set([...teamByUserId.values()].map((team) => team.id))];
-    // Qué pares (proyecto, equipo) están realmente asignados — el líder de un
-    // equipo solo aprueba las horas de SU propio equipo, no las de cualquier
-    // otro equipo asignado al mismo proyecto.
-    const assignedProjectTeamRows =
-      projectIds.length && authorTeamIds.length
-        ? await db
-            .select({
-              projectId: projectTeams.projectId,
-              teamId: projectTeams.teamId,
-              // Líder del equipo PARA ESTE PROYECTO — distinto del líder
-              // orgánico del equipo (`teams.leaderUserId`); un mismo equipo
-              // puede tener un líder distinto por proyecto (ver
-              // `ProjectTeamRepository`/`UpsertProjectTeamInput.leaderUserId`).
-              projectTeamLeaderUserId: projectTeams.leaderUserId,
-            })
-            .from(projectTeams)
-            .where(and(inArray(projectTeams.projectId, projectIds), inArray(projectTeams.teamId, authorTeamIds)))
-        : [];
-    const assignedProjectTeamLeaderId = new Map(
-      assignedProjectTeamRows.map((row) => [`${row.projectId}:${row.teamId}`, row.projectTeamLeaderUserId]),
-    );
+    // Misma regla que ProjectRepository: desarrollo prioriza al líder del
+    // equipo del autor asignado al proyecto; soporte usa al líder del proyecto.
+    const developmentProjectIds = [...new Set(
+      rows.filter((row) => row.projectType === 'development')
+        .map((row) => row.projectId)
+        .filter((id): id is string => Boolean(id)),
+    )];
+    const teamLeaderRows = developmentProjectIds.length && authorIds.length
+      ? await db
+          .select({
+            projectId: projectTeams.projectId,
+            userId: teamMembers.userId,
+            leaderUserId: users.id,
+          })
+          .from(projectTeams)
+          .innerJoin(teams, eq(teams.id, projectTeams.teamId))
+          .innerJoin(users, sql`${users.id} = coalesce(${projectTeams.leaderUserId}, ${teams.leaderUserId})`)
+          .innerJoin(teamMembers, and(
+            eq(teamMembers.teamId, teams.id),
+            isNull(teamMembers.leftAt),
+            inArray(teamMembers.userId, authorIds),
+          ))
+          .where(inArray(projectTeams.projectId, developmentProjectIds))
+      : [];
+    const teamLeadersByProjectAndOwner = new Map<string, Set<string>>();
+    for (const leader of teamLeaderRows) {
+      const key = `${leader.projectId}:${leader.userId}`;
+      const ids = teamLeadersByProjectAndOwner.get(key) ?? new Set<string>();
+      ids.add(leader.leaderUserId);
+      teamLeadersByProjectAndOwner.set(key, ids);
+    }
 
-    // EXCLUYENTE (DECISION-M4-HORAS.md "Tercera corrección"): el líder del
-    // propio equipo del autor, si ese equipo está asignado al proyecto —
-    // tomado primero desde el override por-proyecto y, si no hay, desde el
-    // líder orgánico. El líder del proyecto solo aparece cuando el autor no
-    // tiene líder de equipo resoluble; mismo criterio que
-    // `ProjectRepository.isProjectLeaderOrTeamLeaderOfMember`, que decide
-    // quién puede aprobar de verdad — este cálculo es solo para mostrar
-    // "pendiente con quién" en el listado, y debe coincidir.
     const projectApproverIdsByEntryId = new Map<string, Set<string>>();
     for (const row of rows) {
       if (!row.projectId) continue;
-      let teamLeaderId: string | null = null;
-      const authorTeam = teamByUserId.get(row.userId);
-      if (authorTeam) {
-        const pairKey = `${row.projectId}:${authorTeam.id}`;
-        if (assignedProjectTeamLeaderId.has(pairKey)) {
-          teamLeaderId = assignedProjectTeamLeaderId.get(pairKey) ?? authorTeam.leaderUserId;
-        }
-      }
-      const approverId = teamLeaderId ?? row.projectLeaderUserId;
-      if (approverId) projectApproverIdsByEntryId.set(row.id, new Set([approverId]));
+      const teamLeaders = row.projectType === 'development'
+        ? teamLeadersByProjectAndOwner.get(`${row.projectId}:${row.userId}`)
+        : undefined;
+      const ids = teamLeaders?.size
+        ? teamLeaders
+        : row.projectLeaderUserId
+          ? new Set([row.projectLeaderUserId])
+          : new Set<string>();
+      if (ids.size > 0) projectApproverIdsByEntryId.set(row.id, ids);
     }
 
     const approverIds = [
@@ -206,6 +212,9 @@ export class DrizzleHourEntryRepository implements HourEntryRepository {
       projectName: row.projectName,
       moduleId: row.moduleId,
       moduleName: row.moduleName,
+      segmentId: row.segmentId,
+      segmentName: row.segmentName,
+      taskId: row.taskId,
       teamId: teamByUserId.get(row.userId)?.id ?? null,
       teamName: teamByUserId.get(row.userId)?.name ?? null,
       assignment: row.assignment,
@@ -233,6 +242,17 @@ export class DrizzleHourEntryRepository implements HourEntryRepository {
     }));
 
     return buildPage(items, totalRows[0]?.value ?? 0, page);
+  }
+
+  async summarize(filters: HourEntryFilters, context?: TransactionContext): Promise<HourEntrySummary> {
+    const db = resolveDb(this.database, context);
+    // Mismo join que el conteo de `search()`: `buildWhere` filtra por nombre del autor cuando hay `search`.
+    const rows = await db
+      .select({ entries: count(), hours: sql<string>`coalesce(sum(${hourEntries.hours}), 0)` })
+      .from(hourEntries)
+      .leftJoin(users, eq(users.id, hourEntries.userId))
+      .where(this.buildWhere(filters));
+    return { entries: rows[0]?.entries ?? 0, hours: Number(rows[0]?.hours ?? 0) };
   }
 
   async save(entry: HourEntry, context?: TransactionContext): Promise<void> {
@@ -319,15 +339,17 @@ export class DrizzleHourEntryRepository implements HourEntryRepository {
       .sort((a, b) => b.approvedHours + b.pendingHours - (a.approvedHours + a.pendingHours));
   }
 
-  async sumOvertimeHoursByProjectAndUser(
+  async sumOvertimeHoursByDayProjectAndUser(
     dateFrom: Date,
     dateTo: Date,
+    scope: OvertimeReportScope = {},
     context?: TransactionContext,
-  ): Promise<OvertimeHoursByProjectAndUser[]> {
+  ): Promise<OvertimeHoursByDayProjectAndUser[]> {
     const db = resolveDb(this.database, context);
     const leaders = alias(users, 'project_leaders');
     const rows = await db
       .select({
+        date: hourEntries.date,
         projectId: projects.id,
         projectName: projects.name,
         projectType: projects.type,
@@ -341,7 +363,9 @@ export class DrizzleHourEntryRepository implements HourEntryRepository {
         pending: sql<string>`coalesce(sum(${hourEntries.hours}) filter (where ${hourEntries.status} = 'pending'), 0)`,
       })
       .from(hourEntries)
-      .innerJoin(projects, eq(projects.id, hourEntries.projectId))
+      // `leftJoin`: las horas extra sin proyecto también cuentan — Capacity
+      // excluye todas las extra, así que si no salen aquí no salen en ningún lado.
+      .leftJoin(projects, eq(projects.id, hourEntries.projectId))
       .innerJoin(users, eq(users.id, hourEntries.userId))
       .leftJoin(leaders, eq(leaders.id, projects.leaderUserId))
       .where(
@@ -350,9 +374,12 @@ export class DrizzleHourEntryRepository implements HourEntryRepository {
           ne(hourEntries.status, 'rejected'),
           gte(hourEntries.date, dateFrom),
           lte(hourEntries.date, dateTo),
+          scope.excludeUserId ? ne(hourEntries.userId, scope.excludeUserId) : undefined,
+          scope.leaderScopeUserId ? this.leaderScopeCondition(scope.leaderScopeUserId) : undefined,
         ),
       )
       .groupBy(
+        hourEntries.date,
         projects.id,
         projects.name,
         projects.type,
@@ -366,6 +393,7 @@ export class DrizzleHourEntryRepository implements HourEntryRepository {
     const fullName = (first: string | null, last: string | null) => `${first ?? ''} ${last ?? ''}`.trim();
     return rows
       .map((row) => ({
+        date: row.date,
         projectId: row.projectId,
         projectName: row.projectName,
         projectType: row.projectType,
@@ -378,12 +406,18 @@ export class DrizzleHourEntryRepository implements HourEntryRepository {
       }))
       .sort(
         (a, b) =>
-          a.projectName.localeCompare(b.projectName, 'es') ||
-          b.approvedHours + b.pendingHours - (a.approvedHours + a.pendingHours),
+          a.date.getTime() - b.date.getTime() ||
+          (a.projectName ?? '').localeCompare(b.projectName ?? '', 'es') ||
+          a.userFullName.localeCompare(b.userFullName, 'es'),
       );
   }
 
-  async sumRegularHoursForUserAndDate(userId: string, date: Date, context?: TransactionContext): Promise<number> {
+  async sumRegularHoursForUserAndDate(
+    userId: string,
+    date: Date,
+    excludeEntryId?: string,
+    context?: TransactionContext,
+  ): Promise<number> {
     const db = resolveDb(this.database, context);
     const rows = await db
       .select({ total: sql<string>`coalesce(sum(${hourEntries.hours}), 0)` })
@@ -394,6 +428,7 @@ export class DrizzleHourEntryRepository implements HourEntryRepository {
           eq(hourEntries.date, date),
           eq(hourEntries.isOvertime, false),
           ne(hourEntries.status, 'rejected'),
+          excludeEntryId ? ne(hourEntries.id, excludeEntryId) : undefined,
         ),
       );
     return Number(rows[0]?.total ?? 0);
@@ -402,7 +437,9 @@ export class DrizzleHourEntryRepository implements HourEntryRepository {
   private buildWhere(filters: HourEntryFilters) {
     const conditions = [];
     if (filters.userId) conditions.push(eq(hourEntries.userId, filters.userId));
+    if (filters.excludeUserId) conditions.push(ne(hourEntries.userId, filters.excludeUserId));
     if (filters.projectId) conditions.push(eq(hourEntries.projectId, filters.projectId));
+    if (filters.projectIds?.length) conditions.push(inArray(hourEntries.projectId, [...filters.projectIds]));
     if (filters.search) {
       const term = `%${filters.search.trim()}%`;
       conditions.push(or(ilike(users.firstName, term), ilike(users.lastName, term)));
@@ -418,6 +455,27 @@ export class DrizzleHourEntryRepository implements HourEntryRepository {
         )`,
       );
     }
+    if (filters.outsideTeamsLedByUserId) {
+      // Mismo criterio que `leaderUserId` + `isActive` de los equipos: líder
+      // oficial o líder de ese equipo en algún proyecto.
+      conditions.push(
+        sql`not exists (
+          select 1 from ${teamMembers}
+          inner join ${teams} on ${teams.id} = ${teamMembers.teamId}
+          where ${teamMembers.userId} = ${hourEntries.userId}
+            and ${teamMembers.leftAt} is null
+            and ${teams.isActive} = true
+            and ${teams.deletedAt} is null
+            and (
+              ${teams.leaderUserId} = ${filters.outsideTeamsLedByUserId}
+              or exists (
+                select 1 from ${projectTeams}
+                where ${projectTeams.teamId} = ${teams.id} and ${projectTeams.leaderUserId} = ${filters.outsideTeamsLedByUserId}
+              )
+            )
+        )`,
+      );
+    }
     if (filters.dateFrom) conditions.push(gte(hourEntries.date, filters.dateFrom));
     if (filters.dateTo) conditions.push(lte(hourEntries.date, filters.dateTo));
     if (filters.visibleToUserIds) {
@@ -425,62 +483,76 @@ export class DrizzleHourEntryRepository implements HourEntryRepository {
         filters.visibleToUserIds.length > 0 ? inArray(hourEntries.userId, [...filters.visibleToUserIds]) : sql`false`,
       );
     }
-    if (filters.leaderScopeUserId) {
-      const leaderId = filters.leaderScopeUserId;
-      conditions.push(
-        or(
-          eq(hourEntries.userId, leaderId),
-          // Sin proyecto: mismo criterio amplio que la autoridad de decisión
-          // para estos registros — lidera al dueño en general (no hay
-          // proyecto que acote).
-          sql`(
-            ${hourEntries.projectId} is null
-            and exists (
-              select 1 from ${teamMembers}
-              inner join ${teams} on ${teams.id} = ${teamMembers.teamId}
-              where ${teamMembers.userId} = ${hourEntries.userId}
-                and ${teamMembers.leftAt} is null
-                and (
-                  ${teams.leaderUserId} = ${leaderId}
-                  or exists (
-                    select 1 from ${projectTeams}
-                    where ${projectTeams.teamId} = ${teams.id} and ${projectTeams.leaderUserId} = ${leaderId}
-                  )
-                )
-            )
-          )`,
-          // Con proyecto, EXCLUYENTE: solo el líder del equipo del dueño
-          // PARA ESE PROYECTO — no cualquier equipo que lidere en general.
-          sql`(
-            ${hourEntries.projectId} is not null
-            and exists (
-              select 1 from ${projectTeams}
-              inner join ${teams} on ${teams.id} = ${projectTeams.teamId}
-              inner join ${teamMembers} on ${teamMembers.teamId} = ${teams.id}
-                and ${teamMembers.userId} = ${hourEntries.userId} and ${teamMembers.leftAt} is null
-              where ${projectTeams.projectId} = ${hourEntries.projectId}
-                and coalesce(${projectTeams.leaderUserId}, ${teams.leaderUserId}) = ${leaderId}
-            )
-          )`,
-          // Con proyecto y SIN líder de equipo resoluble para el dueño: cae
-          // al líder del proyecto — mismo respaldo que la autoridad de
-          // decisión.
-          sql`(
-            ${hourEntries.projectId} is not null
-            and exists (select 1 from ${projects} where ${projects.id} = ${hourEntries.projectId} and ${projects.leaderUserId} = ${leaderId})
-            and not exists (
-              select 1 from ${projectTeams}
-              inner join ${teams} on ${teams.id} = ${projectTeams.teamId}
-              inner join ${teamMembers} on ${teamMembers.teamId} = ${teams.id}
-                and ${teamMembers.userId} = ${hourEntries.userId} and ${teamMembers.leftAt} is null
-              where ${projectTeams.projectId} = ${hourEntries.projectId}
-                and coalesce(${projectTeams.leaderUserId}, ${teams.leaderUserId}) is not null
-            )
-          )`,
-        ),
-      );
-    }
+    if (filters.leaderScopeUserId) conditions.push(this.leaderScopeCondition(filters.leaderScopeUserId));
     return conditions.length > 0 ? and(...conditions) : undefined;
+  }
+
+  /** Alcance de `hours:read_team` — ver `HourEntryFilters.leaderScopeUserId`. */
+  private leaderScopeCondition(leaderId: string) {
+    return or(
+      eq(hourEntries.userId, leaderId),
+      // Sin proyecto: mismo criterio amplio que la autoridad de decisión
+      // para estos registros — lidera al dueño en general (no hay
+      // proyecto que acote).
+      sql`(
+        ${hourEntries.projectId} is null
+        and exists (
+          select 1 from ${teamMembers}
+          inner join ${teams} on ${teams.id} = ${teamMembers.teamId}
+          where ${teamMembers.userId} = ${hourEntries.userId}
+            and ${teamMembers.leftAt} is null
+            and (
+              ${teams.leaderUserId} = ${leaderId}
+              or exists (
+                select 1 from ${projectTeams}
+                where ${projectTeams.teamId} = ${teams.id} and ${projectTeams.leaderUserId} = ${leaderId}
+              )
+            )
+        )
+      )`,
+      // Sin proyecto: el designado también puede decidir aunque no lidere
+      // a ese colaborador (la validación de la acción ya lo permite).
+      sql`(
+        ${hourEntries.projectId} is null
+        and ${hourEntries.designatedApproverUserId} = ${leaderId}
+      )`,
+      // Desarrollo: solo líder del equipo asignado a ESTE proyecto.
+      sql`(
+        ${hourEntries.projectId} is not null
+        and exists (
+          select 1 from ${projectTeams}
+          inner join ${projects} on ${projects.id} = ${projectTeams.projectId} and ${projects.type} = 'development'
+          inner join ${teams} on ${teams.id} = ${projectTeams.teamId}
+          inner join ${users} on ${users.id} = coalesce(${projectTeams.leaderUserId}, ${teams.leaderUserId})
+          inner join ${teamMembers} on ${teamMembers.teamId} = ${teams.id}
+            and ${teamMembers.userId} = ${hourEntries.userId} and ${teamMembers.leftAt} is null
+          where ${projectTeams.projectId} = ${hourEntries.projectId}
+            and ${users.id} = ${leaderId}
+        )
+      )`,
+      // Soporte: líder del proyecto. Desarrollo: líder del proyecto solo
+      // si el autor carece de líder de equipo resoluble en ese proyecto.
+      sql`(
+        ${hourEntries.projectId} is not null
+        and exists (
+          select 1 from ${projects}
+          where ${projects.id} = ${hourEntries.projectId}
+            and ${projects.leaderUserId} = ${leaderId}
+            and (
+              ${projects.type} = 'support'
+              or not exists (
+                select 1 from ${projectTeams}
+                inner join ${teams} on ${teams.id} = ${projectTeams.teamId}
+                inner join ${users} on ${users.id} = coalesce(${projectTeams.leaderUserId}, ${teams.leaderUserId})
+                inner join ${teamMembers} on ${teamMembers.teamId} = ${teams.id}
+                  and ${teamMembers.userId} = ${hourEntries.userId}
+                  and ${teamMembers.leftAt} is null
+                where ${projectTeams.projectId} = ${hourEntries.projectId}
+              )
+            )
+        )
+      )`,
+    );
   }
 
   private buildOrderBy(sort: SortRequest<HourEntrySortableField>) {

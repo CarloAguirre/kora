@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import type { Database } from '@kora/db';
 import {
   backfillProjectTeamMembersFromHours,
+  backfillProjectTeamsFromMembers,
   EtlReport,
   JsonLegacyReader,
   migrateCatalogs,
@@ -29,6 +30,10 @@ import type { LegacyImportRunInput, LegacyImportRunner, LegacyImportRunResult } 
  * `hour_entries` (ver el comentario del paso), así que cada reimportación
  * puede traer horas nuevas sin su fila de colaborador — sin este paso, esas
  * asignaciones quedarían faltando otra vez en cada corrida.
+ *
+ * `backfillProjectTeamsFromMembers` va al final, después de la poda, para
+ * marcar los equipos (con su N° de colaboradores) sobre el conjunto final de
+ * asignaciones.
  */
 @Injectable()
 export class DrizzleLegacyImportRunner implements LegacyImportRunner {
@@ -61,6 +66,7 @@ export class DrizzleLegacyImportRunner implements LegacyImportRunner {
       await migrateForecast(tx);
       await backfillProjectTeamMembersFromHours(tx);
       await pruneStaleLegacyRows(tx, input.dump);
+      await backfillProjectTeamsFromMembers(tx);
     });
 
     const summary = report.summary();

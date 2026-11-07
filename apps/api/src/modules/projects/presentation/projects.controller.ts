@@ -8,6 +8,7 @@ import {
   createProjectModuleSchema,
   createProjectModuleSegmentSchema,
   createProjectModuleTaskSchema,
+  excludeRoadmapReferenceSchema,
   createProjectPaymentMilestoneSchema,
   createProjectSchema,
   issueProjectPaymentMilestoneInvoiceSchema,
@@ -34,6 +35,8 @@ import {
   type CreateProjectModuleInput,
   type CreateProjectModuleSegmentInput,
   type CreateProjectModuleTaskInput,
+  type ExcludeRoadmapReferenceInput,
+  type RoadmapReferenceExclusion,
   type CreateProjectPaymentMilestoneInput,
   type IssueProjectPaymentMilestoneInvoiceInput,
   type ListProjectsQuery,
@@ -41,6 +44,10 @@ import {
   type MarkProjectPaymentMilestonePaidInput,
   type ProjectBillingSettings,
   type ProjectDetail,
+  type ProjectSummary,
+  type CollaboratorProjectSummary,
+  type CollaboratorProjectDetail,
+  type ProjectPhaseOption,
   type ResolveProjectObservationInput,
   type SetProjectOvertimeAuthorizationInput,
   type UpdateProjectBillingSettingsInput,
@@ -64,6 +71,8 @@ import { UpdateProjectUseCase } from '../application/use-cases/update-project.us
 import { UpdateProjectExtrasUseCase } from '../application/use-cases/update-project-extras.use-case';
 import { ListProjectsUseCase } from '../application/use-cases/list-projects.use-case';
 import { GetProjectUseCase } from '../application/use-cases/get-project.use-case';
+import { ListProjectPhasesUseCase } from '../application/use-cases/list-project-phases.use-case';
+import { CollaboratorProjectActivityService } from '../application/services/collaborator-project-activity.service';
 import { ChangeProjectStatusUseCase } from '../application/use-cases/change-project-status.use-case';
 import { SetProjectOvertimeAuthorizationUseCase } from '../application/use-cases/set-project-overtime-authorization.use-case';
 import { DeleteProjectUseCase } from '../application/use-cases/delete-project.use-case';
@@ -86,6 +95,7 @@ import { DeleteProjectModuleSegmentUseCase } from '../application/use-cases/dele
 import { CreateProjectModuleTaskUseCase } from '../application/use-cases/create-project-module-task.use-case';
 import { UpdateProjectModuleTaskUseCase } from '../application/use-cases/update-project-module-task.use-case';
 import { DeleteProjectModuleTaskUseCase } from '../application/use-cases/delete-project-module-task.use-case';
+import { ProjectRoadmapReferenceExclusionsService } from '../application/services/project-roadmap-reference-exclusions.service';
 import { CreateProjectPaymentMilestoneUseCase } from '../application/use-cases/create-project-payment-milestone.use-case';
 import { UpdateProjectPaymentMilestoneUseCase } from '../application/use-cases/update-project-payment-milestone.use-case';
 import { DeleteProjectPaymentMilestoneUseCase } from '../application/use-cases/delete-project-payment-milestone.use-case';
@@ -96,6 +106,19 @@ import { UpdateProjectBillingSettingsUseCase } from '../application/use-cases/up
 import { ResolveProjectManagementApprovalUseCase } from '../application/use-cases/resolve-project-management-approval.use-case';
 import { CorrectProjectHito0DateUseCase } from '../application/use-cases/correct-project-hito0-date.use-case';
 
+
+function toCollaboratorSummary(
+  project: Pick<ProjectSummary, 'id' | 'name' | 'slug' | 'type' | 'status' | 'phase'
+    | 'client' | 'leader' | 'startDate' | 'endDate' | 'progress'>,
+  weekHours = 0,
+): CollaboratorProjectSummary {
+  return {
+    id: project.id, name: project.name, slug: project.slug, type: project.type,
+    status: project.status, phase: project.phase, client: project.client, leader: project.leader,
+    startDate: project.startDate, endDate: project.endDate, progress: project.progress, weekHours,
+  };
+}
+
 @Controller('projects')
 export class ProjectsController {
   constructor(
@@ -104,6 +127,7 @@ export class ProjectsController {
     private readonly updateProjectExtras: UpdateProjectExtrasUseCase,
     private readonly listProjects: ListProjectsUseCase,
     private readonly getProject: GetProjectUseCase,
+    private readonly listProjectPhases: ListProjectPhasesUseCase,
     private readonly changeStatus: ChangeProjectStatusUseCase,
     private readonly setOvertimeAuthorization: SetProjectOvertimeAuthorizationUseCase,
     private readonly deleteProject: DeleteProjectUseCase,
@@ -126,6 +150,7 @@ export class ProjectsController {
     private readonly createModuleTask: CreateProjectModuleTaskUseCase,
     private readonly updateModuleTask: UpdateProjectModuleTaskUseCase,
     private readonly deleteModuleTask: DeleteProjectModuleTaskUseCase,
+    private readonly roadmapExclusions: ProjectRoadmapReferenceExclusionsService,
     private readonly createPaymentMilestone: CreateProjectPaymentMilestoneUseCase,
     private readonly updatePaymentMilestone: UpdateProjectPaymentMilestoneUseCase,
     private readonly deletePaymentMilestone: DeleteProjectPaymentMilestoneUseCase,
@@ -135,6 +160,7 @@ export class ProjectsController {
     private readonly updateBillingSettings: UpdateProjectBillingSettingsUseCase,
     private readonly resolveManagementApproval: ResolveProjectManagementApprovalUseCase,
     private readonly correctHito0Date: CorrectProjectHito0DateUseCase,
+    private readonly collaboratorActivity: CollaboratorProjectActivityService,
   ) {}
 
   /**
@@ -178,11 +204,63 @@ export class ProjectsController {
     return { ...page, items: [...page.items] };
   }
 
+  /** Endpoint personal: la API fuerza pertenencia, incluso si el actor tiene otros permisos. */
+  @Get('my')
+  @RequirePermissions('hours:read_own')
+  async myProjects(
+    @Query(new ZodValidationPipe(listProjectsQuerySchema)) query: ListProjectsQuery,
+    @CurrentUser() actor: RequestUser,
+  ): Promise<{ items: CollaboratorProjectSummary[]; page: number; pageSize: number; pageCount: number; total: number }> {
+    const page = unwrapOrThrow(await this.listProjects.execute({
+      query: {
+        page: query.page, pageSize: query.pageSize, search: query.search,
+        sortField: query.sortField, sortDirection: query.sortDirection,
+      } as ListProjectsQuery,
+      actor: toActorContext(actor), actorPermissions: [],
+    }));
+    const hours = await this.collaboratorActivity.weeklyHours(actor.id, page.items.map((p) => p.id));
+    return { ...page, items: page.items.map((p) => toCollaboratorSummary(p, hours.get(p.id) ?? 0)) };
+  }
+
+  @Get('my/:id')
+  @RequirePermissions('hours:read_own')
+  async myProjectDetail(
+    @Param('id') id: string, @CurrentUser() actor: RequestUser,
+  ): Promise<CollaboratorProjectDetail> {
+    const project = unwrapOrThrow(await this.getProject.execute({
+      projectId: id, actorUserId: actor.id, actorPermissions: [],
+    }));
+    const activity = await this.collaboratorActivity.approvedEvents(project.id);
+    const { weekHours: _ignored, ...summary } = toCollaboratorSummary(project);
+    return {
+      ...summary,
+      estimatedDeliveryDate: project.estimatedDeliveryDate,
+      teams: project.teams.map((team) => ({ teamId: team.teamId, leader: team.leader })),
+      modules: project.modules.map((module) => ({
+        ...module,
+        deliveries: module.deliveries.map((delivery) => ({ ...delivery, canManage: false })),
+      })),
+      observations: project.observations.map((observation) => ({
+        ...observation, canEdit: false, canDelete: false, canResolve: false,
+      })),
+      events: activity.entries, activityTruncated: activity.truncated,
+    };
+  }
+
   @Get(':id')
   @RequireAnyPermission('projects:read', 'projects:read_assigned')
   async detail(@Param('id') id: string, @CurrentUser() actor: RequestUser): Promise<ProjectDetail> {
     return unwrapOrThrow(
       await this.getProject.execute({ projectId: id, actorUserId: actor.id, actorPermissions: actor.permissions }),
+    );
+  }
+
+  /** Igual que la lista: `hours:register` basta — es el selector de Fase/Tiempo de ejecución del registro de horas. */
+  @Get(':id/phases')
+  @RequireAnyPermission('projects:read', 'projects:read_assigned', 'hours:register')
+  async phases(@Param('id') id: string, @CurrentUser() actor: RequestUser): Promise<ProjectPhaseOption[]> {
+    return unwrapOrThrow(
+      await this.listProjectPhases.execute({ projectId: id, actorUserId: actor.id, actorPermissions: actor.permissions }),
     );
   }
 
@@ -625,6 +703,37 @@ export class ProjectsController {
     );
   }
 
+  /** Excluir referencias del Roadmap sin borrar actividades de la cotización original. */
+  @Get(':id/roadmap-reference-exclusions')
+  @RequireAnyPermission('projects:read', 'projects:read_assigned')
+  async listRoadmapReferenceExclusions(
+    @Param('id') projectId: string, @CurrentUser() actor: RequestUser,
+  ): Promise<RoadmapReferenceExclusion[]> {
+    return this.roadmapExclusions.list(projectId, actor);
+  }
+
+  @Post(':id/modules/:moduleId/roadmap-reference-exclusions')
+  @RequireAnyPermission('projects:manage', 'projects:read_assigned')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async excludeRoadmapReference(
+    @Param('id') projectId: string, @Param('moduleId') moduleId: string,
+    @Body(new ZodValidationPipe(excludeRoadmapReferenceSchema)) body: ExcludeRoadmapReferenceInput,
+    @CurrentUser() actor: RequestUser,
+  ): Promise<void> {
+    await this.roadmapExclusions.suppress(projectId, moduleId, body, actor);
+  }
+
+  @Post(':id/modules/:moduleId/roadmap-reference-exclusions/restore')
+  @RequireAnyPermission('projects:manage', 'projects:read_assigned')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async restoreRoadmapReference(
+    @Param('id') projectId: string, @Param('moduleId') moduleId: string,
+    @Body(new ZodValidationPipe(excludeRoadmapReferenceSchema)) body: ExcludeRoadmapReferenceInput,
+    @CurrentUser() actor: RequestUser,
+  ): Promise<void> {
+    await this.roadmapExclusions.restore(projectId, moduleId, body, actor);
+  }
+
   /** Sin `projects:manage`, solo quien lidera el equipo de la tarea (ver `CreateProjectModuleTaskUseCase`). */
   @Post(':id/modules/:moduleId/tasks')
   @RequireAnyPermission('projects:manage', 'hours:register')
@@ -680,6 +789,7 @@ export class ProjectsController {
     @Param('id') id: string,
     @Param('moduleId') moduleId: string,
     @Param('taskId') taskId: string,
+    @Query('cancel') cancel: string | undefined,
     @CurrentUser() actor: RequestUser,
   ): Promise<void> {
     unwrapOrThrow(
@@ -687,6 +797,7 @@ export class ProjectsController {
         projectId: id,
         moduleId,
         taskId,
+        forceCancel: cancel === 'true',
         actor: toActorContext(actor),
         actorPermissions: actor.permissions,
       }),

@@ -11,9 +11,11 @@ import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { ApiRequestError } from '@/shared/lib/api-client';
 import { clientProjectPreviewPath } from '@/app/router/paths';
+import { PROJECTS_LIST_PATH, RESTORE_PROJECTS_LIST_STATE } from '../lib/projects-list-search';
 import { ProjectViewTabs } from '@/modules/client-portal/components/ProjectViewTabs';
 import { useProjectDetail, useSetProjectOvertimeAuthorization } from '../api/projects.queries';
 import { EditProjectDialog } from '../components/EditProjectDialog';
+import { EditDevelopmentProjectDialog } from '../components/EditDevelopmentProjectDialog';
 import { TeamLeaderProjectView } from '../components/TeamLeaderProjectView';
 import { DevelopmentProjectDetailView } from './DevelopmentProjectDetailView';
 import { SupportProjectDetailView } from './SupportProjectDetailView';
@@ -34,6 +36,7 @@ export function ProjectDetailPage() {
   const setOvertimeAuthorization = useSetProjectOvertimeAuthorization();
   const { data: project, isLoading, error } = useProjectDetail(projectId ?? null);
   const [editing, setEditing] = useState(false);
+  const [quotationTabRequestId, setQuotationTabRequestId] = useState(0);
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
 
   const onToggleOvertime = async () => {
@@ -53,7 +56,7 @@ export function ProjectDetailPage() {
   if (error) {
     return (
       <DashboardLayout title="Proyectos">
-        <PageLoadError error={error} subject="este proyecto" backLabel="Volver a proyectos" onBack={() => void navigate('/proyectos')} />
+        <PageLoadError error={error} subject="este proyecto" backLabel="Volver a proyectos" onBack={() => void navigate(PROJECTS_LIST_PATH, { state: RESTORE_PROJECTS_LIST_STATE })} />
       </DashboardLayout>
     );
   }
@@ -101,7 +104,7 @@ export function ProjectDetailPage() {
         </div>
 
         <div className={styles.topRow}>
-          <Button variant="tertiary" size="sm" className={styles.backButton} onClick={() => void navigate('/proyectos')}>
+          <Button variant="tertiary" size="sm" className={styles.backButton} onClick={() => void navigate(PROJECTS_LIST_PATH, { state: RESTORE_PROJECTS_LIST_STATE })}>
             <ChevronLeftIcon size={16} /> Volver a proyectos
           </Button>
 
@@ -138,17 +141,30 @@ export function ProjectDetailPage() {
             project={project}
             projectId={projectId}
             onEdit={onEdit}
+            quotationTabRequestId={quotationTabRequestId}
             readOnlyTeamIds={isTeamLeaderOnly ? new Set(ledTeams.map((t) => t.teamId)) : undefined}
           />
         )}
 
-        <EditProjectDialog
-          open={editing}
-          project={project}
-          onClose={() => setEditing(false)}
-          onSuccess={(message) => toast.success(message)}
-          isManagement={can('projects:manage')}
-        />
+        {project.type === 'development'
+          ? <EditDevelopmentProjectDialog
+              open={editing}
+              project={project}
+              onClose={() => setEditing(false)}
+              onSuccess={(message) => toast.success(message)}
+              onViewQuotations={() => {
+                setEditing(false);
+                setQuotationTabRequestId((previous) => previous + 1);
+              }}
+              isManagement={can('projects:manage')}
+            />
+          : <EditProjectDialog
+              open={editing}
+              project={project}
+              onClose={() => setEditing(false)}
+              onSuccess={(message) => toast.success(message)}
+              isManagement={can('projects:manage')}
+            />}
       </div>
     </DashboardLayout>
   );

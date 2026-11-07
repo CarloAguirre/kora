@@ -71,7 +71,8 @@ describe('QuotationCommercialSummary · fidelidad comercial sin alterar el cálc
     render(<QuotationCommercialSummary {...baseProps} version={withEdt}
       draft={withEdt.draft} />);
     expect(screen.getByText('Horas totales del proyecto')).toBeInTheDocument();
-    expect(screen.getByText('Falta el valor HH del proyecto.')).toBeInTheDocument();
+    // El dato faltante se informa al intentar enviar/aprobar (snackbar), no como alerta repetida.
+    expect(screen.queryByText('Falta el valor HH del proyecto.')).not.toBeInTheDocument();
     expect(screen.getByText('40')).toBeInTheDocument();
     expect(screen.getByText('40 hh')).toBeInTheDocument();
     expect(screen.getAllByText('—')).toHaveLength(2);

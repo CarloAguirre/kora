@@ -11,6 +11,7 @@ import { TeamAvailabilityHeatmap } from '@/modules/teams/components/TeamAvailabi
 import { TeamContextBar } from '@/modules/teams/components/TeamContextBar';
 import { useTeamsList } from '@/modules/teams/api/teams.queries';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
+import { useHourEntriesList, useTeamsPendingCounts } from '../api/hours.queries';
 
 /**
  * Aprobaciones de horas — equivalente a la sección "Horas ingresadas
@@ -37,7 +38,40 @@ export function HoursApprovalsPage() {
     user ? { leaderUserId: user.id, pageSize: 50, isActive: true } : { pageSize: 1 },
   );
   const teams = ledTeams?.items ?? [];
-  const activeTeamId = teamId || teams[0]?.id || '';
+
+  // Pendientes por equipo con el mismo criterio que la campanita. Sin equipo
+  // elegido se abre el que tiene más, no el primero de la lista: se llega desde
+  // "N registros por aprobar" (campanita, Dashboard) y abrir un equipo sin
+  // pendientes mostraba la cola vacía.
+  const multipleTeams = teams.length > 1;
+  const pendingByTeam = useTeamsPendingCounts(
+    teams.map((team) => team.id),
+    { enabled: multipleTeams },
+  );
+  const busiestTeamId = [...(pendingByTeam ?? [])].filter(([, count]) => count > 0).sort((a, b) => b[1] - a[1])[0]?.[0];
+  // Se fija al resolverse (ajuste en render, sin efecto): si no, al aprobar
+  // parte del equipo abierto otro pasaba a ser "el más cargado" y la cola
+  // saltaba de equipo a mitad del trabajo.
+  if (!teamId && busiestTeamId) setTeamId(busiestTeamId);
+  const activeTeamId = teamId || busiestTeamId || teams[0]?.id || '';
+  const resolvingDefaultTeam = !teamId && multipleTeams && !pendingByTeam;
+  // La cola muestra un equipo a la vez: sin este aviso, al vaciar el equipo
+  // abierto la campanita seguía contando los de los otros y parecía un error.
+  const otherTeamsWithPending = teams.filter((team) => team.id !== activeTeamId && (pendingByTeam?.get(team.id) ?? 0) > 0);
+  const selectTeam = (nextTeamId: string) => {
+    setTeamId(nextTeamId);
+    setSelectedMember(null);
+  };
+
+  // Lo que le toca aprobar al líder pero no cae en ninguno de sus equipos (p.ej.
+  // soporte de otro equipo en un proyecto que lidera): la cola por equipo no lo
+  // muestra y la campanita seguía contándolo sin que hubiera dónde aprobarlo.
+  const showOutsideTeams = user?.role === 'leader' && teams.length > 0;
+  const { data: outsideTeamsSample } = useHourEntriesList(
+    { status: 'pending', outsideLedTeams: true, pageSize: 1 },
+    { enabled: showOutsideTeams },
+  );
+  const hasOutsideTeamsEntries = showOutsideTeams && (outsideTeamsSample?.total ?? 0) > 0;
 
   // Se llega tanto desde "Equipos" como desde el card de Aprobaciones Pendientes
   // del dashboard, así que no hay un único destino fijo al que volver: se usa
@@ -53,14 +87,11 @@ export function HoursApprovalsPage() {
           <ChevronLeftIcon size={16} /> Volver
         </Button>
 
-        {teams.length > 0 && (
+        {teams.length > 0 && !resolvingDefaultTeam && (
           <TeamContextBar
             teams={teams}
             teamId={activeTeamId}
-            onTeamChange={(nextTeamId) => {
-              setTeamId(nextTeamId);
-              setSelectedMember(null);
-            }}
+            onTeamChange={selectTeam}
             selectedMember={selectedMember}
             onMemberSelect={setSelectedMember}
           />
@@ -68,15 +99,38 @@ export function HoursApprovalsPage() {
 
         <Card>
           <h2 className={styles.sectionTitle}>Horas pendientes de aprobación</h2>
-          {teams.length > 0 && (
+          {!resolvingDefaultTeam && otherTeamsWithPending.length > 0 && (
+            <div className={styles.otherTeams}>
+              <span>También tienes horas por aprobar en:</span>
+              {otherTeamsWithPending.map((team) => (
+                <Button key={team.id} variant="outline" size="sm" onClick={() => selectTeam(team.id)}>
+                  {team.name} ({pendingByTeam?.get(team.id)})
+                </Button>
+              ))}
+            </div>
+          )}
+          {/* Mientras se elige el equipo por defecto no se pinta nada: evita cargar primero el equipo equivocado. */}
+          {!resolvingDefaultTeam && (
             <>
-              <TeamAvailabilityHeatmap teamId={activeTeamId} teamMemberId={selectedMember?.id} />
-              <div className={styles.divider} />
+              {teams.length > 0 && (
+                <>
+                  <TeamAvailabilityHeatmap teamId={activeTeamId} teamMemberId={selectedMember?.id} />
+                  <div className={styles.divider} />
+                </>
+              )}
+
+              <HourEntriesApprovalTable query={{ teamId: activeTeamId || undefined, userId: selectedMember?.userId }} />
             </>
           )}
-
-          <HourEntriesApprovalTable query={{ teamId: activeTeamId || undefined, userId: selectedMember?.userId }} />
         </Card>
+
+        {hasOutsideTeamsEntries && (
+          <Card>
+            <h2 className={styles.sectionTitle}>Otros registros que te toca aprobar</h2>
+            <p className={styles.sectionHint}>De colaboradores fuera de tus equipos, en proyectos que lideras.</p>
+            <HourEntriesApprovalTable query={{ outsideLedTeams: true }} />
+          </Card>
+        )}
       </div>
     </DashboardLayout>
   );

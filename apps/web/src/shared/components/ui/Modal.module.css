@@ -41,9 +41,16 @@
   animation: kora-modal-slide-in 0.22s ease-out;
 }
 
-.side.wide[open] {
+ .side.wide[open] {
   max-width: min(760px, 100vw);
 }
+
+/* Exclusivo para formularios complejos como Editar proyecto: la grilla de tramos
+   cabe en el drawer sin hacer scroll horizontal del formulario. */
+.side.expandedSide[open] {
+  max-width: min(1040px, 100vw);
+}
+.side.expandedSide[open] .body { min-width: 0; overflow-x: hidden; }
 
 .side[open] .body {
   flex: 1 1 auto;
@@ -81,6 +88,12 @@
   min-width: 0;
 }
 
+.eyebrow {
+  font-size: 10.5px;
+  line-height: 1.35;
+  color: var(--kora-text-muted);
+  font-weight: var(--kora-weight-regular);
+}
 .title {
   font-size: var(--kora-text-xl);
   font-weight: var(--kora-weight-bold);
@@ -142,4 +155,83 @@
   .footer > * {
     width: 100%;
   }
+}
+
+/* Compact operational block details use the same accessible native dialog,
+   without altering full-size edit forms or client portal drawers. */
+.side.compactSide[open] {
+  max-width: min(430px, 100vw);
+}
+.compactSide .header {
+  padding: 14px 16px 12px;
+  align-items: center;
+}
+.compactSide .title {
+  font-size: 16px;
+  line-height: 1.3;
+}
+.compactSide .description { font-size: 11px; }
+.compactSide .body {
+  padding: 14px 16px;
+  gap: 0;
+}
+.compactSide .footer {
+  padding: 12px 16px;
+  align-items: center;
+  justify-content: flex-end;
+}
+.compactSide .footer button { font-size: 11px; }
+
+/* Ficha Kora v5.02: drawer de ~600 px (como el HTML de referencia).
+ * Los campos y los tramos de cobro permanecen alineados horizontalmente.
+ * No modificar el drawer de soporte ni el detalle compacto de bloques. */
+.side.projectEditSide[open] {
+  width: 100%;
+  max-width: min(600px, 100vw);
+}
+.projectEditSide .header {
+  padding: 14px 16px 12px;
+  align-items: center;
+}
+.projectEditSide .title {
+  font-size: 16px;
+  line-height: 1.35;
+}
+.projectEditSide .body {
+  min-width: 0;
+  overflow-x: hidden;
+  padding: 14px 16px 18px;
+  gap: 12px;
+}
+.projectEditSide .footer {
+  padding: 10px 14px;
+  align-items: center;
+}
+@media (max-width: 640px) {
+  .projectEditSide .body { padding: 14px 12px; }
+}
+
+/*
+ * Opt-in para formularios largos (p. ej. registrar HH).
+ * El <dialog> nativo no debe desplazar su propio contenido además de .body.
+ * Mantiene cabecera visible y una única barra vertical para el formulario.
+ * Sin este modificador siguen vigentes las reglas de los demás modales.
+ */
+.dialog.bodyScrollOnly[open] {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px);
+  overflow: hidden;
+}
+.dialog.bodyScrollOnly[open] .header,
+.dialog.bodyScrollOnly[open] .footer {
+  flex: 0 0 auto;
+}
+.dialog.bodyScrollOnly[open] .body {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
 }

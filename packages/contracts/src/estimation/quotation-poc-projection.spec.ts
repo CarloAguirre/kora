@@ -41,6 +41,68 @@ const original = () => quotationDraftDataSchema.parse({
 });
 
 describe('Proyección IA Gemini KDM a cotización', () => {
+  it('proyecta una EDT Gemini real de Drive y conserva HH, documentos y origen al guardarla', () => {
+    const originalDraft = original();
+    const draft = quotationDraftDataSchema.parse({
+      ...originalDraft,
+      sourceRefs: ['drive:requerimientos-funcionales'],
+      aiPoc: {
+        ...originalDraft.aiPoc!,
+        source: 'drive',
+        proposal: {
+          ...originalDraft.aiPoc!.proposal,
+          sourceMode: 'drive',
+          summary: 'Gemini revisó documentos de Drive',
+        },
+        edt: {
+          schemaVersion: 'kora.quotation.reference-edt.v2',
+          source: 'drive',
+          provider: 'gemini',
+          totalHours: 80,
+          reservePercent: 0, reserveHours: 0, totalWithReserve: 80,
+          stages: [{
+            code: 'T01', name: 'Implementación y pruebas',
+            startWeek: 1, durationWeeks: 2, totalHours: 80,
+          }],
+          modules: [{
+            name: 'Módulo documental',
+            totalHours: 80,
+            tasks: [{
+              wbs: 'T01.01', name: 'Integración de Drive', description: 'Leer documentación real',
+              role: 'Desarrollo', hours: 80, stageCode: 'T01',
+              roleEffort: [
+                { role: 'Desarrollo', hours: 40 },
+                { role: 'QA', hours: 40 },
+              ],
+            }],
+          }],
+        },
+      },
+    });
+    const savedDraft = projectPocRolesToQuotationDraft(draft, { Desarrollo: t1, QA: t2 });
+    expect(savedDraft.aiPoc?.source).toBe('drive');
+    expect(savedDraft.aiPoc?.proposal.sourceMode).toBe('drive');
+    expect(savedDraft.aiPoc?.edt?.source).toBe('drive');
+    expect(savedDraft.sourceRefs).toEqual(['drive:requerimientos-funcionales']);
+    expect(savedDraft.analysisProjectionStatus).toBe('synced');
+    expect(savedDraft.teams).toHaveLength(2);
+    expect(savedDraft.phases).toHaveLength(1);
+    expect(savedDraft.phases[0]?.teamHours).toEqual([
+      { teamId: t1, hours: 40 },
+      { teamId: t2, hours: 40 },
+    ]);
+    expect(() => validatePocDraftIntegrity(draft, savedDraft)).not.toThrow();
+    const forged = structuredClone(savedDraft);
+    forged.aiPoc!.source = 'kdm_demo';
+    expect(() => projectPocRolesToQuotationDraft(forged, { Desarrollo: t1, QA: t2 }))
+      .toThrow(/procedencia documental coherente/);
+    const inconsistentEdt = structuredClone(savedDraft);
+    inconsistentEdt.aiPoc!.edt!.source = 'kdm_demo';
+    expect(() => projectPocRolesToQuotationDraft(inconsistentEdt, { Desarrollo: t1, QA: t2 }))
+      .toThrow(/procedencia documental coherente/);
+  });
+
+
   it('conserva 80 HH, incluso si dos roles usan el mismo equipo Kora', () => {
     const draft = original();
     const before = structuredClone(draft);

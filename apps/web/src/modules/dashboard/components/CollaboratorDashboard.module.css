@@ -1,0 +1,129 @@
+.dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-4);
+  width: 100%;
+  min-width: 0;
+  /* El padding y ancho de la página los administra DashboardLayout. */
+  color: var(--kora-navy);
+}
+.greeting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.greeting h1 { margin: 0 0 5px; font-size: 19px; font-weight: 700; line-height: 1.3; }
+.greeting p { color: #718097; font-size: 12px; margin: 0; }
+.register { white-space: nowrap; }
+.dashboard .card {
+  /* Superficie, borde, radio, sombra y padding del Card oficial de Kora. */
+  gap: 0;
+  min-width: 0;
+}
+.sectionTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+.sectionTop h2 { font-size: var(--kora-text-lg); font-weight: var(--kora-weight-bold); margin: 0; }
+.count {
+  min-width: 23px;
+  padding: 3px 8px;
+  border-radius: 20px;
+  text-align: center;
+  background: #eef0f5;
+  color: #63738e;
+  font-size: 11px;
+  font-weight: 600;
+}
+.taskTabs {
+  border-bottom: 1px solid var(--kora-border-soft);
+  margin-bottom: var(--kora-space-3);
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.taskTabs :global([role="tablist"]) { min-width: max-content; }
+.taskList { display: flex; flex-direction: column; gap: 7px; }
+/* Solo los listados con más de cinco tareas se desplazan internamente.
+ * El límite equivale aproximadamente a cinco tarjetas a tamaño escritorio.
+ * No altera el alto del Card, el header, las pestañas ni otros listados. */
+.taskListScrollable {
+  max-height: min(720px, 80vh);
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-width: thin;
+  padding-right: 6px;
+}
+.taskListScrollable:focus-visible {
+  outline: 2px solid var(--kora-blue-500, #497fc7);
+  outline-offset: -2px;
+  border-radius: 4px;
+}
+.task {
+  border: 1px solid var(--kora-border-soft);
+  border-radius: var(--kora-radius);
+  padding: var(--kora-space-3);
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  min-width: 0;
+}
+.taskReturned { background: #fffaf0; border-color: #f8d18e; }
+.taskTop, .taskBottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+  min-width: 0;
+}
+.taskInfo { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.taskInfo strong { font-size: var(--kora-text-sm); line-height: 1.35; font-weight: var(--kora-weight-semibold); }
+.taskContext { font-size: var(--kora-text-xs); color: var(--kora-blue-400); line-height: 1.5; }
+.chips { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 5px; }
+.taskBody { display: flex; flex-direction: column; gap: 5px; max-width: min(100%, 620px); }
+.progressTrack {
+  width: 100%;
+  height: 6px;
+  border-radius: 99px;
+  overflow: hidden;
+  background: #edf0f6;
+}
+.progressFill { display: block; background: #55a02a; height: 100%; border-radius: 99px; }
+.taskProgressText { font-size: 11px; color: #8190a4; }
+.rejection {
+  padding: 7px 10px;
+  background: #fff0d4;
+  color: #91600d;
+  border-radius: 6px;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.softNote {
+  padding: 8px 9px;
+  border-radius: 6px;
+  background: #f6f7fa;
+  color: #76839a;
+  font-size: 10.5px;
+  margin: 0;
+  max-width: 100%;
+}
+.taskBottom { align-items: center; min-height: 28px; }
+.waiting { font-size: 11px; color: #8290a4; line-height: 1.4; }
+.overdueDate { font-size: 11px; color: #c44343; line-height: 1.4; }
+.empty { margin: 14px 0; color: #8190a4; font-size: 12px; }
+@media (max-width: 780px) {
+  .taskTop { flex-wrap: wrap; }
+  .chips { justify-content: flex-start; }
+  .taskBottom { flex-wrap: wrap; }
+}
+
+/* Confirmación de tarea: Modal + Button compartidos, sin alterar otras pantallas. */
+.completeMessage { display: flex; flex-direction: column; gap: var(--kora-space-3); font-size: var(--kora-text-base); }
+.completeMessage p { margin: 0; line-height: 1.5; }
+.completeActions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: var(--kora-space-2); }
+@media (max-width: 520px) {
+  .completeActions { flex-direction: column; align-items: stretch; }
+}

@@ -69,6 +69,8 @@ export interface ProjectProps {
   contractAmount: number | null;
   /** Moneda de todos los tramos de pago del proyecto. */
   contractCurrency: ProjectContractCurrency;
+  /** Proyecto interno (de la propia empresa): sin plan de pago, fuera de Facturación y sin correos de cobro. */
+  isInternal: boolean;
   /** Hito 0 quedó pausado esperando que Gerencia active el proyecto a mano — ver `IssueProjectPaymentMilestoneInvoiceUseCase`. */
   pendingManagementApproval: boolean;
   /** Fecha del Hito 0 (kickoff) — editable por Gerencia/PMO. `null` si el proyecto nunca se activó. */
@@ -104,6 +106,7 @@ export interface CreateProjectProps {
   readonly additionalLinks?: string | null;
   readonly contractAmount?: number | null;
   readonly contractCurrency?: ProjectContractCurrency;
+  readonly isInternal?: boolean;
   readonly phase?: ProjectPhase | null;
   /** Subconjunto de estados con sentido al crear (draft/active/on_hold) — ver `createProjectSchema`. */
   readonly status?: ProjectStatus | null;
@@ -198,6 +201,7 @@ export class Project extends AggregateRoot<string> {
       periodReportAchievements: null,
       contractAmount: props.contractAmount ?? null,
       contractCurrency: props.contractCurrency ?? 'UF',
+      isInternal: props.type === 'development' && (props.isInternal ?? false),
       pendingManagementApproval: false,
       hito0At: null,
       hito0Source: null,
@@ -262,6 +266,10 @@ export class Project extends AggregateRoot<string> {
 
   get allowsOvertime(): boolean {
     return this.props.allowsOvertime;
+  }
+
+  get isInternal(): boolean {
+    return this.props.isInternal;
   }
 
   get pendingManagementApproval(): boolean {
@@ -339,6 +347,7 @@ export class Project extends AggregateRoot<string> {
         | 'periodReportAchievements'
         | 'contractAmount'
         | 'contractCurrency'
+        | 'isInternal'
       >
     >,
     now: Date,
@@ -348,7 +357,10 @@ export class Project extends AggregateRoot<string> {
       if (check.isErr()) return err(check.error);
     }
     if (data.name !== undefined) data.name = data.name.trim();
-    if (this.props.type === 'support') data.phase = null;
+    if (this.props.type === 'support') {
+      data.phase = null;
+      data.isInternal = false;
+    }
 
     assignDefined(this.props, data);
     this.touch(now);

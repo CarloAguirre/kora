@@ -11,6 +11,76 @@
     0px 10px 14px 0px rgba(15, 41, 66, 0.16);
 }
 
+/* Filtros — mismos que la Bitácora interna (`BitacoraCard.module.css`). */
+.toolbar {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--kora-space-3);
+  flex-wrap: wrap;
+  padding: 16px 0;
+  border-bottom: 1px solid #e4e9ee;
+}
+
+.filterField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-1);
+}
+
+.filterFieldLabel {
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-medium);
+  line-height: 16px;
+}
+
+.filterTabs {
+  display: inline-flex;
+  align-items: stretch;
+  height: var(--kora-field-height);
+  padding: 3px;
+  border: 1px solid var(--kora-blue-200);
+  border-radius: var(--kora-radius-input);
+  background: var(--kora-surface);
+  flex-shrink: 0;
+}
+
+.filterTab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  padding: 0 var(--kora-space-4);
+  border-radius: calc(var(--kora-radius-input) - 3px);
+  background: transparent;
+  color: var(--kora-text-muted);
+  font-family: var(--kora-font);
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-semibold);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--kora-transition), color var(--kora-transition);
+}
+
+.filterTab:hover {
+  color: var(--kora-navy);
+}
+
+.filterTabActive,
+.filterTabActive:hover {
+  background: var(--kora-lime);
+  color: var(--kora-navy);
+}
+
+.search {
+  flex: 1;
+  min-width: 200px;
+}
+
+.date {
+  min-width: 160px;
+}
+
 .empty {
   padding: 20px 0;
   font-size: 13px;

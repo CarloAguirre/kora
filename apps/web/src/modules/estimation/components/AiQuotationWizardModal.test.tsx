@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import type { ProjectDetail } from '@kora/contracts';
 import { estimationQuestionSchema } from '@kora/contracts';
@@ -8,12 +8,15 @@ import { AiQuotationWizardModal } from './AiQuotationWizardModal';
 
 const mocks = vi.hoisted(() => ({
   analyze: vi.fn(), generate: vi.fn(), onClose: vi.fn(), toastError: vi.fn(),
+  serviceAccountEnabled: true,
+  browse: vi.fn(), driveAccess: vi.fn(), oauthStart: vi.fn(),
 }));
 const project = {
   id: '0777e456-fd76-445e-83f1-afc25061c101',
   slug: 'proyecto-prueba',
   name: 'Motor de notificaciones',
   client: { companyName: 'Cliente QA' },
+  documentationLink: 'https://drive.google.com/drive/folders/carpeta-qa-real',
 } as unknown as ProjectDetail;
 const fixedQuestions = [
   estimationQuestionSchema.parse({
@@ -47,21 +50,52 @@ const dynamicQuestions = [estimationQuestionSchema.parse({
   impact: 'high', answerType: 'single_choice', required: true,
   options: [{ value: 'yes', label: 'Sí' }, { value: 'no', label: 'No' }],
   sourceRefs: [{
-    sourceId: 'kora-poc-requerimiento-kdm', fileName: 'Requerimiento_KDM.pdf',
+    sourceId: 'drive-requerimiento-qa', fileName: 'Requerimiento_KDM.pdf',
   }],
   assumptionIfSkipped: 'API no disponible; estimar adaptador temporal.',
 })];
+const previewResult = {
+  folder: { id: 'carpeta-qa-real', name: 'Levantamiento QA',
+    url: 'https://drive.google.com/drive/folders/carpeta-qa-real', modifiedAt: null },
+  parentFolder: null,
+  siblingFolders: [{
+    id: 'carpeta-hermana-real', name: 'Otra carpeta de requisitos',
+    url: 'https://drive.google.com/drive/folders/carpeta-hermana-real', modifiedAt: null,
+  }],
+  childFolders: [{
+    id: 'carpeta-hija-real', name: 'Historias de usuario',
+    url: 'https://drive.google.com/drive/folders/carpeta-hija-real', modifiedAt: null,
+  }],
+  documents: [{
+    id: 'drive-requerimiento-qa', name: 'Requerimiento_KDM.pdf',
+    path: 'Requerimiento_KDM.pdf', mimeType: 'application/pdf', modifiedAt: null,
+  }],
+  coverage: { scannedItems: 1, eligibleDocuments: 1, analyzedDocuments: 1,
+    scanTruncated: false, omitted: [] },
+  siblingsUnavailable: false,
+};
 const analysisResult = {
-  projectId: project.id, provider: 'gemini', sourceMode: 'poc_simulated',
+  projectId: project.id, provider: 'gemini', sourceMode: 'drive',
   documentsAnalyzed: 1, detectedDocuments: ['Requerimiento_KDM.pdf'],
   summary: 'El motor centraliza notificaciones y requiere confirmar su API.',
   fixedPrefills: [{
     questionId: 'F01', value: 'mvp',
-    sourceRefs: [{ sourceId: 'kora-poc-requerimiento-kdm',
+    sourceRefs: [{ sourceId: 'drive-requerimiento-qa',
       fileName: 'Requerimiento_KDM.pdf' }],
   }],
   dynamicQuestions,
 };
+
+vi.mock('../api/estimation.api', () => ({
+  estimationApi: {
+    browseDriveFolder: (input: unknown) => mocks.browse(input),
+    driveOAuthPocAccess: (input: unknown) => mocks.driveAccess(input),
+    startDriveOAuthPoc: (input: unknown) => mocks.oauthStart(input),
+  },
+}));
+vi.mock('@/modules/projects/api/projects.queries', () => ({
+  useUpdateProjectExtras: () => ({ mutateAsync: vi.fn().mockResolvedValue(undefined) }),
+}));
 
 vi.mock('@/shared/components/ui/Toast', () => ({
   useToast: () => ({ error: mocks.toastError }),
@@ -74,6 +108,7 @@ vi.mock('@/shared/components/ui/Modal', () => ({
 vi.mock('../api/estimation.queries', async () => {
   const React = await import('react');
   return {
+    useEstimationDriveOAuthPocStatus: () => ({ data: { enabled: true, serviceAccountEnabled: mocks.serviceAccountEnabled }, isLoading: false }),
     useEstimationQuestionnaireDefinition: () => ({
       data: { fixedQuestions, maxDynamicFirstRound: 5,
         maxDynamicFollowUp: 2, targetMinutesMin: 3, targetMinutesMax: 5 },
@@ -101,10 +136,10 @@ const Location = () => {
   const location = useLocation();
   return <output data-testid="location">{location.pathname + location.search}</output>;
 };
-const renderWizard = () => render(
+const renderWizard = (selectedProject: ProjectDetail = project) => render(
   <MemoryRouter initialEntries={['/proyectos/proyecto-prueba']}>
     <Location />
-    <AiQuotationWizardModal project={project} onClose={mocks.onClose} />
+    <AiQuotationWizardModal project={selectedProject} onClose={mocks.onClose} />
   </MemoryRouter>,
 );
 
@@ -115,11 +150,34 @@ beforeEach(() => {
   });
   mocks.onClose.mockClear();
   mocks.toastError.mockReset();
+  mocks.serviceAccountEnabled = true;
+  mocks.browse.mockReset().mockImplementation(async (input: { folderUrl: string }) => ({
+    ...previewResult,
+    folder: { ...previewResult.folder, url: input.folderUrl,
+      name: input.folderUrl.includes('carpeta-hermana-real') ?
+        'Otra carpeta de requisitos' : 'Levantamiento QA' },
+    documents: input.folderUrl.includes('carpeta-hermana-real')
+      ? [{ ...previewResult.documents[0], id: 'doc-hermano', name: 'Alcance nuevo.pdf' }]
+      : previewResult.documents,
+  }));
+  mocks.driveAccess.mockReset().mockResolvedValue({ authorized: true });
+  mocks.oauthStart.mockReset().mockResolvedValue({
+    authorizationUrl: 'https://accounts.google.com/o/oauth2/v2/auth?client_id=test',
+  });
 });
 
-async function analyzeAndConfirm() {
+async function prepareDocuments() {
+  fireEvent.click(screen.getByRole('button', { name: 'Analizar proyecto' }));
+  expect(await screen.findByRole('list', { name: 'Documentos que analizará el agente' }))
+    .toBeInTheDocument();
+}
+async function analyzeToUnderstanding() {
+  await prepareDocuments();
   fireEvent.click(screen.getByRole('button', { name: 'Analizar proyecto' }));
   expect(await screen.findByText('Entendimiento del proyecto')).toBeInTheDocument();
+}
+async function analyzeAndConfirm() {
+  await analyzeToUnderstanding();
   fireEvent.click(screen.getByRole('button', { name: 'Está correcto' }));
   expect(screen.getByText('Condiciones de la estimación')).toBeInTheDocument();
 }
@@ -133,33 +191,147 @@ function answerFixed() {
 }
 
 describe('Asistente v5 de cotización · sistema visual Kora', () => {
-  it('solo analiza al pulsar el botón y presenta cinco etapas con origen KDM claro', async () => {
+  it('al cambiar de carpeta hermana lista los documentos nuevos y no mantiene los anteriores', async () => {
+    renderWizard();
+    await prepareDocuments();
+    fireEvent.click(screen.getByRole('button', { name: 'Cambiar' }));
+    const picker = screen.getByRole('dialog', { name: 'Elegir carpeta del proyecto' });
+    expect(picker).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('radio', { name: /Otra carpeta de requisitos/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar carpeta' }));
+    await waitFor(() => expect(mocks.browse).toHaveBeenCalledWith(expect.objectContaining({
+      authorizationFolderUrl: 'https://drive.google.com/drive/folders/carpeta-qa-real',
+      folderUrl: 'https://drive.google.com/drive/folders/carpeta-hermana-real',
+    })));
+    expect(await screen.findByText('Alcance nuevo.pdf')).toBeInTheDocument();
+    expect(screen.queryByText('Requerimiento_KDM.pdf')).not.toBeInTheDocument();
+    expect(mocks.analyze).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Analizar proyecto' }));
+    await waitFor(() => expect(mocks.analyze).toHaveBeenCalledWith(expect.objectContaining({
+      driveFolderUrl: 'https://drive.google.com/drive/folders/carpeta-hermana-real',
+    })));
+  });
+
+  it('muestra progreso real de lectura y solicitud a Gemini, sin duplicar peticiones', async () => {
+    let releaseBrowse!: (result: typeof previewResult) => void;
+    const pendingBrowse = new Promise<typeof previewResult>((resolve) => {
+      releaseBrowse = resolve;
+    });
+    mocks.browse.mockReturnValueOnce(pendingBrowse);
+    renderWizard();
+    fireEvent.click(screen.getByRole('button', { name: 'Analizar proyecto' }));
+    expect(screen.getByRole('status', { name: 'Preparación de la documentación' }))
+      .toHaveTextContent('Leyendo documentos');
+    releaseBrowse(previewResult);
+    expect(await screen.findByText('Levantamiento QA')).toBeInTheDocument();
+
+    let releaseAnalysis!: (result: typeof analysisResult) => void;
+    mocks.analyze.mockReturnValueOnce(new Promise<typeof analysisResult>((resolve) => {
+      releaseAnalysis = resolve;
+    }));
+    fireEvent.click(screen.getByRole('button', { name: 'Analizar proyecto' }));
+    expect(screen.getByRole('status', { name: 'Progreso del análisis IA' }))
+      .toHaveTextContent('Gemini está revisando antecedentes');
+    expect(mocks.analyze).toHaveBeenCalledTimes(1);
+    releaseAnalysis(analysisResult);
+    expect(await screen.findByText('Entendimiento del proyecto')).toBeInTheDocument();
+    expect(mocks.analyze).toHaveBeenCalledTimes(1);
+  });
+
+  it('bloquea análisis si la carpeta no contiene documentos legibles', async () => {
+    mocks.browse.mockResolvedValueOnce({ ...previewResult, documents: [] });
+    renderWizard();
+    await prepareDocuments();
+    expect(screen.getByText(/No hay documentos legibles/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Analizar proyecto' })).toBeDisabled();
+    expect(mocks.analyze).not.toHaveBeenCalled();
+  });
+
+
+  it('desde Analizar proyecto abre OAuth automáticamente sin botones de prueba ni confirmación', async () => {
+    mocks.serviceAccountEnabled = false;
+    mocks.driveAccess.mockResolvedValueOnce({ authorized: false })
+      .mockResolvedValue({ authorized: true });
+    const popup = { close: vi.fn(), location: { replace: vi.fn() } };
+    const open = vi.spyOn(window, 'open').mockReturnValue(popup as unknown as Window);
+    try {
+      renderWizard();
+      expect(screen.queryByText('Indicaciones adicionales · opcional')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /Probar acceso|Comprobar autorización/ }))
+        .not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Analizar proyecto' }));
+      await waitFor(() => expect(mocks.oauthStart).toHaveBeenCalledWith({
+        projectId: project.id,
+        driveFolderUrl: 'https://drive.google.com/drive/folders/carpeta-qa-real',
+      }));
+      expect(open).toHaveBeenCalledOnce();
+      expect(popup.location.replace).toHaveBeenCalledWith(expect.stringContaining('accounts.google.com'));
+      expect(mocks.analyze).not.toHaveBeenCalled();
+      // COOP puede bloquear window.opener; el backend valida la autorización.
+      const data = {
+        type: 'kora-drive-oauth-poc', status: 'ok', code: 'DRIVE_READ_SUCCESS', message: 'OK',
+      };
+      const event = new MessageEvent('message', { origin: window.location.origin, data });
+      Object.defineProperty(event, 'source', { value: popup });
+      await act(async () => { window.dispatchEvent(event); });
+      await waitFor(() => expect(mocks.browse).toHaveBeenCalledTimes(1));
+      expect(await screen.findByText('Levantamiento QA')).toBeInTheDocument();
+    } finally {
+      open.mockRestore();
+    }
+  });
+
+  it('pide el enlace de Drive únicamente cuando Extras no tiene documentación', async () => {
+    renderWizard({ ...project, documentationLink: null } as ProjectDetail);
+    const input = screen.getByLabelText('Carpeta de Google Drive del proyecto');
+    expect(input).toHaveValue('');
+    expect(screen.getByRole('button', { name: 'Analizar proyecto' })).toBeDisabled();
+    fireEvent.change(input, { target: { value: 'https://drive.google.com/drive/folders/carpeta-nueva-real' } });
+    expect(screen.getByRole('button', { name: 'Analizar proyecto' })).not.toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Analizar proyecto' }));
+    await waitFor(() => expect(mocks.browse).toHaveBeenCalledWith(expect.objectContaining({
+      folderUrl: 'https://drive.google.com/drive/folders/carpeta-nueva-real',
+    })));
+    expect(mocks.analyze).not.toHaveBeenCalled();
+    expect(screen.getByText('Indicaciones adicionales · opcional')).toBeInTheDocument();
+  });
+
+  it('si Extras apunta a otro tipo de enlace no suplanta documentos con KDM', () => {
+    renderWizard({ ...project, documentationLink: 'https://example.com/docs' } as ProjectDetail);
+    expect(screen.queryByLabelText('Carpeta de Google Drive del proyecto')).not.toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('Corrígelo en la pestaña Extras.');
+    expect(screen.getByRole('button', { name: 'Analizar proyecto' })).toBeDisabled();
+  });
+
+  it('toma la carpeta Drive de Extras sin solicitar ingresar otra URL', async () => {
     renderWizard();
     expect(screen.getByRole('navigation', {
       name: 'Etapas del asistente de cotización',
     })).toBeInTheDocument();
-    expect(screen.getByText('Requerimiento_KDM.pdf')).toBeInTheDocument();
-    // Atributos visuales/semánticos tomados del HTML v5: título con ✦,
-    // stepper en píldoras y listado compacto de documentos.
+    expect(screen.getByText('Carpeta de documentación registrada en Extras')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Carpeta de Google Drive del proyecto')).not.toBeInTheDocument();
     expect(screen.getByRole('dialog', { name: '✦ Nueva cotización con el agente IA' }))
       .toBeInTheDocument();
     expect(screen.getByText('1. Análisis')).toHaveAttribute('aria-current', 'step');
     expect(screen.getByText('2. Entendimiento')).toBeInTheDocument();
-    expect(screen.getByText('Fuente de prueba')).toBeInTheDocument();
-    expect(screen.getByRole('list', { name: 'Documentos que analizará el agente' }))
-      .toBeInTheDocument();
+    expect(screen.getByText('Abrir carpeta en Google Drive')).toBeInTheDocument();
+    expect(screen.queryByText('Indicaciones adicionales · opcional')).not.toBeInTheDocument();
+    await prepareDocuments();
+    expect(screen.getByText('Levantamiento QA')).toBeInTheDocument();
     const instructions = screen.getByText('Indicaciones adicionales · opcional').closest('details');
     expect(instructions).not.toHaveAttribute('open');
     fireEvent.click(screen.getByText('Indicaciones adicionales · opcional'));
     expect(instructions).toHaveAttribute('open');
-    expect(screen.getByText(/No existe una conexión real con Google Drive/)).toBeInTheDocument();
     expect(mocks.analyze).not.toHaveBeenCalled();
     expect(mocks.generate).not.toHaveBeenCalled();
+    // Ya estamos en la previsualización: el segundo clic envía la solicitud
+    // a Gemini. No se debe volver a ejecutar prepareDocuments().
     fireEvent.click(screen.getByRole('button', { name: 'Analizar proyecto' }));
     expect(await screen.findByText('Entendimiento del proyecto')).toBeInTheDocument();
+    expect(mocks.analyze).toHaveBeenCalledTimes(1);
     expect(mocks.analyze).toHaveBeenCalledWith(expect.objectContaining({
       projectId: project.id,
-      driveFolderUrl: 'https://drive.google.com/drive/folders/kora-poc-fallback',
+      driveFolderUrl: 'https://drive.google.com/drive/folders/carpeta-qa-real',
     }));
     expect(mocks.generate).not.toHaveBeenCalled();
   });
@@ -168,7 +340,7 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
     renderWizard();
     await analyzeAndConfirm();
     expect(screen.getByLabelText('MVP')).toBeChecked();
-    expect(screen.getByText(/Prellenada desde el documento de demostración/)).toBeInTheDocument();
+    expect(screen.getByText(/Prellenada desde el documento:/)).toBeInTheDocument();
     // No avanza hasta completar F01-F04, pero F05 es opcional.
     fireEvent.click(screen.getByRole('button', { name: 'Continuar' }));
     expect(screen.getByText('Condiciones de la estimación')).toBeInTheDocument();
@@ -187,8 +359,7 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
 
   it('admite un supuesto explícito y envía confirmación completa antes de crear la versión', async () => {
     renderWizard();
-    fireEvent.click(screen.getByRole('button', { name: 'Analizar proyecto' }));
-    expect(await screen.findByText('Entendimiento del proyecto')).toBeInTheDocument();
+    await analyzeToUnderstanding();
     fireEvent.click(screen.getByRole('button', { name: 'Editar' }));
     const summary = screen.getByLabelText('Resumen editable');
     fireEvent.change(summary, { target: {
@@ -227,8 +398,7 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
   it('no permite confirmar un resumen vacío y conserva el modal si falla la generación', async () => {
     mocks.generate.mockRejectedValueOnce(new Error('Gemini no está disponible'));
     renderWizard();
-    fireEvent.click(screen.getByRole('button', { name: 'Analizar proyecto' }));
-    expect(await screen.findByText('Entendimiento del proyecto')).toBeInTheDocument();
+    await analyzeToUnderstanding();
     fireEvent.click(screen.getByRole('button', { name: 'Editar' }));
     fireEvent.change(screen.getByLabelText('Resumen editable'), {
       target: { value: '' },
@@ -254,9 +424,10 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
       ...analysisResult, provider: 'poc-ai',
     });
     renderWizard();
+    await prepareDocuments();
     fireEvent.click(screen.getByRole('button', { name: 'Analizar proyecto' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'No se obtuvo un análisis real de Gemini',
+      'Gemini no consiguió analizar documentos reales de la carpeta indicada.',
     );
     expect(screen.queryByText('Entendimiento del proyecto')).not.toBeInTheDocument();
     expect(mocks.generate).not.toHaveBeenCalled();

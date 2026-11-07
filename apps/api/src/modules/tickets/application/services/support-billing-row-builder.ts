@@ -10,7 +10,7 @@ import { SupportMonthlyPeriodReconciler } from './support-monthly-period-reconci
 import { SupportPlanCurrentBillingResolver, type CurrentBillingStatus } from './support-plan-current-billing.resolver';
 import { resolveSupportPlanName } from './support-plan-naming';
 import { resolveSupportPlanHourProjectIds } from './support-plan-linked-projects';
-import { paymentStatusOf } from './support-invoice-payment-status';
+import { aggregatePaymentStatusOf, paymentStatusOf, sumInvoiceAmounts, toInvoiceRefs } from './support-invoice-payment-status';
 
 /**
  * Cuántos contratos se calculan a la vez. Cada uno abre varias consultas (y
@@ -24,6 +24,8 @@ interface BillingCell {
   readonly amountUf: number;
   readonly billingStatus: 'to_invoice' | 'invoiced';
   readonly paymentStatus: SupportBillingRow['paymentStatus'];
+  /** Las facturas del período de la fila — vacío si no se facturó. */
+  readonly invoices: readonly SupportInvoiceRecord[];
 }
 
 /**
@@ -98,14 +100,15 @@ export class SupportBillingRowBuilder {
       this.usedHoursForAlerts(record, linkedIds),
     ]);
     // Mismo criterio que la ficha del contrato (`SupportPlanBillingAction`): una alerta solo pide revisión mientras el período en curso siga por facturar — una vez registrada la factura, queda resuelta y no debe seguir contando acá.
-    const hasAlert = current.billingStatus === 'to_invoice' && computeSupportPlanAlerts(record, periods, usedHours, now).length > 0;
+    const alerts = current.billingStatus === 'to_invoice' ? computeSupportPlanAlerts(record, periods, usedHours, now).map((alert) => alert.type) : [];
+    const hasAlert = alerts.length > 0;
     const isOverdue = planInvoices.some((invoice) => paymentStatusOf(invoice, now) === 'overdue');
 
     // Migrados por el ETL antes de que `name` existiera como columna — sin este fallback, el panel mostraría el nombre en blanco para los 30 contratos legados.
     const linkedProjects = record.name ? [] : await this.projects.findManyByIds(linkedIds);
     const planName = resolveSupportPlanName(record.name, record.scope, linkedProjects.map((p) => p.name), clientName);
 
-    const { amountUf, billingStatus, paymentStatus } = isLivePeriod
+    const { amountUf, billingStatus, paymentStatus, invoices } = isLivePeriod
       ? currentPeriodCell(current, planInvoices, now)
       : pastPeriodCell(planInvoices, period, now);
 
@@ -120,7 +123,10 @@ export class SupportBillingRowBuilder {
       currency: record.currency,
       billingStatus,
       paymentStatus,
+      invoices: toInvoiceRefs(invoices, now),
+      canInvoice: isLivePeriod && billingStatus === 'to_invoice' && amountUf > 0,
       hasAlert,
+      alerts,
       isOverdue,
     };
   }
@@ -141,16 +147,16 @@ export class SupportBillingRowBuilder {
 
 function currentPeriodCell(current: CurrentBillingStatus, planInvoices: readonly SupportInvoiceRecord[], now: Date): BillingCell {
   if (current.billingStatus === 'invoiced') {
-    const invoice = planInvoices.find((item) => item.periodKey === periodKeyOf(now));
-    return { amountUf: current.amountUf, billingStatus: 'invoiced', paymentStatus: invoice ? paymentStatusOf(invoice, now) : null };
+    const invoices = planInvoices.filter((item) => item.periodKey === periodKeyOf(now));
+    return { amountUf: current.amountUf, billingStatus: 'invoiced', paymentStatus: aggregatePaymentStatusOf(invoices, now), invoices };
   }
-  return { amountUf: current.amountUf, billingStatus: 'to_invoice', paymentStatus: null };
+  return { amountUf: current.amountUf, billingStatus: 'to_invoice', paymentStatus: null, invoices: [] };
 }
 
 function pastPeriodCell(planInvoices: readonly SupportInvoiceRecord[], period: string, now: Date): BillingCell {
-  const invoice = planInvoices.find((item) => item.periodKey === period);
-  if (!invoice) return { amountUf: 0, billingStatus: 'to_invoice', paymentStatus: null };
-  return { amountUf: invoice.amountUf, billingStatus: 'invoiced', paymentStatus: paymentStatusOf(invoice, now) };
+  const invoices = planInvoices.filter((item) => item.periodKey === period);
+  if (invoices.length === 0) return { amountUf: 0, billingStatus: 'to_invoice', paymentStatus: null, invoices: [] };
+  return { amountUf: sumInvoiceAmounts(invoices), billingStatus: 'invoiced', paymentStatus: aggregatePaymentStatusOf(invoices, now), invoices };
 }
 
 function groupBy<T>(items: readonly T[], keyOf: (item: T) => string): Map<string, T[]> {

@@ -8,13 +8,18 @@ import type {
   CreateProjectModuleInput,
   CreateProjectModuleSegmentInput,
   CreateProjectModuleTaskInput,
+  ExcludeRoadmapReferenceInput,
+  RoadmapReferenceExclusion,
   CreateProjectPaymentMilestoneInput,
   IssueProjectPaymentMilestoneInvoiceInput,
   ListProjectsQuery,
   ListProjectsResponse,
+  CollaboratorProjectsResponse,
+  CollaboratorProjectDetail,
   MarkProjectPaymentMilestonePaidInput,
   ProjectBillingSettings,
   ProjectDetail,
+  ProjectPhaseOption,
   ResolveProjectObservationInput,
   SetProjectOvertimeAuthorizationInput,
   UpdateProjectBillingSettingsInput,
@@ -31,6 +36,12 @@ import type {
 import { api } from '@/shared/lib/api-client';
 
 export const projectsApi = {
+  mine(query: { page: number; pageSize: number; search?: string }): Promise<CollaboratorProjectsResponse> {
+    return api.get<CollaboratorProjectsResponse>('/projects/my', query);
+  },
+  myDetail(projectId: string): Promise<CollaboratorProjectDetail> {
+    return api.get<CollaboratorProjectDetail>(`/projects/my/${encodeURIComponent(projectId)}`);
+  },
   list(query: Partial<ListProjectsQuery>): Promise<ListProjectsResponse> {
     return api.get<ListProjectsResponse>('/projects', {
       page: query.page,
@@ -41,6 +52,7 @@ export const projectsApi = {
       phase: query.phase,
       salesStage: query.salesStage,
       quotationStatus: query.quotationStatus,
+      kind: query.kind,
       clientId: query.clientId,
       clientIds: query.clientIds,
       period: query.period?.map((period) => `${period.from}..${period.to}`),
@@ -53,6 +65,9 @@ export const projectsApi = {
   },
   detail(projectId: string): Promise<ProjectDetail> {
     return api.get<ProjectDetail>(`/projects/${projectId}`);
+  },
+  phases(projectId: string): Promise<ProjectPhaseOption[]> {
+    return api.get<ProjectPhaseOption[]>(`/projects/${projectId}/phases`);
   },
   create(input: CreateProjectInput): Promise<{ id: string }> {
     return api.post<{ id: string }>('/projects', input);
@@ -138,6 +153,15 @@ export const projectsApi = {
   deleteModuleSegment(projectId: string, moduleId: string, segmentId: string): Promise<void> {
     return api.delete<void>(`/projects/${projectId}/modules/${moduleId}/segments/${segmentId}`);
   },
+  listRoadmapReferenceExclusions(projectId: string): Promise<RoadmapReferenceExclusion[]> {
+    return api.get<RoadmapReferenceExclusion[]>(`/projects/${projectId}/roadmap-reference-exclusions`);
+  },
+  excludeRoadmapReference(projectId: string, moduleId: string, input: ExcludeRoadmapReferenceInput): Promise<void> {
+    return api.post<void>(`/projects/${projectId}/modules/${moduleId}/roadmap-reference-exclusions`, input);
+  },
+  restoreRoadmapReference(projectId: string, moduleId: string, input: ExcludeRoadmapReferenceInput): Promise<void> {
+    return api.post<void>(`/projects/${projectId}/modules/${moduleId}/roadmap-reference-exclusions/restore`, input);
+  },
   createModuleTask(projectId: string, moduleId: string, input: CreateProjectModuleTaskInput): Promise<{ id: string }> {
     return api.post<{ id: string }>(`/projects/${projectId}/modules/${moduleId}/tasks`, input);
   },
@@ -149,8 +173,8 @@ export const projectsApi = {
   ): Promise<void> {
     return api.patch<void>(`/projects/${projectId}/modules/${moduleId}/tasks/${taskId}`, input);
   },
-  deleteModuleTask(projectId: string, moduleId: string, taskId: string): Promise<void> {
-    return api.delete<void>(`/projects/${projectId}/modules/${moduleId}/tasks/${taskId}`);
+  deleteModuleTask(projectId: string, moduleId: string, taskId: string, cancel = false): Promise<void> {
+    return api.delete<void>(`/projects/${projectId}/modules/${moduleId}/tasks/${taskId}${cancel ? '?cancel=true' : ''}`);
   },
   createPaymentMilestone(projectId: string, input: CreateProjectPaymentMilestoneInput): Promise<{ id: string }> {
     return api.post<{ id: string }>(`/projects/${projectId}/payment-milestones`, input);
@@ -199,5 +223,7 @@ export const projectKeys = {
   list: (query: Partial<ListProjectsQuery>) => [...projectKeys.lists(), query] as const,
   details: () => [...projectKeys.all, 'detail'] as const,
   detail: (projectId: string) => [...projectKeys.details(), projectId] as const,
+  /** Bajo `detail(projectId)`: invalidar la ficha también refresca las fases. */
+  phases: (projectId: string) => [...projectKeys.detail(projectId), 'phases'] as const,
   billingSettings: () => [...projectKeys.all, 'billing-settings'] as const,
 };

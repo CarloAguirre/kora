@@ -85,7 +85,7 @@ export class PaymentMilestoneTriggerService {
   }
 
   async promote(project: Project, context?: TransactionContext): Promise<PromotedPaymentMilestone[]> {
-    if (project.type !== 'development') return [];
+    if (project.type !== 'development' || project.isInternal) return [];
     const today = progressToday(this.clock.now());
 
     const promoted: PromotedPaymentMilestone[] = [];
@@ -100,7 +100,7 @@ export class PaymentMilestoneTriggerService {
 
   /** Aviso best-effort: un correo que falla no deshace el cambio de estado (el sender ya deja el error en el log). */
   async notify(project: Project, promoted: readonly PromotedPaymentMilestone[]): Promise<void> {
-    if (promoted.length === 0) return;
+    if (promoted.length === 0 || project.isInternal) return;
 
     const [recipients, client] = await Promise.all([
       this.users.findActiveBillingRecipients(),

@@ -94,4 +94,9 @@ export class DrizzleTicketHhRequestRepository implements TicketHhRequestReposito
       .values({ id: request.id, ...values })
       .onConflictDoUpdate({ target: ticketHhRequests.id, set: values });
   }
+
+  async deleteForTicket(ticketId: string, context?: TransactionContext): Promise<void> {
+    const db = resolveDb(this.database, context);
+    await db.delete(ticketHhRequests).where(eq(ticketHhRequests.ticketId, ticketId));
+  }
 }

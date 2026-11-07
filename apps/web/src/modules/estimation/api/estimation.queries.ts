@@ -6,6 +6,17 @@ import type {
 } from '@kora/contracts';
 import { estimationApi, estimationKeys } from './estimation.api';
 
+/** Oculta la función experimental si la API no la habilitó explícitamente. */
+export function useEstimationDriveOAuthPocStatus(enabled = true) {
+  return useQuery({
+    queryKey: [...estimationKeys.all, 'drive-oauth-poc-status'] as const,
+    queryFn: () => estimationApi.driveOAuthPocStatus(),
+    enabled,
+    retry: false,
+    staleTime: 60_000,
+  });
+}
+
 export function useEstimationQuestionnaireDefinition(enabled = true) {
   return useQuery({
     queryKey: estimationKeys.questionnaireDefinition(),

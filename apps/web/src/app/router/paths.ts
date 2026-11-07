@@ -27,6 +27,10 @@ export function clientSupportContractPreviewPath(client: WithSlug, plan: WithSlu
   return `${clientSupportPortalPreviewPath(client)}/${segment(plan)}`;
 }
 
+export function myProjectPath(project: WithSlug): string {
+  return `/mis-proyectos/${segment(project)}`;
+}
+
 export function projectPath(project: WithSlug): string {
   return `/proyectos/${segment(project)}`;
 }
@@ -45,6 +49,10 @@ export function projectTeamPath(project: WithSlug, team: WithSlug): string {
 
 export function teamPath(team: WithSlug): string {
   return `/equipos/${segment(team)}`;
+}
+
+export function teamLeaderPreviewPath(team: WithSlug): string {
+  return `${teamPath(team)}/vista-lider`;
 }
 
 export function teamMemberPath(team: WithSlug, memberId: string): string {

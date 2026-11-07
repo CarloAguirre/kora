@@ -13,9 +13,12 @@ import { ClientProjectPreviewPage } from '@/modules/clients/pages/ClientProjectP
 import { ClientSupportContractPreviewPage } from '@/modules/clients/pages/ClientSupportContractPreviewPage';
 import { TeamsListPage } from '@/modules/teams/pages/TeamsListPage';
 import { TeamDetailPage } from '@/modules/teams/pages/TeamDetailPage';
+import { TeamLeaderPreviewPage } from '@/modules/teams/pages/TeamLeaderPreviewPage';
 import { TeamMemberDetailPage } from '@/modules/teams/pages/TeamMemberDetailPage';
 import { ProjectsListPage } from '@/modules/projects/pages/ProjectsListPage';
 import { ProjectDetailPage } from '@/modules/projects/pages/ProjectDetailPage';
+import { MyProjectsPage } from '@/modules/projects/pages/MyProjectsPage';
+import { MyProjectDetailPage } from '@/modules/projects/pages/MyProjectDetailPage';
 import { ProjectTeamDetailPage } from '@/modules/projects/pages/ProjectTeamDetailPage';
 import { NewProjectPage } from '@/modules/projects/pages/NewProjectPage';
 import { SupportPlanDetailPage } from '@/modules/projects/pages/SupportPlanDetailPage';
@@ -102,7 +105,17 @@ export const router = createBrowserRouter([
     children: [
       { path: '/equipos', element: <TeamsListPage /> },
       { path: '/equipos/:teamId', element: <TeamDetailPage /> },
+      { path: '/equipos/:teamId/vista-lider', element: <TeamLeaderPreviewPage /> },
       { path: '/equipos/:teamId/miembros/:memberId', element: <TeamMemberDetailPage /> },
+    ],
+  },
+
+  // ── Mis proyectos del colaborador — consulta propia, sin edición ───────
+  {
+    element: <ProtectedRoute permission="hours:read_own" />,
+    children: [
+      { path: '/mis-proyectos', element: <MyProjectsPage /> },
+      { path: '/mis-proyectos/:projectId', element: <MyProjectDetailPage /> },
     ],
   },
 

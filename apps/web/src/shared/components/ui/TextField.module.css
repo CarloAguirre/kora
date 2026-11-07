@@ -209,6 +209,25 @@
   font-weight: var(--kora-weight-semibold);
 }
 
+/* En las vistas de días y meses el título es un botón que sube a la vista
+   siguiente (días → meses → años), para saltar lejos sin las flechas. */
+.datePanelTitleButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kora-space-1);
+  padding: 2px var(--kora-space-2);
+  border: none;
+  border-radius: var(--kora-radius-sm);
+  background: transparent;
+  font-family: var(--kora-font);
+  cursor: pointer;
+  transition: background-color var(--kora-transition);
+}
+
+.datePanelTitleButton:hover {
+  background: var(--kora-lime-surface);
+}
+
 .datePanelNav {
   display: flex;
   align-items: center;
@@ -234,6 +253,18 @@
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: 2px;
+}
+
+/* Vistas de meses y de años: 12 celdas en 3×4, del mismo alto total
+   aproximado que la grilla de días para que el panel no salte. */
+.datePanelGridWide {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--kora-space-1);
+}
+
+.dateCellWide {
+  height: 48px;
 }
 
 .datePanelWeekdays span {

@@ -28,6 +28,15 @@ export interface ProjectTeamRecord {
   readonly memberCount: number;
   /** Tope de colaboradores definido en el formulario (`project_teams.member_count`); nulo = sin tope. */
   readonly maxMembers: number | null;
+  /**
+   * HH aprobadas del líder del equipo (override del proyecto o, si no hay, el
+   * líder orgánico) cuando ese líder NO está asignado como miembro de ningún
+   * equipo del proyecto — sin esto sus horas caían en "Sin equipo" aunque
+   * figure como líder. Si lidera más de un equipo del proyecto, se le cuentan
+   * solo al primero asignado; 0 en el resto y cuando ya es miembro (sus horas
+   * ya suman por `project_team_members`).
+   */
+  readonly leaderConsumedHours: number;
 }
 
 export interface ProjectTeamRepository {

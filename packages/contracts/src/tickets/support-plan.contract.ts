@@ -92,13 +92,22 @@ export const supportProjectSummarySchema = z.object({
   currentPeriod: z
     .object({
       usedHours: z.number(),
+      /** `planHours + priorSurplusHours`. */
       capacityHours: z.number(),
       remainingHours: z.number(),
+      /** HH que el plan entrega este mes (`support_monthly_periods.contracted_hours`). */
+      planHours: z.number(),
+      /** Saldo acumulado de meses anteriores (solo política acumulable; 0 si vence). */
+      priorSurplusHours: z.number(),
     })
     .nullable(),
   history: z.array(supportPlanHistoryPointSchema),
 });
 export type SupportProjectSummary = z.infer<typeof supportProjectSummarySchema>;
+
+/** Resumen de la ficha de proyecto con el identificador del contrato activo que se puede cerrar. */
+export const supportProjectDetailSummarySchema = supportProjectSummarySchema.extend({ planId: uuidSchema });
+export type SupportProjectDetailSummary = z.infer<typeof supportProjectDetailSummarySchema>;
 
 /**
  * Las 3 alertas de negocio del contrato — no existían en ningún lado antes de
@@ -112,7 +121,8 @@ export type SupportPlanAlertType = z.infer<typeof supportPlanAlertTypeSchema>;
 export const SUPPORT_PLAN_ALERT_LABELS: Readonly<Record<SupportPlanAlertType, string>> = {
   deviated_hours: 'Horas desviadas sin facturar',
   quota_expiring: 'Cupo acumulado por vencer',
-  last_period_overage: 'Último mes con excedente de horas',
+  /** El id quedó de cuando el excedente solo se cobraba en el último mes — hoy aplica a cualquier mes sin política acumulable. */
+  last_period_overage: 'Mes con excedente de horas',
 };
 
 export const supportPlanAlertSchema = z.object({
@@ -216,11 +226,21 @@ export const createSupportPlanSchema = z.object({
 });
 export type CreateSupportPlanInput = z.infer<typeof createSupportPlanSchema>;
 
-/** A diferencia de crear, editar acepta `developmentProjectIds: []`: el contrato deja de cubrir proyectos terminados y queda solo con su contenedor de soporte. */
+/**
+ * A diferencia de crear, editar acepta `developmentProjectIds: []`: el contrato deja de cubrir proyectos terminados y queda solo con su contenedor de soporte.
+ * Los campos con `.default()` se redefinen sin él: en Zod 4 `.partial()` igual aplica el default a lo omitido, y cualquier
+ * edición (nombre, SLA, proyectos cubiertos) dejaba las HH y los valores del plan en 0.
+ */
 export const updateSupportPlanSchema = createSupportPlanSchema
   .partial()
   .omit({ clientId: true })
-  .extend({ developmentProjectIds: z.array(uuidSchema).optional() });
+  .extend({
+    developmentProjectIds: z.array(uuidSchema).optional(),
+    contractedHours: z.coerce.number().min(0).optional(),
+    planValueUf: z.coerce.number().min(0).optional(),
+    extraHourValueUf: z.coerce.number().min(0).optional(),
+    currency: supportPlanCurrencySchema.optional(),
+  });
 export type UpdateSupportPlanInput = z.infer<typeof updateSupportPlanSchema>;
 
 export const closeSupportPlanSchema = z.object({

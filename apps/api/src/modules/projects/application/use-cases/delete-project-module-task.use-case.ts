@@ -29,11 +29,13 @@ import {
 import type { ActorContext, UseCase } from '../../../../shared/application/use-case';
 import { ProjectChangeLogRecorder } from '../services/project-change-log.recorder';
 import { ProjectProgressRecalculator } from '../services/project-progress-recalculator';
+import { ForecastSourceSyncService } from '../services/forecast-source-sync.service';
 
 export interface DeleteProjectModuleTaskCommand {
   readonly projectId: string;
   readonly moduleId: string;
   readonly taskId: string;
+  readonly forceCancel?: boolean;
   readonly actor: ActorContext;
   readonly actorPermissions: readonly Permission[];
 }
@@ -49,6 +51,7 @@ export class DeleteProjectModuleTaskUseCase
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
     private readonly changeLog: ProjectChangeLogRecorder,
     private readonly progress: ProjectProgressRecalculator,
+    private readonly forecastSync: ForecastSourceSyncService,
     @Inject(CLOCK) private readonly clock: Clock,
     @Inject(UNIT_OF_WORK) private readonly unitOfWork: UnitOfWork,
   ) {}
@@ -74,17 +77,40 @@ export class DeleteProjectModuleTaskUseCase
       }
     }
 
-    // Borrado físico: sin este registro no quedaría rastro de que la tarea existió — por eso van en
-    // la misma transacción.
+    // No hay FK hour_entry -> task: la comprobación por módulo/colaborador es
+    // deliberadamente conservadora. Si existe actividad o estado aprobado,
+    // la tarea se CANCELA lógicamente, sin borrar horas ni trazabilidad.
+    if (task.cancelledAt) return ok(undefined);
+    const preserve = command.forceCancel === true || task.status === 'done' || task.status === 'in_review' ||
+      (task.assigneeUserId !== null &&
+        await this.modules.hasTaskUserHours(project.id, command.moduleId, task.assigneeUserId));
+
+    // Todo el cambio sucede en la misma transacción que la bitácora y el recálculo.
     await this.unitOfWork.run(async (tx) => {
-      await this.modules.removeTask(command.taskId, tx);
+      if (preserve) await this.modules.cancelTask(command.taskId, this.clock.now(), tx);
+      else await this.modules.removeTask(command.taskId, tx);
+      // Una tarea convertida de la EDT no debe reaparecer como "Por asignar"
+      // después de borrarla. Se oculta solo la referencia OPERATIVA, sin alterar
+      // la cotización; ambas escrituras comparten la misma transacción.
+      const quoteMarker = task.description?.match(
+        /^Referencia cotización ([0-9a-fA-F-]{36}) · WBS (.+?) · (.+)$/m,
+      );
+      if (!preserve && quoteMarker && quoteMarker[2]!.length <= 160 && quoteMarker[3]!.length <= 160) {
+        await this.modules.excludeQuotationReference({
+          projectId: project.id, moduleId: command.moduleId,
+          versionId: quoteMarker[1]!, wbs: quoteMarker[2]!, role: quoteMarker[3]!,
+          actorUserId: command.actor.userId,
+        }, tx);
+      }
+      if (task.segmentId) await this.modules.refreshSegmentClosure(task.segmentId, this.clock.now(), tx);
       await this.progress.recalculate(project.id, tx);
+      if (preserve) await this.forecastSync.syncTask(project, command.moduleId, command.taskId, this.clock.now(), tx);
       await this.changeLog.record(
         [
           {
             projectId: project.id,
             moduleId: command.moduleId,
-            message: `Tarea "${task.name}" eliminada de la fase "${module.name}".`,
+            message: `Tarea "${task.name}" ${preserve ? 'cancelada (se conserva historial)' : 'eliminada'} de la fase "${module.name}".`,
           },
         ],
         command.actor.userId,
@@ -98,7 +124,8 @@ export class DeleteProjectModuleTaskUseCase
       action: 'update',
       entityType: 'project',
       entityId: project.id,
-      metadata: { event: 'module_task_deleted', moduleId: command.moduleId, taskId: command.taskId },
+      metadata: { event: preserve ? 'module_task_cancelled' : 'module_task_deleted',
+        moduleId: command.moduleId, taskId: command.taskId },
     });
 
     return ok(undefined);

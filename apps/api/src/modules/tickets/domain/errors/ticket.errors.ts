@@ -86,6 +86,19 @@ export class CannotDeleteTicketError extends ForbiddenError {
   }
 }
 
+export class CannotDeleteClosedTicketError extends ForbiddenError {
+  constructor() {
+    super('Solo un administrador o PMO puede eliminar un ticket cerrado.', 'TICKET_CANNOT_DELETE_CLOSED');
+  }
+}
+
+/** Eliminar el ticket borra sus HH; si ya hay aprobadas, solo quien podría haberlas aprobado lo puede hacer. */
+export class CannotDeleteTicketWithApprovedHoursError extends ForbiddenError {
+  constructor() {
+    super('El ticket tiene HH aprobadas: solo el líder del proyecto o un administrador/PMO puede eliminarlo.', 'TICKET_CANNOT_DELETE_APPROVED_HOURS');
+  }
+}
+
 /** Sin `tickets:manage` y sin relación con el ticket (no es su responsable ni tiene autoridad sobre su proyecto). */
 export class CannotManageTicketError extends ForbiddenError {
   constructor() {

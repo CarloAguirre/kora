@@ -11,16 +11,19 @@ import {
 } from '@kora/core';
 import type { Permission, UpdateProjectInput } from '@kora/contracts';
 import {
+  CannotChangeProjectInternalFlagError,
   CannotManageProjectError,
   CannotReassignProjectLeaderError,
   ProjectNameAlreadyInUseError,
   ProjectNotFoundError,
   ProjectTeamMaxMembersBelowAssignedError,
+  ProjectTeamHasRoadmapBlocksError,
   ReferencedClientNotFoundError,
-  SoldHoursLockedAfterHito0Error,
+  SoldHoursChangeReasonRequiredError,
 } from '../../domain/errors/project.errors';
 import { PROJECT_REPOSITORY, type ProjectRepository } from '../../domain/repositories/project.repository';
 import { PROJECT_TEAM_REPOSITORY, type ProjectTeamRepository } from '../../domain/repositories/project-team.repository';
+import { PROJECT_MODULE_REPOSITORY, type ProjectModuleRepository } from '../../domain/repositories/project-module.repository';
 import {
   PROJECT_PAYMENT_MILESTONE_REPOSITORY,
   type ProjectPaymentMilestoneRepository,
@@ -60,6 +63,7 @@ export class UpdateProjectUseCase implements UseCase<UpdateProjectCommand, void,
     @Inject(CLOCK) private readonly clock: Clock,
     @Inject(PROJECT_PAYMENT_MILESTONE_REPOSITORY) private readonly paymentMilestones: ProjectPaymentMilestoneRepository,
     private readonly paymentTriggers: PaymentMilestoneTriggerService,
+    @Inject(PROJECT_MODULE_REPOSITORY) private readonly modules: ProjectModuleRepository,
   ) {}
 
   async execute(command: UpdateProjectCommand): Promise<Result<void, ApplicationError>> {
@@ -82,15 +86,33 @@ export class UpdateProjectUseCase implements UseCase<UpdateProjectCommand, void,
       return err(new CannotReassignProjectLeaderError());
     }
 
-    /** Mismo criterio no-op que `leaderUserId`: reenviar el mismo valor sin tocarlo se deja pasar. */
+    if (!hasFullManage && data.isInternal !== undefined && data.isInternal !== project.isInternal) {
+      return err(new CannotChangeProjectInternalFlagError());
+    }
+
+    // Hito 0 ya no bloquea el ajuste de HH vendidas. Como cambia los indicadores
+    // de consumo/desviación, exigir un motivo solo cuando hay un cambio real.
     if (project.hito0At && data.soldHours !== undefined && data.soldHours !== project.toSnapshot().soldHours) {
-      return err(new SoldHoursLockedAfterHito0Error());
+      if (!data.soldHoursChangeReason?.trim()) return err(new SoldHoursChangeReasonRequiredError());
     }
 
     if (data.teams) {
       const assignedByTeam = new Map(
         (await this.projectTeams.findByProject(project.id)).map((team) => [team.teamId, team]),
       );
+      const retainedIds = new Set(data.teams.map((team) => team.teamId));
+      const removed = [...assignedByTeam.values()].filter((team) => !retainedIds.has(team.teamId));
+      if (removed.length > 0) {
+        // Regla de negocio del Roadmap: un equipo con bloques persistidos no
+        // desaparece del proyecto. El frontend también lo advierte, pero la
+        // API debe impedirlo incluso ante llamadas PATCH directas.
+        const modules = await this.modules.listForProject(project.id);
+        const segments = modules.flatMap((module) => module.segments);
+        for (const team of removed) {
+          const count = segments.filter((segment) => segment.teamId === team.teamId).length;
+          if (count > 0) return err(new ProjectTeamHasRoadmapBlocksError(team.teamName, count));
+        }
+      }
       for (const team of data.teams) {
         const current = assignedByTeam.get(team.teamId);
         if (current && team.memberCount != null && team.memberCount < current.memberCount) {
@@ -174,6 +196,7 @@ export class UpdateProjectUseCase implements UseCase<UpdateProjectCommand, void,
         ...(data.qaFailedTests !== undefined ? { qaFailedTests: data.qaFailedTests } : {}),
         ...(data.contractAmount !== undefined ? { contractAmount: data.contractAmount ?? null } : {}),
         ...(data.contractCurrency !== undefined ? { contractCurrency: data.contractCurrency } : {}),
+        ...(data.isInternal !== undefined ? { isInternal: data.isInternal } : {}),
       },
       now,
     );
@@ -206,7 +229,9 @@ export class UpdateProjectUseCase implements UseCase<UpdateProjectCommand, void,
     if (before.soldHours !== after.soldHours) {
       changeEntries.push({
         projectId: project.id,
-        message: `HH vendidas actualizadas de ${before.soldHours} a ${after.soldHours}.`,
+        message: project.hito0At
+          ? `HH vendidas actualizadas de ${before.soldHours} a ${after.soldHours} después del Hito 0. Motivo: ${data.soldHoursChangeReason!.trim()}`
+          : `HH vendidas actualizadas de ${before.soldHours} a ${after.soldHours}.`,
       });
     }
 
@@ -224,6 +249,15 @@ export class UpdateProjectUseCase implements UseCase<UpdateProjectCommand, void,
       });
     }
 
+    if (before.isInternal !== after.isInternal) {
+      changeEntries.push({
+        projectId: project.id,
+        message: after.isInternal
+          ? 'Proyecto marcado como interno: sin facturación ni avisos de cobro.'
+          : 'Proyecto desmarcado como interno: vuelve a tener plan de pago y facturación.',
+      });
+    }
+
     if (before.estimatedDeliveryDate?.getTime() !== after.estimatedDeliveryDate?.getTime()) {
       changeEntries.push({
         projectId: project.id,
@@ -235,7 +269,8 @@ export class UpdateProjectUseCase implements UseCase<UpdateProjectCommand, void,
     try {
       await this.unitOfWork.run(async (tx) => {
         await this.projects.save(project, tx);
-        if (project.type === 'development') {
+        // Un proyecto interno no se cobra: su plan de pago (si quedó de antes) no se toca ni se promueve.
+        if (project.type === 'development' && !project.isInternal) {
           if (data.paymentMilestones) {
             await syncPaymentPlan(
               this.paymentMilestones,

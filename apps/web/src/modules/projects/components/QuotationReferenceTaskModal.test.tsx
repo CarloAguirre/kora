@@ -46,15 +46,33 @@ describe('Nueva tarea operativa a partir de referencia Gemini', () => {
     expect(screen.getByRole('dialog',{name:'Nueva tarea'})).toBeInTheDocument();
     expect(screen.getByLabelText(/Título de la tarea/)).toHaveValue('Conexión con sistema de taller');
     expect(screen.getByLabelText(/HH estimadas/)).toHaveValue(35);
-    expect(screen.getByLabelText('Bloque de trabajo')).toBeDisabled();
+    expect(screen.getByLabelText(/Bloque de trabajo/)).toBeDisabled();
     expect(mocks.create).not.toHaveBeenCalled();
   });
-  it('crea una tarea solo con colaborador, ámbito y fechas; preserva trazabilidad EDT', async () => {
+  it('no permite convertir una referencia sin bloque aunque ya tenga responsable, ámbito y fechas', () => {
+    show();
+    fireEvent.change(screen.getByLabelText(/Asignado a/), {
+      target: { value: teamId + ':' + userId },
+    });
+    fireEvent.change(screen.getByLabelText(/Ámbito Kora/), {
+      target: { value: 'desarrollo' },
+    });
+    fireEvent.change(screen.getByLabelText(/Fecha de inicio/), {
+      target: { value: '2026-11-10' },
+    });
+    fireEvent.change(screen.getByLabelText(/Fecha límite/), {
+      target: { value: '2026-11-20' },
+    });
+    expect(screen.getByRole('button', { name: 'Crear tarea' })).toBeDisabled();
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
+
+  it('crea una tarea con bloque, colaborador, ámbito y fechas; preserva trazabilidad EDT', async () => {
     show();
     fireEvent.change(screen.getByLabelText(/Asignado a/),{
       target: { value: teamId + ':' + userId },
     });
-    fireEvent.change(screen.getByLabelText('Bloque de trabajo'), {
+    fireEvent.change(screen.getByLabelText(/Bloque de trabajo/), {
       target: { value: blockId },
     });
     fireEvent.change(screen.getByLabelText(/Ámbito Kora/), {
@@ -65,7 +83,7 @@ describe('Nueva tarea operativa a partir de referencia Gemini', () => {
     expect(mocks.create).toHaveBeenCalledWith({
       projectId, moduleId,
       input: expect.objectContaining({
-        teamId, assigneeUserId:userId, name:'Conexión con sistema de taller',
+        teamId, segmentId: blockId, assigneeUserId:userId, name:'Conexión con sistema de taller',
         estimatedHours:35, startDate:'2026-11-10', date:'2026-11-20',
         scope:'desarrollo', status:'todo',
         description:expect.stringContaining('Referencia cotización ' + versionId),
@@ -73,4 +91,25 @@ describe('Nueva tarea operativa a partir de referencia Gemini', () => {
     });
     expect(mocks.onClose).toHaveBeenCalledOnce();
   });
+  it('lápiz abre Editar tarea, precarga bloque y permite guardarla por asignar', async () => {
+    render(<MemoryRouter><QuotationReferenceTaskModal
+      mode="edit" project={project} moduleId={moduleId} versionId={versionId}
+      versionNumber={1} reference={reference} onClose={mocks.onClose}
+    /></MemoryRouter>);
+    expect(screen.getByRole('dialog', { name: 'Editar tarea' })).toBeInTheDocument();
+    expect(screen.getByLabelText(/Bloque de trabajo/)).toHaveValue(blockId);
+    expect(screen.getByLabelText(/Fecha de inicio/)).toHaveValue('2026-11-10');
+    expect(screen.getByLabelText(/Fecha límite/)).toHaveValue('2026-11-20');
+    expect(screen.getByLabelText(/HH estimadas/)).toHaveValue(35);
+    expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    await waitFor(() => expect(mocks.create).toHaveBeenCalledWith({
+      projectId, moduleId, input: expect.objectContaining({
+        name: 'Conexión con sistema de taller', estimatedHours: 35,
+        assigneeUserId: null, segmentId: blockId, status: 'todo',
+        startDate: '2026-11-10', date: '2026-11-20',
+      }),
+    }));
+  });
+
 });

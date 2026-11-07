@@ -43,6 +43,10 @@ export interface DataTableProps<T> {
    * final para poder moverse a los lados.
    */
   readonly topScrollbar?: boolean;
+  /** Vista compacta opt-in en tarjetas de resumen. */
+  readonly density?: 'default' | 'compact';
+  /** Permite resaltar filas semánticas sin duplicar el componente. */
+  readonly getRowClassName?: (item: T) => string | undefined;
 }
 
 export function DataTable<T>({
@@ -56,6 +60,8 @@ export function DataTable<T>({
   onSortChange,
   caption,
   topScrollbar = false,
+  density = 'default',
+  getRowClassName,
 }: DataTableProps<T>) {
   const columnCount = columns.length;
   const containerRef = useRef<HTMLDivElement>(null);
@@ -110,7 +116,7 @@ export function DataTable<T>({
       )}
       <div
         ref={containerRef}
-        className={styles.container}
+        className={[styles.container, density === 'compact' ? styles.compact : ''].filter(Boolean).join(' ')}
         onScroll={
           topScrollbar
             ? () => syncScroll(containerRef.current, topScrollRef.current)
@@ -199,7 +205,7 @@ export function DataTable<T>({
             {!loading &&
               !error &&
               items.map((item) => (
-                <tr key={getRowKey(item)} className={styles.row}>
+                <tr key={getRowKey(item)} className={[styles.row, getRowClassName?.(item)].filter(Boolean).join(" ")}>
                   {columns.map((column) => (
                     <td
                       key={column.key}

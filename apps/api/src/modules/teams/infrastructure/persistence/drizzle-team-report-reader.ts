@@ -67,6 +67,7 @@ export class DrizzleTeamReportReader implements TeamReportReader {
         clientId: clients.id,
         clientName: clients.companyName,
         status: projects.status,
+        salesStage: projects.salesStage,
         startDate: projects.startDate,
         endDate: projects.endDate,
         assignedHours: projectTeams.assignedHours,
@@ -93,6 +94,7 @@ export class DrizzleTeamReportReader implements TeamReportReader {
       slug: row.slug,
       client: row.clientId && row.clientName ? { id: row.clientId, companyName: row.clientName } : null,
       status: row.status,
+      salesStage: row.salesStage,
       startDate: toIsoDate(row.startDate),
       endDate: toIsoDate(row.endDate),
       assignedHours: row.assignedHours === null ? null : Number(row.assignedHours),
@@ -103,6 +105,30 @@ export class DrizzleTeamReportReader implements TeamReportReader {
       comment: row.comment,
       dataRequestedAt: row.dataRequestedAt?.toISOString() ?? null,
     }));
+  }
+
+  async findProjectsWithRecentHourEntries(
+    projectIds: string[],
+    userIds: string[],
+    createdSince: Date,
+    createdUntil: Date,
+  ): Promise<Set<string>> {
+    if (projectIds.length === 0 || userIds.length === 0) return new Set();
+
+    const rows = await this.database
+      .selectDistinct({ projectId: hourEntries.projectId })
+      .from(hourEntries)
+      .where(
+        and(
+          inArray(hourEntries.projectId, projectIds),
+          inArray(hourEntries.userId, userIds),
+          inArray(hourEntries.status, ['approved', 'pending']),
+          sql`${hourEntries.hours} > 0`,
+          gte(hourEntries.createdAt, createdSince),
+          lte(hourEntries.createdAt, createdUntil),
+        ),
+      );
+    return new Set(rows.map((row) => row.projectId!));
   }
 
   async sumHours(projectIds: string[], userIds: string[], dateFrom: Date, dateTo: Date): Promise<TeamReportHoursRow[]> {

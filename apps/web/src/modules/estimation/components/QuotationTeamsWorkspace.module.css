@@ -1,104 +1,51 @@
 .workspace{display:grid;gap:12px;min-width:0}
 .header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
-.header h2{font-size:15px;font-weight:750;color:#111a2f;margin:0}
-.caption{margin:0;color:#7b8496;font-size:11.5px;line-height:1.5}
+.header h2{font-size:15px;font-weight:750;color:var(--kora-text);margin:0}
+.caption{margin:0;color:var(--kora-text-muted);font-size:11.5px;line-height:1.5}
 .tableScroll{overflow-x:auto;max-width:100%}
 .columns,.line{display:grid;gap:9px;align-items:center}
 .compactColumns{grid-template-columns:minmax(180px,1fr) 100px 110px}
 .detailedColumns{grid-template-columns:minmax(175px,1.5fr) 85px 100px 83px 83px 88px 80px}
-.columns{padding:10px 9px;border-bottom:1px solid #e4e7ee;background:#f9fafc;font-size:11px;color:#7b8496}
-.line{padding:7px 9px;min-height:51px;border-bottom:1px solid #e7eaf0}
+.columns{padding:10px 9px;border-bottom:1px solid var(--kora-border-subtle);background:var(--kora-surface-alt);font-size:11px;color:var(--kora-text-muted)}
+.line{padding:7px 9px;min-height:51px;border-bottom:1px solid var(--kora-border-subtle)}
 .line:last-child{border-bottom:0}
-.line input[type=number],.line select{width:100%;min-width:0;height:36px;padding:7px 9px;
- border:1px solid #e0e5ec;border-radius:8px;background:#fff;color:#14213b;
- font:inherit;font-size:12.5px}
-.line input[type=number]{text-align:right;font-variant-numeric:tabular-nums}
-.line input:disabled,.line select:disabled{color:#b0b8c5;background:#f6f7f9;cursor:not-allowed}
-.line input:focus-visible,.line select:focus-visible{outline:2px solid #e9ddff;border-color:#5b21b6}
-.line .hoursInput{border-color:#c7b3f1;color:#111b30}
+/* TextField y Select son nativos: los estilos del foco, disabled, borde
+   y superficie se heredan de sus propios CSS Modules. Solo adaptamos
+   el tamaño compacto de la grilla y la alineación numérica. */
+.numberField,.unitField{width:100%;min-width:0}
+.numberField>div,.unitField>div{height:var(--kora-control-height-sm);min-width:0}
+.numberField input{font-size:var(--kora-text-xs);text-align:right;font-variant-numeric:tabular-nums}
+.unitField select{font-size:var(--kora-text-xs);min-width:0}
+.line .hoursInput{border-color:var(--kora-blue-200);color:var(--kora-navy)}
 .name{display:flex;align-items:center;gap:9px;min-width:0;font-size:12.5px}
 .name strong{font-weight:650;overflow-wrap:anywhere}
-.name input{width:14px;height:14px;accent-color:#10192d;flex:none}
+.name input{width:14px;height:14px;accent-color:var(--kora-navy);flex:none}
 .name i{display:inline-block;width:10px;height:10px;border-radius:3px;flex:none}
-.hours{text-align:right;font-size:12.5px;color:#18233a;font-variant-numeric:tabular-nums}
-.inactive{color:#b1b9c4}.inactive strong{color:#adb6c1}
-.empty{color:#7b8496;font-size:12px;padding:12px 8px}
+.hours{text-align:right;font-size:12.5px;color:var(--kora-text);font-variant-numeric:tabular-nums}
+.inactive{color:var(--kora-text-disabled)}.inactive strong{color:var(--kora-text-disabled)}
+.empty{color:var(--kora-text-muted);font-size:12px;padding:12px 8px}
 @media(max-width:700px){.compactColumns{grid-template-columns:minmax(150px,1fr) 85px 85px}
  .detailedColumns{min-width:760px}.name{font-size:11.5px}}
 
-/* Switch v5: una sola pista continua con una selección blanca elevada;
-   no botones independientes ni fondo azul oscuro. */
-.header :global([role="radiogroup"]){display:flex;gap:2px;flex-wrap:nowrap;
- background:#edf0f5;border-radius:11px;padding:3px}
-.header :global([role="radio"]){border:0;border-radius:8px;background:transparent;
- color:#64748b;padding:8px 13px;font-weight:500;font-size:12px;
- line-height:1.3;white-space:nowrap;box-shadow:none}
-.header :global([role="radio"][aria-checked="true"]){background:#fff;color:#11192f;
- box-shadow:0 1px 4px rgba(24,35,55,.10);font-weight:650}
-.header :global([role="radio"]:hover){background:#fff}
-@media(max-width:520px){.header :global([role="radio"]){padding:7px 9px;font-size:11px}}
+/* SegmentedControl mantiene íntegros sus estados y colores del sistema Kora.
+   No sobrescribimos radiogroup ni radio desde este módulo. */
 
-/* Propuesta con EDT: semanas y carga derivadas, nunca capacidad artificial. */
-.plannedColumns{grid-template-columns:minmax(160px,1.6fr) 82px minmax(120px,1.1fr) 100px 104px 103px}
+/* Etiqueta de equipo con el color de referencia (quotationTeamColor). */
 .teamLabel{display:flex;flex-direction:column;gap:3px;min-width:0}
-.teamLabel small{font-size:10px;font-weight:500;color:#8751b6}
-.weekRange{display:flex;flex-direction:column;gap:3px;min-width:0;font-variant-numeric:tabular-nums}
-.weekRange strong{font-size:12px;font-weight:650;color:#1d2b43}
-.weekRange small{font-size:10px;color:#8791a3;white-space:nowrap}
-.weekAverage{text-align:right;color:#22344e;font-size:12.5px;font-weight:650;
- font-variant-numeric:tabular-nums}
-.weeklyPanel{border-top:1px solid #e8eaf0;padding-top:15px;display:grid;gap:12px;min-width:0}
-.weeklyHeading{display:flex;align-items:flex-start;justify-content:space-between;
- gap:14px;flex-wrap:wrap}
-.weeklyHeading h3{margin:0 0 4px;font-size:13px;font-weight:750;color:#16223a}
-.weeklyHeading p,.weeklyFootnote{margin:0;color:#778396;font-size:11px;line-height:1.55}
-.weekPager{display:flex;align-items:center;gap:8px;white-space:nowrap;font-size:11px;
- font-weight:650;color:#475569;font-variant-numeric:tabular-nums}
-.weekPager button{width:29px;height:29px;border:1px solid #e1e5ed;border-radius:8px;
- background:#fff;color:#34435c;font-size:20px;line-height:1;cursor:pointer}
-.weekPager button:hover:not(:disabled){background:#f2edfb;border-color:#c7b3f1}
-.weekPager button:disabled{color:#c0c8d4;background:#f9fafc;cursor:not-allowed}
-.weeklyScroll{overflow-x:auto;max-width:100%;border:1px solid #e5e9f1;border-radius:10px}
-.weeklyTable{width:100%;min-width:700px;table-layout:fixed;border-collapse:collapse;
- font-size:11px;font-variant-numeric:tabular-nums;color:#34445c}
-.weeklyTable th:first-child{width:155px;text-align:left}
-.weeklyTable th:last-child{width:82px}
-.weeklyTable th,.weeklyTable td{padding:10px 7px;border-bottom:1px solid #e9ecf2;
- text-align:right;vertical-align:middle}
-.weeklyTable thead th{background:#f7f8fb;color:#6d7890;font-weight:650}
-.weeklyTable tbody th{font-weight:650;color:#273650}
-.weeklyTable tbody tr:last-child th,.weeklyTable tbody tr:last-child td{border-bottom:1px solid #dfe4ed}
-.weeklyTable tfoot th,.weeklyTable tfoot td{background:#f7f8fb;font-weight:750;
- color:#1e2a41;border-bottom:0}
-.weekTeam{display:flex;align-items:center;gap:7px;min-width:0;text-align:left;
- overflow-wrap:anywhere}
-.weekTeam i{width:9px;height:9px;flex:none;border-radius:3px}
-.weekValue{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
-.weekValue strong{font-size:11px;font-weight:600}
-.weekBar{display:block;height:4px;max-width:100%;border-radius:3px;opacity:.85}
-.noHours{color:#b9c1ce}
-.weekTotal{font-weight:750;color:#17223a;background:#fcfcfe}
-.weeklyFootnote{font-size:10.5px}
-.weeklyUnavailable{margin:0;border:1px solid #e6e2f2;background:#f9f7fe;
- border-radius:8px;padding:11px 12px;font-size:11px;line-height:1.6;color:#685783}
-@media(max-width:800px){
- .plannedColumns{min-width:735px}
- .weeklyTable{min-width:700px}
-}
-
-.pendingProfiles{display:grid;gap:10px;padding:13px;border:1px solid #e5def2;
- background:#faf8fe;border-radius:9px}
-.pendingProfiles h3{font-size:12.5px;font-weight:750;color:#4b2b77;margin:0 0 4px}
-.pendingProfiles p{margin:0;font-size:11px;line-height:1.5;color:#6d6280}
+.pendingProfiles{display:grid;gap:10px;padding:13px;border:1px solid var(--kora-border-subtle);
+ background:var(--kora-blue-surface-alt);border-radius:var(--kora-radius-input)}
+.pendingProfiles h3{font-size:12.5px;font-weight:750;color:var(--kora-navy);margin:0 0 4px}
+.pendingProfiles p{margin:0;font-size:11px;line-height:1.5;color:var(--kora-text-muted)}
 .pendingList{display:grid;gap:7px}
 .pendingRole{display:grid;grid-template-columns:minmax(0,1fr) 110px minmax(150px,.9fr);
- align-items:center;gap:12px;padding:8px 10px;background:white;border:1px solid #eee9f5;
- border-radius:8px}
-.pendingRole strong{font-size:12px;color:#34324b}
-.pendingRole>span{font-size:11.5px;color:#4d4761;font-variant-numeric:tabular-nums}
-.pendingRole label{display:flex;align-items:center;justify-content:flex-end;gap:8px;
- font-size:10.5px;color:#7a7485}
-.pendingRole input{width:54px;padding:6px;border:1px solid #e0e4ec;border-radius:6px;
- font:inherit;color:#17233b}
+ align-items:center;gap:12px;padding:8px 10px;background:var(--kora-surface);border:1px solid var(--kora-border-subtle);
+ border-radius:var(--kora-radius)}
+.pendingRole strong{font-size:12px;color:var(--kora-text)}
+.pendingRole>span{font-size:11.5px;color:var(--kora-text-muted);font-variant-numeric:tabular-nums}
+.pendingPeopleField{display:flex;flex-direction:row;align-items:center;justify-content:flex-end;
+ gap:var(--kora-space-2);min-width:0}
+.pendingPeopleField>label{font-size:10.5px;flex:1;color:var(--kora-text-muted)}
+.pendingPeopleField>div{width:64px;height:var(--kora-control-height-sm);min-width:0}
+.pendingPeopleField input{text-align:right;font-variant-numeric:tabular-nums}
 @media(max-width:650px){.pendingRole{grid-template-columns:1fr 1fr}
- .pendingRole label{grid-column:1/-1;justify-content:flex-start}}
+ .pendingPeopleField{grid-column:1/-1;justify-content:flex-start}}

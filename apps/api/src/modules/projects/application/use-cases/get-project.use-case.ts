@@ -3,6 +3,7 @@ import { CLOCK, ForbiddenError, err, ok, type ApplicationError, type Clock, type
 import { isUuid } from '@kora/core';
 import type { Permission, ProjectDetail } from '@kora/contracts';
 import { PaymentMilestoneTriggerService } from '../services/payment-milestone-trigger.service';
+import { ProjectProgressRecalculator } from '../services/project-progress-recalculator';
 import { ProjectNotFoundError } from '../../domain/errors/project.errors';
 import { PROJECT_REPOSITORY, type ProjectRepository } from '../../domain/repositories/project.repository';
 import {
@@ -29,6 +30,9 @@ import { PROJECT_HOUR_ENTRY_READER, type ProjectHourEntryReader } from '../ports
 import { PROJECT_ACTIVITY_READER, type ProjectActivityReader } from '../ports/project-activity-reader.port';
 import type { UseCase } from '../../../../shared/application/use-case';
 import { toProjectDetail } from '../mappers/project.mapper';
+import {
+  APPROVED_PROJECT_CALENDAR, type ApprovedProjectCalendar,
+} from '../ports/approved-project-calendar.port';
 
 export interface GetProjectCommand {
   readonly projectId: string;
@@ -58,6 +62,8 @@ export class GetProjectUseCase implements UseCase<GetProjectCommand, ProjectDeta
     @Inject(PROJECT_ACTIVITY_READER) private readonly activity: ProjectActivityReader,
     @Inject(CLOCK) private readonly clock: Clock,
     private readonly paymentTriggers: PaymentMilestoneTriggerService,
+    @Inject(APPROVED_PROJECT_CALENDAR) private readonly approvedCalendar: ApprovedProjectCalendar,
+    private readonly progress: ProjectProgressRecalculator,
   ) {}
 
   async execute(command: GetProjectCommand): Promise<Result<ProjectDetail, ApplicationError>> {
@@ -129,10 +135,32 @@ export class GetProjectUseCase implements UseCase<GetProjectCommand, ProjectDeta
         snapshot.leaderUserId === command.actorUserId ||
         snapshot.developerUserId === command.actorUserId ||
         snapshot.commercialManagerUserId === command.actorUserId ||
+        // findByProject ya resuelve el líder efectivo: override del proyecto o líder oficial.
         projectTeams.some((team) => team.leaderUserId === command.actorUserId) ||
-        members.some((member) => member.userId === command.actorUserId);
+        members.some((member) => member.userId === command.actorUserId && !member.blockedAt);
       if (!isParticipant) return err(new ForbiddenError('No tienes acceso a este proyecto.', 'PROJECT_NOT_ASSIGNED'));
     }
+
+    // El traspaso ya fue aprobado. En la primera lectura autorizada de un
+    // proyecto iniciado se materializan las semanas comerciales como bloques
+    // operativos reales. Esta operación es transaccional, idempotente y
+    // preserva toda edición previa; NO exige una segunda aprobación.
+    // El evento de traspaso registrado en la BD es la autorización real del
+    // calendario. No repetir aquí el filtro salesStage: una edición posterior
+    // de la ficha comercial no debe ocultar un traspaso aprobado y persistido.
+    // ensure() comprueba el evento quotation_transferred y la fecha de inicio.
+    const generated = snapshot.type === 'development' && snapshot.status === 'active' &&
+      Boolean(snapshot.startDate || snapshot.hito0At)
+      ? await this.approvedCalendar.ensure(project.id) : false;
+    if (generated) {
+      // El calendario traspasado puede crear los primeros bloques sin pasar
+      // por un caso de uso de edición; sincronizar el caché usado por la
+      // ordenación de proyectos desde la primera materialización.
+      await this.progress.recalculate(project.id);
+    }
+    const currentModules = generated
+      ? await this.modules.listForProject(project.id)
+      : projectModules;
 
     /**
      * Quién puede autorizar que ESTE proyecto admita horas extra: mismo
@@ -152,7 +180,7 @@ export class GetProjectUseCase implements UseCase<GetProjectCommand, ProjectDeta
      * con que `UpdateProjectModuleDeliveryUseCase` deja al líder de equipo gestionar sus entregas.
      */
     const deliveryTeamIds = [
-      ...new Set(projectModules.flatMap((module) => module.deliveries.flatMap((delivery) => (delivery.teamId ? [delivery.teamId] : [])))),
+      ...new Set(currentModules.flatMap((module) => module.deliveries.flatMap((delivery) => (delivery.teamId ? [delivery.teamId] : [])))),
     ];
     const ledTeamIds = new Set(
       canManagePendings
@@ -177,7 +205,7 @@ export class GetProjectUseCase implements UseCase<GetProjectCommand, ProjectDeta
         members,
         teams: projectTeams,
         observations: projectObservations,
-        modules: projectModules,
+        modules: currentModules,
         paymentMilestones: projectPaymentMilestones,
         usedHoursUpdatedAt,
         leaderLastActivityAt,

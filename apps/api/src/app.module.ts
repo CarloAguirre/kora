@@ -16,6 +16,7 @@ import { JwtAccessTokenService } from './shared/infrastructure/crypto/jwt-access
 import { RandomOpaqueTokenGenerator } from './shared/infrastructure/crypto/random-opaque-token.generator';
 import { DrizzleAuditRecorder } from './shared/infrastructure/audit/drizzle-audit-recorder';
 import { GoogleOAuthClientService } from './shared/infrastructure/auth/google-oauth-client.service';
+import { GoogleDriveOAuthPocService } from './shared/infrastructure/auth/google-drive-oauth-poc.service';
 import { DrizzleAuditReader } from './shared/infrastructure/audit/drizzle-audit-reader';
 import { LogNotificationSender } from './shared/infrastructure/notifications/log-notification.sender';
 import { ResendNotificationSender } from './shared/infrastructure/notifications/resend-notification.sender';
@@ -46,6 +47,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { SessionsModule } from './modules/sessions/sessions.module';
 import { RemindersModule } from './modules/reminders/reminders.module';
 import { EstimationModule } from './modules/estimation/estimation.module';
+import { LanguageModule } from './modules/language/language.module';
 import { HealthController } from './shared/presentation/health.controller';
 import { JwtModule } from '@nestjs/jwt';
 
@@ -84,6 +86,7 @@ import { JwtModule } from '@nestjs/jwt';
       },
     },
     { provide: GOOGLE_OAUTH_CLIENT, useClass: GoogleOAuthClientService },
+    GoogleDriveOAuthPocService,
 
     // Las sondas de salud se registran como una lista: añadir una dependencia
     // que vigilar es añadir una clase aquí, sin tocar el controlador.
@@ -107,6 +110,7 @@ import { JwtModule } from '@nestjs/jwt';
     AUDIT_READER,
     NOTIFICATION_SENDER,
     GOOGLE_OAUTH_CLIENT,
+    GoogleDriveOAuthPocService,
     HEALTH_PROBES,
   ],
 })
@@ -143,6 +147,7 @@ export class SharedModule {}
     AdminModule,
     RemindersModule,
     EstimationModule,
+    LanguageModule,
   ],
   controllers: [HealthController],
 })

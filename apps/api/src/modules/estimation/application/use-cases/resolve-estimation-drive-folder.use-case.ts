@@ -10,11 +10,6 @@ import {
   type DriveFolderClient,
   type DriveFolderItem,
 } from '../ports/drive-folder-client.port';
-import {
-  FALLBACK_DRIVE_FOLDER_ID,
-  FALLBACK_DRIVE_FOLDER_URL,
-} from '../fallback-estimation-document';
-
 const GENERIC_PROJECT_TOKENS = new Set([
   'app',
   'aplicacion',
@@ -66,23 +61,14 @@ export class ResolveEstimationDriveFolderUseCase {
     }
 
     if (!this.drive.isConfigured()) {
+      // Sin documentación explícita y sin cuenta de servicio no se puede
+      // inferir una carpeta real. Nunca atribuir el fixture KDM al proyecto.
       return estimationDriveFolderResolutionSchema.parse({
         connection: 'not_configured',
-        status: 'resolved',
-        selectedFolder: {
-          folderId: FALLBACK_DRIVE_FOLDER_ID,
-          name: 'Antecedentes PoC · fallback local',
-          url: FALLBACK_DRIVE_FOLDER_URL,
-          score: 100,
-          confidence: 'high',
-          reasons: [
-            'Google Drive aún no está configurado; se usa el antecedente KDM de la PoC.',
-          ],
-          ancestorNames: ['PoC Calculadora'],
-        },
+        status: 'not_found',
+        selectedFolder: null,
         candidates: [],
-        message:
-          'Google Drive aún no está configurado. Kora usará temporalmente el antecedente KDM de la PoC.',
+        message: 'No hay lector Drive de cuenta de servicio. Ingresa manualmente la carpeta del proyecto y autorízala con Google.',
       });
     }
 
