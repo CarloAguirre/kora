@@ -39,11 +39,14 @@ export function quotationTeamCapacity(
 ): QuotationTeamCapacity {
   const collaborators = Math.max(1, team.collaborators);
   const weeks = weeksOf(team);
-  const averagePerPerson = hasEdt
-    ? weeks > 0 ? round(totalHours / collaborators / weeks) : null
-    : round(team.hoursPerWeek * team.dedicationPercent / 100);
-  const occupationPercent = averagePerPerson === null ? null
-    : round(averagePerPerson / KORA_QUOTATION_REFERENCE_WEEK_HOURS * 100);
+  // Calcular porcentajes con precisión completa, no desde la cifra
+  // de HH/sem ya redondeada a dos decimales (100/3 => 83,33%, no 83,32%).
+  const exactAverage = hasEdt
+    ? weeks > 0 ? totalHours / collaborators / weeks : null
+    : team.hoursPerWeek * team.dedicationPercent / 100;
+  const averagePerPerson = exactAverage === null ? null : round(exactAverage);
+  const occupationPercent = exactAverage === null ? null
+    : round(exactAverage / KORA_QUOTATION_REFERENCE_WEEK_HOURS * 100);
   const capacityPerPerson = round(
     KORA_QUOTATION_REFERENCE_WEEK_HOURS * team.dedicationPercent / 100);
   const loads = [...(scheduled?.weeklyHours ?? new Map<number, number>())]

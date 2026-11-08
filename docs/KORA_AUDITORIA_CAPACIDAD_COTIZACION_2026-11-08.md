@@ -78,3 +78,7 @@ pnpm --filter @kora/web build
 - La advertencia de duración compara las semanas **activas con tareas**,
   no el número absoluto de última semana del proyecto; una fase que
   comienza en semana 10 no implica por sí sola 10 semanas de duración.
+
+- Los porcentajes se calculan con la **carga sin redondear** y solo se
+  redondea la cifra de visualización. Así `100 / 3 / 40 × 100`
+  produce **83,33%**, en lugar de 83,32% por doble redondeo.
