@@ -16,7 +16,7 @@ El proyector IA en `quotation-poc-projection.ts` establecía `hoursPerWeek = HH 
 - **Jornada de comparación Kora:** 40 HH/sem por persona, como **criterio interno de planificación**, no declaración de la jornada legal aplicable al contrato de cada colaborador. Constante `KORA_QUOTATION_REFERENCE_WEEK_HOURS` centralizada para futura parametrización.
 - **Capacidad planificada disponible:** `personas × 40 × dedicación/100` HH por semana.
 - **Pico semanal:** distribuir HH dentro de cada tramo según `quotationTeamWeeklyPlan`, sumar fases simultáneas y verificar carga semanal por persona frente a su capacidad planificada. La distribución es *orientativa*, no asignación individual detallada.
-- **Alertas informativas, no bloqueantes:** sobrecarga de una o varias semanas, media mayor a la dedicación disponible, duración del equipo inferior a la última semana de sus tareas, o imposibilidad de verificar picos cuando no existe calendario en EDT v1. No se alteran ni la aprobación ni el guardado.
+- **Alertas informativas, no bloqueantes:** sobrecarga de una o varias semanas, media mayor a la dedicación disponible, duración del equipo inferior a la cantidad de semanas con tareas (no comparar duración con número absoluto de semana, pues una fase puede empezar más tarde), o imposibilidad de verificar picos cuando no existe calendario en EDT v1. No se alteran ni la aprobación ni el guardado.
 - El máximo legado de `hoursPerWeek` persistido es 168 por compatibilidad del contrato. Los indicadores muestran el esfuerzo derivado **sin usar ese límite para ocultar sobrecargas**.
 
 ## Cambios

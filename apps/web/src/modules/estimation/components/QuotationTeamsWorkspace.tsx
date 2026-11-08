@@ -141,8 +141,9 @@ export function QuotationTeamsWorkspace({
             if (capacity.missingDuration) {
               warningParts.push('Define una duración para distribuir la carga por colaborador.');
             } else if (capacity.durationConflict) {
-              warningParts.push('La duración del equipo no cubre el calendario hasta semana ' +
-                (weeklyPlan?.rows.find((row) => row.teamKey === teamId)?.lastWeek ?? '—') + '.');
+              warningParts.push('La duración del equipo es inferior a las ' +
+                (weeklyPlan?.rows.find((row) => row.teamKey === teamId)?.activeWeeks ?? '—') +
+                ' semanas con tareas planificadas.');
             }
           }
           return (

@@ -59,9 +59,13 @@ describe('Capacidad orientativa de una cotización EDT', () => {
   });
 
   it('advierte duración menor al calendario y no inventa picos de una EDT v1', () => {
-    const plan = row([[3, 25]]);
+    const laterStart = row([[3, 25]]);
+    expect(quotationTeamCapacity(
+      team({ collaborators: 1, duration: 2 }), 25, laterStart, true)
+      .durationConflict).toBe(false); // semana de inicio ≠ duración en semanas
+    const twoActiveWeeks = row([[3, 25], [4, 25]]);
     const mismatched = quotationTeamCapacity(
-      team({ collaborators: 1, duration: 2 }), 25, plan, true);
+      team({ collaborators: 1, duration: 1 }), 50, twoActiveWeeks, true);
     expect(mismatched.durationConflict).toBe(true);
     const legacy = quotationTeamCapacity(team(), 100, undefined, true);
     expect(legacy.scheduleUnavailable).toBe(true);

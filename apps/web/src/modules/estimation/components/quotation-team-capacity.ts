@@ -56,7 +56,7 @@ export function quotationTeamCapacity(
       .map((entry) => entry.week)
     : [];
   const durationConflict = Boolean(hasEdt && totalHours > 0 && scheduled &&
-    (weeks <= 0 || scheduled.lastWeek > weeks + 0.000001));
+    (weeks <= 0 || scheduled.activeWeeks > weeks + 0.000001));
   const missingDuration = Boolean(hasEdt && totalHours > 0 && weeks <= 0);
   const scheduleUnavailable = Boolean(hasEdt && totalHours > 0 && !scheduled);
   return {
