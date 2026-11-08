@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Header, Post, Query, Res, ServiceUnavailableException, BadRequestException } from '@nestjs/common';
+import { Body, Controller, Get, Header, Post, Query, Res, ServiceUnavailableException, BadRequestException, HttpException } from '@nestjs/common';
 import type { FastifyReply } from 'fastify';
 import { z } from 'zod';
 import {
@@ -176,6 +176,47 @@ export class EstimationController {
     input: ListEstimationDriveFilesInput,
   ): Promise<EstimationDriveFolderListing> {
     return this.listDriveFiles.execute(input);
+  }
+
+  /**
+   * Canal SSE autenticado para el mismo análisis. El único trabajo del canal
+   * es transportar resúmenes oficiales de Gemini y el JSON final; no expone
+   * pensamientos internos ni requiere una segunda llamada al modelo.
+   */
+  @Post('poc/analyze/stream')
+  @RequireAnyPermission('projects:manage', 'projects:read_assigned')
+  async analyzeStream(
+    @Body(new ZodValidationPipe(analyzeEstimationPocSchema)) input: AnalyzeEstimationPocInput,
+    @CurrentUser() actor: RequestUser,
+    @Res() reply: FastifyReply,
+  ): Promise<void> {
+    // Antes de escribir una cabecera SSE, mantener el mismo control de acceso.
+    await this.quotationDrafts.authorizeAiPoc(input.projectId, actor);
+    const sourceReader = resolveAuthorizedDriveReader(
+      input.driveFolderUrl, actor.id, this.config, this.driveOAuthPoc,
+    );
+    reply.hijack();
+    reply.raw.writeHead(200, {
+      'Content-Type': 'text/event-stream; charset=utf-8',
+      'Cache-Control': 'no-cache, no-transform',
+      'X-Accel-Buffering': 'no',
+      'Connection': 'keep-alive',
+    });
+    const send = (event: 'thought' | 'complete' | 'error', value: unknown) => {
+      if (reply.raw.destroyed || reply.raw.writableEnded) return;
+      reply.raw.write(`event: ${event}\ndata: ${JSON.stringify(value)}\n\n`);
+    };
+    try {
+      const analysis = await this.analyzePoc.execute(input, sourceReader, (text) => {
+        if (text.trim()) send('thought', { text });
+      });
+      send('complete', analysis);
+    } catch (reason) {
+      send('error', { message: reason instanceof HttpException
+        ? reason.message : 'No se pudo completar el análisis documental.' });
+    } finally {
+      if (!reply.raw.destroyed && !reply.raw.writableEnded) reply.raw.end();
+    }
   }
 
   @Post('poc/analyze')

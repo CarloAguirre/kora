@@ -156,6 +156,67 @@ describe('EstimationController · líder PM de proyecto asignado', () => {
       .toEqual(['F01', 'F02', 'F03', 'F04', 'F05']);
   });
 
+
+  it('transmite resúmenes oficiales y JSON final, sin ejecutar un segundo análisis', async () => {
+    const { controller, analyzer, drafts } = setup();
+    const writes: string[] = [];
+    const reply = {
+      hijack: vi.fn(),
+      raw: { writeHead: vi.fn(), write: vi.fn((chunk: string) => {
+        writes.push(chunk); return true;
+      }), end: vi.fn(), destroyed: false, writableEnded: false },
+    };
+    analyzer.execute.mockImplementationOnce(async (
+      _input: unknown, _sources: unknown, onThought: (text: string) => void,
+    ) => {
+      onThought('Revisando los antecedentes del proyecto');
+      return { projectId, provider: 'gemini', summary: 'Informe válido' };
+    });
+    await controller.analyzeStream(request, actor as never, reply as never);
+    expect(drafts.authorizeAiPoc).toHaveBeenCalledWith(projectId, actor);
+    expect(reply.hijack).toHaveBeenCalledOnce();
+    expect(reply.raw.writeHead).toHaveBeenCalledWith(200,
+      expect.objectContaining({ 'Content-Type': 'text/event-stream; charset=utf-8',
+        'X-Accel-Buffering': 'no' }));
+    expect(writes).toHaveLength(2);
+    expect(writes[0]).toContain('event: thought');
+    expect(writes[0]).toContain('Revisando los antecedentes');
+    expect(writes[1]).toContain('event: complete');
+    expect(writes[1]).toContain('Informe válido');
+    expect(analyzer.execute).toHaveBeenCalledOnce();
+    expect(reply.raw.end).toHaveBeenCalledOnce();
+  });
+
+  it('bloquea SSE de un proyecto ajeno antes de abrirlo o gastar cuota', async () => {
+    const { controller, analyzer, drafts } = setup();
+    const reply = { hijack: vi.fn(), raw: { write: vi.fn(), writeHead: vi.fn() } };
+    drafts.authorizeAiPoc.mockRejectedValueOnce(new ForbiddenException('Sin permisos'));
+    await expect(controller.analyzeStream(request, actor as never, reply as never))
+      .rejects.toBeInstanceOf(ForbiddenException);
+    expect(reply.hijack).not.toHaveBeenCalled();
+    expect(analyzer.execute).not.toHaveBeenCalled();
+    expect(Reflect.getMetadata(ANY_PERMISSIONS_KEY,
+      EstimationController.prototype.analyzeStream)).toEqual([
+      'projects:manage', 'projects:read_assigned',
+    ]);
+  });
+
+  it('envía un evento de error y cierra SSE si Gemini falla sin devolver resultado falso', async () => {
+    const { controller, analyzer } = setup();
+    const writes: string[] = [];
+    const reply = { hijack: vi.fn(), raw: {
+      destroyed: false, writableEnded: false,
+      writeHead: vi.fn(), write: vi.fn((chunk: string) => { writes.push(chunk); return true; }),
+      end: vi.fn(),
+    } };
+    analyzer.execute.mockRejectedValueOnce(new Error('secret-token-should-never-leak'));
+    await controller.analyzeStream(request, actor as never, reply as never);
+    expect(writes).toHaveLength(1);
+    expect(writes[0]).toContain('event: error');
+    expect(writes[0]).not.toContain('secret-token-should-never-leak');
+    expect(reply.raw.end).toHaveBeenCalledOnce();
+  });
+
   it('analiza y consume Gemini solo tras autorizar el proyecto del líder', async () => {
     const { controller, drafts, analyzer } = setup();
     expect(Reflect.getMetadata(ANY_PERMISSIONS_KEY, EstimationController.prototype.analyze))

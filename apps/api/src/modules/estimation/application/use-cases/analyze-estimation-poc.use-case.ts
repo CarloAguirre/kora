@@ -70,7 +70,10 @@ export class AnalyzeEstimationPocUseCase {
     private readonly sources?: DocumentSourceReader,
   ) {}
 
-  async execute(input: AnalyzeEstimationPocInput, authorizedSources?: DocumentSourceReader): Promise<EstimationPocAnalysis> {
+  async execute(
+    input: AnalyzeEstimationPocInput, authorizedSources?: DocumentSourceReader,
+    onThoughtSummary?: (text: string) => void,
+  ): Promise<EstimationPocAnalysis> {
     const isLegacyPoc = this.ai.name === 'poc-ai';
     const sourceReader = authorizedSources ?? this.sources;
     const loaded = isLegacyPoc || !sourceReader
@@ -116,7 +119,7 @@ export class AnalyzeEstimationPocUseCase {
         ...(doc.dataBase64 ? { dataBase64: doc.dataBase64 } : {}),
       })),
       ...(isLegacyPoc ? {} : { responseJsonSchema: DYNAMIC_QUESTIONS_JSON_SCHEMA }),
-    });
+    }, onThoughtSummary);
 
     if (typeof raw !== 'object' || raw === null) {
       throw new BadRequestException('Gemini no entregó un análisis documental estructurado.');
