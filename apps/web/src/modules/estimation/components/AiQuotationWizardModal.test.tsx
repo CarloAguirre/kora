@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   analyze: vi.fn(), generate: vi.fn(), onClose: vi.fn(), toastError: vi.fn(),
   serviceAccountEnabled: true,
   browse: vi.fn(), driveAccess: vi.fn(), oauthStart: vi.fn(),
+  resolve: vi.fn(), updateExtras: vi.fn(),
 }));
 const project = {
   id: '0777e456-fd76-445e-83f1-afc25061c101',
@@ -89,12 +90,13 @@ const analysisResult = {
 vi.mock('../api/estimation.api', () => ({
   estimationApi: {
     browseDriveFolder: (input: unknown) => mocks.browse(input),
+    resolveDriveFolder: (input: unknown) => mocks.resolve(input),
     driveOAuthPocAccess: (input: unknown) => mocks.driveAccess(input),
     startDriveOAuthPoc: (input: unknown) => mocks.oauthStart(input),
   },
 }));
 vi.mock('@/modules/projects/api/projects.queries', () => ({
-  useUpdateProjectExtras: () => ({ mutateAsync: vi.fn().mockResolvedValue(undefined) }),
+  useUpdateProjectExtras: () => ({ mutateAsync: mocks.updateExtras }),
 }));
 
 vi.mock('@/shared/components/ui/Toast', () => ({
@@ -151,6 +153,24 @@ beforeEach(() => {
   mocks.onClose.mockClear();
   mocks.toastError.mockReset();
   mocks.serviceAccountEnabled = true;
+  mocks.updateExtras.mockReset().mockResolvedValue(undefined);
+  mocks.resolve.mockReset().mockResolvedValue({
+    connection: 'connected', status: 'needs_confirmation',
+    selectedFolder: null, message: 'Hay carpetas candidatas',
+    candidates: [{
+      folderId: 'levantamiento-nuevo', name: 'Motor de notificaciones / Levantamiento',
+      url: 'https://drive.google.com/drive/folders/levantamiento-nuevo',
+      score: 68, confidence: 'medium',
+      reasons: ['Nombre compatible con el proyecto.'],
+      ancestorNames: ['Cliente QA'],
+    }, {
+      folderId: 'levantamiento-antiguo', name: 'Motor de notificaciones (cerrado)',
+      url: 'https://drive.google.com/drive/folders/levantamiento-antiguo',
+      score: 45, confidence: 'low',
+      reasons: ['Puede ser un trabajo anterior.'],
+      ancestorNames: ['Cliente QA'],
+    }],
+  });
   mocks.browse.mockReset().mockImplementation(async (input: { folderUrl: string }) => ({
     ...previewResult,
     folder: { ...previewResult.folder, url: input.folderUrl,
@@ -191,6 +211,94 @@ function answerFixed() {
 }
 
 describe('Asistente v5 de cotización · sistema visual Kora', () => {
+
+  it('descubre carpetas sin URL previa y guarda la seleccionada en Extras', async () => {
+    renderWizard({ ...project, documentationLink: null } as ProjectDetail);
+    fireEvent.click(screen.getByRole('button', { name: 'Buscar carpeta en Drive' }));
+    await waitFor(() => expect(mocks.resolve).toHaveBeenCalledWith({
+      projectId: project.id, projectName: project.name,
+      clientName: 'Cliente QA', documentationLink: null, quotationLink: null,
+    }));
+    const group = await screen.findByRole('group', { name: 'Carpetas candidatas' });
+    const radios = group.querySelectorAll('input[type="radio"]');
+    expect(radios).toHaveLength(2);
+    expect(radios[0]).toBeChecked();
+    fireEvent.click(radios[1]!);
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar carpeta' }));
+    await waitFor(() => expect(mocks.browse).toHaveBeenCalledWith(expect.objectContaining({
+      folderUrl: 'https://drive.google.com/drive/folders/levantamiento-antiguo',
+    })));
+    await waitFor(() => expect(mocks.updateExtras).toHaveBeenCalledWith({
+      projectId: project.id,
+      input: { documentationLink: 'https://drive.google.com/drive/folders/levantamiento-antiguo' },
+    }));
+    expect(mocks.analyze).not.toHaveBeenCalled();
+  });
+
+  it('al confirmar otra carpeta reemplaza el enlace anterior de Extras', async () => {
+    renderWizard();
+    fireEvent.click(screen.getByRole('button', {
+      name: 'Buscar carpeta de levantamiento en mi Drive',
+    }));
+    await screen.findByRole('group', { name: 'Carpetas candidatas' });
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar carpeta' }));
+    await waitFor(() => expect(mocks.updateExtras).toHaveBeenCalledWith({
+      projectId: project.id,
+      input: { documentationLink: 'https://drive.google.com/drive/folders/levantamiento-nuevo' },
+    }));
+    expect(await screen.findByRole('list', { name: 'Documentos que analizará el agente' }))
+      .toBeInTheDocument();
+  });
+
+  it('si no hay candidatas permite introducir una URL y no guarda sin confirmación', async () => {
+    mocks.resolve.mockResolvedValueOnce({
+      connection: 'connected', status: 'not_found', selectedFolder: null,
+      candidates: [], message: 'Sin coincidencias',
+    });
+    renderWizard({ ...project, documentationLink: null } as ProjectDetail);
+    fireEvent.click(screen.getByRole('button', { name: 'Buscar carpeta en Drive' }));
+    await screen.findByRole('group', { name: 'Carpetas candidatas' });
+    expect(mocks.updateExtras).not.toHaveBeenCalled();
+    const input = screen.getByLabelText('O pega el enlace de otra carpeta');
+    fireEvent.change(input, { target: {
+      value: 'https://drive.google.com/drive/folders/carpeta-seleccion-manual',
+    } });
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar carpeta' }));
+    await waitFor(() => expect(mocks.updateExtras).toHaveBeenCalledWith({
+      projectId: project.id,
+      input: { documentationLink: 'https://drive.google.com/drive/folders/carpeta-seleccion-manual' },
+    }));
+  });
+
+  it('OAuth sin URL activa descubrimiento del usuario y no inicia análisis Gemini', async () => {
+    mocks.serviceAccountEnabled = false;
+    mocks.driveAccess.mockResolvedValueOnce({ authorized: false })
+      .mockResolvedValue({ authorized: true });
+    const popup = { close: vi.fn(), location: { replace: vi.fn() } };
+    const open = vi.spyOn(window, 'open').mockReturnValue(popup as unknown as Window);
+    try {
+      renderWizard({ ...project, documentationLink: null } as ProjectDetail);
+      fireEvent.click(screen.getByRole('button', { name: 'Buscar carpeta en Drive' }));
+      await waitFor(() => expect(mocks.oauthStart).toHaveBeenCalledWith({
+        projectId: project.id,
+      }));
+      expect(mocks.driveAccess).toHaveBeenCalledWith({ projectId: project.id });
+      const event = new MessageEvent('message', {
+        origin: window.location.origin,
+        data: { type: 'kora-drive-oauth-poc', status: 'ok', code: 'DRIVE_DISCOVERY_READY' },
+      });
+      Object.defineProperty(event, 'source', { value: popup });
+      await act(async () => { window.dispatchEvent(event); });
+      await screen.findByRole('group', { name: 'Carpetas candidatas' });
+      expect(mocks.resolve).toHaveBeenCalledOnce();
+      expect(mocks.analyze).not.toHaveBeenCalled();
+      expect(mocks.updateExtras).not.toHaveBeenCalled();
+    } finally {
+      open.mockRestore();
+    }
+  });
+
+
   it('al cambiar de carpeta hermana lista los documentos nuevos y no mantiene los anteriores', async () => {
     renderWizard();
     await prepareDocuments();
@@ -285,7 +393,7 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
     renderWizard({ ...project, documentationLink: null } as ProjectDetail);
     const input = screen.getByLabelText('Carpeta de Google Drive del proyecto');
     expect(input).toHaveValue('');
-    expect(screen.getByRole('button', { name: 'Analizar proyecto' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Buscar carpeta en Drive' })).toBeEnabled();
     fireEvent.change(input, { target: { value: 'https://drive.google.com/drive/folders/carpeta-nueva-real' } });
     expect(screen.getByRole('button', { name: 'Analizar proyecto' })).not.toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: 'Analizar proyecto' }));
@@ -299,8 +407,8 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
   it('si Extras apunta a otro tipo de enlace no suplanta documentos con KDM', () => {
     renderWizard({ ...project, documentationLink: 'https://example.com/docs' } as ProjectDetail);
     expect(screen.queryByLabelText('Carpeta de Google Drive del proyecto')).not.toBeInTheDocument();
-    expect(screen.getByRole('alert')).toHaveTextContent('Corrígelo en la pestaña Extras.');
-    expect(screen.getByRole('button', { name: 'Analizar proyecto' })).toBeDisabled();
+    expect(screen.getByRole('alert')).toHaveTextContent('Puedes buscar la carpeta correcta');
+    expect(screen.getByRole('button', { name: 'Buscar carpeta en Drive' })).toBeEnabled();
   });
 
   it('toma la carpeta Drive de Extras sin solicitar ingresar otra URL', async () => {

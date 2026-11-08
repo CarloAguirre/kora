@@ -367,3 +367,13 @@ existente; **no se atribuye su puntuación a Gemini**. Gemini se ocupa
 del análisis documental posterior a la selección. Falta ejecutar
 los tests y el build en el checkout local, ya que GitHub no ejecuta
 herramientas de compilación en este flujo.
+
+### Pruebas del descubrimiento documental (08-11-2026)
+
+`AiQuotationWizardModal.test.tsx` cubre: búsqueda sin URL con
+cuenta de servicio, selección entre candidatas, reemplazo del enlace
+anterior en Extras, introducción manual sin candidatas, y OAuth sin
+URL con popup. La escritura no ocurre antes de confirmar una carpeta
+legible. Se conserva el flujo actual de URL explícita, cambio de
+carpeta y análisis Gemini después de previsualizar documentos.
+Pendiente ejecución real de tests y builds.
