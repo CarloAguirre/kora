@@ -122,7 +122,7 @@ describe('Exploración Drive autorizada y evidencia real para Gemini', () => {
       (_user: string, folderId: string) =>
         folderId === DRIVE_DISCOVERY_SESSION ? 'token-descubrimiento' : null);
     const result = await browse('carpeta-inicial');
-    expect(result.documents.map((doc) => doc.name).toEqual(['Requerimientos.txt']);
+    expect(result.documents.map((doc) => doc.name)).toEqual(['Requerimientos.txt']);
     expect(oauth.getAuthorizedAccessToken).toHaveBeenCalledWith('usuario-1', 'carpeta-inicial');
     expect(oauth.getAuthorizedAccessToken).toHaveBeenCalledWith('usuario-1', DRIVE_DISCOVERY_SESSION);
   });
