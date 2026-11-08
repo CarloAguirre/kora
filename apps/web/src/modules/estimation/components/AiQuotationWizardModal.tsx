@@ -399,7 +399,8 @@ export function AiQuotationWizardModal({ project, onClose }: {
       accessCheckInFlight.current = true;
       try {
         const state = await estimationApi.driveOAuthPocAccess({
-          projectId: project.id, driveFolderUrl: requestedUrl.current,
+          projectId: project.id,
+          ...(requestedUrl.current ? { driveFolderUrl: requestedUrl.current } : {}),
         });
         if (!cancelled && state.authorized) {
           if (requestedUrl.current) {
@@ -741,7 +742,7 @@ export function AiQuotationWizardModal({ project, onClose }: {
                     </a>
                   ) : (
                     <p role="alert">El enlace de Extras no es una carpeta de Google Drive.
-                      Corrígelo en la pestaña Extras.</p>
+                      Puedes buscar la carpeta correcta y actualizar Extras.</p>
                   )}
                 </div>
               ) : (
@@ -754,11 +755,61 @@ export function AiQuotationWizardModal({ project, onClose }: {
                       setError('');
                     }}
                     placeholder="https://drive.google.com/drive/folders/..."
-                    helperText="No existe documentación en Extras. Introduce la carpeta del proyecto." />
+                    helperText="Opcional: pega la URL o busca automáticamente la carpeta en tu Drive." />
                 </div>
               )}
-              {oauthResult && <p role="alert" className={styles.error}>{oauthResult}</p>}
+              <Button variant="outline" size="sm" onClick={() => void connectAndDiscover()}>
+                Buscar carpeta de levantamiento en mi Drive
+              </Button>
+              {oauthResult && <p role="alert" className={styles.error}>{oauthResult}</p>
             </>
+          )}
+
+          {sourceStep === 'discovering' && (
+            <div className={styles.connecting} role="status">
+              <span className={styles.bigSpinner} aria-hidden="true" />
+              <strong>Buscando carpetas de levantamiento</strong>
+              <p>Kora coteja proyecto y cliente con carpetas accesibles. No lee
+                ni descarga todo tu Drive.</p>
+            </div>
+          )}
+          {sourceStep === 'candidates' && (
+            <div className={styles.driveSource}>
+              <strong>Carpeta de levantamiento del proyecto</strong>
+              <p>{discovery?.selectedFolder
+                ? 'Encontramos una coincidencia de alta confianza. Confirma que sea correcta.'
+                : discovery?.candidates.length
+                  ? 'Hay varias posibilidades. Confirma cuál corresponde al proyecto.'
+                  : 'No encontramos una coincidencia clara. Puedes pegar el enlace manualmente.'}</p>
+              <div className={styles.discoveryChoices} role="group" aria-label="Carpetas candidatas">
+                {discovery?.candidates.map((candidate) => (
+                  <label key={candidate.folderId} className={styles.folderPickerItem}>
+                    <input type="radio" name="kora-discovery-folder"
+                      checked={discoveryChoice === candidate.url}
+                      onChange={() => { setDiscoveryChoice(candidate.url); setManualFolderUrl(''); }} />
+                    <FolderOpenIcon size={17} />
+                    <span>
+                      <strong>{candidate.name}</strong>
+                      <small>{candidate.confidence === 'high' ? 'Coincidencia alta' :
+                        candidate.confidence === 'medium' ? 'Coincidencia media' : 'Coincidencia baja'}
+                        {' · '}{[...candidate.ancestorNames].reverse().join(' / ') || 'Mi Drive'}
+                      </small>
+                      <small>{candidate.reasons.join(' ')}</small>
+                    </span>
+                  </label>
+                ))}
+              </div>
+              <TextField label="O pega el enlace de otra carpeta" type="url"
+                placeholder="https://drive.google.com/drive/folders/..."
+                value={manualFolderUrl}
+                onChange={(event) => {
+                  setManualFolderUrl(event.target.value);
+                  setDiscoveryChoice('');
+                  setError('');
+                }} />
+              <p className={styles.coverageNote}>La carpeta confirmada se guardará en Extras →
+                Documentación. Gemini analizará documentos reales de la selección.</p>
+            </div>
           )}
           {sourceStep === 'connecting' && (
             <div className={styles.connecting} role="status">

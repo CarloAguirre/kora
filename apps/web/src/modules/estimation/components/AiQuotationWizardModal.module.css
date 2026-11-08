@@ -345,3 +345,12 @@
   .folderPickerList { max-height: 42vh; }
   .folderPickerItem { padding: 10px; }
 }
+
+.discoveryChoices {
+  display: grid;
+  gap: 7px;
+  max-height: min(38vh, 310px);
+  overflow-y: auto;
+  min-width: 0;
+  padding: 2px;
+}
