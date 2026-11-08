@@ -701,6 +701,8 @@ export function AiQuotationWizardModal({ project, onClose }: {
           {stage === 0 ? 'Cancelar' :
             stage === 1 ? editingUnderstanding ? 'Guardar resumen' : 'Editar' : 'Atrás'}
         </Button>
+        {!(stage === 0 && (sourceStep === 'connecting' || sourceStep === 'discovering' ||
+          (sourceStep === 'source' && !driveUrlValid))) && (
         <Button className={styles.primaryAction} loading={working} disabled={
           (stage === 0 && (questionnaire.isLoading || driveStatus.isLoading ||
             (sourceStep === 'documents' && !preview?.documents.length) ||
@@ -718,6 +720,7 @@ export function AiQuotationWizardModal({ project, onClose }: {
             'Analizar proyecto' : stage === 1 ? 'Está correcto' :
             stage === 4 ? 'Generar estimación' : 'Continuar'}
         </Button>
+        )}
       </>}>
       <nav aria-label="Etapas del asistente de cotización" className={styles.stepper}>
         <ol>{STAGES.map((label, index) => (
@@ -733,37 +736,41 @@ export function AiQuotationWizardModal({ project, onClose }: {
           <h3 className={styles.srOnly}>Documentos para el análisis</h3>
           {sourceStep === 'source' && (
             <>
-              <p className={styles.intro}>
-                El agente analizará los antecedentes reales del proyecto en Google Drive.
-              </p>
-              {extrasFolderUrl ? (
-                <div className={styles.driveSource}>
-                  <strong>Carpeta de documentación registrada en Extras</strong>
-                  {driveUrlValid ? (
+              {driveUrlValid ? (
+                <>
+                  <p className={styles.intro}>
+                    El agente analizará los antecedentes reales del proyecto en Google Drive.
+                  </p>
+                  <div className={styles.driveSource}>
+                    <strong>Carpeta de documentación registrada en Extras</strong>
                     <a href={driveFolderUrl} target="_blank" rel="noreferrer">
                       Abrir carpeta en Google Drive
                     </a>
-                  ) : (
-                    <p role="alert">El enlace de Extras no es una carpeta de Google Drive.
-                      Puedes buscar la carpeta correcta y actualizar Extras.</p>
-                  )}
-                </div>
+                  </div>
+                  <Button variant="tertiary" size="sm" className={styles.driveConnectAction}
+                    onClick={() => void connectAndDiscover()}>
+                    Buscar carpeta de levantamiento en mi Drive
+                  </Button>
+                </>
               ) : (
-                <div className={styles.driveSource}>
-                  <TextField label="Carpeta de Google Drive del proyecto" type="url"
-                    value={manualFolderUrl}
-                    onChange={(event) => {
-                      setManualFolderUrl(event.target.value);
-                      setSelectedFolderUrl('');
-                      setError('');
-                    }}
-                    placeholder="https://drive.google.com/drive/folders/..."
-                    helperText="Opcional: pega la URL o busca automáticamente la carpeta en tu Drive." />
-                </div>
+                <>
+                  <p className={styles.intro}>
+                    El agente necesita la carpeta de levantamiento.{' '}
+                    {extrasFolderUrl
+                      ? 'El enlace registrado en Extras no corresponde a una carpeta de Drive.'
+                      : 'El proyecto no tiene una carpeta en Extras.'}{' '}
+                    Conecta tu cuenta de Google: solo se buscará en las carpetas a las que
+                    esta conexión tiene acceso.
+                  </p>
+                  {extrasFolderUrl && <p role="alert" className={styles.coverageNote}>
+                    Puedes localizar otra carpeta y actualizar el enlace de Extras.
+                  </p>}
+                  <Button variant="secondary" size="sm" className={styles.driveConnectAction}
+                    onClick={() => void connectAndDiscover()}>
+                    Conectar con Google Drive
+                  </Button>
+                </>
               )}
-              <Button variant="outline" size="sm" onClick={() => void connectAndDiscover()}>
-                Buscar carpeta de levantamiento en mi Drive
-              </Button>
               {oauthResult && <p role="alert" className={styles.error}>{oauthResult}</p>}
             </>
           )}

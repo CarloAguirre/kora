@@ -101,3 +101,19 @@ pnpm --filter @kora/web build
 Las pruebas se incorporaron al repositorio pero **no se ejecutaron
 localmente** desde este entorno. El PR permanece draft y requiere la
 validación funcional con Google Drive real y Gemini configurados.
+
+## Ajuste de UX inicial de Google Drive (08-11-2026)
+
+La vista sin documentación en Extras debe seguir la segunda captura
+del prototipo: explicación breve y **un único botón Conectar con Google
+Drive**. Se elimina el campo manual y el segundo botón del pie de esa
+primera pantalla. Se mantiene Cancelar; el botón usa `Button secondary sm`
+del UI kit de Kora, no un estilo de botón inventado.
+
+Cuando Extras ya tiene carpeta Drive válida, se conserva la apertura
+directa y el botón Analizar proyecto; el enlace para cambiar de carpeta
+queda como opción secundaria. Las URL manuales se piden **después** del
+descubrimiento, dentro de candidatas, cuando el usuario necesita elegir
+o corregir. OAuth, permisos, ranking, Gemini, guardado en Extras y
+reglas de confirmación siguen intactos. Pruebas del wizard actualizadas
+para proteger el estado inicial sin doble CTA.

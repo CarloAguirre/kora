@@ -214,7 +214,7 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
 
   it('descubre carpetas sin URL previa y guarda la seleccionada en Extras', async () => {
     renderWizard({ ...project, documentationLink: null } as ProjectDetail);
-    fireEvent.click(screen.getByRole('button', { name: 'Buscar carpeta en Drive' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Conectar con Google Drive' }));
     await waitFor(() => expect(mocks.resolve).toHaveBeenCalledWith({
       projectId: project.id, projectName: project.name,
       clientName: 'Cliente QA', documentationLink: null, quotationLink: null,
@@ -239,7 +239,7 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
   it('no modifica Extras si la carpeta confirmada está vacía o no es legible', async () => {
     mocks.browse.mockResolvedValueOnce({ ...previewResult, documents: [] });
     renderWizard({ ...project, documentationLink: null } as ProjectDetail);
-    fireEvent.click(screen.getByRole('button', { name: 'Buscar carpeta en Drive' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Conectar con Google Drive' }));
     await screen.findByRole('group', { name: 'Carpetas candidatas' });
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar carpeta' }));
     expect(await screen.findByText(/No hay documentos legibles/)).toBeInTheDocument();
@@ -268,7 +268,7 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
       candidates: [], message: 'Sin coincidencias',
     });
     renderWizard({ ...project, documentationLink: null } as ProjectDetail);
-    fireEvent.click(screen.getByRole('button', { name: 'Buscar carpeta en Drive' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Conectar con Google Drive' }));
     await screen.findByRole('group', { name: 'Carpetas candidatas' });
     expect(mocks.updateExtras).not.toHaveBeenCalled();
     const input = screen.getByLabelText('O pega el enlace de otra carpeta');
@@ -290,7 +290,7 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
     const open = vi.spyOn(window, 'open').mockReturnValue(popup as unknown as Window);
     try {
       renderWizard({ ...project, documentationLink: null } as ProjectDetail);
-      fireEvent.click(screen.getByRole('button', { name: 'Buscar carpeta en Drive' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Conectar con Google Drive' }));
       await waitFor(() => expect(mocks.oauthStart).toHaveBeenCalledWith({
         projectId: project.id,
       }));
@@ -401,26 +401,30 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
     }
   });
 
-  it('pide el enlace de Drive únicamente cuando Extras no tiene documentación', async () => {
+  it('sin carpeta en Extras presenta una sola conexión nativa y conserva el descubrimiento', async () => {
     renderWizard({ ...project, documentationLink: null } as ProjectDetail);
-    const input = screen.getByLabelText('Carpeta de Google Drive del proyecto');
-    expect(input).toHaveValue('');
-    expect(screen.getByRole('button', { name: 'Buscar carpeta en Drive' })).toBeEnabled();
-    fireEvent.change(input, { target: { value: 'https://drive.google.com/drive/folders/carpeta-nueva-real' } });
-    expect(screen.getByRole('button', { name: 'Analizar proyecto' })).not.toBeDisabled();
-    fireEvent.click(screen.getByRole('button', { name: 'Analizar proyecto' }));
-    await waitFor(() => expect(mocks.browse).toHaveBeenCalledWith(expect.objectContaining({
-      folderUrl: 'https://drive.google.com/drive/folders/carpeta-nueva-real',
-    })));
-    expect(mocks.analyze).not.toHaveBeenCalled();
-    expect(screen.getByText('Indicaciones adicionales · opcional')).toBeInTheDocument();
+    expect(screen.getByText(/El proyecto no tiene una carpeta en Extras/)).toBeInTheDocument();
+    expect(screen.queryByLabelText('Carpeta de Google Drive del proyecto')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Analizar proyecto' })).not.toBeInTheDocument();
+    const connect = screen.getByRole('button', { name: 'Conectar con Google Drive' });
+    expect(connect.className).toContain('secondary');
+    expect(connect).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Cancelar' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('O pega el enlace de otra carpeta')).not.toBeInTheDocument();
+    fireEvent.click(connect);
+    await screen.findByRole('group', { name: 'Carpetas candidatas' });
+    expect(mocks.resolve).toHaveBeenCalledOnce();
+    expect(mocks.updateExtras).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('O pega el enlace de otra carpeta')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Confirmar carpeta' })).toBeInTheDocument();
   });
 
   it('si Extras apunta a otro tipo de enlace no suplanta documentos con KDM', () => {
     renderWizard({ ...project, documentationLink: 'https://example.com/docs' } as ProjectDetail);
     expect(screen.queryByLabelText('Carpeta de Google Drive del proyecto')).not.toBeInTheDocument();
-    expect(screen.getByRole('alert')).toHaveTextContent('Puedes buscar la carpeta correcta');
-    expect(screen.getByRole('button', { name: 'Buscar carpeta en Drive' })).toBeEnabled();
+    expect(screen.getByText(/El enlace registrado en Extras no corresponde/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Conectar con Google Drive' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Analizar proyecto' })).not.toBeInTheDocument();
   });
 
   it('toma la carpeta Drive de Extras sin solicitar ingresar otra URL', async () => {

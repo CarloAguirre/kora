@@ -354,3 +354,9 @@
   min-width: 0;
   padding: 2px;
 }
+
+/* Conexión inicial, una sola acción en el contenido; aspecto del Button Kora. */
+.driveConnectAction {
+  justify-self: start;
+  max-width: 100%;
+}
