@@ -764,7 +764,7 @@ export function AiQuotationWizardModal({ project, onClose }: {
               <Button variant="outline" size="sm" onClick={() => void connectAndDiscover()}>
                 Buscar carpeta de levantamiento en mi Drive
               </Button>
-              {oauthResult && <p role="alert" className={styles.error}>{oauthResult}</p>
+              {oauthResult && <p role="alert" className={styles.error}>{oauthResult}</p>}
             </>
           )}
 
