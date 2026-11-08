@@ -193,3 +193,22 @@ con un PDF anidado), solo formatos incompatibles, y Drive 403.
 Los fixtures antiguos que asumían que una carpeta vacía podía
 resolverse automáticamente se ajustan para contener PDF real.
 Validación TypeScript, Vitest y build pendiente de ejecución local.
+
+## Estado sin candidatas: fallback manual (08-11-2026)
+
+El wizard distingue un descubrimiento con candidatas de otro sin
+resultados (`candidates: []`, `selectedFolder: null`). En el segundo
+caso muestra el estado del prototipo v6: alerta amarilla con nombre
+real del proyecto, campo `O pega el link de la carpeta`, botones
+`Cancelar` y `Confirmar carpeta`; no presenta una lista vacía.
+El aviso utiliza tokens semánticos warning y el campo y los botones
+nativos Kora. Si Drive no estuvo disponible, el texto lo indica
+sin declarar falsamente que la carpeta no existe.
+
+Confirmar sigue deshabilitado hasta que exista un enlace de Google
+Drive válido. Se conserva la exploración/validación del enlace,
+verificación de documentos y escritura de `documentationLink` solo
+tras confirmación y lectura de documentos, sin guardar URLs inválidas
+ni iniciar Gemini anticipadamente. El flujo con candidatas no cambia.
+Se añaden pruebas para el estado sin resultados, URL inválida/válida,
+guardado diferido y fallo de descubrimiento. Validación local pendiente.

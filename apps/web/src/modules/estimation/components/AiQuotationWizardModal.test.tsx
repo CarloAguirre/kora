@@ -270,24 +270,56 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
       .toBeInTheDocument();
   });
 
-  it('si no hay candidatas permite introducir una URL y no guarda sin confirmación', async () => {
+  it('sin candidatas presenta el aviso amarillo, enlace manual y confirmación protegida', async () => {
     mocks.resolve.mockResolvedValueOnce({
       connection: 'connected', status: 'not_found', selectedFolder: null,
       candidates: [], message: 'Sin coincidencias',
     });
     renderWizard({ ...project, documentationLink: null } as ProjectDetail);
     fireEvent.click(screen.getByRole('button', { name: 'Conectar con Google Drive' }));
-    await screen.findByRole('group', { name: 'Carpetas candidatas' });
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('No encontramos carpetas con documentación compatible');
+    expect(alert).toHaveTextContent('Motor de notificaciones');
+    expect(alert.className).toContain('discoveryNoResultsWarning');
+    expect(screen.queryByRole('group', { name: 'Carpetas candidatas' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Carpeta de levantamiento del proyecto')).not.toBeInTheDocument();
+    const confirm = screen.getByRole('button', { name: 'Confirmar carpeta' });
+    expect(confirm).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Cancelar' })).toBeEnabled();
     expect(mocks.updateExtras).not.toHaveBeenCalled();
-    const input = screen.getByLabelText('O pega el enlace de otra carpeta');
+    expect(mocks.browse).not.toHaveBeenCalled();
+
+    const input = screen.getByLabelText('O pega el link de la carpeta');
+    fireEvent.change(input, { target: { value: 'https://example.com/folders/no-es-drive' } });
+    expect(confirm).toBeDisabled();
     fireEvent.change(input, { target: {
       value: 'https://drive.google.com/drive/folders/carpeta-seleccion-manual',
     } });
-    fireEvent.click(screen.getByRole('button', { name: 'Confirmar carpeta' }));
+    expect(confirm).toBeEnabled();
+    expect(mocks.updateExtras).not.toHaveBeenCalled();
+    fireEvent.click(confirm);
+    await waitFor(() => expect(mocks.browse).toHaveBeenCalledWith(expect.objectContaining({
+      folderUrl: 'https://drive.google.com/drive/folders/carpeta-seleccion-manual',
+    })));
     await waitFor(() => expect(mocks.updateExtras).toHaveBeenCalledWith({
       projectId: project.id,
       input: { documentationLink: 'https://drive.google.com/drive/folders/carpeta-seleccion-manual' },
     }));
+    expect(mocks.analyze).not.toHaveBeenCalled();
+  });
+
+  it('si Drive no estuvo disponible no confunde el error con ausencia de carpetas', async () => {
+    mocks.resolve.mockResolvedValueOnce({
+      connection: 'unavailable', status: 'not_found', selectedFolder: null,
+      candidates: [], message: 'Drive no disponible',
+    });
+    renderWizard({ ...project, documentationLink: null } as ProjectDetail);
+    fireEvent.click(screen.getByRole('button', { name: 'Conectar con Google Drive' }));
+    expect(await screen.findByRole('alert'))
+      .toHaveTextContent('No fue posible verificar las carpetas de Drive');
+    expect(screen.queryByText(/No encontramos carpetas con documentación compatible/))
+      .not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Confirmar carpeta' })).toBeDisabled();
   });
 
   it('OAuth sin URL activa descubrimiento del usuario y no inicia análisis Gemini', async () => {

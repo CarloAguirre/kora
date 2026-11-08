@@ -360,3 +360,20 @@
   justify-self: start;
   max-width: 100%;
 }
+
+/* Fallback manual al no encontrar carpetas candidatas, con tokens Kora. */
+.discoveryNoResults {
+  display: grid;
+  gap: var(--kora-space-4);
+  min-width: 0;
+}
+.discoveryNoResultsWarning {
+  margin: 0;
+  padding: var(--kora-space-3);
+  border-radius: var(--kora-radius);
+  background: var(--kora-badge-warning-bg);
+  color: var(--kora-badge-warning-text);
+  font-size: var(--kora-text-xs);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}

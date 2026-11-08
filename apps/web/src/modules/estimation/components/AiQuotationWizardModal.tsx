@@ -784,6 +784,7 @@ export function AiQuotationWizardModal({ project, onClose }: {
             </div>
           )}
           {sourceStep === 'candidates' && (
+            (discovery?.candidates.length ?? 0) > 0 || discovery?.selectedFolder ? (
             <div className={styles.driveSource}>
               <strong>Carpeta de levantamiento del proyecto</strong>
               <p>{discovery?.selectedFolder
@@ -820,7 +821,29 @@ export function AiQuotationWizardModal({ project, onClose }: {
               <p className={styles.coverageNote}>La carpeta confirmada se guardará en Extras →
                 Documentación. Gemini analizará documentos reales de la selección.</p>
             </div>
+            ) : (
+              <div className={styles.discoveryNoResults}>
+                <p role="alert" className={styles.discoveryNoResultsWarning}>
+                  {discovery?.connection === 'connected'
+                    ? <>No encontramos carpetas con documentación compatible para «{project.name}».
+                        Pega el enlace de la carpeta que deseas usar.</>
+                    : 'No fue posible verificar las carpetas de Drive. Si conoces la carpeta, pega su enlace.'}
+                </p>
+                <TextField
+                  label="O pega el link de la carpeta"
+                  type="url"
+                  placeholder="https://drive.google.com/drive/folders/..."
+                  value={manualFolderUrl}
+                  onChange={(event) => {
+                    setManualFolderUrl(event.target.value);
+                    setDiscoveryChoice('');
+                    setError('');
+                  }}
+                />
+              </div>
+            )
           )}
+
           {sourceStep === 'connecting' && (
             <div className={styles.connecting} role="status">
               <span className={styles.bigSpinner} aria-hidden="true" />
