@@ -240,6 +240,7 @@ export function AiQuotationWizardModal({ project, onClose }: {
   const [selectedFolderUrl, setSelectedFolderUrl] = useState(extrasFolderUrl);
   const driveFolderUrl = selectedFolderUrl || manualFolderUrl.trim();
   const driveUrlValid = isRealDriveFolderUrl(driveFolderUrl);
+  const extrasFolderValid = isRealDriveFolderUrl(extrasFolderUrl);
   const [authorizationRootUrl, setAuthorizationRootUrl] = useState('');
   const [sourceStep, setSourceStep] = useState<
     'source' | 'connecting' | 'discovering' | 'candidates' | 'loading' | 'documents' | 'analyzing'
@@ -462,7 +463,9 @@ export function AiQuotationWizardModal({ project, onClose }: {
       reportError('Ingresa una URL válida de carpeta de Google Drive.');
       return;
     }
-    if (serviceAccountEnabled) {
+    // Primero la cuenta autorizada del usuario. La cuenta técnica es
+    // alternativa únicamente cuando OAuth no está habilitado.
+    if (driveStatus.data?.enabled !== true && serviceAccountEnabled) {
       await loadDocuments(url, url);
       return;
     }
@@ -639,7 +642,9 @@ export function AiQuotationWizardModal({ project, onClose }: {
         return;
       }
       if (sourceStep === 'source') {
-        if (driveUrlValid) await connectAndPreview(driveFolderUrl);
+        // Respaldo defensivo: si Extras tiene una carpeta válida, utilizar
+        // esa URL aunque una selección posterior hubiera quedado sin confirmar.
+        if (extrasFolderValid) await connectAndPreview(extrasFolderUrl);
         else await connectAndDiscover();
       } else if (sourceStep === 'candidates') {
         await confirmDiscoveredFolder();
@@ -722,7 +727,7 @@ export function AiQuotationWizardModal({ project, onClose }: {
             stage === 1 ? editingUnderstanding ? 'Guardar resumen' : 'Editar' : 'Atrás'}
         </Button>
         {!(stage === 0 && (sourceStep === 'connecting' || sourceStep === 'discovering' ||
-          (sourceStep === 'source' && !driveUrlValid))) && (
+          sourceStep === 'source')) && (
         <Button className={styles.primaryAction} loading={working} disabled={
           (stage === 0 && (questionnaire.isLoading || driveStatus.isLoading ||
             (sourceStep === 'documents' && !preview?.documents.length) ||
@@ -756,20 +761,16 @@ export function AiQuotationWizardModal({ project, onClose }: {
           <h3 className={styles.srOnly}>Documentos para el análisis</h3>
           {sourceStep === 'source' && (
             <>
-              {driveUrlValid ? (
+              {extrasFolderValid ? (
                 <>
                   <p className={styles.intro}>
-                    El agente analizará los antecedentes reales del proyecto en Google Drive.
+                    La carpeta de documentación ya está registrada en Extras.
+                    Conecta tu cuenta de Google Drive para que el agente pueda leerla.
                   </p>
-                  <div className={styles.driveSource}>
-                    <strong>Carpeta de documentación registrada en Extras</strong>
-                    <a href={driveFolderUrl} target="_blank" rel="noreferrer">
-                      Abrir carpeta en Google Drive
-                    </a>
-                  </div>
-                  <Button variant="tertiary" size="sm" className={styles.driveConnectAction}
-                    onClick={() => void connectAndDiscover()}>
-                    Buscar carpeta de levantamiento en mi Drive
+                  <Button variant="secondary" size="sm" className={styles.driveConnectAction}
+                    disabled={driveStatus.isLoading}
+                    onClick={() => void connectAndPreview(extrasFolderUrl)}>
+                    Conectar con Google Drive
                   </Button>
                 </>
               ) : (
@@ -786,6 +787,7 @@ export function AiQuotationWizardModal({ project, onClose }: {
                     Puedes localizar otra carpeta y actualizar el enlace de Extras.
                   </p>}
                   <Button variant="secondary" size="sm" className={styles.driveConnectAction}
+                    disabled={driveStatus.isLoading}
                     onClick={() => void connectAndDiscover()}>
                     Conectar con Google Drive
                   </Button>

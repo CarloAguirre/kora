@@ -187,7 +187,7 @@ beforeEach(() => {
 });
 
 async function prepareDocuments() {
-  fireEvent.click(screen.getByRole('button', { name: 'Analizar proyecto' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Conectar con Google Drive' }));
   expect(await screen.findByRole('list', { name: 'Documentos que analizará el agente' }))
     .toBeInTheDocument();
 }
@@ -255,19 +255,23 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
     expect(mocks.analyze).not.toHaveBeenCalled();
   });
 
-  it('al confirmar otra carpeta reemplaza el enlace anterior de Extras', async () => {
+  it('con Extras válido conecta directamente a su carpeta sin descubrir ni modificar Extras', async () => {
     renderWizard();
-    fireEvent.click(screen.getByRole('button', {
-      name: 'Buscar carpeta de levantamiento en mi Drive',
-    }));
-    await screen.findByRole('group', { name: 'Carpetas candidatas' });
-    fireEvent.click(screen.getByRole('button', { name: 'Confirmar carpeta' }));
-    await waitFor(() => expect(mocks.updateExtras).toHaveBeenCalledWith({
+    expect(screen.queryByRole('button', { name: 'Analizar proyecto' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Buscar carpeta de levantamiento en mi Drive' }))
+      .not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Conectar con Google Drive' })).toHaveLength(1);
+    expect(mocks.browse).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Conectar con Google Drive' }));
+    await waitFor(() => expect(mocks.browse).toHaveBeenCalledWith({
       projectId: project.id,
-      input: { documentationLink: 'https://drive.google.com/drive/folders/levantamiento-nuevo' },
+      authorizationFolderUrl: project.documentationLink,
+      folderUrl: project.documentationLink,
     }));
     expect(await screen.findByRole('list', { name: 'Documentos que analizará el agente' }))
       .toBeInTheDocument();
+    expect(mocks.resolve).not.toHaveBeenCalled();
+    expect(mocks.updateExtras).not.toHaveBeenCalled();
   });
 
   it('sin candidatas presenta el aviso amarillo, enlace manual y confirmación protegida', async () => {
@@ -475,7 +479,7 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
   });
 
 
-  it('desde Analizar proyecto abre OAuth automáticamente sin botones de prueba ni confirmación', async () => {
+  it('desde Conectar con Google Drive autoriza la carpeta de Extras sin pedir otra', async () => {
     mocks.serviceAccountEnabled = false;
     mocks.driveAccess.mockResolvedValueOnce({ authorized: false })
       .mockResolvedValue({ authorized: true });
@@ -486,12 +490,18 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
       expect(screen.queryByText('Indicaciones adicionales · opcional')).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /Probar acceso|Comprobar autorización/ }))
         .not.toBeInTheDocument();
-      fireEvent.click(screen.getByRole('button', { name: 'Analizar proyecto' }));
+      expect(screen.queryByRole('button', { name: 'Analizar proyecto' })).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Conectar con Google Drive' }));
       await waitFor(() => expect(mocks.oauthStart).toHaveBeenCalledWith({
         projectId: project.id,
         driveFolderUrl: 'https://drive.google.com/drive/folders/carpeta-qa-real',
       }));
       expect(open).toHaveBeenCalledOnce();
+      expect(mocks.driveAccess).toHaveBeenCalledWith({
+        projectId: project.id,
+        driveFolderUrl: project.documentationLink,
+      });
+      expect(mocks.resolve).not.toHaveBeenCalled();
       expect(popup.location.replace).toHaveBeenCalledWith(expect.stringContaining('accounts.google.com'));
       expect(mocks.analyze).not.toHaveBeenCalled();
       // COOP puede bloquear window.opener; el backend valida la autorización.
@@ -539,13 +549,18 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
     expect(screen.getByRole('navigation', {
       name: 'Etapas del asistente de cotización',
     })).toBeInTheDocument();
-    expect(screen.getByText('Carpeta de documentación registrada en Extras')).toBeInTheDocument();
+    expect(screen.getByText(/La carpeta de documentación ya está registrada en Extras/))
+      .toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Conectar con Google Drive' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Analizar proyecto' })).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Carpeta de Google Drive del proyecto')).not.toBeInTheDocument();
     expect(screen.getByRole('dialog', { name: '✦ Nueva cotización con el agente IA' }))
       .toBeInTheDocument();
     expect(screen.getByText('1. Análisis')).toHaveAttribute('aria-current', 'step');
     expect(screen.getByText('2. Entendimiento')).toBeInTheDocument();
-    expect(screen.getByText('Abrir carpeta en Google Drive')).toBeInTheDocument();
+    expect(screen.queryByText('Abrir carpeta en Google Drive')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Buscar carpeta de levantamiento en mi Drive' }))
+      .not.toBeInTheDocument();
     expect(screen.queryByText('Indicaciones adicionales · opcional')).not.toBeInTheDocument();
     await prepareDocuments();
     expect(screen.getByText('Levantamiento QA')).toBeInTheDocument();
