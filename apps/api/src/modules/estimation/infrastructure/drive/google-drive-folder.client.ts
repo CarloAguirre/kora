@@ -33,7 +33,10 @@ interface GoogleDriveFileResponse {
 
 interface GoogleDriveListResponse {
   files?: GoogleDriveFileResponse[];
+  nextPageToken?: string;
 }
+/** Evita asumir que la primera página de Drive contiene todo el levantamiento. */
+const MAX_LIST_PAGES = 10;
 
 /**
  * Adaptador server-to-server para Google Drive mediante cuenta de servicio.
@@ -182,26 +185,35 @@ export class GoogleDriveFolderClient implements DriveFolderClient {
   ): Promise<readonly DriveFolderItem[]> {
     this.assertConfigured();
     const accessToken = await this.getAccessToken();
-    const url = new URL(DRIVE_FILES_ENDPOINT);
-    url.searchParams.set('q', query);
-    url.searchParams.set('fields', `files(${FILE_FIELDS})`);
-    url.searchParams.set('pageSize', String(pageSize));
-    url.searchParams.set('supportsAllDrives', 'true');
-    url.searchParams.set('includeItemsFromAllDrives', 'true');
-    if (orderBy) url.searchParams.set('orderBy', orderBy);
-
-    const response = await fetch(url, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-
-    if (!response.ok) {
-      throw driveError(response.status);
+    const files: DriveFolderItem[] = [];
+    let nextPageToken: string | undefined;
+    const seenPages = new Set<string>();
+    for (let page = 0; page < MAX_LIST_PAGES; page++) {
+      const url = new URL(DRIVE_FILES_ENDPOINT);
+      url.searchParams.set('q', query);
+      url.searchParams.set('fields', `nextPageToken,files(${FILE_FIELDS})`);
+      url.searchParams.set('pageSize', String(pageSize));
+      url.searchParams.set('supportsAllDrives', 'true');
+      url.searchParams.set('includeItemsFromAllDrives', 'true');
+      if (orderBy) url.searchParams.set('orderBy', orderBy);
+      if (nextPageToken) url.searchParams.set('pageToken', nextPageToken);
+      const response = await fetch(url, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (!response.ok) throw driveError(response.status);
+      const body = (await response.json()) as GoogleDriveListResponse;
+      files.push(...(body.files ?? [])
+        .filter(isUsableDriveFile)
+        .map(toDriveFolderItem));
+      if (!body.nextPageToken) return files;
+      if (seenPages.has(body.nextPageToken)) {
+        throw new Error('Google Drive devolvió una paginación repetida. Intenta nuevamente.');
+      }
+      seenPages.add(body.nextPageToken);
+      nextPageToken = body.nextPageToken;
     }
-
-    const body = (await response.json()) as GoogleDriveListResponse;
-    return (body.files ?? [])
-      .filter(isUsableDriveFile)
-      .map(toDriveFolderItem);
+    // No tratar un listado incompleto como si la carpeta estuviera vacía.
+    throw new Error('La carpeta supera el máximo de páginas de Drive. Reduce el alcance o selecciona una subcarpeta.');
   }
 
   private async authorizedFetch(url: string): Promise<Response> {

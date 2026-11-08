@@ -222,9 +222,11 @@ export class GoogleDriveDocumentSourceReader implements DocumentSourceReader {
           continue;
         }
         omitted.push({ path: candidate.path, reason: 'documento sin contenido analizable' });
-      } catch {
-        // No ocultar la pérdida de una fuente: el informe llegará al usuario.
-        omitted.push({ path: candidate.path, reason: 'falló la lectura del archivo' });
+      } catch (cause) {
+        // Distinguir error de permisos/HTTP del caso sin documentos, sin
+        // exponer URLs privadas, tokens ni cuerpos de respuesta de Drive.
+        omitted.push({ path: candidate.path,
+          reason: 'falló la lectura del archivo (' + safeDriveReadFailure(cause) + ')' });
       }
     }
 
@@ -253,7 +255,19 @@ export class GoogleDriveDocumentSourceReader implements DocumentSourceReader {
 
     while (queue.length > 0 && scannedItems < MAX_SCANNED_ITEMS) {
       const current = queue.shift()!;
-      const children = await this.drive.listChildren(current.folderId);
+      let children: readonly DriveFolderItem[];
+      try {
+        children = await this.drive.listChildren(current.folderId);
+      } catch (cause) {
+        // Raíz ilegible: error explícito. Subcarpeta inaccesible: registrar
+        // evidencia sin ocultar el resto de fuentes legibles del proyecto.
+        if (current.depth === 1) throw cause;
+        omissions.push({
+          path: current.path,
+          reason: 'no fue posible explorar la subcarpeta (' + safeDriveReadFailure(cause) + ')',
+        });
+        continue;
+      }
       // Evita que el orden arbitrario de Drive esconda archivos críticos.
       const orderedChildren = [...children].sort((a, b) => {
         const aPriority = classifyDriveSource(a, current.path + '/' + a.name).priority;
@@ -306,4 +320,15 @@ export class GoogleDriveDocumentSourceReader implements DocumentSourceReader {
     if (queue.length > 0) scanTruncated = true;
     return { candidates, omissions, scannedItems, scanTruncated };
   }
+}
+
+/** Mensajes seguros para mostrar en la cobertura sin filtrar secretos OAuth. */
+function safeDriveReadFailure(error: unknown): string {
+  if (!(error instanceof Error)) return 'error desconocido';
+  if (/permiso para consultar|permiso denegado/i.test(error.message)) {
+    return 'Google Drive denegó el acceso o la descarga';
+  }
+  const status = error.message.match(/HTTP\s+(\d{3})/);
+  if (status) return 'Google Drive respondió HTTP ' + status[1];
+  return 'consulta o formato no disponible';
 }

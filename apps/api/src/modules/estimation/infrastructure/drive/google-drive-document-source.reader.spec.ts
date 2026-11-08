@@ -260,4 +260,78 @@ describe('GoogleDriveDocumentSourceReader', () => {
     expect(describeDocumentCoverage(result.coverage)).toContain('límite de exploración');
   });
 
+  it('con carpeta compartida encuentra PDFs en raíz/subcarpeta y explica por qué no procesa XLSX', async () => {
+    const folder = (id: string, name: string): DriveFolderItem => ({
+      id, name, mimeType: 'application/vnd.google-apps.folder',
+      modifiedAt: '2026-09-16T10:00:00.000Z', webViewLink: null,
+      sizeBytes: null, itemType: 'folder', parentIds: ['root123'],
+    });
+    const pdf = (id: string, name: string): DriveFolderItem =>
+      file(id, name, 'application/pdf');
+    const drive: DriveFolderClient = {
+      isConfigured: () => true, listFiles: async () => [],
+      searchFolders: async () => [], getMetadata: async () => null,
+      listChildren: async (id) => id === 'root123' ? [
+        folder('fichas', 'Fichas Protocolo'),
+        pdf('protocol', '1.10 Protocolo Relocalización.pdf'),
+        file('gantt', 'Cronograma Gantt.xlsx',
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'),
+      ] : id === 'fichas'
+        ? [pdf('ficha', 'Ficha de levantamiento.pdf')] : [],
+      readAnalysisContent: async (id, mime) =>
+        ({ mimeType: mime, dataBase64: id === 'protocol' ? 'cGRmMQ==' : 'cGRmMg==' }),
+    };
+    const result = await new GoogleDriveDocumentSourceReader(drive)
+      .readDriveSourcesWithCoverage('https://drive.google.com/drive/folders/root123');
+    expect(result.documents.map((doc) => doc.name)).toEqual([
+      'Ficha de levantamiento.pdf', '1.10 Protocolo Relocalización.pdf',
+    ]);
+    expect(result.coverage?.scannedItems).toBe(4);
+    expect(result.coverage?.eligibleDocuments).toBe(2);
+    expect(result.coverage?.omitted).toEqual(expect.arrayContaining([
+      expect.objectContaining({ path: 'Cronograma Gantt.xlsx',
+        reason: 'formato no compatible con el lector' }),
+    ]));
+  });
+
+  it('si falla la lectura de PDF informa el motivo sin ocultar otro PDF válido', async () => {
+    const drive = mockDrive([
+      file('blocked', 'Requerimiento protegido.pdf', 'application/pdf'),
+      file('readable', 'Alcance del proyecto.pdf', 'application/pdf'),
+    ], async (id) => {
+      if (id === 'blocked') throw new Error('Google Drive rechazó la consulta (HTTP 403).');
+      return { mimeType: 'application/pdf', dataBase64: 'cGRm' };
+    });
+    const result = await new GoogleDriveDocumentSourceReader(drive)
+      .readDriveSourcesWithCoverage('https://drive.google.com/drive/folders/root123');
+    expect(result.documents).toHaveLength(1);
+    expect(result.coverage?.omitted).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        path: 'Requerimiento protegido.pdf',
+        reason: expect.stringContaining('HTTP 403'),
+      }),
+    ]));
+  });
+
+  it('si una subcarpeta está bloqueada no cancela la lectura del resto', async () => {
+    const folder: DriveFolderItem = {
+      ...file('denied', 'Fichas Protocolo',
+        'application/vnd.google-apps.folder'), itemType: 'folder',
+    };
+    const drive = mockDrive([
+      folder, file('ok', 'Alcance general.pdf', 'application/pdf'),
+    ], async (_id, mime) => ({ mimeType: mime, dataBase64: 'cGRm' }));
+    drive.listChildren = async (id) => {
+      if (id === 'root123') return [folder, file('ok', 'Alcance general.pdf', 'application/pdf')];
+      throw new Error('Google Drive rechazó la consulta (HTTP 403).');
+    };
+    const result = await new GoogleDriveDocumentSourceReader(drive)
+      .readDriveSourcesWithCoverage('https://drive.google.com/drive/folders/root123');
+    expect(result.documents).toHaveLength(1);
+    expect(result.coverage?.omitted).toEqual(expect.arrayContaining([
+      expect.objectContaining({ path: 'Fichas Protocolo',
+        reason: expect.stringContaining('HTTP 403') }),
+    ]));
+  });
+
 });
