@@ -27,6 +27,7 @@ import { QuotationPhaseWorkspace } from '../components/QuotationPhaseWorkspace';
 import { QuotationTeamsWorkspace } from '../components/QuotationTeamsWorkspace';
 import { quotationAiAcceptanceBlockReason } from '../components/quotation-ai-acceptance';
 import { readQuotationTaskExcel } from '../lib/quotation-task-excel';
+import { emptyQuotationTeam, withQuotationTeamEdit } from '../lib/quotation-blank-team';
 import { suggestedKoraTeamForRole } from '../components/quotation-role-team-suggestions';
 import { QuotationCommercialSections } from '../components/QuotationCommercialSections';
 import { QuotationDraftSaveBar } from '../components/QuotationDraftSaveBar';
@@ -43,9 +44,7 @@ const fromVersion = (version: QuotationVersion): Form => ({
 });
 const numeric = (value: string): number => Math.max(0, Number(value) || 0);
 
-const emptyTeam = (teamId: string): QuotationDraftData['teams'][number] => ({
-  teamId, collaborators: 1, unit: 'week', duration: 1, hoursPerWeek: 40, dedicationPercent: 100,
-});
+const emptyTeam = emptyQuotationTeam;
 
 export function QuotationWorkspacePage() {
   const { user } = useAuth();
@@ -290,22 +289,15 @@ export function QuotationWorkspacePage() {
   }) : null;
   const editTeamById = (teamId: string, patch: Partial<QuotationDraftData['teams'][number]>) => {
     if (!editable || !form) return;
-    const exists = form.draft.teams.some((team) => team.teamId === teamId);
-    // En blanco, los equipos empiezan desmarcados. La primera edición de
-    // cualquiera de sus campos debe incorporarlo atómicamente al borrador;
-    // sin esto el input parecía habilitarse pero el cambio se perdía.
-    if (!exists && form.draft.aiPoc?.edt) return;
-    const draft = {
-      ...form.draft,
-      teams: exists
-        ? form.draft.teams.map((row) =>
-            row.teamId === teamId ? { ...row, ...patch } : row)
-        : [...form.draft.teams, { ...emptyTeam(teamId), ...patch }],
-    };
-    // En EDT, HH/sem se deriva de la carga WBS: nunca conservar un número
-    // desactualizado al cambiar dotación, unidad o duración.
-    const normalized = draft.aiPoc?.edt ? synchronizeQuotationEdtTeamLoad(draft) : draft;
-    change((current) => ({ ...current, draft: normalized }));
+    change((current) => {
+      // El updater funcional evita perder la primera edición al activar un
+      // equipo en blanco y luego cambiar otra celda inmediatamente.
+      const draft = withQuotationTeamEdit(current.draft, teamId, patch);
+      if (draft === current.draft) return current;
+      // En EDT, HH/sem se deriva de WBS; el modo manual mantiene sus inputs.
+      const normalized = draft.aiPoc?.edt ? synchronizeQuotationEdtTeamLoad(draft) : draft;
+      return { ...current, draft: normalized };
+    });
   };
   const editPhase = (index: number, patch: Partial<QuotationDraftData['phases'][number]>) => {
     updateDraft({ phases: phaseRows.map((row, position) =>
