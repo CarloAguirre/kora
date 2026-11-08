@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { DriveFolderClient } from '../ports/drive-folder-client.port';
+import type { DriveFolderClient, DriveFolderItem } from '../ports/drive-folder-client.port';
 import { ResolveEstimationDriveFolderUseCase } from './resolve-estimation-drive-folder.use-case';
 
 describe('ResolveEstimationDriveFolderUseCase', () => {
