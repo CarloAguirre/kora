@@ -412,7 +412,7 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
     });
     mocks.browse.mockReturnValueOnce(pendingBrowse);
     renderWizard();
-    fireEvent.click(screen.getByRole('button', { name: 'Analizar proyecto' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Conectar con Google Drive' }));
     expect(screen.getByRole('status', { name: 'Preparación de la documentación' }))
       .toHaveTextContent('Leyendo documentos');
     releaseBrowse(previewResult);
