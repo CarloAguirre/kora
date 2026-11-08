@@ -240,7 +240,9 @@ export async function apiEventStream<T>(
     if (event === 'complete') {
       result = data as T;
       complete = true;
-    } else if (event === 'thought') {
+    } else if (event !== 'message') {
+      // Los eventos de progreso se emiten en cuanto llegan del servidor.
+      // No se esperan ni se confunden con el JSON final de la solicitud.
       onEvent(event, data);
     }
   };

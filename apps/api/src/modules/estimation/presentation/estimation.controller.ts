@@ -202,14 +202,18 @@ export class EstimationController {
       'X-Accel-Buffering': 'no',
       'Connection': 'keep-alive',
     });
-    const send = (event: 'thought' | 'complete' | 'error', value: unknown) => {
+    // Se envían eventos comprobables antes de que Gemini emita su primer
+    // resumen. Gemini puede publicar sus thought summaries solo al terminar.
+    reply.raw.flushHeaders?.();
+    const send = (event: 'phase' | 'thought' | 'complete' | 'error', value: unknown) => {
       if (reply.raw.destroyed || reply.raw.writableEnded) return;
       reply.raw.write(`event: ${event}\ndata: ${JSON.stringify(value)}\n\n`);
     };
     try {
+      send('phase', { phase: 'reading', text: 'Consultando los documentos autorizados de Google Drive.' });
       const analysis = await this.analyzePoc.execute(input, sourceReader, (text) => {
         if (text.trim()) send('thought', { text });
-      });
+      }, (phase, text) => send('phase', { phase, text }));
       send('complete', analysis);
     } catch (reason) {
       send('error', { message: reason instanceof HttpException

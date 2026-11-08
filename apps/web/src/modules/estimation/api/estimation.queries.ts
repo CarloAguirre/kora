@@ -71,14 +71,15 @@ export function useEstimationDriveFiles(driveFolderUrl: string, enabled = true) 
 
 export interface AnalyzeEstimationWithSummaries extends AnalyzeEstimationPocInput {
   readonly onThoughtSummary?: (text: string) => void;
+  readonly onProgress?: (phase: string, text: string) => void;
   readonly signal?: AbortSignal;
 }
 
 export function useAnalyzeEstimationPoc() {
   return useMutation({
-    mutationFn: ({ onThoughtSummary, signal, ...input }: AnalyzeEstimationWithSummaries) =>
+    mutationFn: ({ onThoughtSummary, onProgress, signal, ...input }: AnalyzeEstimationWithSummaries) =>
       onThoughtSummary
-        ? estimationApi.analyzePocStream(input, onThoughtSummary, signal)
+        ? estimationApi.analyzePocStream(input, onThoughtSummary, signal, onProgress)
         : estimationApi.analyzePoc(input),
   });
 }

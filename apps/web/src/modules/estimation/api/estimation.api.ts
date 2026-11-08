@@ -87,13 +87,18 @@ export const estimationApi = {
     input: AnalyzeEstimationPocInput,
     onThoughtSummary: (text: string) => void,
     signal?: AbortSignal,
+    onProgress?: (phase: string, text: string) => void,
   ): Promise<EstimationPocAnalysis> {
     return apiEventStream<EstimationPocAnalysis>(
       '/estimations/poc/analyze/stream', input,
       (event, payload) => {
-        if (event !== 'thought' || !payload || typeof payload !== 'object') return;
-        const text = (payload as { text?: unknown }).text;
-        if (typeof text === 'string' && text.length) onThoughtSummary(text);
+        if (!payload || typeof payload !== 'object') return;
+        const value = payload as { text?: unknown; phase?: unknown };
+        if (typeof value.text !== 'string' || !value.text.trim()) return;
+        if (event === 'thought') onThoughtSummary(value.text);
+        if (event === 'phase' && typeof value.phase === 'string') {
+          onProgress?.(value.phase, value.text);
+        }
       }, signal,
     );
   },

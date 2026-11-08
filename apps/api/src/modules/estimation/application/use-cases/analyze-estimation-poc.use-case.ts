@@ -73,6 +73,7 @@ export class AnalyzeEstimationPocUseCase {
   async execute(
     input: AnalyzeEstimationPocInput, authorizedSources?: DocumentSourceReader,
     onThoughtSummary?: (text: string) => void,
+    onProgress?: (phase: 'documents' | 'gemini', text: string) => void,
   ): Promise<EstimationPocAnalysis> {
     const isLegacyPoc = this.ai.name === 'poc-ai';
     const sourceReader = authorizedSources ?? this.sources;
@@ -85,6 +86,9 @@ export class AnalyzeEstimationPocUseCase {
         (coverageNote ?? 'Comprueba los formatos de Drive y sus permisos.'));
     }
     const selected = loaded.documents;
+    onProgress?.('documents',
+      'Documentación leída: ' + selected.length + ' archivo(s) disponibles para el análisis.');
+    onProgress?.('gemini', 'Enviando los antecedentes a Gemini para elaborar el entendimiento.');
     const raw = await this.ai.generateStructured({
       task: 'estimation.poc.analysis',
       context: {
