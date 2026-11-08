@@ -16,6 +16,7 @@ import { Card } from '@/shared/components/ui/Card';
 import { Modal } from '@/shared/components/ui/Modal';
 import { TextField } from '@/shared/components/ui/TextField';
 import { Button } from '@/shared/components/ui/Button';
+import { PillSwitcher } from '@/shared/components/ui/PillSwitcher';
 import { Badge, type BadgeTone } from '@/shared/components/ui/Badge';
 import { TrashIcon } from '@/shared/components/icons/Icons';
 import { useToast } from '@/shared/components/ui/Toast';
@@ -673,12 +674,10 @@ export function ProjectModulesCard({
               <span>0 tareas</span>
             </div>
             {canManage && (
-              <div className={styles.roadmapModeSwitch} role="group" aria-label="Modo del Roadmap">
-                <Button size="sm" variant="ghost" aria-pressed={!planningMode}
-                  onClick={() => setPlanningMode(false)}>Ver</Button>
-                <Button size="sm" variant="ghost" aria-pressed={planningMode}
-                  onClick={() => setPlanningMode(true)}>Planificar</Button>
-              </div>
+              <PillSwitcher aria-label="Modo del Roadmap"
+                options={[{ value: 'view', label: 'Ver' }, { value: 'plan', label: 'Planificar' }]}
+                value={planningMode ? 'plan' : 'view'}
+                onChange={(value) => setPlanningMode(value === 'plan')} />
             )}
           </header>
           <p className={styles.emptyRoadmapDefinition}>
@@ -763,12 +762,10 @@ export function ProjectModulesCard({
         renderPhaseHeaderName={renderPhaseHeaderName}
         renderPhaseHeaderActions={renderPhaseHeaderActions}
         toolbarActions={canManage ? (
-          <div className={styles.roadmapModeSwitch} role="group" aria-label="Modo del Roadmap">
-            <Button size="sm" variant="ghost" aria-pressed={!planningMode}
-              onClick={() => setPlanningMode(false)}>Ver</Button>
-            <Button size="sm" variant="ghost" aria-pressed={planningMode}
-              onClick={() => setPlanningMode(true)}>Planificar</Button>
-          </div>
+          <PillSwitcher aria-label="Modo del Roadmap"
+            options={[{ value: 'view', label: 'Ver' }, { value: 'plan', label: 'Planificar' }]}
+            value={planningMode ? 'plan' : 'view'}
+            onChange={(value) => setPlanningMode(value === 'plan')} />
         ) : undefined} />
       )}
       {creatingFromReference && appliedPlanning.data && (

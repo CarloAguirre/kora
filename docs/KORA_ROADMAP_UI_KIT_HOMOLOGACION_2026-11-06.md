@@ -296,3 +296,40 @@ tabla manual a `DataTable`, la columna Tarea dejó de incluir el atributo
 Se repone ese título exclusivamente para filas `kind: 'reference'`,
 conservando nombre, referencias EDT y todas las reglas de gestión.
 El test preexistente cubre la regresión. Falta repetir suite local.
+
+## Restauración visual desde master (08-11-2026)
+
+El usuario pidió rectificar tres divergencias concretas con capturas:
+1. selector `Ver/Planificar` distinto al verde de Bitácora;
+2. barra de `Avance del proyecto` reducida de 18px (master) a 10px;
+3. barras Gantt reducidas de 24px/filas 46px (master) a 20px/44px,
+   sin texto de estado dentro de la barra.
+
+**Switcher:** Bitácora utilizaba originalmente clases locales
+`filterTabs/filterTab/filterTabActive` con un botón lime seleccionado;
+no era realmente un componente compartido. Se extrae fielmente a
+`shared/components/ui/PillSwitcher`, reutilizado por Bitácora y por
+los dos modos de Roadmap (con/sin fases). Se preservan `role="group"`,
+`aria-pressed`, las etiquetas y los callbacks de filtro/planificación.
+`SegmentedControl` preexistente permanece intacto para otros módulos.
+
+**Avance general:** se restituye solo para
+`ProjectExecutionProgressCard` el patrón de
+`ProjectProgressOverview.module.css` de master: pista 18px,
+radio pill, gradiente lime y marcador vertical 30px. No se sustituye
+el cálculo nuevo de HH ni se altera `TeamProgressCard` que comparte CSS,
+ni el contrato/API.
+
+**Barras por fase:** las barras operativas recuperan altura 24px,
+posición top 11px, radio 6px, filas 46px, texto visible de estado
+(`En curso` o `✓` cuando existe `closedAt`), opacidad de futuros
+y selección azul del Gantt de master. No se marca aprobado por una
+fecha pasada sin cierre: el cierre real determina el check, y el
+diamante vencido ya diferencia el atraso. Se mantienen las nuevas
+etiquetas con HH, la franja de progreso aprobado, los diamantes y
+checks, el scroll y zoom por fase. El portal cliente no cambia.
+
+**Pruebas:** PillSwitcher compartido, aserciones sobre el modo
+planificación, grosor/clases de barra del proyecto y la diferencia
+entre barra vencida y cerrada. Requiere typecheck/Vitest/build y
+revisión visual local con captura sobre el nuevo HEAD.

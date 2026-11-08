@@ -978,6 +978,12 @@ function OperationalPhaseCard({
             {phase.tasks.map((task, index) => {
               const geometry = barGeometry(task, axis.range);
               const metrics = getMetrics?.(phase, task);
+              // Conserva los estados visibles del Gantt de master. Un cierre
+              // real, NO el mero vencimiento del plazo, acredita el check.
+              const now = startOfToday();
+              const isClosed = Boolean(task.closedAt);
+              const isInProgress = toDate(task.startDate) <= now && now <= toDate(task.endDate);
+              const isFuture = toDate(task.startDate) > now;
               const selection: PhaseRoadmapSelection = {
                 kind: 'segment', id: task.id, label: task.label,
               };
@@ -1005,7 +1011,9 @@ function OperationalPhaseCard({
                     style={{ left: axis.todayPercent + '%' }} />}
                   {geometry && <>
                     <button type="button"
-                      className={[styles.operationalBar, isSelected ? styles.operationalBarSelected : ''].join(' ')}
+                      className={[styles.operationalBar,
+                         isFuture ? styles.operationalBarFuture : '',
+                         isSelected ? styles.operationalBarSelected : ''].filter(Boolean).join(' ')}
                       aria-label={'Abrir bloque ' + task.label}
                       aria-pressed={isSelected}
                       style={{
@@ -1017,6 +1025,9 @@ function OperationalPhaseCard({
                       onClick={() => choose(selection)}>
                       {metrics?.progress != null && <span className={styles.operationalBarProgress}
                         style={{ width: Math.min(100, Math.max(0, metrics.progress)) + '%' }} />}
+                      {(isClosed || isInProgress) && <span className={styles.operationalBarState}>
+                        {isClosed ? '✓ ' + PHASE_ROADMAP_ROLE_LABELS[task.role] : 'En curso'}
+                      </span>}
                     </button>
                     {(() => {
                       const closed = Boolean(task.closedAt);

@@ -179,6 +179,9 @@ describe('Roadmap vacío · creación guiada y equipos asignados', () => {
     expect(within(empty).getByText('Desglosa en tareas')).toBeInTheDocument();
     expect(within(empty).getByRole('button', { name: 'Planificar' }))
       .toHaveAttribute('aria-pressed', 'true');
+    const mode = within(empty).getByRole('group', { name: 'Modo del Roadmap' });
+    expect(within(mode).getByRole('button', { name: 'Planificar' }).className)
+      .toContain('selected');
     expect(within(empty).getByRole('button', { name: 'Crear la primera fase' })).toBeEnabled();
   });
 

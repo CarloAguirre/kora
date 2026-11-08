@@ -109,18 +109,18 @@ export function ProjectExecutionProgressCard({ progress }: { readonly progress: 
       </div>
     </div>
     <div className={shared.timelineWrap}>
-      <div className={shared.timeline} role="img"
+      <div className={[shared.timeline, styles.projectTimeline].join(' ')} role="img"
         aria-label={progress.hasPlan
           ? 'Avance real ' + percent(actual) + '; plan a la fecha ' + percent(expected)
           : 'Sin plan operativo del proyecto'}>
         {progress.hasPlan && <>
-          <span className={shared.actualFill} style={{ width: percent(actual) }} />
-          {difference > 0 && <span className={shared.pendingFill}
+          <span className={[shared.actualFill, styles.projectActualFill].join(' ')} style={{ width: percent(actual) }} />
+          {difference > 0 && <span className={[shared.pendingFill, styles.projectPendingFill].join(' ')}
             style={{ left: percent(actual), width: percent(difference) }} />}
-          <span className={shared.expectedLine} style={{ left: percent(expected) }} />
+          <span className={[shared.expectedLine, styles.projectExpectedLine].join(' ')} style={{ left: percent(expected) }} />
         </>}
       </div>
-      {progress.hasPlan && <span className={shared.targetLabel}
+      {progress.hasPlan && <span className={[shared.targetLabel, styles.projectTargetLabel].join(' ')}
         style={{ left: percent(expected), transform: expected <= 10 ? 'translateX(0)' :
           expected >= 90 ? 'translateX(-100%)' : 'translateX(-50%)' }}>
         Plan a la fecha: {percent(expected)}

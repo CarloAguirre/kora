@@ -57,8 +57,11 @@ describe('Avance del proyecto — mismo desglose que el equipo', () => {
     // El mismo 76% aparece en la cifra principal y en su explicación.
     // Verificamos el indicador principal, sin depender de la unicidad del texto.
     expect(screen.getByText('76%', { selector: 'strong' })).toBeInTheDocument();
-    expect(screen.getByRole('img', { name: 'Avance real 76%; plan a la fecha 100%' }))
-      .toBeInTheDocument();
+    const progressTrack = screen.getByRole('img', { name: 'Avance real 76%; plan a la fecha 100%' });
+    expect(progressTrack).toBeInTheDocument();
+    expect(progressTrack.className).toContain('projectTimeline');
+    expect(progressTrack.querySelector('[class*="projectActualFill"]')).toBeInTheDocument();
+    expect(progressTrack.querySelector('[class*="projectExpectedLine"]')).toBeInTheDocument();
     expect(screen.getByText(/607 HH planificadas frente a 606,5 HH vendidas/))
       .toBeInTheDocument();
     const toggle = screen.getByRole('button', { name: /Cómo se calcula este avance/i });

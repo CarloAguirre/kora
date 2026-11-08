@@ -132,6 +132,28 @@ describe('Roadmap operativo · diseño aprobado v5.02', () => {
     expect(screen.queryByText(/Sin fechas:/)).not.toBeInTheDocument();
   });
 
+
+  it('recupera grosor y estados del Gantt de master sin inventar aprobaciones por fecha', () => {
+    const old = {
+      ...phaseRoadmap, rangeStartDate: '2000-11-01', rangeEndDate: '2000-12-01',
+      phases: [{ ...phaseRoadmap.phases[0]!, tasks: [
+        { id: 'late', role: 'qa' as const, scope: 'qa' as const,
+          label: 'QA atrasado', startDate: '2000-11-03', endDate: '2000-11-20' },
+        { id: 'closed', role: 'ux' as const, scope: 'diseno' as const,
+          label: 'UX cerrado', startDate: '2000-11-03', endDate: '2000-11-20',
+          closedAt: '2000-11-17T10:00:00Z' },
+      ] }],
+    };
+    render(<PhaseRoadmap phaseRoadmap={old} operationalView />);
+    const late = screen.getByRole('button', { name: 'Abrir bloque QA atrasado' });
+    const closed = screen.getByRole('button', { name: 'Abrir bloque UX cerrado' });
+    expect(late).not.toHaveTextContent('✓');
+    expect(closed).toHaveTextContent('✓');
+    expect(closed.className).toContain('operationalBar');
+    expect(screen.getByRole('button', { name: 'Cierre vencido QA atrasado' }))
+      .toBeInTheDocument();
+  });
+
   it('abre el detalle de un bloque sin fechas desde el nombre o la zona temporal', () => {
     render(<PhaseRoadmap phaseRoadmap={phaseRoadmap} operationalView
       operationalRows={() => [{ id: 'team-pmo', role: 'pmo', label: 'Coordinación', hours: 36 }]}
@@ -172,6 +194,7 @@ describe('Roadmap operativo · diseño aprobado v5.02', () => {
     expect(screen.getByText('80 HH · 100% de avance')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '+ Agregar fase' })).toBeInTheDocument();
     expect(bar).not.toHaveStyle({ opacity: '0.45' });
+    expect(bar.className).toContain('operationalBar');
     fireEvent.click(bar);
     expect(screen.getByText('Bloque seleccionado: Desarrollo backend')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Cerrar detalle' }));
