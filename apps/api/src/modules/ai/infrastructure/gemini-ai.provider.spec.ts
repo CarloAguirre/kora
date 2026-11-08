@@ -92,6 +92,17 @@ describe('GeminiAiProvider · respuestas de infraestructura sin llamadas reales'
     expect(sent.generationConfig.responseSchema).toEqual(request.responseJsonSchema);
   });
 
+  it('SSE preserva HTTP 429 de Gemini y nunca realiza otro request', async () => {
+    const mock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      error: { status: 'RESOURCE_EXHAUSTED', message: 'Quota exceeded' },
+    }), { status: 429 }));
+    vi.stubGlobal('fetch', mock);
+    const error = await provider().generateStructured(request, () => {}).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(HttpException);
+    expect((error as HttpException).getStatus()).toBe(429);
+    expect(mock).toHaveBeenCalledOnce();
+  });
+
   it('identifica cuota agotada con HTTP 429, sin hacer segundo request', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
       error: { status: 'RESOURCE_EXHAUSTED', message: 'Quota exceeded' },
