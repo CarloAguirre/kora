@@ -161,3 +161,35 @@ Se comprueban el texto de diagnóstico vigente y que el análisis de Gemini
 continúa bloqueado. El caso de PDF detectado pero no descargable
 permanece cubierto por su prueba independiente. Validación local
 del nuevo commit todavía pendiente.
+
+## Corrección de carpetas homónimas vacías (08-11-2026)
+
+Se identificó con una comprobación en Google Drive que la carpeta
+`03.Documento de levantamiento detallado` recomendada por Kora
+tenía el ID `1yUrbnrxU7HBaBSjJzu7m3j3lb1OKB7GG` y estaba realmente
+vacía. Otra carpeta con el mismo nombre contenía PDFs y otros documentos.
+La coincidencia por nombre no demostraba contenido.
+
+En `ResolveEstimationDriveFolderUseCase` ahora se verifica mediante
+`listChildren` el contenido documental real **antes del ranking final
+y antes de consultar a Gemini**. Las carpetas vacías y las que solo
+contienen formatos incompatibles (por ejemplo, `.xlsx` binario) se
+descartan como candidatas automáticas. Se aceptan archivos soportados
+también dentro de subcarpetas, hasta 4 niveles, 12 carpetas por
+candidata y máximo 32 candidatas iniciales. La comprobación es por
+metadatos, sin descargar documentos ajenos antes de confirmación.
+Se reutilizan listados ya obtenidos para evitar llamadas duplicadas.
+Una respuesta no verificable (403 o límite de exploración) no se
+confunde con carpeta vacía y tampoco se anuncia como certeza.
+
+Solo se ofrecen candidatas verificadas, y Gemini recibe únicamente
+esas candidatas. Tras confirmar, sigue ejecutándose la exploración
+y la lectura real con diagnóstico. Un vínculo `documentationLink`
+explicitamente confirmado por el usuario conserva el comportamiento
+de enlace directo; las carpetas vacías no avanzan a análisis.
+
+**Pruebas agregadas:** dos carpetas con el mismo nombre (una vacía y otra
+con un PDF anidado), solo formatos incompatibles, y Drive 403.
+Los fixtures antiguos que asumían que una carpeta vacía podía
+resolverse automáticamente se ajustan para contener PDF real.
+Validación TypeScript, Vitest y build pendiente de ejecución local.

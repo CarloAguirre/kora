@@ -4,6 +4,88 @@ import { ResolveEstimationDriveFolderUseCase } from './resolve-estimation-drive-
 
 describe('ResolveEstimationDriveFolderUseCase', () => {
 
+
+  it('descarta carpeta homónima vacía y recomienda la que contiene PDFs anidados', async () => {
+    const folder = (id: string, parentIds: string[] = []): DriveFolderItem => ({
+      id, name: '03.Documento de levantamiento detallado',
+      mimeType: 'application/vnd.google-apps.folder', itemType: 'folder',
+      modifiedAt: '2026-11-08T10:00:00Z', webViewLink: null,
+      sizeBytes: null, parentIds,
+    });
+    const empty = folder('id-vacio');
+    const filled = folder('id-con-documentos');
+    const child = { ...folder('fichas', ['id-con-documentos']), name: 'Fichas Protocolo' };
+    const pdf: DriveFolderItem = {
+      ...folder('pdf-real', ['fichas']),
+      name: 'Levantamiento y requisitos.pdf', mimeType: 'application/pdf',
+      itemType: 'file', sizeBytes: 180_000,
+    };
+    const drive: DriveFolderClient = {
+      isConfigured: () => true, listFiles: async () => [],
+      searchFolders: async () => [empty, filled],
+      getMetadata: async () => null, readAnalysisContent: async () => null,
+      listChildren: async (id) => id === 'id-vacio' ? [] :
+        id === 'id-con-documentos' ? [child] : id === 'fichas' ? [pdf] : [],
+    };
+    const result = await new ResolveEstimationDriveFolderUseCase(drive).execute({
+      projectId: '550e8400-e29b-41d4-a716-446655440000',
+      projectName: '03.Documento de levantamiento detallado',
+      clientName: null, documentationLink: null, quotationLink: null,
+    });
+    expect(result.candidates.map((c) => c.folderId)).toEqual(['id-con-documentos']);
+    expect(result.selectedFolder?.folderId).toBe('id-con-documentos');
+    expect(result.candidates[0]?.reasons.join(' ')).toContain('verificó documentos');
+  });
+
+  it('no sugiere carpetas vacías ni carpetas que solo contienen XLSX', async () => {
+    const folder = (id: string): DriveFolderItem => ({
+      id, name: 'Documentación Portal PDC',
+      mimeType: 'application/vnd.google-apps.folder', itemType: 'folder',
+      modifiedAt: '2026-11-08T10:00:00Z', webViewLink: null,
+      sizeBytes: null, parentIds: [],
+    });
+    const drive: DriveFolderClient = {
+      isConfigured: () => true, listFiles: async () => [],
+      searchFolders: async () => [folder('sin-archivos'), folder('solo-xlsx')],
+      getMetadata: async () => null, readAnalysisContent: async () => null,
+      listChildren: async (id) => id === 'solo-xlsx' ? [{
+        ...folder('excel'), name: 'Cronograma.xlsx', itemType: 'file',
+        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      }] : [],
+    };
+    const result = await new ResolveEstimationDriveFolderUseCase(drive).execute({
+      projectId: '550e8400-e29b-41d4-a716-446655440000',
+      projectName: 'Documentación Portal PDC', clientName: null,
+      documentationLink: null, quotationLink: null,
+    });
+    expect(result.status).toBe('not_found');
+    expect(result.selectedFolder).toBeNull();
+    expect(result.candidates).toEqual([]);
+    expect(result.message).toContain('vacías');
+  });
+
+  it('si Drive rechaza explorar una carpeta no la confunde con carpeta vacía', async () => {
+    const drive: DriveFolderClient = {
+      isConfigured: () => true, listFiles: async () => [],
+      searchFolders: async () => [{
+        id: 'restringida', name: 'Levantamiento PDC',
+        mimeType: 'application/vnd.google-apps.folder',
+        modifiedAt: '2026-11-08T10:00:00Z', webViewLink: null,
+        sizeBytes: null, itemType: 'folder', parentIds: [],
+      }],
+      getMetadata: async () => null, readAnalysisContent: async () => null,
+      listChildren: async () => { throw new Error('HTTP 403'); },
+    };
+    const result = await new ResolveEstimationDriveFolderUseCase(drive).execute({
+      projectId: '550e8400-e29b-41d4-a716-446655440000',
+      projectName: 'Levantamiento PDC', clientName: null,
+      documentationLink: null, quotationLink: null,
+    });
+    expect(result.status).toBe('not_found');
+    expect(result.candidates).toEqual([]);
+    expect(result.message).toContain('no se pudo verificar');
+  });
+
   it('Gemini prioriza una subcarpeta de levantamiento real sin inventar IDs', async () => {
     const files = (id: string, name: string, parents: string[] = []): DriveFolderItem => ({
       id, name, parentIds: parents, itemType: 'folder',
@@ -21,7 +103,13 @@ describe('ResolveEstimationDriveFolderUseCase', () => {
       searchFolders: async (terms) => terms.some((term) => /postventa/i.test(term))
         ? [root, old] : [client],
       listChildren: async (id) => id === 'cliente' ? [root, old]
-        : id === 'postventa' ? [survey] : [],
+        : id === 'postventa' ? [survey]
+          : id === 'levantamiento' ? [{
+              id: 'requisitos', name: 'Requerimientos del cliente.pdf',
+              mimeType: 'application/pdf', modifiedAt: '2026-11-08T10:00:00Z',
+              webViewLink: null, sizeBytes: 20000, parentIds: ['levantamiento'],
+              itemType: 'file' as const,
+            }] : [],
       getMetadata: async (id) => metadata.get(id) ?? null,
       readAnalysisContent: async () => null,
     };
@@ -35,7 +123,9 @@ describe('ResolveEstimationDriveFolderUseCase', () => {
       documentationLink: null, quotationLink: null,
     });
     expect(result.candidates[0]?.folderId).toBe('levantamiento');
-    expect(result.candidates.some((item) => item.folderId === 'cerrado')).toBe(true);
+    expect(result.candidates.some((item) => item.folderId === 'cerrado')).toBe(false);
+    expect(result.candidates.every((item) => item.reasons.some((reason) =>
+      reason.includes('verificó documentos')))).toBe(true);
     expect(result.status).toBe('needs_confirmation');
     expect(result.selectedFolder).toBeNull();
     expect(result.candidates[0]?.reasons.join(' ')).toContain('Gemini');
@@ -51,6 +141,12 @@ describe('ResolveEstimationDriveFolderUseCase', () => {
     };
     const delegated: DriveFolderClient = {
       ...inaccessible, isConfigured: () => true,
+      listChildren: async (id) => id === 'levantamiento-app' ? [{
+        id: 'documento-1', name: 'Especificación funcional.pdf',
+        mimeType: 'application/pdf', itemType: 'file' as const,
+        modifiedAt: '2026-11-08T08:00:00Z', webViewLink: null,
+        sizeBytes: 20000, parentIds: ['levantamiento-app'],
+      }] : [],
       searchFolders: async () => [{
         id: 'levantamiento-app', name: 'Motor de notificaciones',
         mimeType: 'application/vnd.google-apps.folder',
@@ -122,7 +218,11 @@ describe('ResolveEstimationDriveFolderUseCase', () => {
     const drive: DriveFolderClient = {
       isConfigured: () => true,
       listFiles: async () => [],
-      listChildren: async () => [],
+      listChildren: async (id) => id === 'folder-aurelia' ? [{
+        id: 'aurelia-doc', name: 'Alcance.pdf', mimeType: 'application/pdf',
+        itemType: 'file' as const, modifiedAt: '2026-11-08T08:00:00Z',
+        webViewLink: null, sizeBytes: 20000, parentIds: ['folder-aurelia'],
+      }] : [],
       searchFolders: async (terms) =>
         terms.some((term) => term.toLowerCase().includes('aurelia'))
           ? [

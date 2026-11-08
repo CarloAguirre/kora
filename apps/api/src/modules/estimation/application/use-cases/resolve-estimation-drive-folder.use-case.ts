@@ -6,11 +6,20 @@ import {
   type EstimationDriveFolderResolution,
   type ResolveEstimationDriveFolderInput,
 } from '@kora/contracts';
+import { canReadDriveSource, classifyDriveSource } from '../drive-source-selection';
 import {
   DRIVE_FOLDER_CLIENT,
   type DriveFolderClient,
   type DriveFolderItem,
 } from '../ports/drive-folder-client.port';
+/** Inspection bounds prevent a Drive-wide recursive crawl during discovery. */
+const MAX_DOCUMENT_VERIFICATION_CANDIDATES = 32;
+const MAX_DOCUMENT_VERIFICATION_FOLDERS = 12;
+const MAX_DOCUMENT_VERIFICATION_DEPTH = 4;
+const MAX_VERIFIED_BINARY_BYTES = 5 * 1024 * 1024;
+
+type FolderDocumentCheck = 'has-documents' | 'empty' | 'unverified';
+
 const GENERIC_PROJECT_TOKENS = new Set([
   'app',
   'aplicacion',
@@ -79,6 +88,7 @@ export class ResolveEstimationDriveFolderUseCase {
     try {
       const discovered = new Map<string, DriveFolderItem>();
       const searchRoots: DriveFolderItem[] = [];
+      const childrenCache = new Map<string, readonly DriveFolderItem[]>();
       const projectTerms = significantTerms(input.projectName);
       const clientTerms = significantTerms(input.clientName ?? '');
 
@@ -116,6 +126,7 @@ export class ResolveEstimationDriveFolderUseCase {
         let children: readonly DriveFolderItem[];
         try {
           children = await drive.listChildren(current.root.id);
+          childrenCache.set(current.root.id, children);
         } catch {
           continue; // Un nivel denegado no invalida el resto de carpetas.
         }
@@ -180,7 +191,37 @@ export class ResolveEstimationDriveFolderUseCase {
       }
 
       scored.sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
-      let candidates = scored.slice(0, 8);
+      // Una coincidencia nominal NO basta: validar contenido real antes
+      // de presentar una carpeta o permitir que Gemini la priorice.
+      // Se inspeccionan más de 8 carpetas para no ocultar una válida
+      // detrás de varios homónimos vacíos con mejor puntaje.
+      const usable: EstimationDriveFolderCandidate[] = [];
+      let emptyCount = 0;
+      let unverifiedCount = 0;
+      const toCheck = scored.slice(0, MAX_DOCUMENT_VERIFICATION_CANDIDATES);
+      for (let index = 0; index < toCheck.length; index += 4) {
+        const batch = toCheck.slice(index, index + 4);
+        const checks = await Promise.all(batch.map((folder) =>
+          this.checkFolderDocuments(folder.folderId, drive, childrenCache)));
+        for (let offset = 0; offset < batch.length; offset++) {
+          const folder = batch[offset]!;
+          const status = checks[offset];
+          if (status === 'empty') { emptyCount++; continue; }
+          if (status === 'unverified') { unverifiedCount++; continue; }
+          const score = Math.min(100, folder.score + 10);
+          usable.push({
+            ...folder,
+            score,
+            confidence: score >= 80 ? 'high' : score >= 55 ? 'medium' : 'low',
+            reasons: [
+              ...folder.reasons,
+              'Kora verificó documentos compatibles en la carpeta o sus subcarpetas.',
+            ],
+          });
+        }
+      }
+      usable.sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
+      let candidates = usable.slice(0, 8);
       let aiSuggested = false;
       // Gemini solo coteja metadatos de las 8 candidatas: no descarga
       // documentos de carpetas no confirmadas ni admite IDs inventados.
@@ -254,7 +295,9 @@ export class ResolveEstimationDriveFolderUseCase {
           ? 'Kora encontró una carpeta con alta confianza.'
           : candidates.length > 0
             ? 'Kora encontró carpetas candidatas. Confirma cuál corresponde al prospecto.'
-            : 'No se encontraron carpetas suficientemente relacionadas con este prospecto.',
+            : emptyCount > 0 || unverifiedCount > 0
+              ? 'Las carpetas con nombres similares estaban vacías, no tenían documentos compatibles o no se pudo verificar su contenido. Elige otra carpeta de Drive.'
+              : 'No se encontraron carpetas suficientemente relacionadas con este prospecto.',
       });
     } catch (error) {
       return estimationDriveFolderResolutionSchema.parse({
@@ -268,6 +311,54 @@ export class ResolveEstimationDriveFolderUseCase {
             : 'No fue posible consultar Google Drive.',
       });
     }
+  }
+
+
+  /** Comprobación liviana de metadatos: no descarga documentos en el
+   * descubrimiento. Un PDF/Google Doc/Sheet/Slide compatible basta, también
+   * si está en una subcarpeta. Carpetas vacías o solo XLSX no se recomiendan.
+   * Si Drive deniega el listado o agotamos el límite, NO presumimos vacío. */
+  private async checkFolderDocuments(
+    folderId: string,
+    drive: DriveFolderClient,
+    cache: Map<string, readonly DriveFolderItem[]>,
+  ): Promise<FolderDocumentCheck> {
+    const queue: Array<{ id: string; path: string; depth: number }> = [
+      { id: folderId, path: '', depth: 1 },
+    ];
+    const visited = new Set<string>();
+    let inspected = 0;
+    while (queue.length > 0 && inspected < MAX_DOCUMENT_VERIFICATION_FOLDERS) {
+      const current = queue.shift()!;
+      if (visited.has(current.id)) continue;
+      visited.add(current.id);
+      inspected++;
+      let children = cache.get(current.id);
+      if (!children) {
+        try {
+          children = await drive.listChildren(current.id);
+          cache.set(current.id, children);
+        } catch {
+          return 'unverified';
+        }
+      }
+      for (const item of children) {
+        const path = current.path ? current.path + '/' + item.name : item.name;
+        if (classifyDriveSource(item, path).priority === 'excluded') continue;
+        if (item.itemType === 'file' &&
+          canReadDriveSource(item.mimeType) &&
+          (item.sizeBytes === null || item.sizeBytes <= MAX_VERIFIED_BINARY_BYTES)) {
+          return 'has-documents';
+        }
+        if (item.itemType === 'folder' &&
+          current.depth < MAX_DOCUMENT_VERIFICATION_DEPTH &&
+          !visited.has(item.id)) {
+          queue.push({ id: item.id, path, depth: current.depth + 1 });
+        }
+      }
+    }
+    // Una carpeta no verificada completamente no debe marcarse vacía.
+    return queue.length > 0 ? 'unverified' : 'empty';
   }
 
   private async getAncestorNames(
