@@ -276,8 +276,8 @@ export function AiQuotationWizardModal({ project, onClose }: {
     sourceStep === 'loading' || sourceStep === 'analyzing' || generate.isPending;
   const relevant = stage === 2 ? fixed : dynamic;
 
-  const loadDocuments = async (folderUrl: string, rootUrl: string): Promise<boolean> => {
-    if (previewInFlight.current) return false;
+  const loadDocuments = async (folderUrl: string, rootUrl: string): Promise<DriveBrowseResult | null> => {
+    if (previewInFlight.current) return null;
     previewInFlight.current = true;
     setSourceStep('loading');
     setError('');
@@ -296,12 +296,12 @@ export function AiQuotationWizardModal({ project, onClose }: {
       setPickerError('');
       setOauthResult('');
       oauthPopup.current?.close();
-      return true;
+      return result;
     } catch (cause) {
       setSourceStep('source');
       reportError(cause instanceof Error ? cause.message :
         'No se pudieron obtener los documentos. Comprueba los permisos de Drive.');
-      return false;
+      return null;
     } finally {
       previewInFlight.current = false;
     }
@@ -345,8 +345,10 @@ export function AiQuotationWizardModal({ project, onClose }: {
   };
 
   const connectAndDiscover = async () => {
-    if (serviceAccountEnabled) { await discoverFolders(); return; }
+    // Para "mi Drive" priorizamos OAuth del usuario, no la cuenta técnica.
+    // El service account queda como alternativa si OAuth no está habilitado.
     if (driveStatus.data?.enabled !== true) {
+      if (serviceAccountEnabled) { await discoverFolders(); return; }
       reportError('La conexión Google Drive no está habilitada.');
       return;
     }
@@ -384,8 +386,9 @@ export function AiQuotationWizardModal({ project, onClose }: {
       return;
     }
     const loaded = await loadDocuments(url, url);
-    if (loaded) await persistConfirmedFolder(url);
-    else setSourceStep('candidates');
+    if (!loaded) setSourceStep('candidates');
+    else if (loaded.documents.length > 0) await persistConfirmedFolder(url);
+    // Una carpeta vacía o con formatos ilegibles no modifica Extras.
   };
 
   // Google usa COOP: en algunos navegadores el callback no puede comunicarse

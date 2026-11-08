@@ -395,3 +395,11 @@ aceptan IDs presentes en la respuesta de Drive. Gemini no recibe
 contenido antes de seleccionar una carpeta, y cualquier sugerencia
 requiere confirmación del usuario. Con Gemini no disponible, quedan
 las reglas deterministas y la selección manual. Sin cambios de BD.
+
+### Guardas del descubrimiento (08-11-2026)
+
+Se prioriza autorización OAuth del usuario frente a cuenta de servicio si
+ambas están habilitadas. La cuenta de servicio es un fallback solo si
+OAuth no está disponible. Una selección de carpeta sin documentos reales
+legibles se presenta para corregir, pero **no cambia Extras ni ejecuta
+Gemini**. El test específico protege esta regla.

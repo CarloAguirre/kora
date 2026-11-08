@@ -110,7 +110,7 @@ vi.mock('@/shared/components/ui/Modal', () => ({
 vi.mock('../api/estimation.queries', async () => {
   const React = await import('react');
   return {
-    useEstimationDriveOAuthPocStatus: () => ({ data: { enabled: true, serviceAccountEnabled: mocks.serviceAccountEnabled }, isLoading: false }),
+    useEstimationDriveOAuthPocStatus: () => ({ data: { enabled: !mocks.serviceAccountEnabled, serviceAccountEnabled: mocks.serviceAccountEnabled }, isLoading: false }),
     useEstimationQuestionnaireDefinition: () => ({
       data: { fixedQuestions, maxDynamicFirstRound: 5,
         maxDynamicFollowUp: 2, targetMinutesMin: 3, targetMinutesMax: 5 },
@@ -232,6 +232,18 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
       projectId: project.id,
       input: { documentationLink: 'https://drive.google.com/drive/folders/levantamiento-antiguo' },
     }));
+    expect(mocks.analyze).not.toHaveBeenCalled();
+  });
+
+
+  it('no modifica Extras si la carpeta confirmada está vacía o no es legible', async () => {
+    mocks.browse.mockResolvedValueOnce({ ...previewResult, documents: [] });
+    renderWizard({ ...project, documentationLink: null } as ProjectDetail);
+    fireEvent.click(screen.getByRole('button', { name: 'Buscar carpeta en Drive' }));
+    await screen.findByRole('group', { name: 'Carpetas candidatas' });
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar carpeta' }));
+    expect(await screen.findByText(/No hay documentos legibles/)).toBeInTheDocument();
+    expect(mocks.updateExtras).not.toHaveBeenCalled();
     expect(mocks.analyze).not.toHaveBeenCalled();
   });
 
