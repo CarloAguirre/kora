@@ -6,6 +6,7 @@ import type {
   ProjectDetail,
   SubmitEstimationAnswerInput,
   EstimationPocAnalysis,
+  EstimationDriveFolderResolution,
 } from '@kora/contracts';
 import { projectQuotationPath } from '@/app/router/paths';
 import { useUpdateProjectExtras } from '@/modules/projects/api/projects.queries';
@@ -235,12 +236,16 @@ export function AiQuotationWizardModal({ project, onClose }: {
   const [invalidId, setInvalidId] = useState<string | null>(null);
   const extrasFolderUrl = project.documentationLink?.trim() ?? '';
   const [manualFolderUrl, setManualFolderUrl] = useState('');
-  // Una selección distinta en el explorador no modifica el vínculo de Extras.
+  // Las carpetas confirmadas sustituyen el enlace de Extras si cambió.
   const [selectedFolderUrl, setSelectedFolderUrl] = useState(extrasFolderUrl);
   const driveFolderUrl = selectedFolderUrl || manualFolderUrl.trim();
   const driveUrlValid = isRealDriveFolderUrl(driveFolderUrl);
   const [authorizationRootUrl, setAuthorizationRootUrl] = useState('');
-  const [sourceStep, setSourceStep] = useState<'source' | 'connecting' | 'loading' | 'documents' | 'analyzing'>('source');
+  const [sourceStep, setSourceStep] = useState<
+    'source' | 'connecting' | 'discovering' | 'candidates' | 'loading' | 'documents' | 'analyzing'
+  >('source');
+  const [discovery, setDiscovery] = useState<EstimationDriveFolderResolution | null>(null);
+  const [discoveryChoice, setDiscoveryChoice] = useState('');
   const [preview, setPreview] = useState<DriveBrowseResult | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerChoice, setPickerChoice] = useState('');
@@ -252,6 +257,7 @@ export function AiQuotationWizardModal({ project, onClose }: {
   const requestedUrl = useRef('');
   const previewInFlight = useRef(false);
   const accessCheckInFlight = useRef(false);
+  const discoveryInFlight = useRef(false);
   const [saveWarning, setSaveWarning] = useState('');
   const [analysisSnapshot, setAnalysisSnapshot] = useState<EstimationPocAnalysis | null>(null);
   const driveStatus = useEstimationDriveOAuthPocStatus();
@@ -266,12 +272,12 @@ export function AiQuotationWizardModal({ project, onClose }: {
     ? analysisSnapshot : null;
   const fixed = questionnaire.data?.fixedQuestions ?? [];
   const dynamic = verifiedAnalysis?.dynamicQuestions ?? [];
-  const working = sourceStep === 'connecting' || sourceStep === 'loading' ||
-    sourceStep === 'analyzing' || generate.isPending;
+  const working = sourceStep === 'connecting' || sourceStep === 'discovering' ||
+    sourceStep === 'loading' || sourceStep === 'analyzing' || generate.isPending;
   const relevant = stage === 2 ? fixed : dynamic;
 
-  const loadDocuments = async (folderUrl: string, rootUrl: string) => {
-    if (previewInFlight.current) return;
+  const loadDocuments = async (folderUrl: string, rootUrl: string): Promise<boolean> => {
+    if (previewInFlight.current) return false;
     previewInFlight.current = true;
     setSourceStep('loading');
     setError('');
@@ -290,13 +296,96 @@ export function AiQuotationWizardModal({ project, onClose }: {
       setPickerError('');
       setOauthResult('');
       oauthPopup.current?.close();
+      return true;
     } catch (cause) {
       setSourceStep('source');
       reportError(cause instanceof Error ? cause.message :
         'No se pudieron obtener los documentos. Comprueba los permisos de Drive.');
+      return false;
     } finally {
       previewInFlight.current = false;
     }
+  };
+
+
+  /** Guarda sólo carpetas confirmadas y accesibles; permite sustituir Extras. */
+  const persistConfirmedFolder = async (url: string) => {
+    if (extrasFolderUrl === url) return;
+    try {
+      await updateProjectExtras.mutateAsync({
+        projectId: project.id, input: { documentationLink: url },
+      });
+      setSaveWarning('');
+    } catch {
+      setSaveWarning('La carpeta funciona para la cotización, pero no se pudo guardar en Extras. Revisa permisos.');
+    }
+  };
+
+  const discoverFolders = async () => {
+    if (discoveryInFlight.current) return;
+    discoveryInFlight.current = true;
+    setSourceStep('discovering');
+    setError('');
+    try {
+      const found = await estimationApi.resolveDriveFolder({
+        projectId: project.id, projectName: project.name,
+        clientName: project.client?.companyName ?? null,
+        documentationLink: null, quotationLink: null,
+      });
+      setDiscovery(found);
+      setDiscoveryChoice(found.selectedFolder?.url ?? found.candidates[0]?.url ?? '');
+      setSourceStep('candidates');
+      oauthPopup.current?.close();
+    } catch (cause) {
+      setSourceStep('source');
+      reportError(cause instanceof Error ? cause.message : 'No fue posible buscar en Drive.');
+    } finally {
+      discoveryInFlight.current = false;
+    }
+  };
+
+  const connectAndDiscover = async () => {
+    if (serviceAccountEnabled) { await discoverFolders(); return; }
+    if (driveStatus.data?.enabled !== true) {
+      reportError('La conexión Google Drive no está habilitada.');
+      return;
+    }
+    const popup = window.open('about:blank', 'kora-drive-auth',
+      'width=580,height=730,scrollbars=yes');
+    if (!popup) { reportError('Permite ventanas emergentes para autorizar Google Drive.'); return; }
+    oauthPopup.current = popup;
+    requestedUrl.current = '';
+    setSourceStep('connecting');
+    setError('');
+    setOauthResult('');
+    try {
+      const access = await estimationApi.driveOAuthPocAccess({ projectId: project.id });
+      if (access.authorized) {
+        popup.close();
+        await discoverFolders();
+        return;
+      }
+      const { authorizationUrl } = await estimationApi.startDriveOAuthPoc({ projectId: project.id });
+      if (new URL(authorizationUrl).origin !== 'https://accounts.google.com') {
+        throw new Error('La dirección de autorización Google no es válida.');
+      }
+      popup.location.replace(authorizationUrl);
+    } catch (cause) {
+      popup.close();
+      setSourceStep('source');
+      reportError(cause instanceof Error ? cause.message : 'No fue posible conectar Google Drive.');
+    }
+  };
+
+  const confirmDiscoveredFolder = async () => {
+    const url = discoveryChoice || manualFolderUrl.trim();
+    if (!isRealDriveFolderUrl(url)) {
+      reportError('Selecciona una carpeta o pega una URL válida de Google Drive.');
+      return;
+    }
+    const loaded = await loadDocuments(url, url);
+    if (loaded) await persistConfirmedFolder(url);
+    else setSourceStep('candidates');
   };
 
   // Google usa COOP: en algunos navegadores el callback no puede comunicarse
@@ -313,7 +402,11 @@ export function AiQuotationWizardModal({ project, onClose }: {
           projectId: project.id, driveFolderUrl: requestedUrl.current,
         });
         if (!cancelled && state.authorized) {
-          void loadDocuments(requestedUrl.current, requestedUrl.current);
+          if (requestedUrl.current) {
+            void loadDocuments(requestedUrl.current, requestedUrl.current);
+          } else {
+            void discoverFolders();
+          }
         }
       } catch {
         // El callback OAuth todavía puede estar terminando: reintentar.
@@ -339,7 +432,11 @@ export function AiQuotationWizardModal({ project, onClose }: {
       if (payload.type !== 'kora-drive-oauth-poc' ||
           (payload.status !== 'ok' && payload.status !== 'error')) return;
       if (payload.status === 'ok') {
-        void loadDocuments(requestedUrl.current, requestedUrl.current);
+        if (requestedUrl.current) {
+            void loadDocuments(requestedUrl.current, requestedUrl.current);
+          } else {
+            void discoverFolders();
+          }
       } else {
         setSourceStep('source');
         setOauthResult(typeof payload.message === 'string' ? payload.message :
@@ -473,17 +570,8 @@ export function AiQuotationWizardModal({ project, onClose }: {
       reportError('Selecciona una carpeta con documentos legibles antes de analizar.');
       return;
     }
-    if (!extrasFolderUrl) {
-      // Si el rol puede editar Extras, persistimos el enlace para no volver
-      // a solicitarlo. La falta de permiso de edición no impide cotizar.
-      try {
-        await updateProjectExtras.mutateAsync({
-          projectId: project.id, input: { documentationLink: driveFolderUrl },
-        });
-        setSaveWarning('');
-      } catch {
-        setSaveWarning('La carpeta funcionará en esta cotización, pero no se pudo guardar en Extras. Revisa tus permisos.');
-      }
+    if (extrasFolderUrl !== driveFolderUrl) {
+      await persistConfirmedFolder(driveFolderUrl);
     }
     setSourceStep('analyzing');
     setError('');
@@ -538,7 +626,10 @@ export function AiQuotationWizardModal({ project, onClose }: {
         return;
       }
       if (sourceStep === 'source') {
-        await connectAndPreview(driveFolderUrl);
+        if (driveUrlValid) await connectAndPreview(driveFolderUrl);
+        else await connectAndDiscover();
+      } else if (sourceStep === 'candidates') {
+        await confirmDiscoveredFolder();
       } else if (sourceStep === 'documents') {
         await analyze();
       }
@@ -607,14 +698,20 @@ export function AiQuotationWizardModal({ project, onClose }: {
             stage === 1 ? editingUnderstanding ? 'Guardar resumen' : 'Editar' : 'Atrás'}
         </Button>
         <Button className={styles.primaryAction} loading={working} disabled={
-          (stage === 0 && (questionnaire.isLoading || driveStatus.isLoading || !driveUrlValid ||
+          (stage === 0 && (questionnaire.isLoading || driveStatus.isLoading ||
             (sourceStep === 'documents' && !preview?.documents.length) ||
-            (sourceStep !== 'source' && sourceStep !== 'documents'))) ||
+            (sourceStep === 'candidates' &&
+              !isRealDriveFolderUrl(discoveryChoice || manualFolderUrl.trim())) ||
+            (sourceStep !== 'source' && sourceStep !== 'documents' && sourceStep !== 'candidates'))) ||
           (stage > 0 && !verifiedAnalysis)
         } onClick={() => void next()}>
           {stage === 0 ? sourceStep === 'connecting' ? 'Conectando Google…' :
+            sourceStep === 'discovering' ? 'Buscando carpetas…' :
+            sourceStep === 'candidates' ? 'Confirmar carpeta' :
             sourceStep === 'loading' ? 'Leyendo documentos…' :
-            sourceStep === 'analyzing' ? 'Analizando…' : 'Analizar proyecto' : stage === 1 ? 'Está correcto' :
+            sourceStep === 'analyzing' ? 'Analizando…' :
+            !driveUrlValid && sourceStep === 'source' ? 'Buscar carpeta en Drive' :
+            'Analizar proyecto' : stage === 1 ? 'Está correcto' :
             stage === 4 ? 'Generar estimación' : 'Continuar'}
         </Button>
       </>}>

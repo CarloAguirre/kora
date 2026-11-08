@@ -51,13 +51,14 @@ export const estimationApi = {
     return api.get<{ enabled: boolean; serviceAccountEnabled: boolean }>('/estimations/drive/oauth-poc/status');
   },
   /** Comprueba la concesión efímera sin enviar tokens al navegador. */
-  driveOAuthPocAccess(input: { projectId: string; driveFolderUrl: string }): Promise<{ authorized: boolean }> {
+  driveOAuthPocAccess(input: { projectId: string; driveFolderUrl?: string }): Promise<{ authorized: boolean }> {
     return api.get<{ authorized: boolean }>(
-      '/estimations/drive/oauth-poc/access?' + new URLSearchParams({ projectId: input.projectId, driveFolderUrl: input.driveFolderUrl }).toString(),
+      '/estimations/drive/oauth-poc/access?' + new URLSearchParams({ projectId: input.projectId,
+        ...(input.driveFolderUrl ? { driveFolderUrl: input.driveFolderUrl } : {}) }).toString(),
     );
   },
   /** PoC sin tokens ni credenciales devueltos al navegador. */
-  startDriveOAuthPoc(input: { projectId: string; driveFolderUrl: string }): Promise<DriveOAuthPocStart> {
+  startDriveOAuthPoc(input: { projectId: string; driveFolderUrl?: string }): Promise<DriveOAuthPocStart> {
     return api.post<DriveOAuthPocStart>('/estimations/drive/oauth-poc/start', input);
   },
   browseDriveFolder(input: {
