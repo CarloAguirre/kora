@@ -44,6 +44,10 @@ import {
 } from './ProjectRoadmapTaskDetail';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const ROADMAP_MODE_OPTIONS = [
+  { value: 'view', label: 'Ver' },
+  { value: 'plan', label: 'Planificar' },
+] as const;
 
 const formatDate = (value: string | null) =>
   value ? new Date(`${value}T00:00:00`).toLocaleDateString('es-CL') : '—';
@@ -675,7 +679,7 @@ export function ProjectModulesCard({
             </div>
             {canManage && (
               <PillSwitcher aria-label="Modo del Roadmap"
-                options={[{ value: 'view', label: 'Ver' }, { value: 'plan', label: 'Planificar' }]}
+                options={ROADMAP_MODE_OPTIONS}
                 value={planningMode ? 'plan' : 'view'}
                 onChange={(value) => setPlanningMode(value === 'plan')} />
             )}
@@ -763,7 +767,7 @@ export function ProjectModulesCard({
         renderPhaseHeaderActions={renderPhaseHeaderActions}
         toolbarActions={canManage ? (
           <PillSwitcher aria-label="Modo del Roadmap"
-            options={[{ value: 'view', label: 'Ver' }, { value: 'plan', label: 'Planificar' }]}
+            options={ROADMAP_MODE_OPTIONS}
             value={planningMode ? 'plan' : 'view'}
             onChange={(value) => setPlanningMode(value === 'plan')} />
         ) : undefined} />

@@ -12,6 +12,10 @@ const phaseCss = readFileSync(resolve(cssDir, 'ProjectModulesCard.module.css'), 
 const drawerCss = readFileSync(resolve(cssDir, 'SegmentDrawer.module.css'), 'utf8');
 const ganttCss = readFileSync(resolve(cssDir,
   '../../client-portal/components/PhaseRoadmap.module.css'), 'utf8');
+const progressCss = readFileSync(resolve(cssDir,
+  'ProjectExecutionProgressCard.module.css'), 'utf8');
+const pillCss = readFileSync(resolve(cssDir,
+  '../../../shared/components/ui/PillSwitcher.module.css'), 'utf8');
 const dataTableCss = readFileSync(resolve(cssDir,
   '../../../shared/components/ui/DataTable.module.css'), 'utf8');
 
@@ -46,6 +50,19 @@ describe('Roadmap UI-3: tokens y scroll local', () => {
     expect(ganttCss).toMatch(/\.operationalGanttViewport\s*\{[^}]*overscroll-behavior-x:\s*contain;/s);
     expect(ganttCss).toMatch(/\.operationalStickyLabel,\s*\.operationalBlockLabel\s*\{[^}]*position:\s*sticky;/s);
     expect(ganttCss).toMatch(/@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.operationalGantt\s*\{[^}]*transition:\s*none;/s);
+  });
+
+  it('restaura la barra principal de 18px y las barras Gantt de 24px de master', () => {
+    expect(progressCss).toMatch(/\.root \.projectTimeline\s*\{[^}]*height:\s*18px;/s);
+    expect(progressCss).toMatch(/\.root \.projectActualFill\s*\{[^}]*linear-gradient\(90deg, var\(--kora-lime-mid\), var\(--kora-lime\)\)/s);
+    expect(ganttCss).toMatch(/\.operationalLine\s*\{[^}]*min-height:\s*46px;/s);
+    expect(ganttCss).toMatch(/\.operationalBar\s*\{[^}]*top:\s*11px;[^}]*height:\s*24px;/s);
+    expect(ganttCss).toMatch(/\.operationalBarSelected\s*\{[^}]*outline:\s*2px solid #4c7ef3;/s);
+  });
+
+  it('el selector reutilizado de Bitácora tiene el estado activo lima original', () => {
+    expect(pillCss).toMatch(/\.group\s*\{[^}]*border:\s*1px solid var\(--kora-blue-200\);/s);
+    expect(pillCss).toMatch(/\.selected,\s*\.selected:hover\s*\{[^}]*background:\s*var\(--kora-lime\);/s);
   });
 
 });

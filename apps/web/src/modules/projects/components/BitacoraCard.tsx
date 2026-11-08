@@ -65,6 +65,12 @@ interface BitacoraCardProps {
   canCorrectHito0?: boolean;
 }
 
+const BITACORA_FILTER_OPTIONS = [
+  { value: 'all', label: 'Todos' },
+  { value: 'incidents', label: 'Incidentes' },
+  { value: 'work', label: 'Entregas y tareas' },
+] as const;
+
 const RESOLVE_ACTION_LABEL: Record<BitacoraRowAction, string> = {
   aprobar: 'Aprobar',
   rechazar: 'Rechazar',
@@ -255,11 +261,7 @@ export function BitacoraCard({
             <PillSwitcher
               aria-label="Filtrar por tipo"
               value={filter}
-              options={[
-                { value: 'all', label: 'Todos' },
-                { value: 'incidents', label: 'Incidentes' },
-                { value: 'work', label: 'Entregas y tareas' },
-              ]}
+              options={BITACORA_FILTER_OPTIONS}
               onChange={setFilter}
             />
           </div>

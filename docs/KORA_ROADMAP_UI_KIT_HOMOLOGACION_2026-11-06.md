@@ -333,3 +333,13 @@ checks, el scroll y zoom por fase. El portal cliente no cambia.
 planificación, grosor/clases de barra del proyecto y la diferencia
 entre barra vencida y cerrada. Requiere typecheck/Vitest/build y
 revisión visual local con captura sobre el nuevo HEAD.
+
+### Contratos de regresión visual (08-11-2026)
+
+Se tipan con `as const` los catálogos de opciones de Bitácora y
+Roadmap para conservar la unión literal de valores en `PillSwitcher`.
+`RoadmapResponsiveStyles.test.ts` incorpora casos estáticos para
+bloquear los grosores recuperados de master (18px avance general,
+24px barra Gantt/46px fila, selección azul) y el switcher original
+con borde celeste y botón lima. Son contratos de CSS fuente, **no**
+capturas ni tests de navegador; la verificación local sigue pendiente.
