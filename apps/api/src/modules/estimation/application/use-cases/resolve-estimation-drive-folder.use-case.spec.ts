@@ -3,6 +3,32 @@ import type { DriveFolderClient } from '../ports/drive-folder-client.port';
 import { ResolveEstimationDriveFolderUseCase } from './resolve-estimation-drive-folder.use-case';
 
 describe('ResolveEstimationDriveFolderUseCase', () => {
+
+  it('permite buscar con el Drive delegado sin usar la cuenta de servicio por defecto', async () => {
+    const inaccessible: DriveFolderClient = {
+      isConfigured: () => false, listFiles: async () => [], listChildren: async () => [],
+      searchFolders: async () => [], getMetadata: async () => null,
+      readAnalysisContent: async () => null,
+    };
+    const delegated: DriveFolderClient = {
+      ...inaccessible, isConfigured: () => true,
+      searchFolders: async () => [{
+        id: 'levantamiento-app', name: 'Motor de notificaciones',
+        mimeType: 'application/vnd.google-apps.folder',
+        modifiedAt: '2026-11-08T08:00:00Z', webViewLink: null,
+        parentIds: [], sizeBytes: null, itemType: 'folder',
+      }],
+    };
+    const result = await new ResolveEstimationDriveFolderUseCase(inaccessible).execute({
+      projectId: '550e8400-e29b-41d4-a716-446655440000',
+      projectName: 'Motor de notificaciones', clientName: null,
+      documentationLink: null, quotationLink: null,
+    }, delegated);
+    expect(result.status).toBe('resolved');
+    expect(result.selectedFolder?.folderId).toBe('levantamiento-app');
+  });
+
+
   it('usa documentationLink como vínculo explícito cuando existe', async () => {
     const drive: DriveFolderClient = {
       isConfigured: () => false,

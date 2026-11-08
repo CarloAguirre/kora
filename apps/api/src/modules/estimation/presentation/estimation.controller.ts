@@ -21,9 +21,10 @@ import {
 } from '@kora/contracts';
 import { CurrentUser, type RequestUser } from '../../../shared/presentation/decorators/current-user.decorator';
 import { AppConfigService } from '../../../config/app-config.service';
-import { GoogleDriveOAuthPocService } from '../../../shared/infrastructure/auth/google-drive-oauth-poc.service';
+import { DRIVE_DISCOVERY_SESSION, GoogleDriveOAuthPocService } from '../../../shared/infrastructure/auth/google-drive-oauth-poc.service';
 import { extractDriveFolderId } from '../application/drive-source-selection';
 import { resolveAuthorizedDriveReader } from '../infrastructure/drive/resolve-authorized-drive-reader';
+import { GoogleDriveFolderClient } from '../infrastructure/drive/google-drive-folder.client';
 import {
   browseAuthorizedDriveFolder, browseDriveFolderInputSchema,
   type BrowseDriveFolderInput, type BrowseDriveFolderResult,
@@ -41,7 +42,7 @@ import { validateFixedQuestionnaireAnswers } from '../application/validate-estim
 
 const startDriveOAuthPocSchema = z.object({
   projectId: z.uuid(),
-  driveFolderUrl: z.url().max(2048),
+  driveFolderUrl: z.url().max(2048).optional(),
 });
 
 /** Diagnóstico aislado: esta respuesta nunca contiene tokens de Google. */
@@ -86,9 +87,10 @@ export class EstimationController {
       throw new ServiceUnavailableException('La prueba OAuth de Drive no está habilitada en este entorno.');
     }
     await this.quotationDrafts.authorizeAiPoc(input.projectId, actor);
-    const folderId = extractDriveFolderId(input.driveFolderUrl);
+    const folderId = input.driveFolderUrl
+      ? extractDriveFolderId(input.driveFolderUrl) : DRIVE_DISCOVERY_SESSION;
     if (!folderId || folderId === 'kora-poc-fallback') {
-      throw new BadRequestException('Selecciona una carpeta real de Google Drive para la prueba.');
+      throw new BadRequestException('Selecciona una carpeta real de Google Drive.');
     }
     const { state, authorizationUrl } = this.driveOAuthPoc.start(actor.id, folderId);
     void reply.header('Cache-Control', 'no-store');
@@ -108,12 +110,15 @@ export class EstimationController {
     @Res({ passthrough: true }) reply: FastifyReply,
   ): Promise<{ authorized: boolean }> {
     await this.quotationDrafts.authorizeAiPoc(input.projectId, actor);
-    const id = extractDriveFolderId(input.driveFolderUrl);
+    const id = input.driveFolderUrl
+      ? extractDriveFolderId(input.driveFolderUrl) : DRIVE_DISCOVERY_SESSION;
     void reply.header('Cache-Control', 'no-store');
     return {
       authorized: Boolean(id && id !== 'kora-poc-fallback' &&
         (this.config.googleDrive.enabled ||
-        this.driveOAuthPoc.getAuthorizedAccessToken(actor.id, id))),
+          this.driveOAuthPoc.getAuthorizedAccessToken(actor.id, id) ||
+          (id !== DRIVE_DISCOVERY_SESSION &&
+            this.driveOAuthPoc.getAuthorizedAccessToken(actor.id, DRIVE_DISCOVERY_SESSION)))),
     };
   }
 
@@ -146,7 +151,11 @@ export class EstimationController {
     @CurrentUser() actor: RequestUser,
   ): Promise<EstimationDriveFolderResolution> {
     await this.quotationDrafts.authorizeAiPoc(input.projectId, actor);
-    return this.resolveDriveFolder.execute(input);
+    // Un OAuth de descubrimiento consulta el Drive del usuario conectado,
+    // nunca la cuenta de servicio de otra organización por accidente.
+    const delegated = this.driveOAuthPoc.getAuthorizedAccessToken(actor.id, DRIVE_DISCOVERY_SESSION);
+    return this.resolveDriveFolder.execute(input, delegated
+      ? new GoogleDriveFolderClient(this.config, delegated) : undefined);
   }
 
   @Post('drive/inventory')

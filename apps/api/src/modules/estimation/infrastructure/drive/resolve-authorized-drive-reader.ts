@@ -1,6 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { AppConfigService } from '../../../../config/app-config.service';
-import { GoogleDriveOAuthPocService } from '../../../../shared/infrastructure/auth/google-drive-oauth-poc.service';
+import { DRIVE_DISCOVERY_SESSION, GoogleDriveOAuthPocService } from '../../../../shared/infrastructure/auth/google-drive-oauth-poc.service';
 import { extractDriveFolderId } from '../../application/drive-source-selection';
 import type { DocumentSourceReader } from '../../application/ports/document-source-reader.port';
 import { GoogleDriveFolderClient } from './google-drive-folder.client';
@@ -22,7 +22,8 @@ export function resolveAuthorizedDriveReader(
   if (folderId === 'kora-poc-fallback') return undefined; // compatibilidad con tests legados
   if (!config) throw new BadRequestException('Configuración de Drive no disponible.');
 
-  const delegatedToken = oauth?.getAuthorizedAccessToken(userId, folderId);
+  const delegatedToken = oauth?.getAuthorizedAccessToken(userId, folderId) ??
+    oauth?.getAuthorizedAccessToken(userId, DRIVE_DISCOVERY_SESSION);
   if (delegatedToken) {
     return new GoogleDriveDocumentSourceReader(new GoogleDriveFolderClient(config, delegatedToken));
   }

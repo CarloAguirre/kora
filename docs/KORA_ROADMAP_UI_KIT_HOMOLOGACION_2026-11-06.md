@@ -343,3 +343,27 @@ bloquear los grosores recuperados de master (18px avance general,
 24px barra Gantt/46px fila, selección azul) y el switcher original
 con borde celeste y botón lima. Son contratos de CSS fuente, **no**
 capturas ni tests de navegador; la verificación local sigue pendiente.
+
+## Descubrimiento de documentación de cotización · backend (08-11-2026)
+
+Se amplía OAuth Drive en modo descubrimiento con la clave interna
+`DRIVE_DISCOVERY_SESSION`: el usuario puede conceder permiso de lectura
+sin conocer antes la URL de una carpeta. Se mantiene el `state` de un
+solo uso con cookie httpOnly y token efímero en memoria, unido al ID
+de usuario. No se devuelven credenciales al navegador ni se guardan
+en PostgreSQL. La validación de una carpeta explícita sigue vigente.
+
+`/estimations/drive/oauth-poc/start` y `/access` admiten
+`driveFolderUrl` omitido, y `/estimations/drive/resolve`
+puede reutilizar el motor de búsqueda/puntuación por nombre del
+proyecto, cliente y jerarquía contra el Drive delegado del usuario,
+sin mezclarlo con la cuenta de servicio. La lectura y la exploración
+de una carpeta confirmada aceptan el consentimiento de descubrimiento
+del mismo usuario. Se conservan los límites de parentesco para el
+explorador de carpetas hermanas y la evidencia real en Gemini.
+
+La puntuación previa a elegir una carpeta usa el clasificador
+existente; **no se atribuye su puntuación a Gemini**. Gemini se ocupa
+del análisis documental posterior a la selección. Falta ejecutar
+los tests y el build en el checkout local, ya que GitHub no ejecuta
+herramientas de compilación en este flujo.

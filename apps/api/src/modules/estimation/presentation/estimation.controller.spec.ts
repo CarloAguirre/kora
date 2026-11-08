@@ -81,6 +81,29 @@ describe('EstimationController · líder PM de proyecto asignado', () => {
       ]);
   });
 
+
+  it('admite conectar Drive sin URL y vincula la autorización solo al usuario autorizado', async () => {
+    const { controller, drafts, driveOAuthPoc } = setup();
+    const reply = { header: vi.fn(), setCookie: vi.fn() };
+    await controller.startDriveOAuthPoc({ projectId }, actor as never, reply as never);
+    expect(drafts.authorizeAiPoc).toHaveBeenCalledWith(projectId, actor);
+    expect(driveOAuthPoc.start).toHaveBeenCalledWith(actor.id, 'kora-drive-discovery-session');
+    expect(reply.setCookie).toHaveBeenCalledTimes(1);
+    driveOAuthPoc.getAuthorizedAccessToken.mockReturnValueOnce('delegated-secret');
+    expect(await controller.driveOAuthPocAccess({ projectId }, actor as never, reply as never))
+      .toEqual({ authorized: true });
+    expect(driveOAuthPoc.getAuthorizedAccessToken)
+      .toHaveBeenCalledWith(actor.id, 'kora-drive-discovery-session');
+  });
+
+  it('un proyecto ajeno no puede iniciar búsqueda sin URL', async () => {
+    const { controller, drafts, driveOAuthPoc } = setup();
+    drafts.authorizeAiPoc.mockRejectedValue(new ForbiddenException('No autorizado'));
+    await expect(controller.startDriveOAuthPoc({ projectId }, actor as never,
+      { header: vi.fn(), setCookie: vi.fn() } as never)).rejects.toThrow(ForbiddenException);
+    expect(driveOAuthPoc.start).not.toHaveBeenCalled();
+  });
+
   it('comprueba autorización por usuario y carpeta sin revelar tokens', async () => {
     const { controller, drafts, driveOAuthPoc } = setup();
     driveOAuthPoc.getAuthorizedAccessToken.mockReturnValueOnce('secret-token');

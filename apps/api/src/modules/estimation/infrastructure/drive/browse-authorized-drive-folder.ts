@@ -1,7 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { z } from 'zod';
 import { AppConfigService } from '../../../../config/app-config.service';
-import { GoogleDriveOAuthPocService } from '../../../../shared/infrastructure/auth/google-drive-oauth-poc.service';
+import { DRIVE_DISCOVERY_SESSION, GoogleDriveOAuthPocService } from '../../../../shared/infrastructure/auth/google-drive-oauth-poc.service';
 import { extractDriveFolderId } from '../../application/drive-source-selection';
 import { readEstimationDocuments, type DocumentSourceCoverage } from '../../application/ports/document-source-reader.port';
 import type { DriveFolderClient, DriveFolderItem, DriveFolderMetadata } from '../../application/ports/drive-folder-client.port';
@@ -58,7 +58,11 @@ export async function browseAuthorizedDriveFolder(
       selectedId === 'kora-poc-fallback') {
     throw new BadRequestException('Selecciona una carpeta real de Google Drive.');
   }
-  const delegatedToken = oauth.getAuthorizedAccessToken(actorId, originalId);
+  const folderToken = oauth.getAuthorizedAccessToken(actorId, originalId);
+  // Solo tras consentimiento de Drive del MISMO usuario; nunca inferir tokens
+  // de otro usuario ni de una URL proporcionada por el cliente.
+  const delegatedToken = folderToken ??
+    oauth.getAuthorizedAccessToken(actorId, DRIVE_DISCOVERY_SESSION);
   if (!delegatedToken && !config.googleDrive.enabled) {
     throw new BadRequestException('Autoriza Google Drive antes de explorar carpetas.');
   }
@@ -126,7 +130,8 @@ export async function browseAuthorizedDriveFolder(
   // La autorización derivada ocurre solo tras validar la jerarquía y la
   // accesibilidad del recurso; /poc/analyze sigue exigiendo usuario+carpeta.
   if (delegatedToken && selectedId !== originalId) {
-    oauth.authorizeRelatedFolder(actorId, originalId, selectedId);
+    oauth.authorizeRelatedFolder(actorId,
+      folderToken ? originalId : DRIVE_DISCOVERY_SESSION, selectedId);
   }
 
   return {

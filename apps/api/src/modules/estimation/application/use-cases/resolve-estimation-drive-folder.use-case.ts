@@ -38,11 +38,13 @@ export class ResolveEstimationDriveFolderUseCase {
 
   async execute(
     input: ResolveEstimationDriveFolderInput,
+    overrideDrive?: DriveFolderClient,
   ): Promise<EstimationDriveFolderResolution> {
+    const drive = overrideDrive ?? this.drive;
     const explicitFolderId = extractDriveFolderId(input.documentationLink);
     if (explicitFolderId) {
       return estimationDriveFolderResolutionSchema.parse({
-        connection: this.drive.isConfigured() ? 'connected' : 'not_configured',
+        connection: drive.isConfigured() ? 'connected' : 'not_configured',
         status: 'resolved',
         selectedFolder: {
           folderId: explicitFolderId,
@@ -54,13 +56,13 @@ export class ResolveEstimationDriveFolderUseCase {
           ancestorNames: [],
         },
         candidates: [],
-        message: this.drive.isConfigured()
+        message: drive.isConfigured()
           ? null
           : 'La carpeta está vinculada, pero la API de Kora aún no tiene credenciales para inspeccionarla.',
       });
     }
 
-    if (!this.drive.isConfigured()) {
+    if (!drive.isConfigured()) {
       // Sin documentación explícita y sin cuenta de servicio no se puede
       // inferir una carpeta real. Nunca atribuir el fixture KDM al proyecto.
       return estimationDriveFolderResolutionSchema.parse({
@@ -77,12 +79,12 @@ export class ResolveEstimationDriveFolderUseCase {
       const projectTerms = significantTerms(input.projectName);
       const clientTerms = significantTerms(input.clientName ?? '');
 
-      for (const folder of await this.drive.searchFolders(projectTerms)) {
+      for (const folder of await drive.searchFolders(projectTerms)) {
         if (folder.itemType === 'folder') discovered.set(folder.id, folder);
       }
 
       if (clientTerms.length > 0) {
-        const clientRoots = (await this.drive.searchFolders(clientTerms))
+        const clientRoots = (await drive.searchFolders(clientTerms))
           .filter((item) => item.itemType === 'folder')
           .sort(
             (a, b) =>
@@ -92,7 +94,7 @@ export class ResolveEstimationDriveFolderUseCase {
           .slice(0, 3);
 
         for (const root of clientRoots) {
-          for (const child of await this.drive.listChildren(root.id)) {
+          for (const child of await drive.listChildren(root.id)) {
             if (child.itemType === 'folder') discovered.set(child.id, child);
           }
         }
@@ -100,7 +102,7 @@ export class ResolveEstimationDriveFolderUseCase {
 
       const quotationFolderId = extractDriveFolderId(input.quotationLink);
       if (quotationFolderId && !discovered.has(quotationFolderId)) {
-        const metadata = await this.drive.getMetadata(quotationFolderId);
+        const metadata = await drive.getMetadata(quotationFolderId);
         if (metadata?.mimeType === 'application/vnd.google-apps.folder') {
           discovered.set(quotationFolderId, {
             ...metadata,
@@ -112,7 +114,7 @@ export class ResolveEstimationDriveFolderUseCase {
 
       const scored: EstimationDriveFolderCandidate[] = [];
       for (const folder of discovered.values()) {
-        const ancestorNames = await this.getAncestorNames(folder.parentIds, 3);
+        const ancestorNames = await this.getAncestorNames(folder.parentIds, 3, drive);
         const reasons: string[] = [];
         let score = scoreFolderName(folder.name, input.projectName, reasons);
 
@@ -186,12 +188,13 @@ export class ResolveEstimationDriveFolderUseCase {
   private async getAncestorNames(
     parentIds: readonly string[],
     maxDepth: number,
+    drive: DriveFolderClient = this.drive,
   ): Promise<string[]> {
     const result: string[] = [];
     let currentId = parentIds[0] ?? null;
 
     for (let depth = 0; currentId && depth < maxDepth; depth += 1) {
-      const metadata = await this.drive.getMetadata(currentId);
+      const metadata = await drive.getMetadata(currentId);
       if (!metadata) break;
       result.push(metadata.name);
       currentId = metadata.parentIds[0] ?? null;

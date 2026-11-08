@@ -12,6 +12,9 @@ const MAX_PENDING = 100;
 const MAX_DELEGATED = 100;
 const MAX_TOKEN_TTL_MS = 45 * 60_000;
 const FOLDER_MIME = 'application/vnd.google-apps.folder';
+/** Sesión OAuth para descubrir carpetas sin conocer antes su URL.
+ * No representa un ID de Drive: el token sigue ligado al usuario en memoria. */
+export const DRIVE_DISCOVERY_SESSION = 'kora-drive-discovery-session';
 
 interface PendingAttempt {
   readonly userId: string;
@@ -134,19 +137,25 @@ export class GoogleDriveOAuthPocService {
         return fail('DRIVE_SCOPE_MISSING', 'Google no concedió el permiso de lectura Drive.');
       }
 
-      const metadata = await fetch(
-        `${DRIVE_URL}/${encodeURIComponent(attempt.folderId)}?fields=id%2Cname%2CmimeType&supportsAllDrives=true`,
-        { headers: { Authorization: `Bearer ${tokens.access_token}` },
-          signal: AbortSignal.timeout(15_000) },
-      );
-      if (!metadata.ok) return driveFailure(metadata, 'metadatos');
-      const folder = await metadata.json() as { mimeType?: string };
-      if (folder.mimeType !== FOLDER_MIME) {
-        return fail('NOT_A_FOLDER', 'El enlace no corresponde a una carpeta de Drive.');
+      // Descubrimiento: consulta carpetas accesibles del usuario sin una URL
+      // inicial. Con URL explícita conserva la validación de la carpeta.
+      if (attempt.folderId !== DRIVE_DISCOVERY_SESSION) {
+        const metadata = await fetch(
+          `${DRIVE_URL}/${encodeURIComponent(attempt.folderId)}?fields=id%2Cname%2CmimeType&supportsAllDrives=true`,
+          { headers: { Authorization: `Bearer ${tokens.access_token}` },
+            signal: AbortSignal.timeout(15_000) },
+        );
+        if (!metadata.ok) return driveFailure(metadata, 'metadatos');
+        const folder = await metadata.json() as { mimeType?: string };
+        if (folder.mimeType !== FOLDER_MIME) {
+          return fail('NOT_A_FOLDER', 'El enlace no corresponde a una carpeta de Drive.');
+        }
       }
 
       const url = new URL(DRIVE_URL);
-      url.searchParams.set('q', `'${attempt.folderId}' in parents and trashed = false`);
+      url.searchParams.set('q', attempt.folderId === DRIVE_DISCOVERY_SESSION
+        ? `mimeType = '${FOLDER_MIME}' and trashed = false`
+        : `'${attempt.folderId}' in parents and trashed = false`);
       url.searchParams.set('fields', 'nextPageToken,files(id,name,mimeType)');
       url.searchParams.set('pageSize', '20');
       url.searchParams.set('supportsAllDrives', 'true');
@@ -172,8 +181,10 @@ export class GoogleDriveOAuthPocService {
       }
       return {
         status: 'ok',
-        code: 'DRIVE_READ_SUCCESS',
-        message: 'Google Drive autorizó la lectura y el backend consultó una carpeta real.',
+        code: attempt.folderId === DRIVE_DISCOVERY_SESSION ? 'DRIVE_DISCOVERY_READY' : 'DRIVE_READ_SUCCESS',
+        message: attempt.folderId === DRIVE_DISCOVERY_SESSION
+          ? 'Google Drive autorizó la búsqueda de carpetas accesibles.'
+          : 'Google Drive autorizó la lectura y el backend consultó una carpeta real.',
         filesInSample: Array.isArray(files.files) ? files.files.length : 0,
       };
     } catch {
