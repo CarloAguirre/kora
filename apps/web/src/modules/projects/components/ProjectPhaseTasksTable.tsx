@@ -94,7 +94,10 @@ export function ProjectPhaseTasksTable({
 
   const columns: Column<Row>[] = [
     { key: 'name', header: 'Tarea', render: (row) =>
-      row.kind === 'task' ? row.task.name : row.reference.name },
+      row.kind === 'task' ? row.task.name :
+        <span title="Referencia de cotización pendiente de crear como tarea operativa">
+          {row.reference.name}
+        </span> },
     { key: 'assignee', header: 'Asignada a', render: (row) =>
       row.kind === 'task' ? row.task.assigneeName || 'Sin asignar' : 'Sin asignar' },
     { key: 'block', header: 'Bloque de trabajo', render: blockFor },

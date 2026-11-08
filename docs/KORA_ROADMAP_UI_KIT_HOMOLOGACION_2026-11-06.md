@@ -285,3 +285,14 @@ Se ajustaron las aserciones que previamente exigían los estilos
 compactos propios del prototipo. Los cambios aún requieren pruebas
 locales y comparación de capturas antes/después. No declarar cerrado el
 PR hasta esa validación.
+
+## Hotfix UI-4 · Regresión EDT tras migración a DataTable (08-11-2026)
+
+El log de integración de `dbe720b3` pasó `typecheck` y 88 de 89 pruebas.
+La única falla fue `ProjectModulesCard.phase-controls.test.tsx` al buscar
+el `title` de una referencia comercial. En la migración desde la
+tabla manual a `DataTable`, la columna Tarea dejó de incluir el atributo
+`title="Referencia de cotización pendiente de crear como tarea operativa"`.
+Se repone ese título exclusivamente para filas `kind: 'reference'`,
+conservando nombre, referencias EDT y todas las reglas de gestión.
+El test preexistente cubre la regresión. Falta repetir suite local.
