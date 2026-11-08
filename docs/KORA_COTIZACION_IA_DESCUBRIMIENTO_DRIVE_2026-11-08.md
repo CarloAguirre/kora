@@ -1,0 +1,103 @@
+# Kora 2.0 · Descubrimiento asistido de carpetas Drive
+**Fecha:** 2026-11-08  
+**Rama:** `feature/calculadora-roadmap-diseno-v5-02`  
+**PR:** #7 (draft)  
+**Alcance:** cotización IA → etapa 1 Análisis → fuente documental del proyecto.
+
+## Requerimiento
+
+Al iniciar una nueva cotización, el usuario debe poder conectar su
+Google Drive sin conocer previamente la URL de la carpeta de levantamiento.
+Kora debe localizar carpetas relacionadas con el nombre del proyecto y
+el cliente, priorizar documentación vigente, ofrecer alternativas cuando
+existe incertidumbre y conservar la selección confirmada en
+**Extras → Documentación** (`documentationLink`). No debe analizar ni
+utilizar información de otros proyectos por suposición.
+
+## Implementación
+
+1. `GoogleDriveOAuthPocService` mantiene `drive.readonly` y admite
+   `DRIVE_DISCOVERY_SESSION`, un identificador **interno** para iniciar
+   OAuth sin URL. El token continúa temporal, almacenado solo en memoria
+   del backend, asociado al usuario, con state/cookie HTTP-only. Nunca
+   llega al navegador o a la BD. El consentimiento de la cuenta técnica
+   no se confunde con el consentimiento personal.
+2. Los endpoints `/estimations/drive/oauth-poc/start` y `/access`
+   aceptan `driveFolderUrl` opcional. `/estimations/drive/resolve`
+   utiliza el token delegado del usuario si está disponible;
+   con OAuth personal deshabilitado puede utilizar la cuenta de servicio.
+   Sigue exigiendo permisos del proyecto mediante `authorizeAiPoc`.
+3. El resolver existente hace búsquedas por nombre de proyecto y cliente
+   y recorre raíces relevantes hasta dos niveles, con límite de 80
+   carpetas y 18 expansiones. Considera parentesco de carpetas,
+   vocabulario de levantamiento y enlaces previos. Con Gemini real
+   configurado y varias candidatas, compara **únicamente metadatos**
+   limitados (nombres de carpetas y unos pocos nombres de archivos).
+   Un `folderId` propuesto por Gemini es aceptado **solo** si está
+   entre los IDs efectivamente devueltos por Drive; en caso de error
+   queda el ranking determinista. No se leen contenidos de candidatas
+   no confirmadas.
+4. El asistente muestra candidatas, confianza, motivos y ruta de
+   antecesores. También admite pegar una URL manual. Incluso con alta
+   confianza exige confirmación antes de guardar. Enlace confirmado
+   → exploración de carpeta accesible → verificación de documentos
+   legibles → `useUpdateProjectExtras({documentationLink})`.
+   El reemplazo de un enlace anterior está permitido; si falla la
+   edición de Extras se muestra advertencia. Una carpeta sin documentos
+   legibles no se guarda.
+5. Solo después de seleccionar una carpeta con documentos reales, Gemini
+   recibe los documentos seleccionados para análisis, entendimiento y
+   preguntas dinámicas. No hay fallback silencioso al fixture KDM.
+6. Se conserva el flujo OAuth de URL explícita, la navegación manual
+   por carpetas hermanas/hijas y el callback/polling compatible con
+   restricciones COOP de Google. Sin modificaciones de tablas,
+   migraciones, contratos persistidos o cálculo de estimaciones.
+
+## Archivos clave
+
+- `apps/api/src/shared/infrastructure/auth/google-drive-oauth-poc.service.ts`
+- `apps/api/src/modules/estimation/presentation/estimation.controller.ts`
+- `apps/api/src/modules/estimation/application/use-cases/resolve-estimation-drive-folder.use-case.ts`
+- `apps/api/src/modules/estimation/infrastructure/drive/browse-authorized-drive-folder.ts`
+- `apps/api/src/modules/estimation/infrastructure/drive/resolve-authorized-drive-reader.ts`
+- `apps/web/src/modules/estimation/api/estimation.api.ts`
+- `apps/web/src/modules/estimation/components/AiQuotationWizardModal.tsx`
+
+## Escenarios de aceptación
+
+- Proyecto sin URL: conectar Drive personal, buscar, proponer carpeta y
+  confirmar sin copiar enlace manualmente.
+- Varias candidatas: elegir entre Levantamiento actual y una carpeta
+  de proyecto cerrado, o introducir otra URL.
+- Carpeta confirmada: el vínculo de Extras se guarda/reemplaza y
+  los documentos de esa carpeta alimentan el análisis Gemini.
+- Sin documentos legibles: no guardar Extras ni lanzar Gemini.
+- Permisos insuficientes: no descubrir carpetas de proyectos ajenos;
+  no exponer access tokens al frontend.
+- Cuenta técnica configurada: no considerarla consentimiento OAuth
+  del usuario cuando se busca en «mi Drive».
+- Sin Gemini/cuota: se mantienen candidatos determinísticos y
+  confirmación humana; no se inventan rutas ni certeza.
+
+## Validación local pendiente
+
+```powershell
+pnpm --filter @kora/api typecheck
+pnpm --filter @kora/api exec vitest run `
+  src/shared/infrastructure/auth/google-drive-oauth-poc.discovery.spec.ts `
+  src/modules/estimation/presentation/estimation.controller.spec.ts `
+  src/modules/estimation/application/use-cases/resolve-estimation-drive-folder.use-case.spec.ts `
+  src/modules/estimation/infrastructure/drive/browse-authorized-drive-folder.spec.ts `
+  src/modules/estimation/infrastructure/drive/resolve-authorized-drive-reader.spec.ts
+
+pnpm --filter @kora/web typecheck
+pnpm --filter @kora/web exec vitest run `
+  src/modules/estimation/components/AiQuotationWizardModal.test.tsx
+
+pnpm --filter @kora/api build
+pnpm --filter @kora/web build
+```
+
+Las pruebas se incorporaron al repositorio pero **no se ejecutaron
+localmente** desde este entorno. El PR permanece draft y requiere la
+validación funcional con Google Drive real y Gemini configurados.
