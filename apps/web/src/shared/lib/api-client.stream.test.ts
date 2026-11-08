@@ -25,7 +25,9 @@ describe('apiEventStream / resumen de Gemini', () => {
   it('recibe eventos incrementales con bearer en memoria y un solo request', async () => {
     tokenStore.set('test-bearer');
     const fetchMock = vi.fn().mockResolvedValue(streamResponse(
+      frame('phase', { phase: 'reading', text: 'Leyendo documentos de Drive.' }) +
       frame('thought', { text: 'Identificando alcance.' }) +
+      frame('phase', { phase: 'gemini', text: 'Generando el análisis.' }) +
       frame('thought', { text: ' Revisando dependencias.' }) +
       frame('complete', { summary: 'Resultado final', provider: 'gemini' }),
     ));
@@ -33,11 +35,17 @@ describe('apiEventStream / resumen de Gemini', () => {
     const received: string[] = [];
     const result = await apiEventStream<{ summary: string; provider: string }>(
       '/estimations/poc/analyze/stream', { projectId: 'p1' },
-      (event, payload) => { if (event === 'thought') {
-        received.push((payload as { text: string }).text);
-      } },
+      (event, payload) => {
+        const value = payload as { text: string };
+        received.push(event + ': ' + value.text);
+      },
     );
-    expect(received).toEqual(['Identificando alcance.', ' Revisando dependencias.']);
+    expect(received).toEqual([
+      'phase: Leyendo documentos de Drive.',
+      'thought: Identificando alcance.',
+      'phase: Generando el análisis.',
+      'thought:  Revisando dependencias.',
+    ]);
     expect(result).toEqual({ summary: 'Resultado final', provider: 'gemini' });
     expect(fetchMock).toHaveBeenCalledOnce();
     const [url, options] = fetchMock.mock.calls[0] as [string, RequestInit];

@@ -168,7 +168,10 @@ describe('EstimationController · líder PM de proyecto asignado', () => {
     };
     analyzer.execute.mockImplementationOnce(async (
       _input: unknown, _sources: unknown, onThought: (text: string) => void,
+      onProgress: (phase: 'documents' | 'gemini', text: string) => void,
     ) => {
+      onProgress('documents', 'Documentación leída: 3 archivos.');
+      onProgress('gemini', 'Enviando antecedentes a Gemini.');
       onThought('Revisando los antecedentes del proyecto');
       return { projectId, provider: 'gemini', summary: 'Informe válido' };
     });
@@ -178,11 +181,15 @@ describe('EstimationController · líder PM de proyecto asignado', () => {
     expect(reply.raw.writeHead).toHaveBeenCalledWith(200,
       expect.objectContaining({ 'Content-Type': 'text/event-stream; charset=utf-8',
         'X-Accel-Buffering': 'no' }));
-    expect(writes).toHaveLength(2);
-    expect(writes[0]).toContain('event: thought');
-    expect(writes[0]).toContain('Revisando los antecedentes');
-    expect(writes[1]).toContain('event: complete');
-    expect(writes[1]).toContain('Informe válido');
+    expect(writes).toHaveLength(5);
+    expect(writes[0]).toContain('event: phase');
+    expect(writes[0]).toContain('Consultando los documentos autorizados');
+    expect(writes[1]).toContain('Documentación leída: 3 archivos');
+    expect(writes[2]).toContain('Enviando antecedentes a Gemini');
+    expect(writes[3]).toContain('event: thought');
+    expect(writes[3]).toContain('Revisando los antecedentes');
+    expect(writes[4]).toContain('event: complete');
+    expect(writes[4]).toContain('Informe válido');
     expect(analyzer.execute).toHaveBeenCalledOnce();
     expect(reply.raw.end).toHaveBeenCalledOnce();
   });
@@ -211,9 +218,10 @@ describe('EstimationController · líder PM de proyecto asignado', () => {
     } };
     analyzer.execute.mockRejectedValueOnce(new Error('secret-token-should-never-leak'));
     await controller.analyzeStream(request, actor as never, reply as never);
-    expect(writes).toHaveLength(1);
-    expect(writes[0]).toContain('event: error');
-    expect(writes[0]).not.toContain('secret-token-should-never-leak');
+    expect(writes).toHaveLength(2);
+    expect(writes[0]).toContain('event: phase');
+    expect(writes[1]).toContain('event: error');
+    expect(writes[1]).not.toContain('secret-token-should-never-leak');
     expect(reply.raw.end).toHaveBeenCalledOnce();
   });
 
