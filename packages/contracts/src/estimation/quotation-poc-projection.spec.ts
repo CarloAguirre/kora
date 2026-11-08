@@ -122,7 +122,35 @@ describe('Proyección IA Gemini KDM a cotización', () => {
 
 
   it('actualiza hh/sem por persona al cambiar dotación y plazo sin modificar las HH EDT', () => {
-    const mapped = projectPocRolesToQuotationDraft(original(), { Desarrollo: t1, QA: t2 });
+    // El método solo deriva carga de EDT auténticas. El antiguo fixture de
+    // esta prueba omitía aiPoc.edt y nunca entraba en la rama que se quería probar.
+    const source = original();
+    const sourceWithEdt = quotationDraftDataSchema.parse({
+      ...source,
+      aiPoc: {
+        ...source.aiPoc!,
+        edt: {
+          schemaVersion: 'kora.quotation.reference-edt.v2',
+          source: 'kdm_demo', provider: 'gemini',
+          totalHours: 80, reservePercent: 0, reserveHours: 0, totalWithReserve: 80,
+          stages: [
+            { code: 'DEV', name: 'Desarrollo', startWeek: 1, durationWeeks: 2, totalHours: 40 },
+            { code: 'QA', name: 'QA', startWeek: 3, durationWeeks: 1, totalHours: 40 },
+          ],
+          modules: [{ name: 'Portal', totalHours: 80, tasks: [
+            { wbs: 'DEV.01', name: 'Construir API', role: 'Desarrollo',
+              hours: 40, stageCode: 'DEV',
+              roleEffort: [{ role: 'Desarrollo', hours: 40 }] },
+            { wbs: 'QA.01', name: 'Verificar flujo', role: 'QA',
+              hours: 40, stageCode: 'QA',
+              roleEffort: [{ role: 'QA', hours: 40 }] },
+          ] }],
+        },
+      },
+    });
+    const mapped = projectPocRolesToQuotationDraft(sourceWithEdt, {
+      Desarrollo: t1, QA: t2,
+    });
     const expectedTotal = mapped.phases.flatMap((phase) => phase.teamHours)
       .reduce((sum, item) => sum + item.hours, 0);
     const changed = quotationDraftDataSchema.parse({
