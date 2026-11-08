@@ -626,6 +626,42 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
     ));
   });
 
+
+  it('en el paso 5 muestra logger discreto y recibe resúmenes de propuesta y EDT en vivo', async () => {
+    renderWizard();
+    await analyzeToUnderstanding();
+    fireEvent.click(screen.getByRole('button', { name: 'Está correcto' }));
+    answerFixed();
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar' }));
+    expect(screen.getByText('Confirmar la estimación')).toBeInTheDocument();
+    expect(screen.getByText('Ver razonamiento resumido de Gemini')).toBeInTheDocument();
+    expect(screen.queryByText(/^La cotización se guardará como borrador/)).not.toBeVisible();
+    fireEvent.click(screen.getByText('Ver razonamiento resumido de Gemini'));
+    const log = screen.getByRole('log', { name: 'Resúmenes de Gemini durante la estimación' });
+    expect(log).toHaveTextContent('Al generar la estimación');
+    let resolve!: (value: { id: string }) => void;
+    mocks.generate.mockImplementationOnce(() =>
+      new Promise<{ id: string }>((res) => { resolve = res; }));
+    fireEvent.click(screen.getByRole('button', { name: 'Generar estimación' }));
+    const input = mocks.generate.mock.calls[0]![0] as {
+      onThoughtSummary?: (chunk: string) => void;
+      onPhase?: (phase: 'proposal' | 'edt' | 'saving') => void;
+    };
+    expect(input.onThoughtSummary).toEqual(expect.any(Function));
+    expect(mocks.generate).toHaveBeenCalledOnce();
+    await act(async () => {
+      input.onThoughtSummary?.('Evaluando perfiles y capacidades. ');
+      input.onPhase?.('edt');
+      input.onThoughtSummary?.('Consolidando actividades y HH.');
+    });
+    expect(log).toHaveTextContent('Evaluando perfiles y capacidades. Consolidando actividades y HH.');
+    expect(screen.getByRole('status')).toHaveTextContent('Construyendo EDT');
+    expect(screen.getByRole('button', { name: /Generando estimación/ })).toBeDisabled();
+    await act(async () => { resolve({ id: 'version-qa' }); });
+    expect(await screen.findByTestId('location')).toHaveTextContent('version=version-qa');
+  });
+
   it('no permite confirmar un resumen vacío y conserva el modal si falla la generación', async () => {
     mocks.generate.mockRejectedValueOnce(new Error('Gemini no está disponible'));
     renderWizard();

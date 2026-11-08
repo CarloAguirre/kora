@@ -261,6 +261,10 @@ export function AiQuotationWizardModal({ project, onClose }: {
   const [saveWarning, setSaveWarning] = useState('');
   const [analysisSnapshot, setAnalysisSnapshot] = useState<EstimationPocAnalysis | null>(null);
   const [geminiThoughtSummary, setGeminiThoughtSummary] = useState('');
+  const [proposalThoughtSummary, setProposalThoughtSummary] = useState('');
+  const [proposalPhase, setProposalPhase] = useState<'idle' | 'proposal' | 'edt' | 'saving' | 'error'>('idle');
+  const [generating, setGenerating] = useState(false);
+  const generationInFlight = useRef(false);
   const driveStatus = useEstimationDriveOAuthPocStatus();
   const serviceAccountEnabled = driveStatus.data?.serviceAccountEnabled === true;
   const updateProjectExtras = useUpdateProjectExtras();
@@ -274,7 +278,7 @@ export function AiQuotationWizardModal({ project, onClose }: {
   const fixed = questionnaire.data?.fixedQuestions ?? [];
   const dynamic = verifiedAnalysis?.dynamicQuestions ?? [];
   const working = sourceStep === 'connecting' || sourceStep === 'discovering' ||
-    sourceStep === 'loading' || sourceStep === 'analyzing' || generate.isPending;
+    sourceStep === 'loading' || sourceStep === 'analyzing' || generate.isPending || generating;
   const relevant = stage === 2 ? fixed : dynamic;
 
   const loadDocuments = async (folderUrl: string, rootUrl: string): Promise<DriveBrowseResult | null> => {
@@ -663,9 +667,16 @@ export function AiQuotationWizardModal({ project, onClose }: {
       setStage(stage + 1);
       return;
     }
-    if (stage !== 4 || !verifiedAnalysis || generate.isPending) return;
+    if (stage !== 4 || !verifiedAnalysis || generate.isPending || generationInFlight.current) return;
+    generationInFlight.current = true;
+    setGenerating(true);
+    setProposalPhase('proposal');
+    setProposalThoughtSummary('');
     try {
       const created = await generate.mutateAsync({
+        onThoughtSummary: (chunk) => setProposalThoughtSummary((current) =>
+          (current + chunk).slice(0, 12_000)),
+        onPhase: (phase) => setProposalPhase(phase),
         projectId: project.id,
         projectName: project.name,
         clientName: project.client?.companyName ?? null,
@@ -678,8 +689,12 @@ export function AiQuotationWizardModal({ project, onClose }: {
       onClose();
       navigate(projectQuotationPath(project) + '?version=' + created.id);
     } catch (reason) {
+      setProposalPhase('error');
       reportError(reason instanceof Error ? reason.message :
         'No se pudo generar y guardar la cotización.');
+    } finally {
+      generationInFlight.current = false;
+      setGenerating(false);
     }
   };
 
@@ -723,7 +738,7 @@ export function AiQuotationWizardModal({ project, onClose }: {
             sourceStep === 'analyzing' ? 'Analizando…' :
             !driveUrlValid && sourceStep === 'source' ? 'Buscar carpeta en Drive' :
             'Analizar proyecto' : stage === 1 ? 'Está correcto' :
-            stage === 4 ? 'Generar estimación' : 'Continuar'}
+            stage === 4 ? generating ? 'Generando estimación…' : 'Generar estimación' : 'Continuar'}
         </Button>
         )}
       </>}>
@@ -1087,8 +1102,28 @@ export function AiQuotationWizardModal({ project, onClose }: {
             <p>Validar con el cliente los resultados de esta estimación basada en Drive,
               antes de utilizarla en un proyecto real.</p>
           </div>
-          <p className={styles.warning}>La cotización se guardará como borrador
-            con revisión IA pendiente. No se enviará ni aprobará automáticamente.</p>
+          <details className={[styles.more, styles.thoughtDisclosure].join(' ')}>
+            <summary>Ver razonamiento resumido de Gemini</summary>
+            {proposalPhase !== 'idle' && <p className={styles.thoughtPhase} role="status">
+              {proposalPhase === 'proposal' ? 'Preparando propuesta de perfiles y capacidad…' :
+                proposalPhase === 'edt' ? 'Construyendo EDT y estimando HH por actividad…' :
+                  proposalPhase === 'saving' ? 'Guardando la cotización como borrador…' :
+                    'La generación no pudo completarse.'}
+            </p>}
+            <div className={styles.thoughtLog} role="log"
+              aria-label="Resúmenes de Gemini durante la estimación"
+              aria-live="polite" aria-relevant="additions text">
+              {proposalThoughtSummary
+                ? <p>{proposalThoughtSummary}</p>
+                : <p>{proposalPhase === 'idle'
+                  ? 'Al generar la estimación, se mostrarán aquí los resúmenes que entregue Gemini.'
+                  : 'Gemini aún no ha enviado resúmenes de razonamiento para esta etapa.'}</p>}
+            </div>
+            <p className={styles.thoughtFootnote}>
+              La cotización se guardará como borrador con revisión IA pendiente.
+              No se enviará ni aprobará automáticamente.
+            </p>
+          </details>
         </section>
       )}
       {error && <p role="alert" className={styles.error}>{error}</p>}

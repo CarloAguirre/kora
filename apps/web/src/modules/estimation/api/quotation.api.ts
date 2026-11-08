@@ -18,7 +18,7 @@ import type {
   SavedQuotationReviewAssessment,
   UpdateQuotationDraftInput,
 } from '@kora/contracts';
-import { api } from '@/shared/lib/api-client';
+import { api, apiEventStream } from '@/shared/lib/api-client';
 
 const base = (projectId: string) => '/estimations/projects/' + projectId + '/quotation';
 
@@ -88,6 +88,26 @@ export const quotationApi = {
     input: TransferApprovedQuotationInput): Promise<QuotationTransferResult> {
     return api.post<QuotationTransferResult>(
       base(projectId) + '/versions/' + versionId + '/transfer-approved', input);
+  },
+  /** Resúmenes oficiales en vivo de propuesta y EDT, sin solicitudes adicionales. */
+  generateAiDemoDraftStream(
+    projectId: string, input: GenerateAiDemoQuotationInput,
+    onThoughtSummary: (text: string) => void,
+    onPhase?: (phase: 'proposal' | 'edt' | 'saving') => void,
+  ): Promise<QuotationVersion> {
+    return apiEventStream<QuotationVersion>(
+      base(projectId) + '/versions/ai-poc/stream', input,
+      (event, payload) => {
+        if (!payload || typeof payload !== 'object') return;
+        if (event === 'thought') {
+          const text = (payload as { text?: unknown }).text;
+          if (typeof text === 'string' && text.length) onThoughtSummary(text);
+        } else if (event === 'phase') {
+          const phase = (payload as { phase?: unknown }).phase;
+          if (phase === 'proposal' || phase === 'edt' || phase === 'saving') onPhase?.(phase);
+        }
+      },
+    );
   },
   generateAiDemoDraft(projectId: string, input: GenerateAiDemoQuotationInput): Promise<QuotationVersion> {
     return api.post<QuotationVersion>(base(projectId) + '/versions/ai-poc', input);

@@ -19,11 +19,18 @@ export function useCreateQuotationVersion(projectId: string) {
   });
 }
 
-/** Gemini real + KDM como fuente de demostración, guardado en PostgreSQL. */
+/** La ruta normal conserva POST REST; con observador abre SSE para ambos modelos Gemini. */
+export interface GenerateQuotationWithSummaries extends GenerateAiDemoQuotationInput {
+  readonly onThoughtSummary?: (text: string) => void;
+  readonly onPhase?: (phase: 'proposal' | 'edt' | 'saving') => void;
+}
 export function useGenerateAiDemoQuotationVersion(projectId: string) {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (input: GenerateAiDemoQuotationInput) => quotationApi.generateAiDemoDraft(projectId, input),
+    mutationFn: ({ onThoughtSummary, onPhase, ...input }: GenerateQuotationWithSummaries) =>
+      onThoughtSummary
+        ? quotationApi.generateAiDemoDraftStream(projectId, input, onThoughtSummary, onPhase)
+        : quotationApi.generateAiDemoDraft(projectId, input),
     onSuccess: () => client.invalidateQueries({ queryKey: quotationKeys.project(projectId) }),
   });
 }
