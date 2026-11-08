@@ -479,6 +479,33 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
   });
 
 
+  it('si OAuth ya autorizó la carpeta de Extras, la reutiliza sin buscar ni volver a pedir permisos', async () => {
+    mocks.serviceAccountEnabled = false;
+    const popup = { close: vi.fn(), location: { replace: vi.fn() } };
+    const open = vi.spyOn(window, 'open').mockReturnValue(popup as unknown as Window);
+    try {
+      renderWizard();
+      fireEvent.click(screen.getByRole('button', { name: 'Conectar con Google Drive' }));
+      expect(await screen.findByRole('list', { name: 'Documentos que analizará el agente' }))
+        .toBeInTheDocument();
+      expect(mocks.driveAccess).toHaveBeenCalledWith({
+        projectId: project.id, driveFolderUrl: project.documentationLink,
+      });
+      expect(mocks.browse).toHaveBeenCalledWith({
+        projectId: project.id, authorizationFolderUrl: project.documentationLink,
+        folderUrl: project.documentationLink,
+      });
+      expect(popup.close).toHaveBeenCalled();
+      expect(popup.location.replace).not.toHaveBeenCalled();
+      expect(mocks.oauthStart).not.toHaveBeenCalled();
+      expect(mocks.resolve).not.toHaveBeenCalled();
+      expect(mocks.updateExtras).not.toHaveBeenCalled();
+      expect(mocks.analyze).not.toHaveBeenCalled();
+    } finally {
+      open.mockRestore();
+    }
+  });
+
   it('desde Conectar con Google Drive autoriza la carpeta de Extras sin pedir otra', async () => {
     mocks.serviceAccountEnabled = false;
     mocks.driveAccess.mockResolvedValueOnce({ authorized: false })
