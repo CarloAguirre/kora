@@ -358,6 +358,33 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
     expect(mocks.analyze).toHaveBeenCalledTimes(1);
   });
 
+  it('explica por qué los PDF de una carpeta compartida no pudieron leerse', async () => {
+    mocks.browse.mockResolvedValueOnce({
+      ...previewResult, documents: [],
+      coverage: {
+        scannedItems: 5, eligibleDocuments: 2, analyzedDocuments: 0,
+        scanTruncated: false,
+        omitted: [
+          { path: '1.10 Protocolo Relocalización.pdf',
+            reason: 'falló la lectura del archivo (Google Drive respondió HTTP 403)' },
+          { path: 'Cronograma Gantt.xlsx', reason: 'formato no compatible con el lector' },
+        ],
+      },
+    });
+    renderWizard();
+    await prepareDocuments();
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Drive detectó 2 archivo(s) compatible(s), pero no pudo leerlos');
+    expect(screen.getByRole('list', { name: 'Archivos omitidos en Drive' }))
+      .toHaveTextContent('1.10 Protocolo Relocalización.pdf');
+    expect(screen.getByRole('list', { name: 'Archivos omitidos en Drive' }))
+      .toHaveTextContent('HTTP 403');
+    expect(screen.getByText(/Los Excel .xlsx aún no se leen directamente/))
+      .toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Analizar proyecto' })).toBeDisabled();
+    expect(mocks.analyze).not.toHaveBeenCalled();
+  });
+
   it('bloquea análisis si la carpeta no contiene documentos legibles', async () => {
     mocks.browse.mockResolvedValueOnce({ ...previewResult, documents: [] });
     renderWizard();

@@ -871,15 +871,46 @@ export function AiQuotationWizardModal({ project, onClose }: {
                       </li>
                     ))}
                   </ul>
-                  {!preview.documents.length && <p role="alert" className={styles.error}>
-                    No hay documentos legibles en esta carpeta. Prueba con otra carpeta.
-                  </p>}
+                  {!preview.documents.length && (
+                    <p role="alert" className={styles.error}>
+                      {preview.coverage && preview.coverage.eligibleDocuments > 0
+                        ? `Drive detectó ${preview.coverage.eligibleDocuments} archivo(s) compatible(s), pero no pudo leerlos. Revisa los motivos abajo.`
+                        : preview.coverage && preview.coverage.scannedItems > 0
+                          ? `Drive encontró ${preview.coverage.scannedItems} elemento(s), pero ningún documento compatible para el análisis. Revisa los descartes abajo.`
+                          : 'Drive no devolvió archivos de esta carpeta con la cuenta conectada. Comprueba la cuenta Google y los permisos de lectura.'}
+                    </p>
+                  )}
                   {preview.coverage && (preview.coverage.omitted.length > 0 ||
                     preview.coverage.scanTruncated) && (
-                    <p className={styles.coverageNote}>
-                      Se seleccionaron {preview.documents.length} de {preview.coverage.eligibleDocuments}
-                      {' '}archivos compatibles detectados. Algunos archivos no podrán analizarse.
-                    </p>
+                    <details className={styles.more} open={!preview.documents.length}>
+                      <summary>
+                        Diagnóstico de lectura: {preview.documents.length} de{' '}
+                        {preview.coverage.eligibleDocuments} archivos compatibles procesados
+                      </summary>
+                      <p className={styles.coverageNote}>
+                        Se revisaron {preview.coverage.scannedItems} elementos de Drive.
+                        {preview.coverage.scanTruncated &&
+                          ' La exploración alcanzó un límite; pueden existir más documentos.'}
+                      </p>
+                      {preview.coverage.omitted.length > 0 && (
+                        <ul className={styles.documents} aria-label="Archivos omitidos en Drive">
+                          {preview.coverage.omitted.slice(0, 12).map((item, index) => (
+                            <li key={item.path + index}>
+                              <span><strong>{item.path}</strong> — {item.reason}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      {preview.coverage.omitted.length > 12 &&
+                        <p className={styles.coverageNote}>
+                          Y otros {preview.coverage.omitted.length - 12} elementos omitidos.
+                        </p>}
+                      <p className={styles.coverageNote}>
+                        Los PDF y documentos de Google son compatibles. Los Excel .xlsx
+                        aún no se leen directamente: puedes convertirlos a Hojas de cálculo
+                        de Google o usar una carpeta con PDF/Docs accesibles.
+                      </p>
+                    </details>
                   )}
                   <details className={styles.more}>
                     <summary>Indicaciones adicionales · opcional</summary>

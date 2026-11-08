@@ -117,3 +117,31 @@ descubrimiento, dentro de candidatas, cuando el usuario necesita elegir
 o corregir. OAuth, permisos, ranking, Gemini, guardado en Extras y
 reglas de confirmación siguen intactos. Pruebas del wizard actualizadas
 para proteger el estado inicial sin doble CTA.
+
+## Incidente de carpeta con PDF y Excel visibles, pero sin documentos legibles (08-11-2026)
+
+La captura de `03.Documento de levantamiento detallado` muestra carpetas
+internas, PDF (algunos menores de 5 MB) y archivos Excel. **No es evidencia
+de una carpeta vacía.** El lector del backend soporta PDF y Google Docs,
+Sheets y Slides, pero no interpreta nativamente binarios `.xlsx`.
+
+La revisión confirmó limitaciones del código:
+- El adaptador Google Drive solo pedía la primera página de 100 elementos.
+  Se añade paginación acotada (máximo 10 páginas) sin devolver un listado
+  incompleto como si estuviera vacío.
+- Errores de descarga individual se registraban como una omisión genérica,
+  invisible en el wizard. Ahora se distingue denegación/HTTP y se preservan
+  los demás documentos legibles, incluidos los de subcarpetas cuando
+  alguna ruta no tiene permisos.
+- La vista mostraba siempre el mismo error para 0 compatibles o 2 compatibles
+  con lectura fallida. Se separan los escenarios y se presenta la lista de
+  archivos omitidos con motivos y conteos, sin exponer tokens/cuerpos de
+  respuesta de Google.
+- Los Excel binarios siguen siendo incompatibles. Se explica cómo convertir
+  a Google Sheets; no se atribuye falsamente lectura a Gemini.
+
+**Pendiente de confirmación:** ejecución de pruebas API/Web, build y prueba
+real en Drive. El JSON de cobertura devuelto por `folders/browse`
+determinará si fallan lectura de PDF (403 u otro), formato, tamaño,
+permisos, límite o visibilidad de Drive. Sin esa evidencia no se declara
+una causa única del incidente.
