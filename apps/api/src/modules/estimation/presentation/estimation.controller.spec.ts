@@ -96,6 +96,17 @@ describe('EstimationController · líder PM de proyecto asignado', () => {
       .toHaveBeenCalledWith(actor.id, 'kora-drive-discovery-session');
   });
 
+  it('la cuenta de servicio no suplanta consentimiento OAuth personal de descubrimiento', async () => {
+    const { controller, config, driveOAuthPoc } = setup();
+    config.googleDrive.enabled = true;
+    const reply = { header: vi.fn() };
+    expect(await controller.driveOAuthPocAccess({ projectId }, actor as never, reply as never))
+      .toEqual({ authorized: false });
+    driveOAuthPoc.getAuthorizedAccessToken.mockReturnValueOnce('token-usuario-1');
+    expect(await controller.driveOAuthPocAccess({ projectId }, actor as never, reply as never))
+      .toEqual({ authorized: true });
+  });
+
   it('un proyecto ajeno no puede iniciar búsqueda sin URL', async () => {
     const { controller, drafts, driveOAuthPoc } = setup();
     drafts.authorizeAiPoc.mockRejectedValue(new ForbiddenException('No autorizado'));

@@ -113,13 +113,15 @@ export class EstimationController {
     const id = input.driveFolderUrl
       ? extractDriveFolderId(input.driveFolderUrl) : DRIVE_DISCOVERY_SESSION;
     void reply.header('Cache-Control', 'no-store');
-    return {
-      authorized: Boolean(id && id !== 'kora-poc-fallback' &&
-        (this.config.googleDrive.enabled ||
-          this.driveOAuthPoc.getAuthorizedAccessToken(actor.id, id) ||
-          (id !== DRIVE_DISCOVERY_SESSION &&
-            this.driveOAuthPoc.getAuthorizedAccessToken(actor.id, DRIVE_DISCOVERY_SESSION)))),
-    };
+    // El permiso del service account NO demuestra consentimiento del usuario
+    // para buscar en "mi Drive". Sin URL se exige su token OAuth delegado.
+    const authorized = id === DRIVE_DISCOVERY_SESSION
+      ? this.driveOAuthPoc.getAuthorizedAccessToken(actor.id, DRIVE_DISCOVERY_SESSION)
+      : id && id !== 'kora-poc-fallback' && (
+        this.config.googleDrive.enabled ||
+        this.driveOAuthPoc.getAuthorizedAccessToken(actor.id, id) ||
+        this.driveOAuthPoc.getAuthorizedAccessToken(actor.id, DRIVE_DISCOVERY_SESSION));
+    return { authorized: Boolean(authorized) };
   }
 
   /**
