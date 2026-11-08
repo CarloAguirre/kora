@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { ToastProvider, useToast } from './Toast';
 
 function Trigger() {
@@ -7,7 +7,12 @@ function Trigger() {
   return <button type="button" onClick={() => error('Aviso de prueba')}>Probar aviso</button>;
 }
 const dialogs: HTMLDialogElement[] = [];
-afterEach(() => { dialogs.forEach((d) => d.remove()); dialogs.length = 0; });
+afterEach(async () => {
+  await act(async () => {
+    dialogs.forEach((dialog) => dialog.remove());
+    dialogs.length = 0;
+  });
+});
 
 function openDialog(): HTMLDialogElement {
   const dialog = document.createElement('dialog');
@@ -35,7 +40,7 @@ describe('ToastProvider y modal nativo top-layer', () => {
     render(<ToastProvider><Trigger /></ToastProvider>);
     fireEvent.click(screen.getByRole('button', { name: 'Probar aviso' }));
     await waitFor(() => expect(dialog.textContent).toContain('Aviso de prueba'));
-    dialog.removeAttribute('open');
+    await act(async () => { dialog.removeAttribute('open'); });
     await waitFor(() => expect(dialog.querySelector('aside')).toBeNull());
     expect(document.body.textContent).toContain('Aviso de prueba');
     expect(screen.getByRole('button', { name: 'Cerrar aviso' })).toBeInTheDocument();

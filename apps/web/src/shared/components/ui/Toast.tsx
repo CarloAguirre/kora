@@ -42,6 +42,7 @@ const AUTO_DISMISS_MS = 5000;
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
+  const previousPortalTarget = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     // <dialog>.showModal() entra en la top layer; ningún z-index de body
@@ -59,7 +60,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         ? Array.from(dialogs)
         : Array.from(document.querySelectorAll<HTMLDialogElement>('dialog[open]'));
       const target = openDialogs[openDialogs.length - 1] ?? document.body;
-      setPortalTarget((current) => current === target ? current : target);
+      // El observer también ve los cambios de los propios toasts. Evitar
+      // encolar updates React cuando el diálogo activo no cambió.
+      if (previousPortalTarget.current !== target) {
+        previousPortalTarget.current = target;
+        setPortalTarget(target);
+      }
     };
     updateTarget();
     const observer = new MutationObserver(updateTarget);

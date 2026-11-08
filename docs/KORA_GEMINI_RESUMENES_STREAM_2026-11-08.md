@@ -113,3 +113,22 @@ pnpm --filter @kora/web build
 
 Las pruebas y builds locales requieren ejecución del usuario; desde
 GitHub solo se ha confirmado la publicación y revisión estática.
+
+### Hotfix tras validación local (08-11-2026)
+
+La ejecución con HEAD `7be53ccf` confirmó **typecheck API/Web** y
+**57/57 tests backend**. El frontend aprobó 25/26 tests: una aserción
+de `AiQuotationWizardModal.test.tsx` utilizaba `screen.getByRole('status')`
+y coincidía tanto con el `<output data-testid="location">` como con el
+estado de la EDT. Se reemplaza por el texto exacto de la fase y se
+verifica su atributo `role="status"`. No es un error de ejecución SSE.
+
+Las tres pruebas de `Toast.modal.test.tsx` aprobaron, pero algunos
+`MutationObserver` dispararon advertencias de actualizaciones fuera de
+`act(...)`. Ahora el `ToastProvider` utiliza un ref para no llamar a
+`setPortalTarget` cuando el destino no cambió, y el cierre/limpieza de
+los diálogos de prueba se envuelve en `act`.
+
+**El build no fue ejecutado en el log recibido:** el script se detuvo
+cuando falló el test. Repetir Vitest frontend y builds para validar este
+hotfix; sin cambios en BD, OAuth, Gemini, contratos ni rutas.

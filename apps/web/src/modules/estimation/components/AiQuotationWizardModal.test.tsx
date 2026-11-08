@@ -658,7 +658,8 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
       input.onThoughtSummary?.('Consolidando actividades y HH.');
     });
     expect(log).toHaveTextContent('Evaluando perfiles y capacidades. Consolidando actividades y HH.');
-    expect(screen.getByRole('status')).toHaveTextContent('Construyendo EDT');
+    expect(screen.getByText('Construyendo EDT y estimando HH por actividad…'))
+      .toHaveAttribute('role', 'status');
     expect(screen.getByRole('button', { name: /Generando estimación/ })).toBeDisabled();
     await act(async () => { resolve({ id: 'version-qa' }); });
     expect(await screen.findByTestId('location')).toHaveTextContent('version=version-qa');
