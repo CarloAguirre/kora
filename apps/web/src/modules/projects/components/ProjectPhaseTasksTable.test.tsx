@@ -98,7 +98,7 @@ describe('Tabla operativa compartida de tareas', () => {
       name: 'Eliminar tarea Análisis de flujos existentes',
     }));
     const add = screen.getByRole('button', { name: '+ Agregar tarea' });
-    expect(add.className).toContain('tertiary');
+    expect(add.className).toContain('outline');
     fireEvent.click(add);
     expect(onEditTask).toHaveBeenCalledWith(module.tasks[0]);
     expect(onDuplicateTask).toHaveBeenCalledWith(module.tasks[0]);
@@ -139,6 +139,8 @@ describe('Tabla operativa compartida de tareas', () => {
       name: 'Tabla de tareas de Diseño y Arquitectura',
     });
     expect(scrollRegion).toHaveAttribute('tabindex', '0');
+    expect(within(scrollRegion).getByRole('table')).toHaveAttribute('style',
+      'min-width: 760px;');
     expect(within(scrollRegion).getByRole('table')).toHaveTextContent(longName);
     expect(within(scrollRegion).queryByRole('button')).not.toBeInTheDocument();
   });

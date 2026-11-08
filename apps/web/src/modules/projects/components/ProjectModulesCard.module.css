@@ -478,65 +478,9 @@
   padding: 3px 0 8px;
   list-style: revert;
 }
-.operationalTaskScroll {
-  /* La tabla conserva sus columnas y se desplaza sola, sin arrastrar el Gantt. */
-  width: 100%;
-  max-width: 100%;
-  min-width: 0;
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
-  scrollbar-width: thin;
-}
-/* Al llegar con Tab a una tabla desbordada, se puede recorrer con las flechas
-   sin perder el foco y sin ocultar qué región está seleccionada. */
-.operationalTaskScroll:focus-visible {
-  outline: 2px solid var(--kora-blue-600);
-  outline-offset: -2px;
-  border-radius: var(--kora-radius-sm);
-}
-.operationalTaskTable {
-  width: 100%;
-  min-width: 760px;
-  border-collapse: collapse;
-  table-layout: auto;
-}
-.operationalTaskTable th {
-  padding: 9px 10px;
-  background: var(--kora-surface-muted);
-  border-bottom: 1px solid var(--kora-border-subtle);
-  font-size: var(--kora-text-2xs);
-  font-weight: var(--kora-weight-semibold);
-  color: var(--kora-text-muted);
-  text-align: left;
-}
-.operationalTaskTable td {
-  padding: 9px 10px;
-  border-bottom: 1px solid var(--kora-border-subtle);
-  vertical-align: middle;
-  font-size: var(--kora-text-xs);
-  color: var(--kora-text-muted);
-}
-.operationalTaskTable tr:last-child td { border-bottom: none; }
-.operationalTaskTable td:nth-child(5),
-.operationalTaskTable td:nth-child(6) { white-space: nowrap; }
-.operationalTaskTable td:nth-child(2),
-.operationalTaskTable td:nth-child(3) { overflow-wrap: anywhere; }
-/* Solo la vista gestionable tiene la columna de acciones. Sin ella, la fecha no
-   hereda una anchura fija ni se alinea erróneamente a la derecha. */
-.operationalTaskTable th[aria-label="Acciones"] { width: 118px; min-width: 118px; }
-.operationalTaskTable .operationalTaskTitle {
-  min-width: 190px;
-  color: var(--kora-navy);
-  font-weight: var(--kora-weight-semibold);
-  overflow-wrap: anywhere;
-}
-.operationalTaskTitle small {
-  display: block;
-  margin-top: 3px;
-  color: var(--kora-text-muted);
-  font-weight: var(--kora-weight-regular);
-  font-size: 10.5px;
-}
+/* Apariencia de cabecera, filas y scroll provienen de DataTable nativo Kora. */
+.operationalBlockName { overflow-wrap: anywhere; }
+.operationalTaskActions { display: inline-flex; align-items: center; gap: var(--kora-space-1); white-space: nowrap; }
 .noOperationalTasks { color: var(--kora-text-muted); font-size: var(--kora-text-xs); }
 .legacyReferences {
   border-top: 1px solid #e5e8ef;
@@ -567,37 +511,6 @@
 .phaseCreationForm { display: grid; gap: 8px; }
 .phaseCreationDates { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 @media (max-width: 580px) { .phaseCreationDates { grid-template-columns: 1fr; } }
-
-/* La última columna no lleva título: solo iconos de edición y eliminación. */
-.operationalTaskActions { white-space: nowrap; }
-.operationalTaskActions .taskIconAction {
-  /* El Button ghost icon pone la interacción; estas medidas conservan la tabla v5.02. */
-  width: 28px; height: 28px; margin-left: 3px;
-  color: var(--kora-text-muted);
-}
-.taskIconAction:hover:not(:disabled) { color: var(--kora-navy); }
-.taskIconAction:focus-visible { outline: 2px solid var(--kora-navy); }
-
-/* Acciones de tareas en el panel lateral de bloque operativo. */
-.drawerTaskHeading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.drawerTaskList { padding: 0; margin: 0; list-style: none; }
-.drawerTaskRow { display: flex; gap: 8px; align-items: center; padding: 10px 0; border-top: 1px solid #edf0f4; }
-.drawerTaskRow > div { flex: 1; min-width: 0; display: grid; gap: 4px; }
-.drawerTaskRow strong { font-weight: 600; overflow-wrap: anywhere; }
-.drawerTaskRow small { color: #667085; }
-
-/* Tres acciones (editar, duplicar, eliminar) en la tabla operativa. */
-/* La tabla v5.02 mantiene solamente editar y eliminar en la última columna.
-   Duplicar sigue disponible dentro del modal de edición. */
-/* Tres iconos para tareas asignadas; sin recortar acciones ni texto de otras columnas. */
-.operationalTaskTable .operationalTaskActions { padding-right: 6px; text-align: right; white-space: nowrap; }
-.operationalTaskActions .taskIconAction + .taskIconAction { margin-left: 6px; }
-.addTaskButton {
-  /* Presentación de enlace bajo la tabla, con foco y hover del Button tertiary. */
-  height: auto; min-width: 0; margin: 7px 0 4px; padding: 4px 0;
-  font-size: 12px; font-weight: 600; text-decoration: underline;
-}
-.addTaskButton:focus-visible { outline: 2px solid var(--kora-navy); outline-offset: 2px; }
 
 /* Información temporal junto al nombre, como la cabecera de fases v5.02. */
 .phaseHeadingIdentity {

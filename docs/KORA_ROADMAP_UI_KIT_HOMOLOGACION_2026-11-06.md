@@ -231,3 +231,35 @@ inspección visual en Chrome sin evidencia de navegador.
 (typecheck, suites Roadmap, `PhaseRoadmap.header-actions`, build)
 y revisión de la matriz visual antes de pasar el PR de draft a revisión.
 No se modifica `apps/api/.env.example`, API, BD, contratos o migraciones.
+
+## Rectificación de UI kit con captura real (08-11-2026)
+
+Las capturas demuestran que homologar importaciones no homologó la apariencia:
+la tabla era artesanal y mantenía el CSS del HTML v5.02; los botones del
+drawer estaban redimensionados localmente y `Por asignar` seguía con
+una excepción de color/tamaño fuera del Badge. Por lo tanto el cierre
+visual de UI-1–UI-4 anterior fue prematuro.
+
+### Primera corrección visual efectiva: DataTable nativo Kora
+
+`ProjectPhaseTasksTable` ahora compone filas operativas y EDT en el
+`DataTable` compartido de Kora. Esto activa **la cabecera celeste**,
+el borde y radio de tabla, la alternancia de filas, hover y la tipografía
+nativa. La API del DataTable recibe dos propiedades opt-in:
+`scrollRegionLabel` para scroll accesible por teclado y
+`minTableWidth` para garantizar el mínimo de 760px dentro de la fase
+sin mover el Gantt. Las acciones de tarea usan `Button ghost icon`
+sin tamaños locales y `+ Agregar tarea` usa `Button outline sm`
+en vez de parecer un enlace subrayado. La columna de gestión muestra
+el encabezado explícito `Acciones`.
+
+Reglas preservadas: columnas distintas para colaborador/gestor;
+referencias EDT sin inventar segmentos materializados; fecha y
+horas reales/pendientes; `in_review` y revisión; edición, duplicado y
+eliminación con callbacks; `referenceDeletePending`, `canManage`
+y `readOnly`. Sin cambios de API/BD/contratos/Gantt.
+
+**No es cierre total:** panel, badges compactos y excepciones semánticas
+se auditan en la siguiente iteración; la apariencia real requiere
+validación local con screenshot. No se afirma typecheck ni Vitest PASS
+sin registro del usuario.

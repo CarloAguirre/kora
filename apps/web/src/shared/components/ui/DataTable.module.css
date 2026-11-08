@@ -133,3 +133,6 @@
 .compact .table { min-width: 0; }
 .compact .headerCell { padding: var(--kora-space-2) var(--kora-space-3); }
 .compact .cell { padding: var(--kora-space-2) var(--kora-space-3); }
+
+/* Scroll del DataTable accesible por teclado cuando se activa scrollRegionLabel. */
+.container:focus-visible { outline: 2px solid var(--kora-blue-600); outline-offset: -2px; }

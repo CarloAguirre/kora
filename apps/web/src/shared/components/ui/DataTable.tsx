@@ -45,6 +45,10 @@ export interface DataTableProps<T> {
   readonly topScrollbar?: boolean;
   /** Vista compacta opt-in en tarjetas de resumen. */
   readonly density?: 'default' | 'compact';
+  /** Opt-in: accesibilidad del scroll horizontal. */
+  readonly scrollRegionLabel?: string;
+  /** Opt-in: ancho mínimo de la tabla, independiente del Gantt. */
+  readonly minTableWidth?: string;
   /** Permite resaltar filas semánticas sin duplicar el componente. */
   readonly getRowClassName?: (item: T) => string | undefined;
 }
@@ -61,6 +65,8 @@ export function DataTable<T>({
   caption,
   topScrollbar = false,
   density = 'default',
+  scrollRegionLabel,
+  minTableWidth,
   getRowClassName,
 }: DataTableProps<T>) {
   const columnCount = columns.length;
@@ -117,13 +123,17 @@ export function DataTable<T>({
       <div
         ref={containerRef}
         className={[styles.container, density === 'compact' ? styles.compact : ''].filter(Boolean).join(' ')}
+        role={scrollRegionLabel ? 'region' : undefined}
+        aria-label={scrollRegionLabel}
+        tabIndex={scrollRegionLabel ? 0 : undefined}
         onScroll={
           topScrollbar
             ? () => syncScroll(containerRef.current, topScrollRef.current)
             : undefined
         }
       >
-        <table ref={tableRef} className={styles.table}>
+        <table ref={tableRef} className={styles.table}
+          style={minTableWidth ? { minWidth: minTableWidth } : undefined}>
           {caption && <caption className="srOnly">{caption}</caption>}
 
           <thead>

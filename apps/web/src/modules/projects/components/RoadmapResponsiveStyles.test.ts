@@ -12,24 +12,24 @@ const phaseCss = readFileSync(resolve(cssDir, 'ProjectModulesCard.module.css'), 
 const drawerCss = readFileSync(resolve(cssDir, 'SegmentDrawer.module.css'), 'utf8');
 const ganttCss = readFileSync(resolve(cssDir,
   '../../client-portal/components/PhaseRoadmap.module.css'), 'utf8');
+const dataTableCss = readFileSync(resolve(cssDir,
+  '../../../shared/components/ui/DataTable.module.css'), 'utf8');
 
 /**
  * Contratos estáticos de estilos que jsdom no puede medir visualmente.
  * Complementar con revisión real a 320, 375, 768 y 1280 px (UI-4).
  */
 describe('Roadmap UI-3: tokens y scroll local', () => {
-  it('mantiene la tabla ancha dentro de su propio scroll, sin mover el Gantt', () => {
-    expect(phaseCss).toMatch(/\.operationalContent\s*\{[^}]*min-width:\s*0;/s);
+  it('consume la superficie, cabecera y filas del DataTable nativo', () => {
     expect(phaseCss).toMatch(/\.operationalTasks\s*\{[^}]*min-width:\s*0;/s);
-    expect(phaseCss).toMatch(/\.operationalTaskScroll\s*\{[^}]*overflow-x:\s*auto;/s);
-    expect(phaseCss).toMatch(/\.operationalTaskScroll\s*\{[^}]*overscroll-behavior-x:\s*contain;/s);
-    expect(phaseCss).toMatch(/\.operationalTaskTable\s*\{[^}]*min-width:\s*760px;/s);
+    expect(dataTableCss).toMatch(/\.container\s*\{[^}]*overflow:\s*auto;/s);
+    expect(dataTableCss).toMatch(/\.headerCell\s*\{[^}]*background:\s*var\(--kora-blue-surface-soft\);/s);
+    expect(dataTableCss).toMatch(/\.row:nth-child\(even\)\s*\{[^}]*background:\s*var\(--kora-surface-alt\);/s);
   });
 
-  it('reserva ancho de acciones solo cuando existe esa columna', () => {
-    expect(phaseCss).toMatch(/\.operationalTaskTable th\[aria-label="Acciones"\]\s*\{[^}]*min-width:\s*118px;/s);
-    expect(phaseCss).not.toMatch(/\.operationalTaskTable th:last-child\s*\{/);
-    expect(phaseCss).toMatch(/\.operationalTaskTable \.operationalTaskTitle\s*\{[^}]*overflow-wrap:\s*anywhere;/s);
+  it('usa el foco visible de DataTable y mantiene ancho mínimo propio', () => {
+    expect(dataTableCss).toMatch(/\.container:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--kora-blue-600\);/s);
+    expect(dataTableCss).toMatch(/\.table\s*\{[^}]*min-width:\s*720px;/s);
   });
 
   it('usa tokens Kora y reorganiza el drawer a anchos reducidos', () => {
@@ -41,7 +41,7 @@ describe('Roadmap UI-3: tokens y scroll local', () => {
   });
 
   it('protege el foco del scroll local y el scroll/sticky del Gantt compartido', () => {
-    expect(phaseCss).toMatch(/\.operationalTaskScroll:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--kora-blue-600\);/s);
+    expect(dataTableCss).toMatch(/\.container:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--kora-blue-600\);/s);
     expect(ganttCss).toMatch(/\.operationalGanttViewport\s*\{[^}]*overflow-x:\s*auto;/s);
     expect(ganttCss).toMatch(/\.operationalGanttViewport\s*\{[^}]*overscroll-behavior-x:\s*contain;/s);
     expect(ganttCss).toMatch(/\.operationalStickyLabel,\s*\.operationalBlockLabel\s*\{[^}]*position:\s*sticky;/s);
