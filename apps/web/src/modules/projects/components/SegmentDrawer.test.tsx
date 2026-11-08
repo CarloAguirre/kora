@@ -24,7 +24,7 @@ vi.mock('@/shared/components/ui/Modal', () => ({
     children: ReactNode; title: string; eyebrow?: string; footer?: ReactNode;
     side?: boolean; compactSide?: boolean;
   }) => <aside role="dialog" aria-label={title}
-    data-layout={side && compactSide ? 'compact-side' : 'other'}>
+    data-layout={side ? (compactSide ? 'compact-side' : 'side') : 'other'}>
     <header><span>{eyebrow}</span><h2>{title}</h2></header>
     {children}
     {footer && <footer>{footer}</footer>}
@@ -115,10 +115,10 @@ beforeEach(() => {
 });
 
 describe('Bloque operativo: fidelidad de los tres estados v5.02', () => {
-  it('entrega aprobada: panel compacto, estado cerrado, entrega verde y tareas aprobadas', () => {
+  it('entrega aprobada: panel lateral nativo, estado cerrado, entrega verde y tareas aprobadas', () => {
     show({ onChangeClosure: vi.fn() });
     const dialog = screen.getByRole('dialog', { name: 'Bot de conciliación' });
-    expect(dialog).toHaveAttribute('data-layout', 'compact-side');
+    expect(dialog).toHaveAttribute('data-layout', 'side');
     expect(within(dialog).getByText('Fase 1: Bot de conciliación')).toBeInTheDocument();
     expect(within(dialog).getByText('Líder: José Aponte')).toBeInTheDocument();
     expect(within(dialog).getByLabelText('Estado: Cerrado')).toBeInTheDocument();
@@ -416,7 +416,7 @@ describe('SegmentDrawer compartido en modo de solo lectura', () => {
     show({ readOnly: true, onChangeClosure: vi.fn(), onAddTask: vi.fn(),
       onDeleteTask: vi.fn() });
     const drawer = screen.getByRole('dialog', { name: 'Bot de conciliación' });
-    expect(drawer).toHaveAttribute('data-layout', 'compact-side');
+    expect(drawer).toHaveAttribute('data-layout', 'side');
     expect(within(drawer).getByText('Líder: José Aponte')).toBeInTheDocument();
     expect(within(drawer).getByRole('progressbar', { name: 'Avance real del bloque' }))
       .toHaveAttribute('aria-valuenow', '100');

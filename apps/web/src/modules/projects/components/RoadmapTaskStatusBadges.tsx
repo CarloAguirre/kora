@@ -26,19 +26,19 @@ export function RoadmapTaskStatusBadges({
 }: RoadmapTaskStatusBadgesProps) {
   return <span className={styles.group}>
     {assigned
-      ? <Badge tone={STATUS_TONE[status]} className={styles.compact}>
+      ? <Badge tone={STATUS_TONE[status]}>
         {PROJECT_MODULE_TASK_STATUS_LABELS[status]}
       </Badge>
       : <span title={unassignedTitle}>
-        <Badge tone="brand" className={[styles.compact, styles.unassigned].join(' ')}>
+        <Badge tone="unassigned">
           Por asignar
         </Badge>
       </span>}
     {assigned && status === 'in_progress' && Boolean(rejectionReason?.trim()) &&
       <span title={rejectionReason ?? undefined}>
-        <Badge tone="warning" className={styles.compact}>Devuelta</Badge>
+        <Badge tone="warning">Devuelta</Badge>
       </span>}
     {assigned && (status === 'todo' || status === 'in_progress') && overdue &&
-      <Badge tone="danger" className={styles.compact}>Vencida</Badge>}
+      <Badge tone="danger">Vencida</Badge>}
   </span>;
 }

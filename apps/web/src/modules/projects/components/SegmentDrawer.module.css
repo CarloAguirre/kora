@@ -35,11 +35,6 @@
 .teamDetails { display: grid; gap: 3px; min-width: 0; }
 .teamDetails strong { font-size: var(--kora-text-sm); font-weight: var(--kora-weight-bold); overflow-wrap: anywhere; }
 .teamDetails small { color: var(--drawer-muted); font-size: 11px; }
-.blockState {
-  font-size: 10px;
-  padding: 4px 10px;
-  line-height: 1.25;
-}
 .metrics {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -106,18 +101,11 @@
 .deliveryInfo strong { font-size: 11.5px; overflow-wrap: anywhere; }
 .deliveryInfo small { font-size: 10.5px; color: #65738a; }
 .closureNote { font-size: 11px; color: #64738a; margin: 0; line-height: 1.5; }
-.markDelivered {
-  /* Color, hover y disabled pertenecen al Button primary de Kora. */
-  justify-self: start; height: auto; min-width: 0;
-  border-radius: 5px; padding: 8px 12px; font-size: 11px;
-}
-/* El wrapper conserva el title aunque el botón esté disabled. */
-.markDelivered:disabled { pointer-events: none; }
+/* Tooltip sobre un botón deshabilitado sin modificar Button nativo. */
 .deliveryButtonWrapper { display: inline-flex; width: max-content; max-width: 100%; }
+.deliveryButtonWrapper > button:disabled { pointer-events: none; }
 .completionForm { display: grid; gap: 16px; min-width: 0; }
 .completionFooter { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
-.markDelivered:focus-visible, .addTask:focus-visible,
-.taskActionIcon:focus-visible { outline: 2px solid var(--kora-blue-600); outline-offset: 2px; }
 .deliveryForm { display: grid; gap: 7px; }
 .deliveryForm label { color: #344860; font-weight: 650; }
 .deliveryForm textarea {
@@ -157,11 +145,6 @@
 }
 .tasksHeading h3 { flex: 1 1 100px; min-width: 0; }
 .tasksHeading > button { max-width: 100%; }
-.addTask {
-  /* Mantiene la escala compacta del drawer; usa Button outline del UI kit. */
-  height: 30px; min-width: 0; padding: 6px 9px;
-  border-radius: 7px; font-size: 10.5px; font-weight: 600;
-}
 .taskList { list-style: none; margin: 0; padding: 0; }
 .taskRow {
   min-height: 50px;
@@ -185,11 +168,6 @@
   max-width: 100%;
 }
 .taskActions { flex: 0 0 auto; gap: 2px; }
-.taskActions .taskActionIcon {
-  /* Button ghost icon con dimensiones locales para no ampliar el drawer. */
-  width: 22px; height: 24px; padding: 3px; color: var(--kora-text-muted);
-}
-.taskActionIcon:hover:not(:disabled) { color: var(--kora-navy); }
 .emptyTasks { font-size: var(--kora-text-2xs); color: var(--kora-text-muted); margin: 0; }
 /* En móviles compactos, los valores de HH/fechas no compiten por tres columnas
    estrechas y las acciones bajan de línea sin cortar badges ni nombres. */

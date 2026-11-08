@@ -263,3 +263,25 @@ y `readOnly`. Sin cambios de API/BD/contratos/Gantt.
 se auditan en la siguiente iteración; la apariencia real requiere
 validación local con screenshot. No se afirma typecheck ni Vitest PASS
 sin registro del usuario.
+
+### Segunda corrección visual: badges y drawer (08-11-2026)
+
+Todos los estados operativos usan directamente el Badge original de Kora:
+se retiró el CSS `compact` y sus modificaciones de tamaño/tipografía.
+`Por asignar` mantiene el violeta (identificación semántica) con el
+nuevo tono oficial `unassigned` y tokens compartidos; muestra el punto
+del componente nativo, igual que los demás estados.
+
+El detalle de bloque cambia de `Modal side compactSide` del prototipo
+a `Modal side` estándar de Kora: ancho, título, padding y pie estándar.
+Se retiraron los cambios locales de tamaño/padding/fuente sobre
+`Button primary`, `Button outline` y `Button ghost icon`. Se mantiene
+el tooltip disabled, las reglas de permisos, callbacks y readOnly.
+El contenido de dominio (HH, avance real vs plan, icono/color de equipo)
+sigue siendo específico del Roadmap porque no hay un componente de Kora
+funcionalmente equivalente. Sin cambios API, DB, contratos ni Gantt.
+
+Se ajustaron las aserciones que previamente exigían los estilos
+compactos propios del prototipo. Los cambios aún requieren pruebas
+locales y comparación de capturas antes/después. No declarar cerrado el
+PR hasta esa validación.

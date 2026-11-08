@@ -157,7 +157,7 @@ export function SegmentDrawer({
   };
 
   return <>
-  <Modal open side compactSide className={styles.drawer} title={segment.name}
+  <Modal open side className={styles.drawer} title={segment.name}
     eyebrow={'Fase ' + (project.modules.findIndex((item) => item.id === module.id) + 1) +
       ': ' + module.name}
     onClose={onClose}
@@ -178,7 +178,7 @@ export function SegmentDrawer({
           </div>
         </div>
         <span aria-label={'Estado: ' + state}>
-          <Badge tone={stateTone} className={styles.blockState}>{state}</Badge>
+          <Badge tone={stateTone}>{state}</Badge>
         </span>
       </div>
 
@@ -246,7 +246,7 @@ export function SegmentDrawer({
           </div>
           {canShowDeliveryAction && <span className={styles.deliveryButtonWrapper}
             title={canMarkDelivered ? 'Registrar el cierre del bloque con su entrega.' : closeHint}>
-            <Button variant="primary" size="sm" className={styles.markDelivered}
+            <Button variant="primary" size="sm"
               disabled={!canMarkDelivered || updateDelivery.isPending}
               onClick={() => setShowDeliveryForm(true)}>Marcar como entregado</Button>
           </span>}
@@ -281,9 +281,9 @@ export function SegmentDrawer({
       <section className={styles.tasksSection} aria-label="Tareas del bloque">
         <div className={styles.tasksHeading}>
           <h3>Tareas ({tasks.length})</h3>
-          {canAddTask && <Button variant="outline" size="sm" className={styles.addTask}
+          {canAddTask && <Button variant="outline" size="sm"
             onClick={onAddTask}>+ Agregar tarea</Button>}
-          {!readOnly && onAssignTasks && pendingReferences && <Button variant="outline" size="sm" className={styles.addTask} onClick={onAssignTasks}>Asignar tareas EDT</Button>}
+          {!readOnly && onAssignTasks && pendingReferences && <Button variant="outline" size="sm" onClick={onAssignTasks}>Asignar tareas EDT</Button>}
         </div>
         {tasks.length ? <ul className={styles.taskList}>
           {tasks.map((task) => <li key={task.id} className={styles.taskRow}>
@@ -301,15 +301,15 @@ export function SegmentDrawer({
                  overdue={task.date < today} />
              </span>
              <div className={styles.taskActions}>
-              {!readOnly && onEditTask && <Button variant="ghost" size="icon" className={styles.taskActionIcon} title="Editar tarea"
+              {!readOnly && onEditTask && <Button variant="ghost" size="icon" title="Editar tarea"
                 aria-label={'Editar tarea ' + task.name} onClick={() => onEditTask(task)}>
                 <PencilIcon size={14} />
               </Button>}
-              {!readOnly && onDuplicateTask && <Button variant="ghost" size="icon" className={styles.taskActionIcon} title="Duplicar tarea"
+              {!readOnly && onDuplicateTask && <Button variant="ghost" size="icon" title="Duplicar tarea"
                 aria-label={'Duplicar tarea ' + task.name} onClick={() => onDuplicateTask(task)}>
                 <CopyIcon size={14} />
               </Button>}
-              {!readOnly && onDeleteTask && <Button variant="ghost" size="icon" className={styles.taskActionIcon} title="Eliminar tarea"
+              {!readOnly && onDeleteTask && <Button variant="ghost" size="icon" title="Eliminar tarea"
                 aria-label={'Eliminar tarea ' + task.name} onClick={() => onDeleteTask(task)}>
                 <TrashIcon size={14} />
               </Button>}

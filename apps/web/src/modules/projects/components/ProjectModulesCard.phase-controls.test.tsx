@@ -699,7 +699,7 @@ describe('Homologación de estados del Roadmap v5.02', () => {
       ['completada', 'in_review', 'warning', 'user-1'],
       ['curso', 'in_progress', 'info', 'user-1'],
       ['pendiente', 'todo', 'neutral', 'user-1'],
-      ['sin-asignar', 'todo', 'brand', null],
+      ['sin-asignar', 'todo', 'unassigned', null],
     ] as const;
     const tasks = states.map(([id, status, , assigneeUserId]) => ({
       id, name: 'Estado ' + id, status,
@@ -716,18 +716,12 @@ describe('Homologación de estados del Roadmap v5.02', () => {
           id === 'pendiente' ? 'Pendiente' : 'Por asignar');
       expect(badge.className).toContain('badge');
       expect(badge.className).toContain(tone);
-      expect(badge.className).toContain('compact');
-      if (id === 'sin-asignar') {
-        // Mantiene la excepción violeta sin punto visible mediante CSS local.
-        expect(badge.className).toContain('unassigned');
-      } else {
-        expect(badge.className).not.toContain('unassigned');
-        expect(badge.querySelector('[aria-hidden="true"]')).toBeInTheDocument();
-      }
+      // Punto y tipografía del Badge de Kora para TODOS los estados.
+      expect(badge.querySelector('[aria-hidden="true"]')).toBeInTheDocument();
     }
   });
 
-  it('muestra En curso + Devuelta + Vencida juntos con Badge nativo, punto y tamaño compacto', () => {
+  it('muestra En curso + Devuelta + Vencida juntos con Badge nativo y punto', () => {
     const rejected = {
       id: 'task-returned', name: 'Corrección devuelta', status: 'in_progress',
       rejectionReason: 'Corregir la validación de fechas',
@@ -745,7 +739,6 @@ describe('Homologación de estados del Roadmap v5.02', () => {
     ] as const) {
       expect(chip.className).toContain('badge');
       expect(chip.className).toContain(tone);
-      expect(chip.className).toContain('compact');
       expect(chip.querySelector('[aria-hidden="true"]')).toBeInTheDocument();
     }
     // El tooltip del motivo está en el wrapper, no sobre el Badge.
