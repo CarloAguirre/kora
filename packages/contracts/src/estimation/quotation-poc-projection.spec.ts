@@ -3,6 +3,8 @@ import { quotationDraftDataSchema } from './quotation.contract';
 import { effectiveQuotationEdt } from './quotation-edt-adjustments';
 import {
   projectPocRolesToQuotationDraft,
+  synchronizeQuotationEdtTeamLoad,
+  reconcilePocCommercialDraft,
   validatePocDraftIntegrity,
 } from './quotation-poc-projection';
 
@@ -116,6 +118,42 @@ describe('Proyección IA Gemini KDM a cotización', () => {
     expect(mapped.analysisProjectionStatus).toBe('synced');
     expect(() => validatePocDraftIntegrity(draft, mapped)).not.toThrow();
     expect(draft).toEqual(before);
+  });
+
+
+  it('actualiza hh/sem por persona al cambiar dotación y plazo sin modificar las HH EDT', () => {
+    const mapped = projectPocRolesToQuotationDraft(original(), { Desarrollo: t1, QA: t2 });
+    const expectedTotal = mapped.phases.flatMap((phase) => phase.teamHours)
+      .reduce((sum, item) => sum + item.hours, 0);
+    const changed = quotationDraftDataSchema.parse({
+      ...mapped,
+      teams: mapped.teams.map((team) => team.teamId === t1 ? {
+        ...team, collaborators: 4, duration: 2, hoursPerWeek: 90,
+        dedicationPercent: 50,
+      } : team),
+    });
+    const normalized = synchronizeQuotationEdtTeamLoad(changed);
+    const dev = normalized.teams.find((team) => team.teamId === t1)!;
+    expect(dev.hoursPerWeek).toBe(5); // 40 HH / (2 semanas × 4 personas)
+    expect(dev.dedicationPercent).toBe(50);
+    expect(normalized.phases.flatMap((phase) => phase.teamHours)
+      .reduce((sum, item) => sum + item.hours, 0)).toBe(expectedTotal);
+    expect(normalized.aiPoc).toEqual(mapped.aiPoc);
+    expect(changed.teams.find((team) => team.teamId === t1)?.hoursPerWeek).toBe(90);
+    const reconciled = reconcilePocCommercialDraft(changed);
+    expect(reconciled.teams.find((team) => team.teamId === t1)?.hoursPerWeek).toBe(5);
+    expect(reconciled.teams.find((team) => team.teamId === t1)?.collaborators).toBe(4);
+    expect(reconciled.teams.find((team) => team.teamId === t1)?.dedicationPercent).toBe(50);
+  });
+
+  it('no altera la fórmula de cotizaciones manuales sin EDT', () => {
+    const manual = quotationDraftDataSchema.parse({
+      mode: 'team', teams: [{
+        teamId: t1, collaborators: 3, unit: 'week', duration: 1,
+        hoursPerWeek: 33.33, dedicationPercent: 100,
+      }],
+    });
+    expect(synchronizeQuotationEdtTeamLoad(manual)).toBe(manual);
   });
 
   it('permite mapear distintos equipos sin perder duración original por perfil', () => {

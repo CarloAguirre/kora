@@ -195,6 +195,34 @@ export function projectPocRolesToQuotationDraft(
   return projection;
 }
 
+
+/**
+ * Compatibilidad de borradores EDT: hoursPerWeek es solo una media derivada
+ * de las HH de tareas. Nunca multiplica ni reduce las HH originales.
+ * Se normaliza al modificar dotación, duración, distribución o antes de guardar.
+ * El contrato legado admite hasta 168; el indicador visual de carga utiliza
+ * las HH reales y advierte sobre excesos, incluso por encima de ese límite.
+ */
+export function synchronizeQuotationEdtTeamLoad(draft: QuotationDraftData): QuotationDraftData {
+  if (!draft.aiPoc?.edt) return draft;
+  const totals = new Map<string, number>();
+  for (const assignment of quotationEdtAssignments(draft)) {
+    if (assignment.teamKey.startsWith('profile:')) continue;
+    totals.set(assignment.teamKey,
+      (totals.get(assignment.teamKey) ?? 0) + assignment.hours);
+  }
+  return {
+    ...draft,
+    teams: draft.teams.map((team) => {
+      const weeks = team.unit === 'day' ? team.duration / 5 : team.duration;
+      const total = totals.get(team.teamId) ?? 0;
+      const derived = weeks > 0 && team.collaborators > 0
+        ? Math.round(total / weeks / team.collaborators * 100) / 100 : 0;
+      return { ...team, hoursPerWeek: Math.min(168, derived) };
+    }),
+  };
+}
+
 /** Conserva la edición humana de colaboradores y semanas, pero nunca las HH
  * calculadas desde tareas. Las HH son siempre la única fuente comercial. */
 export function reconcilePocCommercialDraft(draft: QuotationDraftData): QuotationDraftData {
@@ -212,8 +240,10 @@ export function reconcilePocCommercialDraft(draft: QuotationDraftData): Quotatio
       return current ? { ...team, collaborators: current.collaborators,
         unit: current.unit,
         duration: current.duration > 0 ? current.duration : team.duration,
-        hoursPerWeek: current.hoursPerWeek > 0
-          ? current.hoursPerWeek : team.hoursPerWeek,
+        // EDT: la carga media depende de colaboradores y duración actuales.
+        // El usuario sigue editando la dedicación/disponibilidad de forma libre.
+        hoursPerWeek: draft.aiPoc?.edt ? team.hoursPerWeek :
+          current.hoursPerWeek > 0 ? current.hoursPerWeek : team.hoursPerWeek,
         dedicationPercent: current.dedicationPercent } : team;
     }),
     phases: projected.phases.map((phase) => {
@@ -228,7 +258,7 @@ export function reconcilePocCommercialDraft(draft: QuotationDraftData): Quotatio
     }),
     analysisProjectionStatus: 'synced',
   });
-  return merged;
+  return synchronizeQuotationEdtTeamLoad(merged);
 }
 
 /** La igualdad comercial exige equipo y HH idénticos en cada tramo.
