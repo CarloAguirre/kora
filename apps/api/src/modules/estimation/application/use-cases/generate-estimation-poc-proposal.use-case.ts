@@ -218,6 +218,7 @@ export class GenerateEstimationPocProposalUseCase {
     proposal: EstimationPocProposal,
     activeKoraTeams?: readonly KoraActiveTeam[],
     authorizedSources?: DocumentSourceReader,
+    onThoughtSummary?: (text: string) => void,
   ): Promise<QuotationReferenceEdt> {
     const isDemo = extractDriveFolderId(input.driveFolderUrl) === 'kora-poc-fallback';
     if (this.ai.name !== 'gemini' || proposal.provider !== 'gemini' ||
@@ -311,7 +312,7 @@ export class GenerateEstimationPocProposalUseCase {
           'Toda actividad debe referir a un tramo válido y tener HH de al menos un perfil.',
           'No transformes las HH para igualar una cifra preliminar.',
         ].join('\n'),
-      });
+      }, onThoughtSummary);
       try {
         return this.buildVerifiedEdt(output, proposal, isDemo ? 'kdm_demo' : 'drive');
       } catch (error) {
@@ -557,6 +558,7 @@ export class GenerateEstimationPocProposalUseCase {
     input: EstimationInputWithQuestions,
     activeKoraTeams?: readonly KoraActiveTeam[],
     authorizedSources?: DocumentSourceReader,
+    onThoughtSummary?: (text: string) => void,
   ): Promise<EstimationPocProposal> {
     if (activeKoraTeams && activeKoraTeams.length === 0) {
       throw new BadRequestException('Kora no tiene equipos activos disponibles para estimar.');
@@ -638,7 +640,7 @@ export class GenerateEstimationPocProposalUseCase {
             },
           },
         } : TEAM_ESTIMATE_RESPONSE_SCHEMA,
-      }),
+      }, onThoughtSummary),
     );
     if (activeKoraTeams) {
       const allowed = new Set(activeKoraTeams.map((team) => team.teamId));

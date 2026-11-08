@@ -57,6 +57,62 @@ function setup() {
 }
 
 describe('POST versions/ai-poc · Gemini con KDM', () => {
+
+  it('stream produce los dos tramos Gemini y guarda exactamente un borrador', async () => {
+    const { controller, drafts, generator } = setup();
+    const writes: string[] = [];
+    const reply = { hijack: vi.fn(), raw: {
+      destroyed: false, writableEnded: false, writeHead: vi.fn(),
+      write: vi.fn((chunk: string) => { writes.push(chunk); return true; }),
+      end: vi.fn(),
+    } };
+    generator.execute.mockImplementationOnce(async (
+      _input: unknown, _teams: unknown, _source: unknown, notify: (text: string) => void,
+    ) => { notify('Revisando perfiles y capacidad.'); return proposal; });
+    generator.generateEdt.mockImplementationOnce(async (
+      _input: unknown, _proposal: unknown, _teams: unknown, _source: unknown,
+      notify: (text: string) => void,
+    ) => { notify('Construyendo actividades y HH.'); return edt; });
+    await controller.createAiPocStream(projectId, input, actor as never, reply as never);
+    expect(drafts.authorizeAiPoc).toHaveBeenCalledOnce();
+    expect(reply.hijack).toHaveBeenCalledOnce();
+    expect(reply.raw.writeHead).toHaveBeenCalledWith(200,
+      expect.objectContaining({ 'Content-Type': 'text/event-stream; charset=utf-8' }));
+    expect(writes.join('')).toContain('Revisando perfiles y capacidad.');
+    expect(writes.join('')).toContain('Construyendo actividades y HH.');
+    expect(writes.filter((s) => s.includes('event: thought'))).toHaveLength(2);
+    expect(writes.filter((s) => s.includes('event: phase'))).toHaveLength(3);
+    expect(writes.filter((s) => s.includes('event: complete'))).toHaveLength(1);
+    expect(drafts.createAiPocDraft).toHaveBeenCalledOnce();
+    expect(reply.raw.end).toHaveBeenCalledOnce();
+  });
+
+  it('stream deniega proyectos ajenos antes de abrir el canal o gastar IA', async () => {
+    const { controller, drafts, generator } = setup();
+    const reply = { hijack: vi.fn(), raw: { writeHead: vi.fn(), write: vi.fn() } };
+    drafts.authorizeAiPoc.mockRejectedValueOnce(new BadRequestException('Proyecto sin autorización'));
+    await expect(controller.createAiPocStream(projectId, input, actor as never, reply as never))
+      .rejects.toThrow('Proyecto sin autorización');
+    expect(reply.hijack).not.toHaveBeenCalled();
+    expect(generator.execute).not.toHaveBeenCalled();
+  });
+
+  it('stream comunica errores sin emitir complete ni crear borrador inválido', async () => {
+    const { controller, drafts, generator } = setup();
+    const writes: string[] = [];
+    const reply = { hijack: vi.fn(), raw: {
+      destroyed: false, writableEnded: false, writeHead: vi.fn(),
+      write: vi.fn((v: string) => { writes.push(v); return true; }),
+      end: vi.fn(),
+    } };
+    generator.execute.mockRejectedValueOnce(new Error('no-revelar-secretos'));
+    await controller.createAiPocStream(projectId, input, actor as never, reply as never);
+    expect(writes.join('')).toContain('event: error');
+    expect(writes.join('')).not.toContain('no-revelar-secretos');
+    expect(writes.join('')).not.toContain('event: complete');
+    expect(drafts.createAiPocDraft).not.toHaveBeenCalled();
+  });
+
   it('crea una versión real solo después de autorización, cuestionario y Gemini', async () => {
     const { controller, drafts, generator } = setup();
     const result = await controller.createAiPoc(projectId, input, actor as never);

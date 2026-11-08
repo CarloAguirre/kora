@@ -1,4 +1,5 @@
-import { BadRequestException, Body, Controller, Delete, Get, HttpCode, HttpStatus, Inject, Optional, Param, ParseUUIDPipe, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, HttpCode, HttpStatus, HttpException, Inject, Optional, Param, ParseUUIDPipe, ParseIntPipe, Patch, Post, Query, Res } from '@nestjs/common';
+import type { FastifyReply } from 'fastify';
 import {
   applyQuotationPlanningSchema, generateAiDemoQuotationSchema, createQuotationVersionSchema, updateQuotationDraftSchema, quotationReconciliationReviewSchema, assessQuotationReconciliationSchema,
   quotationRevisionActionSchema, approveClientQuotationSchema, transferApprovedQuotationSchema,
@@ -146,6 +147,59 @@ export class QuotationController {
   ): Promise<QuotationVersion> {
     if (input.projectId !== projectId) throw new BadRequestException('El proyecto no coincide.');
     await this.drafts.authorizeAiPoc(projectId, actor);
+    return this.createAuthorizedAiPoc(projectId, input, actor);
+  }
+
+  /**
+   * El stream usa exactamente la misma generación y validaciones de la ruta
+   * REST. Solo transporta los resúmenes que publica Gemini; el borrador se
+   * persiste una vez, después de validar propuesta y EDT.
+   */
+  @Post('versions/ai-poc/stream')
+  @HttpCode(HttpStatus.OK)
+  @RequireAnyPermission('projects:manage', 'projects:read_assigned')
+  async createAiPocStream(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Body(new ZodValidationPipe(generateAiDemoQuotationSchema)) input: GenerateAiDemoQuotationInput,
+    @CurrentUser() actor: RequestUser,
+    @Res() reply: FastifyReply,
+  ): Promise<void> {
+    if (input.projectId !== projectId) throw new BadRequestException('El proyecto no coincide.');
+    await this.drafts.authorizeAiPoc(projectId, actor);
+    reply.hijack();
+    reply.raw.writeHead(200, {
+      'Content-Type': 'text/event-stream; charset=utf-8',
+      'Cache-Control': 'no-cache, no-transform',
+      'X-Accel-Buffering': 'no',
+      Connection: 'keep-alive',
+    });
+    const send = (event: 'thought' | 'phase' | 'complete' | 'error', data: unknown) => {
+      if (!reply.raw.destroyed && !reply.raw.writableEnded) {
+        reply.raw.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+      }
+    };
+    try {
+      const result = await this.createAuthorizedAiPoc(
+        projectId, input, actor, (text) => {
+          if (text.trim()) send('thought', { text });
+        }, (phase) => send('phase', { phase }),
+      );
+      send('complete', result);
+    } catch (reason) {
+      send('error', { message: reason instanceof HttpException
+        ? reason.message : 'No se pudo generar la cotización. Verifica los antecedentes y vuelve a intentarlo.' });
+    } finally {
+      if (!reply.raw.destroyed && !reply.raw.writableEnded) reply.raw.end();
+    }
+  }
+
+  private async createAuthorizedAiPoc(
+    projectId: string,
+    input: GenerateAiDemoQuotationInput,
+    actor: RequestUser,
+    onThoughtSummary?: (text: string) => void,
+    onPhase?: (phase: 'proposal' | 'edt' | 'saving') => void,
+  ): Promise<QuotationVersion> {
     const isDemo = extractDriveFolderId(input.driveFolderUrl) === 'kora-poc-fallback';
     if (isDemo && input.driveFolderUrl !== 'https://drive.google.com/drive/folders/kora-poc-fallback') {
       throw new BadRequestException('URL de demostración no autorizada.');
@@ -174,7 +228,10 @@ export class QuotationController {
     if (!activeTeams.length) {
       throw new BadRequestException('No existen equipos activos en Kora para generar la cotización.');
     }
-    const proposal = await this.generator.execute(input, activeTeams, sourceReader);
+    onPhase?.('proposal');
+    const proposal = onThoughtSummary
+      ? await this.generator.execute(input, activeTeams, sourceReader, onThoughtSummary)
+      : await this.generator.execute(input, activeTeams, sourceReader);
     if (proposal.provider !== 'gemini' ||
         proposal.sourceMode !== (isDemo ? 'poc_simulated' : 'drive') ||
         proposal.documentsAnalyzed < 1) {
@@ -184,7 +241,10 @@ export class QuotationController {
     if (proposal.roles.some((role) => !role.teamId || !validIds.has(role.teamId))) {
       throw new BadRequestException('Gemini propuso un perfil sin equipo activo de Kora.');
     }
-    const edt = await this.generator.generateEdt(input, proposal, activeTeams, sourceReader);
+    onPhase?.('edt');
+    const edt = onThoughtSummary
+      ? await this.generator.generateEdt(input, proposal, activeTeams, sourceReader, onThoughtSummary)
+      : await this.generator.generateEdt(input, proposal, activeTeams, sourceReader);
     // La EDT detallada determina las HH finales; la primera llamada propone
     // perfiles/capacidad, pero no impone un presupuesto a las actividades.
     const reconciled = this.generator.reconcileProposalWithEdt(proposal, edt);
@@ -194,6 +254,7 @@ export class QuotationController {
     const roleTeamIds = Object.fromEntries(
       reconciled.roles.map((role) => [role.role, role.teamId!]),
     );
+    onPhase?.('saving');
     return this.drafts.createAiPocDraft(
       projectId, actor, reconciled, input.answers, input.dynamicQuestions, edt,
       input.confirmedUnderstanding, roleTeamIds,
