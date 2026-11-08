@@ -92,6 +92,39 @@ describe('Equipos · fuente visual prototipo HTML v5', () => {
     expect(handlers.onEditTeam).toHaveBeenCalledWith(dev, { dedicationPercent: 75 });
   });
 
+
+  it('presenta carga calculada y ocupación separadas de la dedicación 100% en EDT', () => {
+    renderTeams(mappedEdtDraft);
+    expect(screen.getByText('Carga media hh/sem')).toBeInTheDocument();
+    expect(screen.getByText('Dedicación planificada %')).toBeInTheDocument();
+    expect(screen.getByText('Ocupación (40 HH)')).toBeInTheDocument();
+    expect(screen.getByLabelText('Carga semanal media de Desarrollo'))
+      .toHaveTextContent('10'); // 40 HH ÷ 2 personas ÷ 2 semanas
+    expect(screen.getByLabelText('Ocupación estimada de Desarrollo'))
+      .toHaveTextContent('25%');
+    expect(screen.getByLabelText('Dedicación de Desarrollo')).toHaveValue(100);
+    expect(screen.getByLabelText('Carga semanal media de Desarrollo')
+      .tagName).toBe('OUTPUT');
+    expect(screen.getByText(/Jornada de comparación Kora:/)).toBeInTheDocument();
+  });
+
+  it('muestra sobrecarga semanal usando dedicación planificada sin reducir HH EDT', () => {
+    const constrained = quotationDraftDataSchema.parse({
+      ...mappedEdtDraft,
+      teams: [{ ...team(dev), dedicationPercent: 20 }],
+    });
+    renderTeams(constrained);
+    expect(screen.getByLabelText('Dedicación de Desarrollo')).toHaveValue(20);
+    expect(screen.getByLabelText('Carga semanal media de Desarrollo'))
+      .toHaveTextContent('10');
+    expect(screen.getByLabelText('Horas totales de Desarrollo')).toHaveValue(40);
+    expect(screen.getByLabelText('Alerta de capacidad de Desarrollo'))
+      .toHaveTextContent('Sobrecarga en semana(s) 1, 2');
+    expect(screen.getByLabelText('Alerta de capacidad de Desarrollo'))
+      .toHaveTextContent('8 HH/persona disponibles');
+    expect(screen.getByText('1 equipo(s) requieren revisar capacidad')).toBeInTheDocument();
+  });
+
   it('conserva disabled y las etiquetas accesibles para equipos no seleccionados', () => {
     renderTeams(manual);
     expect(screen.getByRole('spinbutton', { name: 'Colaboradores de QA' })).toBeDisabled();

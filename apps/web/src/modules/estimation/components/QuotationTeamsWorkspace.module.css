@@ -5,7 +5,7 @@
 .tableScroll{overflow-x:auto;max-width:100%}
 .columns,.line{display:grid;gap:9px;align-items:center}
 .compactColumns{grid-template-columns:minmax(180px,1fr) 100px 110px}
-.detailedColumns{grid-template-columns:minmax(175px,1.5fr) 85px 100px 83px 83px 88px 80px}
+.detailedColumns{grid-template-columns:minmax(175px,1.5fr) 80px 94px 80px 115px 118px 105px 85px}
 .columns{padding:10px 9px;border-bottom:1px solid var(--kora-border-subtle);background:var(--kora-surface-alt);font-size:11px;color:var(--kora-text-muted)}
 .line{padding:7px 9px;min-height:51px;border-bottom:1px solid var(--kora-border-subtle)}
 .line:last-child{border-bottom:0}
@@ -49,3 +49,23 @@
 .pendingPeopleField input{text-align:right;font-variant-numeric:tabular-nums}
 @media(max-width:650px){.pendingRole{grid-template-columns:1fr 1fr}
  .pendingPeopleField{grid-column:1/-1;justify-content:flex-start}}
+
+/* Capacidad EDT: indicadores derivados; inputs y badges mantienen UI kit Kora. */
+.capacityContext{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  flex-wrap:wrap;padding:9px 12px;border:1px solid var(--kora-border-subtle);
+  border-radius:var(--kora-radius-input);background:var(--kora-surface-alt);
+  color:var(--kora-text-muted);font-size:11px;line-height:1.5}
+.capacityContext strong{color:var(--kora-text);font-weight:650}
+.derivedLoad,.occupancy{display:flex;align-items:center;justify-content:flex-end;
+  min-width:0;min-height:var(--kora-control-height-sm);padding:0 9px;
+  border:1px solid var(--kora-border-subtle);border-radius:var(--kora-radius-input);
+  background:var(--kora-surface-alt);font-size:var(--kora-text-xs);
+  color:var(--kora-text);font-variant-numeric:tabular-nums}
+.occupancy{font-weight:600}
+.capacityWarning{grid-column:1/-1;display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  color:var(--kora-text-muted);font-size:11px;line-height:1.5;
+  padding:6px 9px;background:var(--kora-surface-alt);
+  border:1px solid var(--kora-border-subtle);border-radius:var(--kora-radius)}
+.peakLoad{grid-column:1/-1;margin:0;color:var(--kora-text-muted);
+  font-size:10.5px;line-height:1.4}
+@media(max-width:1050px){.detailedColumns{min-width:950px}}
