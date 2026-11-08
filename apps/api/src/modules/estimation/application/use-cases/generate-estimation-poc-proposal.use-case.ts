@@ -250,9 +250,11 @@ export class GenerateEstimationPocProposalUseCase {
         answers: input.answers,
         resolvedAnswers: resolveEstimationQuestionnaireContext(input),
         confirmedUnderstanding: 'confirmedUnderstanding' in input ? input.confirmedUnderstanding : null,
+        // La propuesta previa solo fija el catálogo de perfiles/equipos.
+        // Sus personas/duraciones NO son presupuesto ni restricciones para
+        // Gemini: se dimensionan de forma determinística desde las HH finales.
         allowedRoles: proposal.roles.map((role) => ({
-          role: role.role, teamId: role.teamId ?? null, people: role.people,
-          estimatedDuration: role.duration, unit: role.unit,
+          role: role.role, teamId: role.teamId ?? null,
         })),
         ...(activeKoraTeams ? { activeKoraTeams } : {}),
         sourceCoverage: coverageNote,
@@ -265,6 +267,7 @@ export class GenerateEstimationPocProposalUseCase {
         'activities NO contiene role, hours ni la definición del tramo: solo stageCode como clave foránea hacia stages.',
         'Si una actividad necesita dos perfiles, escribe una sola fila en activities y DOS filas en roleHours con el mismo WBS y distintos role.',
         'Estima las horas por actividad y perfil en roleHours según su complejidad y alcance. No hagas que sumen un total predeterminado.',
+        'No copies ni infieras un presupuesto de la dotación, horas por unidad o duración preliminar. Kora dimensionará el personal después de verificar la EDT.',
         'Solo utiliza role que coincida EXACTAMENTE con allowedRoles. Cada perfil declarado debe intervenir en al menos una actividad real.',
         'No inventes funciones fuera del alcance: separa explícitamente exclusiones y supuestos en la descripción.',
         'Respeta las opciones seleccionadas y los supuestos de context.resolvedAnswers al definir actividades/HH; no confundas supuesto pendiente con decisión confirmada.',

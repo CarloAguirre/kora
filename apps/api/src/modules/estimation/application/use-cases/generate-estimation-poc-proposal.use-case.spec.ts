@@ -408,6 +408,9 @@ describe('GenerateEstimationPocProposalUseCase', () => {
       expect(ceCo?.usedAssumption).toBe(true);
     }
     expect(contexts[1]?.userInstructions).toBe('Excluir soporte de postproducción.');
+    const allowedRoles = contexts[1]?.allowedRoles as Array<Record<string, unknown>>;
+    expect(allowedRoles.every((role) => !('people' in role) &&
+      !('estimatedDuration' in role) && !('unit' in role))).toBe(true);
     expect(contexts[1]?.preliminaryAssumptions).toEqual(['Confirmar interfaz final de SAP']);
     expect(contexts[1]?.unresolvedPreliminaryQuestions).toEqual([
       '¿Quién habilita la conectividad SAP?',
@@ -537,6 +540,28 @@ describe('GenerateEstimationPocProposalUseCase', () => {
     expect(mock.instructions[1]).toContain('duplicado');
     expect(edt.stages).toHaveLength(2);
     expect(edt.stages?.[0]?.startWeek).toBe(1);
+  });
+
+
+  it('dimensiona desde una EDT más grande que la propuesta sin repetir Gemini ni inflar HH', async () => {
+    const mock = createGenerator(() => {
+      const data = baseDetail();
+      data.roleHours[2]!.hours = 200; // etapa T01: 212 HH Dev en 2 semanas
+      return data;
+    });
+    vi.stubEnv('KORA_GEMINI_EDT_MAX_ATTEMPTS', '1');
+    const preliminary = proposal([
+      { role: 'Desarrollo', hours: 50 },
+      { role: 'QA', hours: 30 },
+    ]);
+    const edt = await mock.generator.generateEdt(input, preliminary);
+    expect(mock.calls()).toBe(1);
+    expect(edt.totalHours).toBe(239); // 79 originales + 160 adicionales
+    const reconciled = mock.generator.reconcileProposalWithEdt(preliminary, edt);
+    expect(reconciled.roles.find((role) => role.role === 'Desarrollo')?.people)
+      .toBe(3); // 106 HH por semana / 40 = 3 personas peak
+    expect(reconciled.roles.find((role) => role.role === 'QA')?.people).toBe(1);
+    expect(reconciled.totalHours).toBe(239);
   });
 
   it('por defecto NO repite una EDT inválida y preserva la cuota gratuita', async () => {
