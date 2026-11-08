@@ -372,6 +372,35 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
     })));
   });
 
+
+  it('despliega los resúmenes reales de Gemini mientras analiza y no inventa pasos', async () => {
+    renderWizard();
+    await prepareDocuments();
+    let release!: (result: typeof analysisResult) => void;
+    mocks.analyze.mockImplementationOnce(() => new Promise<typeof analysisResult>(
+      (resolve) => { release = resolve; },
+    ));
+    fireEvent.click(screen.getByRole('button', { name: 'Analizar proyecto' }));
+    expect(screen.getByText('Ver razonamiento resumido de Gemini')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Ver razonamiento resumido de Gemini'));
+    const log = screen.getByRole('log', { name: 'Resúmenes de razonamiento de Gemini' });
+    expect(log).toHaveTextContent('aún no ha enviado resúmenes');
+    const request = mocks.analyze.mock.calls[0]![0] as {
+      onThoughtSummary?: (text: string) => void;
+    };
+    expect(request.onThoughtSummary).toEqual(expect.any(Function));
+    await act(async () => {
+      request.onThoughtSummary?.('Gemini detectó dos módulos. ');
+      request.onThoughtSummary?.('Hay una dependencia documental pendiente.');
+    });
+    expect(log).toHaveTextContent(
+      'Gemini detectó dos módulos. Hay una dependencia documental pendiente.');
+    expect(log).not.toHaveTextContent('Preparando preguntas de aclaración');
+    expect(mocks.analyze).toHaveBeenCalledTimes(1);
+    await act(async () => { release(analysisResult); });
+    expect(await screen.findByText('Entendimiento del proyecto')).toBeInTheDocument();
+  });
+
   it('muestra progreso real de lectura y solicitud a Gemini, sin duplicar peticiones', async () => {
     let releaseBrowse!: (result: typeof previewResult) => void;
     const pendingBrowse = new Promise<typeof previewResult>((resolve) => {

@@ -199,6 +199,78 @@ function toApiError(data: unknown, status: number): ApiError {
   };
 }
 
+
+/** Lee SSE de un POST usando el mismo bearer en memoria y política de refresh
+ * que el cliente REST. Nunca incorpora credenciales en URL ni persiste eventos.
+ * No reintenta flujos a mitad de generación (para no duplicar consumo IA). */
+export async function apiEventStream<T>(
+  path: string, body: unknown,
+  onEvent: (event: string, data: unknown) => void,
+  signal?: AbortSignal,
+): Promise<T> {
+  const options: RequestOptions = { method: 'POST', body, ...(signal ? { signal } : {}) };
+  let response = await send(path, options);
+  if (response.status === 401 && tokenStore.get()) {
+    const refreshed = await refreshAccessToken();
+    if (refreshed) response = await send(path, options);
+  }
+  if (!response.ok) return handleResponse<T>(response);
+  if (!response.body) throw new Error('El servidor no entregó el flujo del análisis.');
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let complete = false;
+  let result: T | undefined;
+  const consume = (frame: string) => {
+    const lines = frame.split('\n');
+    const event = lines.find((line) => line.startsWith('event:'))
+      ?.slice(6).trim() ?? 'message';
+    const dataText = lines.filter((line) => line.startsWith('data:'))
+      .map((line) => line.slice(5).trimStart()).join('\n');
+    if (!dataText) return;
+    let data: unknown;
+    try { data = JSON.parse(dataText) as unknown; }
+    catch { throw new Error('El servidor envió un fragmento de análisis inválido.'); }
+    if (event === 'error') {
+      const message = data && typeof data === 'object' && 'message' in data &&
+        typeof data.message === 'string'
+        ? data.message : 'Gemini no pudo completar el análisis.';
+      throw new Error(message);
+    }
+    if (event === 'complete') {
+      result = data as T;
+      complete = true;
+    } else if (event === 'thought') {
+      onEvent(event, data);
+    }
+  };
+  try {
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      buffer = (buffer + decoder.decode(chunk.value, { stream: true }))
+        .replace(/\r\n/g, '\n');
+      let boundary = buffer.indexOf('\n\n');
+      while (boundary !== -1) {
+        consume(buffer.slice(0, boundary));
+        buffer = buffer.slice(boundary + 2);
+        boundary = buffer.indexOf('\n\n');
+      }
+      if (buffer.length > 1_000_000) {
+        throw new Error('El servidor envió un evento demasiado grande.');
+      }
+    }
+    buffer = (buffer + decoder.decode()).replace(/\r\n/g, '\n');
+    if (buffer.trim()) consume(buffer);
+  } finally {
+    reader.releaseLock();
+  }
+  if (!complete || !result) {
+    throw new Error('El análisis finalizó sin entregar un resultado verificable.');
+  }
+  return result;
+}
+
 export const api = {
   get: <T>(path: string, query?: RequestOptions['query']) =>
     apiRequest<T>(path, query ? { query } : {}),

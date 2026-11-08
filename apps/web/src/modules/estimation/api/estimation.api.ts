@@ -11,7 +11,7 @@ import type {
   ListEstimationDriveFilesInput,
   ResolveEstimationDriveFolderInput,
 } from '@kora/contracts';
-import { api } from '@/shared/lib/api-client';
+import { api, apiEventStream } from '@/shared/lib/api-client';
 
 export interface DriveOAuthPocStart {
   authorizationUrl: string;
@@ -81,6 +81,21 @@ export const estimationApi = {
   },
   driveFiles(input: ListEstimationDriveFilesInput): Promise<EstimationDriveFolderListing> {
     return api.post<EstimationDriveFolderListing>('/estimations/drive/files', input);
+  },
+  /** Streaming autenticado, un único análisis Gemini con fragmentos thought oficiales. */
+  analyzePocStream(
+    input: AnalyzeEstimationPocInput,
+    onThoughtSummary: (text: string) => void,
+    signal?: AbortSignal,
+  ): Promise<EstimationPocAnalysis> {
+    return apiEventStream<EstimationPocAnalysis>(
+      '/estimations/poc/analyze/stream', input,
+      (event, payload) => {
+        if (event !== 'thought' || !payload || typeof payload !== 'object') return;
+        const text = (payload as { text?: unknown }).text;
+        if (typeof text === 'string' && text.length) onThoughtSummary(text);
+      }, signal,
+    );
   },
   analyzePoc(input: AnalyzeEstimationPocInput): Promise<EstimationPocAnalysis> {
     return api.post<EstimationPocAnalysis>('/estimations/poc/analyze', input);

@@ -377,3 +377,43 @@
   line-height: 1.5;
   overflow-wrap: anywhere;
 }
+
+/* Registro discreto, dentro del <details> nativo usado en el wizard. No es un
+   feed simulado: solo muestra fragmentos que Gemini marcó como thought=true. */
+.thoughtDisclosure {
+  margin-top: 2px;
+  border: 1px solid var(--kora-border-subtle);
+  border-radius: var(--kora-radius-input);
+  background: var(--kora-surface);
+  padding: 8px 11px;
+  min-width: 0;
+}
+.thoughtDisclosure summary {
+  width: auto;
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-semibold);
+  color: var(--kora-text-muted);
+}
+.thoughtDisclosure summary:focus-visible {
+  outline: 2px solid var(--kora-blue-600);
+  outline-offset: 3px;
+}
+.thoughtDisclosure[open] { gap: 6px; }
+.thoughtLog {
+  max-height: 175px;
+  overflow-y: auto;
+  font-size: var(--kora-text-xs);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--kora-navy);
+  border-top: 1px solid var(--kora-border-subtle);
+  padding-top: 9px;
+}
+.thoughtLog p { margin: 0; }
+.thoughtFootnote {
+  margin: 0;
+  color: var(--kora-text-muted);
+  font-size: 10px;
+  line-height: 1.5;
+}

@@ -260,6 +260,7 @@ export function AiQuotationWizardModal({ project, onClose }: {
   const discoveryInFlight = useRef(false);
   const [saveWarning, setSaveWarning] = useState('');
   const [analysisSnapshot, setAnalysisSnapshot] = useState<EstimationPocAnalysis | null>(null);
+  const [geminiThoughtSummary, setGeminiThoughtSummary] = useState('');
   const driveStatus = useEstimationDriveOAuthPocStatus();
   const serviceAccountEnabled = driveStatus.data?.serviceAccountEnabled === true;
   const updateProjectExtras = useUpdateProjectExtras();
@@ -577,11 +578,15 @@ export function AiQuotationWizardModal({ project, onClose }: {
     if (extrasFolderUrl !== driveFolderUrl) {
       await persistConfirmedFolder(driveFolderUrl);
     }
+    setGeminiThoughtSummary('');
     setSourceStep('analyzing');
     setError('');
     setInvalidId(null);
     try {
       const result = await analysis.mutateAsync({
+        // Solo los fragmentos enviados como thought=true por Gemini.
+        onThoughtSummary: (chunk) => setGeminiThoughtSummary((current) =>
+          (current + chunk).slice(0, 12_000)),
         projectId: project.id,
         projectName: project.name,
         clientName: project.client?.companyName ?? null,
@@ -969,6 +974,20 @@ export function AiQuotationWizardModal({ project, onClose }: {
                     verificables, no porcentajes estimados.
                   </li>
                 </ol>
+                <details className={[styles.more, styles.thoughtDisclosure].join(' ')}>
+                  <summary>Ver razonamiento resumido de Gemini</summary>
+                  <div className={styles.thoughtLog} role="log"
+                    aria-label="Resúmenes de razonamiento de Gemini"
+                    aria-live="polite" aria-relevant="additions text">
+                    {geminiThoughtSummary
+                      ? <p>{geminiThoughtSummary}</p>
+                      : <p>Gemini aún no ha enviado resúmenes de razonamiento.
+                          Pueden no estar disponibles para esta respuesta.</p>}
+                  </div>
+                  <p className={styles.thoughtFootnote}>
+                    Solo se muestran resúmenes publicados por Gemini, no su razonamiento interno.
+                  </p>
+                </details>
               )}
             </>
           )}
