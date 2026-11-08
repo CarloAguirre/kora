@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { estimationAnalysisArtifactSchema, isQuotationDraftEligibleProject, quotationDraftDataSchema, effectiveQuotationEdt, reconcilePocCommercialDraft, projectPocRolesToQuotationDraft, redistributeQuotationEdtHours, withQuotationTaskSetting, withQuotationEdtStageSetting, quotationEdtAssignments, withQuotationCommercialStage, withoutQuotationCommercialStage, withQuotationCommercialTask, withoutQuotationCommercialTask, patchQuotationCommercialTask, withQuotationTaskDisplayName, type EstimationAnalysisArtifact, type QuotationDraftData, type QuotationVersion, type UpdateQuotationDraftInput } from '@kora/contracts';
+import { estimationAnalysisArtifactSchema, isQuotationDraftEligibleProject, quotationDraftDataSchema, effectiveQuotationEdt, reconcilePocCommercialDraft, synchronizeQuotationEdtTeamLoad, projectPocRolesToQuotationDraft, redistributeQuotationEdtHours, withQuotationTaskSetting, withQuotationEdtStageSetting, quotationEdtAssignments, withQuotationCommercialStage, withoutQuotationCommercialStage, withQuotationCommercialTask, withoutQuotationCommercialTask, patchQuotationCommercialTask, withQuotationTaskDisplayName, type EstimationAnalysisArtifact, type QuotationDraftData, type QuotationVersion, type UpdateQuotationDraftInput } from '@kora/contracts';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { useProjectDetail } from '@/modules/projects/api/projects.queries';
@@ -197,7 +197,9 @@ export function QuotationWorkspacePage() {
 
     try {
       // Contratos compartidos: validación en navegador; el servidor vuelve a validarlo.
-      const draft = quotationDraftDataSchema.parse(form.draft);
+      const current = form.draft.aiPoc?.edt
+        ? synchronizeQuotationEdtTeamLoad(form.draft) : form.draft;
+      const draft = quotationDraftDataSchema.parse(current);
       const saved = await saveDraft.mutateAsync({
         versionId: selected.id,
         input: { revision: selected.revision, name: form.name, hourlyRate: form.hourlyRate,
@@ -293,7 +295,10 @@ export function QuotationWorkspacePage() {
       teams: form.draft.teams.map((row) =>
         row.teamId === teamId ? { ...row, ...patch } : row),
     };
-    change((current) => ({ ...current, draft }));
+    // En EDT, HH/sem se deriva de la carga WBS: nunca conservar un número
+    // desactualizado al cambiar dotación, unidad o duración.
+    const normalized = draft.aiPoc?.edt ? synchronizeQuotationEdtTeamLoad(draft) : draft;
+    change((current) => ({ ...current, draft: normalized }));
   };
   const editPhase = (index: number, patch: Partial<QuotationDraftData['phases'][number]>) => {
     updateDraft({ phases: phaseRows.map((row, position) =>
@@ -491,12 +496,14 @@ export function QuotationWorkspacePage() {
         reportError('Reasigna primero las tareas EDT de este equipo desde Por fases y módulos antes de desactivarlo.');
         return;
       }
-      const next = checked ? { ...form.draft, teams: [...teamRows, emptyTeam(teamId)] } :
-        { ...form.draft, teams: teamRows.filter((item) => item.teamId !== teamId) };
+      const next = checked
+        ? { ...form.draft, teams: [...teamRows, { ...emptyTeam(teamId), hoursPerWeek: 0 }] }
+        : { ...form.draft, teams: teamRows.filter((item) => item.teamId !== teamId) };
       // Una selección sin tareas todavía no pertenece a la proyección derivada.
       // No conciliar aquí: al reasignar actividades por fase sí se calcularán sus HH.
       quotationEdtAssignments(next);
-      change((current) => ({ ...current, draft: next }));
+      const normalized = synchronizeQuotationEdtTeamLoad(next);
+      change((current) => ({ ...current, draft: normalized }));
       inform(checked
         ? 'Equipo incorporado. Asigna tareas desde Por fases y módulos antes de aprobar.'
         : 'Equipo sin tareas retirado de esta cotización.');
