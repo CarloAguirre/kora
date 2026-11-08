@@ -386,13 +386,24 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
     ));
     fireEvent.click(screen.getByRole('button', { name: 'Analizar proyecto' }));
     expect(screen.getByText('Ver razonamiento resumido de Gemini')).toBeInTheDocument();
-    fireEvent.click(screen.getByText('Ver razonamiento resumido de Gemini'));
+    const disclosure = screen.getByText('Ver razonamiento resumido de Gemini').closest('details');
+    expect(disclosure).toHaveAttribute('open');
     const log = screen.getByRole('log', { name: 'Resúmenes de razonamiento de Gemini' });
     expect(log).toHaveTextContent('aún no ha enviado resúmenes');
     const request = mocks.analyze.mock.calls[0]![0] as {
       onThoughtSummary?: (text: string) => void;
+      onProgress?: (phase: string, text: string) => void;
     };
     expect(request.onThoughtSummary).toEqual(expect.any(Function));
+    expect(request.onProgress).toEqual(expect.any(Function));
+    await act(async () => {
+      request.onProgress?.('reading', 'Consultando documentos en Drive.');
+      request.onProgress?.('documents', 'Documentación leída: 3 archivos.');
+      request.onProgress?.('gemini', 'Enviando antecedentes a Gemini.');
+    });
+    expect(log).toHaveTextContent('Consultando documentos en Drive.');
+    expect(log).toHaveTextContent('Documentación leída: 3 archivos.');
+    expect(log).toHaveTextContent('Enviando antecedentes a Gemini.');
     await act(async () => {
       request.onThoughtSummary?.('Gemini detectó dos módulos. ');
       request.onThoughtSummary?.('Hay una dependencia documental pendiente.');
@@ -415,6 +426,14 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Conectar con Google Drive' }));
     expect(screen.getByRole('status', { name: 'Preparación de la documentación' }))
       .toHaveTextContent('Leyendo documentos');
+    const loadingLog = screen.getByRole('log', {
+      name: 'Resúmenes de razonamiento de Gemini',
+    });
+    expect(loadingLog).toBeVisible();
+    expect(screen.getByText('Ver razonamiento resumido de Gemini').closest('details'))
+      .toHaveAttribute('open');
+    expect(loadingLog).toHaveTextContent('se están leyendo los documentos');
+    expect(loadingLog).toHaveTextContent('Gemini todavía no ha comenzado');
     releaseBrowse(previewResult);
     expect(await screen.findByText('Levantamiento QA')).toBeInTheDocument();
 

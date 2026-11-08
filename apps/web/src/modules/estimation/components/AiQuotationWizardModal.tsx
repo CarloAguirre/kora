@@ -262,6 +262,9 @@ export function AiQuotationWizardModal({ project, onClose }: {
   const [saveWarning, setSaveWarning] = useState('');
   const [analysisSnapshot, setAnalysisSnapshot] = useState<EstimationPocAnalysis | null>(null);
   const [geminiThoughtSummary, setGeminiThoughtSummary] = useState('');
+  const [analysisActivity, setAnalysisActivity] = useState<Array<{
+    phase: string; text: string;
+  }>>([]);
   const [proposalThoughtSummary, setProposalThoughtSummary] = useState('');
   const [proposalPhase, setProposalPhase] = useState<'idle' | 'proposal' | 'edt' | 'saving' | 'error'>('idle');
   const [generating, setGenerating] = useState(false);
@@ -586,6 +589,7 @@ export function AiQuotationWizardModal({ project, onClose }: {
       await persistConfirmedFolder(driveFolderUrl);
     }
     setGeminiThoughtSummary('');
+    setAnalysisActivity([]);
     setSourceStep('analyzing');
     setError('');
     setInvalidId(null);
@@ -594,6 +598,12 @@ export function AiQuotationWizardModal({ project, onClose }: {
         // Solo los fragmentos enviados como thought=true por Gemini.
         onThoughtSummary: (chunk) => setGeminiThoughtSummary((current) =>
           (current + chunk).slice(0, 12_000)),
+        // Estados comprobables del servidor, distintos de los resúmenes
+        // de pensamiento que Gemini puede enviar recién cerca del final.
+        onProgress: (phase, text) => setAnalysisActivity((current) => [
+          ...current.filter((item) => item.phase !== phase),
+          { phase, text },
+        ].slice(-6)),
         projectId: project.id,
         projectName: project.name,
         clientName: project.client?.companyName ?? null,
@@ -992,23 +1002,41 @@ export function AiQuotationWizardModal({ project, onClose }: {
                     verificables, no porcentajes estimados.
                   </li>
                 </ol>
-                <details className={[styles.more, styles.thoughtDisclosure].join(' ')}>
-                  <summary>Ver razonamiento resumido de Gemini</summary>
-                  <div className={styles.thoughtLog} role="log"
-                    aria-label="Resúmenes de razonamiento de Gemini"
-                    aria-live="polite" aria-relevant="additions text">
-                    {geminiThoughtSummary
-                      ? <p>{geminiThoughtSummary}</p>
-                      : <p>Gemini aún no ha enviado resúmenes de razonamiento.
-                          Pueden no estar disponibles para esta respuesta.</p>}
-                  </div>
-                  <p className={styles.thoughtFootnote}>
-                    Solo se muestran resúmenes publicados por Gemini, no su razonamiento interno.
-                  </p>
-                </details>
                 </>
               )}
             </>
+          )}
+          {(sourceStep === 'loading' || sourceStep === 'analyzing') && (
+            <details className={[styles.more, styles.thoughtDisclosure].join(' ')} open>
+              <summary>Ver razonamiento resumido de Gemini</summary>
+              <div className={styles.thoughtLog} role="log"
+                aria-label="Resúmenes de razonamiento de Gemini"
+                aria-live="polite" aria-relevant="additions text">
+                {sourceStep === 'loading' ? (
+                  <p>Actividad verificada: se están leyendo los documentos autorizados
+                    de Google Drive. Gemini todavía no ha comenzado el análisis;
+                    sus resúmenes aparecerán cuando se invoque el modelo.</p>
+                ) : (
+                  <>
+                    {analysisActivity.length > 0 ? (
+                      <ul className={styles.thoughtActivity}
+                        aria-label="Actividad verificada del servidor">
+                        {analysisActivity.map((item) =>
+                          <li key={item.phase}>{item.text}</li>)}
+                      </ul>
+                    ) : <p>Conectando con el servicio de análisis documental…</p>}
+                    {geminiThoughtSummary
+                      ? <p>{geminiThoughtSummary}</p>
+                      : <p>Gemini aún no ha enviado resúmenes de razonamiento.
+                          Puede publicarlos cerca del final de la respuesta.</p>}
+                  </>
+                )}
+              </div>
+              <p className={styles.thoughtFootnote}>
+                La actividad muestra operaciones verificables del servidor;
+                los resúmenes son solo los publicados por Gemini, no su razonamiento interno.
+              </p>
+            </details>
           )}
           {saveWarning && <p role="status" className={styles.coverageNote}>{saveWarning}</p>}
           {questionnaire.isLoading && <p>Cargando condiciones de estimación…</p>}
