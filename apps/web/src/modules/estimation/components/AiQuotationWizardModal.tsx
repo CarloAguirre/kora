@@ -953,6 +953,7 @@ export function AiQuotationWizardModal({ project, onClose }: {
                 </>
               )}
               {sourceStep === 'analyzing' && (
+                <>
                 <ol role="status" className={styles.analysisMilestones}
                   aria-label="Progreso del análisis IA">
                   <li className={styles.milestoneDone}>
@@ -988,6 +989,7 @@ export function AiQuotationWizardModal({ project, onClose }: {
                     Solo se muestran resúmenes publicados por Gemini, no su razonamiento interno.
                   </p>
                 </details>
+                </>
               )}
             </>
           )}
