@@ -125,6 +125,31 @@ describe('Equipos · fuente visual prototipo HTML v5', () => {
     expect(screen.getByText('1 equipo(s) requieren revisar capacidad')).toBeInTheDocument();
   });
 
+
+  it('en fases manuales calcula ocupación desde HH de fases, no desde referencia almacenada', () => {
+    const phases = quotationDraftDataSchema.parse({
+      mode: 'phases', teams: [team(dev)],
+      phases: [{ name: 'Entrega', startWeek: 1, durationWeeks: 2,
+        teamHours: [{ teamId: dev, hours: 120 }] }],
+    });
+    renderTeams(phases, 'team');
+    expect(screen.getByLabelText('Carga semanal media de Desarrollo'))
+      .toHaveTextContent('30'); // 120 / 2 / 2 (team.hoursPerWeek era 40)
+    expect(screen.getByLabelText('Ocupación estimada de Desarrollo'))
+      .toHaveTextContent('75%');
+    expect(screen.queryByRole('spinbutton', { name: 'Horas semanales de Desarrollo' }))
+      .not.toBeInTheDocument();
+  });
+
+  it('el cambio de unidad no altera la cantidad efectiva de semanas', () => {
+    renderTeams(mappedEdtDraft);
+    fireEvent.change(screen.getByRole('combobox', { name: 'Unidad de Desarrollo' }),
+      { target: { value: 'day' } });
+    expect(handlers.onEditTeam).toHaveBeenCalledWith(dev, {
+      unit: 'day', duration: 10,
+    });
+  });
+
   it('conserva disabled y las etiquetas accesibles para equipos no seleccionados', () => {
     renderTeams(manual);
     expect(screen.getByRole('spinbutton', { name: 'Colaboradores de QA' })).toBeDisabled();
@@ -183,7 +208,7 @@ describe('Equipos · fuente visual prototipo HTML v5', () => {
     renderTeams(manual);
     fireEvent.change(screen.getByLabelText('Unidad de Desarrollo'),
       { target: { value: 'day' } });
-    expect(handlers.onEditTeam).toHaveBeenCalledWith(dev, { unit: 'day' });
+    expect(handlers.onEditTeam).toHaveBeenCalledWith(dev, { unit: 'day', duration: 10 });
     fireEvent.click(screen.getByLabelText('Incluir QA'));
     expect(handlers.onToggleTeam).toHaveBeenCalledWith(qa, true);
   });

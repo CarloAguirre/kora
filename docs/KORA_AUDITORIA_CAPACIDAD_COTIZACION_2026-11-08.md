@@ -65,3 +65,16 @@ pnpm --filter @kora/web build
 ```
 
 **Estado:** código publicado, inspeccionado estáticamente. La ejecución de TypeScript, Vitest y build en el entorno local aún debe confirmarse con los logs reales.
+
+### Aclaraciones adicionales
+
+- También en cotizaciones **manuales por fases**, las HH de las fases
+  son fuente de verdad: la carga/ocupación es calculada y no editable.
+  En modo manual **por equipo** se mantiene el cálculo original mediante
+  dotación × duración × hh/sem × dedicación.
+- Cambiar unidad de semanas a días (o viceversa) convierte simultáneamente
+  la duración para conservar semanas efectivas: **8 semanas ↔ 40 días**.
+  No se truncan valores que excedan el máximo histórico del contrato.
+- La advertencia de duración compara las semanas **activas con tareas**,
+  no el número absoluto de última semana del proyecto; una fase que
+  comienza en semana 10 no implica por sí sola 10 semanas de duración.

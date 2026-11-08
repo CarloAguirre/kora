@@ -39,6 +39,7 @@ export function QuotationTeamsWorkspace({
   mappingAction?: ReactNode;
 }) {
   const hasEdt = Boolean(draft.aiPoc?.edt);
+  const loadFromPlanning = hasEdt || draft.mode === 'phases';
   const all = hasEdt ? quotationEdtAssignments(draft) : [];
   const grouped = new Map<string, number>();
   for (const row of all) grouped.set(row.teamKey,
@@ -47,8 +48,7 @@ export function QuotationTeamsWorkspace({
     role.role, draft.edtRoleCollaborators?.find((item) =>
       item.role === role.role)?.collaborators ?? role.people,
   ]) ?? []);
-  const weeklyPlan = hasEdt || draft.mode === 'phases'
-    ? quotationTeamWeeklyPlan(draft) : null;
+  const weeklyPlan = loadFromPlanning ? quotationTeamWeeklyPlan(draft) : null;
   const pendingProfiles = hasEdt
     ? [...grouped].filter(([key]) => key.startsWith('profile:')) : [];
   // Misma grilla del prototipo v5 en ambos modos: solo equipos Kora,
@@ -72,9 +72,9 @@ export function QuotationTeamsWorkspace({
     const team = draft.teams.find((row) => row.teamId === teamId);
     if (!team) return null;
     return quotationTeamCapacity(team, getHours(teamId),
-      weeklyPlan?.rows.find((row) => row.teamKey === teamId), hasEdt);
+      weeklyPlan?.rows.find((row) => row.teamKey === teamId), loadFromPlanning);
   };
-  const capacityProblems = hasEdt ? draft.teams.filter((team) => {
+  const capacityProblems = loadFromPlanning ? draft.teams.filter((team) => {
     const audit = capacityForTeam(team.teamId);
     return audit && (audit.overloadedWeeks.length > 0 ||
       audit.overAverageCapacity || audit.durationConflict);
@@ -99,7 +99,7 @@ export function QuotationTeamsWorkspace({
           : 'Las horas de cada equipo se suman desde las fases.'}
         {' '}Los líderes de equipo se asignan en Kora.
       </p>
-      {hasEdt && <div className={styles.capacityContext}
+      {loadFromPlanning && <div className={styles.capacityContext}
         aria-label="Referencia de capacidad de la cotización">
         <span>Jornada de comparación Kora: <strong>{KORA_QUOTATION_REFERENCE_WEEK_HOURS} HH/sem por persona</strong>.
           El 100% de dedicación indica disponibilidad planificada, no ocupación.
@@ -107,7 +107,7 @@ export function QuotationTeamsWorkspace({
         {capacityProblems > 0 && <Badge tone="warning">
           {capacityProblems} equipo(s) requieren revisar capacidad
         </Badge>}
-        {!weeklyPlan && <span>Sin calendario EDT: no se pueden verificar picos semanales.</span>}
+        {!weeklyPlan && <span>Sin calendario de fases/EDT: no se pueden verificar picos semanales.</span>}
       </div>}
       <div className={styles.tableScroll}>
         <div className={styles.columns + ' ' + columns}>
@@ -128,7 +128,7 @@ export function QuotationTeamsWorkspace({
           const checked = Boolean(team);
           const capacity = capacityForTeam(teamId);
           const warningParts: string[] = [];
-          if (capacity && hasEdt && checked) {
+          if (capacity && loadFromPlanning && checked) {
             if (capacity.overloadedWeeks.length) {
               warningParts.push('Sobrecarga en semana(s) ' +
                 capacity.overloadedWeeks.join(', ') + ': pico ' +
@@ -175,23 +175,31 @@ export function QuotationTeamsWorkspace({
               {view === 'team' && <>
                 <Select className={styles.unitField} disabled={!editable || !checked}
                   aria-label={'Unidad de ' + label} value={team?.unit ?? 'week'}
+                  title="Al cambiar unidad se conserva la duración efectiva (5 días por semana)."
                   options={[
                     { value: 'week', label: 'Semanas' },
                     { value: 'day', label: 'Días' },
                   ]}
-                  onChange={(e) => onEditTeam(teamId, {
-                    unit: e.target.value as Team['unit'],
-                  })} />
+                  onChange={(e) => {
+                    const unit = e.target.value as Team['unit'];
+                    const oldUnit = team?.unit ?? 'week';
+                    const duration = team?.duration ?? 0;
+                    const converted = unit === oldUnit ? duration
+                      : unit === 'day' ? duration * 5 : duration / 5;
+                    // El contrato admite hasta 520: no truncar silenciosamente.
+                    if (converted > 520) return;
+                    onEditTeam(teamId, { unit, duration: converted });
+                  }} />
                 <TextField className={styles.numberField} type="number" min={0} max={520}
                   disabled={!editable || !checked}
                   aria-label={'Duración de ' + label} value={team?.duration ?? 0}
                   onChange={(e) => onEditTeam(teamId, {
                     duration: Math.max(0, Number(e.target.value) || 0),
                   })}/>
-                {hasEdt
+                {loadFromPlanning
                   ? <output className={styles.derivedLoad}
                       aria-label={'Carga semanal media de ' + label}
-                      title="HH de tareas EDT ÷ número de colaboradores ÷ duración. No altera el presupuesto.">
+                      title="HH de tareas o fases ÷ colaboradores ÷ duración. No altera el presupuesto.">
                       {checked && capacity?.averagePerPerson !== null &&
                         capacity?.averagePerPerson !== undefined
                         ? fmt(capacity.averagePerPerson) : '—'}
@@ -224,7 +232,7 @@ export function QuotationTeamsWorkspace({
                     disabled={!editable} value={getHours(teamId)}
                     onCommit={(hours) => onEditGroupHours(teamId, hours)}/>
                 : <strong className={styles.hours}>{checked ? fmt(getHours(teamId)) : '—'}</strong>}
-              {view === 'team' && hasEdt && checked && capacity?.peakWeek !== null &&
+              {view === 'team' && loadFromPlanning && checked && capacity?.peakWeek !== null &&
                 capacity?.peakWeek !== undefined && (
                 <p className={styles.peakLoad}>
                   Pico orientativo: semana {capacity.peakWeek}, {fmt(capacity.peakPerPerson ?? 0)}
