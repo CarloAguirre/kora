@@ -163,13 +163,38 @@ export function projectPocRolesToQuotationDraft(
         stage.startWeek + stage.durationWeeks - 1))
     : Math.max(1, ...commercialStages.map((stage) =>
         stage.startWeek + stage.durationWeeks - 1));
+  // Cuando varios perfiles usan un mismo equipo, sus personas se COMPARTEN
+  // si la capacidad lo permite. No sumamos personal preliminar de Gemini:
+  // encontramos cuántas personas trabajan simultáneamente como máximo.
+  const peakCentsByTeam = new Map<string, Map<number, number>>();
+  if (detailed) for (const phase of phases) {
+    for (const row of phase.teamHours) {
+      const weeks = peakCentsByTeam.get(row.teamId) ?? new Map<number, number>();
+      const cents = Math.round(row.hours * 100);
+      const base = Math.floor(cents / phase.durationWeeks);
+      const remainder = cents % phase.durationWeeks;
+      for (let i = 0; i < phase.durationWeeks; i++) {
+        const week = phase.startWeek + i;
+        weeks.set(week, (weeks.get(week) ?? 0) + base + (i < remainder ? 1 : 0));
+      }
+      peakCentsByTeam.set(row.teamId, weeks);
+    }
+  }
   const teams = [...grouped.entries()].map(([teamId, group]) => {
-    const collaborators = Math.max(1, group.collaborators);
+    const peak = Math.max(0, ...(peakCentsByTeam.get(teamId)?.values() ?? []));
+    const optimizedPeople = peak ? Math.ceil(peak / (40 * 100)) : 1;
+    // Conservamos asignaciones manuales explícitas de colaboradores
+    // en remapeos posteriores (historial y revisiones del usuario).
+    const manuallyStaffed = roles.some((role) =>
+      roleTeamIds[role.role] === teamId &&
+      draft.edtRoleCollaborators?.some((entry) => entry.role === role.role));
+    const collaborators = detailed && !manuallyStaffed
+      ? optimizedPeople : Math.max(1, group.collaborators);
     if (collaborators > 100) {
       throw new Error('La cantidad de colaboradores del equipo supera 100.');
     }
     const duration = Math.max(group.maxWeeks, detailed ? lastWeek : 1,
-      Math.ceil(group.hours / (168 * collaborators)));
+      Math.ceil(group.hours / ((detailed ? 40 : 168) * collaborators)));
     if (duration > 520 || !Number.isFinite(duration)) {
       throw new Error('Las HH exceden el horizonte máximo de 520 semanas.');
     }

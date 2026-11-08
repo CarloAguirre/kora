@@ -156,6 +156,61 @@ describe('Proyección IA Gemini KDM a cotización', () => {
     expect(synchronizeQuotationEdtTeamLoad(manual)).toBe(manual);
   });
 
+
+  it('proyecta un equipo común sin sumar personas de perfiles secuenciales', () => {
+    const source = original();
+    const shared = quotationDraftDataSchema.parse({
+      ...source,
+      aiPoc: {
+        ...source.aiPoc!,
+        edt: {
+          schemaVersion: 'kora.quotation.reference-edt.v2',
+          source: 'kdm_demo', provider: 'gemini',
+          totalHours: 80, reservePercent: 0, reserveHours: 0, totalWithReserve: 80,
+          stages: [
+            { code: 'A', name: 'API', startWeek: 1, durationWeeks: 1, totalHours: 40 },
+            { code: 'B', name: 'QA', startWeek: 2, durationWeeks: 1, totalHours: 40 },
+          ],
+          modules: [{ name: 'Portal', totalHours: 80, tasks: [
+            { wbs: 'A.01', name: 'Construir API', role: 'Desarrollo',
+              hours: 40, stageCode: 'A',
+              roleEffort: [{ role: 'Desarrollo', hours: 40 }] },
+            { wbs: 'B.01', name: 'Validar API', role: 'QA',
+              hours: 40, stageCode: 'B',
+              roleEffort: [{ role: 'QA', hours: 40 }] },
+          ] }],
+        },
+      },
+    });
+    const sequential = projectPocRolesToQuotationDraft(shared, {
+      Desarrollo: t1, QA: t1,
+    });
+    expect(sequential.teams).toHaveLength(1);
+    expect(sequential.teams[0]?.collaborators).toBe(1);
+    expect(sequential.teams[0]?.duration).toBe(2);
+    expect(sequential.phases.map((phase) => phase.teamHours[0]?.hours)).toEqual([40, 40]);
+
+    const concurrentDraft = quotationDraftDataSchema.parse({
+      ...shared,
+      aiPoc: {
+        ...shared.aiPoc!,
+        edt: {
+          ...shared.aiPoc!.edt!,
+          stages: [
+            { code: 'A', name: 'API', startWeek: 1, durationWeeks: 1, totalHours: 40 },
+            { code: 'B', name: 'QA', startWeek: 1, durationWeeks: 1, totalHours: 40 },
+          ],
+        },
+      },
+    });
+    const parallel = projectPocRolesToQuotationDraft(concurrentDraft, {
+      Desarrollo: t1, QA: t1,
+    });
+    expect(parallel.teams[0]?.collaborators).toBe(2);
+    expect(parallel.phases.flatMap((stage) => stage.teamHours)
+      .reduce((acc, row) => acc + row.hours, 0)).toBe(80);
+  });
+
   it('permite mapear distintos equipos sin perder duración original por perfil', () => {
     const mapped = projectPocRolesToQuotationDraft(original(), { Desarrollo: t1, QA: t2 });
     expect(mapped.teams).toHaveLength(2);
