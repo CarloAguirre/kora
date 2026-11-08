@@ -134,12 +134,13 @@ describe('Equipos · fuente visual prototipo HTML v5', () => {
     expect(handlers.onToggleTeam).toHaveBeenCalledWith(qa, true);
   });
 
-  it('en Por equipo muestra siete columnas y solo equipos del catálogo, nunca perfiles como equipos', () => {
+  it('en Por equipo muestra ocho columnas y solo equipos del catálogo, nunca perfiles como equipos', () => {
     renderTeams(mappedEdtDraft);
     expect(screen.getByText('Unidad')).toBeInTheDocument();
     expect(screen.getByText('Duración')).toBeInTheDocument();
-    expect(screen.getByText('hh/sem')).toBeInTheDocument();
-    expect(screen.getByText('Dedicación')).toBeInTheDocument();
+    expect(screen.getByText('Carga media hh/sem')).toBeInTheDocument();
+    expect(screen.getByText('Dedicación planificada %')).toBeInTheDocument();
+    expect(screen.getByText('Ocupación (40 HH)')).toBeInTheDocument();
     expect(screen.getByLabelText('Incluir Desarrollo')).toBeChecked();
     expect(screen.getByLabelText('Incluir QA')).not.toBeChecked();
     expect(screen.getByLabelText('Horas totales de Desarrollo')).toHaveValue(40);
