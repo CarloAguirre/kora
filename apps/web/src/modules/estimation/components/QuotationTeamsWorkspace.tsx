@@ -39,6 +39,9 @@ export function QuotationTeamsWorkspace({
   mappingAction?: ReactNode;
 }) {
   const hasEdt = Boolean(draft.aiPoc?.edt);
+  // En blanco no hay equipos todavía: editar cualquier celda lo incorporará.
+  // La EDT IA conserva la activación explícita para proteger sus asignaciones.
+  const canStartManualTeam = !hasEdt;
   const loadFromPlanning = hasEdt || draft.mode === 'phases';
   const all = hasEdt ? quotationEdtAssignments(draft) : [];
   const grouped = new Map<string, number>();
@@ -98,6 +101,9 @@ export function QuotationTeamsWorkspace({
             : 'Horas = colaboradores × duración × hh/semana × dedicación.'
           : 'Las horas de cada equipo se suman desde las fases.'}
         {' '}Los líderes de equipo se asignan en Kora.
+        {canStartManualTeam && editable && (
+          <> Puedes marcar un equipo o editar directamente sus campos para incorporarlo.</>
+        )}
       </p>
       {loadFromPlanning && <div className={styles.capacityContext}
         aria-label="Referencia de capacidad de la cotización">
@@ -126,6 +132,7 @@ export function QuotationTeamsWorkspace({
           const people = team?.collaborators ?? 1;
           const label = teamName(teamId, teamNames);
           const checked = Boolean(team);
+          const fieldsEditable = editable && (checked || canStartManualTeam);
           const capacity = capacityForTeam(teamId);
           const warningParts: string[] = [];
           if (capacity && loadFromPlanning && checked) {
@@ -163,7 +170,7 @@ export function QuotationTeamsWorkspace({
                 </span>
               </label>
               <TextField className={styles.numberField} type="number" min={1} max={100}
-                disabled={!editable || !checked}
+                disabled={!fieldsEditable}
                 aria-label={'Colaboradores de ' + label} value={people}
                 title={hasEdt ? 'Dotación de referencia; no cambia las HH de las tareas.' : undefined}
                 onChange={(e) => {
@@ -173,7 +180,7 @@ export function QuotationTeamsWorkspace({
                   else onEditTeam(teamId, { collaborators: count });
                 }}/>
               {view === 'team' && <>
-                <Select className={styles.unitField} disabled={!editable || !checked}
+                <Select className={styles.unitField} disabled={!fieldsEditable}
                   aria-label={'Unidad de ' + label} value={team?.unit ?? 'week'}
                   title="Al cambiar unidad se conserva la duración efectiva (5 días por semana)."
                   options={[
@@ -183,7 +190,7 @@ export function QuotationTeamsWorkspace({
                   onChange={(e) => {
                     const unit = e.target.value as Team['unit'];
                     const oldUnit = team?.unit ?? 'week';
-                    const duration = team?.duration ?? 0;
+                    const duration = team?.duration ?? (canStartManualTeam ? 1 : 0);
                     const converted = unit === oldUnit ? duration
                       : unit === 'day' ? duration * 5 : duration / 5;
                     // El contrato admite hasta 520: no truncar silenciosamente.
@@ -191,8 +198,9 @@ export function QuotationTeamsWorkspace({
                     onEditTeam(teamId, { unit, duration: converted });
                   }} />
                 <TextField className={styles.numberField} type="number" min={0} max={520}
-                  disabled={!editable || !checked}
-                  aria-label={'Duración de ' + label} value={team?.duration ?? 0}
+                  disabled={!fieldsEditable}
+                  aria-label={'Duración de ' + label}
+                  value={team?.duration ?? (canStartManualTeam ? 1 : 0)}
                   onChange={(e) => onEditTeam(teamId, {
                     duration: Math.max(0, Number(e.target.value) || 0),
                   })}/>
@@ -205,14 +213,14 @@ export function QuotationTeamsWorkspace({
                         ? fmt(capacity.averagePerPerson) : '—'}
                     </output>
                   : <TextField className={styles.numberField} type="number" min={0} max={168}
-                      disabled={!editable || !checked}
+                      disabled={!fieldsEditable}
                       aria-label={'Horas semanales de ' + label}
                       value={team?.hoursPerWeek ?? 40}
                       onChange={(e) => onEditTeam(teamId, {
                         hoursPerWeek: Math.max(0, Number(e.target.value) || 0),
                       })}/>}
                 <TextField className={styles.numberField} type="number" min={0} max={100}
-                  disabled={!editable || !checked}
+                  disabled={!fieldsEditable}
                   aria-label={'Dedicación de ' + label}
                   value={team?.dedicationPercent ?? 100}
                   onChange={(e) => onEditTeam(teamId, {

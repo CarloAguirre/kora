@@ -150,13 +150,36 @@ describe('Equipos · fuente visual prototipo HTML v5', () => {
     });
   });
 
-  it('conserva disabled y las etiquetas accesibles para equipos no seleccionados', () => {
+  it('permite editar equipos aún no seleccionados en cotizaciones manuales', () => {
     renderTeams(manual);
+    expect(screen.getByRole('checkbox', { name: 'Incluir QA' })).not.toBeChecked();
+    expect(screen.getByRole('spinbutton', { name: 'Colaboradores de QA' })).toBeEnabled();
+    expect(screen.getByRole('combobox', { name: 'Unidad de QA' })).toBeEnabled();
+    expect(screen.getByRole('spinbutton', { name: 'Duración de QA' })).toBeEnabled();
+    expect(screen.getByRole('spinbutton', { name: 'Duración de QA' })).toHaveValue(1);
+    expect(screen.getByText(/editar directamente sus campos para incorporarlo/)).toBeInTheDocument();
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Duración de QA' }), {
+      target: { value: '3' },
+    });
+    expect(handlers.onEditTeam).toHaveBeenCalledWith(qa, { duration: 3 });
+    fireEvent.change(screen.getByRole('combobox', { name: 'Unidad de QA' }), {
+      target: { value: 'day' },
+    });
+    expect(handlers.onEditTeam).toHaveBeenCalledWith(qa, {
+      unit: 'day', duration: 5,
+    });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Incluir QA' }));
+    expect(handlers.onToggleTeam).toHaveBeenCalledWith(qa, true);
+  });
+
+  it('no habilita campos de equipos ausentes en una EDT IA', () => {
+    renderTeams(mappedEdtDraft);
+    expect(screen.getByRole('checkbox', { name: 'Incluir QA' })).toBeEnabled();
     expect(screen.getByRole('spinbutton', { name: 'Colaboradores de QA' })).toBeDisabled();
     expect(screen.getByRole('combobox', { name: 'Unidad de QA' })).toBeDisabled();
     expect(screen.getByRole('spinbutton', { name: 'Duración de QA' })).toBeDisabled();
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Incluir QA' }));
-    expect(handlers.onToggleTeam).toHaveBeenCalledWith(qa, true);
+    expect(screen.queryByText(/editar directamente sus campos para incorporarlo/))
+      .not.toBeInTheDocument();
   });
 
   it('en Por equipo muestra ocho columnas y solo equipos del catálogo, nunca perfiles como equipos', () => {

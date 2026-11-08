@@ -290,10 +290,17 @@ export function QuotationWorkspacePage() {
   }) : null;
   const editTeamById = (teamId: string, patch: Partial<QuotationDraftData['teams'][number]>) => {
     if (!editable || !form) return;
+    const exists = form.draft.teams.some((team) => team.teamId === teamId);
+    // En blanco, los equipos empiezan desmarcados. La primera edición de
+    // cualquiera de sus campos debe incorporarlo atómicamente al borrador;
+    // sin esto el input parecía habilitarse pero el cambio se perdía.
+    if (!exists && form.draft.aiPoc?.edt) return;
     const draft = {
       ...form.draft,
-      teams: form.draft.teams.map((row) =>
-        row.teamId === teamId ? { ...row, ...patch } : row),
+      teams: exists
+        ? form.draft.teams.map((row) =>
+            row.teamId === teamId ? { ...row, ...patch } : row)
+        : [...form.draft.teams, { ...emptyTeam(teamId), ...patch }],
     };
     // En EDT, HH/sem se deriva de la carga WBS: nunca conservar un número
     // desactualizado al cambiar dotación, unidad o duración.
