@@ -56,6 +56,36 @@ describe('apiEventStream / resumen de Gemini', () => {
     expect(url).not.toContain('test-bearer');
   });
 
+
+  it('muestra progreso SSE antes de recibir la respuesta final y no espera cierre de conexión', async () => {
+    let writer!: ReadableStreamDefaultController<Uint8Array>;
+    const response = new Response(new ReadableStream<Uint8Array>({
+      start(controller) { writer = controller; },
+    }), { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response));
+    const encoder = new TextEncoder();
+    const events: string[] = [];
+    let finished = false;
+    const pending = apiEventStream<{ summary: string }>(
+      '/estimations/poc/analyze/stream', { projectId: 'p1' },
+      (event, data) => { events.push(event + ':' + (data as { text: string }).text); },
+    ).then((value) => { finished = true; return value; });
+
+    writer.enqueue(encoder.encode(frame('phase', {
+      phase: 'reading', text: 'Drive: archivos autorizados.',
+    })));
+    await vi.waitFor(() => expect(events).toEqual(['phase:Drive: archivos autorizados.']));
+    expect(finished).toBe(false);
+    writer.enqueue(encoder.encode(frame('thought', { text: 'Revisando módulo de clientes.' })));
+    await vi.waitFor(() => expect(events).toHaveLength(2));
+    expect(events[1]).toBe('thought:Revisando módulo de clientes.');
+    expect(finished).toBe(false);
+    writer.enqueue(encoder.encode(frame('complete', { summary: 'Análisis final' })));
+    writer.close();
+    await expect(pending).resolves.toEqual({ summary: 'Análisis final' });
+    expect(finished).toBe(true);
+  });
+
   it('no repite generación y rechaza errores SSE del servidor', async () => {
     const fetchMock = vi.fn().mockResolvedValue(streamResponse(
       frame('thought', { text: 'Evaluando alcance.' }) +

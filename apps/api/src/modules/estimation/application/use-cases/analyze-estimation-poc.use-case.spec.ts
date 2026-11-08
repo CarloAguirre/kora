@@ -50,10 +50,17 @@ describe('AnalyzeEstimationPocUseCase', () => {
   });
   it('pide preguntas dinámicas a Gemini usando el documento KDM real de la fuente de demo', async () => {
     const sourceId = 'kora-poc-requerimiento-kdm';
+    const phases: string[] = [];
     const seen: { documents?: unknown; task?: string } = {};
     const ai: AiProvider = {
       name: 'gemini',
       generateStructured: async (request) => {
+        // Los eventos de lectura y envío anteceden a la llamada al modelo,
+        // sin esperar que Gemini publique thought summaries.
+        expect(phases).toEqual([
+          'documents:Documentación leída: 1 archivo(s) disponibles para el análisis.',
+          'gemini:Enviando los antecedentes a Gemini para elaborar el entendimiento.',
+        ]);
         seen.documents = request.documents;
         seen.task = request.task;
         return {
@@ -90,7 +97,7 @@ describe('AnalyzeEstimationPocUseCase', () => {
       projectName: 'Proyecto', clientName: 'Cliente',
       driveFolderUrl: 'https://drive.google.com/drive/folders/kora-poc-fallback',
       instructions: null,
-    });
+    }, undefined, undefined, (phase, text) => phases.push(phase + ':' + text));
     expect(seen.task).toBe('estimation.poc.analysis');
     expect(seen.documents).toEqual(expect.arrayContaining([
       expect.objectContaining({ name: 'Requerimiento_KDM.pdf' }),
