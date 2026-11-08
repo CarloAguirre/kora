@@ -4,6 +4,45 @@ import { ResolveEstimationDriveFolderUseCase } from './resolve-estimation-drive-
 
 describe('ResolveEstimationDriveFolderUseCase', () => {
 
+  it('Gemini prioriza una subcarpeta de levantamiento real sin inventar IDs', async () => {
+    const files = (id: string, name: string, parents: string[] = []): DriveFolderItem => ({
+      id, name, parentIds: parents, itemType: 'folder',
+      mimeType: 'application/vnd.google-apps.folder',
+      modifiedAt: '2026-11-08T10:00:00Z', sizeBytes: null, webViewLink: null,
+    });
+    const client = files('cliente', 'Abarca Motores');
+    const root = files('postventa', 'Postventa', ['cliente']);
+    const old = files('cerrado', 'Postventa 2024 (cerrado)', ['cliente']);
+    const survey = files('levantamiento', 'Levantamiento app', ['postventa']);
+    const metadata = new Map([client, root, old, survey].map((item) =>
+      [item.id, item] as const));
+    const drive: DriveFolderClient = {
+      isConfigured: () => true, listFiles: async () => [],
+      searchFolders: async (terms) => terms.some((term) => /postventa/i.test(term))
+        ? [root, old] : [client],
+      listChildren: async (id) => id === 'cliente' ? [root, old]
+        : id === 'postventa' ? [survey] : [],
+      getMetadata: async (id) => metadata.get(id) ?? null,
+      readAnalysisContent: async () => null,
+    };
+    const ai = {
+      name: 'gemini',
+      generateStructured: async () => ({ folderId: 'levantamiento' }),
+    };
+    const result = await new ResolveEstimationDriveFolderUseCase(drive, ai).execute({
+      projectId: '550e8400-e29b-41d4-a716-446655440000',
+      projectName: 'App de postventa', clientName: 'Abarca Motores',
+      documentationLink: null, quotationLink: null,
+    });
+    expect(result.candidates[0]?.folderId).toBe('levantamiento');
+    expect(result.candidates.some((item) => item.folderId === 'cerrado')).toBe(true);
+    expect(result.status).toBe('needs_confirmation');
+    expect(result.selectedFolder).toBeNull();
+    expect(result.candidates[0]?.reasons.join(' ')).toContain('Gemini');
+  });
+
+
+
   it('permite buscar con el Drive delegado sin usar la cuenta de servicio por defecto', async () => {
     const inaccessible: DriveFolderClient = {
       isConfigured: () => false, listFiles: async () => [], listChildren: async () => [],

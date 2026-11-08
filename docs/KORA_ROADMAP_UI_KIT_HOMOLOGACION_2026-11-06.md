@@ -377,3 +377,21 @@ URL con popup. La escritura no ocurre antes de confirmar una carpeta
 legible. Se conserva el flujo actual de URL explícita, cambio de
 carpeta y análisis Gemini después de previsualizar documentos.
 Pendiente ejecución real de tests y builds.
+
+### Descubrimiento por niveles y evaluación Gemini de candidatas (08-11-2026)
+
+La búsqueda contempla hasta 8 carpetas raíz relevantes, desciende
+hasta 2 niveles y limita el descubrimiento a 80 carpetas/18 expansiones.
+Esto permite encontrar `Abarca Motores/Postventa/Levantamiento app`
+aunque `Levantamiento app` no contenga literalmente el nombre completo
+del proyecto. Una carpeta con antecesor compatible obtiene evidencia
+de jerarquía; el acceso denegado a un antecesor no cancela toda la búsqueda.
+
+Si hay varias candidatas y el proveedor real es Gemini,
+`ResolveEstimationDriveFolderUseCase` envía SOLO metadatos acotados
+(nombres de las ocho carpetas candidatas, jerarquías y hasta seis nombres
+de archivos/subcarpetas por candidata) para priorizar una. Solo se
+aceptan IDs presentes en la respuesta de Drive. Gemini no recibe
+contenido antes de seleccionar una carpeta, y cualquier sugerencia
+requiere confirmación del usuario. Con Gemini no disponible, quedan
+las reglas deterministas y la selección manual. Sin cambios de BD.
