@@ -166,7 +166,7 @@ del nuevo commit todavía pendiente.
 
 Se identificó con una comprobación en Google Drive que la carpeta
 `03.Documento de levantamiento detallado` recomendada por Kora
-tenía el ID `1yUrbnrxU7HBaBSjJzu7m3j3lb1OKB7GG` y estaba realmente
+tenía el ID `[ID de carpeta vacía, omitido]` y estaba realmente
 vacía. Otra carpeta con el mismo nombre contenía PDFs y otros documentos.
 La coincidencia por nombre no demostraba contenido.
 
