@@ -145,3 +145,19 @@ real en Drive. El JSON de cobertura devuelto por `folders/browse`
 determinará si fallan lectura de PDF (403 u otro), formato, tamaño,
 permisos, límite o visibilidad de Drive. Sin esa evidencia no se declara
 una causa única del incidente.
+
+## Hotfix Vitest Web (08-11-2026)
+
+La validación local de `8ac716cb` confirmó `typecheck` API y Web,
+y 23/23 pruebas Drive backend. El wizard pasó 15/17 pruebas. Las dos
+restantes seguían afirmando el antiguo mensaje genérico
+`No hay documentos legibles` tras incorporar diagnósticos específicos
+de cobertura. No hubo fallo de compilación ni evidencia de un problema
+OAuth en ese log. Se reemplazan los fixtures inconsistentes
+(`documents=[]` con `analyzedDocuments=1`) por dos situaciones
+diferenciadas: carpeta realmente vacía (0 detectados) y carpeta
+con archivos incompatibles (Excel .xlsx, 0 elegibles).
+Se comprueban el texto de diagnóstico vigente y que el análisis de Gemini
+continúa bloqueado. El caso de PDF detectado pero no descargable
+permanece cubierto por su prueba independiente. Validación local
+del nuevo commit todavía pendiente.

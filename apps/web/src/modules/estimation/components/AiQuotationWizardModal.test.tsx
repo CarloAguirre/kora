@@ -236,13 +236,21 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
   });
 
 
-  it('no modifica Extras si la carpeta confirmada está vacía o no es legible', async () => {
-    mocks.browse.mockResolvedValueOnce({ ...previewResult, documents: [] });
+  it('no modifica Extras cuando Drive devuelve una carpeta sin archivos', async () => {
+    mocks.browse.mockResolvedValueOnce({
+      ...previewResult,
+      documents: [],
+      coverage: {
+        scannedItems: 0, eligibleDocuments: 0, analyzedDocuments: 0,
+        scanTruncated: false, omitted: [],
+      },
+    });
     renderWizard({ ...project, documentationLink: null } as ProjectDetail);
     fireEvent.click(screen.getByRole('button', { name: 'Conectar con Google Drive' }));
     await screen.findByRole('group', { name: 'Carpetas candidatas' });
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar carpeta' }));
-    expect(await screen.findByText(/No hay documentos legibles/)).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Drive no devolvió archivos de esta carpeta');
     expect(mocks.updateExtras).not.toHaveBeenCalled();
     expect(mocks.analyze).not.toHaveBeenCalled();
   });
@@ -385,11 +393,22 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
     expect(mocks.analyze).not.toHaveBeenCalled();
   });
 
-  it('bloquea análisis si la carpeta no contiene documentos legibles', async () => {
-    mocks.browse.mockResolvedValueOnce({ ...previewResult, documents: [] });
+  it('bloquea análisis cuando solo hay formatos incompatibles y detalla los descartes', async () => {
+    mocks.browse.mockResolvedValueOnce({
+      ...previewResult,
+      documents: [],
+      coverage: {
+        scannedItems: 2, eligibleDocuments: 0, analyzedDocuments: 0,
+        scanTruncated: false,
+        omitted: [{ path: 'Cronograma.xlsx', reason: 'formato no compatible con el lector' }],
+      },
+    });
     renderWizard();
     await prepareDocuments();
-    expect(screen.getByText(/No hay documentos legibles/)).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Drive encontró 2 elemento(s), pero ningún documento compatible');
+    expect(screen.getByRole('list', { name: 'Archivos omitidos en Drive' }))
+      .toHaveTextContent('Cronograma.xlsx');
     expect(screen.getByRole('button', { name: 'Analizar proyecto' })).toBeDisabled();
     expect(mocks.analyze).not.toHaveBeenCalled();
   });
