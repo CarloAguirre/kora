@@ -1,5 +1,6 @@
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { z } from 'zod';
+import { optimizeWorkforceForEdt } from '../estimation-workforce-optimizer';
 import { extractDriveFolderId } from '../drive-source-selection';
 import { resolveEstimationQuestionnaireContext, type EstimationInputWithQuestions } from '../resolve-estimation-questionnaire-context';
 import {
@@ -463,7 +464,20 @@ export class GenerateEstimationPocProposalUseCase {
       throw new BadRequestException(
         'Todos los tramos declarados deben tener actividades con HH positivas.');
     }
-    validateStageCapacity(raw, proposal.roles);
+    // Dimensionar con las HH definitivas de la EDT, no con el headcount
+    // tentativo del primer Gemini. Las fases simultáneas comparten capacidad;
+    // su pico por semana determina cuántas personas necesitan el rol.
+    const optimized = optimizeWorkforceForEdt(
+      raw.stages,
+      raw.roleHours.map((part) => ({
+        stageCode: activities.get(part.wbs)!.stageCode,
+        role: part.role, hours: part.hours,
+      })),
+      proposal.roles,
+    );
+    validateStageCapacity(raw, optimized.roles.map((role) => ({
+      role: role.role, people: role.people,
+    })));
     const modules = [...modulesByName.values()];
     const totalHours = roundHours(modules.reduce((sum, module) => sum + module.totalHours, 0));
     const reservePercent = raw.reservePercent;
@@ -534,18 +548,32 @@ export class GenerateEstimationPocProposalUseCase {
     }
     const edtWeeks = Math.max(1, ...(edt.stages ?? []).map((stage) =>
       stage.startWeek + stage.durationWeeks - 1));
+    const workforce = optimizeWorkforceForEdt(
+      edt.stages ?? [],
+      edt.modules.flatMap((module) => module.tasks.flatMap((task) =>
+        (task.roleEffort ?? [{ role: task.role, hours: task.hours }])
+          .map((effort) => ({
+            stageCode: task.stageCode ?? '',
+            role: effort.role, hours: effort.hours,
+          })))),
+      preliminary.roles,
+    );
+    const bySizedRole = new Map(workforce.roles.map((role) => [role.role, role]));
     const roles = preliminary.roles.map((role) => {
       const totalHours = byRole.get(role.role)!;
-      // El calendario real de la EDT reemplaza el horizonte tentativo del
-      // Líder Técnico; así el compromiso semanal se ve en el perfil agregado.
-      const duration = isTechLeadRole(role.role) ? edtWeeks : role.duration;
-      const unit = isTechLeadRole(role.role) ? 'week' as const : role.unit;
-      const units = duration * role.people;
-      if (units <= 0) throw new BadRequestException('La capacidad preliminar incluye perfiles sin duración.');
+      const staffing = bySizedRole.get(role.role)!;
+      // El calendario es el de la EDT; cada rol se dimensiona según sus
+      // SEMANAS ACTIVAS y su pico, no según los números iniciales de Gemini.
+      // TL preserva exactamente una persona y el horizonte de supervisión.
+      const lead = isTechLeadRole(role.role);
+      const duration = lead ? edtWeeks : staffing.activeWeeks;
+      const people = lead ? 1 : staffing.people;
+      const units = duration * people;
+      if (units <= 0) throw new BadRequestException('La EDT contiene perfiles sin capacidad.');
       return {
-        ...role, unit, duration, totalHours,
-        // En el TL, >5 puede reflejar arquitectura hands-on adicional.
-        // La base fija vive separada en el WBS TL-GOV.01.
+        ...role, unit: 'week' as const, duration, people, totalHours,
+        // Horas medias REALES, nunca se inflan a 40 por rellenar capacidad.
+        // La dotación peak puede estar activa solo parte del cronograma.
         hoursPerUnit: Math.round(totalHours / units * 10000) / 10000,
       };
     });

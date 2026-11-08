@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { estimationPocProposalSchema } from '@kora/contracts';
+import { estimationPocProposalSchema, quotationReferenceEdtSchema } from '@kora/contracts';
 import type { AiProvider } from '../../../ai/application/ports/ai-provider.port';
 import type { DocumentSourceReader } from '../ports/document-source-reader.port';
 import type { DriveFolderClient } from '../ports/drive-folder-client.port';
@@ -302,6 +302,48 @@ describe('GenerateEstimationPocProposalUseCase', () => {
       requestedSchemas,
     };
   };
+
+
+  it('corrige dotación inicial sobredimensionada con HH de EDT, sin modificar esfuerzo', () => {
+    const preliminary = estimationPocProposalSchema.parse({
+      projectId, provider: 'gemini', sourceMode: 'drive', documentsAnalyzed: 1,
+      summary: 'Estimación inicial de Gemini',
+      roles: [
+        { role: 'Desarrollo', unit: 'week', duration: 2, hoursPerUnit: 10,
+          people: 4, totalHours: 80, source: 'Requerimiento_KDM.pdf' },
+        { role: 'QA', unit: 'week', duration: 3, hoursPerUnit: 10,
+          people: 3, totalHours: 90, source: 'Requerimiento_KDM.pdf' },
+      ], totalHours: 170, assumptions: [], clarifyingQuestions: [],
+    });
+    const edt = quotationReferenceEdtSchema.parse({
+      schemaVersion: 'kora.quotation.reference-edt.v2',
+      source: 'drive', provider: 'gemini', totalHours: 120,
+      reservePercent: 0, reserveHours: 0, totalWithReserve: 120,
+      stages: [
+        { code: 'S1', name: 'Desarrollo', startWeek: 1, durationWeeks: 2, totalHours: 100 },
+        { code: 'S2', name: 'QA', startWeek: 3, durationWeeks: 1, totalHours: 20 },
+      ],
+      modules: [{ name: 'Portal', totalHours: 120, tasks: [
+        { wbs: 'S1.01', name: 'Implementar', description: 'API',
+          role: 'Desarrollo', hours: 100, stageCode: 'S1',
+          roleEffort: [{ role: 'Desarrollo', hours: 100 }] },
+        { wbs: 'S2.01', name: 'Validar', description: 'Pruebas',
+          role: 'QA', hours: 20, stageCode: 'S2',
+          roleEffort: [{ role: 'QA', hours: 20 }] },
+      ] }],
+    });
+    const ai: AiProvider = { name: 'gemini', generateStructured: async () => ({}) };
+    const generator = new GenerateEstimationPocProposalUseCase(ai, sources);
+    const reconciled = generator.reconcileProposalWithEdt(preliminary, edt);
+    expect(reconciled.roles.find((role) => role.role === 'Desarrollo')).toMatchObject({
+      people: 2, duration: 2, totalHours: 100, hoursPerUnit: 25,
+    });
+    expect(reconciled.roles.find((role) => role.role === 'QA')).toMatchObject({
+      people: 1, duration: 1, totalHours: 20, hoursPerUnit: 20,
+    });
+    expect(reconciled.totalHours).toBe(120);
+    expect(edt.totalHours).toBe(120);
+  });
 
   it('transmite decisiones humanas, supuestos y exclusiones a AMBOS procesos Gemini', async () => {
     const contexts: Array<Record<string, unknown>> = [];
