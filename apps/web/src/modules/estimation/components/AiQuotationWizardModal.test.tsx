@@ -633,10 +633,12 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Está correcto' }));
     answerFixed();
     fireEvent.click(screen.getByRole('button', { name: 'Continuar' }));
+    fireEvent.click(screen.getByLabelText('Sí'));
     fireEvent.click(screen.getByRole('button', { name: 'Continuar' }));
     expect(screen.getByText('Confirmar la estimación')).toBeInTheDocument();
     expect(screen.getByText('Ver razonamiento resumido de Gemini')).toBeInTheDocument();
-    expect(screen.queryByText(/^La cotización se guardará como borrador/)).not.toBeVisible();
+    expect(screen.getByText(/La cotización se guardará como borrador/)
+      .closest('details')).not.toHaveAttribute('open');
     fireEvent.click(screen.getByText('Ver razonamiento resumido de Gemini'));
     const log = screen.getByRole('log', { name: 'Resúmenes de Gemini durante la estimación' });
     expect(log).toHaveTextContent('Al generar la estimación');
