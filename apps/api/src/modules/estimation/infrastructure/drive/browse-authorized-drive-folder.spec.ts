@@ -4,6 +4,7 @@ import type {
   DriveFolderClient, DriveFolderItem, DriveFolderMetadata,
 } from '../../application/ports/drive-folder-client.port';
 import { browseAuthorizedDriveFolder } from './browse-authorized-drive-folder';
+import { DRIVE_DISCOVERY_SESSION } from '../../../../shared/infrastructure/auth/google-drive-oauth-poc.service';
 
 const url = (id: string) => `https://drive.google.com/drive/folders/${id}`;
 const folder = (id: string, name: string, parentIds: string[] = []): DriveFolderMetadata => ({
@@ -113,6 +114,17 @@ describe('Exploración Drive autorizada y evidencia real para Gemini', () => {
     expect(result.siblingsUnavailable).toBe(true);
     expect(result.siblingFolders).toEqual([]);
     expect(result.childFolders).toHaveLength(1);
+  });
+
+  it('con OAuth de descubrimiento del usuario permite explorar una carpeta real accesible', async () => {
+    const { browse, oauth } = setup();
+    oauth.getAuthorizedAccessToken.mockImplementation(
+      (_user: string, folderId: string) =>
+        folderId === DRIVE_DISCOVERY_SESSION ? 'token-descubrimiento' : null);
+    const result = await browse('carpeta-inicial');
+    expect(result.documents.map((doc) => doc.name).toEqual(['Requerimientos.txt']);
+    expect(oauth.getAuthorizedAccessToken).toHaveBeenCalledWith('usuario-1', 'carpeta-inicial');
+    expect(oauth.getAuthorizedAccessToken).toHaveBeenCalledWith('usuario-1', DRIVE_DISCOVERY_SESSION);
   });
 
   it('sin autorización delegada ni cuenta de servicio no permite navegar', async () => {

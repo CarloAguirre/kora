@@ -1,6 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { resolveAuthorizedDriveReader } from './resolve-authorized-drive-reader';
+import { DRIVE_DISCOVERY_SESSION } from '../../../../shared/infrastructure/auth/google-drive-oauth-poc.service';
 
 const folder = 'https://drive.google.com/drive/folders/carpeta-real-123';
 const config = { googleDrive: { enabled: false } } as never;
@@ -37,6 +38,17 @@ describe('resolveAuthorizedDriveReader · usuario y carpeta vinculados', () => {
     for (const call of google.mock.calls) {
       expect(call[1].headers.Authorization).toBe('Bearer token-delegado');
     }
+  });
+
+  it('el consentimiento de búsqueda del mismo usuario autoriza una carpeta descubierta', () => {
+    const oauth = { getAuthorizedAccessToken: vi.fn((user: string, id: string) =>
+      user === 'usuario-1' && id === DRIVE_DISCOVERY_SESSION ? 'token-del-usuario' : null) };
+    const reader = resolveAuthorizedDriveReader(folder, 'usuario-1', config, oauth as never);
+    expect(reader).toBeDefined();
+    expect(oauth.getAuthorizedAccessToken)
+      .toHaveBeenCalledWith('usuario-1', DRIVE_DISCOVERY_SESSION);
+    expect(() => resolveAuthorizedDriveReader(folder, 'usuario-2', config, oauth as never))
+      .toThrow(BadRequestException);
   });
 
   it('permite usar lector de cuenta de servicio cuando está configurada', () => {
