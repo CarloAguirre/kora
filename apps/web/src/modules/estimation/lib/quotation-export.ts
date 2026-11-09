@@ -225,8 +225,12 @@ function slideChanges(i: number, m: ReturnType<typeof quotationExportModel>): Re
   const chunk = (n: number) => activities[n];
   const hrs = (n: number) => chunk(n) ? fmt(chunk(n)!.hours) + ' H/H' : '—';
   const amt = money(version.netAmount, version.currency);
-  const axis = (slot: number, count: number) =>
-    'Sem ' + (1 + slot * Math.max(1, Math.ceil((m.weeks || count) / count)));
+  // Dos escalas diferentes sobre las MISMAS semanas persistidas.
+  // Sin fecha contractual, los meses son relativos de 4,345 semanas.
+  const weekStep = Math.max(1, Math.ceil(Math.max(1, m.weeks) / 8));
+  const monthStep = Math.max(1, Math.ceil(Math.ceil(Math.max(1, m.weeks) / (365.25 / 12 / 7)) / 6));
+  const weekAxis = (slot: number) => 'Sem ' + (1 + slot * weekStep);
+  const monthAxis = (slot: number) => 'Mes ' + (1 + slot * monthStep);
   switch (i) {
     case 2: return { 0: (draft.aiPoc?.source === 'kdm_demo' ? 'DEMO INTERNA' : 'PROPUESTA COMERCIAL') + ' · ' + m.status.toUpperCase(), 1: compact(m.projectName, 58),
       2: compact(m.client + ' · ' + version.name, 85) };
@@ -264,11 +268,19 @@ function slideChanges(i: number, m: ReturnType<typeof quotationExportModel>): Re
       5: preview(0, 52), 6: preview(1, 52), 7: preview(2, 52),
       8: preview(3, 52), 9: preview(4, 52), 10: preview(5, 52),
     };
-    case 11: return { 1: 'Resumen referencial. Detalle completo en Excel.',
-      5: compact(chunk(0)?.team ?? '—', 28), 6: compact(chunk(0)?.name ?? 'Sin EDT desglosada', 100), 7: hrs(0),
-      8: compact(chunk(1)?.team ?? '—', 28), 9: compact(chunk(1)?.name ?? '—', 100),
-      10: compact(chunk(2)?.team ?? '—', 28), 11: compact(chunk(2)?.name ?? '—', 100),
-      12: compact(chunk(3)?.name ?? '—', 80), 13: hrs(3),
+    case 11: return {
+      1: 'Actividades principales · HH totales de la cotización. Detalle completo en Excel.',
+      5: compact(chunk(0)?.team ?? '—', 28),
+      6: compact(chunk(0)?.name ?? 'Sin EDT desglosada', 98),
+      // La columna TOTAL H/H está combinada verticalmente en el PPTX original.
+      // Este valor es el TOTAL de la versión, no las HH de una tarea.
+      7: fmt(version.totalHours) + ' H/H',
+      8: compact(chunk(1)?.team ?? '—', 28),
+      9: compact(chunk(1)?.name ?? '—', 98),
+      10: compact(chunk(2)?.team ?? '—', 28),
+      11: compact(chunk(2)?.name ?? '—', 98),
+      12: compact(chunk(3)?.team ?? '—', 28),
+      13: compact(chunk(3)?.name ?? '—', 98),
     };
     case 12: return { 1: 'Arquitectura sujeta a validación del líder técnico.',
       2: 'ARQUITECTURA PENDIENTE DE VALIDACIÓN',
@@ -279,19 +291,20 @@ function slideChanges(i: number, m: ReturnType<typeof quotationExportModel>): Re
       7: 'Arquitectura: según alcance validado',
       8: compact('Perfiles previstos: ' + draft.teams.map((t) => m.team(t.teamId)).join(', '), 105) };
     case 14: return {
-      0: 'PLANIFICACIÓN · VISTA GENERAL',
-      1: 'Cronograma relativo; sin fecha de inicio contractual.',
-      2: 'ETAPA / SEMANA',
-      3: axis(0, 6), 4: axis(1, 6), 5: axis(2, 6),
-      6: axis(3, 6), 7: axis(4, 6), 8: axis(5, 6),
+      0: 'PLANIFICACIÓN · VISTA MENSUAL',
+      1: 'Cronograma relativo por meses; sin fecha de inicio contractual.',
+      2: 'ETAPA / MES',
+      3: monthAxis(0), 4: monthAxis(1), 5: monthAxis(2),
+      6: monthAxis(3), 7: monthAxis(4), 8: monthAxis(5),
       9: compact(phaseLabel(0), 28), 10: compact(phaseLabel(1), 28),
       11: compact(phaseLabel(2), 28), 12: compact(phaseLabel(3), 28),
       13: compact(phaseLabel(4), 28), 14: compact(phaseLabel(5), 28),
-      15: 'Cronograma referencial en semanas. Detalle completo en Excel.' };
+      15: 'Meses relativos calculados desde semanas. Detalle de fases en Excel.' };
     case 15: return {
-      1: 'Fases relativas; ver distribución detallada en Excel.',
-      3: axis(0, 8), 4: axis(1, 8), 5: axis(2, 8), 6: axis(3, 8),
-      7: axis(4, 8), 8: axis(5, 8), 9: axis(6, 8), 10: axis(7, 8),
+      0: 'PLANIFICACIÓN · VISTA SEMANAL',
+      1: 'Cronograma relativo por semanas; sin fecha de inicio contractual.',
+      3: weekAxis(0), 4: weekAxis(1), 5: weekAxis(2), 6: weekAxis(3),
+      7: weekAxis(4), 8: weekAxis(5), 9: weekAxis(6), 10: weekAxis(7),
       11: compact(phaseLabel(0), 28), 12: compact(phaseLabel(1), 28),
       13: compact(phaseLabel(2), 28), 14: compact(phaseLabel(3), 28),
       15: compact(phaseLabel(4), 28), 16: compact(phaseLabel(5), 28),
@@ -338,8 +351,12 @@ function patchQuotationGanttBars(
   const ids = slideNumber === 14 ? [338, 346, 354, 362, 370, 378]
     : [415, 425, 435, 445, 455, 465];
   const origin = 2542032;
-  const usableWidth = slideNumber === 14 ? 6050000 : 6050000;
-  const horizon = Math.max(slideNumber === 14 ? 6 : 8, model.weeks);
+  const usableWidth = 6050000;
+  const monthWeeks = 365.25 / 12 / 7;
+  const monthStep = Math.max(1, Math.ceil(Math.ceil(Math.max(1, model.weeks) / monthWeeks) / 6));
+  const weekStep = Math.max(1, Math.ceil(Math.max(1, model.weeks) / 8));
+  const horizon = slideNumber === 14
+    ? 6 * monthStep * monthWeeks : 8 * weekStep;
   const shapes = Array.from(doc.getElementsByTagNameNS(pns, 'sp'));
   ids.forEach((id, index) => {
     const shape = shapes.find((sp) =>
