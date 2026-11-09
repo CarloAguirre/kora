@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { QuotationVersion } from '@kora/contracts';
 import { buildQuotationWorkbook, patchQuotationSlideXml, quotationExportModel } from './quotation-export';
+import { patchStyledTableSheet } from './quotation-export-template';
 
 const version = (patch: Record<string, unknown> = {}): QuotationVersion => ({
   id: 'v-a', quotationId: 'q-a', versionNumber: 1, name: 'Versión 1',
@@ -94,6 +95,47 @@ describe('Exportación de cotizaciones · versión guardada', () => {
     const x = bars[0]!.getElementsByTagNameNS(ans, 'off')[0]!.getAttribute('x');
     expect(Number(x)).toBeGreaterThan(2542032);
     expect(changed.documentElement.textContent).toContain('Implementación');
+  });
+
+
+
+  it('usa la suma TOTAL de la versión en la columna combinada de HH, no una tarea individual', () => {
+    const v = version({ totalHours: 1592 });
+    const doc = '<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" ' +
+      'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><p:spTree>' +
+      Array.from({ length: 15 }, (_, i) => '<p:sp><p:txBody><a:p><a:r><a:t>' +
+        (i === 7 ? '48 H/H' : 'Texto ' + i) +
+        '</a:t></a:r></a:p></p:txBody></p:sp>').join('') + '</p:spTree></p:sld>';
+    const output = new DOMParser().parseFromString(
+      patchQuotationSlideXml(doc, 11, quotationExportModel(context(v))), 'application/xml');
+    const paragraphs = Array.from(output.getElementsByTagNameNS(
+      'http://schemas.openxmlformats.org/drawingml/2006/main', 'p'));
+    expect(paragraphs[7]?.textContent).toBe('1.592 H/H');
+    expect(paragraphs[12]?.textContent).toBe('—');
+    expect(paragraphs[13]?.textContent).toBe('—');
+  });
+
+  it('mantiene estilos originales de encabezados y elimina datos Zurich en las hojas de EDT', () => {
+    const ns = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main';
+    const xml = '<x:worksheet xmlns:x="' + ns + '"><x:sheetData>' +
+      '<x:row r="1"><x:c r="A1" s="4"/></x:row>' +
+      '<x:row r="2"><x:c r="A2" s="10"/></x:row>' +
+      '<x:row r="4"><x:c r="A4" s="16"/><x:c r="B4" s="16"/></x:row>' +
+      '<x:row r="5"><x:c r="A5" s="24"/><x:c r="B5" s="24"/></x:row>' +
+      '<x:row r="6"><x:c r="A6" s="24"><x:f>SUM(EDT_Detalle!O5:O49)</x:f>' +
+      '<x:v>257</x:v></x:c></x:row></x:sheetData></x:worksheet>';
+    const result = new DOMParser().parseFromString(patchStyledTableSheet(xml, {
+      title: 'Nuevo proyecto | EDT', subtitle: 'Fuente: Kora',
+      headers: ['Actividad','HH'], data: [['Diseñar UI', 24], ['Implementar UI', 40]],
+    }), 'application/xml');
+    const get = (ref: string) => Array.from(result.getElementsByTagNameNS(ns,'c'))
+      .find(c=>c.getAttribute('r')===ref);
+    expect(get('A4')?.getAttribute('s')).toBe('16');
+    expect(get('B4')?.getAttribute('s')).toBe('16');
+    expect(get('A6')?.getAttribute('s')).toBe('24');
+    expect(result.documentElement.textContent).toContain('Implementar UI');
+    expect(result.documentElement.textContent).not.toContain('257');
+    expect(result.getElementsByTagNameNS(ns, 'f')).toHaveLength(0);
   });
 
 
