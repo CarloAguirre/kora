@@ -11,7 +11,7 @@ function fixture(collaborators = 2) {
     mode: 'phases',
     teams: [
       { teamId: dev, collaborators, unit: 'week', duration: 8,
-        hoursPerWeek: 20, dedicationPercent: 50 },
+        hoursPerWeek: 40, dedicationPercent: 100 },
       { teamId: lead, collaborators: 1, unit: 'week', duration: 8,
         hoursPerWeek: 5, dedicationPercent: 100 },
     ],
@@ -71,6 +71,18 @@ describe('Planificación IA con dotación a 40 HH/semana', () => {
     expect(plan.aiPoc?.edt).toEqual(original.aiPoc?.edt);
     expect(effectiveQuotationEdt(plan)?.totalHours).toBe(340);
     expect(plan.teams.every((team) => team.dedicationPercent === 100)).toBe(true);
+  });
+
+  it('respeta una jornada editada a 20 HH/sem y extiende el plazo sin duplicar HH', () => {
+    const draft = fixture();
+    draft.teams[0]!.hoursPerWeek = 20;
+    draft.teams[0]!.dedicationPercent = 50;
+    draft.edtCapacityCustomizedTeamIds = [dev];
+    const plan = replanQuotationEdtForWorkforce(draft);
+    expect(plan.edtStageSettings?.find((s) => s.stageCode === 'DEV')?.durationWeeks)
+      .toBe(8);
+    expect(plan.teams[0]).toMatchObject({ hoursPerWeek: 20, dedicationPercent: 50 });
+    expect(effectiveQuotationEdt(plan)?.totalHours).toBe(360);
   });
 
   it('con cuatro devs reduce implementación a dos semanas sin modificar sus 320 HH', () => {
