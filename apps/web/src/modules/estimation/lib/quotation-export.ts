@@ -98,7 +98,8 @@ export function buildQuotationWorkbook(context: QuotationExportContext): XLSX.Wo
     ['Neto', version.netAmount ?? 'No definido'],
     ['Total impuestos incluidos', version.totalAmount ?? 'No definido'],
     ['Semanas relativas', model.weeks || 'Sin planificación'],
-    ['Fuente técnica', draft.aiPoc?.edt ? 'EDT Gemini versionada' : 'Cotización manual'],
+    ['Fuente técnica', draft.aiPoc?.source === 'kdm_demo' ? 'DEMO KDM · no enviar al cliente' :
+      draft.aiPoc?.edt ? 'EDT Gemini versionada' : 'Cotización manual'],
     ['Aviso', 'Exportación informativa; no equivale a aprobación, envío ni traspaso operativo.'],
   ], [38, 72]);
   if (details.length) {
@@ -212,7 +213,8 @@ const PPT_MIME = 'application/vnd.openxmlformats-officedocument.presentationml.p
  * Los números se validan antes de editar para evitar sustituir otra plantilla. */
 function slideChanges(i: number, m: ReturnType<typeof quotationExportModel>): Record<number, string> {
   const { draft, version, details, phases } = m;
-  const isRpa = draft.teams.some((row) => /rpa|robot/i.test(m.team(row.teamId)));
+  const isRpa = draft.teams.length > 0 && draft.teams.every((row) =>
+    /rpa|robot/i.test(m.team(row.teamId)));
   const featureNames = [...new Set(details.map((row) => row.name))];
   const activities = details.length ? details.map((row) => ({ team: m.team(row.teamId), name: row.name, hours: row.hours }))
     : draft.phases.flatMap((p) => p.teamHours.map((r) => ({ team: m.team(r.teamId), name: p.name, hours: r.hours })));
@@ -226,7 +228,7 @@ function slideChanges(i: number, m: ReturnType<typeof quotationExportModel>): Re
   const axis = (slot: number, count: number) =>
     'Sem ' + (1 + slot * Math.max(1, Math.ceil((m.weeks || count) / count)));
   switch (i) {
-    case 2: return { 0: 'PROPUESTA COMERCIAL · ' + m.status.toUpperCase(), 1: compact(m.projectName, 58),
+    case 2: return { 0: (draft.aiPoc?.source === 'kdm_demo' ? 'DEMO INTERNA' : 'PROPUESTA COMERCIAL') + ' · ' + m.status.toUpperCase(), 1: compact(m.projectName, 58),
       2: compact(m.client + ' · ' + version.name, 85) };
     case 4: return isRpa ? {} : {
       0: 'DESARROLLO DE SOLUCIONES',
@@ -257,8 +259,8 @@ function slideChanges(i: number, m: ReturnType<typeof quotationExportModel>): Re
     };
     case 9: return { 1: compact(m.projectName + ' · alcance y plan de trabajo', 75) };
     case 10: return {
-      2: compact(m.scope, 440),
-      3: compact(m.projectDescription || 'Detalle de alcance y estimación disponible en la EDT adjunta.', 300),
+      2: compact(m.scope, 280),
+      3: compact(m.projectDescription || 'Detalle de alcance y estimación disponible en la EDT adjunta.', 230),
       5: preview(0, 52), 6: preview(1, 52), 7: preview(2, 52),
       8: preview(3, 52), 9: preview(4, 52), 10: preview(5, 52),
     };
