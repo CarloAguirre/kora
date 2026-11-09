@@ -210,11 +210,19 @@ export class QuotationController {
           path: issue.path.map(String).join('.'),
           code: issue.code,
         })) : undefined;
+      // Solo marcos del código (archivo/línea), nunca la primera línea del
+      // stack, que incluye mensajes del proveedor o posibles datos privados.
+      const frames = reason instanceof Error && typeof reason.stack === 'string'
+        ? reason.stack.split('\n').slice(1, 6)
+          .map((line) => line.trim())
+          .filter((line) => /^at\s/.test(line))
+          .map((line) => line.slice(0, 350))
+        : undefined;
       this.logger.error(JSON.stringify({
         event: 'quotation_ai_generation_failed',
         diagnosticId, projectId, phase: currentPhase, kind,
         code: safe(metadata.code), constraint: safe(metadata.constraint),
-        table: safe(metadata.table), column: safe(metadata.column), issues,
+        table: safe(metadata.table), column: safe(metadata.column), issues, frames,
       }));
       const phaseLabel = currentPhase === 'saving'
         ? 'guardado de cotización'
