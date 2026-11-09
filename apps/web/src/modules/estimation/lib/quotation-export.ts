@@ -212,7 +212,9 @@ export async function downloadQuotationExcel(context: QuotationExportContext): P
   }
   const bytes = new Uint8Array(await response.arrayBuffer());
   const output = patchFormattedQuotationTemplate(bytes, model);
-  download(new Blob([output], {
+  const exactBytes = new Uint8Array(output.byteLength);
+  exactBytes.set(output);
+  download(new Blob([exactBytes.buffer], {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   }), fileName(model, 'xlsx'));
 }
@@ -232,7 +234,6 @@ function slideChanges(i: number, m: ReturnType<typeof quotationExportModel>): Re
   const phaseLabel = (n: number) => phases[n]?.name ?? '—';
   const preview = (n: number, max = 70) => compact(n < featureNames.length ? featureNames[n] : '—', max);
   const chunk = (n: number) => activities[n];
-  const hrs = (n: number) => chunk(n) ? fmt(chunk(n)!.hours) + ' H/H' : '—';
   const amt = money(version.netAmount, version.currency);
   // Dos escalas diferentes sobre las MISMAS semanas persistidas.
   // Sin fecha contractual, los meses son relativos de 4,345 semanas.
