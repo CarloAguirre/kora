@@ -10,6 +10,9 @@ import { uuidSchema } from '../common/primitives';
 export const quotationReferenceRoleEffortSchema = z.object({
   role: z.string().trim().min(1).max(120),
   hours: z.number().positive().max(1000000),
+  /** Instrucción ejecutable propia del perfil. Opcional en EDT históricas. */
+  taskName: z.string().trim().min(1).max(300).optional(),
+  taskDescription: z.string().trim().min(1).max(3000).optional(),
 });
 
 export const quotationReferenceStageSchema = z.object({

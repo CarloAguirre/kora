@@ -77,10 +77,12 @@ export function quotationEdtAssignments(draft: Draft): QuotationEdtAssignment[] 
   }
   const renamed = new Set<string>();
   for (const edit of draft.edtTaskNames ?? []) {
-    if (renamed.has(edit.wbs) || !sourceWbs.has(edit.wbs)) {
-      throw new Error('El nombre comercial corresponde a un WBS inexistente o duplicado.');
+    const id = key(edit.wbs, edit.role ?? '');
+    if (renamed.has(id) || !sourceWbs.has(edit.wbs) ||
+      (edit.role !== undefined && !sourceEffort.has(key(edit.wbs, edit.role)))) {
+      throw new Error('El nombre comercial corresponde a un WBS/perfil inexistente o duplicado.');
     }
-    renamed.add(edit.wbs);
+    renamed.add(id);
   }
   for (const item of overrides) {
     const id = key(item.wbs, item.role);
@@ -119,8 +121,12 @@ export function quotationEdtAssignments(draft: Draft): QuotationEdtAssignment[] 
       rows.push({
         wbs: task.wbs, role: effort.role, module: module.name,
         stageCode: task.stageCode ?? null,
-        name: draft.edtTaskNames?.find((item) => item.wbs === task.wbs)?.name ?? task.name,
-        description: task.description, references: task.referenceIds ?? [],
+        name: draft.edtTaskNames?.find((edit) => edit.wbs === task.wbs &&
+          edit.role === effort.role)?.name ??
+          draft.edtTaskNames?.find((edit) => edit.wbs === task.wbs && !edit.role)?.name ??
+          effort.taskName ?? task.name,
+        description: effort.taskDescription ?? task.description,
+        references: task.referenceIds ?? [],
         hours: effort.hours, originalHours: sourceEffort.get(id) ?? effort.hours,
         fixed: item?.fixed ?? false,
         teamId: item?.teamId ?? draft.aiPoc?.roleTeamIds[effort.role] ?? null,
@@ -373,12 +379,18 @@ export function withoutQuotationCommercialTask(draft: Draft, wbs: string): Draft
   quotationEdtAssignments(next);
   return next;
 }
-export function withQuotationTaskDisplayName(draft: Draft, wbs: string, name: string): Draft {
+export function withQuotationTaskDisplayName(
+  draft: Draft, wbs: string, name: string, role?: string,
+): Draft {
   if (!name.trim() || name.length > 300) throw new Error('Nombre de tarea inválido.');
   if (draft.edtCommercialTasks?.some((task) => task.wbs === wbs))
     return patchQuotationCommercialTask(draft, wbs, { name: name.trim() });
-  const edits = (draft.edtTaskNames ?? []).filter((item) => item.wbs !== wbs);
-  const next = { ...draft, edtTaskNames: [...edits, { wbs, name: name.trim() }] };
+  const edits = (draft.edtTaskNames ?? []).filter((item) =>
+    item.wbs !== wbs || (item.role ?? '') !== (role ?? ''));
+  const next = {
+    ...draft,
+    edtTaskNames: [...edits, { wbs, ...(role ? { role } : {}), name: name.trim() }],
+  };
   quotationEdtAssignments(next);
   return next;
 }

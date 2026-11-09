@@ -446,10 +446,10 @@ export function QuotationWorkspacePage() {
       reportError(cause instanceof Error ? cause.message : 'No se pudo quitar la tarea.');
     }
   };
-  const editTaskName = (wbs: string, name: string) => {
+  const editTaskName = (wbs: string, name: string, role?: string) => {
     if (!editable || !form) return;
     try {
-      applyEdtChanges(withQuotationTaskDisplayName(form.draft, wbs, name));
+      applyEdtChanges(withQuotationTaskDisplayName(form.draft, wbs, name, role));
     } catch (cause) {
       reportError(cause instanceof Error ? cause.message : 'Nombre de tarea inválido.');
     }

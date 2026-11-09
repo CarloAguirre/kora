@@ -145,7 +145,7 @@ export function QuotationPhaseWorkspace({
   onOpenRoleMapping?: () => void;
   onAddTask?: (stageCode: string) => void;
   onDeleteTask?: (wbs: string) => void;
-  onEditTaskName?: (wbs: string, name: string) => void;
+  onEditTaskName?: (wbs: string, name: string, role?: string) => void;
   onImportTaskExcel?: (stageCode: string, phaseName: string, file: File) => Promise<void>;
   onRemoveCommercialPhase?: (stageCode: string) => void;
   onEditPhase: (index: number, patch: Partial<Phase>) => void;
@@ -291,7 +291,8 @@ export function QuotationPhaseWorkspace({
                             disabled={!editable}
                             onBlur={(e) => {
                               const name = e.target.value.trim();
-                              if (name && name !== task.name) onEditTaskName?.(task.wbs, name);
+                              if (name && name !== task.name)
+                                onEditTaskName?.(task.wbs, name, task.role);
                             }}/>
                           <select className={styles.teamSelect} disabled={!editable || needsRoleMapping}
                             aria-label={'Equipo de ' + task.wbs + ' · ' + task.role}

@@ -124,6 +124,8 @@ export const quotationDraftDataSchema = z.object({
   })).max(240).optional(),
   edtTaskNames: z.array(z.object({
     wbs: z.string().trim().min(1).max(40),
+    /** Sin role: ajuste comercial anterior para toda la actividad. */
+    role: z.string().trim().min(1).max(120).optional(),
     name: nonEmptyTrimmed(300, 'El nombre de la tarea'),
   })).max(240).optional(),
   /** Fechas relativas y nombre comercial del tramo, sin mutar las etapas Gemini. */
