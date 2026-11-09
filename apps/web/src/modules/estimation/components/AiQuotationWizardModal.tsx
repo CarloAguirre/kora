@@ -39,6 +39,23 @@ function isRealDriveFolderUrl(value: string): boolean {
 
 type AnswerState = Record<string, EstimationAnswerValue>;
 
+// Los valores de "Otro" incluyen lo escrito por el usuario, sin cambiar el
+// contrato existente de respuestas (string | string[]). El backend conserva
+// el texto completo y lo resuelve para la propuesta de perfiles y EDT.
+const OTHER_PREFIX = 'other:';
+const isOtherValue = (value: string): boolean =>
+  value === 'other' || value.startsWith(OTHER_PREFIX);
+const hasOtherOption = (question: EstimationQuestion): boolean =>
+  question.options.some((option) => option.value === 'other');
+const validChoice = (question: EstimationQuestion, value: string): boolean => {
+  if (isOtherValue(value)) {
+    const detail = value.startsWith(OTHER_PREFIX)
+      ? value.slice(OTHER_PREFIX.length).trim() : '';
+    return hasOtherOption(question) && detail.length > 0 && detail.length <= 300;
+  }
+  return question.options.some((option) => option.value === value);
+};
+
 function hasValue(value: EstimationAnswerValue | undefined): boolean {
   if (value === undefined || value === null) return false;
   if (typeof value === 'string') return value.trim().length > 0;
@@ -53,16 +70,17 @@ function matchesQuestion(question: EstimationQuestion, value: unknown): value is
   if (question.answerType === 'number') return typeof value === 'number' && Number.isFinite(value);
   if (question.answerType === 'confirmation') return typeof value === 'boolean';
   if (question.answerType === 'single_choice') {
-    return typeof value === 'string' && question.options.some((option) => option.value === value);
+    return typeof value === 'string' && validChoice(question, value);
   }
   return Array.isArray(value) && value.length > 0 &&
-    value.every((item) => typeof item === 'string' &&
-      question.options.some((option) => option.value === item));
+    value.every((item) => typeof item === 'string' && validChoice(question, item));
 }
 
 function displayAnswer(question: EstimationQuestion, value: EstimationAnswerValue | undefined): string {
   if (value === undefined || value === null) return 'No respondida';
-  const map = (item: string) => question.options.find((option) => option.value === item)?.label ?? item;
+  const map = (item: string) => item.startsWith(OTHER_PREFIX) && hasOtherOption(question)
+    ? 'Otro: ' + item.slice(OTHER_PREFIX.length).trim()
+    : question.options.find((option) => option.value === item)?.label ?? item;
   if (Array.isArray(value)) return value.map(map).join(', ');
   if (typeof value === 'boolean') return value ? 'Sí' : 'No';
   return typeof value === 'string' ? map(value) : String(value);
@@ -79,8 +97,18 @@ function QuestionField({
   error: boolean;
   prefillSource?: string;
 }) {
-  const selected = (key: string) =>
-    Array.isArray(value) ? value.includes(key) : value === key;
+  const selected = (key: string) => {
+    if (key === 'other') {
+      return Array.isArray(value)
+        ? value.some((item) => isOtherValue(item))
+        : typeof value === 'string' && isOtherValue(value);
+    }
+    return Array.isArray(value) ? value.includes(key) : value === key;
+  };
+  const otherAnswer = Array.isArray(value)
+    ? value.find((item) => item.startsWith(OTHER_PREFIX)) ?? ''
+    : typeof value === 'string' && value.startsWith(OTHER_PREFIX) ? value : '';
+  const otherSelected = hasOtherOption(question) && selected('other') && !assumed;
   const plazo = typeof value === 'string' && !assumed ? value : '';
   const dateMode = plazo.startsWith('Fecha objetivo:');
   const weeksMode = plazo.startsWith('N semanas:');
@@ -100,10 +128,17 @@ function QuestionField({
         <input type={multi ? 'checkbox' : 'radio'} name={question.id}
           value={key} checked={checked} disabled={disabled}
           onChange={() => {
-            if (!multi) { onChange(key); return; }
+            if (!multi) {
+              onChange(key === 'other' ? OTHER_PREFIX : key);
+              return;
+            }
             const current = Array.isArray(value) && !assumed ? value : [];
             if (key === 'none') {
               onChange(current.includes('none') ? [] : ['none']);
+            } else if (key === 'other') {
+              onChange(current.some((item) => isOtherValue(item))
+                ? current.filter((item) => !isOtherValue(item))
+                : [...current.filter((item) => item !== 'none'), OTHER_PREFIX]);
             } else {
               onChange(current.includes(key)
                 ? current.filter((item) => item !== key)
@@ -184,10 +219,32 @@ function QuestionField({
           ))}
         </div>}
       {(question.answerType === 'single_choice' || question.answerType === 'multi_choice') &&
-        <div className={styles.options}>
-          {question.options.map((item) =>
-            choice(item.value, item.label, question.answerType === 'multi_choice'))}
-        </div>}
+        <>
+          <div className={styles.options}>
+            {question.options.map((item) =>
+              choice(item.value, item.label, question.answerType === 'multi_choice'))}
+          </div>
+          {otherSelected && (
+            <div className={styles.otherDetail}>
+              <label htmlFor={'other-detail-' + question.id}>Especifica otra opción</label>
+              <textarea id={'other-detail-' + question.id}
+                className={styles.textarea} maxLength={300}
+                placeholder="Describe brevemente la alternativa"
+                value={otherAnswer.startsWith(OTHER_PREFIX)
+                  ? otherAnswer.slice(OTHER_PREFIX.length) : ''}
+                onChange={(event) => {
+                  const next = OTHER_PREFIX + event.target.value;
+                  if (question.answerType === 'multi_choice') {
+                    const chosen = Array.isArray(value) ? value : [];
+                    onChange([
+                      ...chosen.filter((item) => !isOtherValue(item) && item !== 'none'),
+                      next,
+                    ]);
+                  } else onChange(next);
+                }}/>
+            </div>
+          )}
+        </>}
       {question.kind === 'dynamic' && question.assumptionIfSkipped && (
         <label className={[
           styles.choice, styles.choiceAssumption,
@@ -586,7 +643,7 @@ export function AiQuotationWizardModal({ project, onClose }: {
 
   const collectAnswers = (): SubmitEstimationAnswerInput[] =>
     [...fixed, ...dynamic]
-      .filter((question) => assumptions.includes(question.id) || hasValue(answers[question.id]))
+      .filter((question) => assumptions.includes(question.id) || answered(question))
       .map((question) => ({
         questionId: question.id,
         value: assumptions.includes(question.id) ? null : answers[question.id] ?? null,
