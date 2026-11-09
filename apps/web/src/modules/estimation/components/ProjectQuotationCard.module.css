@@ -12,10 +12,3 @@
 .statuses{display:flex;align-items:center;flex-wrap:wrap;gap:6px}
 .closedNotice{margin:0;padding:12px 14px;background:var(--kora-success-soft,#ecfdf3);color:var(--kora-success,#067647);border-radius:9px;font-size:12px;line-height:1.5}
 
-/* Requisitos comerciales visibles incluso sin pasar el mouse por un botón disabled. */
-.approvalReadiness{display:flex;flex-direction:column;align-items:flex-start;gap:5px}
-.approvalRequirements{max-width:260px;font-size:12px;line-height:1.5;color:var(--kora-text-muted,#667085)}
-.approvalRequirements summary{cursor:pointer;color:var(--kora-danger,#b42318);font-weight:600}
-.approvalRequirements ul{margin:6px 0;padding-left:18px}
-.approvalRequirements li{margin:3px 0}
-.approvalRequirements a{display:inline-block;margin:4px 0 6px;font-weight:600}
