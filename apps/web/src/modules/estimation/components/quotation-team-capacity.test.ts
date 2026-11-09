@@ -40,7 +40,7 @@ describe('Capacidad orientativa de una cotización EDT', () => {
 
   it('la dedicación planificada reduce capacidad, pero nunca las HH EDT', () => {
     const constrained = quotationTeamCapacity(
-      team({ dedicationPercent: 50 }), 100, row([[1, 100]]), true);
+      team({ hoursPerWeek: 20, dedicationPercent: 50 }), 100, row([[1, 100]]), true);
     expect(constrained.averagePerPerson).toBe(33.33);
     expect(constrained.occupationPercent).toBe(83.33);
     expect(constrained.capacityPerPerson).toBe(20);
@@ -75,10 +75,11 @@ describe('Capacidad orientativa de una cotización EDT', () => {
       .missingDuration).toBe(true);
   });
 
-  it('no cambia el modelo manual: hh/sem × dedicación calcula esfuerzo comercial', () => {
-    const manual = quotationTeamCapacity(team({ hoursPerWeek: 40, dedicationPercent: 50 }), 60);
+  it('manual no multiplica dos veces: 20 hh/sem equivale a 50%', () => {
+    const manual = quotationTeamCapacity(team({ hoursPerWeek: 20, dedicationPercent: 50 }), 60);
     expect(manual.averagePerPerson).toBe(20);
     expect(manual.occupationPercent).toBe(50);
+    expect(manual.capacityPerPerson).toBe(20);
     expect(manual.overloadedWeeks).toEqual([]);
   });
 });

@@ -16,7 +16,7 @@ describe('Edición directa de equipos en cotización en blanco', () => {
       hoursPerWeek: 40, dedicationPercent: 100,
     }]);
     expect(edited.teams[0]!.collaborators * edited.teams[0]!.duration *
-      edited.teams[0]!.hoursPerWeek * edited.teams[0]!.dedicationPercent / 100)
+      edited.teams[0]!.hoursPerWeek)
       .toBe(120);
     expect(quotationDraftDataSchema.parse(edited)).toEqual(edited);
   });

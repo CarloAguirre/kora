@@ -162,16 +162,16 @@ describe('Proyección IA Gemini KDM a cotización', () => {
     });
     const normalized = synchronizeQuotationEdtTeamLoad(changed);
     const dev = normalized.teams.find((team) => team.teamId === t1)!;
-    expect(dev.hoursPerWeek).toBe(5); // 40 HH / (2 semanas × 4 personas)
-    expect(dev.dedicationPercent).toBe(50);
+    expect(dev.hoursPerWeek).toBe(40); // base jornada, no media de tareas
+    expect(dev.dedicationPercent).toBe(100);
     expect(normalized.phases.flatMap((phase) => phase.teamHours)
       .reduce((sum, item) => sum + item.hours, 0)).toBe(expectedTotal);
     expect(normalized.aiPoc).toEqual(mapped.aiPoc);
     expect(changed.teams.find((team) => team.teamId === t1)?.hoursPerWeek).toBe(90);
     const reconciled = reconcilePocCommercialDraft(changed);
-    expect(reconciled.teams.find((team) => team.teamId === t1)?.hoursPerWeek).toBe(5);
+    expect(reconciled.teams.find((team) => team.teamId === t1)?.hoursPerWeek).toBe(40);
     expect(reconciled.teams.find((team) => team.teamId === t1)?.collaborators).toBe(4);
-    expect(reconciled.teams.find((team) => team.teamId === t1)?.dedicationPercent).toBe(50);
+    expect(reconciled.teams.find((team) => team.teamId === t1)?.dedicationPercent).toBe(100);
   });
 
   it('no altera la fórmula de cotizaciones manuales sin EDT', () => {
