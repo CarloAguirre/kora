@@ -9,6 +9,7 @@ Se añadió `Exportar` a la cabecera de `QuotationWorkspacePage`, con `DropdownM
 La implementación está en:
 
 - `apps/web/src/modules/estimation/lib/quotation-export.ts`
+- `apps/web/src/modules/estimation/lib/quotation-export-template.ts`
 - `apps/web/src/modules/estimation/lib/quotation-export.test.ts`
 - `apps/web/src/modules/estimation/pages/QuotationWorkspacePage.tsx`
 - `apps/web/src/modules/estimation/pages/QuotationWorkspacePage.module.css`
@@ -25,9 +26,22 @@ Se entrega `kora-exportacion-plantilla-pptx.zip`, con esa ruta relativa ya prepa
 
 **PowerPoint:** se lee el paquete OOXML original, se cambia el texto en los párrafos editables identificados y se reposicionan las barras editables originales de los Gantt de las diapositivas 14 y 15. Preserva las 19 diapositivas, imágenes, maestros, estilos, formatos, formas, posiciones y textos corporativos fijos. Las cifras corporativas de la diapositiva 5 se mantienen ocultas hasta validación. En proyectos sin RPA, el contenido RPA de las diapositivas 4, 6 y 7 se reemplaza por contenidos pertinentes al software sin modificar su diseño. No inventa arquitectura aprobada, integrantes nominales, fecha de inicio ni condiciones de pago o garantía.
 
-**Limitación gráfica explícita:** el resumen PPTX dispone de espacios finitos: muestra las primeras seis actividades/fases y remite al Excel para el detalle completo. Los gráficos Gantt usan semanas relativas, no fechas de calendario contractuales. La dimensión de cada barra se calcula desde `startWeek`/`durationWeeks` de la versión, sin alterar colores, formas o escalas geométricas fuera de esas barras.
+**Corrección 09-11:** la lámina 11 muestra `version.totalHours` en su celda de TOTAL H/H (combinada verticalmente), **no** las HH de la primera tarea. El Gantt de la lámina 14 es MENSUAL relativo y el de la 15 es SEMANAL relativo: ambos derivan de `startWeek`/`durationWeeks` de Kora. Un mes relativo equivale a 365,25/12/7 ≈ 4,35 semanas; no se presume fecha contractual de inicio. Los gráficos utilizan las seis barras editables originales, muestran como máximo seis fases y remiten al Excel para el detalle completo.
 
-**Excel:** se genera un archivo nuevo para evitar copiar los valores y rangos fijos de Zurich. Hojas: `Resumen`, `Carga_Equipo`, `Comercial`, y condicionalmente `EDT_Detalle`, `Resumen_Modulos`, `Tramos`, `Roadmap_Semanal`, `Supuestos`, `Fuentes`. Nunca incluye `Auditoria` histórica, `Pendientes` inventados ni `Plan_Diario` sin base ejecutable. Las HH de tareas salen de asignaciones canónicas WBS×perfil vigentes, incluyendo ediciones aprobadas en el borrador; no se recalculan desde la dotación. Compara su suma con `version.totalHours` y bloquea exportaciones incoherentes. La carga semanal se deriva del plan orientativo ya implementado por Kora.
+**Excel corregido:** la salida ahora transforma el OOXML del archivo **`EDT_Zurich_MJE_Portal(5).xlsx` aportado por el usuario** y preserva su estilo real: título oscuro, encabezados azul marino, fuentes, anchos, celdas combinadas y el gráfico de resumen. Se sustituyen todas las cifras y textos del ejemplo Zurich, no se copian fórmulas históricas con rangos fijos. Hojas visibles: `Resumen`, `Comercial`, y condicionalmente `EDT_Detalle`, `Resumen_Modulos`, `Tramos`, `Carga_Equipo`, `Roadmap_Semanal`, `Supuestos`, `Fuentes`. `Pendientes` se reutiliza SOLO como plantilla visual de `Comercial`. Nunca hay `Auditoria`, `Trazabilidad`, `Hitos` inventados ni `Plan_Diario` sin sustento. Las HH se toman de WBS×perfil y se verifica `version.totalHours`; la carga semanal ya es derivada por Kora.
+
+
+## Instalación del archivo Excel corporativo (obligatoria)
+
+El conector GitHub puede modificar el código fuente, pero **no pudo publicar directamente el archivo XLSX binario adjunto**. Se preparó el archivo `kora-plantilla-excel-corporativa.zip`, con la ruta correcta:
+
+```
+apps/web/public/quotation-templates/EDT_Kora_Formato_Corporativo.xlsx
+```
+
+Descomprimir el ZIP en la raíz del monorepo antes de iniciar Vite o compilar para producción. Para verificar que la plantilla está sirviéndose por el frontend, abrir la ruta `/quotation-templates/EDT_Kora_Formato_Corporativo.xlsx` en el dominio del entorno de pruebas: **debe descargarse un XLSX** en vez de retornar el HTML de Vite.
+
+El exportador hace una copia OOXML en memoria de este archivo y reemplaza sus datos y hojas visibles, conservando los estilos. No modifica ni elimina la plantilla original. Cualquier error de lectura devuelve aviso sin generar un Excel incompleto.
 
 ## Validaciones locales pendientes
 
