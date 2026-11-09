@@ -178,13 +178,13 @@ export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
                   <span>Neto: <strong>{transferredVersion.netAmount ?? '—'} {transferredVersion.currency}</strong></span>
                   <span>Total: <strong>{transferredVersion.totalAmount ?? '—'} {transferredVersion.currency}</strong></span>
                 </div>
-                {transferredVersion.draft.costs.length > 0 && (
-                  <p>Costos externos: {transferredVersion.draft.costs.map((cost) =>
+                {(transferredVersion.draft.costs ?? []).length > 0 && (
+                  <p>Costos externos: {(transferredVersion.draft.costs ?? []).map((cost) =>
                     cost.description + ' (' + cost.amount + ' ' + transferredVersion.currency + ' · ' +
                     cost.recurrence + ')').join('; ')}</p>
                 )}
-                {transferredVersion.draft.assumptions.length > 0 && (
-                  <p>Supuestos: {transferredVersion.draft.assumptions.join('; ')}</p>
+                {(transferredVersion.draft.assumptions ?? []).length > 0 && (
+                  <p>Supuestos: {(transferredVersion.draft.assumptions ?? []).join('; ')}</p>
                 )}
                 <Link to={projectQuotationPath(project) + '?version=' + transferredVersion.id}>
                   Ver ficha comercial completa

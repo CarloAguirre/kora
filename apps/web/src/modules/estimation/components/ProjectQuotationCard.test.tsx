@@ -118,6 +118,19 @@ describe('Cotizaciones del proyecto', () => {
     expect(screen.queryByRole('button', { name: 'Traspasar ahora' })).not.toBeInTheDocument();
   });
 
+  it('una versión histórica legada sin costos ni supuestos no rompe el resumen tras el traspaso', () => {
+    mocks.transferredVersionId = v1.id;
+    mocks.versions = [{
+      ...v1, status: 'approved',
+      draft: { ...v1.draft, costs: undefined, assumptions: undefined },
+    }];
+    render(<MemoryRouter><ProjectQuotationCard project={project}/></MemoryRouter>);
+    expect(screen.getByText(/Resumen comercial/)).toBeInTheDocument();
+    expect(screen.getByText('Traspasada')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Ver ficha comercial completa' }))
+      .toHaveAttribute('href', '/project/quotation?version=' + v1.id);
+  });
+
   it('en el tab distingue borrador IA por revisar y aprobada con traspaso pendiente', () => {
     mocks.versions = [
       { ...v1, status: 'draft', origin: 'ai', aiReviewStatus: 'pending' },
