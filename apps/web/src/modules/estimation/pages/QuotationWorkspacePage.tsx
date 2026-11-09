@@ -27,6 +27,8 @@ import { QuotationCommercialSummary } from '../components/QuotationCommercialSum
 import { QuotationPhaseWorkspace } from '../components/QuotationPhaseWorkspace';
 import { replanQuotationEdtForWorkforce } from '../lib/quotation-fulltime-plan';
 import { QuotationTeamsWorkspace } from '../components/QuotationTeamsWorkspace';
+import { QuotationHoursRedistributionDialog } from '../components/QuotationHoursRedistributionDialog';
+import { buildQuotationRedistributionPreview, type QuotationRedistributionPreview } from '../lib/quotation-hour-redistribution-preview';
 import { quotationAiAcceptanceBlockReason } from '../components/quotation-ai-acceptance';
 import { readQuotationTaskExcel } from '../lib/quotation-task-excel';
 import { downloadQuotationExcel, downloadQuotationPowerPoint } from '../lib/quotation-export';
@@ -71,6 +73,7 @@ export function QuotationWorkspacePage() {
   const [roleMappingOpen, setRoleMappingOpen] = useState(false);
   const [teamView, setTeamView] = useState<'team' | 'phases'>('phases');
   const [dirty, setDirty] = useState(false);
+  const [hourPreview, setHourPreview] = useState<QuotationRedistributionPreview | null>(null);
   // Modo de revisión IA estrictamente por versión, sin modificar el artefacto
   // generado hasta que el usuario edite y guarde.
   const [adjustingAiVersionId, setAdjustingAiVersionId] = useState<string | null>(null);
@@ -108,6 +111,7 @@ export function QuotationWorkspacePage() {
   useEffect(() => {
     setForm(selected ? fromVersion(selected) : null);
     setDirty(false);
+    setHourPreview(null);
 
     setTeamView(selected?.draft.aiPoc?.edt || selected?.draft.mode === 'phases'
       ? 'phases' : 'team');
@@ -346,9 +350,10 @@ export function QuotationWorkspacePage() {
   ) => {
     if (!editable || !form) return;
     try {
-      applyEdtChanges(redistributeQuotationEdtHours(form.draft, {
+      const preview = buildQuotationRedistributionPreview(form.draft, {
         teamKey, targetHours, stageCode, module,
-      }));
+      });
+      if (preview.delta !== 0) setHourPreview(preview);
     } catch (cause) {
       reportError(cause instanceof Error ? cause.message :
         'No se pudieron redistribuir las HH de este equipo.');
@@ -903,6 +908,26 @@ export function QuotationWorkspacePage() {
               }}/>
           )}
         </Modal>
+        <QuotationHoursRedistributionDialog
+          preview={hourPreview}
+          teamName={hourPreview ? teamById.get(hourPreview.teamKey) ??
+            hourPreview.teamKey.replace(/^profile:/, '') : ''}
+          phaseName={hourPreview?.stageCode
+            ? form?.draft.phases.find((phase) =>
+                phase.name.startsWith(hourPreview.stageCode + ' · '))?.name.split(' · ').slice(1).join(' · ') ??
+              hourPreview.module ?? hourPreview.stageCode
+            : undefined}
+          onCancel={() => setHourPreview(null)}
+          onApply={() => {
+            if (!hourPreview || !editable || !form) return;
+            if (form.draft !== hourPreview.sourceDraft) {
+              setHourPreview(null);
+              reportError('El borrador cambió durante la vista previa. Vuelve a indicar las HH.');
+              return;
+            }
+            applyEdtChanges(hourPreview.nextDraft);
+            setHourPreview(null);
+          }}/>
         {confirmationDialog}
         {project && mayWrite && newQuotationOpen && (
           <NewProjectQuotationModal project={project} versions={versions} onClose={() => setNewQuotationOpen(false)} />
