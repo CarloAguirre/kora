@@ -60,6 +60,9 @@ export interface AiSettings {
   readonly enabled: boolean;
   readonly geminiApiKey: string;
   readonly geminiModel: string;
+  readonly provider: 'auto' | 'gemini' | 'openai' | 'poc';
+  readonly openaiApiKey: string;
+  readonly openaiModel: string;
 }
 
 export interface MailSettings {
@@ -136,9 +139,16 @@ export class AppConfigService {
 
   get ai(): AiSettings {
     const geminiApiKey = this.config.get('GEMINI_API_KEY', { infer: true }) ?? '';
+    const openaiApiKey = this.config.get('OPENAI_API_KEY', { infer: true }) ?? '';
+    const provider = this.config.get('AI_PROVIDER', { infer: true });
 
     return {
-      enabled: geminiApiKey !== '',
+      enabled: provider === 'openai' ? openaiApiKey !== '' :
+        provider === 'gemini' ? geminiApiKey !== '' :
+          provider === 'poc' ? false : geminiApiKey !== '',
+      provider,
+      openaiApiKey,
+      openaiModel: this.config.get('OPENAI_MODEL', { infer: true }),
       geminiApiKey,
       geminiModel: this.config.get('GEMINI_MODEL', { infer: true }),
     };

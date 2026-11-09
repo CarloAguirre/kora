@@ -53,6 +53,10 @@ export const envSchema = z.object({
   // AiModule cae al proveedor simulado y la aplicación sigue arrancando.
   GEMINI_API_KEY: z.string().trim().min(1).optional(),
   GEMINI_MODEL: z.string().trim().min(1).default('gemini-3.5-flash-lite'),
+  // Selección explícita: nunca cambiar proveedor ni generar costos por accidente.
+  AI_PROVIDER: z.enum(['auto', 'gemini', 'openai', 'poc']).default('auto'),
+  OPENAI_API_KEY: z.string().trim().min(1).optional(),
+  OPENAI_MODEL: z.string().trim().min(1).default('gpt-6.1-sol'),
 
   // Correo saliente (Resend). Sin RESEND_API_KEY los correos se escriben en el
   // log en vez de enviarse — solo admisible fuera de producción.
