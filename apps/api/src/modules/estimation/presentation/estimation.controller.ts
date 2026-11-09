@@ -205,20 +205,27 @@ export class EstimationController {
     // Se envían eventos comprobables antes de que Gemini emita su primer
     // resumen. Gemini puede publicar sus thought summaries solo al terminar.
     reply.raw.flushHeaders?.();
-    const send = (event: 'phase' | 'thought' | 'complete' | 'error', value: unknown) => {
+    const send = (event: 'phase' | 'thought' | 'heartbeat' | 'complete' | 'error', value: unknown) => {
       if (reply.raw.destroyed || reply.raw.writableEnded) return;
       reply.raw.write(`event: ${event}\ndata: ${JSON.stringify(value)}\n\n`);
     };
+    const startedAt = Date.now();
+    const heartbeat = setInterval(() => send('heartbeat', {
+      phase: 'analysis', at: new Date().toISOString(),
+      elapsedSeconds: Math.floor((Date.now() - startedAt) / 1000),
+    }), 15_000);
+    heartbeat.unref?.();
     try {
-      send('phase', { phase: 'reading', text: 'Consultando los documentos autorizados de Google Drive.' });
+      send('phase', { phase: 'reading', text: 'Consultando los documentos autorizados de Google Drive.', at: new Date().toISOString() });
       const analysis = await this.analyzePoc.execute(input, sourceReader, (text) => {
         if (text.trim()) send('thought', { text });
-      }, (phase, text) => send('phase', { phase, text }));
+      }, (phase, text) => send('phase', { phase, text, at: new Date().toISOString() }));
       send('complete', analysis);
     } catch (reason) {
       send('error', { message: reason instanceof HttpException
         ? reason.message : 'No se pudo completar el análisis documental.' });
     } finally {
+      clearInterval(heartbeat);
       if (!reply.raw.destroyed && !reply.raw.writableEnded) reply.raw.end();
     }
   }
