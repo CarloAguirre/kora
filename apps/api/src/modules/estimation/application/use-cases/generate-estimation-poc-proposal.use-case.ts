@@ -288,6 +288,7 @@ export class GenerateEstimationPocProposalUseCase {
         'Respeta context.userInstructions y distingue context.preliminaryAssumptions de decisiones confirmadas. Las preguntas preliminares sin resolver son incertidumbres, nunca autorizaciones para ampliar el alcance.',
         'Agrupa actividades en módulos funcionales (module), submódulos (submodule) y tramos cronológicos (stageCode, stageName). Un tramo puede abarcar varios módulos y perfiles.',
         'Cada stageCode de activities debe existir exactamente una vez en stages. Los periodos se definen SOLO en stages, nunca por actividad.',
+        'No declares stages sin actividades reales: cada tramo debe estar referenciado por al menos un WBS con HH positivas en roleHours. Los hitos sin trabajo propio se describen como entregables, no como tramos vacíos.',
         'startWeek y durationWeeks son rangos SEMANALES RELATIVOS y estimativos, nunca fechas del proyecto; los tramos pueden solaparse con trabajo paralelo.',
         'WBS es único dentro de activities; repetirlo en activities, incluso con datos idénticos, es un error.',
         'Cada roleHours debe referir a un WBS existente, su role debe coincidir EXACTAMENTE con allowedRoles y ninguna pareja WBS×role debe duplicarse.',
@@ -531,22 +532,24 @@ export class GenerateEstimationPocProposalUseCase {
       throw new BadRequestException(
         'La EDT excede el máximo de 20 módulos o 80 actividades por módulo.');
     }
-    if ([...stages.values()].some((stage) => stage.totalHours <= 0)) {
-      throw new BadRequestException(
-        'Todos los tramos declarados deben tener actividades con HH positivas.');
-    }
+    // Gemini puede declarar un tramo cronológico sin asignarle ningún WBS.
+    // Omitir solo esos tramos vacíos: ninguna actividad, perfil ni HH se elimina.
+    // Las validaciones anteriores siguen rechazando referencias, HH y WBS inválidos.
+    const activeStages = [...stages.values()].filter((stage) => stage.totalHours > 0);
+    const activeStageCodes = new Set(activeStages.map((stage) => stage.code));
+    const rawActiveStages = raw.stages.filter((stage) => activeStageCodes.has(stage.code));
     // Dimensionar con las HH definitivas de la EDT, no con el headcount
     // tentativo del primer Gemini. Las fases simultáneas comparten capacidad;
     // su pico por semana determina cuántas personas necesitan el rol.
     const optimized = optimizeWorkforceForEdt(
-      raw.stages,
+      rawActiveStages,
       raw.roleHours.map((part) => ({
         stageCode: activities.get(part.wbs)!.stageCode,
         role: part.role, hours: part.hours,
       })),
       proposal.roles,
     );
-    validateStageCapacity(raw, optimized.roles.map((role) => ({
+    validateStageCapacity({ ...raw, stages: rawActiveStages }, optimized.roles.map((role) => ({
       role: role.role, people: role.people,
     })));
     const modules = [...modulesByName.values()];
@@ -557,7 +560,7 @@ export class GenerateEstimationPocProposalUseCase {
       schemaVersion: 'kora.quotation.reference-edt.v2',
       source, provider: 'gemini',
       modules, totalHours,
-      stages: [...stages.values()].sort((a, b) =>
+      stages: activeStages.sort((a, b) =>
         a.startWeek - b.startWeek || a.code.localeCompare(b.code)),
       reservePercent, reserveHours,
       totalWithReserve: roundHours(totalHours + reserveHours),
