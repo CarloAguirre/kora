@@ -9,7 +9,6 @@ import {
   FolderOpenIcon,
   TicketIcon,
   TrendingUpIcon,
-  SettingsIcon,
   HelpCircleIcon,
   BarChartIcon,
 } from '../icons/Icons';
@@ -107,12 +106,6 @@ const NAVIGATION: readonly NavigationItem[] = [
     label: 'Administración',
     icon: <UsersIcon size={20} />,
     permission: 'users:read',
-  },
-  {
-    to: '/administracion/importar-datos',
-    label: 'Importar datos',
-    icon: <SettingsIcon size={20} />,
-    permission: 'admin:legacy_import',
   },
 ];
 
