@@ -2,10 +2,9 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { isQuotationDraftEligibleProject, type ProjectDetail, type QuotationVersion } from '@kora/contracts';
 import { projectQuotationPath } from '@/app/router/paths';
-import { useAppliedQuotationPlanning, useDeleteQuotationVersion, useProjectQuotation, useQuotationLifecycle } from '../api/quotation.queries';
+import { useAppliedQuotationPlanning, useProjectQuotation, useQuotationLifecycle } from '../api/quotation.queries';
 import { Button } from '@/shared/components/ui/Button';
 import { Badge } from '@/shared/components/ui/Badge';
-import { useConfirmAction } from '@/shared/components/ui/useConfirmAction';
 import { NewProjectQuotationModal } from './NewProjectQuotationModal';
 import { quotationCommercialBlockers } from './quotation-commercial-blockers';
 import { QuotationApprovalDialog, QuotationTransferDialog } from './QuotationLifecycleDialogs';
@@ -15,7 +14,6 @@ export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
   const { data, isLoading, error } = useProjectQuotation(project.id);
   const applied = useAppliedQuotationPlanning(project.id);
   const lifecycle = useQuotationLifecycle(project.id);
-  const deleteVersion = useDeleteQuotationVersion(project.id);
   const [actionError, setActionError] = useState('');
   const [actionNotice, setActionNotice] = useState('');
   const [newOpen, setNewOpen] = useState(false);
@@ -26,7 +24,6 @@ export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
   );
   const [transferFromApproval, setTransferFromApproval] = useState(false);
   const [transferRevision, setTransferRevision] = useState<number | null>(null);
-  const { confirm, dialog: confirmationDialog } = useConfirmAction();
   const versions = [...(data?.versions ?? [])].sort((a, b) => b.versionNumber - a.versionNumber);
   // El traspaso cierra todas las versiones del proyecto, incluso las no seleccionadas.
   const closed = Boolean(data?.transferredVersionId);
@@ -63,17 +60,6 @@ export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
     }
   };
 
-  const removeVersion = async (versionId: string, revision: number,
-    versionNumber: number, name: string) => {
-    setActionError(''); setActionNotice('');
-    if (!await confirm({ title: 'Eliminar cotización v' + versionNumber, description: '¿Eliminar definitivamente la cotización «' + name + '»? Esta acción no se puede deshacer. No se modificarán otras versiones ni la planificación del proyecto.', confirmLabel: 'Eliminar cotización', destructive: true })) return;
-    try {
-      await deleteVersion.mutateAsync({ versionId, revision });
-      setActionNotice('Cotización v' + versionNumber + ' eliminada.');
-    } catch (e) {
-      setActionError(e instanceof Error ? e.message : 'No fue posible eliminar la cotización.');
-    }
-  };
   const transferNow = (version: QuotationVersion) => {
     setActionError(''); setActionNotice('');
     setTransferFromApproval(false);
@@ -157,28 +143,18 @@ export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
                           Abrir en calculadora
                         </Link>
                         {eligible && (v.status === 'sent' || v.status === 'draft') &&
-                          <div className={styles.approvalReadiness}>
-                            {/* Un botón disabled puede no exponer title: también mostrar
-                                el resumen de requisitos sin depender de hover. */}
-                            <span title={approvalBlockers.length ? approvalBlockers.join('\n') : undefined}>
-                              <Button size="sm" variant="ghost"
-                                disabled={lifecycle.approveClient.isPending || approvalBlockers.length > 0}
+                          (approvalBlockers.length > 0
+                            ? <Link to={projectQuotationPath(project) + '?version=' + v.id}
+                                title={'Completa la cotización antes de aprobar:\n' +
+                                  approvalBlockers.join('\n')}>
+                                Registrar aprobación
+                              </Link>
+                            : <Button size="sm" variant="ghost"
+                                disabled={lifecycle.approveClient.isPending}
                                 onClick={() => registerApproval(v)}>
                                 Registrar aprobación
                               </Button>
-                            </span>
-                            {approvalBlockers.length > 0 && (
-                              <details className={styles.approvalRequirements}
-                                aria-label={'Requisitos pendientes cotización v' + v.versionNumber}>
-                                <summary>Faltan {approvalBlockers.length} requisitos</summary>
-                                <ul>{approvalBlockers.map((reason) =>
-                                  <li key={reason}>{reason}</li>)}</ul>
-                                <Link to={projectQuotationPath(project) + '?version=' + v.id}>
-                                  Completar en calculadora
-                                </Link>
-                              </details>
-                            )}
-                          </div>}
+                          )}
                         {eligible && v.status === 'approved' &&
                           data?.transferredVersionId !== v.id &&
                           <Button size="sm" variant="ghost"
@@ -186,13 +162,6 @@ export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
                             onClick={() => transferNow(v)}>
                             Traspasar ahora
                           </Button>}
-                        {eligible && data?.transferredVersionId !== v.id && (
-                          <Button size="sm" variant="ghost"
-                            disabled={deleteVersion.isPending}
-                            onClick={() => void removeVersion(v.id, v.revision, v.versionNumber, v.name)}>
-                            Eliminar
-                          </Button>
-                        )}
                       </div>
                     </td>
                   </tr>;
@@ -226,7 +195,6 @@ export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
         )}
       {actionError && <p role="alert" className={styles.error}>{actionError}</p>}
       {actionNotice && <p role="status" className={styles.helper}>{actionNotice}</p>}
-      {confirmationDialog}
       {approving && (
         <QuotationApprovalDialog project={project} version={approving}
           previouslyApprovedVersionNumber={data?.versions.find((candidate) =>

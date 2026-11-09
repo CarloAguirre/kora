@@ -19,7 +19,7 @@ const base = {
     teams: [{ teamId: '0777e456-fd76-445e-83f1-afc25061c103',
       collaborators: 1, unit: 'week' as const, duration: 1,
       hoursPerWeek: 40, dedicationPercent: 100 }],
-    phases: [], paymentPlan: [{name: 'Inicio', percent: 100, trigger: 'approval' as const}],
+    phases: [], costs: [], assumptions: [], paymentPlan: [{name: 'Inicio', percent: 100, trigger: 'approval' as const}],
   },
 };
 const v1 = { ...base, id:'0777e456-fd76-445e-83f1-afc25061c105',
@@ -74,26 +74,21 @@ describe('Cotizaciones del proyecto', () => {
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name:'Dejar pendiente' }));
     expect(mocks.transfer).not.toHaveBeenCalled();
   });
-  it('bloquea una aprobación incompleta con todos sus requisitos visibles', () => {
+  it('cuando falta configurar, Registrar aprobación navega a la calculadora sin aprobar', () => {
     mocks.versions = [{
       ...v1, origin: 'ai', aiReviewStatus: 'pending',
       hourlyRate: null, netAmount: null, totalAmount: null,
       draft: { ...v1.draft, paymentPlan: [] },
     }];
     render(<MemoryRouter><ProjectQuotationCard project={project}/></MemoryRouter>);
-    const approval = screen.getByRole('button', { name: 'Registrar aprobación' });
-    expect(approval).toBeDisabled();
-    expect(approval.parentElement).toHaveAttribute('title',
-      expect.stringContaining('Completa el plan de pago'));
-    fireEvent.click(screen.getByText(/Faltan \d+ requisitos/));
-    expect(screen.getByText(/Ingresa y guarda un valor HH mayor que cero/)).toBeInTheDocument();
-    expect(screen.getByText(/0% de 100%/)).toBeInTheDocument();
-    expect(screen.getByText(/Acepta la propuesta IA/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Completar en calculadora' }))
-      .toHaveAttribute('href', '/project/quotation?version=' + v1.id);
-    fireEvent.click(approval);
+    const approval = screen.getByRole('link', { name: 'Registrar aprobación' });
+    expect(approval).toHaveAttribute('href', '/project/quotation?version=' + v1.id);
+    expect(approval).toHaveAttribute('title', expect.stringContaining('plan de pago'));
+    expect(approval).toHaveAttribute('title', expect.stringContaining('valor HH'));
+    expect(approval).toHaveAttribute('title', expect.stringContaining('Acepta la propuesta IA'));
+    expect(screen.queryByRole('button', { name: 'Registrar aprobación' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Faltan \\d+ requisitos/)).not.toBeInTheDocument();
     expect(mocks.approve).not.toHaveBeenCalled();
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
   it('permite el flujo normal cuando tarifa, monto, pagos y aceptación IA están completos', () => {
     mocks.versions = [{ ...v1, origin: 'ai', aiReviewStatus: 'accepted' }];
@@ -104,16 +99,11 @@ describe('Cotizaciones del proyecto', () => {
     fireEvent.click(approval);
     expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
-  it('confirma la eliminación de la versión seleccionada', async () => {
+  it('expone solo las acciones de consulta y aprobación mientras falta traspasar', () => {
     render(<MemoryRouter><ProjectQuotationCard project={project}/></MemoryRouter>);
-    const buttons=screen.getAllByRole('button',{name:'Eliminar'});
-    expect(buttons).toHaveLength(2);
-    fireEvent.click(buttons[1]!);
-    fireEvent.click(screen.getByRole('button', { name:'Eliminar cotización' }));
-    await waitFor(() => expect(mocks.remove).toHaveBeenCalledWith({
-      versionId:v1.id,revision:2,
-    }));
-    expect(screen.queryByText(/Eliminar cotización v1/)).not.toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: 'Abrir en calculadora' })).toHaveLength(2);
+    expect(screen.getAllByRole('button', { name: 'Registrar aprobación' })).toHaveLength(2);
+    expect(screen.queryByRole('button', { name: 'Eliminar' })).not.toBeInTheDocument();
   });
   it('tras traspasar cierra todas las versiones y conserva sus enlaces de consulta', () => {
     mocks.transferredVersionId = v1.id;
@@ -123,6 +113,7 @@ describe('Cotizaciones del proyecto', () => {
     expect(screen.getAllByRole('link', { name: 'Abrir en calculadora' })).toHaveLength(2);
     expect(screen.queryByRole('button', { name: /Nueva versión/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Registrar aprobación' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Registrar aprobación' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Eliminar' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Traspasar ahora' })).not.toBeInTheDocument();
   });
@@ -139,10 +130,13 @@ describe('Cotizaciones del proyecto', () => {
     expect(screen.getByRole('button', { name: 'Traspasar ahora' })).toBeInTheDocument();
   });
 
-  it('no elimina si el usuario cancela la confirmación', () => {
+  it('en aprobación pendiente de traspaso abre el modal correspondiente sin volver a aprobar', () => {
+    mocks.versions = [{ ...v1, status: 'approved' }];
     render(<MemoryRouter><ProjectQuotationCard project={project}/></MemoryRouter>);
-    fireEvent.click(screen.getAllByRole('button',{name:'Eliminar'})[0]!);
-    fireEvent.click(screen.getByRole('button', { name:'Cancelar' }));
-    expect(mocks.remove).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Traspasar ahora' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Registrar aprobación' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Registrar aprobación' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Traspasar ahora' }));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 });
