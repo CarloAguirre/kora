@@ -1,7 +1,7 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { AppConfigService } from '../../../config/app-config.service';
 import type {
-  AiDocumentInput, AiProvider, AiStructuredRequest,
+  AiProvider, AiStructuredRequest,
 } from '../application/ports/ai-provider.port';
 
 type ResponseBody = {
