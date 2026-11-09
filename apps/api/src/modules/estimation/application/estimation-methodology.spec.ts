@@ -53,6 +53,19 @@ describe('política de estimación profesional', () => {
     expect(result.activities).toHaveLength(2);
   });
 
+  it('no calcula supervisión sobre tramos huérfanos sin WBS', () => {
+    const data = base(4);
+    data.stages.push({
+      code: 'T02', name: 'Tramo sugerido, sin trabajo asignado',
+      startWeek: 30, durationWeeks: 3,
+    });
+    const result = addMandatoryTechLeadSupervision(data, 'Líder Técnico');
+    expect(result.stages.find((stage) => stage.code === 'TL-GOV'))
+      .toMatchObject({ startWeek: 1, durationWeeks: 4 });
+    expect(result.roleHours.find((row) => row.wbs === 'TL-GOV.01')?.hours).toBe(20);
+    expect(result.roleHours.find((row) => row.wbs === 'T01.01')?.hours).toBe(80);
+  });
+
   it('al comprimir 6 a 4 semanas reduce solo supervisión de 30 a 20 HH', () => {
     const six = addMandatoryTechLeadSupervision(base(6), 'Tech Lead');
     const four = addMandatoryTechLeadSupervision(base(4), 'Tech Lead');
