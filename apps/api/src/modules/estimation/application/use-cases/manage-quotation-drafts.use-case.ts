@@ -259,7 +259,9 @@ export class ManageQuotationDraftsUseCase {
 
   /** Consultar el catálogo solo DESPUÉS de autorizar el proyecto. */
   async listActiveQuotationTeams(projectId: string, actor: QuotationActor): Promise<QuotationTeamCatalogEntry[]> {
-    await this.authorizeAiPoc(projectId, actor);
+    // El catálogo se usa también para mostrar versiones históricas cerradas.
+    // Crear un borrador IA sigue exigiendo authorizeAiPoc (escritura).
+    await this.authorize(projectId, actor, false);
     return this.repository.listActiveQuotationTeams();
   }
 
