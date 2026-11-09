@@ -105,6 +105,40 @@ describe('Proyección IA Gemini KDM a cotización', () => {
   });
 
 
+  it('proyecta fase OpenAI de 300 caracteres sin romper el guardado comercial', () => {
+    const name = 'Validación documental y auditoría de operaciones '.repeat(10).slice(0, 300);
+    const draft = original();
+    const withEdt = quotationDraftDataSchema.parse({
+      ...draft,
+      aiPoc: {
+        ...draft.aiPoc!,
+        source: 'drive',
+        proposal: { ...draft.aiPoc!.proposal, provider: 'openai', sourceMode: 'drive' },
+        edt: {
+          schemaVersion: 'kora.quotation.reference-edt.v2',
+          source: 'drive', provider: 'openai',
+          totalHours: 80, reservePercent: 0, reserveHours: 0, totalWithReserve: 80,
+          stages: [{ code: 'T01', name, startWeek: 1, durationWeeks: 2, totalHours: 80 }],
+          modules: [{ name: 'Portal', totalHours: 80, tasks: [{
+            wbs: 'T01.01', name: 'Construir integración', role: 'Desarrollo', hours: 80,
+            stageCode: 'T01',
+            roleEffort: [{ role: 'Desarrollo', hours: 40 }, { role: 'QA', hours: 40 }],
+          }] }],
+        },
+      },
+    });
+    const result = projectPocRolesToQuotationDraft(withEdt, { Desarrollo: t1, QA: t2 });
+    expect(result.phases).toHaveLength(1);
+    expect(result.phases[0]?.name.length).toBeLessThanOrEqual(300);
+    expect(result.phases[0]?.name).toMatch(/^T01 · /);
+    expect(result.phases[0]?.name).toContain('…');
+    expect(result.phases[0]?.teamHours).toEqual([
+      { teamId: t1, hours: 40 }, { teamId: t2, hours: 40 },
+    ]);
+    expect(result.aiPoc?.edt?.stages?.[0]?.name).toBe(name);
+    expect(() => validatePocDraftIntegrity(withEdt, result)).not.toThrow();
+  });
+
   it('conserva 80 HH, incluso si dos roles usan el mismo equipo Kora', () => {
     const draft = original();
     const before = structuredClone(draft);

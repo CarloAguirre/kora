@@ -6,6 +6,19 @@ import {
   type QuotationDraftData,
 } from './quotation.contract';
 
+/** El nombre comercial añade el código a un nombre EDT de hasta 300 caracteres.
+ * Ajustar solo la etiqueta visible evita un ZodError al guardar la cotización.
+ * El nombre completo se conserva en el snapshot inmutable de la EDT.
+ */
+function commercialStageName(code: string, name: string): string {
+  const prefix = code + ' · ';
+  const available = 300 - prefix.length;
+  if (available < 2) throw new Error('Código de fase incompatible con nombre comercial.');
+  const display = name.trim();
+  return prefix + (display.length <= available
+    ? display : display.slice(0, available - 1).trimEnd() + '…');
+}
+
 /** Comparación de snapshots JSON compatible con navegador y Node. */
 function sameJson(a: unknown, b: unknown): boolean {
   if (Object.is(a, b)) return true;
@@ -120,7 +133,7 @@ export function projectPocRolesToQuotationDraft(
         }
         const edited = draft.edtStageSettings?.find((item) => item.stageCode === stage.code);
         return {
-          name: stage.code + ' · ' + (edited?.name ?? stage.name),
+          name: commercialStageName(stage.code, edited?.name ?? stage.name),
           startWeek: edited?.startWeek ?? stage.startWeek,
           durationWeeks: edited?.durationWeeks ?? stage.durationWeeks,
           teamHours: [...byTeam].map(([teamId, hours]) => ({ teamId, hours })),
