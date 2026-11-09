@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { QuotationVersion } from '@kora/contracts';
-import { buildQuotationWorkbook, patchQuotationSlideXml, quotationExportModel } from './quotation-export';
+import { buildQuotationWorkbook, patchQuotationSlideXml, quotationClientBrief, quotationExportModel } from './quotation-export';
 import { patchStyledTableSheet } from './quotation-export-template';
 
 const version = (patch: Record<string, unknown> = {}): QuotationVersion => ({
@@ -79,6 +79,82 @@ describe('Exportación de cotizaciones · versión guardada', () => {
       expect(result).not.toContain('HORAS HOMBRE ESTIMADAS');
       expect(result).not.toContain('SEMANAS REFERENCIALES');
     });
+
+  it('sintetiza objetivos y funcionalidades sin narración documental ni nombres recortados', () => {
+    const phases = [
+      'Levantamiento UI/UX y Wireframes de Controles Críticos',
+      'Definición de Arquitectura y Modelo Relacional de Controles',
+      'Administración del Catálogo Maestro de 43 Controles',
+      'Sistema de Inspecciones Pre-Operacionales y Chequeos',
+      'Registro y Seguimiento de Mantenimiento Preventivo',
+      'Verificación de Integridad de Sistemas de Contención',
+    ].map((name, index) => ({
+      name, startWeek: index + 1, durationWeeks: 1, teamHours: [],
+    }));
+    const model = quotationExportModel({
+      ...context(version({ draft: { ...version().draft, mode: 'phases', phases } })),
+      project: {
+        name: 'Pruebas QA',
+        description: 'El documento "Environmental Critical Control Performance Specifications Library" ' +
+          '(119 páginas) establece las especificaciones corporativas mínimas para el control ' +
+          'de riesgos ambientales críticos en operaciones mineras.',
+        client: { companyName: 'Cliente QA' },
+      },
+    });
+    const brief = quotationClientBrief(model);
+    expect(brief.features).toEqual([
+      'Gestión del catálogo de controles',
+      'Inspecciones y chequeos',
+      'Mantenimiento preventivo',
+      'Integridad de sistemas de contención',
+      'Diseño UX/UI y prototipos',
+      'Arquitectura y modelo de datos',
+    ]);
+    expect(brief.objective).toContain('gestión del catálogo de controles');
+    expect(brief.objective).not.toMatch(/documento|119 páginas|Gemini|Library/i);
+    expect(brief.scope).not.toMatch(/documento|EDT adjunta|PDF/i);
+    expect(brief.features.every((feature) => !/[.…]$/.test(feature))).toBe(true);
+
+    const xml = '<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" ' +
+      'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><p:spTree>' +
+      Array.from({ length: 12 }, (_, i) => '<p:sp><p:txBody><a:p><a:r><a:t>' +
+        (i === 2 ? 'Texto de prueba CheckApp' : 'Ejemplo original ' + i) +
+        '</a:t></a:r></a:p></p:txBody></p:sp>').join('') + '</p:spTree></p:sld>';
+    const exported = patchQuotationSlideXml(xml, 10, model);
+    const document = new DOMParser().parseFromString(exported, 'application/xml');
+    const paragraphs = Array.from(document.getElementsByTagNameNS(
+      'http://schemas.openxmlformats.org/drawingml/2006/main', 'p'));
+    expect(paragraphs[2]?.textContent).toBe(brief.objective);
+    expect(paragraphs[3]?.textContent).toBe(brief.scope);
+    for (let i = 0; i < 6; i++) {
+      expect(paragraphs[5 + i]?.textContent).toBe(brief.features[i]);
+    }
+    expect(exported).not.toMatch(/Environmental Critical|119 páginas|CheckApp|Wireframes de Controles Crí/i);
+  });
+
+  it('prioriza un objetivo comercial válido y omite nombres de documentos en proyectos manuales', () => {
+    const model = quotationExportModel({
+      ...context(),
+      project: {
+        name: 'Portal clientes',
+        description: 'Implementar un portal para que los clientes consulten sus solicitudes y aprobaciones.',
+        client: { companyName: 'Cliente QA' },
+      },
+    });
+    const brief = quotationClientBrief(model);
+    expect(brief.objective).toBe(
+      'Implementar un portal para que los clientes consulten sus solicitudes y aprobaciones.');
+    expect(brief.features).toHaveLength(0);
+    expect(brief.scope).not.toContain('EDT');
+  });
+
+  it('no reutiliza las funcionalidades CheckApp de la plantilla si no existen en la versión', () => {
+    const model = quotationExportModel(context());
+    const brief = quotationClientBrief(model);
+    expect(brief.features).toHaveLength(0);
+    expect(brief.objective).toContain('Proyecto sin EDT');
+    expect(brief.objective).not.toContain('finanzas');
+  });
 
   it('separa las hojas comerciales y fuentes solo cuando hay datos persistidos', () => {
     const v = version({ draft: {
