@@ -40,9 +40,12 @@ describe('política de estimación profesional', () => {
 
   it('4 semanas generan exactamente 20 HH de supervisión semanal sin alterar HH de feature', () => {
     const result = addMandatoryTechLeadSupervision(base(4), 'Líder Técnico');
-    expect(result.roleHours).toContainEqual({
-      wbs: 'TL-GOV.01', role: 'Líder Técnico', hours: 20,
-    });
+    expect(result.roleHours.find((row) => row.wbs === 'TL-GOV.01'))
+      .toMatchObject({
+        role: 'Líder Técnico', hours: 20,
+        taskName: expect.stringContaining('Supervisar'),
+        taskDescription: expect.stringContaining('Revisar avances'),
+      });
     expect(result.roleHours.find((row) => row.wbs === 'T01.01')?.hours).toBe(80);
     expect(result.stages.find((stage) => stage.code === 'TL-GOV')).toMatchObject({
       startWeek: 1, durationWeeks: 4,
