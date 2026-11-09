@@ -223,6 +223,8 @@ function slideChanges(i: number, m: ReturnType<typeof quotationExportModel>): Re
   const chunk = (n: number) => activities[n];
   const hrs = (n: number) => chunk(n) ? fmt(chunk(n)!.hours) + ' H/H' : '—';
   const amt = money(version.netAmount, version.currency);
+  const axis = (slot: number, count: number) =>
+    'Sem ' + (1 + slot * Math.max(1, Math.ceil((m.weeks || count) / count)));
   switch (i) {
     case 2: return { 0: 'PROPUESTA COMERCIAL · ' + m.status.toUpperCase(), 1: compact(m.projectName, 58),
       2: compact(m.client + ' · ' + version.name, 85) };
@@ -275,19 +277,23 @@ function slideChanges(i: number, m: ReturnType<typeof quotationExportModel>): Re
       7: 'Arquitectura: según alcance validado',
       8: compact('Perfiles previstos: ' + draft.teams.map((t) => m.team(t.teamId)).join(', '), 105) };
     case 14: return {
+      0: 'PLANIFICACIÓN · VISTA GENERAL',
       1: 'Cronograma relativo; sin fecha de inicio contractual.',
-      2: 'ETAPA / BLOQUE',
-      3: 'Sem 1', 4: 'Sem 2', 5: 'Sem 3', 6: 'Sem 4', 7: 'Sem 5', 8: 'Sem 6',
+      2: 'ETAPA / SEMANA',
+      3: axis(0, 6), 4: axis(1, 6), 5: axis(2, 6),
+      6: axis(3, 6), 7: axis(4, 6), 8: axis(5, 6),
       9: compact(phaseLabel(0), 28), 10: compact(phaseLabel(1), 28),
       11: compact(phaseLabel(2), 28), 12: compact(phaseLabel(3), 28),
       13: compact(phaseLabel(4), 28), 14: compact(phaseLabel(5), 28),
-      15: 'Semanas relativas. Barras de diseño ilustrativas; detalle real en Excel.' };
+      15: 'Cronograma referencial en semanas. Detalle completo en Excel.' };
     case 15: return {
       1: 'Fases relativas; ver distribución detallada en Excel.',
+      3: axis(0, 8), 4: axis(1, 8), 5: axis(2, 8), 6: axis(3, 8),
+      7: axis(4, 8), 8: axis(5, 8), 9: axis(6, 8), 10: axis(7, 8),
       11: compact(phaseLabel(0), 28), 12: compact(phaseLabel(1), 28),
       13: compact(phaseLabel(2), 28), 14: compact(phaseLabel(3), 28),
       15: compact(phaseLabel(4), 28), 16: compact(phaseLabel(5), 28),
-      17: 'Semanas relativas. Barras de diseño ilustrativas; ver Excel.' };
+      17: 'Cronograma referencial en semanas. Detalle completo en Excel.' };
     case 16: return { 1: 'Esfuerzo y valor de la versión seleccionada.',
       3: String(m.weeks || '—') + ' semanas relativas',
       7: compact(m.projectName, 85), 8: fmt(version.totalHours) + ' horas',
@@ -316,6 +322,47 @@ const expectedParagraphs: Record<number, number> = {
   11: 15, 12: 5, 13: 16, 14: 17, 15: 19, 16: 15, 17: 18, 18: 8,
 };
 
+/** Se reposicionan ÚNICAMENTE las seis barras originales de la plantilla:
+ * geometría, estilos, rellenos y líneas se conservan tal como están.
+ * Cuando el proyecto tiene menos de seis fases se eliminan barras de ejemplo.
+ */
+function patchQuotationGanttBars(
+  doc: Document, slideNumber: number,
+  model: ReturnType<typeof quotationExportModel>,
+): void {
+  if (slideNumber !== 14 && slideNumber !== 15) return;
+  const pns = 'http://schemas.openxmlformats.org/presentationml/2006/main';
+  const ans = 'http://schemas.openxmlformats.org/drawingml/2006/main';
+  const ids = slideNumber === 14 ? [338, 346, 354, 362, 370, 378]
+    : [415, 425, 435, 445, 455, 465];
+  const origin = 2542032;
+  const usableWidth = slideNumber === 14 ? 6050000 : 6050000;
+  const horizon = Math.max(slideNumber === 14 ? 6 : 8, model.weeks);
+  const shapes = Array.from(doc.getElementsByTagNameNS(pns, 'sp'));
+  ids.forEach((id, index) => {
+    const shape = shapes.find((sp) =>
+      Array.from(sp.getElementsByTagNameNS(pns, 'cNvPr'))
+        .some((n) => (n.getAttribute('name') ?? '').includes(';' + id + ';')));
+    if (!shape) throw new Error('La barra ' + id + ' falta en el Gantt corporativo.');
+    const phase = model.phases[index];
+    if (!phase) {
+      shape.parentNode?.removeChild(shape);
+      return;
+    }
+    const spPr = Array.from(shape.children).find((n) => n.localName === 'spPr');
+    const xfrm = spPr ? Array.from(spPr.getElementsByTagNameNS(ans, 'xfrm'))[0] : null;
+    const off = xfrm ? Array.from(xfrm.getElementsByTagNameNS(ans, 'off'))[0] : null;
+    const ext = xfrm ? Array.from(xfrm.getElementsByTagNameNS(ans, 'ext'))[0] : null;
+    if (!off || !ext) throw new Error('Barra sin geometría en diapositiva ' + slideNumber);
+    const start = Math.max(0, phase.startWeek - 1);
+    const end = Math.min(horizon, start + phase.durationWeeks);
+    const x = origin + Math.round((start / horizon) * usableWidth);
+    const width = Math.max(1, Math.round(((end - start) / horizon) * usableWidth));
+    off.setAttribute('x', String(x));
+    ext.setAttribute('cx', String(width));
+  });
+}
+
 /** Extraído para probar reemplazos XML sin copiar el binario de 43 MB a tests. */
 export function patchQuotationSlideXml(
   xml: string, slideNumber: number, model: ReturnType<typeof quotationExportModel>,
@@ -334,6 +381,7 @@ export function patchQuotationSlideXml(
     const texts = Array.from(p.getElementsByTagNameNS(ns, 't'));
     texts.forEach((text, n) => { text.textContent = n === 0 ? value : ''; });
   }
+  patchQuotationGanttBars(doc, slideNumber, model);
   return new XMLSerializer().serializeToString(doc);
 }
 
