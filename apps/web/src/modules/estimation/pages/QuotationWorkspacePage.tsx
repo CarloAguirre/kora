@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { estimationAnalysisArtifactSchema, isQuotationDraftEligibleProject, quotationDraftDataSchema, effectiveQuotationEdt, reconcilePocCommercialDraft, synchronizeQuotationEdtTeamLoad, projectPocRolesToQuotationDraft, redistributeQuotationEdtHours, withQuotationTaskSetting, withQuotationEdtStageSetting, quotationEdtAssignments, withQuotationCommercialStage, withoutQuotationCommercialStage, withQuotationCommercialTask, withoutQuotationCommercialTask, patchQuotationCommercialTask, withQuotationTaskDisplayName, type EstimationAnalysisArtifact, type QuotationDraftData, type QuotationVersion, type UpdateQuotationDraftInput } from '@kora/contracts';
+import { estimationAnalysisArtifactSchema, isQuotationDraftEligibleProject, quotationDraftDataSchema, effectiveQuotationEdt, reconcilePocCommercialDraft, synchronizeQuotationEdtTeamLoad, projectPocRolesToQuotationDraft, redistributeQuotationEdtHours, withQuotationTaskSetting, withQuotationEdtStageSetting, quotationEdtAssignments, withQuotationCommercialStage, withoutQuotationEdtStage, withQuotationCommercialTask, withoutQuotationEdtTask, patchQuotationCommercialTask, withQuotationTaskDisplayName, type EstimationAnalysisArtifact, type QuotationDraftData, type QuotationVersion, type UpdateQuotationDraftInput } from '@kora/contracts';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { useProjectDetail } from '@/modules/projects/api/projects.queries';
@@ -416,7 +416,7 @@ export function QuotationWorkspacePage() {
   const removeCommercialPhase = (code: string) => {
     if (!editable || !form) return;
     try {
-      applyEdtChanges(withoutQuotationCommercialStage(form.draft, code));
+      applyEdtChanges(withoutQuotationEdtStage(form.draft, code));
     } catch (cause) {
       reportError(cause instanceof Error ? cause.message : 'No se pudo quitar la fase.');
     }
@@ -445,7 +445,7 @@ export function QuotationWorkspacePage() {
   const removeCommercialTask = (wbs: string) => {
     if (!editable || !form) return;
     try {
-      applyEdtChanges(withoutQuotationCommercialTask(form.draft, wbs));
+      applyEdtChanges(withoutQuotationEdtTask(form.draft, wbs));
     } catch (cause) {
       reportError(cause instanceof Error ? cause.message : 'No se pudo quitar la tarea.');
     }

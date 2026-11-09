@@ -208,6 +208,20 @@ describe('Cotización HTML v5 · fases y tareas', () => {
     expect(screen.queryByText(/Descripción y referencias/)).not.toBeInTheDocument();
   });
 
+
+  it('muestra eliminar en tareas Gemini y fases IA con confirmación', () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderEditor(mappedDraft);
+    const sourceDelete = screen.getByRole('button', { name: 'Quitar tarea T01.01' });
+    fireEvent.click(sourceDelete);
+    expect(callbacks.onDeleteTask).toHaveBeenCalledWith('T01.01');
+    const stageButtons = screen.getAllByRole('button', { name: 'Eliminar' });
+    fireEvent.click(stageButtons[0]!);
+    expect(callbacks.onRemoveCommercialPhase).toHaveBeenCalledWith('T01');
+    expect(confirm).toHaveBeenCalled();
+    vi.restoreAllMocks();
+  });
+
   it('muestra una fase comercial nueva con su tarea sin perder los originales', () => {
     const extraPhase = { code: 'KS-0777e456-fd76-445e-83f1-afc25061c103',
       name: 'Control', startWeek: 5, durationWeeks: 2 };

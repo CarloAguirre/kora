@@ -35,7 +35,7 @@ export function quotationEdtAssignments(draft: Draft): QuotationEdtAssignment[] 
         (draft.edtCommercialStages?.length ?? 0) > 0 ||
         (draft.edtCommercialTasks?.length ?? 0) > 0 ||
         (draft.edtTaskNames?.length ?? 0) > 0 ||
-        false) {
+        (draft.edtExcludedWbs?.length ?? 0) > 0) {
       throw new Error('No puedes configurar tareas o perfiles sin una EDT de origen.');
     }
     return [];
@@ -43,7 +43,9 @@ export function quotationEdtAssignments(draft: Draft): QuotationEdtAssignment[] 
   const original = draft.aiPoc?.edt;
   if (!original) throw new Error('Falta EDT original.');
   const sourceEffort = new Map<string, number>();
+  const excludedWbs = new Set(draft.edtExcludedWbs ?? []);
   for (const module of original.modules) for (const task of module.tasks) {
+    if (excludedWbs.has(task.wbs)) continue;
     for (const effort of task.roleEffort ?? [{ role: task.role, hours: task.hours }]) {
       const id = key(task.wbs, effort.role);
       if (sourceEffort.has(id)) {
@@ -379,6 +381,63 @@ export function withoutQuotationCommercialTask(draft: Draft, wbs: string): Draft
   quotationEdtAssignments(next);
   return next;
 }
+
+/** Exclusión comercial de una actividad IA o eliminación de una tarea añadida.
+ * Conserva el snapshot Gemini; suprime todas las asignaciones WBS×perfil y
+ * los ajustes asociados, recalculando módulos, fases y HH. */
+export function withoutQuotationEdtTask(draft: Draft, wbs: string): Draft {
+  if (draft.edtCommercialTasks?.some((task) => task.wbs === wbs)) {
+    return withoutQuotationCommercialTask(draft, wbs);
+  }
+  const source = draft.aiPoc?.edt;
+  if (!source?.modules.some((module) => module.tasks.some((task) => task.wbs === wbs))) {
+    throw new Error('La tarea de Gemini no existe en la EDT original.');
+  }
+  return excludeOriginalTasks(draft, [wbs]);
+}
+
+/** Elimina comercialmente una fase IA completa y sus tareas; la fuente
+ * documental y su EDT siguen disponibles en aiPoc.edt. */
+export function withoutQuotationEdtStage(draft: Draft, stageCode: string): Draft {
+  if (draft.edtCommercialStages?.some((stage) => stage.code === stageCode)) {
+    return withoutQuotationCommercialStage(draft, stageCode);
+  }
+  const source = draft.aiPoc?.edt;
+  if (!source) throw new Error('La cotización no tiene EDT de origen.');
+  const selected = source.schemaVersion === 'kora.quotation.reference-edt.v2'
+    ? source.modules.flatMap((module) => module.tasks).filter((task) =>
+        task.stageCode === stageCode)
+    : source.modules.filter((module) => 'module:' + module.name === stageCode)
+      .flatMap((module) => module.tasks);
+  if (!selected.length) throw new Error('La fase de Gemini no existe.');
+  const next = excludeOriginalTasks(draft, selected.map((task) => task.wbs));
+  const cleaned = {
+    ...next,
+    edtStageSettings: (next.edtStageSettings ?? []).filter((item) =>
+      item.stageCode !== stageCode),
+    edtCommercialTasks: (next.edtCommercialTasks ?? []).filter((task) =>
+      task.stageCode !== stageCode),
+  };
+  quotationEdtAssignments(cleaned);
+  return cleaned;
+}
+
+function excludeOriginalTasks(draft: Draft, wbsList: readonly string[]): Draft {
+  const exclude = new Set([...(draft.edtExcludedWbs ?? []), ...wbsList]);
+  const next: Draft = {
+    ...draft,
+    edtExcludedWbs: [...exclude],
+    edtHourAdjustments: (draft.edtHourAdjustments ?? []).filter((item) =>
+      !exclude.has(item.wbs)),
+    edtTaskSettings: (draft.edtTaskSettings ?? []).filter((item) =>
+      !exclude.has(item.wbs)),
+    edtTaskNames: (draft.edtTaskNames ?? []).filter((item) =>
+      !exclude.has(item.wbs)),
+  };
+  quotationEdtAssignments(next);
+  return next;
+}
+
 export function withQuotationTaskDisplayName(
   draft: Draft, wbs: string, name: string, role?: string,
 ): Draft {

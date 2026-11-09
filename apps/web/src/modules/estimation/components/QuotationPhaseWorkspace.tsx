@@ -211,11 +211,11 @@ export function QuotationPhaseWorkspace({
                 <span className={styles.phaseDescription}>
                   {hh(total)} HH · semanas {phase.startWeek} a {phase.startWeek + phase.durationWeeks - 1}
                 </span>
-                {editable && (!edt || stageCode?.startsWith('KS-')) && (
+                {editable && (!edt || stageCode) && (
                   <Button variant="tertiary" size="sm" className={styles.remove}
                     onClick={() => {
-                      if (!window.confirm('¿Eliminar esta fase y sus tareas comerciales?')) return;
-                      if (stageCode?.startsWith('KS-')) onRemoveCommercialPhase?.(stageCode);
+                      if (!window.confirm('¿Excluir esta fase y todas sus tareas de la cotización? La EDT original de Gemini se conservará.')) return;
+                      if (stageCode) onRemoveCommercialPhase?.(stageCode);
                       else onRemovePhase(index);
                     }}>Eliminar</Button>
                 )}
@@ -329,12 +329,18 @@ export function QuotationPhaseWorkspace({
                               onChange={(e) => onEditTaskFixed?.(
                                 task.wbs, task.role, e.target.checked)}/>
                           </label>
-                          {task.wbs.startsWith('KT-') && editable
+                          {editable && onDeleteTask
                             ? <Button variant="ghost" size="icon" className={styles.deleteTask}
                                 aria-label={'Quitar tarea ' + task.wbs}
-                                title="Quitar tarea añadida (no altera Gemini)"
-                                onClick={() => onDeleteTask?.(task.wbs)}>×</Button>
-                            : <span className={styles.noDelete} title="Tarea original conservada como evidencia"/>}
+                                title={task.wbs.startsWith('KT-')
+                                  ? 'Quitar tarea añadida'
+                                  : 'Excluir actividad del presupuesto; conservar evidencia Gemini'}
+                                onClick={() => {
+                                  if (!task.wbs.startsWith('KT-') &&
+                                      !window.confirm('¿Excluir esta actividad de la cotización, incluyendo sus asignaciones por perfil? El original de Gemini permanecerá intacto.')) return;
+                                  onDeleteTask(task.wbs);
+                                }}>×</Button>
+                            : <span className={styles.noDelete}/>
                         </div>
                       ))}
                     </div>

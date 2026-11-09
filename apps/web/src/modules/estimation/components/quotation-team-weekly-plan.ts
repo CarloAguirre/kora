@@ -1,4 +1,4 @@
-import { quotationEdtAssignments, type QuotationDraftData } from '@kora/contracts';
+import { effectiveQuotationEdt, quotationEdtAssignments, type QuotationDraftData } from '@kora/contracts';
 
 export type QuotationTeamWeeklyRow = {
   teamKey: string;
@@ -34,7 +34,7 @@ const hours = (value: number) => value / 100;
 export function quotationTeamWeeklyPlan(
   draft: QuotationDraftData,
 ): QuotationTeamWeeklyPlan | null {
-  const edt = draft.aiPoc?.edt;
+  const edt = effectiveQuotationEdt(draft);
   if (!edt && (draft.mode !== 'phases' || !draft.phases.length)) return null;
   const overrides = new Map((draft.edtStageSettings ?? []).map((setting) =>
     [setting.stageCode, setting]));
