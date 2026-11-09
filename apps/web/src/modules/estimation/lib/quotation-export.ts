@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx';
 import { quotationEdtAssignments, type QuotationVersion } from '@kora/contracts';
 import { quotationTeamWeeklyPlan } from '../components/quotation-team-weekly-plan';
+import { patchFormattedQuotationTemplate } from './quotation-export-template';
 
 /**
  * Exportación comercial de lectura. Nunca cambia la cotización, ejecuta Gemini,
@@ -201,11 +202,19 @@ const safeName = (text: string) =>
 const fileName = (model: ReturnType<typeof quotationExportModel>, ext: string) =>
   `Kora-${safeName(model.projectName)}-v${model.version.versionNumber}-rev${model.version.revision}.${ext}`;
 
-export function downloadQuotationExcel(context: QuotationExportContext): void {
-  const book = buildQuotationWorkbook(context);
-  const output = XLSX.write(book, { bookType: 'xlsx', type: 'array' });
-  download(new Blob([output], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
-    fileName(quotationExportModel(context), 'xlsx'));
+export async function downloadQuotationExcel(context: QuotationExportContext): Promise<void> {
+  const model = quotationExportModel(context);
+  const templateUrl = import.meta.env.BASE_URL +
+    'quotation-templates/EDT_Kora_Formato_Corporativo.xlsx';
+  const response = await fetch(templateUrl);
+  if (!response.ok) {
+    throw new Error('Falta la plantilla Excel corporativa en public/quotation-templates.');
+  }
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  const output = patchFormattedQuotationTemplate(bytes, model);
+  download(new Blob([output], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  }), fileName(model, 'xlsx'));
 }
 
 const PPT_MIME = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
