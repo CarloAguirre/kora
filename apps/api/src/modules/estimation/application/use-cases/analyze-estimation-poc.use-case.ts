@@ -113,7 +113,13 @@ export class AnalyzeEstimationPocUseCase {
         'Los valores permitidos para F01 son poc, mvp, phase, complete, evolution; F02 es texto libre y F04 es una lista CSV de uat, stabilization, pilot, support o none.',
         'NO prellenes la selección de equipo F03 ni inventes respuestas para las condiciones fijas.',
         'Cada pregunta debe señalar un motivo técnico concreto y citar sourceId de uno de los documentos proporcionados.',
-        'Las opciones deben ser específicas y mutuamente compatibles, o usa answerType=text.',
+        'FORMATO DE ACLARACIONES: prioriza preguntas rápidas y estructuradas cuando la decisión se pueda expresar con alternativas justificables por los documentos.',
+        'Usa answerType=single_choice para escenarios excluyentes (idealmente 2 a 5 opciones concretas), multi_choice para capacidades que pueden coexistir y confirmation para una decisión inequívocamente binaria Sí/No (options=[]).',
+        'Reserva answerType=text SOLO si realmente se necesita información abierta o una explicación que no pueda representarse fielmente con opciones; para text y confirmation entrega options=[].',
+        'Cada opción debe tener value estable y corto, label claro y vinculado al alcance. No inventes alternativas, porcentajes, funcionalidades o decisiones que los documentos no sustenten. No fuerces listas artificiales.',
+        'Si una pregunta de opciones no es exhaustiva y existen otras posibilidades reales, añade UNA opción {value:"other",label:"Otro (especificar)"} al final; el usuario podrá redactar esa alternativa. No incluyas Otro cuando los escenarios son exhaustivos, especialmente en decisiones Sí/No.',
+        'Evita preguntas que mezclen varias decisiones independientes en una sola; prioriza las cinco aclaraciones de mayor impacto sobre alcance, HH o arquitectura.',
+        'No exijas al usuario escribir párrafos cuando una selección o confirmación permita tomar la misma decisión de estimación.',
         'Para cada aclaración, propone assumptionIfSkipped: un supuesto prudente y específico si el usuario aún no puede responder. Nunca afirmes que ese supuesto ya fue validado.',
         'No estimes HH todavía ni redactes un EDT: solo resumen del entendimiento y aclaraciones.',
         input.instructions ?? '',
@@ -133,7 +139,7 @@ export class AnalyzeEstimationPocUseCase {
     const questions = Array.isArray(data.dynamicQuestions)
       ? data.dynamicQuestions.slice(0, 5) : [];
     const allowedSources = new Map(selected.map((doc) => [doc.sourceId, doc.name]));
-    // Solo prellenar cuando Gemini cita realmente el documento proporcionado.
+    // Solo prellenar cuando el proveedor cita realmente el documento proporcionado.
     // La detección no sustituye la confirmación humana de las cinco preguntas.
     const fixedPrefills: Array<{
       questionId: 'F01' | 'F02' | 'F04';
@@ -175,7 +181,7 @@ export class AnalyzeEstimationPocUseCase {
 
     const normalizedQuestions = questions.map((question, index) => {
       if (!question || typeof question !== 'object' || Array.isArray(question)) {
-        throw new BadRequestException('Gemini devolvió una pregunta inválida.');
+        throw new BadRequestException('El proveedor IA devolvió una pregunta inválida.');
       }
       const candidate = question as Record<string, unknown>;
       if (!isLegacyPoc) {
@@ -185,7 +191,7 @@ export class AnalyzeEstimationPocUseCase {
           const id = (ref as { sourceId?: string }).sourceId;
           return !id || !allowedSources.has(id);
         })) {
-          throw new BadRequestException('Gemini no justificó una aclaración con el documento proporcionado.');
+          throw new BadRequestException('El proveedor IA no justificó una aclaración con el documento proporcionado.');
         }
         candidate.sourceRefs = refs.map((ref) => {
           const row = ref as { sourceId: string; excerpt?: string };
@@ -196,11 +202,49 @@ export class AnalyzeEstimationPocUseCase {
           };
         });
       }
+      // El modelo puede devolver un tipo de selección sin alternativas válidas.
+      // No mostramos controles vacíos ni fabricamos decisiones: texto libre es
+      // el fallback seguro. "Otro" solo existe si el modelo lo propone como
+      // alternativa no exhaustiva, con un identificador estable para la UI.
+      const requestedType = candidate.answerType;
+      const isChoice = requestedType === 'single_choice' ||
+        requestedType === 'multi_choice';
+      const seenOptions = new Set<string>();
+      const validOptions = (isChoice && Array.isArray(candidate.options)
+        ? candidate.options : [])
+        .flatMap((option): Array<{ value: string; label: string }> => {
+          if (!option || typeof option !== 'object') return [];
+          const entry = option as { value?: unknown; label?: unknown };
+          if (typeof entry.value !== 'string' || typeof entry.label !== 'string')
+            return [];
+          const rawValue = entry.value.trim();
+          const rawLabel = entry.label.trim();
+          if (!rawValue || !rawLabel || rawValue.length > 200 ||
+              rawLabel.length > 300) return [];
+          const other = rawValue.toLowerCase() === 'other' ||
+            /^(otro|otra opción|other)(?:\s*\(|\s*[:\-]|$)/i.test(rawLabel);
+          return [{ value: other ? 'other' : rawValue,
+            label: other ? 'Otro (especificar)' : rawLabel }];
+        })
+        .filter((option) => {
+          if (seenOptions.has(option.value)) return false;
+          seenOptions.add(option.value);
+          return true;
+        })
+        .slice(0, 10);
+      const orderedOptions = [
+        ...validOptions.filter((option) => option.value !== 'other'),
+        ...validOptions.filter((option) => option.value === 'other'),
+      ];
+      const usableChoice = isChoice &&
+        orderedOptions.filter((option) => option.value !== 'other').length >= 2;
       return {
         ...candidate,
+        answerType: isChoice && !usableChoice ? 'text' : requestedType,
+        options: usableChoice ? orderedOptions : [],
         id: 'D' + String(index + 1).padStart(2, '0'),
         kind: 'dynamic',
-        // Cuando Gemini no propone un escenario concreto, solo es posible
+        // Cuando el proveedor no propone un escenario concreto, solo es posible
         // declarar el dato como pendiente; nunca inventar una decisión comercial.
         assumptionIfSkipped: typeof candidate.assumptionIfSkipped === 'string' &&
           candidate.assumptionIfSkipped.trim()
