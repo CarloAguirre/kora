@@ -1092,7 +1092,7 @@ export function AiQuotationWizardModal({ project, onClose }: {
               )}
             </>
           )}
-          {(sourceStep === 'loading' || sourceStep === 'analyzing') && (
+          {(sourceStep === 'loading' || sourceStep === 'analyzing' || analysisActivity.length > 0) && (
             <details className={[styles.more, styles.thoughtDisclosure].join(' ')} open>
               <summary>Actividad del agente IA en tiempo real</summary>
               <div ref={analysisLogRef} className={styles.thoughtLog} role="log"
