@@ -688,6 +688,79 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
   });
 
 
+  it('OpenAI muestra alternativas, Otro editable y Sí/No, con validación y valor enviado a EDT', async () => {
+    const single = estimationQuestionSchema.parse({
+      ...dynamicQuestions[0], id: 'D01',
+      question: '¿Qué integración se requiere?',
+      options: [
+        { value: 'native', label: 'Módulo nativo' },
+        { value: 'api', label: 'Integración API' },
+        { value: 'other', label: 'Otro (especificar)' },
+      ],
+    });
+    const multiple = estimationQuestionSchema.parse({
+      ...dynamicQuestions[0], id: 'D02',
+      question: '¿Qué plataformas necesita?',
+      answerType: 'multi_choice',
+      options: [
+        { value: 'web', label: 'Portal web' },
+        { value: 'mobile', label: 'Aplicación móvil' },
+        { value: 'other', label: 'Otro (especificar)' },
+      ],
+    });
+    const confirmation = estimationQuestionSchema.parse({
+      ...dynamicQuestions[0], id: 'D03',
+      question: '¿Se requiere autenticación SSO?',
+      answerType: 'confirmation', options: [],
+    });
+    mocks.analyze.mockResolvedValueOnce({
+      ...analysisResult, provider: 'openai',
+      dynamicQuestions: [single, multiple, confirmation],
+    });
+    renderWizard();
+    await analyzeAndConfirm();
+    answerFixed();
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar' }));
+    expect(screen.getByText('Aclaraciones de mayor impacto')).toBeInTheDocument();
+    expect(screen.getAllByLabelText('Otro (especificar)')).toHaveLength(2);
+    expect(screen.getByLabelText('Portal web')).toHaveAttribute('type', 'checkbox');
+    expect(screen.getByLabelText('Sí')).toHaveAttribute('type', 'radio');
+
+    // Seleccionar Otro sin describirlo no es una respuesta válida.
+    fireEvent.click(screen.getAllByLabelText('Otro (especificar)')[0]!);
+    expect(screen.getByLabelText('Especifica otra opción')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar' }));
+    expect(mocks.toastError).toHaveBeenCalledWith(
+      'Completa la pregunta obligatoria: ¿Qué integración se requiere?');
+    fireEvent.change(screen.getByLabelText('Especifica otra opción'), {
+      target: { value: 'Conector SFTP por lotes' },
+    });
+    fireEvent.click(screen.getByLabelText('Portal web'));
+    fireEvent.click(screen.getAllByLabelText('Otro (especificar)')[1]!);
+    const extraChannel = document.getElementById('other-detail-D02');
+    expect(extraChannel).toBeInTheDocument();
+    fireEvent.change(extraChannel!, {
+      target: { value: 'Aplicación de terreno offline' },
+    });
+    fireEvent.click(screen.getByLabelText('Sí'));
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar' }));
+    expect(screen.getByText('Confirmar la estimación')).toBeInTheDocument();
+    expect(screen.getByText(/Otro: Conector SFTP por lotes/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Generar estimación' }));
+    await waitFor(() => expect(mocks.generate).toHaveBeenCalledTimes(1));
+    const payload = mocks.generate.mock.calls[0]![0] as {
+      dynamicQuestions: Array<{ id: string }>;
+      answers: Array<{ questionId: string; value: unknown; usedAssumption: boolean }>;
+    };
+    expect(payload.dynamicQuestions).toHaveLength(3);
+    expect(payload.answers).toEqual(expect.arrayContaining([
+      { questionId: 'D01', value: 'other:Conector SFTP por lotes', usedAssumption: false },
+      { questionId: 'D02', value: ['web', 'other:Aplicación de terreno offline'],
+        usedAssumption: false },
+      { questionId: 'D03', value: true, usedAssumption: false },
+    ]));
+  });
+
   it('en el paso 5 muestra logger discreto y recibe resúmenes de propuesta y EDT en vivo', async () => {
     renderWizard();
     await analyzeToUnderstanding();
