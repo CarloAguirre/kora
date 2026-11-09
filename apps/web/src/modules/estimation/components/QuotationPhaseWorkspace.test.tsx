@@ -212,7 +212,7 @@ describe('Cotización HTML v5 · fases y tareas', () => {
   it('muestra eliminar en tareas Gemini y fases IA con confirmación', () => {
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
     renderEditor(mappedDraft);
-    const sourceDelete = screen.getByRole('button', { name: 'Quitar tarea T01.01' });
+    const sourceDelete = screen.getAllByRole('button', { name: 'Quitar tarea T01.01' })[0]!;
     fireEvent.click(sourceDelete);
     expect(callbacks.onDeleteTask).toHaveBeenCalledWith('T01.01');
     const stageButtons = screen.getAllByRole('button', { name: 'Eliminar' });
