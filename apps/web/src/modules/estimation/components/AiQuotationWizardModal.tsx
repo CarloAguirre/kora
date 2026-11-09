@@ -312,9 +312,16 @@ export function AiQuotationWizardModal({ project, onClose }: {
   const [saveWarning, setSaveWarning] = useState('');
   const [analysisSnapshot, setAnalysisSnapshot] = useState<EstimationPocAnalysis | null>(null);
   const [geminiThoughtSummary, setGeminiThoughtSummary] = useState('');
+  // Cronología de operaciones verificadas: nunca sustituir hitos previos de
+  // la misma fase ni presentar las respuestas del modelo como actividad real.
   const [analysisActivity, setAnalysisActivity] = useState<Array<{
-    phase: string; text: string;
+    phase: string; text: string; at: string;
   }>>([]);
+  const [analysisHeartbeat, setAnalysisHeartbeat] = useState('');
+  const [proposalActivity, setProposalActivity] = useState<Array<{
+    phase: string; text: string; at: string;
+  }>>([]);
+  const [proposalHeartbeat, setProposalHeartbeat] = useState('');
   const [proposalThoughtSummary, setProposalThoughtSummary] = useState('');
   const [proposalPhase, setProposalPhase] = useState<'idle' | 'proposal' | 'edt' | 'saving' | 'error'>('idle');
   const analysisLogRef = useRef<HTMLDivElement | null>(null);
@@ -324,11 +331,11 @@ export function AiQuotationWizardModal({ project, onClose }: {
   useLayoutEffect(() => {
     if (analysisLogRef.current)
       analysisLogRef.current.scrollTop = analysisLogRef.current.scrollHeight;
-  }, [geminiThoughtSummary, analysisActivity, sourceStep]);
+  }, [geminiThoughtSummary, analysisActivity, analysisHeartbeat, sourceStep]);
   useLayoutEffect(() => {
     if (proposalLogRef.current)
       proposalLogRef.current.scrollTop = proposalLogRef.current.scrollHeight;
-  }, [proposalThoughtSummary, proposalPhase]);
+  }, [proposalThoughtSummary, proposalActivity, proposalHeartbeat, proposalPhase]);
   const [generating, setGenerating] = useState(false);
   const generationInFlight = useRef(false);
   const driveStatus = useEstimationDriveOAuthPocStatus();
@@ -652,21 +659,26 @@ export function AiQuotationWizardModal({ project, onClose }: {
       await persistConfirmedFolder(driveFolderUrl);
     }
     setGeminiThoughtSummary('');
-    setAnalysisActivity([]);
+    setAnalysisHeartbeat('');
+    setAnalysisActivity([{
+      phase: 'connecting', at: new Date().toISOString(),
+      text: 'Solicitud de análisis iniciada; conectando con el servidor de Kora.',
+    }]);
     setSourceStep('analyzing');
     setError('');
     setInvalidId(null);
     try {
       const result = await analysis.mutateAsync({
-        // Solo los fragmentos enviados como thought=true por Gemini.
+        // El razonamiento resumido del proveedor es opcional; los eventos de
+        // Kora llegan por un canal separado y conservan su orden original.
         onThoughtSummary: (chunk) => setGeminiThoughtSummary((current) =>
           (current + chunk).slice(-12_000)),
-        // Estados comprobables del servidor, distintos de los resúmenes
-        // de pensamiento que Gemini puede enviar recién cerca del final.
-        onProgress: (phase, text) => setAnalysisActivity((current) => [
-          ...current.filter((item) => item.phase !== phase),
-          { phase, text },
-        ].slice(-6)),
+        onProgress: (phase, text, at) => setAnalysisActivity((current) => [
+          ...current, { phase, text, at: at ?? new Date().toISOString() },
+        ].slice(-100)),
+        onHeartbeat: (seconds) => setAnalysisHeartbeat(
+          'Conexión con el servidor activa · ' + seconds +
+          ' s transcurridos; no implica avances internos del modelo.'),
         projectId: project.id,
         projectName: project.name,
         clientName: project.client?.companyName ?? null,
@@ -750,11 +762,22 @@ export function AiQuotationWizardModal({ project, onClose }: {
     setGenerating(true);
     setProposalPhase('proposal');
     setProposalThoughtSummary('');
+    setProposalHeartbeat('');
+    setProposalActivity([{
+      phase: 'connecting', at: new Date().toISOString(),
+      text: 'Solicitud de cotización iniciada; conectando con el servidor de Kora.',
+    }]);
     try {
       const created = await generate.mutateAsync({
         onThoughtSummary: (chunk) => setProposalThoughtSummary((current) =>
           (current + chunk).slice(-12_000)),
         onPhase: (phase) => setProposalPhase(phase),
+        onActivity: (phase, text, at) => setProposalActivity((current) => [
+          ...current, { phase, text, at },
+        ].slice(-100)),
+        onHeartbeat: (seconds) => setProposalHeartbeat(
+          'Conexión con el servidor activa · ' + seconds +
+          ' s transcurridos; el modelo puede continuar procesando.'),
         projectId: project.id,
         projectName: project.name,
         clientName: project.client?.companyName ?? null,
@@ -1071,7 +1094,7 @@ export function AiQuotationWizardModal({ project, onClose }: {
           )}
           {(sourceStep === 'loading' || sourceStep === 'analyzing') && (
             <details className={[styles.more, styles.thoughtDisclosure].join(' ')} open>
-              <summary>Ver razonamiento resumido del agente IA</summary>
+              <summary>Actividad del agente IA en tiempo real</summary>
               <div ref={analysisLogRef} className={styles.thoughtLog} role="log"
                 aria-label="Resúmenes de razonamiento del agente IA"
                 aria-live="polite" aria-relevant="additions text">
@@ -1082,16 +1105,23 @@ export function AiQuotationWizardModal({ project, onClose }: {
                 ) : (
                   <>
                     {analysisActivity.length > 0 ? (
-                      <ul className={styles.thoughtActivity}
+                      <ol className={styles.thoughtActivity}
                         aria-label="Actividad verificada del servidor">
-                        {analysisActivity.map((item) =>
-                          <li key={item.phase}>{item.text}</li>)}
-                      </ul>
+                        {analysisActivity.map((item, index) =>
+                          <li key={index}>
+                            <time className={styles.thoughtTime} dateTime={item.at}>
+                              {new Date(item.at).toLocaleTimeString('es-CL')}
+                            </time>{' '}{item.text}
+                          </li>)}
+                      </ol>
                     ) : <p>Conectando con el servicio de análisis documental…</p>}
-                    {geminiThoughtSummary
-                      ? <p>{geminiThoughtSummary}</p>
-                      : <p>El agente IA aún no ha enviado resúmenes de razonamiento.
-                          Puede publicarlos cerca del final de la respuesta.</p>}
+                    {analysisHeartbeat &&
+                      <p className={styles.thoughtHeartbeat}>{analysisHeartbeat}</p>}
+                    <div className={styles.thoughtModelSummary}>
+                      <strong>Resumen del modelo (opcional)</strong>
+                      <p>{geminiThoughtSummary ||
+                        'El proveedor aún no ha enviado un resumen; los eventos anteriores son actividad de Kora.'}</p>
+                    </div>
                   </>
                 )}
               </div>
@@ -1195,12 +1225,12 @@ export function AiQuotationWizardModal({ project, onClose }: {
             <p>Validar con el cliente los resultados de esta estimación basada en Drive,
               antes de utilizarla en un proyecto real.</p>
           </div>
-          <details className={[styles.more, styles.thoughtDisclosure].join(' ')}
+          <details className={[styles.more, styles.thoughtDisclosure].join(' ')} open
             onToggle={(event) => {
               if (!event.currentTarget.open || !proposalLogRef.current) return;
               proposalLogRef.current.scrollTop = proposalLogRef.current.scrollHeight;
             }}>
-            <summary>Ver razonamiento resumido del agente IA</summary>
+            <summary>Actividad del agente IA en tiempo real</summary>
             {proposalPhase !== 'idle' && <p className={styles.thoughtPhase} role="status">
               {proposalPhase === 'proposal' ? 'Preparando propuesta de perfiles y capacidad…' :
                 proposalPhase === 'edt' ? 'Construyendo EDT y estimando HH por actividad…' :
@@ -1210,11 +1240,23 @@ export function AiQuotationWizardModal({ project, onClose }: {
             <div ref={proposalLogRef} className={styles.thoughtLog} role="log"
               aria-label="Resúmenes del agente IA durante la estimación"
               aria-live="polite" aria-relevant="additions text">
-              {proposalThoughtSummary
-                ? <p>{proposalThoughtSummary}</p>
-                : <p>{proposalPhase === 'idle'
-                  ? 'Al generar la estimación, se mostrarán aquí los resúmenes que entregue el agente IA.'
-                  : 'El agente IA aún no ha enviado resúmenes de razonamiento para esta etapa.'}</p>}
+              {proposalActivity.length ? (
+                <ol className={styles.thoughtActivity} aria-label="Actividad de generación verificada">
+                  {proposalActivity.map((item, index) =>
+                    <li key={index}>
+                      <time className={styles.thoughtTime} dateTime={item.at}>
+                        {new Date(item.at).toLocaleTimeString('es-CL')}
+                      </time>{' '}{item.text}
+                    </li>)}
+                </ol>
+              ) : <p>Al generar la estimación, Kora registrará aquí sus operaciones verificables.</p>}
+              {proposalHeartbeat &&
+                <p className={styles.thoughtHeartbeat}>{proposalHeartbeat}</p>}
+              <div className={styles.thoughtModelSummary}>
+                <strong>Resumen del modelo (opcional)</strong>
+                <p>{proposalThoughtSummary ||
+                  'Todavía no se ha recibido un resumen del modelo. Las operaciones de Kora se muestran aparte.'}</p>
+              </div>}
             </div>
             <p className={styles.thoughtFootnote}>
               La cotización se guardará como borrador con revisión IA pendiente.
