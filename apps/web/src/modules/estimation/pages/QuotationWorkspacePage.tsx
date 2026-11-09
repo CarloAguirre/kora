@@ -7,6 +7,7 @@ import { useProjectDetail } from '@/modules/projects/api/projects.queries';
 import { useTeamsList } from '@/modules/teams/api/teams.queries';
 import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Button } from '@/shared/components/ui/Button';
+import { DropdownMenu } from '@/shared/components/ui/DropdownMenu';
 import { Card } from '@/shared/components/ui/Card';
 import { Select } from '@/shared/components/ui/Select';
 import { Badge } from '@/shared/components/ui/Badge';
@@ -27,6 +28,7 @@ import { QuotationPhaseWorkspace } from '../components/QuotationPhaseWorkspace';
 import { QuotationTeamsWorkspace } from '../components/QuotationTeamsWorkspace';
 import { quotationAiAcceptanceBlockReason } from '../components/quotation-ai-acceptance';
 import { readQuotationTaskExcel } from '../lib/quotation-task-excel';
+import { downloadQuotationExcel, downloadQuotationPowerPoint } from '../lib/quotation-export';
 import { emptyQuotationTeam, withQuotationTeamEdit } from '../lib/quotation-blank-team';
 import { suggestedKoraTeamForRole } from '../components/quotation-role-team-suggestions';
 import { QuotationCommercialSections } from '../components/QuotationCommercialSections';
@@ -64,6 +66,7 @@ export function QuotationWorkspacePage() {
 
   const [form, setForm] = useState<Form | null>(null);
   const [newQuotationOpen, setNewQuotationOpen] = useState(false);
+  const [exporting, setExporting] = useState<'pptx' | 'xlsx' | null>(null);
   const [roleMappingOpen, setRoleMappingOpen] = useState(false);
   const [teamView, setTeamView] = useState<'team' | 'phases'>('phases');
   const [dirty, setDirty] = useState(false);
@@ -515,6 +518,22 @@ export function QuotationWorkspacePage() {
             teamHours: phase.teamHours.filter((item) => item.teamId !== teamId),
           })) });
   };
+  const exportQuotation = async (format: 'pptx' | 'xlsx') => {
+    if (!project || !selected || exporting) return;
+    if (dirty) {
+      reportError('Guarda o descarta los cambios antes de exportar la versión.');
+      return;
+    }
+    setExporting(format);
+    try {
+      const context = { project, version: selected, teamNames: teamById };
+      if (format === 'pptx') await downloadQuotationPowerPoint(context);
+      else downloadQuotationExcel(context);
+      inform('Archivo ' + format.toUpperCase() + ' generado desde la versión guardada.');
+    } catch (error) {
+      reportError(error instanceof Error ? error.message : 'No se pudo exportar la cotización.');
+    } finally { setExporting(null); }
+  };
   const acceptAiProposal = async () => {
     if (!selected || lifecycle.acceptAi.isPending) return;
     if (aiAcceptBlockReason) { reportError(aiAcceptBlockReason); return; }
@@ -533,7 +552,24 @@ export function QuotationWorkspacePage() {
   return (
     <DashboardLayout title="Proyectos" containedScroll>
       <main className={styles.page}>
-        {project && <h1 className={styles.projectTitle}>{project.name}</h1>}
+        {project && (
+          <div className={styles.projectHeading}>
+            <h1 className={styles.projectTitle}>{project.name}</h1>
+            {selected && (
+              <DropdownMenu align="right"
+                trigger={({ onClick, open }) => (
+                  <Button variant="outline" size="sm" onClick={onClick}
+                    disabled={Boolean(exporting)} loading={Boolean(exporting)}
+                    aria-haspopup="menu" aria-expanded={open}>Exportar ▾</Button>
+                )}
+                items={[
+                  { key: 'pptx', label: 'PowerPoint (.pptx)', onSelect: () => { void exportQuotation('pptx'); } },
+                  { key: 'xlsx', label: 'Excel (.xlsx)', onSelect: () => { void exportQuotation('xlsx'); } },
+                ]}
+              />
+            )}
+          </div>
+        )}
         <nav className={styles.breadcrumb} aria-label="Navegación de cotización">
           <Link to={project ? '/proyectos/' + project.slug : '/proyectos'}>‹ Volver a la ficha del proyecto</Link>
           <Link className={styles.listLink} to="/calculadora">Ver todas las cotizaciones</Link>
