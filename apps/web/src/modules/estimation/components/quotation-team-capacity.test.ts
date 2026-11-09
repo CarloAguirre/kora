@@ -13,7 +13,7 @@ const row = (weekly: Array<[number, number]>): QuotationTeamWeeklyRow => ({
 });
 const team = (patch: Partial<QuotationDraftData['teams'][number]> = {}) => ({
   teamId: 'dev', collaborators: 3, unit: 'week' as const, duration: 1,
-  hoursPerWeek: 33.33, dedicationPercent: 100, ...patch,
+  hoursPerWeek: 40, dedicationPercent: 100, ...patch,
 });
 
 describe('Capacidad orientativa de una cotización EDT', () => {
