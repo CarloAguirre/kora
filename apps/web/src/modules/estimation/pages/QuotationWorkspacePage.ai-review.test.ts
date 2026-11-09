@@ -26,10 +26,17 @@ describe('Revisión de la propuesta Gemini · flujo UI + persistencia', () => {
     expect(page).toContain('setAdjustingAiVersionId(null);');
     expect(page).toContain('toast.success(\'Propuesta IA aceptada.');
   });
-  it('el aviso inicial desaparece al modificar o guardar, sin perder aceptación en ciclo comercial', () => {
+  it('restaura Usar tal cual tras guardar ajustes, sin reabrir el banner inicial', () => {
     expect(page).toContain("selected.revision === 1");
     expect(page).toContain("!dirty && adjustingAiVersionId !== selected.id");
-    expect(page).toContain("showAiAcceptance={selected.origin === 'ai' && selected.revision > 1}");
+    expect(page).toContain("selected.aiReviewStatus === 'pending'");
+    expect(page).toContain("selected.revision > 1");
+    expect(page).toContain("className={styles.aiAcceptanceAction}");
+    expect(page).toContain("disabled={!editable || dirty}");
+    expect(page).toContain("Guarda o descarta los cambios antes de aceptar");
+    expect(page).toContain("onClick={() => void acceptAiProposal()}");
+    expect(page).toContain("Usar tal cual");
+    expect(page).toContain("embedded showAiAcceptance={false}");
     expect(page).toContain("setDirty(true)");
     expect(page).toContain("setDirty(false)");
     expect(page).toContain("toast.success('Cambios guardados en la versión.");
