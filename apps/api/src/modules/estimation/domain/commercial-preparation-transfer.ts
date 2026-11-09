@@ -15,10 +15,20 @@ export function hasOnlyCommercialPreparationHours(
   usedHours: number,
 ): boolean {
   if (!entries.length || !Number.isFinite(usedHours) || usedHours < 0) return false;
+  // Durante la prospección no siempre se clasificaban las horas por tarea:
+  // NULL y las etiquetas comerciales explícitas corresponden a Fase 1
+  // solo cuando tampoco hay módulo operativo (ver guarda transaccional).
+  const commercial = new Set([
+    '', 'prospecto', 'prospeccion', 'cotizacion', 'preventa', 'fase 1',
+    'fase 1 prospecto cotizacion',
+  ]);
   if (!entries.every((entry) => entry.moduleId === null &&
-    entry.status === 'approved' &&
-    ['prospecto', 'cotizacion'].includes(normalize(entry.assignment ?? '')))) return false;
-  const total = entries.reduce((sum, entry) => sum + Number(entry.hours), 0);
+    commercial.has(normalize(entry.assignment ?? '')) &&
+    Number.isFinite(Number(entry.hours)) && Number(entry.hours) >= 0)) return false;
+  // Pendientes/rechazadas se conservan, pero nunca son HH consumidas.
+  // Solo las aprobadas deben conciliar con projects.usedHours.
+  const total = entries.filter((entry) => entry.status === 'approved')
+    .reduce((sum, entry) => sum + Number(entry.hours), 0);
   return Number.isFinite(total) && Math.abs(total - usedHours) <= 0.01;
 }
 
