@@ -250,6 +250,7 @@ export class GenerateEstimationPocProposalUseCase {
     activeKoraTeams?: readonly KoraActiveTeam[],
     authorizedSources?: DocumentSourceReader,
     onThoughtSummary?: (text: string) => void,
+    onActivity?: (step: string, text: string) => void,
   ): Promise<QuotationReferenceEdt> {
     const isDemo = extractDriveFolderId(input.driveFolderUrl) === 'kora-poc-fallback';
     if (!['gemini', 'openai'].includes(this.ai.name) ||
@@ -259,10 +260,12 @@ export class GenerateEstimationPocProposalUseCase {
       throw new BadRequestException('La EDT no corresponde al análisis IA de la carpeta seleccionada.');
     }
     this.validatePreliminaryRoles(proposal.roles);
+    onActivity?.('edt_reading', 'Leyendo las fuentes documentales para elaborar la EDT.');
     const loaded = await readEstimationDocuments(
       authorizedSources ?? this.sources, input.driveFolderUrl,
     );
     const docs = loaded.documents;
+    onActivity?.('edt_documents', 'Documentos preparados para EDT: ' + docs.length + '.');
     const coverageNote = describeDocumentCoverage(loaded.coverage);
     if (docs.length === 0 || (isDemo && (docs.length !== 1 || docs[0]?.name !== 'Requerimiento_KDM.pdf'))) {
       throw new BadRequestException('No se pudieron comprobar antecedentes válidos de la carpeta documental.');
@@ -344,6 +347,9 @@ export class GenerateEstimationPocProposalUseCase {
     const providerLabel = this.ai.name === 'openai' ? 'OpenAI' : 'Gemini';
     let validationIssue = '';
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      onActivity?.('edt_model_request', attempt === 0
+        ? 'Solicitud de EDT enviada al agente IA; esperando la respuesta estructurada.'
+        : 'Reintentando la EDT tras una validación fallida (reintento configurado).');
       const output = await this.ai.generateStructured({
         ...request,
         instructions: attempt === 0 ? request.instructions : [
@@ -358,8 +364,12 @@ export class GenerateEstimationPocProposalUseCase {
           'No transformes las HH para igualar una cifra preliminar.',
         ].join('\n'),
       }, onThoughtSummary);
+      onActivity?.('edt_model_response', 'EDT recibida; validando tareas, WBS, perfiles y HH.');
       try {
-        return this.buildVerifiedEdt(output, proposal, isDemo ? 'kdm_demo' : 'drive');
+        const verified = this.buildVerifiedEdt(output, proposal, isDemo ? 'kdm_demo' : 'drive');
+        onActivity?.('edt_verified', 'EDT validada: ' + verified.modules.length +
+          ' módulos y ' + verified.totalHours + ' HH.');
+        return verified;
       } catch (error) {
         if (!(error instanceof BadRequestException) && !(error instanceof z.ZodError)) {
           throw error;
@@ -700,14 +710,17 @@ export class GenerateEstimationPocProposalUseCase {
     activeKoraTeams?: readonly KoraActiveTeam[],
     authorizedSources?: DocumentSourceReader,
     onThoughtSummary?: (text: string) => void,
+    onActivity?: (step: string, text: string) => void,
   ): Promise<EstimationPocProposal> {
     if (activeKoraTeams && activeKoraTeams.length === 0) {
       throw new BadRequestException('Kora no tiene equipos activos disponibles para estimar.');
     }
+    onActivity?.('proposal_reading', 'Leyendo las fuentes documentales para proponer perfiles.');
     const loaded = this.ai.name === 'poc-ai'
       ? { documents: [], coverage: null }
       : await readEstimationDocuments(authorizedSources ?? this.sources, input.driveFolderUrl);
     const documents = loaded.documents;
+    onActivity?.('proposal_documents', 'Documentos preparados para perfiles: ' + documents.length + '.');
     const coverageNote = describeDocumentCoverage(loaded.coverage);
 
     if (this.ai.name !== 'poc-ai' && documents.length === 0) {
@@ -717,6 +730,7 @@ export class GenerateEstimationPocProposalUseCase {
       );
     }
 
+    onActivity?.('proposal_model_request', 'Solicitando perfiles y capacidades al agente IA.');
     const draft = estimationPocAiDraftSchema.parse(
       normalizeGeneratedProposal(await this.ai.generateStructured({
         task: 'estimation.poc.proposal',
@@ -784,6 +798,7 @@ export class GenerateEstimationPocProposalUseCase {
         } : TEAM_ESTIMATE_RESPONSE_SCHEMA,
       }, onThoughtSummary)),
     );
+    onActivity?.('proposal_response', 'Propuesta recibida; validando perfiles y equipos autorizados.');
     if (activeKoraTeams) {
       const allowed = new Set(activeKoraTeams.map((team) => team.teamId));
       const invalid = draft.roles.find((role) => !role.teamId || !allowed.has(role.teamId));
@@ -857,7 +872,7 @@ export class GenerateEstimationPocProposalUseCase {
       roles.reduce((sum, role) => sum + role.totalHours, 0),
     );
 
-    return estimationPocProposalSchema.parse({
+    const result = estimationPocProposalSchema.parse({
       projectId: input.projectId,
       provider: this.ai.name,
       sourceMode: this.ai.name === 'poc-ai' ||
@@ -874,6 +889,8 @@ export class GenerateEstimationPocProposalUseCase {
       assumptions: draft.assumptions,
       clarifyingQuestions: draft.clarifyingQuestions,
     });
+    onActivity?.('proposal_verified', 'Propuesta verificada: ' + result.roles.length + ' perfiles.');
+    return result;
   }
 }
 
