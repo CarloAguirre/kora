@@ -575,6 +575,45 @@ describe('GenerateEstimationPocProposalUseCase', () => {
     expect(edt.modules[0]?.tasks[0]?.roleEffort?.[0]?.hours).toBe(12);
   });
 
+  it('acepta referencias largas con comas desde OpenAI sin repetir el análisis', async () => {
+    const citation = 'Roles.xlsx, Hoja Matriz, B2:B5 y descripción del acceso supervisado '.repeat(3).trim();
+    const mock = createGenerator(() => {
+      const response = baseDetail();
+      response.activities[0]!.references = 'RN-01;' + citation + ';Reglas.pdf · página 12';
+      return response;
+    }, 'openai');
+    vi.stubEnv('KORA_EDT_MAX_ATTEMPTS', '1');
+    const edt = await mock.generator.generateEdt(input, proposal([
+      { role: 'Desarrollo', hours: 50 }, { role: 'QA', hours: 30 },
+    ], 'openai'));
+    expect(mock.calls()).toBe(1);
+    expect(mock.instructions[0]).toContain('máximo 1.000 caracteres');
+    expect(edt.modules[0]?.tasks[0]?.referenceIds).toEqual([
+      'RN-01', citation, 'Reglas.pdf · página 12',
+    ]);
+    expect(edt.modules[0]?.tasks[0]?.hours).toBe(15);
+    expect(edt.totalHours).toBe(79);
+  });
+
+  it('agrupa más de 30 códigos cortos sin perder ninguna referencia', async () => {
+    const refs = Array.from({ length: 35 }, (_, i) =>
+      'RN-' + String(i + 1).padStart(2, '0'));
+    const mock = createGenerator(() => {
+      const response = baseDetail();
+      response.activities[0]!.references = refs.join(';');
+      return response;
+    }, 'openai');
+    vi.stubEnv('KORA_EDT_MAX_ATTEMPTS', '1');
+    const edt = await mock.generator.generateEdt(input, proposal([
+      { role: 'Desarrollo', hours: 50 }, { role: 'QA', hours: 30 },
+    ], 'openai'));
+    const actual = edt.modules[0]?.tasks[0]?.referenceIds ?? [];
+    expect(actual).toHaveLength(30);
+    expect(actual.slice(0, 29)).toEqual(refs.slice(0, 29));
+    expect(actual[29]).toBe(refs.slice(29).join(';'));
+    expect(mock.calls()).toBe(1);
+  });
+
   it('informa OpenAI (nunca Gemini) cuando el contenido de una EDT es realmente inválido', async () => {
     const mock = createGenerator(() => {
       const data = baseDetail();

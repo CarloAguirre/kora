@@ -113,6 +113,17 @@ const TEAM_ESTIMATE_RESPONSE_SCHEMA = {
  * El esquema ofrecido a Flash-Lite usa solo objetos y arrays de UN nivel,
  * evitando INVALID_ARGUMENT de estructuras profundamente anidadas.
  */
+/** Referencias del modelo: conservar la evidencia textual completa.
+ * Las comas forman parte de títulos, capítulos o celdas, no son separadores.
+ * Si hay más de 30 identificadores, agrupar el resto en el último elemento
+ * (sin eliminar ninguno ni inventar contenido). */
+function normalizeEdtReferences(raw: string): string[] {
+  const refs = [...new Set(raw.split(';').map((part) => part.trim()).filter(Boolean))];
+  return refs.length <= 30
+    ? refs
+    : [...refs.slice(0, 29), refs.slice(29).join(';')];
+}
+
 const detailResponseSchema = z.object({
   reservePercent: z.number().min(0).max(100),
   stages: z.array(z.object({
@@ -171,7 +182,8 @@ const EDT_JSON_SCHEMA = {
           wbs: { type: 'STRING' }, stageCode: { type: 'STRING' },
           module: { type: 'STRING' }, submodule: { type: 'STRING' },
           name: { type: 'STRING' }, description: { type: 'STRING' },
-          references: { type: 'STRING' },
+          references: { type: 'STRING',
+            description: 'Códigos de fuentes verificables (archivo y página/hoja/celda). Separar con punto y coma; hasta 1000 caracteres en total, preferentemente referencias menores a 100. No copiar párrafos completos.' },
           classification: { type: 'STRING',
             description: 'Etiqueta de clasificación CORTA, máximo 40 caracteres; nunca un párrafo. Si no aplica, cadena vacía.' },
         },
@@ -300,7 +312,7 @@ export class GenerateEstimationPocProposalUseCase {
         'startWeek y durationWeeks son rangos SEMANALES RELATIVOS y estimativos, nunca fechas del proyecto; los tramos pueden solaparse con trabajo paralelo.',
         'WBS es único dentro de activities; repetirlo en activities, incluso con datos idénticos, es un error.',
         'Cada roleHours debe referir a un WBS existente, su role debe coincidir EXACTAMENTE con allowedRoles y ninguna pareja WBS×role debe duplicarse.',
-        'references: códigos o referencias verificables del documento separados por punto y coma; cadena vacía si no existe fuente explícita.',
+        'references: SOLO referencias verificables, como código de requisito, archivo + página, archivo + HOJA + celda (ejemplo Reglas.xlsx · Matriz!B14). Separadas por punto y coma (;), en total máximo 1.000 caracteres, idealmente menos de 100 por referencia. No copiar párrafos, URLs largas ni descripciones: ese detalle va en description. Nunca inventar fuentes.',
         'Para documentos Excel convertidos a texto identifica la HOJA y las coordenadas de celda que sustentan cada actividad (ejemplo: Reglas.xlsx · HOJA Validaciones · B14). Revisa todas las hojas visibles entregadas; no interpretes fórmulas sin valor calculado como resultados ni inventes filas omitidas.',
         'classification: SOLO una etiqueta de categoría corta (máximo 40 caracteres), nunca una explicación. Si no aplica, cadena vacía. La explicación detallada pertenece a description.',
         'roleHours.hours siempre mayor a 0 y con hasta dos decimales. Cada actividad debe tener al menos un perfil. No inventes personas, responsables nominales ni estados de ejecución.',
@@ -540,8 +552,9 @@ export class GenerateEstimationPocProposalUseCase {
         wbs: row.wbs, name: row.name, description: row.description,
         role: primary.role, hours: activityHours, stageCode: row.stageCode,
         submodule: row.submodule,
-        referenceIds: [...new Set(row.references.split(/[;,]/)
-          .map((ref) => ref.trim()).filter(Boolean))],
+        // Separar solo por punto y coma; títulos y secciones pueden contener
+        // comas. El campo original limita la longitud total a 1.000 caracteres.
+        referenceIds: normalizeEdtReferences(row.references),
         classification: row.classification, roleEffort: effort,
       });
       module.totalHours = roundHours(module.totalHours + activityHours);

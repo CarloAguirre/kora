@@ -33,7 +33,11 @@ export const quotationReferenceTaskSchema = z.object({
   hours: z.number().positive().max(1000000),
   stageCode: z.string().trim().min(1).max(40).optional(),
   submodule: z.string().trim().max(300).optional(),
-  referenceIds: z.array(z.string().trim().min(1).max(100)).max(30).optional(),
+  /** Identificadores de evidencia que también pueden incluir archivo, sección,
+   * página o celda. La entrada del LLM permite hasta 1000 caracteres en total;
+   * no rechazar referencias reales que excedan 100 sin perder trazabilidad.
+   */
+  referenceIds: z.array(z.string().trim().min(1).max(1000)).max(30).optional(),
   classification: z.string().trim().max(40).optional(),
   roleEffort: z.array(quotationReferenceRoleEffortSchema).min(1).max(12).optional(),
 });
