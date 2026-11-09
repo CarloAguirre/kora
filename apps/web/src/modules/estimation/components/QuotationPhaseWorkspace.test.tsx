@@ -163,10 +163,11 @@ describe('Cotización HTML v5 · fases y tareas', () => {
       onAddPhase={callbacks.onAddPhase} onRemovePhase={callbacks.onRemovePhase}/>);
     fireEvent.click(screen.getByRole('button', { name: /Agregar fase/ }));
     expect(callbacks.onAddPhase).toHaveBeenCalledOnce();
-    vi.spyOn(window, 'confirm').mockReturnValue(false);
     fireEvent.click(screen.getByRole('button', { name: 'Eliminar' }));
+    expect(screen.getByRole('dialog', { name: 'Eliminar fase de la cotización' })).toBeInTheDocument();
     expect(callbacks.onRemovePhase).not.toHaveBeenCalled();
-    vi.restoreAllMocks();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+    expect(callbacks.onRemovePhase).not.toHaveBeenCalled();
   });
 
   it('reutiliza Button Kora en las acciones sin cambiar sus callbacks ni permisos', () => {
@@ -209,17 +210,21 @@ describe('Cotización HTML v5 · fases y tareas', () => {
   });
 
 
-  it('muestra eliminar en tareas Gemini y fases IA con confirmación', () => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+  it('muestra modal Kora al eliminar tarea y fase y respeta cancelación', async () => {
     renderEditor(mappedDraft);
-    const sourceDelete = screen.getAllByRole('button', { name: 'Quitar tarea T01.01' })[0]!;
-    fireEvent.click(sourceDelete);
-    expect(callbacks.onDeleteTask).toHaveBeenCalledWith('T01.01');
-    const stageButtons = screen.getAllByRole('button', { name: 'Eliminar' });
-    fireEvent.click(stageButtons[0]!);
-    expect(callbacks.onRemoveCommercialPhase).toHaveBeenCalledWith('T01');
-    expect(confirm).toHaveBeenCalled();
-    vi.restoreAllMocks();
+    const taskDelete = screen.getAllByRole('button', { name: 'Quitar tarea T01.01' })[0]!;
+    fireEvent.click(taskDelete);
+    expect(screen.getByRole('dialog', { name: 'Eliminar tarea de la cotización' })).toBeInTheDocument();
+    expect(callbacks.onDeleteTask).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+    expect(callbacks.onDeleteTask).not.toHaveBeenCalled();
+    fireEvent.click(taskDelete);
+    fireEvent.click(screen.getByRole('button', { name: 'Eliminar tarea' }));
+    await vi.waitFor(() => expect(callbacks.onDeleteTask).toHaveBeenCalledWith('T01.01'));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Eliminar' })[0]!);
+    expect(callbacks.onRemoveCommercialPhase).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Eliminar fase' }));
+    await vi.waitFor(() => expect(callbacks.onRemoveCommercialPhase).toHaveBeenCalledWith('T01'));
   });
 
   it('muestra una fase comercial nueva con su tarea sin perder los originales', () => {

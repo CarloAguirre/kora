@@ -2,6 +2,7 @@ import type { QuotationDraftData, QuotationReferenceEdt } from '@kora/contracts'
 import { quotationEdtAssignments } from '@kora/contracts';
 import { Card } from '@/shared/components/ui/Card';
 import { Button } from '@/shared/components/ui/Button';
+import { useConfirmAction } from '@/shared/components/ui/useConfirmAction';
 import { quotationTeamColor } from './quotation-team-colors';
 import { QuotationGroupHoursInput } from './QuotationGroupHoursInput';
 import { downloadQuotationTaskTemplate } from '../lib/quotation-task-excel';
@@ -152,6 +153,7 @@ export function QuotationPhaseWorkspace({
   onAddPhase: () => void;
   onRemovePhase: (index: number) => void;
 }) {
+  const { confirm, dialog: removalConfirmationDialog } = useConfirmAction();
   const mapping = roleTeamIds ?? {};
   const displayPhases = edt
     ? referencePhasesFromEdt(edt, mapping, teamNames, draft)
@@ -213,11 +215,17 @@ export function QuotationPhaseWorkspace({
                 </span>
                 {editable && (!edt || stageCode) && (
                   <Button variant="tertiary" size="sm" className={styles.remove}
-                    onClick={() => {
-                      if (!window.confirm('¿Excluir esta fase y todas sus tareas de la cotización? La EDT original de Gemini se conservará.')) return;
+                    onClick={() => void (async () => {
+                      const accepted = await confirm({
+                        title: 'Eliminar fase de la cotización',
+                        description: '¿Excluir «' + visibleName + '» y todas sus tareas del presupuesto?',
+                        warning: 'Se descontarán sus HH de la cotización. La EDT original de Gemini se conservará para auditoría.',
+                        confirmLabel: 'Eliminar fase', destructive: true,
+                      });
+                      if (!accepted) return;
                       if (stageCode) onRemoveCommercialPhase?.(stageCode);
                       else onRemovePhase(index);
-                    }}>Eliminar</Button>
+                    })()}>Eliminar</Button>
                 )}
               </div>
               <div className={styles.phaseFields}>
@@ -335,11 +343,15 @@ export function QuotationPhaseWorkspace({
                                 title={task.wbs.startsWith('KT-')
                                   ? 'Quitar tarea añadida'
                                   : 'Excluir actividad del presupuesto; conservar evidencia Gemini'}
-                                onClick={() => {
-                                  if (!task.wbs.startsWith('KT-') &&
-                                      !window.confirm('¿Excluir esta actividad de la cotización, incluyendo sus asignaciones por perfil? El original de Gemini permanecerá intacto.')) return;
-                                  onDeleteTask(task.wbs);
-                                }}>×</Button>
+                                onClick={() => void (async () => {
+                                  const accepted = await confirm({
+                                    title: 'Eliminar tarea de la cotización',
+                                    description: '¿Excluir «' + task.name + '» de esta cotización?',
+                                    warning: 'Se quitarán las HH de todas sus asignaciones por perfil. La evidencia original de Gemini permanece intacta.',
+                                    confirmLabel: 'Eliminar tarea', destructive: true,
+                                  });
+                                  if (accepted) onDeleteTask(task.wbs);
+                                })()}>×</Button>
                             : <span className={styles.noDelete}/>}
                         </div>
                       ))}
@@ -419,6 +431,7 @@ export function QuotationPhaseWorkspace({
           </div>
         </section>
       )}
+      {removalConfirmationDialog}
     </Card>
   );
 }
