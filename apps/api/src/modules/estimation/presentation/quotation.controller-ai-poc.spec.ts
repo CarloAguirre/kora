@@ -82,6 +82,12 @@ describe('POST versions/ai-poc · Gemini con KDM', () => {
     expect(writes.join('')).toContain('Construyendo actividades y HH.');
     expect(writes.filter((s) => s.includes('event: thought'))).toHaveLength(2);
     expect(writes.filter((s) => s.includes('event: phase'))).toHaveLength(3);
+    const activities = writes.filter((s) => s.includes('event: activity'));
+    expect(activities.length).toBeGreaterThanOrEqual(5);
+    expect(activities.join('')).toContain('Respuestas y aclaraciones del cuestionario validadas.');
+    expect(activities.join('')).toContain('Equipos activos disponibles: 1');
+    expect(activities.join('')).toContain('Conciliación de perfiles y HH completada.');
+    expect(activities.join('')).toContain('Cotización guardada correctamente.');
     expect(writes.filter((s) => s.includes('event: complete'))).toHaveLength(1);
     expect(drafts.createAiPocDraft).toHaveBeenCalledOnce();
     expect(reply.raw.end).toHaveBeenCalledOnce();

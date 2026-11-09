@@ -385,14 +385,15 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
       (resolve) => { release = resolve; },
     ));
     fireEvent.click(screen.getByRole('button', { name: 'Analizar proyecto' }));
-    expect(screen.getByText('Ver razonamiento resumido del agente IA')).toBeInTheDocument();
-    const disclosure = screen.getByText('Ver razonamiento resumido del agente IA').closest('details');
+    expect(screen.getByText('Actividad del agente IA en tiempo real')).toBeInTheDocument();
+    const disclosure = screen.getByText('Actividad del agente IA en tiempo real').closest('details');
     expect(disclosure).toHaveAttribute('open');
     const log = screen.getByRole('log', { name: 'Resúmenes de razonamiento del agente IA' });
-    expect(log).toHaveTextContent('aún no ha enviado resúmenes');
+    expect(log).toHaveTextContent('El proveedor aún no ha enviado un resumen');
     const request = mocks.analyze.mock.calls[0]![0] as {
       onThoughtSummary?: (text: string) => void;
-      onProgress?: (phase: string, text: string) => void;
+      onProgress?: (phase: string, text: string, at?: string) => void;
+      onHeartbeat?: (seconds: number) => void;
     };
     expect(request.onThoughtSummary).toEqual(expect.any(Function));
     expect(request.onProgress).toEqual(expect.any(Function));
@@ -400,7 +401,11 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
       request.onProgress?.('reading', 'Consultando documentos en Drive.');
       request.onProgress?.('documents', 'Documentación leída: 3 archivos.');
       request.onProgress?.('gemini', 'Enviando antecedentes a Gemini.');
+      request.onHeartbeat?.(15);
     });
+    expect(screen.getByRole('list', { name: 'Actividad verificada del servidor' })
+      .querySelectorAll('li')).toHaveLength(4);
+    expect(log).toHaveTextContent('15 s transcurridos');
     expect(log).toHaveTextContent('Consultando documentos en Drive.');
     expect(log).toHaveTextContent('Documentación leída: 3 archivos.');
     expect(log).toHaveTextContent('Enviando antecedentes a Gemini.');
@@ -430,7 +435,7 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
       name: 'Resúmenes de razonamiento del agente IA',
     });
     expect(loadingLog).toBeVisible();
-    expect(screen.getByText('Ver razonamiento resumido del agente IA').closest('details'))
+    expect(screen.getByText('Actividad del agente IA en tiempo real').closest('details'))
       .toHaveAttribute('open');
     expect(loadingLog).toHaveTextContent('se están leyendo los documentos');
     expect(loadingLog).toHaveTextContent('el agente IA todavía no ha comenzado');
@@ -770,10 +775,9 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
     fireEvent.click(screen.getByLabelText('Sí'));
     fireEvent.click(screen.getByRole('button', { name: 'Continuar' }));
     expect(screen.getByText('Confirmar la estimación')).toBeInTheDocument();
-    expect(screen.getByText('Ver razonamiento resumido del agente IA')).toBeInTheDocument();
+    expect(screen.getByText('Actividad del agente IA en tiempo real')).toBeInTheDocument();
     expect(screen.getByText(/La cotización se guardará como borrador/)
-      .closest('details')).not.toHaveAttribute('open');
-    fireEvent.click(screen.getByText('Ver razonamiento resumido del agente IA'));
+      .closest('details')).toHaveAttribute('open');
     const log = screen.getByRole('log', { name: 'Resúmenes del agente IA durante la estimación' });
     expect(log).toHaveTextContent('Al generar la estimación');
     Object.defineProperty(log, 'scrollHeight', { value: 480, configurable: true });
@@ -784,14 +788,26 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
     const input = mocks.generate.mock.calls[0]![0] as {
       onThoughtSummary?: (chunk: string) => void;
       onPhase?: (phase: 'proposal' | 'edt' | 'saving') => void;
+      onActivity?: (step: string, text: string, at: string) => void;
+      onHeartbeat?: (seconds: number, phase: string) => void;
     };
     expect(input.onThoughtSummary).toEqual(expect.any(Function));
     expect(mocks.generate).toHaveBeenCalledOnce();
     await act(async () => {
       input.onThoughtSummary?.('Evaluando perfiles y capacidades. ');
+      input.onActivity?.('proposal_reading', 'Leyendo documentación para perfiles.', '2026-11-09T18:00:00Z');
+      input.onActivity?.('proposal_model_request', 'Solicitando propuesta al agente IA.', '2026-11-09T18:00:01Z');
       input.onPhase?.('edt');
+      input.onActivity?.('edt_model_request', 'Esperando respuesta de EDT.', '2026-11-09T18:00:02Z');
+      input.onHeartbeat?.(15, 'edt');
       input.onThoughtSummary?.('Consolidando actividades y HH.');
     });
+    expect(screen.getByRole('list', { name: 'Actividad de generación verificada' })
+      .querySelectorAll('li')).toHaveLength(4);
+    expect(log).toHaveTextContent('Leyendo documentación para perfiles.');
+    expect(log).toHaveTextContent('Solicitando propuesta al agente IA.');
+    expect(log).toHaveTextContent('Esperando respuesta de EDT.');
+    expect(log).toHaveTextContent('15 s transcurridos');
     expect(log).toHaveTextContent('Evaluando perfiles y capacidades. Consolidando actividades y HH.');
     expect(log.scrollTop).toBe(480); // Último fragmento visible automáticamente.
     expect(screen.getByText('Construyendo EDT y estimando HH por actividad…'))

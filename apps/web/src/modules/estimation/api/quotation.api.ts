@@ -89,11 +89,13 @@ export const quotationApi = {
     return api.post<QuotationTransferResult>(
       base(projectId) + '/versions/' + versionId + '/transfer-approved', input);
   },
-  /** Resúmenes oficiales en vivo de propuesta y EDT, sin solicitudes adicionales. */
+  /** Actividad del backend, heartbeat SSE y resúmenes oficiales del modelo. */
   generateAiDemoDraftStream(
     projectId: string, input: GenerateAiDemoQuotationInput,
     onThoughtSummary: (text: string) => void,
     onPhase?: (phase: 'proposal' | 'edt' | 'saving') => void,
+    onActivity?: (step: string, text: string, at: string) => void,
+    onHeartbeat?: (seconds: number, phase: string) => void,
   ): Promise<QuotationVersion> {
     return apiEventStream<QuotationVersion>(
       base(projectId) + '/versions/ai-poc/stream', input,
@@ -105,6 +107,15 @@ export const quotationApi = {
         } else if (event === 'phase') {
           const phase = (payload as { phase?: unknown }).phase;
           if (phase === 'proposal' || phase === 'edt' || phase === 'saving') onPhase?.(phase);
+        } else if (event === 'activity') {
+          const { step, text, at } = payload as Record<string, unknown>;
+          if (typeof step === 'string' && typeof text === 'string' &&
+            typeof at === 'string') onActivity?.(step, text, at);
+        } else if (event === 'heartbeat') {
+          const { elapsedSeconds, phase } = payload as Record<string, unknown>;
+          if (typeof elapsedSeconds === 'number' && typeof phase === 'string') {
+            onHeartbeat?.(elapsedSeconds, phase);
+          }
         }
       },
     );

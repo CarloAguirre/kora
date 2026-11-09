@@ -88,8 +88,9 @@ describe('AnalyzeEstimationPocUseCase', () => {
         // Los eventos de lectura y envío anteceden a la llamada al modelo,
         // sin esperar que Gemini publique thought summaries.
         expect(phases).toEqual([
+          'reading:Iniciando lectura de los documentos autorizados de Drive.',
           'documents:Documentación leída: 1 archivo(s) disponibles para el análisis.',
-          'gemini:Enviando los antecedentes al agente IA para elaborar el entendimiento.',
+          'model_request:Solicitando al agente IA el entendimiento y las aclaraciones del proyecto.',
         ]);
         seen.documents = request.documents;
         seen.task = request.task;

@@ -82,22 +82,29 @@ export const estimationApi = {
   driveFiles(input: ListEstimationDriveFilesInput): Promise<EstimationDriveFolderListing> {
     return api.post<EstimationDriveFolderListing>('/estimations/drive/files', input);
   },
-  /** Streaming autenticado, un único análisis Gemini con fragmentos thought oficiales. */
+  /** Una solicitud IA; actividad verificable y resúmenes del modelo independientes. */
   analyzePocStream(
     input: AnalyzeEstimationPocInput,
     onThoughtSummary: (text: string) => void,
     signal?: AbortSignal,
-    onProgress?: (phase: string, text: string) => void,
+    onProgress?: (phase: string, text: string, at?: string) => void,
+    onHeartbeat?: (seconds: number) => void,
   ): Promise<EstimationPocAnalysis> {
     return apiEventStream<EstimationPocAnalysis>(
       '/estimations/poc/analyze/stream', input,
       (event, payload) => {
         if (!payload || typeof payload !== 'object') return;
-        const value = payload as { text?: unknown; phase?: unknown };
-        if (typeof value.text !== 'string' || !value.text.trim()) return;
-        if (event === 'thought') onThoughtSummary(value.text);
-        if (event === 'phase' && typeof value.phase === 'string') {
-          onProgress?.(value.phase, value.text);
+        const value = payload as { text?: unknown; phase?: unknown;
+          at?: unknown; elapsedSeconds?: unknown };
+        if (event === 'thought' && typeof value.text === 'string' &&
+          value.text.trim()) onThoughtSummary(value.text);
+        if (event === 'phase' && typeof value.phase === 'string' &&
+          typeof value.text === 'string' && value.text.trim()) {
+          onProgress?.(value.phase, value.text,
+            typeof value.at === 'string' ? value.at : undefined);
+        }
+        if (event === 'heartbeat' && typeof value.elapsedSeconds === 'number') {
+          onHeartbeat?.(value.elapsedSeconds);
         }
       }, signal,
     );
