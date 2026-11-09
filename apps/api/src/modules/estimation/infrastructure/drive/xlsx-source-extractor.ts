@@ -26,11 +26,11 @@ const MAX_CELLS = 12000;
 const MAX_TEXT_CHARS = 140000;
 const MAX_CELL_CHARS = 1000;
 function stringifyCell(cell) {
-  if (!cell || cell.t === 'z') return '';
+  if (!cell) return '';
   if (cell.f && (cell.v === undefined || cell.v === null)) {
     return '[fórmula sin resultado calculado: =' + String(cell.f) + ']';
   }
-  if (cell.v === null || cell.v === undefined) return '';
+  if (cell.t === 'z' || cell.v === null || cell.v === undefined) return '';
   const formatted = cell.w !== undefined ? String(cell.w)
     : XLSX.utils.format_cell(cell);
   return formatted.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, ' ')
@@ -39,7 +39,7 @@ function stringifyCell(cell) {
 try {
   const workbook = XLSX.read(Buffer.from(workerData.bytes), {
     type: 'buffer', dense: true, sheetRows: MAX_ROWS + 1,
-    cellText: true, cellFormula: true, bookVBA: false,
+    cellText: true, cellFormula: true, sheetStubs: true, bookVBA: false,
   });
   if (!workbook.SheetNames.length) fail('el libro no contiene hojas.');
   if (workbook.SheetNames.length > MAX_SHEETS) {

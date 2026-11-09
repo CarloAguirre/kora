@@ -37,7 +37,7 @@ describe('ResolveEstimationDriveFolderUseCase', () => {
     expect(result.candidates[0]?.reasons.join(' ')).toContain('verificó documentos');
   });
 
-  it('no sugiere carpetas vacías ni carpetas que solo contienen XLSX', async () => {
+  it('admite carpetas con solo XLSX, pero nunca selecciona una carpeta vacía', async () => {
     const folder = (id: string): DriveFolderItem => ({
       id, name: 'Documentación Portal PDC',
       mimeType: 'application/vnd.google-apps.folder', itemType: 'folder',
@@ -58,10 +58,9 @@ describe('ResolveEstimationDriveFolderUseCase', () => {
       projectName: 'Documentación Portal PDC', clientName: null,
       documentationLink: null, quotationLink: null,
     });
-    expect(result.status).toBe('not_found');
-    expect(result.selectedFolder).toBeNull();
-    expect(result.candidates).toEqual([]);
-    expect(result.message).toContain('vacías');
+    expect(result.status).toBe('resolved');
+    expect(result.selectedFolder?.folderId).toBe('solo-xlsx');
+    expect(result.candidates.map((row) => row.folderId)).toEqual(['solo-xlsx']);
   });
 
   it('si Drive rechaza explorar una carpeta no la confunde con carpeta vacía', async () => {

@@ -300,7 +300,7 @@ describe('GoogleDriveDocumentSourceReader', () => {
     expect(describeDocumentCoverage(result.coverage)).toContain('límite de exploración');
   });
 
-  it('con carpeta compartida encuentra PDFs en raíz/subcarpeta y explica por qué no procesa XLSX', async () => {
+  it('con carpeta compartida analiza PDF y XLSX en raíz/subcarpeta', async () => {
     const folder = (id: string, name: string): DriveFolderItem => ({
       id, name, mimeType: 'application/vnd.google-apps.folder',
       modifiedAt: '2026-09-16T10:00:00.000Z', webViewLink: null,
@@ -318,20 +318,21 @@ describe('GoogleDriveDocumentSourceReader', () => {
           'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'),
       ] : id === 'fichas'
         ? [pdf('ficha', 'Ficha de levantamiento.pdf')] : [],
-      readAnalysisContent: async (id, mime) =>
-        ({ mimeType: mime, dataBase64: id === 'protocol' ? 'cGRmMQ==' : 'cGRmMg==' }),
+      readAnalysisContent: async (id, mime) => id === 'gantt'
+        ? ({ mimeType: 'text/plain', text: 'HOJA "Plan":\\nFila 2: A2="S1" | B2="Implementación"' })
+        : ({ mimeType: mime, dataBase64: id === 'protocol' ? 'cGRmMQ==' : 'cGRmMg==' }),
     };
     const result = await new GoogleDriveDocumentSourceReader(drive)
       .readDriveSourcesWithCoverage('https://drive.google.com/drive/folders/root123');
     expect(result.documents.map((doc) => doc.name)).toEqual([
-      'Ficha de levantamiento.pdf', '1.10 Protocolo Relocalización.pdf',
+      'Ficha de levantamiento.pdf', 'Cronograma Gantt.xlsx',
+      '1.10 Protocolo Relocalización.pdf',
     ]);
+    expect(result.documents.find((doc) => doc.name === 'Cronograma Gantt.xlsx')
+      ?.text).toContain('Implementación');
     expect(result.coverage?.scannedItems).toBe(4);
-    expect(result.coverage?.eligibleDocuments).toBe(2);
-    expect(result.coverage?.omitted).toEqual(expect.arrayContaining([
-      expect.objectContaining({ path: 'Cronograma Gantt.xlsx',
-        reason: 'formato no compatible con el lector' }),
-    ]));
+    expect(result.coverage?.eligibleDocuments).toBe(3);
+    expect(result.coverage?.omitted).toEqual([]);
   });
 
   it('si falla la lectura de PDF informa el motivo sin ocultar otro PDF válido', async () => {
