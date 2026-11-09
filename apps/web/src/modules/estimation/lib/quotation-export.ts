@@ -302,6 +302,15 @@ export function quotationClientBrief(model: ReturnType<typeof quotationExportMod
   ].slice(0, 6);
   const business = features.filter((label) => !supportingWork.test(label));
   const lower = (value: string) => value.charAt(0).toLocaleLowerCase('es') + value.slice(1);
+  const nominal = (value: string): string => {
+    const item = lower(value);
+    if (/^inspecciones y chequeos$/iu.test(value)) return 'la realización de inspecciones y chequeos';
+    if (/^reportes e indicadores$/iu.test(value)) return 'la generación de reportes e indicadores';
+    if (/^integraciones y servicios$/iu.test(value)) return 'la integración de servicios';
+    if (/^aprobaciones y validaciones$/iu.test(value)) return 'la gestión de aprobaciones y validaciones';
+    if (/^(?:mantenimiento|control de)/iu.test(value)) return 'el ' + item;
+    return 'la ' + item;
+  };
   const joinItems = (items: string[]): string => items.length === 1 ? items[0]! :
     items.length === 2 ? items.join(' y ') :
     items.slice(0, -1).join(', ') + ' y ' + items[items.length - 1]!;
@@ -326,12 +335,12 @@ export function quotationClientBrief(model: ReturnType<typeof quotationExportMod
   }
   if (!objective) {
     objective = business.length ?
-      'Implementar una solución con funcionalidades de ' +
-        joinItems(business.slice(0, 2).map(lower)) + '.' :
+      'Desarrollar una solución orientada a ' +
+        joinItems(business.slice(0, 2).map(nominal)) + '.' :
       'Desarrollar las capacidades definidas para el proyecto ' + tidy(model.projectName) + '.';
   }
   const scope = features.length > 2 ?
-    'La propuesta incluye ' + joinItems(features.slice(2, 5).map(lower)) +
+    'El alcance incluye ' + joinItems(features.slice(2, 4).map(nominal)) +
       ', con entregables definidos para cada componente.' :
     'El alcance considera los componentes y entregables acordados en esta propuesta comercial.';
   return { objective, scope, features };
