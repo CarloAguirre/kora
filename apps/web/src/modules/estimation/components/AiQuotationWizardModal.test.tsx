@@ -385,8 +385,8 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
       (resolve) => { release = resolve; },
     ));
     fireEvent.click(screen.getByRole('button', { name: 'Analizar proyecto' }));
-    expect(screen.getByText('Ver razonamiento resumido de Gemini')).toBeInTheDocument();
-    const disclosure = screen.getByText('Ver razonamiento resumido de Gemini').closest('details');
+    expect(screen.getByText('Ver razonamiento resumido del agente IA')).toBeInTheDocument();
+    const disclosure = screen.getByText('Ver razonamiento resumido del agente IA').closest('details');
     expect(disclosure).toHaveAttribute('open');
     const log = screen.getByRole('log', { name: 'Resúmenes de razonamiento de Gemini' });
     expect(log).toHaveTextContent('aún no ha enviado resúmenes');
@@ -430,7 +430,7 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
       name: 'Resúmenes de razonamiento de Gemini',
     });
     expect(loadingLog).toBeVisible();
-    expect(screen.getByText('Ver razonamiento resumido de Gemini').closest('details'))
+    expect(screen.getByText('Ver razonamiento resumido del agente IA').closest('details'))
       .toHaveAttribute('open');
     expect(loadingLog).toHaveTextContent('se están leyendo los documentos');
     expect(loadingLog).toHaveTextContent('Gemini todavía no ha comenzado');
@@ -697,11 +697,11 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
     fireEvent.click(screen.getByLabelText('Sí'));
     fireEvent.click(screen.getByRole('button', { name: 'Continuar' }));
     expect(screen.getByText('Confirmar la estimación')).toBeInTheDocument();
-    expect(screen.getByText('Ver razonamiento resumido de Gemini')).toBeInTheDocument();
+    expect(screen.getByText('Ver razonamiento resumido del agente IA')).toBeInTheDocument();
     expect(screen.getByText(/La cotización se guardará como borrador/)
       .closest('details')).not.toHaveAttribute('open');
-    fireEvent.click(screen.getByText('Ver razonamiento resumido de Gemini'));
-    const log = screen.getByRole('log', { name: 'Resúmenes de Gemini durante la estimación' });
+    fireEvent.click(screen.getByText('Ver razonamiento resumido del agente IA'));
+    const log = screen.getByRole('log', { name: 'Resúmenes del agente IA durante la estimación' });
     expect(log).toHaveTextContent('Al generar la estimación');
     let resolve!: (value: { id: string }) => void;
     mocks.generate.mockImplementationOnce(() =>
@@ -758,7 +758,7 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
     await prepareDocuments();
     fireEvent.click(screen.getByRole('button', { name: 'Analizar proyecto' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Gemini no consiguió analizar documentos reales de la carpeta indicada.',
+      'El agente IA no consiguió analizar documentos reales de la carpeta indicada.',
     );
     expect(screen.queryByText('Entendimiento del proyecto')).not.toBeInTheDocument();
     expect(mocks.generate).not.toHaveBeenCalled();

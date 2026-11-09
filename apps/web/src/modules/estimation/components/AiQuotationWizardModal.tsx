@@ -288,7 +288,8 @@ export function AiQuotationWizardModal({ project, onClose }: {
   const analysis = useAnalyzeEstimationPoc();
   const generate = useGenerateAiDemoQuotationVersion(project.id);
 
-  const verifiedAnalysis = analysisSnapshot?.provider === 'gemini' &&
+  const verifiedAnalysis = (analysisSnapshot?.provider === 'gemini' ||
+    analysisSnapshot?.provider === 'openai') &&
     analysisSnapshot.sourceMode === 'drive' && analysisSnapshot.documentsAnalyzed > 0
     ? analysisSnapshot : null;
   const fixed = questionnaire.data?.fixedQuestions ?? [];
@@ -622,9 +623,9 @@ export function AiQuotationWizardModal({ project, onClose }: {
         driveFolderUrl,
         instructions: instructions.trim() || null,
       });
-      if (result.provider !== 'gemini' || result.sourceMode !== 'drive' ||
+      if (!['gemini', 'openai'].includes(result.provider) || result.sourceMode !== 'drive' ||
           result.documentsAnalyzed < 1) {
-        reportError('Gemini no consiguió analizar documentos reales de la carpeta indicada.');
+        reportError('El agente IA no consiguió analizar documentos reales de la carpeta indicada.');
         return;
       }
       setAnalysisSnapshot(result);
@@ -863,7 +864,7 @@ export function AiQuotationWizardModal({ project, onClose }: {
                   setError('');
                 }} />
               <p className={styles.coverageNote}>La carpeta confirmada se guardará en Extras →
-                Documentación. Gemini analizará documentos reales de la selección.</p>
+                Documentación. El agente IA analizará documentos reales de la selección.</p>
             </div>
             ) : (
               <div className={styles.discoveryNoResults}>
@@ -907,7 +908,7 @@ export function AiQuotationWizardModal({ project, onClose }: {
                 Leyendo documentos y preparando las fuentes de análisis…
               </li>
               <li className={styles.milestonePending}>
-                <span className={styles.milestoneCircle} /> Analizar el proyecto con Gemini
+                <span className={styles.milestoneCircle} /> Analizar el proyecto con IA
               </li>
             </ol>
           )}
@@ -982,7 +983,7 @@ export function AiQuotationWizardModal({ project, onClose }: {
                   <details className={styles.more}>
                     <summary>Indicaciones adicionales · opcional</summary>
                     <label className={styles.textLabel} htmlFor="kora-quotation-instructions">
-                      Instrucciones para Gemini
+                      Instrucciones para el agente IA
                     </label>
                     <textarea id="kora-quotation-instructions" className={styles.textarea}
                       value={instructions} maxLength={3000}
@@ -1003,7 +1004,7 @@ export function AiQuotationWizardModal({ project, onClose }: {
                   </li>
                   <li className={styles.milestoneActive}>
                     <span className={styles.milestoneSpinner} aria-hidden="true" />
-                    Gemini está revisando antecedentes y elaborando el entendimiento…
+                    El agente IA está revisando antecedentes y elaborando el entendimiento…
                   </li>
                   <li className={styles.milestonePending}>
                     <span className={styles.milestoneCircle} />
@@ -1020,13 +1021,13 @@ export function AiQuotationWizardModal({ project, onClose }: {
           )}
           {(sourceStep === 'loading' || sourceStep === 'analyzing') && (
             <details className={[styles.more, styles.thoughtDisclosure].join(' ')} open>
-              <summary>Ver razonamiento resumido de Gemini</summary>
+              <summary>Ver razonamiento resumido del agente IA</summary>
               <div ref={analysisLogRef} className={styles.thoughtLog} role="log"
-                aria-label="Resúmenes de razonamiento de Gemini"
+                aria-label="Resúmenes de razonamiento del agente IA"
                 aria-live="polite" aria-relevant="additions text">
                 {sourceStep === 'loading' ? (
                   <p>Actividad verificada: se están leyendo los documentos autorizados
-                    de Google Drive. Gemini todavía no ha comenzado el análisis;
+                    de Google Drive. el agente IA todavía no ha comenzado el análisis;
                     sus resúmenes aparecerán cuando se invoque el modelo.</p>
                 ) : (
                   <>
@@ -1039,14 +1040,14 @@ export function AiQuotationWizardModal({ project, onClose }: {
                     ) : <p>Conectando con el servicio de análisis documental…</p>}
                     {geminiThoughtSummary
                       ? <p>{geminiThoughtSummary}</p>
-                      : <p>Gemini aún no ha enviado resúmenes de razonamiento.
+                      : <p>El agente IA aún no ha enviado resúmenes de razonamiento.
                           Puede publicarlos cerca del final de la respuesta.</p>}
                   </>
                 )}
               </div>
               <p className={styles.thoughtFootnote}>
                 La actividad muestra operaciones verificables del servidor;
-                los resúmenes son solo los publicados por Gemini, no su razonamiento interno.
+                los resúmenes son solo los publicados por el proveedor IA, no su razonamiento interno.
               </p>
             </details>
           )}
@@ -1103,7 +1104,7 @@ export function AiQuotationWizardModal({ project, onClose }: {
           <h3 className={styles.srOnly}>Aclaraciones de mayor impacto</h3>
           <p className={styles.intro}>{dynamic.length} aclaraciones de mayor impacto. Lo demás quedó como supuesto.</p>
           {dynamic.length === 0 ? (
-            <p className={styles.summaryBox}>Gemini no detectó aclaraciones adicionales de impacto.</p>
+            <p className={styles.summaryBox}>El agente IA no detectó aclaraciones adicionales de impacto.</p>
           ) : dynamic.map((question, index) => (
             <div key={question.id} className={styles.dynamic}>
               <QuestionField question={{ ...question, category: 'Aclaración ' + (index + 1) + ' de ' + dynamic.length + ' · ' + question.category }} value={answers[question.id]}
@@ -1145,7 +1146,7 @@ export function AiQuotationWizardModal({ project, onClose }: {
               antes de utilizarla en un proyecto real.</p>
           </div>
           <details className={[styles.more, styles.thoughtDisclosure].join(' ')}>
-            <summary>Ver razonamiento resumido de Gemini</summary>
+            <summary>Ver razonamiento resumido del agente IA</summary>
             {proposalPhase !== 'idle' && <p className={styles.thoughtPhase} role="status">
               {proposalPhase === 'proposal' ? 'Preparando propuesta de perfiles y capacidad…' :
                 proposalPhase === 'edt' ? 'Construyendo EDT y estimando HH por actividad…' :
@@ -1153,13 +1154,13 @@ export function AiQuotationWizardModal({ project, onClose }: {
                     'La generación no pudo completarse.'}
             </p>}
             <div ref={proposalLogRef} className={styles.thoughtLog} role="log"
-              aria-label="Resúmenes de Gemini durante la estimación"
+              aria-label="Resúmenes del agente IA durante la estimación"
               aria-live="polite" aria-relevant="additions text">
               {proposalThoughtSummary
                 ? <p>{proposalThoughtSummary}</p>
                 : <p>{proposalPhase === 'idle'
-                  ? 'Al generar la estimación, se mostrarán aquí los resúmenes que entregue Gemini.'
-                  : 'Gemini aún no ha enviado resúmenes de razonamiento para esta etapa.'}</p>}
+                  ? 'Al generar la estimación, se mostrarán aquí los resúmenes que entregue el agente IA.'
+                  : 'El agente IA aún no ha enviado resúmenes de razonamiento para esta etapa.'}</p>}
             </div>
             <p className={styles.thoughtFootnote}>
               La cotización se guardará como borrador con revisión IA pendiente.
