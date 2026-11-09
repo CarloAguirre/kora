@@ -1,5 +1,6 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { AppConfigService } from '../../../config/app-config.service';
+import { fetchGeminiResponseWithRetry } from './gemini-transient-retry';
 import type {
   AiDocumentInput,
   AiProvider,
@@ -45,7 +46,7 @@ export class GeminiAiProvider implements AiProvider {
     try {
       // Evita que una solicitud quede indefinidamente en espera. No reintenta
       // automáticamente un timeout, que podría consumir cuota de todas formas.
-      response = await fetch(url, {
+      response = await fetchGeminiResponseWithRetry(url, {
         method: 'POST',
         signal: AbortSignal.timeout(180_000),
         headers: {
@@ -95,8 +96,8 @@ export class GeminiAiProvider implements AiProvider {
         : response.status === 503 ? HttpStatus.SERVICE_UNAVAILABLE
           : HttpStatus.BAD_GATEWAY;
       const advice = response.status === 429
-        ? 'Se agotó la cuota o el límite temporal del modelo. No se reintentó.'
-        : 'La solicitud fue rechazada por el proveedor; no se reintentó.';
+        ? 'Revisa cuota, facturación y límites en Google AI Studio.'
+        : 'Saturación temporal del proveedor; se agotaron los reintentos configurados.';
       throw new HttpException(
         `Gemini [${input.task}] modelo ${geminiModel}: HTTP ${response.status}${status}: ${reason}. ${advice}`,
         httpStatus,
@@ -146,7 +147,7 @@ export class GeminiAiProvider implements AiProvider {
     url.searchParams.set('alt', 'sse');
     let response: Response;
     try {
-      response = await fetch(url, {
+      response = await fetchGeminiResponseWithRetry(url, {
         method: 'POST',
         signal: AbortSignal.timeout(180_000),
         headers: { 'Content-Type': 'application/json', 'x-goog-api-key': geminiApiKey },
@@ -176,7 +177,7 @@ export class GeminiAiProvider implements AiProvider {
         reason = body.error?.message?.slice(0, 450) ?? reason;
       } catch { /* Respuesta no JSON */ }
       throw new HttpException(
-        `Gemini [${input.task}] modelo ${geminiModel}: HTTP ${response.status}: ${reason}. No se reintentó.`,
+        `Gemini [${input.task}] modelo ${geminiModel}: HTTP ${response.status}: ${reason}. Revisa cuotas y disponibilidad; los reintentos están limitados.`,
         response.status === 429 ? HttpStatus.TOO_MANY_REQUESTS
           : response.status === 503 ? HttpStatus.SERVICE_UNAVAILABLE
             : HttpStatus.BAD_GATEWAY,

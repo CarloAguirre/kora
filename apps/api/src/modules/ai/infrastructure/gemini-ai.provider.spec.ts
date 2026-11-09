@@ -134,7 +134,7 @@ describe('GeminiAiProvider · respuestas de infraestructura sin llamadas reales'
     expect(error).toBeInstanceOf(HttpException);
     expect((error as HttpException).getStatus()).toBe(503);
     expect((error as HttpException).message).toMatch(/HTTP 503/);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
   it('distingue JSON parcial de Gemini y nunca retorna el resultado cortado', async () => {
