@@ -74,10 +74,11 @@ export class AnalyzeEstimationPocUseCase {
   async execute(
     input: AnalyzeEstimationPocInput, authorizedSources?: DocumentSourceReader,
     onThoughtSummary?: (text: string) => void,
-    onProgress?: (phase: 'documents' | 'gemini', text: string) => void,
+    onProgress?: (phase: string, text: string) => void,
   ): Promise<EstimationPocAnalysis> {
     const isLegacyPoc = this.ai.name === 'poc-ai';
     const sourceReader = authorizedSources ?? this.sources;
+    onProgress?.('reading', 'Iniciando lectura de los documentos autorizados de Drive.');
     const loaded = isLegacyPoc || !sourceReader
       ? { documents: [], coverage: null }
       : await readEstimationDocuments(sourceReader, input.driveFolderUrl);
@@ -89,7 +90,7 @@ export class AnalyzeEstimationPocUseCase {
     const selected = loaded.documents;
     onProgress?.('documents',
       'Documentación leída: ' + selected.length + ' archivo(s) disponibles para el análisis.');
-    onProgress?.('gemini', 'Enviando los antecedentes al agente IA para elaborar el entendimiento.');
+    onProgress?.('model_request', 'Solicitando al agente IA el entendimiento y las aclaraciones del proyecto.');
     const raw = await this.ai.generateStructured({
       task: 'estimation.poc.analysis',
       context: {
@@ -133,6 +134,7 @@ export class AnalyzeEstimationPocUseCase {
       ...(isLegacyPoc ? {} : { responseJsonSchema: DYNAMIC_QUESTIONS_JSON_SCHEMA }),
     }, onThoughtSummary);
 
+    onProgress?.('model_response', 'Respuesta del agente recibida; comprobando su estructura.');
     if (typeof raw !== 'object' || raw === null) {
       throw new BadRequestException('El proveedor IA no entregó un análisis documental estructurado.');
     }
@@ -261,7 +263,8 @@ export class AnalyzeEstimationPocUseCase {
         dependsOn: [],
       };
     });
-    return estimationPocAnalysisSchema.parse({
+    onProgress?.('validation', 'Verificando preguntas, opciones y referencias a las fuentes.');
+    const result = estimationPocAnalysisSchema.parse({
       projectId: input.projectId,
       provider: this.ai.name,
       sourceMode: isLegacyPoc || extractDriveFolderId(input.driveFolderUrl) === 'kora-poc-fallback'
@@ -275,5 +278,7 @@ export class AnalyzeEstimationPocUseCase {
       fixedPrefills,
       dynamicQuestions: normalizedQuestions,
     });
+    onProgress?.('ready', 'Análisis validado: ' + result.dynamicQuestions.length + ' aclaraciones propuestas.');
+    return result;
   }
 }
