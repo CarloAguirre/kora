@@ -266,6 +266,7 @@ export function AiQuotationWizardModal({ project, onClose }: {
     phase: string; text: string;
   }>>([]);
   const [proposalThoughtSummary, setProposalThoughtSummary] = useState('');
+  const [proposalPhase, setProposalPhase] = useState<'idle' | 'proposal' | 'edt' | 'saving' | 'error'>('idle');
   const analysisLogRef = useRef<HTMLDivElement | null>(null);
   const proposalLogRef = useRef<HTMLDivElement | null>(null);
   // Mantener ambos logs con overflow propio al final de cada actualización SSE.
@@ -278,7 +279,6 @@ export function AiQuotationWizardModal({ project, onClose }: {
     if (proposalLogRef.current)
       proposalLogRef.current.scrollTop = proposalLogRef.current.scrollHeight;
   }, [proposalThoughtSummary, proposalPhase]);
-  const [proposalPhase, setProposalPhase] = useState<'idle' | 'proposal' | 'edt' | 'saving' | 'error'>('idle');
   const [generating, setGenerating] = useState(false);
   const generationInFlight = useRef(false);
   const driveStatus = useEstimationDriveOAuthPocStatus();
