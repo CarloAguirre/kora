@@ -703,6 +703,7 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
     fireEvent.click(screen.getByText('Ver razonamiento resumido del agente IA'));
     const log = screen.getByRole('log', { name: 'Resúmenes del agente IA durante la estimación' });
     expect(log).toHaveTextContent('Al generar la estimación');
+    Object.defineProperty(log, 'scrollHeight', { value: 480, configurable: true });
     let resolve!: (value: { id: string }) => void;
     mocks.generate.mockImplementationOnce(() =>
       new Promise<{ id: string }>((res) => { resolve = res; }));
@@ -719,6 +720,7 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
       input.onThoughtSummary?.('Consolidando actividades y HH.');
     });
     expect(log).toHaveTextContent('Evaluando perfiles y capacidades. Consolidando actividades y HH.');
+    expect(log.scrollTop).toBe(480); // Último fragmento visible automáticamente.
     expect(screen.getByText('Construyendo EDT y estimando HH por actividad…'))
       .toHaveAttribute('role', 'status');
     expect(screen.getByRole('button', { name: /Generando estimación/ })).toBeDisabled();
