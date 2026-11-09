@@ -338,13 +338,13 @@ export class DrizzleQuotationRepository implements QuotationRepository {
     answers: readonly SubmitEstimationAnswerInput[],
     dynamicQuestions: readonly EstimationQuestion[], edt: QuotationReferenceEdt,
     confirmedUnderstanding?: string, roleTeamIds?: Readonly<Record<string, string>>): Promise<QuotationVersion> {
-    if (proposal.projectId !== projectId || proposal.provider !== 'gemini' ||
+    if (proposal.projectId !== projectId || !['gemini', 'openai'].includes(proposal.provider) ||
         !['poc_simulated', 'drive'].includes(proposal.sourceMode) || proposal.documentsAnalyzed < 1 ||
         proposal.totalHours <= 0 || proposal.roles.some((role) => role.totalHours <= 0) ||
         Math.abs(proposal.roles.reduce((total, role) => total + role.totalHours, 0) - proposal.totalHours) > 0.011 ||
         Math.abs(edt.totalHours - proposal.totalHours) > 0.011 ||
-        edt.source !== (proposal.sourceMode === 'drive' ? 'drive' : 'kdm_demo') || edt.provider !== 'gemini') {
-      throw new BadRequestException('Propuesta Gemini sin trazabilidad documental coherente o HH conciliadas.');
+        edt.source !== (proposal.sourceMode === 'drive' ? 'drive' : 'kdm_demo') || edt.provider !== proposal.provider) {
+      throw new BadRequestException('Propuesta IA sin trazabilidad documental coherente o HH conciliadas.');
     }
     return this.createVersionInternal(projectId, userId, {}, { proposal, answers, dynamicQuestions, edt, confirmedUnderstanding, roleTeamIds });
   }
@@ -677,11 +677,12 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       const snapshot = draft.aiPoc;
       const edt = snapshot?.edt;
       if (!snapshot || !edt || !['kdm_demo', 'drive'].includes(snapshot.source) ||
-          edt.source !== snapshot.source || edt.provider !== 'gemini' ||
-          snapshot.proposal.provider !== 'gemini' ||
+          edt.source !== snapshot.source ||
+          !['gemini', 'openai'].includes(edt.provider) ||
+          snapshot.proposal.provider !== edt.provider ||
           snapshot.proposal.projectId !== projectId ||
           draft.analysisProjectionStatus !== 'synced') {
-        throw new BadRequestException('EDT no conciliada o sin evidencia Gemini de la fuente declarada.');
+        throw new BadRequestException('EDT no conciliada o sin evidencia IA de la fuente declarada.');
       }
       const roles = snapshot.proposal.roles;
       const roleNames = roles.map((role) => role.role);

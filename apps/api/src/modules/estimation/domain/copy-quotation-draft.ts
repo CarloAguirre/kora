@@ -27,7 +27,8 @@ export function copyQuotationDraft(
     snapshot.proposal.sourceMode === 'drive' &&
     snapshot.proposal.projectId === destinationProjectId &&
     snapshot.edt?.source === 'drive' &&
-    snapshot.edt.provider === 'gemini';
+    ['gemini', 'openai'].includes(snapshot.edt.provider) &&
+    snapshot.edt.provider === snapshot.proposal.provider;
 
   if (preserveRealDriveEdt) {
     // Zod crea el nuevo draft y valida los metadatos copiados; no altera v1.

@@ -273,7 +273,7 @@ export class ManageQuotationDraftsUseCase {
     roleTeamIds?: Readonly<Record<string, string>>,
   ): Promise<QuotationVersion> {
     await this.authorizeAiPoc(projectId, actor);
-    if (proposal.projectId !== projectId || proposal.provider !== 'gemini' ||
+    if (proposal.projectId !== projectId || !['gemini', 'openai'].includes(proposal.provider) ||
         !['poc_simulated', 'drive'].includes(proposal.sourceMode)) {
       throw new BadRequestException('El proyecto y el origen de la propuesta IA no coinciden.');
     }
