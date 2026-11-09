@@ -1,4 +1,8 @@
+import { useEffect, useState } from 'react';
 import type { ProjectModuleDelivery, ProjectTeamMember } from '@kora/contracts';
+import { Modal } from '@/shared/components/ui/Modal';
+import { Button } from '@/shared/components/ui/Button';
+import styles from './TeamLeaderProjectView.module.css';
 import { useToast } from '@/shared/components/ui/Toast';
 import { ApiRequestError } from '@/shared/lib/api-client';
 import { useUpdateProjectModuleDelivery } from '../api/projects.queries';
@@ -8,7 +12,9 @@ import { AssignCollaboratorModal } from './AssignCollaboratorModal';
 import { assignableOptions } from '@/modules/users/lib/assignable-options';
 
 export interface DeliveryActionTarget {
-  readonly action: DeliveryAction;
+  readonly action: DeliveryAction | 'finalize';
+  readonly blockName?: string;
+  readonly blockStartDate?: string;
   readonly moduleId: string;
   readonly moduleName: string;
   readonly delivery: ProjectModuleDelivery;
@@ -37,6 +43,11 @@ const ON_BEHALF_PROMPT = {
 };
 
 const formatDate = (value: string) => new Date(`${value}T00:00:00`).toLocaleDateString('es-CL');
+const localToday = () => {
+  const now = new Date();
+  return [now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0'),
+    String(now.getDate()).padStart(2, '0')].join('-');
+};
 
 /**
  * Modales de gestión de una entrega (marcarla terminada en nombre del colaborador, asignar/reasignar,
@@ -47,7 +58,18 @@ export function DeliveryActionDialogs({ projectId, members, target, onClose }: D
   const toast = useToast();
   const updateDelivery = useUpdateProjectModuleDelivery();
   const delivery = target?.delivery;
-  const reviewAction = target && target.action !== 'assign' ? target.action : null;
+  const reviewAction = target && target.action !== 'assign' && target.action !== 'finalize'
+    ? target.action : null;
+  const [completedOn, setCompletedOn] = useState(localToday());
+  const [completionComment, setCompletionComment] = useState('');
+  const [completionError, setCompletionError] = useState('');
+  useEffect(() => {
+    if (target?.action === 'finalize') {
+      setCompletedOn(localToday());
+      setCompletionComment('');
+      setCompletionError('');
+    }
+  }, [target]);
 
   const summary = delivery
     ? [
@@ -86,6 +108,29 @@ export function DeliveryActionDialogs({ projectId, members, target, onClose }: D
     }
   };
 
+  const onConfirmFinalize = async () => {
+    if (!target || target.action !== 'finalize') return;
+    const start = target.blockStartDate?.slice(0, 10);
+    if (!completedOn || completedOn > localToday() || (start && completedOn < start)) {
+      setCompletionError('La fecha real debe estar entre el inicio del bloque y hoy.');
+      return;
+    }
+    try {
+      await updateDelivery.mutateAsync({
+        projectId, moduleId: target.moduleId, deliveryId: target.delivery.id,
+        input: {
+          finalizeBlock: true, completedOn,
+          ...(completionComment.trim() ? { comment: completionComment.trim() } : {}),
+        },
+      });
+      toast.success('Entrega registrada. El bloque quedó cerrado y con 100 % de avance.');
+      onClose();
+    } catch (error) {
+      toast.error(error instanceof ApiRequestError ? error.message :
+        'No se pudo cerrar el bloque. Comprueba que todas sus tareas estén aprobadas.');
+    }
+  };
+
   const onConfirmAssign = async (userId: string) => {
     if (!target) return;
     try {
@@ -104,6 +149,42 @@ export function DeliveryActionDialogs({ projectId, members, target, onClose }: D
 
   return (
     <>
+      <Modal open={target?.action === 'finalize'} title="Marcar como entregada"
+        onClose={onClose} dismissible={!updateDelivery.isPending}
+        footer={<>
+          <Button variant="outline" disabled={updateDelivery.isPending} onClick={onClose}>Cancelar</Button>
+          <Button loading={updateDelivery.isPending} onClick={() => void onConfirmFinalize()}>
+            Marcar como entregada
+          </Button>
+        </>}>
+        <div className={styles.taskForm}>
+          <p><strong>Entrega:</strong> {delivery?.name ?? 'Entrega del bloque'}</p>
+          <p><strong>Bloque de trabajo:</strong> {target?.blockName ?? delivery?.segmentName ?? '—'}</p>
+          <p className={styles.deliverySubtitle}>
+            El cierre registra al líder, la fecha real y la evidencia. La entrega queda aprobada
+            y el bloque llega al 100 % cuando todas sus tareas están aprobadas.
+          </p>
+          <div className={styles.field}>
+            <label className={styles.fieldLabel} htmlFor="delivery-completed-on">
+              Fecha real de entrega
+            </label>
+            <input id="delivery-completed-on" className={styles.deliveryDateInput}
+              type="date" value={completedOn} min={target?.blockStartDate?.slice(0, 10)}
+              max={localToday()}
+              onChange={(event) => { setCompletedOn(event.target.value); setCompletionError(''); }} />
+          </div>
+          <div className={styles.field}>
+            <label className={styles.fieldLabel} htmlFor="delivery-completion-comment">
+              Evidencia o comentario (opcional)
+            </label>
+            <textarea id="delivery-completion-comment" className={styles.textarea}
+              maxLength={1000} value={completionComment}
+              onChange={(event) => setCompletionComment(event.target.value)}
+              placeholder="Acta de conformidad, enlace o detalle de entrega" />
+          </div>
+          {completionError && <p role="alert" className={styles.modalError}>{completionError}</p>}
+        </div>
+      </Modal>
       <ReviewActionModal
         open={reviewAction !== null}
         action={reviewAction === 'complete' || reviewAction === null ? 'approve' : reviewAction}
