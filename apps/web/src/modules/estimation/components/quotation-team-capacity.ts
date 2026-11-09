@@ -29,7 +29,8 @@ const weeksOf = (team: Team) => team.unit === 'day' ? team.duration / 5 : team.d
  *
  * EDT: HH son las tareas; carga media = HH / dotación / duración; el pico
  * se obtiene de semanas y tramos realmente planificados, con solapamientos.
- * Manual: HH comerciales = dotación × semanas × hh/sem × dedicación.
+ * Manual: HH = dotación × semanas × hh/sem; dedicación es un espejo
+ * de esa capacidad (40 HH = 100%), NO otro multiplicador.
  * En ningún caso esta auditoría modifica el presupuesto ni asume una
  * asignación individual de actividades (distribución equitativa orientativa).
  */
@@ -43,12 +44,11 @@ export function quotationTeamCapacity(
   // de HH/sem ya redondeada a dos decimales (100/3 => 83,33%, no 83,32%).
   const exactAverage = hasEdt
     ? weeks > 0 ? totalHours / collaborators / weeks : null
-    : team.hoursPerWeek * team.dedicationPercent / 100;
+    : team.hoursPerWeek;
   const averagePerPerson = exactAverage === null ? null : round(exactAverage);
   const occupationPercent = exactAverage === null ? null
     : round(exactAverage / KORA_QUOTATION_REFERENCE_WEEK_HOURS * 100);
-  const capacityPerPerson = round(
-    KORA_QUOTATION_REFERENCE_WEEK_HOURS * team.dedicationPercent / 100);
+  const capacityPerPerson = round(team.hoursPerWeek);
   const loads = [...(scheduled?.weeklyHours ?? new Map<number, number>())]
     .map(([week, hh]) => ({ week, perPerson: hh / collaborators }))
     .sort((a, b) => a.week - b.week);

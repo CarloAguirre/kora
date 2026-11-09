@@ -199,8 +199,7 @@ export function projectPocRolesToQuotationDraft(
     return {
       teamId, collaborators,
       unit: 'week' as const, duration,
-      hoursPerWeek: Math.min(168,
-        Math.round(group.hours / duration / collaborators * 100) / 100),
+      hoursPerWeek: 40,
       dedicationPercent: 100,
     };
   });
@@ -220,29 +219,17 @@ export function projectPocRolesToQuotationDraft(
 
 
 /**
- * Compatibilidad de borradores EDT: hoursPerWeek es solo una media derivada
- * de las HH de tareas. Nunca multiplica ni reduce las HH originales.
- * Se normaliza al modificar dotación, duración, distribución o antes de guardar.
- * El contrato legado admite hasta 168; el indicador visual de carga utiliza
- * las HH reales y advierte sobre excesos, incluso por encima de ese límite.
+ * En EDT los datos hoursPerWeek/dedicationPercent son disponibilidad
+ * comercial, NO carga media derivada de la EDT. Sin decisión explícita:
+ * 40 HH/semana = 100%. Se conserva el snapshot y todas las HH de Gemini.
  */
 export function synchronizeQuotationEdtTeamLoad(draft: QuotationDraftData): QuotationDraftData {
   if (!draft.aiPoc?.edt) return draft;
-  const totals = new Map<string, number>();
-  for (const assignment of quotationEdtAssignments(draft)) {
-    if (assignment.teamKey.startsWith('profile:')) continue;
-    totals.set(assignment.teamKey,
-      (totals.get(assignment.teamKey) ?? 0) + assignment.hours);
-  }
+  const customized = new Set(draft.edtCapacityCustomizedTeamIds ?? []);
   return {
     ...draft,
-    teams: draft.teams.map((team) => {
-      const weeks = team.unit === 'day' ? team.duration / 5 : team.duration;
-      const total = totals.get(team.teamId) ?? 0;
-      const derived = weeks > 0 && team.collaborators > 0
-        ? Math.round(total / weeks / team.collaborators * 100) / 100 : 0;
-      return { ...team, hoursPerWeek: Math.min(168, derived) };
-    }),
+    teams: draft.teams.map((team) => customized.has(team.teamId)
+      ? team : { ...team, hoursPerWeek: 40, dedicationPercent: 100 }),
   };
 }
 
@@ -263,11 +250,11 @@ export function reconcilePocCommercialDraft(draft: QuotationDraftData): Quotatio
       return current ? { ...team, collaborators: current.collaborators,
         unit: current.unit,
         duration: current.duration > 0 ? current.duration : team.duration,
-        // EDT: la carga media depende de colaboradores y duración actuales.
-        // El usuario sigue editando la dedicación/disponibilidad de forma libre.
-        hoursPerWeek: draft.aiPoc?.edt ? team.hoursPerWeek :
-          current.hoursPerWeek > 0 ? current.hoursPerWeek : team.hoursPerWeek,
-        dedicationPercent: current.dedicationPercent } : team;
+        // Solo la edición comercial explícita reemplaza el valor base.
+        hoursPerWeek: draft.edtCapacityCustomizedTeamIds?.includes(team.teamId)
+          ? current.hoursPerWeek : 40,
+        dedicationPercent: draft.edtCapacityCustomizedTeamIds?.includes(team.teamId)
+          ? current.dedicationPercent : 100 } : team;
     }),
     phases: projected.phases.map((phase) => {
       const code = phase.name.split(' · ')[0];

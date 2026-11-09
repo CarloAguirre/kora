@@ -7,7 +7,7 @@ export function calculateQuotation(draft: QuotationDraftData, hourlyRate: number
   const hours = draft.mode === 'team'
     ? draft.teams.reduce((sum, team) =>
         sum + team.collaborators * (team.unit === 'day' ? team.duration / 5 : team.duration)
-          * team.hoursPerWeek * team.dedicationPercent / 100, 0)
+          * team.hoursPerWeek, 0)
     : draft.phases.reduce((sum, phase) =>
         sum + phase.teamHours.reduce((acc, item) => acc + (active.has(item.teamId) ? item.hours : 0), 0), 0);
   const totalHours = round(hours, 2);

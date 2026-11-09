@@ -95,6 +95,9 @@ export const quotationDraftDataSchema = z.object({
     role: z.string().trim().min(1).max(120),
     hours: z.number().positive().max(1000000),
   })).max(240).optional(),
+  /** Equipos con jornada editada explícitamente; los borradores IA antiguos
+   * parten de 40 HH/semana y 100% sin mutar su EDT original. */
+  edtCapacityCustomizedTeamIds: z.array(uuidSchema).max(100).optional(),
   /** Actividades de Gemini excluidas solo del presupuesto comercial; la evidencia IA sigue intacta. */
   edtExcludedWbs: z.array(z.string().trim().min(1).max(40)).max(120).optional(),
   /** Configuración comercial por asignación WBS×perfil, sin modificar Gemini. */

@@ -52,8 +52,11 @@ export function replanQuotationEdtForWorkforce(draft: QuotationDraftData): Quota
       }
     }
     if (segmentLoads.size) {
-      nextWeek += Math.max(1, ...[...segmentLoads].map(([id, amount]) =>
-        Math.ceil(amount / (40 * (people.get(id) ?? 1)))));
+      nextWeek += Math.max(1, ...[...segmentLoads].map(([id, amount]) => {
+        const capacity = draft.teams.find((team) => team.teamId === id)?.hoursPerWeek ?? 40;
+        if (capacity <= 0) throw new Error('Define HH/semana positivas para el equipo ' + id);
+        return Math.ceil(amount / (capacity * (people.get(id) ?? 1)));
+      }));
     }
     if (nextWeek > 521) throw new Error('La dotación indicada requiere más de 520 semanas.');
   }
@@ -101,7 +104,10 @@ export function replanQuotationEdtForWorkforce(draft: QuotationDraftData): Quota
     edtHourAdjustments: adjustedHours,
     teams: draft.teams.map((team) => ({
       ...team, unit: 'week' as const, duration: 0,
-      hoursPerWeek: 40, dedicationPercent: 100,
+      hoursPerWeek: draft.edtCapacityCustomizedTeamIds?.includes(team.teamId)
+        ? team.hoursPerWeek : 40,
+      dedicationPercent: draft.edtCapacityCustomizedTeamIds?.includes(team.teamId)
+        ? team.dedicationPercent : 100,
     })),
   };
 }
