@@ -857,7 +857,7 @@ export function QuotationWorkspacePage() {
                 onSave={() => void save()}
                 actions={selected && project ? (
                   <QuotationCommercialLifecycleCard
-                    key={selected.id + ':' + selected.revision}
+                    key={selected.id}
                     project={project} version={selected}
                     quotation={quotation ?? null}
                     canOperate={mayWrite} hasUnsavedChanges={dirty}

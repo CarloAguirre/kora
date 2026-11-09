@@ -45,7 +45,14 @@ describe('Iteración 4 · controles nativos y flujos de cotización', () => {
     expect(aiStyles).not.toContain('button:last-child');
   });
 
-  it('conserva footer único y los mensajes con useToast sin tocar persistencia', () => {
+  it('no reinicia el modal de traspaso cuando cambia la revisión al aprobar', () => {
+    // La aprobación incrementa revision y actualiza la query; la segunda
+    // confirmación de traspaso conserva su estado usando la identidad de versión.
+    expect(page).toContain('key={selected.id}');
+    expect(page).not.toContain("key={selected.id + ':' + selected.revision}");
+  });
+
+    it('conserva footer único y los mensajes con useToast sin tocar persistencia', () => {
     expect(page).toContain('<QuotationDraftSaveBar');
     expect(page).toContain('saveDraft.mutateAsync');
     expect(page).toContain('await lifecycle.acceptAi.mutateAsync');
