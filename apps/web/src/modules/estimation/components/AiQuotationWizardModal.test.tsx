@@ -389,7 +389,7 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
     const disclosure = screen.getByText('Actividad del agente IA en tiempo real').closest('details');
     expect(disclosure).toHaveAttribute('open');
     const log = screen.getByRole('log', { name: 'Resúmenes de razonamiento del agente IA' });
-    expect(log).toHaveTextContent('aún no ha enviado resúmenes');
+    expect(log).toHaveTextContent('El proveedor aún no ha enviado un resumen');
     const request = mocks.analyze.mock.calls[0]![0] as {
       onThoughtSummary?: (text: string) => void;
       onProgress?: (phase: string, text: string, at?: string) => void;
