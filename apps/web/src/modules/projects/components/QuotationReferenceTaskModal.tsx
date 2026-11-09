@@ -41,7 +41,7 @@ export function QuotationReferenceTaskModal({
   const [blockId, setBlockId] = useState(initialBlock?.id ?? '');
   const [status, setStatus] = useState<'todo' | 'in_progress'>('todo');
   const [targetModuleId, setTargetModuleId] = useState(moduleId ?? '');
-  const [teamId, setTeamId] = useState(initialTeamId);
+  const teamId = initialTeamId; // La tarea EDT mantiene su equipo responsable.
   const [assignee, setAssignee] = useState('');
   const [startDate, setStartDate] = useState(initialBlock?.startDate ?? '');
   const [date, setDate] = useState(initialBlock?.endDate ?? '');
