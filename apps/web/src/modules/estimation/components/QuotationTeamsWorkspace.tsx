@@ -12,6 +12,7 @@ import {
 } from './quotation-team-capacity';
 import { quotationTeamColor } from './quotation-team-colors';
 import { QuotationGroupHoursInput } from './QuotationGroupHoursInput';
+import { QuotationCapacityInput } from './QuotationCapacityInput';
 import styles from './QuotationTeamsWorkspace.module.css';
 
 type Team = QuotationDraftData['teams'][number];
@@ -190,19 +191,16 @@ export function QuotationTeamsWorkspace({
                   onChange={(e) => onEditTeam(teamId, {
                     duration: Math.max(0, Number(e.target.value) || 0),
                   })}/>
-                <TextField className={styles.numberField} type="number" min={0}
-                  max={KORA_QUOTATION_REFERENCE_WEEK_HOURS} step={0.01}
-                  disabled={!fieldsEditable}
-                  aria-label={'Horas semanales de ' + label}
+                <QuotationCapacityInput className={styles.numberField}
+                  label={'Horas semanales de ' + label}
                   value={team?.hoursPerWeek ?? KORA_QUOTATION_REFERENCE_WEEK_HOURS}
-                  onChange={(event) =>
-                    onEditTeamCapacity(teamId, 'hoursPerWeek', Number(event.target.value))}/>
-                <TextField className={styles.numberField} type="number" min={0}
-                  max={100} step={0.01} disabled={!fieldsEditable}
-                  aria-label={'Dedicación de ' + label}
-                  value={team?.dedicationPercent ?? 100}
-                  onChange={(event) =>
-                    onEditTeamCapacity(teamId, 'dedicationPercent', Number(event.target.value))}/>
+                  max={KORA_QUOTATION_REFERENCE_WEEK_HOURS} disabled={!fieldsEditable}
+                  onCommit={(value) => onEditTeamCapacity(teamId, 'hoursPerWeek', value)}/>
+                <QuotationCapacityInput className={styles.numberField}
+                  label={'Dedicación de ' + label}
+                  value={team?.dedicationPercent ?? 100} max={100}
+                  disabled={!fieldsEditable}
+                  onCommit={(value) => onEditTeamCapacity(teamId, 'dedicationPercent', value)}/>
               </>}
               {hasEdt && checked
                 ? <QuotationGroupHoursInput className={styles.hoursInput}

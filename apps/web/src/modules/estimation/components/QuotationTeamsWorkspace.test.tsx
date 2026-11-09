@@ -86,9 +86,11 @@ describe('Equipos · fuente visual prototipo HTML v5', () => {
     expect(screen.getByText('160')).toBeInTheDocument();
     fireEvent.change(screen.getByRole('spinbutton', { name: 'Horas semanales de Desarrollo' }),
       { target: { value: '35' } });
+    fireEvent.blur(screen.getByRole('spinbutton', { name: 'Horas semanales de Desarrollo' }));
     expect(handlers.onEditTeamCapacity).toHaveBeenCalledWith(dev, 'hoursPerWeek', 35);
     fireEvent.change(screen.getByRole('spinbutton', { name: 'Dedicación de Desarrollo' }),
       { target: { value: '75' } });
+    fireEvent.blur(screen.getByRole('spinbutton', { name: 'Dedicación de Desarrollo' }));
     expect(handlers.onEditTeamCapacity).toHaveBeenCalledWith(dev, 'dedicationPercent', 75);
   });
 
@@ -104,9 +106,12 @@ describe('Equipos · fuente visual prototipo HTML v5', () => {
     expect(screen.getByLabelText('Dedicación de Desarrollo')).toBeEnabled();
     fireEvent.change(screen.getByLabelText('Horas semanales de Desarrollo'),
       { target: { value: '20' } });
+    expect(handlers.onEditTeamCapacity).not.toHaveBeenCalledWith(dev, 'hoursPerWeek', 20);
+    fireEvent.blur(screen.getByLabelText('Horas semanales de Desarrollo'));
     expect(handlers.onEditTeamCapacity).toHaveBeenCalledWith(dev, 'hoursPerWeek', 20);
     fireEvent.change(screen.getByLabelText('Dedicación de Desarrollo'),
       { target: { value: '75' } });
+    fireEvent.blur(screen.getByLabelText('Dedicación de Desarrollo'));
     expect(handlers.onEditTeamCapacity).toHaveBeenCalledWith(dev, 'dedicationPercent', 75);
     expect(screen.getByLabelText('Horas totales de Desarrollo')).toHaveValue(40);
   });
