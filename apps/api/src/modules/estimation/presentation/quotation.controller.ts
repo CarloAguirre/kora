@@ -179,11 +179,24 @@ export class QuotationController {
       Connection: 'keep-alive',
     });
     const progress: { phase: 'preflight' | 'proposal' | 'edt' | 'saving' } = { phase: 'preflight' };
-    const send = (event: 'thought' | 'phase' | 'complete' | 'error', data: unknown) => {
+    const send = (event: 'thought' | 'phase' | 'activity' | 'heartbeat' | 'complete' | 'error', data: unknown) => {
       if (!reply.raw.destroyed && !reply.raw.writableEnded) {
         reply.raw.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
       }
     };
+    const startedAt = Date.now();
+    const activity = (step: string, text: string) =>
+      send('activity', { step, text, at: new Date().toISOString() });
+    activity('request_authorized', 'Acceso verificado. Preparando la solicitud de cotización.');
+    // Solo confirma que la conexión al servidor sigue activa; no representa
+    // avances internos ficticios del modelo ni consume tokens.
+    const heartbeat = setInterval(() => {
+      send('heartbeat', {
+        phase: progress.phase, at: new Date().toISOString(),
+        elapsedSeconds: Math.floor((Date.now() - startedAt) / 1000),
+      });
+    }, 15_000);
+    heartbeat.unref?.();
     try {
       const result = await this.createAuthorizedAiPoc(
         projectId, input, actor, (text) => {
@@ -191,7 +204,7 @@ export class QuotationController {
         }, (phase) => {
           progress.phase = phase;
           send('phase', { phase });
-        },
+        }, activity,
       );
       send('complete', result);
     } catch (reason) {
@@ -236,6 +249,7 @@ export class QuotationController {
           '. No repitas la generación todavía: revisa el estado de las cotizaciones y el log del servidor.';
       send('error', { message, phase: progress.phase, diagnosticId });
     } finally {
+      clearInterval(heartbeat);
       if (!reply.raw.destroyed && !reply.raw.writableEnded) reply.raw.end();
     }
   }
@@ -246,6 +260,7 @@ export class QuotationController {
     actor: RequestUser,
     onThoughtSummary?: (text: string) => void,
     onPhase?: (phase: 'proposal' | 'edt' | 'saving') => void,
+    onActivity?: (step: string, text: string) => void,
   ): Promise<QuotationVersion> {
     const isDemo = extractDriveFolderId(input.driveFolderUrl) === 'kora-poc-fallback';
     if (isDemo && input.driveFolderUrl !== 'https://drive.google.com/drive/folders/kora-poc-fallback') {
@@ -261,6 +276,7 @@ export class QuotationController {
       throw new BadRequestException('Las preguntas dinámicas deben citar la fuente documental seleccionada.');
     }
     if (!isDemo && sourceReader && input.dynamicQuestions.length) {
+      onActivity?.('verify_sources', 'Comprobando referencias a documentos autorizados.');
       const validIds = new Set((await sourceReader.readDriveSources(input.driveFolderUrl)).map((doc) => doc.sourceId));
       if (input.dynamicQuestions.some((question) => question.sourceRefs.some((ref) => !validIds.has(ref.sourceId)))) {
         throw new BadRequestException('Las preguntas recibidas citan documentos ajenos a la carpeta de Drive.');
@@ -269,15 +285,18 @@ export class QuotationController {
     validateQuestionnaireAnswers(
       this.questionnaire.execute(), input.answers, input.dynamicQuestions,
     );
+    onActivity?.('questionnaire_verified', 'Respuestas y aclaraciones del cuestionario validadas.');
     // Usar el catálogo real activo, leído en backend tras comprobar permisos.
     // Ninguna identidad de equipo proviene de un nombre libre de Gemini.
+    onActivity?.('teams_query', 'Consultando los equipos activos del proyecto.');
     const activeTeams = await this.drafts.listActiveQuotationTeams(projectId, actor);
     if (!activeTeams.length) {
       throw new BadRequestException('No existen equipos activos en Kora para generar la cotización.');
     }
+    onActivity?.('teams_verified', 'Equipos activos disponibles: ' + activeTeams.length + '.');
     onPhase?.('proposal');
     const proposal = onThoughtSummary
-      ? await this.generator.execute(input, activeTeams, sourceReader, onThoughtSummary)
+      ? await this.generator.execute(input, activeTeams, sourceReader, onThoughtSummary, onActivity)
       : await this.generator.execute(input, activeTeams, sourceReader);
     if (!['gemini', 'openai'].includes(proposal.provider) ||
         proposal.sourceMode !== (isDemo ? 'poc_simulated' : 'drive') ||
@@ -290,10 +309,11 @@ export class QuotationController {
     }
     onPhase?.('edt');
     const edt = onThoughtSummary
-      ? await this.generator.generateEdt(input, proposal, activeTeams, sourceReader, onThoughtSummary)
+      ? await this.generator.generateEdt(input, proposal, activeTeams, sourceReader, onThoughtSummary, onActivity)
       : await this.generator.generateEdt(input, proposal, activeTeams, sourceReader);
     // La EDT detallada determina las HH finales; la primera llamada propone
     // perfiles/capacidad, pero no impone un presupuesto a las actividades.
+    onActivity?.('reconciling', 'Conciliando perfiles y horas contra la EDT validada.');
     const reconciled = this.generator.reconcileProposalWithEdt(proposal, edt);
     if (reconciled.roles.some((role) => !role.teamId || !validIds.has(role.teamId))) {
       throw new BadRequestException('La propuesta IA no asignó todos los perfiles a equipos activos de Kora.');
@@ -301,11 +321,15 @@ export class QuotationController {
     const roleTeamIds = Object.fromEntries(
       reconciled.roles.map((role) => [role.role, role.teamId!]),
     );
+    onActivity?.('reconciled', 'Conciliación de perfiles y HH completada.');
     onPhase?.('saving');
-    return this.drafts.createAiPocDraft(
+    onActivity?.('saving', 'Guardando la cotización comercial como borrador.');
+    const saved = await this.drafts.createAiPocDraft(
       projectId, actor, reconciled, input.answers, input.dynamicQuestions, edt,
       input.confirmedUnderstanding, roleTeamIds,
     );
+    onActivity?.('saved', 'Cotización guardada correctamente.');
+    return saved;
   }
 
   @Post('versions')
