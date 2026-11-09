@@ -406,6 +406,23 @@ export async function downloadQuotationPowerPoint(context: QuotationExportContex
     entry.content = encoder.encode(patchQuotationSlideXml(xml, i, model));
     entry.size = entry.content.length;
   }
+  // Las notas originales son instrucciones editoriales del deck (CheckApp,
+  // Sinco, fechas de ejemplo). No forman parte de la propuesta entregable.
+  // Vaciar solo su texto mantiene intactas relaciones, geometría y maestros.
+  for (const [index, fullPath] of cfb.FullPaths.entries()) {
+    if (!/\\/ppt\\/notesSlides\\/notesSlide\\d+\\.xml$/i.test(fullPath)) continue;
+    const entry = cfb.FileIndex[index];
+    if (!entry?.content) continue;
+    const note = new DOMParser().parseFromString(
+      decoder.decode(new Uint8Array(entry.content)), 'application/xml');
+    if (note.getElementsByTagName('parsererror').length) continue;
+    for (const run of Array.from(note.getElementsByTagNameNS(
+      'http://schemas.openxmlformats.org/drawingml/2006/main', 't'))) {
+      run.textContent = '';
+    }
+    entry.content = encoder.encode(new XMLSerializer().serializeToString(note));
+    entry.size = entry.content.length;
+  }
   const output = XLSX.CFB.write(cfb, { fileType: 'zip', type: 'array' });
   download(new Blob([new Uint8Array(output)], { type: PPT_MIME }), fileName(model, 'pptx'));
 }
