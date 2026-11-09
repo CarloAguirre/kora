@@ -124,6 +124,63 @@ describe('Referencias comerciales sin afectar Roadmap', () => {
     expect(refs.unassignedTasks).toEqual([]);
   });
 
+
+  it('transfiere una WBS compartida con entregables UX/UI y Desarrollo distintos', () => {
+    const edt = quotationReferenceEdtSchema.parse({
+      schemaVersion: 'kora.quotation.reference-edt.v2', source: 'drive',
+      provider: 'gemini', totalHours: 64, reservePercent: 0,
+      reserveHours: 0, totalWithReserve: 64,
+      stages: [{ code: 'STG-01', name: 'Interfaz de usuarios',
+        startWeek: 1, durationWeeks: 2, totalHours: 64 }],
+      modules: [{
+        name: 'Experiencia de usuario', totalHours: 64,
+        tasks: [{
+          wbs: 'STG-01.01', name: 'Diseñar e implementar interfaz',
+          description: 'Entregar experiencia funcional de usuario.',
+          role: 'Desarrollo', hours: 64, stageCode: 'STG-01',
+          roleEffort: [
+            { role: 'UX/UI', hours: 24,
+              taskName: 'Diseñar flujos, pantallas y prototipo en Figma',
+              taskDescription: 'Entregar prototipo navegable y especificaciones visuales.' },
+            { role: 'Desarrollo', hours: 40,
+              taskName: 'Implementar interfaz conectada a la API',
+              taskDescription: 'Construir componentes React, validaciones y conexión API.' },
+          ],
+        }],
+      }],
+    });
+    const draft: QuotationDraftData = {
+      ...quotationDraftDataSchema.parse({
+        mode: 'phases', teams,
+        phases: [{ name: 'STG-01 · Interfaz de usuarios', startWeek: 1,
+          durationWeeks: 2, teamHours: [
+            { teamId: qa, hours: 24 }, { teamId: dev, hours: 40 },
+          ] }],
+      }),
+      aiPoc: { source: 'drive', proposal: { roles: [] },
+        answers: [], dynamicQuestions: [], edt,
+        roleTeamIds: { 'UX/UI': qa, Desarrollo: dev } },
+    } as QuotationDraftData;
+    const projected = buildQuotationTransferReferences(draft, [
+      { moduleId: one, name: 'STG-01 · Interfaz de usuarios', totalHours: 64 },
+    ]);
+    const rows = projected.modules[0]!.tasks;
+    expect(rows).toHaveLength(2);
+    expect(rows.map((row) => [row.role, row.name, row.description, row.hours]))
+      .toEqual([
+        ['UX/UI', 'Diseñar flujos, pantallas y prototipo en Figma',
+          'Entregar prototipo navegable y especificaciones visuales.', 24],
+        ['Desarrollo', 'Implementar interfaz conectada a la API',
+          'Construir componentes React, validaciones y conexión API.', 40],
+      ]);
+    expect(rows[0]!.wbs).toBe(rows[1]!.wbs);
+    expect(rows.reduce((total, row) => total + row.hours, 0)).toBe(64);
+    expect(projected.unassignedTasks).toEqual([]);
+    // La evidencia Gemini conserva el propósito compartido, no se reescribe.
+    expect(draft.aiPoc?.edt?.modules[0]?.tasks[0]?.name)
+      .toBe('Diseñar e implementar interfaz');
+  });
+
   it('recupera referencias de copia solo con etapas, equipos y HH iguales', () => {
     const edt = quotationReferenceEdtSchema.parse({
       schemaVersion:'kora.quotation.reference-edt.v2',source:'drive',provider:'gemini',
