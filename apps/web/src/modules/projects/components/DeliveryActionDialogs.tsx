@@ -23,7 +23,7 @@ interface DeliveryActionDialogsProps {
 }
 
 const REVIEW_TITLE = {
-  complete: 'Marcar entrega como terminada',
+  complete: 'Marcar entrega como lista',
   approve: 'Aprobar entrega',
   reject: 'Rechazar entrega',
   revert: 'Revertir aprobación',
@@ -32,7 +32,7 @@ const REVIEW_TITLE = {
 /** El líder la marca terminada sin que el colaborador la haya enviado: el porqué queda en la bitácora. */
 const ON_BEHALF_PROMPT = {
   label: 'Motivo',
-  placeholder: 'Explica por qué la marcas como terminada sin que el colaborador la haya enviado',
+  placeholder: 'Explica por qué la marcas como lista sin que el colaborador la haya enviado',
   missingMessage: 'Escribe el motivo antes de continuar: queda registrado en la bitácora.',
 };
 
@@ -73,7 +73,7 @@ export function DeliveryActionDialogs({ projectId, members, target, onClose }: D
       await updateDelivery.mutateAsync({ projectId, moduleId: target.moduleId, deliveryId: target.delivery.id, input });
       toast.success(
         reviewAction === 'complete'
-          ? 'Entrega marcada como terminada: queda pendiente de aprobación.'
+          ? 'Entrega marcada como lista: queda pendiente de aprobación.'
           : reviewAction === 'approve'
             ? 'Entrega aprobada.'
             : reviewAction === 'reject'
@@ -109,7 +109,7 @@ export function DeliveryActionDialogs({ projectId, members, target, onClose }: D
         action={reviewAction === 'complete' || reviewAction === null ? 'approve' : reviewAction}
         title={REVIEW_TITLE[reviewAction ?? 'approve']}
         confirmLabel={
-          reviewAction === 'revert' ? 'Revertir aprobación' : reviewAction === 'complete' ? 'Marcar como terminada' : undefined
+          reviewAction === 'revert' ? 'Revertir aprobación' : reviewAction === 'complete' ? 'Marcar como lista' : undefined
         }
         reasonPrompt={reviewAction === 'complete' ? ON_BEHALF_PROMPT : undefined}
         summary={summary}

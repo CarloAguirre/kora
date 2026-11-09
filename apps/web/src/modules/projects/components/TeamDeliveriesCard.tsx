@@ -70,7 +70,8 @@ export function TeamDeliveriesCard({ project, projectId, teamId, managerView = f
   const matchesManagerFilter = (delivery: (typeof teamDeliveries)[number]['delivery'],
     filter: typeof managerFilter) =>
     filter === 'all' || (filter === 'planned' ? delivery.status === 'planned' :
-      filter === 'overdue' ? overdue(delivery) : delivery.status !== 'planned');
+      filter === 'overdue' ? overdue(delivery) :
+        delivery.status === 'delivered' || delivery.status === 'approved');
   const filteredDeliveries = teamDeliveries.filter(({ delivery }) =>
     managerView ? matchesManagerFilter(delivery, managerFilter) :
       deliveryFilter === 'all' || deliveryDisplayStatus(delivery) === deliveryFilter);
@@ -111,10 +112,10 @@ export function TeamDeliveriesCard({ project, projectId, teamId, managerView = f
             if (delivery.status === 'delivered') return <Button variant="outline" size="sm"
               onClick={() => setActionTarget({ ...item, action: 'approve' })}>Aprobar entrega</Button>;
             return <Button variant="outline" size="sm"
-              title={delivery.assigneeUserId ? 'Marcar como terminada para aprobación' : 'Primero asigna un colaborador a la entrega'}
+              title={delivery.assigneeUserId ? 'Marcar como lista y enviar a aprobación' : 'Primero asigna un colaborador a la entrega'}
               onClick={() => setActionTarget({ ...item,
                 action: delivery.assigneeUserId ? 'complete' : 'assign',
-              })}>{delivery.assigneeUserId ? 'Marcar como entregada' : 'Asignar responsable'}</Button>;
+              })}>{delivery.assigneeUserId ? 'Marcar como lista' : 'Asignar responsable'}</Button>;
           } },
         ]} items={pageItems} getRowKey={(item) => item.delivery.id}
           emptyMessage="Sin entregas en este filtro." />

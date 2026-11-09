@@ -54,7 +54,9 @@ export function QuotationReferenceTaskModal({
     mode === 'edit' ? suggestedScope : '',
   );
   const [error, setError] = useState('');
-  const members = project.members.filter((member) => member.userStatus === 'active');
+  // La tarea referencial tiene equipo fijo: asignar personas nunca lo cambia.
+  const members = project.members.filter((member) =>
+    member.teamId === teamId && member.userStatus === 'active' && !member.blockedAt);
   const eligibleBlocks = project.modules.find((module) => module.id === targetModuleId)
     ?.segments.filter((segment) => segment.teamId === teamId) ?? [];
   const selectedBlock = eligibleBlocks.find((segment) => segment.id === blockId);
@@ -127,15 +129,13 @@ export function QuotationReferenceTaskModal({
             const selected = members.find((member) =>
               member.teamId + ':' + member.userId === event.target.value);
             setAssignee(selected?.userId ?? '');
-            const nextTeamId = selected?.teamId ?? initialTeamId;
-            setTeamId(nextTeamId);
-            if (nextTeamId !== teamId) setBlockId('');
             if (!selected) setStatus('todo');
           }} />
-        <p className={styles.help}>Solo puedes asignar colaboradores reales de este proyecto.
-          {mode === 'edit' && ' Si aún no hay responsable, puedes guardar la tarea por asignar.'}
+        <p className={styles.help}>Solo aparecen colaboradores activos del equipo
+          responsable de esta tarea.
+          {mode === 'edit' && ' Si todavía no hay personas, puedes guardar la tarea por asignar.'}
         </p>
-        {initialTeamId && !members.some((member) => member.teamId === initialTeamId) && (
+        {initialTeamId && members.length === 0 && (
           <p className={styles.help}>
             El equipo propuesto todavía no tiene colaboradores en este proyecto.
             {' '}

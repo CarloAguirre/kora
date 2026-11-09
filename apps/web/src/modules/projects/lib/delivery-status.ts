@@ -49,7 +49,7 @@ export function deliveryActions(
 export function deliveryActionLabel(action: DeliveryAction, delivery: Pick<ProjectModuleDelivery, 'assigneeUserId'>): string {
   switch (action) {
     case 'complete':
-      return 'Marcar como terminada';
+      return 'Marcar como lista';
     case 'assign':
       return delivery.assigneeUserId ? 'Reasignar' : 'Asignar colaborador';
     case 'approve':

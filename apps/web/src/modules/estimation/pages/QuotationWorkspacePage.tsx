@@ -677,7 +677,11 @@ export function QuotationWorkspacePage() {
                       </Badge>
                     </div>
                   </div>
-                  {selected.origin === 'ai' && (
+                  {/* La barra fija administra ajustes; el aviso inicial desaparece al editar
+                      y nunca reaparece después de guardar. La aceptación IA posterior
+                      permanece en el ciclo comercial, separada de la aprobación del cliente. */}
+                  {selected.origin === 'ai' && selected.revision === 1 &&
+                    !dirty && adjustingAiVersionId !== selected.id && (
                     <QuotationAiReviewBanner
                       version={selected}
                       adjusting={adjustingAiVersionId === selected.id}
@@ -896,7 +900,7 @@ export function QuotationWorkspacePage() {
                     project={project} version={selected}
                     quotation={quotation ?? null}
                     canOperate={mayWrite} hasUnsavedChanges={dirty}
-                    embedded showAiAcceptance={false}
+                    embedded showAiAcceptance={selected.origin === 'ai' && selected.revision > 1}
                   />
                 ) : null}
               />
