@@ -132,7 +132,9 @@ describe('Historial reciente del colaborador', () => {
     expect(within(dialog).getByText('No')).toBeInTheDocument();
     expect(within(dialog).getByText('por Solmary Castro')).toBeInTheDocument();
     expect(mocks.detail).toHaveBeenCalledWith('h-approved');
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Cerrar' }));
+    // El modal incluye X y botón inferior, ambos con aria-label "Cerrar".
+    // Seleccionar expresamente el botón visible del pie.
+    fireEvent.click(within(dialog).getByText('Cerrar', { selector: 'button' }));
     expect(screen.queryByRole('dialog', { name: 'Detalle del registro' })).not.toBeInTheDocument();
   });
 });
