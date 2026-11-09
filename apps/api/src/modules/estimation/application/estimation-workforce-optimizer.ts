@@ -87,11 +87,11 @@ function summarize(
  * en intervalos de actividad y calcula las semanas necesarias por equipo.
  * La última semana puede tener menos de 40 HH; no rellena con horas ficticias.
  */
-export function replanEdtStagesToFullTime(
-  stages: readonly WorkforceStage[],
+export function replanEdtStagesToFullTime<T extends WorkforceStage>(
+  stages: readonly T[],
   efforts: readonly WorkforceEffort[],
   roles: readonly (WorkforceRoleInput & { people?: number })[],
-): WorkforceStage[] {
+): T[] {
   if (!stages.length) return [];
   if (new Set(stages.map((stage) => stage.code)).size !== stages.length ||
       stages.some((stage) =>
