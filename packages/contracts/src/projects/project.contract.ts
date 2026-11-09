@@ -478,7 +478,7 @@ export const updateProjectModuleDeliverySchema = z.object({
   rejectionReason: z.string().trim().max(1000).nullish(),
   /**
    * No se guarda en la entrega: va al registro de la bitácora. Obligatorio cuando un líder la marca
-   * como terminada en nombre del colaborador asignado — por qué lo hizo sin que el colaborador la enviara.
+   * como terminada en nombre del colaborador asignado o sin asignación nominal: registra el motivo.
    */
   comment: z.string().trim().max(1000).optional(),
   /** Finalizar en una sola operación la entrega vinculada a un bloque: requiere tareas aprobadas y permiso de líder. */

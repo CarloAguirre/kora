@@ -211,12 +211,38 @@ describe('UpdateProjectModuleDeliveryUseCase — ciclo de vida', () => {
     expect(modules.updateDelivery).not.toHaveBeenCalled();
   });
 
-  it('no deja marcar como terminada una entrega sin colaborador asignado', async () => {
-    const { useCase } = buildUseCase(buildModule({ status: 'planned', assigneeUserId: null }));
-
+  it('sin asignado exige que el líder registre el motivo, sin inventar colaborador', async () => {
+    const { useCase, modules } = buildUseCase(buildModule({ status: 'planned', assigneeUserId: null }));
     const result = await useCase.execute({ ...TARGET, ...LEADER, data: { status: 'delivered' } });
+    expect(errorCode(result)).toBe('PROJECT_MODULE_DELIVERY_ON_BEHALF_COMMENT_REQUIRED');
+    expect(modules.updateDelivery).not.toHaveBeenCalled();
+  });
 
-    expect(errorCode(result)).toBe('PROJECT_MODULE_DELIVERY_INVALID_TRANSITION');
+  it('el líder puede entregar sin asignado, dejando su identidad y motivo en bitácora', async () => {
+    const { useCase, modules, changeLogRecord } = buildUseCase(
+      buildModule({ status: 'planned', assigneeUserId: null }),
+    );
+    const result = await useCase.execute({
+      ...TARGET, ...LEADER,
+      data: { status: 'delivered', comment: 'Entrega revisada y validada por el líder' },
+    });
+    expect(result.isOk()).toBe(true);
+    expect(modules.updateDelivery).toHaveBeenCalledWith('delivery-1',
+      expect.objectContaining({ status: 'delivered' }), expect.any(Date), expect.anything());
+    expect(loggedMessages(changeLogRecord)).toEqual([
+      expect.stringMatching(/por el líder sin colaborador asignado.*Motivo: Entrega revisada/),
+    ]);
+    expect(changeLogRecord.mock.calls[0]![1]).toBe('leader-1');
+  });
+
+  it('un colaborador sin asignación no puede enviar entregas ajenas', async () => {
+    const { useCase, modules } = buildUseCase(buildModule({ status: 'planned', assigneeUserId: null }));
+    const result = await useCase.execute({
+      ...TARGET, ...COLLABORATOR,
+      data: { status: 'delivered' },
+    });
+    expect(errorCode(result)).toBe('PROJECT_MODULE_DELIVERY_NOT_ASSIGNEE');
+    expect(modules.updateDelivery).not.toHaveBeenCalled();
   });
 
   it('el colaborador asignado marca su entrega como terminada y queda pendiente de aprobación en la bitácora', async () => {

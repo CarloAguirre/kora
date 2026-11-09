@@ -33,8 +33,8 @@ export type DeliveryAction = 'complete' | 'assign' | 'approve' | 'reject' | 'rev
  * Acciones de gestión según el estado — ver `PROJECT_MODULE_DELIVERY_ALLOWED_TRANSITIONS`. Solo para
  * quien puede gestionarla (`delivery.canManage`: líder del proyecto, PMO/admin o líder del equipo).
  * Aprobar/rechazar recién cuando se marcó como terminada; una aprobada solo se revierte. El líder
- * también puede marcarla como terminada en nombre del colaborador asignado (sin asignar, no: el
- * backend exige un responsable antes de dejarla pendiente de aprobación).
+ * puede marcarla terminada en nombre del colaborador asignado o sin
+ * asignación nominal cuando aporta un motivo para la bitácora.
  */
 export function deliveryActions(
   delivery: Pick<ProjectModuleDelivery, 'status' | 'canManage' | 'teamId' | 'assigneeUserId'>,
@@ -43,7 +43,7 @@ export function deliveryActions(
   const assign: DeliveryAction[] = delivery.teamId ? ['assign'] : [];
   if (delivery.status === 'delivered') return ['approve', 'reject', ...assign];
   if (delivery.status === 'approved') return ['revert'];
-  return delivery.assigneeUserId ? ['complete', ...assign] : assign;
+  return ['complete', ...assign];
 }
 
 export function deliveryActionLabel(action: DeliveryAction, delivery: Pick<ProjectModuleDelivery, 'assigneeUserId'>): string {
