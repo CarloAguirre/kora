@@ -60,6 +60,26 @@ describe('Exportación de cotizaciones · versión guardada', () => {
     expect(changed).toContain('lang="es"');
   });
 
+  it.each([
+    { slide: 5, figures: ['+190', '+150', '+40', '+5'] },
+    { slide: 7, figures: ['+80.000', '+1.000'] },
+  ])('no altera la lámina institucional $slide, ni sus cifras ni su XML original',
+    ({ slide, figures }) => {
+      const corporateXml =
+        '<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" ' +
+        'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">' +
+        '<p:spTree><p:sp><p:txBody><a:p>' +
+        figures.map((figure) => '<a:r><a:t>' + figure + '</a:t></a:r>').join('') +
+        '</a:p></p:txBody></p:sp></p:spTree></p:sld>';
+      const quote = version({ totalHours: 1592 });
+      const result = patchQuotationSlideXml(
+        corporateXml, slide, quotationExportModel(context(quote)));
+      expect(result).toBe(corporateXml);
+      for (const figure of figures) expect(result).toContain(figure);
+      expect(result).not.toContain('HORAS HOMBRE ESTIMADAS');
+      expect(result).not.toContain('SEMANAS REFERENCIALES');
+    });
+
   it('separa las hojas comerciales y fuentes solo cuando hay datos persistidos', () => {
     const v = version({ draft: {
       ...version().draft,
