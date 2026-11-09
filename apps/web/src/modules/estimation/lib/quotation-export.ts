@@ -219,6 +219,124 @@ export async function downloadQuotationExcel(context: QuotationExportContext): P
   }), fileName(model, 'xlsx'));
 }
 
+
+/**
+ * Síntesis orientada a cliente para la diapositiva de objetivo.
+ * La documentación de Gemini sigue guardada como evidencia, pero no se presenta
+ * su narración de fuentes, los nombres de PDF ni títulos WBS incompletos.
+ * No invoca otro modelo ni modifica la EDT.
+ */
+export function quotationClientBrief(model: ReturnType<typeof quotationExportModel>): {
+  objective: string; scope: string; features: string[];
+} {
+  const tidy = (value: string) => value.replace(/\s+/gu, ' ').trim();
+  const norm = (value: string) => tidy(value).normalize('NFD')
+    .replace(/[\u0300-\u036f]/gu, '').toLocaleLowerCase('es');
+  const sourceNarration = (value: string) =>
+    /(?:\b(?:el|la|este|esta|un|una)\s+(?:documento|archivo|informe|pdf|planilla|presentaci[oó]n)\b|\b\d+\s*p[aá]ginas?\b|\.(?:pdf|docx?|xlsx?|pptx?)\b|\b(?:gemini|ia\s+(?:identific[oó]|analiz[oó])|razonamiento|tras\s+revisar|fuentes?\s+consultadas?)\b|\b(?:se\s+desprende\s+del|seg[uú]n\s+el\s+(?:documento|archivo|informe))\b)/iu.test(value);
+  const patterns: Array<[RegExp, (value: string) => string]> = [
+    [/cat[aá]logo\s+(?:maestro\s+)?(?:de\s+)?(?:\d+\s+)?controles?/iu,
+      () => 'Gestión del catálogo de controles'],
+    [/\b(?:inspecciones?|chequeos?|checklists?|pre[ -]?operacional)\b/iu,
+      () => 'Inspecciones y chequeos'],
+    [/\bmantenimiento\b/iu,
+      (v) => /preventivo/iu.test(v) ? 'Mantenimiento preventivo' : 'Gestión de mantenimiento'],
+    [/\b(?:integridad|contenci[oó]n)\b/iu,
+      (v) => /contenci[oó]n/iu.test(v) ? 'Integridad de sistemas de contención' : 'Control de integridad'],
+    [/\b(?:trazabilidad|seguimiento)\b/iu, () => 'Trazabilidad y seguimiento'],
+    [/\b(?:reportes?|informes?|tableros?|dashboards?|indicadores?)\b/iu, () => 'Reportes e indicadores'],
+    [/\b(?:usuarios?|permisos?|roles|accesos)\b/iu, () => 'Gestión de usuarios y accesos'],
+    [/\b(?:aprobaciones?|flujos?\s+de\s+validaci[oó]n)\b/iu, () => 'Aprobaciones y validaciones'],
+    [/\b(?:integraci[oó]n|apis?|servicios\s+externos)\b/iu, () => 'Integraciones y servicios'],
+    [/\b(?:wireframes?|figma|prototip\w*|ux\s*[/-]\s*ui|ui\s*[/-]\s*ux|diseño\s+de\s+(?:interfaces?|pantallas))\b/iu,
+      () => 'Diseño UX/UI y prototipos'],
+    [/\b(?:arquitectura|modelo\s+relacional|modelo\s+de\s+datos)\b/iu,
+      () => 'Arquitectura y modelo de datos'],
+    [/\b(?:requisitos?|requerimientos?|levantamiento)\b/iu, () => 'Definición de requisitos'],
+    [/\b(?:pruebas?|aseguramiento\s+de\s+calidad|testing)\b/iu, () => 'Validación y pruebas'],
+  ];
+  const labelFor = (raw: string): string | null => {
+    const title = tidy(raw)
+      .replace(/^(?:(?:STG|FASE|ETAPA|M[ÓO]DULO)[\s_.-]*\d+[\s_.:-]*)+/iu, '')
+      .replace(/\s*\([^)]{1,80}\)\s*$/u, '')
+      .replace(/[.;:,\-–\s]+$/u, '');
+    if (!title || sourceNarration(title) ||
+      /^(?:proyecto(?:\s+.+)?|fase|etapa|m[oó]dulo|desarrollo|general|ux\s*[/-]\s*ui|qa)(?:\s+\d+)?$/iu.test(title)) {
+      return null;
+    }
+    for (const [pattern, label] of patterns) {
+      if (pattern.test(title)) return label(title);
+    }
+    const rawLabel = title
+      .replace(/^(?:implementaci[oó]n|desarrollo|construcci[oó]n|definici[oó]n|creaci[oó]n)\s+de\s+/iu, '')
+      .replace(/\s*(?:\s[-–]\s|\s*:\s).+$/u, '');
+    if (rawLabel.length <= 42) return rawLabel;
+    const words: string[] = [];
+    for (const word of rawLabel.split(' ')) {
+      if ([...words, word].join(' ').length > 42) break;
+      words.push(word);
+    }
+    while (words.length && /^(?:de|del|la|el|los|las|y|e|para|por|en|con|un|una)$/iu.test(words[words.length - 1]!)) {
+      words.pop();
+    }
+    return words.length >= 2 ? words.join(' ') : null;
+  };
+  const modules = model.draft.aiPoc?.edt?.modules ?? [];
+  const rawCandidates = [
+    ...modules.flatMap((module) => module.tasks.map((task) => task.name)),
+    ...modules.map((module) => module.name),
+    ...model.phases.map((phase) => phase.name),
+  ];
+  const labels: string[] = [];
+  const seen = new Set<string>();
+  for (const candidate of rawCandidates) {
+    const label = labelFor(candidate);
+    if (!label || seen.has(norm(label))) continue;
+    seen.add(norm(label));
+    labels.push(label);
+  }
+  const supportingWork = /^(?:Diseño UX\/UI|Arquitectura|Definici[oó]n de requisitos|Validaci[oó]n y pruebas)/iu;
+  const features = [
+    ...labels.filter((label) => !supportingWork.test(label)),
+    ...labels.filter((label) => supportingWork.test(label)),
+  ].slice(0, 6);
+  const business = features.filter((label) => !supportingWork.test(label));
+  const lower = (value: string) => value.charAt(0).toLocaleLowerCase('es') + value.slice(1);
+  const joinItems = (items: string[]): string => items.length === 1 ? items[0]! :
+    items.length === 2 ? items.join(' y ') :
+    items.slice(0, -1).join(', ') + ' y ' + items[items.length - 1]!;
+  const sourceSentences = [
+    model.projectDescription,
+    model.draft.aiPoc?.confirmedUnderstanding,
+    model.draft.aiPoc?.proposal.summary,
+  ];
+  let objective: string | null = null;
+  for (const source of sourceSentences) {
+    if (!source) continue;
+    for (const original of tidy(source).split(/(?<=[.!?])\s+(?=[A-ZÁÉÍÓÚÜÑ])/u)) {
+      const sentence = original.replace(/^["'“”«»\s]+|["'“”«»\s]+$/gu, '').trim();
+      if (!sentence || sentence.length > 165 || sourceNarration(sentence) ||
+          !/\b(?:desarrollar|implementar|construir|crear|digitalizar|automatizar|mejorar|facilitar|habilitar|permitir|optimizar|centralizar|gestionar|el\s+proyecto\s+busca|la\s+soluci[oó]n\s+(?:permite|busca)|el\s+sistema\s+(?:permite|busca))\b/iu.test(sentence)) {
+        continue;
+      }
+      objective = /[.!?]$/u.test(sentence) ? sentence : sentence + '.';
+      break;
+    }
+    if (objective) break;
+  }
+  if (!objective) {
+    objective = business.length ?
+      'Implementar una solución con funcionalidades de ' +
+        joinItems(business.slice(0, 2).map(lower)) + '.' :
+      'Desarrollar las capacidades definidas para el proyecto ' + tidy(model.projectName) + '.';
+  }
+  const scope = features.length > 2 ?
+    'La propuesta incluye ' + joinItems(features.slice(2, 5).map(lower)) +
+      ', con entregables definidos para cada componente.' :
+    'El alcance considera los componentes y entregables acordados en esta propuesta comercial.';
+  return { objective, scope, features };
+}
+
 const PPT_MIME = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
 /** Orden de párrafos NO VACÍOS del archivo Kabeli_Cotizaciones_DS.pptx adjunto.
  * Los números se validan antes de editar para evitar sustituir otra plantilla. */
@@ -226,13 +344,13 @@ function slideChanges(i: number, m: ReturnType<typeof quotationExportModel>): Re
   const { draft, version, details, phases } = m;
   const isRpa = draft.teams.length > 0 && draft.teams.every((row) =>
     /rpa|robot/i.test(m.team(row.teamId)));
-  const featureNames = [...new Set(details.map((row) => row.name))];
+
   const activities = details.length ? details.map((row) => ({ team: m.team(row.teamId), name: row.name, hours: row.hours }))
     : draft.phases.flatMap((p) => p.teamHours.map((r) => ({ team: m.team(r.teamId), name: p.name, hours: r.hours })));
   const ass = draft.assumptions;
   const pay = draft.paymentPlan.map((p) => p.name + ': ' + fmt(p.percent) + '%');
   const phaseLabel = (n: number) => phases[n]?.name ?? '—';
-  const preview = (n: number, max = 70) => compact(n < featureNames.length ? featureNames[n] : '—', max);
+
   const chunk = (n: number) => activities[n];
   const amt = money(version.netAmount, version.currency);
   // Dos escalas diferentes sobre las MISMAS semanas persistidas.
@@ -262,12 +380,19 @@ function slideChanges(i: number, m: ReturnType<typeof quotationExportModel>): Re
       6: 'Coordinación de equipos y tecnologías necesarias para construir la solución.',
     };
     case 9: return { 1: compact(m.projectName + ' · alcance y plan de trabajo', 75) };
-    case 10: return {
-      2: compact(m.scope, 280),
-      3: compact(m.projectDescription || 'Detalle de alcance y estimación disponible en la EDT adjunta.', 230),
-      5: preview(0, 52), 6: preview(1, 52), 7: preview(2, 52),
-      8: preview(3, 52), 9: preview(4, 52), 10: preview(5, 52),
-    };
+    case 10: {
+      const brief = quotationClientBrief(m);
+      return {
+        2: brief.objective,
+        3: brief.scope,
+        5: brief.features[0] ?? '',
+        6: brief.features[1] ?? '',
+        7: brief.features[2] ?? '',
+        8: brief.features[3] ?? '',
+        9: brief.features[4] ?? '',
+        10: brief.features[5] ?? '',
+      };
+    }
     case 11: return {
       1: 'Actividades principales · HH totales de la cotización. Detalle completo en Excel.',
       5: compact(chunk(0)?.team ?? '—', 28),
