@@ -528,7 +528,7 @@ export function QuotationWorkspacePage() {
     try {
       const context = { project, version: selected, teamNames: teamById };
       if (format === 'pptx') await downloadQuotationPowerPoint(context);
-      else downloadQuotationExcel(context);
+      else await downloadQuotationExcel(context);
       inform('Archivo ' + format.toUpperCase() + ' generado desde la versión guardada.');
     } catch (error) {
       reportError(error instanceof Error ? error.message : 'No se pudo exportar la cotización.');
