@@ -93,40 +93,35 @@ describe('Equipos · fuente visual prototipo HTML v5', () => {
   });
 
 
-  it('presenta carga calculada y ocupación separadas de la dedicación 100% en EDT', () => {
+  it('presenta 40 HH y dedicación 100% separadas de ocupación real en EDT', () => {
     renderTeams(mappedEdtDraft);
-    expect(screen.getByText('Carga media hh/sem')).toBeInTheDocument();
+    expect(screen.getByText('Capacidad HH/sem')).toBeInTheDocument();
     expect(screen.getByText('Dedicación planificada %')).toBeInTheDocument();
     expect(screen.getByText('Ocupación (40 HH)')).toBeInTheDocument();
-    expect(screen.getByLabelText('Carga semanal media de Desarrollo'))
-      .toHaveTextContent('10'); // 40 HH ÷ 2 personas ÷ 2 semanas
+    expect(screen.getByLabelText('Capacidad semanal de Desarrollo'))
+      .toHaveTextContent('40'); // capacidad, no ocupación
     expect(screen.getByLabelText('Ocupación estimada de Desarrollo'))
       .toHaveTextContent('25%');
     expect(screen.getByLabelText('Dedicación de Desarrollo')).toHaveValue(100);
-    expect(screen.getByLabelText('Carga semanal media de Desarrollo')
+    expect(screen.getByLabelText('Capacidad semanal de Desarrollo')
       .tagName).toBe('OUTPUT');
     expect(screen.getByText(/Jornada de comparación Kora:/)).toBeInTheDocument();
   });
 
-  it('muestra sobrecarga semanal usando dedicación planificada sin reducir HH EDT', () => {
+  it('mantiene 100% de dedicación en EDT histórica aunque la versión anterior tuviera 20%', () => {
     const constrained = quotationDraftDataSchema.parse({
-      ...mappedEdtDraft,
-      teams: [{ ...team(dev), dedicationPercent: 20 }],
+      ...mappedEdtDraft, teams: [{ ...team(dev), dedicationPercent: 20 }],
     });
     renderTeams(constrained);
-    expect(screen.getByLabelText('Dedicación de Desarrollo')).toHaveValue(20);
-    expect(screen.getByLabelText('Carga semanal media de Desarrollo'))
-      .toHaveTextContent('10');
+    expect(screen.getByLabelText('Dedicación de Desarrollo')).toHaveValue(100);
+    expect(screen.getByLabelText('Dedicación de Desarrollo')).toBeDisabled();
+    expect(screen.getByLabelText('Capacidad semanal de Desarrollo')).toHaveTextContent('40');
     expect(screen.getByLabelText('Horas totales de Desarrollo')).toHaveValue(40);
-    expect(screen.getByLabelText('Alerta de capacidad de Desarrollo'))
-      .toHaveTextContent('Sobrecarga en semana(s) 1, 2');
-    expect(screen.getByLabelText('Alerta de capacidad de Desarrollo'))
-      .toHaveTextContent('8 HH/persona disponibles');
-    expect(screen.getByText('1 equipo(s) requieren revisar capacidad')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Alerta de capacidad de Desarrollo')).not.toBeInTheDocument();
   });
 
 
-  it('en fases manuales calcula ocupación desde HH de fases, no desde referencia almacenada', () => {
+    it('en fases manuales calcula ocupación desde HH de fases, no desde referencia almacenada', () => {
     const phases = quotationDraftDataSchema.parse({
       mode: 'phases', teams: [team(dev)],
       phases: [{ name: 'Entrega', startWeek: 1, durationWeeks: 2,
@@ -186,7 +181,7 @@ describe('Equipos · fuente visual prototipo HTML v5', () => {
     renderTeams(mappedEdtDraft);
     expect(screen.getByText('Unidad')).toBeInTheDocument();
     expect(screen.getByText('Duración')).toBeInTheDocument();
-    expect(screen.getByText('Carga media hh/sem')).toBeInTheDocument();
+    expect(screen.getByText('Capacidad HH/sem')).toBeInTheDocument();
     expect(screen.getByText('Dedicación planificada %')).toBeInTheDocument();
     expect(screen.getByText('Ocupación (40 HH)')).toBeInTheDocument();
     expect(screen.getByLabelText('Incluir Desarrollo')).toBeChecked();
