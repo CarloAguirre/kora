@@ -89,7 +89,7 @@ describe('AnalyzeEstimationPocUseCase', () => {
         // sin esperar que Gemini publique thought summaries.
         expect(phases).toEqual([
           'documents:Documentación leída: 1 archivo(s) disponibles para el análisis.',
-          'gemini:Enviando los antecedentes a Gemini para elaborar el entendimiento.',
+          'gemini:Enviando los antecedentes al agente IA para elaborar el entendimiento.',
         ]);
         seen.documents = request.documents;
         seen.task = request.task;
