@@ -205,6 +205,49 @@ describe('AnalyzeEstimationPocUseCase', () => {
       q.sourceRefs[0]?.sourceId === sourceId)).toBe(true);
   });
 
+  it('OpenAI no descarta un cuestionario completo por textos descriptivos demasiado largos', async () => {
+    const sourceId = 'drive-rules';
+    const ai: AiProvider = {
+      name: 'openai',
+      generateStructured: async () => ({
+        summary: 'Resumen extendido. '.repeat(230),
+        dynamicQuestions: [{
+          id: 'Q1', kind: 'dynamic', category: 'A'.repeat(250),
+          question: '¿Qué restricción de control se confirma? '.repeat(60),
+          reason: 'Impacta permisos. '.repeat(140),
+          impact: 'high', answerType: 'single_choice',
+          options: [
+            { value: 'per_site', label: 'Permisos separados por sitio. '.repeat(20) },
+            { value: 'shared', label: 'Permisos centralizados. '.repeat(20) },
+          ],
+          required: true, confidence: 'medium', priorityScore: 90,
+          assumptionIfSkipped: 'Escenario pendiente. '.repeat(100),
+          sourceRefs: [{ sourceId, excerpt: 'Matriz de acceso. '.repeat(200) }],
+        }],
+      }),
+    };
+    const reader: DocumentSourceReader = { readDriveSources: async () => [{
+      sourceId, name: 'Roles.xlsx', mimeType: 'text/plain',
+      path: 'Levantamiento/Roles.xlsx', text: 'HOJA Matriz, B2: control por sitio',
+    }] };
+    const result = await new AnalyzeEstimationPocUseCase(ai, reader).execute({
+      projectId: '550e8400-e29b-41d4-a716-446655440000',
+      projectName: 'Portal', clientName: 'Cliente',
+      driveFolderUrl: 'https://drive.google.com/drive/folders/real-folder',
+      instructions: null,
+    });
+    const question = result.dynamicQuestions[0]!;
+    expect(result.summary.length).toBeLessThanOrEqual(3000);
+    expect(question.category.length).toBeLessThanOrEqual(120);
+    expect(question.question.length).toBeLessThanOrEqual(1500);
+    expect(question.reason?.length).toBeLessThanOrEqual(1500);
+    expect(question.assumptionIfSkipped?.length).toBeLessThanOrEqual(1500);
+    expect(question.options).toHaveLength(2);
+    expect(question.options.every((o) => o.label.length <= 300)).toBe(true);
+    expect(question.sourceRefs[0]?.excerpt?.length).toBeLessThanOrEqual(1000);
+    expect(question.sourceRefs[0]?.sourceId).toBe(sourceId);
+  });
+
   it('rechaza aclaraciones que citan archivos inexistentes o ajenos al KDM', async () => {
     const ai: AiProvider = {
       name: 'gemini',
