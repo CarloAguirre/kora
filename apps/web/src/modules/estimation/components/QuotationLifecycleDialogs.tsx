@@ -25,7 +25,7 @@ export function QuotationApprovalDialog({
   project, version, previouslyApprovedVersionNumber, timing, onTimingChange,
   onCancel, onApprove, pending, error,
 }: ApprovalProps) {
-  const canTransferNow = project.status === 'draft';
+  const canTransferNow = project.status === 'draft' || project.status === 'active';
   return (
     <Modal open title="Registrar aprobación del cliente"
       className={styles.approvalDialog} dismissible={!pending} onClose={onCancel}
@@ -68,10 +68,18 @@ export function QuotationApprovalDialog({
           </span>
         </label>
       </fieldset>
+      {project.status === 'active' && (
+        <p className={styles.warning}>
+          El proyecto está Activo. El traspaso inmediato solo será posible si todavía no existen
+          fases ni ejecución operativa que reemplazar. Kora verificará los registros y conservará
+          las HH históricas. Si encuentra conflictos, la aprobación quedará registrada y el
+          traspaso permanecerá pendiente de conciliación.
+        </p>
+      )}
       {!canTransferNow && (
         <p className={styles.warning}>
-          El proyecto no está en «No iniciado». Podrás registrar la aprobación, pero el traspaso
-          exige conciliación de la ejecución existente.
+          Este estado operativo no permite un traspaso inicial. Puedes aprobar la versión y
+          dejar el traspaso pendiente.
         </p>
       )}
       {error && <p role="alert" className={styles.dialogError}>{error}</p>}

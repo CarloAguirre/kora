@@ -8,3 +8,6 @@
 
 /* La versión enviada se distingue con una línea discreta azul, como exige la ficha v5. */
 .sentRow td:first-child{border-left:3px solid #3b82f6}
+
+.statuses{display:flex;align-items:center;flex-wrap:wrap;gap:6px}
+.closedNotice{margin:0;padding:12px 14px;background:var(--kora-success-soft,#ecfdf3);color:var(--kora-success,#067647);border-radius:9px;font-size:12px;line-height:1.5}

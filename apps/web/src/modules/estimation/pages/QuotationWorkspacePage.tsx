@@ -112,7 +112,8 @@ export function QuotationWorkspacePage() {
       ? 'phases' : 'team');
   }, [selected?.id, selected?.revision]);
 
-  const mayWrite = Boolean(project && isQuotationDraftEligibleProject(project));
+  const quotationClosed = Boolean(quotation?.transferredVersionId);
+  const mayWrite = Boolean(project && isQuotationDraftEligibleProject(project) && !quotationClosed);
   const editable = Boolean(mayWrite && selected?.status === 'draft' && form &&
     appliedPlan.data?.versionId !== selected?.id && !appliedPlan.isLoading);
 
@@ -584,7 +585,9 @@ export function QuotationWorkspacePage() {
         {project && !mayWrite && (
           <Card>
             <strong>Consulta histórica</strong>
-            <p>Este proyecto no permite crear o editar borradores en su etapa comercial actual. Los proyectos aprobados, detenidos, finalizados o cancelados quedan en modo consulta hasta acordar el flujo de recotización.</p>
+            <p>{quotationClosed
+              ? 'Cotización cerrada: ya fue aprobada y traspasada al proyecto. Las versiones son históricas y no se pueden generar otras nuevas.'
+              : 'Este proyecto no permite crear ni editar borradores en su etapa comercial actual.'}</p>
           </Card>
         )}
 
@@ -597,7 +600,8 @@ export function QuotationWorkspacePage() {
                     <h2>Cotización · {project?.client?.companyName ?? project?.name ?? 'Proyecto'}</h2>
                   </div>
                   <Badge tone={selected?.status === 'approved' ? 'success' : selected?.status === 'sent' ? 'info' : 'neutral'}>
-                    {selected?.status === 'approved' ? 'Aprobada' : selected?.status === 'sent' ? 'Enviada' : 'Cotización'}
+                    {selected && quotation?.transferredVersionId === selected.id ? 'Cerrada · traspasada' :
+                      selected?.status === 'approved' ? 'Aprobada por el cliente' : selected?.status === 'sent' ? 'Enviada' : 'Cotización'}
                   </Badge>
                 </div>
                 <div className={styles.versions}>
@@ -634,7 +638,8 @@ export function QuotationWorkspacePage() {
                     <div className={styles.statusField}>
                       <span>Estado</span>
                       <Badge tone={selected.status === 'approved' ? 'success' : selected.status === 'sent' ? 'info' : 'neutral'}>
-                        {selected.status === 'approved' ? 'Aprobada' : selected.status === 'sent' ? 'Enviada al cliente' : 'Borrador'}
+                        {quotation?.transferredVersionId === selected.id ? 'Cerrada · traspasada' :
+                          selected.status === 'approved' ? 'Aprobada por el cliente' : selected.status === 'sent' ? 'Enviada al cliente' : 'Borrador'}
                       </Badge>
                     </div>
                   </div>

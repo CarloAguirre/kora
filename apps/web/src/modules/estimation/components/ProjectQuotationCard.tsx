@@ -4,6 +4,7 @@ import { isQuotationDraftEligibleProject, type ProjectDetail, type QuotationVers
 import { projectQuotationPath } from '@/app/router/paths';
 import { useAppliedQuotationPlanning, useDeleteQuotationVersion, useProjectQuotation, useQuotationLifecycle } from '../api/quotation.queries';
 import { Button } from '@/shared/components/ui/Button';
+import { Badge } from '@/shared/components/ui/Badge';
 import { useConfirmAction } from '@/shared/components/ui/useConfirmAction';
 import { NewProjectQuotationModal } from './NewProjectQuotationModal';
 import { QuotationApprovalDialog, QuotationTransferDialog } from './QuotationLifecycleDialogs';
@@ -26,7 +27,9 @@ export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
   const [transferRevision, setTransferRevision] = useState<number | null>(null);
   const { confirm, dialog: confirmationDialog } = useConfirmAction();
   const versions = [...(data?.versions ?? [])].sort((a, b) => b.versionNumber - a.versionNumber);
-  const eligible = isQuotationDraftEligibleProject(project);
+  // El traspaso cierra todas las versiones del proyecto, incluso las no seleccionadas.
+  const closed = Boolean(data?.transferredVersionId);
+  const eligible = isQuotationDraftEligibleProject(project) && !closed;
   const transferredVersion = versions.find((version) => version.id === data?.transferredVersionId);
   const registerApproval = (version: QuotationVersion) => {
     setActionError(''); setActionNotice('');
@@ -43,7 +46,7 @@ export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
         ...(approving.status === 'draft' ? { confirmWithoutSend: true as const } : {}),
       });
       setApproving(null);
-      if (transferTiming === 'now' && project.status === 'draft') {
+      if (transferTiming === 'now' && (project.status === 'draft' || project.status === 'active')) {
         setTransferring(approving);
         setTransferRevision(approved.revision);
         setTransferFromApproval(true);
@@ -116,9 +119,11 @@ export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
               </div>
               {eligible && <Button size="sm" onClick={() => setNewOpen(true)}>+ Nueva versión</Button>}
             </div>
-            {versions[0]?.status === 'approved' && data?.transferredVersionId !== versions[0]?.id && (
-              <p className={styles.helper}>Existe una versión aprobada con traspaso pendiente.</p>
-            )}
+            {closed ? (
+              <p className={styles.closedNotice}>Cotización aprobada y traspasada a la ficha del proyecto. Historial cerrado: no se pueden crear nuevas versiones.</p>
+            ) : versions.some((version) => version.status === 'approved') ? (
+              <p className={styles.helper}>Cotización aprobada por el cliente · traspaso pendiente. La versión se conserva hasta confirmar el traspaso.</p>
+            ) : null}
             <div className={styles.scroll}>
               <table className={styles.versions}>
                 <thead><tr><th>Versión</th><th>Estado</th><th>Horas</th><th>Total</th><th>Acciones</th></tr></thead>
@@ -127,12 +132,15 @@ export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
                     <td><strong>v{v.versionNumber} · {v.name}</strong>
                       <small>{new Date(v.createdAt).toLocaleDateString('es-CL')}
                         {v.origin === 'ai' ? ' · Origen IA (KDM de prueba)' : ''}</small></td>
-                    <td><span className={styles.status}>
-                      {data?.transferredVersionId === v.id ? 'Traspasada' :
-                        applied.data?.versionId === v.id ? 'Planificación previa (sin aprobación)' :
-                        v.status === 'draft' ? 'Borrador' :
-                          v.status === 'sent' ? 'Enviada al cliente' : 'Aprobada · traspaso pendiente'}
-                    </span></td>
+                    <td><div className={styles.statuses}>
+                      {data?.transferredVersionId === v.id ? <Badge tone="success">Traspasada</Badge> :
+                        applied.data?.versionId === v.id ? <Badge tone="warning">Planificación previa</Badge> :
+                          v.status === 'draft' ? <Badge tone="neutral">Borrador</Badge> :
+                            v.status === 'sent' ? <Badge tone="info">Enviada al cliente</Badge> :
+                              <Badge tone="success">Aprobada por el cliente</Badge>}
+                      {!closed && v.status === 'draft' && v.origin === 'ai' && v.aiReviewStatus === 'pending' &&
+                        <Badge tone="brand">✦ Por revisar</Badge>}
+                    </div></td>
                     <td>{number(v.totalHours)} HH</td>
                     <td>{v.totalAmount === null ? 'Sin valor HH' : number(v.totalAmount) + ' ' + v.currency}</td>
                     <td>
@@ -149,7 +157,7 @@ export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
                         {eligible && v.status === 'approved' &&
                           data?.transferredVersionId !== v.id &&
                           <Button size="sm" variant="ghost"
-                            disabled={lifecycle.transferApproved.isPending || project.status !== 'draft'}
+                            disabled={lifecycle.transferApproved.isPending}
                             onClick={() => transferNow(v)}>
                             Traspasar ahora
                           </Button>}
