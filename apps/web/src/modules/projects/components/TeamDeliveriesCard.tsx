@@ -38,10 +38,11 @@ export interface TeamDeliveriesCardProps {
 
 /**
  * "Entregas del equipo" — el líder asigna cada entrega a un colaborador de su
- * equipo; el colaborador la marca como terminada (`delivered`, "Pendiente de
- * aprobación", desde "Mis entregas" del Dashboard) y recién ahí el líder
- * aprueba, rechaza (con motivo) o revierte una aprobación. Mismos modales y
- * reglas que el menú de la bitácora (`DeliveryActionDialogs`/`deliveryActions`).
+ * equipo y puede marcarla LISTA para revisión (`delivered`) registrando un
+ * motivo, o esperar a que la termine el colaborador desde "Mis entregas".
+ * Estar lista NO es estar aprobada: la aprobación, el rechazo y la reversión
+ * mantienen acciones independientes, permisos y bitácora.
+ * Reutiliza los modales y reglas de la bitácora (`DeliveryActionDialogs`/`deliveryActions`).
  * La estructura de las entregas (nombre, fecha objetivo) se crea desde
  * "Crear/editar proyecto", no aquí.
  */

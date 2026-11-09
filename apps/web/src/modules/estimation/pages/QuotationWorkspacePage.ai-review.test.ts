@@ -26,6 +26,14 @@ describe('Revisión de la propuesta Gemini · flujo UI + persistencia', () => {
     expect(page).toContain('setAdjustingAiVersionId(null);');
     expect(page).toContain('toast.success(\'Propuesta IA aceptada.');
   });
+  it('el aviso inicial desaparece al modificar o guardar, sin perder aceptación en ciclo comercial', () => {
+    expect(page).toContain("selected.revision === 1");
+    expect(page).toContain("!dirty && adjustingAiVersionId !== selected.id");
+    expect(page).toContain("showAiAcceptance={selected.origin === 'ai' && selected.revision > 1}");
+    expect(page).toContain("setDirty(true)");
+    expect(page).toContain("setDirty(false)");
+    expect(page).toContain("toast.success('Cambios guardados en la versión.");
+  });
   it('el aviso de aceptación queda vinculado a la versión correcta', () => {
     expect(page).toContain('recentAiAcceptance?.versionId === selected.id');
     expect(page).toContain("selected.origin === 'ai'");

@@ -67,6 +67,45 @@ describe('Nueva tarea operativa a partir de referencia Gemini', () => {
     expect(mocks.create).not.toHaveBeenCalled();
   });
 
+  it('solo lista colaboradores activos del equipo responsable de la referencia EDT', async () => {
+    const otherTeamId = '0777e456-fd76-445e-83f1-afc25061c111';
+    const otherUserId = '0777e456-fd76-445e-83f1-afc25061c112';
+    const mixedProject = {
+      ...project,
+      members: [
+        ...project.members,
+        { teamId, userId: '0777e456-fd76-445e-83f1-afc25061c113',
+          fullName: 'Persona deshabilitada', userStatus: 'disabled' },
+        { teamId: otherTeamId, userId: otherUserId,
+          fullName: 'Persona de QA', userStatus: 'active' },
+      ],
+      teams: [...project.teams, { teamId: otherTeamId, teamName: 'QA', teamSlug: 'qa' }],
+    } as ProjectDetail;
+    render(<MemoryRouter><QuotationReferenceTaskModal
+      project={mixedProject} moduleId={moduleId} versionId={versionId}
+      versionNumber={1} reference={reference} onClose={mocks.onClose}
+    /></MemoryRouter>);
+    const options = (screen.getByLabelText(/Asignado a/) as HTMLSelectElement).options;
+    expect([...options].some((option) => option.textContent?.includes('Persona asignada'))).toBe(true);
+    expect([...options].some((option) => option.textContent?.includes('Persona de QA'))).toBe(false);
+    expect([...options].some((option) => option.textContent?.includes('Persona deshabilitada'))).toBe(false);
+    fireEvent.change(screen.getByLabelText(/Asignado a/), {
+      target: { value: teamId + ':' + userId },
+    });
+    fireEvent.change(screen.getByLabelText(/Bloque de trabajo/), {
+      target: { value: blockId },
+    });
+    fireEvent.change(screen.getByLabelText(/Ámbito Kora/), {
+      target: { value: 'desarrollo' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Crear tarea' }));
+    await waitFor(() => expect(mocks.create).toHaveBeenCalledWith(
+      expect.objectContaining({ input: expect.objectContaining({
+        teamId, assigneeUserId: userId,
+      }) }),
+    ));
+  });
+
   it('crea una tarea con bloque, colaborador, ámbito y fechas; preserva trazabilidad EDT', async () => {
     show();
     fireEvent.change(screen.getByLabelText(/Asignado a/),{
