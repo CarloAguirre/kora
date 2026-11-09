@@ -159,8 +159,8 @@ describe('Referencias comerciales sin afectar Roadmap', () => {
       }),
       aiPoc: { source: 'drive', proposal: { roles: [] },
         answers: [], dynamicQuestions: [], edt,
-        roleTeamIds: { 'UX/UI': qa, Desarrollo: dev } },
-    } as QuotationDraftData;
+        roleTeamIds: { 'UX/UI': qa, Desarrollo: dev } } as unknown as QuotationDraftData['aiPoc'],
+    };
     const projected = buildQuotationTransferReferences(draft, [
       { moduleId: one, name: 'STG-01 · Interfaz de usuarios', totalHours: 64 },
     ]);
