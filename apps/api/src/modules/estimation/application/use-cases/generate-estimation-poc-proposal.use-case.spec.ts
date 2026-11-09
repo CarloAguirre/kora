@@ -744,7 +744,7 @@ describe('GenerateEstimationPocProposalUseCase', () => {
     vi.stubEnv('KORA_GEMINI_EDT_MAX_ATTEMPTS', '1');
     await expect(mock.generator.generateEdt(input, proposal([
       { role: 'Desarrollo', hours: 50 }, { role: 'QA', hours: 30 },
-    ]))).rejects.toThrow(/sin reintento para ahorrar cuota/);
+    ]))).rejects.toThrow(/sin reintento automático/);
     expect(mock.calls()).toBe(1);
   });
 
