@@ -362,6 +362,15 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       if (!quotation) throw new NotFoundException('No se pudo crear la cotización del proyecto.');
       // Serializa los números v1, v2, ... por proyecto y evita carreras entre peticiones.
       await tx.execute(sql`SELECT id FROM project_quotations WHERE id = ${quotation.id} FOR UPDATE`);
+      // Una cotización que ya se traspasó es inmutable, incluso si quedan
+      // borradores históricos. Esta comprobación comparte el lock del proyecto.
+      const [closedEvent] = await tx.select({ id: quotationEvents.id }).from(quotationEvents)
+        .innerJoin(quotationVersions, eq(quotationEvents.versionId, quotationVersions.id))
+        .where(and(eq(quotationVersions.quotationId, quotation.id),
+          eq(quotationEvents.action, 'quotation_transferred'))).limit(1);
+      if (closedEvent) {
+        throw new ConflictException('La cotización ya fue traspasada y está cerrada. No se pueden crear nuevas versiones.');
+      }
       const [last] = await tx.select({ versionNumber: quotationVersions.versionNumber })
         .from(quotationVersions).where(eq(quotationVersions.quotationId, quotation.id))
         .orderBy(desc(quotationVersions.versionNumber)).limit(1);
@@ -947,8 +956,9 @@ export class DrizzleQuotationRepository implements QuotationRepository {
     });
   }
 
-  /** Traspaso SOLO de una versión aprobada, a proyecto nuevo sin ejecución.
-   * La recotización histórica debe reconciliarse con un proceso distinto. */
+  /** Traspaso inicial de una versión aprobada, sin reemplazar ejecución.
+   * Admite un proyecto Activo SOLO cuando aún contiene exclusivamente preparación
+   * comercial. La ejecución operativa exige conciliación separada. */
   async transferApproved(projectId: string, versionId: string, userId: string,
     input: TransferApprovedQuotationInput): Promise<QuotationTransferResult> {
     return this.db.transaction(async (tx) => {
@@ -957,8 +967,8 @@ export class DrizzleQuotationRepository implements QuotationRepository {
         eq(projects.id, projectId), isNull(projects.deletedAt),
       )).limit(1);
       if (!project || project.type !== 'development') throw new NotFoundException('Proyecto no encontrado.');
-      if (project.status !== 'draft' || project.salesStage !== 'approved') {
-        throw new ConflictException('Este traspaso inicial requiere proyecto aprobado y No iniciado.');
+      if (!['draft', 'active'].includes(project.status) || project.salesStage !== 'approved') {
+        throw new ConflictException('El traspaso requiere aprobación comercial y un proyecto No iniciado o Activo sin ejecución operativa.');
       }
       const [quotation] = await tx.select({ id: projectQuotations.id })
         .from(projectQuotations).where(eq(projectQuotations.projectId, projectId)).limit(1);
@@ -1019,6 +1029,15 @@ export class DrizzleQuotationRepository implements QuotationRepository {
         project.contractAmount === null &&
         hasOnlyUntouchedDefaultPaymentMilestones(existingPayments) &&
         hasOnlyCommercialPreparationHours(existingHours, Number(project.usedHours));
+      // Un prospecto Activo puede registrar preventa sin ejecución. El estado
+      // Activo por sí solo no basta: se requiere ausencia de fases, horas
+      // operativas y pagos alterados para utilizar el traspaso inicial.
+      if (project.status === 'active' && !commercialPreparationOnly) {
+        throw new ConflictException(
+          'Proyecto Activo con ejecución o compromisos previos: requiere conciliación. ' +
+          'No se modificaron HH, equipos, Roadmap ni pagos.',
+        );
+      }
       const unresolvedBlockers = commercialPreparationOnly
         ? transferBlockers.filter((reason) => !(
             reason === 'HH vendidas existentes' ||

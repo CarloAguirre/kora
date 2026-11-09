@@ -27,6 +27,9 @@ export class ManageQuotationDraftsUseCase {
     if (write && !isQuotationDraftEligibleProject(project)) {
       throw new ConflictException('El proyecto no admite borradores comerciales en esta etapa y estado.');
     }
+    if (write && (await this.repository.getByProjectId(projectId))?.transferredVersionId) {
+      throw new ConflictException('Cotización cerrada: ya fue traspasada al proyecto. Solo puedes consultar sus versiones históricas.');
+    }
     return project;
   }
 

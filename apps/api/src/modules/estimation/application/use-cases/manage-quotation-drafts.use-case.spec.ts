@@ -58,6 +58,20 @@ describe('ManageQuotationDraftsUseCase', () => {
     }
   });
 
+  it('después del traspaso no crea versiones y conserva el historial de lectura', async () => {
+    const { useCase, repository } = setup({ ...project, salesStage: 'approved', status: 'active' });
+    vi.mocked(repository.getByProjectId).mockResolvedValue({
+      id: '0777e456-fd76-445e-83f1-afc25061c106',
+      projectId: project.id, versions: [],
+      transferredVersionId: '0777e456-fd76-445e-83f1-afc25061c105',
+    });
+    await expect(useCase.create(project.id, manager, {})).rejects.toBeInstanceOf(ConflictException);
+    expect(repository.createDraft).not.toHaveBeenCalled();
+    await expect(useCase.get(project.id, manager)).resolves.toMatchObject({
+      transferredVersionId: '0777e456-fd76-445e-83f1-afc25061c105',
+    });
+  });
+
   it('permite consultar historial comercial aunque el proyecto esté aprobado', async () => {
     const { useCase } = setup({ ...project, salesStage: 'approved', status: 'active' });
     await expect(useCase.get(project.id, manager)).resolves.toBeNull();
