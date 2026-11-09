@@ -136,11 +136,13 @@ export function buildQuotationWorkbook(context: QuotationExportContext): XLSX.Wo
     ['Equipo', 'Colaboradores', 'Unidad', 'Duración', 'HH/sem persona',
       'Dedicación (%)', 'Capacidad referencial HH', 'HH cotizadas'],
     draft.teams.map((entry) => {
-      const hh = draft.mode === 'phases'
-        ? draft.phases.reduce((sum, phase) =>
-          sum + (phase.teamHours.find((row) => row.teamId === entry.teamId)?.hours ?? 0), 0)
-        : entry.collaborators * (entry.unit === 'day' ? entry.duration / 5 : entry.duration) *
-          entry.hoursPerWeek * entry.dedicationPercent / 100;
+      const hh = details.length
+        ? details.reduce((sum, row) => sum + (row.teamId === entry.teamId ? row.hours : 0), 0)
+        : draft.mode === 'phases'
+          ? draft.phases.reduce((sum, phase) =>
+            sum + (phase.teamHours.find((row) => row.teamId === entry.teamId)?.hours ?? 0), 0)
+          : entry.collaborators * (entry.unit === 'day' ? entry.duration / 5 : entry.duration) *
+            entry.hoursPerWeek * entry.dedicationPercent / 100;
       const capacity = entry.collaborators *
         (entry.unit === 'day' ? entry.duration / 5 : entry.duration) *
         entry.hoursPerWeek * entry.dedicationPercent / 100;
