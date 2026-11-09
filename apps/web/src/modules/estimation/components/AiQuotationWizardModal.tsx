@@ -1256,7 +1256,7 @@ export function AiQuotationWizardModal({ project, onClose }: {
                 <strong>Resumen del modelo (opcional)</strong>
                 <p>{proposalThoughtSummary ||
                   'Todavía no se ha recibido un resumen del modelo. Las operaciones de Kora se muestran aparte.'}</p>
-              </div>}
+              </div>
             </div>
             <p className={styles.thoughtFootnote}>
               La cotización se guardará como borrador con revisión IA pendiente.
