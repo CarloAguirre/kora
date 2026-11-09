@@ -29,6 +29,13 @@ export function QuotationHoursRedistributionDialog({
         {' '}<strong>{teamName}</strong>{phaseName ? ' · ' + phaseName : ' · todas sus fases'}.
         Las diferencias se reparten entre las tareas no fijas, sin modificar su evidencia IA.
       </p>
+      {preview.capacityChange && (
+        <p className={styles.description} aria-label="Cambio de jornada y dedicación">
+          Capacidad: <strong>{hh(preview.capacityChange.beforeHoursPerWeek)} → {hh(preview.capacityChange.afterHoursPerWeek)} HH/sem</strong>
+          {' · '}Dedicación: <strong>{hh(preview.capacityChange.beforeDedicationPercent)}% → {hh(preview.capacityChange.afterDedicationPercent)}%</strong>.
+          Se ajustan proporcionalmente las HH de las actividades existentes; no se inventan HH para completar semanas.
+        </p>
+      )}
       <div className={styles.summary}>
         <span>Antes: <strong>{hh(preview.before)} HH</strong></span>
         <span>Después: <strong>{hh(preview.after)} HH</strong></span>

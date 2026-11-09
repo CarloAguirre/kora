@@ -22,6 +22,10 @@ export type QuotationRedistributionPreview = {
   after: number;
   delta: number;
   changes: QuotationHourChange[];
+  capacityChange?: {
+    beforeHoursPerWeek: number; afterHoursPerWeek: number;
+    beforeDedicationPercent: number; afterDedicationPercent: number;
+  };
 };
 
 const cents = (value: number) => Math.round(value * 100);
