@@ -273,10 +273,18 @@ describe('GenerateEstimationPocProposalUseCase', () => {
         references: 'R05', classification: 'C' },
     ],
     roleHours: [
-      { wbs: 'T01.01', role: 'Desarrollo', hours: 12 },
-      { wbs: 'T01.01', role: 'QA', hours: 3 },
-      { wbs: 'T01.02', role: 'Desarrollo', hours: 40 },
-      { wbs: 'T02.01', role: 'QA', hours: 24 },
+      { wbs: 'T01.01', role: 'Desarrollo', hours: 12,
+        taskName: 'Implementar servicio de integración API',
+        taskDescription: 'Construir el endpoint REST, manejar validaciones y errores.' },
+      { wbs: 'T01.01', role: 'QA', hours: 3,
+        taskName: 'Validar el contrato y errores de la API',
+        taskDescription: 'Ejecutar pruebas del contrato REST y registrar defectos.' },
+      { wbs: 'T01.02', role: 'Desarrollo', hours: 40,
+        taskName: 'Implementar interfaz de operación',
+        taskDescription: 'Construir componentes React conectados a la API.' },
+      { wbs: 'T02.01', role: 'QA', hours: 24,
+        taskName: 'Ejecutar pruebas de aceptación de flujos',
+        taskDescription: 'Verificar criterios de negocio y documentar resultados UAT.' },
     ],
   });
   const createGenerator = (output: (attempt: number, instructions?: string) => unknown) => {
@@ -495,8 +503,16 @@ describe('GenerateEstimationPocProposalUseCase', () => {
     expect(edt.modules.map((module) => module.totalHours)).toEqual([55, 24]);
     expect(edt.modules[0]?.tasks[0]?.hours).toBe(15);
     expect(edt.modules[0]?.tasks[0]?.roleEffort).toEqual([
-      { role: 'Desarrollo', hours: 12 }, { role: 'QA', hours: 3 },
+      { role: 'Desarrollo', hours: 12,
+        taskName: 'Implementar servicio de integración API',
+        taskDescription: 'Construir el endpoint REST, manejar validaciones y errores.' },
+      { role: 'QA', hours: 3,
+        taskName: 'Validar el contrato y errores de la API',
+        taskDescription: 'Ejecutar pruebas del contrato REST y registrar defectos.' },
     ]);
+    const schema = JSON.stringify(mock.requestedSchemas[0]);
+    expect(schema).toContain('taskName');
+    expect(schema).toContain('taskDescription');
     expect(edt.modules[0]?.tasks[0]?.referenceIds).toEqual(['R01', 'R03']);
     expect(edt.stages?.map((stage) => stage.totalHours)).toEqual([55, 24]);
     expect(edt.reserveHours).toBe(7.9);
@@ -504,6 +520,60 @@ describe('GenerateEstimationPocProposalUseCase', () => {
     const reconciled = mock.generator.reconcileProposalWithEdt(preliminary, edt);
     expect(reconciled.roles.map((role) => role.totalHours)).toEqual([52, 27]);
     expect(preliminary.totalHours).toBe(80);
+  });
+
+
+  it('rechaza que dos perfiles reciban la misma descripción dentro de un WBS', async () => {
+    const mock = createGenerator(() => {
+      const data = baseDetail();
+      data.roleHours[1]!.taskName = 'Ejecutar pruebas del contrato REST';
+      data.roleHours[1]!.taskDescription = data.roleHours[0]!.taskDescription;
+      return data;
+    });
+    vi.stubEnv('KORA_GEMINI_EDT_MAX_ATTEMPTS', '1');
+    await expect(mock.generator.generateEdt(input, proposal([
+      { role: 'Desarrollo', hours: 50 }, { role: 'QA', hours: 30 },
+    ]))).rejects.toThrow(/repite la misma tarea o descripción/);
+    expect(mock.calls()).toBe(1);
+  });
+
+  it('rechaza tareas por perfil vacías o sin entregable verificable', async () => {
+    const mock = createGenerator(() => {
+      const data = baseDetail();
+      data.roleHours[0]!.taskName = '';
+      return data;
+    });
+    vi.stubEnv('KORA_GEMINI_EDT_MAX_ATTEMPTS', '1');
+    await expect(mock.generator.generateEdt(input, proposal([
+      { role: 'Desarrollo', hours: 50 }, { role: 'QA', hours: 30 },
+    ]))).rejects.toThrow(/taskName/);
+    expect(mock.calls()).toBe(1);
+  });
+
+  it('rechaza fases equivalentes con el mismo nombre y semanas', async () => {
+    const mock = createGenerator(() => {
+      const data = baseDetail();
+      data.stages.push({ code: 'T03', name: 'analisis', startWeek: 1, durationWeeks: 2 });
+      return data;
+    });
+    vi.stubEnv('KORA_GEMINI_EDT_MAX_ATTEMPTS', '1');
+    await expect(mock.generator.generateEdt(input, proposal([
+      { role: 'Desarrollo', hours: 50 }, { role: 'QA', hours: 30 },
+    ]))).rejects.toThrow(/Dos fases tienen el mismo nombre/);
+  });
+
+  it('rechaza dos WBS con mismo módulo, etapa, título y descripción', async () => {
+    const mock = createGenerator(() => {
+      const data = baseDetail();
+      data.activities[1] = {
+        ...data.activities[0]!, wbs: 'T01.02',
+      };
+      return data;
+    });
+    vi.stubEnv('KORA_GEMINI_EDT_MAX_ATTEMPTS', '1');
+    await expect(mock.generator.generateEdt(input, proposal([
+      { role: 'Desarrollo', hours: 50 }, { role: 'QA', hours: 30 },
+    ]))).rejects.toThrow(/duplica el mismo título y descripción/);
   });
 
   it('pide corregir HH de más de dos decimales sin prorratearlas', async () => {
@@ -618,7 +688,8 @@ describe('GenerateEstimationPocProposalUseCase', () => {
   it('nunca agrega dos asignaciones de HH del mismo perfil y WBS', async () => {
     const mock = createGenerator(() => {
       const result = baseDetail();
-      result.roleHours.push({ wbs: 'T01.01', role: 'QA', hours: 5 });
+      result.roleHours.push({ wbs: 'T01.01', role: 'QA', hours: 5,
+        taskName: 'Repetido QA', taskDescription: 'Prueba duplicada.' });
       return result;
     });
     await expect(mock.generator.generateEdt(input, proposal([
@@ -644,7 +715,8 @@ describe('GenerateEstimationPocProposalUseCase', () => {
   it('rechaza relaciones entre tareas y HH que no tienen respaldo en una actividad', async () => {
     const mock = createGenerator(() => {
       const result = baseDetail();
-      result.roleHours.push({ wbs: 'T99.99', role: 'QA', hours: 2 });
+      result.roleHours.push({ wbs: 'T99.99', role: 'QA', hours: 2,
+        taskName: 'Tarea ajena', taskDescription: 'Tarea inexistente.' });
       return result;
     });
     await expect(mock.generator.generateEdt(input, proposal([

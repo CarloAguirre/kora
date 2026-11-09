@@ -73,6 +73,42 @@ const source = () => quotationDraftDataSchema.parse({
 });
 
 describe('EDT comercial: equipos, tareas Fija y redistribución por centésimos', () => {
+
+  it('en un mismo WBS, renombrar un perfil no modifica el otro ni las HH', () => {
+    const sourceDraft = source();
+    const withRoles = quotationDraftDataSchema.parse({
+      ...sourceDraft,
+      aiPoc: {
+        ...sourceDraft.aiPoc!,
+        edt: {
+          ...sourceDraft.aiPoc!.edt!,
+          modules: sourceDraft.aiPoc!.edt!.modules.map((m) => ({
+            ...m,
+            tasks: m.tasks.map((task) => task.wbs === 'T01.01' ? {
+              ...task, roleEffort: [
+                { role: 'Desarrollo', hours: 10,
+                  taskName: 'Construir API', taskDescription: 'Implementar endpoint REST.' },
+                { role: 'QA', hours: 10,
+                  taskName: 'Probar API', taskDescription: 'Verificar endpoint REST.' },
+              ],
+            } : task),
+          })),
+        },
+      },
+    });
+    const edited = withQuotationTaskDisplayName(withRoles,
+      'T01.01', 'Implementar API revisada', 'Desarrollo');
+    const rows = quotationEdtAssignments(edited).filter((row) => row.wbs === 'T01.01');
+    expect(rows.map((row) => [row.role, row.name, row.description, row.hours]))
+      .toEqual([
+        ['Desarrollo', 'Implementar API revisada', 'Implementar endpoint REST.', 10],
+        ['QA', 'Probar API', 'Verificar endpoint REST.', 10],
+      ]);
+    expect(edited.aiPoc?.edt).toEqual(withRoles.aiPoc?.edt);
+    expect(() => withQuotationTaskDisplayName(withRoles,
+      'T01.01', 'Tarea imposible', 'Arquitectura')).toThrow(/WBS\/perfil/);
+  });
+
   it('redistribuye la diferencia exacta entre tareas no fijas, preservando Fija y otros tramos', () => {
     const draft = withQuotationTaskSetting(source(), 'T01.01', 'Desarrollo', { fixed: true });
     const updated = redistributeQuotationEdtHours(draft, {

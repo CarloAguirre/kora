@@ -202,7 +202,8 @@ describe('Cotización HTML v5 · fases y tareas', () => {
     const name = screen.getByLabelText('Tarea T01.01 · Fullstack');
     fireEvent.change(name, { target: { value: 'Integración revisada' } });
     fireEvent.blur(name);
-    expect(callbacks.onEditTaskName).toHaveBeenCalledWith('T01.01', 'Integración revisada');
+    expect(callbacks.onEditTaskName).toHaveBeenCalledWith(
+      'T01.01', 'Integración revisada', 'Fullstack');
     expect(screen.queryByText(/Propuesta del agente/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Descripción y referencias/)).not.toBeInTheDocument();
   });
@@ -235,6 +236,41 @@ describe('Cotización HTML v5 · fases y tareas', () => {
     expect(screen.getByText('1 tarea · 8 HH')).toBeInTheDocument();
     const fields = screen.getAllByLabelText(/^Tarea T01.01/);
     expect(fields).toHaveLength(2);
+  });
+
+
+  it('una WBS multiperfil muestra nombres y descripciones propios de cada rol', () => {
+    const specific = quotationReferenceEdtSchema.parse({
+      ...edt,
+      modules: edt.modules.map((m) => ({
+        ...m,
+        tasks: m.tasks.map((task) => task.wbs !== 'T01.01' ? task : {
+          ...task, roleEffort: [
+            { role: 'Fullstack', hours: 12,
+              taskName: 'Implementar integración SOAP',
+              taskDescription: 'Programar cliente SOAP y errores de integración.' },
+            { role: 'Tester', hours: 3,
+              taskName: 'Verificar integración SOAP',
+              taskDescription: 'Ejecutar casos de prueba positivos y negativos.' },
+          ],
+        }),
+      })),
+    });
+    const draftWithDeliverables = quotationDraftDataSchema.parse({
+      ...draft, aiPoc: { ...draft.aiPoc!, edt: specific },
+    });
+    const rows = referenceTasksForPhase(
+      referencePhasesFromEdt(specific, {}, teams, draftWithDeliverables)[0]!,
+      specific, {}, teams, draftWithDeliverables,
+    );
+    expect(rows.map((row) => row.name)).toEqual([
+      'Implementar integración SOAP', 'Verificar integración SOAP',
+    ]);
+    expect(rows.map((row) => row.description)).toEqual([
+      'Programar cliente SOAP y errores de integración.',
+      'Ejecutar casos de prueba positivos y negativos.',
+    ]);
+    expect(rows.reduce((sum, row) => sum + row.hours, 0)).toBe(15);
   });
 
   it('mantiene HH por perfil y WBS al representar un mismo trabajo multiperfil', () => {
