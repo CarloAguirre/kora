@@ -104,6 +104,7 @@ export class AnalyzeEstimationPocUseCase {
       },
       instructions: [
         'Analiza EXCLUSIVAMENTE los documentos adjuntos. No inventes archivos ni hallazgos.',
+        'Si un documento proviene de Excel, revisa todas las hojas visibles entregadas: las referencias HOJA, FILA y celda permiten identificar requisitos, reglas y matrices. Los valores de fórmulas sin resultado calculado NO son resultados válidos.',
         ESTIMATION_ANALYSIS_GUIDANCE,
         'Informa únicamente sobre las fuentes realmente entregadas a esta llamada; no afirmes haber revisado toda la carpeta Drive si solo se seleccionó una parte.',
         'Propón como máximo 5 preguntas dinámicas SOLO cuando su respuesta pueda modificar alcance, HH o arquitectura.',

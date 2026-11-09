@@ -1,6 +1,9 @@
 import { createSign } from 'node:crypto';
 import { Injectable, Optional } from '@nestjs/common';
 import { AppConfigService } from '../../../../config/app-config.service';
+import {
+  extractXlsxSourceText, MAX_XLSX_SOURCE_BYTES, XLSX_ANALYSIS_MIME,
+} from './xlsx-source-extractor';
 import type {
   DriveFolderClient,
   DriveFolderFile,
@@ -105,6 +108,11 @@ export class GoogleDriveFolderClient implements DriveFolderClient {
       );
       if (!response.ok) throw driveError(response.status);
 
+      if (exportMimeType === XLSX_ANALYSIS_MIME) {
+        const bytes = await readXlsxBytes(response);
+        return { mimeType: 'text/plain', text: await extractXlsxSourceText(bytes) };
+      }
+
       if (exportMimeType === 'application/pdf') {
         const bytes = Buffer.from(await response.arrayBuffer());
         return {
@@ -117,6 +125,15 @@ export class GoogleDriveFolderClient implements DriveFolderClient {
         mimeType: exportMimeType,
         text: await response.text(),
       };
+    }
+
+    if (mimeType === XLSX_ANALYSIS_MIME) {
+      const response = await this.authorizedFetch(
+        `${DRIVE_FILES_ENDPOINT}/${encodeURIComponent(fileId)}?alt=media&supportsAllDrives=true`,
+      );
+      if (!response.ok) throw driveError(response.status);
+      const bytes = await readXlsxBytes(response);
+      return { mimeType: 'text/plain', text: await extractXlsxSourceText(bytes) };
     }
 
     if (mimeType === 'application/pdf') {
@@ -336,7 +353,8 @@ function googleExportMimeType(mimeType: string): string | null {
     case 'application/vnd.google-apps.document':
       return 'text/plain';
     case 'application/vnd.google-apps.spreadsheet':
-      return 'text/csv';
+      // CSV pierde pestañas; XLSX conserva todas las hojas visibles.
+      return XLSX_ANALYSIS_MIME;
     case 'application/vnd.google-apps.presentation':
       return 'application/pdf';
     default:
@@ -355,4 +373,29 @@ function isPlainTextMime(mimeType: string): boolean {
     'text/rtf',
     'application/json',
   ]).has(mimeType);
+}
+
+/** Límite de descarga previo al parseo para evitar respuestas enormes de Drive. */
+async function readXlsxBytes(response: Response): Promise<Buffer> {
+  const declared = Number(response.headers.get('content-length'));
+  if (Number.isFinite(declared) && declared > MAX_XLSX_SOURCE_BYTES) {
+    throw new Error('Excel: el archivo supera 5 MB.');
+  }
+  if (!response.body) throw new Error('Excel: Google Drive devolvió un archivo vacío.');
+  const chunks: Uint8Array[] = [];
+  const reader = response.body.getReader();
+  let size = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > MAX_XLSX_SOURCE_BYTES) {
+        await reader.cancel();
+        throw new Error('Excel: el archivo supera 5 MB.');
+      }
+      chunks.push(value);
+    }
+  } finally { reader.releaseLock(); }
+  return Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)), size);
 }

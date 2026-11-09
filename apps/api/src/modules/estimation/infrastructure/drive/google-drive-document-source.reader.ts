@@ -325,6 +325,9 @@ export class GoogleDriveDocumentSourceReader implements DocumentSourceReader {
 /** Mensajes seguros para mostrar en la cobertura sin filtrar secretos OAuth. */
 function safeDriveReadFailure(error: unknown): string {
   if (!(error instanceof Error)) return 'error desconocido';
+  // Los errores Excel son mensajes estáticos del lector; no incluyen celdas
+  // ni credenciales, y ayudan a detectar cobertura incompleta.
+  if (error.message.startsWith('Excel:')) return error.message;
   if (/permiso para consultar|permiso denegado/i.test(error.message)) {
     return 'Google Drive denegó el acceso o la descarga';
   }

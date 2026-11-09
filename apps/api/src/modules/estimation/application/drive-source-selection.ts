@@ -90,6 +90,7 @@ export function canReadDriveSource(mimeType: string): boolean {
   return (
     mimeType === 'application/vnd.google-apps.document' ||
     mimeType === 'application/vnd.google-apps.spreadsheet' ||
+    mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
     mimeType === 'application/vnd.google-apps.presentation' ||
     mimeType === 'application/pdf' ||
     mimeType === 'application/json' ||
