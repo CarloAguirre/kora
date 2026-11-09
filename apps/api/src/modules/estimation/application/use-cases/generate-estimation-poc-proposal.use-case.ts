@@ -599,7 +599,7 @@ export class GenerateEstimationPocProposalUseCase {
   ): void {
     if (roles.length === 0 || roles.length > 12) {
       throw new BadRequestException(
-        'Gemini propuso una cantidad inválida de perfiles (máximo 12).',
+        'El proveedor IA propuso una cantidad inválida de perfiles (máximo 12).',
       );
     }
     const seen = new Set<string>();
@@ -607,7 +607,7 @@ export class GenerateEstimationPocProposalUseCase {
       const key = role.role.trim().toLocaleLowerCase('es');
       if (seen.has(key)) {
         throw new BadRequestException(
-          'Gemini propuso el perfil duplicado «' + role.role +
+          'El proveedor IA propuso el perfil duplicado «' + role.role +
           '». La EDT no se solicitará para ahorrar cuota.',
         );
       }
@@ -771,7 +771,7 @@ export class GenerateEstimationPocProposalUseCase {
       const allowed = new Set(activeKoraTeams.map((team) => team.teamId));
       const invalid = draft.roles.find((role) => !role.teamId || !allowed.has(role.teamId));
       if (invalid) {
-        throw new BadRequestException('Gemini propuso un perfil sin equipo activo válido de Kora: ' + invalid.role);
+        throw new BadRequestException('El proveedor IA propuso un perfil sin equipo activo válido de Kora: ' + invalid.role);
       }
     }
 
@@ -790,7 +790,7 @@ export class GenerateEstimationPocProposalUseCase {
         .filter((index) => index >= 0);
       if (leadIndices.length > 1) {
         throw new BadRequestException(
-          'Gemini propuso más de un Líder Técnico. Debe existir un único perfil de supervisión.',
+          'El proveedor IA propuso más de un Líder Técnico. Debe existir un único perfil de supervisión.',
         );
       }
       const governanceSource = 'Política ' + ESTIMATION_METHODOLOGY_VERSION +
