@@ -178,7 +178,7 @@ export class QuotationController {
       'X-Accel-Buffering': 'no',
       Connection: 'keep-alive',
     });
-    let currentPhase: 'preflight' | 'proposal' | 'edt' | 'saving' = 'preflight';
+    const progress: { phase: 'preflight' | 'proposal' | 'edt' | 'saving' } = { phase: 'preflight' };
     const send = (event: 'thought' | 'phase' | 'complete' | 'error', data: unknown) => {
       if (!reply.raw.destroyed && !reply.raw.writableEnded) {
         reply.raw.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
@@ -189,7 +189,7 @@ export class QuotationController {
         projectId, input, actor, (text) => {
           if (text.trim()) send('thought', { text });
         }, (phase) => {
-          currentPhase = phase;
+          progress.phase = phase;
           send('phase', { phase });
         },
       );
@@ -220,21 +220,21 @@ export class QuotationController {
         : undefined;
       this.logger.error(JSON.stringify({
         event: 'quotation_ai_generation_failed',
-        diagnosticId, projectId, phase: currentPhase, kind,
+        diagnosticId, projectId, phase: progress.phase, kind,
         code: safe(metadata.code), constraint: safe(metadata.constraint),
         table: safe(metadata.table), column: safe(metadata.column), issues, frames,
       }));
-      const phaseLabel = currentPhase === 'saving'
+      const phaseLabel = progress.phase === 'saving'
         ? 'guardado de cotización'
-        : currentPhase === 'edt' ? 'generación o validación de EDT'
-          : currentPhase === 'proposal' ? 'propuesta de perfiles'
+        : progress.phase === 'edt' ? 'generación o validación de EDT'
+          : progress.phase === 'proposal' ? 'propuesta de perfiles'
             : 'validación inicial';
       const message = reason instanceof HttpException
         ? reason.message
         : 'Kora no pudo completar la etapa de ' + phaseLabel +
           '. Código de diagnóstico: ' + diagnosticId +
           '. No repitas la generación todavía: revisa el estado de las cotizaciones y el log del servidor.';
-      send('error', { message, phase: currentPhase, diagnosticId });
+      send('error', { message, phase: progress.phase, diagnosticId });
     } finally {
       if (!reply.raw.destroyed && !reply.raw.writableEnded) reply.raw.end();
     }
