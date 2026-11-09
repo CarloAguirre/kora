@@ -131,7 +131,7 @@ export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
                   <tr key={v.id} className={v.status === 'sent' ? styles.sentRow : undefined}>
                     <td><strong>v{v.versionNumber} · {v.name}</strong>
                       <small>{new Date(v.createdAt).toLocaleDateString('es-CL')}
-                        {v.origin === 'ai' ? ' · Origen IA (KDM de prueba)' : ''}</small></td>
+                        {v.origin === 'ai' ? (v.draft.aiPoc?.source === 'kdm_demo' ? ' · Agente IA (KDM demo)' : ' · Agente IA') : ''}</small></td>
                     <td><div className={styles.statuses}>
                       {data?.transferredVersionId === v.id ? <Badge tone="success">Traspasada</Badge> :
                         applied.data?.versionId === v.id ? <Badge tone="warning">Planificación previa</Badge> :
