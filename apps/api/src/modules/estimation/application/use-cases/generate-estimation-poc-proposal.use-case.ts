@@ -294,6 +294,7 @@ export class GenerateEstimationPocProposalUseCase {
         'WBS es único dentro de activities; repetirlo en activities, incluso con datos idénticos, es un error.',
         'Cada roleHours debe referir a un WBS existente, su role debe coincidir EXACTAMENTE con allowedRoles y ninguna pareja WBS×role debe duplicarse.',
         'references: códigos o referencias verificables del documento separados por punto y coma; cadena vacía si no existe fuente explícita.',
+        'Para documentos Excel convertidos a texto identifica la HOJA y las coordenadas de celda que sustentan cada actividad (ejemplo: Reglas.xlsx · HOJA Validaciones · B14). Revisa todas las hojas visibles entregadas; no interpretes fórmulas sin valor calculado como resultados ni inventes filas omitidas.',
         'classification: categoría resumida según la evidencia, o cadena vacía si no aplica.',
         'roleHours.hours siempre mayor a 0 y con hasta dos decimales. Cada actividad debe tener al menos un perfil. No inventes personas, responsables nominales ni estados de ejecución.',
         'reservePercent: solo usa el porcentaje expresamente pedido en el documento o cuestionario; si no aparece, devuelve 0. La reserva no integra las HH base.',
@@ -688,7 +689,7 @@ export class GenerateEstimationPocProposalUseCase {
     if (this.ai.name !== 'poc-ai' && documents.length === 0) {
       throw new Error(
         'La carpeta no contiene documentos compatibles para la PoC. ' +
-        (coverageNote ?? 'Usa PDF, Google Docs, Sheets, Slides o archivos de texto/CSV.'),
+        (coverageNote ?? 'Usa PDF, Excel .xlsx, Google Docs, Sheets, Slides o archivos de texto/CSV.'),
       );
     }
 
@@ -715,6 +716,7 @@ export class GenerateEstimationPocProposalUseCase {
         instructions: [
           BASE_INSTRUCTIONS,
           'Si context.sourceCoverage advierte omisiones, no inventes los requisitos faltantes ni afirmes cobertura documental total.',
+          'Los Excel .xlsx se entregan como texto por HOJA y FILA con coordenadas de celda. Considera sus reglas, matrices y alcance igual que los PDF y documentos; no uses fórmulas sin resultado calculado como valores confirmados.',
           ...(activeKoraTeams ? [
             'Los únicos equipos permitidos son los de context.activeKoraTeams, leídos del catálogo real de Kora.',
             'Cada perfil profesional debe indicar teamId, que debe coincidir EXACTAMENTE con un ID del catálogo.',
