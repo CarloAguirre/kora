@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type {
   EstimationAnswerValue,
@@ -266,6 +266,18 @@ export function AiQuotationWizardModal({ project, onClose }: {
     phase: string; text: string;
   }>>([]);
   const [proposalThoughtSummary, setProposalThoughtSummary] = useState('');
+  const analysisLogRef = useRef<HTMLDivElement | null>(null);
+  const proposalLogRef = useRef<HTMLDivElement | null>(null);
+  // Mantener ambos logs con overflow propio al final de cada actualización SSE.
+  // Se mueve solo el scroll interno, nunca el modal ni la página.
+  useLayoutEffect(() => {
+    if (analysisLogRef.current)
+      analysisLogRef.current.scrollTop = analysisLogRef.current.scrollHeight;
+  }, [geminiThoughtSummary, analysisActivity, sourceStep]);
+  useLayoutEffect(() => {
+    if (proposalLogRef.current)
+      proposalLogRef.current.scrollTop = proposalLogRef.current.scrollHeight;
+  }, [proposalThoughtSummary, proposalPhase]);
   const [proposalPhase, setProposalPhase] = useState<'idle' | 'proposal' | 'edt' | 'saving' | 'error'>('idle');
   const [generating, setGenerating] = useState(false);
   const generationInFlight = useRef(false);
@@ -597,7 +609,7 @@ export function AiQuotationWizardModal({ project, onClose }: {
       const result = await analysis.mutateAsync({
         // Solo los fragmentos enviados como thought=true por Gemini.
         onThoughtSummary: (chunk) => setGeminiThoughtSummary((current) =>
-          (current + chunk).slice(0, 12_000)),
+          (current + chunk).slice(-12_000)),
         // Estados comprobables del servidor, distintos de los resúmenes
         // de pensamiento que Gemini puede enviar recién cerca del final.
         onProgress: (phase, text) => setAnalysisActivity((current) => [
@@ -690,7 +702,7 @@ export function AiQuotationWizardModal({ project, onClose }: {
     try {
       const created = await generate.mutateAsync({
         onThoughtSummary: (chunk) => setProposalThoughtSummary((current) =>
-          (current + chunk).slice(0, 12_000)),
+          (current + chunk).slice(-12_000)),
         onPhase: (phase) => setProposalPhase(phase),
         projectId: project.id,
         projectName: project.name,
@@ -1009,7 +1021,7 @@ export function AiQuotationWizardModal({ project, onClose }: {
           {(sourceStep === 'loading' || sourceStep === 'analyzing') && (
             <details className={[styles.more, styles.thoughtDisclosure].join(' ')} open>
               <summary>Ver razonamiento resumido de Gemini</summary>
-              <div className={styles.thoughtLog} role="log"
+              <div ref={analysisLogRef} className={styles.thoughtLog} role="log"
                 aria-label="Resúmenes de razonamiento de Gemini"
                 aria-live="polite" aria-relevant="additions text">
                 {sourceStep === 'loading' ? (
@@ -1140,7 +1152,7 @@ export function AiQuotationWizardModal({ project, onClose }: {
                   proposalPhase === 'saving' ? 'Guardando la cotización como borrador…' :
                     'La generación no pudo completarse.'}
             </p>}
-            <div className={styles.thoughtLog} role="log"
+            <div ref={proposalLogRef} className={styles.thoughtLog} role="log"
               aria-label="Resúmenes de Gemini durante la estimación"
               aria-live="polite" aria-relevant="additions text">
               {proposalThoughtSummary
