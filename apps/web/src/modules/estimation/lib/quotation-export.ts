@@ -232,7 +232,7 @@ function slideChanges(i: number, m: ReturnType<typeof quotationExportModel>): Re
       6: '¿Dónde aplicarlo?', 7: 'En procesos y productos digitales identificados dentro del alcance de cada proyecto.',
       8: '¿Cómo implementarlo?', 9: 'Por etapas, con validaciones, entregables y revisión continua del alcance.',
     };
-    case 5: return { 16: 'Cifras corporativas sujetas a validación por Kabeli' };
+    case 5: return { 2: '—', 5: '—', 8: '—', 11: '—', 14: 'Cifras pendientes de validación por Kabeli' };
     case 6: return isRpa ? {} : {
       0: 'ACOMPAÑAMIENTO TECNOLÓGICO',
       1: 'Trabajo colaborativo con el equipo del cliente.',
@@ -262,7 +262,7 @@ function slideChanges(i: number, m: ReturnType<typeof quotationExportModel>): Re
       5: compact(chunk(0)?.team ?? '—', 28), 6: compact(chunk(0)?.name ?? 'Sin EDT desglosada', 100), 7: hrs(0),
       8: compact(chunk(1)?.team ?? '—', 28), 9: compact(chunk(1)?.name ?? '—', 100),
       10: compact(chunk(2)?.team ?? '—', 28), 11: compact(chunk(2)?.name ?? '—', 100),
-      12: compact(chunk(3)?.team ?? '—', 28), 13: hrs(3),
+      12: compact(chunk(3)?.name ?? '—', 80), 13: hrs(3),
     };
     case 12: return { 1: 'Arquitectura sujeta a validación del líder técnico.',
       2: 'ARQUITECTURA PENDIENTE DE VALIDACIÓN',
@@ -348,12 +348,14 @@ export async function downloadQuotationPowerPoint(context: QuotationExportContex
   const encoder = new TextEncoder();
   for (let i = 1; i <= 19; i++) {
     if (!Object.keys(slideChanges(i, model)).length) continue;
-    const entry = XLSX.CFB.find(cfb, 'ppt/slides/slide' + i + '.xml');
+    const index = cfb.FullPaths.findIndex((p: string) =>
+      p.toLowerCase().endsWith('/ppt/slides/slide' + i + '.xml'));
+    const entry = index < 0 ? null : cfb.FileIndex[index];
     if (!entry?.content) throw new Error('Falta la diapositiva ' + i + ' de la plantilla corporativa.');
-    const xml = decoder.decode(entry.content);
+    const xml = decoder.decode(new Uint8Array(entry.content));
     entry.content = encoder.encode(patchQuotationSlideXml(xml, i, model));
     entry.size = entry.content.length;
   }
   const output = XLSX.CFB.write(cfb, { fileType: 'zip', type: 'array' });
-  download(new Blob([output], { type: PPT_MIME }), fileName(model, 'pptx'));
+  download(new Blob([new Uint8Array(output)], { type: PPT_MIME }), fileName(model, 'pptx'));
 }
