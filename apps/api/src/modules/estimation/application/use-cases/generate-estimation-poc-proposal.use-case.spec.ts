@@ -587,7 +587,7 @@ describe('GenerateEstimationPocProposalUseCase', () => {
       { role: 'Desarrollo', hours: 50 }, { role: 'QA', hours: 30 },
     ], 'openai'));
     expect(mock.calls()).toBe(1);
-    expect(mock.instructions[0]).toContain('máximo 1.000 caracteres');
+    expect(mock.instructions[0]).toContain('conserva las referencias extensas');
     expect(edt.modules[0]?.tasks[0]?.referenceIds).toEqual([
       'RN-01', citation, 'Reglas.pdf · página 12',
     ]);
@@ -612,6 +612,38 @@ describe('GenerateEstimationPocProposalUseCase', () => {
     expect(actual.slice(0, 29)).toEqual(refs.slice(0, 29));
     expect(actual[29]).toBe(refs.slice(29).join(';'));
     expect(mock.calls()).toBe(1);
+  });
+
+  it('OpenAI conserva descripciones y citas extensas y acota solo etiquetas de EDT', async () => {
+    const long = 'Regla técnica de operación, auditoría y permisos; '.repeat(100);
+    const reference = 'Documento-Control.xlsx · HOJA Reglas!B12 · ' + 'Z'.repeat(5000);
+    const stageName = 'Construcción de integración y controles; '.repeat(15);
+    const mock = createGenerator(() => {
+      const data = baseDetail();
+      data.stages[0]!.name = stageName;
+      data.activities[0]!.module = 'Módulo de implementación y control; '.repeat(15);
+      data.activities[0]!.submodule = stageName;
+      data.activities[0]!.name = stageName;
+      data.activities[0]!.description = long;
+      data.activities[0]!.references = reference;
+      data.roleHours[0]!.taskName = stageName;
+      data.roleHours[0]!.taskDescription = long;
+      return data;
+    }, 'openai');
+    vi.stubEnv('KORA_EDT_MAX_ATTEMPTS', '1');
+    const edt = await mock.generator.generateEdt(input, proposal([
+      { role: 'Desarrollo', hours: 50 }, { role: 'QA', hours: 30 },
+    ], 'openai'));
+    expect(mock.calls()).toBe(1);
+    expect(edt.totalHours).toBe(79);
+    expect(edt.stages?.[0]?.name.length).toBeLessThanOrEqual(300);
+    expect(edt.modules[0]?.name.length).toBeLessThanOrEqual(300);
+    const task = edt.modules[0]?.tasks[0];
+    expect(task?.name.length).toBeLessThanOrEqual(300);
+    expect(task?.roleEffort?.[0]?.taskName?.length).toBeLessThanOrEqual(300);
+    expect(task?.description).toBe(long.trim());
+    expect(task?.roleEffort?.[0]?.taskDescription).toBe(long.trim());
+    expect(task?.referenceIds?.[0]).toBe(reference);
   });
 
   it('informa OpenAI (nunca Gemini) cuando el contenido de una EDT es realmente inválido', async () => {

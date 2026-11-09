@@ -1,5 +1,6 @@
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { z } from 'zod';
+import { fitGeneratedLabel, normalizeGeneratedProposal } from '../ai-generated-text';
 import { optimizeWorkforceForEdt, replanEdtStagesToFullTime } from '../estimation-workforce-optimizer';
 import { extractDriveFolderId } from '../drive-source-selection';
 import { resolveEstimationQuestionnaireContext, type EstimationInputWithQuestions } from '../resolve-estimation-questionnaire-context';
@@ -128,18 +129,20 @@ const detailResponseSchema = z.object({
   reservePercent: z.number().min(0).max(100),
   stages: z.array(z.object({
     code: z.string().trim().min(1).max(40),
-    name: z.string().trim().min(1).max(300),
+    name: z.string().trim().min(1).transform((v) => fitGeneratedLabel(v, 300)),
     startWeek: z.number().int().min(1).max(520),
     durationWeeks: z.number().int().min(1).max(520),
   })).min(1).max(20),
   activities: z.array(z.object({
     wbs: z.string().trim().min(1).max(40),
     stageCode: z.string().trim().min(1).max(40),
-    module: z.string().trim().min(1).max(300),
-    submodule: z.string().trim().max(300),
-    name: z.string().trim().min(1).max(300),
-    description: z.string().trim().max(3000),
-    references: z.string().trim().max(1000),
+    module: z.string().trim().min(1).transform((v) => fitGeneratedLabel(v, 300)),
+    submodule: z.string().trim().transform((v) => fitGeneratedLabel(v, 300)),
+    name: z.string().trim().min(1).transform((v) => fitGeneratedLabel(v, 300)),
+    // Narrativas y referencias completas: la respuesta del proveedor ya está
+    // acotada por su límite global de salida. No truncar evidencia.
+    description: z.string().trim(),
+    references: z.string().trim(),
     // classification es una etiqueta auxiliar. No se debe invalidar TODA la
     // EDT (ni las HH) si el modelo devuelve un nombre descriptivo largo.
     // Normalizamos solo la etiqueta, sin alterar tareas, evidencias ni esfuerzo.
@@ -152,8 +155,9 @@ const detailResponseSchema = z.object({
     hours: z.number().positive().max(1000000),
     // Los campos son opcionales al parsear para generar un mensaje claro de
     // validación; todas las EDT nuevas deben traer ambos por perfil.
-    taskName: z.string().trim().min(1).max(300).optional(),
-    taskDescription: z.string().trim().min(1).max(3000).optional(),
+    taskName: z.string().trim().min(1)
+      .transform((v) => fitGeneratedLabel(v, 300)).optional(),
+    taskDescription: z.string().trim().min(1).optional(),
   })).min(1).max(240),
 });
 
@@ -183,7 +187,7 @@ const EDT_JSON_SCHEMA = {
           module: { type: 'STRING' }, submodule: { type: 'STRING' },
           name: { type: 'STRING' }, description: { type: 'STRING' },
           references: { type: 'STRING',
-            description: 'Códigos de fuentes verificables (archivo y página/hoja/celda). Separar con punto y coma; hasta 1000 caracteres en total, preferentemente referencias menores a 100. No copiar párrafos completos.' },
+            description: 'Códigos de fuente verificables: archivo y página/hoja/celda. Separar con punto y coma; no copiar párrafos. Las referencias extensas se conservarán íntegras.' },
           classification: { type: 'STRING',
             description: 'Etiqueta de clasificación CORTA, máximo 40 caracteres; nunca un párrafo. Si no aplica, cadena vacía.' },
         },
@@ -312,7 +316,7 @@ export class GenerateEstimationPocProposalUseCase {
         'startWeek y durationWeeks son rangos SEMANALES RELATIVOS y estimativos, nunca fechas del proyecto; los tramos pueden solaparse con trabajo paralelo.',
         'WBS es único dentro de activities; repetirlo en activities, incluso con datos idénticos, es un error.',
         'Cada roleHours debe referir a un WBS existente, su role debe coincidir EXACTAMENTE con allowedRoles y ninguna pareja WBS×role debe duplicarse.',
-        'references: SOLO referencias verificables, como código de requisito, archivo + página, archivo + HOJA + celda (ejemplo Reglas.xlsx · Matriz!B14). Separadas por punto y coma (;), en total máximo 1.000 caracteres, idealmente menos de 100 por referencia. No copiar párrafos, URLs largas ni descripciones: ese detalle va en description. Nunca inventar fuentes.',
+        'references: SOLO referencias verificables, como código de requisito, archivo + página o archivo + HOJA + celda (ejemplo Reglas.xlsx · Matriz!B14). Separa con punto y coma (;). Mantén las citas concisas y no copies párrafos ni inventes fuentes. Kora conserva las referencias extensas sin recortarlas.',
         'Para documentos Excel convertidos a texto identifica la HOJA y las coordenadas de celda que sustentan cada actividad (ejemplo: Reglas.xlsx · HOJA Validaciones · B14). Revisa todas las hojas visibles entregadas; no interpretes fórmulas sin valor calculado como resultados ni inventes filas omitidas.',
         'classification: SOLO una etiqueta de categoría corta (máximo 40 caracteres), nunca una explicación. Si no aplica, cadena vacía. La explicación detallada pertenece a description.',
         'roleHours.hours siempre mayor a 0 y con hasta dos decimales. Cada actividad debe tener al menos un perfil. No inventes personas, responsables nominales ni estados de ejecución.',
@@ -714,7 +718,7 @@ export class GenerateEstimationPocProposalUseCase {
     }
 
     const draft = estimationPocAiDraftSchema.parse(
-      await this.ai.generateStructured({
+      normalizeGeneratedProposal(await this.ai.generateStructured({
         task: 'estimation.poc.proposal',
         context: {
           projectId: input.projectId,
@@ -778,7 +782,7 @@ export class GenerateEstimationPocProposalUseCase {
             },
           },
         } : TEAM_ESTIMATE_RESPONSE_SCHEMA,
-      }, onThoughtSummary),
+      }, onThoughtSummary)),
     );
     if (activeKoraTeams) {
       const allowed = new Set(activeKoraTeams.map((team) => team.teamId));

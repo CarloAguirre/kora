@@ -39,10 +39,18 @@ describe('EDT comercial por actividad y perfil (v2)', () => {
     expect(parsed.totalHours).toBe(40);
     expect(parsed.modules[0]?.tasks[0]?.roleEffort).toHaveLength(2);
   });
-  it('sigue rechazando referencias que exceden 1.000 caracteres', () => {
+  it('conserva intactas referencias y descripciones extensas en la EDT v2', () => {
     const source = structuredClone(detail);
-    source.modules[0]!.tasks[0]!.referenceIds = ['R'.repeat(1001)];
-    expect(quotationReferenceEdtSchema.safeParse(source).success).toBe(false);
+    const citation = 'Reglas.xlsx · HOJA Integraciones!A124-' + 'Z'.repeat(6000);
+    const explanation = 'Regla de validación y trazabilidad. '.repeat(125);
+    source.modules[0]!.tasks[0]!.referenceIds = [citation];
+    source.modules[0]!.tasks[0]!.description = explanation;
+    source.modules[0]!.tasks[0]!.roleEffort![0]!.taskDescription = explanation;
+    const parsed = quotationReferenceEdtSchema.parse(source);
+    expect(parsed.modules[0]?.tasks[0]?.referenceIds?.[0]).toBe(citation);
+    expect(parsed.modules[0]?.tasks[0]?.description).toBe(explanation.trim());
+    expect(parsed.modules[0]?.tasks[0]?.roleEffort?.[0]?.taskDescription)
+      .toBe(explanation.trim());
   });
 
   it('rechaza discrepancias entre HH de perfiles, actividades, módulos y tramos', () => {

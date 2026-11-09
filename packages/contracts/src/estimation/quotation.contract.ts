@@ -144,7 +144,7 @@ export const quotationDraftDataSchema = z.object({
   paymentPlan: z.array(quotationPaymentItemSchema).max(100).default([]),
   assumptions: z.array(z.string().trim().max(2000)).max(100).default([]),
   exclusions: z.array(z.string().trim().max(2000)).max(100).default([]),
-  sourceRefs: z.array(z.string().trim().max(1000)).max(100).default([]),
+  sourceRefs: z.array(z.string().trim()).max(100).default([]),
   answers: z.record(z.string(), z.unknown()).default({}),
   /** Snapshot de evidencia de IA o simulación. Nunca se descarta al editar HH. */
   analysis: estimationAnalysisArtifactSchema.nullish(),

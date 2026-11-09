@@ -11,6 +11,7 @@ import {
 } from '../ports/document-source-reader.port';
 import { extractDriveFolderId } from '../drive-source-selection';
 import { ESTIMATION_ANALYSIS_GUIDANCE } from '../estimation-methodology';
+import { fitGeneratedText } from '../ai-generated-text';
 
 const DYNAMIC_QUESTIONS_JSON_SCHEMA = {
   type: 'OBJECT',
@@ -219,12 +220,14 @@ export class AnalyzeEstimationPocUseCase {
             return [];
           const rawValue = entry.value.trim();
           const rawLabel = entry.label.trim();
-          if (!rawValue || !rawLabel || rawValue.length > 200 ||
-              rawLabel.length > 300) return [];
+          // Identidad de value: no truncar para evitar colisiones entre
+          // opciones; label es solo presentación y sí se puede abreviar.
+          if (!rawValue || !rawLabel || rawValue.length > 200) return [];
           const other = rawValue.toLowerCase() === 'other' ||
             /^(otro|otra opción|other)(?:\s*\(|\s*[:\-]|$)/i.test(rawLabel);
           return [{ value: other ? 'other' : rawValue,
-            label: other ? 'Otro (especificar)' : rawLabel }];
+            label: other ? 'Otro (especificar)' :
+              fitGeneratedText(rawLabel, 300) as string }];
         })
         .filter((option) => {
           if (seenOptions.has(option.value)) return false;
@@ -242,6 +245,11 @@ export class AnalyzeEstimationPocUseCase {
         ...candidate,
         answerType: isChoice && !usableChoice ? 'text' : requestedType,
         options: usableChoice ? orderedOptions : [],
+        // Respetar el contrato compartido sin rechazar el cuestionario entero
+        // por una categoría, justificación o pregunta redactada en exceso.
+        category: fitGeneratedText(candidate.category, 120),
+        question: fitGeneratedText(candidate.question, 1500),
+        reason: fitGeneratedText(candidate.reason, 1500),
         id: 'D' + String(index + 1).padStart(2, '0'),
         kind: 'dynamic',
         // Cuando el proveedor no propone un escenario concreto, solo es posible
@@ -262,7 +270,7 @@ export class AnalyzeEstimationPocUseCase {
       summary: coverageNote
         ? (String(data.summary).slice(0, Math.max(0, 2998 - coverageNote.length)) +
           '\n\n' + coverageNote).slice(0, 3000)
-        : data.summary,
+        : fitGeneratedText(data.summary, 3000),
       detectedDocuments: selected.map((doc) => doc.name),
       fixedPrefills,
       dynamicQuestions: normalizedQuestions,

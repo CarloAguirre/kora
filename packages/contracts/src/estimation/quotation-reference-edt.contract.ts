@@ -12,7 +12,7 @@ export const quotationReferenceRoleEffortSchema = z.object({
   hours: z.number().positive().max(1000000),
   /** Instrucción ejecutable propia del perfil. Opcional en EDT históricas. */
   taskName: z.string().trim().min(1).max(300).optional(),
-  taskDescription: z.string().trim().min(1).max(3000).optional(),
+  taskDescription: z.string().trim().min(1).optional(),
 });
 
 export const quotationReferenceStageSchema = z.object({
@@ -26,18 +26,18 @@ export const quotationReferenceStageSchema = z.object({
 export const quotationReferenceTaskSchema = z.object({
   wbs: z.string().trim().min(1).max(40),
   name: z.string().trim().min(1).max(300),
-  description: z.string().trim().max(3000).default(''),
+  description: z.string().trim().default(''),
   /** Perfil predominante. Mantiene consumidores v1 (traspaso y conciliación). */
   role: z.string().trim().min(1).max(120),
   /** Suma de roleEffort en v2; valor persistido sin prorrateos de IA. */
   hours: z.number().positive().max(1000000),
   stageCode: z.string().trim().min(1).max(40).optional(),
   submodule: z.string().trim().max(300).optional(),
-  /** Identificadores de evidencia que también pueden incluir archivo, sección,
-   * página o celda. La entrada del LLM permite hasta 1000 caracteres en total;
-   * no rechazar referencias reales que excedan 100 sin perder trazabilidad.
+  /** Citas y coordenadas del documento de origen, sin truncamiento de texto.
+   * El tamaño de respuesta del proveedor IA está limitado globalmente.
+   * El máximo de entradas se mantiene para proteger la estructura de la EDT.
    */
-  referenceIds: z.array(z.string().trim().min(1).max(1000)).max(30).optional(),
+  referenceIds: z.array(z.string().trim().min(1)).max(30).optional(),
   classification: z.string().trim().max(40).optional(),
   roleEffort: z.array(quotationReferenceRoleEffortSchema).min(1).max(12).optional(),
 });
