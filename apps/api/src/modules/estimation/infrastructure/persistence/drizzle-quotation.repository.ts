@@ -44,7 +44,7 @@ import { InvalidCommercialQuotation, assertQuotationReadyForClient, assertAiProp
 import type { QuotationProjectScope, QuotationRepository } from '../../domain/repositories/quotation.repository';
 
 /** Mantener Nest fuera del dominio y traducir a HTTP 400 en infraestructura. */
-function validateCommercial(action: () => void): void {
+export function validateCommercial(action: () => void): void {
   try {
     action();
   } catch (error) {
@@ -923,7 +923,7 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       validateCommercial(() => assertDirectClientApprovalAcknowledged(
         current.status as 'draft' | 'sent', input.confirmWithoutSend,
       ));
-      assertQuotationReadyForClient(toVersion(current));
+      validateCommercial(() => assertQuotationReadyForClient(toVersion(current)));
       if (process.env.NODE_ENV === 'production' &&
           quotationDraftDataSchema.parse(current.draft).aiPoc?.source === 'kdm_demo') {
         throw new ConflictException('No se puede registrar aprobación comercial con documentación KDM de demostración.');

@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
   versions: null as null | unknown[],
 }));
 const base = {
-  status: 'draft' as const, revision: 2,
+  status: 'draft' as const, revision: 2, hourlyRate: 2,
   createdAt: '2026-11-01T10:00:00.000Z',
   origin: 'manual' as const, totalHours: 40,
   totalAmount: 80, netAmount: 80, currency: 'UF' as const,
@@ -73,6 +73,36 @@ describe('Cotizaciones del proyecto', () => {
     expect(mocks.transfer).not.toHaveBeenCalled();
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name:'Dejar pendiente' }));
     expect(mocks.transfer).not.toHaveBeenCalled();
+  });
+  it('bloquea una aprobación incompleta con todos sus requisitos visibles', () => {
+    mocks.versions = [{
+      ...v1, origin: 'ai', aiReviewStatus: 'pending',
+      hourlyRate: null, netAmount: null, totalAmount: null,
+      draft: { ...v1.draft, paymentPlan: [] },
+    }];
+    render(<MemoryRouter><ProjectQuotationCard project={project}/></MemoryRouter>);
+    const approval = screen.getByRole('button', { name: 'Registrar aprobación' });
+    expect(approval).toBeDisabled();
+    expect(approval.parentElement).toHaveAttribute('title',
+      expect.stringContaining('Completa el plan de pago'));
+    fireEvent.click(screen.getByText(/Faltan \d+ requisitos/));
+    expect(screen.getByText(/Ingresa y guarda un valor HH mayor que cero/)).toBeInTheDocument();
+    expect(screen.getByText(/0% de 100%/)).toBeInTheDocument();
+    expect(screen.getByText(/Acepta la propuesta IA/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Completar en calculadora' }))
+      .toHaveAttribute('href', '/project/quotation?version=' + v1.id);
+    fireEvent.click(approval);
+    expect(mocks.approve).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+  it('permite el flujo normal cuando tarifa, monto, pagos y aceptación IA están completos', () => {
+    mocks.versions = [{ ...v1, origin: 'ai', aiReviewStatus: 'accepted' }];
+    render(<MemoryRouter><ProjectQuotationCard project={project}/></MemoryRouter>);
+    const approval = screen.getByRole('button', { name: 'Registrar aprobación' });
+    expect(approval).toBeEnabled();
+    expect(screen.queryByText(/Faltan \d+ requisitos/)).not.toBeInTheDocument();
+    fireEvent.click(approval);
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
   it('confirma la eliminación de la versión seleccionada', async () => {
     render(<MemoryRouter><ProjectQuotationCard project={project}/></MemoryRouter>);

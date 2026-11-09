@@ -7,6 +7,7 @@ import { Button } from '@/shared/components/ui/Button';
 import { Badge } from '@/shared/components/ui/Badge';
 import { useConfirmAction } from '@/shared/components/ui/useConfirmAction';
 import { NewProjectQuotationModal } from './NewProjectQuotationModal';
+import { quotationCommercialBlockers } from './quotation-commercial-blockers';
 import { QuotationApprovalDialog, QuotationTransferDialog } from './QuotationLifecycleDialogs';
 import styles from './ProjectQuotationCard.module.css';
 
@@ -32,6 +33,10 @@ export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
   const eligible = isQuotationDraftEligibleProject(project) && !closed;
   const transferredVersion = versions.find((version) => version.id === data?.transferredVersionId);
   const registerApproval = (version: QuotationVersion) => {
+    // Prevalidación compartida con la calculadora; el backend vuelve a validar.
+    if (quotationCommercialBlockers(version, {
+      dirty: false, canOperate: eligible, demoProduction: import.meta.env.PROD,
+    }).length > 0) return;
     setActionError(''); setActionNotice('');
     setTransferTiming(project.status === 'draft' ? 'now' : 'later');
     setApproving(version);
@@ -127,8 +132,11 @@ export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
             <div className={styles.scroll}>
               <table className={styles.versions}>
                 <thead><tr><th>Versión</th><th>Estado</th><th>Horas</th><th>Total</th><th>Acciones</th></tr></thead>
-                <tbody>{versions.map((v) => (
-                  <tr key={v.id} className={v.status === 'sent' ? styles.sentRow : undefined}>
+                <tbody>{versions.map((v) => {
+                  const approvalBlockers = quotationCommercialBlockers(v, {
+                    dirty: false, canOperate: eligible, demoProduction: import.meta.env.PROD,
+                  });
+                  return <tr key={v.id} className={v.status === 'sent' ? styles.sentRow : undefined}>
                     <td><strong>v{v.versionNumber} · {v.name}</strong>
                       <small>{new Date(v.createdAt).toLocaleDateString('es-CL')}
                         {v.origin === 'ai' ? (v.draft.aiPoc?.source === 'kdm_demo' ? ' · Agente IA (KDM demo)' : ' · Agente IA') : ''}</small></td>
@@ -149,11 +157,28 @@ export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
                           Abrir en calculadora
                         </Link>
                         {eligible && (v.status === 'sent' || v.status === 'draft') &&
-                          <Button size="sm" variant="ghost"
-                            disabled={lifecycle.approveClient.isPending}
-                            onClick={() => registerApproval(v)}>
-                            Registrar aprobación
-                          </Button>}
+                          <div className={styles.approvalReadiness}>
+                            {/* Un botón disabled puede no exponer title: también mostrar
+                                el resumen de requisitos sin depender de hover. */}
+                            <span title={approvalBlockers.length ? approvalBlockers.join('\n') : undefined}>
+                              <Button size="sm" variant="ghost"
+                                disabled={lifecycle.approveClient.isPending || approvalBlockers.length > 0}
+                                onClick={() => registerApproval(v)}>
+                                Registrar aprobación
+                              </Button>
+                            </span>
+                            {approvalBlockers.length > 0 && (
+                              <details className={styles.approvalRequirements}
+                                aria-label={'Requisitos pendientes cotización v' + v.versionNumber}>
+                                <summary>Faltan {approvalBlockers.length} requisitos</summary>
+                                <ul>{approvalBlockers.map((reason) =>
+                                  <li key={reason}>{reason}</li>)}</ul>
+                                <Link to={projectQuotationPath(project) + '?version=' + v.id}>
+                                  Completar en calculadora
+                                </Link>
+                              </details>
+                            )}
+                          </div>}
                         {eligible && v.status === 'approved' &&
                           data?.transferredVersionId !== v.id &&
                           <Button size="sm" variant="ghost"
@@ -170,8 +195,8 @@ export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
                         )}
                       </div>
                     </td>
-                  </tr>
-                ))}</tbody>
+                  </tr>;
+                })}</tbody>
               </table>
             </div>
             {transferredVersion && (
