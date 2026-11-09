@@ -4,11 +4,11 @@ import type { quotationExportModel } from './quotation-export';
 type Model = ReturnType<typeof quotationExportModel>;
 type CellValue = string | number | null | undefined;
 type RowValues = CellValue[];
+type TemplateArchive = ReturnType<typeof XLSX.CFB.read>;
 type SheetSpec = { title: string; subtitle: string; headers: string[]; data: RowValues[] };
 const NS = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main';
 const REL = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
 const PKG_REL = 'http://schemas.openxmlformats.org/package/2006/relationships';
-const NS_CHART = 'http://schemas.openxmlformats.org/drawingml/2006/chart';
 const PREFIX = 'x:';
 const parse = (s: string): Document => {
   const doc = new DOMParser().parseFromString(s, 'application/xml');
@@ -17,7 +17,6 @@ const parse = (s: string): Document => {
 };
 const children = (node: Element, name: string): Element[] =>
   Array.from(node.children).filter((el) => el.localName === name);
-const child = (node: Element, name: string): Element | undefined => children(node, name)[0];
 const el = (doc: Document, name: string): Element => doc.createElementNS(NS, PREFIX + name);
 const serial = (doc: Document) => new XMLSerializer().serializeToString(doc);
 const clean = (text: unknown): string => {
@@ -34,7 +33,7 @@ const cellIndex = (ref: string) => {
   for (const ch of ref.match(/^[A-Z]+/)?.[0] ?? '') n = n * 26 + ch.charCodeAt(0) - 64;
   return n - 1;
 };
-const findFile = (cfb: XLSX.CFB.CFB, path: string) => {
+const findFile = (cfb: TemplateArchive, path: string) => {
   const i = cfb.FullPaths.findIndex((p: string) => p.toLowerCase().endsWith('/' + path.toLowerCase()));
   return i < 0 ? undefined : cfb.FileIndex[i];
 };
@@ -122,7 +121,7 @@ export function patchStyledTableSheet(xml: string, spec: SheetSpec): string {
   // Antiguas fórmulas de Zurich, rangos fijos y reglas condicionales se
   // eliminan al reemplazar las filas. Evitar rangos obsoletos.
   for (const section of Array.from(doc.documentElement.children)) {
-    if (['conditionalFormatting', 'autoFilter', 'dataValidations'].includes(section.localName)) {
+    if (['conditionalFormatting', 'autoFilter', 'dataValidations', 'extLst'].includes(section.localName)) {
       section.remove();
     }
   }
@@ -209,6 +208,9 @@ function workbookNames(cfb: XLSX.CFB.CFB, keep: Set<string>): void {
   for (const relation of Array.from(rels.getElementsByTagNameNS(PKG_REL,'Relationship'))) {
     if (removed.has(relation.getAttribute('Id') ?? '')) relation.remove();
   }
+  // Resumen se presenta primero, como en una EDT ejecutiva.
+  const summary = Array.from(list.children).find((s) => s.getAttribute('name') === 'Resumen');
+  if (summary) list.insertBefore(summary, list.firstChild);
   const defined = work.getElementsByTagNameNS(NS,'definedNames')[0];
   defined?.remove(); // zonas impresas antiguas de Zurich
   const calc = work.getElementsByTagNameNS(NS,'calcPr')[0];
@@ -309,11 +311,14 @@ function buildSpecs(model: Model): Map<string, SheetSpec> {
   if(weekly?.rows.length){
     const teamKeys=[...new Set(weekly.rows.map(r=>r.teamKey))];
     const cols=teamKeys.length>5?[...teamKeys.slice(0,4),'Otros equipos']:teamKeys;
+    const nameForKey=(key:string)=>key.startsWith('profile:')
+      ? key.slice('profile:'.length)+' (sin equipo)'
+      : model.team(key);
     const weeks=Array.from({length:Math.max(0,model.weeks)},(_,i)=>i+1);
     out.set('Roadmap_Semanal',{
       title:base+'Carga semanal',subtitle:'HH distribuidas semanalmente según la planificación referencial de Kora.',
       headers:['Semana','Día inicial','Día final',...Array.from({length:5},(_,i)=>
-        cols[i]?(cols[i]==='Otros equipos'?'Otros equipos':model.team(cols[i])):'—'),'Fases activas'],
+        cols[i]?(cols[i]==='Otros equipos'?'Otros equipos':nameForKey(cols[i])):'—'),'Fases activas'],
       data:weeks.map((week)=>{
         const hours=[0,0,0,0,0];
         for(const r of weekly.rows){
