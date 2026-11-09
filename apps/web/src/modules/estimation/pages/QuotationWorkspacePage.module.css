@@ -83,3 +83,7 @@
 /* Un único acceso secundario al mapeo IA: las tablas técnicas y
    desplegables inventados no forman parte de la vista principal del v5. */
 
+
+/* Exportación: acción secundaria en la cabecera, UI kit sin estilos paralelos. */
+.projectHeading{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
+.projectHeading .projectTitle{margin:3px 0 0}
