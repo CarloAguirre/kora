@@ -340,7 +340,7 @@ export function QuotationPhaseWorkspace({
                                       !window.confirm('¿Excluir esta actividad de la cotización, incluyendo sus asignaciones por perfil? El original de Gemini permanecerá intacto.')) return;
                                   onDeleteTask(task.wbs);
                                 }}>×</Button>
-                            : <span className={styles.noDelete}/>
+                            : <span className={styles.noDelete}/>}
                         </div>
                       ))}
                     </div>
