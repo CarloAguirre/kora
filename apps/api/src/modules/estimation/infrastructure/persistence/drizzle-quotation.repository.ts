@@ -37,7 +37,7 @@ import { DATABASE } from '../../../../shared/infrastructure/database/database.mo
 import { calculateQuotation } from '../../domain/quotation-math';
 import { hasOnlyUntouchedDefaultPaymentMilestones } from '../../domain/default-payment-plan-eligibility';
 import { initialQuotationTransferBlockers } from '../../domain/initial-quotation-transfer-blockers';
-import { hasOnlyCommercialPreparationHours } from '../../domain/commercial-preparation-transfer';
+import { hasOnlyCommercialPreparationHours, planCommercialPreparationTransfer } from '../../domain/commercial-preparation-transfer';
 import { buildQuotationTransferReferences, matchingCopiedQuotationReferenceSource } from '../../domain/quotation-transfer-references';
 import { copyQuotationDraft } from '../../domain/copy-quotation-draft';
 import { InvalidCommercialQuotation, assertQuotationReadyForClient, assertAiProposalReadyToAccept, assertDirectClientApprovalAcknowledged } from '../../domain/quotation-commercial-eligibility';
@@ -1084,19 +1084,38 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       if (Math.abs(sum - Number(version.totalHours)) > 0.011) {
         throw new BadRequestException('Las HH por equipo difieren del total aprobado.');
       }
+      // Fase 1 (prospecto/cotización) NO tiene calendario ni módulos.
+      // Sus HH de equipo se preservan; las HH nuevas se suman y se
+      // mantienen las filas de equipos históricos ajenos a esta cotización.
+      let transferPlan: ReturnType<typeof planCommercialPreparationTransfer>;
+      try {
+        transferPlan = planCommercialPreparationTransfer({
+          previousSoldHours: Number(project.soldHours),
+          approvedQuotationHours: Number(version.totalHours),
+          existingTeams,
+          quotationTeams: [...byTeam].map(([teamId, quotedHours]) => ({
+            teamId, quotedHours,
+          })),
+        });
+      } catch (error) {
+        throw new ConflictException(error instanceof Error ? error.message :
+          'No se pudo conciliar la Fase 1 con la cotización aprobada.');
+      }
+      const allocations = new Map(transferPlan.teamAllocations.map((row) =>
+        [row.teamId, row]));
       for (const team of draft.teams) {
+        const allocation = allocations.get(team.teamId)!;
         await tx.insert(projectTeams).values({
           projectId, teamId: team.teamId, memberCount: team.collaborators,
-          assignedHours: (byTeam.get(team.teamId) ?? 0).toFixed(2),
+          assignedHours: allocation.combinedHours.toFixed(2),
         }).onConflictDoUpdate({
           target: [projectTeams.projectId, projectTeams.teamId],
           set: {
-            assignedHours: (byTeam.get(team.teamId) ?? 0).toFixed(2),
-            memberCount: team.collaborators,
+            // No sobrescribir el cupo, líder ni miembros del equipo histórico.
+            assignedHours: allocation.combinedHours.toFixed(2),
             updatedAt: new Date(),
           },
         });
-        // ON CONFLICT no toca leaderUserId ni project_team_members.
       }
       // Las fases comercialmente aceptadas son la fuente de verdad del
       // Roadmap inicial y de los hitos. No usar nombres de módulos Gemini que
@@ -1167,7 +1186,7 @@ export class DrizzleQuotationRepository implements QuotationRepository {
         throw new BadRequestException('Moneda de la cotización incompatible con el contrato del proyecto.');
       }
       await tx.update(projects).set({
-        soldHours: Number(version.totalHours).toFixed(2),
+        soldHours: transferPlan.projectSoldHours.toFixed(2),
         contractAmount: targetTotal.toFixed(2),
         contractCurrency: version.currency,
         updatedAt: new Date(),
@@ -1176,6 +1195,17 @@ export class DrizzleQuotationRepository implements QuotationRepository {
         versionId, actorUserId: userId, action: 'quotation_transferred',
         metadata: { moduleIds, versionRevision: input.revision,
           totalHours: Number(version.totalHours),
+          totalProjectHours: transferPlan.projectSoldHours,
+          uncalendarizedProspectPhase: {
+            priorSoldHours: Number(project.soldHours),
+            phase1AssignedHours: transferPlan.phase1AssignedHours,
+            existingTeams: existingTeams.map((row) => ({
+              teamId: row.teamId,
+              assignedHours: row.assignedHours === null ? null : Number(row.assignedHours),
+              memberCount: row.memberCount,
+            })),
+          },
+          phase2QuotationAllocations: transferPlan.teamAllocations,
           paymentCount: draft.paymentPlan.length,
           preservedStartDate: true,
           commercialPreparationOnly,
@@ -1191,7 +1221,8 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       }).returning();
       return {
         projectId, versionId, transferredAt: event!.occurredAt.toISOString(),
-        projectHours: Number(version.totalHours), teamCount: draft.teams.length,
+        projectHours: transferPlan.projectSoldHours,
+        teamCount: new Set([...existingTeams.map((team) => team.teamId), ...ids]).size,
         moduleCount: moduleIds.length,
         paymentMilestoneCount: draft.paymentPlan.length,
       };
