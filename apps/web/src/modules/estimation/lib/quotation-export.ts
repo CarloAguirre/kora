@@ -252,7 +252,6 @@ function slideChanges(i: number, m: ReturnType<typeof quotationExportModel>): Re
       6: '¿Dónde aplicarlo?', 7: 'En procesos y productos digitales identificados dentro del alcance de cada proyecto.',
       8: '¿Cómo implementarlo?', 9: 'Por etapas, con validaciones, entregables y revisión continua del alcance.',
     };
-    case 5: return { 2: '—', 5: '—', 8: '—', 11: '—', 14: 'Cifras pendientes de validación por Kabeli' };
     case 6: return isRpa ? {} : {
       0: 'ACOMPAÑAMIENTO TECNOLÓGICO',
       1: 'Trabajo colaborativo con el equipo del cliente.',
@@ -261,15 +260,6 @@ function slideChanges(i: number, m: ReturnType<typeof quotationExportModel>): Re
       4: 'Revisión de decisiones y resolución de incidencias según alcance contratado.',
       5: 'Colaboración con especialistas',
       6: 'Coordinación de equipos y tecnologías necesarias para construir la solución.',
-    };
-    case 7: return isRpa ? {} : {
-      0: 'DIMENSIONAMIENTO PROPUESTO',
-      1: 'Esfuerzo calculado para esta cotización.',
-      2: 'Las cifras son estimaciones, sujetas a revisión y aceptación comercial.',
-      3: fmt(version.totalHours),
-      4: 'HORAS HOMBRE ESTIMADAS',
-      5: String(m.weeks || '—'),
-      6: 'SEMANAS REFERENCIALES',
     };
     case 9: return { 1: compact(m.projectName + ' · alcance y plan de trabajo', 75) };
     case 10: return {
@@ -396,6 +386,9 @@ function patchQuotationGanttBars(
 export function patchQuotationSlideXml(
   xml: string, slideNumber: number, model: ReturnType<typeof quotationExportModel>,
 ): string {
+  // Las diapositivas 5 y 7 son material institucional fijo de Kabeli.
+  // Conservar los bytes XML originales: cifras, textos, estilos y formas intactos.
+  if (slideNumber === 5 || slideNumber === 7) return xml;
   const doc = new DOMParser().parseFromString(xml, 'application/xml');
   if (doc.getElementsByTagName('parsererror').length) throw new Error('Plantilla PPTX inválida: XML ilegible.');
   const ns = 'http://schemas.openxmlformats.org/drawingml/2006/main';
@@ -426,6 +419,8 @@ export async function downloadQuotationPowerPoint(context: QuotationExportContex
   const decoder = new TextDecoder();
   const encoder = new TextEncoder();
   for (let i = 1; i <= 19; i++) {
+    // Se reutilizan SIN CAMBIOS las láminas corporativas 5 y 7 del PPTX base.
+    if (i === 5 || i === 7) continue;
     if (!Object.keys(slideChanges(i, model)).length) continue;
     const index = cfb.FullPaths.findIndex((p: string) =>
       p.toLowerCase().endsWith('/ppt/slides/slide' + i + '.xml'));
