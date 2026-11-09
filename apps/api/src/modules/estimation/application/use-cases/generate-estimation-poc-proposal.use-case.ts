@@ -1,6 +1,6 @@
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { z } from 'zod';
-import { optimizeWorkforceForEdt } from '../estimation-workforce-optimizer';
+import { optimizeWorkforceForEdt, replanEdtStagesToFullTime } from '../estimation-workforce-optimizer';
 import { extractDriveFolderId } from '../drive-source-selection';
 import { resolveEstimationQuestionnaireContext, type EstimationInputWithQuestions } from '../resolve-estimation-questionnaire-context';
 import {
@@ -281,6 +281,7 @@ export class GenerateEstimationPocProposalUseCase {
         'No dupliques activities bajo WBS diferentes con el mismo nombre, descripción, etapa y módulo; si el objetivo es el mismo, consérvalo como una actividad con subtareas y HH diferenciadas por rol.',
         'Los nombres de stages deben distinguir los tramos cuando son diferentes; no declares dos etapas equivalentes con el mismo nombre e intervalo.',
         'Estima las horas por actividad y perfil en roleHours según su complejidad y alcance. No hagas que sumen un total predeterminado.',
+         'Para ventanas temporales considera dedicación completa de 40 HH por semana por persona; si hay más colaboradores, reduce la duración de las fases cuando el trabajo permita paralelismo. Nunca reduzcas HH de actividades para simular mayor dotación.',
         'No copies ni infieras un presupuesto de la dotación, horas por unidad o duración preliminar. Kora dimensionará el personal después de verificar la EDT.',
         'Solo utiliza role que coincida EXACTAMENTE con allowedRoles. Cada perfil declarado debe intervenir en al menos una actividad real.',
         'No inventes funciones fuera del alcance: separa explícitamente exclusiones y supuestos en la descripción.',
@@ -374,9 +375,22 @@ export class GenerateEstimationPocProposalUseCase {
         'Verifica el catálogo de equipos y vuelve a generar la propuesta.',
       );
     }
-    const raw = source === 'drive'
-      ? addMandatoryTechLeadSupervision(parsed, leadRoles[0]!.role)
+    // Replanificar con 40 HH por persona antes de calcular la supervisión TL.
+    // No altera HH por actividad ni consume una llamada adicional a Gemini.
+    const planned = source === 'drive'
+      ? { ...parsed, stages: replanEdtStagesToFullTime(
+          parsed.stages,
+          parsed.roleHours.map((item) => ({
+            stageCode: parsed.activities.find((activity) =>
+              activity.wbs === item.wbs)?.stageCode ?? '',
+            role: item.role, hours: item.hours,
+          })),
+          proposal.roles,
+        ) }
       : parsed;
+    const raw = source === 'drive'
+      ? addMandatoryTechLeadSupervision(planned, leadRoles[0]!.role)
+      : planned;
     const validRoles = new Set(proposal.roles.map((role) => role.role));
 
     type Stage = {

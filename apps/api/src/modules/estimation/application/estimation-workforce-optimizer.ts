@@ -80,6 +80,73 @@ function summarize(
   };
 }
 
+
+/**
+ * Comprime ventanas de Gemini con capacidad de 40 HH/semana por persona.
+ * Mantiene las HH y el paralelismo de etapas solapadas: divide el horizonte
+ * en intervalos de actividad y calcula las semanas necesarias por equipo.
+ * La última semana puede tener menos de 40 HH; no rellena con horas ficticias.
+ */
+export function replanEdtStagesToFullTime(
+  stages: readonly WorkforceStage[],
+  efforts: readonly WorkforceEffort[],
+  roles: readonly (WorkforceRoleInput & { people?: number })[],
+): WorkforceStage[] {
+  if (!stages.length) return [];
+  if (new Set(stages.map((stage) => stage.code)).size !== stages.length ||
+      stages.some((stage) =>
+        !Number.isInteger(stage.startWeek) || !Number.isInteger(stage.durationWeeks) ||
+        stage.startWeek < 1 || stage.durationWeeks < 1 ||
+        stage.startWeek + stage.durationWeeks - 1 > 520)) {
+    throw new Error('Tramos inválidos para dimensionar a jornada completa.');
+  }
+  const teamForRole = new Map(roles.map((role) =>
+    [role.role, role.teamId ?? role.role]));
+  const peopleByTeam = new Map<string, number>();
+  for (const role of roles) {
+    const team = role.teamId ?? role.role;
+    peopleByTeam.set(team, Math.max(peopleByTeam.get(team) ?? 0,
+      Number.isInteger(role.people) && (role.people ?? 0) >= 1 ? role.people! : 1));
+  }
+  const perStageTeam = new Map<string, number>();
+  for (const effort of efforts) {
+    const team = teamForRole.get(effort.role);
+    if (!team || !Number.isFinite(effort.hours) || effort.hours <= 0) continue;
+    const key = JSON.stringify([effort.stageCode, team]);
+    perStageTeam.set(key, (perStageTeam.get(key) ?? 0) + effort.hours);
+  }
+  const bounds = [...new Set(stages.flatMap((stage) =>
+    [stage.startWeek, stage.startWeek + stage.durationWeeks]))].sort((a, b) => a - b);
+  const transformed = new Map<number, number>();
+  let current = 1;
+  for (let i = 0; i < bounds.length - 1; i++) {
+    const from = bounds[i]!, to = bounds[i + 1]!;
+    transformed.set(from, current);
+    const weeklyEquivalentByTeam = new Map<string, number>();
+    for (const stage of stages) {
+      if (stage.startWeek > from || stage.startWeek + stage.durationWeeks < to) continue;
+      for (const [key, total] of perStageTeam) {
+        const [code, team] = JSON.parse(key) as [string, string];
+        if (code !== stage.code) continue;
+        weeklyEquivalentByTeam.set(team, (weeklyEquivalentByTeam.get(team) ?? 0) +
+          total * (to - from) / stage.durationWeeks);
+      }
+    }
+    if (weeklyEquivalentByTeam.size) current += Math.max(1,
+      ...[...weeklyEquivalentByTeam].map(([team, hours]) =>
+        Math.ceil(hours / (WEEKLY_HOURS_PER_PERSON * (peopleByTeam.get(team) ?? 1)))));
+    if (current > 521) throw new Error('La EDT requiere más de 520 semanas.');
+  }
+  transformed.set(bounds[bounds.length - 1]!, current);
+  return stages.map((stage) => ({
+    ...stage,
+    startWeek: transformed.get(stage.startWeek)!,
+    durationWeeks: Math.max(1,
+      transformed.get(stage.startWeek + stage.durationWeeks)! -
+      transformed.get(stage.startWeek)!),
+  }));
+}
+
 export function optimizeWorkforceForEdt(
   stages: readonly WorkforceStage[],
   efforts: readonly WorkforceEffort[],

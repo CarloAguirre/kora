@@ -1,7 +1,34 @@
 import { describe, expect, it } from 'vitest';
-import { optimizeWorkforceForEdt } from './estimation-workforce-optimizer';
+import { optimizeWorkforceForEdt, replanEdtStagesToFullTime } from './estimation-workforce-optimizer';
 
 describe('dimensionamiento determinístico posterior a EDT', () => {
+  it('320 HH con 2 devs en 8 semanas se comprimen a 4 sin tocar esfuerzo', () => {
+    const stages = replanEdtStagesToFullTime(
+      [{ code: 'DEV', startWeek: 1, durationWeeks: 8 }],
+      [{ stageCode: 'DEV', role: 'Dev', hours: 320 }],
+      [{ role: 'Dev', teamId: 'desarrollo', people: 2 }],
+    );
+    expect(stages[0]).toEqual({ code: 'DEV', startWeek: 1, durationWeeks: 4 });
+    expect(optimizeWorkforceForEdt(stages,
+      [{ stageCode: 'DEV', role: 'Dev', hours: 320 }],
+      [{ role: 'Dev', teamId: 'desarrollo' }]).totalHours).toBe(320);
+  });
+
+  it('reordena ventanas superpuestas y conserva su simultaneidad', () => {
+    const stages = replanEdtStagesToFullTime(
+      [{ code: 'DEV', startWeek: 1, durationWeeks: 6 },
+        { code: 'QA', startWeek: 5, durationWeeks: 4 }],
+      [{ stageCode: 'DEV', role: 'Dev', hours: 160 },
+        { stageCode: 'QA', role: 'QA', hours: 40 }],
+      [{ role: 'Dev', teamId: 'desarrollo', people: 2 },
+        { role: 'QA', teamId: 'calidad', people: 1 }],
+    );
+    expect(stages[0]!.durationWeeks).toBeLessThan(6);
+    expect(stages[1]!.startWeek).toBeLessThan(5);
+    expect(stages[0]!.startWeek + stages[0]!.durationWeeks - 1)
+      .toBeGreaterThanOrEqual(stages[1]!.startWeek);
+  });
+
   it('100 HH en una semana exige tres personas como PICO, sin crear HH', () => {
     const plan = optimizeWorkforceForEdt(
       [{ code: 'S1', startWeek: 1, durationWeeks: 1 }],
