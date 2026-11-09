@@ -73,4 +73,28 @@ describe('Exportación de cotizaciones · versión guardada', () => {
     expect(workbook.Sheets.Supuestos?.B3?.v).toBe('API externa disponible');
     expect(workbook.Sheets.Comercial?.C3?.v).toBe(12);
   });
+  it('adapta las barras editables del Gantt a las semanas reales de la cotización', () => {
+    const v = version({ draft: {
+      ...version().draft, mode: 'phases',
+      phases: [{ name: 'Implementación', startWeek: 3, durationWeeks: 2, teamHours: [] }],
+    } });
+    const model = quotationExportModel(context(v));
+    const pns = 'http://schemas.openxmlformats.org/presentationml/2006/main';
+    const ans = 'http://schemas.openxmlformats.org/drawingml/2006/main';
+    const xml = `<p:sld xmlns:p="${pns}" xmlns:a="${ans}"><p:spTree>` +
+      Array.from({ length: 17 }, (_, n) =>
+        `<p:sp><p:txBody><a:p><a:r><a:t>Texto ${n}</a:t></a:r></a:p></p:txBody></p:sp>`).join('') +
+      [338, 346, 354, 362, 370, 378].map((id) =>
+        `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="Google Shape;${id};p22"/></p:nvSpPr><p:spPr><a:xfrm><a:off x="2542032" y="1929384"/><a:ext cx="1000000" cy="173736"/></a:xfrm></p:spPr></p:sp>`).join('') +
+      '</p:spTree></p:sld>';
+    const changed = new DOMParser().parseFromString(patchQuotationSlideXml(xml, 14, model), 'application/xml');
+    const shapes = Array.from(changed.getElementsByTagNameNS(pns, 'sp'));
+    const bars = shapes.filter((node) => node.getElementsByTagNameNS(pns, 'cNvPr').length);
+    expect(bars).toHaveLength(1);
+    const x = bars[0]!.getElementsByTagNameNS(ans, 'off')[0]!.getAttribute('x');
+    expect(Number(x)).toBeGreaterThan(2542032);
+    expect(changed.documentElement.textContent).toContain('Implementación');
+  });
+
+
 });
