@@ -412,7 +412,7 @@ export async function downloadQuotationPowerPoint(context: QuotationExportContex
   // Sinco, fechas de ejemplo). No forman parte de la propuesta entregable.
   // Vaciar solo su texto mantiene intactas relaciones, geometría y maestros.
   for (const [index, fullPath] of cfb.FullPaths.entries()) {
-    if (!/\\/ppt\\/notesSlides\\/notesSlide\\d+\\.xml$/i.test(fullPath)) continue;
+    if (!/\/ppt\/notesSlides\/notesSlide\d+\.xml$/i.test(fullPath)) continue;
     const entry = cfb.FileIndex[index];
     if (!entry?.content) continue;
     const note = new DOMParser().parseFromString(
