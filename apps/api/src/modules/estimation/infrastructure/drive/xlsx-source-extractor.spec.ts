@@ -36,14 +36,17 @@ describe('XLSX para análisis documental IA (worker aislado)', () => {
     expect(text).not.toContain('C2="REST"');
   }, 15000);
 
-  it('no inventa resultados cuando una fórmula carece de valor cacheado', async () => {
+  it('incluye fórmula y resultado almacenado; advierte que NO calcula fórmulas faltantes', async () => {
     const book = XLSX.utils.book_new();
     const sheet = XLSX.utils.aoa_to_sheet([['Plan', 'HH'], ['Dev', 20]]);
-    sheet.B3 = { t: 'n', f: 'SUM(B2:B2)' };
-    sheet['!ref'] = 'A1:B3';
+    sheet.B3 = { t: 'n', f: 'SUM(B2:B2)', v: 20 };
+    sheet.C3 = { t: 'n', f: 'B2*2' }; // Sin valor calculado guardado.
+    sheet['!ref'] = 'A1:C3';
     XLSX.utils.book_append_sheet(book, sheet, 'Esfuerzo');
     const output = await extractXlsxSourceText(encode(book));
-    expect(output).toContain('fórmula sin resultado calculado');
+    expect(output).toContain('B3="20 [fórmula: =SUM(B2:B2)]"');
+    expect(output).toContain('algunas fórmulas sin resultado guardado pueden no estar disponibles');
+    expect(output).not.toContain('C3="40"'); // Nunca inventar el cálculo.
   }, 15000);
 
   it('rechaza libros malformados y tamaño excedido, sin entregar texto parcial', async () => {

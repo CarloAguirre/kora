@@ -33,8 +33,9 @@ function stringifyCell(cell) {
   if (cell.t === 'z' || cell.v === null || cell.v === undefined) return '';
   const formatted = cell.w !== undefined ? String(cell.w)
     : XLSX.utils.format_cell(cell);
-  return formatted.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, ' ')
+  const cleaned = formatted.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, ' ')
     .replace(/\r\n?/g, '\n').trim();
+  return cell.f ? cleaned + ' [fórmula: =' + String(cell.f) + ']' : cleaned;
 }
 try {
   const workbook = XLSX.read(Buffer.from(workerData.bytes), {
@@ -45,7 +46,10 @@ try {
   if (workbook.SheetNames.length > MAX_SHEETS) {
     fail('el libro supera ' + MAX_SHEETS + ' hojas; no se analizó parcialmente.');
   }
-  const lines = ['Libro Excel (datos tabulares; se indican hojas y celdas).'];
+  const lines = [
+    'Libro Excel (datos tabulares; se indican hojas y celdas).',
+    'AVISO: las fórmulas NO se recalculan. Cuando el libro guarda un resultado, se muestra junto a su fórmula; algunas fórmulas sin resultado guardado pueden no estar disponibles y requieren revisión.',
+  ];
   let cells = 0;
   let skippedHidden = [];
   for (let index = 0; index < workbook.SheetNames.length; index++) {
@@ -117,6 +121,7 @@ export async function extractXlsxSourceText(binary: Buffer): Promise<string> {
     const worker = new Worker(WORKER_SCRIPT, {
       eval: true,
       workerData: { bytes: binary, modulePath: require.resolve('xlsx') },
+      env: {}, // No heredar claves ni credenciales del servidor.
       resourceLimits: { maxOldGenerationSizeMb: 96, maxYoungGenerationSizeMb: 16 },
     });
     let completed = false;
