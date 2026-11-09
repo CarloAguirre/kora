@@ -37,12 +37,12 @@ const findFile = (cfb: TemplateArchive, path: string) => {
   const i = cfb.FullPaths.findIndex((p: string) => p.toLowerCase().endsWith('/' + path.toLowerCase()));
   return i < 0 ? undefined : cfb.FileIndex[i];
 };
-const readXml = (cfb: XLSX.CFB.CFB, path: string) => {
+const readXml = (cfb: TemplateArchive, path: string) => {
   const file = findFile(cfb, path);
   if (!file?.content) throw new Error('Falta ' + path + ' en el Excel corporativo.');
   return parse(new TextDecoder().decode(new Uint8Array(file.content)));
 };
-const writeXml = (cfb: XLSX.CFB.CFB, path: string, doc: Document) => {
+const writeXml = (cfb: TemplateArchive, path: string, doc: Document) => {
   const file = findFile(cfb, path);
   if (!file) throw new Error('No se pudo escribir ' + path);
   file.content = new TextEncoder().encode(serial(doc));
@@ -114,7 +114,7 @@ export function patchStyledTableSheet(xml: string, spec: SheetSpec): string {
   }
   for (let i = 0; i < spec.data.length; i++) {
     const row = cloneRow(sample, i + 5);
-    writeRow(row, spec.data[i]);
+    writeRow(row, spec.data[i] ?? []);
     rows.push(row);
   }
   data.replaceChildren(...rows);
@@ -188,7 +188,7 @@ function patchSummary(xml: string, model: Model): string {
   set(22, 0, 'Reserva técnica: ' + reserve + ' HH registradas por separado. No duplicar esfuerzo comercial.');
   return serial(doc);
 }
-function workbookNames(cfb: XLSX.CFB.CFB, keep: Set<string>): void {
+function workbookNames(cfb: TemplateArchive, keep: Set<string>): void {
   const work = readXml(cfb, 'xl/workbook.xml');
   const rels = readXml(cfb, 'xl/_rels/workbook.xml.rels');
   const list = work.getElementsByTagNameNS(NS, 'sheets')[0];
@@ -264,7 +264,10 @@ function buildSpecs(model: Model): Map<string, SheetSpec> {
       data:modules.map(([module,hours])=>{
         const rows=details.filter(d=>d.module===module);
         const totals=[0,0,0,0,0];
-        for(const r of rows)totals[roleColumn(r.role)]+=r.hours;
+        for(const r of rows){
+          const index = roleColumn(r.role);
+          totals[index] = (totals[index] ?? 0) + r.hours;
+        }
         return [module,rows.length,...totals,round(hours),version.totalHours?hours/version.totalHours:0];
       }),
     });
@@ -318,8 +321,10 @@ function buildSpecs(model: Model): Map<string, SheetSpec> {
     const weeks=Array.from({length:Math.max(0,model.weeks)},(_,i)=>i+1);
     out.set('Roadmap_Semanal',{
       title:base+'Carga semanal',subtitle:'HH distribuidas semanalmente según la planificación referencial de Kora.',
-      headers:['Semana','Día inicial','Día final',...Array.from({length:5},(_,i)=>
-        cols[i]?(cols[i]==='Otros equipos'?'Otros equipos':nameForKey(cols[i])):'—'),'Fases activas'],
+      headers:['Semana','Día inicial','Día final',...Array.from({length:5},(_,i)=>{
+        const key = cols[i];
+        return key ? (key==='Otros equipos' ? 'Otros equipos' : nameForKey(key)) : '—';
+      }),'Fases activas'],
       data:weeks.map((week)=>{
         const hours=[0,0,0,0,0];
         for(const r of weekly.rows){
