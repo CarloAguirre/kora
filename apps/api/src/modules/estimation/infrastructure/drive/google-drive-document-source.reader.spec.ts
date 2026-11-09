@@ -5,6 +5,7 @@ import type {
 } from '../../application/ports/drive-folder-client.port';
 import { GoogleDriveDocumentSourceReader } from './google-drive-document-source.reader';
 import { describeDocumentCoverage } from '../../application/ports/document-source-reader.port';
+import { canReadDriveSource } from '../../application/drive-source-selection';
 
 function file(
   id: string,
@@ -24,6 +25,45 @@ function file(
 }
 
 describe('GoogleDriveDocumentSourceReader', () => {
+  it('considera .xlsx compatible y lo entrega al análisis como texto por hoja', async () => {
+    const mime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    expect(canReadDriveSource(mime)).toBe(true);
+    const drive: DriveFolderClient = {
+      isConfigured: () => true,
+      listFiles: async () => [],
+      listChildren: async () => [file('matrix', 'Matriz de requisitos.xlsx', mime)],
+      searchFolders: async () => [],
+      getMetadata: async () => null,
+      readAnalysisContent: async () => ({
+        mimeType: 'text/plain',
+        text: 'HOJA "Reglas":\nFila 2: A2="RN01" | B2="El supervisor debe aprobar"',
+      }),
+    };
+    const result = await new GoogleDriveDocumentSourceReader(drive)
+      .readDriveSourcesWithCoverage('https://drive.google.com/drive/folders/root123');
+    expect(result.documents).toHaveLength(1);
+    expect(result.documents[0]).toMatchObject({
+      sourceId: 'matrix', name: 'Matriz de requisitos.xlsx',
+      mimeType: 'text/plain',
+    });
+    expect(result.documents[0]?.text).toContain('RN01');
+    expect(result.coverage?.omitted).toEqual([]);
+  });
+  it('declara la omisión Excel cuando el libro excede los límites', async () => {
+    const mime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    const drive: DriveFolderClient = {
+      isConfigured: () => true, listFiles: async () => [],
+      listChildren: async () => [file('large-xlsx', 'Requisitos.xlsx', mime)],
+      searchFolders: async () => [], getMetadata: async () => null,
+      readAnalysisContent: async () => { throw new Error('Excel: el libro supera 1200 filas; no se analizó parcialmente.'); },
+    };
+    const result = await new GoogleDriveDocumentSourceReader(drive)
+      .readDriveSourcesWithCoverage('https://drive.google.com/drive/folders/root123');
+    expect(result.documents).toEqual([]);
+    expect(describeDocumentCoverage(result.coverage)).toContain('COBERTURA DOCUMENTAL PARCIAL');
+    expect(result.coverage?.omitted[0]?.reason).toContain('1200 filas');
+  });
+
 
   it('entrega el contenido KDM a Gemini si Drive no está configurado', async () => {
     const drive: DriveFolderClient = {

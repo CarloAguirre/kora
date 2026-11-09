@@ -4,6 +4,36 @@ import type { DocumentSourceReader } from '../ports/document-source-reader.port'
 import { AnalyzeEstimationPocUseCase } from './analyze-estimation-poc.use-case';
 
 describe('AnalyzeEstimationPocUseCase', () => {
+  it('incluye celdas XLSX como evidencia del mismo análisis Gemini y conserva el nombre del archivo', async () => {
+    let received = '';
+    let filename = '';
+    const ai: AiProvider = {
+      name: 'gemini',
+      generateStructured: async (request) => {
+        received = request.documents?.[0]?.text ?? '';
+        filename = request.documents?.[0]?.name ?? '';
+        return { summary: 'La matriz requiere aprobación', dynamicQuestions: [] };
+      },
+    };
+    const reader: DocumentSourceReader = {
+      readDriveSources: async () => [{
+        sourceId: 'matriz-1', name: 'Reglas.xlsx',
+        mimeType: 'text/plain', path: 'Levantamiento/Reglas.xlsx',
+        text: 'HOJA "Validaciones": Fila 2: A2="RN-14" | B2="Requiere aprobación"',
+      }],
+    };
+    const result = await new AnalyzeEstimationPocUseCase(ai, reader).execute({
+      projectId: '550e8400-e29b-41d4-a716-446655440000',
+      projectName: 'Portal', clientName: 'Cliente',
+      driveFolderUrl: 'https://drive.google.com/drive/folders/folder-1',
+      instructions: null,
+    });
+    expect(result.documentsAnalyzed).toBe(1);
+    expect(filename).toBe('Reglas.xlsx');
+    expect(received).toContain('RN-14');
+    expect(result.detectedDocuments).toContain('Reglas.xlsx');
+  });
+
   it('normaliza el análisis previo sin generar todavía HH', async () => {
     const ai: AiProvider = {
       name: 'poc-ai',

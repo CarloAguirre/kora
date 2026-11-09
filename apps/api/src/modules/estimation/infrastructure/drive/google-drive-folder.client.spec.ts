@@ -1,9 +1,34 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GoogleDriveFolderClient } from './google-drive-folder.client';
+import * as XLSX from 'xlsx';
 
 afterEach(() => vi.unstubAllGlobals());
 
 describe('GoogleDriveFolderClient · paginación de carpetas compartidas', () => {
+  it('descarga XLSX original y exporta Google Sheets a XLSX para incluir sus pestañas', async () => {
+    const book = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet([['R1', 'Primera']]), 'Inicio');
+    XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet([['R2', 'Segunda']]), 'Reglas');
+    const bytes = XLSX.write(book, { type: 'buffer', bookType: 'xlsx' }) as Uint8Array;
+    const mock = vi.fn().mockImplementation(async () => new Response(bytes, { status: 200 }));
+    vi.stubGlobal('fetch', mock);
+    const client = new GoogleDriveFolderClient({ googleDrive: { enabled: false } } as never,
+      'token-de-prueba');
+    const original = await client.readAnalysisContent('xlsx-file',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    expect(original?.mimeType).toBe('text/plain');
+    expect(original?.text).toContain('HOJA "Inicio"');
+    expect(original?.text).toContain('HOJA "Reglas"');
+
+    const native = await client.readAnalysisContent('sheet-file',
+      'application/vnd.google-apps.spreadsheet');
+    expect(native?.text).toContain('A1="R2"');
+    const url = new URL(String(mock.mock.calls[1]![0]));
+    expect(url.pathname).toContain('/sheet-file/export');
+    expect(url.searchParams.get('mimeType'))
+      .toBe('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  }, 15000);
+
   it('consulta todas las páginas y conserva los PDF fuera de la primera', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({
