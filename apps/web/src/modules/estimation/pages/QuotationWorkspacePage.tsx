@@ -29,6 +29,7 @@ import { replanQuotationEdtForWorkforce } from '../lib/quotation-fulltime-plan';
 import { QuotationTeamsWorkspace } from '../components/QuotationTeamsWorkspace';
 import { QuotationHoursRedistributionDialog } from '../components/QuotationHoursRedistributionDialog';
 import { buildQuotationRedistributionPreview, type QuotationRedistributionPreview } from '../lib/quotation-hour-redistribution-preview';
+import { buildQuotationTeamCapacityEdit, type QuotationTeamCapacityField } from '../lib/quotation-team-capacity-edit';
 import { quotationAiAcceptanceBlockReason } from '../components/quotation-ai-acceptance';
 import { readQuotationTaskExcel } from '../lib/quotation-task-excel';
 import { downloadQuotationExcel, downloadQuotationPowerPoint } from '../lib/quotation-export';
@@ -45,7 +46,9 @@ type Form = Pick<UpdateQuotationDraftInput, 'name' | 'hourlyRate' | 'currency' |
 const money = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 4 });
 const fromVersion = (version: QuotationVersion): Form => ({
   name: version.name, hourlyRate: version.hourlyRate, currency: version.currency,
-  tax: version.tax, draft: structuredClone(version.draft),
+  tax: version.tax, draft: version.draft.aiPoc?.edt
+    ? synchronizeQuotationEdtTeamLoad(structuredClone(version.draft))
+    : structuredClone(version.draft),
 });
 const numeric = (value: string): number => Math.max(0, Number(value) || 0);
 
@@ -303,10 +306,27 @@ export function QuotationWorkspacePage() {
       // equipo en blanco y luego cambiar otra celda inmediatamente.
       const draft = withQuotationTeamEdit(current.draft, teamId, patch);
       if (draft === current.draft) return current;
-      // En EDT, HH/sem se deriva de WBS; el modo manual mantiene sus inputs.
+      // La disponibilidad del equipo no equivale a la carga real de las tareas.
       const normalized = draft.aiPoc?.edt ? synchronizeQuotationEdtTeamLoad(draft) : draft;
       return { ...current, draft: normalized };
     });
+  };
+  const editTeamCapacity = (
+    teamId: string, field: QuotationTeamCapacityField, value: number,
+  ) => {
+    if (!editable || !form) return;
+    try {
+      const result = buildQuotationTeamCapacityEdit(form.draft, teamId, field, value);
+      if (result.preview) {
+        // Confirmación transaccional WBS×perfil; cancelar conserva el original.
+        setHourPreview(result.preview);
+      } else {
+        change((current) => ({ ...current, draft: result.draft }));
+      }
+    } catch (cause) {
+      reportError(cause instanceof Error ? cause.message :
+        'No se pudo modificar la dedicación del equipo.');
+    }
   };
   const editPhase = (index: number, patch: Partial<QuotationDraftData['phases'][number]>) => {
     updateDraft({ phases: phaseRows.map((row, position) =>
@@ -716,6 +736,7 @@ export function QuotationWorkspacePage() {
                         if (!form.draft.aiPoc?.edt) updateDraft({ mode: view });
                       }}
                       onEditTeam={editTeamById}
+                      onEditTeamCapacity={editTeamCapacity}
                       onToggleTeam={toggleTeam}
                       onEditGroupHours={(teamKey, hours) =>
                         adjustEdtGroupHours(teamKey, hours)}
