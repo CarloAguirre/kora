@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, Logger } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 import { estimationPocProposalSchema, quotationReferenceEdtSchema } from '@kora/contracts';
 import { QuotationController } from './quotation.controller';
@@ -106,11 +106,46 @@ describe('POST versions/ai-poc · Gemini con KDM', () => {
       end: vi.fn(),
     } };
     generator.execute.mockRejectedValueOnce(new Error('no-revelar-secretos'));
-    await controller.createAiPocStream(projectId, input, actor as never, reply as never);
-    expect(writes.join('')).toContain('event: error');
-    expect(writes.join('')).not.toContain('no-revelar-secretos');
-    expect(writes.join('')).not.toContain('event: complete');
+    const logged = vi.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
+    try {
+      await controller.createAiPocStream(projectId, input, actor as never, reply as never);
+      expect(writes.join('')).toContain('event: error');
+      expect(writes.join('')).not.toContain('no-revelar-secretos');
+      expect(writes.join('')).toContain('"phase":"proposal"');
+      expect(writes.join('')).toMatch(/Código de diagnóstico: [a-f0-9]{8}/);
+      expect(writes.join('')).not.toContain('event: complete');
+      expect(logged).toHaveBeenCalledWith(expect.stringContaining('"phase":"proposal"'));
+      expect(logged.mock.calls[0]![0]).not.toContain('no-revelar-secretos');
+    } finally {
+      logged.mockRestore();
+    }
     expect(drafts.createAiPocDraft).not.toHaveBeenCalled();
+  });
+
+  it('reporta fallos de guardado sin exponer detalles y sin invocar OpenAI de nuevo', async () => {
+    const { controller, generator, drafts } = setup();
+    const writes: string[] = [];
+    const reply = { hijack: vi.fn(), raw: {
+      destroyed: false, writableEnded: false, writeHead: vi.fn(),
+      write: vi.fn((v: string) => { writes.push(v); return true; }),
+      end: vi.fn(),
+    } };
+    const logged = vi.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
+    drafts.createAiPocDraft.mockRejectedValueOnce(new Error('password=private-from-db'));
+    try {
+      await controller.createAiPocStream(projectId, input, actor as never, reply as never);
+      expect(generator.execute).toHaveBeenCalledOnce();
+      expect(generator.generateEdt).toHaveBeenCalledOnce();
+      expect(drafts.createAiPocDraft).toHaveBeenCalledOnce();
+      expect(writes.join('')).toContain('"phase":"saving"');
+      expect(writes.join('')).toContain('No repitas la generación todavía');
+      expect(writes.join('')).not.toContain('password=private-from-db');
+      expect(writes.join('')).not.toContain('event: complete');
+      expect(logged).toHaveBeenCalledWith(expect.stringContaining('"phase":"saving"'));
+      expect(logged.mock.calls[0]![0]).not.toContain('password=private-from-db');
+    } finally {
+      logged.mockRestore();
+    }
   });
 
   it('crea una versión real solo después de autorización, cuestionario y Gemini', async () => {

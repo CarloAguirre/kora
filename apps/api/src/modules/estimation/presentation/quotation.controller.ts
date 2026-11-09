@@ -1,4 +1,6 @@
-import { BadRequestException, Body, Controller, Delete, Get, HttpCode, HttpStatus, HttpException, Inject, Optional, Param, ParseUUIDPipe, ParseIntPipe, Patch, Post, Query, Res } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, HttpCode, HttpStatus, HttpException, Inject, Logger, Optional, Param, ParseUUIDPipe, ParseIntPipe, Patch, Post, Query, Res } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
+import { ZodError } from 'zod';
 import type { FastifyReply } from 'fastify';
 import {
   applyQuotationPlanningSchema, generateAiDemoQuotationSchema, createQuotationVersionSchema, updateQuotationDraftSchema, quotationReconciliationReviewSchema, assessQuotationReconciliationSchema,
@@ -26,6 +28,8 @@ import { resolveAuthorizedDriveReader } from '../infrastructure/drive/resolve-au
  */
 @Controller('estimations/projects/:projectId/quotation')
 export class QuotationController {
+  private readonly logger = new Logger(QuotationController.name);
+
   constructor(
     private readonly drafts: ManageQuotationDraftsUseCase,
     private readonly generator: GenerateEstimationPocProposalUseCase,
@@ -151,9 +155,10 @@ export class QuotationController {
   }
 
   /**
-   * El stream usa exactamente la misma generación y validaciones de la ruta
-   * REST. Solo transporta los resúmenes que publica Gemini; el borrador se
-   * persiste una vez, después de validar propuesta y EDT.
+   * El stream usa el mismo flujo de generación/validación de la ruta REST.
+   * La propuesta y EDT cuestan llamadas IA; guardar solo ocurre al final.
+   * Los fallos tienen fase e ID de diagnóstico para no repetir generación
+   * a ciegas, y los detalles internos se registran exclusivamente en servidor.
    */
   @Post('versions/ai-poc/stream')
   @HttpCode(HttpStatus.OK)
@@ -173,6 +178,7 @@ export class QuotationController {
       'X-Accel-Buffering': 'no',
       Connection: 'keep-alive',
     });
+    let currentPhase: 'preflight' | 'proposal' | 'edt' | 'saving' = 'preflight';
     const send = (event: 'thought' | 'phase' | 'complete' | 'error', data: unknown) => {
       if (!reply.raw.destroyed && !reply.raw.writableEnded) {
         reply.raw.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
@@ -182,12 +188,45 @@ export class QuotationController {
       const result = await this.createAuthorizedAiPoc(
         projectId, input, actor, (text) => {
           if (text.trim()) send('thought', { text });
-        }, (phase) => send('phase', { phase }),
+        }, (phase) => {
+          currentPhase = phase;
+          send('phase', { phase });
+        },
       );
       send('complete', result);
     } catch (reason) {
-      send('error', { message: reason instanceof HttpException
-        ? reason.message : 'No se pudo generar la cotización. Verifica los antecedentes y vuelve a intentarlo.' });
+      const diagnosticId = randomUUID().slice(0, 8);
+      // Nunca registrar el body, PDF, texto documental ni credenciales.
+      // En Zod reportar solo rutas/códigos; en PostgreSQL solo código/tabla/
+      // restricción. Los mensajes del proveedor pueden incluir datos privados.
+      const kind = reason instanceof Error ? reason.name : typeof reason;
+      const metadata = reason && typeof reason === 'object'
+        ? reason as { code?: unknown; constraint?: unknown; table?: unknown; column?: unknown }
+        : {};
+      const safe = (value: unknown) =>
+        typeof value === 'string' ? value.replace(/[^a-zA-Z0-9_.-]/g, '').slice(0, 100) : undefined;
+      const issues = reason instanceof ZodError
+        ? reason.issues.slice(0, 12).map((issue) => ({
+          path: issue.path.map(String).join('.'),
+          code: issue.code,
+        })) : undefined;
+      this.logger.error(JSON.stringify({
+        event: 'quotation_ai_generation_failed',
+        diagnosticId, projectId, phase: currentPhase, kind,
+        code: safe(metadata.code), constraint: safe(metadata.constraint),
+        table: safe(metadata.table), column: safe(metadata.column), issues,
+      }));
+      const phaseLabel = currentPhase === 'saving'
+        ? 'guardado de cotización'
+        : currentPhase === 'edt' ? 'generación o validación de EDT'
+          : currentPhase === 'proposal' ? 'propuesta de perfiles'
+            : 'validación inicial';
+      const message = reason instanceof HttpException
+        ? reason.message
+        : 'Kora no pudo completar la etapa de ' + phaseLabel +
+          '. Código de diagnóstico: ' + diagnosticId +
+          '. No repitas la generación todavía: revisa el estado de las cotizaciones y el log del servidor.';
+      send('error', { message, phase: currentPhase, diagnosticId });
     } finally {
       if (!reply.raw.destroyed && !reply.raw.writableEnded) reply.raw.end();
     }

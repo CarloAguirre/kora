@@ -234,7 +234,7 @@ export async function apiEventStream<T>(
     if (event === 'error') {
       const message = data && typeof data === 'object' && 'message' in data &&
         typeof data.message === 'string'
-        ? data.message : 'Gemini no pudo completar el análisis.';
+        ? data.message : 'El agente IA no pudo completar el análisis.';
       throw new Error(message);
     }
     if (event === 'complete') {
