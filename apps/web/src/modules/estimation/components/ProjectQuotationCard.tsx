@@ -192,10 +192,10 @@ export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
                   <span className={styles.calculatorOnlyBadge}>Solo usuarios de la calculadora</span>
                 </div>
                 <div className={styles.summaryGrid}>
-                  <span><small>Valor HH</small><strong>{transferredVersion.hourlyRate ?? '—'} {transferredVersion.currency}</strong></span>
+                  <span><small>Valor HH</small><strong>{transferredVersion.hourlyRate === null ? '—' : number(transferredVersion.hourlyRate)} {transferredVersion.currency}</strong></span>
                   <span><small>Horas cotizadas</small><strong>{number(transferredVersion.totalHours)} HH</strong></span>
-                  <span><small>Neto</small><strong>{transferredVersion.netAmount ?? '—'} {transferredVersion.currency}</strong></span>
-                  <span><small>Total con IVA</small><strong>{transferredVersion.totalAmount ?? '—'} {transferredVersion.currency}</strong></span>
+                  <span><small>Neto</small><strong>{transferredVersion.netAmount === null ? '—' : number(transferredVersion.netAmount)} {transferredVersion.currency}</strong></span>
+                  <span><small>Total con IVA</small><strong>{transferredVersion.totalAmount === null ? '—' : number(transferredVersion.totalAmount)} {transferredVersion.currency}</strong></span>
                 </div>
                 <div className={styles.costsScroll}>
                   <table className={styles.costsTable}>
