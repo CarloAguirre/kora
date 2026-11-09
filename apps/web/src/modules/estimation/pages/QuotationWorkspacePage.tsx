@@ -677,9 +677,9 @@ export function QuotationWorkspacePage() {
                       </Badge>
                     </div>
                   </div>
-                  {/* La barra fija administra ajustes; el aviso inicial desaparece al editar
-                      y nunca reaparece después de guardar. La aceptación IA posterior
-                      permanece en el ciclo comercial, separada de la aprobación del cliente. */}
+                  {/* Tras editar desaparece el bloque inicial, pero la aceptación IA
+                      sigue disponible para la versión guardada. Guardar los ajustes no
+                      equivale a aceptar la IA ni a registrar aprobación del cliente. */}
                   {selected.origin === 'ai' && selected.revision === 1 &&
                     !dirty && adjustingAiVersionId !== selected.id && (
                     <QuotationAiReviewBanner
@@ -696,6 +696,21 @@ export function QuotationWorkspacePage() {
                       onDiscard={discardChanges}
                       onSave={() => void save()}
                     />
+                  )}
+                  {selected.origin === 'ai' && selected.aiReviewStatus === 'pending' &&
+                    selected.revision > 1 && (
+                    <div className={styles.aiAcceptanceAction}>
+                      <span>Propuesta IA pendiente de aceptación.</span>
+                      <Button size="sm" variant="secondary"
+                        disabled={!editable || dirty}
+                        loading={lifecycle.acceptAi.isPending}
+                        title={dirty
+                          ? 'Guarda o descarta los cambios antes de aceptar la propuesta.'
+                          : aiAcceptBlockReason ?? 'Aceptar la propuesta IA guardada, sin aprobar al cliente.'}
+                        onClick={() => void acceptAiProposal()}>
+                        Usar tal cual
+                      </Button>
+                    </div>
                   )}
                 </>}
                 {versions.length === 0 && <p className={styles.helper}>Aún no hay versiones. Crea un borrador para comenzar.</p>}
@@ -900,7 +915,7 @@ export function QuotationWorkspacePage() {
                     project={project} version={selected}
                     quotation={quotation ?? null}
                     canOperate={mayWrite} hasUnsavedChanges={dirty}
-                    embedded showAiAcceptance={selected.origin === 'ai' && selected.revision > 1}
+                    embedded showAiAcceptance={false}
                   />
                 ) : null}
               />
