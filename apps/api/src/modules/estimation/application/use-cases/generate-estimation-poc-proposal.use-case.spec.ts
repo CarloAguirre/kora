@@ -244,9 +244,9 @@ describe('GenerateEstimationPocProposalUseCase', () => {
       path: 'KDM.pdf', text: 'Portal, API y pruebas del documento.',
     }],
   };
-  const proposal = (roles: Array<{ role: string; hours: number }>) =>
+  const proposal = (roles: Array<{ role: string; hours: number }>, provider: 'gemini' | 'openai' = 'gemini') =>
     estimationPocProposalSchema.parse({
-      projectId, provider: 'gemini', sourceMode: 'poc_simulated',
+      projectId, provider, sourceMode: 'poc_simulated',
       documentsAnalyzed: 1, summary: 'Estimación preliminar KDM',
       roles: roles.map(({ role, hours }) => ({
         role, unit: 'week', duration: 1, hoursPerUnit: hours,
@@ -287,7 +287,8 @@ describe('GenerateEstimationPocProposalUseCase', () => {
         taskDescription: 'Verificar criterios de negocio y documentar resultados UAT.' },
     ],
   });
-  const createGenerator = (output: (attempt: number, instructions?: string) => unknown) => {
+  const createGenerator = (output: (attempt: number, instructions?: string) => unknown,
+    provider: 'gemini' | 'openai' = 'gemini') => {
     // El default de producción ahorra cuota. Los tests de corrección activan
     // explícitamente el segundo intento y jamás contactan al proveedor real.
     vi.stubEnv('KORA_GEMINI_EDT_MAX_ATTEMPTS', '2');
@@ -295,7 +296,7 @@ describe('GenerateEstimationPocProposalUseCase', () => {
     const instructions: string[] = [];
     const requestedSchemas: Array<Readonly<Record<string, unknown>> | undefined> = [];
     const ai: AiProvider = {
-      name: 'gemini',
+      name: provider,
       generateStructured: async (request) => {
         calls++;
         instructions.push(request.instructions ?? '');
@@ -551,6 +552,40 @@ describe('GenerateEstimationPocProposalUseCase', () => {
     await expect(new GenerateEstimationPocProposalUseCase(ai, sources)
       .execute(input)).rejects.toThrow(/perfil duplicado/);
     expect(calls).toBe(1);
+  });
+
+  it('OpenAI no pierde la EDT ni reintenta si classification excede 40 caracteres', async () => {
+    const longLabel = 'Integración transversal y automatización de controles regulatorios de ambiente';
+    const mock = createGenerator(() => {
+      const data = baseDetail();
+      for (const activity of data.activities) activity.classification = longLabel;
+      return data;
+    }, 'openai');
+    vi.stubEnv('KORA_EDT_MAX_ATTEMPTS', '1');
+    const edt = await mock.generator.generateEdt(input, proposal([
+      { role: 'Desarrollo', hours: 50 }, { role: 'QA', hours: 30 },
+    ], 'openai'));
+    expect(mock.calls()).toBe(1);
+    expect(mock.instructions[0]).toContain('máximo 40 caracteres');
+    expect(edt.provider).toBe('openai');
+    expect(edt.totalHours).toBe(79);
+    expect(edt.modules[0]?.tasks[0]?.classification?.length).toBeLessThanOrEqual(40);
+    expect(edt.modules[0]?.tasks[0]?.classification).toContain('…');
+    expect(edt.modules[0]?.tasks[0]?.description).toBe('Servicio de integración.');
+    expect(edt.modules[0]?.tasks[0]?.roleEffort?.[0]?.hours).toBe(12);
+  });
+
+  it('informa OpenAI (nunca Gemini) cuando el contenido de una EDT es realmente inválido', async () => {
+    const mock = createGenerator(() => {
+      const data = baseDetail();
+      data.roleHours[0]!.hours = 12.123;
+      return data;
+    }, 'openai');
+    vi.stubEnv('KORA_EDT_MAX_ATTEMPTS', '1');
+    await expect(mock.generator.generateEdt(input, proposal([
+      { role: 'Desarrollo', hours: 50 }, { role: 'QA', hours: 30 },
+    ], 'openai'))).rejects.toThrow(/OpenAI devolvió una EDT inconsistente/);
+    expect(mock.calls()).toBe(1);
   });
 
   it('genera EDT v2 desde tablas no redundantes y conserva las HH por actividad/perfil', async () => {

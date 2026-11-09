@@ -146,6 +146,65 @@ describe('AnalyzeEstimationPocUseCase', () => {
     });
   });
 
+  it('OpenAI solicita tipos estructurados y conserva Otro sin inventar opciones', async () => {
+    const sourceId = 'drive-rules';
+    let instructions = '';
+    const makeQuestion = (id: string, answerType: string,
+      options: Array<{ value: string; label: string }>) => ({
+      id, kind: 'dynamic', category: 'Alcance', question: '¿Qué alcance se confirma?',
+      reason: 'Modifica HH y arquitectura', impact: 'high', answerType, options,
+      required: true, confidence: 'medium', priorityScore: 90,
+      assumptionIfSkipped: 'Pendiente de confirmar',
+      sourceRefs: [{ sourceId, fileName: 'Reglas.xlsx' }],
+    });
+    const ai: AiProvider = { name: 'openai',
+      generateStructured: async (request) => {
+        instructions = request.instructions ?? '';
+        return { summary: 'Alcance pendiente de decisiones.',
+          dynamicQuestions: [
+            makeQuestion('Q1', 'single_choice', [
+              { value: 'app', label: 'Aplicación nueva' },
+              { value: 'existing', label: 'Adaptar aplicación actual' },
+              { value: 'other', label: 'Otro' },
+            ]),
+            makeQuestion('Q2', 'multi_choice', [
+              { value: 'web', label: 'Web' },
+              { value: 'mobile', label: 'Móvil' },
+            ]),
+            makeQuestion('Q3', 'confirmation', []),
+            makeQuestion('Q4', 'text', []),
+            // Si OpenAI devuelve una selección sin opciones, no se inventan.
+            makeQuestion('Q5', 'single_choice', []),
+          ],
+        };
+      },
+    };
+    const reader: DocumentSourceReader = { readDriveSources: async () => [{
+      sourceId, name: 'Reglas.xlsx', mimeType: 'text/plain',
+      path: 'Requisitos/Reglas.xlsx', text: 'HOJA Matriz B2=Control de acceso',
+    }] };
+    const output = await new AnalyzeEstimationPocUseCase(ai, reader).execute({
+      projectId: '550e8400-e29b-41d4-a716-446655440000',
+      projectName: 'Controles', clientName: 'Cliente',
+      driveFolderUrl: 'https://drive.google.com/drive/folders/real-folder',
+      instructions: null,
+    });
+    expect(instructions).toContain('prioriza preguntas rápidas y estructuradas');
+    expect(instructions).toContain('Otro (especificar)');
+    expect(output.provider).toBe('openai');
+    expect(output.dynamicQuestions.map((q) => q.answerType)).toEqual([
+      'single_choice', 'multi_choice', 'confirmation', 'text', 'text',
+    ]);
+    expect(output.dynamicQuestions[0]?.options).toEqual([
+      { value: 'app', label: 'Aplicación nueva' },
+      { value: 'existing', label: 'Adaptar aplicación actual' },
+      { value: 'other', label: 'Otro (especificar)' },
+    ]);
+    expect(output.dynamicQuestions[4]?.options).toEqual([]);
+    expect(output.dynamicQuestions.every((q) =>
+      q.sourceRefs[0]?.sourceId === sourceId)).toBe(true);
+  });
+
   it('rechaza aclaraciones que citan archivos inexistentes o ajenos al KDM', async () => {
     const ai: AiProvider = {
       name: 'gemini',
