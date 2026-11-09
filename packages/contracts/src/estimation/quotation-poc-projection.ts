@@ -193,7 +193,10 @@ export function projectPocRolesToQuotationDraft(
     if (collaborators > 100) {
       throw new Error('La cantidad de colaboradores del equipo supera 100.');
     }
-    const duration = Math.max(group.maxWeeks, detailed ? lastWeek : 1,
+    // En EDT las semanas son actividad real del equipo, no la duración previa
+    // sugerida por Gemini para todo el proyecto.
+    const activeWeeks = detailed ? (peakCentsByTeam.get(teamId)?.size ?? 1) : group.maxWeeks;
+    const duration = Math.max(activeWeeks,
       Math.ceil(group.hours / ((detailed ? 40 : 168) * collaborators)));
     if (duration > 520 || !Number.isFinite(duration)) {
       throw new Error('Las HH exceden el horizonte máximo de 520 semanas.');

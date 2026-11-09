@@ -25,6 +25,7 @@ import { QuotationPlanningAcceptanceCard } from '../components/QuotationPlanning
 import { QuotationCommercialLifecycleCard } from '../components/QuotationCommercialLifecycleCard';
 import { QuotationCommercialSummary } from '../components/QuotationCommercialSummary';
 import { QuotationPhaseWorkspace } from '../components/QuotationPhaseWorkspace';
+import { replanQuotationEdtForWorkforce } from '../lib/quotation-fulltime-plan';
 import { QuotationTeamsWorkspace } from '../components/QuotationTeamsWorkspace';
 import { quotationAiAcceptanceBlockReason } from '../components/quotation-ai-acceptance';
 import { readQuotationTaskExcel } from '../lib/quotation-task-excel';
@@ -490,7 +491,15 @@ export function QuotationWorkspacePage() {
     applyEdtChanges({ ...form.draft, edtRoleCollaborators: next });
   };
   const editMappedCollaborators = (teamId: string, collaborators: number) => {
-    editTeamById(teamId, { collaborators });
+    if (!editable || !form) return;
+    try {
+      const updated = withQuotationTeamEdit(form.draft, teamId, { collaborators });
+      // El número de personas modifica el calendario, nunca las HH de WBS.
+      applyEdtChanges(replanQuotationEdtForWorkforce(updated));
+    } catch (cause) {
+      reportError(cause instanceof Error ? cause.message :
+        'No se pudo replanificar el calendario a 40 HH semanales.');
+    }
   };
   const toggleTeam = (teamId: string, checked: boolean) => {
     if (!editable || !form?.draft) return;
