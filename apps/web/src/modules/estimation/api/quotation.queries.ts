@@ -19,17 +19,19 @@ export function useCreateQuotationVersion(projectId: string) {
   });
 }
 
-/** La ruta normal conserva POST REST; con observador abre SSE para ambos modelos Gemini. */
+/** La ruta normal conserva REST; con observador abre SSE para la actividad real. */
 export interface GenerateQuotationWithSummaries extends GenerateAiDemoQuotationInput {
   readonly onThoughtSummary?: (text: string) => void;
   readonly onPhase?: (phase: 'proposal' | 'edt' | 'saving') => void;
+  readonly onActivity?: (step: string, text: string, at: string) => void;
+  readonly onHeartbeat?: (seconds: number, phase: string) => void;
 }
 export function useGenerateAiDemoQuotationVersion(projectId: string) {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: ({ onThoughtSummary, onPhase, ...input }: GenerateQuotationWithSummaries) =>
+    mutationFn: ({ onThoughtSummary, onPhase, onActivity, onHeartbeat, ...input }: GenerateQuotationWithSummaries) =>
       onThoughtSummary
-        ? quotationApi.generateAiDemoDraftStream(projectId, input, onThoughtSummary, onPhase)
+        ? quotationApi.generateAiDemoDraftStream(projectId, input, onThoughtSummary, onPhase, onActivity, onHeartbeat)
         : quotationApi.generateAiDemoDraft(projectId, input),
     onSuccess: () => client.invalidateQueries({ queryKey: quotationKeys.project(projectId) }),
   });
