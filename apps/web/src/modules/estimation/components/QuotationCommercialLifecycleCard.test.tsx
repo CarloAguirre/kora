@@ -163,14 +163,40 @@ describe('Ciclo comercial separado · Kora', () => {
     expect(mocks.transferApproved).not.toHaveBeenCalled();
   });
 
-  it('versión aprobada muestra traspaso pendiente, bloqueado si ya está Activo', () => {
+  it('la aprobada de proyecto Activo puede solicitar traspaso con validación del servidor', async () => {
     show({ ...version, status: 'approved', aiReviewStatus: 'accepted' },
       { ...project, status: 'active' });
-    expect(screen.getByRole('button', { name: 'Traspasar ahora' })).toBeEnabled();
     fireEvent.click(screen.getByRole('button', { name: 'Traspasar ahora' }));
-    expect(mocks.toastError).toHaveBeenCalledWith(expect.stringContaining('requiere conciliación'));
+    expect(screen.getByText('Traspasar a la ficha del proyecto')).toBeInTheDocument();
     expect(mocks.transferApproved).not.toHaveBeenCalled();
-    expect(screen.getByText(/La versión aprobada permanece registrada/)).toBeInTheDocument();
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Traspasar' }));
+    await waitFor(() => expect(mocks.transferApproved).toHaveBeenCalledWith({
+      versionId: version.id, revision: version.revision,
+    }));
+  });
+
+  it('permite escoger traspaso ahora al aprobar en un proyecto Activo', async () => {
+    show({ ...version, status: 'sent', aiReviewStatus: 'accepted' }, { ...project, status: 'active' });
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar aprobación' }));
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText(/proyecto está Activo/)).toBeInTheDocument();
+    const option = within(dialog).getByLabelText(/Aprobar y traspasar ahora/);
+    expect(option).toBeEnabled();
+    fireEvent.click(option);
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Registrar aprobación' }));
+    await waitFor(() => expect(mocks.approveClient).toHaveBeenCalled());
+    expect(await screen.findByText('Traspasar a la ficha del proyecto')).toBeInTheDocument();
+    expect(mocks.transferApproved).not.toHaveBeenCalled();
+  });
+
+  it('una cotización traspasada no muestra acciones comerciales', () => {
+    render(<QuotationCommercialLifecycleCard project={project}
+      quotation={{ ...quotation, transferredVersionId: version.id }}
+      version={{ ...version, status: 'approved', aiReviewStatus: 'accepted' }}
+      canOperate hasUnsavedChanges={false} embedded />);
+    expect(screen.getByText(/Cotización aprobada y traspasada/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Traspasar/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Registrar aprobación/ })).not.toBeInTheDocument();
   });
 
   it('permite aprobar un borrador sin envío solo con advertencia y confirmación reforzada', async () => {
