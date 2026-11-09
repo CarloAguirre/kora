@@ -216,7 +216,7 @@ export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
           afterApproval={transferFromApproval} pending={lifecycle.transferApproved.isPending}
           error={actionError} onClose={closeTransfer} onTransfer={() => void confirmTransfer()} />
       )}
-      {newOpen && <NewProjectQuotationModal project={project} versions={data?.versions ?? []}
+      {eligible && newOpen && <NewProjectQuotationModal project={project} versions={data?.versions ?? []}
         onClose={() => setNewOpen(false)} />}
     </section>
   );

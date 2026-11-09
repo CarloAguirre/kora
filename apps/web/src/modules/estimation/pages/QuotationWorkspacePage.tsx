@@ -895,7 +895,7 @@ export function QuotationWorkspacePage() {
           )}
         </Modal>
         {confirmationDialog}
-        {project && newQuotationOpen && (
+        {project && mayWrite && newQuotationOpen && (
           <NewProjectQuotationModal project={project} versions={versions} onClose={() => setNewQuotationOpen(false)} />
         )}
       </main>
