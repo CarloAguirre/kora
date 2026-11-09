@@ -55,7 +55,23 @@ describe('ListEstimationDriveFilesUseCase', () => {
     expect(result.files[1]?.kind).toBe('pdf');
   });
 
-  it('expone el PDF KDM cuando Drive no está configurado', async () => {
+  it('expone el PDF KDM solo en la carpeta fallback explícita', async () => {
+    const drive: DriveFolderClient = {
+      ...emptyDiscovery,
+      isConfigured: () => false,
+      listFiles: async () => [],
+    };
+
+    const result = await new ListEstimationDriveFilesUseCase(drive).execute({
+      driveFolderUrl: 'https://drive.google.com/drive/folders/kora-poc-fallback',
+    });
+
+    expect(result.connection).toBe('connected');
+    expect(result.files).toHaveLength(1);
+    expect(result.files[0]?.name).toBe('Requerimiento_KDM.pdf');
+    expect(result.files[0]?.kind).toBe('pdf');
+  });
+  it('no devuelve documentos de ejemplo para carpetas reales si Drive no está configurado', async () => {
     const drive: DriveFolderClient = {
       ...emptyDiscovery,
       isConfigured: () => false,
@@ -66,9 +82,8 @@ describe('ListEstimationDriveFilesUseCase', () => {
       driveFolderUrl: 'https://drive.google.com/drive/folders/abc_123',
     });
 
-    expect(result.connection).toBe('connected');
-    expect(result.files).toHaveLength(1);
-    expect(result.files[0]?.name).toBe('Requerimiento_KDM.pdf');
-    expect(result.files[0]?.kind).toBe('pdf');
+    expect(result.connection).toBe('not_configured');
+    expect(result.files).toEqual([]);
   });
+
 });

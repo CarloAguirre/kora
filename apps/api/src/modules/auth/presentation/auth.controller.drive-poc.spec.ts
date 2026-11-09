@@ -33,7 +33,7 @@ describe('Callback OAuth compartido (login existente / PoC Drive)', () => {
     expect(googleLogin.execute).not.toHaveBeenCalled();
     expect(reply.clearCookie).toHaveBeenCalledWith('kora_drive_poc_state', { path: '/' });
     expect(reply.clearCookie).not.toHaveBeenCalledWith('kora_google_state', { path: '/' });
-    expect(reply.send).toHaveBeenCalledWith(expect.stringContaining('Lectura de Drive confirmada'));
+    expect(reply.send).toHaveBeenCalledWith(expect.stringContaining('Conexión con Drive completada'));
     expect(reply.redirect).not.toHaveBeenCalled();
   });
 

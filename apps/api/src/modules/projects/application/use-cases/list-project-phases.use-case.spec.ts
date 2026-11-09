@@ -18,7 +18,7 @@ describe('Fases para registrar horas · consumo progresivo por tarea', () => {
       listForProject: vi.fn().mockResolvedValue([{
         id: 'module-1', name: 'Desarrollo', currentStage: 'development',
         segments: [{
-          id: 'segment-1', name: 'Calculadora', teamName: 'Desarrollo',
+          id: 'segment-1', name: 'Calculadora', teamId: 'team-1', teamName: 'Desarrollo',
           startDate: new Date('2026-11-01T12:00:00.000Z'),
           endDate: new Date('2026-11-30T12:00:00.000Z'),
         }],
