@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { isQuotationDraftEligibleProject, type ProjectDetail, type QuotationVersion } from '@kora/contracts';
 import { projectQuotationPath } from '@/app/router/paths';
+import { useAuth } from '@/modules/auth/hooks/useAuth';
+import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { useAppliedQuotationPlanning, useProjectQuotation, useQuotationLifecycle } from '../api/quotation.queries';
 import { Button } from '@/shared/components/ui/Button';
 import { Badge } from '@/shared/components/ui/Badge';
@@ -11,8 +13,18 @@ import { QuotationApprovalDialog, QuotationTransferDialog } from './QuotationLif
 import styles from './ProjectQuotationCard.module.css';
 
 export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
-  const { data, isLoading, error } = useProjectQuotation(project.id);
-  const applied = useAppliedQuotationPlanning(project.id);
+  const { user } = useAuth();
+  const { can } = usePermissions();
+  // Igual que la ruta /calculadora y la autorización de cotizaciones en API:
+  // proyectos:manage o líder de ESTE proyecto con projects:read_assigned.
+  // No basta con poder consultar el proyecto ni con liderar otro equipo.
+  const canAccessCalculator = can('projects:manage') ||
+    (can('projects:read_assigned') && user?.id === project.leader?.id);
+  // Evitar incluso solicitar las cifras comerciales si no está autorizado.
+  const { data, isLoading, error } = useProjectQuotation(
+    canAccessCalculator ? project.id : null,
+  );
+  const applied = useAppliedQuotationPlanning(canAccessCalculator ? project.id : null);
   const lifecycle = useQuotationLifecycle(project.id);
   const [actionError, setActionError] = useState('');
   const [actionNotice, setActionNotice] = useState('');
@@ -90,6 +102,8 @@ export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
     }
   };
   const number = (n: number) => n.toLocaleString('es-CL', { maximumFractionDigits: 2 });
+  if (!canAccessCalculator) return null;
+
   return (
     <section className={styles.tabContent} aria-label="Cotizaciones del proyecto">
       {isLoading ? <p className={styles.helper}>Consultando cotizaciones…</p>
@@ -170,23 +184,35 @@ export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
             </div>
             {transferredVersion && (
               <div className={styles.commercialSummary}>
-                <h3>Resumen comercial · versión traspasada v{transferredVersion.versionNumber}</h3>
-                <p>Consulta histórica; no modifica el proyecto operativo.</p>
-                <div className={styles.summaryGrid}>
-                  <span>Valor HH: <strong>{transferredVersion.hourlyRate ?? '—'} {transferredVersion.currency}</strong></span>
-                  <span>HH cotizadas: <strong>{number(transferredVersion.totalHours)}</strong></span>
-                  <span>Neto: <strong>{transferredVersion.netAmount ?? '—'} {transferredVersion.currency}</strong></span>
-                  <span>Total: <strong>{transferredVersion.totalAmount ?? '—'} {transferredVersion.currency}</strong></span>
+                <div className={styles.summaryHead}>
+                  <div>
+                    <h3>Resumen comercial</h3>
+                    <p>Copia fija de la v{transferredVersion.versionNumber}, traspasada a la ficha del proyecto.</p>
+                  </div>
+                  <span className={styles.calculatorOnlyBadge}>Solo usuarios de la calculadora</span>
                 </div>
-                {(transferredVersion.draft.costs ?? []).length > 0 && (
-                  <p>Costos externos: {(transferredVersion.draft.costs ?? []).map((cost) =>
-                    cost.description + ' (' + cost.amount + ' ' + transferredVersion.currency + ' · ' +
-                    cost.recurrence + ')').join('; ')}</p>
-                )}
-                {(transferredVersion.draft.assumptions ?? []).length > 0 && (
-                  <p>Supuestos: {(transferredVersion.draft.assumptions ?? []).join('; ')}</p>
-                )}
-                <Link to={projectQuotationPath(project) + '?version=' + transferredVersion.id}>
+                <div className={styles.summaryGrid}>
+                  <span><small>Valor HH</small><strong>{transferredVersion.hourlyRate ?? '—'} {transferredVersion.currency}</strong></span>
+                  <span><small>Horas cotizadas</small><strong>{number(transferredVersion.totalHours)} HH</strong></span>
+                  <span><small>Neto</small><strong>{transferredVersion.netAmount ?? '—'} {transferredVersion.currency}</strong></span>
+                  <span><small>Total con IVA</small><strong>{transferredVersion.totalAmount ?? '—'} {transferredVersion.currency}</strong></span>
+                </div>
+                <div className={styles.costsScroll}>
+                  <table className={styles.costsTable}>
+                    <thead><tr><th>Licencia o costo externo</th><th>Cobro</th><th>Monto</th></tr></thead>
+                    <tbody>{(transferredVersion.draft.costs ?? []).length === 0 ? (
+                      <tr><td colSpan={3} className={styles.noCosts}>Sin licencias ni costos externos.</td></tr>
+                    ) : (transferredVersion.draft.costs ?? []).map((cost, index) =>
+                      <tr key={index}>
+                        <td>{cost.description}</td>
+                        <td>{cost.recurrence === 'once' ? 'Único'
+                          : cost.recurrence === 'monthly' ? 'Mensual' : 'Anual'}</td>
+                        <td>{number(cost.amount)} {transferredVersion.currency}</td>
+                      </tr>)}</tbody>
+                  </table>
+                </div>
+                <Link className={styles.commercialDetailLink}
+                  to={projectQuotationPath(project) + '?version=' + transferredVersion.id}>
                   Ver ficha comercial completa
                 </Link>
               </div>
