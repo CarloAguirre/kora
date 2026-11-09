@@ -135,6 +135,10 @@ const detailResponseSchema = z.object({
     wbs: z.string().trim().min(1).max(40),
     role: z.string().trim().min(1).max(120),
     hours: z.number().positive().max(1000000),
+    // Los campos son opcionales al parsear para generar un mensaje claro de
+    // validación; todas las EDT nuevas deben traer ambos por perfil.
+    taskName: z.string().trim().min(1).max(300).optional(),
+    taskDescription: z.string().trim().min(1).max(3000).optional(),
   })).min(1).max(240),
 });
 
@@ -177,8 +181,12 @@ const EDT_JSON_SCHEMA = {
         properties: {
           wbs: { type: 'STRING' }, role: { type: 'STRING' },
           hours: { type: 'NUMBER' },
+          taskName: { type: 'STRING',
+            description: 'Tarea concreta ejecutada SOLO por este perfil dentro del WBS compartido.' },
+          taskDescription: { type: 'STRING',
+            description: 'Acciones y entregable verificable propios del perfil. NO repetir tareas de otros perfiles.' },
         },
-        required: ['wbs', 'role', 'hours'],
+        required: ['wbs', 'role', 'hours', 'taskName', 'taskDescription'],
       },
     },
   },
@@ -266,6 +274,12 @@ export class GenerateEstimationPocProposalUseCase {
         'Devuelve 3 tablas planas: stages (cada tramo una sola vez), activities (cada WBS una sola vez) y roleHours (cada pareja WBS×perfil una sola vez).',
         'activities NO contiene role, hours ni la definición del tramo: solo stageCode como clave foránea hacia stages.',
         'Si una actividad necesita dos perfiles, escribe una sola fila en activities y DOS filas en roleHours con el mismo WBS y distintos role.',
+        'activities.name y activities.description describen el objetivo COMPARTIDO, no instrucciones de un rol particular.',
+        'Cada fila roleHours debe tener taskName y taskDescription NO VACÍOS y propios del perfil: qué acciones realizará exactamente y qué entregable verificable producirá.',
+        'La participación de varios roles NO significa ejecutar la misma labor: UX/UI diseña flujos, pantallas y prototipos Figma; Desarrollo implementa e integra interfaces/API; QA prueba criterios y reporta defectos. Ajusta estos ejemplos al alcance real.',
+        'Para un WBS compartido, NO repitas taskName ni taskDescription entre perfiles distintos; las responsabilidades y entregables deben ser complementarios sin sumar dos veces las mismas HH.',
+        'No dupliques activities bajo WBS diferentes con el mismo nombre, descripción, etapa y módulo; si el objetivo es el mismo, consérvalo como una actividad con subtareas y HH diferenciadas por rol.',
+        'Los nombres de stages deben distinguir los tramos cuando son diferentes; no declares dos etapas equivalentes con el mismo nombre e intervalo.',
         'Estima las horas por actividad y perfil en roleHours según su complejidad y alcance. No hagas que sumen un total predeterminado.',
         'No copies ni infieras un presupuesto de la dotación, horas por unidad o duración preliminar. Kora dimensionará el personal después de verificar la EDT.',
         'Solo utiliza role que coincida EXACTAMENTE con allowedRoles. Cada perfil declarado debe intervenir en al menos una actividad real.',
@@ -312,7 +326,8 @@ export class GenerateEstimationPocProposalUseCase {
           'Rehaz la EDT desde la fuente original. Corrige exactamente este problema:',
           validationIssue,
           'Corrige las tres tablas: stages sin códigos repetidos; activities con un WBS único',
-          'por actividad; roleHours con una sola pareja WBS×perfil, HH > 0 y dos decimales.',
+          'por actividad; roleHours con una sola pareja WBS×perfil, HH > 0,',
+        'taskName y taskDescription específicos del perfil y dos decimales.',
           'Toda actividad debe referir a un tramo válido y tener HH de al menos un perfil.',
           'No transformes las HH para igualar una cifra preliminar.',
         ].join('\n'),
@@ -368,7 +383,20 @@ export class GenerateEstimationPocProposalUseCase {
       durationWeeks: number; totalHours: number;
     };
     const stages = new Map<string, Stage>();
+    const normalizeText = (value: string) => value.normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es')
+      .replace(/[^a-z0-9]+/g, ' ').trim();
+    const uniqueStageWindows = new Set<string>();
     for (const row of raw.stages) {
+      const sameWindow = JSON.stringify([
+        normalizeText(row.name), row.startWeek, row.durationWeeks,
+      ]);
+      if (uniqueStageWindows.has(sameWindow)) {
+        throw new BadRequestException(
+          'Dos fases tienen el mismo nombre y las mismas semanas: ' + row.name +
+          '. Agrupa el trabajo en una etapa o diferencia claramente los tramos.');
+      }
+      uniqueStageWindows.add(sameWindow);
       if (stages.has(row.code)) {
         throw new BadRequestException('El tramo ' + row.code +
           ' está duplicado. Define cada tramo cronológico solo una vez.');
@@ -384,7 +412,19 @@ export class GenerateEstimationPocProposalUseCase {
 
     type Activity = typeof raw.activities[number];
     const activities = new Map<string, Activity>();
+    const uniqueActivities = new Set<string>();
     for (const row of raw.activities) {
+      const signature = JSON.stringify([
+        row.stageCode, normalizeText(row.module),
+        normalizeText(row.name), normalizeText(row.description),
+      ]);
+      if (uniqueActivities.has(signature)) {
+        throw new BadRequestException(
+          'La actividad ' + row.wbs +
+          ' duplica el mismo título y descripción en su fase y módulo. ' +
+          'Consolida el trabajo compartido y diferencia tareas por perfil.');
+      }
+      uniqueActivities.add(signature);
       if (activities.has(row.wbs)) {
         throw new BadRequestException('WBS duplicado en activities: ' +
           row.wbs + '. Cada actividad debe declararse una sola vez.');
@@ -396,7 +436,9 @@ export class GenerateEstimationPocProposalUseCase {
       activities.set(row.wbs, row);
     }
 
-    const effortByWbs = new Map<string, Array<{ role: string; hours: number }>>();
+    const effortByWbs = new Map<string, Array<{
+      role: string; hours: number; taskName?: string; taskDescription?: string;
+    }>>();
     const usedRoles = new Set<string>();
     for (const item of raw.roleHours) {
       if (!activities.has(item.wbs)) {
@@ -416,13 +458,39 @@ export class GenerateEstimationPocProposalUseCase {
         throw new BadRequestException('HH duplicadas: el perfil ' + item.role +
           ' aparece dos veces para WBS ' + item.wbs + '.');
       }
-      effort.push({ role: item.role, hours: item.hours });
+      effort.push({
+        role: item.role, hours: item.hours,
+        ...(item.taskName ? { taskName: item.taskName } : {}),
+        ...(item.taskDescription ? { taskDescription: item.taskDescription } : {}),
+      });
       effortByWbs.set(item.wbs, effort);
       usedRoles.add(item.role);
     }
     for (const role of validRoles) {
       if (!usedRoles.has(role)) {
         throw new BadRequestException('La EDT no contiene actividades para el perfil ' + role + '.');
+      }
+    }
+    // Las comprobaciones estructurales anteriores siguen teniendo prioridad;
+    // después validar la calidad semántica de los entregables por perfil.
+    for (const [wbs, effort] of effortByWbs) {
+      const titles = new Set<string>();
+      const details = new Set<string>();
+      for (const item of effort) {
+        if (!item.taskName?.trim() || !item.taskDescription?.trim()) {
+          throw new BadRequestException(
+            'La asignación ' + wbs + ' / ' + item.role +
+            ' necesita taskName y taskDescription específicos del perfil.');
+        }
+        const title = normalizeText(item.taskName);
+        const detail = normalizeText(item.taskDescription);
+        if (effort.length > 1 && (titles.has(title) || details.has(detail))) {
+          throw new BadRequestException(
+            'El WBS ' + wbs + ' repite la misma tarea o descripción para perfiles ' +
+            'distintos. Cada perfil necesita responsabilidades y entregables diferenciados.');
+        }
+        titles.add(title);
+        details.add(detail);
       }
     }
 

@@ -26,6 +26,7 @@ export const ESTIMATION_TEAM_GUIDANCE = [
 export const ESTIMATION_EDT_GUIDANCE = [
   'Trabaja desde requisitos y flujos verificables: [CONFIRMADO] fuente documental; [DERIVADO] necesidad técnica mínima enlazada; [SUPUESTO] no confirmado; [EXCLUIDO] sin HH del proveedor.',
   'Produce etapas de avance reconocibles, módulos funcionales y tareas con entregables comprobables y lenguaje natural; tramos pueden solaparse entre equipos.',
+  'Cuando varios perfiles participan en una misma actividad, conserva el objetivo WBS pero describe tareas, responsabilidades y entregables exclusivos de cada perfil. UX diseña; Desarrollo implementa; QA verifica; no copies sus descripciones entre roles.',
   'Estima bottom-up la implementación mínima suficiente: evita duplicar CRUD, DTO, modelo, frontend y backend si corresponden al mismo feature end-to-end.',
   'Considera IA aplicada a todos los procesos, reutilización de componentes, nodos Figma, ORM/migraciones y pruebas asistidas, sin aplicar factores porcentuales arbitrarios.',
   'Una tarea de integración externa solo recibe HH propias para adaptar o entregar un contrato expresamente requerido. No presupuestes el trabajo del tercero.',
@@ -122,6 +123,9 @@ export function addMandatoryTechLeadSupervision<T extends FlatEdtRows>(
     }],
     roleHours: [...edt.roleHours, {
       wbs, role: leadRole, hours: TECH_LEAD_HOURS_PER_WEEK * horizonWeeks,
+      taskName: 'Supervisar calidad, riesgos y decisiones técnicas de forma semanal',
+      taskDescription: 'Revisar avances y riesgos técnicos, coordinar decisiones ' +
+        'de arquitectura y registrar acuerdos; no incluye codificación ni Figma.',
     }],
   } as T;
 }
