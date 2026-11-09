@@ -109,7 +109,7 @@ export function patchStyledTableSheet(xml: string, spec: SheetSpec): string {
   const rows: Element[] = [];
   for (const [num, values] of [[1,[spec.title]],[2,[spec.subtitle]],[4,spec.headers]] as [number,RowValues][]) {
     const row = cloneRow(byRow(num)!, num);
-    writeRow(row, values);
+    writeRow(row, values ?? []);
     rows.push(row);
   }
   for (let i = 0; i < spec.data.length; i++) {
@@ -243,7 +243,8 @@ function buildSpecs(model: Model): Map<string, SheetSpec> {
   if (details.length) {
     const list: RowValues[] = details.map((d)=>{
       const roleHours = [0,0,0,0,0];
-      roleHours[roleColumn(d.role)] = d.hours;
+      const index = roleColumn(d.role);
+      roleHours[index] = (roleHours[index] ?? 0) + d.hours;
       const phase = phases.find((phase)=>phase.code===d.stageCode);
       return [d.wbs,d.stageCode ?? '',phase?.name ?? '',d.module,'',d.name,
         d.references.join('; '),d.role,model.team(d.teamId),...roleHours,
@@ -324,7 +325,7 @@ function buildSpecs(model: Model): Map<string, SheetSpec> {
         for(const r of weekly.rows){
           let i=cols.indexOf(r.teamKey);
           if(i<0&&cols.includes('Otros equipos'))i=4;
-          if(i>=0)hours[i]+=r.weeklyHours.get(week)??0;
+          if(i>=0)hours[i]=(hours[i] ?? 0)+(r.weeklyHours.get(week)??0);
         }
         const active=phases.filter(p=>p.startWeek<=week&&p.startWeek+p.durationWeeks>week)
           .map(p=>p.code).join(', ');
