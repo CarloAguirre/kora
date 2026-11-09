@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { TextField } from '@/shared/components/ui/TextField';
 
 /** Evita que una EDT abra el modal a mitad de escribir 20 o 75.
@@ -12,6 +12,7 @@ export function QuotationCapacityInput({
   disabled: boolean; className?: string; onCommit: (value: number) => void;
 }) {
   const [editing, setEditing] = useState(false);
+  const cancelOnBlur = useRef(false);
   const [text, setText] = useState(String(value));
   useEffect(() => {
     if (!editing) setText(String(value));
@@ -36,10 +37,22 @@ export function QuotationCapacityInput({
       setEditing(true);
       setText(event.target.value);
     }}
-    onBlur={commit}
+    onBlur={() => {
+      if (cancelOnBlur.current) {
+        cancelOnBlur.current = false;
+        restore();
+        return;
+      }
+      commit();
+    }}
     onKeyDown={(event) => {
-      if (event.key === 'Enter') event.currentTarget.blur();
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        event.currentTarget.blur();
+      }
       if (event.key === 'Escape') {
+        event.preventDefault();
+        cancelOnBlur.current = true;
         restore();
         event.currentTarget.blur();
       }
