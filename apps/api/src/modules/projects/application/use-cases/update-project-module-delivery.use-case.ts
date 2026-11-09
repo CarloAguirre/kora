@@ -214,10 +214,11 @@ export class UpdateProjectModuleDeliveryUseCase
         !PROJECT_MODULE_DELIVERY_ALLOWED_TRANSITIONS[delivery.status].includes(nextStatus)) {
         return err(new InvalidDeliveryStatusTransitionError(invalidTransitionMessage(delivery.status, nextStatus)));
       }
-      if (nextStatus === 'delivered' && delivery.status === 'planned' && nextAssigneeUserId === null) {
-        return err(
-          new InvalidDeliveryStatusTransitionError('Asigna la entrega a un colaborador antes de marcarla como terminada.'),
-        );
+      if (nextStatus === 'delivered' && delivery.status === 'planned' &&
+        nextAssigneeUserId === null && !canManage) {
+        return err(new InvalidDeliveryStatusTransitionError(
+          'Solo un líder puede entregar sin colaborador asignado.',
+        ));
       }
       if (nextStatus === 'planned' && !reopenBlock && !command.data.rejectionReason?.trim()) {
         return err(new RejectionReasonRequiredError());
@@ -297,7 +298,9 @@ export class UpdateProjectModuleDeliveryUseCase
       // Un líder puede marcarla terminada por el colaborador — que se sepa que no fue él.
       const assigneeName =
         members.find((member) => member.userId === nextAssigneeUserId)?.fullName ?? delivery.assigneeName ?? 'el colaborador asignado';
-      const onBehalfOf = nextAssigneeUserId !== command.actor.userId ? ` en nombre de ${assigneeName}` : '';
+      const onBehalfOf = nextAssigneeUserId === null
+        ? ' por el líder sin colaborador asignado'
+        : nextAssigneeUserId !== command.actor.userId ? ` en nombre de ${assigneeName}` : '';
       messages.push(
         finalizeBlock
           ? `Entrega${label} del bloque "${linkedSegment!.name}" cerrada el ${formatCommittedDate(new Date(command.data.completedOn!))} ${inPhase}.${command.data.comment?.trim() ? ' Evidencia: ' + command.data.comment.trim() : ''}`
