@@ -90,7 +90,14 @@ export function addMandatoryTechLeadSupervision<T extends FlatEdtRows>(
     throw new Error('Supervisión técnica duplicada en WBS ' + overlapping.wbs +
       ': la supervisión semanal la incorpora el servidor, no Gemini.');
   }
-  const horizonWeeks = Math.max(...edt.stages.map((stage) =>
+  // Un tramo sin actividades no debe aumentar la duración contractual ni
+  // generar HH ficticias de supervisión. Las FK y HH se validan después.
+  const referencedStages = new Set(edt.activities.map((activity) => activity.stageCode));
+  const activeStages = edt.stages.filter((stage) => referencedStages.has(stage.code));
+  if (activeStages.length === 0) {
+    throw new Error('Ninguna actividad de la EDT referencia un tramo cronológico declarado.');
+  }
+  const horizonWeeks = Math.max(...activeStages.map((stage) =>
     stage.startWeek + stage.durationWeeks - 1));
   if (!Number.isInteger(horizonWeeks) || horizonWeeks < 1 || horizonWeeks > 520) {
     throw new Error('Horizonte semanal de la EDT fuera de rango.');
