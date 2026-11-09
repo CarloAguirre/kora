@@ -28,7 +28,7 @@ describe('EDT comercial por actividad y perfil (v2)', () => {
   it('conserva referencias largas con archivo y sección sin alterar el esfuerzo', () => {
     const source = structuredClone(detail);
     const ref = 'Requerimientos funcionales v2.pdf, sección 4.3, página 17 - ' +
-      'validación cruzada de perfiles y trazabilidad de aprobación '.repeat(3);
+      'validación cruzada de perfiles y trazabilidad de aprobación '.repeat(3).trim();
     expect(ref.length).toBeGreaterThan(100);
     expect(ref.length).toBeLessThanOrEqual(1000);
     source.modules[0]!.tasks[0]!.referenceIds = [ref, 'Roles.xlsx · Matriz!B2:B5'];
