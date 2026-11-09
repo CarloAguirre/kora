@@ -1028,7 +1028,8 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       const commercialPreparationOnly = existingModules.length === 0 &&
         project.contractAmount === null &&
         hasOnlyUntouchedDefaultPaymentMilestones(existingPayments) &&
-        hasOnlyCommercialPreparationHours(existingHours, Number(project.usedHours));
+        ((existingHours.length === 0 && Number(project.usedHours) === 0) ||
+          hasOnlyCommercialPreparationHours(existingHours, Number(project.usedHours)));
       // Un prospecto Activo puede registrar preventa sin ejecución. El estado
       // Activo por sí solo no basta: se requiere ausencia de fases, horas
       // operativas y pagos alterados para utilizar el traspaso inicial.
