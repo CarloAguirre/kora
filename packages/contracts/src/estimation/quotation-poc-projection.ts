@@ -158,11 +158,6 @@ export function projectPocRolesToQuotationDraft(
       });
     }
   }
-  const lastWeek = detailed && edt
-    ? Math.max(1, ...stageRows.map((stage) =>
-        stage.startWeek + stage.durationWeeks - 1))
-    : Math.max(1, ...commercialStages.map((stage) =>
-        stage.startWeek + stage.durationWeeks - 1));
   // Cuando varios perfiles usan un mismo equipo, sus personas se COMPARTEN
   // si la capacidad lo permite. No sumamos personal preliminar de Gemini:
   // encontramos cuántas personas trabajan simultáneamente como máximo.
