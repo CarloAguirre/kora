@@ -227,7 +227,7 @@ describe('Cotización HTML v5 · fases y tareas', () => {
     await vi.waitFor(() => expect(callbacks.onRemoveCommercialPhase).toHaveBeenCalledWith('T01'));
   });
 
-  it('muestra una fase comercial nueva con su tarea sin perder los originales', () => {
+  it('muestra una fase comercial nueva con su tarea sin perder los originales', async () => {
     const extraPhase = { code: 'KS-0777e456-fd76-445e-83f1-afc25061c103',
       name: 'Control', startWeek: 5, durationWeeks: 2 };
     const extraTask = { wbs: 'KT-0777e456-fd76-445e-83f1-afc25061c105',
@@ -246,7 +246,10 @@ describe('Cotización HTML v5 · fases y tareas', () => {
     const deleteButton = screen.getByRole('button', { name: 'Quitar tarea ' + extraTask.wbs });
     expect(deleteButton).toHaveClass(nativeButtonClass('button'), nativeButtonClass('ghost'));
     fireEvent.click(deleteButton);
-    expect(callbacks.onDeleteTask).toHaveBeenCalledWith(extraTask.wbs);
+    expect(screen.getByRole('dialog', { name: 'Eliminar tarea de la cotización' })).toBeInTheDocument();
+    expect(callbacks.onDeleteTask).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Eliminar tarea' }));
+    await vi.waitFor(() => expect(callbacks.onDeleteTask).toHaveBeenCalledWith(extraTask.wbs));
   });
 
   it('el contador anuncia las filas reales de un WBS multiperfil, no sólo códigos WBS únicos', () => {
