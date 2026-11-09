@@ -56,13 +56,6 @@ const validChoice = (question: EstimationQuestion, value: string): boolean => {
   return question.options.some((option) => option.value === value);
 };
 
-function hasValue(value: EstimationAnswerValue | undefined): boolean {
-  if (value === undefined || value === null) return false;
-  if (typeof value === 'string') return value.trim().length > 0;
-  if (Array.isArray(value)) return value.length > 0;
-  return true;
-}
-
 function matchesQuestion(question: EstimationQuestion, value: unknown): value is EstimationAnswerValue {
   if (question.answerType === 'text' || question.answerType === 'date') {
     return typeof value === 'string' && value.trim().length > 0;

@@ -129,7 +129,11 @@ const detailResponseSchema = z.object({
     name: z.string().trim().min(1).max(300),
     description: z.string().trim().max(3000),
     references: z.string().trim().max(1000),
-    classification: z.string().trim().max(40),
+    // classification es una etiqueta auxiliar. No se debe invalidar TODA la
+    // EDT (ni las HH) si el modelo devuelve un nombre descriptivo largo.
+    // Normalizamos solo la etiqueta, sin alterar tareas, evidencias ni esfuerzo.
+    classification: z.string().trim().transform((label) =>
+      label.length <= 40 ? label : label.slice(0, 39).trimEnd() + '…'),
   })).min(1).max(120),
   roleHours: z.array(z.object({
     wbs: z.string().trim().min(1).max(40),
@@ -167,7 +171,9 @@ const EDT_JSON_SCHEMA = {
           wbs: { type: 'STRING' }, stageCode: { type: 'STRING' },
           module: { type: 'STRING' }, submodule: { type: 'STRING' },
           name: { type: 'STRING' }, description: { type: 'STRING' },
-          references: { type: 'STRING' }, classification: { type: 'STRING' },
+          references: { type: 'STRING' },
+          classification: { type: 'STRING',
+            description: 'Etiqueta de clasificación CORTA, máximo 40 caracteres; nunca un párrafo. Si no aplica, cadena vacía.' },
         },
         required: ['wbs', 'stageCode', 'module', 'submodule', 'name',
           'description', 'references', 'classification'],
@@ -296,11 +302,11 @@ export class GenerateEstimationPocProposalUseCase {
         'Cada roleHours debe referir a un WBS existente, su role debe coincidir EXACTAMENTE con allowedRoles y ninguna pareja WBS×role debe duplicarse.',
         'references: códigos o referencias verificables del documento separados por punto y coma; cadena vacía si no existe fuente explícita.',
         'Para documentos Excel convertidos a texto identifica la HOJA y las coordenadas de celda que sustentan cada actividad (ejemplo: Reglas.xlsx · HOJA Validaciones · B14). Revisa todas las hojas visibles entregadas; no interpretes fórmulas sin valor calculado como resultados ni inventes filas omitidas.',
-        'classification: categoría resumida según la evidencia, o cadena vacía si no aplica.',
+        'classification: SOLO una etiqueta de categoría corta (máximo 40 caracteres), nunca una explicación. Si no aplica, cadena vacía. La explicación detallada pertenece a description.',
         'roleHours.hours siempre mayor a 0 y con hasta dos decimales. Cada actividad debe tener al menos un perfil. No inventes personas, responsables nominales ni estados de ejecución.',
         'reservePercent: solo usa el porcentaje expresamente pedido en el documento o cuestionario; si no aparece, devuelve 0. La reserva no integra las HH base.',
         'Máximo 20 módulos, 120 actividades WBS únicas, 20 tramos y 240 filas roleHours.',
-        'Controla el tamaño de salida: para un proyecto de complejidad media busca unas 20 a 45 actividades WBS concretas; no fragmentes tareas triviales. Prioriza cubrir todo el alcance documentado sin exceder los límites de respuesta de Gemini.',
+        'Controla el tamaño de salida: para un proyecto de complejidad media busca unas 20 a 45 actividades WBS concretas; no fragmentes tareas triviales. Prioriza cubrir todo el alcance documentado sin exceder los límites de respuesta del proveedor IA.',
         'Evita entregables genéricos; describe actividades que un desarrollador o QA pueda implementar y revisar.',
         'No reutilices horas ni reservas de otros proyectos. Usa únicamente estos antecedentes y respuestas.',
         'Si context.sourceCoverage indica omisiones, no supongas que has recibido todos los requerimientos de Drive; evita inventar alcance no disponible.',
@@ -314,12 +320,12 @@ export class GenerateEstimationPocProposalUseCase {
     };
 
 
-    // Los artefactos generativos no son entradas determinísticas: si Gemini
-    // incumple una condición verificable, le pedimos corregir SU salida una
-    // única vez. Nunca saltamos validaciones ni reemplazamos HH con un fallback.
-    // La cuota gratuita puede ser muy limitada. No gastar una segunda
-    // solicitud a Gemini sin aprobación explícita de configuración.
-    const maxAttempts = process.env.KORA_GEMINI_EDT_MAX_ATTEMPTS === '2' ? 2 : 1;
+    // Los artefactos generativos se validan en servidor (integridad WBS/HH).
+    // Reintentar consume tokens/créditos; el segundo intento es opt-in.
+    // Mantener el nombre antiguo por compatibilidad con instalaciones Gemini.
+    const maxAttempts = (process.env.KORA_EDT_MAX_ATTEMPTS ??
+      process.env.KORA_GEMINI_EDT_MAX_ATTEMPTS) === '2' ? 2 : 1;
+    const providerLabel = this.ai.name === 'openai' ? 'OpenAI' : 'Gemini';
     let validationIssue = '';
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       const output = await this.ai.generateStructured({
@@ -349,14 +355,14 @@ export class GenerateEstimationPocProposalUseCase {
         if (attempt + 1 === maxAttempts) {
           throw new BadRequestException(
             (maxAttempts === 1
-              ? 'Gemini devolvió una EDT inconsistente (sin reintento para ahorrar cuota): '
-              : 'Gemini devolvió una EDT inconsistente tras el reintento: ') +
+              ? providerLabel + ' devolvió una EDT inconsistente (sin reintento automático): '
+              : providerLabel + ' devolvió una EDT inconsistente tras el reintento: ') +
             validationIssue.slice(0, 250),
           );
         }
       }
     }
-    throw new BadRequestException('Gemini no devolvió una EDT válida.');
+    throw new BadRequestException(providerLabel + ' no devolvió una EDT válida.');
   }
 
   /**

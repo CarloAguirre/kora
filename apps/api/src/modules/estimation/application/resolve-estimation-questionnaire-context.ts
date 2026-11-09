@@ -61,8 +61,15 @@ function readableAnswer(
   question: EstimationQuestion, value: unknown,
 ): string {
   if (value === null || value === undefined) return 'No informado';
-  const optionLabel = (item: string) =>
-    question.options.find((opt) => opt.value === item)?.label ?? item;
+  const optionLabel = (item: string) => {
+    // Las respuestas "Otro" conservan el texto ingresado por el usuario
+    // sin exponer el valor técnico "other:" a los prompts de perfiles/EDT.
+    if (item.startsWith('other:') &&
+        question.options.some((opt) => opt.value === 'other')) {
+      return 'Otro (especificado por el usuario): ' + item.slice(6).trim();
+    }
+    return question.options.find((opt) => opt.value === item)?.label ?? item;
+  };
   if (Array.isArray(value)) {
     return value.map((entry) => optionLabel(String(entry))).join('; ');
   }
