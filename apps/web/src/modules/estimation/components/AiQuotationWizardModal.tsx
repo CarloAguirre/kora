@@ -1145,7 +1145,11 @@ export function AiQuotationWizardModal({ project, onClose }: {
             <p>Validar con el cliente los resultados de esta estimación basada en Drive,
               antes de utilizarla en un proyecto real.</p>
           </div>
-          <details className={[styles.more, styles.thoughtDisclosure].join(' ')}>
+          <details className={[styles.more, styles.thoughtDisclosure].join(' ')}
+            onToggle={(event) => {
+              if (!event.currentTarget.open || !proposalLogRef.current) return;
+              proposalLogRef.current.scrollTop = proposalLogRef.current.scrollHeight;
+            }}>
             <summary>Ver razonamiento resumido del agente IA</summary>
             {proposalPhase !== 'idle' && <p className={styles.thoughtPhase} role="status">
               {proposalPhase === 'proposal' ? 'Preparando propuesta de perfiles y capacidad…' :
