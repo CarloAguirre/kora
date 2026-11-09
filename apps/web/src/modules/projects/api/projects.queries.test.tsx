@@ -3,7 +3,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { PropsWithChildren } from 'react';
 import type { ProjectDetail } from '@kora/contracts';
-import { projectsApi } from './projects.api';
+import { projectKeys, projectsApi } from './projects.api';
 import { useChangeProjectStatus, useCreateProjectModuleSegment, useProjectDetail, useUpdateProject } from './projects.queries';
 
 afterEach(() => vi.restoreAllMocks());
@@ -124,8 +124,12 @@ describe('Crear bloque → formulario de tarea sin refrescar', () => {
       await inFlight;
     });
     expect(settled).toBe(true);
-    expect(result.current.detail.data?.modules[0]?.segments).toMatchObject([{
+    // La promesa de la mutación garantiza el refetch y la caché activa;
+    // el commit del render de React puede llegar un tick después.
+    expect(client.getQueryData<ProjectDetail>(projectKeys.detail(projectId))?.modules[0]?.segments)
+      .toMatchObject([{ id: 'segment-1', estimatedHours: 20 }]);
+    await waitFor(() => expect(result.current.detail.data?.modules[0]?.segments).toMatchObject([{
       id: 'segment-1', estimatedHours: 20,
-    }]);
+    }]));
   });
 });
