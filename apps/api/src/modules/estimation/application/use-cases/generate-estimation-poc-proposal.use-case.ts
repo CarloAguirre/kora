@@ -230,10 +230,11 @@ export class GenerateEstimationPocProposalUseCase {
     onThoughtSummary?: (text: string) => void,
   ): Promise<QuotationReferenceEdt> {
     const isDemo = extractDriveFolderId(input.driveFolderUrl) === 'kora-poc-fallback';
-    if (this.ai.name !== 'gemini' || proposal.provider !== 'gemini' ||
+    if (!['gemini', 'openai'].includes(this.ai.name) ||
+        proposal.provider !== this.ai.name ||
         proposal.projectId !== input.projectId ||
         proposal.sourceMode !== (isDemo ? 'poc_simulated' : 'drive')) {
-      throw new BadRequestException('La EDT no corresponde al análisis Gemini de la carpeta seleccionada.');
+      throw new BadRequestException('La EDT no corresponde al análisis IA de la carpeta seleccionada.');
     }
     this.validatePreliminaryRoles(proposal.roles);
     const loaded = await readEstimationDocuments(
@@ -250,7 +251,7 @@ export class GenerateEstimationPocProposalUseCase {
         projectId: input.projectId,
         projectName: input.projectName,
         clientName: input.clientName,
-        provider: 'gemini',
+        provider: this.ai.name,
         source: isDemo ? 'kdm_demo' : 'drive',
         userInstructions: input.instructions,
         preliminaryAssumptions: proposal.assumptions,
@@ -573,7 +574,7 @@ export class GenerateEstimationPocProposalUseCase {
     const reserveHours = roundHours(totalHours * reservePercent / 100);
     return quotationReferenceEdtSchema.parse({
       schemaVersion: 'kora.quotation.reference-edt.v2',
-      source, provider: 'gemini',
+      source, provider: this.ai.name,
       modules, totalHours,
       stages: activeStages.sort((a, b) =>
         a.startWeek - b.startWeek || a.code.localeCompare(b.code)),
@@ -771,9 +772,9 @@ export class GenerateEstimationPocProposalUseCase {
     // El modelo propone roles; el backend materializa la gobernanza obligatoria.
     // En datos PoC de demostración preservamos el fixture heredado.
     const preliminaryRoles = [...draft.roles];
-    const isRealGemini = this.ai.name === 'gemini' &&
+    const isRealAi = (this.ai.name === 'gemini' || this.ai.name === 'openai') &&
       extractDriveFolderId(input.driveFolderUrl) !== 'kora-poc-fallback';
-    if (isRealGemini) {
+    if (isRealAi) {
       // El propio TL no fija el horizonte: evita que una duración sugerida
       // excesiva por Gemini infle circularmente sus horas de supervisión.
       const horizonWeeks = estimatedWeeksFromRoles(preliminaryRoles.filter((role) =>

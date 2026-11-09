@@ -88,7 +88,7 @@ export class AnalyzeEstimationPocUseCase {
     const selected = loaded.documents;
     onProgress?.('documents',
       'Documentación leída: ' + selected.length + ' archivo(s) disponibles para el análisis.');
-    onProgress?.('gemini', 'Enviando los antecedentes a Gemini para elaborar el entendimiento.');
+    onProgress?.('gemini', 'Enviando los antecedentes al agente IA para elaborar el entendimiento.');
     const raw = await this.ai.generateStructured({
       task: 'estimation.poc.analysis',
       context: {
@@ -127,7 +127,7 @@ export class AnalyzeEstimationPocUseCase {
     }, onThoughtSummary);
 
     if (typeof raw !== 'object' || raw === null) {
-      throw new BadRequestException('Gemini no entregó un análisis documental estructurado.');
+      throw new BadRequestException('El proveedor IA no entregó un análisis documental estructurado.');
     }
     const data = raw as Record<string, unknown>;
     const questions = Array.isArray(data.dynamicQuestions)

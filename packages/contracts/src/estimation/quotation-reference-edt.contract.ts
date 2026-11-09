@@ -50,7 +50,7 @@ export const quotationReferenceEdtSchema = z.object({
     'kora.quotation.reference-edt.v2',
   ]),
   source: z.enum(['kdm_demo', 'drive']),
-  provider: z.literal('gemini'),
+  provider: z.enum(['gemini', 'openai']),
   modules: z.array(quotationReferenceModuleSchema).min(1).max(30),
   /** Horas base, sin reserva técnica. */
   totalHours: z.number().positive().max(1000000),

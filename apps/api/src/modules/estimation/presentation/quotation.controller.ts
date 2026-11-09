@@ -232,14 +232,14 @@ export class QuotationController {
     const proposal = onThoughtSummary
       ? await this.generator.execute(input, activeTeams, sourceReader, onThoughtSummary)
       : await this.generator.execute(input, activeTeams, sourceReader);
-    if (proposal.provider !== 'gemini' ||
+    if (!['gemini', 'openai'].includes(proposal.provider) ||
         proposal.sourceMode !== (isDemo ? 'poc_simulated' : 'drive') ||
         proposal.documentsAnalyzed < 1) {
-      throw new BadRequestException('La propuesta Gemini no tiene evidencia documental válida.');
+      throw new BadRequestException('La propuesta IA no tiene evidencia documental válida.');
     }
     const validIds = new Set(activeTeams.map((team) => team.teamId));
     if (proposal.roles.some((role) => !role.teamId || !validIds.has(role.teamId))) {
-      throw new BadRequestException('Gemini propuso un perfil sin equipo activo de Kora.');
+      throw new BadRequestException('El proveedor IA propuso un perfil sin equipo activo de Kora.');
     }
     onPhase?.('edt');
     const edt = onThoughtSummary
