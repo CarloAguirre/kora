@@ -87,7 +87,7 @@ describe('Cotizaciones del proyecto', () => {
     expect(approval).toHaveAttribute('title', expect.stringContaining('valor HH'));
     expect(approval).toHaveAttribute('title', expect.stringContaining('Acepta la propuesta IA'));
     expect(screen.queryByRole('button', { name: 'Registrar aprobación' })).not.toBeInTheDocument();
-    expect(screen.queryByText(/Faltan \\d+ requisitos/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Faltan \d+ requisitos/)).not.toBeInTheDocument();
     expect(mocks.approve).not.toHaveBeenCalled();
   });
   it('permite el flujo normal cuando tarifa, monto, pagos y aceptación IA están completos', () => {
