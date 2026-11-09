@@ -388,7 +388,7 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
     expect(screen.getByText('Ver razonamiento resumido del agente IA')).toBeInTheDocument();
     const disclosure = screen.getByText('Ver razonamiento resumido del agente IA').closest('details');
     expect(disclosure).toHaveAttribute('open');
-    const log = screen.getByRole('log', { name: 'Resúmenes de razonamiento de Gemini' });
+    const log = screen.getByRole('log', { name: 'Resúmenes de razonamiento del agente IA' });
     expect(log).toHaveTextContent('aún no ha enviado resúmenes');
     const request = mocks.analyze.mock.calls[0]![0] as {
       onThoughtSummary?: (text: string) => void;
@@ -427,13 +427,13 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
     expect(screen.getByRole('status', { name: 'Preparación de la documentación' }))
       .toHaveTextContent('Leyendo documentos');
     const loadingLog = screen.getByRole('log', {
-      name: 'Resúmenes de razonamiento de Gemini',
+      name: 'Resúmenes de razonamiento del agente IA',
     });
     expect(loadingLog).toBeVisible();
     expect(screen.getByText('Ver razonamiento resumido del agente IA').closest('details'))
       .toHaveAttribute('open');
     expect(loadingLog).toHaveTextContent('se están leyendo los documentos');
-    expect(loadingLog).toHaveTextContent('Gemini todavía no ha comenzado');
+    expect(loadingLog).toHaveTextContent('el agente IA todavía no ha comenzado');
     releaseBrowse(previewResult);
     expect(await screen.findByText('Levantamiento QA')).toBeInTheDocument();
 
@@ -443,7 +443,7 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
     }));
     fireEvent.click(screen.getByRole('button', { name: 'Analizar proyecto' }));
     expect(screen.getByRole('status', { name: 'Progreso del análisis IA' }))
-      .toHaveTextContent('Gemini está revisando antecedentes');
+      .toHaveTextContent('El agente IA está revisando antecedentes');
     expect(mocks.analyze).toHaveBeenCalledTimes(1);
     releaseAnalysis(analysisResult);
     expect(await screen.findByText('Entendimiento del proyecto')).toBeInTheDocument();
