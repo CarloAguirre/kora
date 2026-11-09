@@ -464,6 +464,72 @@ describe('GenerateEstimationPocProposalUseCase', () => {
     expect(reconciled.totalHours).toBe(94);
   });
 
+  it('ignora un tramo vacío de Gemini sin perder actividades, HH ni consumir otro intento', async () => {
+    const mock = createGenerator(() => {
+      const data = baseDetail();
+      data.stages.push({
+        code: 'T03', name: 'Preparación referencial sin tareas',
+        startWeek: 25, durationWeeks: 3,
+      });
+      return data;
+    });
+    vi.stubEnv('KORA_GEMINI_EDT_MAX_ATTEMPTS', '1');
+    const edt = await mock.generator.generateEdt(input, proposal([
+      { role: 'Desarrollo', hours: 50 }, { role: 'QA', hours: 30 },
+    ]));
+    expect(mock.calls()).toBe(1);
+    expect(edt.stages?.map((stage) => stage.code)).toEqual(['T01', 'T02']);
+    expect(edt.modules.flatMap((module) => module.tasks.map((task) => task.wbs)))
+      .toEqual(['T01.01', 'T01.02', 'T02.01']);
+    expect(edt.totalHours).toBe(79);
+    expect(edt.stages?.reduce((sum, stage) => sum + stage.totalHours, 0)).toBe(79);
+  });
+
+  it('un tramo vacío no infla las 5 HH semanales obligatorias del Líder Técnico', async () => {
+    const mock = createGenerator(() => {
+      const data = baseDetail();
+      data.stages.push({
+        code: 'T03', name: 'Calendario sin actividades',
+        startWeek: 25, durationWeeks: 4,
+      });
+      return data;
+    });
+    const preliminary = proposal([
+      { role: 'Desarrollo', hours: 50 }, { role: 'QA', hours: 30 },
+    ]);
+    const realProposal = estimationPocProposalSchema.parse({
+      ...preliminary, sourceMode: 'drive',
+      roles: [...preliminary.roles, {
+        role: 'Líder Técnico', unit: 'week', duration: 3,
+        hoursPerUnit: 5, people: 1, totalHours: 15,
+      }],
+      totalHours: 95,
+    });
+    vi.stubEnv('KORA_GEMINI_EDT_MAX_ATTEMPTS', '1');
+    const edt = await mock.generator.generateEdt({
+      ...input, driveFolderUrl: 'https://drive.google.com/drive/folders/demo-real',
+    }, realProposal);
+    expect(mock.calls()).toBe(1);
+    expect(edt.stages?.map((stage) => stage.code).sort())
+      .toEqual(['T01', 'T02', 'TL-GOV']);
+    expect(edt.stages?.find((stage) => stage.code === 'TL-GOV'))
+      .toMatchObject({ durationWeeks: 3, totalHours: 15 });
+    expect(edt.totalHours).toBe(94);
+  });
+
+  it('sigue rechazando actividades sin HH, no las oculta como tramos vacíos', async () => {
+    const mock = createGenerator(() => {
+      const data = baseDetail();
+      data.roleHours = data.roleHours.filter((effort) => effort.wbs !== 'T02.01');
+      return data;
+    });
+    vi.stubEnv('KORA_GEMINI_EDT_MAX_ATTEMPTS', '1');
+    await expect(mock.generator.generateEdt(input, proposal([
+      { role: 'Desarrollo', hours: 50 }, { role: 'QA', hours: 30 },
+    ]))).rejects.toThrow(/actividad T02\.01 no tiene HH por perfil/);
+    expect(mock.calls()).toBe(1);
+  });
+
   it('descarta roles duplicados del primer Gemini sin pedir la EDT', async () => {
     let calls = 0;
     const ai: AiProvider = {
