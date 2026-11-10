@@ -210,6 +210,30 @@
 .choiceSelected { background: var(--ia-navy); border-color: var(--ia-navy); color: white; }
 .choiceSelected small { color: #e6e8ee; }
 .choiceDisabled { opacity: .45; cursor: not-allowed; }
+/* F03 · Selección múltiple de equipos activos del mismo catálogo que usa la IA. */
+.specificTeams {
+  display: grid; gap: 8px; width: 100%; margin-top: 10px;
+  border: 1px solid var(--ia-border); background: #fafbfd;
+  border-radius: 10px; padding: 13px;
+}
+.specificTeams > strong { font-size: 12.5px; color: var(--ia-text); }
+.specificTeams p, .specificTeams small {
+  margin: 0; font-size: 11.5px; line-height: 1.5; color: var(--ia-muted);
+}
+.specificTeams [role="alert"] { color: #b91c1c; }
+.specificTeamOptions {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(175px, 1fr));
+  gap: 8px; max-height: 215px; overflow-y: auto;
+}
+.specificTeamOption {
+  display: flex; align-items: center; gap: 8px; cursor: pointer;
+  border: 1px solid var(--ia-border); background: white;
+  border-radius: 8px; padding: 8px 10px; font-size: 12px;
+}
+.specificTeamOption:has(input:checked) { border-color: var(--ia-purple); background: var(--ia-purple-tint); }
+.specificTeamOption input { accent-color: var(--ia-purple); flex-shrink: 0; }
+.specificTeamOption:has(input:focus-visible) { outline: 2px solid var(--ia-purple); outline-offset: 2px; }
+.teamReview { display: block; font-size: 11.5px; font-weight: 400; color: var(--ia-muted); margin-top: 3px; }
 .choiceAssumption { border-style: dashed; color: var(--ia-muted); }
 .choiceAssumption.choiceSelected { background: var(--ia-gray); color: var(--ia-text); border-color: var(--ia-muted); }
 .question .source { font-size: 11.5px; margin-top: 1px; }
