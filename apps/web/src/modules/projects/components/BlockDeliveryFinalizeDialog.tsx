@@ -129,7 +129,7 @@ export function BlockDeliveryFinalizeDialog({
           <td>{task.assigneeName ?? 'Sin asignar'}</td>
           <td><RoadmapTaskStatusBadges status={task.status}
             assigned={Boolean(task.assigneeUserId)}
-            overdue={task.date?.slice(0, 10) < currentChileDate()}
+            overdue={Boolean(task.date && task.date.slice(0, 10) < currentChileDate())}
             rejectionReason={task.rejectionReason} /></td>
           <td>{dateLabel(task.startDate)}</td>
           <td>{dateLabel(task.date)}</td>
@@ -189,7 +189,7 @@ export function BlockDeliveryFinalizeDialog({
         <p className={styles.subtitle}>
           {target?.delivery.name ?? 'Entrega del bloque'}{', del bloque '}
           {target?.blockName ?? target?.delivery.segmentName ?? '—'}.
-          El bloque quedará completo al 100 % y se avisará al líder del proyecto.
+          El bloque quedará completo al 100 % y el cierre constará en la bitácora del proyecto.
         </p>
         {dateAndEvidence}
         <div className={styles.cancelNote} role="alert">
