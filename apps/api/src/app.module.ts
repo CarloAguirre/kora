@@ -35,6 +35,7 @@ import { HEALTH_PROBES } from './shared/application/ports/health-probe.port';
 
 import { UsersModule } from './modules/users/users.module';
 import { ClientsModule } from './modules/clients/clients.module';
+import { ClientPortalModule } from './modules/client-portal/client-portal.module';
 import { TeamsModule } from './modules/teams/teams.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { ProjectsModule } from './modules/projects/projects.module';
