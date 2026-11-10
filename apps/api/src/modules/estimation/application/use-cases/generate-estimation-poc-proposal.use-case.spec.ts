@@ -180,7 +180,7 @@ describe('GenerateEstimationPocProposalUseCase', () => {
     const ai: AiProvider = {
       name: 'gemini',
       generateStructured: async (request) => {
-        instructions = request.instructions;
+        instructions = request.instructions ?? '';
         return {
           summary: 'Estimación para MVP',
           roles: [{
