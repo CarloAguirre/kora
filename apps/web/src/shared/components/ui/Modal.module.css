@@ -235,3 +235,10 @@
   overflow-y: auto;
   overscroll-behavior-y: contain;
 }
+
+/* Un drawer lateral ocupa todo el alto; el margen de 32px solo es útil
+   en diálogos centrados. Con bodyScrollOnly queda una sola zona desplazable. */
+.dialog.side.bodyScrollOnly[open] {
+  height: 100dvh;
+  max-height: 100dvh;
+}
