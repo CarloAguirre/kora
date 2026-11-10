@@ -28,6 +28,7 @@ const project = (status: 'planned' | 'delivered' | 'approved' = 'planned',
   modules: [{
     id: '0777e456-fd76-445e-83f1-afc25061c106',
     name: 'Desarrollo',
+    tasks: [],
     segments: [{
       id: segmentId, name: 'Bloque núcleo',
       teamId, startDate: '2026-11-01', endDate: '2026-11-15',
