@@ -183,7 +183,7 @@ const EDT_JSON_SCHEMA = {
       items: {
         type: 'OBJECT',
         properties: {
-          wbs: { type: 'STRING' }, stageCode: { type: 'STRING' },
+          wbs: { type: 'STRING', description: 'ID WBS ÚNICO EN TODA LA EDT. Genera uno por actividad con el código del tramo y sufijo consecutivo de tres cifras (ej. T01.001, T01.002, T02.001); no reinicies el contador al cambiar de módulo o perfil. Si varios roles comparten actividad, declara su WBS una sola vez en activities.' }, stageCode: { type: 'STRING' },
           module: { type: 'STRING' }, submodule: { type: 'STRING' },
           name: { type: 'STRING' }, description: { type: 'STRING' },
           references: { type: 'STRING',
@@ -201,7 +201,7 @@ const EDT_JSON_SCHEMA = {
       items: {
         type: 'OBJECT',
         properties: {
-          wbs: { type: 'STRING' }, role: { type: 'STRING' },
+          wbs: { type: 'STRING', description: 'Referencia EXACTA a uno de los WBS ya definidos en activities. Nunca agregues un WBS nuevo en roleHours.' }, role: { type: 'STRING' },
           hours: { type: 'NUMBER' },
           taskName: { type: 'STRING',
             description: 'Tarea concreta ejecutada SOLO por este perfil dentro del WBS compartido.' },
@@ -300,6 +300,8 @@ export class GenerateEstimationPocProposalUseCase {
         'Devuelve 3 tablas planas: stages (cada tramo una sola vez), activities (cada WBS una sola vez) y roleHours (cada pareja WBS×perfil una sola vez).',
         'activities NO contiene role, hours ni la definición del tramo: solo stageCode como clave foránea hacia stages.',
         'Si una actividad necesita dos perfiles, escribe una sola fila en activities y DOS filas en roleHours con el mismo WBS y distintos role.',
+        'REGLA CRÍTICA WBS: recorre todas las actividades una única vez y asígnales identificadores únicos globales usando stageCode + punto + correlativo de 3 dígitos (ejemplo T01.001, T01.002, T02.001). No reinicies el contador por módulo, submódulo, equipo ni perfil. En activities nunca repitas un identificador, aunque los nombres de las actividades sean distintos.',
+        'Verifica antes de responder que activities tiene tantos WBS distintos como actividades y que cada roleHours.wbs coincide exactamente con uno de ellos. Los roles de una misma actividad COMPARTEN su WBS; no duplican filas en activities. No cambies las HH para corregir numeración.',
         'activities.name y activities.description describen el objetivo COMPARTIDO, no instrucciones de un rol particular.',
         'Cada fila roleHours debe tener taskName y taskDescription NO VACÍOS y propios del perfil: qué acciones realizará exactamente y qué entregable verificable producirá.',
         'La participación de varios roles NO significa ejecutar la misma labor: UX/UI diseña flujos, pantallas y prototipos Figma; Desarrollo implementa e integra interfaces/API; QA prueba criterios y reporta defectos. Ajusta estos ejemplos al alcance real.',
@@ -358,7 +360,10 @@ export class GenerateEstimationPocProposalUseCase {
           'Rehaz la EDT desde la fuente original. Corrige exactamente este problema:',
           validationIssue,
           'Corrige las tres tablas: stages sin códigos repetidos; activities con un WBS único',
-          'por actividad; roleHours con una sola pareja WBS×perfil, HH > 0,',
+          'en TODA la EDT (no reinicies WBS por módulo ni por perfil). Si un mismo WBS',
+          'identifica dos actividades distintas, asígnales identificadores separados y',
+          'ajusta cada referencia roleHours.wbs sin duplicar ni transferir HH entre ellas.',
+          'roleHours con una sola pareja WBS×perfil, HH > 0,',
         'taskName y taskDescription específicos del perfil y dos decimales.',
           'Toda actividad debe referir a un tramo válido y tener HH de al menos un perfil.',
           'No transformes las HH para igualar una cifra preliminar.',
