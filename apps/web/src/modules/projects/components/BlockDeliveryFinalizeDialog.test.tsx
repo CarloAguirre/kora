@@ -156,7 +156,7 @@ describe('Cierre de bloque por el líder de equipo', () => {
     fireEvent.click(screen.getByRole('button', {
       name: 'Cancelar 3 tareas y marcar como entregada',
     }));
-    expect(await screen.findByRole('alert', { name: '' })).toHaveTextContent('No se pudo cerrar el bloque');
+    expect(await screen.findByText('No se pudo cerrar el bloque. Revisa los estados de sus tareas.')).toBeInTheDocument();
     expect(mocks.success).not.toHaveBeenCalled();
     expect(mocks.onClose).not.toHaveBeenCalled();
   });
