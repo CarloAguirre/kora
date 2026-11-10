@@ -137,6 +137,16 @@ export const stepBlockHours = (hours: string, delta: number) => {
  * normales del día — misma regla que `splitByDailyCap` en la API. Los bloques
  * ya marcados como extra van como `0`.
  */
+/** Capacidad normal restante antes de un bloque en el formulario del día. */
+export function remainingRegularHoursForBlock(existingRegularHours: number, blocks: readonly DailyBlock[], key: string): number {
+  let consumed = existingRegularHours;
+  for (const block of blocks) {
+    if (block.key === key) break;
+    if (!block.isOvertime) consumed += Math.max(0, Number(block.hours) || 0);
+  }
+  return Math.max(0, Math.round((DAILY_CAP_HOURS - consumed) * 100) / 100);
+}
+
 export function overflowByBlock(existingHours: number, blockHours: readonly number[]): number[] {
   let running = existingHours;
   return blockHours.map((hours) => {
@@ -184,7 +194,7 @@ export function validateDailyBlock(
     return 'Selecciona el bloque al que corresponden estas HH.';
   if (block.assignment === 'Proyecto' && block.roadmapNeedsTask && !block.taskId)
     return 'Selecciona una tarea o «Otro trabajo del bloque».';
-  if (needsProject && block.isOvertime && !overtimeAlreadyGranted) {
+  if (needsProject && ((block.isOvertime && !overtimeAlreadyGranted) || exceedsDailyCap)) {
     const project = projects.find((p) => p.id === block.projectId);
     if (!project?.allowsOvertime) return 'Este proyecto no tiene autorizadas horas extra.';
   }
@@ -286,7 +296,17 @@ export function DailyEntryForm({
       : null;
 
   const updateBlock = (key: string, patch: Partial<DailyBlock>) => {
-    setBlocks((prev) => prev.map((block) => (block.key === key ? { ...block, ...patch } : block)));
+    setBlocks((prev) => prev.map((block) => {
+      if (block.key !== key) return block;
+      const next = { ...block, ...patch };
+      const project = (projects?.items ?? []).find((item) => item.id === next.projectId);
+      if (PROJECT_REQUIRING_ASSIGNMENTS.has(next.assignment as HourEntryAssignment) &&
+          project && !project.allowsOvertime && !next.isOvertime) {
+        const max = remainingRegularHoursForBlock(existingNonOvertimeHoursForDate, prev, key);
+        if (Number(next.hours) > max) next.hours = max > 0 ? String(max) : '';
+      }
+      return next;
+    }));
   };
 
   const addBlock = () =>
@@ -299,7 +319,8 @@ export function DailyEntryForm({
     return project ? getProjectOptionLabel(project) : `Registro ${index + 1}`;
   };
   const adjustHours = (key: string, delta: number) => {
-    setBlocks((prev) => prev.map((block) => (block.key === key ? { ...block, hours: stepBlockHours(block.hours, delta) } : block)));
+    const block = blocks.find((item) => item.key === key);
+    if (block) updateBlock(key, { hours: stepBlockHours(block.hours, delta) });
   };
 
   const dailyTotal = blocks.reduce((sum, block) => sum + (Number(block.hours) || 0), 0);
@@ -310,6 +331,11 @@ export function DailyEntryForm({
   );
   const overflowByKey = new Map(blocks.map((block, index) => [block.key, blockOverflow[index] ?? 0]));
   const autoOvertimeHours = blockOverflow.reduce((sum, hours) => sum + hours, 0);
+  const authorizedAutoOvertimeHours = blocks.reduce((total, block, index) => {
+    const project = (projects?.items ?? []).find((item) => item.id === block.projectId);
+    const isProject = PROJECT_REQUIRING_ASSIGNMENTS.has(block.assignment as HourEntryAssignment);
+    return total + (!isProject || project?.allowsOvertime ? (blockOverflow[index] ?? 0) : 0);
+  }, 0);
 
   useEffect(() => {
     onTotalChange?.(totalWithExisting);
@@ -416,12 +442,12 @@ export function DailyEntryForm({
         </div>
       )}
 
-      {!blockingMessage && autoOvertimeHours > 0 && (
+      {!blockingMessage && authorizedAutoOvertimeHours > 0 && (
         <div className={styles.noticeWarning} role="status">
           <AlertIcon size={16} />
           <span>
             Superas la jornada de {DAILY_CAP_HOURS}h ({totalWithExisting.toLocaleString('es-CL', { maximumFractionDigits: 1 })}h en
-            total ese día): {autoOvertimeHours.toLocaleString('es-CL', { maximumFractionDigits: 2 })}h quedarán como horas extra
+            total ese día): {authorizedAutoOvertimeHours.toLocaleString('es-CL', { maximumFractionDigits: 2 })}h quedarán como horas extra
             {overtimeNeedsApproval ? ', pendientes de aprobación.' : '.'}
           </span>
         </div>
@@ -445,6 +471,13 @@ export function DailyEntryForm({
           isCollaborator={user?.role === 'collaborator'}
           overtimeNeedsApproval={overtimeNeedsApproval}
           exceedsDailyCap={(overflowByKey.get(block.key) ?? 0) > 0}
+          maxHours={(() => {
+            const project = (projects?.items ?? []).find((item) => item.id === block.projectId);
+            return PROJECT_REQUIRING_ASSIGNMENTS.has(block.assignment as HourEntryAssignment) &&
+              project && !project.allowsOvertime && !block.isOvertime
+              ? remainingRegularHoursForBlock(existingNonOvertimeHoursForDate, blocks, block.key)
+              : undefined;
+          })()}
           error={blockErrors[block.key]}
           title={blockTitle(block, index)}
           onUpdate={(patch) => updateBlock(block.key, patch)}
@@ -553,6 +586,7 @@ export function DailyEntryBlockFields({
   isCollaborator,
   overtimeNeedsApproval = true,
   exceedsDailyCap = false,
+  maxHours,
   error,
   title,
   onUpdate,
@@ -571,6 +605,8 @@ export function DailyEntryBlockFields({
   overtimeNeedsApproval?: boolean;
   /** Parte del bloque quedará como horas extra — sin proyecto, eso exige aprobador. */
   exceedsDailyCap?: boolean;
+  /** Tope acumulado de horas regulares cuando el proyecto no permite extras. */
+  maxHours?: number;
   error?: string;
   title: string;
   onUpdate: (patch: Partial<DailyBlock>) => void;
@@ -768,6 +804,7 @@ export function DailyEntryBlockFields({
                   type="number"
                   step={HOURS_STEP}
                   min={0}
+                  max={maxHours}
                   value={block.hours}
                   onChange={(event) => onUpdate({ hours: event.target.value })}
                 />
