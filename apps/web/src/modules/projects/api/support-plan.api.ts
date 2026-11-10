@@ -55,6 +55,11 @@ export const supportPlanApi = {
   invoiceAttachment(invoiceId: string): Promise<Blob> {
     return api.getBlob(`/support-invoices/${invoiceId}/attachment`);
   },
+  uploadInvoiceAttachment(invoiceId: string, file: File): Promise<void> {
+    const body = new FormData();
+    body.append('file', file);
+    return api.postFormData<void>(`/support-invoices/${invoiceId}/attachment`, body);
+  },
   markInvoicePaid(invoiceId: string, input: MarkSupportInvoicePaidInput): Promise<void> {
     return api.patch<void>(`/support-invoices/${invoiceId}/paid`, input);
   },

@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import type { SupportMonthlyBillingPeriod } from '@kora/contracts';
 import { ToastProvider } from '@/shared/components/ui/Toast';
 import { SupportMonthlyBillingSchedule } from './SupportMonthlyBillingSchedule';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const period: SupportMonthlyBillingPeriod = {
   monthlyPeriodId: 'period-1', periodKey: '2026-01', startDate: '2026-01-01', endDate: '2026-02-01',
@@ -12,7 +13,7 @@ const period: SupportMonthlyBillingPeriod = {
 
 function show(value = period, canManageBilling = true) {
   const onIssue = vi.fn();
-  render(<ToastProvider><SupportMonthlyBillingSchedule periods={[value]} currency="UF" canManageBilling={canManageBilling} onIssue={onIssue} /></ToastProvider>);
+  render(<QueryClientProvider client={new QueryClient()}><ToastProvider><SupportMonthlyBillingSchedule periods={[value]} currency="UF" canManageBilling={canManageBilling} onIssue={onIssue} /></ToastProvider></QueryClientProvider>);
   return onIssue;
 }
 
@@ -31,6 +32,18 @@ describe('Meses del contrato: acciones de factura', () => {
   it('no inventa enlaces para facturas antiguas sin PDF', () => {
     show({ ...period, invoices: [{ ...period.invoices[0]!, hasAttachment: false }] });
     expect(screen.queryByRole('button', { name: 'Ver factura' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Subir documento' })).toBeInTheDocument();
+  });
+
+  it('no permite subir documentos sin permiso de facturacion', () => {
+    show({ ...period, invoices: [{ ...period.invoices[0]!, hasAttachment: false }] }, false);
+    expect(screen.queryByRole('button', { name: 'Subir documento' })).not.toBeInTheDocument();
+  });
+
+  it('identifica por folio las acciones de un mes con y sin documentos', () => {
+    show({ ...period, invoices: [...period.invoices, { ...period.invoices[0]!, id: 'invoice-2', folio: '5555', hasAttachment: false }] });
+    expect(screen.getByRole('button', { name: 'Ver factura 4444' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Subir documento 5555' })).toBeInTheDocument();
   });
 
   it('muestra un boton identificado por folio por cada PDF', () => {

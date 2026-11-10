@@ -29,6 +29,15 @@ historial como «Meses del contrato» muestran «Ver factura» cuando existe
 contenido; si hay varias facturas, el calendario identifica cada boton por
 folio. Un nombre de archivo legado no se considera un PDF disponible.
 
+Para facturas ya registradas sin contenido (incluidas las pagadas), ambas
+tablas ofrecen «Subir documento» a quienes tienen `billing:manage`.
+`POST /support-invoices/:id/attachment` recibe un unico campo multipart
+`file`, valida el mismo limite y formato, y agrega el adjunto sin alterar
+folio, montos, fechas, pago ni tickets. La insercion y la actualizacion del
+nombre son atomicas; si ya existe un PDF, responde conflicto y no lo reemplaza.
+La accion queda auditada y al refrescar los datos aparece «Ver factura».
+No requiere una migracion adicional.
+
 ## Qué se migra y construye en esta pasada
 
 - **`ticket` (641)** → `tickets`: título, cliente, proyecto, proyecto de

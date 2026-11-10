@@ -47,6 +47,8 @@ export interface SupportInvoiceRecord {
  * `packages/db/src/schema/tickets.ts`.
  */
 export interface SupportInvoiceRepository {
+  /** Agrega un PDF solo si no existe; nunca reemplaza el documento previo. */
+  attachDocument(id: string, attachment: { name: string; content: string }): Promise<boolean>;
   getAttachment(id: string): Promise<{ name: string; content: string } | null>;
   findById(id: string, context?: TransactionContext): Promise<SupportInvoiceRecord | null>;
   /** Las facturas de un período, ordenadas por `position` — vacío si el período no se facturó. */

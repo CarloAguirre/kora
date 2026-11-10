@@ -54,6 +54,20 @@ export class DrizzleSupportInvoiceRepository implements SupportInvoiceRepository
     hasAttachment: sql<boolean>`exists(select 1 from ${supportInvoiceAttachments} where ${supportInvoiceAttachments.invoiceId} = ${supportInvoices.id})`,
   };
 
+  async attachDocument(id: string, attachment: { name: string; content: string }): Promise<boolean> {
+    return this.database.transaction(async (tx) => {
+      const inserted = await tx.insert(supportInvoiceAttachments)
+        .values({ invoiceId: id, content: attachment.content })
+        .onConflictDoNothing()
+        .returning({ invoiceId: supportInvoiceAttachments.invoiceId });
+      if (inserted.length === 0) return false;
+      await tx.update(supportInvoices)
+        .set({ attachmentName: attachment.name, updatedAt: new Date() })
+        .where(eq(supportInvoices.id, id));
+      return true;
+    });
+  }
+
   async getAttachment(id: string): Promise<{ name: string; content: string } | null> {
     const [row] = await this.database
       .select({ name: supportInvoices.attachmentName, content: supportInvoiceAttachments.content })

@@ -1,5 +1,7 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Query, Res, StreamableFile } from '@nestjs/common';
-import type { FastifyReply } from 'fastify';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Query, Req, Res, StreamableFile } from '@nestjs/common';
+import type { FastifyReply, FastifyRequest } from 'fastify';
+import { AttachSupportInvoiceDocumentUseCase } from '../application/use-cases/attach-support-invoice-document.use-case';
+import { readSupportInvoiceAttachmentUpload } from './support-invoice-upload';
 import { GetSupportInvoiceAttachmentUseCase } from '../application/use-cases/get-support-invoice-attachment.use-case';
 import {
   listSupportBillingRowsQuerySchema,
@@ -32,6 +34,7 @@ export class SupportInvoicesController {
     private readonly getLedger: ListBillingLedgerEntriesUseCase,
     private readonly listRows: ListSupportBillingRowsUseCase,
     private readonly getAttachment: GetSupportInvoiceAttachmentUseCase,
+    private readonly attachDocument: AttachSupportInvoiceDocumentUseCase,
   ) {}
 
   /** Panel de Facturación de Soporte — declarado ANTES de `:id/paid` no aplica aquí (`overview` no colisiona con `:id`), pero se mantiene el mismo orden defensivo que en `SupportPlansController`. */
@@ -83,6 +86,18 @@ export class SupportInvoicesController {
       type: 'application/pdf',
       disposition: `inline; filename="factura.pdf"; filename*=UTF-8''${encodeURIComponent(file.name)}`,
     });
+  }
+
+  @Post(':id/attachment')
+  @RequirePermissions('billing:manage')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async uploadAttachment(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Req() request: FastifyRequest,
+    @CurrentUser() actor: RequestUser,
+  ): Promise<void> {
+    const attachment = await readSupportInvoiceAttachmentUpload(request);
+    unwrapOrThrow(await this.attachDocument.execute({ invoiceId: id, attachment, actor: toActorContext(actor) }));
   }
 
   /** "Anular factura" — solo pendientes de pago; el período vuelve a quedar por facturar. */

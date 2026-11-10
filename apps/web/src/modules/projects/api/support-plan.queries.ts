@@ -105,6 +105,15 @@ export function useMarkSupportInvoicePaid(planId: string, clientId?: string) {
   });
 }
 
+export function useUploadSupportInvoiceAttachment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ invoiceId, file }: { invoiceId: string; file: File }) =>
+      supportPlanApi.uploadInvoiceAttachment(invoiceId, file),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: supportPlanKeys.details() }),
+  });
+}
+
 export function useVoidSupportInvoice(clientId?: string) {
   const invalidate = useInvalidateSupportPlans(clientId);
   return useMutation({

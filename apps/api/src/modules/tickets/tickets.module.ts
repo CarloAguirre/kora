@@ -3,6 +3,7 @@ import { TicketsController } from './presentation/tickets.controller';
 import { SupportPlansController } from './presentation/support-plans.controller';
 import { SupportInvoicesController } from './presentation/support-invoices.controller';
 import { GetSupportInvoiceAttachmentUseCase } from './application/use-cases/get-support-invoice-attachment.use-case';
+import { AttachSupportInvoiceDocumentUseCase } from './application/use-cases/attach-support-invoice-document.use-case';
 
 import { CreateTicketUseCase } from './application/use-cases/create-ticket.use-case';
 import { UpdateTicketUseCase } from './application/use-cases/update-ticket.use-case';
@@ -78,6 +79,7 @@ import { HoursModule } from '../hours/hours.module';
   controllers: [TicketsController, SupportPlansController, SupportInvoicesController],
   providers: [
     GetSupportInvoiceAttachmentUseCase,
+    AttachSupportInvoiceDocumentUseCase,
     CreateTicketUseCase,
     UpdateTicketUseCase,
     ListTicketsUseCase,

@@ -26,7 +26,7 @@ import {
 import { MarkSupportInvoicePaidDialog } from '../components/MarkSupportInvoicePaidDialog';
 import { IssueSupportInvoiceDialog } from '../components/IssueSupportInvoiceDialog';
 import { SupportMonthlyBillingSchedule, formatPeriodMonth } from '../components/SupportMonthlyBillingSchedule';
-import { ViewSupportInvoiceButton } from '../components/ViewSupportInvoiceButton';
+import { SupportInvoiceDocumentButton } from '../components/SupportInvoiceDocumentButton';
 import { CloseSupportPlanDialog } from '../components/CloseSupportPlanDialog';
 import {
   useCloseSupportPlan,
@@ -162,7 +162,7 @@ export function SupportPlanDetailPage() {
       header: '',
       render: (i) => (
         <span className={styles.invoiceActions}>
-          {i.hasAttachment && <ViewSupportInvoiceButton invoiceId={i.id} />}
+          <SupportInvoiceDocumentButton invoiceId={i.id} hasAttachment={i.hasAttachment} canManageBilling={canManageBilling} />
           {i.paymentStatus !== 'paid' && canManageBilling && (
             <>
               <Button variant="outline" size="sm" onClick={() => setPayAction({ invoice: i })}>
