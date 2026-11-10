@@ -57,6 +57,12 @@
   margin-top: 1px;
 }
 
+.portalCompany {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-3);
+}
+
 .portalHint {
   display: flex;
   flex-direction: column;
