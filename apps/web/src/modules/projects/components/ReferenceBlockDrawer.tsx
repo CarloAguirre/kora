@@ -92,7 +92,7 @@ export function ReferenceBlockDrawer({
       <section className={[styles.drawerSection, taskStyles.tasksSection].join(' ')}
         aria-label="Tareas del bloque">
         <div className={taskStyles.tasksHeading}>
-          <h3>Tareas (${pending.length + savedTasks.length})</h3>
+          <h3>Tareas ({pending.length + savedTasks.length})</h3>
           {onCreateReference && pending.length > 0 && <Button variant="outline" size="sm"
             onClick={() => onCreateReference(pending[0]!)}>Asignar tareas EDT</Button>}
         </div>
