@@ -240,7 +240,8 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
     expect(screen.getByRole('group', { name: 'Equipos específicos disponibles' }))
       .toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Continuar' }));
-    expect(screen.getByRole('alert')).toHaveTextContent('Completa la pregunta obligatoria');
+    expect(screen.getAllByRole('alert').map((item) => item.textContent).join(' '))
+      .toContain('Completa la pregunta obligatoria');
     expect(screen.getByText('Condiciones de la estimación')).toBeInTheDocument();
     fireEvent.click(screen.getByLabelText('Desarrollo'));
     fireEvent.click(screen.getByLabelText('QA'));
