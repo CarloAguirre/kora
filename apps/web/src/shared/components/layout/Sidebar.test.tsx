@@ -26,8 +26,10 @@ describe('Sidebar de Kora', () => {
     const navigation = screen.getByRole('navigation');
     expect(within(navigation).queryByRole('link', { name: 'Calculadora' }))
       .not.toBeInTheDocument();
-    expect(within(navigation).getByRole('link', { name: 'Proyectos' }))
-      .toHaveAttribute('href', '/proyectos');
+    // Kora tiene dos entradas con etiqueta «Proyectos» según permisos:
+    // menú interno y portal de cliente. Verificar el href sin exigir unicidad.
+    expect(within(navigation).getAllByRole('link', { name: 'Proyectos' })
+      .some((link) => link.getAttribute('href') === '/proyectos')).toBe(true);
     expect(within(navigation).getByRole('link', { name: 'Dashboard' }))
       .toHaveAttribute('href', '/dashboard');
   });
