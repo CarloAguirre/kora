@@ -130,7 +130,7 @@ export class ClientPortalService {
       const [firstName, ...lastName] = contact.name.trim().split(/\s+/);
       const created = unwrapOrThrow(await this.createUser.execute({
         data: { email: contact.email.trim(), firstName: firstName ?? 'Contacto', lastName: lastName.join(' ') || 'Cliente', role: 'cliente',
-          teamId: null, isCommercialManager: false, grantAccess: true },
+          clientId, teamId: null, isCommercialManager: false, grantAccess: true },
         actor: { userId: actor.id, email: actor.email },
       }));
       userId = created.userId;
