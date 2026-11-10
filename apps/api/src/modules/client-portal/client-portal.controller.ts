@@ -1,5 +1,5 @@
 import {
-  Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Put,
+  Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Patch,
 } from '@nestjs/common';
 import {
   clientPortalGrantInputSchema, type ClientPortalGrantInput,
@@ -66,7 +66,7 @@ export class ClientPortalAccessController {
     return this.service.listClientContactAccess(clientId);
   }
 
-  @Put('contacts/:contactId')
+  @Patch('contacts/:contactId')
   @RequirePermissions('clients:manage', 'users:create')
   setAccess(
     @Param('clientId', ParseUUIDPipe) clientId: string,

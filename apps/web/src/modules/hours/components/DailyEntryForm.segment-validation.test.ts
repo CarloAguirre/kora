@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ProjectSummary, ProjectPhaseOption } from '@kora/contracts';
-import { type DailyBlock, matchesTaskHourTarget, selectAttributableTasks, validateDailyBlock } from './DailyEntryForm';
+import { type DailyBlock, matchesTaskHourTarget, remainingRegularHoursForBlock, selectAttributableTasks, validateDailyBlock } from './DailyEntryForm';
 
 const base: DailyBlock = {
   key: 'hh-1', expanded: true, assignment: 'Proyecto', projectId: 'project-1',
@@ -13,6 +13,29 @@ const context = {
   projects: [{ id: 'project-1', allowsOvertime: true } as unknown as ProjectSummary],
   isCollaborator: true,
 };
+
+describe('jornada diaria y horas extra autorizadas', () => {
+  const withoutOvertime = {
+    ...context, projects: [{ id: 'project-1', allowsOvertime: false } as unknown as ProjectSummary],
+  };
+  it('rechaza el excedente automático aunque el switch de extra esté desmarcado', () => {
+    expect(validateDailyBlock({ ...base, hours: '9.25' }, {
+      ...withoutOvertime, exceedsDailyCap: true,
+    })).toBe('Este proyecto no tiene autorizadas horas extra.');
+  });
+  it('permite el excedente cuando el proyecto autoriza horas extra', () => {
+    expect(validateDailyBlock({ ...base, hours: '9.25' }, {
+      ...context, exceedsDailyCap: true,
+    })).toBeNull();
+  });
+  it('calcula el máximo permitido descontando registros anteriores del día', () => {
+    const first = { ...base, key: 'first', hours: '3' };
+    const second = { ...base, key: 'second', hours: '9.25' };
+    expect(remainingRegularHoursForBlock(2, [first, second], 'second')).toBe(3);
+    expect(remainingRegularHoursForBlock(8, [first, second], 'second')).toBe(0);
+    expect(remainingRegularHoursForBlock(0, [second], 'second')).toBe(8);
+  });
+});
 
 describe('registro diario: imputación por bloque del Roadmap', () => {
   it('ofrece sólo tareas propias, del bloque elegido y no canceladas', () => {

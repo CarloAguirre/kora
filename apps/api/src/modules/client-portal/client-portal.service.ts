@@ -115,10 +115,14 @@ export class ClientPortalService {
       .limit(1);
     if (existing && existing.role !== 'cliente')
       throw new ConflictException('El correo pertenece a un usuario interno. No se pueden convertir sus permisos al portal.');
-    const [linkedToAnother] = existing ? await this.db.select({ clientId: clientPortalAccounts.clientId })
-      .from(clientPortalAccounts).where(eq(clientPortalAccounts.userId, existing.id)).limit(1) : [];
-    if (linkedToAnother && linkedToAnother.clientId !== clientId)
-      throw new ConflictException('Este usuario ya tiene acceso al portal de otra empresa.');
+    const [linkedToAnother] = existing ? await this.db.select({
+      clientId: clientPortalAccounts.clientId, contactId: clientPortalAccounts.contactId,
+    }).from(clientPortalAccounts).where(eq(clientPortalAccounts.userId, existing.id)).limit(1) : [];
+    if (linkedToAnother && (linkedToAnother.clientId !== clientId ||
+      linkedToAnother.contactId !== contactId))
+      throw new ConflictException('Esta cuenta ya está vinculada a otro contacto o empresa.');
+    if (!input.enabled && !existing)
+      throw new BadRequestException('Este contacto todavía no tiene acceso que revocar.');
 
     let userId = existing?.id;
     let invitationSent = false;
@@ -126,7 +130,7 @@ export class ClientPortalService {
       const [firstName, ...lastName] = contact.name.trim().split(/\s+/);
       const created = unwrapOrThrow(await this.createUser.execute({
         data: { email: contact.email.trim(), firstName: firstName ?? 'Contacto', lastName: lastName.join(' ') || 'Cliente', role: 'cliente',
-          teamId: null, isCommercialManager: false, grantAccess: true },
+          clientId, teamId: null, isCommercialManager: false, grantAccess: true },
         actor: { userId: actor.id, email: actor.email },
       }));
       userId = created.userId;

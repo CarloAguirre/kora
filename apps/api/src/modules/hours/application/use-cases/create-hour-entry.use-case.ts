@@ -70,12 +70,14 @@ export class CreateHourEntryUseCase implements UseCase<CreateHourEntryCommand, {
     }
 
     let projectStageAtEntry: string | null = null;
+    let projectAllowsOvertime = false;
     if (data.projectId) {
       const project = await this.projects.findById(data.projectId);
       if (!project) return err(new ReferencedProjectNotFoundError(data.projectId));
       if (project.status === 'on_hold') return err(new ProjectStoppedError());
       if (project.status === 'finished' || project.status === 'cancelled') return err(new ProjectClosedError());
       if (data.isOvertime && !project.allowsOvertime) return err(new ProjectOvertimeNotAllowedError());
+      projectAllowsOvertime = project.allowsOvertime;
       projectStageAtEntry = project.status;
     }
 
@@ -131,13 +133,19 @@ export class CreateHourEntryUseCase implements UseCase<CreateHourEntryCommand, {
     const date = new Date(data.date);
     // Las marcadas a mano como extra van completas como extra (con la
     // autorización del proyecto, arriba). En las normales, lo que pase de la
-    // jornada de 8h del día queda solo como un segundo registro de horas extra
-    // — igual que en las solicitudes de HH de ticket, sin exigir autorización.
+    // jornada de 8h del día queda como un segundo registro de horas extra.
+    // Si es una imputación de proyecto, también exige su autorización.
     // Horas fuera de rango no se dividen: las rechaza `HourEntry.create`.
     const tranches: HoursTranche[] =
       data.isOvertime || !(data.hours > 0) || data.hours > 24
         ? [{ hours: data.hours, isOvertime: data.isOvertime }]
         : splitByDailyCap(data.hours, await this.entries.sumRegularHoursForUserAndDate(ownerId, date));
+
+    // El excedente automático también es hora extra: nunca se crea sin permiso
+    // del proyecto, aunque el usuario no haya marcado el switch manualmente.
+    if (data.projectId && !projectAllowsOvertime && tranches.some((t) => t.isOvertime)) {
+      return err(new ProjectOvertimeNotAllowedError());
+    }
 
     const now = this.clock.now();
     const entries: HourEntry[] = [];

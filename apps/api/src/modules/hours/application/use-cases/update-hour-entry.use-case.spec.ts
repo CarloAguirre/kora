@@ -21,6 +21,7 @@ function setup() {
   const entry = result.value;
   const save = vi.fn().mockResolvedValue(undefined);
   const projects = {
+    findById: vi.fn().mockResolvedValue({ id: 'project-1', status: 'active', allowsOvertime: false }),
     findModuleById: vi.fn().mockResolvedValue({
       id: 'module-1', projectId: 'project-1',
       segments: [{ id: 'segment-1', name: 'Bloque 1' }, { id: 'segment-2', name: 'Bloque 2' }],
@@ -130,7 +131,7 @@ function buildEntry(date: string) {
 function buildUseCase(
   entry: HourEntry,
   statuses: Record<string, ProjectStatus>,
-  options: { canDecide?: boolean; regularHoursForDate?: number } = {},
+  options: { canDecide?: boolean; regularHoursForDate?: number; allowsOvertime?: boolean } = {},
 ) {
   const entries = {
     findById: vi.fn().mockResolvedValue(entry),
@@ -143,7 +144,7 @@ function buildUseCase(
   } as unknown as HourEntryUserReader;
   const projects = {
     findById: vi.fn(async (id: string) =>
-      statuses[id] ? { id, name: id, status: statuses[id], leaderUserId: null, allowsOvertime: false } : null,
+      statuses[id] ? { id, name: id, status: statuses[id], leaderUserId: null, allowsOvertime: options.allowsOvertime ?? false } : null,
     ),
     recalculateUsedHours: vi.fn().mockResolvedValue(undefined),
     hasAttributableWorkBlocks: vi.fn().mockResolvedValue(false),
@@ -214,9 +215,27 @@ describe('UpdateHourEntryUseCase', () => {
     expect(entries.save).toHaveBeenCalled();
   });
 
-  it('si con la edición el día pasa de 8h normales, el excedente queda como un registro de horas extra', async () => {
-    // Proyecto sin horas extra autorizadas: el excedente automático no la exige.
+  it('no permite aumentar a más de 8h al editar un proyecto sin extras autorizadas', async () => {
     const { useCase, entries } = buildUseCase(buildEntry('2026-10-20'), { 'project-1': 'active' }, { regularHoursForDate: 5 });
+    const result = await useCase.execute({
+      entryId: 'entry-1', data: { hours: 6 }, actor: OWNER, actorRole: 'collaborator',
+    });
+    expect(result.isErr() && result.error.code).toBe('HOUR_ENTRY_PROJECT_OVERTIME_NOT_ALLOWED');
+    expect(entries.save).not.toHaveBeenCalled();
+  });
+
+  it('no permite convertir la entrada en extra si la jornada ya está completa', async () => {
+    const { useCase, entries } = buildUseCase(buildEntry('2026-10-20'), { 'project-1': 'active' }, { regularHoursForDate: 8 });
+    const result = await useCase.execute({
+      entryId: 'entry-1', data: { hours: 2 }, actor: OWNER, actorRole: 'collaborator',
+    });
+    expect(result.isErr() && result.error.code).toBe('HOUR_ENTRY_PROJECT_OVERTIME_NOT_ALLOWED');
+    expect(entries.save).not.toHaveBeenCalled();
+  });
+
+  it('si con la edición el día pasa de 8h normales, el excedente queda como un registro de horas extra', async () => {
+    // Sólo se divide en horas extra si el proyecto lo autoriza.
+    const { useCase, entries } = buildUseCase(buildEntry('2026-10-20'), { 'project-1': 'active' }, { regularHoursForDate: 5, allowsOvertime: true });
 
     const result = await useCase.execute({ entryId: 'entry-1', data: { hours: 6 }, actor: OWNER, actorRole: 'collaborator' });
 
@@ -229,7 +248,7 @@ describe('UpdateHourEntryUseCase', () => {
   });
 
   it('con la jornada ya completa, el registro editado pasa entero a horas extra', async () => {
-    const { useCase, entries } = buildUseCase(buildEntry('2026-10-20'), { 'project-1': 'active' }, { regularHoursForDate: 8 });
+    const { useCase, entries } = buildUseCase(buildEntry('2026-10-20'), { 'project-1': 'active' }, { regularHoursForDate: 8, allowsOvertime: true });
 
     const result = await useCase.execute({ entryId: 'entry-1', data: { hours: 2 }, actor: OWNER, actorRole: 'collaborator' });
 

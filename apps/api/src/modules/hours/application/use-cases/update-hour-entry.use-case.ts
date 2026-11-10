@@ -82,22 +82,14 @@ export class UpdateHourEntryUseCase implements UseCase<UpdateHourEntryCommand, v
     const isOvertime = data.isOvertime !== undefined ? data.isOvertime : entry.isOvertime;
     const projectId = data.projectId !== undefined ? data.projectId : entry.projectId;
 
-    if (data.projectId) {
-      const project = await this.projects.findById(data.projectId);
-      if (!project) return err(new ReferencedProjectNotFoundError(data.projectId));
-      // Detenido/finalizado solo impide MOVER horas a ese proyecto: las que ya
-      // tenía se siguen pudiendo corregir.
-      if (data.projectId !== previousProjectId) {
-        if (project.status === 'on_hold') return err(new ProjectStoppedError());
-        if (project.status === 'finished' || project.status === 'cancelled') return err(new ProjectClosedError());
-      }
-      if (isOvertime && !project.allowsOvertime) return err(new ProjectOvertimeNotAllowedError());
-    } else if (data.isOvertime === true && !entry.isOvertime && projectId) {
-      // Solo al MARCAR como extra: un registro que ya nació extra (p. ej. el
-      // excedente de 8h de una solicitud de ticket de soporte, que no exige
-      // autorización) sigue siendo editable aunque el proyecto no las autorice.
-      const project = await this.projects.findById(projectId);
-      if (project && !project.allowsOvertime) return err(new ProjectOvertimeNotAllowedError());
+    // Consultar la autorización del proyecto efectivo incluso si no cambia
+    // en el PATCH. La regla también aplica al excedente automático de 8h.
+    const project = projectId ? await this.projects.findById(projectId) : null;
+    if (projectId && !project) return err(new ReferencedProjectNotFoundError(projectId));
+    // Detenido/finalizado solo impide MOVER horas a ese proyecto.
+    if (project && projectId !== previousProjectId) {
+      if (project.status === 'on_hold') return err(new ProjectStoppedError());
+      if (project.status === 'finished' || project.status === 'cancelled') return err(new ProjectClosedError());
     }
 
     if (data.designatedApproverUserId) {
@@ -172,6 +164,17 @@ export class UpdateHourEntryUseCase implements UseCase<UpdateHourEntryCommand, v
       isOvertime || !(hours > 0) || hours > 24
         ? [{ hours, isOvertime }]
         : splitByDailyCap(hours, await this.entries.sumRegularHoursForUserAndDate(entry.userId, date, entry.id));
+
+    // Los registros históricos de ticket que ya nacieron como extra pueden
+    // corregirse sin aumentar HH, cambiar fecha o mover proyecto. No se
+    // permite convertir nuevos excedentes de proyectos no autorizados.
+    const editingExistingOvertime = entry.isOvertime && isOvertime &&
+      projectId === previousProjectId && hours <= entry.hours &&
+      date.getTime() === entry.date.getTime();
+    if (project && !project.allowsOvertime &&
+        (ownTranche!.isOvertime || overtimeTranche !== undefined) && !editingExistingOvertime) {
+      return err(new ProjectOvertimeNotAllowedError());
+    }
 
     const owner = await this.users.findById(entry.userId);
     const ownerRequiresApproval = hourEntryRequiresApproval(owner?.role, ownTranche!.isOvertime);

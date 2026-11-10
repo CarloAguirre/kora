@@ -1,5 +1,6 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CreateUserInput } from '@kora/contracts';
+import type { ClientPortalProvisioner } from '../ports/client-portal-provisioner.port';
 import { CreateUserUseCase } from './create-user.use-case';
 import { InMemoryUserRepository } from '../../../../test/fakes/in-memory-user.repository';
 import {
@@ -42,6 +43,7 @@ describe('CreateUserUseCase', () => {
   let audit: RecordingAuditRecorder;
   let unitOfWork: PassthroughUnitOfWork;
   let useCase: CreateUserUseCase;
+  let provisionPortal: ReturnType<typeof vi.fn<ClientPortalProvisioner['provision']>>;
 
   beforeEach(() => {
     users = new InMemoryUserRepository();
@@ -51,6 +53,7 @@ describe('CreateUserUseCase', () => {
     notifications = new RecordingNotificationSender();
     audit = new RecordingAuditRecorder();
     unitOfWork = new PassthroughUnitOfWork();
+    provisionPortal = vi.fn<ClientPortalProvisioner['provision']>().mockResolvedValue(undefined);
 
     useCase = new CreateUserUseCase(
       users,
@@ -63,7 +66,62 @@ describe('CreateUserUseCase', () => {
       unitOfWork,
       new FixedClock(),
       new SequentialIdGenerator('user'),
+      { provision: provisionPortal },
     );
+  });
+
+  it('exige empresa para un usuario externo y no crea cuentas sin ella', async () => {
+    const result = await useCase.execute({
+      data: buildInput({ role: 'cliente', teamId: null }),
+      actor: ACTOR,
+    });
+    expect(result.isErr()).toBe(true);
+    if (result.isErr()) expect(result.error.code).toBe('USER_CLIENT_COMPANY_REQUIRED');
+    expect(users.all()).toHaveLength(0);
+    expect(provisionPortal).not.toHaveBeenCalled();
+  });
+
+  it('crea cliente y contacto en el mismo ciclo transaccional, sin conceder proyectos', async () => {
+    const data = buildInput({
+      role: 'cliente', teamId: null,
+      clientId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      email: '  CLIENTE@ejemplo.cl ',
+      firstName: 'María', lastName: 'Pérez',
+    });
+    const result = await useCase.execute({ data, actor: ACTOR });
+    expect(result.isOk()).toBe(true);
+    expect(provisionPortal).toHaveBeenCalledExactlyOnceWith({
+      userId: users.all()[0]?.id,
+      clientId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      email: 'cliente@ejemplo.cl',
+      fullName: 'María Pérez',
+      actorUserId: ACTOR.userId,
+      enabled: true,
+    }, expect.anything());
+    expect(unitOfWork.calls).toBe(1);
+  });
+
+  it('respeta la casilla sin acceso para el portal', async () => {
+    await useCase.execute({
+      data: buildInput({
+        role: 'cliente', teamId: null, clientId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        grantAccess: false,
+      }), actor: ACTOR,
+    });
+    expect(provisionPortal).toHaveBeenCalledWith(
+      expect.objectContaining({ enabled: false }), expect.anything(),
+    );
+    expect(notifications.invitations).toHaveLength(0);
+  });
+
+  it('no permite asignar una empresa a un usuario interno', async () => {
+    const result = await useCase.execute({
+      data: buildInput({ clientId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }),
+      actor: ACTOR,
+    });
+    expect(result.isErr()).toBe(true);
+    if (result.isErr()) expect(result.error.code).toBe('USER_CLIENT_COMPANY_NOT_ALLOWED');
+    expect(users.all()).toHaveLength(0);
   });
 
   it('crea el usuario y le envía la invitación', async () => {
