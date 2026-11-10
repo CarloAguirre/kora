@@ -28,7 +28,7 @@ const STAGES = ['Análisis', 'Entendimiento', 'Condiciones', 'Aclaraciones', 'Co
 
 function PendingModelSummary() {
   return (
-    <p className={styles.thoughtWaiting} role="status">
+    <p className={styles.thoughtWaiting} role="status" aria-label="Esperando respuesta del agente">
       Esperando respuesta del agente
       <span className={styles.thoughtDots} aria-hidden="true">
         <span>.</span><span>.</span><span>.</span>
