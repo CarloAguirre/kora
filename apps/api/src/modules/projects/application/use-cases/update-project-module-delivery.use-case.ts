@@ -48,6 +48,7 @@ import { ProjectChangeLogRecorder, type ProjectChangeLogEntry } from '../service
 import { ProjectProgressRecalculator } from '../services/project-progress-recalculator';
 import { deadlineNote, formatCommittedDate } from '../services/deadline-note';
 import { progressToday } from '../services/project-progress';
+import { ForecastSourceSyncService } from '../services/forecast-source-sync.service';
 
 export interface UpdateProjectModuleDeliveryCommand {
   readonly projectId: string;
@@ -86,6 +87,7 @@ export class UpdateProjectModuleDeliveryUseCase
     private readonly progress: ProjectProgressRecalculator,
     @Inject(CLOCK) private readonly clock: Clock,
     @Inject(UNIT_OF_WORK) private readonly unitOfWork: UnitOfWork,
+    private readonly forecastSync: ForecastSourceSyncService,
   ) {}
 
   async execute(command: UpdateProjectModuleDeliveryCommand): Promise<Result<void, ApplicationError>> {
@@ -128,6 +130,11 @@ export class UpdateProjectModuleDeliveryUseCase
     // sigue requiriendo revisión. Esta acción no puede autoaprobar una entrega
     // genérica de fase ni utilizarse sin permisos de líder.
     const finalizeBlock = command.data.finalizeBlock === true;
+    const forceCancelIncompleteTasks = command.data.forceCancelIncompleteTasks === true;
+    if (forceCancelIncompleteTasks && !finalizeBlock) {
+      return err(new ForbiddenError('La cancelación excepcional requiere confirmar el cierre del bloque.',
+        'PROJECT_BLOCK_FORCE_CLOSE_INVALID'));
+    }
     const reopenBlock = command.data.reopenBlock === true;
     if ((finalizeBlock && reopenBlock) || (finalizeBlock || reopenBlock) && !canManage) {
       return err(new ForbiddenError('No tienes permiso para gestionar el cierre del bloque.', 'PROJECT_BLOCK_CLOSE_FORBIDDEN'));
@@ -138,6 +145,7 @@ export class UpdateProjectModuleDeliveryUseCase
     }
     const now = this.clock.now();
     const today = progressToday(now);
+    const incompleteTasksToCancel: (typeof module.tasks)[number][] = [];
     if (finalizeBlock) {
       const selectedDate = command.data.completedOn;
       if (delivery.status !== 'planned' || command.data.status != null && command.data.status !== 'approved') {
@@ -155,11 +163,17 @@ export class UpdateProjectModuleDeliveryUseCase
         if (marker) return marker[1]?.toLowerCase() === linkedSegment!.id.toLowerCase();
         return teamBlocks.length === 1;
       });
-      if (linkedTasks.length === 0 || linkedTasks.some((task) => task.status !== 'done')) {
+      if (linkedTasks.length === 0 ||
+        (!forceCancelIncompleteTasks && linkedTasks.some((task) => task.status !== 'done'))) {
         return err(new ForbiddenError(
-          'Solo puedes marcar como entregado cuando todas las tareas del bloque están aprobadas.',
+          linkedTasks.length === 0
+            ? 'No se puede cerrar un bloque sin tareas operativas.'
+            : 'Solo puedes marcar como entregado cuando todas las tareas del bloque están aprobadas.',
           'PROJECT_BLOCK_TASKS_NOT_APPROVED',
         ));
+      }
+      if (forceCancelIncompleteTasks) {
+        incompleteTasksToCancel.push(...linkedTasks.filter((task) => task.status !== 'done'));
       }
     }
     if (reopenBlock && (delivery.status !== 'approved' ||
@@ -316,6 +330,11 @@ export class UpdateProjectModuleDeliveryUseCase
       );
     }
 
+    for (const task of incompleteTasksToCancel) {
+      messages.push('Tarea "' + task.name + '" cancelada al cerrar excepcionalmente el bloque "' +
+        linkedSegment!.name + '" ' + inPhase + '. Se conserva el historial de horas.');
+    }
+
     const entries: ProjectChangeLogEntry[] = messages.map((message) => ({
       projectId: project.id,
       moduleId: command.moduleId,
@@ -325,6 +344,12 @@ export class UpdateProjectModuleDeliveryUseCase
     // Cambio y registro en la misma transacción: si no se puede escribir la bitácora, la entrega
     // tampoco cambia — nunca queda una aprobación/rechazo sin quién ni cuándo.
     await this.unitOfWork.run(async (tx) => {
+      // Cancelación lógica, forecast, bitácora y cierre son atómicos.
+      // No ejecutar dos endpoints secuenciales: un error intermedio dejaría el bloque inconsistente.
+      for (const task of incompleteTasksToCancel) {
+        await this.modules.cancelTask(task.id, now, tx);
+        await this.forecastSync.syncTask(project, module.id, task.id, now, tx);
+      }
       await this.modules.updateDelivery(
         command.deliveryId,
         {
