@@ -25,6 +25,23 @@ describe('normalización de prosa del proveedor IA', () => {
     expect(source.summary.length).toBeGreaterThan(3000);
   });
 
+  it('recorta los arreglos auxiliares del modelo que superan maxItems sin tocar perfiles ni HH', () => {
+    const source = {
+      summary: 'Resultado de una estimación real',
+      roles: [{
+        role: 'Backend', unit: 'week', duration: 3,
+        hoursPerUnit: 40, people: 2, source: 'Requisitos.pdf',
+      }],
+      assumptions: Array.from({ length: 10 }, (_, index) => 'Supuesto ' + index),
+      clarifyingQuestions: Array.from({ length: 9 }, (_, index) => 'Aclaración ' + index),
+    };
+    const parsed = estimationPocAiDraftSchema.parse(normalizeGeneratedProposal(source));
+    expect(parsed.clarifyingQuestions).toEqual(source.clarifyingQuestions.slice(0, 5));
+    expect(parsed.assumptions).toEqual(source.assumptions.slice(0, 8));
+    expect(parsed.roles).toEqual(source.roles);
+    expect(source.clarifyingQuestions).toHaveLength(9);
+  });
+
   it('deja intactos los valores que caben y no inventa texto para tipos inválidos', () => {
     expect(fitGeneratedLabel('  Normal  ', 30)).toBe('Normal');
     expect(fitGeneratedLabel('Z'.repeat(301), 300).length).toBe(300);
