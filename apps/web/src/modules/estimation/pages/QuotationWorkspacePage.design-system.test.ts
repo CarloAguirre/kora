@@ -48,8 +48,12 @@ describe('Iteración 4 · controles nativos y flujos de cotización', () => {
   it('no reinicia el modal de traspaso cuando cambia la revisión al aprobar', () => {
     // La aprobación incrementa revision y actualiza la query; la segunda
     // confirmación de traspaso conserva su estado usando la identidad de versión.
-    expect(page).toContain('key={selected.id}');
-    expect(page).not.toContain("key={selected.id + ':' + selected.revision}");
+    // Solo el ciclo comercial debe conservar identidad entre revisiones.
+    // Otros paneles (preflight, mapeo y planificación) sí necesitan reconstruirse.
+    const lifecycle = page.match(/<QuotationCommercialLifecycleCard\s+([\s\S]*?)\/>/)?.[1];
+    expect(lifecycle).toBeDefined();
+    expect(lifecycle).toContain('key={selected.id}');
+    expect(lifecycle).not.toContain("key={selected.id + ':' + selected.revision}");
   });
 
     it('conserva footer único y los mensajes con useToast sin tocar persistencia', () => {

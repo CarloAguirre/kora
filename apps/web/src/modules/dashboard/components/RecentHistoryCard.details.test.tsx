@@ -89,8 +89,13 @@ describe('Historial reciente del colaborador', () => {
   it('permite editar la propia hora pendiente del mes, sin exponer edición de aprobadas', () => {
     show();
     const table = screen.getByRole('table', { name: 'Historial reciente de mis horas' });
-    expect(within(table).queryByRole('button', { name: 'Editar registro del ' + approved.date.slice(8, 10)
-      + '/' + approved.date.slice(5, 7) + '/' + approved.date.slice(0, 4) })).not.toBeInTheDocument();
+    // Aprobadas y pendientes de un mes cerrado pueden compartir fecha.
+    // Comprobar la fila aprobada, no todos los botones con esa fecha.
+    const approvedRow = within(table).getAllByText('Portal Herramientas')[1]!.closest('tr')!;
+    expect(within(approvedRow).queryByRole('button', {
+      name: 'Editar registro del ' + approved.date.slice(8, 10)
+        + '/' + approved.date.slice(5, 7) + '/' + approved.date.slice(0, 4),
+    })).not.toBeInTheDocument();
     const ownEdit = within(table).getByRole('button', { name: 'Editar registro del ' + current.slice(8, 10)
       + '/' + current.slice(5, 7) + '/' + current.slice(0, 4) });
     expect(ownEdit).toBeEnabled();
@@ -119,14 +124,17 @@ describe('Historial reciente del colaborador', () => {
     for (const label of ['Fecha', 'Asignación', 'Proyecto', 'Fase',
       'Bloque de trabajo', 'Tarea', 'Actividad', 'Horas trabajadas', 'Descripción',
       'Bloqueo o problema', 'Estado']) {
-      expect(within(dialog).getByText(label)).toBeInTheDocument();
+      // El valor de Asignación también puede ser "Proyecto": consultar el título <dt>.
+      expect(within(dialog).getByText(label, { selector: 'dt' })).toBeInTheDocument();
     }
     expect(within(dialog).getByText('Wireframes flujo de reservas')).toBeInTheDocument();
     expect(within(dialog).getByText('4 h')).toBeInTheDocument();
     expect(within(dialog).getByText('No')).toBeInTheDocument();
     expect(within(dialog).getByText('por Solmary Castro')).toBeInTheDocument();
     expect(mocks.detail).toHaveBeenCalledWith('h-approved');
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Cerrar' }));
+    // El modal incluye X y botón inferior, ambos con aria-label "Cerrar".
+    // Seleccionar expresamente el botón visible del pie.
+    fireEvent.click(within(dialog).getByText('Cerrar', { selector: 'button' }));
     expect(screen.queryByRole('dialog', { name: 'Detalle del registro' })).not.toBeInTheDocument();
   });
 });
