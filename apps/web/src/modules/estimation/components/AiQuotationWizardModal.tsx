@@ -258,7 +258,7 @@ function QuestionField({
                         </label>
                       ))}
                     </div>}
-              {!teamListLoading && !teamListError && teamOptions?.length &&
+              {!teamListLoading && !teamListError && (teamOptions?.length ?? 0) > 0 &&
                 !(selectedTeamIds?.length) && <small>Selecciona al menos un equipo.</small>}
             </div>
           )}
