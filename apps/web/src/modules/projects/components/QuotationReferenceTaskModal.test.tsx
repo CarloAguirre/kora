@@ -151,4 +151,26 @@ describe('Nueva tarea operativa a partir de referencia Gemini', () => {
     }));
   });
 
+  it('duplicar referencia conserva la EDT original y crea una copia operativa independiente', async () => {
+    render(<MemoryRouter><QuotationReferenceTaskModal
+      mode="duplicate" project={project} moduleId={moduleId} versionId={versionId}
+      versionNumber={1} reference={reference} onClose={mocks.onClose}
+    /></MemoryRouter>);
+    expect(screen.getByRole('dialog', { name: 'Duplicar tarea' })).toBeInTheDocument();
+    expect(screen.getByLabelText(/Título de la tarea/))
+      .toHaveValue('Conexión con sistema de taller (copia)');
+    expect(screen.getByLabelText(/Bloque de trabajo/)).toHaveValue(blockId);
+    expect(screen.getByRole('button', { name: 'Crear copia' })).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Crear copia' }));
+    await waitFor(() => expect(mocks.create).toHaveBeenCalledWith({
+      projectId, moduleId, input: expect.objectContaining({
+        name: 'Conexión con sistema de taller (copia)', assigneeUserId: null,
+        segmentId: blockId, estimatedHours: 35,
+        description: expect.stringContaining('Copia de referencia de cotización ' + versionId),
+      }),
+    }));
+    const description = mocks.create.mock.calls[0]![0].input.description as string;
+    expect(description).not.toContain('Referencia cotización ' + versionId);
+  });
+
 });
