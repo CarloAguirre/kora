@@ -229,8 +229,8 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
   it('F03 habilita solo perfiles específicos y exige equipos reales antes de continuar', async () => {
     renderWizard();
     await analyzeAndConfirm();
-    expect(screen.getByLabelText('Disponibilidad real de Kora')).toBeDisabled();
-    expect(screen.getByLabelText('Comparar ambos escenarios')).toBeDisabled();
+    expect(screen.getByLabelText(/Disponibilidad real de Kora/)).toBeDisabled();
+    expect(screen.getByLabelText(/Comparar ambos escenarios/)).toBeDisabled();
     expect(screen.getByLabelText('Perfiles específicos')).toBeEnabled();
     fireEvent.click(screen.getByLabelText('MVP'));
     fireEvent.click(screen.getByLabelText('N semanas'));
