@@ -170,9 +170,11 @@ export function UserFormDialog({ open, user, teams, onClose, onSuccess, onDelete
       } else {
         const created = await createUser.mutateAsync({ ...values, teamId });
         onSuccess(
-          created.invitationSent
-            ? `Se creó a ${values.firstName} y se le envió la invitación.`
-            : `Se creó a ${values.firstName}, pero no se pudo enviar la invitación. Reenvíala desde el listado.`,
+          values.role === 'cliente'
+            ? `Se creó a ${values.firstName}. Para que pueda ingresar, entra a Clientes, abre su empresa y habilita el acceso al portal desde el contacto con este correo.`
+            : created.invitationSent
+              ? `Se creó a ${values.firstName} y se le envió la invitación.`
+              : `Se creó a ${values.firstName}, pero no se pudo enviar la invitación. Reenvíala desde el listado.`,
         );
       }
 
@@ -289,6 +291,13 @@ export function UserFormDialog({ open, user, teams, onClose, onSuccess, onDelete
             />
           )}
         </div>
+
+        {selectedRole === 'cliente' && (
+          <div className={styles.portalHint} role="note">
+            <strong>Acceso al portal de clientes</strong>
+            <span>Este formulario solo crea la cuenta y su invitación. Para poder iniciar sesión, después debes abrir la ficha de la empresa en Clientes, registrar un contacto con el mismo correo y habilitarle los proyectos o contratos en «Acceso al portal de clientes».</span>
+          </div>
+        )}
 
         <div className={styles.checkboxRow}>
           <input
