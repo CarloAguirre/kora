@@ -16,6 +16,8 @@ import { User } from '../../domain/entities/user.entity';
 import { Email } from '../../domain/value-objects/email.vo';
 import { PersonName } from '../../domain/value-objects/person-name.vo';
 import {
+  ClientCompanyRequiredError,
+  ClientCompanyNotAllowedError,
   EmailAlreadyInUseError,
   TeamNotFoundError,
 } from '../../domain/errors/user.errors';
@@ -47,6 +49,10 @@ import {
   type InvitationRepository,
 } from '../ports/invitation.port';
 import { isUniqueViolation } from '../../../../shared/infrastructure/database/postgres-errors';
+import {
+  CLIENT_PORTAL_PROVISIONER,
+  type ClientPortalProvisioner,
+} from '../ports/client-portal-provisioner.port';
 
 export interface CreateUserCommand {
   readonly data: CreateUserInput;
@@ -91,6 +97,7 @@ export class CreateUserUseCase
     @Inject(UNIT_OF_WORK) private readonly unitOfWork: UnitOfWork,
     @Inject(CLOCK) private readonly clock: Clock,
     @Inject(ID_GENERATOR) private readonly ids: IdGenerator,
+    @Inject(CLIENT_PORTAL_PROVISIONER) private readonly clientPortal: ClientPortalProvisioner,
   ) {}
 
   async execute(command: CreateUserCommand): Promise<Result<CreateUserResult, ApplicationError>> {
@@ -106,7 +113,15 @@ export class CreateUserUseCase
     if (nameResult.isErr()) return err(nameResult.error);
     const name = nameResult.value;
 
-    // 2. Reglas de negocio previas a tocar la base.
+    // 2. Un cliente externo siempre pertenece a una empresa real.
+    // Los usuarios internos no reciben acceso al portal por accidente.
+    if (data.role === 'cliente' && !data.clientId) {
+      return err(new ClientCompanyRequiredError());
+    }
+    if (data.role !== 'cliente' && data.clientId) {
+      return err(new ClientCompanyNotAllowedError());
+    }
+
     const teamId = TeamAssignmentPolicy.normalizeTeamForRole(data.role, data.teamId ?? null);
     const teamPolicy = TeamAssignmentPolicy.validate(data.role, teamId);
     if (teamPolicy.isErr()) return err(teamPolicy.error);
@@ -139,6 +154,19 @@ export class CreateUserUseCase
     try {
       await this.unitOfWork.run(async (tx) => {
         await this.users.save(user, actor.userId, tx);
+
+        if (data.role === 'cliente' && data.clientId) {
+          // Misma transacción: sin cuenta huérfana si falla el contacto o la
+          // empresa. La cuenta queda vinculada, sin grants de proyectos.
+          await this.clientPortal.provision({
+            userId: user.id,
+            clientId: data.clientId,
+            email: email.value,
+            fullName: `${name.firstName} ${name.lastName}`,
+            actorUserId: actor.userId,
+            enabled: data.grantAccess,
+          }, tx);
+        }
 
         if (data.grantAccess && invitationToken) {
           // El usuario nace SIN contraseña: se la fija él con el enlace de la
@@ -209,6 +237,7 @@ export class CreateUserUseCase
         email: email.value,
         role: data.role,
         teamId,
+        clientId: data.role === 'cliente' ? data.clientId : null,
         grantAccess: data.grantAccess,
         invitationSent,
       },
