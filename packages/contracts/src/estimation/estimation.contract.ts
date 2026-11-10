@@ -283,7 +283,7 @@ export const generateAiDemoQuotationSchema = generateEstimationPocSchema.extend(
   selectedTeamIds: z.array(uuidSchema).max(12).refine(
     (ids) => new Set(ids).size === ids.length,
     'No se pueden seleccionar equipos repetidos.',
-  ).default([]),
+  ).optional(),
 });
 export type GenerateAiDemoQuotationInput = z.infer<typeof generateAiDemoQuotationSchema>;
 
