@@ -442,6 +442,13 @@
       "when": 1793980800000,
       "tag": "0056_hour_entry_task_attribution",
       "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1794330000000,
+      "tag": "0063_portal_cliente_externo",
+      "breakpoints": true
     }
   ]
 }
