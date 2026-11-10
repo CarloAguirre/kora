@@ -165,6 +165,13 @@ export function ExternalClientProjectDetailPage() {
   const billing = billingForPortal(project);
   const history = receivedEvents(project, data.receipts);
   const hoursDeviation = Math.max(0, project.usedHours - project.soldHours);
+  const accessLinks = [
+    { label: 'Demostración', href: project.demoLink },
+    { label: 'Ambiente de pruebas', href: project.testEnvironmentLink },
+    { label: 'Diseño en Figma', href: project.figmaLink },
+    { label: 'Documentación', href: project.documentationLink },
+  ].filter((link): link is { label: string; href: string } =>
+    !!link.href && /^https?:\/\//i.test(link.href));
   return (
     <DashboardLayout title="Proyectos">
       <div className={styles.page}>
@@ -225,6 +232,31 @@ export function ExternalClientProjectDetailPage() {
           <h3 className={styles.sectionTitle}>Facturación</h3>
           <ProjectBillingCard billing={billing}/>
         </section>
+        {accessLinks.length > 0 && <section className={styles.section}>
+          <h3 className={styles.sectionTitle}>Accesos y enlaces</h3>
+          <Card><div style={{ display: 'flex', flexWrap: 'wrap', gap: 16 }}>
+            {accessLinks.map((link) => <a key={link.label} href={link.href}
+              target="_blank" rel="noopener noreferrer">{link.label}</a>)}
+          </div></Card>
+        </section>}
+        {(project.impactBeforeHours != null || project.impactAfterHours != null) && (
+          <section className={styles.section}>
+            <h3 className={styles.sectionTitle}>Impacto en el negocio</h3>
+            <Card>
+              <p><strong>Antes:</strong> {project.impactBeforeHours ?? '—'} horas por proceso</p>
+              <p><strong>Después:</strong> {project.impactAfterHours ?? '—'} horas por proceso</p>
+            </Card>
+          </section>
+        )}
+        {project.qaPlannedTests != null && <section className={styles.section}>
+          <h3 className={styles.sectionTitle}>Métricas QA</h3>
+          <Card>
+            <p><strong>Módulo:</strong> {project.qaEvaluatedModule ?? 'General'}</p>
+            <p><strong>Pruebas planificadas:</strong> {project.qaPlannedTests}</p>
+            <p><strong>Pruebas ejecutadas:</strong> {project.qaExecutedTests ?? 0}</p>
+            <p><strong>Pruebas con error:</strong> {project.qaFailedTests ?? 0}</p>
+          </Card>
+        </section>}
         <section className={styles.section}>
           <h3 className={styles.sectionTitle}>Roadmap por fases</h3>
           <PhaseRoadmap phaseRoadmap={roadmap}/>
