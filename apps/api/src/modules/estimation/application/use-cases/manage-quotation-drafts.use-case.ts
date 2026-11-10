@@ -271,13 +271,14 @@ export class ManageQuotationDraftsUseCase {
     dynamicQuestions: readonly EstimationQuestion[], edt: QuotationReferenceEdt,
     confirmedUnderstanding?: string,
     roleTeamIds?: Readonly<Record<string, string>>,
+    selectedTeamIds: readonly string[] = [],
   ): Promise<QuotationVersion> {
     await this.authorizeAiPoc(projectId, actor);
     if (proposal.projectId !== projectId || !['gemini', 'openai'].includes(proposal.provider) ||
         !['poc_simulated', 'drive'].includes(proposal.sourceMode)) {
       throw new BadRequestException('El proyecto y el origen de la propuesta IA no coinciden.');
     }
-    return this.repository.createAiPocDraft(projectId, actor.id, proposal, answers, dynamicQuestions, edt, confirmedUnderstanding, roleTeamIds);
+    return this.repository.createAiPocDraft(projectId, actor.id, proposal, answers, dynamicQuestions, edt, confirmedUnderstanding, roleTeamIds, selectedTeamIds);
   }
 
   /** Aceptación del baseline técnico KDM: NO es aprobación del cliente ni
