@@ -142,6 +142,18 @@ export const quotationDraftDataSchema = z.object({
     startWeek: z.number().int().min(1).max(520),
     durationWeeks: z.number().int().min(1).max(520),
   })).max(100).optional(),
+  /**
+   * Calendario de referencia ESTABLE para recalcular dotación en EDT v2.
+   * Nunca se rellena desde las duraciones derivadas de una replanificación:
+   * nace de aiPoc.edt.stages y solo cambia cuando el usuario edita
+   * explícitamente inicio/duración de una fase.
+   * Guardado en el snapshot JSON existente (sin migración).
+   */
+  edtWorkforceReferenceStages: z.array(z.object({
+    stageCode: z.string().trim().min(1).max(40),
+    startWeek: z.number().int().min(1).max(520),
+    durationWeeks: z.number().int().min(1).max(520),
+  })).max(100).optional(),
   costs: z.array(quotationExternalCostSchema).max(100).default([]),
   paymentPlan: z.array(quotationPaymentItemSchema).max(100).default([]),
   assumptions: z.array(z.string().trim().max(2000)).max(100).default([]),

@@ -24,13 +24,19 @@ export function replanQuotationEdtForWorkforce(draft: QuotationDraftData): Quota
   if (relevant.some((row) => !row.teamId)) return draft;
   const people = new Map(draft.teams.map((team) =>
     [team.teamId, Math.max(1, team.collaborators)]));
+  // Replanificar siempre desde un calendario ESTABLE: el original de la IA
+  // o la referencia modificada manualmente por el usuario. Las fechas en
+  // edtStageSettings son la SALIDA de la última replanificación y no pueden
+  // volver a ser su entrada (3 -> 4 -> 3 debe dar el mismo plan que 3).
   const current = regular.map((stage) => {
     const override = draft.edtStageSettings?.find((setting) =>
       setting.stageCode === stage.code);
+    const reference = draft.edtWorkforceReferenceStages?.find((setting) =>
+      setting.stageCode === stage.code);
     return {
       code: stage.code, name: override?.name ?? stage.name,
-      startWeek: override?.startWeek ?? stage.startWeek,
-      durationWeeks: override?.durationWeeks ?? stage.durationWeeks,
+      startWeek: reference?.startWeek ?? stage.startWeek,
+      durationWeeks: reference?.durationWeeks ?? stage.durationWeeks,
     };
   });
   const boundaries = [...new Set(current.flatMap((stage) =>

@@ -124,6 +124,6 @@ import { HoursModule } from '../hours/hours.module';
     { provide: TICKET_CODE_GENERATOR, useClass: DrizzleTicketCodeGenerator },
   ],
   // Los contratos de soporte y sus lectores los usa también el resumen de fin de mes de `RemindersModule`.
-  exports: [TICKET_REPOSITORY, SUPPORT_PLAN_REPOSITORY, TICKET_CLIENT_READER, TICKET_PROJECT_READER],
+  exports: [GetSupportPlanUseCase, TICKET_REPOSITORY, SUPPORT_PLAN_REPOSITORY, TICKET_CLIENT_READER, TICKET_PROJECT_READER],
 })
 export class TicketsModule {}
