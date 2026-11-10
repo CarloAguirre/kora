@@ -172,7 +172,7 @@ export class UpdateHourEntryUseCase implements UseCase<UpdateHourEntryCommand, v
       projectId === previousProjectId && hours <= entry.hours &&
       date.getTime() === entry.date.getTime();
     if (project && !project.allowsOvertime &&
-        (isOvertime || overtimeTranche !== undefined) && !editingExistingOvertime) {
+        (ownTranche!.isOvertime || overtimeTranche !== undefined) && !editingExistingOvertime) {
       return err(new ProjectOvertimeNotAllowedError());
     }
 
