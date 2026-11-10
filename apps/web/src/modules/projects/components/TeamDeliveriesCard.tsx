@@ -11,6 +11,7 @@ import {
   DELIVERY_DISPLAY_STATUS_LABEL, DELIVERY_DISPLAY_STATUS_TONE, deliveryDisplayStatus,
 } from '../lib/delivery-status';
 import { DeliveryActionDialogs, type DeliveryActionTarget } from './DeliveryActionDialogs';
+import { getLinkedBlockTasks } from '../lib/team-progress';
 
 const formatDate = (value: string | null | undefined) =>
   value ? new Date(value + 'T00:00:00').toLocaleDateString('es-CL') : '—';
@@ -29,7 +30,7 @@ export interface TeamDeliveriesCardProps {
  * una entrega independiente sigue el ciclo normal de envío y aprobación. */
 export function TeamDeliveriesCard({ project, projectId, teamId }: TeamDeliveriesCardProps) {
   const [filter, setFilter] = useState<DeliveryFilter>('all');
-  const [actionTarget, setActionTarget] = useState<DeliveryActionTarget | null>(null);
+  const [selectedAction, setSelectedAction] = useState<DeliveryActionTarget | null>(null);
   const teamDeliveries = useMemo(() => project.modules.flatMap((module) =>
     module.deliveries.filter((delivery) => delivery.teamId === teamId).map((delivery) => {
       const linkedBlock = module.segments.find((segment) => segment.id === delivery.segmentId);
@@ -39,6 +40,21 @@ export function TeamDeliveriesCard({ project, projectId, teamId }: TeamDeliverie
         blockStartDate: linkedBlock?.startDate,
       };
     })), [project.modules, teamId]);
+
+  // No conservar una copia congelada de las tareas: al aprobar desde el aviso,
+  // React Query refresca el proyecto y la lista debe actualizarse sin cerrar el modal.
+  const actionTarget = useMemo<DeliveryActionTarget | null>(() => {
+    if (!selectedAction) return null;
+    const module = project.modules.find((item) => item.id === selectedAction.moduleId);
+    const live = teamDeliveries.find((item) =>
+      item.moduleId === selectedAction.moduleId && item.delivery.id === selectedAction.delivery.id);
+    if (!module || !live) return null;
+    const segment = module.segments.find((item) => item.id === live.delivery.segmentId);
+    return {
+      ...live, action: selectedAction.action,
+      blockTasks: segment ? getLinkedBlockTasks(module, segment) : [],
+    };
+  }, [selectedAction, project.modules, teamDeliveries]);
 
   const now = new Date();
   const today = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0'),
@@ -93,16 +109,20 @@ export function TeamDeliveriesCard({ project, projectId, teamId }: TeamDeliverie
           { key: 'action', header: '', align: 'right' as const,
             render: (item: (typeof teamDeliveries)[number]) => {
               const { delivery } = item;
-              if (!delivery.canManage || delivery.status === 'approved') return null;
+              if (!delivery.canManage) return null;
+              if (delivery.status === 'approved') return <Button variant="outline" size="sm"
+                onClick={() => setSelectedAction({
+                  ...item, action: delivery.segmentId ? 'reopen' : 'revert',
+                })}>Revertir entrega</Button>;
               if (delivery.status === 'delivered') return <Button variant="outline" size="sm"
-                onClick={() => setActionTarget({ ...item, action: 'approve' })}>
+                onClick={() => setSelectedAction({ ...item, action: 'approve' })}>
                 Aprobar entrega
               </Button>;
               return <Button variant="outline" size="sm"
                 title={delivery.segmentId
                   ? 'Cierra el bloque con fecha real; requiere todas las tareas aprobadas.'
                   : 'Envía la entrega a aprobación; el líder debe registrar el motivo.'}
-                onClick={() => setActionTarget({
+                onClick={() => setSelectedAction({
                   ...item, action: delivery.segmentId ? 'finalize' : 'complete',
                 })}>
                 Marcar como entregada
@@ -114,7 +134,7 @@ export function TeamDeliveriesCard({ project, projectId, teamId }: TeamDeliverie
       </Card>
       <DeliveryActionDialogs projectId={projectId}
         members={project.members.filter((member) => !member.blockedAt)}
-        target={actionTarget} onClose={() => setActionTarget(null)} />
+        target={actionTarget} onClose={() => setSelectedAction(null)} />
     </>
   );
 }

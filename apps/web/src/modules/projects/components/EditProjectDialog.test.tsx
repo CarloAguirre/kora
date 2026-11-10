@@ -170,6 +170,7 @@ describe('EditProjectDialog', () => {
   it('precarga el formulario con los datos actuales del proyecto', () => {
     renderDialog({ open: true, project: buildProject(), onClose: vi.fn(), onSuccess: vi.fn(), isManagement: true });
 
+    expect(screen.getByRole('dialog', { name: 'Editar proyecto' })).toHaveClass('bodyScrollOnly');
     expect(screen.getByLabelText(/Nombre del proyecto/)).toHaveValue('Proyecto de prueba');
     expect(screen.getByLabelText('HH vendidas')).toHaveValue(500);
   });
@@ -556,6 +557,7 @@ describe('Editar proyecto de desarrollo · contenido acotado a la referencia v5.
   it('muestra exclusivamente los bloques de la imagen y ningún editor de equipos/fases', () => {
     renderDevelopmentDialog(props({ canAuthorizeOvertime: true }));
     expect(screen.getByRole('dialog', { name: 'Editar proyecto' })).toHaveClass('projectEditSide');
+    expect(screen.getByRole('dialog', { name: 'Editar proyecto' })).toHaveClass('bodyScrollOnly');
     for (const name of [
       'Nombre del proyecto', 'Cliente', 'Líder Kabeli a cargo', 'Responsable comercial',
       'Tipo de proyecto', 'Estado', 'Etapa de avance', 'Proyecto interno',

@@ -483,6 +483,8 @@ export const updateProjectModuleDeliverySchema = z.object({
   comment: z.string().trim().max(1000).optional(),
   /** Finalizar en una sola operación la entrega vinculada a un bloque: requiere tareas aprobadas y permiso de líder. */
   finalizeBlock: z.boolean().optional(),
+  /** Cierre excepcional confirmado: cancela lógicamente las tareas no aprobadas del bloque. */
+  forceCancelIncompleteTasks: z.boolean().optional(),
   /** Reabrir explícitamente el bloque ya finalizado, sin confundirlo con rechazo de entrega del colaborador. */
   reopenBlock: z.boolean().optional(),
   /** Fecha real seleccionada en el formulario de cierre; NO modifica estimatedDate. */
