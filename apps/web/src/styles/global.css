@@ -120,8 +120,9 @@ table {
 /* El <dialog> en top layer inertiza el fondo, pero no cancela por sí mismo
    el desplazamiento de la página. Al abrir cualquier modal nativo Kora,
    bloquear la raíz (además de los scroll containers del DashboardLayout).
+   Solo html: overflow en body crea otro contenedor de scroll y desplaza
+   el sidebar sticky si el modal se abre con la página ya desplazada.
    Al cerrar el último dialog, el scroll se restaura automáticamente. */
-html:has(dialog[open]),
-body:has(dialog[open]) {
+html:has(dialog[open]) {
   overflow: hidden;
 }
