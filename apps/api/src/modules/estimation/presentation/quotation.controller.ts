@@ -306,14 +306,15 @@ export class QuotationController {
     }
     const f03 = input.answers.find((answer) => answer.questionId === 'F03')?.value;
     const specific = f03 === 'specific_profiles';
-    if (!specific && input.selectedTeamIds.length) {
+    const chosenTeamIds = input.selectedTeamIds ?? [];
+    if (!specific && chosenTeamIds.length) {
       throw new BadRequestException('Los equipos específicos solo se permiten si F03=Perfiles específicos.');
     }
-    if (specific && !input.selectedTeamIds.length) {
+    if (specific && !chosenTeamIds.length) {
       throw new BadRequestException('Selecciona al menos un equipo activo para F03.');
     }
-    const selectedIds = new Set(input.selectedTeamIds);
-    const missingTeam = input.selectedTeamIds.find((id) =>
+    const selectedIds = new Set(chosenTeamIds);
+    const missingTeam = chosenTeamIds.find((id) =>
       !activeTeams.some((team) => team.teamId === id));
     if (missingTeam) {
       throw new BadRequestException('Se seleccionó un equipo inexistente o inactivo: ' + missingTeam);
@@ -359,7 +360,7 @@ export class QuotationController {
     onActivity?.('saving', 'Guardando la cotización comercial como borrador.');
     const saved = await this.drafts.createAiPocDraft(
       projectId, actor, reconciled, input.answers, input.dynamicQuestions, edt,
-      input.confirmedUnderstanding, roleTeamIds, input.selectedTeamIds,
+      input.confirmedUnderstanding, roleTeamIds, chosenTeamIds,
     );
     onActivity?.('saved', 'Cotización guardada correctamente.');
     return saved;
