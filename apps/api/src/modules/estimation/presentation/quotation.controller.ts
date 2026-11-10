@@ -6,7 +6,7 @@ import {
   applyQuotationPlanningSchema, generateAiDemoQuotationSchema, createQuotationVersionSchema, updateQuotationDraftSchema, quotationReconciliationReviewSchema, assessQuotationReconciliationSchema,
   quotationRevisionActionSchema, approveClientQuotationSchema, transferApprovedQuotationSchema,
   type QuotationRevisionActionInput, type ApproveClientQuotationInput, type TransferApprovedQuotationInput, type QuotationTransferResult,
-  type ApplyQuotationPlanningInput, type AppliedQuotationPlanning, type GenerateAiDemoQuotationInput, type CreateQuotationVersionInput, type ProjectQuotation, type QuotationVersion, type UpdateQuotationDraftInput, type QuotationTransferPreview, type QuotationCommercialPreflight, type QuotationCommercialDossier, type QuotationReconciliationReview, type SavedQuotationReconciliationReview, type AssessQuotationReconciliationInput, type SavedQuotationReviewAssessment,
+  type ApplyQuotationPlanningInput, type AppliedQuotationPlanning, type GenerateAiDemoQuotationInput, type QuotationTeamCatalogEntry, type CreateQuotationVersionInput, type ProjectQuotation, type QuotationVersion, type UpdateQuotationDraftInput, type QuotationTransferPreview, type QuotationCommercialPreflight, type QuotationCommercialDossier, type QuotationReconciliationReview, type SavedQuotationReconciliationReview, type AssessQuotationReconciliationInput, type SavedQuotationReviewAssessment,
 } from '@kora/contracts';
 import { CurrentUser, type RequestUser } from '../../../shared/presentation/decorators/current-user.decorator';
 import { RequireAnyPermission } from '../../../shared/presentation/decorators/require-permissions.decorator';
@@ -18,6 +18,7 @@ import { validateQuestionnaireAnswers } from '../application/validate-estimation
 import { AppConfigService } from '../../../config/app-config.service';
 import { GoogleDriveOAuthPocService } from '../../../shared/infrastructure/auth/google-drive-oauth-poc.service';
 import { extractDriveFolderId } from '../application/drive-source-selection';
+import { isCompatibleTechLeadTeam } from '../application/estimation-methodology';
 import { resolveAuthorizedDriveReader } from '../infrastructure/drive/resolve-authorized-drive-reader';
 
 /**
@@ -42,6 +43,16 @@ export class QuotationController {
   @RequireAnyPermission('projects:manage', 'projects:read_assigned')
   get(@Param('projectId', ParseUUIDPipe) projectId: string, @CurrentUser() actor: RequestUser): Promise<ProjectQuotation | null> {
     return this.drafts.get(projectId, actor);
+  }
+
+  /** Catálogo real activo leído con permiso del proyecto, sin exigir teams:read. */
+  @Get('active-teams')
+  @RequireAnyPermission('projects:manage', 'projects:read_assigned')
+  listActiveTeams(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @CurrentUser() actor: RequestUser,
+  ): Promise<QuotationTeamCatalogEntry[]> {
+    return this.drafts.listActiveQuotationTeams(projectId, actor);
   }
 
   @Get('versions/:versionId/commercial-dossier')
@@ -293,24 +304,49 @@ export class QuotationController {
     if (!activeTeams.length) {
       throw new BadRequestException('No existen equipos activos en Kora para generar la cotización.');
     }
-    onActivity?.('teams_verified', 'Equipos activos disponibles: ' + activeTeams.length + '.');
+    const f03 = input.answers.find((answer) => answer.questionId === 'F03')?.value;
+    const specific = f03 === 'specific_profiles';
+    const chosenTeamIds = input.selectedTeamIds ?? [];
+    if (!specific && chosenTeamIds.length) {
+      throw new BadRequestException('Los equipos específicos solo se permiten si F03=Perfiles específicos.');
+    }
+    if (specific && !chosenTeamIds.length) {
+      throw new BadRequestException('Selecciona al menos un equipo activo para F03.');
+    }
+    const selectedIds = new Set(chosenTeamIds);
+    const missingTeam = chosenTeamIds.find((id) =>
+      !activeTeams.some((team) => team.teamId === id));
+    if (missingTeam) {
+      throw new BadRequestException('Se seleccionó un equipo inexistente o inactivo: ' + missingTeam);
+    }
+    const allowedTeams = specific
+      ? activeTeams.filter((team) => selectedIds.has(team.teamId))
+      : activeTeams;
+    if (specific && !allowedTeams.some((team) => isCompatibleTechLeadTeam(team.name))) {
+      throw new BadRequestException(
+        'Incluye un equipo de desarrollo o arquitectura para la supervisión obligatoria del Líder Técnico.',
+      );
+    }
+    onActivity?.('teams_verified', specific
+      ? 'Equipos específicos seleccionados: ' + allowedTeams.length + '.'
+      : 'Equipos activos disponibles: ' + allowedTeams.length + '.');
     onPhase?.('proposal');
     const proposal = onThoughtSummary
-      ? await this.generator.execute(input, activeTeams, sourceReader, onThoughtSummary, onActivity)
-      : await this.generator.execute(input, activeTeams, sourceReader);
+      ? await this.generator.execute(input, allowedTeams, sourceReader, onThoughtSummary, onActivity)
+      : await this.generator.execute(input, allowedTeams, sourceReader);
     if (!['gemini', 'openai'].includes(proposal.provider) ||
         proposal.sourceMode !== (isDemo ? 'poc_simulated' : 'drive') ||
         proposal.documentsAnalyzed < 1) {
       throw new BadRequestException('La propuesta IA no tiene evidencia documental válida.');
     }
-    const validIds = new Set(activeTeams.map((team) => team.teamId));
+    const validIds = new Set(allowedTeams.map((team) => team.teamId));
     if (proposal.roles.some((role) => !role.teamId || !validIds.has(role.teamId))) {
       throw new BadRequestException('El proveedor IA propuso un perfil sin equipo activo de Kora.');
     }
     onPhase?.('edt');
     const edt = onThoughtSummary
-      ? await this.generator.generateEdt(input, proposal, activeTeams, sourceReader, onThoughtSummary, onActivity)
-      : await this.generator.generateEdt(input, proposal, activeTeams, sourceReader);
+      ? await this.generator.generateEdt(input, proposal, allowedTeams, sourceReader, onThoughtSummary, onActivity)
+      : await this.generator.generateEdt(input, proposal, allowedTeams, sourceReader);
     // La EDT detallada determina las HH finales; la primera llamada propone
     // perfiles/capacidad, pero no impone un presupuesto a las actividades.
     onActivity?.('reconciling', 'Conciliando perfiles y horas contra la EDT validada.');
@@ -326,7 +362,7 @@ export class QuotationController {
     onActivity?.('saving', 'Guardando la cotización comercial como borrador.');
     const saved = await this.drafts.createAiPocDraft(
       projectId, actor, reconciled, input.answers, input.dynamicQuestions, edt,
-      input.confirmedUnderstanding, roleTeamIds,
+      input.confirmedUnderstanding, roleTeamIds, chosenTeamIds,
     );
     onActivity?.('saved', 'Cotización guardada correctamente.');
     return saved;

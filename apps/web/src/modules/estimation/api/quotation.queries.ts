@@ -11,6 +11,17 @@ export function useProjectQuotation(projectId: string | null, enabled = true) {
   });
 }
 
+/** Solo se consulta cuando el usuario elige perfiles específicos en F03. */
+export function useQuotationActiveTeams(projectId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: quotationKeys.activeTeams(projectId),
+    queryFn: () => quotationApi.activeTeams(projectId),
+    enabled,
+    retry: false,
+    staleTime: 30_000,
+  });
+}
+
 export function useCreateQuotationVersion(projectId: string) {
   const client = useQueryClient();
   return useMutation({

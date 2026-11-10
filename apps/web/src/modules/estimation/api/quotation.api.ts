@@ -9,6 +9,7 @@ import type {
   QuotationTransferResult,
   ProjectQuotation,
   QuotationVersion,
+  QuotationTeamCatalogEntry,
   QuotationTransferPreview,
   QuotationCommercialPreflight,
   QuotationCommercialDossier,
@@ -25,6 +26,9 @@ const base = (projectId: string) => '/estimations/projects/' + projectId + '/quo
 export const quotationApi = {
   get(projectId: string): Promise<ProjectQuotation | null> {
     return api.get<ProjectQuotation | null>(base(projectId));
+  },
+  activeTeams(projectId: string): Promise<QuotationTeamCatalogEntry[]> {
+    return api.get<QuotationTeamCatalogEntry[]>(base(projectId) + '/active-teams');
   },
   appliedPlan(projectId: string): Promise<AppliedQuotationPlanning | null> {
     return api.get<AppliedQuotationPlanning | null>(base(projectId) + '/applied-plan');
@@ -140,6 +144,7 @@ export const quotationApi = {
 export const quotationKeys = {
   all: ['quotations'] as const,
   project: (projectId: string) => [...quotationKeys.all, projectId] as const,
+  activeTeams: (projectId: string) => [...quotationKeys.project(projectId), 'active-teams'] as const,
   reconciliationReviews: (projectId: string, versionId: string) =>
     [...quotationKeys.project(projectId), 'reconciliation-reviews', versionId] as const,
   reconciliationAssessments: (projectId: string, versionId: string) =>

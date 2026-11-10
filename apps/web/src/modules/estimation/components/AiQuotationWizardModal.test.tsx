@@ -11,6 +11,10 @@ const mocks = vi.hoisted(() => ({
   serviceAccountEnabled: true,
   browse: vi.fn(), driveAccess: vi.fn(), oauthStart: vi.fn(),
   resolve: vi.fn(), updateExtras: vi.fn(),
+  activeTeams: [
+    { teamId: '0777e456-fd76-445e-83f1-afc25061c121', name: 'Desarrollo', isActive: true },
+    { teamId: '0777e456-fd76-445e-83f1-afc25061c122', name: 'QA', isActive: true },
+  ],
 }));
 const project = {
   id: '0777e456-fd76-445e-83f1-afc25061c101',
@@ -32,7 +36,12 @@ const fixedQuestions = [
   estimationQuestionSchema.parse({
     id: 'F03', kind: 'fixed', category: 'Equipo', question: '¿Equipo?',
     impact: 'high', answerType: 'single_choice', required: true,
-    options: [{ value: 'ideal', label: 'Equipo ideal' }],
+    options: [
+      { value: 'ideal', label: 'Equipo ideal' },
+      { value: 'kora_availability', label: 'Disponibilidad real de Kora' },
+      { value: 'compare', label: 'Comparar ambos escenarios' },
+      { value: 'specific_profiles', label: 'Perfiles específicos' },
+    ],
   }),
   estimationQuestionSchema.parse({
     id: 'F04', kind: 'fixed', category: 'Postproducción', question: '¿Postproducción?',
@@ -130,6 +139,7 @@ vi.mock('../api/estimation.queries', async () => {
   };
 });
 vi.mock('../api/quotation.queries', () => ({
+  useQuotationActiveTeams: () => ({ data: mocks.activeTeams, isLoading: false, isFetching: false, isError: false }),
   useGenerateAiDemoQuotationVersion: () => ({
     isPending: false, mutateAsync: mocks.generate,
   }),
@@ -153,6 +163,10 @@ beforeEach(() => {
   mocks.onClose.mockClear();
   mocks.toastError.mockReset();
   mocks.serviceAccountEnabled = true;
+  mocks.activeTeams = [
+    { teamId: '0777e456-fd76-445e-83f1-afc25061c121', name: 'Desarrollo', isActive: true },
+    { teamId: '0777e456-fd76-445e-83f1-afc25061c122', name: 'QA', isActive: true },
+  ];
   mocks.updateExtras.mockReset().mockResolvedValue(undefined);
   mocks.resolve.mockReset().mockResolvedValue({
     connection: 'connected', status: 'needs_confirmation',
@@ -211,6 +225,66 @@ function answerFixed() {
 }
 
 describe('Asistente v5 de cotización · sistema visual Kora', () => {
+
+  it('F03 habilita solo perfiles específicos y exige equipos reales antes de continuar', async () => {
+    renderWizard();
+    await analyzeAndConfirm();
+    expect(screen.getByLabelText(/Disponibilidad real de Kora/)).toBeDisabled();
+    expect(screen.getByLabelText(/Comparar ambos escenarios/)).toBeDisabled();
+    expect(screen.getByLabelText('Perfiles específicos')).toBeEnabled();
+    fireEvent.click(screen.getByLabelText('MVP'));
+    fireEvent.click(screen.getByLabelText('N semanas'));
+    fireEvent.change(screen.getByLabelText('Número de semanas'), { target: { value: '8' } });
+    fireEvent.click(screen.getByLabelText('Ninguna'));
+    fireEvent.click(screen.getByLabelText('Perfiles específicos'));
+    expect(screen.getByRole('group', { name: 'Equipos específicos disponibles' }))
+      .toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar' }));
+    expect(screen.getAllByRole('alert').map((item) => item.textContent).join(' '))
+      .toContain('Completa la pregunta obligatoria');
+    expect(screen.getByText('Condiciones de la estimación')).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText('Desarrollo'));
+    fireEvent.click(screen.getByLabelText('QA'));
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar' }));
+    expect(screen.getByText(/aclaraciones de mayor impacto/)).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText('Sí'));
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar' }));
+    expect(screen.getByText('Desarrollo, QA')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Generar estimación' }));
+    await waitFor(() => expect(mocks.generate).toHaveBeenCalledOnce());
+    const payload = mocks.generate.mock.calls[0]![0] as {
+      selectedTeamIds: string[]; answers: Array<{ questionId: string; value: unknown }>;
+    };
+    expect(payload.selectedTeamIds).toEqual([
+      '0777e456-fd76-445e-83f1-afc25061c121',
+      '0777e456-fd76-445e-83f1-afc25061c122',
+    ]);
+    expect(payload.answers).toEqual(expect.arrayContaining([
+      expect.objectContaining({ questionId: 'F03', value: 'specific_profiles' }),
+    ]));
+  });
+
+  it('F03 al regresar a Equipo ideal descarta la selección específica', async () => {
+    renderWizard();
+    await analyzeAndConfirm();
+    fireEvent.click(screen.getByLabelText('Perfiles específicos'));
+    fireEvent.click(screen.getByLabelText('Desarrollo'));
+    fireEvent.click(screen.getByLabelText('Equipo ideal'));
+    expect(screen.queryByRole('group', { name: 'Equipos específicos disponibles' }))
+      .not.toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText('MVP'));
+    fireEvent.click(screen.getByLabelText('N semanas'));
+    fireEvent.change(screen.getByLabelText('Número de semanas'), { target: { value: '8' } });
+    fireEvent.click(screen.getByLabelText('Ninguna'));
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar' }));
+    fireEvent.click(screen.getByLabelText('Sí'));
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Generar estimación' }));
+    await waitFor(() => expect(mocks.generate).toHaveBeenCalledOnce());
+    expect(mocks.generate.mock.calls[0]![0].selectedTeamIds).toEqual([]);
+  });
+
+
 
   it('descubre carpetas sin URL previa y guarda la seleccionada en Extras', async () => {
     renderWizard({ ...project, documentationLink: null } as ProjectDetail);

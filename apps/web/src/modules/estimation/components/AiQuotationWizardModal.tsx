@@ -21,7 +21,7 @@ import {
 } from '../api/estimation.queries';
 import { estimationApi, type DriveBrowseResult, type DriveBrowseFolder } from '../api/estimation.api';
 import { FileTextIcon, FolderOpenIcon, CheckIcon } from '@/shared/components/icons/Icons';
-import { useGenerateAiDemoQuotationVersion } from '../api/quotation.queries';
+import { useGenerateAiDemoQuotationVersion, useQuotationActiveTeams } from '../api/quotation.queries';
 import styles from './AiQuotationWizardModal.module.css';
 import { adaptDynamicQuestionToScope } from './quotation-dynamic-scope';
 
@@ -93,6 +93,7 @@ function displayAnswer(question: EstimationQuestion, value: EstimationAnswerValu
 
 function QuestionField({
   question, value, assumed, onChange, onAssume, error, prefillSource,
+  teamOptions, selectedTeamIds, onTeamSelectionChange, teamListLoading, teamListError,
 }: {
   question: EstimationQuestion;
   value: EstimationAnswerValue | undefined;
@@ -101,6 +102,11 @@ function QuestionField({
   onAssume: () => void;
   error: boolean;
   prefillSource?: string;
+  teamOptions?: readonly { teamId: string; name: string }[];
+  selectedTeamIds?: readonly string[];
+  onTeamSelectionChange?: (ids: string[]) => void;
+  teamListLoading?: boolean;
+  teamListError?: boolean;
 }) {
   const selected = (key: string) => {
     if (key === 'other') {
@@ -123,7 +129,7 @@ function QuestionField({
   // Control nativo, pero con apariencia de píldora v5.
   // Los radios/checkboxes permanecen accesibles por teclado.
   const choice = (key: string, label: string, multi = false) => {
-    const disabled = question.id === 'F03' && key !== 'ideal';
+    const disabled = question.id === 'F03' && key !== 'ideal' && key !== 'specific_profiles';
     const checked = selected(key) && !assumed;
     return (
       <label key={key} className={[
@@ -229,6 +235,33 @@ function QuestionField({
             {question.options.map((item) =>
               choice(item.value, item.label, question.answerType === 'multi_choice'))}
           </div>
+          {question.id === 'F03' && value === 'specific_profiles' && !assumed && (
+            <div className={styles.specificTeams}>
+              <strong>Equipos que participarán en la estimación</strong>
+              <p>Selecciona uno o más equipos activos de Kora. El modelo solo podrá asignar perfiles
+                a estos equipos. La política de supervisión exige incluir Desarrollo o Arquitectura.</p>
+              {teamListLoading ? <p role="status">Cargando equipos activos…</p>
+                : teamListError ? <p role="alert">No fue posible cargar el catálogo de equipos.</p>
+                  : !teamOptions?.length ? <p role="alert">No hay equipos activos disponibles.</p>
+                    : <div className={styles.specificTeamOptions} role="group"
+                      aria-label="Equipos específicos disponibles">
+                      {teamOptions.map((team) => (
+                        <label key={team.teamId} className={styles.specificTeamOption}>
+                          <input type="checkbox" aria-label={team.name}
+                            checked={selectedTeamIds?.includes(team.teamId) ?? false}
+                            onChange={(event) => onTeamSelectionChange?.(
+                              event.target.checked
+                                ? [...(selectedTeamIds ?? []), team.teamId]
+                                : (selectedTeamIds ?? []).filter((id) => id !== team.teamId),
+                            )} />
+                          <span>{team.name}</span>
+                        </label>
+                      ))}
+                    </div>}
+              {!teamListLoading && !teamListError && (teamOptions?.length ?? 0) > 0 &&
+                !(selectedTeamIds?.length) && <small>Selecciona al menos un equipo.</small>}
+            </div>
+          )}
           {otherSelected && (
             <div className={styles.otherDetail}>
               <label htmlFor={'other-detail-' + question.id}>Especifica otra opción</label>
@@ -291,6 +324,7 @@ export function AiQuotationWizardModal({ project, onClose }: {
   const [understanding, setUnderstanding] = useState('');
   const [editingUnderstanding, setEditingUnderstanding] = useState(false);
   const [answers, setAnswers] = useState<AnswerState>({});
+  const [selectedTeamIds, setSelectedTeamIds] = useState<string[]>([]);
   const [assumptions, setAssumptions] = useState<string[]>([]);
   const [error, setError] = useState('');
   const toast = useToast();
@@ -356,6 +390,8 @@ export function AiQuotationWizardModal({ project, onClose }: {
   const questionnaire = useEstimationQuestionnaireDefinition();
   const analysis = useAnalyzeEstimationPoc();
   const generate = useGenerateAiDemoQuotationVersion(project.id);
+  const teamCatalog = useQuotationActiveTeams(project.id,
+    stage === 2 && answers.F03 === 'specific_profiles');
 
   const verifiedAnalysis = (analysisSnapshot?.provider === 'gemini' ||
     analysisSnapshot?.provider === 'openai') &&
@@ -630,6 +666,12 @@ export function AiQuotationWizardModal({ project, onClose }: {
   const answered = (question: EstimationQuestion) => {
     if (assumptions.includes(question.id)) return true;
     const value = answers[question.id];
+    if (question.id === 'F03' && value === 'specific_profiles') {
+      const active = teamCatalog.data ?? [];
+      return !teamCatalog.isLoading && !teamCatalog.isError && active.length > 0 &&
+        selectedTeamIds.length > 0 && selectedTeamIds.length <= 12 &&
+        selectedTeamIds.every((id) => active.some((team) => team.teamId === id));
+    }
     if (question.id === 'F02' && typeof value === 'string') {
       if (value.startsWith('Fecha objetivo:')) {
         return /^Fecha objetivo:\s*\d{4}-\d{2}-\d{2}$/.test(value);
@@ -724,6 +766,7 @@ export function AiQuotationWizardModal({ project, onClose }: {
         }
       }
       setAnswers(prefilled);
+      setSelectedTeamIds([]);
       setAssumptions([]);
       setStage(1);
     } catch (reason) {
@@ -801,6 +844,7 @@ export function AiQuotationWizardModal({ project, onClose }: {
         confirmedUnderstanding: understanding.trim(),
         dynamicQuestions: dynamic,
         answers: collectAnswers(),
+        selectedTeamIds: answers.F03 === 'specific_profiles' ? selectedTeamIds : [],
       });
       onClose();
       navigate(projectQuotationPath(project) + '?version=' + created.id);
@@ -1177,7 +1221,15 @@ export function AiQuotationWizardModal({ project, onClose }: {
               prefillSource={verifiedAnalysis?.fixedPrefills?.find(
                 (item) => item.questionId === question.id,
               )?.sourceRefs.map((source) => source.fileName).join(', ')}
-              onChange={(value) => change(question.id, value)}
+              onChange={(value) => {
+                change(question.id, value);
+                if (question.id === 'F03') setSelectedTeamIds([]);
+              }}
+              teamOptions={question.id === 'F03' ? teamCatalog.data?.filter((team) => team.isActive) : undefined}
+              selectedTeamIds={question.id === 'F03' ? selectedTeamIds : undefined}
+              onTeamSelectionChange={setSelectedTeamIds}
+              teamListLoading={teamCatalog.isLoading || teamCatalog.isFetching}
+              teamListError={teamCatalog.isError}
               onAssume={() => assume(question.id)} error={invalidId === question.id} />
           ))}
         </section>
@@ -1214,7 +1266,12 @@ export function AiQuotationWizardModal({ project, onClose }: {
                 <dt>{question.category} · {question.question}</dt>
                 <dd>{assumptions.includes(question.id)
                   ? 'Se deja como supuesto: ' + question.assumptionIfSkipped
-                  : displayAnswer(question, answers[question.id])}</dd>
+                  : displayAnswer(question, answers[question.id])}
+                  {question.id === 'F03' && answers.F03 === 'specific_profiles' &&
+                    <span className={styles.teamReview}>
+                      {selectedTeamIds.map((id) =>
+                        teamCatalog.data?.find((team) => team.teamId === id)?.name ?? id).join(', ')}
+                    </span>}</dd>
               </div>
             ))}</dl>
             <h4>Supuestos adoptados</h4>

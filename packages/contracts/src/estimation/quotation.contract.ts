@@ -79,6 +79,8 @@ export const quotationAiPocSnapshotSchema = z.object({
   confirmedUnderstanding: z.string().trim().max(4000).nullish(),
   edt: quotationReferenceEdtSchema.nullish(),
   roleTeamIds: z.record(z.string(), uuidSchema).default({}),
+  /** Restricción comercial elegida en F03; las asignaciones efectivas quedan en roleTeamIds. */
+  selectedTeamIds: z.array(uuidSchema).max(12).default([]),
 });
 export type QuotationAiPocSnapshot = z.infer<typeof quotationAiPocSnapshotSchema>;
 

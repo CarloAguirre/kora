@@ -279,6 +279,11 @@ export type GenerateEstimationPocInput = z.infer<typeof generateEstimationPocSch
 export const generateAiDemoQuotationSchema = generateEstimationPocSchema.extend({
   dynamicQuestions: z.array(estimationQuestionSchema).max(5).default([]),
   confirmedUnderstanding: z.string().trim().min(20).max(4000).optional(),
+  /** Equipos reales de Kora habilitados por el usuario cuando F03=specific_profiles. */
+  selectedTeamIds: z.array(uuidSchema).max(12).refine(
+    (ids) => new Set(ids).size === ids.length,
+    'No se pueden seleccionar equipos repetidos.',
+  ).optional(),
 });
 export type GenerateAiDemoQuotationInput = z.infer<typeof generateAiDemoQuotationSchema>;
 

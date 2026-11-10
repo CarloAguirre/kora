@@ -163,7 +163,7 @@ describe('POST versions/ai-poc · Gemini con KDM', () => {
     expect(generator.reconcileProposalWithEdt).toHaveBeenCalledWith(proposal, edt);
     expect(drafts.createAiPocDraft).toHaveBeenCalledWith(
       projectId, actor, proposal, input.answers, input.dynamicQuestions, edt,
-      undefined, { Desarrollo: teamId },
+      undefined, { Desarrollo: teamId }, [],
     );
     expect(result).toMatchObject({
       origin: 'ai', status: 'draft', aiReviewStatus: 'pending',
@@ -180,7 +180,7 @@ describe('POST versions/ai-poc · Gemini con KDM', () => {
     expect(generator.generateEdt).toHaveBeenCalledWith(enriched, proposal, catalog, undefined);
     expect(drafts.createAiPocDraft).toHaveBeenCalledWith(
       projectId, actor, proposal, input.answers, input.dynamicQuestions,
-      edt, confirmedUnderstanding, { Desarrollo: teamId },
+      edt, confirmedUnderstanding, { Desarrollo: teamId }, [],
     );
   });
 
@@ -202,6 +202,67 @@ describe('POST versions/ai-poc · Gemini con KDM', () => {
     expect(generator.generateEdt).toHaveBeenCalledWith(real,
       expect.objectContaining({ sourceMode: 'drive' }), catalog,
       expect.objectContaining({ readDriveSources: expect.any(Function) }));
+  });
+
+  it('expone un catálogo real autorizado para el selector F03 sin consultar equipos inventados', async () => {
+    const { controller, drafts } = setup();
+    const found = await controller.listActiveTeams(projectId, actor as never);
+    expect(found).toEqual(catalog);
+    expect(drafts.listActiveQuotationTeams).toHaveBeenCalledWith(projectId, actor);
+  });
+
+  it('F03 específico restringe propuesta y EDT a los equipos activos seleccionados', async () => {
+    const { controller, drafts, generator } = setup();
+    const qaId = '0777e456-fd76-445e-83f1-afc25061c125';
+    drafts.listActiveQuotationTeams.mockResolvedValueOnce([
+      ...catalog, { teamId: qaId, name: 'QA', isActive: true },
+    ]);
+    const selection = {
+      ...input,
+      answers: input.answers.map((answer) => answer.questionId === 'F03'
+        ? { ...answer, value: 'specific_profiles' } : answer),
+      selectedTeamIds: [teamId],
+    };
+    await controller.createAiPoc(projectId, selection, actor as never);
+    expect(generator.execute).toHaveBeenCalledWith(selection, catalog, undefined);
+    expect(generator.generateEdt).toHaveBeenCalledWith(selection, proposal, catalog, undefined);
+    expect(drafts.createAiPocDraft).toHaveBeenCalledWith(
+      projectId, actor, proposal, selection.answers, selection.dynamicQuestions,
+      edt, undefined, { Desarrollo: teamId }, [teamId],
+    );
+  });
+
+  it('rechaza equipos inactivos, ajenos y ausencia de selección ANTES de llamar IA', async () => {
+    const selection = (ids: string[]) => ({
+      ...input,
+      selectedTeamIds: ids,
+      answers: input.answers.map((answer) => answer.questionId === 'F03'
+        ? { ...answer, value: 'specific_profiles' } : answer),
+    });
+    for (const ids of [[], [actor.id]]) {
+      const { controller, generator } = setup();
+      await expect(controller.createAiPoc(projectId, selection(ids), actor as never))
+        .rejects.toBeInstanceOf(BadRequestException);
+      expect(generator.execute).not.toHaveBeenCalled();
+    }
+    const { controller, generator } = setup();
+    await expect(controller.createAiPoc(projectId, { ...input, selectedTeamIds: [teamId] },
+      actor as never)).rejects.toThrow(/solo se permiten si F03/);
+    expect(generator.execute).not.toHaveBeenCalled();
+  });
+
+  it('impide selección solo QA cuando falta equipo compatible con supervisión TL', async () => {
+    const { controller, drafts, generator } = setup();
+    const qaId = '0777e456-fd76-445e-83f1-afc25061c125';
+    drafts.listActiveQuotationTeams.mockResolvedValueOnce([
+      ...catalog, { teamId: qaId, name: 'QA', isActive: true },
+    ]);
+    await expect(controller.createAiPoc(projectId, {
+      ...input, selectedTeamIds: [qaId],
+      answers: input.answers.map((answer) => answer.questionId === 'F03'
+        ? { ...answer, value: 'specific_profiles' } : answer),
+    }, actor as never)).rejects.toThrow(/supervisión obligatoria/);
+    expect(generator.execute).not.toHaveBeenCalled();
   });
 
   it('no gasta solicitudes Gemini si no existe autorización para carpeta real', async () => {
