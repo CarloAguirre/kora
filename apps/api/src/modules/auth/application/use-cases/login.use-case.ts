@@ -3,6 +3,7 @@ import { CLOCK, err, ok, type ApplicationError, type Clock, type Result } from '
 import { AUTH_ERROR_CODES, type LoginInput } from '@kora/contracts';
 import { UnauthorizedError, ForbiddenError } from '@kora/core';
 import { Email } from '../../../users/domain/value-objects/email.vo';
+import { ClientPortalLoginAccessService } from '../../infrastructure/client-portal-login-access.service';
 import {
   USER_REPOSITORY,
   type UserRepository,
@@ -60,6 +61,7 @@ export class LoginUseCase implements UseCase<LoginCommand, LoginOutcome, Applica
     @Inject(CLOCK) private readonly clock: Clock,
     private readonly sessionIssuer: SessionIssuerService,
     private readonly config: AppConfigService,
+    private readonly portalLoginAccess: ClientPortalLoginAccessService,
   ) {}
 
   async execute(command: LoginCommand): Promise<Result<LoginOutcome, ApplicationError>> {
@@ -70,16 +72,23 @@ export class LoginUseCase implements UseCase<LoginCommand, LoginOutcome, Applica
     if (emailResult.isErr()) return err(invalidCredentials());
     const email = emailResult.value;
 
-    if (!email.belongsToAnyDomain(settings.allowedEmailDomains)) {
+    // El dominio corporativo sigue siendo la regla general.
+    // Excepción estricta: usuario cliente cuyo contacto está habilitado
+    // por un administrador en el portal externo (nunca por dominio abierto).
+    const user = await this.users.findByEmail(email);
+    const isExternalContact = user && !user.isDeleted && user.role === 'cliente';
+    const portalEnabled = isExternalContact
+      ? await this.portalLoginAccess.isEnabled(user.id, email.value)
+      : false;
+    if ((!email.belongsToAnyDomain(settings.allowedEmailDomains) && !portalEnabled) ||
+      (isExternalContact && !portalEnabled)) {
       return err(
         new ForbiddenError(
-          'Este correo no pertenece a un dominio autorizado.',
+          'Este correo no pertenece a un dominio autorizado o su acceso al portal fue revocado.',
           AUTH_ERROR_CODES.EMAIL_DOMAIN_NOT_ALLOWED,
         ),
       );
     }
-
-    const user = await this.users.findByEmail(email);
     if (!user || user.isDeleted) {
       await this.recordFailure(command, null, email.value, 'unknown_user');
       return err(invalidCredentials());
