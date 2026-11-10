@@ -907,6 +907,66 @@ describe('GenerateEstimationPocProposalUseCase', () => {
     expect(mock.calls()).toBe(2);
   });
 
+  it('explica al modelo OpenAI la unicidad global de WBS y las referencias exactas en roleHours', async () => {
+    const mock = createGenerator(() => baseDetail(), 'openai');
+    const edt = await mock.generator.generateEdt(input, proposal([
+      { role: 'Desarrollo', hours: 50 }, { role: 'QA', hours: 30 },
+    ], 'openai'));
+    expect(mock.calls()).toBe(1);
+    expect(edt.totalHours).toBe(79);
+    expect(mock.instructions[0]).toContain('REGLA CRÍTICA WBS');
+    expect(mock.instructions[0]).toContain('No reinicies el contador por módulo');
+    const schema = mock.requestedSchemas[0] as {
+      properties: {
+        activities: { items: { properties: { wbs: { description: string } } } };
+        roleHours: { items: { properties: { wbs: { description: string } } } };
+      };
+    };
+    expect(schema.properties.activities.items.properties.wbs.description)
+      .toContain('ÚNICO EN TODA LA EDT');
+    expect(schema.properties.roleHours.items.properties.wbs.description)
+      .toContain('Referencia EXACTA');
+  });
+
+  it('reintenta WBS duplicado solo con opt-in, sin fusionar actividades ni cambiar HH', async () => {
+    vi.stubEnv('KORA_EDT_MAX_ATTEMPTS', '2');
+    const mock = createGenerator((attempt) => {
+      const data = baseDetail();
+      if (attempt === 1) {
+        data.activities.push({
+          ...data.activities[0]!,
+          name: 'Otra funcionalidad',
+          description: 'Entrega independiente de la API',
+        });
+      }
+      return data;
+    }, 'openai');
+    const edt = await mock.generator.generateEdt(input, proposal([
+      { role: 'Desarrollo', hours: 50 }, { role: 'QA', hours: 30 },
+    ], 'openai'));
+    expect(mock.calls()).toBe(2);
+    expect(mock.instructions[1]).toContain('WBS duplicado en activities');
+    expect(mock.instructions[1]).toContain('ajusta cada referencia roleHours.wbs');
+    expect(edt.totalHours).toBe(79);
+    expect(edt.modules.flatMap((module) => module.tasks)).toHaveLength(3);
+  });
+
+  it('un WBS duplicado de OpenAI sigue bloqueando el resultado sin reintento automático', async () => {
+    vi.stubEnv('KORA_EDT_MAX_ATTEMPTS', '1');
+    const mock = createGenerator(() => {
+      const data = baseDetail();
+      data.activities.push({
+        ...data.activities[0]!,
+        name: 'Otra funcionalidad',
+      });
+      return data;
+    }, 'openai');
+    await expect(mock.generator.generateEdt(input, proposal([
+      { role: 'Desarrollo', hours: 50 }, { role: 'QA', hours: 30 },
+    ], 'openai'))).rejects.toThrow(/OpenAI devolvió una EDT inconsistente.*WBS duplicado/);
+    expect(mock.calls()).toBe(1);
+  });
+
   it('nunca fusiona actividades con WBS duplicado', async () => {
     const mock = createGenerator(() => {
       const result = baseDetail();
