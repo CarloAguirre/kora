@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CreateUserInput } from '@kora/contracts';
+import type { ClientPortalProvisioner } from '../ports/client-portal-provisioner.port';
 import { CreateUserUseCase } from './create-user.use-case';
 import { InMemoryUserRepository } from '../../../../test/fakes/in-memory-user.repository';
 import {
@@ -42,7 +43,7 @@ describe('CreateUserUseCase', () => {
   let audit: RecordingAuditRecorder;
   let unitOfWork: PassthroughUnitOfWork;
   let useCase: CreateUserUseCase;
-  let provisionPortal: ReturnType<typeof vi.fn>;
+  let provisionPortal: ReturnType<typeof vi.fn<ClientPortalProvisioner['provision']>>;
 
   beforeEach(() => {
     users = new InMemoryUserRepository();
@@ -52,7 +53,7 @@ describe('CreateUserUseCase', () => {
     notifications = new RecordingNotificationSender();
     audit = new RecordingAuditRecorder();
     unitOfWork = new PassthroughUnitOfWork();
-    provisionPortal = vi.fn().mockResolvedValue(undefined);
+    provisionPortal = vi.fn<ClientPortalProvisioner['provision']>().mockResolvedValue(undefined);
 
     useCase = new CreateUserUseCase(
       users,
