@@ -327,7 +327,9 @@ export class QuotationController {
         'Incluye un equipo de desarrollo o arquitectura para la supervisión obligatoria del Líder Técnico.',
       );
     }
-    onActivity?.('teams_verified', 'Equipos permitidos para esta estimación: ' + allowedTeams.length + '.');
+    onActivity?.('teams_verified', specific
+      ? 'Equipos específicos seleccionados: ' + allowedTeams.length + '.'
+      : 'Equipos activos disponibles: ' + allowedTeams.length + '.');
     onPhase?.('proposal');
     const proposal = onThoughtSummary
       ? await this.generator.execute(input, allowedTeams, sourceReader, onThoughtSummary, onActivity)
