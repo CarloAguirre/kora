@@ -105,7 +105,7 @@ export const clientPortalApi = {
   grants: (clientId: string) =>
     api.get<PortalContactGrant[]>(`/clients/${encodeURIComponent(clientId)}/portal-access`),
   setGrant: (clientId: string, contactId: string, input: ClientPortalGrantInput) =>
-    api.put<{ userId: string; invitationSent: boolean; enabled: boolean }>(
+    api.patch<{ userId: string; invitationSent: boolean; enabled: boolean }>(
       `/clients/${encodeURIComponent(clientId)}/portal-access/contacts/${encodeURIComponent(contactId)}`, input),
 };
 
