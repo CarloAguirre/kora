@@ -554,6 +554,7 @@ export const projectPaymentMilestoneSchema = z.object({
   percent: z.number().nullable(),
   amount: z.number(),
   invoiceNumber: z.string().nullable(),
+  hasAttachment: z.boolean().optional(),
   issuedAt: z.iso.date().nullable(),
   /** Vencimiento del pago — se fija al facturar. */
   dueAt: z.iso.date().nullable(),

@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, clients, eq, gt, isNull, lte, projectPaymentMilestones, projects, type Database } from '@kora/db';
+import { and, asc, clients, eq, gt, isNull, lte, sql, projectInvoiceAttachments, projectPaymentMilestones, projects, type Database } from '@kora/db';
 import type { TransactionContext } from '@kora/core';
 import type {
   CreateProjectPaymentMilestoneInput,
@@ -13,6 +13,7 @@ import { DATABASE } from '../../../../shared/infrastructure/database/database.mo
 import { resolveDb } from '../../../../shared/infrastructure/database/unit-of-work';
 
 const SELECTION = {
+  hasAttachment: sql<boolean>`exists(select 1 from ${projectInvoiceAttachments} where ${projectInvoiceAttachments.milestoneId} = ${projectPaymentMilestones.id})`,
   id: projectPaymentMilestones.id,
   projectId: projectPaymentMilestones.projectId,
   name: projectPaymentMilestones.name,
@@ -30,6 +31,7 @@ const SELECTION = {
 };
 
 type Row = {
+  hasAttachment: boolean;
   id: string;
   projectId: string;
   name: string;
@@ -48,6 +50,7 @@ type Row = {
 
 function toRecord(row: Row): ProjectPaymentMilestoneRecord {
   return {
+    hasAttachment: row.hasAttachment,
     id: row.id,
     projectId: row.projectId,
     name: row.name,
@@ -68,6 +71,21 @@ function toRecord(row: Row): ProjectPaymentMilestoneRecord {
 @Injectable()
 export class DrizzleProjectPaymentMilestoneRepository implements ProjectPaymentMilestoneRepository {
   constructor(@Inject(DATABASE) private readonly database: Database) {}
+
+  async getAttachment(id: string): Promise<{ name: string; content: string } | null> {
+    const [row] = await this.database.select({ name: projectInvoiceAttachments.name, content: projectInvoiceAttachments.content })
+      .from(projectInvoiceAttachments)
+      .where(eq(projectInvoiceAttachments.milestoneId, id));
+    return row ?? null;
+  }
+
+  async attachDocument(id: string, attachment: { name: string; content: string }): Promise<boolean> {
+    const inserted = await this.database.insert(projectInvoiceAttachments)
+      .values({ milestoneId: id, ...attachment })
+      .onConflictDoNothing()
+      .returning({ id: projectInvoiceAttachments.milestoneId });
+    return inserted.length > 0;
+  }
 
   async listForProject(
     projectId: string,
@@ -165,24 +183,29 @@ export class DrizzleProjectPaymentMilestoneRepository implements ProjectPaymentM
   async update(id: string, input: UpdateProjectPaymentMilestoneInput, context?: TransactionContext): Promise<void> {
     const db = resolveDb(this.database, context);
 
-    await db
-      .update(projectPaymentMilestones)
-      .set({
-        ...(input.name !== undefined ? { name: input.name } : {}),
-        ...(input.percent !== undefined ? { percent: input.percent != null ? String(input.percent) : null } : {}),
-        ...(input.amount !== undefined ? { amount: String(input.amount) } : {}),
-        ...(input.sortOrder !== undefined ? { sortOrder: input.sortOrder } : {}),
-        ...(input.triggerType !== undefined ? { triggerType: input.triggerType } : {}),
-        ...(input.triggerPhase !== undefined ? { triggerPhase: input.triggerPhase } : {}),
-        ...(input.triggerDate !== undefined ? { triggerDate: input.triggerDate } : {}),
-        ...(input.status !== undefined ? { status: input.status } : {}),
-        ...(input.invoiceNumber !== undefined ? { invoiceNumber: input.invoiceNumber } : {}),
-        ...(input.issuedAt !== undefined ? { issuedAt: input.issuedAt } : {}),
-        ...(input.dueAt !== undefined ? { dueAt: input.dueAt } : {}),
-        ...(input.paidAt !== undefined ? { paidAt: input.paidAt } : {}),
-        updatedAt: new Date(),
-      })
-      .where(eq(projectPaymentMilestones.id, id));
+    await db.transaction(async (tx) => {
+      await tx
+        .update(projectPaymentMilestones)
+        .set({
+          ...(input.name !== undefined ? { name: input.name } : {}),
+          ...(input.percent !== undefined ? { percent: input.percent != null ? String(input.percent) : null } : {}),
+          ...(input.amount !== undefined ? { amount: String(input.amount) } : {}),
+          ...(input.sortOrder !== undefined ? { sortOrder: input.sortOrder } : {}),
+          ...(input.triggerType !== undefined ? { triggerType: input.triggerType } : {}),
+          ...(input.triggerPhase !== undefined ? { triggerPhase: input.triggerPhase } : {}),
+          ...(input.triggerDate !== undefined ? { triggerDate: input.triggerDate } : {}),
+          ...(input.status !== undefined ? { status: input.status } : {}),
+          ...(input.invoiceNumber !== undefined ? { invoiceNumber: input.invoiceNumber } : {}),
+          ...(input.issuedAt !== undefined ? { issuedAt: input.issuedAt } : {}),
+          ...(input.dueAt !== undefined ? { dueAt: input.dueAt } : {}),
+          ...(input.paidAt !== undefined ? { paidAt: input.paidAt } : {}),
+          updatedAt: new Date(),
+        })
+        .where(eq(projectPaymentMilestones.id, id));
+      if (input.status === 'pending' || input.status === 'to_invoice') {
+        await tx.delete(projectInvoiceAttachments).where(eq(projectInvoiceAttachments.milestoneId, id));
+      }
+    });
   }
 
   async remove(id: string, context?: TransactionContext): Promise<void> {
@@ -219,6 +242,9 @@ export class DrizzleProjectPaymentMilestoneRepository implements ProjectPaymentM
         updatedAt: new Date(),
       })
       .where(eq(projectPaymentMilestones.id, id));
+    if (input.attachment) {
+      await db.insert(projectInvoiceAttachments).values({ milestoneId: id, ...input.attachment });
+    }
   }
 
   async markPaid(id: string, paidAt: Date, context?: TransactionContext): Promise<void> {

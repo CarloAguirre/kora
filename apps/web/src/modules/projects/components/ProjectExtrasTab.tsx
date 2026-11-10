@@ -29,6 +29,7 @@ import {
 import { ApiRequestError } from '@/shared/lib/api-client';
 import { formatMoney } from '@/shared/lib/format-money';
 import { IssueProjectMilestoneInvoiceDialog } from './IssueProjectMilestoneInvoiceDialog';
+import { ProjectInvoiceDocumentButton } from './ProjectInvoiceDocumentButton';
 import { MarkProjectMilestonePaidDialog } from './MarkProjectMilestonePaidDialog';
 import { EditProjectMilestoneDialog } from './EditProjectMilestoneDialog';
 import { PaymentTriggerFields } from './PaymentTriggerFields';
@@ -494,6 +495,14 @@ export function ProjectExtrasTab({ project, canManage }: { project: ProjectDetai
                   </Badge>
 
                   <div className={styles.milestoneActions}>
+                    {!isNotInvoiced(milestone.status) && (
+                      <ProjectInvoiceDocumentButton
+                        projectId={project.id}
+                        milestoneId={milestone.id}
+                        hasAttachment={milestone.hasAttachment}
+                        canManageBilling={canManageBillingActions}
+                      />
+                    )}
                     {canManageMilestones && (
                       <Button variant="ghost" size="icon" onClick={() => setEditingMilestone(milestone)} aria-label={`Editar ${milestone.name}`}>
                         <PencilIcon size={16} />

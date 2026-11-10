@@ -24,6 +24,8 @@ import { NOTIFICATION_SENDER, type NotificationSender } from '../../../../shared
 import type { ActorContext, UseCase } from '../../../../shared/application/use-case';
 
 export interface IssueProjectPaymentMilestoneInvoiceCommand {
+  readonly projectId?: string;
+  readonly attachment?: { name: string; content: string };
   readonly milestoneId: string;
   readonly data: IssueProjectPaymentMilestoneInvoiceInput;
   readonly actor: ActorContext;
@@ -32,7 +34,7 @@ export interface IssueProjectPaymentMilestoneInvoiceCommand {
 /**
  * Registra que un tramo ya fue facturado — igual criterio que
  * `MarkSupportInvoiceIssuedUseCase`: Kora no emite la factura, solo folio y
- * fecha. El adjunto es solo el nombre del archivo (sin Storage todavía).
+ * fecha. El PDF opcional se guarda en la misma transaccion.
  *
  * Si es el primer tramo del proyecto (el de `sortOrder` más bajo) de un
  * proyecto `aprobado`, dispara Hito 0: activa el proyecto (interruptor
@@ -69,7 +71,9 @@ export class IssueProjectPaymentMilestoneInvoiceUseCase
 
   async execute(command: IssueProjectPaymentMilestoneInvoiceCommand): Promise<Result<void, ApplicationError>> {
     const milestone = await this.milestones.findById(command.milestoneId);
-    if (!milestone) return err(new ProjectPaymentMilestoneNotFoundError(command.milestoneId));
+    if (!milestone || (command.projectId && milestone.projectId !== command.projectId)) {
+      return err(new ProjectPaymentMilestoneNotFoundError(command.milestoneId));
+    }
     // Normalmente se factura un tramo "Por facturar", pero Finanzas puede adelantarse al hito (p.ej. planes manuales).
     if (milestone.status !== 'pending' && milestone.status !== 'to_invoice') {
       return err(new ProjectPaymentMilestoneAlreadyIssuedError());
@@ -113,6 +117,7 @@ export class IssueProjectPaymentMilestoneInvoiceUseCase
           invoiceNumber: command.data.folio,
           issuedAt,
           dueAt: command.data.dueAt ? new Date(command.data.dueAt) : addDays(issuedAt, PROJECT_PAYMENT_DEFAULT_TERM_DAYS),
+          attachment: command.attachment,
         },
         tx,
       );

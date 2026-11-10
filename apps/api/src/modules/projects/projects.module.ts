@@ -38,6 +38,8 @@ import { CreateProjectPaymentMilestoneUseCase } from './application/use-cases/cr
 import { UpdateProjectPaymentMilestoneUseCase } from './application/use-cases/update-project-payment-milestone.use-case';
 import { DeleteProjectPaymentMilestoneUseCase } from './application/use-cases/delete-project-payment-milestone.use-case';
 import { IssueProjectPaymentMilestoneInvoiceUseCase } from './application/use-cases/issue-project-payment-milestone-invoice.use-case';
+import { AttachProjectInvoiceDocumentUseCase, GetProjectInvoiceDocumentUseCase } from './application/use-cases/project-invoice-document.use-cases';
+import { ProjectInvoiceDocumentsController } from './presentation/project-invoice-documents.controller';
 import { MarkProjectPaymentMilestonePaidUseCase } from './application/use-cases/mark-project-payment-milestone-paid.use-case';
 import { GetProjectBillingSettingsUseCase } from './application/use-cases/get-project-billing-settings.use-case';
 import { UpdateProjectBillingSettingsUseCase } from './application/use-cases/update-project-billing-settings.use-case';
@@ -86,7 +88,7 @@ import { DrizzleSupportContractStatusReader } from './infrastructure/services/dr
  */
 @Module({
   imports: [TeamsModule],
-  controllers: [ProjectsController],
+  controllers: [ProjectsController, ProjectInvoiceDocumentsController],
   providers: [
     CreateProjectUseCase,
     UpdateProjectUseCase,
@@ -124,6 +126,8 @@ import { DrizzleSupportContractStatusReader } from './infrastructure/services/dr
     UpdateProjectPaymentMilestoneUseCase,
     DeleteProjectPaymentMilestoneUseCase,
     IssueProjectPaymentMilestoneInvoiceUseCase,
+    AttachProjectInvoiceDocumentUseCase,
+    GetProjectInvoiceDocumentUseCase,
     MarkProjectPaymentMilestonePaidUseCase,
     GetProjectBillingSettingsUseCase,
     UpdateProjectBillingSettingsUseCase,

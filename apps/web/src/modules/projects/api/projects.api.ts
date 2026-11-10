@@ -171,9 +171,24 @@ export const projectsApi = {
   issuePaymentMilestoneInvoice(
     projectId: string,
     milestoneId: string,
-    input: IssueProjectPaymentMilestoneInvoiceInput,
+    input: IssueProjectPaymentMilestoneInvoiceInput & { file?: File },
   ): Promise<void> {
+    if (input.file) {
+      const { file, ...metadata } = input;
+      const body = new FormData();
+      body.append('metadata', JSON.stringify(metadata));
+      body.append('file_0', file);
+      return api.postFormData<void>(`/projects/${projectId}/payment-milestones/${milestoneId}/invoice/upload`, body);
+    }
     return api.post<void>(`/projects/${projectId}/payment-milestones/${milestoneId}/invoice`, input);
+  },
+  invoiceAttachment(projectId: string, milestoneId: string): Promise<Blob> {
+    return api.getBlob(`/projects/${projectId}/payment-milestones/${milestoneId}/attachment`);
+  },
+  uploadInvoiceAttachment(projectId: string, milestoneId: string, file: File): Promise<void> {
+    const body = new FormData();
+    body.append('file', file);
+    return api.postFormData<void>(`/projects/${projectId}/payment-milestones/${milestoneId}/attachment`, body);
   },
   markPaymentMilestonePaid(
     projectId: string,

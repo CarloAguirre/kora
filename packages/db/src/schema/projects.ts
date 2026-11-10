@@ -462,6 +462,12 @@ export const projectPaymentMilestones = pgTable('project_payment_milestones', {
   ...timestamps,
 });
 
+export const projectInvoiceAttachments = pgTable('project_invoice_attachments', {
+  milestoneId: uuid('milestone_id').primaryKey().references(() => projectPaymentMilestones.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  content: text('content').notNull(),
+});
+
 export const projectsRelations = relations(projects, ({ one, many }) => ({
   client: one(clients, { fields: [projects.clientId], references: [clients.id] }),
   leader: one(users, { fields: [projects.leaderUserId], references: [users.id] }),

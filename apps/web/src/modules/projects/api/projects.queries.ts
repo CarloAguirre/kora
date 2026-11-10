@@ -459,6 +459,19 @@ export function useMarkProjectPaymentMilestonePaid() {
   });
 }
 
+export function useUploadProjectInvoiceAttachment() {
+  const invalidate = useInvalidateProjects();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ projectId, milestoneId, file }: { projectId: string; milestoneId: string; file: File }) =>
+      projectsApi.uploadInvoiceAttachment(projectId, milestoneId, file),
+    onSuccess: () => {
+      invalidate();
+      return queryClient.invalidateQueries({ queryKey: ['billing'] });
+    },
+  });
+}
+
 export function useResolveProjectManagementApproval() {
   const invalidate = useInvalidateProjects();
   return useMutation({

@@ -9,6 +9,7 @@ export interface ProjectPaymentMilestoneRecord {
   readonly percent: number | null;
   readonly amount: number;
   readonly invoiceNumber: string | null;
+  readonly hasAttachment?: boolean;
   readonly issuedAt: Date | null;
   readonly dueAt: Date | null;
   readonly status: ProjectPaymentStatus;
@@ -51,12 +52,15 @@ export interface UpdateProjectPaymentMilestoneInput extends Partial<ProjectPayme
 }
 
 export interface IssueProjectPaymentMilestoneInvoiceInput {
+  readonly attachment?: { name: string; content: string };
   readonly invoiceNumber: string;
   readonly issuedAt: Date;
   readonly dueAt: Date;
 }
 
 export interface ProjectPaymentMilestoneRepository {
+  getAttachment(id: string): Promise<{ name: string; content: string } | null>;
+  attachDocument(id: string, attachment: { name: string; content: string }): Promise<boolean>;
   listForProject(projectId: string, context?: TransactionContext): Promise<ProjectPaymentMilestoneRecord[]>;
   /** Todos los tramos de proyectos no eliminados ni internos, con nombre de proyecto/cliente y moneda — para el libro combinado de Facturación. */
   listAll(context?: TransactionContext): Promise<ProjectPaymentMilestoneWithContext[]>;

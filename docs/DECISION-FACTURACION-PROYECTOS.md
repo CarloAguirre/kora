@@ -11,6 +11,33 @@ décimo perfil, `kora-perfil-finanzas.html`: un rol nuevo, "Finanzas", con una
 sola pantalla que junta Soporte y Proyectos, y una regla de negocio nueva:
 **Hito 0**.
 
+## Documentos PDF de facturas
+
+Las facturas de proyectos admiten el mismo flujo de documentos que soporte:
+al registrar una factura se puede adjuntar un PDF de hasta 5 MB; para un tramo
+ya facturado o pagado sin archivo aparece «Subir documento», y si tiene PDF
+aparece «Ver factura», que abre el archivo en otra pestaña. Disponible en
+Facturacion > Proyectos, su panel lateral y los tramos de la ficha del proyecto.
+
+La migracion `0055_confused_cargill` crea `project_invoice_attachments`, con
+nombre y contenido base64 separados de los listados. El PDF inicial se guarda
+en la misma transaccion que registra la factura y procesa Hito 0. Adjuntar a
+una factura existente no cambia importes, folio, fechas, pago ni Hito 0, y
+no permite reemplazar un archivo existente. Eliminar un tramo elimina su
+archivo por cascada; devolverlo a Pendiente/Por facturar limpia el PDF junto
+con el folio y las fechas para no reutilizar la factura anulada.
+
+Las rutas bajo `/projects/:projectId/payment-milestones/:milestoneId` son:
+`POST invoice/upload` (metadata JSON y `file_0`), `POST attachment` (campo
+`file`) y `GET attachment`. La carga exige `billing:manage`; la lectura,
+`billing:read`. Se comprueba que el tramo pertenece al proyecto y se
+reutiliza la validacion PDF de soporte (tipo, firma y tamaño). Las respuestas
+son PDF inline sin cache y viajan por el cliente autenticado, sin tokens en
+la URL. El registro JSON sin adjunto sigue usando la ruta original.
+
+Aplicar `pnpm db:migrate` con `DATABASE_URL` configurada antes de iniciar la
+API actualizada. Este cambio no incluye comprobantes de pago, solo facturas.
+
 ## Modelo de tramos: manual, no 2×50%
 
 El prototipo de la pestaña "Proyectos" de `kora-facturacion-soporte.html`
