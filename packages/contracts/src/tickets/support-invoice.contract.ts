@@ -258,6 +258,7 @@ export const BILLING_LEDGER_STATUS_LABELS: Readonly<Record<BillingLedgerStatus, 
 
 export const billingLedgerEntrySchema = z.object({
   hasAttachment: z.boolean().optional(),
+  hasPaymentReceipt: z.boolean().optional(),
   /** Id de la fila para la lista (no siempre corresponde a una entidad — la fila "pendiente" de un contrato de soporte vigente no tiene factura todavía). */
   id: z.string(),
   line: billingLedgerLineSchema,

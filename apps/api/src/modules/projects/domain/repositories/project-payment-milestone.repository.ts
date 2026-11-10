@@ -1,5 +1,11 @@
 import type { TransactionContext } from '@kora/core';
-import type { ProjectContractCurrency, ProjectPaymentStatus, ProjectPaymentTrigger, ProjectPhase } from '@kora/contracts';
+import type { PaymentReceiptMimeType, ProjectContractCurrency, ProjectPaymentStatus, ProjectPaymentTrigger, ProjectPhase } from '@kora/contracts';
+
+export interface ProjectPaymentReceipt {
+  readonly name: string;
+  readonly content: string;
+  readonly mimeType: PaymentReceiptMimeType;
+}
 
 /** Tramo de pago del proyecto ("Facturación de Proyectos") — cronograma de cobro configurado manualmente por proyecto. */
 export interface ProjectPaymentMilestoneRecord {
@@ -10,6 +16,7 @@ export interface ProjectPaymentMilestoneRecord {
   readonly amount: number;
   readonly invoiceNumber: string | null;
   readonly hasAttachment?: boolean;
+  readonly hasPaymentReceipt?: boolean;
   readonly issuedAt: Date | null;
   readonly dueAt: Date | null;
   readonly status: ProjectPaymentStatus;
@@ -59,6 +66,8 @@ export interface IssueProjectPaymentMilestoneInvoiceInput {
 }
 
 export interface ProjectPaymentMilestoneRepository {
+  getPaymentReceipt(id: string): Promise<ProjectPaymentReceipt | null>;
+  attachPaymentReceipt(id: string, receipt: ProjectPaymentReceipt): Promise<boolean>;
   getAttachment(id: string): Promise<{ name: string; content: string } | null>;
   attachDocument(id: string, attachment: { name: string; content: string }): Promise<boolean>;
   listForProject(projectId: string, context?: TransactionContext): Promise<ProjectPaymentMilestoneRecord[]>;
@@ -75,7 +84,7 @@ export interface ProjectPaymentMilestoneRepository {
   /** `pending` → `to_invoice` solo si sigue `pending`; `false` si otro proceso ya lo cambió. */
   markToInvoice(id: string, context?: TransactionContext): Promise<boolean>;
   markIssued(id: string, input: IssueProjectPaymentMilestoneInvoiceInput, context?: TransactionContext): Promise<void>;
-  markPaid(id: string, paidAt: Date, context?: TransactionContext): Promise<void>;
+  markPaid(id: string, paidAt: Date, context?: TransactionContext, receipt?: ProjectPaymentReceipt): Promise<void>;
 }
 
 export const PROJECT_PAYMENT_MILESTONE_REPOSITORY = Symbol('ProjectPaymentMilestoneRepository');

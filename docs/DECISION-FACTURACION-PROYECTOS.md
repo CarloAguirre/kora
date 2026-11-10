@@ -36,7 +36,31 @@ son PDF inline sin cache y viajan por el cliente autenticado, sin tokens en
 la URL. El registro JSON sin adjunto sigue usando la ruta original.
 
 Aplicar `pnpm db:migrate` con `DATABASE_URL` configurada antes de iniciar la
-API actualizada. Este cambio no incluye comprobantes de pago, solo facturas.
+API actualizada.
+
+## Comprobantes de pago
+
+Al marcar un tramo como pagado se puede adjuntar un comprobante PDF, JPG o PNG
+de hasta 5 MB. El servidor valida MIME, firma y tamaño; el archivo se guarda
+junto con el pago en una unica transaccion. La ruta original sin documento
+sigue funcionando.
+
+La migracion `0056_serious_quicksilver` crea `project_payment_receipts`, separada
+del PDF de la factura, con nombre original, MIME y contenido base64. En los
+tramos pagados aparece «Subir comprobante» si falta archivo real o «Ver
+comprobante» si existe. Aplica en Facturacion > Proyectos, su panel lateral y
+la ficha del proyecto. El archivo se abre en una pestaña nueva mediante el
+cliente autenticado.
+
+Bajo `/projects/:projectId/payment-milestones/:milestoneId`, `POST paid/upload`
+recibe metadata JSON y `file_0` para registrar el pago; `POST payment-receipt`
+recibe `file` para completar un pago antiguo sin alterar fecha, monto ni
+factura; `GET payment-receipt` devuelve el documento inline con su MIME
+original, sin cache. Las cargas exigen `billing:manage`, y la lectura
+`billing:read`. Se comprueba la pertenencia al proyecto y no se reemplazan
+comprobantes existentes. Corregir el tramo a un estado distinto de Pagado
+elimina el comprobante para no asociarlo a un pago futuro; eliminar el tramo
+lo elimina por cascada. El archivo de factura es independiente.
 
 ## Modelo de tramos: manual, no 2×50%
 

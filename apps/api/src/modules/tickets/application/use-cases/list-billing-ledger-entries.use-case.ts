@@ -199,6 +199,7 @@ export class ListBillingLedgerEntriesUseCase implements UseCase<void, BillingLed
         currency: milestone.currency,
         folio: milestone.invoiceNumber,
         hasAttachment: milestone.hasAttachment ?? false,
+        hasPaymentReceipt: milestone.hasPaymentReceipt ?? false,
         issuedAt: milestone.issuedAt?.toISOString().slice(0, 10) ?? null,
         status: isPaymentMilestoneOverdue(milestone, today) ? 'atrasado' : PROJECT_STATUS_TO_LEDGER_STATUS[milestone.status],
         paidAt: milestone.paidAt?.toISOString().slice(0, 10) ?? null,

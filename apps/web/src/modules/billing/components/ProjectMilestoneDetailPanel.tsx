@@ -9,6 +9,7 @@ import { useProjectDetail } from '@/modules/projects/api/projects.queries';
 import { formatMoney } from '@/shared/lib/format-money';
 import { paymentTriggerLabel } from '@/modules/projects/lib/payment-milestone-display';
 import { ProjectInvoiceDocumentButton } from '@/modules/projects/components/ProjectInvoiceDocumentButton';
+import { ProjectPaymentReceiptButton } from '@/modules/projects/components/ProjectPaymentReceiptButton';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 
 const formatDate = (value: string | null) => (value ? new Date(`${value}T00:00:00`).toLocaleDateString('es-CL') : '—');
@@ -88,6 +89,14 @@ export function ProjectMilestoneDetailPanel({ projectId, milestoneId, onClose, o
             )}
             {milestone.isOverdue && (
               <Badge tone="danger">Pago atrasado</Badge>
+            )}
+            {milestone.status === 'paid' && project && (
+              <ProjectPaymentReceiptButton
+                projectId={project.id}
+                milestoneId={milestone.id}
+                hasPaymentReceipt={milestone.hasPaymentReceipt}
+                canManageBilling={can('billing:manage')}
+              />
             )}
             {milestone.status === 'paid' && (
               <p className={styles.record}>

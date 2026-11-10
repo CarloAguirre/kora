@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, clients, eq, gt, isNull, lte, sql, projectInvoiceAttachments, projectPaymentMilestones, projects, type Database } from '@kora/db';
+import { and, asc, clients, eq, gt, isNull, lte, sql, projectInvoiceAttachments, projectPaymentReceipts, projectPaymentMilestones, projects, type Database } from '@kora/db';
+import { PAYMENT_RECEIPT_MIME_TYPES } from '@kora/contracts';
 import type { TransactionContext } from '@kora/core';
 import type {
   CreateProjectPaymentMilestoneInput,
@@ -7,12 +8,14 @@ import type {
   ProjectPaymentMilestoneRecord,
   ProjectPaymentMilestoneRepository,
   ProjectPaymentMilestoneWithContext,
+  ProjectPaymentReceipt,
   UpdateProjectPaymentMilestoneInput,
 } from '../../domain/repositories/project-payment-milestone.repository';
 import { DATABASE } from '../../../../shared/infrastructure/database/database.module';
 import { resolveDb } from '../../../../shared/infrastructure/database/unit-of-work';
 
 const SELECTION = {
+  hasPaymentReceipt: sql<boolean>`exists(select 1 from ${projectPaymentReceipts} where ${projectPaymentReceipts.milestoneId} = ${projectPaymentMilestones.id})`,
   hasAttachment: sql<boolean>`exists(select 1 from ${projectInvoiceAttachments} where ${projectInvoiceAttachments.milestoneId} = ${projectPaymentMilestones.id})`,
   id: projectPaymentMilestones.id,
   projectId: projectPaymentMilestones.projectId,
@@ -31,6 +34,7 @@ const SELECTION = {
 };
 
 type Row = {
+  hasPaymentReceipt: boolean;
   hasAttachment: boolean;
   id: string;
   projectId: string;
@@ -50,6 +54,7 @@ type Row = {
 
 function toRecord(row: Row): ProjectPaymentMilestoneRecord {
   return {
+    hasPaymentReceipt: row.hasPaymentReceipt,
     hasAttachment: row.hasAttachment,
     id: row.id,
     projectId: row.projectId,
@@ -71,6 +76,23 @@ function toRecord(row: Row): ProjectPaymentMilestoneRecord {
 @Injectable()
 export class DrizzleProjectPaymentMilestoneRepository implements ProjectPaymentMilestoneRepository {
   constructor(@Inject(DATABASE) private readonly database: Database) {}
+
+  async getPaymentReceipt(id: string): Promise<ProjectPaymentReceipt | null> {
+    const [row] = await this.database.select({
+      name: projectPaymentReceipts.name, content: projectPaymentReceipts.content, mimeType: projectPaymentReceipts.mimeType,
+    }).from(projectPaymentReceipts).where(eq(projectPaymentReceipts.milestoneId, id));
+    if (!row) return null;
+    const mimeType = PAYMENT_RECEIPT_MIME_TYPES.find((value) => value === row.mimeType);
+    if (!mimeType) throw new Error('Tipo de comprobante almacenado no valido.');
+    return { ...row, mimeType };
+  }
+
+  async attachPaymentReceipt(id: string, receipt: ProjectPaymentReceipt): Promise<boolean> {
+    const inserted = await this.database.insert(projectPaymentReceipts)
+      .values({ milestoneId: id, ...receipt }).onConflictDoNothing()
+      .returning({ id: projectPaymentReceipts.milestoneId });
+    return inserted.length > 0;
+  }
 
   async getAttachment(id: string): Promise<{ name: string; content: string } | null> {
     const [row] = await this.database.select({ name: projectInvoiceAttachments.name, content: projectInvoiceAttachments.content })
@@ -205,6 +227,9 @@ export class DrizzleProjectPaymentMilestoneRepository implements ProjectPaymentM
       if (input.status === 'pending' || input.status === 'to_invoice') {
         await tx.delete(projectInvoiceAttachments).where(eq(projectInvoiceAttachments.milestoneId, id));
       }
+      if (input.status !== undefined && input.status !== 'paid') {
+        await tx.delete(projectPaymentReceipts).where(eq(projectPaymentReceipts.milestoneId, id));
+      }
     });
   }
 
@@ -247,12 +272,14 @@ export class DrizzleProjectPaymentMilestoneRepository implements ProjectPaymentM
     }
   }
 
-  async markPaid(id: string, paidAt: Date, context?: TransactionContext): Promise<void> {
+  async markPaid(id: string, paidAt: Date, context?: TransactionContext, receipt?: ProjectPaymentReceipt): Promise<void> {
     const db = resolveDb(this.database, context);
 
-    await db
-      .update(projectPaymentMilestones)
-      .set({ status: 'paid', paidAt, updatedAt: new Date() })
-      .where(eq(projectPaymentMilestones.id, id));
+    await db.transaction(async (tx) => {
+      await tx.update(projectPaymentMilestones)
+        .set({ status: 'paid', paidAt, updatedAt: new Date() })
+        .where(eq(projectPaymentMilestones.id, id));
+      if (receipt) await tx.insert(projectPaymentReceipts).values({ milestoneId: id, ...receipt });
+    });
   }
 }

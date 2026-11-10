@@ -3,7 +3,7 @@ import { Button } from '@/shared/components/ui/Button';
 import { useToast } from '@/shared/components/ui/Toast';
 import { ApiRequestError } from '@/shared/lib/api-client';
 
-export function ViewInvoiceButton({ load, folio }: { load: () => Promise<Blob>; folio?: string }) {
+export function ViewInvoiceButton({ load, folio, receipt = false }: { load: () => Promise<Blob>; folio?: string; receipt?: boolean }) {
   const [loading, setLoading] = useState(false);
   const toast = useToast();
 
@@ -11,7 +11,7 @@ export function ViewInvoiceButton({ load, folio }: { load: () => Promise<Blob>; 
     // Abrir antes de esperar la API evita el bloqueo de ventanas emergentes.
     const tab = window.open('about:blank', '_blank');
     if (!tab) {
-      toast.error('El navegador bloqueó la pestaña. Permite ventanas emergentes para ver la factura.');
+      toast.error(`El navegador bloqueó la pestaña. Permite ventanas emergentes para ver ${receipt ? 'el comprobante' : 'la factura'}.`);
       return;
     }
     tab.opener = null;
@@ -27,7 +27,7 @@ export function ViewInvoiceButton({ load, folio }: { load: () => Promise<Blob>; 
       }
     } catch (error) {
       tab.close();
-      toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo abrir la factura. Inténtalo de nuevo.');
+      toast.error(error instanceof ApiRequestError ? error.message : `No se pudo abrir ${receipt ? 'el comprobante' : 'la factura'}. Inténtalo de nuevo.`);
     } finally {
       setLoading(false);
     }
@@ -35,7 +35,7 @@ export function ViewInvoiceButton({ load, folio }: { load: () => Promise<Blob>; 
 
   return (
     <Button variant="outline" size="sm" loading={loading} onClick={() => void open()}>
-      Ver factura{folio ? ` ${folio}` : ''}
+      {receipt ? 'Ver comprobante' : 'Ver factura'}{folio ? ` ${folio}` : ''}
     </Button>
   );
 }

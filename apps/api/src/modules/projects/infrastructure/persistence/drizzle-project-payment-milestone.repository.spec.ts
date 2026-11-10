@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { projectInvoiceAttachments, type Database } from '@kora/db';
+import { projectInvoiceAttachments, projectPaymentReceipts, type Database } from '@kora/db';
 import { DrizzleProjectPaymentMilestoneRepository } from './drizzle-project-payment-milestone.repository';
 
 function setup(inserted = true) {
@@ -21,6 +21,41 @@ function setup(inserted = true) {
 }
 
 describe('Persistencia del PDF del tramo de proyecto', () => {
+  it('registra el pago y su comprobante en una sola transaccion', async () => {
+    const { repository, db, values, set } = setup();
+    const paidAt = new Date('2026-11-10');
+    const receipt = { name: 'boleta.png', mimeType: 'image/png' as const, content: 'iVBORw0KGgo=' };
+    await repository.markPaid('milestone-1', paidAt, undefined, receipt);
+    expect(db.transaction).toHaveBeenCalledOnce();
+    expect(set).toHaveBeenCalledWith({ status: 'paid', paidAt, updatedAt: expect.any(Date) });
+    expect(db.insert).toHaveBeenCalledWith(projectPaymentReceipts);
+    expect(values).toHaveBeenCalledWith({ milestoneId: 'milestone-1', ...receipt });
+  });
+
+  it('propaga errores del comprobante para revertir el registro del pago', async () => {
+    const { repository, values } = setup();
+    values.mockImplementationOnce(() => { throw new Error('receipt write failed'); });
+    await expect(repository.markPaid('milestone-1', new Date(), undefined, {
+      name: 'boleta.png', mimeType: 'image/png', content: 'iVBORw0KGgo=',
+    })).rejects.toThrow('receipt write failed');
+  });
+
+  it('no reemplaza un comprobante existente', async () => {
+    const { repository, db, onConflictDoNothing } = setup(false);
+    expect(await repository.attachPaymentReceipt('milestone-1', {
+      name: 'otro.pdf', content: 'JVBERi0=', mimeType: 'application/pdf',
+    })).toBe(false);
+    expect(onConflictDoNothing).toHaveBeenCalled();
+    expect(db.update).not.toHaveBeenCalled();
+  });
+
+  it('elimina el comprobante si se corrige un pago de vuelta a facturado', async () => {
+    const { repository, db } = setup();
+    await repository.update('milestone-1', { status: 'invoiced', paidAt: null });
+    expect(db.delete).toHaveBeenCalledWith(projectPaymentReceipts);
+    expect(db.delete).not.toHaveBeenCalledWith(projectInvoiceAttachments);
+  });
+
   it('escribe el PDF en la conexion transaccional usada para registrar la factura', async () => {
     const { repository, db } = setup();
     const txValues = vi.fn().mockResolvedValue(undefined);

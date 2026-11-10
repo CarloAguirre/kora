@@ -37,6 +37,38 @@ function show() {
 }
 
 describe('Facturacion > Proyectos: documentos en la tabla', () => {
+  it('muestra la factura y el comprobante como documentos independientes de un pago', () => {
+    entries = [{ ...row, status: 'pagado', hasAttachment: true, hasPaymentReceipt: true }];
+    show();
+    const table = screen.getByRole('table', { name: 'Tramos de pago de proyectos' });
+    expect(within(table).getByRole('button', { name: 'Ver factura' })).toBeInTheDocument();
+    expect(within(table).getByRole('button', { name: 'Ver comprobante' })).toBeInTheDocument();
+  });
+
+  it('permite completar comprobantes faltantes de pagos antiguos', () => {
+    entries = [{ ...row, status: 'pagado', hasAttachment: true, hasPaymentReceipt: false }];
+    show();
+    expect(screen.getByRole('button', { name: 'Subir comprobante' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Ver factura' })).toBeInTheDocument();
+  });
+
+  it('no ofrece subir comprobantes antes del pago', () => {
+    show();
+    expect(screen.queryByRole('button', { name: 'Subir comprobante' })).not.toBeInTheDocument();
+  });
+
+  it('envia la imagen real al marcar la factura como pagada desde la tabla', async () => {
+    const pay = vi.spyOn(projectsApi, 'markPaymentMilestonePaid').mockResolvedValue(undefined);
+    show();
+    fireEvent.click(screen.getByRole('button', { name: 'Marcar pagado' }));
+    const file = new File(['image'], 'boleta.png', { type: 'image/png' });
+    fireEvent.change(screen.getByLabelText('Adjuntar comprobante (opcional)'), { target: { files: [file] } });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar' }));
+    await waitFor(() => expect(pay).toHaveBeenCalledWith(
+      'project-1', 'milestone-1', expect.objectContaining({ file, attachmentName: 'boleta.png' }),
+    ));
+  });
+
   it('muestra Subir documento junto a la factura registrada y Ver factura junto a la que tiene PDF', () => {
     entries.push({ ...row, id: 'milestone-2', referenceId: 'milestone-2', hasAttachment: true, status: 'pagado' });
     show();

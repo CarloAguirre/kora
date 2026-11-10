@@ -193,9 +193,24 @@ export const projectsApi = {
   markPaymentMilestonePaid(
     projectId: string,
     milestoneId: string,
-    input: MarkProjectPaymentMilestonePaidInput,
+    input: MarkProjectPaymentMilestonePaidInput & { file?: File },
   ): Promise<void> {
+    if (input.file) {
+      const { file, ...metadata } = input;
+      const body = new FormData();
+      body.append('metadata', JSON.stringify(metadata));
+      body.append('file_0', file);
+      return api.postFormData<void>(`/projects/${projectId}/payment-milestones/${milestoneId}/paid/upload`, body);
+    }
     return api.patch<void>(`/projects/${projectId}/payment-milestones/${milestoneId}/paid`, input);
+  },
+  paymentReceipt(projectId: string, milestoneId: string): Promise<Blob> {
+    return api.getBlob(`/projects/${projectId}/payment-milestones/${milestoneId}/payment-receipt`);
+  },
+  uploadPaymentReceipt(projectId: string, milestoneId: string, file: File): Promise<void> {
+    const body = new FormData();
+    body.append('file', file);
+    return api.postFormData<void>(`/projects/${projectId}/payment-milestones/${milestoneId}/payment-receipt`, body);
   },
   resolveManagementApproval(projectId: string): Promise<void> {
     return api.patch<void>(`/projects/${projectId}/resolve-management-approval`);
