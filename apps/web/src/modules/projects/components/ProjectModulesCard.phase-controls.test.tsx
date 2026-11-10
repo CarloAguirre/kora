@@ -455,11 +455,14 @@ describe('Referencias de bloque de trabajo de la cotización', () => {
     expect(screen.getByText('Sin fechas, 120 HH de fase')).toBeInTheDocument();
   });
 
-  it('ofrece planificar mientras no exista un segmento de ese equipo y fase', () => {
+  it('quita Planificar bloque de la fila y lo conserva dentro del panel lateral', () => {
     seedReference();
     show();
     fireEvent.click(screen.getByRole('button', { name: 'Planificar' }));
-    expect(screen.getByRole('button', { name: 'Planificar bloque' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Planificar bloque' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir bloque Diseño Backend · Desarrollo' }));
+    const drawer = screen.getByRole('dialog', { name: 'Diseño Backend' });
+    expect(within(drawer).getByRole('button', { name: 'Planificar bloque' })).toBeEnabled();
     expect(screen.queryByText('Bloque planificado')).not.toBeInTheDocument();
   });
 
@@ -488,7 +491,10 @@ describe('Referencias de bloque de trabajo de la cotización', () => {
     seedReference();
     const view = show();
     fireEvent.click(screen.getByRole('button', { name: 'Planificar' }));
-    expect(screen.getByRole('button', { name: 'Planificar bloque' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Planificar bloque' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir bloque Diseño Backend · Desarrollo' }));
+    expect(within(screen.getByRole('dialog', { name: 'Diseño Backend' }))
+      .getByRole('button', { name: 'Planificar bloque' })).toBeInTheDocument();
     view.rerender(
       <ProjectModulesCard project={{
         ...project, modules: [{ ...module, segments: [plannedSegment] }],
