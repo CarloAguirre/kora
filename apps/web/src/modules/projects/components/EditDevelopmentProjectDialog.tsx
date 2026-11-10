@@ -273,6 +273,7 @@ export function EditDevelopmentProjectDialog({
       open={open}
       side
       projectEditSide
+      bodyScrollOnly
       title="Editar proyecto"
       onClose={onClose}
       dismissible={!isSubmitting}
