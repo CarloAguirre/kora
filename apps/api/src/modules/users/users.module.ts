@@ -27,6 +27,8 @@ import { DrizzleInvitationRepository } from './infrastructure/persistence/drizzl
 import { DrizzlePermissionReader } from './infrastructure/persistence/drizzle-permission-reader';
 import { AssignmentLeaderProfileResolver } from './infrastructure/services/assignment-leader-profile.resolver';
 import { RoleCatalog } from './infrastructure/persistence/role-catalog';
+import { CLIENT_PORTAL_PROVISIONER } from './application/ports/client-portal-provisioner.port';
+import { DrizzleClientPortalProvisioner } from './infrastructure/persistence/drizzle-client-portal-provisioner';
 
 /**
  * Composición del módulo de usuarios.
@@ -51,6 +53,7 @@ import { RoleCatalog } from './infrastructure/persistence/role-catalog';
 
     RoleCatalog,
 
+    { provide: CLIENT_PORTAL_PROVISIONER, useClass: DrizzleClientPortalProvisioner },
     { provide: USER_REPOSITORY, useClass: DrizzleUserRepository },
     { provide: USER_CREDENTIAL_REPOSITORY, useClass: DrizzleUserCredentialRepository },
     { provide: TEAM_READER, useClass: TeamsModuleTeamReader },
