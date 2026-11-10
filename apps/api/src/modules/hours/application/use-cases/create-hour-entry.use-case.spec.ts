@@ -145,7 +145,7 @@ const INPUT = {
   hasBlocker: false,
 } as CreateHourEntryInput;
 
-function buildUseCase(projectStatus: ProjectStatus, regularHoursForDate = 0, ownerRole: RoleCode = 'collaborator', ownerStatus: UserStatus = 'active') {
+function buildUseCase(projectStatus: ProjectStatus, regularHoursForDate = 0, ownerRole: RoleCode = 'collaborator', ownerStatus: UserStatus = 'active', allowsOvertime = false) {
   const entries = {
     save: vi.fn().mockResolvedValue(undefined),
     sumApprovedHoursForProject: vi.fn().mockResolvedValue(0),
@@ -160,7 +160,7 @@ function buildUseCase(projectStatus: ProjectStatus, regularHoursForDate = 0, own
       name: 'Proyecto',
       status: projectStatus,
       leaderUserId: null,
-      allowsOvertime: false,
+      allowsOvertime,
     }),
     recalculateUsedHours: vi.fn().mockResolvedValue(undefined),
     hasAttributableWorkBlocks: vi.fn().mockResolvedValue(false),
@@ -211,9 +211,34 @@ describe('CreateHourEntryUseCase', () => {
     expect(entries.save).toHaveBeenCalled();
   });
 
-  it('lo que pase de las 8h normales del día queda como un segundo registro de horas extra', async () => {
-    // Proyecto sin horas extra autorizadas: el excedente automático no la exige.
+  it('rechaza una imputación que supera 8h sin permiso, sin guardar ni el tramo normal', async () => {
     const { useCase, entries } = buildUseCase('active', 6);
+    const result = await useCase.execute({
+      data: { ...INPUT, hours: 5 }, actor: ACTOR, actorRole: 'collaborator',
+    });
+    expect(result.isErr() && result.error.code).toBe('HOUR_ENTRY_PROJECT_OVERTIME_NOT_ALLOWED');
+    expect(entries.save).not.toHaveBeenCalled();
+  });
+
+  it('rechaza cuando las 8h ya están completas en otro proyecto', async () => {
+    const { useCase, entries } = buildUseCase('active', 8);
+    const result = await useCase.execute({ data: INPUT, actor: ACTOR, actorRole: 'collaborator' });
+    expect(result.isErr() && result.error.code).toBe('HOUR_ENTRY_PROJECT_OVERTIME_NOT_ALLOWED');
+    expect(entries.save).not.toHaveBeenCalled();
+  });
+
+  it('permite completar exactamente 8h sin autorización extra', async () => {
+    const { useCase, entries } = buildUseCase('active', 6);
+    const result = await useCase.execute({
+      data: { ...INPUT, hours: 2 }, actor: ACTOR, actorRole: 'collaborator',
+    });
+    expect(result.isOk()).toBe(true);
+    expect(entries.save).toHaveBeenCalledOnce();
+  });
+
+  it('lo que pase de las 8h normales del día queda como un segundo registro de horas extra', async () => {
+    // Con autorización, el excedente queda pendiente como hora extra.
+    const { useCase, entries } = buildUseCase('active', 6, 'collaborator', 'active', true);
 
     const result = await useCase.execute({ data: { ...INPUT, hours: 5 }, actor: ACTOR, actorRole: 'collaborator' });
 
@@ -226,7 +251,7 @@ describe('CreateHourEntryUseCase', () => {
   });
 
   it('con la jornada ya completa, todo queda como horas extra', async () => {
-    const { useCase, entries } = buildUseCase('active', 8);
+    const { useCase, entries } = buildUseCase('active', 8, 'collaborator', 'active', true);
 
     const result = await useCase.execute({ data: INPUT, actor: ACTOR, actorRole: 'collaborator' });
 
@@ -236,7 +261,7 @@ describe('CreateHourEntryUseCase', () => {
   });
 
   it('las horas extra de un líder también se autoaprueban', async () => {
-    const { useCase, entries } = buildUseCase('active', 6, 'leader');
+    const { useCase, entries } = buildUseCase('active', 6, 'leader', 'active', true);
 
     const result = await useCase.execute({ data: { ...INPUT, hours: 5 }, actor: ACTOR, actorRole: 'leader' });
 
@@ -249,7 +274,7 @@ describe('CreateHourEntryUseCase', () => {
   });
 
   it('las horas extra de PMO siguen quedando pendientes', async () => {
-    const { useCase, entries } = buildUseCase('active', 6, 'pmo');
+    const { useCase, entries } = buildUseCase('active', 6, 'pmo', 'active', true);
 
     const result = await useCase.execute({ data: { ...INPUT, hours: 5 }, actor: ACTOR, actorRole: 'pmo' });
 
