@@ -323,7 +323,33 @@ export function withQuotationEdtStageSetting(
   }
   const others = (draft.edtStageSettings ?? []).filter(
     (row) => row.stageCode !== stageCode);
-  const next = { ...draft, edtStageSettings: [...others, value] };
+  // Una edición MANUAL de fechas pasa a ser referencia de la próxima
+  // replanificación. Un cambio de nombre no debe modificar esa referencia.
+  // No usar las fechas actuales del resto de edtStageSettings: pueden ser
+  // resultado de replanificaciones previas y acumularían compresión.
+  const changesWindow = edt.schemaVersion === 'kora.quotation.reference-edt.v2' &&
+    stageCode !== 'TL-GOV' &&
+    (patch.startWeek !== undefined || patch.durationWeeks !== undefined);
+  const sourceReference = draft.edtWorkforceReferenceStages ??
+    (draft.aiPoc?.edt?.schemaVersion === 'kora.quotation.reference-edt.v2'
+      ? (draft.aiPoc.edt.stages ?? [])
+        .filter((stage) => stage.code !== 'TL-GOV')
+        .map((stage) => ({
+          stageCode: stage.code,
+          startWeek: stage.startWeek,
+          durationWeeks: stage.durationWeeks,
+        }))
+      : []);
+  const next = {
+    ...draft,
+    edtStageSettings: [...others, value],
+    ...(changesWindow ? {
+      edtWorkforceReferenceStages: [
+        ...sourceReference.filter((stage) => stage.stageCode !== stageCode),
+        { stageCode, startWeek: value.startWeek, durationWeeks: value.durationWeeks },
+      ],
+    } : {}),
+  };
   quotationEdtAssignments(next);
   return next;
 }
