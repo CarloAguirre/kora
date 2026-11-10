@@ -22,6 +22,7 @@ import {
 
 /** Tope de facturas en que se puede dividir el total de un período. */
 export const MAX_SUPPORT_INVOICES_PER_PERIOD = 10;
+export const MAX_SUPPORT_INVOICE_PDF_BYTES = 5 * 1024 * 1024;
 
 export const SUPPORT_INVOICE_BILLING_STATUSES = ['to_invoice', 'invoiced'] as const;
 export const supportInvoiceBillingStatusSchema = z.enum(SUPPORT_INVOICE_BILLING_STATUSES);
@@ -60,6 +61,7 @@ export const supportInvoiceSchema = z.object({
   dueAt: z.iso.date().nullable(),
   paidAt: z.iso.date().nullable(),
   attachmentName: z.string().nullable(),
+  hasAttachment: z.boolean().optional(),
   /** Derivado al leer — ver el comentario del schema de la tabla. */
   paymentStatus: supportInvoicePaymentStatusSchema,
 });
@@ -92,6 +94,7 @@ export const supportInvoiceRefSchema = z.object({
   folio: z.string(),
   amountUf: z.number(),
   paymentStatus: supportInvoicePaymentStatusSchema,
+  hasAttachment: z.boolean().optional(),
 });
 export type SupportInvoiceRef = z.infer<typeof supportInvoiceRefSchema>;
 

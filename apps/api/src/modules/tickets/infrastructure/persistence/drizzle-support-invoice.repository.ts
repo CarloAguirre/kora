@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, eq, inArray, isNull, lt, sql, supportInvoices, type Database } from '@kora/db';
+import { and, asc, eq, getTableColumns, inArray, isNull, lt, sql, supportInvoices, supportInvoiceAttachments, type Database } from '@kora/db';
 import type { TransactionContext } from '@kora/core';
 import type {
   CreateSupportInvoiceInput,
@@ -22,6 +22,7 @@ interface SupportInvoiceRow {
   dueAt: Date | null;
   paidAt: Date | null;
   attachmentName: string | null;
+  hasAttachment: boolean;
   monthlyPeriodId: string | null;
 }
 
@@ -39,6 +40,7 @@ function toRecord(row: SupportInvoiceRow): SupportInvoiceRecord {
     dueAt: row.dueAt,
     paidAt: row.paidAt,
     attachmentName: row.attachmentName,
+    hasAttachment: row.hasAttachment,
     monthlyPeriodId: row.monthlyPeriodId,
   };
 }
@@ -47,9 +49,23 @@ function toRecord(row: SupportInvoiceRow): SupportInvoiceRecord {
 export class DrizzleSupportInvoiceRepository implements SupportInvoiceRepository {
   constructor(@Inject(DATABASE) private readonly database: Database) {}
 
+  private readonly columns = {
+    ...getTableColumns(supportInvoices),
+    hasAttachment: sql<boolean>`exists(select 1 from ${supportInvoiceAttachments} where ${supportInvoiceAttachments.invoiceId} = ${supportInvoices.id})`,
+  };
+
+  async getAttachment(id: string): Promise<{ name: string; content: string } | null> {
+    const [row] = await this.database
+      .select({ name: supportInvoices.attachmentName, content: supportInvoiceAttachments.content })
+      .from(supportInvoiceAttachments)
+      .innerJoin(supportInvoices, eq(supportInvoices.id, supportInvoiceAttachments.invoiceId))
+      .where(eq(supportInvoices.id, id));
+    return row && row.name ? { name: row.name, content: row.content } : null;
+  }
+
   async findById(id: string, context?: TransactionContext): Promise<SupportInvoiceRecord | null> {
     const db = resolveDb(this.database, context);
-    const rows = await db.select().from(supportInvoices).where(eq(supportInvoices.id, id)).limit(1);
+    const rows = await db.select(this.columns).from(supportInvoices).where(eq(supportInvoices.id, id)).limit(1);
     const row = rows[0];
     return row ? toRecord(row as SupportInvoiceRow) : null;
   }
@@ -57,7 +73,7 @@ export class DrizzleSupportInvoiceRepository implements SupportInvoiceRepository
   async listByPlanAndPeriod(planId: string, periodKey: string, context?: TransactionContext): Promise<SupportInvoiceRecord[]> {
     const db = resolveDb(this.database, context);
     const rows = await db
-      .select()
+      .select(this.columns)
       .from(supportInvoices)
       .where(and(eq(supportInvoices.planId, planId), eq(supportInvoices.periodKey, periodKey)))
       .orderBy(asc(supportInvoices.position));
@@ -66,33 +82,33 @@ export class DrizzleSupportInvoiceRepository implements SupportInvoiceRepository
 
   async listForPlan(planId: string, context?: TransactionContext): Promise<SupportInvoiceRecord[]> {
     const db = resolveDb(this.database, context);
-    const rows = await db.select().from(supportInvoices).where(eq(supportInvoices.planId, planId));
+    const rows = await db.select(this.columns).from(supportInvoices).where(eq(supportInvoices.planId, planId));
     return rows.map((row) => toRecord(row as SupportInvoiceRow));
   }
 
   async listForPlans(planIds: readonly string[], context?: TransactionContext): Promise<SupportInvoiceRecord[]> {
     if (planIds.length === 0) return [];
     const db = resolveDb(this.database, context);
-    const rows = await db.select().from(supportInvoices).where(inArray(supportInvoices.planId, [...planIds]));
+    const rows = await db.select(this.columns).from(supportInvoices).where(inArray(supportInvoices.planId, [...planIds]));
     return rows.map((row) => toRecord(row as SupportInvoiceRow));
   }
 
   async listForPeriod(periodKey: string, context?: TransactionContext): Promise<SupportInvoiceRecord[]> {
     const db = resolveDb(this.database, context);
-    const rows = await db.select().from(supportInvoices).where(eq(supportInvoices.periodKey, periodKey));
+    const rows = await db.select(this.columns).from(supportInvoices).where(eq(supportInvoices.periodKey, periodKey));
     return rows.map((row) => toRecord(row as SupportInvoiceRow));
   }
 
   async listAll(context?: TransactionContext): Promise<SupportInvoiceRecord[]> {
     const db = resolveDb(this.database, context);
-    const rows = await db.select().from(supportInvoices);
+    const rows = await db.select(this.columns).from(supportInvoices);
     return rows.map((row) => toRecord(row as SupportInvoiceRow));
   }
 
   async listOverdue(asOf: Date, context?: TransactionContext): Promise<SupportInvoiceRecord[]> {
     const db = resolveDb(this.database, context);
     const rows = await db
-      .select()
+      .select(this.columns)
       .from(supportInvoices)
       .where(and(isNull(supportInvoices.paidAt), lt(supportInvoices.dueAt, asOf)));
     return rows.map((row) => toRecord(row as SupportInvoiceRow));
@@ -126,6 +142,10 @@ export class DrizzleSupportInvoiceRepository implements SupportInvoiceRepository
         monthlyPeriodId: input.monthlyPeriodId,
       })),
     );
+    const attachments = inputs.flatMap((input) =>
+      input.attachmentContent ? [{ invoiceId: input.id, content: input.attachmentContent }] : [],
+    );
+    if (attachments.length > 0) await db.insert(supportInvoiceAttachments).values(attachments);
   }
 
   async markPaid(id: string, paidAt: Date, context?: TransactionContext): Promise<void> {

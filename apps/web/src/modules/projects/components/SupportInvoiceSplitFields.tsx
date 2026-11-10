@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
-import { MAX_SUPPORT_INVOICES_PER_PERIOD, type SupportInvoiceDocumentInput, type SupportPlanCurrency } from '@kora/contracts';
+import { MAX_SUPPORT_INVOICES_PER_PERIOD, MAX_SUPPORT_INVOICE_PDF_BYTES, type SupportPlanCurrency } from '@kora/contracts';
+import type { SupportInvoiceUploadInput } from '../api/support-plan.api';
 import styles from './SupportInvoiceSplitFields.module.css';
 import { Button } from '@/shared/components/ui/Button';
 import { TextField } from '@/shared/components/ui/TextField';
@@ -14,6 +15,7 @@ interface InvoiceDraft {
   /** Texto del input — se valida y convierte al guardar. */
   readonly amount: string;
   readonly attachmentName: string | null;
+  readonly file?: File;
 }
 
 const toCents = (value: number) => Math.round(value * 100);
@@ -70,6 +72,9 @@ export function useSupportInvoiceSplit(totalAmount: number) {
 
   /** Mensaje del primer problema, o `null` si se puede guardar. */
   const validate = (): string | null => {
+    if (drafts.some((draft) => draft.file && (draft.file.type !== 'application/pdf' || draft.file.size > MAX_SUPPORT_INVOICE_PDF_BYTES))) {
+      return 'Adjunta archivos PDF de hasta 5 MB cada uno.';
+    }
     if (drafts.some((draft) => !draft.folio.trim() || !draft.invoicedAt)) {
       return isSplit ? 'Ingresa el folio y la fecha de emisión de cada factura.' : 'Ingresa el folio y la fecha de emisión.';
     }
@@ -81,12 +86,13 @@ export function useSupportInvoiceSplit(totalAmount: number) {
     return null;
   };
 
-  const toInput = (): SupportInvoiceDocumentInput[] =>
+  const toInput = (): SupportInvoiceUploadInput['invoices'] =>
     drafts.map((draft) => ({
       folio: draft.folio.trim(),
       invoicedAt: draft.invoicedAt,
       amountUf: (draftCents(draft) ?? 0) / 100,
       attachmentName: draft.attachmentName ?? undefined,
+      file: draft.file,
     }));
 
   return { drafts, isSplit, totalCents, assignedCents, reset, add, remove, update, validate, toInput };
@@ -145,7 +151,7 @@ export function SupportInvoiceSplitFields({ split, currency, disabled }: Support
         <FileField
           label="Adjuntar PDF (opcional)"
           fileName={draft.attachmentName}
-          onChange={(attachmentName) => split.update(draft.key, { attachmentName })}
+          onChange={(attachmentName, file) => split.update(draft.key, { attachmentName, file: file ?? undefined })}
           accept="application/pdf"
           disabled={disabled}
         />
@@ -204,7 +210,7 @@ export function SupportInvoiceSplitFields({ split, currency, disabled }: Support
             />
             <FileField
               fileName={draft.attachmentName}
-              onChange={(attachmentName) => split.update(draft.key, { attachmentName })}
+              onChange={(attachmentName, file) => split.update(draft.key, { attachmentName, file: file ?? undefined })}
               accept="application/pdf"
               disabled={disabled}
             />

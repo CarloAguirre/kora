@@ -116,6 +116,7 @@ export class GetSupportPlanUseCase implements UseCase<GetSupportPlanQuery, Suppo
         dueAt: invoice.dueAt ? toIsoDate(invoice.dueAt) : null,
         paidAt: invoice.paidAt ? toIsoDate(invoice.paidAt) : null,
         attachmentName: invoice.attachmentName,
+        hasAttachment: invoice.hasAttachment ?? false,
         paymentStatus: paymentStatusOf(invoice, now),
       })),
       billingPeriods: buildMonthlyBillingSchedule(record, periods, invoiceRows, now),

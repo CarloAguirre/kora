@@ -22,6 +22,7 @@ export interface MarkSupportInvoiceIssuedCommand {
   readonly planId: string;
   readonly data: MarkSupportInvoiceIssuedInput;
   readonly actor: ActorContext;
+  readonly attachments?: ReadonlyMap<number, { name: string; content: string }>;
 }
 
 const DEFAULT_PAYMENT_TERM_DAYS = 30;
@@ -83,7 +84,8 @@ export class MarkSupportInvoiceIssuedUseCase implements UseCase<MarkSupportInvoi
         folio: invoice.folio,
         invoicedAt,
         dueAt: addDays(invoicedAt, DEFAULT_PAYMENT_TERM_DAYS),
-        attachmentName: invoice.attachmentName ?? null,
+        attachmentName: command.attachments?.get(position)?.name ?? invoice.attachmentName ?? null,
+        attachmentContent: command.attachments?.get(position)?.content,
         monthlyPeriodId: calculation.monthlyPeriodId,
       };
     });

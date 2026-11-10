@@ -33,7 +33,7 @@ export function aggregatePaymentStatusOf(
 export function toInvoiceRefs(invoices: readonly SupportInvoiceRecord[], now: Date): SupportInvoiceRef[] {
   return [...invoices]
     .sort((a, b) => a.position - b.position)
-    .map((invoice) => ({ id: invoice.id, folio: invoice.folio, amountUf: invoice.amountUf, paymentStatus: paymentStatusOf(invoice, now) }));
+    .map((invoice) => ({ id: invoice.id, folio: invoice.folio, amountUf: invoice.amountUf, paymentStatus: paymentStatusOf(invoice, now), hasAttachment: invoice.hasAttachment ?? false }));
 }
 
 /** Suma de montos de las facturas de un período, redondeada a centavos. */

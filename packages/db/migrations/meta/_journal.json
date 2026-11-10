@@ -379,6 +379,13 @@
       "when": 1793294271281,
       "tag": "0053_support_invoice_split",
       "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1794318390369,
+      "tag": "0054_lucky_slyde",
+      "breakpoints": true
     }
   ]
 }
