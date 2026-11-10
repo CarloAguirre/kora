@@ -14,6 +14,8 @@ const ganttCss = readFileSync(resolve(cssDir,
   '../../client-portal/components/PhaseRoadmap.module.css'), 'utf8');
 const progressCss = readFileSync(resolve(cssDir,
   'ProjectExecutionProgressCard.module.css'), 'utf8');
+const teamProgressCss = readFileSync(resolve(cssDir,
+  'TeamProgressCard.module.css'), 'utf8');
 const pillCss = readFileSync(resolve(cssDir,
   '../../../shared/components/ui/PillSwitcher.module.css'), 'utf8');
 const dataTableCss = readFileSync(resolve(cssDir,
@@ -58,6 +60,14 @@ describe('Roadmap UI-3: tokens y scroll local', () => {
     expect(ganttCss).toMatch(/\.operationalLine\s*\{[^}]*min-height:\s*46px;/s);
     expect(ganttCss).toMatch(/\.operationalBar\s*\{[^}]*top:\s*11px;[^}]*height:\s*24px;/s);
     expect(ganttCss).toMatch(/\.operationalBarSelected\s*\{[^}]*outline:\s*2px solid #4c7ef3;/s);
+  });
+
+  it('hace la barra de avance del equipo tan gruesa como la del proyecto, sin afectar minimarcadores', () => {
+    expect(progressCss).toMatch(/\.root \.projectTimeline\s*\{[^}]*height:\s*18px;/s);
+    expect(teamProgressCss).toMatch(/\.timeline\s*\{[^}]*height:\s*18px;/s);
+    expect(teamProgressCss).toMatch(/\.expectedLine\s*\{[^}]*height:\s*30px;/s);
+    expect(teamProgressCss).toMatch(/\.targetLabel\s*\{[^}]*top:\s*25px;/s);
+    expect(teamProgressCss).toMatch(/\.miniTrack\s*\{[^}]*height:\s*6px;/s);
   });
 
   it('el selector reutilizado de Bitácora tiene el estado activo lima original', () => {
