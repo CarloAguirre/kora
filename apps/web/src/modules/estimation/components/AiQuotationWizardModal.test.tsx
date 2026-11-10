@@ -389,7 +389,10 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
     const disclosure = screen.getByText('Actividad del agente IA en tiempo real').closest('details');
     expect(disclosure).toHaveAttribute('open');
     const log = screen.getByRole('log', { name: 'Resúmenes de razonamiento del agente IA' });
-    expect(log).toHaveTextContent('El proveedor aún no ha enviado un resumen');
+    expect(screen.getByRole('status', { name: 'Esperando respuesta del agente' })).toBeInTheDocument();
+    expect(screen.queryByText('Resumen del modelo (opcional)')).not.toBeInTheDocument();
+    expect(log).not.toHaveTextContent('El proveedor aún no ha enviado un resumen');
+    expect(log).not.toHaveTextContent('La actividad muestra operaciones verificables');
     const request = mocks.analyze.mock.calls[0]![0] as {
       onThoughtSummary?: (text: string) => void;
       onProgress?: (phase: string, text: string, at?: string) => void;
@@ -415,13 +418,15 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
     });
     expect(log).toHaveTextContent(
       'Gemini detectó dos módulos. Hay una dependencia documental pendiente.');
+    expect(screen.queryByRole('status', { name: 'Esperando respuesta del agente' }))
+      .not.toBeInTheDocument();
     expect(log).not.toHaveTextContent('Preparando preguntas de aclaración');
     expect(mocks.analyze).toHaveBeenCalledTimes(1);
     await act(async () => { release(analysisResult); });
     expect(await screen.findByText('Entendimiento del proyecto')).toBeInTheDocument();
   });
 
-  it('muestra progreso real de lectura y solicitud a Gemini, sin duplicar peticiones', async () => {
+  it('omite logger durante la lectura Drive y lo muestra al analizar, sin duplicar peticiones', async () => {
     let releaseBrowse!: (result: typeof previewResult) => void;
     const pendingBrowse = new Promise<typeof previewResult>((resolve) => {
       releaseBrowse = resolve;
@@ -431,14 +436,10 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Conectar con Google Drive' }));
     expect(screen.getByRole('status', { name: 'Preparación de la documentación' }))
       .toHaveTextContent('Leyendo documentos');
-    const loadingLog = screen.getByRole('log', {
+    expect(screen.queryByRole('log', {
       name: 'Resúmenes de razonamiento del agente IA',
-    });
-    expect(loadingLog).toBeVisible();
-    expect(screen.getByText('Actividad del agente IA en tiempo real').closest('details'))
-      .toHaveAttribute('open');
-    expect(loadingLog).toHaveTextContent('se están leyendo los documentos');
-    expect(loadingLog).toHaveTextContent('el agente IA todavía no ha comenzado');
+    })).not.toBeInTheDocument();
+    expect(screen.queryByText('Actividad del agente IA en tiempo real')).not.toBeInTheDocument();
     releaseBrowse(previewResult);
     expect(await screen.findByText('Levantamiento QA')).toBeInTheDocument();
 
@@ -449,6 +450,10 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Analizar proyecto' }));
     expect(screen.getByRole('status', { name: 'Progreso del análisis IA' }))
       .toHaveTextContent('El agente IA está revisando antecedentes');
+    expect(screen.getByRole('log', { name: 'Resúmenes de razonamiento del agente IA' }))
+      .toBeInTheDocument();
+    expect(screen.getByRole('status', { name: 'Esperando respuesta del agente' }))
+      .toBeInTheDocument();
     expect(mocks.analyze).toHaveBeenCalledTimes(1);
     releaseAnalysis(analysisResult);
     expect(await screen.findByText('Entendimiento del proyecto')).toBeInTheDocument();
@@ -785,6 +790,8 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
     mocks.generate.mockImplementationOnce(() =>
       new Promise<{ id: string }>((res) => { resolve = res; }));
     fireEvent.click(screen.getByRole('button', { name: 'Generar estimación' }));
+    expect(screen.getByRole('status', { name: 'Esperando respuesta del agente' })).toBeInTheDocument();
+    expect(log).not.toHaveTextContent('Resumen del modelo (opcional)');
     const input = mocks.generate.mock.calls[0]![0] as {
       onThoughtSummary?: (chunk: string) => void;
       onPhase?: (phase: 'proposal' | 'edt' | 'saving') => void;
@@ -809,6 +816,8 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
     expect(log).toHaveTextContent('Esperando respuesta de EDT.');
     expect(log).toHaveTextContent('15 s transcurridos');
     expect(log).toHaveTextContent('Evaluando perfiles y capacidades. Consolidando actividades y HH.');
+    expect(screen.queryByRole('status', { name: 'Esperando respuesta del agente' }))
+      .not.toBeInTheDocument();
     expect(log.scrollTop).toBe(480); // Último fragmento visible automáticamente.
     expect(screen.getByText('Construyendo EDT y estimando HH por actividad…'))
       .toHaveAttribute('role', 'status');
