@@ -115,10 +115,14 @@ export class ClientPortalService {
       .limit(1);
     if (existing && existing.role !== 'cliente')
       throw new ConflictException('El correo pertenece a un usuario interno. No se pueden convertir sus permisos al portal.');
-    const [linkedToAnother] = existing ? await this.db.select({ clientId: clientPortalAccounts.clientId })
-      .from(clientPortalAccounts).where(eq(clientPortalAccounts.userId, existing.id)).limit(1) : [];
-    if (linkedToAnother && linkedToAnother.clientId !== clientId)
-      throw new ConflictException('Este usuario ya tiene acceso al portal de otra empresa.');
+    const [linkedToAnother] = existing ? await this.db.select({
+      clientId: clientPortalAccounts.clientId, contactId: clientPortalAccounts.contactId,
+    }).from(clientPortalAccounts).where(eq(clientPortalAccounts.userId, existing.id)).limit(1) : [];
+    if (linkedToAnother && (linkedToAnother.clientId !== clientId ||
+      linkedToAnother.contactId !== contactId))
+      throw new ConflictException('Esta cuenta ya está vinculada a otro contacto o empresa.');
+    if (!input.enabled && !existing)
+      throw new BadRequestException('Este contacto todavía no tiene acceso que revocar.');
 
     let userId = existing?.id;
     let invitationSent = false;
