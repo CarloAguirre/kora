@@ -98,6 +98,8 @@ export const createUserSchema = z.object({
   lastName: nonEmptyTrimmed(100, 'El apellido'),
   role: roleCodeSchema,
   teamId: uuidSchema.nullish(),
+  /** Obligatorio para las altas de rol cliente; sin efecto para roles internos. */
+  clientId: uuidSchema.nullish(),
   isCommercialManager: z.boolean().default(false),
   /** Si es true se crea la cuenta de acceso y se envía la invitación. */
   grantAccess: z.boolean().default(true),
