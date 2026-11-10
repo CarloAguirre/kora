@@ -98,6 +98,7 @@ function overlappingFixture() {
       name: row.code, totalHours: row.developer + row.testing,
       tasks: [{
         wbs: row.code + '.01', name: 'Implementar ' + row.code,
+        description: 'Desarrollo y validación del tramo ' + row.code,
         role: 'Desarrollo', hours: row.developer + row.testing,
         stageCode: row.code,
         roleEffort: [
@@ -108,6 +109,7 @@ function overlappingFixture() {
     })),
     { name: 'Gobierno técnico', totalHours: 80, tasks: [
       { wbs: 'TL-GOV.01', name: 'Supervisar avances',
+        description: 'Seguimiento técnico transversal',
         role: 'Líder Técnico', hours: 80, stageCode: 'TL-GOV',
         roleEffort: [{ role: 'Líder Técnico', hours: 80 }] },
     ] },
