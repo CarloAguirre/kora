@@ -623,6 +623,8 @@ export const projectPaymentMilestoneSchema = z.object({
   percent: z.number().nullable(),
   amount: z.number(),
   invoiceNumber: z.string().nullable(),
+  hasAttachment: z.boolean().optional(),
+  hasPaymentReceipt: z.boolean().optional(),
   issuedAt: z.iso.date().nullable(),
   /** Vencimiento del pago — se fija al facturar. */
   dueAt: z.iso.date().nullable(),
@@ -724,6 +726,10 @@ export const markProjectPaymentMilestonePaidSchema = z.object({
   attachmentName: z.string().trim().max(255).optional(),
 });
 export type MarkProjectPaymentMilestonePaidInput = z.infer<typeof markProjectPaymentMilestonePaidSchema>;
+
+export const PAYMENT_RECEIPT_MIME_TYPES = ['application/pdf', 'image/jpeg', 'image/png'] as const;
+export type PaymentReceiptMimeType = (typeof PAYMENT_RECEIPT_MIME_TYPES)[number];
+export const MAX_PAYMENT_RECEIPT_BYTES = 5 * 1024 * 1024;
 
 /** Gerencia/PMO corrige la fecha del Hito 0 ya registrado — no reabre ni cambia el estado del proyecto. */
 export const correctProjectHito0DateSchema = z.object({ date: z.iso.date() });
@@ -1004,6 +1010,10 @@ export const createProjectSchema = z
   .refine((data) => data.type !== 'development' || data.salesStage, {
     message: 'Los proyectos de desarrollo requieren una etapa comercial.',
     path: ['salesStage'],
+  })
+  .refine((data) => data.type !== 'development' || data.salesStage === 'approved' || data.status !== 'active', {
+    message: 'Solo un proyecto aprobado puede estar Activo.',
+    path: ['status'],
   })
   /** Desde que se crea, al proyecto de desarrollo se le pueden cargar horas — necesita un líder que las apruebe. */
   .refine((data) => data.type !== 'development' || data.leaderUserId, {

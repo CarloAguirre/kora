@@ -1,4 +1,6 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, Patch, Post, Req } from '@nestjs/common';
+import type { FastifyRequest } from 'fastify';
+import { readSupportInvoiceUpload } from './support-invoice-upload';
 import {
   closeSupportPlanSchema,
   createProjectSchema,
@@ -118,6 +120,18 @@ export class SupportPlansController {
     @CurrentUser() actor: RequestUser,
   ): Promise<{ ids: string[] }> {
     return unwrapOrThrow(await this.markInvoiceIssued.execute({ planId: id, data: body, actor: toActorContext(actor) }));
+  }
+
+  @Post(':id/invoices/upload')
+  @RequirePermissions('billing:manage')
+  @HttpCode(HttpStatus.CREATED)
+  async issueInvoiceWithFiles(
+    @Param('id') id: string,
+    @Req() request: FastifyRequest,
+    @CurrentUser() actor: RequestUser,
+  ): Promise<{ ids: string[] }> {
+    const { data, attachments } = await readSupportInvoiceUpload(request);
+    return unwrapOrThrow(await this.markInvoiceIssued.execute({ planId: id, data, attachments, actor: toActorContext(actor) }));
   }
 }
 

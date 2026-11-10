@@ -8,6 +8,36 @@ contrato, período mensual activo y política de sobrantes. Tickets y Soporte
 **no se pueden separar limpiamente**: el gate de creación de tickets depende
 del motor financiero de soporte.
 
+## PDF de facturas de soporte
+
+Al registrar una factura se puede adjuntar un PDF de hasta 5 MB. Se carga por
+`POST /support-plans/:id/invoices/upload` como multipart (`metadata` con el
+JSON del registro y `file_0` a `file_9` por posicion). La API valida el tipo,
+la firma PDF, el tamaño y la correspondencia con cada factura. El registro
+JSON sin adjuntos sigue disponible en la ruta original.
+
+La migracion `0054_lucky_slyde` agrega `support_invoice_attachments`: conserva
+el contenido en base64, separado de las consultas de listados y en la misma
+transaccion que la factura. Al anular la factura, el adjunto se elimina por
+cascada. Requiere aplicar `pnpm db:migrate` con `DATABASE_URL` configurada
+antes de desplegar la API.
+
+`GET /support-invoices/:id/attachment` exige autenticacion y `billing:read`;
+responde `application/pdf` inline, sin cache. El front lo obtiene mediante
+el cliente autenticado y abre el archivo en una pestaña nueva. Tanto el
+historial como «Meses del contrato» muestran «Ver factura» cuando existe
+contenido; si hay varias facturas, el calendario identifica cada boton por
+folio. Un nombre de archivo legado no se considera un PDF disponible.
+
+Para facturas ya registradas sin contenido (incluidas las pagadas), ambas
+tablas ofrecen «Subir documento» a quienes tienen `billing:manage`.
+`POST /support-invoices/:id/attachment` recibe un unico campo multipart
+`file`, valida el mismo limite y formato, y agrega el adjunto sin alterar
+folio, montos, fechas, pago ni tickets. La insercion y la actualizacion del
+nombre son atomicas; si ya existe un PDF, responde conflicto y no lo reemplaza.
+La accion queda auditada y al refrescar los datos aparece «Ver factura».
+No requiere una migracion adicional.
+
 ## Qué se migra y construye en esta pasada
 
 - **`ticket` (641)** → `tickets`: título, cliente, proyecto, proyecto de

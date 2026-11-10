@@ -69,6 +69,7 @@ export const tokenStore = new TokenStore();
 const BASE_URL = '/api';
 
 interface RequestOptions {
+  readonly responseType?: 'blob';
   readonly method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
   readonly body?: unknown;
   readonly query?: Record<string, string | number | boolean | readonly string[] | undefined>;
@@ -125,11 +126,11 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     const refreshed = await refreshAccessToken();
     if (refreshed) {
       const retried = await send(path, options);
-      return handleResponse<T>(retried);
+      return handleResponse<T>(retried, options.responseType);
     }
   }
 
-  return handleResponse<T>(response);
+  return handleResponse<T>(response, options.responseType);
 }
 
 async function send(path: string, options: RequestOptions): Promise<Response> {
@@ -164,8 +165,9 @@ async function send(path: string, options: RequestOptions): Promise<Response> {
   });
 }
 
-async function handleResponse<T>(response: Response): Promise<T> {
+async function handleResponse<T>(response: Response, responseType?: 'blob'): Promise<T> {
   if (response.status === 204) return undefined as T;
+  if (response.ok && responseType === 'blob') return await response.blob() as T;
 
   const text = await response.text();
   const data: unknown = text ? JSON.parse(text) : null;
@@ -274,6 +276,7 @@ export async function apiEventStream<T>(
 }
 
 export const api = {
+  getBlob: (path: string) => apiRequest<Blob>(path, { responseType: 'blob' }),
   get: <T>(path: string, query?: RequestOptions['query']) =>
     apiRequest<T>(path, query ? { query } : {}),
   post: <T>(path: string, body?: unknown) => apiRequest<T>(path, { method: 'POST', body }),

@@ -7,6 +7,8 @@ import {
 } from "@/modules/projects/api/projects.queries";
 import { EditProjectMilestoneDialog } from "@/modules/projects/components/EditProjectMilestoneDialog";
 import { IssueProjectMilestoneInvoiceDialog } from "@/modules/projects/components/IssueProjectMilestoneInvoiceDialog";
+import { ProjectInvoiceDocumentButton } from "@/modules/projects/components/ProjectInvoiceDocumentButton";
+import { ProjectPaymentReceiptButton } from "@/modules/projects/components/ProjectPaymentReceiptButton";
 import { MarkProjectMilestonePaidDialog } from "@/modules/projects/components/MarkProjectMilestonePaidDialog";
 import { PencilIcon } from "@/shared/components/icons/Icons";
 import { Badge, type BadgeTone } from "@/shared/components/ui/Badge";
@@ -280,6 +282,22 @@ export function ProjectsBillingSection() {
 
   const renderAction = (entry: BillingLedgerEntry) => (
     <div className={styles.actions}>
+      {entry.projectId && entry.referenceId && entry.status === "pagado" && (
+        <ProjectPaymentReceiptButton
+          projectId={entry.projectId}
+          milestoneId={entry.referenceId}
+          hasPaymentReceipt={entry.hasPaymentReceipt}
+          canManageBilling={can("billing:manage")}
+        />
+      )}
+      {entry.projectId && entry.referenceId && !['pendiente', 'por_facturar'].includes(entry.status) && (
+        <ProjectInvoiceDocumentButton
+          projectId={entry.projectId}
+          milestoneId={entry.referenceId}
+          hasAttachment={entry.hasAttachment}
+          canManageBilling={can("billing:manage")}
+        />
+      )}
       {canManageBilling && (
         <Button
           variant="ghost"

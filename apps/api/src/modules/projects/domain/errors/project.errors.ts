@@ -57,6 +57,16 @@ export class SupportContractRequiredForStatusError extends ConflictError {
   }
 }
 
+/** Prospectos y cotizaciones pueden detenerse, pero no activarse antes de la aprobación comercial. */
+export class ProjectApprovalRequiredForActivationError extends ConflictError {
+  constructor() {
+    super(
+      'Un prospecto o una cotización no puede estar Activo. Cambia su estado a No iniciado o Detenido antes de continuar.',
+      'PROJECT_APPROVAL_REQUIRED_FOR_ACTIVATION',
+    );
+  }
+}
+
 export class ProjectTeamMemberNotFoundError extends NotFoundError {
   constructor(identifier: string) {
     super('Miembro asignado', identifier, 'PROJECT_TEAM_MEMBER_NOT_FOUND');

@@ -42,6 +42,14 @@ const invoice = (overrides: Partial<SupportInvoiceRecord> = {}) =>
   ({ id: 'inv-1', planId: 'plan-1', periodKey: '2026-10', amountUf: 250, position: 0, folio: '27846', monthlyPeriodId: 'period-oct', paidAt: null, dueAt: null, ...overrides }) as SupportInvoiceRecord;
 
 describe('buildMonthlyBillingSchedule', () => {
+  it('informa si cada factura tiene un PDF real, no solo el nombre legado', () => {
+    const schedule = buildMonthlyBillingSchedule(plan(), [period()], [
+      invoice({ hasAttachment: true }),
+      invoice({ id: 'inv-2', position: 1, attachmentName: 'legado.pdf' }),
+    ], utc('2026-10-29'));
+    expect(schedule[0]!.invoices.map((item) => item.hasAttachment)).toEqual([true, false]);
+  });
+
   it('lista el mes vigente y proyecta los meses que faltan hasta el término del contrato', () => {
     const schedule = buildMonthlyBillingSchedule(plan(), [period()], [], utc('2026-10-29'));
     expect(schedule.map((item) => [item.periodKey, item.status, item.amountUf, item.isCurrent])).toEqual([

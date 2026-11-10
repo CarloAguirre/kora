@@ -26,6 +26,7 @@ import {
 import { MarkSupportInvoicePaidDialog } from '../components/MarkSupportInvoicePaidDialog';
 import { IssueSupportInvoiceDialog } from '../components/IssueSupportInvoiceDialog';
 import { SupportMonthlyBillingSchedule, formatPeriodMonth } from '../components/SupportMonthlyBillingSchedule';
+import { SupportInvoiceDocumentButton } from '../components/SupportInvoiceDocumentButton';
 import { CloseSupportPlanDialog } from '../components/CloseSupportPlanDialog';
 import {
   useCloseSupportPlan,
@@ -159,17 +160,21 @@ export function SupportPlanDetailPage() {
     {
       key: 'actions',
       header: '',
-      render: (i) =>
-        i.paymentStatus !== 'paid' && canManageBilling ? (
-          <span className={styles.invoiceActions}>
-            <Button variant="outline" size="sm" onClick={() => setPayAction({ invoice: i })}>
-              Marcar como pagado
-            </Button>
-            <Button variant="dangerOutline" size="sm" onClick={() => setInvoiceToVoid(i)}>
-              Anular factura
-            </Button>
-          </span>
-        ) : null,
+      render: (i) => (
+        <span className={styles.invoiceActions}>
+          <SupportInvoiceDocumentButton invoiceId={i.id} hasAttachment={i.hasAttachment} canManageBilling={canManageBilling} />
+          {i.paymentStatus !== 'paid' && canManageBilling && (
+            <>
+              <Button variant="outline" size="sm" onClick={() => setPayAction({ invoice: i })}>
+                Marcar como pagado
+              </Button>
+              <Button variant="dangerOutline" size="sm" onClick={() => setInvoiceToVoid(i)}>
+                Anular factura
+              </Button>
+            </>
+          )}
+        </span>
+      ),
     },
   ];
 

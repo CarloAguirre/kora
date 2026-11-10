@@ -6,6 +6,7 @@ import { Button } from '@/shared/components/ui/Button';
 import { DataTable, type Column } from '@/shared/components/ui/DataTable';
 import { Pagination, usePaginatedItems } from '@/shared/components/ui/Pagination';
 import { formatMoney } from '@/shared/lib/format-money';
+import { SupportInvoiceDocumentButton } from './SupportInvoiceDocumentButton';
 
 const formatDate = (value: string) => new Date(`${value}T00:00:00`).toLocaleDateString('es-CL');
 
@@ -82,7 +83,19 @@ export function SupportMonthlyBillingSchedule({ periods, currency, canManageBill
       key: 'actions',
       header: '',
       render: (p) =>
-        p.status === 'to_invoice' && p.monthlyPeriodId && p.amountUf > 0 && canManageBilling ? (
+        p.status === 'invoiced' ? (
+          <span className={styles.invoiceActions}>
+            {p.invoices.map((invoice) => (
+              <SupportInvoiceDocumentButton
+                key={invoice.id}
+                invoiceId={invoice.id}
+                hasAttachment={invoice.hasAttachment}
+                canManageBilling={canManageBilling}
+                folio={p.invoices.length > 1 ? invoice.folio : undefined}
+              />
+            ))}
+          </span>
+        ) : p.status === 'to_invoice' && p.monthlyPeriodId && p.amountUf > 0 && canManageBilling ? (
           <Button variant="outline" size="sm" onClick={() => onIssue(p)}>
             Registrar factura
           </Button>

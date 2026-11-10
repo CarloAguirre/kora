@@ -112,6 +112,28 @@ function buildUseCase(options: {
 }
 
 describe('IssueProjectPaymentMilestoneInvoiceUseCase', () => {
+  it('pasa el PDF a la misma transaccion que registra la factura y conserva Hito 0', async () => {
+    const { useCase, milestones, projects } = buildUseCase({});
+    const attachment = { name: 'factura.pdf', content: 'JVBERi0xLjQ=' };
+    const result = await useCase.execute({
+      projectId: 'project-1', milestoneId: 'milestone-1', attachment,
+      data: { folio: 'F-1', issuedAt: '2026-09-24' }, actor: ACTOR,
+    });
+    expect(result.isOk()).toBe(true);
+    expect(milestones.markIssued).toHaveBeenCalledWith('milestone-1', expect.objectContaining({ attachment }), expect.anything());
+    expect(projects.save).toHaveBeenCalled();
+  });
+
+  it('rechaza subir la factura de un tramo que pertenece a otro proyecto', async () => {
+    const { useCase, milestones } = buildUseCase({});
+    const result = await useCase.execute({
+      projectId: 'other-project', milestoneId: 'milestone-1',
+      data: { folio: 'F-1', issuedAt: '2026-09-24' }, actor: ACTOR,
+    });
+    expect(result.isErr()).toBe(true);
+    expect(milestones.markIssued).not.toHaveBeenCalled();
+  });
+
   it('bloquea facturar si el proyecto de desarrollo no está Aprobado, y avisa a Gerencia/PMO igual', async () => {
     const { useCase, milestones, notifications } = buildUseCase({ project: buildProject({ salesStage: 'quoted' }) });
 

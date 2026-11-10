@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { MarkProjectPaymentMilestonePaidInput } from '@kora/contracts';
+import { MAX_PAYMENT_RECEIPT_BYTES, PAYMENT_RECEIPT_MIME_TYPES, type MarkProjectPaymentMilestonePaidInput } from '@kora/contracts';
 import styles from './SupportPlanActionDialog.module.css';
 import { Modal } from '@/shared/components/ui/Modal';
 import { Button } from '@/shared/components/ui/Button';
@@ -12,7 +12,7 @@ export interface MarkProjectMilestonePaidDialogProps {
   open: boolean;
   milestoneName: string;
   onClose: () => void;
-  onConfirm: (input: MarkProjectPaymentMilestonePaidInput) => Promise<void>;
+  onConfirm: (input: MarkProjectPaymentMilestonePaidInput & { file?: File }) => Promise<void>;
 }
 
 /**
@@ -29,6 +29,7 @@ export function MarkProjectMilestonePaidDialog({
 }: MarkProjectMilestonePaidDialogProps) {
   const [paidAt, setPaidAt] = useState('');
   const [attachmentName, setAttachmentName] = useState<string | null>(null);
+  const [file, setFile] = useState<File | undefined>();
   const [error, setError] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
 
@@ -36,11 +37,16 @@ export function MarkProjectMilestonePaidDialog({
     if (open) {
       setPaidAt(new Date().toISOString().slice(0, 10));
       setAttachmentName(null);
+      setFile(undefined);
       setError(null);
     }
   }, [open]);
 
   const handleConfirm = async () => {
+    if (file && (!PAYMENT_RECEIPT_MIME_TYPES.some((type) => type === file.type) || file.size > MAX_PAYMENT_RECEIPT_BYTES)) {
+      setError('Adjunta un PDF o imagen JPG/PNG de hasta 5 MB.');
+      return;
+    }
     if (!paidAt) {
       setError('Ingresa la fecha de pago.');
       return;
@@ -48,7 +54,7 @@ export function MarkProjectMilestonePaidDialog({
     setError(null);
     setRunning(true);
     try {
-      await onConfirm({ paidAt, attachmentName: attachmentName ?? undefined });
+      await onConfirm({ paidAt, attachmentName: attachmentName ?? undefined, file });
       onClose();
     } catch (caught) {
       setError(caught instanceof ApiRequestError ? caught.message : 'No se pudo registrar el pago. Inténtalo de nuevo.');
@@ -82,8 +88,9 @@ export function MarkProjectMilestonePaidDialog({
         <FileField
           label="Adjuntar comprobante (opcional)"
           fileName={attachmentName}
-          onChange={setAttachmentName}
-          accept="application/pdf"
+          onChange={(name, selected) => { setAttachmentName(name); setFile(selected ?? undefined); }}
+          accept={PAYMENT_RECEIPT_MIME_TYPES.join(',')}
+          disabled={running}
         />
       </div>
 

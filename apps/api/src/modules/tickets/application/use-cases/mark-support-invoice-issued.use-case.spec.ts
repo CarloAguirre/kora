@@ -76,6 +76,19 @@ const doc = (folio: string, amountUf: number, invoicedAt = '2026-10-29') => ({ f
 const input = (invoices: MarkSupportInvoiceIssuedInput['invoices']): MarkSupportInvoiceIssuedInput => ({ invoices });
 
 describe('MarkSupportInvoiceIssuedUseCase', () => {
+  it('guarda el contenido de cada PDF junto a su factura, sin confiar en el nombre enviado en metadata', async () => {
+    const { useCase, invoices } = build();
+    const result = await useCase.execute({
+      planId: 'plan-1',
+      data: input([doc('1', 100), doc('2', 34.81)]),
+      attachments: new Map([[1, { name: 'factura-2.pdf', content: 'JVBERi0xLjQ=' }]]),
+      actor,
+    });
+    expect(result.isOk()).toBe(true);
+    expect(invoices.created[0]).toMatchObject({ attachmentName: null, attachmentContent: undefined });
+    expect(invoices.created[1]).toMatchObject({ attachmentName: 'factura-2.pdf', attachmentContent: 'JVBERi0xLjQ=' });
+  });
+
   it('registra una sola factura por el total', async () => {
     const { useCase, invoices } = build();
     const result = await useCase.execute({ planId: 'plan-1', data: input([doc('27846', 134.81)]), actor });

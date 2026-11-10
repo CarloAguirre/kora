@@ -308,7 +308,7 @@ export const supportInvoices = pgTable(
     /** Vencimiento del pago — hoy se calcula como `invoicedAt + 30 días` al crear la factura, pero se guarda (no se recalcula) para poder hacerlo configurable sin migrar datos. */
     dueAt: date('due_at', { mode: 'date' }),
     paidAt: date('paid_at', { mode: 'date' }),
-    /** Solo el nombre del archivo adjunto — la v2 todavía no tiene almacenamiento de archivos (tarea transversal pendiente en docs/PLAN-MODULOS.md). */
+    /** Nombre visible; el contenido, cuando existe, vive en support_invoice_attachments. */
     attachmentName: text('attachment_name'),
 
     /** Trazabilidad hacia el período mensual facturado — solo `plan_type='monthly'`. */
@@ -318,3 +318,9 @@ export const supportInvoices = pgTable(
   },
   (table) => [uniqueIndex('support_invoices_plan_period_position_key').on(table.planId, table.periodKey, table.position)],
 );
+
+export const supportInvoiceAttachments = pgTable('support_invoice_attachments', {
+  invoiceId: uuid('invoice_id').primaryKey().references(() => supportInvoices.id, { onDelete: 'cascade' }),
+  /** PDF en base64, separado de las consultas del libro de facturas. */
+  content: text('content').notNull(),
+});

@@ -239,6 +239,8 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
     percent: milestone.percent,
     amount: milestone.amount,
     invoiceNumber: milestone.invoiceNumber,
+    hasAttachment: milestone.hasAttachment ?? false,
+    hasPaymentReceipt: milestone.hasPaymentReceipt ?? false,
     issuedAt: milestone.issuedAt?.toISOString().slice(0, 10) ?? null,
     dueAt: milestone.dueAt?.toISOString().slice(0, 10) ?? null,
     status: milestone.status,

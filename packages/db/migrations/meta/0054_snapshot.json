@@ -1,5 +1,5 @@
 {
-  "id": "b894a4cc-4c77-4f77-a047-818e68721548",
+  "id": "b141acd1-b9d2-45fa-bf68-e94f86e4a949",
   "prevId": "edebc8c6-0f39-4c0a-86a3-df9997bf9c21",
   "version": "7",
   "dialect": "postgresql",
@@ -2164,6 +2164,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "logo_data_url": {
+          "name": "logo_data_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "country_id": {
           "name": "country_id",
           "type": "uuid",
@@ -2237,12 +2243,6 @@
         "deleted_at": {
           "name": "deleted_at",
           "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "logo_data_url": {
-          "name": "logo_data_url",
-          "type": "text",
           "primaryKey": false,
           "notNull": false
         }
@@ -2464,6 +2464,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "segment_id": {
+          "name": "segment_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "estimated_date": {
           "name": "estimated_date",
           "type": "date",
@@ -2497,12 +2503,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
-        },
-        "segment_id": {
-          "name": "segment_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
         }
       },
       "indexes": {},
@@ -2787,6 +2787,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "segment_id": {
+          "name": "segment_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "name": {
           "name": "name",
           "type": "varchar(300)",
@@ -2858,12 +2864,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
-        },
-        "segment_id": {
-          "name": "segment_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
         }
       },
       "indexes": {},
@@ -4118,6 +4118,13 @@
           "notNull": true,
           "default": "'UF'"
         },
+        "is_internal": {
+          "name": "is_internal",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
         "pending_management_approval": {
           "name": "pending_management_approval",
           "type": "boolean",
@@ -4163,13 +4170,6 @@
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
-        },
-        "is_internal": {
-          "name": "is_internal",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
         }
       },
       "indexes": {
@@ -4430,6 +4430,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "segment_id": {
+          "name": "segment_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "assignment": {
           "name": "assignment",
           "type": "text",
@@ -4534,12 +4540,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
-        },
-        "segment_id": {
-          "name": "segment_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
         }
       },
       "indexes": {
@@ -4600,6 +4600,19 @@
           "onDelete": "set null",
           "onUpdate": "no action"
         },
+        "hour_entries_segment_id_project_module_segments_id_fk": {
+          "name": "hour_entries_segment_id_project_module_segments_id_fk",
+          "tableFrom": "hour_entries",
+          "tableTo": "project_module_segments",
+          "columnsFrom": [
+            "segment_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
         "hour_entries_decision_user_id_users_id_fk": {
           "name": "hour_entries_decision_user_id_users_id_fk",
           "tableFrom": "hour_entries",
@@ -4619,19 +4632,6 @@
           "tableTo": "users",
           "columnsFrom": [
             "designated_approver_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "hour_entries_segment_id_project_module_segments_id_fk": {
-          "name": "hour_entries_segment_id_project_module_segments_id_fk",
-          "tableFrom": "hour_entries",
-          "tableTo": "project_module_segments",
-          "columnsFrom": [
-            "segment_id"
           ],
           "columnsTo": [
             "id"
@@ -6830,6 +6830,45 @@
             "id"
           ],
           "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.support_invoice_attachments": {
+      "name": "support_invoice_attachments",
+      "schema": "",
+      "columns": {
+        "invoice_id": {
+          "name": "invoice_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "content": {
+          "name": "content",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "support_invoice_attachments_invoice_id_support_invoices_id_fk": {
+          "name": "support_invoice_attachments_invoice_id_support_invoices_id_fk",
+          "tableFrom": "support_invoice_attachments",
+          "tableTo": "support_invoices",
+          "columnsFrom": [
+            "invoice_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
           "onUpdate": "no action"
         }
       },

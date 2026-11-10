@@ -6,6 +6,7 @@ import {
   ActiveSupportContractMustBeClosedError,
   CannotManageProjectError,
   ManualHito0ReasonRequiredError,
+  ProjectApprovalRequiredForActivationError,
   SupportContractRequiredForStatusError,
 } from '../../domain/errors/project.errors';
 import type { SupportContractStatusReader } from '../ports/support-contract-status-reader.port';
@@ -83,7 +84,7 @@ describe('Regla de inicio: cotización aprobada y traspasada', () => {
         actor: ACTOR, actorPermissions: ['projects:manage'],
       });
       expect(result.isErr()).toBe(true);
-      expect(result.isErr() && result.error).toBeInstanceOf(ProjectQuotationTransferRequiredError);
+      expect(result.isErr() && result.error).toBeInstanceOf(ProjectApprovalRequiredForActivationError);
       expect(projects.save).not.toHaveBeenCalled();
     }
   });
@@ -182,10 +183,13 @@ describe('ChangeProjectStatusUseCase — Hito 0 manual', () => {
       slug: 'portal',
       type: 'development',
       salesStage: 'approved',
-      status: 'on_hold',
+      status: 'draft',
       leaderUserId: 'leader-1',
       now: NOW,
     }).unwrap();
+    // Reactivación real: este proyecto ya pasó por Hito 0 antes de detenerse.
+    project.activateFromHito0(NOW, 'manual', 'Contrato firmado');
+    project.changeStatus('on_hold', NOW);
     const { useCase, projects } = buildUseCase(project);
 
     const result = await useCase.execute({
@@ -225,6 +229,60 @@ describe('ChangeProjectStatusUseCase — Hito 0 manual', () => {
     });
 
     expect(paymentTriggers.promoteAndNotify).toHaveBeenCalledWith(expect.objectContaining({ status: 'finished' }));
+  });
+});
+
+describe('ChangeProjectStatusUseCase — prospectos y cotizaciones', () => {
+  function unapprovedProject(salesStage: 'prospect' | 'quoted', status: 'draft' | 'on_hold' = 'draft') {
+    return Project.create({
+      id: 'project-1', name: 'Vespucio Norte', slug: 'vespucio-norte',
+      type: 'development', salesStage, status, leaderUserId: ACTOR.userId, now: NOW,
+    }).unwrap();
+  }
+
+  it.each(['prospect', 'quoted'] as const)('permite detener y reanudar %s sin Hito 0 ni cobros', async (salesStage) => {
+    const project = unapprovedProject(salesStage);
+    const { useCase, projects, paymentTriggers } = buildUseCase(project);
+    const command = (status: 'draft' | 'on_hold') => ({
+      projectId: 'project-1', data: { status }, actor: ACTOR, actorPermissions: ['projects:read_assigned'] as const,
+    });
+
+    expect((await useCase.execute(command('on_hold'))).isOk()).toBe(true);
+    expect(project.status).toBe('on_hold');
+    expect(project.salesStage).toBe(salesStage);
+    expect((await useCase.execute(command('draft'))).isOk()).toBe(true);
+    expect(project.status).toBe('draft');
+    expect(project.hito0At).toBeNull();
+    expect(projects.save).toHaveBeenCalledTimes(2);
+    expect(paymentTriggers.promoteAndNotify).not.toHaveBeenCalled();
+  });
+
+  it.each(['prospect', 'quoted'] as const)('impide activar %s sin aprobación', async (salesStage) => {
+    const { useCase, projects } = buildUseCase(unapprovedProject(salesStage, 'on_hold'));
+    const result = await useCase.execute({
+      projectId: 'project-1', data: { status: 'active' }, actor: ACTOR, actorPermissions: ['projects:manage'],
+    });
+    expect(result.isErr() && result.error).toBeInstanceOf(ProjectApprovalRequiredForActivationError);
+    expect(projects.save).not.toHaveBeenCalled();
+  });
+
+  it('un Aprobado detenido sin Hito 0 exige motivo para activarse', async () => {
+    const project = buildApprovedDraftProject();
+    project.changeStatus('on_hold', NOW);
+    const { useCase, projects } = buildUseCase(project);
+    const missing = await useCase.execute({
+      projectId: 'project-1', data: { status: 'active' }, actor: ACTOR, actorPermissions: ['projects:manage'],
+    });
+    expect(missing.isErr() && missing.error).toBeInstanceOf(ManualHito0ReasonRequiredError);
+    expect(projects.save).not.toHaveBeenCalled();
+
+    const activated = await useCase.execute({
+      projectId: 'project-1', data: { status: 'active', reason: 'Orden de compra aprobada' },
+      actor: ACTOR, actorPermissions: ['projects:manage'],
+    });
+    expect(activated.isOk()).toBe(true);
+    expect(project.hito0Source).toBe('manual');
+    expect(project.hito0Reason).toBe('Orden de compra aprobada');
   });
 });
 

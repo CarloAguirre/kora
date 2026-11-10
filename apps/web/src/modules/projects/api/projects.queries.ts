@@ -501,6 +501,7 @@ export function useIssueProjectPaymentMilestoneInvoice() {
 
 export function useMarkProjectPaymentMilestonePaid() {
   const invalidate = useInvalidateProjects();
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({
       projectId,
@@ -509,9 +510,38 @@ export function useMarkProjectPaymentMilestonePaid() {
     }: {
       projectId: string;
       milestoneId: string;
-      input: MarkProjectPaymentMilestonePaidInput;
+      input: MarkProjectPaymentMilestonePaidInput & { file?: File };
     }) => projectsApi.markPaymentMilestonePaid(projectId, milestoneId, input),
-    onSuccess: () => invalidate(),
+    onSuccess: () => {
+      invalidate();
+      return queryClient.invalidateQueries({ queryKey: ['billing'] });
+    },
+  });
+}
+
+export function useUploadProjectInvoiceAttachment() {
+  const invalidate = useInvalidateProjects();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ projectId, milestoneId, file }: { projectId: string; milestoneId: string; file: File }) =>
+      projectsApi.uploadInvoiceAttachment(projectId, milestoneId, file),
+    onSuccess: () => {
+      invalidate();
+      return queryClient.invalidateQueries({ queryKey: ['billing'] });
+    },
+  });
+}
+
+export function useUploadProjectPaymentReceipt() {
+  const invalidate = useInvalidateProjects();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ projectId, milestoneId, file }: { projectId: string; milestoneId: string; file: File }) =>
+      projectsApi.uploadPaymentReceipt(projectId, milestoneId, file),
+    onSuccess: () => {
+      invalidate();
+      return queryClient.invalidateQueries({ queryKey: ['billing'] });
+    },
   });
 }
 

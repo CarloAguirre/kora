@@ -11,6 +11,57 @@ décimo perfil, `kora-perfil-finanzas.html`: un rol nuevo, "Finanzas", con una
 sola pantalla que junta Soporte y Proyectos, y una regla de negocio nueva:
 **Hito 0**.
 
+## Documentos PDF de facturas
+
+Las facturas de proyectos admiten el mismo flujo de documentos que soporte:
+al registrar una factura se puede adjuntar un PDF de hasta 5 MB; para un tramo
+ya facturado o pagado sin archivo aparece «Subir documento», y si tiene PDF
+aparece «Ver factura», que abre el archivo en otra pestaña. Disponible en
+Facturacion > Proyectos, su panel lateral y los tramos de la ficha del proyecto.
+
+La migracion `0055_confused_cargill` crea `project_invoice_attachments`, con
+nombre y contenido base64 separados de los listados. El PDF inicial se guarda
+en la misma transaccion que registra la factura y procesa Hito 0. Adjuntar a
+una factura existente no cambia importes, folio, fechas, pago ni Hito 0, y
+no permite reemplazar un archivo existente. Eliminar un tramo elimina su
+archivo por cascada; devolverlo a Pendiente/Por facturar limpia el PDF junto
+con el folio y las fechas para no reutilizar la factura anulada.
+
+Las rutas bajo `/projects/:projectId/payment-milestones/:milestoneId` son:
+`POST invoice/upload` (metadata JSON y `file_0`), `POST attachment` (campo
+`file`) y `GET attachment`. La carga exige `billing:manage`; la lectura,
+`billing:read`. Se comprueba que el tramo pertenece al proyecto y se
+reutiliza la validacion PDF de soporte (tipo, firma y tamaño). Las respuestas
+son PDF inline sin cache y viajan por el cliente autenticado, sin tokens en
+la URL. El registro JSON sin adjunto sigue usando la ruta original.
+
+Aplicar `pnpm db:migrate` con `DATABASE_URL` configurada antes de iniciar la
+API actualizada.
+
+## Comprobantes de pago
+
+Al marcar un tramo como pagado se puede adjuntar un comprobante PDF, JPG o PNG
+de hasta 5 MB. El servidor valida MIME, firma y tamaño; el archivo se guarda
+junto con el pago en una unica transaccion. La ruta original sin documento
+sigue funcionando.
+
+La migracion `0056_serious_quicksilver` crea `project_payment_receipts`, separada
+del PDF de la factura, con nombre original, MIME y contenido base64. En los
+tramos pagados aparece «Subir comprobante» si falta archivo real o «Ver
+comprobante» si existe. Aplica en Facturacion > Proyectos, su panel lateral y
+la ficha del proyecto. El archivo se abre en una pestaña nueva mediante el
+cliente autenticado.
+
+Bajo `/projects/:projectId/payment-milestones/:milestoneId`, `POST paid/upload`
+recibe metadata JSON y `file_0` para registrar el pago; `POST payment-receipt`
+recibe `file` para completar un pago antiguo sin alterar fecha, monto ni
+factura; `GET payment-receipt` devuelve el documento inline con su MIME
+original, sin cache. Las cargas exigen `billing:manage`, y la lectura
+`billing:read`. Se comprueba la pertenencia al proyecto y no se reemplazan
+comprobantes existentes. Corregir el tramo a un estado distinto de Pagado
+elimina el comprobante para no asociarlo a un pago futuro; eliminar el tramo
+lo elimina por cascada. El archivo de factura es independiente.
+
 ## Modelo de tramos: manual, no 2×50%
 
 El prototipo de la pestaña "Proyectos" de `kora-facturacion-soporte.html`

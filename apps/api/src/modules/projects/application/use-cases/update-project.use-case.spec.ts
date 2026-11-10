@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { UpdateProjectUseCase } from './update-project.use-case';
 import { Project } from '../../domain/entities/project.entity';
-import { CannotReassignProjectLeaderError, SoldHoursChangeReasonRequiredError, ProjectTeamHasRoadmapBlocksError } from '../../domain/errors/project.errors';
+import { CannotReassignProjectLeaderError, ProjectApprovalRequiredForActivationError, SoldHoursChangeReasonRequiredError, ProjectTeamHasRoadmapBlocksError } from '../../domain/errors/project.errors';
 import type { ProjectRepository } from '../../domain/repositories/project.repository';
 import type { ProjectTeamRepository } from '../../domain/repositories/project-team.repository';
 import type { ProjectModuleRepository } from '../../domain/repositories/project-module.repository';
@@ -114,6 +114,31 @@ describe('UpdateProjectUseCase — reasignar líder', () => {
 
     expect(result.isOk()).toBe(true);
     expect(projects.save).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('UpdateProjectUseCase — etapa comercial y estado operativo', () => {
+  const PMO = { actor: { userId: 'pmo-1', email: 'pmo@kabeli.cl' }, actorPermissions: ['projects:manage'] as const };
+
+  it('impide retroceder a Cotización si el proyecto sigue Activo', async () => {
+    const project = buildProject(null);
+    project.activateFromHito0(NOW, 'manual', 'Contrato firmado');
+    const { useCase, projects } = buildUseCase(null, project);
+    const result = await useCase.execute({ projectId: 'project-1', data: { salesStage: 'quoted' }, ...PMO });
+    expect(result.isErr() && result.error).toBeInstanceOf(ProjectApprovalRequiredForActivationError);
+    expect(projects.save).not.toHaveBeenCalled();
+    expect(project.salesStage).toBe('approved');
+  });
+
+  it('permite retroceder a Cotización después de detener el proyecto', async () => {
+    const project = buildProject(null);
+    project.changeStatus('on_hold', NOW);
+    const { useCase, projects } = buildUseCase(null, project);
+    const result = await useCase.execute({ projectId: 'project-1', data: { salesStage: 'quoted' }, ...PMO });
+    expect(result.isOk()).toBe(true);
+    expect(projects.save).toHaveBeenCalledOnce();
+    expect(project.salesStage).toBe('quoted');
+    expect(project.status).toBe('on_hold');
   });
 });
 

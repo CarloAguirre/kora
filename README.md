@@ -147,7 +147,7 @@ docs/           Arquitectura, migración y decisiones
 | M8 · Notificaciones | Implementado, con recordatorios diarios de horas |
 | M9 · Facturación | Implementado, con el rol Finanzas. Ver [`docs/DECISION-FACTURACION-PROYECTOS.md`](docs/DECISION-FACTURACION-PROYECTOS.md) |
 | Portal de cliente | Implementado. Ver [`docs/DECISION-PORTAL-CLIENTE.md`](docs/DECISION-PORTAL-CLIENTE.md) |
-| Importación de datos v1 | Desde la app, en Administración → Importar datos |
+| Importación de datos v1 | Oculta en el menú lateral; acceso directo en `/administracion/importar-datos` con el permiso correspondiente |
 
 [`docs/PLAN-MODULOS.md`](docs/PLAN-MODULOS.md) tiene el plan original de construcción y las reglas a portar de cada módulo.
 
