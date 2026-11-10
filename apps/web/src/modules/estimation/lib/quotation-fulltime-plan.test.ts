@@ -69,6 +69,15 @@ function overlappingFixture() {
     hoursPerWeek: 40, dedicationPercent: 100,
   });
   snapshot.roleTeamIds.QA = qa;
+  snapshot.proposal.roles = [
+    { role: 'Desarrollo', unit: 'week', duration: 23, hoursPerUnit: 40,
+      people: 1, totalHours: 920 },
+    { role: 'QA', unit: 'week', duration: 13, hoursPerUnit: 20,
+      people: 1, totalHours: 260 },
+    { role: 'Líder Técnico', unit: 'week', duration: 16, hoursPerUnit: 5,
+      people: 1, totalHours: 80 },
+  ];
+  snapshot.proposal.totalHours = 1260;
   const source = snapshot.edt!;
   const loads = [
     { code: 'S0', startWeek: 3, durationWeeks: 12, developer: 120, testing: 260 },
