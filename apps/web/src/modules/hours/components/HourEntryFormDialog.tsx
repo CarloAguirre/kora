@@ -71,7 +71,7 @@ export function HourEntryFormDialog({ open, entry, onClose, onSuccess, readOnly 
 
   if (entry && readOnly) {
     return (
-      <Modal open={open} onClose={onClose} title="Detalle del registro">
+      <Modal open={open} onClose={onClose} title="Detalle del registro" bodyScrollOnly>
         <ViewEntryDetail entry={entry} onClose={onClose} />
       </Modal>
     );
@@ -79,7 +79,7 @@ export function HourEntryFormDialog({ open, entry, onClose, onSuccess, readOnly 
 
   if (entry) {
     return (
-      <Modal open={open} onClose={onClose} title="Editar registro de horas" wide>
+      <Modal open={open} onClose={onClose} title="Editar registro de horas" wide bodyScrollOnly>
         <EditEntryForm key={entry.id} entry={entry} onClose={onClose} onSuccess={onSuccess} />
       </Modal>
     );

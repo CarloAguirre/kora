@@ -14,6 +14,8 @@ const modalCssPath = [
 ].find((path) => existsSync(path));
 if (!modalCssPath) throw new Error('No se encontró Modal.module.css para el test.');
 const modalCss = readFileSync(modalCssPath, 'utf8');
+const hourDialogSource = readFileSync(resolve(modalCssPath, '../../../../modules/hours/components/HourEntryFormDialog.tsx'), 'utf8');
+const globalCss = readFileSync(resolve(modalCssPath, '../../../../styles/global.css'), 'utf8');
 
 // No se simulan consultas ni se envían HH; verificamos el contenedor real.
 vi.mock('./DailyEntryForm', async (importOriginal) => ({
@@ -28,6 +30,16 @@ vi.mock('./WeeklyEntryForm', () => ({
 const noop = vi.fn();
 
 describe('Scroll vertical del modal Registrar horas', () => {
+  it('limita tambien la edicion y el detalle al scroll del cuerpo', () => {
+    for (const title of ['Editar registro de horas', 'Detalle del registro']) {
+      expect(hourDialogSource).toMatch(new RegExp(`<Modal[^>]*title="${title}"[^>]*bodyScrollOnly[^>]*>`));
+    }
+  });
+
+  it('bloquea la raiz sin convertir body en un contenedor que desplace el sidebar sticky', () => {
+    expect(globalCss).toMatch(/html:has\(dialog\[open\]\)\s*\{\s*overflow:\s*hidden;/);
+    expect(globalCss).not.toMatch(/body:has\(dialog\[open\]\)/);
+  });
   it('activa una sola zona de desplazamiento tanto en el formulario diario como semanal', () => {
     render(<HourEntryFormDialog open entry={null} onClose={noop} onSuccess={noop} />);
     const dialog = screen.getByRole('dialog', { name: 'Registrar horas' });
