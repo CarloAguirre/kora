@@ -424,5 +424,26 @@
 .thoughtActivity li { padding: 5px 8px; border-left: 2px solid var(--kora-border-subtle); }
 .thoughtTime { display: inline-block; margin-right: 5px; color: var(--kora-text-muted); font-size: 10px; font-variant-numeric: tabular-nums; }
 .thoughtHeartbeat { color: var(--kora-text-muted); font-style: italic; margin: 6px 0 !important; }
-.thoughtModelSummary { border-top: 1px solid var(--kora-border-subtle); margin-top: 9px; padding-top: 8px; }
-.thoughtModelSummary strong { display: block; color: var(--kora-text-muted); margin-bottom: 4px; }
+.thoughtModelSummary { border-top: 1px solid var(--kora-border-subtle); margin-top: 9px !important; padding-top: 8px; }
+.thoughtWaiting {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-xs);
+  margin-top: 8px !important;
+}
+.thoughtDots { display: inline-flex; gap: 2px; }
+.thoughtDots span {
+  display: inline-block;
+  animation: kora-thought-dot-pulse 1.25s ease-in-out infinite;
+}
+.thoughtDots span:nth-child(2) { animation-delay: .2s; }
+.thoughtDots span:nth-child(3) { animation-delay: .4s; }
+@keyframes kora-thought-dot-pulse {
+  0%, 60%, 100% { opacity: .25; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-2px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .thoughtDots span { animation: none; opacity: 1; }
+}
