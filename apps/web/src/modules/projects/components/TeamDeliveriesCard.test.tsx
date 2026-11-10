@@ -4,8 +4,12 @@ import type { ProjectDetail } from '@kora/contracts';
 import { TeamDeliveriesCard } from './TeamDeliveriesCard';
 
 vi.mock('./DeliveryActionDialogs', () => ({
-  DeliveryActionDialogs: ({ target }: { target: { action: string } | null }) =>
-    target ? <div role="dialog" aria-label={'Acción entrega: ' + target.action} /> : null,
+  DeliveryActionDialogs: ({ target }: { target: {
+    action: string; blockTasks?: { status: string }[];
+  } | null }) => target
+    ? <div role="dialog" aria-label={'Acción entrega: ' + target.action}>
+      {target.blockTasks?.filter((task) => task.status !== 'done').length ?? 0} pendientes
+    </div> : null,
 }));
 
 const teamId = '0777e456-fd76-445e-83f1-afc25061c101';
@@ -82,6 +86,36 @@ describe('Entregas del equipo · tabla del prototipo', () => {
       projectId={projectId} teamId={teamId} managerView />);
     expect(screen.getByText('Entregadas 1')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Marcar como entregada' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Revertir entrega' }));
+    expect(screen.getByRole('dialog', { name: 'Acción entrega: reopen' })).toBeInTheDocument();
+  });
+
+  it('actualiza tareas del aviso tras cambiar sus estados, sin reabrir el modal', () => {
+    const input = project();
+    input.modules[0]!.tasks = [{
+      id: 'task-1', teamId, segmentId, status: 'in_review', cancelledAt: null,
+    }] as ProjectDetail['modules'][number]['tasks'][number][];
+    const view = render(<TeamDeliveriesCard project={input} projectId={projectId} teamId={teamId} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Marcar como entregada' }));
+    expect(screen.getByRole('dialog', { name: 'Acción entrega: finalize' }))
+      .toHaveTextContent('1 pendientes');
+    const updated: ProjectDetail = {
+      ...input, modules: [{
+        ...input.modules[0]!,
+        tasks: [{ ...input.modules[0]!.tasks[0]!, status: 'done' }],
+      }],
+    };
+    view.rerender(<TeamDeliveriesCard project={updated} projectId={projectId} teamId={teamId} />);
+    expect(screen.getByRole('dialog', { name: 'Acción entrega: finalize' }))
+      .toHaveTextContent('0 pendientes');
+  });
+
+  it('reversion independiente usa transición normal, sin reopenBlock', () => {
+    const independent = project('approved');
+    independent.modules[0]!.deliveries[0]!.segmentId = null;
+    render(<TeamDeliveriesCard project={independent} projectId={projectId} teamId={teamId} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Revertir entrega' }));
+    expect(screen.getByRole('dialog', { name: 'Acción entrega: revert' })).toBeInTheDocument();
   });
 
   it('sin permisos de gestión no permite entregar ni aprobar', () => {
