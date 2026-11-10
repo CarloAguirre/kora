@@ -826,6 +826,51 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
     expect(await screen.findByTestId('location')).toHaveTextContent('version=version-qa');
   });
 
+  it('al seleccionar MVP adapta preguntas heredadas de PoC y envía el mismo texto a la propuesta', async () => {
+    mocks.analyze.mockResolvedValueOnce({
+      ...analysisResult,
+      dynamicQuestions: [{
+        ...dynamicQuestions[0]!,
+        required: false,
+        question: '¿Cómo debe relacionarse el PoC con los robots RPA existentes?',
+        reason: '¿Qué componentes deben incluirse dentro del PoC?',
+        options: [
+          { value: 'reuse', label: 'Reutilizar los robots del PoC' },
+          { value: 'exclude', label: 'Excluir los robots del PoC' },
+        ],
+      }],
+    });
+    renderWizard();
+    await analyzeToUnderstanding();
+    fireEvent.click(screen.getByRole('button', { name: 'Está correcto' }));
+    answerFixed();
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar' }));
+    expect(screen.getByText('¿Cómo debe relacionarse el MVP con los robots RPA existentes? · Opcional'))
+      .toBeInTheDocument();
+    expect(screen.getByText('Por qué preguntamos: ¿Qué componentes deben incluirse dentro del MVP?'))
+      .toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText('Excluir los robots del MVP'));
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Generar estimación' }));
+    await waitFor(() => expect(mocks.generate).toHaveBeenCalledTimes(1));
+    const payload = mocks.generate.mock.calls[0]![0] as {
+      dynamicQuestions: Array<{
+        question: string; options: Array<{ value: string; label: string }>;
+        sourceRefs: Array<{ sourceId: string }>;
+      }>;
+      answers: Array<{ questionId: string; value: unknown }>;
+    };
+    expect(payload.dynamicQuestions[0]?.question).toContain('el MVP');
+    expect(payload.dynamicQuestions[0]?.options[1]).toEqual({
+      value: 'exclude', label: 'Excluir los robots del MVP',
+    });
+    expect(payload.dynamicQuestions[0]?.sourceRefs[0]?.sourceId).toBe('drive-requerimiento-qa');
+    expect(payload.answers).toEqual(expect.arrayContaining([
+      expect.objectContaining({ questionId: 'F01', value: 'mvp' }),
+      expect.objectContaining({ questionId: 'D01', value: 'exclude' }),
+    ]));
+  });
+
   it('no permite confirmar un resumen vacío y conserva el modal si falla la generación', async () => {
     mocks.generate.mockRejectedValueOnce(new Error('Gemini no está disponible'));
     renderWizard();

@@ -754,6 +754,8 @@ export class GenerateEstimationPocProposalUseCase {
         instructions: [
           BASE_INSTRUCTIONS,
           'Si context.sourceCoverage advierte omisiones, no inventes los requisitos faltantes ni afirmes cobertura documental total.',
+          'clarifyingQuestions es una lista residual de CERO a CINCO preguntas, en orden de impacto. No repitas ninguna que ya tenga respuesta confirmada en context.resolvedAnswers; si no hay pendientes devuelve []. Exceder cinco preguntas invalida la propuesta.',
+          'El nivel de entrega confirmado en context.resolvedAnswers (F01: PoC, MVP, fase, solución completa o evolutivo) manda sobre el lenguaje ambiguo de los documentos: nunca llames PoC a un MVP o a una solución completa. Conserva la denominación PoC únicamente para referencias explícitas a trabajos previos en documentos.',
           'Los Excel .xlsx se entregan como texto por HOJA y FILA con coordenadas de celda. Considera sus reglas, matrices y alcance igual que los PDF y documentos; no uses fórmulas sin resultado calculado como valores confirmados.',
           ...(activeKoraTeams ? [
             'Los únicos equipos permitidos son los de context.activeKoraTeams, leídos del catálogo real de Kora.',

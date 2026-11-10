@@ -111,6 +111,8 @@ export class AnalyzeEstimationPocUseCase {
         'Informa únicamente sobre las fuentes realmente entregadas a esta llamada; no afirmes haber revisado toda la carpeta Drive si solo se seleccionó una parte.',
         'Propón como máximo 5 preguntas dinámicas SOLO cuando su respuesta pueda modificar alcance, HH o arquitectura.',
         'No repitas las preguntas fijas de nivel de entrega, plazo, equipo, postproducción y condiciones generales.',
+        'IMPORTANTE: en esta etapa el usuario TODAVÍA NO ha confirmado F01 (PoC, MVP, fase o solución completa). Redacta todas las aclaraciones, opciones, justificaciones y supuestos usando términos NEUTROS: "solución a estimar", "entrega", "implementación". Nunca des por hecho que la entrega solicitada es una PoC, aunque un documento describa una PoC antigua.',
+        'Si necesitas referirte a una PoC existente en los antecedentes, hazlo claramente como un artefacto HISTÓRICO o PREEXISTENTE distinto de la solución que se está estimando. No reescribas nombres propios, citas ni títulos de archivos.',
         'Si el documento contiene respuestas claras a F01/F02/F04, agrega fixedPrefills con questionId, value y sourceId real. Si no hay evidencia, devuelve [].',
         'Los valores permitidos para F01 son poc, mvp, phase, complete, evolution; F02 es texto libre y F04 es una lista CSV de uat, stabilization, pilot, support o none.',
         'NO prellenes la selección de equipo F03 ni inventes respuestas para las condiciones fijas.',

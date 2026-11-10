@@ -20,15 +20,18 @@ export function fitGeneratedText(value: unknown, max: number): unknown {
 export function normalizeGeneratedProposal(raw: unknown): unknown {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return raw;
   const value = raw as Record<string, unknown>;
-  const limitList = (source: unknown, max: number): unknown =>
+  // Las listas auxiliares pueden exceder maxItems incluso si el proveedor
+  // recibe un JSON schema. Acotar su cantidad sin rechazar perfiles/HH válidos.
+  // Mantener el orden: el prompt exige priorizar primero las más relevantes.
+  const limitList = (source: unknown, maxChars: number, maxItems: number): unknown =>
     Array.isArray(source)
-      ? source.map((item) => fitGeneratedText(item, max))
+      ? source.slice(0, maxItems).map((item) => fitGeneratedText(item, maxChars))
       : source;
   return {
     ...value,
     summary: fitGeneratedText(value.summary, 3000),
-    assumptions: limitList(value.assumptions, 1500),
-    clarifyingQuestions: limitList(value.clarifyingQuestions, 1500),
+    assumptions: limitList(value.assumptions, 1500, 8),
+    clarifyingQuestions: limitList(value.clarifyingQuestions, 1500, 5),
     roles: Array.isArray(value.roles)
       ? value.roles.map((role) =>
         role && typeof role === 'object' && !Array.isArray(role)
