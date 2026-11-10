@@ -23,6 +23,7 @@ import { estimationApi, type DriveBrowseResult, type DriveBrowseFolder } from '.
 import { FileTextIcon, FolderOpenIcon, CheckIcon } from '@/shared/components/icons/Icons';
 import { useGenerateAiDemoQuotationVersion } from '../api/quotation.queries';
 import styles from './AiQuotationWizardModal.module.css';
+import { adaptDynamicQuestionToScope } from './quotation-dynamic-scope';
 
 const STAGES = ['Análisis', 'Entendimiento', 'Condiciones', 'Aclaraciones', 'Confirmación'] as const;
 
@@ -361,7 +362,10 @@ export function AiQuotationWizardModal({ project, onClose }: {
     analysisSnapshot.sourceMode === 'drive' && analysisSnapshot.documentsAnalyzed > 0
     ? analysisSnapshot : null;
   const fixed = questionnaire.data?.fixedQuestions ?? [];
-  const dynamic = verifiedAnalysis?.dynamicQuestions ?? [];
+  // F01 se confirma DESPUÉS de analizar Drive: armonizar menciones al
+  // entregable actual al mostrar/persistir las preguntas, sin tocar las fuentes.
+  const dynamic = (verifiedAnalysis?.dynamicQuestions ?? []).map((question) =>
+    adaptDynamicQuestionToScope(question, answers.F01));
   const working = sourceStep === 'connecting' || sourceStep === 'discovering' ||
     sourceStep === 'loading' || sourceStep === 'analyzing' || generate.isPending || generating;
   const relevant = stage === 2 ? fixed : dynamic;
