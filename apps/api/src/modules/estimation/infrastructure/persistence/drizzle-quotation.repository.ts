@@ -337,7 +337,8 @@ export class DrizzleQuotationRepository implements QuotationRepository {
   async createAiPocDraft(projectId: string, userId: string, proposal: EstimationPocProposal,
     answers: readonly SubmitEstimationAnswerInput[],
     dynamicQuestions: readonly EstimationQuestion[], edt: QuotationReferenceEdt,
-    confirmedUnderstanding?: string, roleTeamIds?: Readonly<Record<string, string>>): Promise<QuotationVersion> {
+    confirmedUnderstanding?: string, roleTeamIds?: Readonly<Record<string, string>>,
+    selectedTeamIds: readonly string[] = []): Promise<QuotationVersion> {
     if (proposal.projectId !== projectId || !['gemini', 'openai'].includes(proposal.provider) ||
         !['poc_simulated', 'drive'].includes(proposal.sourceMode) || proposal.documentsAnalyzed < 1 ||
         proposal.totalHours <= 0 || proposal.roles.some((role) => role.totalHours <= 0) ||
@@ -346,14 +347,15 @@ export class DrizzleQuotationRepository implements QuotationRepository {
         edt.source !== (proposal.sourceMode === 'drive' ? 'drive' : 'kdm_demo') || edt.provider !== proposal.provider) {
       throw new BadRequestException('Propuesta IA sin trazabilidad documental coherente o HH conciliadas.');
     }
-    return this.createVersionInternal(projectId, userId, {}, { proposal, answers, dynamicQuestions, edt, confirmedUnderstanding, roleTeamIds });
+    return this.createVersionInternal(projectId, userId, {}, { proposal, answers, dynamicQuestions, edt, confirmedUnderstanding, roleTeamIds, selectedTeamIds });
   }
 
   private async createVersionInternal(
     projectId: string, userId: string, input: CreateQuotationVersionInput,
     aiPoc?: { proposal: EstimationPocProposal; answers: readonly SubmitEstimationAnswerInput[];
       dynamicQuestions: readonly EstimationQuestion[]; edt: QuotationReferenceEdt;
-      confirmedUnderstanding?: string; roleTeamIds?: Readonly<Record<string, string>> },
+      confirmedUnderstanding?: string; roleTeamIds?: Readonly<Record<string, string>>;
+      selectedTeamIds?: readonly string[] }, 
   ): Promise<QuotationVersion> {
     return this.db.transaction(async (tx) => {
       await tx.insert(projectQuotations).values({ projectId, createdByUserId: userId }).onConflictDoNothing();
@@ -401,6 +403,7 @@ export class DrizzleQuotationRepository implements QuotationRepository {
             answers: aiPoc.answers, dynamicQuestions: aiPoc.dynamicQuestions,
             confirmedUnderstanding: aiPoc.confirmedUnderstanding,
             edt: aiPoc.edt, roleTeamIds: aiPoc.roleTeamIds ?? {},
+            selectedTeamIds: aiPoc.selectedTeamIds ?? [],
           }),
         });
         if (aiPoc.roleTeamIds) {
