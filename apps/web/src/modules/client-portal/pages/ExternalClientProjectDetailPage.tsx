@@ -36,12 +36,18 @@ function roadmapForPortal(project: PortalProjectDetail): ProjectPhaseRoadmap {
     ...phase.deliveries.map((delivery) => delivery.estimatedDate),
   ]).filter(Boolean).sort();
   const today = new Date().toISOString().slice(0, 10);
+  const shift = (iso: string, days: number) => {
+    const date = new Date(`${iso}T12:00:00Z`);
+    date.setUTCDate(date.getUTCDate() + days);
+    return date.toISOString().slice(0, 10);
+  };
   return {
     phaseCount: project.modules.length,
     teamSegmentCount: project.modules.reduce((sum, phase) => sum + phase.segments.length, 0),
     plannedDeliveryCount: project.modules.reduce((sum, phase) => sum + phase.deliveries.length, 0),
-    rangeStartDate: dates[0] ?? project.startDate ?? today,
-    rangeEndDate: dates.at(-1) ?? project.endDate ?? today,
+    // Evita rango de longitud cero cuando todavía no hay tareas/entregas.
+    rangeStartDate: shift(dates[0] ?? project.startDate ?? today, -7),
+    rangeEndDate: shift(dates.at(-1) ?? project.endDate ?? today, 7),
     phases: project.modules.map((phase, index) => ({
       id: phase.id,
       badge: `FASE ${index + 1}`,
