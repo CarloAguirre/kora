@@ -3,6 +3,7 @@ export * from './users/roles';
 export * from './users/user.contract';
 export * from './auth/auth.contract';
 export * from './clients/client.contract';
+export * from './client-portal/portal.contract';
 export * from './teams/team.contract';
 export * from './notifications/notification.contract';
 export * from './projects/project.contract';
