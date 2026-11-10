@@ -831,6 +831,7 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
       ...analysisResult,
       dynamicQuestions: [{
         ...dynamicQuestions[0]!,
+        required: false,
         question: '¿Cómo debe relacionarse el PoC con los robots RPA existentes?',
         reason: '¿Qué componentes deben incluirse dentro del PoC?',
         options: [
