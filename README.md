@@ -66,6 +66,25 @@ en `drizzle.__drizzle_migrations` y el esquema antes de migrar: Drizzle decide
 lo pendiente por fecha y puede omitir cambios anteriores a la última registrada.
 No borres el historial ni vuelvas a ejecutar SQL sin comprobar qué falta.
 
+La migración correctiva `0067_reconcile_quotation_roadmap_history` completa las
+tablas y columnas de cotizaciones/Roadmap omitidas por ese salto de fechas.
+Es aditiva, conserva el journal anterior y puede ejecutarse sobre bases donde
+los cambios originales ya existen. El backfill original de vínculos solo corre
+si `0051_work_block_links_and_closure` no figura aplicada; no inventa horas,
+pagos ni fechas de cierre.
+
+Antes de aplicarla en producción, crea y verifica un respaldo y ensaya en una
+copia aislada con el migrador normal. La regresión SQL comprueba preservación de
+registros e historial y una segunda ejecución sin cambios:
+
+```sh
+psql -X -v ON_ERROR_STOP=1 -d <base_de_pruebas> -f packages/db/tests/0067_reconcile_quotation_roadmap_history.sql
+```
+
+La prueba revierte su transacción; no debe ejecutarse contra producción porque
+toma bloqueos de esquema. No renumeres ni cambies las fechas de migraciones
+históricas para forzar su repetición.
+
 ### 3. Variables de entorno de la API
 
 ```sh

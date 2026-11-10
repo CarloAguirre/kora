@@ -470,6 +470,13 @@
       "when": 1794330000000,
       "tag": "0063_portal_cliente_externo",
       "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "7",
+      "when": 1794343200000,
+      "tag": "0067_reconcile_quotation_roadmap_history",
+      "breakpoints": true
     }
   ]
 }
