@@ -175,6 +175,43 @@ describe('GenerateEstimationPocProposalUseCase', () => {
       unit: 'week', duration: 4, hoursPerUnit: 5, people: 1, totalHours: 20,
     });
   });
+  it('preserva perfiles y HH cuando Gemini devuelve más de cinco aclaraciones', async () => {
+    let instructions = '';
+    const ai: AiProvider = {
+      name: 'gemini',
+      generateStructured: async (request) => {
+        instructions = request.instructions;
+        return {
+          summary: 'Estimación para MVP',
+          roles: [{
+            role: 'Desarrollador', unit: 'week', duration: 3,
+            hoursPerUnit: 40, people: 1, source: 'Requerimientos.pdf',
+          }],
+          assumptions: Array.from({ length: 10 }, (_, index) => 'Supuesto ' + index),
+          clarifyingQuestions: Array.from({ length: 7 }, (_, index) => 'Aclaración ' + index),
+        };
+      },
+    };
+    const sources: DocumentSourceReader = {
+      readDriveSources: async () => [{
+        sourceId: 'doc-1', path: 'Requerimientos.pdf',
+        name: 'Requerimientos.pdf', mimeType: 'application/pdf', text: 'Proyecto MVP',
+      }],
+    };
+    const result = await new GenerateEstimationPocProposalUseCase(ai, sources).execute({
+      projectId: '550e8400-e29b-41d4-a716-446655440000',
+      projectName: 'Proyecto MVP', clientName: null,
+      driveFolderUrl: 'https://drive.google.com/drive/folders/real',
+      instructions: null, answers: [{ questionId: 'F01', value: 'mvp', usedAssumption: false }],
+    });
+    expect(result.clarifyingQuestions).toHaveLength(5);
+    expect(result.assumptions).toHaveLength(8);
+    expect(result.roles.find((role) => role.role === 'Desarrollador')?.totalHours).toBe(120);
+    expect(result.totalHours).toBe(135); // Más las 5 HH/semana de supervisión técnica
+    expect(instructions).toContain('El nivel de entrega confirmado');
+    expect(instructions).toContain('CINCO');
+  });
+
   it('usa catálogo real en el prompt y rechaza perfiles con IDs ajenos a Kora', async () => {
     const teamId = '0777e456-fd76-445e-83f1-afc25061c103';
     const catalog = [{ teamId, name: 'Desarrollo' }];
